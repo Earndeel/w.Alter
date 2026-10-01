@@ -78,3 +78,15 @@ def post_object(file: UploadFile = File(...), source: str = Form(...), captured_
 @app.get("/v1/checkpoints/{connector}", dependencies=[Depends(auth)])
 def get_checkpoint(connector: str, stream: str = ""):
     return ingestion.get_checkpoint(connector, stream)
+
+
+class ContextIn(BaseModel):
+    query: str
+    budget: dict | None = None
+    include_profile: bool = True
+
+
+@app.post("/v1/context", dependencies=[Depends(auth)])
+def post_context(body: ContextIn):
+    from . import context
+    return context.get_context(body.query, budget=body.budget, include_profile=body.include_profile)
