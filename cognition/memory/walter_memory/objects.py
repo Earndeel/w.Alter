@@ -91,12 +91,12 @@ def safe_name(name: str) -> str:
 
 def put_object(path: str | Path, source: str, *, source_ref: dict | None = None, captured_at: datetime | None = None,
                links: list[tuple[str, str]] | None = None, original_name: str | None = None,
-               privacy_class: str | None = None, conn=None) -> dict:
+               privacy_class: str | None = None, zone: str | None = None, conn=None) -> dict:
     """Store a file once (dedupe by sha256) in the right zone, register it, attach links. Returns the row."""
     if conn is None:
         with connection() as c:
             return put_object(path, source, source_ref=source_ref, captured_at=captured_at, links=links,
-                              original_name=original_name, privacy_class=privacy_class, conn=c)
+                              original_name=original_name, privacy_class=privacy_class, zone=zone, conn=c)
     path = Path(path)
     sha = sha256_file(path)
     name = original_name or path.name
@@ -112,7 +112,8 @@ def put_object(path: str | Path, source: str, *, source_ref: dict | None = None,
         cls, _ = privacy.classify(conn, {"source": source, "mime": mime, "object_kind": kind,
                                          "categories": {c for c, _ in privacy.detect(name)}})
         cls = privacy.strictest(cls, privacy_class)
-        zone = "secure" if cls == "local_only" else "clear"
+        # local_only always lands in the encrypted zone; callers may also ask for it explicitly (e.g. third-party media)
+        zone = "secure" if cls == "local_only" or zone == "secure" else "clear"
         key = f"{source}/{when:%Y}/{when:%m}/{when:%Y%m%d-%H%M%S}_{sha[:8]}_{safe_name(name)}"
         s3().upload_file(str(path), BUCKETS[zone], key, ExtraArgs={"ContentType": mime})
         row = conn.execute(
@@ -174,3 +175,24 @@ def stats() -> list[dict]:
         return conn.execute("""select source, kind, storage_zone, count(*) as files, pg_size_pretty(sum(size_bytes)) as size,
                                       count(derived_text) as with_text
                                from core.objects where purged_at is null group by 1, 2, 3 order by 1, 2, 3""").fetchall()
+
+
+def move_to_secure(ref: str, conn=None) -> dict:
+    """Re-home an object in the encrypted zone (bytes copied + verified, clear copy deleted, row updated)."""
+    import tempfile
+    if conn is None:
+        with connection() as c:
+            return move_to_secure(ref, conn=c)
+    row = conn.execute("select * from core.objects where id::text = %s or sha256 = %s", (ref, ref)).fetchone()
+    if row["storage_zone"] == "secure":
+        return row
+    with tempfile.TemporaryDirectory(dir="/var/tmp") as d:
+        tmp = Path(d) / "obj"
+        s3().download_file(BUCKETS["clear"], row["storage_key"], str(tmp))
+        if sha256_file(tmp) != row["sha256"]:
+            raise IOError(f"integrity error while moving {ref}")
+        s3().upload_file(str(tmp), BUCKETS["secure"], row["storage_key"], ExtraArgs={"ContentType": row["mime"]})
+    s3().delete_object(Bucket=BUCKETS["clear"], Key=row["storage_key"])
+    return conn.execute("""update core.objects set storage_zone = 'secure',
+                               privacy_class = case when privacy_class = 'cloud_allowed' then 'local_only' else privacy_class end
+                           where id = %s returning *""", (row["id"],)).fetchone()
