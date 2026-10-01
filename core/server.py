@@ -8,7 +8,7 @@ capabilities without importing Hermes internals:
   walter_profile                                  → USER.md / SOUL.md / MEMORY.md
   skills_search / skill_read                      → Hermes procedural skills (~/.hermes/skills)
   ask_hermes                                      → delegate a task to the live Hermes agent (all its tools)
-  memory_events                                   → canonical event history (Walter Memory core.events)
+  memory_search / memory_events                   → unified search (knowledge + evidence) / canonical event history
   vault_search / vault_get / vault_put            → Raw Vault: every non-text raw file (Google Drive + PG catalog)
   walter_health                                   → status of the stack services
 
@@ -201,6 +201,22 @@ def _walter_memory(*args: str, timeout: float = 600) -> str:
     if r.returncode != 0:
         return f"Walter Memory error: {(r.stderr or r.stdout).strip()[-800:]}"
     return r.stdout.strip()
+
+
+@mcp.tool()
+def memory_search(query: str, limit: int = 10, source: str = "", since: str = "", until: str = "",
+                  evidence_only: bool = False) -> str:
+    """Unified search over everything W.Alter has observed and learned: knowledge (derived memories) AND original
+    evidence (messages with W.Alter, Beeper chats, e-mails, calendar, files' extracted text), each result with its
+    source and date. Full-text + semantic + rerank. evidence_only=True skips derived knowledge (raw history only).
+    since/until: ISO dates. Prefer this to find *when/where/who said what*; memory_recall for synthesised facts."""
+    args = ["search", query, "--limit", str(max(1, min(int(limit), 50))), "--rerank", "--cloud-safe"]
+    for flag, value in (("--source", source), ("--since", since), ("--until", until)):
+        if value:
+            args += [flag, value]
+    if evidence_only:
+        args.append("--no-derived")
+    return _walter_memory(*args, timeout=90)
 
 
 @mcp.tool()
