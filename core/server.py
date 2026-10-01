@@ -8,6 +8,7 @@ capabilities without importing Hermes internals:
   walter_profile                                  → USER.md / SOUL.md / MEMORY.md
   skills_search / skill_read                      → Hermes procedural skills (~/.hermes/skills)
   ask_hermes                                      → delegate a task to the live Hermes agent (all its tools)
+  memory_events                                   → canonical event history (Walter Memory core.events)
   vault_search / vault_get / vault_put            → Raw Vault: every non-text raw file (Google Drive + PG catalog)
   walter_health                                   → status of the stack services
 
@@ -36,11 +37,11 @@ HERMES_API_URL = os.environ.get("WALTER_HERMES_API_URL", "http://127.0.0.1:8642"
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
 SKILLS_DIR = HERMES_HOME / "skills"
 STACK_UNITS = [
-    "hindsight-api", "walter-voice-memory", "raw-vault-s3", "hermes-bridge", "voice-router",
+    "hindsight-api", "walter-voice-memory", "walter-memory-gateway", "raw-vault-s3", "hermes-bridge", "voice-router",
     "hermes-dashboard", "cloudflared-tunnel", "docker",
 ]
-# Raw Vault runs in its own venv (boto3/psycopg2); called as a CLI so this server stays dependency-light.
-RAW_VAULT = ["/opt/walter-raw-vault/venv/bin/python3", "/opt/walter-raw-vault/rawvault.py"]
+# Walter Memory (events, Raw Vault objects) runs in its own venv; called as a CLI so this server stays light.
+WALTER_MEMORY = ["/usr/local/bin/walter-memory"]
 BUDGETS = {"low", "mid", "high"}
 
 
@@ -120,8 +121,12 @@ def memory_retain(content: str, context: str = "", tags: list[str] | None = None
     content: a self-contained statement, e.g. "Monsieur prefers X because Y". Never store secrets."""
     item = {"content": content, "context": context or f"noted by {CLIENT_TAG} via walter-core",
             "tags": sorted({f"source:{CLIENT_TAG}", *(tags or [])})}
+    # Canonical record first (the statement as told, A1/§5), then Hindsight until the P5 router takes over.
+    note = _walter_memory("note", content, "--source", CLIENT_TAG, "--context", context,
+                          *[x for t in tags or [] for x in ("--tag", t)], timeout=60)
     data = _hindsight("/memories", {"items": [item], "async": True})
-    return f"Queued for memory (operation {data.get('operation_id') or data.get('id') or 'ok'})."
+    return (f"Recorded as event ({'ok' if 'recorded' in note else note[:200]}); "
+            f"queued for memory (operation {data.get('operation_id') or data.get('id') or 'ok'}).")
 
 
 @mcp.tool()
@@ -191,11 +196,26 @@ def ask_hermes(prompt: str, session_id: str = "", timeout_s: int = 600) -> str:
     return f"{answer}\n\n[session_id: {r.headers.get('X-Hermes-Session-Id', '')}]"
 
 
-def _raw_vault(*args: str, timeout: float = 600) -> str:
-    r = subprocess.run([*RAW_VAULT, *args], capture_output=True, text=True, timeout=timeout)
+def _walter_memory(*args: str, timeout: float = 600) -> str:
+    r = subprocess.run([*WALTER_MEMORY, *args], capture_output=True, text=True, timeout=timeout)
     if r.returncode != 0:
-        return f"Raw Vault error: {(r.stderr or r.stdout).strip()[-800:]}"
+        return f"Walter Memory error: {(r.stderr or r.stdout).strip()[-800:]}"
     return r.stdout.strip()
+
+
+@mcp.tool()
+def memory_events(text: str = "", source: str = "", event_type: str = "", thread_id: str = "", since: str = "",
+                  limit: int = 20) -> str:
+    """Read W.Alter's canonical event history (what actually happened: messages, conversations with W.Alter,
+    e-mails, calendar, files...). Exact substring search on content; filters: source (hermes, beeper, gmail,
+    calendar, vault, claude…), event_type (message.received, message.sent, tool.called…), thread_id, since (ISO).
+    Use memory_recall for synthesised knowledge, this for the original record."""
+    args = ["events", "--limit", str(max(1, min(int(limit), 200)))]
+    for flag, value in (("--text", text), ("--source", source), ("--type", event_type), ("--thread", thread_id),
+                        ("--since", since)):
+        if value:
+            args += [flag, value]
+    return _walter_memory(*args, timeout=60)
 
 
 @mcp.tool()
@@ -203,12 +223,12 @@ def vault_search(text: str = "", kind: str = "", source: str = "", limit: int = 
     """Search the Raw Vault: every raw file of the user's life that is not text (photos, screenshots, videos,
     voice notes, documents). Matches file names and derived text (OCR/transcripts/captions); empty text lists
     the newest. kind: image|screenshot|video|audio|document|archive. Returns ids for vault_get."""
-    args = ["search", text, "--limit", str(int(limit))]
+    args = ["objects", "search", text, "--limit", str(int(limit))]
     if kind:
         args += ["--kind", kind]
     if source:
         args += ["--source", source]
-    return _raw_vault(*args, timeout=60)
+    return _walter_memory(*args, timeout=60)
 
 
 @mcp.tool()
@@ -216,7 +236,7 @@ def vault_get(object_id: str, dest_dir: str = "/tmp/walter-vault") -> str:
     """Download one Raw Vault file (by id or sha256) to a local directory on the W.Alter VM, integrity-checked.
     Returns the local path."""
     Path(dest_dir).mkdir(parents=True, exist_ok=True, mode=0o700)
-    return _raw_vault("get", object_id, dest_dir)
+    return _walter_memory("objects", "get", object_id, "--dest", dest_dir)
 
 
 @mcp.tool()
@@ -224,12 +244,12 @@ def vault_put(path: str, source: str = "", captured_at: str = "", links: list[st
     """Store a local file (path on the W.Alter VM) in the Raw Vault, once (deduplicated by content).
     source: where it comes from (default: the client name). captured_at: ISO date if known.
     links: ["kardex_contact:5", "hermes_session:<id>", ...] to attach people/conversations."""
-    args = ["put", path, "--source", source or CLIENT_TAG]
+    args = ["objects", "put", path, "--source", source or CLIENT_TAG]
     if captured_at:
         args += ["--captured", captured_at]
     for link in links or []:
         args += ["--link", link]
-    return _raw_vault(*args)
+    return _walter_memory(*args)
 
 
 @mcp.tool()
