@@ -84,9 +84,22 @@ class ContextIn(BaseModel):
     query: str
     budget: dict | None = None
     include_profile: bool = True
+    caller: str = "unknown"
+    mode: str = "on"
+    session_id: str | None = None
 
 
 @app.post("/v1/context", dependencies=[Depends(auth)])
 def post_context(body: ContextIn):
+    import hashlib
+    import json as _json
     from . import context
-    return context.get_context(body.query, budget=body.budget, include_profile=body.include_profile)
+    res = context.get_context(body.query, budget=body.budget, include_profile=body.include_profile)
+    with connection() as conn:
+        conn.execute("""insert into system.context_requests (caller, mode, session_id, query_sha, total_tokens, sections, latency_ms)
+                        values (%s,%s,%s,%s,%s,%s,%s)""",
+                     (body.caller, body.mode, body.session_id, hashlib.sha256(body.query.encode()).hexdigest(),
+                      res["trace"].get("total_tokens"),
+                      _json.dumps({k: {kk: vv for kk, vv in v.items() if kk != "refs"} for k, v in res["trace"]["sections"].items()}),
+                      res["trace"].get("latency_ms")))
+    return res
