@@ -53,6 +53,8 @@ def main(argv=None) -> None:
     so = sub.add_parser("social", help="P4: resolve identities, groups, baselines, deviations; person cards")
     so.add_argument("action", choices=["refresh", "person", "deviations"]); so.add_argument("query", nargs="?")
     so.add_argument("--cloud-safe", action="store_true")
+    cx = sub.add_parser("context", help="P6: assemble the memory context for a query")
+    cx.add_argument("query"); cx.add_argument("--no-profile", action="store_true"); cx.add_argument("--trace", action="store_true")
     sub.add_parser("privacy-rescan", help="re-run detectors and tighten privacy classes (never loosen)")
     j = sub.add_parser("jobs"); j.add_argument("action", choices=["requeue-stale"])
     g = sub.add_parser("purge", help="break-glass purge (dry-run unless --execute)")
@@ -126,6 +128,12 @@ def main(argv=None) -> None:
                 _print(conn.execute("""select e.canonical_name, d.metric, d.observation, d.detected_on from kardex.communication_deviations d
                                        join core.entities e using (entity_id) where d.acknowledged_at is null
                                        order by d.detected_on desc limit 30""").fetchall())
+    elif a.cmd == "context":
+        from . import context
+        res = context.get_context(a.query, include_profile=not a.no_profile)
+        print(res["text"])
+        if a.trace:
+            _print(res["trace"])
     elif a.cmd == "privacy-rescan":
         from . import privacy
         _print(privacy.rescan())
