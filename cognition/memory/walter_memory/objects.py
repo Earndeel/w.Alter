@@ -1,0 +1,176 @@
+"""Raw Vault object registry (A5: core.objects is the single registry).
+
+Bytes: S3 API of `raw-vault-s3` (rclone over Google Drive). Bucket `raw` = clear (browsable in Drive),
+bucket `secure` = rclone crypt (local_only objects, P1.5). The original is stored before any analysis.
+Layout: <source>/<YYYY>/<MM>/<YYYYMMDD-HHMMSS>_<sha8>_<original-name>
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import mimetypes
+import os
+import re
+import unicodedata
+from datetime import datetime, timezone
+from pathlib import Path
+
+import boto3
+from botocore.config import Config
+
+from . import privacy
+from .db import connection
+
+BUCKETS = {"clear": "raw", "secure": "secure"}
+_ENV_FILE = Path("/root/.hermes/raw-vault/s3.env")
+_s3 = None
+
+
+def _env() -> dict:
+    env = {}
+    if _ENV_FILE.exists():
+        for line in _ENV_FILE.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                env[k.strip()] = v.strip()
+    return {**env, **{k: v for k, v in os.environ.items() if k.startswith("RAW_VAULT_")}}
+
+
+def s3():
+    global _s3
+    if _s3 is None:
+        e = _env()
+        _s3 = boto3.client("s3", endpoint_url=e.get("RAW_VAULT_S3_ENDPOINT", "http://127.0.0.1:8899"),
+                           aws_access_key_id=e["RAW_VAULT_S3_ACCESS_KEY"], aws_secret_access_key=e["RAW_VAULT_S3_SECRET_KEY"],
+                           region_name="«secret:vault»",
+                           config=Config(s3={"addressing_style": "path"}, signature_version="s3v4",
+                                         retries={"max_attempts": 5, "mode": "standard"}))
+    return _s3
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+SCREENSHOT_RE = re.compile(r"(screenshot|capture d.?[ée]cran|screen ?shot|scr_)", re.I)
+
+
+def kind_of(mime: str | None, name: str) -> str:
+    m = mime or ""
+    if m.startswith("image/"):
+        return "screenshot" if SCREENSHOT_RE.search(name) else "image"
+    for prefix, kind in (("video/", "video"), ("audio/", "audio")):
+        if m.startswith(prefix):
+            return kind
+    if m in ("application/zip", "application/x-tar", "application/gzip", "application/x-7z-compressed"):
+        return "archive"
+    return "document" if m.startswith(("text/", "application/")) else "other"
+
+
+def _image_meta(path: Path) -> tuple[dict, datetime | None]:
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            meta = {"width": im.width, "height": im.height}
+            exif = im.getexif()
+            raw = exif.get_ifd(0x8769).get(36867) or exif.get(306)
+            when = datetime.strptime(raw, "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc) if raw else None
+            return meta, when
+    except Exception:
+        return {}, None
+
+
+def safe_name(name: str) -> str:
+    name = unicodedata.normalize("NFKC", name).strip().replace("/", "_")
+    return re.sub(r"[\x00-\x1f\\:*?\"<>|]+", "_", name)[-120:] or "file"
+
+
+def put_object(path: str | Path, source: str, *, source_ref: dict | None = None, captured_at: datetime | None = None,
+               links: list[tuple[str, str]] | None = None, original_name: str | None = None,
+               privacy_class: str | None = None, conn=None) -> dict:
+    """Store a file once (dedupe by sha256) in the right zone, register it, attach links. Returns the row."""
+    if conn is None:
+        with connection() as c:
+            return put_object(path, source, source_ref=source_ref, captured_at=captured_at, links=links,
+                              original_name=original_name, privacy_class=privacy_class, conn=c)
+    path = Path(path)
+    sha = sha256_file(path)
+    name = original_name or path.name
+    row = conn.execute("select * from core.objects where sha256 = %s", (sha,)).fetchone()
+    if row is None:
+        mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        kind = kind_of(mime, name)
+        meta, exif_when = _image_meta(path) if mime.startswith("image/") else ({}, None)
+        when = captured_at or exif_when
+        if when is None:
+            when = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+            meta["captured_at_from"] = "file_mtime"
+        cls, _ = privacy.classify(conn, {"source": source, "mime": mime, "object_kind": kind,
+                                         "categories": {c for c, _ in privacy.detect(name)}})
+        cls = privacy.strictest(cls, privacy_class)
+        zone = "secure" if cls == "local_only" else "clear"
+        key = f"{source}/{when:%Y}/{when:%m}/{when:%Y%m%d-%H%M%S}_{sha[:8]}_{safe_name(name)}"
+        s3().upload_file(str(path), BUCKETS[zone], key, ExtraArgs={"ContentType": mime})
+        row = conn.execute(
+            """insert into core.objects (sha256, size_bytes, mime, kind, storage_key, original_name, captured_at, source,
+                                         source_ref, meta, privacy_class, storage_zone)
+               values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning *""",
+            (sha, path.stat().st_size, mime, kind, key, name, when, source, json.dumps(source_ref or {}),
+             json.dumps(meta), cls, zone)).fetchone()
+        row["created"] = True
+    else:
+        row["created"] = False  # same bytes already stored: only add provenance links
+    for target_type, target_id in links or []:
+        conn.execute("""insert into core.object_links (object_id, target_type, target_id) values (%s,%s,%s)
+                        on conflict do nothing""", (row["id"], target_type, str(target_id)))
+    return row
+
+
+def find(ref: str) -> dict | None:
+    col = "sha256" if re.fullmatch(r"[0-9a-f]{64}", ref) else "id::text"
+    with connection() as conn:
+        return conn.execute(f"select * from core.objects where {col} = %s and purged_at is null", (ref,)).fetchone()
+
+
+def get_object(ref: str, dest: str | Path | None = None) -> Path:
+    """Download an object (id or sha256) to dest, verifying its sha256."""
+    row = find(ref)
+    if not row:
+        raise FileNotFoundError(f"no vault object {ref}")
+    out = Path(dest) if dest else Path.cwd() / safe_name(row["original_name"] or row["sha256"])
+    if out.is_dir():
+        out = out / safe_name(row["original_name"] or row["sha256"])
+    s3().download_file(BUCKETS[row["storage_zone"]], row["storage_key"], str(out))
+    if sha256_file(out) != row["sha256"]:
+        out.unlink(missing_ok=True)
+        raise IOError(f"integrity error: object {ref} does not match its sha256")
+    return out
+
+
+def search(text: str = "", kind: str | None = None, source: str | None = None, limit: int = 20) -> list[dict]:
+    where, args = ["purged_at is null"], []
+    if text:
+        where.append("(to_tsvector('french', coalesce(derived_text,'') || ' ' || coalesce(original_name,''))"
+                     " @@ websearch_to_tsquery('french', %s) or original_name ilike %s)")
+        args += [text, f"%{text}%"]
+    if kind:
+        where.append("kind = %s"); args.append(kind)
+    if source:
+        where.append("source = %s"); args.append(source)
+    with connection() as conn:
+        return conn.execute(
+            f"""select id::text, kind, source, original_name, captured_at, size_bytes, privacy_class, storage_zone,
+                       left(derived_text, 300) as derived_text
+                from core.objects where {' and '.join(where)} order by captured_at desc nulls last limit %s""",
+            (*args, limit)).fetchall()
+
+
+def stats() -> list[dict]:
+    with connection() as conn:
+        return conn.execute("""select source, kind, storage_zone, count(*) as files, pg_size_pretty(sum(size_bytes)) as size,
+                                      count(derived_text) as with_text
+                               from core.objects where purged_at is null group by 1, 2, 3 order by 1, 2, 3""").fetchall()
