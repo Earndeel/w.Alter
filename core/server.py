@@ -35,7 +35,7 @@ HERMES_API_URL = os.environ.get("WALTER_HERMES_API_URL", "http://127.0.0.1:8642"
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
 SKILLS_DIR = HERMES_HOME / "skills"
 STACK_UNITS = [
-    "hindsight-api", "hybrid-search", "write-worker", "jarvis-memory-gateway",
+    "hindsight-api", "walter-voice-memory", "hermes-bridge", "voice-router",
     "hermes-dashboard", "cloudflared-tunnel", "docker",
 ]
 BUDGETS = {"low", "mid", "high"}
