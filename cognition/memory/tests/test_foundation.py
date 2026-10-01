@@ -142,3 +142,8 @@ def test_detector_false_positives():
 def test_card_detector_ignores_port_lists():
     assert privacy.detect("for p in 8642 8644 8787 8888 8896 12110; do curl :$p; done") == []
     assert privacy.detect("IG @x (ID 1784453396146767) rien à voir avec une card plus loin dans le texte") == []
+
+
+def test_intimate_detector_and_tightening():
+    assert ("intimate", "intimate") in privacy.detect("Yok | seins 5/5, visage 2.5/5")
+    assert not any(c == "intimate" for c, _ in privacy.detect("Déploie le string de config sur le serveur"))  # known FP risk documented

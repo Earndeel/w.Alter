@@ -53,8 +53,11 @@ CATEGORY_PATTERNS = {
                          r"psychiatr\w*|psychologue|antid[ée]presseurs?|antidepressants?|th[ée]rapeute|kin[ée]sith[ée]rapeute|"
                          r"s[ée]ropositi\w*|\bVIH\b|\bHIV\b|cancer|chimioth[ée]rapie|prise de sang|blood test|"
                          r"rendez-vous m[ée]dical|my doctor|mon dentiste|bless[ée] au|douleur (?:au|à la|aux) )"),
-    "intimate": re.compile(r"(?i)\b(nude|nudes|nu[e]?s? photo|sexting|sex tape|porn\w*|orgasm\w*|blowjob|"
-                           r"sexe oral|baiser ce soir|fuck me|horny)\b"),
+    "intimate": re.compile(r"(?i)\b(nudes?|nue?s?\b(?: photo)?|photos? (?:sexy|coquines?|hot)|sexting|sex ?tape|porn\w*|"
+                           r"orgasm\w*|blowjob|sexe|sexuel\w*|sexy|baiser|baise[rz]?\b|coucher avec|plan cul|"
+                           r"fesses|seins|cul\b|bite\b|chatte\b|nichons|lingerie|horny|fuck(?:ing)? (?:me|her|you)|"
+                           r"dick\b|pussy|boobs|tits\b|ass\b|cum\b|threesome|plan à trois|escort\w*|onlyfans|"
+                           r"\d(?:[.,]5)?/5 (?:seins|cul|fesses|visage|body|corps))"),
     "finance": re.compile(r"(?i)\b(relev[ée] bancaire|bank statement|virement de \d|wire transfer|solde (?:du compte|bancaire)|"
                           r"account balance|d[ée]claration d'imp[ôo]ts|tax return|salaire de \d|salary of \d)\b"),
 }
@@ -161,3 +164,41 @@ def restore(text: str, mapping: dict[str, str]) -> str:
     for ph, original in mapping.items():
         text = text.replace(ph, original)
     return text
+
+
+def rescan(batch: int = 5000) -> dict:
+    """Re-run detectors over stored rows and TIGHTEN privacy classes where needed (never loosen).
+    Events: allowed by the append-only trigger (privacy_class tightening only). Derived items and search chunks too."""
+    from .db import connection
+    out = {"events": 0, "derived": 0, "chunks": 0}
+    for table, key, text_sql, ref_sql, target in (
+            ("core.events", "event_id", "coalesce(content,'') || ' ' || payload::text", "source || ':' || source_id", "event"),
+            ("core.derived_items", "item_id", "content", "item_id::text", "derived"),
+            ("search.chunks", "chunk_id", "text", "chunk_id::text", None)):
+        last = None
+        while True:
+            with connection() as conn:
+                rows = conn.execute(f"""select {key} as k, {text_sql} as t, privacy_class as cls, source_x as src, {ref_sql} as ref
+                                        from (select *, {'source' if table != 'core.derived_items' else 'derived_by'} as source_x
+                                              from {table}) x
+                                        where privacy_class <> 'local_only' {'and ' + key + ' > %s' if last is not None else ''}
+                                        order by {key} limit %s""",
+                                    ((last, batch) if last is not None else (batch,))).fetchall()
+                if not rows:
+                    break
+                last = rows[-1]["k"]
+                for r in rows:
+                    det = detect(r["t"])
+                    if not det:
+                        continue
+                    cls, _ = classify(conn, {"source": r["src"], "categories": {c for c, _ in det}})
+                    cls = strictest(cls, r["cls"])
+                    if cls != r["cls"]:
+                        conn.execute(f"update {table} set privacy_class = %s where {key} = %s", (cls, r["k"]))
+                        out[{"core.events": "events", "core.derived_items": "derived", "search.chunks": "chunks"}[table]] += 1
+                        if target:
+                            for cat, rule in dict.fromkeys(det):
+                                conn.execute("""insert into privacy.detections (target_type, target_ref, category, rule, action)
+                                                values (%s, %s, %s, %s, %s)""",
+                                             (target, r["ref"], cat, rule, "flagged_for_purge" if cat == "secret" else "classified_" + cls))
+    return out
