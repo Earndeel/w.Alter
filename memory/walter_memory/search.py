@@ -128,11 +128,15 @@ def index_pending(limit: int = 20000) -> dict:
     cp = ingestion.get_checkpoint("search_indexer", "events")
     since = cp.get("ingested_at", "1970-01-01T00:00:00+00:00")
     with connection() as conn:
-        rows = conn.execute("""select event_id as ref_id, occurred_at, ingested_at, source, event_type as label, thread_id,
-                                      actor_identity_id, content as text, privacy_class
-                               from core.events where ingested_at > %s and event_type = any(%s)
-                                 and content is not null and length(content) > 1
-                               order by ingested_at limit %s""", (since, list(TEXT_EVENT_TYPES), limit)).fetchall()
+        # Anti-join on a sliding window rather than a pure cursor: long-running connector transactions commit rows
+        # whose ingested_at is older than the cursor, and a cursor alone would skip them (seen 2026-10-01).
+        rows = conn.execute("""select e.event_id as ref_id, e.occurred_at, e.ingested_at, e.source, e.event_type as label,
+                                      e.thread_id, e.actor_identity_id, e.content as text, e.privacy_class
+                               from core.events e
+                               where e.ingested_at > %s::timestamptz - interval '3 days' and e.event_type = any(%s)
+                                 and e.content is not null and length(e.content) > 1
+                                 and not exists (select 1 from search.chunks c where c.kind = 'event' and c.ref_id = e.event_id)
+                               order by e.ingested_at limit %s""", (since, list(TEXT_EVENT_TYPES), limit)).fetchall()
         out["events"] = _index_rows(conn, rows, "event")
         if rows:
             ingestion.set_checkpoint("search_indexer", "events", {"ingested_at": rows[-1]["ingested_at"].isoformat()}, conn=conn)
@@ -152,6 +156,7 @@ def index_pending(limit: int = 20000) -> dict:
                                  and not exists (select 1 from search.chunks c where c.kind = 'object' and c.ref_id = o.id)
                                limit %s""", (limit,)).fetchall()
         out["objects"] = _index_rows(conn, rows, "object")
+    ingestion.mark_success("search_indexer")
     return out
 
 
