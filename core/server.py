@@ -99,7 +99,9 @@ mcp = FastMCP("walter-core", instructions=(
 def memory_recall(query: str, budget: str = "mid", max_tokens: int = 2048) -> str:
     """Search W.Alter's long-term memory about the user (preferences, projects, people, past decisions).
     Use before answering anything personal or project-related. budget: low | mid | high (depth/latency)."""
-    body = {"query": query, "budget": budget if budget in BUDGETS else "mid", "max_tokens": int(max_tokens)}
+    body = {"query": query, "budget": budget if budget in BUDGETS else "mid", "max_tokens": int(max_tokens),
+            # junk/task-log memories flagged by the usefulness audit are kept but never recalled
+            "tag_groups": [{"not": {"tags": ["quarantine:noise"], "match": "any_strict"}}]}
     data = _hindsight("/memories/recall", body)
     results = data.get("results") or []
     if not results:
