@@ -41,14 +41,18 @@ SECRET_PATTERNS = [
     ("iban", re.compile(r"\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}\b")),
     ("cvv", re.compile(r"(?i)\b(cvv|cvc|cryptogramme)\b\D{0,10}\b\d{3,4}\b")),
 ]
-CARD = re.compile(r"\b(?:\d[ -]?){13,19}\b")
+CARD = re.compile(r"(?<![\d][ -])(?<!\d)\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{1,4}(?![ -]?\d)")   # printed card, not a list
+CARD_CONTEXT = re.compile(r"(?i)\b(carte|card|visa|mastercard|amex|\bcb\b|cvv|expir)")
+CARD_BARE = re.compile(r"\b\d{13,19}\b")
 
 CATEGORY_PATTERNS = {
     "identity_doc": re.compile(r"(?i)\b(num[ée]ro de passeport|passport (?:number|no)|n[°o] de s[ée]curit[ée] sociale|"
                                r"social security number|carte d'identit[ée] n|permis de conduire n)\b"),
-    "health": re.compile(r"(?i)\b(diagnostic|diagnosis|ordonnance|prescription|m[ée]decin|doctor|h[ôo]pital|hospital|"
-                         r"maladie|disease|th[ée]rapie|therapy|psychiatr\w*|antid[ée]presseur|antidepressant|"
-                         r"s[ée]ropositi\w*|\bVIH\b|\bHIV\b|IST\b|STD\b|cancer|chimioth[ée]rapie|blood test|prise de sang)\b"),
+    "health": re.compile(r"(?i)\b(m[ée]decin traitant|mon m[ée]decin|ordonnance m[ée]dicale|ordonnance|prescription m[ée]dicale|"
+                         r"h[ôo]pital|hospitali[sz]\w*|urgences m[ée]dicales|maladie|sympt[ôo]mes?|traitement m[ée]dical|"
+                         r"psychiatr\w*|psychologue|antid[ée]presseurs?|antidepressants?|th[ée]rapeute|kin[ée]sith[ée]rapeute|"
+                         r"s[ée]ropositi\w*|\bVIH\b|\bHIV\b|cancer|chimioth[ée]rapie|prise de sang|blood test|"
+                         r"rendez-vous m[ée]dical|my doctor|mon dentiste|bless[ée] au|douleur (?:au|à la|aux) )"),
     "intimate": re.compile(r"(?i)\b(nude|nudes|nu[e]?s? photo|sexting|sex tape|porn\w*|orgasm\w*|blowjob|"
                            r"sexe oral|baiser ce soir|fuck me|horny)\b"),
     "finance": re.compile(r"(?i)\b(relev[ée] bancaire|bank statement|virement de \d|wire transfer|solde (?:du compte|bancaire)|"
@@ -61,7 +65,10 @@ def detect(text: str | None) -> list[tuple[str, str]]:
     if not text:
         return []
     found = [("secret", name) for name, rx in SECRET_PATTERNS if rx.search(text)]
-    for m in CARD.finditer(text):
+    candidates = list(CARD.finditer(text))
+    # bare digit runs only count right after a card word (e.g. "carte: 4111…", "card_number 4111…")
+    candidates += [m for m in CARD_BARE.finditer(text) if CARD_CONTEXT.search(text[max(0, m.start() - 40):m.start()])]
+    for m in candidates:
         digits = re.sub(r"\D", "", m.group())
         if 13 <= len(digits) <= 19 and _luhn(digits):
             found.append(("secret", "card_number")); break

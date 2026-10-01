@@ -130,3 +130,15 @@ def test_queue_skip_locked_and_retry():
     with connection() as conn:
         job = conn.execute("select status, attempts from ingestion.jobs where job_id = %s", (jid,)).fetchone()
     assert job == {"status": "queued", "attempts": 1}
+
+
+def test_detector_false_positives():
+    assert privacy.detect("Lance un diagnostic du serveur et regarde stdout / STD error") == []
+    assert privacy.detect("session id 1790882198123456 et timestamp 4111111111111111") == []
+    assert ("secret", "card_number") in privacy.detect("ma carte visa 4111 1111 1111 1111 exp 12/28")
+    assert ("health", "health") in privacy.detect("J'ai rendez-vous médical demain, prise de sang")
+
+
+def test_card_detector_ignores_port_lists():
+    assert privacy.detect("for p in 8642 8644 8787 8888 8896 12110; do curl :$p; done") == []
+    assert privacy.detect("IG @x (ID 1784453396146767) rien à voir avec une card plus loin dans le texte") == []
