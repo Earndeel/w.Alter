@@ -43,6 +43,14 @@ def main(argv=None) -> None:
     n = sub.add_parser("note", help="record a note.recorded event (a statement an agent was told)")
     n.add_argument("content"); n.add_argument("--source", default="claude"); n.add_argument("--context", default="")
     n.add_argument("--tag", action="append", default=[])
+    ix = sub.add_parser("index", help="index new canonical rows into search.chunks")
+    ix.add_argument("--loops", type=int, default=1000)
+    sq = sub.add_parser("search", help="unified search (FTS + vectors + filters)")
+    sq.add_argument("query"); sq.add_argument("--limit", type=int, default=10); sq.add_argument("--source", action="append")
+    sq.add_argument("--label", action="append"); sq.add_argument("--since"); sq.add_argument("--until")
+    sq.add_argument("--no-derived", action="store_true"); sq.add_argument("--rerank", action="store_true")
+    sq.add_argument("--cloud-safe", action="store_true", help="only rows allowed to leave the VM")
+    sub.add_parser("privacy-rescan", help="re-run detectors and tighten privacy classes (never loosen)")
     j = sub.add_parser("jobs"); j.add_argument("action", choices=["requeue-stale"])
     g = sub.add_parser("purge", help="break-glass purge (dry-run unless --execute)")
     g.add_argument("--reason", required=True); g.add_argument("--by", required=True)
@@ -81,6 +89,26 @@ def main(argv=None) -> None:
                                   occurred_at=now, content=a.content, payload={"context": a.context, "tags": a.tag},
                                   actor={"account": "walter-core", "external_id": a.source, "display_name": a.source})
         _print({"recorded": res["inserted"], "event_ids": res["event_ids"]})
+    elif a.cmd == "index":
+        from . import search
+        total = {}
+        for _ in range(a.loops):
+            out = search.index_pending()
+            for k, v in out.items():
+                total[k] = total.get(k, 0) + v
+            if not any(out.values()):
+                break
+        _print(total)
+    elif a.cmd == "search":
+        from . import search
+        res = search.search(a.query, limit=a.limit, sources=a.source, labels=a.label, since=a.since, until=a.until,
+                            include_derived=not a.no_derived, rerank=a.rerank,
+                            max_privacy="cloud_allowed" if a.cloud_safe else "local_only")
+        _print([{k: (r[k][:300] if k == "text" else r[k]) for k in ("occurred_at", "source", "label", "actor", "text", "kind",
+                                                                     "ref_id", "latency_ms")} for r in res])
+    elif a.cmd == "privacy-rescan":
+        from . import privacy
+        _print(privacy.rescan())
     elif a.cmd == "jobs":
         _print({"requeued": ingestion.requeue_stale()})
     elif a.cmd == "purge":
