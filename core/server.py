@@ -10,6 +10,7 @@ capabilities without importing Hermes internals:
   ask_hermes                                      → delegate a task to the live Hermes agent (all its tools)
   memory_search / memory_events                   → unified search (knowledge + evidence) / canonical event history
   person_lookup                                   → Kardex social card (relationship metrics, accounts, groups)
+  memory_context                                  → budgeted context block for a request (P6 context engine)
   vault_search / vault_get / vault_put            → Raw Vault: every non-text raw file (Google Drive + PG catalog)
   walter_health                                   → status of the stack services
 
@@ -218,6 +219,15 @@ def memory_search(query: str, limit: int = 10, source: str = "", since: str = ""
     if evidence_only:
         args.append("--no-derived")
     return _walter_memory(*args, timeout=90)
+
+
+@mcp.tool()
+def memory_context(query: str, include_profile: bool = False) -> str:
+    """Ready-to-use memory context for a request: Kardex card of people named in it, relevant knowledge
+    (deduplicated), and original sources when the request is about who/when/what was said. Budgeted (~2k tokens),
+    cloud-safe. Call this first when answering anything personal; then go deeper with memory_search/person_lookup."""
+    args = ["context", query] + ([] if include_profile else ["--no-profile"])
+    return _walter_memory(*args, timeout=120)
 
 
 @mcp.tool()
