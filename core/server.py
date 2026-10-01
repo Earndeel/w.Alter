@@ -9,6 +9,7 @@ capabilities without importing Hermes internals:
   skills_search / skill_read                      → Hermes procedural skills (~/.hermes/skills)
   ask_hermes                                      → delegate a task to the live Hermes agent (all its tools)
   memory_search / memory_events                   → unified search (knowledge + evidence) / canonical event history
+  person_lookup                                   → Kardex social card (relationship metrics, accounts, groups)
   vault_search / vault_get / vault_put            → Raw Vault: every non-text raw file (Google Drive + PG catalog)
   walter_health                                   → status of the stack services
 
@@ -217,6 +218,15 @@ def memory_search(query: str, limit: int = 10, source: str = "", since: str = ""
     if evidence_only:
         args.append("--no-derived")
     return _walter_memory(*args, timeout=90)
+
+
+@mcp.tool()
+def person_lookup(name: str) -> str:
+    """Kardex social card for a person (name, alias, handle or phone): their accounts across networks, relationship
+    metrics with Monsieur (volume, who initiates, reply latencies, first/last contact), measured communication changes,
+    what Kardex knows (respecting mention policies), shared groups, recent interactions, media counts.
+    Only facts measured or stated with evidence; deviations are observations, never causes."""
+    return _walter_memory("social", "person", name, "--cloud-safe", timeout=60)
 
 
 @mcp.tool()
