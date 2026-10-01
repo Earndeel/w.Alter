@@ -50,6 +50,9 @@ def main(argv=None) -> None:
     sq.add_argument("--label", action="append"); sq.add_argument("--since"); sq.add_argument("--until")
     sq.add_argument("--no-derived", action="store_true"); sq.add_argument("--rerank", action="store_true")
     sq.add_argument("--cloud-safe", action="store_true", help="only rows allowed to leave the VM")
+    so = sub.add_parser("social", help="P4: resolve identities, groups, baselines, deviations; person cards")
+    so.add_argument("action", choices=["refresh", "person", "deviations"]); so.add_argument("query", nargs="?")
+    so.add_argument("--cloud-safe", action="store_true")
     sub.add_parser("privacy-rescan", help="re-run detectors and tighten privacy classes (never loosen)")
     j = sub.add_parser("jobs"); j.add_argument("action", choices=["requeue-stale"])
     g = sub.add_parser("purge", help="break-glass purge (dry-run unless --execute)")
@@ -106,6 +109,23 @@ def main(argv=None) -> None:
                             max_privacy="cloud_allowed" if a.cloud_safe else "local_only")
         _print([{k: (r[k][:300] if k == "text" else r[k]) for k in ("occurred_at", "source", "label", "actor", "text", "kind",
                                                                      "ref_id", "latency_ms")} for r in res])
+    elif a.cmd == "social":
+        from . import social
+        if a.action == "refresh":
+            _print({"identities": social.resolve_identities(), "groups": social.sync_groups(),
+                    "baselines": social.compute_baselines(), "new_deviations": social.detect_deviations()})
+        elif a.action == "person":
+            found = social.find_entities(a.query or "")
+            _print(social.person_card(found[0]["entity_id"], "cloud_allowed" if a.cloud_safe else "local_only")
+                   if found else {"error": f"no person matching {a.query!r}"})
+            if len(found) > 1:
+                _print({"other_matches": [{k: f[k] for k in ("canonical_name", "messages", "entity_id")} for f in found[1:]]})
+        else:
+            from .db import connection
+            with connection() as conn:
+                _print(conn.execute("""select e.canonical_name, d.metric, d.observation, d.detected_on from kardex.communication_deviations d
+                                       join core.entities e using (entity_id) where d.acknowledged_at is null
+                                       order by d.detected_on desc limit 30""").fetchall())
     elif a.cmd == "privacy-rescan":
         from . import privacy
         _print(privacy.rescan())
