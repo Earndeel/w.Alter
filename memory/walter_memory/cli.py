@@ -1,0 +1,93 @@
+"""walter-memory CLI: stats, events, types, objects, jobs, purge."""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+
+from . import events, ingestion, objects, purge, types
+from .db import connection
+
+
+def _print(obj) -> None:
+    print(json.dumps(obj, default=str, ensure_ascii=False, indent=1))
+
+
+def cmd_stats(_a) -> None:
+    with connection() as conn:
+        _print({
+            "events": conn.execute("select source, count(*) n, max(occurred_at) last from core.events group by 1 order by 1").fetchall(),
+            "objects": objects.stats(),
+            "identities": conn.execute("select source, account, count(*) n from core.source_identities group by 1,2 order by 1,2").fetchall(),
+            "derived": conn.execute("select kind, status, count(*) n from core.derived_items group by 1,2 order by 1,2").fetchall(),
+            "connectors": conn.execute("""select c.connector, c.enabled, c.last_success_at, c.last_error_at,
+                                                 (select count(*) from ingestion.failures f where f.connector = c.connector and resolved_at is null) open_failures
+                                          from ingestion.connectors c order by 1""").fetchall(),
+            "jobs": conn.execute("select queue, status, count(*) n from ingestion.jobs group by 1,2 order by 1,2").fetchall(),
+            "privacy": conn.execute("select category, count(*) n from privacy.detections where reviewed_at is null group by 1").fetchall(),
+        })
+
+
+def main(argv=None) -> None:
+    p = argparse.ArgumentParser(prog="walter-memory", description=__doc__)
+    sub = p.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("stats")
+    e = sub.add_parser("events"); e.add_argument("--source"); e.add_argument("--type", action="append")
+    e.add_argument("--thread"); e.add_argument("--since"); e.add_argument("--text"); e.add_argument("--limit", type=int, default=20)
+    t = sub.add_parser("types"); t.add_argument("action", choices=["list", "sync"])
+    o = sub.add_parser("objects"); o.add_argument("action", choices=["search", "get", "put", "stats"])
+    o.add_argument("ref", nargs="?"); o.add_argument("--dest"); o.add_argument("--source", default="vault")
+    o.add_argument("--kind"); o.add_argument("--link", action="append", default=[]); o.add_argument("--captured")
+    o.add_argument("--privacy", choices=["local_only", "redacted_cloud", "cloud_allowed"])
+    o.add_argument("--limit", type=int, default=20)
+    n = sub.add_parser("note", help="record a note.recorded event (a statement an agent was told)")
+    n.add_argument("content"); n.add_argument("--source", default="claude"); n.add_argument("--context", default="")
+    n.add_argument("--tag", action="append", default=[])
+    j = sub.add_parser("jobs"); j.add_argument("action", choices=["requeue-stale"])
+    g = sub.add_parser("purge", help="break-glass purge (dry-run unless --execute)")
+    g.add_argument("--reason", required=True); g.add_argument("--by", required=True)
+    g.add_argument("--event", action="append"); g.add_argument("--object", action="append"); g.add_argument("--pattern")
+    g.add_argument("--hindsight", action="store_true"); g.add_argument("--execute", action="store_true")
+    g.add_argument("--no-backup-rewrite", action="store_true")
+    a = p.parse_args(argv)
+
+    if a.cmd == "stats":
+        cmd_stats(a)
+    elif a.cmd == "events":
+        _print(events.get_events(source=a.source, event_types=a.type, thread_id=a.thread, since=a.since, text=a.text,
+                                 limit=a.limit))
+    elif a.cmd == "types":
+        _print(types.list_types() if a.action == "list" else {"synced": types.sync_seed()})
+    elif a.cmd == "objects":
+        if a.action == "search":
+            _print(objects.search(a.ref or "", kind=a.kind, source=a.source if a.source != "vault" else None,
+                                  limit=a.limit))
+        elif a.action == "get":
+            print(objects.get_object(a.ref, a.dest))
+        elif a.action == "stats":
+            _print(objects.stats())
+        else:
+            from datetime import datetime
+            row = objects.put_object(a.ref, a.source, links=[tuple(x.split(":", 1)) for x in a.link],
+                                     captured_at=datetime.fromisoformat(a.captured) if a.captured else None,
+                                     privacy_class=a.privacy)
+            _print({k: row[k] for k in ("id", "created", "kind", "storage_zone", "privacy_class", "storage_key")})
+    elif a.cmd == "note":
+        import hashlib
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        res = events.record_event(event_type="note.recorded", source=a.source, source_account="walter-core",
+                                  source_id=hashlib.sha256(f"{a.content}|{now.isoformat()}".encode()).hexdigest()[:32],
+                                  occurred_at=now, content=a.content, payload={"context": a.context, "tags": a.tag},
+                                  actor={"account": "walter-core", "external_id": a.source, "display_name": a.source})
+        _print({"recorded": res["inserted"], "event_ids": res["event_ids"]})
+    elif a.cmd == "jobs":
+        _print({"requeued": ingestion.requeue_stale()})
+    elif a.cmd == "purge":
+        _print(purge.purge(reason=a.reason, requested_by=a.by, event_ids=a.event, object_refs=a.object,
+                           pattern=a.pattern, include_hindsight=a.hindsight, execute=a.execute,
+                           rewrite_backups=not a.no_backup_rewrite))
+
+
+if __name__ == "__main__":
+    sys.exit(main())
