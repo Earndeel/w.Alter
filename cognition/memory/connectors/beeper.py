@@ -218,12 +218,14 @@ def main() -> None:
         if a.chats:
             chats = chats[:a.chats]
         total_ins = total_media = 0
-        for chat in chats:
+        for n, chat in enumerate(chats, 1):
             try:
                 ins, med = sync_chat(bp, chat, a.backfill_pages)
                 total_ins += ins; total_media += med
             except Exception as e:
                 ingestion.record_failure(CONNECTOR, f"{type(e).__name__}: {e}", stream=chat["id"])
+            if n % 25 == 0:
+                ingestion.mark_success(CONNECTOR)   # long backfill runs still report liveness
         media_done = run_media(bp, a.media) if a.media else 0
         ingestion.mark_success(CONNECTOR)
         with connection() as conn:

@@ -55,6 +55,12 @@ def main(argv=None) -> None:
     so.add_argument("--cloud-safe", action="store_true")
     cx = sub.add_parser("context", help="P6: assemble the memory context for a query")
     cx.add_argument("query"); cx.add_argument("--no-profile", action="store_true"); cx.add_argument("--trace", action="store_true")
+    ex = sub.add_parser("extract", help="P5 L3: summarise W.Alter conversations into derived knowledge")
+    ex.add_argument("--limit", type=int, default=20); ex.add_argument("--since"); ex.add_argument("--budget", default="recurring")
+    ex.add_argument("--session")
+    ha = sub.add_parser("hindsight-push", help="P5 adapter: retain derived knowledge into a Hindsight bank")
+    ha.add_argument("--bank", default="walter-shadow"); ha.add_argument("--limit", type=int, default=500)
+    sub.add_parser("health", help="supervision: connectors freshness, failures, queues, budgets, index lag")
     sub.add_parser("privacy-rescan", help="re-run detectors and tighten privacy classes (never loosen)")
     j = sub.add_parser("jobs"); j.add_argument("action", choices=["requeue-stale"])
     g = sub.add_parser("purge", help="break-glass purge (dry-run unless --execute)")
@@ -134,6 +140,18 @@ def main(argv=None) -> None:
         print(res["text"])
         if a.trace:
             _print(res["trace"])
+    elif a.cmd == "extract":
+        from . import extract
+        _print(extract.summarize_session(a.session, a.budget) if a.session else extract.run(a.limit, a.since, a.budget))
+    elif a.cmd == "hindsight-push":
+        from . import hindsight_adapter
+        _print(hindsight_adapter.push(a.bank, a.limit))
+    elif a.cmd == "health":
+        from . import health
+        problems, metrics = health.check()
+        _print({"status": "ok" if not problems else "problems", "problems": problems, "metrics": metrics})
+        if problems:
+            sys.exit(1)
     elif a.cmd == "privacy-rescan":
         from . import privacy
         _print(privacy.rescan())
