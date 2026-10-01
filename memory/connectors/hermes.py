@@ -214,7 +214,9 @@ def export_days(db) -> list[str]:
             with tempfile.TemporaryDirectory(dir="/var/tmp") as d:
                 p = Path(d) / f"hermes-state-{day:%Y%m%d}.jsonl.zst"
                 p.write_bytes(buf.getvalue())
+                # raw rows include tool outputs and secrets typed in conversations: encrypted zone only
                 objects.put_object(p, "hermes_export", captured_at=datetime(day.year, day.month, day.day, tzinfo=timezone.utc),
+                                   privacy_class="local_only",
                                    source_ref={"state_db_day": str(day), "messages": len(msgs), "sessions": len(sess)})
             done.append(str(day))
         ingestion.set_checkpoint(CONNECTOR, "export", {"last_day": str(day)})
