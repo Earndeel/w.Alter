@@ -8,6 +8,7 @@ capabilities without importing Hermes internals:
   walter_profile                                  → USER.md / SOUL.md / MEMORY.md
   skills_search / skill_read                      → Hermes procedural skills (~/.hermes/skills)
   ask_hermes                                      → delegate a task to the live Hermes agent (all its tools)
+  vault_search / vault_get / vault_put            → Raw Vault: every non-text raw file (Google Drive + PG catalog)
   walter_health                                   → status of the stack services
 
 Each tool talks to a public HTTP API or a file, never to Hermes' Python modules, so `hermes update`
@@ -35,9 +36,11 @@ HERMES_API_URL = os.environ.get("WALTER_HERMES_API_URL", "http://127.0.0.1:8642"
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
 SKILLS_DIR = HERMES_HOME / "skills"
 STACK_UNITS = [
-    "hindsight-api", "walter-voice-memory", "hermes-bridge", "voice-router",
+    "hindsight-api", "walter-voice-memory", "raw-vault-s3", "hermes-bridge", "voice-router",
     "hermes-dashboard", "cloudflared-tunnel", "docker",
 ]
+# Raw Vault runs in its own venv (boto3/psycopg2); called as a CLI so this server stays dependency-light.
+RAW_VAULT = ["/opt/walter-raw-vault/venv/bin/python3", "/opt/walter-raw-vault/rawvault.py"]
 BUDGETS = {"low", "mid", "high"}
 
 
@@ -184,6 +187,47 @@ def ask_hermes(prompt: str, session_id: str = "", timeout_s: int = 600) -> str:
         return f"Hermes API error HTTP {r.status_code}: {r.text[:500]}"
     answer = r.json()["choices"][0]["message"]["content"]
     return f"{answer}\n\n[session_id: {r.headers.get('X-Hermes-Session-Id', '')}]"
+
+
+def _raw_vault(*args: str, timeout: float = 600) -> str:
+    r = subprocess.run([*RAW_VAULT, *args], capture_output=True, text=True, timeout=timeout)
+    if r.returncode != 0:
+        return f"Raw Vault error: {(r.stderr or r.stdout).strip()[-800:]}"
+    return r.stdout.strip()
+
+
+@mcp.tool()
+def vault_search(text: str = "", kind: str = "", source: str = "", limit: int = 20) -> str:
+    """Search the Raw Vault: every raw file of the user's life that is not text (photos, screenshots, videos,
+    voice notes, documents). Matches file names and derived text (OCR/transcripts/captions); empty text lists
+    the newest. kind: image|screenshot|video|audio|document|archive. Returns ids for vault_get."""
+    args = ["search", text, "--limit", str(int(limit))]
+    if kind:
+        args += ["--kind", kind]
+    if source:
+        args += ["--source", source]
+    return _raw_vault(*args, timeout=60)
+
+
+@mcp.tool()
+def vault_get(object_id: str, dest_dir: str = "/tmp/walter-vault") -> str:
+    """Download one Raw Vault file (by id or sha256) to a local directory on the W.Alter VM, integrity-checked.
+    Returns the local path."""
+    Path(dest_dir).mkdir(parents=True, exist_ok=True, mode=0o700)
+    return _raw_vault("get", object_id, dest_dir)
+
+
+@mcp.tool()
+def vault_put(path: str, source: str = "", captured_at: str = "", links: list[str] | None = None) -> str:
+    """Store a local file (path on the W.Alter VM) in the Raw Vault, once (deduplicated by content).
+    source: where it comes from (default: the client name). captured_at: ISO date if known.
+    links: ["kardex_contact:5", "hermes_session:<id>", ...] to attach people/conversations."""
+    args = ["put", path, "--source", source or CLIENT_TAG]
+    if captured_at:
+        args += ["--captured", captured_at]
+    for link in links or []:
+        args += ["--link", link]
+    return _raw_vault(*args)
 
 
 @mcp.tool()
