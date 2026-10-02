@@ -182,6 +182,34 @@ def stale_sources(conn) -> list[str]:
     return created
 
 
+def tiers(conn, run_id: int | None = None) -> list[str]:
+    """When Monsieur's method (nightly L1/L2/L3 in models.selection) designates another model x reasoning level than
+    the declared tier, one alert per tier; he tests and adopts or ignores (never switched automatically)."""
+    run = {"run_id": run_id} if run_id else conn.execute("select run_id from models.latest_run").fetchone()
+    if not run:
+        return []
+    created = []
+    for r in conn.execute("""select s.level, s.model_id, s.variant, s.display_name, s.quality, s.real_cost,
+                                    p.pinned_model_id, p.pinned_variant
+                             from models.selection s join models.preferences p
+                               on p.task = 'general' and p.role = s.level
+                             where s.run_id = %s and s.task = 'general' and s.level in ('L1', 'L2', 'L3')""",
+                          (run["run_id"],)):
+        if (r["model_id"], r["variant"]) == (r["pinned_model_id"], r["pinned_variant"]):
+            conn.execute("""update models.alerts set status = 'dismissed', verdict_note = 'auto: méthode = niveau déclaré'
+                            where kind = 'tier' and role = %s and status in ('open', 'notified')""", (r["level"],))
+            continue
+        pinned = conn.execute("""select score, cost from models.benchmarks b join models.latest_snapshots l using (snapshot_id)
+                                 where b.benchmark = 'aa_intelligence' and b.model_id = %s and b.variant = %s limit 1""",
+                              (r["pinned_model_id"], r["pinned_variant"])).fetchone()
+        ev = {"level": r["level"], "proposed": f'{r["model_id"]}/{r["variant"]}', "name": r["display_name"],
+              "score": r["quality"], "real_cost": r["real_cost"],
+              "current": f'{r["pinned_model_id"]}/{r["pinned_variant"]}', "current_score": pinned and pinned["score"]}
+        if _upsert(conn, "tier", "general", ev["proposed"], ev, "open", r["level"]):
+            created.append(f'{r["level"]}:{ev["proposed"]}')
+    return created
+
+
 def billing(conn) -> list[str]:
     """Providers whose last probe found no credit left: one alert each, auto-cleared once topped up."""
     created = []
@@ -200,8 +228,10 @@ def billing(conn) -> list[str]:
 
 def _watched_interfaces(conn) -> set[str]:
     """Interfaces Monsieur has a declared preference on: new unranked releases there are worth a message."""
+    # Text is governed by the tier method ('tier' alerts) and specialised tasks auto-pick their #1: no decision for
+    # Monsieur there, so no podium messages for chat.
     return {r["interface"] for r in conn.execute(
-        "select distinct t.interface from models.preferences p join models.tasks t using (task)")}
+        "select distinct t.interface from models.preferences p join models.tasks t using (task)")} - {"chat"}
 
 
 def pending(conn) -> list[dict]:
@@ -240,7 +270,13 @@ def render(alerts: list[dict], conn=None) -> str:
     podium = [a for a in alerts if a["kind"] == "top3" and a["subject"] not in beaten_models]
     stale = [a for a in alerts if a["kind"] == "source_stale"]
     bills = [a for a in alerts if a["kind"] == "billing"]
+    tier_alerts = [a for a in alerts if a["kind"] == "tier"]
     out = ["Walter Router"]
+    for a in tier_alerts:
+        e = a["evidence"]
+        cur = f' (actuel {e["current"]}, {e["current_score"]:.1f})' if e.get("current_score") else f' (actuel {e["current"]})'
+        out.append(f'📐 [{a["alert_id"]}] Niveau {e["level"]} : ta méthode désigne maintenant {e["name"]} '
+                   f'— {e["score"]:.1f} AA, {e["real_cost"]:.3f} $/tâche{cur}. « adopter {a["alert_id"]} » ou « ignorer {a["alert_id"]} ».')
     for a in bills:
         name = catalog.PROVIDERS.get(a["subject"], a["subject"])
         out.append(f'💳 {name} : {a["evidence"]["detail"]}. Les modèles payants passent par les autres providers '
@@ -252,7 +288,9 @@ def render(alerts: list[dict], conn=None) -> str:
         out.append("🏆 Nouveau dans le top 3 :")
         for a in podium:
             c = catalog.card(conn, a["subject"], a["evidence"]["interface"])
-            ranks = ", ".join(f'{_short_board(b)} #{v["rank"]}' for b, v in a["evidence"]["boards"].items())
+            boards = list(a["evidence"]["boards"].items())
+            ranks = ", ".join(f'{_short_board(b)} #{v["rank"]}' for b, v in boards[:3]) + \
+                (f" (+{len(boards) - 3})" if len(boards) > 3 else "")
             out.append(f'• [{a["alert_id"]}] {catalog.line(c)} — {ranks}')
     if stale:
         out.append("Sources en retard : " + ", ".join(f'{a["subject"]} ({str(a["evidence"]["last"])[:10]})' for a in stale))
@@ -284,6 +322,11 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None) -> dict
                      (decision, note, alert_id)).fetchone()
     if not a:
         raise KeyError(alert_id)
+    if decision == "adopted" and a["kind"] == "tier":
+        from .choose import set_preference
+        set_preference(conn, "general", pin=a["subject"], role=a["role"], watch="dominance",
+                       note=f"Niveau {a['role']} adopté par Monsieur (alerte {alert_id}), méthode des 3 niveaux.")
+        return {"alert_id": alert_id, "status": decision, "pinned": a["subject"]}
     if decision == "adopted" and a["kind"] == "challenger" and ("boards" in a["evidence"] or "challenger" in a["evidence"]):
         from .choose import set_preference
         set_preference(conn, a["task"], pin=a["subject"], role=a["role"] or "default",

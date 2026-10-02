@@ -48,6 +48,8 @@ def card(conn, model_id: str, interface: str, modes: list[str] | None = None) ->
             "prices": dict(sorted(prices.items(), key=lambda kv: media.resolution_rank(kv[0]))),
             "audio": sorted(a for a in audio if a is not None), "token_priced": token_priced,
             "content_policy": row["content_policy"] if row else "standard",
+            "price_in_1m": row["price_in_1m"] if row else None, "price_out_1m": row["price_out_1m"] if row else None,
+            "subscriptions": list(row["subscriptions"]) if row and row["subscriptions"] else [],
             "open_weights": row["open_weights"] if row else None}
 
 
@@ -60,6 +62,9 @@ def money(x: float) -> str:
 
 
 def price_text(c: dict) -> str:
+    if c.get("interface") == "chat" and c.get("price_in_1m") is not None:
+        sub = " (inclus abonnement)" if c.get("subscriptions") else ""
+        return f'{money(c["price_in_1m"])}/{money(c["price_out_1m"])} $ par M tokens{sub}'
     if not c["prices"]:
         return "tarif au token" if c.get("token_priced") else "prix non publié"
     items = list(c["prices"].items())

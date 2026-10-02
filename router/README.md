@@ -43,6 +43,12 @@ inside the tie margin — 1 AA point, 10 Elo — the preferred model, then a sub
 orchestrator can overrule the keyword match. Video today: default/équilibré H3 (Kie), premium Seedance 2.5
 (workflow: references + adapted prompt), action H3, UGC Omni 1.1 (Flow, Gemini AI Pro credits), budget Grok 1.5.
 
+## Text tiers (Monsieur's method — docs/TIERS.md)
+L1 économique / L2 intermédiaire / L3 haut de gamme on the AA Pareto frontier of callable model x reasoning level at
+real provider cost (`tiers.py`): L1 = first knee above 35 AA, L2 = best pts per extra $ from L1, L3 = best pts per
+extra $ from L2 within 5 points of the ceiling. Declared tiers live in knowledge.json `levels`; a different nightly
+result raises one `tier` alert (adopt/ignore). Specialised tasks keep only their #1 (`best` rank 1).
+
 ## Weighting and dossiers
 `scoring.composite(task)`: each board of the task (`models.task_benchmarks.weight`) is put on 0-100 (linear from the
 board's median model = 0 to its leader = 100), weighted by weight x reliability (votes v/(v+500); provisional 0.5)

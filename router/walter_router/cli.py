@@ -29,6 +29,7 @@ def refresh(notify: bool = True, dry_run: bool = False) -> dict:
                 report["alerts"] = {"challengers": alerts.challengers(conn, "baseline" if first else "open"),
                                     "top3": alerts.top3(conn), "unranked": alerts.unranked(conn),
                                     "billing": alerts.billing(conn),
+                                    "tiers": alerts.tiers(conn, run_id),
                                     "stale": alerts.stale_sources(conn)}
                 report["pruned_snapshots"] = collect.prune(conn)
                 conn.execute("update models.runs set status = 'ok', finished_at = now(), summary = %s::jsonb where run_id = %s",
