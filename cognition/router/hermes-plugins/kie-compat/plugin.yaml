@@ -1,0 +1,5 @@
+name: kie-compat
+version: 0.1.0
+description: "DISABLED (not enabled in config) — Kie.ai: drop output_config for its Claude endpoint. Hypothesis not confirmed on 2026-10-02 (Kie Claude was down for every request shape)."
+author: W.Alter
+kind: standalone

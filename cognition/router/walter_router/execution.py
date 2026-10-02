@@ -39,9 +39,26 @@ def _runnable(offer: dict) -> tuple[str, str, str] | None:
     return (hp, offer["offer_key"], offer["provider"]) if hp else None
 
 
+# Monsieur's fallback order (2026-10-02): subscription (Codex) first, then Kie if available and not dearer than
+# OpenRouter by more than KIE_MAX_PREMIUM, then OpenRouter as the last resort. Arnict (unrestricted) ranks with Kie.
+PROVIDER_RANK = {"kie": 1, "kie-codex": 1, "arnict": 1, "openrouter": 3}
+KIE_MAX_PREMIUM = 1.25
+UNRELIABLE_MIN_RUNS, UNRELIABLE_FAIL_RATE, RELIABILITY_DAYS = 3, 0.5, 14
+
+
+def reliability(conn, provider: str, model: str) -> dict:
+    """Recent real executions of this provider x model (models.exec_log, skipped attempts excluded)."""
+    r = conn.execute("""select count(*) as n, count(*) filter (where not ok) as failed from (
+                          select ok from models.exec_log where provider = %s and model = %s and skipped is null
+                          and at > now() - make_interval(days => %s) order by at desc limit 10) x""",
+                     (provider, model, RELIABILITY_DAYS)).fetchone()
+    unreliable = r["n"] >= UNRELIABLE_MIN_RUNS and r["failed"] / r["n"] >= UNRELIABLE_FAIL_RATE
+    return {"runs": r["n"], "failed": r["failed"], "unreliable": unreliable}
+
+
 def routes(conn, model_id: str, variant: str = "", preferred: str | None = None) -> list[dict]:
-    """Every way Hermes can run this chat model: preferred provider, then subscription, then paid by blended
-    price; providers whose last live probe failed go last (kept as a last resort, flagged)."""
+    """Every way Hermes can run this chat model, in Monsieur's order: subscription, Kie (if not much dearer),
+    OpenRouter last. Providers whose last probe failed, or that failed most recent real runs, go to the end."""
     snaps = sel.latest_snapshots(conn)
     status = {r["provider"]: r for r in conn.execute("select * from models.provider_status")}
     out = []
@@ -51,12 +68,36 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None)
             continue
         hp, model, key = run
         st = status.get(key)
+        rel = reliability(conn, hp, model)
         out.append({"provider": o["provider"], "hermes_provider": hp, "model": model,
                     "reasoning": REASONING.get(variant), "access": o["access"],
-                    "blended_1m": sel.blended(o), "probe_ok": None if st is None else st["ok"]})
-    out.sort(key=lambda r: (r["probe_ok"] is False, r["provider"] != preferred, r["access"] != "subscription",
+                    "blended_1m": sel.blended(o), "probe_ok": None if st is None else st["ok"],
+                    "unreliable": rel["unreliable"], "recent_runs": rel["runs"], "recent_failures": rel["failed"]})
+    or_price = min((r["blended_1m"] for r in out if r["hermes_provider"] == "openrouter" and r["blended_1m"]),
+                   default=None)
+
+    def rank(r: dict) -> float:
+        if r["access"] == "subscription":
+            return 0
+        base = PROVIDER_RANK.get(r["hermes_provider"], 2)
+        if base == 1 and r["provider"] == "kie" and or_price and r["blended_1m"] and \
+                r["blended_1m"] > or_price * KIE_MAX_PREMIUM:
+            return 3.5  # Kie clearly dearer than OpenRouter here: after it
+        return base
+
+    out.sort(key=lambda r: (r["probe_ok"] is False, r["unreliable"], rank(r), r["provider"] != preferred,
                             r["blended_1m"] if r["blended_1m"] is not None else 1e9))
     return out
+
+
+def log(conn, entry: dict) -> int:
+    """One routed execution attempt (from the Hermes plugin or the media executor)."""
+    keys = ("task", "role", "model_id", "provider", "model", "ok", "skipped", "seconds", "cost_usd", "fallback_for", "kind")
+    row = {k: entry.get(k) for k in keys}
+    row["ok"] = bool(row["ok"])
+    row["kind"] = row["kind"] or "text"
+    return conn.execute(f"""insert into models.exec_log ({", ".join(keys)}) values ({", ".join(["%s"] * len(keys))})
+                            returning exec_id""", [row[k] for k in keys]).fetchone()["exec_id"]
 
 
 _TIMEOUT = 90

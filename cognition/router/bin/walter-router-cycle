@@ -1,6 +1,7 @@
 #!/bin/bash
 # Walter Router 48 h cycle: (1) benchmark collection (aa-pareto skill), (2) router refresh + notifications,
-# (3) analysis by the ECONOMIC text tier model (L1, read from the router: today GPT-6 Luna max via Codex).
+# (3) analysis by the ECONOMIC text tier model (L1, read from the router: today GPT-6 Luna max via Codex), which
+# links renamed models (validated `alias-add`), (4) recompute + Telegram (only new models above an active one).
 # A failing step 1 keeps the last good caches (step 2 still runs); step 3 never blocks the cycle.
 set -uo pipefail
 export HOME=/root HERMES_HOME=/root/.hermes
@@ -11,30 +12,29 @@ LOG=/root/.hermes/logs/walter-router
 mkdir -p "$LOG"
 day=$(date -u +%Y%m%d)
 
-echo "[cycle] 1/3 benchmark collection"
+echo "[cycle] 1/4 benchmark collection"
 timeout 2400 "$HPY" /root/.hermes/scripts/aa_pareto_daily_refresh.py > "$LOG/collect-$day.log" 2>&1 \
   || echo "[cycle] collection failed (exit $?) — last good caches kept, see $LOG/collect-$day.log"
 
-echo "[cycle] 2/3 router refresh"
-"$WR" refresh || exit 1   # a failed refresh fails the unit -> OnFailure Telegram message
+echo "[cycle] 2/4 router refresh (no message yet)"
+"$WR" refresh --no-notify || exit 1   # a failed refresh fails the unit (Telegram only after 2 failed cycles)
 
-echo "[cycle] 3/3 analysis on the economic tier"
-route=$("$WR" pick general --level L1) || { echo "[cycle] no L1 route"; exit 0; }
+echo "[cycle] 3/4 analysis on the economic tier (fixes naming gaps through validated alias-add)"
+route=$("$WR" pick general --level L1) || route='{}' 
 read -r PROVIDER MODEL REASONING < <(printf '%s' "$route" | "$HPY" -c '
 import json, sys
 d = json.load(sys.stdin)
 r = next((e for e in d.get("execution", []) if e.get("probe_ok") is not False), None)
 print(r["hermes_provider"], r["model"], r.get("reasoning") or "") if r else print("", "", "")')
-if [ -z "$PROVIDER" ]; then echo "[cycle] no usable L1 route"; exit 0; fi
+if [ -z "$PROVIDER" ]; then echo "[cycle] no usable L1 route: analysis skipped"; else
 args=(chat --query-file /opt/walter-router/config/analysis_prompt.md --oneshot -Q --provider "$PROVIDER" -m "$MODEL"
       -t terminal,file,web --max-turns 30 --run-budget 900 --source walter-router-analysis)
 [ -n "$REASONING" ] && args+=(--reasoning "$REASONING")
 echo "[cycle] analysis model: $PROVIDER $MODEL ${REASONING:-}"
 WALTER_ROUTER_CHILD=1 timeout 1100 "$HERMES" "${args[@]}" > "$LOG/analysis-run-$day.log" 2>&1 \
   || echo "[cycle] analysis failed (exit $?) — see $LOG/analysis-run-$day.log"
-report="$LOG/analysis-$day.md"
-if [ -f "$report" ] && head -3 "$report" | grep -q "VERDICT: ACTION"; then
-  "$HERMES" send -t telegram "🔎 Walter Router — l'analyse de 48 h demande ton attention : $(grep -m1 -v 'VERDICT' "$report" | head -c 300)
-Rapport : $report" || true
 fi
+
+echo "[cycle] 4/4 re-derive with the new name links, recompute, notify (only: a new model above an active one)"
+"$WR" refresh --skip-collect || exit 1
 exit 0

@@ -59,7 +59,11 @@ def build(conn, task: str, run_id: int, n: int = 8) -> dict[str, Any]:
                                 "marginal": (r["reasons"] or {}).get("marginal")}
                                for r in conn.execute("""select * from models.selection where run_id = %s and task = 'general'
                                                         and level = 'frontier' order by rank""", (run_id,))]}
-    return {"task": task, "label": t["label"], "tier_method": method, "interface": t["interface"], "modes": t["modes"],
+    postes_doc = None
+    if task == "general":
+        from . import postes as postes_mod
+        postes_doc = {p: postes_mod.rank(conn, p, 3) for p in ("orchestrator", "agent_worker")}
+    return {"task": task, "label": t["label"], "tier_method": method, "postes": postes_doc, "interface": t["interface"], "modes": t["modes"],
             "default_objective": t["default_objective"],
             "boards": [{"board": f'{b["benchmark"]}:{b["bench_task"]}', "weight": b["weight"],
                         "primary": b["is_primary"]} for b in boards],

@@ -293,5 +293,34 @@
         "evidence": "coude du haut : 14,5 pts/$ jusqu'à Opus high, puis 3,7 (xhigh), 1,6 (max) ; repli Astra xhigh via Codex (52,4)"
       }
     }
+  },
+  "postes": {
+    "_doc": "Fiches de poste (2026-10-02): weights over model attributes (0-100 each, see walter_router/postes.py). min_context in tokens. The orchestrator poste is compared with the model Hermes actually runs; a clearly better one (>= margin points) is proposed to Monsieur, never switched automatically.",
+    "orchestrator": {
+      "label": "Orchestrateur de Walter",
+      "margin": 3.0,
+      "min_context": 400000,
+      "weights": {
+        "agentic": 0.3,
+        "intelligence": 0.25,
+        "reliability": 0.15,
+        "speed": 0.15,
+        "access": 0.15
+      },
+      "why": "Mène la conversation et pilote les outils : fiabilité des appels d'outils, intelligence, peu d'hallucinations, réactivité, et accès par abonnement (il tourne en permanence)."
+    },
+    "agent_worker": {
+      "label": "Sous-agent d'exécution (walter_run)",
+      "margin": 3.0,
+      "min_context": 200000,
+      "weights": {
+        "agentic": 0.35,
+        "intelligence": 0.3,
+        "reliability": 0.2,
+        "speed": 0.05,
+        "access": 0.1
+      },
+      "why": "Exécute des tâches longues avec outils : agentique et intelligence d'abord."
+    }
   }
 }

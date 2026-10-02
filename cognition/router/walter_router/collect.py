@@ -491,7 +491,8 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                              unit_price=None, unit=None, provider_created=created, pricing=pr,
                              display_name=_or_name(m.get("name")),
                              meta={"open_weights": True if m.get("hugging_face_id") else None, "license": None,
-                                   "hf": m.get("hugging_face_id") or None},
+                                   "hf": m.get("hugging_face_id") or None,
+                                   "context_length": m.get("context_length")},
                              **_media_fields(interface, "", None, None, inputs)))
             for entry in m.get("_display_pricing") or []:
                 if entry.get("kind") != "unit":
@@ -589,6 +590,9 @@ def _display_name(namespace: str, name: str | None) -> str | None:
 def _apply_meta(conn, namespace: str, model_id: str, meta: dict | None) -> None:
     """Open weights / licence: 'open' from any source wins (Arena licence, AA open_weights, a Hugging Face id);
     'proprietary' only fills an unknown. The Arena licence text is preferred."""
+    if meta and meta.get("context_length"):
+        conn.execute("""update models.canonical set context_length = greatest(coalesce(context_length, 0), %s)
+                        where model_id = %s""", (int(meta["context_length"]), model_id))
     if not meta or meta.get("open_weights") is None:
         return
     conn.execute("""update models.canonical set
