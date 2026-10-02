@@ -68,11 +68,19 @@ def purge(*, reason: str, requested_by: str, event_ids=None, object_refs=None, p
                          (requested_by, reason, json.dumps(selector), fps, json.dumps(counts)))
             return {"status": "dry_run", "counts": counts}
         conn.execute("set local walter.purge = 'on'")
+        src_refs = [r["ref"] for r in conn.execute(
+            "select source || ':' || source_id ref from core.events where event_id = any(%s::uuid[])",
+            (targets["events"],)).fetchall()] if targets["events"] else []
         if targets["events"]:
             conn.execute("delete from core.event_keys where event_id = any(%s::uuid[])", (targets["events"],))
             conn.execute("delete from core.events where event_id = any(%s::uuid[])", (targets["events"],))
         if targets["derived"]:
             conn.execute("delete from core.derived_items where item_id = any(%s::uuid[])", (targets["derived"],))
+        # derived copies of the text: search index and privacy detection refs
+        refs = [*targets["events"], *targets["derived"], *targets["objects"]]
+        if refs:
+            conn.execute("delete from search.chunks where ref_id = any(%s::uuid[])", (refs,))
+            conn.execute("delete from privacy.detections where target_ref = any(%s)", ([str(r) for r in refs] + src_refs,))
         for oid in targets["objects"]:
             row = conn.execute("select storage_key, storage_zone from core.objects where id = %s", (oid,)).fetchone()
             s3().delete_object(Bucket=BUCKETS[row["storage_zone"]], Key=row["storage_key"])
