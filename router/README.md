@@ -53,6 +53,18 @@ Monsieur's roles with fiches/workflows, the top candidates with per-board eviden
 content policy, affinity, the level picks, and the decision rules. `walter-router dossier <task>` prints it.
 BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local FlareSolverr (127.0.0.1:8191).
 
+## In production (2026-10-02)
+- **Hermes plugin** `~/.hermes/plugins/walter-router` (toolset `walter-router`, enabled for cli + telegram):
+  `walter_route` (which model/provider/workflow for a task; video role by objective) and `walter_run` (runs a text
+  sub-task on the routed model in a separate `hermes chat --oneshot --provider P -m M` process — plugin tools get no
+  parent agent, so `delegate_task` cannot be pinned from a plugin; falls back to the next route; hidden inside its
+  own children via `WALTER_ROUTER_CHILD=1`). Tests: `test_walter_router.py` next to the plugin.
+- **Execution routes** (`execution.routes`): preferred provider, subscription (Codex), then paid by price; Kie only
+  for Claude models (its Hermes provider is the Anthropic endpoint). `probe` = a 5-token live call per provider at
+  every refresh (`models.provider_status`); a failed provider goes last.
+- **Health**: `walter-router health` (exit 1 when not fed), shown in walter-core `walter_health`;
+  `walter-router-failure.service` (OnFailure of the refresh) sends one Telegram message.
+
 ## Commands
 ```
 bin/walter-router migrate
@@ -62,6 +74,7 @@ bin/walter-router pick <task> --require unrestricted|open_weights   # hard const
 bin/walter-router decide <task> "<request in French>"  # role by objective, route, workflow, brief
 bin/walter-router declare                               # apply config/knowledge.json
 bin/walter-router dossier <task>                        # the JSON the router reads
+bin/walter-router health | probe | tasks | notify-failure
 bin/walter-router prefer <task> [--objective value|best_available] [--pin model_id[/variant]] [--provider p] [--note ...]
 bin/walter-router alerts [--all]
 bin/walter-router verdict <alert_id> adopted|dismissed [--note ...]   # adopted challenger becomes the favourite
