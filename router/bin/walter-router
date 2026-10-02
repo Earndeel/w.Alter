@@ -1,0 +1,2 @@
+#!/bin/sh
+cd /opt/walter-router && exec /opt/walter-router/venv/bin/python -m walter_router.cli "$@"
