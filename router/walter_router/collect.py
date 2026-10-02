@@ -6,6 +6,7 @@ import hashlib
 import html
 import json
 import os
+import re
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
 
-from . import identity
+from . import identity, media
 
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/root/.hermes"))
 CACHE = HERMES_HOME / "cache" / "aa-pareto"
@@ -25,6 +26,13 @@ MM_TASKS = {"provider_voice": "tts", "index": "speech_to_speech"}
 # Kie publishes a few chat price rows with a wrong dimension label; each fix is checked against the
 # published input price and the vendor's 1:5 input/output ratio before being added here.
 KIE_DIMENSION_FIXES = {("claude-opus-5-5", "claude-opus-5"): "output"}
+ARENA_URL = "https://arena.ai/leaderboard/"
+# Arena.ai page -> board key stored in models.benchmarks.task (benchmark = 'arena')
+ARENA_BOARDS = {"text": "text", "text/french": "text_french", "text/coding": "text_coding",
+                "text/creative-writing": "text_creative", "code/webdev": "webdev",
+                "code/image-to-webdev": "image_to_webdev", "vision": "vision", "document": "document",
+                "search": "search", "agent": "agent", "text-to-image": "text_to_image", "image-edit": "image_edit",
+                "text-to-video": "text_to_video", "image-to-video": "image_to_video", "video-edit": "video_edit"}
 
 
 def now() -> datetime:
@@ -74,6 +82,62 @@ def fetch_text(url: str) -> str:
     return raw.decode("utf-8", "replace")
 
 
+def _json_array(text: str, start: int) -> list:
+    """The JSON array starting at text[start] == '[' (string-aware bracket matching)."""
+    depth, in_str, esc = 0, False, False
+    for k in range(start, len(text)):
+        ch = text[k]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return json.loads(text[start:k + 1])
+    raise ValueError("unterminated array")
+
+
+def arena_board(page: str) -> dict | None:
+    """Leaderboard rows embedded in an Arena.ai page (Next.js flight data): pairwise boards carry 'entries'
+    (Elo rating + CI + votes), the agent board carries 'snapshot.rows' (average task score + CI)."""
+    text = html.unescape(page).replace('\\"', '"').replace("\\\\", "\\")
+    m = re.search(r'"id":"(leaderboard-sets/[^"]+)","entries":\[', text)
+    if m:
+        return {"leaderboard_id": m.group(1), "kind": "elo", "rows": _json_array(text, m.end() - 1)}
+    i = text.find('"snapshot":{"lastUpdated"')
+    if i >= 0:
+        j = text.index('"rows":[', i) + len('"rows":')
+        updated = re.search(r'"lastUpdated":"([^"]+)"', text[i:i + 80])
+        return {"leaderboard_id": "agent", "kind": "agent", "updated": updated and updated.group(1),
+                "rows": _json_array(text, j)}
+    return None
+
+
+def source_arena() -> tuple[dict, datetime, str]:
+    boards, errors = {}, {}
+    for path, key in ARENA_BOARDS.items():
+        try:
+            board = arena_board(fetch_text(ARENA_URL + path))
+            if board and board["rows"]:
+                boards[key] = {"path": path, **board}
+            else:
+                errors[key] = "no leaderboard rows in page"
+        except Exception as exc:  # noqa: BLE001 — one missing board leaves the others usable
+            errors[key] = f"{type(exc).__name__}: {exc}"[:200]
+        time.sleep(0.5)
+    if len(boards) < len(ARENA_BOARDS) // 2:
+        raise ValueError(f"arena: only {len(boards)} boards parsed: {errors}")
+    return {"boards": boards, "errors": errors}, now(), ARENA_URL
+
+
 def display_pricing(page: str) -> list | None:
     """The `displayPricing` array embedded in an OpenRouter model page (per-second / per-song / per-tier prices
     that the /models API reports as 0 for media models)."""
@@ -98,7 +162,7 @@ def source_openrouter() -> tuple[dict, datetime, str]:
     if not doc.get("data"):
         raise ValueError("openrouter: empty catalogue")
     for m in doc["data"]:
-        if _or_interface(m) == "chat" or ":" in m["id"] or m["id"].startswith(("openrouter/", "~")):
+        if _or_interface(m) not in MEDIA_INTERFACES or ":" in m["id"] or m["id"].startswith(("openrouter/", "~")):
             continue
         try:
             m["_display_pricing"] = display_pricing(fetch_text(f"https://openrouter.ai/{m['id']}"))
@@ -144,7 +208,7 @@ def source_declared() -> tuple[dict, datetime, str]:
     return {"offers": doc["offers"]}, now(), str(DECLARED)
 
 
-SOURCES = {"aa": source_aa, "mm": source_mm, "da": source_da,
+SOURCES = {"aa": source_aa, "mm": source_mm, "da": source_da, "arena": source_arena,
            "openrouter": source_openrouter, "kie": source_kie, "codex": source_codex,
            "declared": source_declared}
 
@@ -220,17 +284,61 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
                                      display_name=key, score=score, score_unit="Design Arena Elo", cost=None,
                                      cost_unit=None, released=None,
                                      extra={k: r.get(k) for k in ("win_rate", "battles", "avg_generation_time_ms")}))
+    elif kind == "arena":
+        for task_key, board in doc["boards"].items():
+            seen: set[str] = set()
+            for r in board["rows"]:
+                key = r.get("modelDisplayName") or r.get("model")
+                if not key or key in seen:
+                    continue
+                if board["kind"] == "agent":
+                    score = _num((r.get("avgScore") or {}).get("value"))
+                    ci = _num((r.get("avgScore") or {}).get("ci"))
+                    score, ci = (score * 1000 if score is not None else None), (ci * 1000 if ci is not None else None)
+                    extra = {"rank": r.get("rank"), "ci": [score - ci, score + ci] if score is not None and ci else None,
+                             "sessions": r.get("sessions"), "organization": r.get("modelOrganization"),
+                             "release_type": r.get("releaseType")}
+                    unit = "Arena Agent score (x1000)"
+                else:
+                    score = _num(r.get("rating"))
+                    extra = {"rank": r.get("rank"), "ci": [r.get("ratingLower"), r.get("ratingUpper")],
+                             "votes": r.get("votes"), "organization": r.get("modelOrganization"),
+                             "release_type": r.get("releaseType"), "price_per_second": r.get("pricePerSecond"),
+                             "price_per_image": r.get("pricePerImage"), "license": r.get("license")}
+                    unit = "Arena Elo"
+                if score is None:
+                    continue
+                seen.add(key)
+                mid, variant = identity.normalize("arena", key)
+                rows.append(dict(benchmark="arena", task=task_key, external_key=key, model_id=mid, variant=variant,
+                                 display_name=key, score=score, score_unit=unit, cost=None, cost_unit=None,
+                                 released=None, extra=extra))
     return rows
+
+
+MEDIA_INTERFACES = ("image", "video", "audio", "music")
+OR_BASE_UNITS = {"/M characters": "per character", "/M UTF-8 bytes": "per utf-8 byte", "/minute": "per second",
+                 "/1K calls": "per call", "/M tokens": "per token"}
+_OR_OUTPUTS = {"video": "video", "image": "image", "audio": "audio", "speech": "audio", "transcription": "transcription",
+               "embeddings": "embedding", "rerank": "rerank"}
+
+
+def _or_name(name: str | None) -> str | None:
+    """'Black Forest Labs: FLUX.3 Image' -> 'FLUX.3 Image'; short names keep their vendor ('MiniMax H3', 'HeyGen Video 1')."""
+    if not name:
+        return None
+    vendor, _, rest = name.partition(": ")
+    return (rest if len(rest) >= 9 else f"{vendor} {rest}") if rest else vendor
 
 
 def _or_interface(model: dict) -> str:
     out = model.get("architecture", {}).get("output_modalities") or ["text"]
     if "lyria" in model["id"]:
         return "music"
-    for kind in ("video", "image", "audio"):
-        if kind in out:
-            return kind
-    return "chat"
+    for modality, interface in _OR_OUTPUTS.items():
+        if modality in out:
+            return interface
+    return "chat" if "text" in out else (out[0] if out else "chat")
 
 
 def _kie_interface(rec: dict) -> str:
@@ -242,6 +350,15 @@ def _kie_interface(rec: dict) -> str:
 
 
 OFFER_KINDS = ("openrouter", "kie", "codex", "declared")
+
+
+def _media_fields(interface: str, label: str, unit_price: float | None, unit: str | None,
+                  inputs: list[str] | None = None, tier_label: str = "") -> dict:
+    """What the offer sells (media.classify) and its price in the interface's comparable unit."""
+    c = media.classify(interface, label, inputs)
+    price, norm_unit = media.norm_price(interface, unit_price, unit, label)
+    return dict(offer_kind=c["kind"], modes=c["modes"], resolution=media.resolution(label, tier_label) or c["resolution"],
+                audio=c["audio"], norm_price=price if c["kind"] == "generation" else None, norm_unit=norm_unit)
 
 
 def parse_offers(kind: str, doc: dict) -> list[dict]:
@@ -256,24 +373,33 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
             pin, pout = _num(pr.get("prompt")), _num(pr.get("completion"))
             interface = _or_interface(m)
             created = datetime.fromtimestamp(m["created"], timezone.utc) if m.get("created") else None
-            media = interface != "chat"
+            is_media = interface in MEDIA_INTERFACES
+            inputs = m.get("architecture", {}).get("input_modalities") or []
             rows.append(dict(provider="openrouter", offer_key=oid, model_id=mid, interface=interface, access="paid",
                              # media models report 0/0 token prices in the API: that is not a price
-                             price_in_1m=None if media or pin is None or pin < 0 else pin * 1e6,
-                             price_out_1m=None if media or pout is None or pout < 0 else pout * 1e6,
-                             unit_price=None, unit=None, provider_created=created, pricing=pr))
+                             price_in_1m=None if is_media or pin is None or pin < 0 else pin * 1e6,
+                             price_out_1m=None if is_media or pout is None or pout < 0 else pout * 1e6,
+                             unit_price=None, unit=None, provider_created=created, pricing=pr,
+                             display_name=_or_name(m.get("name")),
+                             **_media_fields(interface, "", None, None, inputs)))
             for entry in m.get("_display_pricing") or []:
                 if entry.get("kind") != "unit":
                     continue  # token-priced media (e.g. image output per M tokens) has no per-unit equivalent
-                unit = "per " + (entry.get("unitLabel") or "").lstrip("/").strip()
+                label_unit = (entry.get("unitLabel") or "").strip()
+                unit = "per " + label_unit.lstrip("/").strip()
+                if (_num(entry.get("displayMultiplier")) or 1) != 1:
+                    # the price is per base unit; the page multiplies it for display ("/M characters" x 1e6)
+                    unit = OR_BASE_UNITS.get(label_unit, f'{unit} / {entry["displayMultiplier"]}')
                 for tier in entry.get("tiers") or [{"sku_label": "", "price": entry.get("price")}]:
                     price = _num(tier.get("price"))
                     if price is None:
                         continue
                     key = " | ".join(x for x in (oid, entry.get("sku_label"), tier.get("sku_label")) if x)
+                    label = " | ".join(x for x in (entry.get("sku_label"), tier.get("sku_label")) if x)
                     rows.append(dict(provider="openrouter", offer_key=key, model_id=mid, interface=interface, access="paid",
                                      price_in_1m=None, price_out_1m=None, unit_price=price, unit=unit,
-                                     provider_created=created, pricing={"display": entry, "tier": tier}))
+                                     provider_created=created, pricing={"display": entry, "tier": tier},
+                                     **_media_fields(interface, label, price, unit, inputs, tier.get("sku_label") or "")))
     elif kind == "kie":
         chat: dict[str, dict] = {}
         for rec in doc["data"]:
@@ -295,14 +421,17 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                 continue
             rows.append(dict(provider="kie", offer_key=rec["modelDescription"], model_id=mid, interface=interface,
                              access="paid", price_in_1m=None, price_out_1m=None, unit_price=price,
-                             unit=rec.get("creditUnit"), provider_created=None, pricing=rec))
+                             unit=rec.get("creditUnit"), provider_created=None, pricing=rec,
+                             **_media_fields(interface, ", ".join(parts[1:]), price, rec.get("creditUnit"))))
         rows.extend(chat.values())
     elif kind == "declared":
         for d in doc["offers"]:
             mid, _ = identity.normalize("declared", d["model"])
             rows.append(dict(provider=d["provider"], offer_key=d["offer_key"], model_id=mid, interface=d["interface"],
                              access=d["access"], price_in_1m=None, price_out_1m=None, unit_price=None, unit=None,
-                             provider_created=None, pricing={"declared": d.get("declared"), "note": d.get("note")}))
+                             provider_created=None, pricing={"declared": d.get("declared"), "note": d.get("note")},
+                             offer_kind="generation", modes=d.get("modes") or [], resolution=None, audio=None,
+                             norm_price=None, norm_unit=None))
     elif kind == "codex":
         for oid in doc["models"]:
             mid, _ = identity.normalize("codex", oid)
@@ -314,8 +443,26 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
 
 # --- storage -------------------------------------------------------------------------------------------
 
-def _ensure_identity(conn, namespace: str, key: str, model_id: str, vendor: str | None = None) -> None:
+NAME_PRIORITY = {"openrouter": 1, "aa": 2, "mm": 3, "arena": 4, "kie": 5, "da": 6}
+
+
+def _display_name(namespace: str, name: str | None) -> str | None:
+    if not name or namespace not in NAME_PRIORITY:
+        return None
+    if namespace in ("aa", "mm", "arena"):
+        name = re.sub(r"\s*\([^)]*\)", "", name).strip()  # effort tier / 'based on' notes are variants, not names
+    return name if namespace != "kie" else name.split(",")[0].strip()
+
+
+def _ensure_identity(conn, namespace: str, key: str, model_id: str, vendor: str | None = None,
+                     name: str | None = None) -> None:
     conn.execute("insert into models.canonical (model_id, vendor) values (%s, %s) on conflict do nothing", (model_id, vendor))
+    name = _display_name(namespace, name)
+    if name:  # the most readable source names the model (OpenRouter > AA > AA multimodal > Arena > Kie > Design Arena)
+        conn.execute("""update models.canonical set display_name = %s, display_source = %s where model_id = %s
+                        and (display_source is null or display_source = %s
+                             or coalesce((%s::jsonb ->> display_source)::int, 99) > %s)""",
+                     (name, namespace, model_id, namespace, json.dumps(NAME_PRIORITY), NAME_PRIORITY[namespace]))
     origin = "manual" if key in identity.MANUAL.get(namespace, {}) else "auto"
     conn.execute("""insert into models.aliases (namespace, external_key, model_id, origin) values (%s, %s, %s, %s)
                     on conflict (namespace, external_key) do update set model_id = excluded.model_id, origin = excluded.origin
@@ -330,7 +477,8 @@ def _insert_rows(conn, sid: int, kind: str, doc: dict) -> int:
     rows = parse_offers(kind, doc) if kind in OFFER_KINDS else parse_benchmarks(kind, doc)
     for r in rows:
         key = r.get("external_key") or r["offer_key"]
-        _ensure_identity(conn, kind, key, r["model_id"])
+        _ensure_identity(conn, kind, key, r["model_id"],
+                         name=r.get("display_name") or (key if kind == "kie" else None))
         if "benchmark" in r:
             conn.execute("""insert into models.benchmarks (snapshot_id, benchmark, task, external_key, model_id, variant,
                             display_name, score, score_unit, cost, cost_unit, released, extra)
@@ -339,10 +487,13 @@ def _insert_rows(conn, sid: int, kind: str, doc: dict) -> int:
                           r["score"], r["score_unit"], r["cost"], r["cost_unit"], r["released"], json.dumps(r["extra"])))
         else:
             conn.execute("""insert into models.offers (snapshot_id, provider, offer_key, model_id, interface, access,
-                            price_in_1m, price_out_1m, unit_price, unit, provider_created, pricing)
-                            values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb) on conflict do nothing""",
+                            price_in_1m, price_out_1m, unit_price, unit, provider_created, pricing,
+                            offer_kind, modes, resolution, audio, norm_price, norm_unit)
+                            values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s,%s) on conflict do nothing""",
                          (sid, r["provider"], r["offer_key"], r["model_id"], r["interface"], r["access"], r["price_in_1m"],
-                          r["price_out_1m"], r["unit_price"], r["unit"], r["provider_created"], json.dumps(r["pricing"])))
+                          r["price_out_1m"], r["unit_price"], r["unit"], r["provider_created"], json.dumps(r["pricing"]),
+                          r.get("offer_kind", "generation"), r.get("modes") or [], r.get("resolution"), r.get("audio"),
+                          r.get("norm_price"), r.get("norm_unit")))
     conn.execute("update models.snapshots set row_count = %s where snapshot_id = %s", (len(rows), sid))
     return len(rows)
 

@@ -13,15 +13,15 @@ def latest_run(conn) -> int | None:
     return row["run_id"] if row else None
 
 
-def routes_for(conn, model_id: str, interface: str) -> dict[str, Any]:
+def routes_for(conn, model_id: str, interface: str, modes: list[str] | None = None) -> dict[str, Any]:
     """Every current route for one model: subscription first, then paid routes cheapest first."""
     snaps = sel.latest_snapshots(conn)
     offers = sel.load_offers(conn, snaps).get(model_id, [])
-    return sel.chat_route(offers, None) if interface == "chat" else sel.media_route(offers, interface)
+    return sel.chat_route(offers, None) if interface == "chat" else sel.media_route(offers, interface, modes)
 
 
 def _pinned_answer(conn, task: dict, pref: dict) -> dict[str, Any]:
-    route = routes_for(conn, pref["pinned_model_id"], task["interface"])
+    route = routes_for(conn, pref["pinned_model_id"], task["interface"], task["modes"])
     provider = pref["pinned_provider"] or route.get("subscription") or (route.get("paid") or {}).get("provider") \
         or route.get("ui")
     mode = "manual_ui" if provider and provider == route.get("ui") else "delegate"

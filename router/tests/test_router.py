@@ -16,7 +16,14 @@ from walter_router import select as sel
     ("openrouter", "openai/gpt-6.1-sol", None, ("gpt-6-1-sol", "")),
     ("openrouter", "minimax/hailuo-3-max", None, ("minimax-h3-max", "")),
     ("kie", "Google nano banana 2", None, ("nano-banana-2", "")),
-    ("kie", "wan 3.0 video", None, ("wan-3-0", "")),
+    ("kie", "wan 3.0 video", None, ("wan-3", "")),
+    ("openrouter", "bytedance/seedance-2.0", None, ("seedance-2", "")),
+    ("arena", "gemini-omni-1.1-flash", None, ("gemini-omni-flash-1-1", "")),
+    ("arena", "dreamina-seedance-2.5-720p", None, ("seedance-2-5", "720p")),
+    ("arena", "veo-3.1-fast-audio-1080p", None, ("veo-3-1-fast", "audio-1080p")),
+    ("arena", "claude-opus-5.5-max", None, ("claude-opus-5-5", "max")),
+    ("arena", "flux-3-video-20260811", None, ("flux-3-video", "")),
+    ("aa", "qwen3-0-6b", "Qwen3 0.6B", ("qwen-3-0-6b", "")),
     ("codex", "gpt-6.1-sol", None, ("gpt-6-1-sol", "")),
 ])
 def test_identity_is_deterministic(ns, key, name, expected):
@@ -73,7 +80,7 @@ def test_challenger_flow_baseline_then_new_then_adopt(conn):
     conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d' and subject = 'gpt-6-astra'")
     assert "3d:default:gpt-6-astra" in alerts.challengers(conn, "open", only_task="3d")
     pend = [a for a in alerts.pending(conn) if a["task"] == "3d"]
-    assert pend and "dépassé" in alerts.render(pend)
+    assert pend and "dépasse" in alerts.render(pend, conn)
     # Monsieur adopts it: it becomes the pinned favourite.
     alerts.verdict(conn, pend[0]["alert_id"], "adopted")
     assert choose.pick(conn, "3d")["model_id"] == "gpt-6-astra"
