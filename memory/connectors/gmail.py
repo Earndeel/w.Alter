@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""Gmail connector (P2.5, D2: read-only). E-mails → core.events (email.received / email.sent), attachments → Raw Vault
-(encrypted zone). Backfill pages through messages.list (newest first, resumable); then incremental via history.list.
-Spam and trash are skipped. Bodies are stored as plain text (HTML stripped), capped at 50 000 chars.
+"""Gmail connector (P2.5, D2: read-only). Human correspondence only (quality gate in gmail_filter.py, decision
+2026-10-02): Gmail stays the archive for everything else and is searched live. Kept e-mails → core.events
+(email.received / email.sent), their attachments → Raw Vault (encrypted zone).
+
+Backfill, resumable, in two lanes: (1) every thread where Monsieur wrote (`in:sent`, whole thread), which also builds
+the correspondents set; (2) the rest of the mailbox, read as metadata only and fetched in full only when the gate keeps
+it. Then incremental via history.list. Bodies are plain text (HTML stripped), capped at 50 000 chars.
 """
 from __future__ import annotations
 
@@ -18,6 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from google_api import Google, SyncTokenExpired  # noqa: E402
+from gmail_filter import ME, keep  # noqa: E402
 from walter_memory import events, ingestion, objects  # noqa: E402
 from walter_memory.db import connection  # noqa: E402
 
@@ -82,8 +87,7 @@ def store(g: Google, me: str, msgs: list[dict]) -> int:
     for m in msgs:
         ev, atts = to_event(m, me)
         evs.append(ev)
-        promo = any(l in (m.get("labelIds") or []) for l in ("CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL", "CATEGORY_FORUMS"))
-        jobs += [] if promo else [(m, a) for a in atts if (a.get("size") or 0) <= MAX_ATTACH]
+        jobs += [(m, a) for a in atts if (a.get("size") or 0) <= MAX_ATTACH]
     with connection() as conn:
         n = events.record_events(evs, conn=conn)["inserted"] if evs else 0
     for m, a in jobs:
@@ -100,51 +104,115 @@ def store(g: Google, me: str, msgs: list[dict]) -> int:
     return n
 
 
+def _headers(m: dict) -> dict:
+    return {x["name"].lower(): x["value"] for x in (m.get("payload") or {}).get("headers", [])}
+
+
+class Gate:
+    """Decides per message from metadata; knows the threads where Monsieur wrote and the people he wrote to."""
+
+    def __init__(self):
+        with connection() as conn:
+            rows = conn.execute("""select thread_id, payload->'to' t, payload->'cc' c from core.events
+                                   where source = 'gmail' and payload->'labels' ? 'SENT'""").fetchall()
+            self.stored_threads = {r["thread_id"] for r in conn.execute(
+                "select distinct thread_id from core.events where source = 'gmail'").fetchall()}
+        self.human_threads = {r["thread_id"] for r in rows}
+        self.correspondents = {a.lower() for r in rows for a in (r["t"] or []) + (r["c"] or [])} - {ME}
+
+    def learn(self, m: dict) -> None:
+        if "SENT" in (m.get("labelIds") or []):
+            h = _headers(m)
+            self.human_threads.add(m["threadId"])
+            self.correspondents |= {a.lower() for _, a in getaddresses([h.get("to", ""), h.get("cc", "")]) if a} - {ME}
+
+    def ok(self, m: dict) -> bool:
+        labels = m.get("labelIds") or []
+        if {"SPAM", "TRASH", "CHAT"} & set(labels):
+            return False
+        h = _headers(m)
+        return keep(labels=labels, from_header=h.get("from"), subject=h.get("subject"), snippet=m.get("snippet"),
+                    human_thread=m["threadId"] in self.human_threads, correspondents=self.correspondents)
+
+
+def store_threads(g: Google, me: str, gate: Gate, thread_ids) -> int:
+    """Whole threads where Monsieur wrote (each message still passes the OTP part of the gate)."""
+    n = 0
+    for tid in dict.fromkeys(thread_ids):
+        msgs = g.get(f"{API}/threads/{tid}", format="full").get("messages", [])
+        for m in msgs:
+            gate.learn(m)
+        n += store(g, me, [m for m in msgs if gate.ok(m)])
+        gate.stored_threads.add(tid)
+    return n
+
+
+def store_if_kept(g: Google, me: str, gate: Gate, ids) -> int:
+    """Metadata first; full fetch only for kept messages. A new message from Monsieur pulls its whole thread."""
+    keep_full, new_threads = [], []
+    for mid in dict.fromkeys(ids):
+        try:
+            m = g.get(f"{API}/messages/{mid}", format="metadata", metadataHeaders=["From", "To", "Cc", "Subject"])
+        except Exception:
+            continue
+        if "SENT" in (m.get("labelIds") or []) and m["threadId"] not in gate.stored_threads:
+            gate.learn(m); new_threads.append(m["threadId"]); continue
+        gate.learn(m)
+        if gate.ok(m):
+            keep_full.append(mid)
+    n = store_threads(g, me, gate, new_threads)
+    full = [g.get(f"{API}/messages/{mid}", format="full") for mid in keep_full]
+    return n + (store(g, me, full) if full else 0)
+
+
 def main() -> None:
-    ingestion.register_connector(CONNECTOR, "gmail", "pull", "Gmail lucas.jouvencon@gmail.com (read-only)", timedelta(minutes=15))
+    ingestion.register_connector(CONNECTOR, "gmail", "pull", "Gmail lucas.jouvencon@gmail.com (read-only, human only)",
+                                 timedelta(minutes=15))
+    pages = int(sys.argv[1]) if len(sys.argv) > 1 else 5
     try:
         g = Google()
         prof = g.get(f"{API}/profile")
         me = prof["emailAddress"]
-        cp = ingestion.get_checkpoint(CONNECTOR, me)
-        total = 0
-        if not cp.get("backfill_done"):
-            if "history_id" not in cp:
-                cp["history_id"] = prof["historyId"]       # incremental starts from the moment backfill began
-            page = cp.get("page_token")
-            for _ in range(int(sys.argv[1]) if len(sys.argv) > 1 else 10):   # pages of 100 per run
-                lst = g.get(f"{API}/messages", maxResults=100, pageToken=page, includeSpamTrash="false")
-                msgs = [g.get(f"{API}/messages/{x['id']}", format="full") for x in lst.get("messages", [])]
-                total += store(g, me, msgs)
-                page = lst.get("nextPageToken")
-                ingestion.set_checkpoint(CONNECTOR, me, {**cp, "page_token": page, "backfill_done": not page})
-                if not page:
-                    cp["backfill_done"] = True
+        key = f"v2:{me}"
+        cp = ingestion.get_checkpoint(CONNECTOR, key)
+        cp.setdefault("history_id", prof["historyId"])     # incremental starts from the moment backfill began
+        gate, total = Gate(), 0
+        for lane, q in (("sent", "in:sent"), ("rest", "-in:sent -in:chats")):
+            if cp.get(f"{lane}_done"):
+                continue
+            for _ in range(pages):
+                lst = g.get(f"{API}/messages", maxResults=100, pageToken=cp.get(f"{lane}_page"), q=q,
+                            includeSpamTrash="false")
+                ids = [x["id"] for x in lst.get("messages", [])]
+                if lane == "sent":
+                    total += store_threads(g, me, gate, [x["threadId"] for x in lst.get("messages", [])
+                                                         if x["threadId"] not in gate.stored_threads])
+                else:
+                    total += store_if_kept(g, me, gate, ids)
+                cp[f"{lane}_page"] = lst.get("nextPageToken")
+                cp[f"{lane}_done"] = not cp[f"{lane}_page"]
+                ingestion.set_checkpoint(CONNECTOR, key, cp)
+                ingestion.mark_success(CONNECTOR)
+                if cp[f"{lane}_done"]:
                     break
-        if cp.get("backfill_done") or ingestion.get_checkpoint(CONNECTOR, me).get("backfill_done"):
-            cp = ingestion.get_checkpoint(CONNECTOR, me)
+            break                                           # one lane per run: lane 2 needs lane 1's correspondents
+        if cp.get("sent_done") and cp.get("rest_done"):
             try:
-                hist, token = [], None
+                hist, token, h = [], None, {}
                 while True:
                     h = g.get(f"{API}/history", startHistoryId=cp["history_id"], historyTypes="messageAdded", pageToken=token)
                     hist += [x["message"]["id"] for rec in h.get("history", []) for x in rec.get("messagesAdded", [])]
                     token = h.get("nextPageToken")
                     if not token:
                         break
-                msgs = []
-                for mid in dict.fromkeys(hist):
-                    try:
-                        m = g.get(f"{API}/messages/{mid}", format="full")
-                        if not {"SPAM", "TRASH"} & set(m.get("labelIds") or []):
-                            msgs.append(m)
-                    except Exception:
-                        pass
-                total += store(g, me, msgs)
-                ingestion.set_checkpoint(CONNECTOR, me, {**cp, "history_id": h.get("historyId", cp["history_id"])})
+                total += store_if_kept(g, me, gate, hist)
+                cp["history_id"] = h.get("historyId", cp["history_id"])
+                ingestion.set_checkpoint(CONNECTOR, key, cp)
             except SyncTokenExpired:
-                ingestion.set_checkpoint(CONNECTOR, me, {"backfill_done": False})   # full re-scan, idempotent
+                ingestion.set_checkpoint(CONNECTOR, key, {})   # full re-scan, idempotent
         ingestion.mark_success(CONNECTOR)
-        print(json.dumps({"account": me, "events_inserted": total}))
+        print(json.dumps({"account": me, "events_inserted": total,
+                          "lanes": {k: cp.get(k) for k in ("sent_done", "rest_done")}}))
     except Exception as e:
         ingestion.record_failure(CONNECTOR, f"{type(e).__name__}: {e}")
         raise
