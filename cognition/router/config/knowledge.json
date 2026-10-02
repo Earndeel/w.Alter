@@ -263,5 +263,35 @@
     "tts": "Lire un texte à voix haute, générer une voix off ou un audio parlé",
     "speech_to_speech": "Conversation vocale en temps réel",
     "music": "Composer ou générer une musique, une chanson, un jingle"
+  },
+  "levels": {
+    "_doc": "Monsieur's text tiers (2026-10-02), verified on the AA Pareto frontier with real provider prices: each is the knee of its segment. pin = model_id/variant (reasoning level).",
+    "general": {
+      "L1": {
+        "label": "Économique",
+        "pin": "gpt-6-luna/max",
+        "provider": "codex",
+        "watch": "dominance",
+        "description": "Quotidien et tâches légères : GPT-6 Luna en raisonnement max (38,1 AA, 0,020 $/tâche, inclus Codex).",
+        "evidence": "frontière AA : +467 pts/$ depuis Luna xhigh ; domine MiMo 2.6 Flash (37,9 pour 0,062 $)"
+      },
+      "L2": {
+        "label": "Intermédiaire",
+        "pin": "gpt-6-1-sol/medium",
+        "provider": "codex",
+        "watch": "dominance",
+        "description": "Analyse, comparatif, rédaction soignée : GPT-6.1 Sol en raisonnement medium (47,8 AA, 0,064 $/tâche, inclus Codex).",
+        "evidence": "coude de Sol : 229 pts/$ jusqu'à medium, puis 78 (high), 36 (xhigh), 8 (max)"
+      },
+      "L3": {
+        "label": "Haut de gamme",
+        "pin": "claude-opus-5-5/high",
+        "provider": "kie",
+        "watch": "dominance",
+        "fallback": "gpt-6-astra/xhigh",
+        "description": "Raisonnement le plus exigeant, enjeux importants : Claude Opus 5.5 en high (53,6 AA, 0,73 $/tâche).",
+        "evidence": "coude du haut : 14,5 pts/$ jusqu'à Opus high, puis 3,7 (xhigh), 1,6 (max) ; repli Astra xhigh via Codex (52,4)"
+      }
+    }
   }
 }
