@@ -14,7 +14,7 @@ from typing import Any
 
 SKILL = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "skills/research/aa-pareto-model-optimizer/scripts"
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
-MEDIA_UNITS = {"image": "per image", "video": "per second", "audio": "per 1000 characters"}
+MEDIA_UNITS = {"image": "per image", "video": "per second", "audio": "per 1000 characters", "music": None}
 
 
 def _load(name: str):
@@ -73,8 +73,8 @@ def chat_route(offers: list[dict], list_cost: float | None) -> dict[str, Any]:
 
 def _per_unit(o: dict, unit: str | None) -> dict | None:
     """Offer priced in the task unit; 'per video' prices with an explicit duration (e.g. '10s') become per second."""
-    if o["unit_price"] is None:
-        return None
+    if not o["unit_price"]:
+        return None  # unpriced, or a free auxiliary operation (e.g. Kie Suno "Cover Generate" $0) — not a generation price
     got = (o["unit"] or "").strip().lower()
     if unit is None or got == unit:
         return o
@@ -85,16 +85,28 @@ def _per_unit(o: dict, unit: str | None) -> dict | None:
     return None
 
 
+VIDEO_INPUT = re.compile(r"with video|(^|[,|] *)video input", re.I)  # video-to-video SKUs, not generation
+RESOLUTION = re.compile(r"\b(\d{3,4}p|[1248]k)\b", re.I)
+
+
 def media_route(offers: list[dict], interface: str) -> dict[str, Any]:
     unit = MEDIA_UNITS.get(interface)
-    paid = [c for c in (_per_unit(o, unit) for o in offers if o["interface"] == interface) if c]
+    paid = [c for c in (_per_unit(o, unit) for o in offers if o["interface"] == interface
+                        and not VIDEO_INPUT.search(o["offer_key"])) if c]
+    by_res: dict[str, dict] = {}
+    for c in paid:
+        m = RESOLUTION.search(c["offer_key"])
+        res = m.group(1).lower() if m else "any"
+        if res not in by_res or c["unit_price"] < by_res[res]["cost"]:
+            by_res[res] = {"provider": c["provider"], "offer_key": c["offer_key"], "cost": c["unit_price"]}
     any_offer = [o for o in offers if o["interface"] == interface]
     best = min(paid, key=lambda o: o["unit_price"], default=None)
     top = max(paid, key=lambda o: o["unit_price"], default=None)
     route = None
     if best:
         route = {"provider": best["provider"], "offer_key": best["offer_key"], "cost": best["unit_price"],
-                 "unit": best["unit"], "max_variant_cost": top["unit_price"], "max_variant": top["offer_key"]}
+                 "unit": best["unit"], "max_variant_cost": top["unit_price"], "max_variant": top["offer_key"],
+                 "by_resolution": by_res}
     elif any_offer:
         o = any_offer[0]
         route = {"provider": o["provider"], "offer_key": o["offer_key"], "cost": None, "unit": None}

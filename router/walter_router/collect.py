@@ -3,9 +3,11 @@ then parse each new snapshot into models.benchmarks / models.offers."""
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import os
 import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -65,10 +67,44 @@ def source_da() -> tuple[dict, datetime, str]:
     return doc, _parse_time(doc.get("generated_at")), doc.get("source_url") or "https://www.designarena.ai/"
 
 
+def fetch_text(url: str) -> str:
+    req = Request(url, headers={"User-Agent": "Mozilla/5.0 (Walter-Router/1.0)", "Accept": "text/html"})
+    with urlopen(req, timeout=40) as resp:  # noqa: S310 (fixed https host)
+        raw = resp.read(MAX_BYTES + 1)
+    return raw.decode("utf-8", "replace")
+
+
+def display_pricing(page: str) -> list | None:
+    """The `displayPricing` array embedded in an OpenRouter model page (per-second / per-song / per-tier prices
+    that the /models API reports as 0 for media models)."""
+    text = html.unescape(page).replace('\\"', '"')
+    i = text.find('"displayPricing":')
+    if i < 0:
+        return None
+    j = text.index("[", i)
+    depth = 0
+    for k in range(j, len(text)):
+        if text[k] == "[":
+            depth += 1
+        elif text[k] == "]":
+            depth -= 1
+            if depth == 0:
+                return json.loads(text[j:k + 1])
+    return None
+
+
 def source_openrouter() -> tuple[dict, datetime, str]:
     doc = fetch_json(OPENROUTER_URL)
     if not doc.get("data"):
         raise ValueError("openrouter: empty catalogue")
+    for m in doc["data"]:
+        if _or_interface(m) == "chat" or ":" in m["id"] or m["id"].startswith(("openrouter/", "~")):
+            continue
+        try:
+            m["_display_pricing"] = display_pricing(fetch_text(f"https://openrouter.ai/{m['id']}"))
+        except Exception as exc:  # noqa: BLE001 — a missing page leaves that model unpriced, not the run failed
+            m["_display_pricing_error"] = f"{type(exc).__name__}: {exc}"[:200]
+        time.sleep(0.3)
     return doc, now(), OPENROUTER_URL
 
 
@@ -218,12 +254,26 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
             mid, _ = identity.normalize("openrouter", oid)
             pr = m.get("pricing") or {}
             pin, pout = _num(pr.get("prompt")), _num(pr.get("completion"))
-            rows.append(dict(provider="openrouter", offer_key=oid, model_id=mid, interface=_or_interface(m), access="paid",
-                             price_in_1m=pin * 1e6 if pin is not None and pin >= 0 else None,
-                             price_out_1m=pout * 1e6 if pout is not None and pout >= 0 else None,
-                             unit_price=None, unit=None,
-                             provider_created=datetime.fromtimestamp(m["created"], timezone.utc) if m.get("created") else None,
-                             pricing=pr))
+            interface = _or_interface(m)
+            created = datetime.fromtimestamp(m["created"], timezone.utc) if m.get("created") else None
+            media = interface != "chat"
+            rows.append(dict(provider="openrouter", offer_key=oid, model_id=mid, interface=interface, access="paid",
+                             # media models report 0/0 token prices in the API: that is not a price
+                             price_in_1m=None if media or pin is None or pin < 0 else pin * 1e6,
+                             price_out_1m=None if media or pout is None or pout < 0 else pout * 1e6,
+                             unit_price=None, unit=None, provider_created=created, pricing=pr))
+            for entry in m.get("_display_pricing") or []:
+                if entry.get("kind") != "unit":
+                    continue  # token-priced media (e.g. image output per M tokens) has no per-unit equivalent
+                unit = "per " + (entry.get("unitLabel") or "").lstrip("/").strip()
+                for tier in entry.get("tiers") or [{"sku_label": "", "price": entry.get("price")}]:
+                    price = _num(tier.get("price"))
+                    if price is None:
+                        continue
+                    key = " | ".join(x for x in (oid, entry.get("sku_label"), tier.get("sku_label")) if x)
+                    rows.append(dict(provider="openrouter", offer_key=key, model_id=mid, interface=interface, access="paid",
+                                     price_in_1m=None, price_out_1m=None, unit_price=price, unit=unit,
+                                     provider_created=created, pricing={"display": entry, "tier": tier}))
     elif kind == "kie":
         chat: dict[str, dict] = {}
         for rec in doc["data"]:
