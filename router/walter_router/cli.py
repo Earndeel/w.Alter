@@ -6,7 +6,7 @@ import json
 import subprocess
 import sys
 
-from . import alerts, choose, collect, db, dossier, execution, intent, knowledge
+from . import alerts, choose, collect, db, dossier, execution, intent, knowledge, review
 from . import select as sel
 
 
@@ -58,7 +58,7 @@ def status() -> dict:
     return {"last_run": run, "sources": snaps, "alerts": open_alerts, "preferences": prefs}
 
 
-RUN_MAX_AGE_H = 30  # the timer runs daily at 03:30 UTC
+RUN_MAX_AGE_H = 54  # the cycle runs every 48 h
 
 
 def health() -> dict:
@@ -172,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--provider", help="only this status key (kie, kie-codex, openrouter, arnict)")
     pr.add_argument("--timeout", type=int, default=90)
     sub.add_parser("tasks", help="task keys, labels and interfaces (for tool descriptions)")
+    sub.add_parser("review", help="deterministic digest of the last cycle (input of the 48 h analysis agent)")
     sub.add_parser("notify-failure", help="Telegram message after a failed refresh (systemd OnFailure)")
     d = sub.add_parser("decide", help="free-text request -> role, model, route, workflow, brief")
     d.add_argument("task")
@@ -218,6 +219,8 @@ def main(argv: list[str] | None = None) -> int:
                 out = route(conn, args.request, args.task, args.level)
             elif args.cmd == "classify":
                 out = intent.classify(conn, args.request)
+            elif args.cmd == "review":
+                out = review.digest(conn)
             elif args.cmd == "tasks":
                 out = list(conn.execute("select task, label, interface from models.tasks order by interface, task"))
             elif args.cmd == "dossier":
