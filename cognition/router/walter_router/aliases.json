@@ -1,0 +1,17 @@
+{
+  "_doc": "Manual identity links. '*' maps a normalised base from any namespace to a canonical model_id. Every entry needs a reason; never add a guess.",
+  "*": {
+    "hailuo-3-max": {"model_id": "minimax-h3-max", "reason": "OpenRouter minimax/hailuo-3-max = AA 'MiniMax H3 Max' (Hailuo is MiniMax's video brand; same vendor, same version)"},
+    "hailuo-3": {"model_id": "minimax-h3", "reason": "OpenRouter minimax/hailuo-3 = AA 'MiniMax H3'"},
+    "dreamina-seedance-2-5": {"model_id": "seedance-2-5", "reason": "AA 'Dreamina Seedance 2.5' = OpenRouter bytedance/seedance-2.5"},
+    "dreamina-seedance-2-0": {"model_id": "seedance-2-0", "reason": "AA 'Dreamina Seedance 2.0' = OpenRouter bytedance/seedance-2.0"},
+    "wan-3-0-video": {"model_id": "wan-3-0", "reason": "Kie 'wan 3.0 video' = AA/OpenRouter Wan 3.0"},
+    "wan3-0-video-prime": {"model_id": "wan-3-0-prime", "reason": "Kie 'wan3.0 video prime' = OpenRouter alibaba/wan-3.0-prime"}
+  },
+  "kie": {},
+  "openrouter": {},
+  "aa": {},
+  "da": {},
+  "mm": {},
+  "codex": {}
+}
