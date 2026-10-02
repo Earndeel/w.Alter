@@ -51,3 +51,12 @@ def test_tie_goes_to_monsieurs_affinity(conn):
     assert out[0]["model_id"] == "gpt-6-luna" and "préférence" in out[0]["reasons"]["tie_break"]
     far = [{**rows[0], "quality": 1480.0}, rows[1]]
     assert knowledge.tie_break(conn, "general", far)[0]["model_id"] == "mimo-v2-6-flash"
+
+
+def test_tie_group_puts_subscription_first_but_not_beyond_the_margin(conn):
+    rows = [{"model_id": "claude-opus-5-5", "quality": 86.4, "quality_unit": "Composite /100", "subscription": None},
+            {"model_id": "claude-fable-5-1", "quality": 86.3, "quality_unit": "Composite /100", "subscription": None},
+            {"model_id": "gpt-6-astra", "quality": 85.7, "quality_unit": "Composite /100", "subscription": "codex"},
+            {"model_id": "gpt-6-sol", "quality": 80.0, "quality_unit": "Composite /100", "subscription": "codex"}]
+    out = [r["model_id"] for r in knowledge.tie_break(conn, "general", rows)]
+    assert out == ["gpt-6-astra", "claude-opus-5-5", "claude-fable-5-1", "gpt-6-sol"]

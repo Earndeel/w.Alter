@@ -12,7 +12,7 @@ from pathlib import Path
 TIERS = ("non-reasoning", "minimal", "low", "medium", "high", "xhigh", "max")
 VENDOR_PREFIXES = ("google-", "openai-", "anthropic-", "meta-", "microsoft-", "alibaba-", "bytedance-",
                    "black-forest-labs-")
-BENCHMARK_NAMESPACES = ("aa", "da", "mm", "arena")
+BENCHMARK_NAMESPACES = ("aa", "da", "mm", "arena", "bridgebench")
 _TIER_SUFFIX = re.compile(r"-(" + "|".join(TIERS) + r")$")
 _PAREN = re.compile(r"\(([^)]*)\)")
 _GLUED = re.compile(r"(?<![a-z0-9])([a-z]{3,})(\d)")      # wan2-7 -> wan-2-7, flux1-1 -> flux-1-1 (not h3, v2, o1)
@@ -100,7 +100,9 @@ def normalize(namespace: str, key: str, name: str | None = None) -> tuple[str, s
         variant = "-".join(parts) or variant
     else:
         base = key.split(":")[0]
-        if namespace in ("openrouter", "hermes_providers") and "/" in base:
+        if namespace == "bridgebench" and base.startswith("openrouter/"):
+            base = base[len("openrouter/"):]
+        if namespace in ("openrouter", "hermes_providers", "bridgebench") and "/" in base:
             base = base.split("/", 1)[1].split("/")[0]  # vendor/model[/service-tier, e.g. /flex]
         if namespace == "kie" and "/" in base:
             base = base.rsplit("/", 1)[1]

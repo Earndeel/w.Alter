@@ -43,6 +43,16 @@ inside the tie margin — 1 AA point, 10 Elo — the preferred model, then a sub
 orchestrator can overrule the keyword match. Video today: default/équilibré H3 (Kie), premium Seedance 2.5
 (workflow: references + adapted prompt), action H3, UGC Omni 1.1 (Flow, Gemini AI Pro credits), budget Grok 1.5.
 
+## Weighting and dossiers
+`scoring.composite(task)`: each board of the task (`models.task_benchmarks.weight`) is put on 0-100 (linear from the
+board's median model = 0 to its leader = 100), weighted by weight x reliability (votes v/(v+500); provisional 0.5)
+and shrunk toward 50 when the evidence is thin (K = 0.25). The `best` level ranks callable models by this composite,
+then close calls (margin 1.5 composite points) go to Monsieur's affinity, then a subscription route.
+Every refresh writes one JSON per task to `models.dossiers` (view `models.latest_dossiers`): boards and weights,
+Monsieur's roles with fiches/workflows, the top candidates with per-board evidence, routes, prices, open weights,
+content policy, affinity, the level picks, and the decision rules. `walter-router dossier <task>` prints it.
+BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local FlareSolverr (127.0.0.1:8191).
+
 ## Commands
 ```
 bin/walter-router migrate
@@ -51,6 +61,7 @@ bin/walter-router pick <task> [--level L1|L2|L3]      # preferences first, then 
 bin/walter-router pick <task> --require unrestricted|open_weights   # hard constraint, best callable model
 bin/walter-router decide <task> "<request in French>"  # role by objective, route, workflow, brief
 bin/walter-router declare                               # apply config/knowledge.json
+bin/walter-router dossier <task>                        # the JSON the router reads
 bin/walter-router prefer <task> [--objective value|best_available] [--pin model_id[/variant]] [--provider p] [--note ...]
 bin/walter-router alerts [--all]
 bin/walter-router verdict <alert_id> adopted|dismissed [--note ...]   # adopted challenger becomes the favourite

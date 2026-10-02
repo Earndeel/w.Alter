@@ -11,7 +11,7 @@ from . import select as sel
 
 HERMES = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "hermes-agent" / "venv" / "bin" / "hermes"
 UNRANKED_DAYS = 30
-STALE_HOURS = {"aa": 48, "mm": 48, "da": 48, "arena": 48, "openrouter": 48, "kie": 48, "codex": 72}
+STALE_HOURS = {"aa": 48, "mm": 48, "da": 48, "arena": 48, "bridgebench": 72, "openrouter": 48, "kie": 48, "codex": 72}
 
 
 def _upsert(conn, kind: str, task: str, subject: str, evidence: dict, status: str, role: str = "") -> bool:
@@ -151,7 +151,7 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
 def unranked(conn) -> list[str]:
     """Models released recently on a provider with no measurement on any leaderboard yet (one alert per model)."""
     snaps = sel.latest_snapshots(conn)
-    bench_ids = [snaps[k] for k in ("aa", "mm", "da", "arena") if k in snaps]
+    bench_ids = [snaps[k] for k in ("aa", "mm", "da", "arena", "bridgebench") if k in snaps]
     created = []
     for o in conn.execute("""select o.model_id, o.interface, min(o.provider_created) as released
                              from models.offers o where o.snapshot_id = %s

@@ -8,7 +8,7 @@ UNIT_SHORT = {"per second": "$/s", "per image": "$/img", "per song": "$/titre", 
               "per request": "$/requête"}
 PROVIDERS = {"openrouter": "OpenRouter", "kie": "Kie", "codex": "Codex", "google-flow": "Flow"}
 BOARDS = {"aa_intelligence": "AA", "aa_mm": "AA", "da_models": "Design Arena", "da_agents": "Design Arena",
-          "arena": "Arena"}
+          "arena": "Arena", "bridgebench": "BridgeBench"}
 MAX_LISTED_RESOLUTIONS = 4
 ICONS = {"image": "🖼️", "video": "🎬", "audio": "🗣️", "music": "🎵", "chat": "💬"}
 
