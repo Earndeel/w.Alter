@@ -20,21 +20,38 @@ def routes_for(conn, model_id: str, interface: str) -> dict[str, Any]:
     return sel.chat_route(offers, None) if interface == "chat" else sel.media_route(offers, interface)
 
 
-def pick(conn, task: str, level: str | None = None) -> dict[str, Any]:
+def _pinned_answer(conn, task: dict, pref: dict) -> dict[str, Any]:
+    route = routes_for(conn, pref["pinned_model_id"], task["interface"])
+    provider = pref["pinned_provider"] or route.get("subscription") or (route.get("paid") or {}).get("provider") \
+        or route.get("ui")
+    mode = "manual_ui" if provider and provider == route.get("ui") else "delegate"
+    return {"task": task["task"], "role": pref["role"], "mode": mode, "source": "preference_pinned",
+            "model_id": pref["pinned_model_id"], "variant": pref["pinned_variant"], "provider": provider,
+            "route": route, "why": pref["note"]}
+
+
+def pick(conn, task: str, level: str | None = None, role: str | None = None) -> dict[str, Any]:
+    """Monsieur's favourite for (task, role) first; otherwise the computed choice for the task's objective.
+
+    Without a role, the 'default' favourite is used and the other roles are listed so the orchestrator can
+    switch on intent (e.g. an action scene -> role 'action').
+    """
     t = conn.execute("select * from models.tasks where task = %s", (task,)).fetchone()
     if not t:
         raise KeyError(f"unknown task: {task}")
     if t["default_objective"] == "tool":
         return {"task": task, "mode": "tool", "tool": task, "why": t["description"]}
-    pref = conn.execute("select * from models.preferences where task = %s", (task,)).fetchone()
+    prefs = {p["role"]: p for p in conn.execute("select * from models.preferences where task = %s", (task,))}
+    if role and role not in prefs:
+        raise KeyError(f"no preference role '{role}' for {task}; known: {sorted(prefs)}")
+    pref = prefs.get(role or "default")
+    others = {r: {"model_id": p["pinned_model_id"], "note": p["note"]} for r, p in prefs.items()
+              if r != (role or "default") and p["pinned_model_id"]}
     if pref and pref["pinned_model_id"]:
-        route = routes_for(conn, pref["pinned_model_id"], t["interface"])
-        return {"task": task, "mode": "delegate", "source": "preference_pinned", "model_id": pref["pinned_model_id"],
-                "variant": pref["pinned_variant"], "provider": pref["pinned_provider"] or (route.get("subscription")
-                or (route.get("paid") or {}).get("provider")), "route": route, "why": pref["note"]}
+        return {**_pinned_answer(conn, t, pref), "other_roles": others}
     if t["quality_benchmark"] is None:
         snaps = sel.latest_snapshots(conn)
-        ids = [snaps[k] for k in ("openrouter", "kie", "codex") if k in snaps]
+        ids = [snaps[k] for k in ("openrouter", "kie", "codex", "declared") if k in snaps]
         offers = conn.execute("""select provider, offer_key, model_id, unit_price, unit from models.offers
                                  where snapshot_id = any(%s) and interface = %s order by provider, offer_key""",
                               (ids, t["interface"])).fetchall()
@@ -55,23 +72,25 @@ def pick(conn, task: str, level: str | None = None) -> dict[str, Any]:
                     "objective": objective, "level": lvl, "model_id": row["model_id"], "variant": row["variant"],
                     "display_name": row["display_name"], "quality": row["quality"], "quality_unit": row["quality_unit"],
                     "provider": row["subscription"] or row["provider"], "paid_fallback": row["provider"],
-                    "real_cost": row["real_cost"], "cost_unit": row["cost_unit"], "run_id": run_id}
-    return {"task": task, "mode": "none", "why": "no callable candidate in the latest run"}
+                    "real_cost": row["real_cost"], "cost_unit": row["cost_unit"], "run_id": run_id, "other_roles": others}
+    return {"task": task, "mode": "none", "why": "no callable candidate in the latest run", "other_roles": others}
 
 
-def set_preference(conn, task: str, objective: str | None = None, pin: str | None = None,
-                   provider: str | None = None, note: str | None = None) -> dict:
-    """Record Monsieur's declaration. Pinning records every model already better as 'baseline' (no alert for those)."""
+def set_preference(conn, task: str, objective: str | None = None, pin: str | None = None, provider: str | None = None,
+                   note: str | None = None, role: str = "default", watch: str | None = None) -> dict:
+    """Record Monsieur's declaration. Pinning records every current challenger as 'baseline' (no alert for those)."""
     model_id, variant = (pin.split("/", 1) + [""])[:2] if pin else (None, "")
     if model_id:
         conn.execute("insert into models.canonical (model_id) values (%s) on conflict do nothing", (model_id,))
-    conn.execute("""insert into models.preferences (task, objective, pinned_model_id, pinned_variant, pinned_provider, note, declared_at)
-                    values (%s, %s, %s, %s, %s, %s, now())
-                    on conflict (task) do update set objective = coalesce(excluded.objective, models.preferences.objective),
+    conn.execute("""insert into models.preferences (task, role, objective, pinned_model_id, pinned_variant, pinned_provider,
+                      note, watch, declared_at)
+                    values (%s, %s, %s, %s, %s, %s, %s, coalesce(%s, 'quality'), now())
+                    on conflict (task, role) do update set objective = coalesce(excluded.objective, models.preferences.objective),
                       pinned_model_id = excluded.pinned_model_id, pinned_variant = excluded.pinned_variant,
-                      pinned_provider = excluded.pinned_provider,
+                      pinned_provider = excluded.pinned_provider, watch = coalesce(%s, models.preferences.watch),
                       note = coalesce(excluded.note, models.preferences.note), declared_at = now()""",
-                 (task, objective, model_id, variant, provider, note))
+                 (task, role, objective, model_id, variant, provider, note, watch, watch))
     from . import alerts
-    baseline = alerts.challengers(conn, status_for_new="baseline", only_task=task) if model_id else []
-    return {"task": task, "objective": objective, "pinned": pin, "baseline_challengers": len(baseline)}
+    baseline = alerts.challengers(conn, status_for_new="baseline", only_task=task, only_role=role) if model_id else []
+    return {"task": task, "role": role, "objective": objective, "pinned": pin, "watch": watch,
+            "baseline_challengers": len(baseline)}

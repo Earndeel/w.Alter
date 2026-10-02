@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,7 @@ def latest_snapshots(conn) -> dict[str, int]:
 
 
 def load_offers(conn, snaps: dict[str, int]) -> dict[str, list[dict]]:
-    ids = [snaps[k] for k in ("openrouter", "kie", "codex") if k in snaps]
+    ids = [snaps[k] for k in ("openrouter", "kie", "codex", "declared") if k in snaps]
     by_model: dict[str, list[dict]] = {}
     for r in conn.execute("select * from models.offers where snapshot_id = any(%s)", (ids,)):
         by_model.setdefault(r["model_id"], []).append(r)
@@ -70,10 +71,23 @@ def chat_route(offers: list[dict], list_cost: float | None) -> dict[str, Any]:
     return {"paid": best, "subscription": subscription, "callable": bool(best or subscription)}
 
 
+def _per_unit(o: dict, unit: str | None) -> dict | None:
+    """Offer priced in the task unit; 'per video' prices with an explicit duration (e.g. '10s') become per second."""
+    if o["unit_price"] is None:
+        return None
+    got = (o["unit"] or "").strip().lower()
+    if unit is None or got == unit:
+        return o
+    m = re.search(r"(?<![\d.])(\d+(?:\.\d+)?)s\b", o["offer_key"])
+    if unit == "per second" and got in ("per video", "per vedio") and m and float(m.group(1)) > 0:
+        return {**o, "unit_price": o["unit_price"] / float(m.group(1)), "unit": "per second",
+                "converted_from": f'{o["unit_price"]} {got}'}
+    return None
+
+
 def media_route(offers: list[dict], interface: str) -> dict[str, Any]:
     unit = MEDIA_UNITS.get(interface)
-    paid = [o for o in offers if o["interface"] == interface and o["unit_price"] is not None
-            and (unit is None or (o["unit"] or "").strip().lower() == unit)]
+    paid = [c for c in (_per_unit(o, unit) for o in offers if o["interface"] == interface) if c]
     any_offer = [o for o in offers if o["interface"] == interface]
     best = min(paid, key=lambda o: o["unit_price"], default=None)
     top = max(paid, key=lambda o: o["unit_price"], default=None)
@@ -84,7 +98,8 @@ def media_route(offers: list[dict], interface: str) -> dict[str, Any]:
     elif any_offer:
         o = any_offer[0]
         route = {"provider": o["provider"], "offer_key": o["offer_key"], "cost": None, "unit": None}
-    return {"paid": route, "subscription": None, "callable": bool(any_offer)}
+    ui = next((o["provider"] for o in any_offer if o["access"] == "ui"), None)
+    return {"paid": route, "subscription": None, "ui": ui, "callable": bool(any_offer)}
 
 
 def _intelligence_index(conn, snaps: dict[str, int], offers: dict[str, list[dict]]) -> dict[tuple[str, str], dict]:

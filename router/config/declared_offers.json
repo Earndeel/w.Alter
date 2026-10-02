@@ -1,0 +1,14 @@
+{
+  "_doc": "Offers declared by Monsieur that no provider API lists (web interfaces, subscriptions). Only explicit declarations go here.",
+  "offers": [
+    {
+      "provider": "google-flow",
+      "offer_key": "flow:gemini-omni-flash-1-1",
+      "model": "gemini-omni-flash-1-1",
+      "interface": "video",
+      "access": "ui",
+      "declared": "2026-10-02",
+      "note": "Monsieur génère Gemini Omni Flash 1.1 via l'interface web Flow (meilleur ratio pour lui). Abonnement Google exact non précisé."
+    }
+  ]
+}
