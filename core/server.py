@@ -290,7 +290,7 @@ def vault_put(path: str, source: str = "", captured_at: str = "", links: list[st
 
 @mcp.tool()
 def walter_health() -> str:
-    """Status of the W.Alter stack: core services, Hermes gateway, memory health score, disk."""
+    """Status of the W.Alter stack: core services, Hermes gateway, memory health score, model router, disk."""
     out = []
     states = subprocess.run(["systemctl", "is-active", *STACK_UNITS], capture_output=True, text=True).stdout.split()
     out += [f"{u}: {s}" for u, s in zip(STACK_UNITS, states)]
@@ -302,6 +302,15 @@ def walter_health() -> str:
                    f"errors={summary.get('errors')} warnings={summary.get('warnings')}")
     except (OSError, KeyError, ValueError):
         out.append("memory autopilot: no report")
+    try:  # Walter Router (model choice per task): fed, fresh, providers reachable
+        r = subprocess.run(["/opt/walter-router/bin/walter-router", "health"], capture_output=True, text=True, timeout=30)
+        h = json.loads(r.stdout)
+        line = "walter-router: ok" if h["ok"] else "walter-router: KO — " + "; ".join(h["issues"][:3])
+        if h.get("warnings"):
+            line += " | avertissements : " + "; ".join(w[:90] for w in h["warnings"][:2])
+        out.append(line)
+    except (OSError, ValueError, KeyError, subprocess.TimeoutExpired):
+        out.append("walter-router: no health report")
     st = os.statvfs("/")
     out.append(f"disk /: {100 - st.f_bavail * 100 // st.f_blocks}% used, {st.f_bavail * st.f_frsize >> 30} GiB free")
     return "\n".join(out)
