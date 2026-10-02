@@ -7,7 +7,10 @@ from . import collect
 from . import select as sel
 
 LEVELS = ("L1", "L2", "L3")
-REQUIREMENTS = {"unrestricted": "c.content_policy = 'unrestricted'", "open_weights": "c.open_weights"}
+# Effective content policy = Monsieur's profile override, else the detected one. 'permissive' models (reputedly
+# lenient, unverified) answer an unrestricted request only after every truly unrestricted one, flagged.
+POLICY = "coalesce(pr.content_policy, c.content_policy)"
+REQUIREMENTS = {"unrestricted": f"{POLICY} in ('unrestricted', 'permissive')", "open_weights": "c.open_weights"}
 
 
 def latest_run(conn) -> int | None:
@@ -58,8 +61,9 @@ def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]
     ids = [snaps[k] for k in collect.OFFER_KINDS if k in snaps]
     cands = []
     for c in conn.execute(f"""select distinct c.model_id, coalesce(c.display_name, c.model_id) as name, c.base_model_id,
-                                     c.license, c.content_policy, c.open_weights
+                                     c.license, {POLICY} as content_policy, c.open_weights
                               from models.offers o join models.canonical c using (model_id)
+                              left join models.profiles pr on pr.model_id = c.model_id
                               where o.snapshot_id = any(%s) and o.interface = %s and {REQUIREMENTS[require]}""",
                           (ids, t["interface"])):
         route = sel.chat_route(offers[c["model_id"]], None) if t["interface"] == "chat" else \
@@ -78,8 +82,12 @@ def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]
                       "offer_key": paid.get("offer_key"), "cost": paid.get("cost"),
                       "price_1m_blended": paid.get("blended_1m")})
     order = [f'{b["benchmark"]}:{b["bench_task"]}' for b in boards]
-    cands.sort(key=lambda x: (order.index(x["board"]) if x["board"] in order else len(order), -(x["score"] or 0),
+    cands.sort(key=lambda x: (require == "unrestricted" and x["content_policy"] == "permissive",
+                              order.index(x["board"]) if x["board"] in order else len(order), -(x["score"] or 0),
                               x["price_1m_blended"] or x["cost"] or 0))
+    for x in cands:
+        if require == "unrestricted" and x["content_policy"] == "permissive":
+            x["warning"] = "réputé permissif (déclaration de Monsieur), pas garanti sans restriction"
     if not cands:
         return {"task": t["task"], "mode": "none", "require": require,
                 "why": f"aucun modèle {require} appelable pour {t['interface']} chez les providers connus"}
