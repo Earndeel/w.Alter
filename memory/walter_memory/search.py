@@ -131,13 +131,21 @@ def index_pending(limit: int = 20000) -> dict:
         # Anti-join on a sliding window rather than a pure cursor: long-running connector transactions commit rows
         # whose ingested_at is older than the cursor, and a cursor alone would skip them (seen 2026-10-01).
         rows = conn.execute("""select e.event_id as ref_id, e.occurred_at, e.ingested_at, e.source, e.event_type as label,
-                                      e.thread_id, e.actor_identity_id, e.content as text, e.privacy_class
+                                      e.thread_id, e.actor_identity_id, e.content as text, e.privacy_class,
+                                      exists (select 1 from core.events r where r.event_type = 'event.retracted'
+                                              and r.payload @> jsonb_build_object('target_event_id', e.event_id::text)) as hidden
                                from core.events e
                                where e.ingested_at > %s::timestamptz - interval '3 days' and e.event_type = any(%s)
                                  and e.content is not null and length(e.content) > 1
                                  and not exists (select 1 from search.chunks c where c.kind = 'event' and c.ref_id = e.event_id)
                                order by e.ingested_at limit %s""", (since, list(TEXT_EVENT_TYPES), limit)).fetchall()
         out["events"] = _index_rows(conn, rows, "event")
+        # retractions arriving after indexing: hide the chunks (the event stays in the journal, readers skip it)
+        out["retracted_hidden"] = conn.execute(
+            """update search.chunks c set hidden = true from core.events r
+               where r.event_type = 'event.retracted' and r.ingested_at > %s::timestamptz - interval '3 days'
+                 and c.kind = 'event' and c.ref_id::text = r.payload->>'target_event_id' and not c.hidden""",
+            (since,)).rowcount
         if rows:
             ingestion.set_checkpoint("search_indexer", "events", {"ingested_at": rows[-1]["ingested_at"].isoformat()}, conn=conn)
     with connection() as conn:
