@@ -191,7 +191,9 @@ def compute(conn) -> list[dict]:
         if not cands:
             continue
         best = sorted(cands, key=lambda c: (-c["score"], c["real_cost"] if c["real_cost"] is not None else float("inf")))
-        out += [_row(t["task"], "best", i + 1, c) for i, c in enumerate(best[:5])]
+        from .knowledge import tie_break  # late import: knowledge -> choose -> select
+        ranked = tie_break(conn, t["task"], [_row(t["task"], "best", i + 1, c) for i, c in enumerate(best[:6])])
+        out += [{**r, "rank": i + 1} for i, r in enumerate(ranked[:5])]
         if t["task"] == "general":
             lad = _ladder(cands, 35.0, 0.75)
             if lad:

@@ -1,0 +1,104 @@
+{
+  "_doc": "Monsieur's own model knowledge (dated declarations). Applied with `walter-router declare` (idempotent). Leaderboards rank; this file says what each model is FOR, what it demands, and which words of a request call for it. Signals are matched accent- and case-insensitively on whole words.",
+  "profiles": {
+    "seedance-2-5": {
+      "strengths": ["premium", "cinematic", "character_consistency", "storytelling"],
+      "weaknesses": ["most_expensive", "needs_preparation"],
+      "effort": "workflow",
+      "workflow": [
+        "Créer les références d'abord (personnages, décor, produit) avec le modèle image favori, en planche cohérente",
+        "Adapter le prompt à Seedance : découpage plan par plan, cadrage et mouvement de caméra, action, durée, références jointes",
+        "Valider en 480p/720p, puis rendu final en 1080p ou 4K",
+        "Router le rendu sur le provider le moins cher à résolution égale (OpenRouter aujourd'hui ; 4K seulement chez OpenRouter)"
+      ],
+      "cost_note": "Le plus cher du panier : à réserver aux rendus qui le justifient.",
+      "note": "Monsieur (2026-10-02) : le top du top, mais demande un workflow avec création de références et un prompting adapté.",
+      "declared_at": "2026-10-02"
+    },
+    "minimax-h3": {
+      "strengths": ["balanced", "value", "action"],
+      "weaknesses": [],
+      "effort": "direct",
+      "workflow": ["Prompt direct ; 768p via Kie pour le meilleur prix"],
+      "cost_note": "Meilleur ratio qualité/prix, surtout via Kie.ai.",
+      "content_policy": "permissive",
+      "note": "Monsieur (2026-10-02) : bonne balance, meilleur ratio, très bon en scènes d'action ; open source et peut-être unrestricted (à vérifier).",
+      "declared_at": "2026-10-02"
+    },
+    "gemini-omni-flash-1-1": {
+      "strengths": ["ugc", "realism"],
+      "weaknesses": [],
+      "effort": "guided",
+      "workflow": [
+        "Générer dans Flow (interface web Google) en pilotant l'interface, avec les crédits mensuels gratuits de l'abonnement Gemini AI Pro",
+        "Si les crédits sont épuisés : Kie en payant (prix par seconde du catalogue)"
+      ],
+      "access_note": "Crédits mensuels gratuits via l'abonnement Gemini AI Pro, dans l'interface Flow (pas d'API).",
+      "cost_note": "0 $ tant qu'il reste des crédits Flow du mois.",
+      "note": "Monsieur (2026-10-02) : très bon en UGC.",
+      "declared_at": "2026-10-02"
+    },
+    "grok-imagine-video-1-5": {
+      "strengths": ["cheap", "drafts"],
+      "weaknesses": ["lower_quality"],
+      "effort": "direct",
+      "workflow": ["Prompt direct ; 480p/720p via Kie"],
+      "cost_note": "Vraiment pas cher sur Kie, mais pas au niveau des autres.",
+      "note": "Monsieur (2026-10-02).",
+      "declared_at": "2026-10-02"
+    },
+    "gpt-6-luna": {
+      "strengths": ["fast", "cheap", "subscription"],
+      "effort": "direct",
+      "access_note": "Inclus dans l'abonnement ChatGPT (Codex).",
+      "note": "Monsieur (2026-10-02) : préféré à MiMo 2.6 Flash à niveau égal, surtout avec l'abonnement Codex.",
+      "declared_at": "2026-10-02"
+    }
+  },
+  "roles": {
+    "_tasks": ["text_to_video", "image_to_video"],
+    "default": {
+      "label": "Équilibré",
+      "model": "minimax-h3", "provider": "kie", "watch": "dominance", "priority": 0,
+      "description": "Demande vidéo sans objectif particulier : bonne balance qualité/prix, direct, sans préparation.",
+      "signals": []
+    },
+    "premium": {
+      "label": "Premium / cinématique",
+      "model": "seedance-2-5", "provider": null, "watch": "quality", "priority": 40,
+      "description": "Rendu final haut de gamme : pub, clip, film, personnage récurrent. Lance le workflow références + prompt adapté.",
+      "signals": ["pub", "publicite", "publicitaire", "spot", "cinematique", "cinema", "film", "court metrage", "clip", "trailer",
+                  "bande annonce", "haut de gamme", "premium", "luxe", "qualite max", "meilleure qualite", "top qualite",
+                  "rendu final", "storytelling", "personnage recurrent", "coherence des personnages", "seedance"]
+    },
+    "action": {
+      "label": "Action",
+      "model": "minimax-h3", "provider": "kie", "watch": "dominance", "priority": 20,
+      "description": "Scènes d'action, mouvement rapide, pour pas cher.",
+      "signals": ["action", "combat", "bagarre", "baston", "poursuite", "course poursuite", "explosion", "cascade", "fight",
+                  "chase", "sport", "drift", "dynamique", "mouvement rapide", "arts martiaux", "h3", "minimax"]
+    },
+    "ugc": {
+      "label": "UGC",
+      "model": "gemini-omni-flash-1-1", "provider": "google-flow", "watch": "none", "priority": 30,
+      "description": "Contenu type créateur : face caméra, témoignage, avis client, TikTok/Reels. Via Flow avec les crédits gratuits.",
+      "signals": ["ugc", "temoignage", "face camera", "avis client", "tiktok", "reel", "reels", "story", "stories", "selfie",
+                  "influenceur", "influenceuse", "unboxing", "vlog", "createur", "testimonial", "authentique", "smartphone",
+                  "omni", "flow"]
+    },
+    "budget": {
+      "label": "Budget / brouillon",
+      "model": "grok-imagine-video-1-5", "provider": "kie", "watch": "dominance", "priority": 10,
+      "description": "Essais, brouillons, beaucoup de variantes, quand le prix compte plus que la qualité.",
+      "signals": ["pas cher", "brouillon", "test", "essai", "maquette", "previsualisation", "preview", "draft", "variantes",
+                  "batch", "economique", "low cost", "grok"]
+    }
+  },
+  "retired_roles": {"_tasks": ["text_to_video", "image_to_video"], "roles": ["value"],
+                    "reason": "2026-10-02 : Omni 1.1 n'est plus le « meilleur ratio » (c'est H3) mais le choix UGC."},
+  "affinities": [
+    {"model": "gpt-6-luna", "scope": "*", "weight": 1,
+     "reason": "Monsieur (2026-10-02) : préféré à MiMo 2.6 Flash au coude à coude, surtout via l'abonnement Codex."}
+  ],
+  "unrestricted_signals": ["sans censure", "uncensored", "unrestricted", "sans restriction", "nsfw", "explicite", "non censure"]
+}

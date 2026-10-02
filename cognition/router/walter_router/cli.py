@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 
-from . import alerts, choose, collect, db
+from . import alerts, choose, collect, db, knowledge
 from . import select as sel
 
 
@@ -15,6 +15,8 @@ def refresh(notify: bool = True, dry_run: bool = False) -> dict:
         conn.commit()
         try:
             report = {"sources": collect.collect_all(conn)}
+            with conn.transaction():
+                report["knowledge"] = knowledge.declare(conn)  # config/knowledge.json is the source of truth
             with conn.transaction():
                 rows = sel.compute(conn)
                 sel.save(conn, run_id, rows)
@@ -77,6 +79,11 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("decision", choices=("adopted", "dismissed"))
     v.add_argument("--note")
     sub.add_parser("status")
+    d = sub.add_parser("decide", help="free-text request -> role, model, route, workflow, brief")
+    d.add_argument("task")
+    d.add_argument("intent")
+    d.add_argument("--level", choices=choose.LEVELS)
+    sub.add_parser("declare", help="apply config/knowledge.json (profiles, roles, affinities)")
     args = p.parse_args(argv)
 
     if args.cmd == "migrate":
@@ -92,6 +99,10 @@ def main(argv: list[str] | None = None) -> int:
             elif args.cmd == "prefer":
                 out = choose.set_preference(conn, args.task, args.objective, args.pin, args.provider, args.note,
                                             args.role, args.watch)
+            elif args.cmd == "decide":
+                out = knowledge.decide(conn, args.task, args.intent, args.level)
+            elif args.cmd == "declare":
+                out = knowledge.declare(conn)
             elif args.cmd == "alerts":
                 rows = conn.execute("select * from models.alerts order by alert_id").fetchall() if args.all else alerts.pending(conn)
                 out = rows

@@ -34,12 +34,23 @@ Plan and decisions: `/root/projects/walter-model-router/docs/PLAN-v2.md`.
    `hermes send` only for challengers, stale sources, and unranked models in an interface Monsieur has a
    preference on. Pinning records already-better models as `baseline` (no message).
 
+## Monsieur's knowledge (`config/knowledge.json`, applied by `declare` and at every refresh)
+Leaderboards rank; the knowledge file says what a model is *for*. `models.profiles` (strengths, workflow,
+effort direct|guided|workflow, access/cost notes, content policy override), favourite **roles** per objective in
+`models.preferences` (label, description, French request `signals`, priority) and `models.affinities` (close calls:
+inside the tie margin — 1 AA point, 10 Elo — the preferred model, then a subscription route, wins).
+`decide <task> "<request>"` = signals → role → favourite → route + workflow + a `brief` listing every role so the
+orchestrator can overrule the keyword match. Video today: default/équilibré H3 (Kie), premium Seedance 2.5
+(workflow: references + adapted prompt), action H3, UGC Omni 1.1 (Flow, Gemini AI Pro credits), budget Grok 1.5.
+
 ## Commands
 ```
 bin/walter-router migrate
 bin/walter-router refresh [--no-notify] [--dry-run]
 bin/walter-router pick <task> [--level L1|L2|L3]      # preferences first, then computed choice
 bin/walter-router pick <task> --require unrestricted|open_weights   # hard constraint, best callable model
+bin/walter-router decide <task> "<request in French>"  # role by objective, route, workflow, brief
+bin/walter-router declare                               # apply config/knowledge.json
 bin/walter-router prefer <task> [--objective value|best_available] [--pin model_id[/variant]] [--provider p] [--note ...]
 bin/walter-router alerts [--all]
 bin/walter-router verdict <alert_id> adopted|dismissed [--note ...]   # adopted challenger becomes the favourite
