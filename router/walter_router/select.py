@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from . import media
+from . import collect, media
 
 SKILL = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "skills/research/aa-pareto-model-optimizer/scripts"
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
@@ -36,7 +36,7 @@ def latest_snapshots(conn) -> dict[str, int]:
 
 
 def load_offers(conn, snaps: dict[str, int]) -> dict[str, list[dict]]:
-    ids = [snaps[k] for k in ("openrouter", "kie", "codex", "declared") if k in snaps]
+    ids = [snaps[k] for k in collect.OFFER_KINDS if k in snaps]
     by_model: dict[str, list[dict]] = {}
     for r in conn.execute("select * from models.offers where snapshot_id = any(%s)", (ids,)):
         by_model.setdefault(r["model_id"], []).append(r)

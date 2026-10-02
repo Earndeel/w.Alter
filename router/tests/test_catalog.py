@@ -38,11 +38,11 @@ def test_task_modes_restrict_pricing():
 
 
 def test_one_line_per_model_with_prices_per_resolution():
-    c = {"name": "FLUX.3 Image", "modes": ["t2i", "i2i"], "providers": ["openrouter"], "audio": [],
+    c = {"name": "FLUX.3 Image", "interface": "image", "modes": ["t2i", "i2i"], "providers": ["openrouter"], "audio": [],
          "prices": {"1K": {"price": 0.03, "unit": "per image", "provider": "openrouter"},
                     "4K": {"price": 0.12, "unit": "per image", "provider": "openrouter"}}}
     line = catalog.line(c)
-    assert line == "FLUX.3 Image — t2i/i2i — 1K 0,03 · 4K 0,12 $/img — OpenRouter" and "\n" not in line
+    assert line == "🖼️ FLUX.3 Image — t2i/i2i — 1K 0,03 · 4K 0,12 $/img — OpenRouter" and "\n" not in line
 
 
 def test_many_resolutions_collapse_to_a_range():
@@ -71,13 +71,11 @@ def conn():
         c.rollback()
 
 
-def test_unranked_alert_is_one_per_model_and_renders_on_one_line(conn):
+def test_unranked_alert_is_one_per_model(conn):
     conn.execute("delete from models.alerts where kind = 'unranked'")
     alerts.unranked(conn)
     rows = conn.execute("select * from models.alerts where kind = 'unranked'").fetchall()
     assert rows and all("|" not in r["subject"] for r in rows)
-    text = alerts.render(rows, conn)
-    assert len(text.splitlines()) == len(rows) + 2  # title + section header + one line per model
 
 
 def test_favourite_is_checked_on_every_board_of_the_task(conn):
@@ -100,3 +98,43 @@ def test_video_editor_is_not_text_to_video():
 def test_music_side_operations_are_not_song_prices():
     assert media.classify("music", "Generate Lyrics")["kind"] == "tool"
     assert media.classify("music", "Generate Music")["kind"] == "generation"
+
+
+def test_unrestricted_finetune_points_to_its_base_model():
+    from walter_router import identity
+    assert identity.policy("glm-5-3-flash-uncensored") == ("unrestricted", "glm-5-3-flash")
+    assert identity.policy("gpt-6-1-sol") == ("standard", None)
+    assert identity.normalize("hermes_providers", "zai/glm-5.3-flash-uncensored/flex") == ("glm-5-3-flash-uncensored", "")
+
+
+def test_icons_show_the_kind_of_model():
+    c = {"name": "X", "interface": "video", "modes": [], "providers": [], "prices": {}, "audio": [],
+         "content_policy": "unrestricted"}
+    assert catalog.line(c).startswith("🎬 🔓 X")
+
+
+def test_unranked_releases_are_never_sent(conn):
+    conn.execute("""insert into models.alerts (kind, task, subject, evidence, status)
+                    values ('unranked', 'image', 'zz-test-model', '{}', 'open')""")
+    assert not [a for a in alerts.pending(conn) if a["kind"] == "unranked"]
+
+
+def test_top3_first_run_is_baseline_then_newcomer_is_open(conn):
+    conn.execute("delete from models.alerts where kind = 'top3'")
+    alerts.top3(conn)
+    assert conn.execute("select count(*) as n from models.alerts where kind = 'top3' and status <> 'baseline'"
+                        ).fetchone()["n"] == 0
+    victim = conn.execute("select subject from models.alerts where kind = 'top3' limit 1").fetchone()["subject"]
+    conn.execute("delete from models.alerts where kind = 'top3' and subject = %s", (victim,))
+    alerts.top3(conn)
+    pend = [a for a in alerts.pending(conn) if a["kind"] == "top3"]
+    assert [a["subject"] for a in pend] == [victim] and "top 3" in alerts.render(pend, conn)
+
+
+def test_unrestricted_pick_uses_an_unrestricted_model(conn):
+    from walter_router import choose
+    got = choose.pick(conn, "general", require="unrestricted")
+    if got["mode"] == "none":
+        pytest.skip("no unrestricted provider collected")
+    assert conn.execute("select content_policy from models.canonical where model_id = %s",
+                        (got["model_id"],)).fetchone()["content_policy"] == "unrestricted"

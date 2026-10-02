@@ -40,6 +40,43 @@ def _board_rows(conn, snaps: dict, benchmark: str, bench_task: str) -> list[dict
                                where snapshot_id = %s and benchmark = %s and task = %s""", (sid, benchmark, bench_task)))
 
 
+TOP_N = 3
+
+
+def _order(rows: list[dict]) -> list[str]:
+    """Distinct models of a board, best first (variants of one model count once)."""
+    seen: list[str] = []
+    for r in sorted(rows, key=lambda r: -r["score"]):
+        if r["model_id"] not in seen:
+            seen.append(r["model_id"])
+    return seen
+
+
+def top3(conn, status_for_new: str | None = None) -> list[str]:
+    """A model entering the top 3 of a leaderboard in a domain Monsieur watches (interfaces he has preferences on).
+    The first computation records the current podiums as 'baseline'."""
+    if status_for_new is None:
+        first = conn.execute("select not exists (select 1 from models.alerts where kind = 'top3') as f").fetchone()["f"]
+        status_for_new = "baseline" if first else "open"
+    snaps = sel.latest_snapshots(conn)
+    watched = _watched_interfaces(conn)
+    podium: dict[tuple[str, str], dict] = {}
+    for tb in conn.execute("""select tb.*, t.interface from models.task_benchmarks tb join models.tasks t using (task)
+                              order by tb.benchmark, tb.bench_task""").fetchall():
+        if tb["interface"] not in watched:
+            continue
+        rows = _board_rows(conn, snaps, tb["benchmark"], tb["bench_task"])
+        board = f'{catalog.BOARDS.get(tb["benchmark"], tb["benchmark"])} {tb["bench_task"]}'
+        for rank, model_id in enumerate(_order(rows)[:TOP_N], 1):
+            ev = podium.setdefault((tb["interface"], model_id), {"interface": tb["interface"], "boards": {}})
+            ev["boards"][board] = {"rank": rank, "score": max(r["score"] for r in rows if r["model_id"] == model_id)}
+    created = []
+    for (interface, model_id), ev in podium.items():
+        if _upsert(conn, "top3", interface, model_id, ev, status_for_new):
+            created.append(f"{interface}:{model_id}")
+    return created
+
+
 def challengers(conn, status_for_new: str = "open", only_task: str | None = None,
                 only_role: str | None = None) -> list[str]:
     """Models that overtake one of Monsieur's pinned favourites on any leaderboard of that task
@@ -65,8 +102,21 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
             continue  # no comparable price for the favourite: dominance cannot be established
         found: dict[str, dict] = {}
         measured = False
+        costs: dict[str, float | None] = {}
+
+        def cost_of(model_id: str) -> float | None:
+            if model_id not in costs:
+                costs[model_id] = _unit_cost(offers.get(model_id, []), p["interface"], p["modes"])
+            return costs[model_id]
+
         for b in boards:
             rows = _board_rows(conn, snaps, b["benchmark"], b["bench_task"])
+            # Relevance (Monsieur, 2026-10-02): only a challenger in the board's top 3 is worth a message —
+            # top 3 overall for a quality favourite, top 3 among models no dearer than the favourite for a
+            # ratio / budget favourite.
+            pool = rows if p["watch"] == "quality" else \
+                [r for r in rows if cost_of(r["model_id"]) is not None and cost_of(r["model_id"]) <= ref_cost]
+            podium = _order(pool)[:TOP_N]
             same = [r for r in rows if r["model_id"] == p["pinned_model_id"]]
             mine = [r for r in same if r["variant"] == p["pinned_variant"]] or same
             if not mine:
@@ -75,11 +125,9 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
             ref = max(r["score"] for r in mine)
             board = f'{catalog.BOARDS.get(b["benchmark"], b["benchmark"])} {b["bench_task"]}'
             for r in rows:
-                if r["model_id"] == p["pinned_model_id"] or r["score"] <= ref:
+                if r["model_id"] == p["pinned_model_id"] or r["score"] <= ref or r["model_id"] not in podium:
                     continue
-                cost = _unit_cost(offers.get(r["model_id"], []), p["interface"], p["modes"])
-                if p["watch"] == "dominance" and (cost is None or cost > ref_cost):
-                    continue
+                cost = cost_of(r["model_id"])
                 ev = found.setdefault(r["model_id"], {
                     "task_label": p["label"], "role": p["role"], "watch": p["watch"], "pinned": p["pinned_model_id"],
                     "pinned_unit_cost": ref_cost, "unit_cost": cost, "boards": {},
@@ -87,7 +135,7 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
                 prev = ev["boards"].get(board)
                 if prev is None or r["score"] - ref > prev["delta"]:
                     ev["boards"][board] = {"score": r["score"], "pinned_score": ref, "delta": r["score"] - ref,
-                                           "unit": r["score_unit"], "rank": (r["extra"] or {}).get("rank"),
+                                           "unit": r["score_unit"], "rank": podium.index(r["model_id"]) + 1,
                                            "variant": r["variant"]}
         if not measured:
             _upsert(conn, "challenger", p["task"], f'{p["pinned_model_id"]}:unmeasured',
@@ -141,9 +189,10 @@ def _watched_interfaces(conn) -> set[str]:
 
 
 def pending(conn) -> list[dict]:
-    watched = _watched_interfaces(conn)
-    rows = list(conn.execute("select * from models.alerts where status = 'open' order by kind, task, alert_id"))
-    return [r for r in rows if r["kind"] != "unranked" or r["task"] in watched]
+    """What goes to Telegram. Unranked releases are recorded but never sent (too many, unproven): a new model is
+    reported once it reaches a top 3 (kind 'top3') or overtakes a favourite from a top-3 place."""
+    return list(conn.execute("""select * from models.alerts where status = 'open' and kind <> 'unranked'
+                                order by kind, task, alert_id"""))
 
 
 ROLE_LABELS = {"value": "ratio", "budget": "budget", "action": "action"}
@@ -159,26 +208,31 @@ def _challenger_line(conn, a: dict) -> str:
     c = catalog.card(conn, a["subject"], task["interface"], task["modes"])
     pinned = catalog.card(conn, e["pinned"], task["interface"], task["modes"])["name"]
     role = ROLE_LABELS.get(e.get("role"), "")
-    gains = ", ".join(f'+{b["delta"]:.0f} {name.split()[0]}' + (f' #{b["rank"]}' if b.get("rank") else "")
-                      for name, b in e["boards"].items())
-    return (f'[{a["alert_id"]}] {e["task_label"]}{f" ({role})" if role else ""} : {c["name"]} dépasse {pinned} '
+    gains = ", ".join(f'+{b["delta"]:.0f} {_short_board(name)} #{b["rank"]}' for name, b in e["boards"].items())
+    return (f'[{a["alert_id"]}] {e["task_label"]}{f" ({role})" if role else ""} : {catalog.icon(c)} {c["name"]} dépasse {pinned} '
             f'({gains}) — {catalog.price_text(c)} — {", ".join(catalog.PROVIDERS.get(p, p) for p in c["providers"]) or "aucun provider"}')
 
 
+def _short_board(name: str) -> str:
+    return name.replace("text_to_", "t2").replace("image_to_", "i2").replace("_", " ")
+
+
 def render(alerts: list[dict], conn=None) -> str:
-    """Short Telegram message: one line per model (name — modes — price per resolution — providers)."""
-    new = [a for a in alerts if a["kind"] == "unranked"]
+    """Short Telegram message: one line per model (emoji name — modes — price per resolution — providers)."""
     beaten = [a for a in alerts if a["kind"] == "challenger"]
+    beaten_models = {a["subject"] for a in beaten}
+    podium = [a for a in alerts if a["kind"] == "top3" and a["subject"] not in beaten_models]
     stale = [a for a in alerts if a["kind"] == "source_stale"]
     out = ["Walter Router"]
     if beaten:
-        out.append("Favori dépassé (à tester) :")
+        out.append("⚠️ Favori dépassé (à tester) :")
         out += [f"• {_challenger_line(conn, a)}" for a in beaten]
-    if new:
-        out.append("Nouveaux, pas encore classés :")
-        for a in new:
-            c = catalog.card(conn, a["subject"], a["evidence"].get("interface") or a["task"]) if conn else None
-            out.append(f'• [{a["alert_id"]}] {catalog.line(c) if c else a["subject"]}')
+    if podium:
+        out.append("🏆 Nouveau dans le top 3 :")
+        for a in podium:
+            c = catalog.card(conn, a["subject"], a["evidence"]["interface"])
+            ranks = ", ".join(f'{_short_board(b)} #{v["rank"]}' for b, v in a["evidence"]["boards"].items())
+            out.append(f'• [{a["alert_id"]}] {catalog.line(c)} — {ranks}')
     if stale:
         out.append("Sources en retard : " + ", ".join(f'{a["subject"]} ({str(a["evidence"]["last"])[:10]})' for a in stale))
     if beaten:

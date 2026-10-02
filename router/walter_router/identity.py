@@ -53,6 +53,18 @@ def _variant_from_paren(name: str) -> tuple[str, str]:
     return _PAREN.sub("", name).strip(), variant
 
 
+_UNRESTRICTED = re.compile(r"-(uncensored|unrestricted|abliterated|heretic|nsfw|venice-edition)\b")
+
+
+def policy(model_id: str) -> tuple[str, str | None]:
+    """('unrestricted', base model) for uncensored / abliterated fine-tunes, else ('standard', None).
+    glm-5-3-flash-uncensored -> ('unrestricted', 'glm-5-3-flash')."""
+    m = _UNRESTRICTED.search(model_id)
+    if not m:
+        return "standard", None
+    return "unrestricted", (model_id[: m.start()] + model_id[m.end():]).strip("-") or None
+
+
 def normalize(namespace: str, key: str, name: str | None = None) -> tuple[str, str]:
     """Return (model_id, variant) for an external key of a namespace (aa | da | mm | arena | openrouter | kie | codex)."""
     manual = MANUAL.get(namespace, {}).get(key)
@@ -88,8 +100,8 @@ def normalize(namespace: str, key: str, name: str | None = None) -> tuple[str, s
         variant = "-".join(parts) or variant
     else:
         base = key.split(":")[0]
-        if namespace == "openrouter" and "/" in base:
-            base = base.split("/", 1)[1]
+        if namespace in ("openrouter", "hermes_providers") and "/" in base:
+            base = base.split("/", 1)[1].split("/")[0]  # vendor/model[/service-tier, e.g. /flex]
         if namespace == "kie" and "/" in base:
             base = base.rsplit("/", 1)[1]
         base = slugify(base)

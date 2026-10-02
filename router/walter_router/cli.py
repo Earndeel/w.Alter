@@ -21,7 +21,8 @@ def refresh(notify: bool = True, dry_run: bool = False) -> dict:
                 report["selection_rows"] = len(rows)
                 first = conn.execute("select count(*) as n from models.runs where status = 'ok'").fetchone()["n"] == 0
                 report["alerts"] = {"challengers": alerts.challengers(conn, "baseline" if first else "open"),
-                                    "unranked": alerts.unranked(conn), "stale": alerts.stale_sources(conn)}
+                                    "top3": alerts.top3(conn), "unranked": alerts.unranked(conn),
+                                    "stale": alerts.stale_sources(conn)}
                 report["pruned_snapshots"] = collect.prune(conn)
                 conn.execute("update models.runs set status = 'ok', finished_at = now(), summary = %s::jsonb where run_id = %s",
                              (json.dumps(report, default=str), run_id))
@@ -60,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     k.add_argument("task")
     k.add_argument("--level", choices=choose.LEVELS)
     k.add_argument("--role", help="favourite role, e.g. action / value / budget")
+    k.add_argument("--require", choices=sorted(choose.REQUIREMENTS), help="hard constraint (unrestricted, open_weights)")
     f = sub.add_parser("prefer", help="record Monsieur's preference for a task")
     f.add_argument("task")
     f.add_argument("--objective", choices=("value", "best_available"))
@@ -86,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         with db.connect() as conn:
             if args.cmd == "pick":
-                out = choose.pick(conn, args.task, args.level, args.role)
+                out = choose.pick(conn, args.task, args.level, args.role, args.require)
             elif args.cmd == "prefer":
                 out = choose.set_preference(conn, args.task, args.objective, args.pin, args.provider, args.note,
                                             args.role, args.watch)

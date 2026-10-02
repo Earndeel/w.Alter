@@ -200,6 +200,43 @@ def source_codex() -> tuple[dict, datetime, str]:
     return {"models": ids}, now(), "chatgpt.com/backend-api/codex (account catalogue)"
 
 
+PROVIDERS_CONFIG = Path(__file__).resolve().parent.parent / "config" / "providers.json"
+HERMES_ENV = HERMES_HOME / ".env"
+
+
+def _env_value(name: str) -> str | None:
+    """A key from Hermes' 0600 .env, read at run time (never logged, never put in a URL)."""
+    try:
+        for line in HERMES_ENV.read_text().splitlines():
+            if line.startswith(name + "="):
+                return line.split("=", 1)[1].strip().strip("'\"") or None
+    except OSError:
+        return None
+    return os.environ.get(name)
+
+
+def source_hermes_providers() -> tuple[dict, datetime, str]:
+    """Live /models catalogue of OpenAI-compatible providers configured in Hermes (config/providers.json)."""
+    out, errors = [], {}
+    for p in json.loads(PROVIDERS_CONFIG.read_text())["providers"]:
+        key = _env_value(p["key_env"])
+        if not key:
+            errors[p["provider"]] = f'{p["key_env"]} missing'
+            continue
+        req = Request(p["api"].rstrip("/") + "/models",
+                      headers={"Authorization": f"Bearer {key}", "User-Agent": "Walter-Router/1.0",
+                               "Accept": "application/json"})
+        try:
+            with urlopen(req, timeout=60) as resp:  # noqa: S310 (configured https endpoint)
+                data = json.loads(resp.read(MAX_BYTES))["data"]
+            out.append({**{k: p[k] for k in ("provider", "name", "api", "hermes_provider")}, "models": data})
+        except Exception as exc:  # noqa: BLE001
+            errors[p["provider"]] = f"{type(exc).__name__}: {exc}"[:200]
+    if not out:
+        raise ValueError(f"hermes_providers: no catalogue ({errors})")
+    return {"providers": out, "errors": errors}, now(), str(PROVIDERS_CONFIG)
+
+
 DECLARED = Path(__file__).resolve().parent.parent / "config" / "declared_offers.json"
 
 
@@ -210,7 +247,7 @@ def source_declared() -> tuple[dict, datetime, str]:
 
 SOURCES = {"aa": source_aa, "mm": source_mm, "da": source_da, "arena": source_arena,
            "openrouter": source_openrouter, "kie": source_kie, "codex": source_codex,
-           "declared": source_declared}
+           "declared": source_declared, "hermes_providers": source_hermes_providers}
 
 
 # --- parsing -------------------------------------------------------------------------------------------
@@ -266,7 +303,8 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
                         variant=variant, display_name=r["model"], score=score, score_unit=r.get("quality_metric"),
                         cost=cost, cost_unit=unit, released=r.get("released"),
                         extra={"api_price_raw": r.get("api_price_raw"), "samples": r.get("samples"),
-                               "provider": r.get("provider")})
+                               "provider": r.get("provider")},
+                        meta={"open_weights": True if r.get("open_weights") is True else None, "license": None})
                 rows.extend(best.values())
     elif kind == "da":
         for section, bench in (("categories", "da_models"), ("agent_categories", "da_agents")):
@@ -310,9 +348,12 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
                     continue
                 seen.add(key)
                 mid, variant = identity.normalize("arena", key)
+                lic = r.get("license")
                 rows.append(dict(benchmark="arena", task=task_key, external_key=key, model_id=mid, variant=variant,
                                  display_name=key, score=score, score_unit=unit, cost=None, cost_unit=None,
-                                 released=None, extra=extra))
+                                 released=None, extra=extra,
+                                 meta={"open_weights": None if not lic else lic.strip().lower() != "proprietary",
+                                       "license": lic}))
     return rows
 
 
@@ -328,7 +369,7 @@ def _or_name(name: str | None) -> str | None:
     if not name:
         return None
     vendor, _, rest = name.partition(": ")
-    return (rest if len(rest) >= 9 else f"{vendor} {rest}") if rest else vendor
+    return (rest if len(rest) >= 9 and " " in rest else f"{vendor} {rest}") if rest else vendor
 
 
 def _or_interface(model: dict) -> str:
@@ -349,7 +390,7 @@ def _kie_interface(rec: dict) -> str:
     return kind
 
 
-OFFER_KINDS = ("openrouter", "kie", "codex", "declared")
+OFFER_KINDS = ("openrouter", "kie", "codex", "declared", "hermes_providers")
 
 
 def _media_fields(interface: str, label: str, unit_price: float | None, unit: str | None,
@@ -381,6 +422,8 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                              price_out_1m=None if is_media or pout is None or pout < 0 else pout * 1e6,
                              unit_price=None, unit=None, provider_created=created, pricing=pr,
                              display_name=_or_name(m.get("name")),
+                             meta={"open_weights": True if m.get("hugging_face_id") else None, "license": None,
+                                   "hf": m.get("hugging_face_id") or None},
                              **_media_fields(interface, "", None, None, inputs)))
             for entry in m.get("_display_pricing") or []:
                 if entry.get("kind") != "unit":
@@ -432,6 +475,27 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                              provider_created=None, pricing={"declared": d.get("declared"), "note": d.get("note")},
                              offer_kind="generation", modes=d.get("modes") or [], resolution=None, audio=None,
                              norm_price=None, norm_unit=None))
+    elif kind == "hermes_providers":
+        for p in doc["providers"]:
+            for m in p["models"]:
+                outs = [x.get("type") for x in m.get("output_modalities") or [] if isinstance(x, dict)] or ["text"]
+                interface = next((i for i in ("video", "image", "audio") if i in outs), "chat")
+                prices = {pr.get("type"): _num(pr.get("cost_usd")) for side in ("input_modalities", "output_modalities")
+                          for x in m.get(side) or [] if isinstance(x, dict) for pr in x.get("pricing") or []}
+                mid, _ = identity.normalize("hermes_providers", m["id"])
+                pin, pout = prices.get("prompt"), prices.get("completion")
+                rows.append(dict(provider=p["provider"], offer_key=m["id"], model_id=mid, interface=interface,
+                                 access="free" if m.get("is_free") else "paid",
+                                 price_in_1m=pin * 1e6 if pin is not None else None,
+                                 price_out_1m=pout * 1e6 if pout is not None else None, unit_price=None, unit=None,
+                                 provider_created=datetime.fromtimestamp(m["created"], timezone.utc) if m.get("created") else None,
+                                 pricing={"prices": prices, "quantization": m.get("quantization"),
+                                          "hermes_provider": p["hermes_provider"]},
+                                 # the base id names the model; a service tier (".../flex") or a raw id is no name
+                                 display_name=None if m["id"].count("/") > 1 or "/" in (m.get("name") or "/")
+                                 else m["name"].split(": ", 1)[-1],
+                                 meta={"open_weights": True if m.get("hugging_face_id") else None,
+                                       "license": None, "hf": m.get("hugging_face_id")}))
     elif kind == "codex":
         for oid in doc["models"]:
             mid, _ = identity.normalize("codex", oid)
@@ -443,7 +507,7 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
 
 # --- storage -------------------------------------------------------------------------------------------
 
-NAME_PRIORITY = {"openrouter": 1, "aa": 2, "mm": 3, "arena": 4, "kie": 5, "da": 6}
+NAME_PRIORITY = {"openrouter": 1, "hermes_providers": 2, "aa": 3, "mm": 4, "arena": 5, "kie": 6, "da": 7}
 
 
 def _display_name(namespace: str, name: str | None) -> str | None:
@@ -454,9 +518,31 @@ def _display_name(namespace: str, name: str | None) -> str | None:
     return name if namespace != "kie" else name.split(",")[0].strip()
 
 
+def _apply_meta(conn, namespace: str, model_id: str, meta: dict | None) -> None:
+    """Open weights / licence: 'open' from any source wins (Arena licence, AA open_weights, a Hugging Face id);
+    'proprietary' only fills an unknown. The Arena licence text is preferred."""
+    if not meta or meta.get("open_weights") is None:
+        return
+    conn.execute("""update models.canonical set
+                      open_weights = case when %(ow)s then true else coalesce(open_weights, false) end,
+                      license = case when %(lic)s::text is not null and (license is null or %(src)s = 'arena')
+                                     then %(lic)s else license end,
+                      license_source = case when %(lic)s::text is not null and (license is null or %(src)s = 'arena')
+                                            then %(src)s else coalesce(license_source, %(src)s) end
+                    where model_id = %(id)s""",
+                 {"ow": meta["open_weights"], "lic": meta.get("license") or (f'hf:{meta["hf"]}' if meta.get("hf") else None),
+                  "src": namespace, "id": model_id})
+
+
 def _ensure_identity(conn, namespace: str, key: str, model_id: str, vendor: str | None = None,
                      name: str | None = None) -> None:
-    conn.execute("insert into models.canonical (model_id, vendor) values (%s, %s) on conflict do nothing", (model_id, vendor))
+    content_policy, base = identity.policy(model_id)
+    conn.execute("""insert into models.canonical (model_id, vendor, content_policy, base_model_id) values (%s, %s, %s, %s)
+                    on conflict (model_id) do update set content_policy = excluded.content_policy,
+                      base_model_id = excluded.base_model_id
+                    where models.canonical.content_policy is distinct from excluded.content_policy
+                       or models.canonical.base_model_id is distinct from excluded.base_model_id""",
+                 (model_id, vendor, content_policy, base))
     name = _display_name(namespace, name)
     if name:  # the most readable source names the model (OpenRouter > AA > AA multimodal > Arena > Kie > Design Arena)
         conn.execute("""update models.canonical set display_name = %s, display_source = %s where model_id = %s
@@ -479,6 +565,7 @@ def _insert_rows(conn, sid: int, kind: str, doc: dict) -> int:
         key = r.get("external_key") or r["offer_key"]
         _ensure_identity(conn, kind, key, r["model_id"],
                          name=r.get("display_name") or (key if kind == "kie" else None))
+        _apply_meta(conn, kind, r["model_id"], r.get("meta"))
         if "benchmark" in r:
             conn.execute("""insert into models.benchmarks (snapshot_id, benchmark, task, external_key, model_id, variant,
                             display_name, score, score_unit, cost, cost_unit, released, extra)
