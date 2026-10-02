@@ -72,6 +72,18 @@ def declare(conn, doc: dict | None = None) -> dict:
     retired = doc.get("retired_roles") or {}
     for task in retired.get("_tasks", []):
         conn.execute("delete from models.preferences where task = %s and role = any(%s)", (task, retired["roles"]))
+    for task, levels in {k: v for k, v in (doc.get("levels") or {}).items() if not k.startswith("_")}.items():
+        for level, lv in levels.items():
+            current = conn.execute("""select pinned_model_id, pinned_variant, pinned_provider, watch from models.preferences
+                                      where task = %s and role = %s""", (task, level)).fetchone()
+            model_id, variant = lv["pin"].split("/", 1)
+            if not current or (current["pinned_model_id"], current["pinned_variant"], current["pinned_provider"],
+                               current["watch"]) != (model_id, variant, lv.get("provider"), lv["watch"]):
+                choose.set_preference(conn, task, pin=lv["pin"], provider=lv.get("provider"), role=level,
+                                      watch=lv["watch"], note=lv["description"])
+                applied.append(f"{task}:{level}")
+            conn.execute("""update models.preferences set label = %s, description = %s where task = %s and role = %s""",
+                         (lv["label"], lv["description"], task, level))
     for task, hint in (doc.get("task_hints") or {}).items():
         conn.execute("update models.tasks set intent_hint = %s where task = %s", (hint, task))
     for a in doc.get("affinities", []):
@@ -120,6 +132,12 @@ def tie_break(conn, task: str, rows: list[dict], score="quality", unit="quality_
 
 
 # --- decision -------------------------------------------------------------------------------------------
+
+def level_fallback(task: str, level: str | None) -> str | None:
+    """Declared fallback (model_id/variant) of a text tier, used when every route of the pinned model fails."""
+    lv = ((load().get("levels") or {}).get(task) or {}).get(level or "")
+    return lv.get("fallback") if isinstance(lv, dict) else None
+
 
 def effective_policy(conn, model_id: str) -> str:
     row = conn.execute("""select coalesce(p.content_policy, c.content_policy) as cp from models.canonical c

@@ -30,7 +30,8 @@ def _pinned_answer(conn, task: dict, pref: dict) -> dict[str, Any]:
     provider = pref["pinned_provider"] or route.get("subscription") or (route.get("paid") or {}).get("provider") \
         or route.get("ui")
     mode = "manual_ui" if provider and provider == route.get("ui") else "delegate"
-    return {"task": task["task"], "role": pref["role"], "mode": mode, "source": "preference_pinned",
+    return {"task": task["task"], "role": pref["role"], "level": pref["role"] if pref["role"] in LEVELS else None,
+            "mode": mode, "source": "preference_pinned",
             "model_id": pref["pinned_model_id"], "variant": pref["pinned_variant"], "provider": provider,
             "route": route, "why": pref["note"]}
 
@@ -112,6 +113,8 @@ def pick(conn, task: str, level: str | None = None, role: str | None = None,
     prefs = {p["role"]: p for p in conn.execute("select * from models.preferences where task = %s", (task,))}
     if role and role not in prefs:
         raise KeyError(f"no preference role '{role}' for {task}; known: {sorted(prefs)}")
+    if task == "general" and not role and (level or "L1") in prefs:
+        role = level or "L1"  # Monsieur's declared text tiers (knowledge.json "levels")
     pref = prefs.get(role or "default")
     others = {r: {"model_id": p["pinned_model_id"], "note": p["note"]} for r, p in prefs.items()
               if r != (role or "default") and p["pinned_model_id"]}

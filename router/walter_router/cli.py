@@ -116,6 +116,11 @@ def with_execution(conn, out: dict) -> dict:
     if out.get("model_id") and task and task["interface"] == "chat":
         out["execution"] = execution.routes(conn, out["model_id"], out.get("variant") or "",
                                             preferred=out.get("provider"))
+        fallback = knowledge.level_fallback(out["task"], out.get("level") or out.get("role"))
+        if fallback:  # declared tier fallback, after every route of the pinned model
+            fb_model, _, fb_variant = fallback.partition("/")
+            out["execution"] += [{**r, "fallback_for": out["model_id"]}
+                                 for r in execution.routes(conn, fb_model, fb_variant)]
     return out
 
 
