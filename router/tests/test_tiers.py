@@ -63,3 +63,16 @@ def test_specialised_tasks_keep_only_the_best(conn):
     n = conn.execute("""select count(*) as n from models.selection where run_id = %s and task = 'coding'
                         and level = 'best'""", (choose.latest_run(conn),)).fetchone()["n"]
     assert n <= 1
+
+
+def test_orchestrator_poste_proposes_without_switching(conn, monkeypatch):
+    from walter_router import postes
+    monkeypatch.setattr(postes, "current_orchestrator", lambda: {"model": "gpt-6.1-sol", "provider": "openai-codex"})
+    conn.execute("delete from models.alerts where kind = 'tier' and role = 'orchestrator'")
+    created = alerts.postes(conn)
+    top = postes.rank(conn, "orchestrator", 1)[0]["model_id"]
+    if top == "gpt-6-1-sol":
+        assert created == []
+    else:
+        a = conn.execute("select * from models.alerts where kind = 'tier' and role = 'orchestrator'").fetchone()
+        assert a and "Orchestrateur" in alerts.render([a], conn)

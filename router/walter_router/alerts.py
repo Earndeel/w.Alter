@@ -53,6 +53,34 @@ def _order(rows: list[dict]) -> list[str]:
     return seen
 
 
+def new_best(conn, run_id: int) -> list[str]:
+    """Specialised tasks use their #1 automatically. When a run's #1 differs from the previous run's #1 and scores
+    higher, Monsieur gets one line (the router already uses it; « ignorer N » keeps the previous one pinned)."""
+    prev = conn.execute("""select run_id from models.runs where status = 'ok' and run_id < %s
+                           order by run_id desc limit 1""", (run_id,)).fetchone()
+    if not prev:
+        return []
+    created = []
+    for r in conn.execute("""select n.task, t.label, t.interface, n.model_id as new_id, n.display_name, n.quality,
+                                    o.model_id as old_id, o.display_name as old_name
+                             from models.selection n join models.selection o
+                               on o.run_id = %s and o.task = n.task and o.level = 'best' and o.rank = 1
+                             join models.tasks t on t.task = n.task
+                             where n.run_id = %s and n.level = 'best' and n.rank = 1 and n.task <> 'general'
+                               and n.model_id <> o.model_id
+                               and not exists (select 1 from models.preferences p where p.task = n.task
+                                               and p.pinned_model_id is not null)""", (prev["run_id"], run_id)):
+        old_q = conn.execute("""select quality from models.selection where run_id = %s and task = %s and level = 'best'
+                                and model_id = %s""", (run_id, r["task"], r["old_id"])).fetchone()
+        if old_q and old_q["quality"] >= r["quality"]:
+            continue  # reshuffle by tie-break, not a better model
+        ev = {"task_label": r["label"], "interface": r["interface"], "name": r["display_name"], "score": r["quality"],
+              "previous": r["old_id"], "previous_name": r["old_name"], "previous_score": old_q and old_q["quality"]}
+        if _upsert(conn, "new_best", r["task"], r["new_id"], ev, "open"):
+            created.append(f'{r["task"]}:{r["new_id"]}')
+    return created
+
+
 def top3(conn, status_for_new: str | None = None) -> list[str]:
     """A model entering the top 3 of a leaderboard in a domain Monsieur watches (interfaces he has preferences on).
     The first computation records the current podiums as 'baseline'."""
@@ -211,6 +239,48 @@ def tiers(conn, run_id: int | None = None) -> list[str]:
     return created
 
 
+def adopt_orchestrator(conn, model_id: str) -> dict:
+    """Monsieur adopted a new orchestrator: point Hermes model.default/provider at its first route (subscription
+    first), config backed up, gateway restarted gracefully."""
+    import shutil
+    from datetime import datetime, timezone
+    from . import execution
+    route = next((r for r in execution.routes(conn, model_id) if r.get("probe_ok") is not False), None)
+    if not route:
+        raise RuntimeError(f"no usable route for {model_id}")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    shutil.copy2("/root/.hermes/config.yaml", f"/root/.hermes/backups/config/config.yaml.{ts}.pre-orchestrator")
+    for key, value in (("model.default", route["model"]), ("model.provider", route["hermes_provider"])):
+        subprocess.run([str(HERMES), "config", "set", key, value], check=True, capture_output=True, timeout=60)
+    subprocess.run([str(HERMES), "gateway", "restart"], capture_output=True, timeout=1900)
+    return {"orchestrator": route["model"], "provider": route["hermes_provider"], "backup": ts}
+
+
+def postes(conn) -> list[str]:
+    """Orchestrator fiche de poste vs the model Hermes really runs: a clearly better one (>= margin) is proposed."""
+    from . import identity, knowledge
+    from . import postes as postes_mod
+    cfg = knowledge.load().get("postes", {}).get("orchestrator")
+    if not cfg:
+        return []
+    ranking = postes_mod.rank(conn, "orchestrator", 20)
+    cur = postes_mod.current_orchestrator()
+    cur_id = identity.normalize("codex", cur["model"] or "")[0]
+    current = next((r for r in ranking if r["model_id"] == cur_id), None)
+    if not ranking or ranking[0]["model_id"] == cur_id:
+        conn.execute("""update models.alerts set status = 'dismissed', verdict_note = 'auto: orchestrateur déjà optimal'
+                        where kind = 'tier' and role = 'orchestrator' and status in ('open', 'notified')""")
+        return []
+    top = ranking[0]
+    if current and top["score"] - current["score"] < cfg.get("margin", 3.0):
+        return []
+    ev = {"level": "orchestrator", "poste": cfg["label"], "proposed": top["model_id"], "score": top["score"],
+          "attributes": top["attributes"], "current": cur_id, "current_score": current and current["score"],
+          "current_attributes": current and current["attributes"]}
+    return [f'orchestrator:{top["model_id"]}'] if _upsert(conn, "tier", "general", top["model_id"], ev, "open",
+                                                            "orchestrator") else []
+
+
 def billing(conn) -> list[str]:
     """Providers whose last probe found no credit left: one alert each, auto-cleared once topped up."""
     created = []
@@ -237,9 +307,11 @@ def _watched_interfaces(conn) -> set[str]:
 
 def pending(conn) -> list[dict]:
     """What goes to Telegram. Unranked releases are recorded but never sent (too many, unproven): a new model is
-    reported once it reaches a top 3 (kind 'top3') or overtakes a favourite from a top-3 place."""
-    return list(conn.execute("""select * from models.alerts where status = 'open' and kind <> 'unranked'
-                                order by kind, task, alert_id"""))
+    reported only when it ranks above an active model."""
+    # Monsieur 2026-10-02: only « a new model ranks above one of our active models » — favourites ('challenger'),
+    # text tiers ('tier'), auto-picked #1 of specialised tasks ('new_best'). No credit, staleness or podium news.
+    return list(conn.execute("""select * from models.alerts where status = 'open'
+                                and kind in ('challenger', 'tier', 'new_best') order by kind, task, alert_id"""))
 
 
 ROLE_LABELS = {"value": "ratio", "budget": "budget", "action": "action"}
@@ -273,6 +345,14 @@ def render(alerts: list[dict], conn=None) -> str:
     bills = [a for a in alerts if a["kind"] == "billing"]
     tier_alerts = [a for a in alerts if a["kind"] == "tier"]
     out = ["Walter Router"]
+    for a in [x for x in tier_alerts if x["role"] == "orchestrator"]:
+        e = a["evidence"]
+        c = catalog.card(conn, a["subject"], "chat")
+        att = e["attributes"]
+        out.append(f'🎛️ [{a["alert_id"]}] Orchestrateur de Walter : {catalog.line(c)} ferait mieux que {e["current"]} '
+                   f'(poste {e["score"]:.0f} vs {e["current_score"] or 0:.0f} ; agentique {att.get("agentic", 0):.0f}, '
+                   f'fiabilité {att.get("reliability", 0):.0f}) · « adopter {a["alert_id"]} » ou « ignorer {a["alert_id"]} »')
+    tier_alerts = [x for x in tier_alerts if x["role"] != "orchestrator"]
     for a in tier_alerts:
         e = a["evidence"]
         cur = f' (actuel {e["current"]}, {e["current_score"]:.1f})' if e.get("current_score") else f' (actuel {e["current"]})'
@@ -282,6 +362,13 @@ def render(alerts: list[dict], conn=None) -> str:
         name = catalog.PROVIDERS.get(a["subject"], a["subject"])
         out.append(f'💳 {name} : {a["evidence"]["detail"]}. Les modèles payants passent par les autres providers '
                    f'(Codex, Kie) en attendant une recharge.')
+    news = [a for a in alerts if a["kind"] == "new_best"]
+    for a in news:
+        e = a["evidence"]
+        task = conn.execute("select interface, modes from models.tasks where task = %s", (a["task"],)).fetchone()
+        c = catalog.card(conn, a["subject"], task["interface"], task["modes"])
+        out.append(f'🆕 [{a["alert_id"]}] {e["task_label"]} : {catalog.line(c)} — dépasse {e["previous_name"]} '
+                   f'({e["score"]:.0f} vs {e["previous_score"] or 0:.0f}), utilisé désormais · « ignorer {a["alert_id"]} » pour garder l\'ancien')
     if beaten:
         out.append("⚠️ Favori dépassé (à tester) :")
         out += [f"• {_challenger_line(conn, a)}" for a in beaten]
@@ -295,7 +382,7 @@ def render(alerts: list[dict], conn=None) -> str:
             out.append(f'• [{a["alert_id"]}] {catalog.line(c)} — {ranks}')
     if stale:
         out.append("Sources en retard : " + ", ".join(f'{a["subject"]} ({str(a["evidence"]["last"])[:10]})' for a in stale))
-    if beaten:
+    if beaten or tier_alerts:
         out.append("Après test : « adopter N » ou « ignorer N ».")
     return "\n".join(out)
 
@@ -323,6 +410,13 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None) -> dict
                      (decision, note, alert_id)).fetchone()
     if not a:
         raise KeyError(alert_id)
+    if a["kind"] == "new_best" and decision == "dismissed":
+        from .choose import set_preference
+        set_preference(conn, a["task"], pin=a["evidence"]["previous"], watch="quality",
+                       note=f"Monsieur garde {a['evidence']['previous']} (alerte {alert_id} ignorée).")
+        return {"alert_id": alert_id, "status": decision, "pinned": a["evidence"]["previous"]}
+    if decision == "adopted" and a["kind"] == "tier" and a["role"] == "orchestrator":
+        return {"alert_id": alert_id, "status": decision, **adopt_orchestrator(conn, a["subject"])}
     if decision == "adopted" and a["kind"] == "tier":
         from .choose import set_preference
         set_preference(conn, "general", pin=a["subject"], role=a["role"], watch="dominance",

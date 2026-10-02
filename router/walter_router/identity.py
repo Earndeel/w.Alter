@@ -26,10 +26,23 @@ def canon(base: str) -> str:
     return _DOT_ZERO.sub(r"\1", _GLUED.sub(r"\1-\2", base))
 
 
+AUTO_ALIASES = Path(__file__).resolve().parent.parent / "config" / "aliases_auto.json"
+
+
 def _load_manual() -> dict:
+    """aliases.json (hand-written) + config/aliases_auto.json (validated additions by the analysis agent)."""
     doc = json.loads((Path(__file__).with_name("aliases.json")).read_text())
-    doc["*"] = {canon(k): {**v, "model_id": canon(v["model_id"])} for k, v in doc.get("*", {}).items()}
+    star = dict(doc.get("*", {}))
+    if AUTO_ALIASES.exists():
+        for k, v in json.loads(AUTO_ALIASES.read_text()).get("aliases", {}).items():
+            star.setdefault(k, v)  # a hand-written alias always wins
+    doc["*"] = {canon(k): {**v, "model_id": canon(v["model_id"])} for k, v in star.items()}
     return doc
+
+
+def reload() -> None:
+    global MANUAL
+    MANUAL = _load_manual()
 
 
 MANUAL = _load_manual()

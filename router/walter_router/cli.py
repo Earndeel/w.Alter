@@ -6,20 +6,32 @@ import json
 import subprocess
 import sys
 
-from . import alerts, choose, collect, db, dossier, execution, intent, knowledge, review
+from . import aliases_admin, alerts, media_exec, choose, collect, db, dossier, execution, intent, knowledge, review
 from . import select as sel
 
 
-def refresh(notify: bool = True, dry_run: bool = False) -> dict:
+def rederive(conn) -> dict:
+    """Re-derive the latest snapshot of every source with the current identity rules (no network)."""
+    out = {}
+    for s in conn.execute("select kind, snapshot_id from models.latest_snapshots").fetchall():
+        raw = conn.execute("select raw from models.snapshots where snapshot_id = %s", (s["snapshot_id"],)).fetchone()["raw"]
+        with conn.transaction():
+            out[s["kind"]] = {"snapshot_id": s["snapshot_id"], "rows": collect._insert_rows(conn, s["snapshot_id"],
+                                                                                            s["kind"], raw)}
+    return out
+
+
+def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = False) -> dict:
     with db.connect() as conn:
         run_id = conn.execute("insert into models.runs default values returning run_id").fetchone()["run_id"]
         conn.commit()
         try:
-            report = {"sources": collect.collect_all(conn)}
+            report = {"sources": rederive(conn) if skip_collect else collect.collect_all(conn)}
             with conn.transaction():
                 report["knowledge"] = knowledge.declare(conn)  # config/knowledge.json is the source of truth
-            with conn.transaction():
-                report["providers"] = execution.probe(conn)
+            if not skip_collect:
+                with conn.transaction():
+                    report["providers"] = execution.probe(conn)
             with conn.transaction():
                 rows = sel.compute(conn)
                 sel.save(conn, run_id, rows)
@@ -27,9 +39,10 @@ def refresh(notify: bool = True, dry_run: bool = False) -> dict:
                 report["dossiers"] = dossier.build_all(conn, run_id)
                 first = conn.execute("select count(*) as n from models.runs where status = 'ok'").fetchone()["n"] == 0
                 report["alerts"] = {"challengers": alerts.challengers(conn, "baseline" if first else "open"),
-                                    "top3": alerts.top3(conn), "unranked": alerts.unranked(conn),
+                                    "new_best": alerts.new_best(conn, run_id), "unranked": alerts.unranked(conn),
                                     "billing": alerts.billing(conn),
                                     "tiers": alerts.tiers(conn, run_id),
+                                    "postes": alerts.postes(conn),
                                     "stale": alerts.stale_sources(conn)}
                 report["pruned_snapshots"] = collect.prune(conn)
                 conn.execute("update models.runs set status = 'ok', finished_at = now(), summary = %s::jsonb where run_id = %s",
@@ -105,10 +118,42 @@ def notify_failure() -> dict:
         why = "; ".join(h["issues"][:3]) or "voir journalctl -u walter-router-refresh"
     except Exception as exc:  # noqa: BLE001 — the database itself may be the problem
         why = f"base injoignable ({type(exc).__name__})"
-    text = f"⚠️ Walter Router : le refresh de cette nuit a échoué — {why}. Les derniers choix restent utilisés."
+    with db.connect() as conn:  # Monsieur wants no noise: only when two cycles in a row failed (4 days blind)
+        last = [r["status"] for r in conn.execute("select status from models.runs order by run_id desc limit 2")]
+    if last != ["failed", "failed"]:
+        return {"sent": False, "reason": "single failure: health only"}
+    text = f"⚠️ Walter Router : deux cycles de suite ont échoué — {why}. Les derniers choix restent utilisés."
     out = subprocess.run([str(alerts.HERMES), "send", "-t", "telegram", text], capture_output=True, text=True,
                          timeout=120)
     return {"sent": out.returncode == 0, "text": text}
+
+
+def feedback(conn, model: str, rating: int, task: str | None, note: str | None) -> dict:
+    if model == "last":
+        last = conn.execute("""select model_id, task from models.exec_log where ok and model_id is not null
+                               order by at desc limit 1""").fetchone()
+        if not last:
+            raise KeyError("no routed run yet")
+        model, task = last["model_id"], task or last["task"]
+    conn.execute("insert into models.canonical (model_id) values (%s) on conflict do nothing", (model,))
+    fid = conn.execute("""insert into models.feedback (model_id, task, rating, note) values (%s, %s, %s, %s)
+                          returning feedback_id""", (model, task, rating, note)).fetchone()["feedback_id"]
+    return {"feedback_id": fid, "model_id": model, "task": task, "rating": rating}
+
+
+def subscription_fallback(conn, task: str, exclude: str | None = None) -> dict | None:
+    """Best model of the task (weighted composite) that the subscription (Codex) can run, with the reasoning level
+    measured on the task's primary board."""
+    from . import scoring
+    subs = {r["model_id"] for r in conn.execute("""select distinct o.model_id from models.offers o
+                                                  join models.latest_snapshots s using (snapshot_id)
+                                                  where o.access = 'subscription' and o.interface = 'chat'""")}
+    for c in scoring.composite(conn, task):
+        if c["model_id"] in subs and c["model_id"] != exclude:
+            variants = [b["variant"] for b in c["boards"].values() if b.get("variant")]
+            return {"model_id": c["model_id"], "variant": variants[0] if variants else "high",
+                    "composite": c["composite"]}
+    return None
 
 
 def with_execution(conn, out: dict) -> dict:
@@ -117,6 +162,11 @@ def with_execution(conn, out: dict) -> dict:
     if out.get("model_id") and task and task["interface"] == "chat":
         out["execution"] = execution.routes(conn, out["model_id"], out.get("variant") or "",
                                             preferred=out.get("provider"))
+        if out["task"] != "general" and not any(r["access"] == "subscription" for r in out["execution"]):
+            sub = subscription_fallback(conn, out["task"], exclude=out["model_id"])
+            if sub:  # best model of this task reachable through the subscription, after the paid routes
+                out["execution"] += [{**r, "fallback_for": out["model_id"]}
+                                     for r in execution.routes(conn, sub["model_id"], sub["variant"])]
         fallback = knowledge.level_fallback(out["task"], out.get("level") or out.get("role"))
         if fallback:  # declared tier fallback, after every route of the pinned model
             fb_model, _, fb_variant = fallback.partition("/")
@@ -147,6 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("refresh")
     r.add_argument("--no-notify", action="store_true")
     r.add_argument("--dry-run", action="store_true", help="compose the notification without sending it")
+    r.add_argument("--skip-collect", action="store_true", help="re-derive the latest snapshots (no network)")
     k = sub.add_parser("pick")
     k.add_argument("task")
     k.add_argument("--level", choices=choose.LEVELS)
@@ -173,6 +224,33 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--timeout", type=int, default=90)
     sub.add_parser("tasks", help="task keys, labels and interfaces (for tool descriptions)")
     sub.add_parser("review", help="deterministic digest of the last cycle (input of the 48 h analysis agent)")
+    aa = sub.add_parser("alias-add", help="link an unscored model id to the scored id it is (validated, with evidence)")
+    aa.add_argument("key")
+    aa.add_argument("model_id")
+    aa.add_argument("--reason", required=True)
+    aa.add_argument("--origin", default="agent")
+    ar = sub.add_parser("alias-remove")
+    ar.add_argument("key")
+    sub.add_parser("alias-list")
+    po = sub.add_parser("postes", help="fiche de poste ranking (orchestrator, agent_worker)")
+    po.add_argument("poste", nargs="?", default="orchestrator")
+    g = sub.add_parser("generate", help="generate an image / video / music / voice on the routed model")
+    g.add_argument("request")
+    g.add_argument("--task")
+    g.add_argument("--role")
+    g.add_argument("--image-url", action="append", dest="image_urls")
+    g.add_argument("--aspect-ratio")
+    g.add_argument("--duration", type=int)
+    g.add_argument("--resolution")
+    g.add_argument("--paid-fallback", action="store_true", help="UI-only role (Flow): generate via Kie instead")
+    g.add_argument("--no-craft", action="store_true", help="send the request as the prompt")
+    lg = sub.add_parser("log-exec", help="record one routed execution attempt (JSON)")
+    lg.add_argument("entry")
+    fb = sub.add_parser("feedback", help="Monsieur's verdict on a model (rating -2..2)")
+    fb.add_argument("model", help="model_id, or 'last' for the model of the last successful routed run")
+    fb.add_argument("rating", type=int, choices=range(-2, 3))
+    fb.add_argument("--task")
+    fb.add_argument("--note")
     sub.add_parser("notify-failure", help="Telegram message after a failed refresh (systemd OnFailure)")
     d = sub.add_parser("decide", help="free-text request -> role, model, route, workflow, brief")
     d.add_argument("task")
@@ -192,7 +270,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "migrate":
         out = {"applied": db.migrate()}
     elif args.cmd == "refresh":
-        out = refresh(notify=not args.no_notify, dry_run=args.dry_run)
+        out = refresh(notify=not args.no_notify, dry_run=args.dry_run, skip_collect=args.skip_collect)
     elif args.cmd == "status":
         out = status()
     elif args.cmd == "health":
@@ -219,6 +297,22 @@ def main(argv: list[str] | None = None) -> int:
                 out = route(conn, args.request, args.task, args.level)
             elif args.cmd == "classify":
                 out = intent.classify(conn, args.request)
+            elif args.cmd == "log-exec":
+                out = {"exec_id": execution.log(conn, json.loads(args.entry))}
+            elif args.cmd == "feedback":
+                out = feedback(conn, args.model, args.rating, args.task, args.note)
+            elif args.cmd == "generate":
+                out = media_exec.generate(conn, args.request, args.task, args.role, args.image_urls, args.aspect_ratio,
+                                          args.duration, args.resolution, args.paid_fallback, not args.no_craft)
+            elif args.cmd == "postes":
+                from . import postes as postes_mod
+                out = {"current": postes_mod.current_orchestrator(), "ranking": postes_mod.rank(conn, args.poste)}
+            elif args.cmd == "alias-add":
+                out = aliases_admin.add(conn, args.key, args.model_id, args.reason, args.origin)
+            elif args.cmd == "alias-remove":
+                out = aliases_admin.remove(args.key)
+            elif args.cmd == "alias-list":
+                out = aliases_admin.listing()
             elif args.cmd == "review":
                 out = review.digest(conn)
             elif args.cmd == "tasks":

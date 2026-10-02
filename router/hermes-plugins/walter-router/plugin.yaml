@@ -1,0 +1,11 @@
+name: walter-router
+version: 0.3.0
+description: "Walter Router — best model per task (Monsieur's favourites first) and running a text sub-task on it"
+author: W.Alter
+kind: standalone
+provides_tools:
+  - walter_route
+  - walter_run
+  - walter_verdict
+  - walter_feedback
+  - walter_generate

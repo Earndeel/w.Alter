@@ -65,6 +65,30 @@ Monsieur's roles with fiches/workflows, the top candidates with per-board eviden
 content policy, affinity, the level picks, and the decision rules. `walter-router dossier <task>` prints it.
 BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local FlareSolverr (127.0.0.1:8191).
 
+## Phase A + B (2026-10-02 evening)
+- **Telegram = model news only**: `challenger` (a favourite overtaken from a top-3 place), `tier` (Monsieur's method
+  designates another text tier, or the orchestrator fiche de poste finds a clearly better orchestrator), `new_best`
+  (a specialised task's auto-picked #1 changed and scores higher; « ignorer N » pins the previous one). No credit,
+  staleness, podium or analysis messages; a cycle failure is reported only after two failed cycles in a row.
+- **Replies**: plugin tool `walter_verdict` (« adopter N » / « ignorer N »); adopting an orchestrator sets Hermes
+  `model.default/provider` (config backup + graceful gateway restart).
+- **Learning**: `models.exec_log` (every routed attempt; a provider x model failing >= 50 % of its last >= 3 runs in
+  14 days is demoted), `models.feedback` + tool `walter_feedback` (Monsieur's verdicts move a model by +/-3 composite
+  points per net rating, capped +/-9).
+- **Fallback order**: subscription (Codex) -> Kie when available and <= 1.25 x OpenRouter's price -> OpenRouter; a
+  specialised task whose #1 has no subscription route gets the best subscription model of that task appended.
+  Hermes' own `fallback_providers`: kie-codex gpt-6-1-sol, then OpenRouter.
+- **Names**: `alias-add/alias-remove/alias-list` (validated: unscored -> scored, no chain, evidence; renames need a
+  source URL); the 48 h analysis agent applies certain links, then the cycle re-derives (`refresh --skip-collect`).
+- **Media execution**: `generate` / tool `walter_generate` (media_exec.py): role -> prompt rewritten by the
+  economic tier in the model's style (config/media_models.json) -> workflow (Seedance premium: reference still with
+  Sunburst first) -> Kie market API or OpenRouter /videos, /images -> files in ~/.hermes/generated/walter-router.
+  Params coerced to each model's schema (config/kie_media_schemas.json, from docs.kie.ai OpenAPI).
+- **Fiches de poste** (`postes.py`, knowledge.json `postes`): orchestrator / agent_worker on intelligence (AA),
+  agentic (Arena agent), reliability (BridgeBench trustworthiness), speed (BridgeBench), access; context window from
+  OpenRouter. `walter-router postes [poste]`.
+- Hermes plugin sources are mirrored in `hermes-plugins/` (live copy: ~/.hermes/plugins).
+
 ## In production (2026-10-02)
 - **Hermes plugin** `~/.hermes/plugins/walter-router` (toolset `walter-router`, enabled for cli + telegram):
   `walter_route` (which model/provider/workflow for a task; video role by objective) and `walter_run` (runs a text

@@ -10,6 +10,8 @@ the same 0-100 scale, then boards are averaged with the task's weights:
    0.38, with 20 000 votes 0.98); a provisional BridgeBench row 0.5; otherwise 1.
 3. Composite = (sum weight x reliability x q + K x 50) / (sum weight x reliability + K): a model measured on a single
    light board is pulled toward the middle instead of winning on thin evidence (K = 0.25).
+4. Monsieur's own verdicts (models.feedback, last 180 days, this task or any): +/-3 points per net rating, capped
+   at +/-9 — his experience moves a model, without erasing the benchmarks.
 
 Monsieur's favourites and roles stay above this score: it ranks what he has not decided.
 """
@@ -20,6 +22,7 @@ from statistics import median
 from . import select as sel
 
 SHRINK_K = 0.25
+FEEDBACK_POINTS = 3.0  # per net rating point from Monsieur on that task (capped at +/-3 -> +/-9 composite points)
 VOTES_HALF = 500.0
 BOARD_NAMES = {"aa_intelligence": "AA", "aa_mm": "AA", "da_models": "Design Arena", "da_agents": "Design Arena",
                "arena": "Arena", "bridgebench": "BridgeBench"}
@@ -73,9 +76,16 @@ def composite(conn, task: str, snaps: dict | None = None) -> list[dict]:
                                  "q": round(v["q"], 1), "rank": v["rank"], "of": v["of"], "weight": b["weight"],
                                  "reliability": round(rel, 2), "variant": v["row"]["variant"],
                                  "primary": b["is_primary"]}
+    fb = {r["model_id"]: r["s"] for r in conn.execute(
+        """select model_id, sum(rating) as s from models.feedback where (task = %s or task is null)
+           and at > now() - interval '180 days' group by 1""", (task,))}
     out = []
     for a in acc.values():
         score = (a["wq"] + SHRINK_K * 50) / (a["w"] + SHRINK_K)
+        adj = FEEDBACK_POINTS * max(-3, min(3, fb.get(a["model_id"]) or 0))
+        if adj:
+            a["boards"]["Retours de Monsieur"] = {"adjustment": adj, "net_rating": fb[a["model_id"]]}
+            score = max(0.0, min(100.0, score + adj))
         out.append({"model_id": a["model_id"], "composite": round(score, 2), "evidence_weight": round(a["w"], 2),
                     "boards": a["boards"]})
     return sorted(out, key=lambda x: -x["composite"])

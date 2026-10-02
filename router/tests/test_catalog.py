@@ -119,16 +119,25 @@ def test_unranked_releases_are_never_sent(conn):
     assert not [a for a in alerts.pending(conn) if a["kind"] == "unranked"]
 
 
-def test_top3_first_run_is_baseline_then_newcomer_is_open(conn):
-    conn.execute("delete from models.alerts where kind = 'top3'")
-    alerts.top3(conn)
-    assert conn.execute("select count(*) as n from models.alerts where kind = 'top3' and status <> 'baseline'"
-                        ).fetchone()["n"] == 0
-    victim = conn.execute("select subject from models.alerts where kind = 'top3' limit 1").fetchone()["subject"]
-    conn.execute("delete from models.alerts where kind = 'top3' and subject = %s", (victim,))
-    alerts.top3(conn)
-    pend = [a for a in alerts.pending(conn) if a["kind"] == "top3"]
-    assert [a["subject"] for a in pend] == [victim] and "top 3" in alerts.render(pend, conn)
+def test_new_best_for_a_specialised_task_is_the_only_kind_of_news(conn):
+    from walter_router import choose
+    prev = choose.latest_run(conn)
+    old = conn.execute("""select model_id from models.selection where run_id = %s and task = 'coding' and level = 'best'
+                          and rank = 1""", (prev,)).fetchone()["model_id"]
+    new_run = conn.execute("insert into models.runs (status) values ('ok') returning run_id").fetchone()["run_id"]
+    for mid, q, rank in (("zz-newcomer", 99.0, 1), (old, 80.0, 2)):
+        conn.execute("insert into models.canonical (model_id) values (%s) on conflict do nothing", (mid,))
+        conn.execute("""insert into models.selection (run_id, task, level, rank, model_id, display_name, quality)
+                        values (%s, 'coding', 'best', %s, %s, %s, %s)""", (new_run, rank, mid, mid, q))
+    conn.execute("delete from models.preferences where task = 'coding'")
+    assert alerts.new_best(conn, new_run) == ["coding:zz-newcomer"]
+    pend = alerts.pending(conn)
+    assert {a["kind"] for a in pend} <= {"challenger", "tier", "new_best"}
+    a = next(a for a in pend if a["kind"] == "new_best")
+    assert "dépasse" in alerts.render([a], conn)
+    alerts.verdict(conn, a["alert_id"], "dismissed")  # « ignorer » keeps the previous #1 pinned
+    assert conn.execute("select pinned_model_id from models.preferences where task = 'coding'").fetchone()[
+        "pinned_model_id"] == old
 
 
 def test_unrestricted_pick_uses_an_unrestricted_model(conn):
