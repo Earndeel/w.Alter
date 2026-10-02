@@ -2,8 +2,16 @@
   "_doc": "Monsieur's own model knowledge (dated declarations). Applied with `walter-router declare` (idempotent). Leaderboards rank; this file says what each model is FOR, what it demands, and which words of a request call for it. Signals are matched accent- and case-insensitively on whole words.",
   "profiles": {
     "seedance-2-5": {
-      "strengths": ["premium", "cinematic", "character_consistency", "storytelling"],
-      "weaknesses": ["most_expensive", "needs_preparation"],
+      "strengths": [
+        "premium",
+        "cinematic",
+        "character_consistency",
+        "storytelling"
+      ],
+      "weaknesses": [
+        "most_expensive",
+        "needs_preparation"
+      ],
       "effort": "workflow",
       "workflow": [
         "Créer les références d'abord (personnages, décor, produit) avec le modèle image favori, en planche cohérente",
@@ -16,17 +24,26 @@
       "declared_at": "2026-10-02"
     },
     "minimax-h3": {
-      "strengths": ["balanced", "value", "action"],
+      "strengths": [
+        "balanced",
+        "value",
+        "action"
+      ],
       "weaknesses": [],
       "effort": "direct",
-      "workflow": ["Prompt direct ; 768p via Kie pour le meilleur prix"],
+      "workflow": [
+        "Prompt direct ; 768p via Kie pour le meilleur prix"
+      ],
       "cost_note": "Meilleur ratio qualité/prix, surtout via Kie.ai.",
       "content_policy": "permissive",
       "note": "Monsieur (2026-10-02) : bonne balance, meilleur ratio, très bon en scènes d'action ; open source et peut-être unrestricted (à vérifier).",
       "declared_at": "2026-10-02"
     },
     "gemini-omni-flash-1-1": {
-      "strengths": ["ugc", "realism"],
+      "strengths": [
+        "ugc",
+        "realism"
+      ],
       "weaknesses": [],
       "effort": "guided",
       "workflow": [
@@ -39,16 +56,27 @@
       "declared_at": "2026-10-02"
     },
     "grok-imagine-video-1-5": {
-      "strengths": ["cheap", "drafts"],
-      "weaknesses": ["lower_quality"],
+      "strengths": [
+        "cheap",
+        "drafts"
+      ],
+      "weaknesses": [
+        "lower_quality"
+      ],
       "effort": "direct",
-      "workflow": ["Prompt direct ; 480p/720p via Kie"],
+      "workflow": [
+        "Prompt direct ; 480p/720p via Kie"
+      ],
       "cost_note": "Vraiment pas cher sur Kie, mais pas au niveau des autres.",
       "note": "Monsieur (2026-10-02).",
       "declared_at": "2026-10-02"
     },
     "gpt-6-luna": {
-      "strengths": ["fast", "cheap", "subscription"],
+      "strengths": [
+        "fast",
+        "cheap",
+        "subscription"
+      ],
       "effort": "direct",
       "access_note": "Inclus dans l'abonnement ChatGPT (Codex).",
       "note": "Monsieur (2026-10-02) : préféré à MiMo 2.6 Flash à niveau égal, surtout avec l'abonnement Codex.",
@@ -56,49 +84,184 @@
     }
   },
   "roles": {
-    "_tasks": ["text_to_video", "image_to_video"],
+    "_tasks": [
+      "text_to_video",
+      "image_to_video"
+    ],
     "default": {
       "label": "Équilibré",
-      "model": "minimax-h3", "provider": "kie", "watch": "dominance", "priority": 0,
+      "model": "minimax-h3",
+      "provider": "kie",
+      "watch": "dominance",
+      "priority": 0,
       "description": "Demande vidéo sans objectif particulier : bonne balance qualité/prix, direct, sans préparation.",
       "signals": []
     },
     "premium": {
       "label": "Premium / cinématique",
-      "model": "seedance-2-5", "provider": null, "watch": "quality", "priority": 40,
+      "model": "seedance-2-5",
+      "provider": null,
+      "watch": "quality",
+      "priority": 40,
       "description": "Rendu final haut de gamme : pub, clip, film, personnage récurrent. Lance le workflow références + prompt adapté.",
-      "signals": ["pub", "publicite", "publicitaire", "spot", "cinematique", "cinema", "film", "court metrage", "clip", "trailer",
-                  "bande annonce", "haut de gamme", "premium", "luxe", "qualite max", "meilleure qualite", "top qualite",
-                  "rendu final", "storytelling", "personnage recurrent", "coherence des personnages", "seedance"]
+      "signals": [
+        "pub",
+        "publicite",
+        "publicitaire",
+        "spot",
+        "cinematique",
+        "cinema",
+        "film",
+        "court metrage",
+        "clip",
+        "trailer",
+        "bande annonce",
+        "haut de gamme",
+        "premium",
+        "luxe",
+        "qualite max",
+        "meilleure qualite",
+        "top qualite",
+        "rendu final",
+        "storytelling",
+        "personnage recurrent",
+        "coherence des personnages",
+        "seedance"
+      ]
     },
     "action": {
       "label": "Action",
-      "model": "minimax-h3", "provider": "kie", "watch": "dominance", "priority": 20,
+      "model": "minimax-h3",
+      "provider": "kie",
+      "watch": "dominance",
+      "priority": 20,
       "description": "Scènes d'action, mouvement rapide, pour pas cher.",
-      "signals": ["action", "combat", "bagarre", "baston", "poursuite", "course poursuite", "explosion", "cascade", "fight",
-                  "chase", "sport", "drift", "dynamique", "mouvement rapide", "arts martiaux", "h3", "minimax"]
+      "signals": [
+        "action",
+        "combat",
+        "bagarre",
+        "baston",
+        "poursuite",
+        "course poursuite",
+        "explosion",
+        "cascade",
+        "fight",
+        "chase",
+        "sport",
+        "drift",
+        "dynamique",
+        "mouvement rapide",
+        "arts martiaux",
+        "h3",
+        "minimax"
+      ]
     },
     "ugc": {
       "label": "UGC",
-      "model": "gemini-omni-flash-1-1", "provider": "google-flow", "watch": "none", "priority": 30,
+      "model": "gemini-omni-flash-1-1",
+      "provider": "google-flow",
+      "watch": "none",
+      "priority": 30,
       "description": "Contenu type créateur : face caméra, témoignage, avis client, TikTok/Reels. Via Flow avec les crédits gratuits.",
-      "signals": ["ugc", "temoignage", "face camera", "avis client", "tiktok", "reel", "reels", "story", "stories", "selfie",
-                  "influenceur", "influenceuse", "unboxing", "vlog", "createur", "testimonial", "authentique", "smartphone",
-                  "omni", "flow"]
+      "signals": [
+        "ugc",
+        "temoignage",
+        "face camera",
+        "avis client",
+        "tiktok",
+        "reel",
+        "reels",
+        "story",
+        "stories",
+        "selfie",
+        "influenceur",
+        "influenceuse",
+        "unboxing",
+        "vlog",
+        "createur",
+        "testimonial",
+        "authentique",
+        "smartphone",
+        "omni",
+        "flow"
+      ]
     },
     "budget": {
       "label": "Budget / brouillon",
-      "model": "grok-imagine-video-1-5", "provider": "kie", "watch": "dominance", "priority": 10,
+      "model": "grok-imagine-video-1-5",
+      "provider": "kie",
+      "watch": "dominance",
+      "priority": 10,
       "description": "Essais, brouillons, beaucoup de variantes, quand le prix compte plus que la qualité.",
-      "signals": ["pas cher", "brouillon", "test", "essai", "maquette", "previsualisation", "preview", "draft", "variantes",
-                  "batch", "economique", "low cost", "grok"]
+      "signals": [
+        "pas cher",
+        "brouillon",
+        "test",
+        "essai",
+        "maquette",
+        "previsualisation",
+        "preview",
+        "draft",
+        "variantes",
+        "batch",
+        "economique",
+        "low cost",
+        "grok"
+      ]
     }
   },
-  "retired_roles": {"_tasks": ["text_to_video", "image_to_video"], "roles": ["value"],
-                    "reason": "2026-10-02 : Omni 1.1 n'est plus le « meilleur ratio » (c'est H3) mais le choix UGC."},
+  "retired_roles": {
+    "_tasks": [
+      "text_to_video",
+      "image_to_video"
+    ],
+    "roles": [
+      "value"
+    ],
+    "reason": "2026-10-02 : Omni 1.1 n'est plus le « meilleur ratio » (c'est H3) mais le choix UGC."
+  },
   "affinities": [
-    {"model": "gpt-6-luna", "scope": "*", "weight": 1,
-     "reason": "Monsieur (2026-10-02) : préféré à MiMo 2.6 Flash au coude à coude, surtout via l'abonnement Codex."}
+    {
+      "model": "gpt-6-luna",
+      "scope": "*",
+      "weight": 1,
+      "reason": "Monsieur (2026-10-02) : préféré à MiMo 2.6 Flash au coude à coude, surtout via l'abonnement Codex."
+    }
   ],
-  "unrestricted_signals": ["sans censure", "uncensored", "unrestricted", "sans restriction", "nsfw", "explicite", "non censure"]
+  "unrestricted_signals": [
+    "sans censure",
+    "uncensored",
+    "unrestricted",
+    "sans restriction",
+    "nsfw",
+    "explicite",
+    "non censure"
+  ],
+  "task_hints": {
+    "general": "Réponse texte : question, explication, résumé, rédaction, traduction, conseil, analyse ou comparaison (pas de code, pas de média, pas de fichier joint)",
+    "research": "Recherche web d'informations récentes ou de sources : actualités, prix du moment, qui/quand/où sur un fait actuel",
+    "weather": "Météo actuelle ou prévisions pour un lieu",
+    "calculation": "Calcul arithmétique ou conversion d'unités exacte",
+    "coding": "Écrire, corriger, expliquer ou relire du code, scripts, API, back-end, automatisation",
+    "frontend": "Créer un site web ou une landing page (HTML/CSS/JS, design web)",
+    "ui_component": "Créer un composant d'interface isolé (bouton, formulaire, carte, tableau de bord) en code",
+    "3d": "Créer une scène 3D interactive ou du WebGL/Three.js en code",
+    "gamedev": "Créer un petit jeu jouable (HTML5/canvas) en code",
+    "dataviz": "Créer un graphique ou une visualisation de données en code",
+    "svg": "Créer une illustration ou une icône vectorielle SVG en code",
+    "fullstack": "Construire une application web complète avec front-end, back-end et base de données",
+    "mobile_app": "Construire une application mobile",
+    "vision": "Analyser ou décrire une image ou une photo fournie (que voit-on, lire du texte dans l'image)",
+    "document": "Analyser un fichier fourni : PDF, contrat, rapport, tableur, document joint",
+    "text_to_image": "Générer une image, une photo, une illustration à partir d'une description",
+    "image_edit": "Modifier ou retoucher une image existante (changer le fond, ajouter/retirer un objet, style)",
+    "logo": "Créer un logo ou une identité visuelle",
+    "graphic_design": "Créer une affiche, un flyer, une bannière, un visuel graphique avec texte",
+    "text_to_video": "Générer une vidéo (clip, scène animée, pub vidéo, plan cinéma) à partir d'une description",
+    "image_to_video": "Animer une image ou une photo existante pour en faire une vidéo",
+    "video_edit": "Modifier une vidéo existante (changer le style, remplacer un élément, prolonger)",
+    "tts": "Lire un texte à voix haute, générer une voix off ou un audio parlé",
+    "speech_to_speech": "Conversation vocale en temps réel",
+    "music": "Composer ou générer une musique, une chanson, un jingle"
+  }
 }

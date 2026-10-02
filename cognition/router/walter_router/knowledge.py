@@ -72,6 +72,8 @@ def declare(conn, doc: dict | None = None) -> dict:
     retired = doc.get("retired_roles") or {}
     for task in retired.get("_tasks", []):
         conn.execute("delete from models.preferences where task = %s and role = any(%s)", (task, retired["roles"]))
+    for task, hint in (doc.get("task_hints") or {}).items():
+        conn.execute("update models.tasks set intent_hint = %s where task = %s", (hint, task))
     for a in doc.get("affinities", []):
         conn.execute("""insert into models.affinities (model_id, scope, weight, reason) values (%s, %s, %s, %s)
                         on conflict (model_id, scope) do update set weight = excluded.weight, reason = excluded.reason""",
@@ -136,13 +138,18 @@ def _role_line(conn, task: dict, p: dict) -> str:
     return f'{p["label"] or p["role"]} → {catalog.line(c)} : {p["description"] or ""}{extra}'.strip()
 
 
-def decide(conn, task: str, intent: str, level: str | None = None) -> dict[str, Any]:
-    """Free-text request -> role (objective) -> favourite model -> route, workflow and a brief for the orchestrator."""
+def decide(conn, task: str, intent: str, level: str | None = None, jev: dict | None = None) -> dict[str, Any]:
+    """Free-text request -> role (objective) -> favourite model -> route, workflow and a brief for the orchestrator.
+
+    `jev` = intent.classify() result when available: its video role (confidence >= 0.5) and its unrestricted
+    verdict win over keywords; keywords remain the fallback when Jev is unavailable or unsure."""
     t = conn.execute("select * from models.tasks where task = %s", (task,)).fetchone()
     if not t:
         raise KeyError(f"unknown task: {task}")
     doc = load()
     unrestricted = hits(intent, doc.get("unrestricted_signals", []))
+    if jev and jev.get("unrestricted") and (jev.get("unrestricted_confidence") or 0) >= 0.6:
+        unrestricted = unrestricted or ["jev:unrestricted"]
     roles = conn.execute("select * from models.preferences where task = %s and pinned_model_id is not null",
                          (task,)).fetchall()
     if not any(r["signals"] or r["role"] == "default" for r in roles) or len(roles) < 2:
@@ -151,7 +158,13 @@ def decide(conn, task: str, intent: str, level: str | None = None) -> dict[str, 
         return choose.pick(conn, task, level)
     scored = sorted(((len(hits(intent, r["signals"])), r["priority"], r) for r in roles),
                     key=lambda x: (x[0], x[1]), reverse=True)
-    chosen = scored[0][2] if scored[0][0] > 0 else next((r for r in roles if r["role"] == "default"), scored[0][2])
+    by_role = {r["role"]: r for r in roles}
+    if jev and jev.get("video_role") in by_role and (jev.get("role_confidence") or 0) >= 0.5:
+        chosen, role_source = by_role[jev["video_role"]], "jev"
+    elif scored[0][0] > 0:
+        chosen, role_source = scored[0][2], "keywords"
+    else:
+        chosen, role_source = by_role.get("default", scored[0][2]), "default"
     warning = None
     if unrestricted and effective_policy(conn, chosen["pinned_model_id"]) == "standard":
         permissive = [r for r in roles if effective_policy(conn, r["pinned_model_id"]) != "standard"]
@@ -167,7 +180,7 @@ def decide(conn, task: str, intent: str, level: str | None = None) -> dict[str, 
     brief = "\n".join([f'Tâche {t["label"]} — rôles de Monsieur (choisis selon l\'objectif de la demande) :']
                       + [f'- {"[choisi] " if r["role"] == chosen["role"] else ""}{_role_line(conn, t, r)}'
                          for r in [chosen] + others])
-    return {**answer, "role": chosen["role"], "role_label": chosen["label"],
+    return {**answer, "role": chosen["role"], "role_label": chosen["label"], "role_source": role_source,
             "matched_signals": hits(intent, chosen["signals"]), "unrestricted_signals": unrestricted,
             "warning": warning,
             "profile": {k: prof[k] for k in ("strengths", "weaknesses", "effort", "workflow", "access_note",

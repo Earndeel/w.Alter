@@ -62,6 +62,16 @@ BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local Fla
 - **Execution routes** (`execution.routes`): preferred provider, subscription (Codex), then paid by price; Kie only
   for Claude models (its Hermes provider is the Anthropic endpoint). `probe` = a 5-token live call per provider at
   every refresh (`models.provider_status`); a failed provider goes last.
+- **Intent (Jev)**: `route "<request>"` classifies with TypeSafe Jev through OpenRouter's Decisions API
+  (`intent.py`; one call = task + video role + level + unrestricted, ~0.3 s, ~0.00005 $; criteria from
+  `tasks.intent_hint` / role descriptions in knowledge.json). Eval `eval/intents_fr.json`: task 30/30, video role
+  6/7 (keywords 5/7). Keywords stay the fallback. `walter_route` without `task` uses it; the plugin also adds a
+  system-prompt rule so the orchestrator calls walter_route before choosing a model.
+- **Kie**: `kie` (Anthropic endpoint, Claude) and `kie-codex` (Responses endpoint, GPT; Hermes provider added
+  2026-10-02). Kie Claude is often degraded: a 5-token preflight runs before any Kie route in `walter_run`.
+  `~/.hermes/plugins/kie-compat` (strip `output_config`) is kept DISABLED: hypothesis not confirmed.
+- **Credit**: the OpenRouter probe reads `/api/v1/credits`; below 1 $ its routes go last and a `billing` alert is
+  sent once. `walter_run` last resort = GPT-6.1 Sol on the Codex subscription (never for unrestricted requests).
 - **Health**: `walter-router health` (exit 1 when not fed), shown in walter-core `walter_health`;
   `walter-router-failure.service` (OnFailure of the refresh) sends one Telegram message.
 
@@ -74,7 +84,9 @@ bin/walter-router pick <task> --require unrestricted|open_weights   # hard const
 bin/walter-router decide <task> "<request in French>"  # role by objective, route, workflow, brief
 bin/walter-router declare                               # apply config/knowledge.json
 bin/walter-router dossier <task>                        # the JSON the router reads
-bin/walter-router health | probe | tasks | notify-failure
+bin/walter-router route "<request>" [--task T]            # Jev intent -> decision -> execution routes
+bin/walter-router classify "<request>"                    # Jev intent only
+bin/walter-router health | probe [--provider P] | tasks | notify-failure
 bin/walter-router prefer <task> [--objective value|best_available] [--pin model_id[/variant]] [--provider p] [--note ...]
 bin/walter-router alerts [--all]
 bin/walter-router verdict <alert_id> adopted|dismissed [--note ...]   # adopted challenger becomes the favourite
