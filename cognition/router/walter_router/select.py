@@ -155,6 +155,23 @@ def _ladder(cands: list[dict], minimum_score: float, cost_cap: float) -> dict | 
             "frontier": [by_slug[r["slug"]] for r in frontier["pragmatic_frontier"]]}
 
 
+def _tier_rows(cands: list[dict]) -> list[dict]:
+    """Monsieur's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs."""
+    from . import tiers  # late import keeps the module graph flat
+    pts = [{**c, "cost": c["real_cost"]} for c in cands if c.get("real_cost")]
+    t = tiers.compute(pts)
+    rows = []
+    for level, why in (("L1", "économique : premier coude au-dessus du plancher de qualité"),
+                       ("L2", "intermédiaire : meilleur gain en points par $ depuis L1"),
+                       ("L3", "haut de gamme : meilleur gain depuis L2 dans la bande du plafond")):
+        if t[level]:
+            p = t[level]
+            rows.append(_row("general", level, 1, p, role=why, marginal=p.get("marginal"), method=t.get("params")))
+    rows += [_row("general", "frontier", i + 1, p, marginal=p.get("marginal"))
+             for i, p in enumerate(q for q in t["frontier"] if q["score"] >= tiers.QUALITY_FLOOR - 5)]
+    return rows
+
+
 def _best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dict], n: int = 6) -> list[dict]:
     """'best' level: callable models ordered by the weighted multi-board score (scoring.composite)."""
     from .scoring import composite  # late import (scoring -> select)
@@ -225,21 +242,12 @@ def compute(conn) -> list[dict]:
             cands.append({**b, "route": route, "real_cost": (route["paid"] or {}).get("cost"), "real_cost_unit": cost_unit})
         from .knowledge import tie_break  # late import: knowledge -> choose -> select
         ranked = tie_break(conn, t["task"], _best_by_composite(conn, t, snaps, offers, cands))
-        out += [{**r, "rank": i + 1} for i, r in enumerate(ranked[:5])]
+        # Monsieur: specialised tasks keep only the best model (#2/#3 are useless); general keeps a short list.
+        out += [{**r, "rank": i + 1} for i, r in enumerate(ranked[:5 if t["task"] == "general" else 1])]
         if not cands:
             continue
         if t["task"] == "general":
-            lad = _ladder(cands, 35.0, 0.75)
-            if lad:
-                out.append(_row("general", "L1", 1, lad["anchor"], role="value_anchor"))
-                out.append(_row("general", "L2", 1, lad["knee"], role="ladder_knee"))
-                out.append(_row("general", "L3", 1, lad["ceiling"], role="quality_ceiling"))
-                out += [_row("general", "frontier", i + 1, c) for i, c in enumerate(lad["frontier"])]
-        else:
-            lad = _ladder(cands, 0.0, float("inf"))
-            if lad:
-                out.append(_row(t["task"], "value", 1, lad["knee"], role="ladder_knee"))
-                out += [_row(t["task"], "frontier", i + 1, c) for i, c in enumerate(lad["frontier"])]
+            out += _tier_rows(cands)
     return out
 
 
