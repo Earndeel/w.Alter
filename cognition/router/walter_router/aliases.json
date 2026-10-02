@@ -28,6 +28,10 @@
     "grok-imagine-video-1-5-preview": {
       "model_id": "grok-imagine-video-1-5",
       "reason": "Kie 'grok-imagine-video-1-5-preview' = AA/OpenRouter grok-imagine-video-1.5 (same version, Kie labels it preview)"
+    },
+    "gemini-omni-1-1-flash": {
+      "model_id": "gemini-omni-flash-1-1",
+      "reason": "Arena 'gemini-omni-1.1-flash' = AA/Kie Gemini Omni Flash 1.1 (same model, Arena orders the words differently; Google blog link on Arena confirms)"
     }
   },
   "kie": {},
@@ -36,5 +40,12 @@
   "da": {},
   "mm": {},
   "codex": {},
-  "declared": {}
+  "declared": {},
+  "arena": {
+    "grok-imagine-video-1.5-agent": {
+      "model_id": "grok-imagine-video-1-5",
+      "variant": "agent",
+      "reason": "Arena row of Grok Imagine Video 1.5 driven by its agent mode (co-release); same model, different generation mode"
+    }
+  }
 }

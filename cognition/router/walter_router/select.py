@@ -8,13 +8,15 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import re
 from pathlib import Path
 from typing import Any
+
+from . import media
 
 SKILL = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "skills/research/aa-pareto-model-optimizer/scripts"
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
 MEDIA_UNITS = {"image": "per image", "video": "per second", "audio": "per 1000 characters", "music": None}
+BENCH_KIND = {"aa_intelligence": "aa", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena"}
 
 
 def _load(name: str):
@@ -71,41 +73,42 @@ def chat_route(offers: list[dict], list_cost: float | None) -> dict[str, Any]:
     return {"paid": best, "subscription": subscription, "callable": bool(best or subscription)}
 
 
-def _per_unit(o: dict, unit: str | None) -> dict | None:
-    """Offer priced in the task unit; 'per video' prices with an explicit duration (e.g. '10s') become per second."""
-    if not o["unit_price"]:
-        return None  # unpriced, or a free auxiliary operation (e.g. Kie Suno "Cover Generate" $0) — not a generation price
-    got = (o["unit"] or "").strip().lower()
-    if unit is None or got == unit:
-        return o
-    m = re.search(r"(?<![\d.])(\d+(?:\.\d+)?)s\b", o["offer_key"])
-    if unit == "per second" and got in ("per video", "per vedio") and m and float(m.group(1)) > 0:
-        return {**o, "unit_price": o["unit_price"] / float(m.group(1)), "unit": "per second",
-                "converted_from": f'{o["unit_price"]} {got}'}
-    return None
+def _fields(o: dict) -> dict:
+    """Stored classification of an offer (models.offers columns), or computed from its key when absent."""
+    if "offer_kind" in o:
+        return {k: o[k] for k in ("offer_kind", "modes", "resolution", "norm_price", "norm_unit")}
+    c = media.classify(o["interface"], o["offer_key"])
+    price, unit = media.norm_price(o["interface"], o["unit_price"], o["unit"], o["offer_key"])
+    return {"offer_kind": c["kind"], "modes": c["modes"], "resolution": c["resolution"],
+            "norm_price": price if c["kind"] == "generation" else None, "norm_unit": unit}
 
 
-VIDEO_INPUT = re.compile(r"with video|(^|[,|] *)video input", re.I)  # video-to-video SKUs, not generation
-RESOLUTION = re.compile(r"\b(\d{3,4}p|[1248]k)\b", re.I)
-
-
-def media_route(offers: list[dict], interface: str) -> dict[str, Any]:
-    unit = MEDIA_UNITS.get(interface)
-    paid = [c for c in (_per_unit(o, unit) for o in offers if o["interface"] == interface
-                        and not VIDEO_INPUT.search(o["offer_key"])) if c]
+def media_route(offers: list[dict], interface: str, modes: list[str] | None = None) -> dict[str, Any]:
+    """Cheapest generation offer in the interface's comparable unit (video per second, image per image), restricted
+    to the task's generation modes; input fees, upscales, extensions and free auxiliary SKUs never count."""
+    want = MEDIA_UNITS.get(interface)
+    paid = []
+    for o in offers:
+        if o["interface"] != interface:
+            continue
+        f = _fields(o)
+        if f["offer_kind"] != "generation" or f["norm_price"] is None or not media.compatible(f["modes"], modes):
+            continue
+        if want and f["norm_unit"] != want:
+            continue
+        paid.append({**o, **f})
     by_res: dict[str, dict] = {}
     for c in paid:
-        m = RESOLUTION.search(c["offer_key"])
-        res = m.group(1).lower() if m else "any"
-        if res not in by_res or c["unit_price"] < by_res[res]["cost"]:
-            by_res[res] = {"provider": c["provider"], "offer_key": c["offer_key"], "cost": c["unit_price"]}
+        res = c["resolution"] or "any"
+        if res not in by_res or c["norm_price"] < by_res[res]["cost"]:
+            by_res[res] = {"provider": c["provider"], "offer_key": c["offer_key"], "cost": c["norm_price"]}
     any_offer = [o for o in offers if o["interface"] == interface]
-    best = min(paid, key=lambda o: o["unit_price"], default=None)
-    top = max(paid, key=lambda o: o["unit_price"], default=None)
+    best = min(paid, key=lambda o: o["norm_price"], default=None)
+    top = max(paid, key=lambda o: o["norm_price"], default=None)
     route = None
     if best:
-        route = {"provider": best["provider"], "offer_key": best["offer_key"], "cost": best["unit_price"],
-                 "unit": best["unit"], "max_variant_cost": top["unit_price"], "max_variant": top["offer_key"],
+        route = {"provider": best["provider"], "offer_key": best["offer_key"], "cost": best["norm_price"],
+                 "unit": best["norm_unit"], "max_variant_cost": top["norm_price"], "max_variant": top["offer_key"],
                  "by_resolution": by_res}
     elif any_offer:
         o = any_offer[0]
@@ -158,7 +161,7 @@ def compute(conn) -> list[dict]:
     tasks = list(conn.execute("select * from models.tasks where quality_benchmark is not null"))
     out: list[dict] = []
     for t in tasks:
-        kind = {"aa_intelligence": "aa", "aa_mm": "mm", "da_models": "da", "da_agents": "da"}[t["quality_benchmark"]]
+        kind = BENCH_KIND[t["quality_benchmark"]]
         if kind not in snaps:
             continue
         bench = list(conn.execute("""select * from models.benchmarks where snapshot_id = %s and benchmark = %s and task = %s""",
@@ -180,7 +183,7 @@ def compute(conn) -> list[dict]:
                 if assumed:
                     route = {**route, "paid": {**(route["paid"] or {}), "cost_basis_effort_assumed": assumed}}
             else:
-                route = media_route(mo, t["interface"])
+                route = media_route(mo, t["interface"], t["modes"])
                 cost_unit = (route["paid"] or {}).get("unit")
             if not route["callable"]:
                 continue
