@@ -71,7 +71,7 @@ def test_challenger_flow_baseline_then_new_then_adopt(conn):
     assert not [a for a in alerts.pending(conn) if a["kind"] == "challenger" and a["task"] == "3d"]
     # A model overtaking later is 'open' and gets rendered for Telegram.
     conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d' and subject = 'gpt-6-astra'")
-    assert "gpt-6-astra" in alerts.challengers(conn, "open", only_task="3d")
+    assert "3d:default:gpt-6-astra" in alerts.challengers(conn, "open", only_task="3d")
     pend = [a for a in alerts.pending(conn) if a["task"] == "3d"]
     assert pend and "dépassé" in alerts.render(pend)
     # Monsieur adopts it: it becomes the pinned favourite.
@@ -79,12 +79,44 @@ def test_challenger_flow_baseline_then_new_then_adopt(conn):
     assert choose.pick(conn, "3d")["model_id"] == "gpt-6-astra"
 
 
-def test_image_preference_is_best_available(conn):
-    got = choose.pick(conn, "text_to_image")
-    best = conn.execute("""select max(quality) as q from models.selection where run_id = %s and task = 'text_to_image'
+def test_best_available_objective_without_pin_takes_top_callable(conn):
+    choose.set_preference(conn, "text_to_video", objective="best_available")  # no pin, rolled back
+    got = choose.pick(conn, "text_to_video")
+    best = conn.execute("""select max(quality) as q from models.selection where run_id = %s and task = 'text_to_video'
                            and level = 'best'""", (choose.latest_run(conn),)).fetchone()["q"]
     assert got["objective"] == "best_available" and got["quality"] == best
 
 
+def test_image_favourite_is_sunburst(conn):
+    assert choose.pick(conn, "text_to_image")["model_id"] == "gpt-image-2-5-sunburst"
+
+
 def test_tool_tasks_never_get_a_model(conn):
     assert choose.pick(conn, "weather")["mode"] == "tool"
+
+
+def test_per_video_price_with_duration_becomes_per_second():
+    offers = [_offer("kie", interface="video", unit_price=0.63, unit="per video")]
+    offers[0]["offer_key"] = "google/gemini-omni-flash-1-1, video, 10s 720p no video input"
+    assert sel.media_route(offers, "video")["paid"]["cost"] == pytest.approx(0.063)
+    offers[0]["offer_key"] = "kling 2.6, text-to-video, with audio-10.0s"
+    assert sel.media_route(offers, "video")["paid"]["cost"] == pytest.approx(0.063)
+
+
+def test_roles_keep_separate_favourites(conn):
+    choose.set_preference(conn, "text_to_video", pin="seedance-2-5", note="top")
+    choose.set_preference(conn, "text_to_video", pin="minimax-h3", role="action", watch="dominance")
+    assert choose.pick(conn, "text_to_video")["model_id"] == "seedance-2-5"
+    got = choose.pick(conn, "text_to_video", role="action")
+    assert got["model_id"] == "minimax-h3" and "default" in got["other_roles"]
+
+
+def test_dominance_watch_ignores_better_but_dearer_models(conn):
+    # Budget favourite: a better model only counts if it is no more expensive per second.
+    choose.set_preference(conn, "image_to_video", pin="grok-imagine-video-1-5", role="budget", watch="dominance")
+    conn.execute("delete from models.alerts where task = 'image_to_video' and role = 'budget'")
+    alerts.challengers(conn, "open", only_task="image_to_video", only_role="budget")
+    for a in conn.execute("""select evidence from models.alerts where task = 'image_to_video' and role = 'budget'
+                             and kind = 'challenger' and subject not like '%%:unmeasured'"""):
+        e = a["evidence"]
+        assert e["unit_cost"] <= e["pinned_unit_cost"] and e["score"] > e["pinned_score"]

@@ -100,8 +100,17 @@ def source_codex() -> tuple[dict, datetime, str]:
     return {"models": ids}, now(), "chatgpt.com/backend-api/codex (account catalogue)"
 
 
+DECLARED = Path(__file__).resolve().parent.parent / "config" / "declared_offers.json"
+
+
+def source_declared() -> tuple[dict, datetime, str]:
+    doc = json.loads(DECLARED.read_text())
+    return {"offers": doc["offers"]}, now(), str(DECLARED)
+
+
 SOURCES = {"aa": source_aa, "mm": source_mm, "da": source_da,
-           "openrouter": source_openrouter, "kie": source_kie, "codex": source_codex}
+           "openrouter": source_openrouter, "kie": source_kie, "codex": source_codex,
+           "declared": source_declared}
 
 
 # --- parsing -------------------------------------------------------------------------------------------
@@ -196,6 +205,9 @@ def _kie_interface(rec: dict) -> str:
     return kind
 
 
+OFFER_KINDS = ("openrouter", "kie", "codex", "declared")
+
+
 def parse_offers(kind: str, doc: dict) -> list[dict]:
     rows: list[dict] = []
     if kind == "openrouter":
@@ -235,6 +247,12 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                              access="paid", price_in_1m=None, price_out_1m=None, unit_price=price,
                              unit=rec.get("creditUnit"), provider_created=None, pricing=rec))
         rows.extend(chat.values())
+    elif kind == "declared":
+        for d in doc["offers"]:
+            mid, _ = identity.normalize("declared", d["model"])
+            rows.append(dict(provider=d["provider"], offer_key=d["offer_key"], model_id=mid, interface=d["interface"],
+                             access=d["access"], price_in_1m=None, price_out_1m=None, unit_price=None, unit=None,
+                             provider_created=None, pricing={"declared": d.get("declared"), "note": d.get("note")}))
     elif kind == "codex":
         for oid in doc["models"]:
             mid, _ = identity.normalize("codex", oid)
@@ -255,23 +273,14 @@ def _ensure_identity(conn, namespace: str, key: str, model_id: str, vendor: str 
                  (namespace, key, model_id, origin))
 
 
-def store(conn, kind: str, doc: dict, fetched_at: datetime, url: str) -> tuple[int, bool]:
-    """Insert the snapshot and its parsed rows. Returns (snapshot_id, is_new)."""
-    blob = json.dumps(doc, sort_keys=True, ensure_ascii=False)
-    sha = hashlib.sha256(blob.encode()).hexdigest()
-    found = conn.execute("select snapshot_id from models.snapshots where kind = %s and sha256 = %s", (kind, sha)).fetchone()
-    if found:
-        return found["snapshot_id"], False
-    if kind in ("openrouter", "kie", "codex"):
-        rows, ns = parse_offers(kind, doc), kind
-    else:
-        rows, ns = parse_benchmarks(kind, doc), kind
-    sid = conn.execute("""insert into models.snapshots (kind, fetched_at, source_url, sha256, row_count, raw)
-                          values (%s, %s, %s, %s, %s, %s::jsonb) returning snapshot_id""",
-                       (kind, fetched_at, url, sha, len(rows), blob)).fetchone()["snapshot_id"]
+def _insert_rows(conn, sid: int, kind: str, doc: dict) -> int:
+    """(Re)derive benchmarks/offers of one snapshot from its raw document with the current identity rules."""
+    conn.execute("delete from models.benchmarks where snapshot_id = %s", (sid,))
+    conn.execute("delete from models.offers where snapshot_id = %s", (sid,))
+    rows = parse_offers(kind, doc) if kind in OFFER_KINDS else parse_benchmarks(kind, doc)
     for r in rows:
         key = r.get("external_key") or r["offer_key"]
-        _ensure_identity(conn, ns, key, r["model_id"])
+        _ensure_identity(conn, kind, key, r["model_id"])
         if "benchmark" in r:
             conn.execute("""insert into models.benchmarks (snapshot_id, benchmark, task, external_key, model_id, variant,
                             display_name, score, score_unit, cost, cost_unit, released, extra)
@@ -284,7 +293,28 @@ def store(conn, kind: str, doc: dict, fetched_at: datetime, url: str) -> tuple[i
                             values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb) on conflict do nothing""",
                          (sid, r["provider"], r["offer_key"], r["model_id"], r["interface"], r["access"], r["price_in_1m"],
                           r["price_out_1m"], r["unit_price"], r["unit"], r["provider_created"], json.dumps(r["pricing"])))
-    return sid, True
+    conn.execute("update models.snapshots set row_count = %s where snapshot_id = %s", (len(rows), sid))
+    return len(rows)
+
+
+def store(conn, kind: str, doc: dict, fetched_at: datetime, url: str) -> tuple[int, bool]:
+    """Insert the snapshot (deduplicated by content) and (re)derive its rows. Returns (snapshot_id, is_new).
+
+    An unchanged document is re-derived anyway, so identity rule changes (aliases.json) apply immediately.
+    """
+    blob = json.dumps(doc, sort_keys=True, ensure_ascii=False)
+    sha = hashlib.sha256(blob.encode()).hexdigest()
+    found = conn.execute("select snapshot_id from models.snapshots where kind = %s and sha256 = %s", (kind, sha)).fetchone()
+    if found:
+        sid, new = found["snapshot_id"], False
+        conn.execute("update models.snapshots set fetched_at = greatest(fetched_at, %s) where snapshot_id = %s",
+                     (fetched_at, sid))
+    else:
+        sid, new = conn.execute("""insert into models.snapshots (kind, fetched_at, source_url, sha256, row_count, raw)
+                                   values (%s, %s, %s, %s, 0, %s::jsonb) returning snapshot_id""",
+                                (kind, fetched_at, url, sha, blob)).fetchone()["snapshot_id"], True
+    _insert_rows(conn, sid, kind, doc)
+    return sid, new
 
 
 def collect_all(conn) -> dict[str, Any]:

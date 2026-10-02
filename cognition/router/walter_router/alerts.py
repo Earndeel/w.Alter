@@ -13,24 +13,41 @@ UNRANKED_DAYS = 30
 STALE_HOURS = {"aa": 48, "mm": 48, "da": 48, "openrouter": 48, "kie": 48, "codex": 72}
 
 
-def _upsert(conn, kind: str, task: str, subject: str, evidence: dict, status: str) -> bool:
+def _upsert(conn, kind: str, task: str, subject: str, evidence: dict, status: str, role: str = "") -> bool:
     """Insert or refresh an alert; returns True when it is new. Verdicts and statuses are never overwritten."""
-    row = conn.execute("""insert into models.alerts (kind, task, subject, evidence, status) values (%s, %s, %s, %s::jsonb, %s)
-                          on conflict (kind, task, subject) do update set last_seen = now(), evidence = excluded.evidence
+    row = conn.execute("""insert into models.alerts (kind, task, role, subject, evidence, status)
+                          values (%s, %s, %s, %s, %s::jsonb, %s)
+                          on conflict (kind, task, role, subject) do update set last_seen = now(), evidence = excluded.evidence
                           returning (xmax = 0) as inserted""",
-                       (kind, task, subject, json.dumps(evidence, default=str), status)).fetchone()
+                       (kind, task, role, subject, json.dumps(evidence, default=str), status)).fetchone()
     return bool(row["inserted"])
 
 
-def challengers(conn, status_for_new: str = "open", only_task: str | None = None) -> list[str]:
-    """Models measured strictly better than Monsieur's pinned favourite on that task's own leaderboard."""
+def _unit_cost(offers: list[dict], interface: str) -> float | None:
+    if interface == "chat":
+        paid = sel.chat_route(offers, None)["paid"]
+        return paid["blended_1m"] if paid else None
+    paid = sel.media_route(offers, interface)["paid"]
+    return paid["cost"] if paid else None
+
+
+def challengers(conn, status_for_new: str = "open", only_task: str | None = None,
+                only_role: str | None = None) -> list[str]:
+    """Models that overtake one of Monsieur's pinned favourites on that task's own leaderboard.
+
+    watch = quality   -> any model scoring higher;
+    watch = dominance -> scoring higher AND no more expensive per unit (ratio / budget picks);
+    watch = none      -> never.
+    """
     snaps = sel.latest_snapshots(conn)
+    offers = sel.load_offers(conn, snaps)
     kinds = {"aa_intelligence": "aa", "aa_mm": "mm", "da_models": "da", "da_agents": "da"}
     created = []
-    for p in conn.execute("""select p.*, t.quality_benchmark, t.quality_task, t.label from models.preferences p
-                             join models.tasks t using (task) where p.pinned_model_id is not null
-                             and t.quality_benchmark is not null and (%s::text is null or p.task = %s)""",
-                          (only_task, only_task)).fetchall():
+    for p in conn.execute("""select p.*, t.quality_benchmark, t.quality_task, t.label, t.interface from models.preferences p
+                             join models.tasks t using (task) where p.pinned_model_id is not null and p.watch <> 'none'
+                             and t.quality_benchmark is not null and (%s::text is null or p.task = %s)
+                             and (%s::text is null or p.role = %s)""",
+                          (only_task, only_task, only_role, only_role)).fetchall():
         sid = snaps.get(kinds[p["quality_benchmark"]])
         rows = list(conn.execute("""select model_id, variant, display_name, score, score_unit from models.benchmarks
                                    where snapshot_id = %s and benchmark = %s and task = %s""",
@@ -39,20 +56,26 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
                 and (not p["pinned_variant"] or r["variant"] == p["pinned_variant"])]
         if not mine:
             _upsert(conn, "challenger", p["task"], f'{p["pinned_model_id"]}:unmeasured',
-                    {"pinned": p["pinned_model_id"], "note": "favourite absent from the leaderboard"}, status_for_new)
+                    {"pinned": p["pinned_model_id"], "note": "favourite absent from this leaderboard"},
+                    status_for_new, p["role"])
             continue
         ref = max(r["score"] for r in mine)
-        offers = sel.load_offers(conn, snaps)
+        ref_cost = _unit_cost(offers.get(p["pinned_model_id"], []), p["interface"])
+        if p["watch"] == "dominance" and ref_cost is None:
+            continue  # no comparable price for the favourite: dominance cannot be established
         for r in rows:
             if r["model_id"] == p["pinned_model_id"] or r["score"] <= ref:
                 continue
+            cost = _unit_cost(offers.get(r["model_id"], []), p["interface"])
+            if p["watch"] == "dominance" and (cost is None or cost > ref_cost):
+                continue
             subject = f'{r["model_id"]}/{r["variant"]}' if r["variant"] else r["model_id"]
-            callable_via = sorted({o["provider"] for o in offers.get(r["model_id"], [])})
-            ev = {"task_label": p["label"], "pinned": p["pinned_model_id"], "pinned_score": ref,
-                  "challenger": r["display_name"], "score": r["score"], "delta": r["score"] - ref,
-                  "unit": r["score_unit"], "callable_via": callable_via}
-            if _upsert(conn, "challenger", p["task"], subject, ev, status_for_new):
-                created.append(subject)
+            ev = {"task_label": p["label"], "role": p["role"], "watch": p["watch"], "pinned": p["pinned_model_id"],
+                  "pinned_score": ref, "pinned_unit_cost": ref_cost, "challenger": r["display_name"], "score": r["score"],
+                  "delta": r["score"] - ref, "unit": r["score_unit"], "unit_cost": cost,
+                  "callable_via": sorted({o["provider"] for o in offers.get(r["model_id"], [])})}
+            if _upsert(conn, "challenger", p["task"], subject, ev, status_for_new, p["role"]):
+                created.append(f'{p["task"]}:{p["role"]}:{subject}')
     return created
 
 
@@ -105,8 +128,10 @@ def render(alerts: list[dict]) -> str:
         e = a["evidence"]
         if a["kind"] == "challenger" and "challenger" in e:
             via = ", ".join(e["callable_via"]) or "aucun provider autorisé pour l'instant"
-            lines.append(f'• [{a["alert_id"]}] {e["task_label"]} : ton favori {e["pinned"]} ({e["pinned_score"]:.0f}) '
-                         f'est dépassé par {e["challenger"]} ({e["score"]:.0f}, +{e["delta"]:.0f}). Dispo : {via}.')
+            role = "" if e.get("role", "default") == "default" else f' ({e["role"]})'
+            cheaper = " pour un prix égal ou inférieur" if e.get("watch") == "dominance" else ""
+            lines.append(f'• [{a["alert_id"]}] {e["task_label"]}{role} : ton favori {e["pinned"]} ({e["pinned_score"]:.0f}) '
+                         f'est dépassé{cheaper} par {e["challenger"]} ({e["score"]:.0f}, +{e["delta"]:.0f}). Dispo : {via}.')
         elif a["kind"] == "challenger":
             lines.append(f'• [{a["alert_id"]}] {a["task"]} : ton favori {e["pinned"]} n\'apparaît plus dans le classement.')
         elif a["kind"] == "unranked":
@@ -147,5 +172,6 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None) -> dict
         raise KeyError(alert_id)
     if decision == "adopted" and a["kind"] == "challenger" and "challenger" in a["evidence"]:
         from .choose import set_preference
-        set_preference(conn, a["task"], pin=a["subject"], note=f"Adopté par Monsieur (alerte {alert_id}). {note or ''}".strip())
+        set_preference(conn, a["task"], pin=a["subject"], role=a["role"] or "default",
+                       note=f"Adopté par Monsieur (alerte {alert_id}). {note or ''}".strip())
     return {"alert_id": alert_id, "status": decision}

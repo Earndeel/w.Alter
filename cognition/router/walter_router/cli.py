@@ -44,7 +44,8 @@ def status() -> dict:
                                      order by kind, fetched_at desc"""))
         run = conn.execute("select run_id, finished_at, status from models.runs order by run_id desc limit 1").fetchone()
         open_alerts = conn.execute("select kind, status, count(*) as n from models.alerts group by 1, 2 order by 1, 2").fetchall()
-        prefs = list(conn.execute("select task, objective, pinned_model_id, pinned_variant from models.preferences"))
+        prefs = list(conn.execute("""select task, role, objective, pinned_model_id, pinned_variant, pinned_provider, watch
+                                     from models.preferences order by task, role"""))
     return {"last_run": run, "sources": snaps, "alerts": open_alerts, "preferences": prefs}
 
 
@@ -58,12 +59,15 @@ def main(argv: list[str] | None = None) -> int:
     k = sub.add_parser("pick")
     k.add_argument("task")
     k.add_argument("--level", choices=choose.LEVELS)
+    k.add_argument("--role", help="favourite role, e.g. action / value / budget")
     f = sub.add_parser("prefer", help="record Monsieur's preference for a task")
     f.add_argument("task")
     f.add_argument("--objective", choices=("value", "best_available"))
     f.add_argument("--pin", help="favourite model as model_id[/variant], e.g. gpt-image-2-5-sunburst/max")
     f.add_argument("--provider")
     f.add_argument("--note")
+    f.add_argument("--role", default="default")
+    f.add_argument("--watch", choices=("quality", "dominance", "none"))
     a = sub.add_parser("alerts")
     a.add_argument("--all", action="store_true")
     v = sub.add_parser("verdict")
@@ -82,9 +86,10 @@ def main(argv: list[str] | None = None) -> int:
     else:
         with db.connect() as conn:
             if args.cmd == "pick":
-                out = choose.pick(conn, args.task, args.level)
+                out = choose.pick(conn, args.task, args.level, args.role)
             elif args.cmd == "prefer":
-                out = choose.set_preference(conn, args.task, args.objective, args.pin, args.provider, args.note)
+                out = choose.set_preference(conn, args.task, args.objective, args.pin, args.provider, args.note,
+                                            args.role, args.watch)
             elif args.cmd == "alerts":
                 rows = conn.execute("select * from models.alerts order by alert_id").fetchall() if args.all else alerts.pending(conn)
                 out = rows
