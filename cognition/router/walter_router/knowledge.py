@@ -17,7 +17,7 @@ from typing import Any
 from . import catalog, choose
 
 KNOWLEDGE = Path(__file__).resolve().parent.parent / "config" / "knowledge.json"
-TIE_MARGIN = {"AA Intelligence Index": 1.0}   # score points inside which two models are a tie
+TIE_MARGIN = {"AA Intelligence Index": 1.0, "Composite /100": 1.5}   # score points inside which two models are a tie
 ELO_TIE = 10.0                                  # Elo boards (Arena, AA arenas, Design Arena)
 
 
@@ -92,21 +92,29 @@ def tie_margin(unit: str | None) -> float:
 
 
 def tie_break(conn, task: str, rows: list[dict], score="quality", unit="quality_unit") -> list[dict]:
-    """Inside the tie margin, Monsieur's affinity, then a subscription route, beat a fraction of a point.
-    Rows stay sorted best first; a swapped row gets reasons['tie_break']."""
-    rows = list(rows)
-    for i in range(len(rows) - 1):
-        a, b = rows[i], rows[i + 1]
-        if a[score] is None or b[score] is None or a[score] - b[score] > tie_margin(a.get(unit)):
-            continue
-        pref_a = (affinity(conn, a["model_id"], task), bool(a.get("subscription")))
-        pref_b = (affinity(conn, b["model_id"], task), bool(b.get("subscription")))
-        if pref_b > pref_a:
-            why = (f'égalité ({a[score]:.1f} vs {b[score]:.1f}, marge {tie_margin(a.get(unit)):g}) : '
-                   + ("préférence de Monsieur" if pref_b[0] > pref_a[0] else "accès par abonnement"))
-            b = {**b, "reasons": {**(b.get("reasons") or {}), "tie_break": why}}
-            rows[i], rows[i + 1] = b, a
-    return rows
+    """Close calls: every model within the tie margin of the current leader forms a group; inside the group
+    Monsieur's affinity, then a subscription route, then the score decide. A model moved up gets
+    reasons['tie_break']."""
+    rest = sorted(rows, key=lambda r: -(r[score] if r[score] is not None else float("-inf")))
+    out: list[dict] = []
+    while rest:
+        lead = rest[0]
+        if lead[score] is None:
+            out += rest
+            break
+        margin = tie_margin(lead.get(unit))
+        group = [r for r in rest if r[score] is not None and lead[score] - r[score] <= margin]
+        rest = [r for r in rest if r not in group]
+        ordered = sorted(group, key=lambda r: (-affinity(conn, r["model_id"], task), not r.get("subscription"),
+                                               -r[score]))
+        for r in ordered:
+            if r is not lead and ordered.index(r) < group.index(r):
+                pref = affinity(conn, r["model_id"], task) > affinity(conn, lead["model_id"], task)
+                why = (f'égalité avec {lead["model_id"]} ({lead[score]:.1f} vs {r[score]:.1f}, marge {margin:g}) : '
+                       + ("préférence de Monsieur" if pref else "accès par abonnement"))
+                r = {**r, "reasons": {**(r.get("reasons") or {}), "tie_break": why}}
+            out.append(r)
+    return out
 
 
 # --- decision -------------------------------------------------------------------------------------------

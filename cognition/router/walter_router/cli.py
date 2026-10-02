@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 
-from . import alerts, choose, collect, db, knowledge
+from . import alerts, choose, collect, db, dossier, knowledge
 from . import select as sel
 
 
@@ -21,6 +21,7 @@ def refresh(notify: bool = True, dry_run: bool = False) -> dict:
                 rows = sel.compute(conn)
                 sel.save(conn, run_id, rows)
                 report["selection_rows"] = len(rows)
+                report["dossiers"] = dossier.build_all(conn, run_id)
                 first = conn.execute("select count(*) as n from models.runs where status = 'ok'").fetchone()["n"] == 0
                 report["alerts"] = {"challengers": alerts.challengers(conn, "baseline" if first else "open"),
                                     "top3": alerts.top3(conn), "unranked": alerts.unranked(conn),
@@ -84,6 +85,8 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("intent")
     d.add_argument("--level", choices=choose.LEVELS)
     sub.add_parser("declare", help="apply config/knowledge.json (profiles, roles, affinities)")
+    o = sub.add_parser("dossier", help="the task's pre-computed dossier (what the router reads)")
+    o.add_argument("task")
     args = p.parse_args(argv)
 
     if args.cmd == "migrate":
@@ -101,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
                                             args.role, args.watch)
             elif args.cmd == "decide":
                 out = knowledge.decide(conn, args.task, args.intent, args.level)
+            elif args.cmd == "dossier":
+                out = dossier.latest(conn, args.task)
             elif args.cmd == "declare":
                 out = knowledge.declare(conn)
             elif args.cmd == "alerts":

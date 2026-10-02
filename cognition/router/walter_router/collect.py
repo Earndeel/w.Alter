@@ -27,6 +27,8 @@ MM_TASKS = {"provider_voice": "tts", "index": "speech_to_speech"}
 # published input price and the vendor's 1:5 input/output ratio before being added here.
 KIE_DIMENSION_FIXES = {("claude-opus-5-5", "claude-opus-5"): "output"}
 ARENA_URL = "https://arena.ai/leaderboard/"
+BRIDGEBENCH_URL = "https://www.bridgebench.ai/leaderboard"
+FLARESOLVERR = os.environ.get("WALTER_FLARESOLVERR", "http://127.0.0.1:8191/v1")  # local, behind Cloudflare sites
 # Arena.ai page -> board key stored in models.benchmarks.task (benchmark = 'arena')
 ARENA_BOARDS = {"text": "text", "text/french": "text_french", "text/coding": "text_coding",
                 "text/creative-writing": "text_creative", "code/webdev": "webdev",
@@ -119,6 +121,59 @@ def arena_board(page: str) -> dict | None:
         return {"leaderboard_id": "agent", "kind": "agent", "updated": updated and updated.group(1),
                 "rows": _json_array(text, j)}
     return None
+
+
+def _json_object(text: str, start: int) -> str:
+    """The JSON object starting at text[start] == '{' (string-aware brace matching)."""
+    depth, in_str, esc = 0, False, False
+    for k in range(start, len(text)):
+        ch = text[k]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:k + 1]
+    raise ValueError("unterminated object")
+
+
+def bridgebench_rows(page: str) -> list[dict]:
+    """Model rows of the BridgeBench leaderboard page: {id, name, vendor, provisional, scores{overall, reasoning,
+    frontend, backend, oneShot, security, trustworthiness, efficiency, speed, cost}, price, blended, context}."""
+    text = html.unescape(page).replace('\\"', '"')
+    rows: dict[str, dict] = {}
+    for m in re.finditer(r'\{"id":"[^"]+","href":"/leaderboard/', text):
+        try:
+            obj = json.loads(_json_object(text, m.start()))
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if isinstance(obj.get("scores"), dict):
+            obj.pop("mark", None)
+            rows[obj["id"]] = obj
+    return list(rows.values())
+
+
+def source_bridgebench() -> tuple[dict, datetime, str]:
+    """BridgeBench sits behind a Cloudflare challenge: fetched through the local FlareSolverr."""
+    body = json.dumps({"cmd": "request.get", "url": BRIDGEBENCH_URL, "maxTimeout": 90000}).encode()
+    req = Request(FLARESOLVERR, data=body, headers={"Content-Type": "application/json"})
+    with urlopen(req, timeout=150) as resp:  # noqa: S310 (local service)
+        sol = json.loads(resp.read(MAX_BYTES))["solution"]
+    if sol.get("status") != 200:
+        raise ValueError(f"bridgebench: HTTP {sol.get('status')}")
+    rows = bridgebench_rows(sol["response"])
+    if len(rows) < 10:
+        raise ValueError(f"bridgebench: only {len(rows)} rows parsed")
+    return {"rows": rows}, now(), BRIDGEBENCH_URL
 
 
 def source_arena() -> tuple[dict, datetime, str]:
@@ -245,7 +300,7 @@ def source_declared() -> tuple[dict, datetime, str]:
     return {"offers": doc["offers"]}, now(), str(DECLARED)
 
 
-SOURCES = {"aa": source_aa, "mm": source_mm, "da": source_da, "arena": source_arena,
+SOURCES = {"aa": source_aa, "mm": source_mm, "da": source_da, "arena": source_arena, "bridgebench": source_bridgebench,
            "openrouter": source_openrouter, "kie": source_kie, "codex": source_codex,
            "declared": source_declared, "hermes_providers": source_hermes_providers}
 
@@ -354,6 +409,19 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
                                  released=None, extra=extra,
                                  meta={"open_weights": None if not lic else lic.strip().lower() != "proprietary",
                                        "license": lic}))
+    elif kind == "bridgebench":
+        axes = {"oneShot": "one_shot"}
+        for r in doc["rows"]:
+            mid, variant = identity.normalize("bridgebench", r["id"])
+            for axis, score in (r.get("scores") or {}).items():
+                score = _num(score)
+                if score is None:
+                    continue
+                rows.append(dict(benchmark="bridgebench", task=axes.get(axis, axis), external_key=r["id"], model_id=mid,
+                                 variant=variant, display_name=r.get("name"), score=score,
+                                 score_unit="BridgeBench points /1000", cost=None, cost_unit=None, released=None,
+                                 extra={"provisional": r.get("provisional"), "price": r.get("price"),
+                                        "blended": r.get("blended"), "context": r.get("context")}))
     return rows
 
 
@@ -507,7 +575,7 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
 
 # --- storage -------------------------------------------------------------------------------------------
 
-NAME_PRIORITY = {"openrouter": 1, "hermes_providers": 2, "aa": 3, "mm": 4, "arena": 5, "kie": 6, "da": 7}
+NAME_PRIORITY = {"openrouter": 1, "hermes_providers": 2, "aa": 3, "mm": 4, "bridgebench": 5, "arena": 6, "kie": 7, "da": 8}
 
 
 def _display_name(namespace: str, name: str | None) -> str | None:

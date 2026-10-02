@@ -16,7 +16,8 @@ from . import collect, media
 SKILL = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "skills/research/aa-pareto-model-optimizer/scripts"
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
 MEDIA_UNITS = {"image": "per image", "video": "per second", "audio": "per 1000 characters", "music": None}
-BENCH_KIND = {"aa_intelligence": "aa", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena"}
+BENCH_KIND = {"aa_intelligence": "aa", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena",
+              "bridgebench": "bridgebench"}
 
 
 def _load(name: str):
@@ -154,6 +155,40 @@ def _ladder(cands: list[dict], minimum_score: float, cost_cap: float) -> dict | 
             "frontier": [by_slug[r["slug"]] for r in frontier["pragmatic_frontier"]]}
 
 
+def _best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dict], n: int = 6) -> list[dict]:
+    """'best' level: callable models ordered by the weighted multi-board score (scoring.composite)."""
+    from .scoring import composite  # late import (scoring -> select)
+    primary = {}
+    for c in cands:  # the primary board's best variant keeps its route and real cost (AA cost per task for chat)
+        if c["model_id"] not in primary or c["score"] > primary[c["model_id"]]["score"]:
+            primary[c["model_id"]] = c
+    rows = []
+    for comp in composite(conn, t["task"], snaps):
+        mid = comp["model_id"]
+        if mid in primary:
+            route, cost, unit, variant = primary[mid]["route"], primary[mid]["real_cost"], \
+                primary[mid]["real_cost_unit"], primary[mid]["variant"]
+        else:
+            mo = offers.get(mid, [])
+            route = chat_route(mo, None) if t["interface"] == "chat" else media_route(mo, t["interface"], t["modes"])
+            if not route["callable"]:
+                continue
+            cost, variant = (route["paid"] or {}).get("cost"), ""
+            unit = (route["paid"] or {}).get("unit") if t["interface"] != "chat" else None
+        paid = route.get("paid") or {}
+        name = conn.execute("select coalesce(display_name, model_id) as n from models.canonical where model_id = %s",
+                            (mid,)).fetchone()["n"]
+        rows.append(dict(task=t["task"], level="best", rank=len(rows) + 1, model_id=mid, variant=variant,
+                         display_name=name, quality=comp["composite"], quality_unit="Composite /100",
+                         real_cost=cost, cost_unit=unit, provider=paid.get("provider"), offer_key=paid.get("offer_key"),
+                         subscription=route.get("subscription"),
+                         reasons={**{k: v for k, v in paid.items() if k not in ("provider", "offer_key")},
+                                  "boards": comp["boards"], "evidence_weight": comp["evidence_weight"]}))
+        if len(rows) >= n:
+            break
+    return rows
+
+
 def compute(conn) -> list[dict]:
     snaps = latest_snapshots(conn)
     offers = load_offers(conn, snaps)
@@ -188,12 +223,11 @@ def compute(conn) -> list[dict]:
             if not route["callable"]:
                 continue
             cands.append({**b, "route": route, "real_cost": (route["paid"] or {}).get("cost"), "real_cost_unit": cost_unit})
+        from .knowledge import tie_break  # late import: knowledge -> choose -> select
+        ranked = tie_break(conn, t["task"], _best_by_composite(conn, t, snaps, offers, cands))
+        out += [{**r, "rank": i + 1} for i, r in enumerate(ranked[:5])]
         if not cands:
             continue
-        best = sorted(cands, key=lambda c: (-c["score"], c["real_cost"] if c["real_cost"] is not None else float("inf")))
-        from .knowledge import tie_break  # late import: knowledge -> choose -> select
-        ranked = tie_break(conn, t["task"], [_row(t["task"], "best", i + 1, c) for i, c in enumerate(best[:6])])
-        out += [{**r, "rank": i + 1} for i, r in enumerate(ranked[:5])]
         if t["task"] == "general":
             lad = _ladder(cands, 35.0, 0.75)
             if lad:
