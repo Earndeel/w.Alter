@@ -10,6 +10,7 @@ PROVIDERS = {"openrouter": "OpenRouter", "kie": "Kie", "codex": "Codex", "google
 BOARDS = {"aa_intelligence": "AA", "aa_mm": "AA", "da_models": "Design Arena", "da_agents": "Design Arena",
           "arena": "Arena"}
 MAX_LISTED_RESOLUTIONS = 4
+ICONS = {"image": "🖼️", "video": "🎬", "audio": "🗣️", "music": "🎵", "chat": "💬"}
 
 
 def card(conn, model_id: str, interface: str, modes: list[str] | None = None) -> dict:
@@ -45,7 +46,9 @@ def card(conn, model_id: str, interface: str, modes: list[str] | None = None) ->
             "modes": list(row["modes"]) if row else [], "providers": list(row["providers"]) if row else [],
             "released": row["released"] if row else None, "scores": row["scores"] if row else {},
             "prices": dict(sorted(prices.items(), key=lambda kv: media.resolution_rank(kv[0]))),
-            "audio": sorted(a for a in audio if a is not None), "token_priced": token_priced}
+            "audio": sorted(a for a in audio if a is not None), "token_priced": token_priced,
+            "content_policy": row["content_policy"] if row else "standard",
+            "open_weights": row["open_weights"] if row else None}
 
 
 def money(x: float) -> str:
@@ -80,8 +83,13 @@ def price_text(c: dict) -> str:
     return text
 
 
+def icon(c: dict) -> str:
+    """🖼️ image, 🎬 video, 🗣️ voice, 🎵 music, 💬 text; 🔓 added for an unrestricted model."""
+    return ICONS.get(c["interface"], "•") + (" 🔓" if c.get("content_policy") == "unrestricted" else "")
+
+
 def line(c: dict) -> str:
-    parts = [c["name"]]
+    parts = [f'{icon(c)} {c["name"]}']
     if c["modes"]:
         parts.append(media.short_modes(c["modes"]))
     parts.append(price_text(c))

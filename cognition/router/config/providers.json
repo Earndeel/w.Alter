@@ -1,0 +1,7 @@
+{
+  "_doc": "OpenAI-compatible providers configured in Hermes whose live /models catalogue (with prices) is collected. The key is read at run time from /root/.hermes/.env (never stored here or in the unit file) and sent as a header only.",
+  "providers": [
+    {"provider": "arnict", "name": "Arnict AI", "api": "https://api.arnict.com/v1", "key_env": "ARNICT_API_KEY",
+     "hermes_provider": "arnict", "note": "Uncensored open-weights fine-tunes (GLM 5.3 Flash Uncensored...)"}
+  ]
+}

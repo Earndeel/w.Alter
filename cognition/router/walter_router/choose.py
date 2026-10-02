@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import collect
 from . import select as sel
 
 LEVELS = ("L1", "L2", "L3")
+REQUIREMENTS = {"unrestricted": "c.content_policy = 'unrestricted'", "open_weights": "c.open_weights"}
 
 
 def latest_run(conn) -> int | None:
@@ -30,7 +32,63 @@ def _pinned_answer(conn, task: dict, pref: dict) -> dict[str, Any]:
             "route": route, "why": pref["note"]}
 
 
-def pick(conn, task: str, level: str | None = None, role: str | None = None) -> dict[str, Any]:
+def _best_score(conn, snaps: dict, boards: list[dict], model_id: str) -> tuple[float | None, str | None]:
+    """Score on the first board of the task that measures the model (primary first): boards are never mixed,
+    an AA index and an Arena Elo are not comparable."""
+    for b in boards:
+        sid = snaps.get(sel.BENCH_KIND[b["benchmark"]])
+        row = conn.execute("""select max(score) as s from models.benchmarks where snapshot_id = %s and benchmark = %s
+                              and task = %s and model_id = %s""", (sid, b["benchmark"], b["bench_task"], model_id)).fetchone()
+        if row and row["s"] is not None:
+            return row["s"], f'{b["benchmark"]}:{b["bench_task"]}'
+    return None, None
+
+
+def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]:
+    """Best callable model satisfying a hard constraint (unrestricted / open weights) for a task.
+
+    Quality = the model's own score on the task's boards (primary first); an unrestricted fine-tune that no
+    leaderboard measures inherits its base model's score, flagged `score_from_base`."""
+    if require not in REQUIREMENTS:
+        raise KeyError(f"unknown requirement {require}; known: {sorted(REQUIREMENTS)}")
+    snaps = sel.latest_snapshots(conn)
+    offers = sel.load_offers(conn, snaps)
+    boards = conn.execute("""select benchmark, bench_task from models.task_benchmarks where task = %s
+                             order by is_primary desc, benchmark""", (t["task"],)).fetchall()
+    ids = [snaps[k] for k in collect.OFFER_KINDS if k in snaps]
+    cands = []
+    for c in conn.execute(f"""select distinct c.model_id, coalesce(c.display_name, c.model_id) as name, c.base_model_id,
+                                     c.license, c.content_policy, c.open_weights
+                              from models.offers o join models.canonical c using (model_id)
+                              where o.snapshot_id = any(%s) and o.interface = %s and {REQUIREMENTS[require]}""",
+                          (ids, t["interface"])):
+        route = sel.chat_route(offers[c["model_id"]], None) if t["interface"] == "chat" else \
+            sel.media_route(offers[c["model_id"]], t["interface"], t["modes"])
+        if not route["callable"]:
+            continue
+        score, board = _best_score(conn, snaps, boards, c["model_id"])
+        from_base = None
+        if score is None and c["base_model_id"]:
+            score, board = _best_score(conn, snaps, boards, c["base_model_id"])
+            from_base = c["base_model_id"] if score is not None else None
+        paid = route.get("paid") or {}
+        cands.append({"model_id": c["model_id"], "display_name": c["name"], "score": score, "board": board,
+                      "score_from_base": from_base, "license": c["license"], "content_policy": c["content_policy"],
+                      "provider": route.get("subscription") or paid.get("provider") or route.get("ui"),
+                      "offer_key": paid.get("offer_key"), "cost": paid.get("cost"),
+                      "price_1m_blended": paid.get("blended_1m")})
+    order = [f'{b["benchmark"]}:{b["bench_task"]}' for b in boards]
+    cands.sort(key=lambda x: (order.index(x["board"]) if x["board"] in order else len(order), -(x["score"] or 0),
+                              x["price_1m_blended"] or x["cost"] or 0))
+    if not cands:
+        return {"task": t["task"], "mode": "none", "require": require,
+                "why": f"aucun modèle {require} appelable pour {t['interface']} chez les providers connus"}
+    return {"task": t["task"], "mode": "delegate", "source": f"required:{require}", "require": require, **cands[0],
+            "alternatives": cands[1:limit]}
+
+
+def pick(conn, task: str, level: str | None = None, role: str | None = None,
+         require: str | None = None) -> dict[str, Any]:
     """Monsieur's favourite for (task, role) first; otherwise the computed choice for the task's objective.
 
     Without a role, the 'default' favourite is used and the other roles are listed so the orchestrator can
@@ -41,6 +99,8 @@ def pick(conn, task: str, level: str | None = None, role: str | None = None) -> 
         raise KeyError(f"unknown task: {task}")
     if t["default_objective"] == "tool":
         return {"task": task, "mode": "tool", "tool": task, "why": t["description"]}
+    if require:
+        return pick_required(conn, t, require)
     prefs = {p["role"]: p for p in conn.execute("select * from models.preferences where task = %s", (task,))}
     if role and role not in prefs:
         raise KeyError(f"no preference role '{role}' for {task}; known: {sorted(prefs)}")
@@ -51,7 +111,7 @@ def pick(conn, task: str, level: str | None = None, role: str | None = None) -> 
         return {**_pinned_answer(conn, t, pref), "other_roles": others}
     if t["quality_benchmark"] is None:
         snaps = sel.latest_snapshots(conn)
-        ids = [snaps[k] for k in ("openrouter", "kie", "codex", "declared") if k in snaps]
+        ids = [snaps[k] for k in collect.OFFER_KINDS if k in snaps]
         offers = conn.execute("""select provider, offer_key, model_id, unit_price, unit from models.offers
                                  where snapshot_id = any(%s) and interface = %s order by provider, offer_key""",
                               (ids, t["interface"])).fetchall()
