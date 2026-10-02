@@ -3,7 +3,7 @@ privacy flags. Returns problems as short strings (empty = healthy) plus a metric
 from __future__ import annotations
 
 from .db import connection
-from .llm import budget_status
+from .llm import ACCOUNT_FLOOR_USD, account_balance, budget_status
 
 
 def check() -> tuple[list[str], dict]:
@@ -37,4 +37,9 @@ def check() -> tuple[list[str], dict]:
         m[f"budget:{b}"] = f"{float(s['spent_usd']):.2f}/{float(s['limit_usd']):.0f}"
         if float(s["spent_usd"]) >= 0.8 * float(s["limit_usd"]):
             problems.append(f"budget {b} at {float(s['spent_usd']):.2f}/{float(s['limit_usd']):.0f} USD this month")
+    bal = account_balance()
+    if bal is not None:
+        m["openrouter_balance_usd"] = round(bal, 2)
+        if bal < ACCOUNT_FLOOR_USD["recurring"] * 2:
+            problems.append(f"OpenRouter balance low: {bal:.2f} USD (synthesis stops below {ACCOUNT_FLOOR_USD['recurring']} USD)")
     return problems, m

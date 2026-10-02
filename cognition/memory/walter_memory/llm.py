@@ -35,6 +35,26 @@ def _key() -> str:
     raise RuntimeError("OPENROUTER_API_KEY not configured")
 
 
+# Real OpenRouter balance floors (2026-10-02: a backfill under a 50 $ internal envelope drained an ~8 $ account).
+# Backfill stops first, so live uses (Hindsight/voice rerank, recurring synthesis) keep a reserve.
+ACCOUNT_FLOOR_USD = {"backfill": 5.0, "recurring": 1.0}
+_balance: tuple[float, float] | None = None
+
+
+def account_balance() -> float | None:
+    """Remaining OpenRouter credits (cached 5 min); None when unknown."""
+    global _balance
+    if _balance and time.time() - _balance[0] < 300:
+        return _balance[1]
+    try:
+        r = httpx.get("https://openrouter.ai/api/v1/credits", headers={"Authorization": f"Bearer {_key()}"}, timeout=15)
+        d = r.json()["data"]
+        _balance = (time.time(), float(d["total_credits"]) - float(d["total_usage"]))
+        return _balance[1]
+    except Exception:
+        return None
+
+
 def budget_status(budget: str) -> dict:
     with connection() as conn:
         return conn.execute(
@@ -70,6 +90,10 @@ def chat(messages: list[dict], *, model: str, processor: str, privacy_class: str
     if b and b["hard_stop"] and b["spent_usd"] >= b["limit_usd"]:
         _log(**base, status="refused_budget")
         raise BudgetExceeded(f"{budget} budget exhausted ({b['spent_usd']:.2f}/{b['limit_usd']} USD this month)")
+    bal = account_balance()
+    if bal is not None and bal < ACCOUNT_FLOOR_USD.get(budget, 1.0):
+        _log(**base, status="refused_budget", error=f"OpenRouter balance {bal:.2f} USD below floor")
+        raise BudgetExceeded(f"OpenRouter balance {bal:.2f} USD below the {budget} floor {ACCOUNT_FLOOR_USD.get(budget)} USD")
     mapping: dict[str, str] = {}
     if privacy_class == "redacted_cloud":
         red = []
