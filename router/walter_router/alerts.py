@@ -182,6 +182,22 @@ def stale_sources(conn) -> list[str]:
     return created
 
 
+def billing(conn) -> list[str]:
+    """Providers whose last probe found no credit left: one alert each, auto-cleared once topped up."""
+    created = []
+    for r in conn.execute("select provider, ok, detail from models.provider_status"):
+        empty = not r["ok"] and (r["detail"] or "").startswith("crédit épuisé")
+        if empty:
+            if _upsert(conn, "billing", "", r["provider"], {"detail": r["detail"]}, "open"):
+                created.append(r["provider"])
+        else:
+            conn.execute("""update models.alerts set status = 'dismissed', verdict_note = 'auto: crédit rechargé'
+                            where kind = 'billing' and subject = %s and status in ('open', 'notified')""", (r["provider"],))
+            conn.execute("delete from models.alerts where kind = 'billing' and subject = %s and status = 'dismissed'",
+                         (r["provider"],))  # so a later outage alerts again
+    return created
+
+
 def _watched_interfaces(conn) -> set[str]:
     """Interfaces Monsieur has a declared preference on: new unranked releases there are worth a message."""
     return {r["interface"] for r in conn.execute(
@@ -223,7 +239,12 @@ def render(alerts: list[dict], conn=None) -> str:
     beaten_models = {a["subject"] for a in beaten}
     podium = [a for a in alerts if a["kind"] == "top3" and a["subject"] not in beaten_models]
     stale = [a for a in alerts if a["kind"] == "source_stale"]
+    bills = [a for a in alerts if a["kind"] == "billing"]
     out = ["Walter Router"]
+    for a in bills:
+        name = catalog.PROVIDERS.get(a["subject"], a["subject"])
+        out.append(f'💳 {name} : {a["evidence"]["detail"]}. Les modèles payants passent par les autres providers '
+                   f'(Codex, Kie) en attendant une recharge.')
     if beaten:
         out.append("⚠️ Favori dépassé (à tester) :")
         out += [f"• {_challenger_line(conn, a)}" for a in beaten]

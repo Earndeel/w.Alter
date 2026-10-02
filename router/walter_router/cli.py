@@ -6,7 +6,7 @@ import json
 import subprocess
 import sys
 
-from . import alerts, choose, collect, db, dossier, execution, knowledge
+from . import alerts, choose, collect, db, dossier, execution, intent, knowledge
 from . import select as sel
 
 
@@ -28,6 +28,7 @@ def refresh(notify: bool = True, dry_run: bool = False) -> dict:
                 first = conn.execute("select count(*) as n from models.runs where status = 'ok'").fetchone()["n"] == 0
                 report["alerts"] = {"challengers": alerts.challengers(conn, "baseline" if first else "open"),
                                     "top3": alerts.top3(conn), "unranked": alerts.unranked(conn),
+                                    "billing": alerts.billing(conn),
                                     "stale": alerts.stale_sources(conn)}
                 report["pruned_snapshots"] = collect.prune(conn)
                 conn.execute("update models.runs set status = 'ok', finished_at = now(), summary = %s::jsonb where run_id = %s",
@@ -118,6 +119,21 @@ def with_execution(conn, out: dict) -> dict:
     return out
 
 
+def route(conn, request: str, task: str | None = None, level: str | None = None) -> dict:
+    """Free-text request -> Jev intent (task, video role, level, unrestricted) -> decision + execution routes.
+    Without Jev (network/credits/contract error) the task must be given or defaults to 'general' + keywords."""
+    try:
+        jev = intent.classify(conn, request)
+    except Exception as exc:  # noqa: BLE001 — keywords fallback
+        jev = {"error": f"{type(exc).__name__}: {exc}"[:200]}
+    if not task:
+        task = jev.get("task") if (jev.get("task_confidence") or 0) >= intent.MIN_CONFIDENCE else "general"
+    if task == "general" and not level and jev.get("level"):
+        level = jev["level"]
+    out = with_execution(conn, knowledge.decide(conn, task, request, level, jev if "error" not in jev else None))
+    return {**out, "intent": jev}
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="walter-router")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -146,7 +162,9 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--note")
     sub.add_parser("status")
     sub.add_parser("health", help="exit 1 when the router is not fed or not usable")
-    sub.add_parser("probe", help="tiny live call per provider (Kie, OpenRouter, Arnict)")
+    pr = sub.add_parser("probe", help="tiny live call per provider (Kie, OpenRouter, Arnict)")
+    pr.add_argument("--provider", help="only this status key (kie, kie-codex, openrouter, arnict)")
+    pr.add_argument("--timeout", type=int, default=90)
     sub.add_parser("tasks", help="task keys, labels and interfaces (for tool descriptions)")
     sub.add_parser("notify-failure", help="Telegram message after a failed refresh (systemd OnFailure)")
     d = sub.add_parser("decide", help="free-text request -> role, model, route, workflow, brief")
@@ -154,6 +172,12 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("intent")
     d.add_argument("--level", choices=choose.LEVELS)
     sub.add_parser("declare", help="apply config/knowledge.json (profiles, roles, affinities)")
+    rt = sub.add_parser("route", help="free-text request -> Jev intent -> decision (task optional)")
+    rt.add_argument("request")
+    rt.add_argument("--task")
+    rt.add_argument("--level", choices=choose.LEVELS)
+    cl = sub.add_parser("classify", help="Jev intent only (task, video role, level, unrestricted)")
+    cl.add_argument("request")
     o = sub.add_parser("dossier", help="the task's pre-computed dossier (what the router reads)")
     o.add_argument("task")
     args = p.parse_args(argv)
@@ -171,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if out["ok"] else 1
     elif args.cmd == "probe":
         with db.connect() as conn:
-            out = execution.probe(conn)
+            out = execution.probe(conn, args.provider, args.timeout)
             conn.commit()
     elif args.cmd == "notify-failure":
         out = notify_failure()
@@ -184,6 +208,10 @@ def main(argv: list[str] | None = None) -> int:
                                             args.role, args.watch)
             elif args.cmd == "decide":
                 out = with_execution(conn, knowledge.decide(conn, args.task, args.intent, args.level))
+            elif args.cmd == "route":
+                out = route(conn, args.request, args.task, args.level)
+            elif args.cmd == "classify":
+                out = intent.classify(conn, args.request)
             elif args.cmd == "tasks":
                 out = list(conn.execute("select task, label, interface from models.tasks order by interface, task"))
             elif args.cmd == "dossier":
