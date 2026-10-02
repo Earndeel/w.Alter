@@ -3,7 +3,13 @@
 Model catalogue + per-task model choice for W.Alter. Schema `models` in hindsight-pg (127.0.0.1:5433, creds in ~/.pgpass).
 Plan and decisions: `/root/projects/walter-model-router/docs/PLAN-v2.md`.
 
-## Flow (timer `walter-router-refresh` 03:30 UTC, after the 03:00 aa-pareto collection)
+## Cycle every 48 h (timer `walter-router-refresh`, `bin/walter-router-cycle`; was daily until 2026-10-02)
+1. benchmark collection (aa-pareto skill script; its daily Hermes cron 096741a21a32 is paused), 2. router refresh +
+notifications, 3. analysis by the ECONOMIC text tier (L1 read from the router — GPT-6 Luna max via Codex today):
+`config/analysis_prompt.md` + `walter-router review` digest -> `~/.hermes/logs/walter-router/analysis-YYYYMMDD.md`
+(read-only, proposals only; Telegram only when the report says `VERDICT: ACTION`).
+
+## Flow
 1. **Collect** → `models.snapshots` (deduplicated by sha256, 30-day retention, latest per kind always kept):
    AA intelligence, AA multimodal, Design Arena (files from the aa-pareto skill cache), Arena.ai (15 boards read
    from the pages' embedded data: text, French, coding, webdev, vision, document, search, agent, text-to-image,

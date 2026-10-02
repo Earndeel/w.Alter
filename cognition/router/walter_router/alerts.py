@@ -11,7 +11,8 @@ from . import select as sel
 
 HERMES = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "hermes-agent" / "venv" / "bin" / "hermes"
 UNRANKED_DAYS = 30
-STALE_HOURS = {"aa": 48, "mm": 48, "da": 48, "arena": 48, "bridgebench": 72, "openrouter": 48, "kie": 48, "codex": 72}
+STALE_HOURS = {"aa": 60, "mm": 60, "da": 60, "arena": 60, "bridgebench": 60, "openrouter": 60, "kie": 60,
+               "codex": 60, "hermes_providers": 60, "declared": 24 * 365}  # 48 h cycle + 12 h margin
 
 
 def _upsert(conn, kind: str, task: str, subject: str, evidence: dict, status: str, role: str = "") -> bool:
