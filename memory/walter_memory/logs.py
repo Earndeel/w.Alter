@@ -61,8 +61,12 @@ def mask(text: str | None) -> str | None:
     return text
 
 
+_MASKED = re.compile(r"«secret[^»]*»")
+
+
 def classify(conn, runtime: str, base: str, text: str | None) -> str:
-    cats = {c for c, _ in privacy.detect(text[:DETECT_CHARS])} if text else set()
+    # masked placeholders are not secrets any more ("password: «secret:password»" must not re-trigger the detector)
+    cats = {c for c, _ in privacy.detect(_MASKED.sub("", text[:DETECT_CHARS]))} if text else set()
     cls, _ = privacy.classify(conn, {"source": runtime, "categories": cats})
     return privacy.strictest(base, cls)
 

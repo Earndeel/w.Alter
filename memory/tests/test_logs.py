@@ -104,3 +104,10 @@ def test_show_respects_privacy():
     assert L._show("appelle +33 6 12 34 56 78", "redacted_cloud", "cloud_allowed") == "appelle [PHONE_1]"
     assert L._show("abc", "local_only", "local_only") == "abc"
     assert L._title("Titre", "local_only", "cloud_allowed") == "[session locale]"
+
+
+def test_masked_password_does_not_retrigger_detector():
+    from walter_memory import privacy
+    masked = L.mask("mot de passe: Hunter2024")
+    assert ("secret", "password_stmt") in privacy.detect(masked)          # the raw detector would fire
+    assert not privacy.detect(L._MASKED.sub("", masked))                   # what classify() actually checks
