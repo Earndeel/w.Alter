@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -48,13 +49,15 @@ def main() -> None:
         g = Google()
         total = 0
         for cal in g.get(f"{API}/users/me/calendarList").get("items", []):
+          try:
+            cid = urllib.parse.quote(cal["id"], safe="")
             cp = ingestion.get_checkpoint(CONNECTOR, cal["id"])
             page, sync = None, cp.get("sync_token")
             while True:
                 try:
                     params = {"syncToken": sync} if sync else {"singleEvents": "false", "showDeleted": "true",
                                                                "maxResults": 2500}
-                    d = g.get(f"{API}/calendars/{cal['id']}/events", pageToken=page, **params)
+                    d = g.get(f"{API}/calendars/{cid}/events", pageToken=page, **params)
                 except SyncTokenExpired:
                     sync, page = None, None
                     continue
@@ -65,6 +68,8 @@ def main() -> None:
                 if not page:
                     ingestion.set_checkpoint(CONNECTOR, cal["id"], {"sync_token": d.get("nextSyncToken")})
                     break
+          except Exception as e:
+            ingestion.record_failure(CONNECTOR, f"{type(e).__name__}: {e}"[:500], stream=cal["id"])
         ingestion.mark_success(CONNECTOR)
         print(json.dumps({"events_inserted": total}))
     except Exception as e:
