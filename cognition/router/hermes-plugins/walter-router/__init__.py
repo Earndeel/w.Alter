@@ -282,6 +282,8 @@ async def _handle_verdict(args: Mapping[str, Any], **_: Any) -> str:
         cmd = ["verdict", str(int(args["alert_id"])), "adopted" if args.get("decision") == "adopter" else "dismissed"]
         if args.get("note"):
             cmd += ["--note", str(args["note"])]
+        if args.get("role"):
+            cmd += ["--role", str(args["role"])]
         return json.dumps(await _cli(*cmd), ensure_ascii=False, default=str)
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": f"walter_verdict: {exc}"}, ensure_ascii=False)
@@ -338,10 +340,13 @@ GENERATE_SCHEMA = {
 
 VERDICT_SCHEMA = {
     "name": "walter_verdict",
-    "description": ("Monsieur's answer to a Walter Router Telegram alert (« adopter 12 » / « ignorer 12 »): adopting "
-                    "a challenger or a text tier pins it as the new choice; ignoring a new #1 keeps the previous model."),
+    "description": ("Monsieur's answer to a Walter Router Telegram message (« adopter 1 », « ignorer 2 », "
+                    "« adopter 1 action »): adopting a new model pins it for the roles it beats (or only the named "
+                    "role); adopting a text tier pins it; ignoring a new #1 keeps the previous model."),
     "parameters": {"type": "object", "properties": {
-        "alert_id": {"type": "integer", "description": "The number in brackets in the alert."},
+        "alert_id": {"type": "integer", "description": "The short number shown in the message (1, 2, 3…)."},
+        "role": {"type": "string", "description": "Optional role named by Monsieur (premium, action, ugc, budget, "
+                                                  "default, L1, L2, L3)."},
         "decision": {"type": "string", "enum": ["adopter", "ignorer"]},
         "note": {"type": "string"}}, "required": ["alert_id", "decision"]},
 }

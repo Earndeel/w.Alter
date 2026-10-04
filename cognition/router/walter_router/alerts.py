@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 import os
 import subprocess
 from pathlib import Path
 
-from . import catalog
+from . import catalog, changes, media
 from . import select as sel
 
 HERMES = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "hermes-agent" / "venv" / "bin" / "hermes"
@@ -53,7 +54,7 @@ def _order(rows: list[dict]) -> list[str]:
     return seen
 
 
-def new_best(conn, run_id: int) -> list[str]:
+def new_best(conn, run_id: int, chg: dict | None = None) -> list[str]:
     """Specialised tasks use their #1 automatically. When a run's #1 differs from the previous run's #1 and scores
     higher, Monsieur gets one line (the router already uses it; « ignorer N » keeps the previous one pinned)."""
     prev = conn.execute("""select run_id from models.runs where status = 'ok' and run_id < %s
@@ -74,9 +75,12 @@ def new_best(conn, run_id: int) -> list[str]:
                                 and model_id = %s""", (run_id, r["task"], r["old_id"])).fetchone()
         if old_q and old_q["quality"] >= r["quality"]:
             continue  # reshuffle by tie-break, not a better model
+        chg = chg or changes.events(conn)
+        why = changes.changed(chg, r["new_id"]) + [f'{r["old_id"]} dégradé' for _ in chg["nerf"].get(r["old_id"], [])[:1]]
         ev = {"task_label": r["label"], "interface": r["interface"], "name": r["display_name"], "score": r["quality"],
-              "previous": r["old_id"], "previous_name": r["old_name"], "previous_score": old_q and old_q["quality"]}
-        if _upsert(conn, "new_best", r["task"], r["new_id"], ev, "open"):
+              "previous": r["old_id"], "previous_name": r["old_name"], "previous_score": old_q and old_q["quality"],
+              "why": why}
+        if _upsert(conn, "new_best", r["task"], r["new_id"], ev, "open" if why else "baseline") and why:
             created.append(f'{r["task"]}:{r["new_id"]}')
     return created
 
@@ -107,7 +111,7 @@ def top3(conn, status_for_new: str | None = None) -> list[str]:
 
 
 def challengers(conn, status_for_new: str = "open", only_task: str | None = None,
-                only_role: str | None = None) -> list[str]:
+                only_role: str | None = None, chg: dict | None = None) -> list[str]:
     """Models that overtake one of Monsieur's pinned favourites on any leaderboard of that task
     (models.task_benchmarks: AA, Design Arena, Arena.ai). One alert per challenger model, listing every board.
 
@@ -117,6 +121,7 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
     """
     snaps = sel.latest_snapshots(conn)
     offers = sel.load_offers(conn, snaps)
+    chg = chg or changes.events(conn)  # only a CHANGE (new / cheaper challenger, nerfed favourite) is news
     created = []
     for p in conn.execute("""select p.*, t.label, t.interface, t.modes from models.preferences p
                              join models.tasks t using (task) where p.pinned_model_id is not null and p.watch <> 'none'
@@ -172,7 +177,12 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
                     status_for_new, p["role"])
             continue
         for model_id, ev in found.items():
-            if _upsert(conn, "challenger", p["task"], model_id, ev, status_for_new, p["role"]):
+            why = changes.changed(chg, model_id) + [f'{p["pinned_model_id"]} dégradé'
+                                                     for _ in chg["nerf"].get(p["pinned_model_id"], [])[:1]]
+            ev["why"] = why
+            status = status_for_new if (why or status_for_new != "open") else "baseline"
+            if _upsert(conn, "challenger", p["task"], model_id, ev, status, p["role"]) and \
+                    (status == "open" or status_for_new == "baseline"):
                 created.append(f'{p["task"]}:{p["role"]}:{model_id}')
     return created
 
@@ -211,7 +221,7 @@ def stale_sources(conn) -> list[str]:
     return created
 
 
-def tiers(conn, run_id: int | None = None) -> list[str]:
+def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]:
     """When Monsieur's method (nightly L1/L2/L3 in models.selection) designates another model x reasoning level than
     the declared tier, one alert per tier; he tests and adopts or ignores (never switched automatically)."""
     run = {"run_id": run_id} if run_id else conn.execute("select run_id from models.latest_run").fetchone()
@@ -234,7 +244,11 @@ def tiers(conn, run_id: int | None = None) -> list[str]:
         ev = {"level": r["level"], "proposed": f'{r["model_id"]}/{r["variant"]}', "name": r["display_name"],
               "score": r["quality"], "real_cost": r["real_cost"],
               "current": f'{r["pinned_model_id"]}/{r["pinned_variant"]}', "current_score": pinned and pinned["score"]}
-        if _upsert(conn, "tier", "general", ev["proposed"], ev, "open", r["level"]):
+        chg = chg or changes.events(conn)
+        ev["why"] = changes.changed(chg, r["model_id"]) + [
+            f'{r["pinned_model_id"]} dégradé' for _ in chg["nerf"].get(r["pinned_model_id"], [])[:1]]
+        if _upsert(conn, "tier", "general", ev["proposed"], ev, "open" if ev["why"] else "baseline",
+                   r["level"]) and ev["why"]:
             created.append(f'{r["level"]}:{ev["proposed"]}')
     return created
 
@@ -281,6 +295,39 @@ def postes(conn) -> list[str]:
                                                             "orchestrator") else []
 
 
+def nerfs(conn, run_id: int, chg: dict | None = None) -> list[str]:
+    """An ACTIVE model (favourite, text tier, auto #1) lost score on a board of the task it is active for."""
+    chg = chg or changes.events(conn)
+    created = []
+    active = [(r["task"], r["model_id"], r["why"]) for r in conn.execute(
+        """select pinned_model_id as model_id, task, 'favori ' || role as why from models.preferences
+           where pinned_model_id is not null
+           union select model_id, task, 'n°1' from models.selection where run_id = %s and level = 'best' and rank = 1
+             and task <> 'general'""", (run_id,))]
+    for task, model_id, why in active:
+        boards = {f'{b["benchmark"]}:{b["bench_task"]}' for b in conn.execute(
+            "select benchmark, bench_task from models.task_benchmarks where task = %s", (task,))}
+        hits = [n for n in chg["nerf"].get(model_id, []) if n["board"] in boards]
+        if hits and _upsert(conn, "nerf", task, model_id, {"active_as": why, "drops": hits}, "open"):
+            created.append(f"{task}:{model_id}")
+    return created
+
+
+def pareto(conn, run_id: int, chg: dict | None = None) -> list[str]:
+    """A price drop (or a release) that puts a model on the text Pareto frontier."""
+    chg = chg or changes.events(conn)
+    created = []
+    for r in changes.frontier_entrants(conn, run_id):
+        why = changes.changed(chg, r["model_id"])
+        if not why:
+            continue
+        ev = {"name": r["display_name"], "variant": r["variant"], "score": r["quality"], "real_cost": r["real_cost"],
+              "why": why}
+        if _upsert(conn, "pareto", "general", f'{r["model_id"]}/{r["variant"]}', ev, "open"):
+            created.append(r["model_id"])
+    return created
+
+
 def billing(conn) -> list[str]:
     """Providers whose last probe found no credit left: one alert each, auto-cleared once topped up."""
     created = []
@@ -311,7 +358,9 @@ def pending(conn) -> list[dict]:
     # Monsieur 2026-10-02: only « a new model ranks above one of our active models » — favourites ('challenger'),
     # text tiers ('tier'), auto-picked #1 of specialised tasks ('new_best'). No credit, staleness or podium news.
     return list(conn.execute("""select * from models.alerts where status = 'open'
-                                and kind in ('challenger', 'tier', 'new_best') order by kind, task, alert_id"""))
+                                and kind in ('challenger', 'tier', 'new_best', 'nerf', 'pareto')
+                                and not (kind = 'tier' and role = 'orchestrator')
+                                order by kind, task, alert_id"""))
 
 
 ROLE_LABELS = {"value": "ratio", "budget": "budget", "action": "action"}
@@ -336,61 +385,128 @@ def _short_board(name: str) -> str:
     return name.replace("text_to_", "t2").replace("image_to_", "i2").replace("_", " ")
 
 
-def render(alerts: list[dict], conn=None) -> str:
-    """Short Telegram message: one line per model (emoji name — modes — price per resolution — providers)."""
-    beaten = [a for a in alerts if a["kind"] == "challenger"]
-    beaten_models = {a["subject"] for a in beaten}
-    podium = [a for a in alerts if a["kind"] == "top3" and a["subject"] not in beaten_models]
-    stale = [a for a in alerts if a["kind"] == "source_stale"]
-    bills = [a for a in alerts if a["kind"] == "billing"]
-    tier_alerts = [a for a in alerts if a["kind"] == "tier"]
-    out = ["Walter Router"]
-    for a in [x for x in tier_alerts if x["role"] == "orchestrator"]:
-        e = a["evidence"]
-        c = catalog.card(conn, a["subject"], "chat")
-        att = e["attributes"]
-        out.append(f'🎛️ [{a["alert_id"]}] Orchestrateur de Walter : {catalog.line(c)} ferait mieux que {e["current"]} '
-                   f'(poste {e["score"]:.0f} vs {e["current_score"] or 0:.0f} ; agentique {att.get("agentic", 0):.0f}, '
-                   f'fiabilité {att.get("reliability", 0):.0f}) · « adopter {a["alert_id"]} » ou « ignorer {a["alert_id"]} »')
-    tier_alerts = [x for x in tier_alerts if x["role"] != "orchestrator"]
-    for a in tier_alerts:
-        e = a["evidence"]
-        cur = f' (actuel {e["current"]}, {e["current_score"]:.1f})' if e.get("current_score") else f' (actuel {e["current"]})'
-        out.append(f'📐 [{a["alert_id"]}] Niveau {e["level"]} : ta méthode désigne maintenant {e["name"]} '
-                   f'— {e["score"]:.1f} AA, {e["real_cost"]:.3f} $/tâche{cur}. « adopter {a["alert_id"]} » ou « ignorer {a["alert_id"]} ».')
-    for a in bills:
-        name = catalog.PROVIDERS.get(a["subject"], a["subject"])
-        out.append(f'💳 {name} : {a["evidence"]["detail"]}. Les modèles payants passent par les autres providers '
-                   f'(Codex, Kie) en attendant une recharge.')
-    news = [a for a in alerts if a["kind"] == "new_best"]
-    for a in news:
-        e = a["evidence"]
-        task = conn.execute("select interface, modes from models.tasks where task = %s", (a["task"],)).fetchone()
+def _fr(x, digits: int) -> str:
+    return f"{x:.{digits}f}".replace(".", ",") if x is not None else "?"
+
+
+def _head(c: dict) -> str:
+    modes = f' · {media.short_modes(c["modes"])}' if c.get("modes") else ""
+    return f'{catalog.icon(c)} {c["name"]}{modes}'
+
+
+def _money_line(c: dict) -> str:
+    prov = ", ".join(catalog.PROVIDERS.get(p, p) for p in c.get("providers") or [])
+    return f'💰 {catalog.price_text(c)}' + (f' — {prov}' if prov else "")
+
+
+def _why(e: dict) -> str | None:
+    return ("🔎 " + " ; ".join(str(w) for w in e["why"][:3])) if e.get("why") else None
+
+
+def _block(conn, a: dict) -> list[str]:
+    e, n = a["evidence"], a.get("ref") or a["alert_id"]
+    task = conn.execute("select label, interface, modes from models.tasks where task = %s", (a["task"],)).fetchone() \
+        if a["task"] else None
+    if a["kind"] == "challenger" and "boards" in e:
         c = catalog.card(conn, a["subject"], task["interface"], task["modes"])
-        out.append(f'🆕 [{a["alert_id"]}] {e["task_label"]} : {catalog.line(c)} — dépasse {e["previous_name"]} '
-                   f'({e["score"]:.0f} vs {e["previous_score"] or 0:.0f}), utilisé désormais · « ignorer {a["alert_id"]} » pour garder l\'ancien')
-    if beaten:
-        out.append("⚠️ Favori dépassé (à tester) :")
-        out += [f"• {_challenger_line(conn, a)}" for a in beaten]
-    if podium:
-        out.append("🏆 Nouveau dans le top 3 :")
-        for a in podium:
-            c = catalog.card(conn, a["subject"], a["evidence"]["interface"])
-            boards = list(a["evidence"]["boards"].items())
-            ranks = ", ".join(f'{_short_board(b)} #{v["rank"]}' for b, v in boards[:3]) + \
-                (f" (+{len(boards) - 3})" if len(boards) > 3 else "")
-            out.append(f'• [{a["alert_id"]}] {catalog.line(c)} — {ranks}')
-    if stale:
-        out.append("Sources en retard : " + ", ".join(f'{a["subject"]} ({str(a["evidence"]["last"])[:10]})' for a in stale))
-    if beaten or tier_alerts:
-        out.append("Après test : « adopter N » ou « ignorer N ».")
-    return "\n".join(out)
+        pinned = catalog.card(conn, e["pinned"], task["interface"], task["modes"])["name"]
+        role = ROLE_LABELS.get(e.get("role"), "")
+        gains = ", ".join(f'+{b["delta"]:.0f} {_short_board(k)} (#{b["rank"]})' for k, b in e["boards"].items())
+        return [f'🆕 {n} · {task["label"]}{f" ({role})" if role else ""}', _head(c), _money_line(c),
+                f'📈 dépasse {pinned} : {gains}', _why(e), f'→ « adopter {n} » ou « ignorer {n} »']
+    if a["kind"] == "new_best":
+        c = catalog.card(conn, a["subject"], task["interface"], task["modes"])
+        return [f'🆕 {n} · {task["label"]} — nouveau n°1, utilisé désormais', _head(c), _money_line(c),
+                f'📈 dépasse {e["previous_name"]} : {e["score"]:.0f} vs {e["previous_score"] or 0:.0f}', _why(e),
+                f'→ « ignorer {n} » pour garder {e["previous_name"]}']
+    if a["kind"] == "tier":
+        model_id, _, variant = a["subject"].partition("/")
+        c = catalog.card(conn, model_id, "chat")
+        cur = e.get("current", "")
+        cur_id, _, cur_var = cur.partition("/")
+        cur_name = catalog.card(conn, cur_id, "chat")["name"] + (f" ({cur_var})" if cur_var else "")
+        return [f'📐 {n} · Niveau texte {e["level"]}', f'{_head(c)} ({variant})',
+                f'📊 {_fr(e["score"], 1)} AA · {_fr(e["real_cost"], 3)} $/tâche',
+                f'📈 remplacerait {cur_name}' + (f' ({_fr(e["current_score"], 1)} AA)' if e.get("current_score") else ""),
+                _why(e), f'→ « adopter {n} » ou « ignorer {n} »']
+    if a["kind"] == "nerf":
+        c = catalog.card(conn, a["subject"], task["interface"] if task else "chat")
+        drops = " ; ".join(f'{_short_board(d["board"].replace(":", " "))} {d["before"]:.0f} → {d["after"]:.0f}'
+                           for d in e["drops"][:3])
+        return [f'📉 {n} · Dégradation — {c["name"]} ({e["active_as"]}, {task["label"] if task else a["task"]})',
+                f'   {drops}', f'→ le routeur réévalue au prochain cycle ; « ignorer {n} » pour masquer']
+    if a["kind"] == "pareto":
+        model_id, _, variant = a["subject"].partition("/")
+        c = catalog.card(conn, model_id, "chat")
+        return [f'💸 {n} · Entre dans la frontière de Pareto (texte)', f'{_head(c)} ({variant})',
+                f'📊 {_fr(e["score"], 1)} AA · {_fr(e["real_cost"], 3)} $/tâche', _why(e)]
+    return [f'• {n} · {a["kind"]} {a["subject"]}']
+
+
+def _group_key(conn, a: dict) -> tuple:
+    if a["kind"] != "challenger":
+        return (a["alert_id"],)
+    iface = conn.execute("select interface from models.tasks where task = %s", (a["task"],)).fetchone()
+    return ("challenger", a["subject"], iface and iface["interface"])
+
+
+def _challenger_group(conn, group: list[dict]) -> list[str]:
+    """One block for one new model that beats several of Monsieur's choices (roles, t2v and i2v…)."""
+    a0 = group[0]
+    n = a0.get("ref") or a0["alert_id"]
+    task = conn.execute("select interface, modes from models.tasks where task = %s", (a0["task"],)).fetchone()
+    c = catalog.card(conn, a0["subject"], task["interface"], task["modes"])
+    beats: dict[str, list[str]] = {}
+    gains: dict[str, str] = {}
+    for a in group:
+        e = a["evidence"]
+        pinned = catalog.card(conn, e["pinned"], task["interface"], task["modes"])["name"]
+        label = conn.execute("select label from models.tasks where task = %s", (a["task"],)).fetchone()["label"]
+        role = {"default": "défaut"}.get(e.get("role"), ROLE_LABELS.get(e.get("role"), e.get("role")))
+        beats.setdefault(pinned, []).append(f"{label.lower()}, {role}")
+        best = max(e["boards"].items(), key=lambda kv: kv[1]["delta"])
+        gains.setdefault(pinned, f'+{best[1]["delta"]:.0f} {_short_board(best[0])} (#{best[1]["rank"]})')
+    lines = [f'🆕 {n} · {_head(c)}', _money_line(c), "📈 dépasse :"]
+    lines += [f'   • {p} ({" ; ".join(sorted(set(r)))}) — {gains[p]}' for p, r in beats.items()]
+    lines += [_why(a0["evidence"]), f'→ « adopter {n} » (ou « adopter {n} <rôle> ») · « ignorer {n} »']
+    return lines
+
+
+def render(alerts: list[dict], conn=None) -> str:
+    """One airy block per piece of news (Monsieur, 2026-10-04): what it is, its price, what it beats, why now."""
+    groups: dict[tuple, list[dict]] = {}
+    for a in alerts:
+        groups.setdefault(_group_key(conn, a), []).append(a)
+    blocks = []
+    for key, group in groups.items():
+        lines = _challenger_group(conn, group) if key[0] == "challenger" else _block(conn, group[0])
+        blocks.append("\n".join(x for x in lines if x))
+    day = datetime.now(timezone.utc).strftime("%d/%m")
+    return f"Walter Router — nouveautés du {day}\n\n" + "\n\n".join(blocks)
+
+
+def _assign_refs(conn, alerts: list[dict]) -> list[dict]:
+    """Short numbers Monsieur can answer with (1, 2, 3…), unique among alerts still awaiting his answer."""
+    used = {r["ref"] for r in conn.execute("""select ref from models.alerts where ref is not null
+                                              and status = 'notified' and notified_at > now() - interval '30 days'""")}
+    out, n, by_group = [], 1, {}
+    for a in alerts:
+        key = _group_key(conn, a)
+        if key not in by_group:
+            while n in used:
+                n += 1
+            used.add(n)
+            by_group[key] = n
+        conn.execute("update models.alerts set ref = %s where alert_id = %s", (by_group[key], a["alert_id"]))
+        out.append({**a, "ref": by_group[key]})
+    return out
 
 
 def notify(conn, dry_run: bool = False) -> dict:
     alerts = pending(conn)
     if not alerts:
         return {"sent": 0}
+    alerts = _assign_refs(conn, alerts)
     text = render(alerts, conn)
     if dry_run:
         return {"sent": 0, "dry_run": text}
@@ -402,10 +518,21 @@ def notify(conn, dry_run: bool = False) -> dict:
     return {"sent": len(ids)}
 
 
-def verdict(conn, alert_id: int, decision: str, note: str | None = None) -> dict:
+def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: str | None = None,
+            _resolved: bool = False) -> dict:
     """Record Monsieur's answer. 'adopted' on a challenger also pins the challenger as the new favourite."""
     if decision not in ("adopted", "dismissed"):
         raise ValueError("decision must be adopted or dismissed")
+    group = [] if _resolved else conn.execute("""select alert_id, role from models.alerts where ref = %s
+                            and status = 'notified' and notified_at > now() - interval '30 days'""",
+                                              (alert_id,)).fetchall()
+    if group:  # Monsieur answers with the short number of the message (one number = one model, maybe several roles)
+        if role:
+            group = [g for g in group if g["role"] == role] or group
+        if len(group) > 1:
+            return {"ref": alert_id, "results": [verdict(conn, g["alert_id"], decision, note, _resolved=True)
+                                                 for g in group]}
+        alert_id = group[0]["alert_id"]
     a = conn.execute("update models.alerts set status = %s, verdict_note = %s where alert_id = %s returning *",
                      (decision, note, alert_id)).fetchone()
     if not a:

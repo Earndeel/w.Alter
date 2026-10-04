@@ -66,7 +66,13 @@ content policy, affinity, the level picks, and the decision rules. `walter-route
 BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local FlareSolverr (127.0.0.1:8191).
 
 ## Phase A + B (2026-10-02 evening)
-- **Telegram = model news only**: `challenger` (a favourite overtaken from a top-3 place), `tier` (Monsieur's method
+- **2026-10-04 — notifications are CHANGES between cycles** (`changes.py`): a model newly on a leaderboard or
+  newly listed by a provider, an active model nerfed (score drop > 15 Elo / 2 AA pts / 30 BridgeBench pts on a board
+  of the task it is active for), an offer >= 15 % cheaper. challenger / new_best / tier are sent only with such a
+  reason (`why`); `nerf` and `pareto` (text frontier entrant thanks to a release or price drop) are new kinds. The
+  orchestrator fiche de poste is no longer notified (static comparison). One airy block per new model, all the roles
+  it beats grouped, short numbers (`alerts.ref`) — « adopter 1 », « adopter 1 action », « ignorer 2 ».
+- **Telegram = model news only** (superseded by the line above for the trigger rule): `challenger` (a favourite overtaken from a top-3 place), `tier` (Monsieur's method
   designates another text tier, or the orchestrator fiche de poste finds a clearly better orchestrator), `new_best`
   (a specialised task's auto-picked #1 changed and scores higher; « ignorer N » pins the previous one). No credit,
   staleness, podium or analysis messages; a cycle failure is reported only after two failed cycles in a row.

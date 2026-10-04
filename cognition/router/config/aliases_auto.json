@@ -1,4 +1,35 @@
 {
   "_doc": "Name links added by the 48 h analysis agent (or Monsieur) through `walter-router alias-add`, each with its evidence. Merged into aliases.json \"*\" at load. Remove with `walter-router alias-remove <key>`.",
-  "aliases": {}
+  "aliases": {
+    "riverflow-v2-5-pro": {
+      "model_id": "riverflow-2-5-pro",
+      "reason": "Riverflow 2.5 Pro (Sourceful) : le modèle sourceful/riverflow-v2.5-pro est désigné Riverflow 2.5 Pro ; même modèle, seule l’écriture v2.5 varie. https://replicate.com/sourceful/riverflow-v2.5-pro",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:40+00:00"
+    },
+    "gpt-3-5-turbo": {
+      "model_id": "gpt-35-turbo",
+      "reason": "Microsoft Azure désigne gpt-35-turbo comme le modèle GPT-3.5 Turbo ; identifiant Azure raccourci du même modèle. https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:46+00:00"
+    },
+    "recraft-v4-1-pro-vector": {
+      "model_id": "recraftv-4-1-pro-vector",
+      "reason": "Les docs officielles Recraft listent un unique modèle Recraft V4.1 Pro Vector ; recraftv est une variante d’écriture compacte, pas une variante de modèle. https://www.recraft.ai/docs/api-reference/getting-started",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:52+00:00"
+    },
+    "recraft-v4-pro-vector": {
+      "model_id": "recraftv-4-pro-vector",
+      "reason": "Les docs officielles Recraft listent un unique modèle Recraft V4 Pro Vector ; recraftv est une variante d’écriture compacte, pas une variante de modèle. https://www.recraft.ai/docs/api-reference/getting-started",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:56+00:00"
+    },
+    "recraft-v4-vector": {
+      "model_id": "recraftv-4-vector",
+      "reason": "Les docs officielles Recraft listent un unique modèle Recraft V4 Vector ; recraftv est une variante d’écriture compacte, pas une variante de modèle. https://www.recraft.ai/docs/api-reference/getting-started",
+      "origin": "agent",
+      "added_at": "2026-10-04T03:38:59+00:00"
+    }
+  }
 }

@@ -50,10 +50,13 @@ def test_divergence_from_declared_tier_raises_one_alert_and_adopting_pins_it(con
     conn.execute("""update models.preferences set pinned_model_id = 'gpt-6-luna', pinned_variant = 'high'
                     where task = 'general' and role = 'L1'""")
     conn.execute("delete from models.alerts where kind = 'tier'")
-    created = alerts.tiers(conn, run)
+    assert alerts.tiers(conn, run, {"new": {}, "nerf": {}, "price_drop": {}}) == []  # nothing changed: silent
+    conn.execute("delete from models.alerts where kind = 'tier'")
+    news = {"new": {}, "nerf": {}, "price_drop": {"gpt-6-luna": [{"provider": "kie", "drop_pct": 30}]}}
+    created = alerts.tiers(conn, run, news)
     assert created == ["L1:gpt-6-luna/max"]
     a = conn.execute("select * from models.alerts where kind = 'tier'").fetchone()
-    assert "Niveau L1" in alerts.render([a], conn)
+    assert "Niveau texte L1" in alerts.render([a], conn)
     alerts.verdict(conn, a["alert_id"], "adopted")
     p = conn.execute("select pinned_variant from models.preferences where task = 'general' and role = 'L1'").fetchone()
     assert p["pinned_variant"] == "max"
@@ -65,14 +68,8 @@ def test_specialised_tasks_keep_only_the_best(conn):
     assert n <= 1
 
 
-def test_orchestrator_poste_proposes_without_switching(conn, monkeypatch):
-    from walter_router import postes
-    monkeypatch.setattr(postes, "current_orchestrator", lambda: {"model": "gpt-6.1-sol", "provider": "openai-codex"})
-    conn.execute("delete from models.alerts where kind = 'tier' and role = 'orchestrator'")
-    created = alerts.postes(conn)
-    top = postes.rank(conn, "orchestrator", 1)[0]["model_id"]
-    if top == "gpt-6-1-sol":
-        assert created == []
-    else:
-        a = conn.execute("select * from models.alerts where kind = 'tier' and role = 'orchestrator'").fetchone()
-        assert a and "Orchestrateur" in alerts.render([a], conn)
+def test_static_orchestrator_comparison_is_never_news(conn):
+    """Astra vs Sol on poste criteria is a comparison between known models: never sent (Monsieur, 2026-10-04)."""
+    conn.execute("""insert into models.alerts (kind, task, role, subject, evidence, status)
+                    values ('tier', 'general', 'orchestrator', 'zz-model', '{}', 'open')""")
+    assert not [a for a in alerts.pending(conn) if a["role"] == "orchestrator"]
