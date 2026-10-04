@@ -260,13 +260,15 @@ HERMES_ENV = HERMES_HOME / ".env"
 
 
 def _env_value(name: str) -> str | None:
-    """A key from Hermes' 0600 .env, read at run time (never logged, never put in a URL)."""
+    """A key from Hermes' 0600 .env (or the process environment), read at run time (never logged / put in a URL)."""
+    if os.environ.get(name):
+        return os.environ[name]
     try:
         for line in HERMES_ENV.read_text().splitlines():
             if line.startswith(name + "="):
                 return line.split("=", 1)[1].strip().strip("'\"") or None
     except OSError:
-        return None
+        pass
     return os.environ.get(name)
 
 

@@ -36,7 +36,7 @@ def test_classify_reads_every_answer(conn, monkeypatch):
 
     monkeypatch.setattr(intent, "urlopen", fake_urlopen)
     monkeypatch.setattr(intent.collect, "_env_value", lambda name: "k")
-    out = intent.classify(conn, "une pub vidéo")
+    out = intent.classify(conn, "une pub vidéo", models=(intent.MODEL,))
     assert sent["model"] == "~typesafe/jev-latest" and "text_to_video" in sent["questions"]["task"]["criteria"]
     assert out["task"] == "text_to_video" and out["cost"] == 0.00005
 
@@ -46,4 +46,25 @@ def test_forwarding_router_model_is_refused(conn, monkeypatch):
         {"model": "typesafe/jev-router", "answers": {}}).encode()))
     monkeypatch.setattr(intent.collect, "_env_value", lambda name: "k")
     with pytest.raises(ValueError):
-        intent.classify(conn, "x")
+        intent.classify(conn, "x", models=(intent.MODEL,))
+
+
+def test_chain_falls_back_to_the_next_decision_model(conn, monkeypatch):
+    calls = []
+
+    def fake_cloudflare(model, payload, timeout):
+        calls.append(model)
+        raise RuntimeError("quota")
+
+    def fake_urlopen(req, timeout):
+        body = json.loads(req.data)
+        calls.append(body["model"])
+        answers = {n: {"choice": next(iter(q["criteria"])), "confidence": 0.9, "probabilities": {}}
+                   for n, q in body["questions"].items()}
+        return _Resp(json.dumps({"model": "inception/mercury-decide-x", "answers": answers}).encode())
+
+    monkeypatch.setattr(intent, "_cloudflare", fake_cloudflare)
+    monkeypatch.setattr(intent, "urlopen", fake_urlopen)
+    monkeypatch.setattr(intent.collect, "_env_value", lambda name: "k")
+    out = intent.classify(conn, "une pub vidéo")
+    assert calls[:2] == ["cloudflare/clef", "inception/mercury-decide:free"] and out["fallback_errors"]
