@@ -20,6 +20,10 @@ from . import collect
 
 URL = "https://openrouter.ai/api/alpha/decisions"
 MODEL = "~typesafe/jev-latest"
+# Same Decisions contract, tried in order when the previous one fails (e.g. HTTP 402 when the OpenRouter credit is
+# exhausted — the free model still answers). Eval 2026-10-04 on eval/intents_fr.json before being admitted.
+MODELS = (MODEL, "inception/mercury-decide:free")
+ACCEPTED_PREFIXES = ("typesafe/jev-", "inception/mercury-decide")
 MIN_CONFIDENCE = 0.35  # eval 2026-10-02: a correct task came back at 0.48
 LEVELS = {"L1": "Everyday: short answer, simple summary, quick fact, small rewrite",
           "L2": "Harder: multi-step analysis, comparison, careful writing, planning",
@@ -38,7 +42,7 @@ def _criteria(conn) -> tuple[dict, dict]:
     return tasks, roles
 
 
-def classify(conn, request: str, timeout: float = 8.0) -> dict:
+def classify(conn, request: str, timeout: float = 8.0, models: tuple | None = None) -> dict:
     """{'task', 'task_confidence', 'video_role', 'role_confidence', 'level', 'unrestricted', 'model', 'cost', 'ms'}.
     Raises on transport/contract errors (callers fall back to keywords)."""
     key = collect._env_value("OPENROUTER_API_KEY")
@@ -60,13 +64,22 @@ def classify(conn, request: str, timeout: float = 8.0) -> dict:
         questions["video_role"] = {"type": "choice", "criteria": roles,
                                    "instructions": f"If the request is a video, which objective fits best? "
                                                    f"If it is not a video, choose default. {note}"}
-    body = json.dumps({"model": MODEL, "state": {"request": request}, "questions": questions}).encode()
     t0 = time.monotonic()
-    with urlopen(Request(URL, data=body, headers={"Authorization": f"Bearer {key}",  # noqa: S310 (fixed URL)
-                                                  "Content-Type": "application/json"}), timeout=timeout) as resp:
-        data = json.loads(resp.read(200000))
+    errors = []
+    data = None
+    for model in (models or MODELS):
+        body = json.dumps({"model": model, "state": {"request": request}, "questions": questions}).encode()
+        try:
+            with urlopen(Request(URL, data=body, headers={"Authorization": f"Bearer {key}",  # noqa: S310
+                                                          "Content-Type": "application/json"}), timeout=timeout) as resp:
+                data = json.loads(resp.read(200000))
+            break
+        except Exception as exc:  # noqa: BLE001 — next decision model
+            errors.append(f"{model}: {type(exc).__name__}: {exc}"[:160])
+    if data is None:
+        raise RuntimeError("; ".join(errors))
     ms = int((time.monotonic() - t0) * 1000)
-    if not str(data.get("model", "")).startswith("typesafe/jev-") or data["model"].startswith("typesafe/jev-router"):
+    if not str(data.get("model", "")).startswith(ACCEPTED_PREFIXES) or data["model"].startswith("typesafe/jev-router"):
         raise ValueError(f"unexpected decision model {data.get('model')}")
     a = data["answers"]
     for name in questions:
@@ -78,4 +91,5 @@ def classify(conn, request: str, timeout: float = 8.0) -> dict:
             "role_confidence": a.get("video_role", {}).get("confidence"),
             "level": a["level"]["choice"], "unrestricted": a["unrestricted"]["choice"] == "yes",
             "unrestricted_confidence": a["unrestricted"]["confidence"],
-            "model": data["model"], "cost": (data.get("usage") or {}).get("cost"), "ms": ms}
+            "model": data["model"], "cost": (data.get("usage") or {}).get("cost"), "ms": ms,
+            "fallback_errors": errors or None}
