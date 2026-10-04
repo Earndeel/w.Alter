@@ -60,7 +60,7 @@ Le modèle de décision ne compare jamais de benchmarks : tout est tranché pend
 | Entrée | Chemin aujourd'hui | Cible |
 |---|---|---|
 | Telegram | Gateway Hermes → GPT-6.1 Sol, qui appelle le routeur ensuite 🟡 | Routeur **avant** le modèle (§9) |
-| App Mac | Dashboard Hermes, profil `wild` (base séparée, non ingérée en mémoire) 🟡 | Même chaîne ; ingestion `local_only` si Monsieur le veut |
+| App Mac | Dashboard Hermes, profil `wild` — ingéré en mémoire en `local_only` depuis le 2026-10-04 ✅ | Même chaîne |
 | Téléphone | Asterisk → Gemini Live → voice router (Gemini Flash Lite) ✅ | Brancher la décision Clef sur le voice router 🔜 |
 | Événements | Ingestion seule, aucune réaction 🟡 | Tri des événements (§10) 🔜 |
 
@@ -169,7 +169,12 @@ heure / lieu / agenda seulement si la dimension le demande.
 
 ---
 
-## 10. Événements environnementaux 🔜
+## 10. Événements environnementaux 🟡 (mode observation depuis le 2026-10-04)
+
+Implémenté dans walter-memory : `walter_memory/triage.py`, table `triage.decisions`, règles
+`/opt/walter-memory/config/triage_rules.json`, timer `walter-memory-triage` (10 min). Reste : livraison (résumé
+Telegram, brouillons de réponse) une fois les règles validées par Monsieur.
+
 
 Pour chaque nouvel événement ingéré (message reçu, mail, rendez-vous, photo…), une décision **Clef** sur le
 Context Lite de l'événement (métadonnées seules si `local_only`) : `ignorer` · `mémoriser` (déjà fait) ·
