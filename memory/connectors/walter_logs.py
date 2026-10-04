@@ -117,7 +117,7 @@ def watch_main() -> int:
                 subprocess.run(["systemctl", "start", "--no-block", "walter-memory-hermes.service"], check=False)
                 last_core = now
             ins = sum(v.get("inserted", 0) for v in res.values() if isinstance(v, dict))
-            if ins:
+            if ins and (len(res) > 2 or ins >= 200):     # sweeps and big catch-ups only (journal stays quiet)
                 print(f"{datetime.now(timezone.utc):%H:%M:%S}Z +{ins} {res}", flush=True)
             if res:
                 ingestion.mark_success(logs.CONNECTOR)
