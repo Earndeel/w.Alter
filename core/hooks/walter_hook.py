@@ -10,6 +10,7 @@ One script, several hosts (the wire format is Claude Code's, which Hermes' shell
                Stop / SessionEnd → journal the transcript in the background (connector agent_sessions)
   Hermes       pre_llm_call      → same memory context, answered as {"context": …}
   Codex        notify            → `walter_hook.py codex-notify '<json>'` (agent-turn-complete) → journal
+  DeepSeek H.  dsh-hooks-claude-code (same events as Claude Code; runs inside dsh's workspace-write sandbox)
 
 Fail-open: any error → no output, exit 0, one line in ~/.hermes/logs/walter-hook.log. Never prints secrets.
 Per-prompt context can be switched off with WALTER_HOOK_CONTEXT=off.
@@ -78,7 +79,7 @@ def memory_context(query: str, caller: str, session_id: str) -> str:
 
 
 def journal(transcript: str | None, *, wait: bool, runtime_flag: str | None = None) -> None:
-    args = CONNECTOR + (["--file", transcript] if transcript else [runtime_flag] if runtime_flag else [])
+    args = CONNECTOR + ([runtime_flag] if runtime_flag else ["--file", transcript] if transcript else [])
     if wait:
         r = subprocess.run(args, capture_output=True, text=True, timeout=25)
         if r.returncode:
@@ -88,22 +89,29 @@ def journal(transcript: str | None, *, wait: bool, runtime_flag: str | None = No
             subprocess.Popen(args, stdin=null, stdout=null, stderr=null, start_new_session=True)
 
 
+def runtime_of(ev: dict) -> str:
+    """Claude Code and DeepSeek Harness both speak this format; dsh session ids are 'session-<uuid>'."""
+    sid, path = ev.get("session_id") or "", ev.get("transcript_path") or ""
+    return "dsh" if sid.startswith("session-") or path.startswith("/opt/dsh/") else "claude_code"
+
+
 def claude_code(ev: dict) -> dict | None:
-    name, sid = ev.get("hook_event_name"), ev.get("session_id") or ""
+    name, sid, runtime = ev.get("hook_event_name"), ev.get("session_id") or "", runtime_of(ev)
     if name == "SessionStart":
-        line = (f"Cette session est journalisée dans la mémoire W.Alter (core.events, source claude_code, "
+        line = (f"Cette session est journalisée dans la mémoire W.Alter (core.events, source {runtime}, "
                 f"thread_id={sid}).")
         if ev.get("source") == "compact":
             line += (" La conversation vient d'être compactée : pour retrouver le texte exact d'un message antérieur, "
                      f"appelle memory_events(thread_id=\"{sid}\", text=\"<mots-clés>\").")
         return {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": line}}
     if name == "UserPromptSubmit":
-        ctx = memory_context(ev.get("prompt") or "", "claude-code-hook", sid)
+        ctx = memory_context(ev.get("prompt") or "", f"{runtime.replace('_', '-')}-hook", sid)
         return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": ctx}} if ctx else None
     if name == "PreCompact":
         journal(ev.get("transcript_path"), wait=True)
     elif name in ("Stop", "SessionEnd", "SubagentStop"):
-        journal(ev.get("transcript_path"), wait=False)
+        # dsh runs hooks in a sandbox that reaps detached children: journal synchronously there (~1 s, incremental)
+        journal(ev.get("transcript_path"), wait=runtime == "dsh", runtime_flag="--dsh" if runtime == "dsh" else None)
     return None
 
 
