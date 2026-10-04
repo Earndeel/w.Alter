@@ -255,6 +255,47 @@ def memory_events(text: str = "", source: str = "", event_type: str = "", thread
 
 
 @mcp.tool()
+def logs_search(query: str = "", runtime: str = "", event_type: str = "", tool: str = "", session: str = "",
+                since: str = "", until: str = "", limit: int = 20) -> str:
+    """walter-logs: search what Walter's agents DID in past sessions, any runtime (Hermes and its profiles, Claude
+    Code, Codex, DSH): user/assistant messages, reasoning, tool calls with their full arguments, tool results in full,
+    compaction summaries. Words (full-text, accent-insensitive) or an exact string (paths, error messages, ids).
+    Filters: runtime (hermes, claude_code, codex, dsh), event_type (user/message, assistant/message,
+    assistant/reasoning, tool/call, tool/result, compaction/summary), tool (e.g. terminal, Bash, walter_route),
+    session (id or part of it), since/until (ISO). Each hit has a ref 'session#seq': open the surrounding flow with
+    logs_timeline(session, seq), the full event with logs_get. Secrets are masked; local-only content is hidden."""
+    args = ["logs", "search", query, "--limit", str(max(1, min(int(limit), 100))), "--cloud-safe"]
+    for flag, value in (("--runtime", runtime), ("--type", event_type), ("--tool", tool), ("--session", session),
+                        ("--since", since), ("--until", until)):
+        if value:
+            args += [flag, value]
+    return _walter_memory(*args, timeout=60)
+
+
+@mcp.tool()
+def logs_timeline(session: str, seq: int = -1, before: int = 5, after: int = 15, event_type: str = "",
+                  max_chars: int = 600) -> str:
+    """walter-logs: the flow of one agent session in order (message → reasoning → tool call → result → answer...).
+    session: id or part of it (from logs_search refs 'session#seq'); seq: anchor event (-1 = the latest events);
+    before/after: how many events around it; event_type: only one type; max_chars: text per event (logs_get for
+    the full text)."""
+    args = ["logs", "timeline", session, "--before", str(max(0, min(int(before), 100))),
+            "--after", str(max(0, min(int(after), 200))), "--max-chars", str(max(80, min(int(max_chars), 5000))),
+            "--cloud-safe"]
+    if int(seq) >= 0:
+        args += ["--seq", str(int(seq))]
+    if event_type:
+        args += ["--type", event_type]
+    return _walter_memory(*args, timeout=60)
+
+
+@mcp.tool()
+def logs_get(session: str, seq: int) -> str:
+    """walter-logs: one event in full (e.g. a complete tool result or reasoning), with the linked tool call/result."""
+    return _walter_memory("logs", "get", session, "--seq", str(int(seq)), "--cloud-safe", timeout=60)
+
+
+@mcp.tool()
 def vault_search(text: str = "", kind: str = "", source: str = "", limit: int = 20) -> str:
     """Search the Raw Vault: every raw file of the user's life that is not text (photos, screenshots, videos,
     voice notes, documents). Matches file names and derived text (OCR/transcripts/captions); empty text lists
