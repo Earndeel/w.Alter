@@ -1,7 +1,8 @@
 # Walter Router
 
 Model catalogue + per-task model choice for W.Alter. Schema `models` in hindsight-pg (127.0.0.1:5433, creds in ~/.pgpass).
-Plan and decisions: `/root/projects/walter-model-router/docs/PLAN-v2.md`.
+**End-to-end design: `docs/DESIGN.md`** (two clocks, ExecutionPlan contract, roadmap V1–V5, open decisions).
+Text tiers method: `docs/TIERS.md`. Historical plan: `/root/projects/walter-model-router/docs/PLAN-v2.md`.
 
 ## Cycle every 48 h (timer `walter-router-refresh`, `bin/walter-router-cycle`; was daily until 2026-10-02)
 1. benchmark collection (aa-pareto skill script; its daily Hermes cron 096741a21a32 is paused), 2. router refresh +
