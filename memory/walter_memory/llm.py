@@ -120,3 +120,65 @@ def chat(messages: list[dict], *, model: str, processor: str, privacy_class: str
          input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),
          cached_tokens=(usage.get("prompt_tokens_details") or {}).get("cached_tokens"), cost_usd=usage.get("cost"))
     return {"content": content, "usage": usage, "cost_usd": usage.get("cost")}
+
+
+# --- structured decisions (System One contract) on Cloudflare Workers AI -------------------------------------
+
+CF_RUN = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/cloudflare/{model}"
+CF_PRICE = {"clef": 0.24, "clef-flash": 0.09}  # USD per M input tokens (Workers AI catalogue, 2026-10-03)
+HERMES_ENV = "/root/.hermes/.env"
+
+
+def _hermes_env(name: str) -> str | None:
+    try:
+        for line in open(HERMES_ENV).read().splitlines():
+            if line.startswith(name + "="):
+                return line.split("=", 1)[1].strip().strip("'\"") or None
+    except OSError:
+        return None
+    return None
+
+
+def _redact_tree(value, names, mapping):
+    if isinstance(value, str):
+        text, mp = privacy.redact(value, names)
+        mapping.update(mp)
+        return text
+    if isinstance(value, list):
+        return [_redact_tree(v, names, mapping) for v in value]
+    if isinstance(value, dict):
+        return {k: _redact_tree(v, names, mapping) for k, v in value.items()}
+    return value
+
+
+def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, names: list[str] | None = None,
+           model: str = "clef", purpose: str | None = None, budget: str = "recurring", timeout: float = 30) -> dict:
+    """Typed decisions from Cloudflare Clef (Workers AI free daily allocation; scoped token CLOUDFLARE_AI_TOKEN).
+    local_only state is refused; redacted_cloud state is pseudonymised (strings, recursively) before leaving the VM.
+    Returns {"answers": {...}, "usage": {...}, "model": ...}."""
+    base = {"processor": processor, "processor_version": None, "provider": "cloudflare",
+            "model": f"@cf/cloudflare/{model}", "purpose": purpose,
+            "budget": budget, "privacy_class": privacy_class}
+    if privacy_class == "local_only":
+        _log(**base, status="refused_privacy")
+        raise PrivacyRefused(f"{processor}: local_only data cannot be sent to {model}")
+    if privacy_class == "redacted_cloud":
+        state = _redact_tree(state, names, {})
+    account, token = _hermes_env("CLOUDFLARE_ACCOUNT_ID"), _hermes_env("CLOUDFLARE_AI_TOKEN")
+    if not (account and token):
+        raise RuntimeError("Cloudflare Workers AI credentials missing (CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_AI_TOKEN)")
+    t0 = time.perf_counter()
+    try:
+        r = httpx.post(CF_RUN.format(account=account, model=model), headers={"Authorization": f"Bearer {token}"},
+                       json={"model": model, "state": state, "questions": questions}, timeout=timeout)
+        data = r.json()
+        if r.status_code >= 400 or not data.get("success"):
+            raise RuntimeError(f"HTTP {r.status_code}: {str(data.get('errors'))[:300]}")
+    except Exception as e:
+        _log(**base, status="error", error=str(e)[:500], latency_ms=int((time.perf_counter() - t0) * 1000))
+        raise
+    res = data["result"]
+    tok = (res.get("usage") or {}).get("input_tokens") or 0
+    _log(**base, status="ok", latency_ms=int((time.perf_counter() - t0) * 1000), input_tokens=tok, output_tokens=0,
+         cost_usd=tok * CF_PRICE.get(model, 0.24) / 1e6)
+    return {"answers": res["answers"], "usage": res.get("usage") or {}, "model": f"cloudflare/{model}"}

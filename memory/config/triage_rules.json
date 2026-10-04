@@ -1,0 +1,12 @@
+{
+  "_doc": "Monsieur's rules for environmental events (V3, 2026-10-04). Deterministic, applied after the decision model. Edit freely; threads are Beeper chat ids or Gmail thread ids, people are display names as they appear.",
+  "timezone": "Asia/Bangkok",
+  "silence_hours": [23, 8],
+  "vip_people": [],
+  "vip_threads": [],
+  "muted_threads": [],
+  "groups": "notify only when Monsieur is mentioned or the message is urgent",
+  "email_categories_never_notified": ["promo", "newsletter", "notification"],
+  "max_notifications_per_hour": 3,
+  "shadow": true
+}
