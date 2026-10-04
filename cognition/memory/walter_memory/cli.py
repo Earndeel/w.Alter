@@ -68,6 +68,16 @@ def main(argv=None) -> None:
     g.add_argument("--event", action="append"); g.add_argument("--object", action="append"); g.add_argument("--pattern")
     g.add_argument("--hindsight", action="store_true"); g.add_argument("--execute", action="store_true")
     g.add_argument("--no-backup-rewrite", action="store_true")
+    lg = sub.add_parser("logs", help="walter-logs: what the agents did (messages, reasoning, tool calls/results), all runtimes")
+    lg.add_argument("action", choices=["search", "timeline", "get", "sessions", "stats"])
+    lg.add_argument("query", nargs="?", default="", help="search: words / exact string; timeline/get: session id")
+    lg.add_argument("--runtime"); lg.add_argument("--type", action="append"); lg.add_argument("--tool")
+    lg.add_argument("--session"); lg.add_argument("--since"); lg.add_argument("--until")
+    lg.add_argument("--seq", type=int, help="timeline: anchor event; get: the event")
+    lg.add_argument("--before", type=int, default=5); lg.add_argument("--after", type=int, default=15)
+    lg.add_argument("--max-chars", type=int, default=600); lg.add_argument("--limit", type=int, default=20)
+    lg.add_argument("--cloud-safe", action="store_true", help="hide local_only, pseudonymise redacted_cloud")
+    lg.add_argument("--json", action="store_true")
     a = p.parse_args(argv)
 
     if a.cmd == "stats":
@@ -129,7 +139,6 @@ def main(argv=None) -> None:
             if len(found) > 1:
                 _print({"other_matches": [{k: f[k] for k in ("canonical_name", "messages", "entity_id")} for f in found[1:]]})
         else:
-            from .db import connection
             with connection() as conn:
                 _print(conn.execute("""select e.canonical_name, d.metric, d.observation, d.detected_on from kardex.communication_deviations d
                                        join core.entities e using (entity_id) where d.acknowledged_at is null
@@ -157,6 +166,23 @@ def main(argv=None) -> None:
         _print(privacy.rescan())
     elif a.cmd == "jobs":
         _print({"requeued": ingestion.requeue_stale()})
+    elif a.cmd == "logs":
+        from . import logs
+        mp = "cloud_allowed" if a.cloud_safe else "local_only"
+        with connection() as conn:
+            if a.action == "search":
+                res = logs.search(conn, a.query, runtime=a.runtime, types=a.type, tool=a.tool, session=a.session,
+                                  since=a.since, until=a.until, limit=a.limit, max_privacy=mp)
+            elif a.action == "timeline":
+                res = logs.timeline(conn, a.query or a.session, around=a.seq, before=a.before, after=a.after,
+                                    types=a.type, max_chars=a.max_chars, max_privacy=mp)
+            elif a.action == "get":
+                res = logs.get(conn, a.query or a.session, a.seq, max_privacy=mp)
+            elif a.action == "sessions":
+                res = logs.sessions(conn, runtime=a.runtime, text=a.query or None, since=a.since, limit=a.limit, max_privacy=mp)
+            else:
+                res = logs.stats(conn)
+        print(json.dumps(res, default=str, ensure_ascii=False, indent=1) if a.json else logs.render(a.action, res))
     elif a.cmd == "purge":
         _print(purge.purge(reason=a.reason, requested_by=a.by, event_ids=a.event, object_refs=a.object,
                            pattern=a.pattern, include_hindsight=a.hindsight, execute=a.execute,
