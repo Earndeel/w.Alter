@@ -14,7 +14,8 @@ Triggered by the runtimes' hooks (Claude Code Stop/PreCompact/SessionEnd, Codex 
 /opt/walter-core/hooks/walter_hook.py — no timer. Incremental per file (byte offset of the last complete line) and
 idempotent (source_id = line uuid / byte offset), so any run catches up whatever earlier runs missed.
 
-Usage: agent_sessions.py [--claude] [--codex] [--file PATH]     (no flag = both runtimes, every file)
+  - DeepSeek Harness: /opt/dsh/home/sessions/<workspace>/session-*/session.v4.jsonl.zstd
+Usage: agent_sessions.py [--claude] [--codex] [--dsh] [--file PATH]     (no flag = every runtime, every file)
 """
 from __future__ import annotations
 
@@ -32,10 +33,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 CONNECTOR = "agent_sessions"
 CLAUDE_DIR = Path("/root/.claude/projects")
 CODEX_DIR = Path("/root/.codex/sessions")
+DSH_DIR = Path("/opt/dsh/home/sessions")
 LOCK = Path("/run/lock/walter-agent-sessions.lock")
+ROOTS = {"claude": CLAUDE_DIR, "codex": CODEX_DIR, "dsh": DSH_DIR}
 MONSIEUR = {"external_id": "monsieur", "display_name": "Monsieur", "is_self": True}
 AGENTS = {"claude_code": {"external_id": "claude-code", "display_name": "Claude Code"},
-          "codex": {"external_id": "codex", "display_name": "Codex"}}
+          "codex": {"external_id": "codex", "display_name": "Codex"},
+          "dsh": {"external_id": "dsh", "display_name": "DeepSeek Harness"}}
 DELEGATOR = {"external_id": "delegator", "display_name": "Agent délégant (codex exec)"}
 CODEX_INTERACTIVE = {"codex_cli_rs", "codex-tui", "codex_vscode", "codex_desktop"}
 REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
@@ -170,7 +174,57 @@ def parse_codex(d: dict, offset: int, st: dict) -> list[dict]:
     return []
 
 
-PARSERS = {"claude": parse_claude, "codex": parse_codex}
+def parse_dsh(d: dict, idx: int, st: dict) -> list[dict]:
+    """One DeepSeek Harness session-log event (session.v4.jsonl.zstd). Only human `user/message` rows are Monsieur's
+    words (hook context, instructions, skill catalogue and runtime snapshots are injected rows)."""
+    kind, data = d.get("type"), d.get("data") or {}
+    if kind == "session":
+        st.update(sid=d.get("id"), cwd=d.get("cwd"))
+    sid = st.get("sid")
+    if not sid:
+        return []
+    ms = d.get("time") or d.get("createdAt")
+    ts = datetime.fromtimestamp(ms / 1000, tz=timezone.utc) if ms else None
+    base = {"source": "dsh", "source_account": "vm", "thread_id": sid, "occurred_at": ts}
+    agent = {**AGENTS["dsh"], "account": "vm"}
+    chat = {"id": sid, "type": "agent", "network": "dsh"}
+    ref = f"{sid}:{d.get('seq', idx)}"
+    if kind == "session":
+        return [{**base, "event_type": "conversation.started", "source_id": f"session:{sid}:start", "actor": agent,
+                 "payload": {"platform": "dsh", "model": None, "title": None, "parent_session_id": None, "cwd": st.get("cwd"),
+                             "delegation_depth": d.get("delegationDepth")}}]
+    if kind == "request/context":
+        st["model"] = f"{data.get('provider')}/{data.get('model')}"
+    if kind == "tool/call":
+        st.setdefault("pending", {})[data.get("callId")] = [data.get("name"), summarise_args(data.get("arguments"))]
+    msg = data.get("message") or {}
+    if kind == "user/message" and (data.get("source") or {}).get("kind") == "user":
+        text = _text(data.get("content")).strip()
+        if not text:
+            return []
+        st["last_user"] = f"msg:{ref}"
+        return [{**base, "event_type": "message.sent", "source_id": f"msg:{ref}", "content": text,
+                 "actor": {**MONSIEUR, "account": "vm"},
+                 "payload": {"chat": chat, "session_id": sid, "message_id": ref, "role": "user", "cwd": st.get("cwd"),
+                             "attachments": []}}]
+    if kind == "assistant/message":
+        text = _text(msg.get("content")).strip()
+        served = ((msg.get("source") or {}).get("replayState") or {}).get("response", {}).get("responseModel")
+        return [{**base, "event_type": "message.received", "source_id": f"msg:{ref}", "content": text,
+                 "reply_to": st.get("last_user"), "actor": agent,
+                 "payload": {"chat": chat, "session_id": sid, "message_id": ref, "role": "assistant",
+                             "model": st.get("model"), "served_by": served, "attachments": []}}] if text else []
+    if kind == "tool/result":
+        call = msg.get("toolCallId")
+        name, args = st.get("pending", {}).pop(call, [None, None])
+        return [{**base, "event_type": "tool.called", "source_id": f"tool:{ref}", "actor": agent,
+                 "payload": {"tool": name or "unknown", "args_summary": args, "status": "error" if msg.get("isError") else "ok",
+                             "output_chars": _chars(msg.get("content")), "output_ref": f"dsh:{ref}", "session_id": sid,
+                             "call_id": call, "automated": False}}]
+    return []
+
+
+PARSERS = {"claude": parse_claude, "codex": parse_codex, "dsh": parse_dsh}
 
 
 def read_complete_lines(path: Path, offset: int, max_bytes: int = 64 << 20):
@@ -189,10 +243,30 @@ def read_complete_lines(path: Path, offset: int, max_bytes: int = 64 << 20):
     return offset + end
 
 
+def read_zstd_lines(path: Path, done: int):
+    """dsh logs are zstd-compressed JSONL (one frame per flush): decompress whole, skip the `done` first lines;
+    returns the new line count. A frame still being written is left for the next run."""
+    import zstandard
+    with path.open("rb") as f:
+        try:
+            raw = zstandard.ZstdDecompressor().stream_reader(f, read_across_frames=True).read()
+        except zstandard.ZstdError:
+            return done
+    complete = raw.split(b"\n")[:-1]          # the last piece is empty or a partial line
+    for i in range(done, len(complete)):
+        try:
+            yield i, json.loads(complete[i])
+        except ValueError:
+            continue
+    return max(done, len(complete))
+
+
 # ───────────────────────── driver ─────────────────────────
 def files(runtime: str) -> list[Path]:
     if runtime == "claude":
         return sorted(CLAUDE_DIR.glob("*/*.jsonl"))
+    if runtime == "dsh":
+        return sorted(DSH_DIR.glob("*/session-*/session.v4.jsonl.zstd"))
     return sorted(CODEX_DIR.glob("*/*/*/rollout-*.jsonl"))
 
 
@@ -202,12 +276,18 @@ def sync_file(runtime: str, path: Path) -> tuple[int, int]:
     stream = f"{runtime}:{path}"
     cur = ingestion.get_checkpoint(CONNECTOR, stream)
     offset, st = int(cur.get("offset", 0)), cur.get("state") or {}
-    if path.stat().st_size < offset:          # truncated/rewritten: start over (idempotent)
-        offset, st = 0, {}
-    if path.stat().st_size == offset:
-        return 0, 0
+    size = path.stat().st_size
+    if runtime == "dsh":                      # compressed: offset = lines done; size guards needless decompression
+        if size == cur.get("size"):
+            return 0, 0
+        gen = read_zstd_lines(path, offset)
+    else:
+        if size < offset:                     # truncated/rewritten: start over (idempotent)
+            offset, st = 0, {}
+        if size == offset:
+            return 0, 0
+        gen = read_complete_lines(path, offset)
     batch, last_ts = [], None
-    gen = read_complete_lines(path, offset)
     try:
         while True:
             at, d = next(gen)
@@ -222,7 +302,7 @@ def sync_file(runtime: str, path: Path) -> tuple[int, int]:
     with connection() as conn:
         for i in range(0, len(batch), BATCH):
             inserted += events.record_events(batch[i:i + BATCH], conn=conn)["inserted"]
-        ingestion.set_checkpoint(CONNECTOR, stream, {"offset": new_offset, "state": st},
+        ingestion.set_checkpoint(CONNECTOR, stream, {"offset": new_offset, "state": st, "size": size},
                                  last_item_at=last_ts, conn=conn)
     return len(batch), inserted
 
@@ -231,11 +311,15 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--claude", action="store_true")
     ap.add_argument("--codex", action="store_true")
+    ap.add_argument("--dsh", action="store_true")
     ap.add_argument("--file", help="one transcript (runtime inferred from its path)")
     a = ap.parse_args()
     from walter_memory import ingestion
-    LOCK.parent.mkdir(parents=True, exist_ok=True)
-    with LOCK.open("w") as lock:
+    try:
+        lock_file = LOCK.open("a")
+    except OSError:                           # sandboxed caller (dsh hooks): writable temp area only
+        lock_file = (Path("/tmp") / LOCK.name).open("a")
+    with lock_file as lock:
         for _ in range(120):                  # hooks fire often; runs queue up briefly instead of overlapping
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -247,9 +331,10 @@ def main() -> int:
             return 0
         if a.file:
             p = Path(a.file).resolve()
-            targets = [("codex" if str(p).startswith(str(CODEX_DIR)) else "claude", p)]
+            runtime = next((r for r, root in ROOTS.items() if str(p).startswith(str(root) + "/")), None)
+            targets = [(runtime, p)] if runtime else []          # unknown runtime: never parse with a wrong reader
         else:
-            runtimes = [r for r, on in (("claude", a.claude), ("codex", a.codex)) if on] or ["claude", "codex"]
+            runtimes = [r for r, on in (("claude", a.claude), ("codex", a.codex), ("dsh", a.dsh)) if on] or list(ROOTS)
             targets = [(r, p) for r in runtimes for p in files(r)]
         total = ins = 0
         try:
