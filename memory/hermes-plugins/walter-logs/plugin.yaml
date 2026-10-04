@@ -1,0 +1,9 @@
+name: walter-logs
+version: 0.1.0
+description: "walter-logs — search the raw session log of every Walter agent (messages, reasoning, tool calls and results), all runtimes"
+author: W.Alter
+kind: standalone
+provides_tools:
+  - walter_logs_search
+  - walter_logs_timeline
+  - walter_logs_get
