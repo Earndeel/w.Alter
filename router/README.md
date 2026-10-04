@@ -117,6 +117,13 @@ BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local Fla
 - **Health**: `walter-router health` (exit 1 when not fed), shown in walter-core `walter_health`;
   `walter-router-failure.service` (OnFailure of the refresh) sends one Telegram message.
 
+## Cloudflare access (decision model Clef)
+`intent.py` calls Clef on Cloudflare Workers AI with `CLOUDFLARE_AI_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` from
+`~/.hermes/.env` (scoped token « W.Alter — Workers AI (walter-router intent) », permission Workers AI Read, created
+2026-10-04 with the global key). Any other Cloudflare work goes through `/root/.hermes/scripts/walter-cloudflare`
+(`check` / `-- <command>`): global key from Bitwarden « W.Alter · cloudflare », account e-mail from `.env`
+`CLOUDFLARE_EMAIL` (the vault item has no e-mail; an example e-mail from a skill gives 401/403).
+
 ## Commands
 ```
 bin/walter-router migrate
