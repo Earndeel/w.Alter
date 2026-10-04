@@ -130,7 +130,10 @@ def test_new_best_for_a_specialised_task_is_the_only_kind_of_news(conn):
         conn.execute("""insert into models.selection (run_id, task, level, rank, model_id, display_name, quality)
                         values (%s, 'coding', 'best', %s, %s, %s, %s)""", (new_run, rank, mid, mid, q))
     conn.execute("delete from models.preferences where task = 'coding'")
-    assert alerts.new_best(conn, new_run) == ["coding:zz-newcomer"]
+    assert alerts.new_best(conn, new_run, {"new": {}, "nerf": {}, "price_drop": {}}) == []  # unchanged: silent
+    conn.execute("delete from models.alerts where kind = 'new_best' and subject = 'zz-newcomer'")
+    news = {"new": {"zz-newcomer": ["nouveau sur arena:text_coding"]}, "nerf": {}, "price_drop": {}}
+    assert alerts.new_best(conn, new_run, news) == ["coding:zz-newcomer"]
     pend = alerts.pending(conn)
     assert {a["kind"] for a in pend} <= {"challenger", "tier", "new_best"}
     a = next(a for a in pend if a["kind"] == "new_best")

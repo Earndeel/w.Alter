@@ -6,7 +6,7 @@ import json
 import subprocess
 import sys
 
-from . import aliases_admin, alerts, media_exec, choose, collect, db, dossier, execution, intent, knowledge, review
+from . import aliases_admin, alerts, changes, media_exec, choose, collect, db, dossier, execution, intent, knowledge, review
 from . import select as sel
 
 
@@ -38,11 +38,13 @@ def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = Fal
                 report["selection_rows"] = len(rows)
                 report["dossiers"] = dossier.build_all(conn, run_id)
                 first = conn.execute("select count(*) as n from models.runs where status = 'ok'").fetchone()["n"] == 0
-                report["alerts"] = {"challengers": alerts.challengers(conn, "baseline" if first else "open"),
-                                    "new_best": alerts.new_best(conn, run_id), "unranked": alerts.unranked(conn),
-                                    "billing": alerts.billing(conn),
-                                    "tiers": alerts.tiers(conn, run_id),
-                                    "postes": alerts.postes(conn),
+                chg = changes.events(conn)  # notifications are about what changed since the previous cycle
+                report["changes"] = {k: sorted(v)[:30] for k, v in chg.items()}
+                report["alerts"] = {"challengers": alerts.challengers(conn, "baseline" if first else "open", chg=chg),
+                                    "new_best": alerts.new_best(conn, run_id, chg), "unranked": alerts.unranked(conn),
+                                    "tiers": alerts.tiers(conn, run_id, chg),
+                                    "nerfs": alerts.nerfs(conn, run_id, chg),
+                                    "pareto": alerts.pareto(conn, run_id, chg),
                                     "stale": alerts.stale_sources(conn)}
                 report["pruned_snapshots"] = collect.prune(conn)
                 conn.execute("update models.runs set status = 'ok', finished_at = now(), summary = %s::jsonb where run_id = %s",
@@ -217,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("alert_id", type=int)
     v.add_argument("decision", choices=("adopted", "dismissed"))
     v.add_argument("--note")
+    v.add_argument("--role", help="with a short number covering several roles: only this one")
     sub.add_parser("status")
     sub.add_parser("health", help="exit 1 when the router is not fed or not usable")
     pr = sub.add_parser("probe", help="tiny live call per provider (Kie, OpenRouter, Arnict)")
@@ -325,7 +328,7 @@ def main(argv: list[str] | None = None) -> int:
                 rows = conn.execute("select * from models.alerts order by alert_id").fetchall() if args.all else alerts.pending(conn)
                 out = rows
             else:
-                out = alerts.verdict(conn, args.alert_id, args.decision, args.note)
+                out = alerts.verdict(conn, args.alert_id, args.decision, args.note, args.role)
             conn.commit()
     json.dump(out, sys.stdout, indent=1, ensure_ascii=False, default=str)
     print()

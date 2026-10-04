@@ -78,7 +78,12 @@ def test_challenger_flow_baseline_then_new_then_adopt(conn):
     assert not [a for a in alerts.pending(conn) if a["kind"] == "challenger" and a["task"] == "3d"]
     # A model overtaking later is 'open' and gets rendered for Telegram.
     conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d' and subject = 'gpt-6-astra'")
-    assert "3d:default:gpt-6-astra" in alerts.challengers(conn, "open", only_task="3d")
+    # an UNCHANGED better model is not news; a new (or cheaper) one is
+    still = {"new": {}, "nerf": {}, "price_drop": {}}
+    assert alerts.challengers(conn, "open", only_task="3d", chg=still) == []
+    conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d' and subject = 'gpt-6-astra'")
+    news = {"new": {"gpt-6-astra": ["nouveau sur da_models:3d"]}, "nerf": {}, "price_drop": {}}
+    assert "3d:default:gpt-6-astra" in alerts.challengers(conn, "open", only_task="3d", chg=news)
     pend = [a for a in alerts.pending(conn) if a["task"] == "3d"]
     assert pend and "dépasse" in alerts.render(pend, conn)
     # Monsieur adopts it: it becomes the pinned favourite.
