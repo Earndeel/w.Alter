@@ -88,14 +88,17 @@ def _load(d: Path, state: str, domain: str) -> Skill:
                  tags=fm.get("tags", ""), body=text, meta=read_sidecar(d))
 
 
-def iter_skills(include_archived: bool = False, include_drafts: bool = False):
-    if SKILLS.exists():
-        for md in sorted(SKILLS.rglob("SKILL.md")):
-            rel = md.parent.relative_to(SKILLS)
+def iter_skills(include_archived: bool = False, include_drafts: bool = False, root: Path | None = None):
+    """Skills of the store at `root` (default: the live store; a git worktree for curator branches)."""
+    root = root or ROOT
+    skills_dir, archive_dir, drafts_dir = root / "skills", root / "archive", root / "drafts"
+    if skills_dir.exists():
+        for md in sorted(skills_dir.rglob("SKILL.md")):
+            rel = md.parent.relative_to(skills_dir)
             if set(rel.parts) & IGNORED_PARTS:
                 continue
             yield _load(md.parent, "active", "/".join(rel.parts[:-1]))
-    for base, state, wanted in ((ARCHIVE, "archived", include_archived), (DRAFTS, "draft", include_drafts)):
+    for base, state, wanted in ((archive_dir, "archived", include_archived), (drafts_dir, "draft", include_drafts)):
         if wanted and base.exists():
             for d in sorted(p for p in base.iterdir() if (p / "SKILL.md").exists()):
                 yield _load(d, state, read_sidecar(d).get("domain", ""))
@@ -105,17 +108,20 @@ def find(name: str, include_archived: bool = True) -> Skill | None:
     return next((s for s in iter_skills(include_archived=include_archived) if s.name == name), None)
 
 
-def git(*args: str, check: bool = True) -> str:
-    r = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, check=check)
+def git(*args: str, check: bool = True, root: Path | None = None) -> str:
+    r = subprocess.run(["git", "-C", str(root or ROOT), *args], capture_output=True, text=True, check=check)
     return r.stdout.strip()
 
 
-def commit(message: str, paths: list[str] | None = None, author: str = "walter-skills") -> str | None:
-    paths = [p for p in (paths or ["skills", "archive", "drafts"]) if (ROOT / p).exists()]
+def commit(message: str, paths: list[str] | None = None, author: str = "walter-skills",
+           root: Path | None = None) -> str | None:
+    root = root or ROOT
+    paths = [p for p in (paths or ["skills", "archive", "drafts"]) if (root / p).exists()]
     if not paths:
         return None
-    git("add", "-A", *paths)
-    if not git("status", "--porcelain", *paths):
+    git("add", "-A", *paths, root=root)
+    if not git("status", "--porcelain", *paths, root=root):
         return None
-    git("-c", f"user.name={author}", "-c", "user.email=walter-skills@localhost", "commit", "-q", "-m", message)
-    return git("rev-parse", "HEAD")
+    git("-c", f"user.name={author}", "-c", "user.email=walter-skills@localhost", "commit", "-q", "-m", message,
+        root=root)
+    return git("rev-parse", "HEAD", root=root)
