@@ -1,0 +1,49 @@
+{
+ "name": "ponytail",
+ "sha": "7b1d7164954f463cd9c012e79dd18f02eb4bb8fae66ecd339722bbd1741c5766",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000440649,
+ "summary": "Use when a Hephaestus coding task needs the smallest working implementation, favoring YAGNI, reuse, stdlib, and concise code.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Dans Hephaestus, code ça au plus simple.",
+  "Fix ce bug sans rajouter une usine à gaz.",
+  "Ecris un petit script pour faire ça, minimal si possible.",
+  "On peut éviter cette feature ? Vérifie si elle est vraiment nécessaire avant de coder.",
+  "Cherche d'abord si on a déjà un truc réutilisable dans le repo.",
+  "Fais-le sans nouvelle dépendance si la stdlib suffit.",
+  "Tu peux réduire cette implémentation ? Garde juste ce qui sert.",
+  "Pour cette tâche de code, privilégie une fonction simple plutôt qu'une classe.",
+  "Ajoute juste le nécessaire, pas de framework ou d'abstraction en plus.",
+  "Passe en `/ponytail ultra` pour ce ticket : une ligne si ça suffit, zéro blabla.",
+  "Désactive Ponytail avec `/ponytail off` pour cette tâche.",
+  "Le code proposé est trop compliqué pour ce besoin ; reprends-le en mode minimal, sans sacrifier les tests ni la sécurité."
+ ],
+ "intents_en": [
+  "Keep the implementation minimal.",
+  "Can we solve this without adding a dependency?",
+  "Check for reusable code before writing anything.",
+  "Use `/ponytail ultra` for this task.",
+  "Turn Ponytail off for this task."
+ ],
+ "entities": [
+  "Hephaestus",
+  "super_coder",
+  "Ponytail",
+  "/ponytail ultra",
+  "/ponytail off",
+  "YAGNI",
+  "pxpipe-planning-proxy",
+  "FastAPI",
+  "React",
+  "hephaestus/skills/software-development/ponytail/"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "W.Alter orchestrator sessions; Ponytail must never be loaded there.",
+  "Security decisions that would weaken auth, validation, or sanitization.",
+  "Skipping data-integrity work, error handling, or tests in the name of minimalism.",
+  "Planning or compressing prompts for the Fable 5 → DeepSeek pipeline."
+ ]
+}

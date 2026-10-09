@@ -1,0 +1,72 @@
+{
+ "name": "stripe-checkout-automation",
+ "sha": "e674ae68ad556095c406bc5f1788d260a09cf710b470585e024a65bee254367a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000669042,
+ "summary": "Use when adding a payment card to a Stripe Checkout flow, bypassing Link, filling Stripe Elements, or completing 3DS verification.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute ma carte sur Vast.ai, le checkout Stripe est ouvert.",
+  "Comment je passe par « Pay without Link » pour entrer une nouvelle carte ?",
+  "Mets à jour ma carte pour la facturation Anthropic.",
+  "Stripe garde l'ancienne carte Link, faut forcer la saisie de la nouvelle.",
+  "Tu peux remplir les champs de carte sur cette page de paiement Stripe ?",
+  "J'ai le checkout Claude ouvert pour acheter des crédits, ajoute la carte.",
+  "Le champ carte a l'air rempli mais le paiement échoue, tu peux vérifier la saisie ?",
+  "Stripe me demande un code 3DS, récupère-le dans Beeper et termine le flow.",
+  "Le checkout détecte la Thaïlande alors que ma carte est française : règle le pays avant de continuer.",
+  "La fenêtre Stripe ne s'ouvre plus quand je clique sur Add Card, on fait quoi ?",
+  "Ça reste bloqué sur Processing après l'ajout de la carte, regarde si elle a été tokenisée.",
+  "Le CDP Playwright ne répond pas ; utilise camoufox-max pour finir l'ajout de carte."
+ ],
+ "intents_en": [
+  "Add my card through Stripe Checkout.",
+  "Bypass Link and enter a new card.",
+  "Complete the Stripe 3DS verification.",
+  "Fix Stripe card fields that look filled but fail.",
+  "Use camoufox-max because Playwright CDP is down."
+ ],
+ "entities": [
+  "Stripe Checkout",
+  "Stripe Link",
+  "Stripe Elements",
+  "Playwright",
+  "CDP",
+  "camoufox-max",
+  "Vast.ai",
+  "Anthropic",
+  "Claude billing",
+  "Beeper",
+  "iMessage",
+  "vault",
+  "api.stripe.com",
+  "payment_methods",
+  "payment_pages",
+  "SetupIntent",
+  "9378",
+  "100.127.150.1:23373",
+  "#cardNumber",
+  "#cardExpiry",
+  "#cardCvc",
+  "#billingCountry",
+  "#one-time-code",
+  "vastai-billing-flow.md"
+ ],
+ "symptoms": [
+  "Card fields appear filled, but checkout silently fails on submit",
+  "Stripe checkout keeps showing a saved Link card",
+  "Checkout detects the wrong billing country",
+  "Add Card no longer opens Stripe after repeated attempts",
+  "Checkout remains on Processing",
+  "3DS verification asks for a code sent by SMS or iMessage",
+  "Playwright CDP is unreachable",
+  "Stripe checkout session expires or redirects back to the merchant"
+ ],
+ "not_for": [
+  "Changing a payment method in a non-Stripe billing flow",
+  "Debugging general Stripe API integrations or webhook code",
+  "Handling refunds, invoices, or subscription cancellations",
+  "Recovering account access unrelated to a Stripe checkout"
+ ]
+}

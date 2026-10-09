@@ -1,0 +1,67 @@
+{
+ "name": "hermes-desktop-host-header-pitfall",
+ "sha": "4db2b2a8e4f4b016840dd32c8b45d2844593c85b67b9aab8b8a028a5c32860cb",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0006366195,
+ "summary": "Use when Hermes v0.18.2+ on Mac returns 400 Invalid Host header for dashboard connections via Tailscale.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Depuis la mise à jour Hermes 0.18.2, mon app Mac affiche « Invalid Host header », tu peux corriger ça ?",
+  "J’ai un 400 sur le dashboard Hermes quand je me connecte depuis le Mac via Tailscale.",
+  "Avant ça marchait en Tailscale, maintenant Hermes refuse le Host : c’est quoi le fix propre ?",
+  "Le dashboard répond en local mais pas depuis mon app desktop. Le message parle du hostname auquel le serveur est bindé.",
+  "Tu peux mettre une allowlist pour mon IP Tailscale et mon nom MagicDNS, sans ouvrir le dashboard à tout le réseau ?",
+  "Je préfère garder Tailscale direct plutôt qu’un tunnel SSH : comment autoriser le Host correctement ?",
+  "On peut régler ça avec un tunnel SSH comme solution rapide, sans modifier le code du dashboard ?",
+  "J’ai ajouté HERMES_DASHBOARD_ACCEPTED_HOSTS mais j’ai toujours le 400, vérifie quel service systemd tourne vraiment.",
+  "Le Host passe maintenant, mais l’onglet chat a un 403 sur /api/ws. Est-ce encore le même problème ?",
+  "curl sur /api/status renvoie 200, mais /api/config renvoie 401 depuis le desktop, aide-moi à vérifier le token.",
+  "J’ai redémarré Hermes mais on dirait qu’il utilise encore l’ancien code Python ou l’ancienne config.",
+  "Vérifie le service qui écoute sur 8787 et corrige le rejet Host sans désactiver l’auth ni tuer un PID au hasard."
+ ],
+ "intents_en": [
+  "Fix the Hermes Mac desktop Invalid Host header error after v0.18.2.",
+  "Allow my Tailscale hostname without binding the dashboard to 0.0.0.0.",
+  "Set up an SSH tunnel as a workaround for the dashboard Host check.",
+  "The Host check passes but the dashboard WebSocket returns 403.",
+  "Check which systemd dashboard service owns port 8787 and apply the allowlist."
+ ],
+ "entities": [
+  "Hermes",
+  "Hermes v0.18.2",
+  "Mac desktop app",
+  "Hermes dashboard",
+  "Tailscale",
+  "MagicDNS",
+  "SSH tunnel",
+  "Host header",
+  "HERMES_DASHBOARD_ACCEPTED_HOSTS",
+  "HERMES_DASHBOARD_SESSION_TOKEN",
+  "_is_accepted_host()",
+  "_ws_host_origin_reason()",
+  "systemd",
+  "hermes-dashboard.service",
+  "systemctl --user",
+  "journalctl",
+  "curl",
+  "ss",
+  "port 8787",
+  "/api/status",
+  "/api/config",
+  "/api/ws"
+ ],
+ "symptoms": [
+  "400: Invalid Host header. Dashboard requests must use the hostname the server was bound to.",
+  "Mac desktop app dashboard connection fails after upgrading to Hermes v0.18.2 or later.",
+  "Tailscale connection fails with a non-loopback Host header while the dashboard is bound to loopback.",
+  "WebSocket /api/ws returns 403 after the Host allowlist is configured.",
+  "/api/status returns 200 but the protected /api/config route returns 401.",
+  "Dashboard behavior does not change after a source edit or service environment update."
+ ],
+ "not_for": [
+  "General Hermes desktop connection debugging or its full decision tree.",
+  "Recovering or troubleshooting an SSH or Tailscale tunnel unrelated to Host validation.",
+  "Bypassing dashboard session-token authentication or making the dashboard publicly bind to 0.0.0.0."
+ ]
+}

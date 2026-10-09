@@ -1,0 +1,70 @@
+{
+ "name": "tui-ink-modifications",
+ "sha": "c92de805d3cea2b04474241b6138207739e18a2e12bc2c2687334c09d1df85f1",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00068921325,
+ "summary": "Use when modifying or debugging Hermes TUI Ink/React rendering, tool trails, thinking display, emojis, or customized UI files.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Modifie le rendu du thinking dans le TUI pour que ca reste dans le meme flux que les tools.",
+  "Les appels tools s'affichent dans des panneaux separes, je veux un feed continu avec les elbows.",
+  "Ajoute les emojis CLI aux lignes des tools termines, pas juste pendant leur execution.",
+  "Enleve les tokens et les durees du trail, je veux juste le contenu et les tools.",
+  "Pourquoi j'ai deux lignes drafting pour le meme tool ? Corrige le rendu.",
+  "Fais un arbre avec les blocs de thinking et les tools dessous, avec ├─ et └─.",
+  "Le gateway n'envoie pas les emojis dans tool.start, tu peux corriger ca avec les overrides du skin ?",
+  "Attention aux modifs du TUI : ne restaure pas les fichiers avec git checkout, j'ai mes personnalisations.",
+  "J'ai change thinking.tsx et text.ts, comment rebuild le TUI pour que le nouveau bundle soit charge ?",
+  "Les tools restent separes du thinking alors que liveProgress est cense les merger, regarde d'ou vient la barriere.",
+  "Explique-moi ce que veut dire Σ ~125 total dans le TUI, ne change rien pour l'instant.",
+  "J'ai modifie le rendu mais l'ancien affichage reste apres le build, quoi verifier et comment relancer sans tuer mes autres sessions ?"
+ ],
+ "intents_en": [
+  "Keep thinking and tools in one continuous TUI feed.",
+  "Add CLI-style emojis to completed tool trail lines.",
+  "Remove token counts and execution times from the TUI.",
+  "Fix duplicate drafting entries for tool calls.",
+  "Rebuild Hermes TUI safely without losing customizations."
+ ],
+ "entities": [
+  "Hermes TUI",
+  "Ink",
+  "React",
+  "ui-tui/src/components/thinking.tsx",
+  "ui-tui/src/components/text.ts",
+  "ui-tui/src/components/turnController.ts",
+  "ui-tui/src/components/messageLine.tsx",
+  "ui-tui/src/components/types.ts",
+  "ui-tui/src/components/liveProgress.ts",
+  "ui-tui/src/components/createGatewayEventHandler.ts",
+  "ui-tui/src/components/details.ts",
+  "ui-tui/src/components/appLayout.tsx",
+  "ui-tui/src/components/branding.tsx",
+  "ui-tui/src/components/appChrome.tsx",
+  "ui-tui/src/theme.ts",
+  "ui-tui/src/domain/roles.ts",
+  "tui_gateway/server.py",
+  "~/.hermes/skins/<name>.yaml",
+  "dist/entry.js",
+  "buildToolTrailLine",
+  "appendToolShelfMessage",
+  "canHoldToolShelf",
+  "tool.start",
+  "tool.generating",
+  "hermes --tui"
+ ],
+ "symptoms": [
+  "Thinking and tools appear in separate panels instead of one continuous feed.",
+  "A tool appears twice, including a duplicate drafting entry.",
+  "Completed tool trail lines have no emoji.",
+  "Token counts such as Σ ~125 total or execution times such as (2.1s) appear in the feed.",
+  "TUI changes do not appear after a build or relaunch."
+ ],
+ "not_for": [
+  "Changing Hermes agent behavior or tool execution logic unrelated to TUI rendering.",
+  "Explaining a displayed label or metric when no code change is requested.",
+  "General Hermes installation, upgrade, or configuration tasks outside the TUI.",
+  "Redesigning unrelated web or desktop interfaces."
+ ]
+}

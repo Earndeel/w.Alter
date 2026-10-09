@@ -1,0 +1,63 @@
+{
+ "name": "kie-gpt-image-25",
+ "sha": "498bca0df6fe3cdec487705e3397b3de4990a0a3c52ba62690b853878898f77f",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00061001325,
+ "summary": "Use when Monsieur asks about GPT Image 2.5 availability, API paths or payloads, or using it through Kie.ai or Scena.",
+ "kind": "integration",
+ "intents_fr": [
+  "Kie propose déjà GPT Image 2.5 ou pas ?",
+  "C'est quoi le vrai model ID pour appeler GPT Image 2.5 chez Kie ?",
+  "Tu peux vérifier les model paths GPT Image sur l'API Kie ?",
+  "Fais-moi le payload Kie pour générer une image avec GPT Image 2.5 en 16:9.",
+  "Comment je passe mes images de référence à GPT Image 2.5 via Kie ?",
+  "Scena me laisse pas choisir GPT Image 2.5, tu peux regarder d'où ça vient ?",
+  "J'ai une erreur avec GPT Image 2.5 dans Scena, c'est Kie qui le supporte pas ?",
+  "On peut ajouter les routes GPT Image 2.5 dans l'adapter Kie de Scena ?",
+  "Mets à jour le schema pour envoyer aussi resolution et background, pas juste aspect_ratio.",
+  "Je veux du PNG transparent en 2K, quels champs et quelles contraintes côté Kie ?",
+  "Ne change pas mon prompt, branche-le tel quel à GPT Image 2.5 chez Kie.",
+  "Avant qu'on touche à l'intégration, vérifie la doc API actuelle et les IDs exacts stp."
+ ],
+ "intents_en": [
+  "Check GPT Image 2.5 availability on Kie",
+  "What is the correct Kie model path?",
+  "Build a GPT Image 2.5 request payload",
+  "Why does GPT Image 2.5 fail in Scena?",
+  "Add Kie GPT Image 2.5 routes to Scena"
+ ],
+ "entities": [
+  "Kie.ai",
+  "Scena",
+  "GPT Image 2.5",
+  "GPT Image 2",
+  "https://api.kie.ai/api/v1/playground/model-paths",
+  "https://kie.ai/gpt-image-2-5",
+  "gpt-image-2-5-flare-text-to-image",
+  "gpt-image-2-5-flare-image-to-image",
+  "gpt-image-2-5-sunburst-text-to-image",
+  "gpt-image-2-5-sunburst-image-to-image",
+  "gpt-image-2-text-to-image",
+  "gpt-image-2-image-to-image",
+  "input_urls",
+  "aspect_ratio",
+  "resolution",
+  "background",
+  "Flare",
+  "Sunburst"
+ ],
+ "symptoms": [
+  "Scena ne propose que les routes GPT Image 2",
+  "GPT Image 2.5 échoue via Scena alors que Kie le liste",
+  "L'adapter ignore resolution ou background",
+  "Le payload image-to-image n'envoie pas input_urls",
+  "Un appel utilise le model ID générique gpt-image-2.5"
+ ],
+ "not_for": [
+  "Intégrer GPT Image 2.0 sans demande de compatibilité avec la version 2.5",
+  "Générer des images avec un autre fournisseur que Kie.ai",
+  "Améliorer ou réécrire un prompt sans demande liée à l'intégration Kie",
+  "Diagnostiquer une erreur Playground sans obtenir son message exact"
+ ]
+}

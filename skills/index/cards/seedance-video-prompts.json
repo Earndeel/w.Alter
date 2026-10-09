@@ -1,0 +1,54 @@
+{
+ "name": "seedance-video-prompts",
+ "sha": "995d1e6d94ebb8c139c5c7dd1283259777973023457b9d1ab5f0c3390349b26f",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005762295,
+ "summary": "Use when Monsieur veut écrire ou structurer un prompt Jimeng Seedance 2.0 avec scènes, caméra, durée, audio et références @.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi un prompt Seedance pour une pub vidéo de mon produit.",
+  "Comment je dois structurer un prompt Jimeng Seedance 2.0 ?",
+  "J’ai 3 images et une vidéo de référence, aide-moi à faire un prompt avec les @.",
+  "Tu peux me rédiger un prompt pour une vidéo de danse calée sur la musique ?",
+  "Mon prompt Seedance part dans tous les sens, tu peux le rendre plus clair avec un découpage par secondes ?",
+  "Je veux prolonger cette vidéo de 10 secondes avec une fin où on voit le logo.",
+  "Fais un prompt pour reprendre les mouvements de caméra de @Video1, mais avec mon personnage de @Image1.",
+  "Comment faire un plan-séquence dans Seedance, sans cuts ?",
+  "J’ai une image du produit et un audio, écris-moi un prompt pour un showcase de 8 secondes.",
+  "Ça me dit que mes références sont pas claires : comment préciser le rôle de chaque image et vidéo ?",
+  "Je veux une petite vidéo éducative sur le fonctionnement de mon service, avec un rendu ciné et une voix calme.",
+  "Le prompt doit tenir compte de mes fichiers et de la durée choisie, tu peux vérifier les limites Seedance ?"
+ ],
+ "intents_en": [
+  "Write a Jimeng Seedance prompt for a product ad.",
+  "Help me assign roles to my @ image and video references.",
+  "Create a timed Seedance prompt for a 15-second clip.",
+  "Prompt a one-take tracking shot in Seedance 2.0.",
+  "Adapt my video prompt to match music beats."
+ ],
+ "entities": [
+  "Jimeng",
+  "ByteDance",
+  "Seedance 2.0",
+  "@Image1",
+  "@Video1",
+  "@Audio1",
+  "image references",
+  "video references",
+  "audio references",
+  "first frame",
+  "camera movement",
+  "video extension",
+  "BGM",
+  "sound effects",
+  "beat-synced transitions"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Lancer une génération vidéo ou appeler l’API Seedance.",
+  "Monter ou retoucher directement un fichier vidéo existant.",
+  "Écrire des prompts pour un autre générateur vidéo sans besoin spécifique de Seedance.",
+  "Créer une image fixe plutôt qu’une vidéo."
+ ]
+}

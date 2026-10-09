@@ -1,0 +1,58 @@
+{
+ "name": "smm-panel-integration",
+ "sha": "eb1ebc38c941f834f3fe6353309f59c024130649951110f161c7bfdb8e89e4dc",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000425502,
+ "summary": "Use when Monsieur veut commander ou suivre des vues, likes ou followers via SMMFlare ou une API de panel SMM.",
+ "kind": "integration",
+ "intents_fr": [
+  "Tu peux me booster cette video TikTok avec des vues ?",
+  "Comment commander des followers Instagram avec SMMFlare ?",
+  "Check le solde de mon panel SMM stp",
+  "J'ai passe une commande de likes, tu peux voir ou ca en est ?",
+  "Liste-moi les services disponibles pour YouTube sur ce panel",
+  "Mon ordre est toujours en cours, comment verifier son statut ?",
+  "Tu peux automatiser mes campagnes de vues avec l'API SMMFlare ?",
+  "J'ai besoin de relancer un refill, le nombre de followers a baisse",
+  "C'est quoi le bon service ID pour acheter des vues TikTok ?",
+  "Fais-moi un wrapper MCP pour passer des commandes sur mon panel",
+  "Pourquoi mon appel API balance ne marche pas ?",
+  "Je veux commander des commentaires personnalisés, quels paramètres il faut envoyer ?"
+ ],
+ "intents_en": [
+  "Order TikTok views through an SMM panel",
+  "Check my SMMFlare order status",
+  "List available Instagram follower services",
+  "Check the panel API balance",
+  "Build an MCP wrapper for the SMM panel"
+ ],
+ "entities": [
+  "SMMFlare",
+  "SMM Heaven",
+  "JustAnotherPanel",
+  "PerfectPanel",
+  "SmartPanel",
+  "SMM panel",
+  "API v2",
+  "/api/v2",
+  "services",
+  "add",
+  "status",
+  "balance",
+  "refill",
+  "refill_status",
+  "cancel",
+  "TikTok",
+  "Instagram",
+  "YouTube",
+  "MCP"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Planning organic social media content or engagement",
+  "Running official TikTok, Instagram, or YouTube ads",
+  "Writing or editing social media posts",
+  "Integrating unrelated APIs or payment providers"
+ ]
+}

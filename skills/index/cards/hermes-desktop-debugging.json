@@ -1,0 +1,73 @@
+{
+ "name": "hermes-desktop-debugging",
+ "sha": "beff5c1d6a9ca327a442ad318227bcff476e689120686b2df147c2851ebf6739",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000626967,
+ "summary": "Use when diagnosing Hermes V2 macOS desktop white screens, failed connections, auth loops, or unstable remote sessions.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Hermes Desktop reste sur un écran blanc au lancement, tu peux diagnostiquer ?",
+  "J'ai une 401 dans l'app Hermes, tu peux vérifier le token et la config ?",
+  "Le desktop dit connection refused alors que le dashboard répond, on regarde quoi ?",
+  "Hermes alterne ready, offline, connecting puis checking, aide-moi à trouver pourquoi.",
+  "Je viens de changer connection.json et l'app ne se connecte plus au serveur.",
+  "Tu peux m'aider à configurer Hermes Desktop sur mon Mac pour qu'il passe par Tailscale ?",
+  "J'ai un timeout did not become ready, c'est le Host header ou le proxy ?",
+  "Le dashboard est en restart loop depuis que j'ai touché public_url, comment je remets ça propre ?",
+  "J'ai modifié le code du dashboard : comment le redémarrer sans tuer ma session ?",
+  "Le tunnel SSH marche, mais dès que le Mac se met en veille Hermes perd la connexion.",
+  "Les requêtes API renvoient 200 mais l'app desktop décroche au bout d'un moment, tu peux investiguer les websockets ?",
+  "Je vois un auth loop au boot de Hermes V2, vérifie les logs, le bundle et les tokens sans les afficher."
+ ],
+ "intents_en": [
+  "Debug a blank Hermes Desktop window on macOS.",
+  "Fix a Hermes Desktop 401 or authentication loop.",
+  "Investigate why the desktop keeps going offline.",
+  "Check Hermes remote connectivity and proxy setup.",
+  "Restart the dashboard safely after a code change."
+ ],
+ "entities": [
+  "Hermes V2",
+  "Hermes Desktop",
+  "Electron",
+  "hermes serve",
+  "connection.json",
+  "connections.json",
+  "HERMES_DESKTOP_REMOTE_URL",
+  "HERMES_DESKTOP_REMOTE_TOKEN",
+  "X-Hermes-Session-Token",
+  "_SESSION_TOKEN",
+  "dashboard.public_url",
+  "HERMES_DASHBOARD_ACCEPTED_HOSTS",
+  "hermes-dashboard.service",
+  "systemd-run",
+  "dash-reload-helper",
+  "launchctl",
+  "Tailscale",
+  "SSH tunnel",
+  "127.0.0.1:9119",
+  "127.0.0.1:8787",
+  "8788",
+  "/api/status",
+  "references/commands.md",
+  "references/server-config.md"
+ ],
+ "symptoms": [
+  "White screen on launch",
+  "Connection refused",
+  "401 Unauthorized",
+  "Auth loop or boot failure",
+  "did not become ready timeout",
+  "ready → offline → connecting → checking cycle",
+  "Dashboard restart loop",
+  "WebSocket closes after a fixed interval",
+  "Dashboard port held by a zombie process"
+ ],
+ "not_for": [
+  "General Hermes agent or TUI usage questions",
+  "Building or packaging the Electron app beyond diagnosing missing bundled assets",
+  "Designing a new public reverse-proxy or authentication architecture",
+  "Debugging unrelated server applications or services"
+ ]
+}

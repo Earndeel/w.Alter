@@ -1,0 +1,73 @@
+{
+ "name": "cloudflare-named-tunnel-setup",
+ "sha": "fdf97c2543c6548bccb7cc58161be1a7be26615bfcbce376550c9f61fda9933b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00069540075,
+ "summary": "Use when exposing local apps through Cloudflare Named Tunnels, routing custom domains, persisting tunnels with systemd, or troubleshooting connectivity.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Expose mon app Flask sur app.walter-ai.cloud avec un tunnel Cloudflare permanent.",
+  "Ajoute mon nouveau service sur le tunnel existant, il écoute sur le port 6767.",
+  "Je veux router api.mondomaine.fr et dashboard.mondomaine.fr vers deux ports différents avec un seul tunnel.",
+  "Le quick tunnel change d’URL à chaque redémarrage, comment avoir une URL fixe ?",
+  "Configure le tunnel pour qu’il redémarre tout seul après un reboot du serveur.",
+  "Tu peux créer le named tunnel via l’API Cloudflare et mettre les DNS CNAME qui vont avec ?",
+  "J’ai modifié config.yml, faut redémarrer quel service systemd déjà ?",
+  "Mon domaine renvoie une 530 alors que le tunnel a l’air connecté, tu peux diagnostiquer ?",
+  "J’ai une 522 sur le nouveau sous-domaine, c’est le DNS du tunnel qui n’a pas propagé ?",
+  "J’ai une 403 Vite « Blocked request. This host is not allowed » derrière le tunnel, on corrige ça où ?",
+  "Je déplace mon app vers un nouveau hostname : fais le changement sans couper l’ancien tout de suite.",
+  "wrangler tunnel route dns ne marche pas : quelle est la bonne méthode pour relier le sous-domaine au tunnel ?"
+ ],
+ "intents_en": [
+  "Set up a permanent Cloudflare tunnel for my local app.",
+  "Route two hostnames to different local ports through one tunnel.",
+  "Add this app to the existing tunnel and create its DNS record.",
+  "Make the tunnel start automatically with systemd.",
+  "Troubleshoot a 530 or 522 from my Cloudflare tunnel."
+ ],
+ "entities": [
+  "Cloudflare Named Tunnel",
+  "cloudflared",
+  "Cloudflare API",
+  "Cloudflare API token",
+  "Cloudflare account_id",
+  "Cloudflare zone_id",
+  "cfargotunnel.com",
+  "trycloudflare.com",
+  "DNS CNAME",
+  "ingress rules",
+  "tunnel_secret",
+  "tunnel JWT",
+  "systemd",
+  "cloudflared-tunnel.service",
+  "cloudflared.service",
+  "/root/.cloudflared/config.yml",
+  "/root/.cloudflared/<tunnel_id>.json",
+  "cloudflared tunnel ingress validate",
+  "cloudflared tunnel --url",
+  "wrangler tunnel",
+  "Vite",
+  "vite.config.js",
+  "ExcaliDash",
+  "MiroShark",
+  "walter-ai.cloud"
+ ],
+ "symptoms": [
+  "HTTP 530: tunnel connected but origin unavailable",
+  "HTTP 522 while DNS propagates",
+  "HTTP 000 immediately after creating a DNS record",
+  "Vite returns 403: Blocked request. This host is not allowed.",
+  "Quick tunnel URL changes after restart",
+  "cloudflared reports invalid ingress configuration because the catch-all is not last",
+  "Tunnel fails to start because credentials are missing or empty",
+  "cloudflared tunnel run --token rejects a Cloudflare API token"
+ ],
+ "not_for": [
+  "General Cloudflare DNS changes unrelated to routing traffic through a tunnel",
+  "Deploying an app or fixing its code without configuring tunnel access",
+  "Setting up Cloudflare Workers or Pages hosting",
+  "Troubleshooting domain registration, email, or unrelated website hosting"
+ ]
+}

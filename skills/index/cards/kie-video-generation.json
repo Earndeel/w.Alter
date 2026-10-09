@@ -1,0 +1,65 @@
+{
+ "name": "kie-video-generation",
+ "sha": "acd0c90f664de9e5030b1231fb3a70c8223c34e423ab1eedf41a48cab2306318",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008722395,
+ "summary": "Use when Monsieur wants to generate, extend, upscale, or integrate video creation through Kie.ai models and its unified task API.",
+ "kind": "integration",
+ "intents_fr": [
+  "Fais une vidéo avec Seedance 2.0 à partir de ce prompt.",
+  "Tu peux me brancher l’API Kie.ai pour générer des vidéos depuis Scena ?",
+  "Seedance Fast serait moins cher pour nos clips, tu peux adapter l’intégration ?",
+  "J’ai une image produit, génère-moi une vidéo avec Kling en image-to-video.",
+  "Comment je récupère le résultat de la task Kie une fois qu’elle est lancée ?",
+  "La génération reste en pending, tu peux vérifier le polling et le callback Kie.ai ?",
+  "Compare le coût de Kling sur Kie et Fal avant qu’on choisisse le provider.",
+  "J’ai un 404 sur getTaskDetail avec ce modèle Kie, c’est quel endpoint qu’il faut utiliser ?",
+  "On peut tester Hailuo ou Wan pour cette vidéo plutôt que Seedance ?",
+  "Configure la clé KIE_API_KEY dans le Worker scena-api, sans la mettre dans le code.",
+  "Ajoute Sora2 en text-to-video dans notre intégration Kie, avec récupération de l’URL finale.",
+  "Mon appel createTask échoue : vérifie le payload, les paramètres du modèle et les règles d’exclusivité."
+ ],
+ "intents_en": [
+  "Generate a video with Seedance via Kie.ai.",
+  "Integrate Kie.ai video tasks into Scena.",
+  "Poll a Kie.ai task and fetch its result URL.",
+  "Compare Kie.ai and Fal pricing for Kling.",
+  "Set up the Kie API key for the Worker."
+ ],
+ "entities": [
+  "Kie.ai",
+  "api.kie.ai",
+  "createTask",
+  "getTaskDetail",
+  "recordInfo",
+  "callBackUrl",
+  "KIE_API_KEY",
+  "vault get kie/api_key",
+  "wrangler",
+  "scena-api",
+  "Seedance 2.0",
+  "Seedance 2.0 Fast",
+  "Kling",
+  "Hailuo",
+  "Wan",
+  "Sora2",
+  "Grok Imagine",
+  "scripts/test.py",
+  "scripts/check-credits.sh",
+  "Fal.ai"
+ ],
+ "symptoms": [
+  "getTaskDetail returns 404 for a Market model",
+  "Kie task remains pending or result URL is missing",
+  "Task creation fails due to invalid or mutually exclusive parameters",
+  "401 Unauthorized from api.kie.ai",
+  "Video generation request fails or returns an unexpected task state"
+ ],
+ "not_for": [
+  "Generating or editing still images with GPT Image 2",
+  "Integrating chat or LLM models through Kie.ai",
+  "Choosing a video concept or writing a creative prompt without API work",
+  "Integrating video generation through Fal.ai rather than Kie.ai"
+ ]
+}

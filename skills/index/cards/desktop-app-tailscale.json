@@ -1,0 +1,60 @@
+{
+ "name": "desktop-app-tailscale",
+ "sha": "3d30e19df0efb274f1f8ae83e09cfeafff3e3d5ab8505e54a120185b2507066c",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000451935,
+ "summary": "Use when connecting an Electron desktop app to a backend API over Tailscale and fixing host, token, persistence, or sleep issues.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Branche mon app Electron sur l'API du serveur via Tailscale, sans tunnel SSH.",
+  "Le backend répond en localhost mais pas depuis mon app sur le Mac, tu peux checker le Host header ?",
+  "Mets en place tailscale serve pour exposer le port de l'API à mon desktop app.",
+  "Après la veille du laptop, la connexion tombe et l'app essaie de lancer le backend en local. On règle ça avec Tailscale ?",
+  "Le status endpoint passe par le hostname Tailscale, mais l'endpoint protégé me renvoie 401.",
+  "Aligne le token d'auth entre mon Electron et le service systemd, je pense qu'ils n'ont pas la même valeur.",
+  "J'ai mis les env vars pour l'URL distante et le token, mais elles disparaissent au reboot. Il faut les persister comment ?",
+  "Pourquoi le serveur rejette le hostname MagicDNS alors que localhost marche ?",
+  "Configure l'accès distant à l'API via Tailscale serve et vérifie les endpoints avec et sans token.",
+  "Mon app retombe sur le spawn local quand le SSH tunnel meurt ; passe-la sur une URL Tailscale stable.",
+  "J'ai relancé l'app après avoir fait launchctl setenv et elle ne voit toujours pas le token, tu regarderais quoi ?",
+  "Vérifie tailscale serve, le port backend et la validation du hostname : l'API est inaccessible depuis le desktop."
+ ],
+ "intents_en": [
+  "Connect my Electron app to the backend over Tailscale.",
+  "Fix MagicDNS Host header rejection.",
+  "Persist the remote URL and auth token environment variables.",
+  "Replace the SSH tunnel with Tailscale serve.",
+  "Debug backend access after laptop sleep."
+ ],
+ "entities": [
+  "Electron",
+  "Tailscale",
+  "Tailscale Serve",
+  "MagicDNS",
+  "tailnet",
+  "backend API",
+  "SSH tunnel",
+  "systemd",
+  "launchctl",
+  "macOS",
+  "zshenv",
+  ".bash_profile",
+  "Host header",
+  "auth token",
+  "localhost"
+ ],
+ "symptoms": [
+  "Backend works on localhost but rejects the Tailscale hostname.",
+  "Protected endpoint returns 401 because the client token is missing or mismatched.",
+  "SSH tunnel dies after laptop sleep and the app falls back to local process spawning.",
+  "Tailscale Serve is not running or the configured port is unreachable.",
+  "Environment variables disappear after relaunch or reboot."
+ ],
+ "not_for": [
+  "Setting up general Tailscale networking or adding devices to a tailnet.",
+  "Building or debugging unrelated Electron UI features.",
+  "Deploying a backend without connecting it to a desktop app through Tailscale.",
+  "Designing general API authentication unrelated to aligning this app's token."
+ ]
+}

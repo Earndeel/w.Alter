@@ -1,0 +1,59 @@
+{
+ "name": "linear",
+ "sha": "bc2c40cb03304a797e254ed9a28d7ca5ee8f3ba076391930547d8d1d055c0a8a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000840807,
+ "summary": "Use when Monsieur veut consulter ou modifier des issues, projets, équipes, statuts, commentaires ou documents dans Linear.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Crée une issue Linear pour le bug de login, priorité haute.",
+  "Tu peux me dire où en est ENG-42 et qui s'en occupe ?",
+  "Passe cette issue en In Progress et assigne-la à Léa.",
+  "Cherche dans Linear les tickets qui parlent du SSO.",
+  "Liste-moi mes issues ouvertes, avec leur priorité.",
+  "Ajoute un commentaire à ENG-123 : j'ai trouvé la cause, je prépare un fix.",
+  "Mets ENG-42 en urgent et rattache-le au projet Auth Overhaul.",
+  "On a déjà un ticket pour le bug de paiement ? Cherche dans Linear.",
+  "Crée un projet Linear pour la refonte auth et associe l'équipe ENG.",
+  "C'est quoi les équipes et les statuts disponibles dans notre Linear ?",
+  "Retrouve le document RFC dont je t'ai envoyé l'URL, et résume son contenu.",
+  "Pour celle qu'on vient de regarder, change le statut en Done et ajoute le label regression."
+ ],
+ "intents_en": [
+  "Create a high-priority Linear issue for the login bug.",
+  "Show me the details and status of ENG-42.",
+  "Assign this issue to Léa and move it to In Progress.",
+  "Search Linear for issues about SSO.",
+  "Find the Linear doc from this URL."
+ ],
+ "entities": [
+  "Linear",
+  "Linear GraphQL API",
+  "https://api.linear.app/graphql",
+  "LINEAR_API_KEY",
+  "curl",
+  "scripts/linear_api.py",
+  "issues",
+  "projects",
+  "teams",
+  "workflow states",
+  "comments",
+  "labels",
+  "documents",
+  "ENG-123",
+  "issueCreate",
+  "issueUpdate",
+  "commentCreate",
+  "issueSearch",
+  "slugId",
+  "Linear personal API key"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Créer ou modifier des tickets dans GitHub, Jira ou un autre outil que Linear.",
+  "Gérer des événements ou des tâches dans un calendrier.",
+  "Rédiger un document sans le rechercher ou le gérer dans Linear.",
+  "Modifier du code ou déployer un projet."
+ ]
+}

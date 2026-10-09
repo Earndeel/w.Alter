@@ -106,9 +106,11 @@ def main() -> None:
 
     cases, cur = [], None
     prev_user, prev_assistant, prev_session = "", "", None
+    turn, opened = 0, {}  # skills opened earlier in the session -> turn index of the last opening
     for r in rows:
         if r["session_id"] != prev_session:
             prev_user, prev_assistant, prev_session = "", "", r["session_id"]
+            turn, opened = 0, {}
         if r["type"] == "assistant/message":
             if r["text"]:
                 prev_assistant = r["text"].strip()
@@ -119,7 +121,9 @@ def main() -> None:
             cur = {"session_id": r["session_id"], "seq": r["seq"], "at": r["occurred_at"].isoformat(),
                    "platform": r["platform"], "profile": r["profile"], "privacy_class": r["privacy_class"],
                    "query": (r["text"] or "").strip(), "gold": [],
-                   "context": {"prev_user": prev_user[-400:], "prev_assistant": prev_assistant[-600:]}}
+                   "context": {"prev_user": prev_user[-400:], "prev_assistant": prev_assistant[-600:]},
+                   "session_skills": {n: turn - t for n, t in opened.items()}}
+            turn += 1
             prev_assistant = ""
             cases.append(cur)
             continue
@@ -134,6 +138,8 @@ def main() -> None:
         name = by_alias.get(str(args.get("name", "")).strip())
         if name and name not in cur["gold"]:
             cur["gold"].append(name)
+        if name:
+            opened[name] = turn
 
     seen, kept, stats = set(), [], {"messages": len(cases)}
     for c in cases:

@@ -1,0 +1,58 @@
+{
+ "name": "scena-image-routing",
+ "sha": "a49dbfcdaa282a8da13d992373d72d1e983a5259004ea5c9e410311b57b2d4a7",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00037719,
+ "summary": "Use when choosing or configuring an image-generation provider for Scena, including model selection, pricing, and fallback after errors.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Pour Scena, tu prendrais Atlas ou Kie pour générer cette image ?",
+  "Fais-moi le routage image le moins cher, avec un fallback si Kie plante.",
+  "Kie.ai me renvoie une 402, bascule sur quoi ?",
+  "Je veux une génération rapide texte vers image, quel provider on utilise ?",
+  "Pour une image premium avec beaucoup de détails, route ça où ?",
+  "GPT-Image 2 en text-to-image, je passe par Atlas ou OpenAI direct ?",
+  "Et pour GPT-Image 2 avec une image de référence, tu recommandes quoi ?",
+  "Configure le pipeline Scena pour utiliser ERNIE en principal et gérer les indispos.",
+  "C'est quoi le plus adapté entre Z-Image et Atlas pour faire un portrait réaliste ?",
+  "Atlas Cloud a l'air async : rappelle-moi le flow de génération et le polling.",
+  "Tu peux comparer le prix et le délai de Kie.ai et Atlas pour une image ?",
+  "On ajoute un tenant Scena : choisis son provider image et récupère les clés via le vault, pas en dur."
+ ],
+ "intents_en": [
+  "Pick the best provider for Scena image generation.",
+  "Route this image request to the cheapest provider.",
+  "Kie.ai returned 402; what is the fallback?",
+  "Which provider should handle GPT-Image 2 image-to-image?",
+  "Configure image routing with a provider fallback chain."
+ ],
+ "entities": [
+  "Scena",
+  "Atlas Cloud",
+  "Kie.ai",
+  "Z-Image",
+  "PiAPI",
+  "ERNIE-Image-Turbo",
+  "GPT-Image 2",
+  "grok-imagine/image-to-video",
+  "grok-imagine/image-to-image",
+  "Seedance 2.0",
+  "Kling v2",
+  "vault get atlas/api_key",
+  "vault get kie/api_key",
+  "prediction/{id}"
+ ],
+ "symptoms": [
+  "Kie.ai returns 402",
+  "Kie.ai account has insufficient funds",
+  "Atlas Cloud image generation requires submit-and-poll",
+  "Image provider unavailable and a fallback is needed"
+ ],
+ "not_for": [
+  "Writing or editing image prompts without choosing a provider",
+  "Implementing video-generation workflows beyond selecting a listed image/video route",
+  "Managing API credentials or vault access unrelated to image-provider routing",
+  "Debugging image-generation quality issues unrelated to provider or model selection"
+ ]
+}

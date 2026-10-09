@@ -1,0 +1,67 @@
+{
+ "name": "outlines",
+ "sha": "8743f83557012c814566cf71bacd1c6c6ca7113a2b7814a8b026a17fe9915c69",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000871992,
+ "summary": "Use when building or debugging constrained LLM generation of JSON, regex, choices, or Pydantic-typed outputs with Outlines.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Comment je génère du JSON valide avec Outlines et un modèle local ?",
+  "Fais-moi un exemple Outlines avec un modèle Pydantic imbriqué.",
+  "Je veux forcer la réponse du LLM à être une des valeurs de cette liste, tu utiliserais quoi ?",
+  "Mon modèle renvoie parfois du JSON cassé. Comment contraindre la génération au niveau des tokens ?",
+  "Tu peux me montrer la génération regex avec Outlines pour valider un numéro de téléphone ?",
+  "Je cherche à extraire des champs typés d’un texte avec Pydantic et un modèle Transformers.",
+  "Comment brancher Outlines sur vLLM pour générer selon un schéma JSON en prod ?",
+  "J’ai une classification positive/négative/neutre à faire, je veux une sortie garantie dans ces choix.",
+  "Est-ce qu’Outlines sait générer des entiers, des floats et des objets JSON avec le même modèle ?",
+  "J’ai des sorties qui ne respectent pas mon schéma Pydantic, montre-moi comment configurer le générateur.",
+  "Pour mon pipeline d’extraction, je veux traiter plusieurs textes avec un schéma Pydantic. Tu peux me faire le pattern ?",
+  "On peut faire de la génération structurée avec mon modèle GGUF via llama.cpp et Outlines ?"
+ ],
+ "intents_en": [
+  "Generate schema-valid JSON with Outlines",
+  "Use Pydantic models for constrained LLM output",
+  "Constrain generation to a regex or choice list",
+  "Set up Outlines with vLLM",
+  "Debug malformed structured model output"
+ ],
+ "entities": [
+  "Outlines",
+  "outlines",
+  "outlines.generate.json",
+  "outlines.generate.choice",
+  "outlines.generate.regex",
+  "outlines.generate.integer",
+  "outlines.generate.float",
+  "outlines.models.transformers",
+  "outlines.models.llamacpp",
+  "outlines.models.vllm",
+  "outlines.models.openai",
+  "Pydantic",
+  "BaseModel",
+  "Field",
+  "JSON Schema",
+  "regex",
+  "Transformers",
+  "Hugging Face",
+  "llama.cpp",
+  "GGUF",
+  "vLLM",
+  "OpenAI"
+ ],
+ "symptoms": [
+  "Le modèle renvoie du JSON invalide ou mal formé",
+  "La sortie ne respecte pas le schéma attendu",
+  "Une classification renvoie une valeur hors de la liste autorisée",
+  "La génération ne respecte pas le format regex demandé",
+  "Les nombres ou champs typés sont renvoyés comme texte libre"
+ ],
+ "not_for": [
+  "Concevoir un prompt sans contrainte de sortie structurée",
+  "Entraîner ou fine-tuner un modèle",
+  "Déployer ou surveiller un serveur d’inférence vLLM sans génération contrainte",
+  "Valider des données après génération sans configurer le décodage du modèle"
+ ]
+}

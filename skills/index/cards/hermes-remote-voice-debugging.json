@@ -1,0 +1,73 @@
+{
+ "name": "hermes-remote-voice-debugging",
+ "sha": "9554e323b9f955ca23fc8b2f358d5694ea87f1425609440157162c7130241525",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00067832325,
+ "summary": "Use when Hermes Desktop remote voice or wake-word fails, is slow, duplicates replies, or cannot resolve an STT/TTS provider.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Le wake word d'Hermes Desktop s'arme mais ne detecte jamais rien, tu peux diagnostiquer ?",
+  "Hermes tourne sur mon Linux distant et le micro est sur le Mac : pourquoi wake.start echoue ?",
+  "J'ai PortAudioError sur le device -1, c'est quoi le bon fix pour Hermes remote ?",
+  "Le push-to-talk marche mais pas le wake word, c'est le meme micro ou pas ?",
+  "Hermes me repond deux fois, une fois en texte et une fois en audio. C'est un bug ?",
+  "La voix met une plombe a repondre, aide-moi a voir si c'est STT, Hermes ou TTS qui traine.",
+  "Il dit que mon provider STT est pas registered alors que j'ai configure Gemini. Tu peux checker le chemin ?",
+  "Le TTS Gemini marche, mais la transcription non : ca devrait pas partager le provider ?",
+  "Le voyant est bleu et dit listening, mais il n'entend rien. On verifie quoi cote backend ?",
+  "J'ai active le wake word dans Hermes Desktop, mais apres redemarrage il est encore casse.",
+  "Tu m'avais dit de tester wake.status : voila le resultat, tu peux me dire quel process doit etre relance ?",
+  "Pour une conversation vocale plus naturelle avec Hermes, vaut mieux garder STT puis TTS ou passer en realtime ?"
+ ],
+ "intents_en": [
+  "Debug Hermes Desktop remote wake word.",
+  "Why does remote wake.start fail with PortAudio?",
+  "Hermes voice replies are slow or duplicated.",
+  "My configured STT provider is not registered.",
+  "Check which process owns the microphone."
+ ],
+ "entities": [
+  "Hermes Desktop",
+  "Hermes",
+  "wake.status",
+  "wake.start",
+  "wake.stop",
+  "wake_word.enabled",
+  "wake_word.input_device",
+  "tools/wake_word.py",
+  "tui_gateway/server.py",
+  "sounddevice",
+  "PortAudio",
+  "STT",
+  "TTS",
+  "Gemini",
+  "transcribe_audio()",
+  "hermes plugins list",
+  "Electron",
+  "WebSocket",
+  "voice.record",
+  "voice_router",
+  "voice_only",
+  "text_and_voice",
+  "Mac",
+  "Linux",
+  "Tailscale"
+ ],
+ "symptoms": [
+  "PortAudioError while querying device -1",
+  "Wake-word UI says armed/listening but no audio arrives",
+  "audio_silent is true",
+  "input_device.error cannot resolve the configured/default input",
+  "STT provider is configured but not registered",
+  "Voice replies are slow",
+  "Assistant response appears both as text and audio",
+  "Remote backend has no usable default input device"
+ ],
+ "not_for": [
+  "General Hermes Desktop installation or unrelated backend troubleshooting",
+  "Configuring API credentials without an STT/TTS or voice failure",
+  "Debugging ordinary text chat, tools, or messaging gateways",
+  "Building a full realtime voice product unrelated to Hermes voice failures"
+ ]
+}

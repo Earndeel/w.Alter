@@ -1,0 +1,67 @@
+{
+ "name": "authenticated-workflows",
+ "sha": "1e2067dc87dccd2fbe438f157622eda4a479a6442077fb3e758a5fd37f2fb7e1",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000703197,
+ "summary": "Use when accessing, checking, downloading from, or QA-ing a logged-in web service and its authenticated results.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Va voir dans mon dashboard si le quota a bien bougé.",
+  "Connecte-toi au portail et vérifie que c'est le bon compte avant de télécharger le fichier.",
+  "Le site me renvoie sur le login, tu peux checker si la session est encore valide ?",
+  "Récupère le PDF depuis l'espace client et confirme que le fichier s'ouvre.",
+  "J'ai lancé une génération dans le Studio : vérifie que le résultat est bien dispo, pas juste le toast.",
+  "Tu peux regarder mes messages privés dans le channel, pas une page publique ?",
+  "On a redesigné la page login, teste les états connecté et déconnecté sans casser les routes.",
+  "Le dashboard affiche zéro crédit, vérifie la métrique et la période de reset sur la page officielle.",
+  "Le download apparaît dans la liste mais je ne le trouve pas sur le disque, récupère-le proprement.",
+  "MFA me bloque, dis-moi où ça coince sans essayer de contourner la vérification.",
+  "Après le changement de filtre la page affiche encore les vieilles données, reprends une capture d'état et vérifie.",
+  "Pour le check récurrent de la boîte, distingue bien pas de nouveaux messages d'une erreur d'auth."
+ ],
+ "intents_en": [
+  "Check my logged-in dashboard quota.",
+  "Download and verify the portal file.",
+  "Confirm whether this browser session is authenticated.",
+  "Verify the generated artifact in the Studio.",
+  "QA the authenticated page without breaking its routes."
+ ],
+ "entities": [
+  "authenticated web services",
+  "browser",
+  "browser tab",
+  "SSO",
+  "OTP",
+  "MFA",
+  "passkeys",
+  "CAPTCHA",
+  "vault",
+  "cookies",
+  "SPA",
+  "signed URLs",
+  "Usage/Plan/Account",
+  "EventSource",
+  "authenticated dashboard",
+  "media-generation UI",
+  "private community",
+  "authenticated binary download"
+ ],
+ "symptoms": [
+  "AUTH_UNAVAILABLE",
+  "CHECK_ERROR",
+  "HISTORY_RESTORE_REQUIRED",
+  "NO_DATA",
+  "DIRECT_PRIVATE_CHANNEL",
+  "PUBLIC_FIRST_PARTY_FALLBACK",
+  "Login redirect instead of the requested page",
+  "A download is listed but no verified file is available",
+  "Quota or usage value cannot be confirmed from the live account surface"
+ ],
+ "not_for": [
+  "Bypassing MFA, CAPTCHA, passkeys, or account recovery",
+  "Changing billing, buying credits, or resetting a quota without explicit authorization",
+  "Generic public-web browsing that needs no authenticated account",
+  "Bypassing backend authorization or provider access controls"
+ ]
+}

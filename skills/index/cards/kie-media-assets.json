@@ -1,0 +1,63 @@
+{
+ "name": "kie-media-assets",
+ "sha": "87f15167501d63fb08f56656d0c826520e4878d4b22605ebe5eaef24848a0007",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00051423075,
+ "summary": "Use when uploading local media to Kie.ai for reference URLs, or clarifying Seedance/Seedream naming before generation.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Upload cette image sur Kie pour que je l'utilise comme first frame.",
+  "J'ai une video locale, comment je la mets sur le CDN Kie pour Seedance ?",
+  "Tu peux me donner l'URL publique de ce fichier pour mon prompt video ?",
+  "Je veux utiliser ces images comme reference_image_urls, faut d'abord les envoyer où ?",
+  "Le fichier est sur mon disque, envoie-le à Kie et récupère le downloadUrl.",
+  "Prépare-moi l'upload de cette image dans le dossier images, avec un nom personnalisé.",
+  "Kie me demande une URL pour mon image de référence, mais j'ai seulement le fichier local.",
+  "Je pensais que Seedance 5 était le modèle vidéo, c'est bien ça ou je confonds avec Seedream ?",
+  "Seedream 5 peut prendre cette image en entrée ? Et tu peux la mettre sur Kie avant ?",
+  "J'ai un 404 sur getTaskDetail pour mon task Seedance, je dois appeler quoi ?",
+  "L'upload Kie est gratuit et le lien reste disponible combien de temps ?",
+  "Pour mon createTask Kling, j'ai besoin d'une URL Kie de cette vidéo locale : tu peux la générer ?"
+ ],
+ "intents_en": [
+  "Upload this local image to Kie for a video reference.",
+  "Get a Kie CDN URL for this video file.",
+  "How do I set a custom upload path or filename?",
+  "Does Seedance 5 exist, or do I mean Seedream 5?",
+  "getTaskDetail returns 404 for my Seedance task."
+ ],
+ "entities": [
+  "Kie.ai",
+  "kieai.redpandaai.co",
+  "/api/file-stream-upload",
+  "api.kie.ai",
+  "multipart/form-data",
+  "file",
+  "uploadPath",
+  "fileName",
+  "data.downloadUrl",
+  "vault get kie/api_key",
+  "Seedance",
+  "Seedream 5 Pro",
+  "Seedream 5 Lite",
+  "Kling",
+  "first_frame_url",
+  "reference_image_urls",
+  "createTask",
+  "recordInfo",
+  "getTaskDetail",
+  "tempfile.redpandaai.co"
+ ],
+ "symptoms": [
+  "getTaskDetail returns 404 for a Market model task",
+  "A local image or video has no URL usable by a Kie generation API",
+  "Confusion between Seedance 5 and Seedream 5"
+ ],
+ "not_for": [
+  "Creating or configuring video-generation tasks and their model parameters",
+  "Generating images with Seedream",
+  "Archiving uploaded files permanently",
+  "Looking up or rotating the Kie API key"
+ ]
+}

@@ -1,0 +1,58 @@
+{
+ "name": "frontend-artifact-workflows",
+ "sha": "be7b9f68128b5f1e227be7a9fad95beefe7b61045c60ce1438c91340755ce904",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0004930695,
+ "summary": "Use when building or polishing frontend visuals, interactive prototypes, landing pages, games, or verifying them in a real browser.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fais-moi une landing page clean pour présenter mon service, avec un CTA bien visible.",
+  "Tu peux transformer cette maquette en page responsive et garder le style cohérent ?",
+  "Le hero est joli mais on comprend pas ce que je vends, retravaille la hiérarchie et le copy.",
+  "Ajoute un fond animé discret, mais faut que le texte reste lisible et que ça respecte reduced motion.",
+  "Fais un petit jeu jouable en canvas avec un bouton restart et un score.",
+  "J'ai besoin d'un prototype frontend vite fait, le plus petit truc runnable possible.",
+  "Tu peux vérifier le rendu sur mobile et desktop ? J'ai peur qu'il y ait du overflow.",
+  "Le build passe, mais est-ce que tu peux tester les vraies interactions dans le browser ?",
+  "J'ai une erreur Tailwind depuis le passage à Vite, vérifie la config et les classes générées.",
+  "Les boutons sont pas accessibles au clavier et les états focus sont absents, corrige ça.",
+  "La page affiche encore du placeholder et j'ai des assets qui chargent pas, tu peux faire le QA ?",
+  "Refais l'interface avec une direction visuelle plus premium, puis teste les états loading et error."
+ ],
+ "intents_en": [
+  "Build a responsive landing page for my service.",
+  "Polish this frontend prototype and its visual hierarchy.",
+  "Add a subtle animated background with reduced-motion support.",
+  "Make a small playable browser game with restart and scoring.",
+  "Test the served page in a real browser at mobile and desktop sizes."
+ ],
+ "entities": [
+  "Tailwind",
+  "Vite",
+  "p5.js",
+  "CSS",
+  "SVG",
+  "Canvas",
+  "browser",
+  "HTTP",
+  "JavaScript",
+  "shaders"
+ ],
+ "symptoms": [
+  "Horizontal overflow or clipped controls at target viewport sizes",
+  "Unreadable text or missing focus and hover states",
+  "Broken routes or missing scripts and assets",
+  "Browser console or network errors",
+  "Tailwind utilities missing from generated CSS",
+  "Game interaction, reset, or replay flow does not work",
+  "Animation keeps running when the surface is hidden",
+  "Static screenshot looks right but served behavior has not been tested"
+ ],
+ "not_for": [
+  "Backend service or database implementation",
+  "API integration unrelated to rendering a frontend artifact",
+  "Brand strategy or copywriting without a frontend deliverable",
+  "General browser research unrelated to testing an artifact"
+ ]
+}

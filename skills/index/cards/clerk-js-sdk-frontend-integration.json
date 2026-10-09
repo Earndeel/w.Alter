@@ -1,0 +1,60 @@
+{
+ "name": "clerk-js-sdk-frontend-integration",
+ "sha": "531f55a2f40addd4e329e9aabfaeb114afc2e36cfa0cad9acc59e344b74778d3",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00041795325,
+ "summary": "Use when adding or debugging Clerk JS sign-in on static HTML or Flask sites, especially SDK loading, Google sign-in, or dark styling.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute Clerk à mon site HTML statique.",
+  "Tu peux intégrer l’auth Clerk dans mon app Flask ?",
+  "Mets un login Google avec Clerk sur cette page.",
+  "Le login Clerk doit être en dark, tu peux styler ça ?",
+  "J’ai `Cannot read properties of undefined (reading 'load')` avec Clerk, corrige.",
+  "Pourquoi `window.Clerk` est undefined après le chargement du script ?",
+  "Le SDK Clerk ne se charge pas sur mon site, regarde le fallback CDN.",
+  "Mon publishable key Clerk ne correspond peut-être pas au domaine, comment vérifier ?",
+  "J’ai une erreur CSP qui bloque le script Clerk, quels domaines autoriser ?",
+  "Le bouton Google Sign-in Clerk ne s’affiche plus depuis que j’ai intégré le SDK.",
+  "J’ai déjà la page de login, il faut juste fiabiliser le chargement de Clerk v5.",
+  "Après le login Clerk, affiche le portail si l’utilisateur est déjà connecté."
+ ],
+ "intents_en": [
+  "Add Clerk auth to my static site.",
+  "Set up Google sign-in with Clerk.",
+  "Fix window.Clerk being undefined.",
+  "Style the Clerk sign-in page for dark mode.",
+  "Debug the Clerk JS SDK loading."
+ ],
+ "entities": [
+  "Clerk",
+  "Clerk JS SDK",
+  "Clerk v5",
+  "Google Sign-in",
+  "Flask",
+  "static HTML",
+  "window.Clerk",
+  "publishableKey",
+  "pk_test_",
+  "clerk.accounts.dev",
+  "clerk.com",
+  "jsdelivr",
+  "clerk.browser.js",
+  "Content Security Policy",
+  "openid-configuration"
+ ],
+ "symptoms": [
+  "Cannot read properties of undefined (reading 'load')",
+  "window.Clerk is undefined after the script loads",
+  "Clerk CDN script is blocked by CSP",
+  "Clerk sign-in does not mount",
+  "Clerk Google sign-in is missing"
+ ],
+ "not_for": [
+  "Implementing Clerk server-side API calls or backend authorization",
+  "Configuring Clerk webhooks or user management",
+  "Building a custom authentication system without Clerk",
+  "Debugging Google OAuth configuration outside the Clerk frontend"
+ ]
+}

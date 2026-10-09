@@ -1,0 +1,59 @@
+{
+ "name": "hermes-desktop-tunnel-recovery",
+ "sha": "35cea62d841f32ae2f1f411ff0b54c9960590b46e41c8bbff3c39add61175ab9",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00044055,
+ "summary": "Use when Hermes V2 on Mac loses dashboard connectivity after sleep, especially with ECONNREFUSED or a stale SSH tunnel.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Depuis que mon Mac s'est réveillé, Hermes desktop me met ECONNREFUSED, tu peux diagnostiquer ?",
+  "Hermes V2 ne se connecte plus après la veille du Mac, on vérifie quoi en premier ?",
+  "Le SSH a l'air actif mais l'app Hermes n'arrive plus à joindre le dashboard.",
+  "J'ai relancé l'app, toujours ECONNREFUSED après le sleep du Mac.",
+  "Tu peux vérifier si le tunnel vers le dashboard est encore établi depuis mon Mac ?",
+  "Le Mac est bien sur Tailscale mais Hermes desktop reste hors ligne, c'est le tunnel ?",
+  "Petit suivi : le serveur répond en Tailscale, mais l'app desktop ne repart pas.",
+  "J'ai le message « token is not set » dans les logs Hermes, quelles variables doivent matcher ?",
+  "Le token du desktop et celui du dashboard sont-ils censés être identiques ?",
+  "On peut isoler si ça vient du gateway, du dashboard ou du port forwarding après le réveil ?",
+  "Le tunnel SSH a survécu à la veille mais le port local refuse la connexion, comment récupérer Hermes ?",
+  "Est-ce que les patches hermes-desktop-tailscale permettraient de ne plus dépendre du tunnel ?"
+ ],
+ "intents_en": [
+  "Hermes desktop gets ECONNREFUSED after my Mac wakes.",
+  "Check whether the SSH tunnel survived Mac sleep.",
+  "The app says the token is not set; what should match?",
+  "Tailscale reaches the server, but the desktop app cannot connect.",
+  "Help restore Hermes V2 dashboard connectivity."
+ ],
+ "entities": [
+  "Hermes V2",
+  "Hermes desktop app",
+  "SSH tunnel",
+  "Tailscale",
+  "Mac",
+  "server dashboard",
+  "gateway",
+  "HERMES_DESKTOP_REMOTE_URL",
+  "HERMES_DESKTOP_REMOTE_TOKEN",
+  "hermes-desktop-tailscale",
+  "ECONNREFUSED",
+  "ESTAB",
+  "LISTEN"
+ ],
+ "symptoms": [
+  "ECONNREFUSED after Mac sleep",
+  "SSH session appears alive but forwarded port is no longer established",
+  "Desktop app cannot connect to the dashboard",
+  "token is not set",
+  "Desktop app boot loop",
+  "Tailscale can reach the server while the desktop app cannot"
+ ],
+ "not_for": [
+  "Debugging LLM routing or tools through the gateway API",
+  "General Hermes desktop installation or feature support",
+  "Fixing server-side dashboard or gateway failures unrelated to Mac sleep or tunnel connectivity",
+  "Configuring Tailscale networking for unrelated devices or services"
+ ]
+}

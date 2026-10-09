@@ -1,0 +1,70 @@
+{
+ "name": "hermes-provider-routing",
+ "sha": "8ac7f6ce30fa7c055c0fbb29b933ca6f2ee0bba9b0303a3e9a8bc7ae44800fe8",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007613595,
+ "summary": "Use when debugging Hermes model-family routing, mixed provider transports, Desktop selection failures, or consolidating provider rows without changing wire behavior.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Dans Hermes Desktop, le modèle apparaît dans /model mais dès que je le sélectionne le stream est vide, tu peux regarder le routing ?",
+  "Mon probe Kie marche en direct, mais Hermes ne reçoit aucun event SSE. Vérifie l’URL, l’api_mode et le parser avant de conclure que le modèle est cassé.",
+  "Je veux une seule ligne Kie dans le picker pour Claude, Grok et Astra, sans envoyer tous les modèles sur le même endpoint.",
+  "J’ai Unknown provider 'kie' au démarrage d’un profil nommé, alors que le modèle marche sur le profil par défaut. Rends-le dispo sur ce profil.",
+  "Ajoute gpt-6-astra à mon provider Kie existant et route-le sur le bon endpoint Responses, sans créer un slug à côté.",
+  "Depuis que j’ai changé de modèle dans Desktop, la réponse est vide ou mal formée. Tu peux capturer la requête Hermes et vérifier le transport ?",
+  "Le modèle est bien dans /api/model/options mais je ne le vois pas dans Desktop. C’est la config ou un cache du picker ?",
+  "Je veux ajouter mon provider TTS comme option pour Walter, mais ne change pas le provider vocal par défaut.",
+  "J’ai ajouté un modèle au provider partagé, mais le switch en cours de session ne semble pas passer par la bonne route. Vérifie aussi les autres chemins runtime.",
+  "Pour les modèles Kie, Claude doit rester en Anthropic Messages et Grok/Astra en Responses. Fais le routage selon le modèle, pas selon le provider global.",
+  "Le direct test renvoie des events, mais côté Hermes j’ai un stream vide. Vérifie le endpoint outbound réel et les headers, sans afficher mes credentials.",
+  "Mon modèle marche sur un profil, pas sur l’autre. Copie le provider custom qui fonctionne dans l’autre profil, garde le même slug et teste une nouvelle session Desktop."
+ ],
+ "intents_en": [
+  "Debug an empty Hermes model stream.",
+  "Route Kie models by API family.",
+  "Consolidate provider rows without changing transports.",
+  "Copy a working custom provider to another profile.",
+  "Verify the live Desktop request reaches the right endpoint."
+ ],
+ "entities": [
+  "Hermes",
+  "Hermes Desktop",
+  "Dashboard/gateway",
+  "Kie.ai",
+  "providers.kie",
+  "custom:kie",
+  "providers.kie-kimi",
+  "Claude",
+  "Grok",
+  "gpt-6-astra",
+  "Kimi",
+  "Anthropic Messages",
+  "Responses API",
+  "Chat API",
+  "Gemini",
+  "TTS",
+  "api_mode",
+  "resolve_runtime_provider",
+  "build_models_payload()",
+  "/api/model/options",
+  "https://api.kie.ai/claude",
+  "https://api.kie.ai/grok/v1",
+  "https://api.kie.ai/codex/v1",
+  "stream=True"
+ ],
+ "symptoms": [
+  "Empty or malformed stream after selecting a model in Desktop",
+  "No events received from a streaming response",
+  "Unknown provider '<slug>' on named-profile session init",
+  "Direct provider probe succeeds but Hermes fails",
+  "Model appears in /model but fails after selection",
+  "Model exists in /api/model/options but is missing from the Desktop picker"
+ ],
+ "not_for": [
+  "Choosing or comparing models without a provider-routing issue",
+  "Managing a provider’s model catalog when routing already works",
+  "Auditing the harness without a specific provider or transport failure",
+  "Changing Walter’s default model or TTS provider without an explicit request"
+ ]
+}

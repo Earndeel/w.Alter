@@ -1,0 +1,66 @@
+{
+ "name": "landing-page-positioning",
+ "sha": "4936d546655a54171252979a4e88a30f672c6ffa962b77798e7113cbe1f34e10",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00064788075,
+ "summary": "Use when positioning a product landing page for both end users and developer or partner integrators.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Refais la home de mon produit : elle doit parler aux clients, mais garder un accès pour les intégrateurs.",
+  "J’ai mélangé API, webhooks et bénéfices clients sur la landing, tu peux remettre ça au clair ?",
+  "On a deux audiences, utilisateurs finaux et partenaires dev : quelle structure pour / et /connect ?",
+  "La home fait trop documentation technique. Repositionne-la pour vendre le résultat aux utilisateurs.",
+  "Tu peux revoir les textes et les noms des plans ? « Starter » et « Pro » font trop SaaS B2B.",
+  "Sur la landing, le bouton connexion passe par une page intermédiaire. Branche-le directement sur l’auth.",
+  "Les devs ont besoin de détails d’intégration, mais je veux pas de code sur la page d’accueil.",
+  "On construit la plateforme et sa landing : sépare bien le site public de l’espace produit /app.",
+  "La home montre le dashboard au lieu de ce que le client reçoit. Tu peux corriger le positionnement ?",
+  "Vérifie le CTA login sur Cloudflare Pages : j’ai peur que la redirection 308 perde le state.",
+  "J’ai pas encore de vrais témoignages ni de chiffres, fais une landing crédible sans rien inventer.",
+  "Pour ce produit, tranche entre une seule page pour tout le monde ou une home B2C avec une page développeurs."
+ ],
+ "intents_en": [
+  "Separate the consumer landing from the developer integration page.",
+  "Rewrite the homepage for end users, not API customers.",
+  "Fix the landing page login CTA redirect.",
+  "Keep the product workspace separate from the public homepage.",
+  "Rename the plans with consumer-friendly names."
+ ],
+ "entities": [
+  "/",
+  "/connect",
+  "/api",
+  "/developers",
+  "/app",
+  "/login",
+  "/login.html",
+  "Cloudflare Pages",
+  "public/_redirects",
+  "API host",
+  "identity provider",
+  "auth initiation route",
+  "redirect_uri",
+  "state",
+  "GET",
+  "302",
+  "308",
+  "SPA fallback"
+ ],
+ "symptoms": [
+  "La landing parle de pipeline, provider, webhook, SDK ou inference aux consommateurs.",
+  "Un schéma d’architecture ou un exemple de code apparaît sur la home B2C.",
+  "Les plans s’appellent Starter, Pro ou Enterprise malgré une cible grand public.",
+  "Le hero montre le dashboard ou le système plutôt que le résultat livré au client.",
+  "Le CTA login renvoie 200 avec une page HTML intermédiaire au lieu de rediriger vers le fournisseur d’identité.",
+  "Le CTA login renvoie 308 et la redirection peut perdre state ou redirect_uri.",
+  "/app ne se recharge pas directement sur l’hébergement statique.",
+  "La landing contient des témoignages, résultats ou capacités IA non vérifiés."
+ ],
+ "not_for": [
+  "Concevoir une documentation API ou implémenter une intégration technique complète.",
+  "Créer une page d’administration interne ou un dashboard opérationnel.",
+  "Choisir uniquement une direction visuelle sans définir les audiences et le positionnement.",
+  "Construire ou déboguer le backend d’authentification ou le fournisseur d’identité."
+ ]
+}

@@ -1,0 +1,68 @@
+{
+ "name": "video-reconstruction-adaptation",
+ "sha": "a7580e02300f3da74658a8b21060f11dca0d9da24f336ec776493d9f3acc8506",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000764577,
+ "summary": "Use when reconstructing a reference video for a brand through staged analysis, adaptation, asset generation, approval gates, and delivery.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Je veux refaire cette vidéo de référence pour W.Alter, en gardant sa structure mais avec notre marque.",
+  "Peux-tu analyser cette pub et préparer les étapes pour en faire une version adaptée à mon produit ?",
+  "J’ai mis la vidéo source sur Drive : lance le workflow de reconstruction, mais arrête-toi à la validation avant génération.",
+  "On reprend le projet vidéo où on l’avait laissé : vérifie les artefacts et trouve le bon stage de reprise.",
+  "Adapte ce Reel à notre identité visuelle, avec les infos produit et les logos que je t’ai donnés.",
+  "La vidéo générée ne respecte pas le plan approuvé. Vérifie les références, le fingerprint et le gate avant de relancer quoi que ce soit.",
+  "Prépare le blueprint, les prompts et le plan POST à partir de cette vidéo, sans faire d’appel payant.",
+  "Je veux transformer cette référence en vidéo pour notre audience, avec les sous-titres et le CTA ajoutés proprement en post-prod.",
+  "La source est un lien TikTok : télécharge-la dans le workspace, vérifie-la, puis commence l’analyse.",
+  "On a changé les guidelines de marque depuis l’approbation : invalide ce qui doit l’être et remets le projet en attente de validation.",
+  "Vérifie l’installation du pipeline vidéo avec un fixture local, ffmpeg et zéro appel aux providers.",
+  "J’ai déjà un clip, mais il me faut surtout le reconstruire selon une référence avec les étapes et artefacts du workflow."
+ ],
+ "intents_en": [
+  "Recreate this reference video for our brand.",
+  "Prepare the staged adaptation and stop for approval.",
+  "Resume the video reconstruction from persisted artifacts.",
+  "Validate the pipeline without paid provider calls.",
+  "Adapt this ad using our product facts and visual guidelines."
+ ],
+ "entities": [
+  "Hermes profile",
+  "workflow manifest",
+  "ffmpeg",
+  "ffprobe",
+  "yt-dlp",
+  "Google Drive",
+  "Creative Factory",
+  "SOURCE INTAKE",
+  "SOURCE FORENSICS",
+  "CREATIVE DNA",
+  "BRAND ADAPT",
+  "VIDEO PLAN",
+  "ASSET BUILD",
+  "PREGEN_REVIEW",
+  "VIDEO GENERATE",
+  "POST PROD",
+  "QA DELIVERY",
+  "KIE_API_KEY",
+  "VIDEO_MODEL_OVERRIDE",
+  "QA_MODE",
+  "CREATIVE_FACTORY_MODE",
+  "post_capabilities.json",
+  "PENDING_APPROVAL"
+ ],
+ "symptoms": [
+  "current_stage=PREGEN_REVIEW",
+  "video_generation_blocked=true",
+  "Approval invalidated because the PREGEN fingerprint changed",
+  "Source URL inspected but media not downloaded or materialized locally",
+  "Pipeline cannot resume because a required persisted artifact is missing or invalid"
+ ],
+ "not_for": [
+  "Generic video editing with no reference-reconstruction workflow",
+  "A single stage’s provider-specific API operation",
+  "Standalone video analysis without brand adaptation or staged artifacts",
+  "Unrelated Drive file management or credential setup"
+ ]
+}

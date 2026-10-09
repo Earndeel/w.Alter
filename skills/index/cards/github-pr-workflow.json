@@ -1,0 +1,66 @@
+{
+ "name": "github-pr-workflow",
+ "sha": "72e31dfea0e561766d7c4fb87f6a00c15409ede1d4f7a639cf058d8237717d71",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007232445,
+ "summary": "Use when Monsieur veut gérer une PR GitHub de bout en bout : créer branche et commits, ouvrir la PR, suivre ou corriger CI, puis fusionner.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fais une branche pour cette feature, committe les changements et ouvre une PR.",
+  "Tu peux créer une PR draft vers develop avec Alice en reviewer ?",
+  "J’ai fini le fix, pousse ma branche et ouvre la pull request avec un bon résumé.",
+  "La CI est rouge sur ma PR, regarde les logs, corrige et repousse.",
+  "Tu peux checker les checks de la PR et me dire quand tout est vert ?",
+  "Relance le suivi CI, ça tourne encore ou c’est bloqué ?",
+  "Tout est vert, merge la PR en squash et supprime la branche.",
+  "Active l’auto-merge dès que les checks passent.",
+  "On repart de main à jour, crée une branche fix pour le bug de login et prépare la PR.",
+  "J’ai poussé un commit de plus, vérifie que la PR est à jour et que la CI passe.",
+  "Ferme ma PR finalement, je ne veux pas la merger.",
+  "Comment on crée la PR ici ? Utilise gh si possible, sinon le token et l’API GitHub."
+ ],
+ "intents_en": [
+  "Create a branch and open a PR.",
+  "Check the PR's CI status.",
+  "Fix the failing checks and push again.",
+  "Merge the PR with squash and delete the branch.",
+  "Enable auto-merge when checks pass."
+ ],
+ "entities": [
+  "GitHub",
+  "Pull Requests",
+  "Git",
+  "GitHub CLI (gh)",
+  "GitHub REST API",
+  "GitHub GraphQL API",
+  "GitHub Actions",
+  "CI checks",
+  "GITHUB_TOKEN",
+  "git remote",
+  "git fetch",
+  "git checkout",
+  "git pull",
+  "git add",
+  "git commit",
+  "git push",
+  "gh pr create",
+  "gh pr checks",
+  "gh run view",
+  "gh pr merge",
+  "api.github.com",
+  "Conventional Commits",
+  "PR body templates"
+ ],
+ "symptoms": [
+  "GitHub PR checks are pending, failing, or returning an error.",
+  "A GitHub Actions run fails and its logs need inspection.",
+  "A PR is ready to merge but branch cleanup or auto-merge is needed."
+ ],
+ "not_for": [
+  "Configuring GitHub authentication or resolving token and account setup.",
+  "Reviewing code changes or writing detailed PR review feedback.",
+  "Implementing a standalone code change without a GitHub PR lifecycle request.",
+  "Designing or debugging CI workflow configuration unrelated to a specific PR."
+ ]
+}

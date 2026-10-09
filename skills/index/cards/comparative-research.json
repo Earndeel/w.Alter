@@ -1,0 +1,62 @@
+{
+ "name": "comparative-research",
+ "sha": "85f71baf46431902a60a72b2ab9932b1c0eb0e6361841ec92c44159abf0e1a20",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0006376095,
+ "summary": "Use when Monsieur wants a ranked shortlist of candidates checked against 3+ hard constraints, especially claims listings may misrepresent.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Compare-moi 5 destinations qui respectent ces contraintes : plage accessible à pied, moins de 30 € la nuit et ferry direct.",
+  "Je cherche un hôtel vraiment sur le sable, avec piscine et petit dej, pour moins de 80 € en août. Fais un classement vérifié.",
+  "Tu peux me trouver les meilleurs outils qui font X, coûtent moins de 20 €/mois et s’intègrent à mon workflow ?",
+  "Classe les îles où aller depuis Bangkok : trajet de moins de 6 h, plages baignables en août et hébergements abordables.",
+  "Les annonces disent toutes « beachfront » mais je veux savoir si on arrive vraiment directement sur le sable. Compare ces hôtels.",
+  "Fais-moi un tableau comparatif de ces services : prix, export des données, API et hébergement en Europe. Signale clairement ceux qui ne cochent pas tout.",
+  "Et pour les options qui respectent bien les 4 critères, tu choisirais lesquelles ?",
+  "T’as vérifié le trajet porte-à-porte, pas juste la durée du bus ? Compare aussi le coût total avec le ferry.",
+  "Je veux un shortlist de destinations avec vol possible, moins de 2 h de transfert ensuite et au moins 3 hôtels sous 100 €.",
+  "Le comparatif précédent oublie la météo en août. Reprends les destinations et vérifie les conditions par région.",
+  "Trouve-moi des alternatives à ce produit, mais garde absolument le prix sous 50 €, le support Linux et la garantie 2 ans.",
+  "Ok, si on assouplit le critère du prix mais pas celui de l’accès direct à la plage, c’est quoi les meilleures options ?"
+ ],
+ "intents_en": [
+  "Rank options that meet all five constraints.",
+  "Compare hotels that are genuinely on the beach, not just nearby.",
+  "Find transport options by door-to-door time and total cost.",
+  "Shortlist tools with these features, price, and API requirements.",
+  "Which candidates fail a hard constraint, and why?"
+ ],
+ "entities": [
+  "12Go.asia",
+  "Rome2Rio",
+  "Busbud",
+  "Google Flights",
+  "Brave",
+  "browser_navigate",
+  "Scrapling stealthy_fetch",
+  "execute_code",
+  "Travelfish",
+  "OTA",
+  "U-Tapao (UTP)",
+  "Bangkok (BKK)",
+  "Trat (TDX)",
+  "Bangkok Airways",
+  "references/agentic-hotel-research.md",
+  "references/dynamic-ota-verification.md",
+  "references/thailand-transport-comparison.md",
+  "references/travel-sources-se-asia.md"
+ ],
+ "symptoms": [
+  "Une annonce indique « beachfront », mais l’accès réel à la plage est incertain.",
+  "Les prix ou durées d’un comparateur ne correspondent pas aux autres sources.",
+  "Une option semble respecter les critères, mais un critère important n’est pas vérifié.",
+  "Les horaires, prix ou disponibilités dépendent des dates exactes."
+ ],
+ "not_for": [
+  "Une recherche simple sur un seul candidat sans classement ni critères multiples.",
+  "Un itinéraire de transport unique sans comparaison entre destinations ou modes.",
+  "Une recherche générale d’hôtels sans contraintes à vérifier.",
+  "Une comparaison multi-agents dédiée à la recherche hôtelière détaillée."
+ ]
+}

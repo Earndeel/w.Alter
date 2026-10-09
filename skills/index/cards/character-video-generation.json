@@ -1,0 +1,59 @@
+{
+ "name": "character-video-generation",
+ "sha": "652b870aa8f22a8ccfd540cd646c1400f800f50a232dec8068a37d02c10dec14",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00057734325,
+ "summary": "Use when animating a known person or character from references and preserving identity, facial features, teeth, or multi-shot continuity matters.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Anime cette photo en vidéo, mais garde exactement son visage et ses dents.",
+  "Fais une vidéo de mon perso à partir de ces images de référence, sans changer son identité.",
+  "Je veux que la première frame soit exactement cette image, même si le visage bouge un peu après.",
+  "Pour ce personnage récurrent, tu peux utiliser les refs pour conserver son visage pendant l’animation ?",
+  "Le rendu ne ressemble plus à la personne au milieu du clip, vérifie les frames et corrige.",
+  "Tu m’as généré un clip trop lent ; refais-le avec des mouvements naturels sur toute la durée.",
+  "Avant de lancer la génération payante, montre-moi le prompt de mouvement exact.",
+  "J’ai quatre fiches personnages : fais d’abord une image cinéma propre, puis anime-la sans reprendre la planche.",
+  "Fais mon brief en 20 secondes avec 20 plans distincts et vérifie qu’il y a bien 20 cuts.",
+  "Le modèle a ignoré l’image de référence, tu peux vérifier si le conditioning a bien marché ?",
+  "Le fichier annoncé en 16:9 n’a pas le bon ratio : mesure les dimensions et corrige-le si besoin.",
+  "On garde le même prompt validé, mais passe sur le bon modèle et vérifie l’identité avant de me livrer."
+ ],
+ "intents_en": [
+  "Animate this character while keeping the face and teeth consistent.",
+  "Use these images as identity references for a short video.",
+  "Make the opening frame match this image exactly.",
+  "Check facial drift throughout the generated clip.",
+  "Create a 20-second video with exactly 20 distinct shots."
+ ],
+ "entities": [
+  "Kie.ai",
+  "Seedance 2 Mini",
+  "Grok Imagine Video 1.5 Preview",
+  "FLUX 3",
+  "reference_image_urls",
+  "Reference-to-Video",
+  "first-frame I2V",
+  "FFmpeg",
+  "ffprobe",
+  "scene detection",
+  "multi-character reference sheets",
+  "storyboard tile=5x4",
+  "pad=1280:720:0:8:color=black,setsar=1"
+ ],
+ "symptoms": [
+  "Le visage ou les dents changent entre les frames.",
+  "La première frame ne reprend pas l’image source.",
+  "Le modèle semble ignorer les images de référence.",
+  "Le mouvement paraît ralenti ou étiré malgré le prompt.",
+  "La vidéo livrée n’a pas les dimensions ou le ratio annoncés.",
+  "Le clip n’a pas le nombre de plans ou la durée demandés."
+ ],
+ "not_for": [
+  "Générer une vidéo sans personnage ni image de référence.",
+  "Retoucher une image fixe sans l’animer.",
+  "Monter des séquences existantes sans génération vidéo.",
+  "Écrire un scénario ou un brief vidéo sans lancer ni préparer une génération."
+ ]
+}

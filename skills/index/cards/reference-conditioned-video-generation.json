@@ -1,0 +1,63 @@
+{
+ "name": "reference-conditioned-video-generation",
+ "sha": "238e876a1cfa875ff8505e49155fd3ee2fb7dfa574e219fe11bc5dbe82259ebd",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000516087,
+ "summary": "Use when Monsieur wants a cinematic video from character or environment references while preserving identities across shots.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fais une petite vidéo cinématique à partir de ces fiches persos et de ce décor.",
+  "Génère un clip avec ces refs, mais garde bien les mêmes visages et costumes d’un plan à l’autre.",
+  "J’ai uploadé le character sheet et l’environment board : fais-moi une vidéo, sans que les planches apparaissent dedans.",
+  "Tu peux animer cette scène en gardant le design du perso fidèle aux images de référence ?",
+  "Le rendu a repris les labels et les swatches de la fiche, corrige le prompt et refais une image d’ancrage propre.",
+  "Ajoute 5 secondes à la fin, mais garde tout le prompt et les plans déjà prévus.",
+  "Le clip doit faire exactement 20 secondes en 16:9, avec le même perso et le même décor sur toute la séquence.",
+  "Ne recommence pas la scène après l’extension : repars de la pose finale et continue le mouvement.",
+  "Vérifie le MP4 avant de me l’envoyer : durée, résolution, audio et pas de texte parasite.",
+  "J’ai plusieurs images de référence, regarde lesquelles sont les persos et laquelle est le décor avant de lancer la génération.",
+  "La vidéo est encore en train de render, suis le job existant plutôt que d’en lancer un deuxième.",
+  "Garde la palette et les marqueurs du perso, mais fais une vraie scène cinématique, pas un montage des fiches."
+ ],
+ "intents_en": [
+  "Make a cinematic video from these character sheets.",
+  "Keep the character identity consistent across shots.",
+  "Extend the clip without rewriting the original timeline.",
+  "Check the final MP4 duration, aspect ratio, and audio.",
+  "Use the images as references, not as video frames."
+ ],
+ "entities": [
+  "FLUX 3",
+  "BFL",
+  "image-to-video (I2V)",
+  "ffmpeg",
+  "ffprobe",
+  "MP4",
+  "720p",
+  "1280×704",
+  "1280×720",
+  "setsar=1",
+  "job ID",
+  "storyboard",
+  "reference sheets",
+  "character sheets",
+  "environment boards",
+  "anchor frame"
+ ],
+ "symptoms": [
+  "Character sheet labels, diagrams, or swatches appear in the video",
+  "Character identity or costume changes between shots",
+  "Extra characters or duplicated anatomy appear",
+  "The result is 1280×704 despite being labelled 16:9",
+  "The rendered clip is shorter or longer than the requested duration",
+  "The extension restarts the scene instead of continuing its final pose",
+  "The job is still rendering and has not returned an artifact"
+ ],
+ "not_for": [
+  "Generating a standalone still image from reference sheets",
+  "Using reference sheets as visible storyboard or keyframe frames",
+  "Editing an existing video without reference-conditioned generation",
+  "Creating a video with no character or environment references"
+ ]
+}

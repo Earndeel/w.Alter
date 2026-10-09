@@ -1,0 +1,65 @@
+{
+ "name": "suno-clerk-auth",
+ "sha": "5df60bfca072264c29b6605e41cc476751f951717c73bbfca10d9593294226f1",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000471537,
+ "summary": "Use when Suno needs authenticated browsing and its Clerk cookies must be extracted, refreshed, injected, or verified.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Connecte Suno dans le navigateur du webtop avec mon compte.",
+  "Tu peux récupérer les cookies Suno de Brave et les injecter dans Camoufox ?",
+  "Suno me renvoie sur la page login, remets la session d'aplomb.",
+  "J'ai besoin d'ouvrir Suno déjà connecté, tu peux réinjecter les cookies ?",
+  "La session Suno a expiré, renouvelle l'auth depuis Brave.",
+  "Pourquoi Suno me demande de me reconnecter dans le navigateur ?",
+  "Vérifie si la session Suno est bien authentifiée et si mes crédits apparaissent.",
+  "Je veux juste accéder à mon compte Suno dans le webtop, pas générer de musique.",
+  "Les cookies sont injectés mais Suno retourne toujours sur login, tu peux regarder ?",
+  "Prépare la session Suno sur le port 9378 et confirme que je suis connecté.",
+  "Il manque peut-être des cookies Clerk Suno, récupère les bons domaines aussi.",
+  "On avait ouvert Suno tout à l'heure, maintenant ça ne marche plus : renouvelle les cookies et vérifie."
+ ],
+ "intents_en": [
+  "Log in to Suno in the browser.",
+  "Extract and inject my Suno cookies.",
+  "Refresh the expired Suno session.",
+  "Check whether Suno is authenticated.",
+  "Suno keeps redirecting me to login."
+ ],
+ "entities": [
+  "Suno",
+  "Clerk",
+  "Mac Brave",
+  "Camoufox",
+  "webtop",
+  "port 9378",
+  "POST /sessions/walter/cookies",
+  "POST /tabs",
+  "suno-main",
+  "suno.com",
+  "auth.suno.com",
+  ".suno.com",
+  "studio-api.prod.suno.com",
+  "__session",
+  "clerk_active_context",
+  "__client",
+  "__client_Jnxw-muT",
+  "__client_uat",
+  "__client_uat_Jnxw-muT",
+  "sessionid"
+ ],
+ "symptoms": [
+  "Suno redirects to the login page instead of /discover.",
+  "Camoufox shows the Suno login page.",
+  "Suno cookies were injected but the session is still unauthenticated.",
+  "The Suno session has expired.",
+  "The sidebar username or credits counter is missing."
+ ],
+ "not_for": [
+  "Writing prompts or lyrics for Suno music generation.",
+  "Creating or editing songs in Suno.",
+  "General web browsing authentication unrelated to Suno Clerk cookies.",
+  "Managing Suno subscriptions, billing, or account settings."
+ ]
+}

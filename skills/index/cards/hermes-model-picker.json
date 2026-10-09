@@ -1,0 +1,68 @@
+{
+ "name": "hermes-model-picker",
+ "sha": "51fc8f7364622c31737c2178b58c863ce341a7f29222e3ff056806fcb7700246",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00068005575,
+ "summary": "Use when customizing Hermes /model picker providers, curated model lists, fallback models, ordering, or stale model caches.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Dans Hermes, je veux mettre NVIDIA et Gemini en haut du /model.",
+  "Pourquoi mes nouveaux modèles n’apparaissent pas dans le picker ?",
+  "Ajoute ces modèles à la liste visible de mon provider, et garde le bon modèle sélectionné par défaut.",
+  "Le /model me montre plein de modèles TTS et d’embeddings que je ne veux pas. Comment nettoyer ça ?",
+  "J’ai ajouté ma clé API, mais la liste des modèles n’a pas bougé.",
+  "Tu peux synchroniser les fallback_models du plugin avec la liste curated ?",
+  "Change l’ordre des providers dans le picker Hermes, pas dans mes autres configs.",
+  "Le cache des modèles a l’air pété : son timestamp est en 1970.",
+  "Je veux un seul dossier visible dans Desktop pour ces modèles, mais sans casser les transports différents derrière.",
+  "J’ai deux entrées Anthropic dans /model. On peut les fusionner ou il faut garder les routes séparées ?",
+  "J’ai modifié la liste des modèles, mais le TUI affiche toujours l’ancienne. Je dois redémarrer quoi ?",
+  "Ajoute ce nouveau catalogue provider au picker et vérifie que les IDs, labels et fallbacks sont cohérents."
+ ],
+ "intents_en": [
+  "Reorder providers in Hermes /model.",
+  "My new models are missing from the picker.",
+  "Update the curated model list and plugin fallbacks.",
+  "Clear stale Hermes model caches.",
+  "Group Desktop picker entries without merging incompatible transports."
+ ],
+ "entities": [
+  "Hermes",
+  "/model",
+  "TUI",
+  "Desktop",
+  "hermes_cli/models.py",
+  "CANONICAL_PROVIDERS",
+  "_PROVIDER_MODELS",
+  "_MODELS_DEV_PREFERRED",
+  "hermes_cli/model_switch.py",
+  "hermes_cli/inventory.py",
+  "tui_gateway/server.py",
+  "providers/base.py",
+  "plugins/model-providers",
+  "fallback_models",
+  "provider_models_cache.json",
+  "models_dev_cache.json",
+  "hermes model --refresh",
+  "systemctl --user restart hermes-gateway.service",
+  "NVIDIA NIM",
+  "Gemini",
+  "OpenRouter",
+  "Anthropic",
+  "OpenAI Codex"
+ ],
+ "symptoms": [
+  "Models don't appear in the /model picker after adding an API key",
+  "Picker model count does not match the live API",
+  "Picker still shows the old provider order or model list",
+  "Cache timestamp shows 1970-01-01",
+  "Unwanted TTS, embedding, or safety models clutter the picker"
+ ],
+ "not_for": [
+  "Configuring provider API keys or fixing authentication failures",
+  "Changing which model Hermes uses for ordinary conversation outside the picker",
+  "Implementing a new provider transport or API protocol",
+  "Customizing unrelated Hermes TUI behavior"
+ ]
+}

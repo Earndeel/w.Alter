@@ -1,0 +1,67 @@
+{
+ "name": "cartesia-beeper-voice-notes",
+ "sha": "e5c9b682591f00be8391838174e1ffd42ab9f496c70247c6bd54dddbdd137d5c",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00074292075,
+ "summary": "Use when Monsieur wants Cartesia speech sent as a Beeper/Messenger voice note, or needs a careful retry after Messenger reconnects.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Envoie ce texte en note vocale à Julie sur Messenger avec Cartesia.",
+  "Fais-moi une voice note Beeper avec ma voix habituelle et envoie-la à Marc.",
+  "Tu peux lire exactement ce message et l'envoyer en vocal à Sophie ?",
+  "Convertis le WAV Cartesia en vrai vocal Messenger, pas en pièce jointe audio.",
+  "La note vocale n'est pas partie, Messenger était déconnecté. Réessaie une fois.",
+  "J'ai reconnecté mon compte Facebook, renvoie le vocal à Paul sans changer le texte.",
+  "C'est bien envoyé comme note vocale ou juste comme fichier ? Vérifie dans Beeper.",
+  "Envoie ce petit message en vocal à mon contact Facebook, garde la ponctuation exacte.",
+  "Le vocal est resté dans Beeper pendant que Messenger était offline. Vérifie avant de retenter.",
+  "Peux-tu générer ça avec Cartesia et me l'envoyer dans notre chat Beeper ?",
+  "Même message qu'avant, mais cette fois en voice note à Camille sur Messenger.",
+  "Le destinataire a deux chats qui matchent, tu peux vérifier lequel est le bon avant d'envoyer le vocal ?"
+ ],
+ "intents_en": [
+  "Send this as a Cartesia voice note on Messenger.",
+  "Retry the voice note after reconnecting Facebook.",
+  "Make sure Beeper sends it as a native voice note.",
+  "Check whether the voice note was accepted locally.",
+  "Send the exact text as a Beeper voice message."
+ ],
+ "entities": [
+  "Cartesia",
+  "Beeper Desktop",
+  "Facebook Messenger",
+  "Hermes text_to_speech",
+  "execute_code",
+  "ffmpeg",
+  "ffprobe",
+  "libopus",
+  "vault",
+  "cartesia/api_key",
+  "beeper/token",
+  "http://100.127.150.1:23373",
+  "facebookgo",
+  "GET /v1/chats",
+  "GET /v1/chats/{chat_id}",
+  "POST /v1/ + assets + /upload/ + base64",
+  "POST /v1/chats/{chat_id}/messages",
+  "GET /v1/chats/{chat_id}/messages/{message_id}",
+  "audio/ogg",
+  "OGG/Opus",
+  "voice-note",
+  "Lucas voice ID f0545137-edd6-4591-bd98-b68dafd315ea",
+  "beeper-messages"
+ ],
+ "symptoms": [
+  "Cartesia returns a WAV that is not ready to attach as a Beeper voice note.",
+  "Beeper sends the audio as a file attachment instead of a native voice note.",
+  "Messenger account was disconnected and the outgoing voice note may not have been relayed.",
+  "Beeper returns a pending message ID but delivery to Messenger is uncertain."
+ ],
+ "not_for": [
+  "Sending a plain text message through Beeper.",
+  "Sending voice messages through platforms whose API differs from Beeper's local REST API.",
+  "Generic Cartesia TTS generation without sending a Beeper voice note.",
+  "Proving Facebook Messenger delivered a message remotely when no delivery receipt is available."
+ ]
+}

@@ -1,0 +1,63 @@
+{
+ "name": "provider-model-catalog-management",
+ "sha": "9fbc455a608b4495b6c4103e53098146c3fd0b6828d64231626a633c074a850e",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000454905,
+ "summary": "Use when mapping provider model IDs and benchmark labels into Hermes /model pickers, including separate reasoning-effort settings.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Ajoute les modèles du chart Pareto dans mon picker Hermes, mais vérifie les vrais IDs d'abord.",
+  "Le modèle frère apparaît dans /model, pas celui demandé : tu peux trouver où ça bloque ?",
+  "J'ai une liste de modèles GPT avec low/medium/high, faut les ajouter au catalogue KIE.",
+  "Mets à jour les modèles disponibles chez ce provider sans inventer des IDs pour les variantes reasoning.",
+  "Tu peux vérifier que la config curated et le fallback catalog sont bien alignés ?",
+  "Le test provider passe, mais le modèle n'est toujours pas visible dans /model…",
+  "Repars de l'image du benchmark et transcris les labels exactement, stp.",
+  "J'ai mis des modèles Claude, Gemini et GPT dans mon tableau ; garde chaque modèle sous son vrai provider.",
+  "Fais le split de routing recommandé pour Scena dans le Cloudflare Worker et vérifie les catalogues Hermes.",
+  "Est-ce que GPT-5.6 low est un model ID distinct ou juste un effort de raisonnement ?",
+  "Le catalogue live montre plus de modèles que mon Pareto : donne-moi la liste réellement résolue.",
+  "Avant de commit les IDs, charge model-id-lookup et valide aussi le mapping des reasoning settings."
+ ],
+ "intents_en": [
+  "Add these benchmark models to the Hermes picker.",
+  "Verify the provider's exact model IDs.",
+  "Why is the sibling model missing from /model?",
+  "Separate reasoning effort from model IDs.",
+  "Check the resolved catalog and provider routing."
+ ],
+ "entities": [
+  "Hermes",
+  "/model",
+  "hermes_cli.models.provider_model_ids(provider)",
+  "model-id-lookup",
+  "provider model catalog",
+  "static fallback catalog",
+  "curated picker configuration",
+  "benchmark chart",
+  "Pareto chart",
+  "KIE",
+  "GPT-5.6",
+  "reasoning effort",
+  "Claude",
+  "Gemini",
+  "Scena",
+  "Cloudflare Worker",
+  "references/kie-gpt56-pareto.md",
+  "references/scena-kie-routing-split.md"
+ ],
+ "symptoms": [
+  "A sibling model works, but the requested sibling is absent from /model.",
+  "A model appears in configuration but not in the resolved picker catalog.",
+  "Provider transport tests pass, but picker visibility is unverified or incorrect.",
+  "Reasoning variants are being treated as separate model IDs.",
+  "The live provider catalog includes models beyond the curated Pareto subset."
+ ],
+ "not_for": [
+  "Changing a model's runtime reasoning effort without updating or validating its catalog entry.",
+  "General Hermes installation or configuration troubleshooting unrelated to model catalogs.",
+  "Benchmark analysis or ranking without mapping results into a Hermes provider picker.",
+  "Implementing unrelated Cloudflare Worker features or provider routing changes."
+ ]
+}

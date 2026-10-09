@@ -1,0 +1,51 @@
+{
+ "name": "session-librarian",
+ "sha": "149043c438958a93377d16e101144875ce8263f9184899659b8276884b6307b3",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00045161325,
+ "summary": "Use when Monsieur wants to find, review, rename, branch, archive, or prune past sessions in his session library.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Retrouve mes sessions sur le pricing Q3.",
+  "Qu'est-ce qu'on avait décidé sur le lancement de W.Alter ?",
+  "Renomme cette session avec un titre plus clair.",
+  "Tu peux nettoyer ma bibliothèque de sessions ?",
+  "Archive les sessions qui datent et ne servent plus.",
+  "Celle d'hier sur le bug de paiement, retrouve-la et rappelle-moi la conclusion.",
+  "J'ai plusieurs sessions sur ce projet, trouve les doublons et propose quoi garder.",
+  "Fais-moi une session par ticket à partir de cette liste, avec un suivi séparé.",
+  "Cherche les discussions Telegram de plus de 60 jours et dis-moi lesquelles sont encore utiles.",
+  "Supprime les sessions vides, mais montre-moi d'abord ce que tu comptes supprimer.",
+  "Forke cette session pour qu'on se concentre uniquement sur la partie onboarding.",
+  "Avant d'archiver les anciennes sessions, exporte celles qui contiennent des décisions importantes."
+ ],
+ "intents_en": [
+  "Find my sessions about Q3 pricing.",
+  "What did we decide in that session?",
+  "Rename these sessions clearly.",
+  "Archive stale sessions in my library.",
+  "Show me a dry run before deleting duplicates."
+ ],
+ "entities": [
+  "session_search",
+  "hermes sessions list",
+  "hermes sessions stats",
+  "hermes sessions rename",
+  "hermes sessions archive",
+  "hermes sessions delete",
+  "hermes sessions prune",
+  "hermes sessions export",
+  "/branch",
+  "/resume",
+  "delegate_task",
+  "@session:"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Summarizing the current conversation without searching past sessions",
+  "Organizing project files or documents",
+  "Managing calendars, reminders, or task lists",
+  "Editing sessions belonging to another profile"
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "name": "hermes-tui-feed-customization",
+ "sha": "7df2156c1fb0adef719c553f9d2a2b94165c2cb89dedaf8363f66b7012a358e8",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000528462,
+ "summary": "Use when modifying Hermes TUI feed rendering, tool trails/emojis, inline thinking, or section visibility in the Ink/React interface.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Je veux afficher thinking et les tools dans l'ordre chronologique comme dans le CLI, tu modifies où ?",
+  "Peux-tu fusionner le panneau Thinking et Tool calls dans le feed ?",
+  "Les emojis des tools disparaissent quand l'appel se termine, regarde le pipeline stp.",
+  "Comment changer les sections thinking/tools pour qu'elles soient ouvertes par défaut ?",
+  "Je veux afficher le raisonnement complet inline, pas juste le preview tronqué à 160 caractères.",
+  "J'ai deux lignes drafting terminal dans le feed, tu peux corriger le doublon ?",
+  "Dans le TUI, j'ai encore un point ● avant chaque tool alors que l'emoji est déjà affiché.",
+  "Les tool emojis définis dans le registry ne s'affichent pas, est-ce que le skin les écrase ?",
+  "J'ai modifié thinking.tsx et rebuild dist/entry.js, mais le TUI lancé n'a pas changé.",
+  "Pour mon changement ToolTrail, quels composants et fichiers du TUI je dois toucher ?",
+  "Quand je copie un fichier avec read_file puis write_file, les numéros de ligne sont ajoutés au contenu. Comment éviter ça ?",
+  "Le Spinner plante avec une prop running, tu peux vérifier comment le composant est utilisé dans le feed ?"
+ ],
+ "intents_en": [
+  "Show thinking and tool calls in chronological order in the TUI feed.",
+  "Tool emojis disappear when a call completes.",
+  "Make thinking and tools expanded by default.",
+  "Remove duplicate drafting tool entries from the feed.",
+  "Render full reasoning inline instead of a truncated preview."
+ ],
+ "entities": [
+  "Hermes TUI",
+  "Ink",
+  "React",
+  "ToolTrail",
+  "thinking.tsx",
+  "details.ts",
+  "SECTION_DEFAULTS",
+  "config.yaml",
+  "display.sections",
+  "tools/*.py",
+  "registry.register()",
+  "skins/*.yaml",
+  "tool_emojis",
+  "tui_gateway/server.py",
+  "_on_tool_start",
+  "tool.start",
+  "turnController.ts",
+  "recordToolStart",
+  "ActiveTool.emoji",
+  "text.ts",
+  "buildToolTrailLine",
+  "completeTool()",
+  "createGatewayEventHandler.ts",
+  "THINKING_COT_MAX",
+  "cleanThinkingText"
+ ],
+ "symptoms": [
+  "Tool emojis disappear when tools complete",
+  "Duplicate drafting terminal entries in the feed",
+  "A hardcoded ● appears before tool emojis",
+  "Thinking text is truncated to 160 characters",
+  "Rebuilt dist/entry.js has no effect on the running TUI",
+  "read_file output with line-number prefixes corrupts files when written back",
+  "Spinner rejects the running prop"
+ ],
+ "not_for": [
+  "Changing Hermes agent behavior or prompt/persona",
+  "Adding or implementing a new tool or provider integration",
+  "Customizing the web UI rather than the Ink/React TUI feed",
+  "General user configuration unrelated to feed sections or tool display"
+ ]
+}

@@ -1,0 +1,71 @@
+{
+ "name": "walter-operating-mode",
+ "sha": "15897a07b43debc8124d741534b21aebbf2514f63eb496296d06b788d9bbaa00",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008573895,
+ "summary": "Use when Monsieur’s request depends on W.Alter’s identity, communication style, autonomy, tool choices, or operating rules.",
+ "kind": "persona",
+ "intents_fr": [
+  "Walter, réponds-moi comme d’habitude, sans bla-bla.",
+  "Je te demande une action précise : fais-la, ne me propose pas trois alternatives.",
+  "Je t’ai dit X et Y, c’est tout. Reste sur cette stack.",
+  "Pourquoi tu compliques tout ? Trouve le chemin le plus court.",
+  "Prends en charge la tâche et dis-moi juste quand c’est lancé.",
+  "Tu peux déléguer ça aux agents et me faire une synthèse après ?",
+  "Pour cette mission de code, passe par le super-coder et suis l’avancement.",
+  "Je veux Fable-5 pour réfléchir à l’architecture, puis DeepSeek pour exécuter.",
+  "Réponds-moi en anglais pour cette conversation.",
+  "Je te parle de l’app Hermes V2 sur mon Mac : règle le problème côté Mac d’abord.",
+  "Tu viens d’inventer cette info ou tu l’as vraiment vérifiée ?",
+  "Garde ce handle en mémoire tout de suite, je ne veux pas avoir à te le redonner."
+ ],
+ "intents_en": [
+  "Just do the task, no alternatives.",
+  "Keep it short and tell me what you actually know.",
+  "Use only the tools I specified.",
+  "Delegate the coding task and track its progress.",
+  "Fix the Hermes app on my Mac first."
+ ],
+ "entities": [
+  "W.Alter",
+  "Hermes",
+  "Hermes V2",
+  "Telegram",
+  "Gemini Live",
+  "DeepSeek",
+  "deepseek/deepseek-v4-pro",
+  "Fable-5",
+  "Dipsyque",
+  "spawn_super_coder_async.py",
+  "delegate_task",
+  "Hermes tools",
+  "voice_router_service.py",
+  "outer_router.py",
+  "CHAT_COMMUNICATION_CONTEXT",
+  "TECHNICAL_DETAIL_CUES",
+  "PostgreSQL",
+  "Qdrant",
+  "Memory Gateway",
+  "Action Firewall",
+  "Context Builder",
+  "Kardex",
+  "Hindsight",
+  "USER.md",
+  "Tailscale"
+ ],
+ "symptoms": [
+  "Réponses trop longues, robotiques ou chargées de labels comme « Décision » et « Action »",
+  "Alternatives proposées alors que Monsieur a nommé un outil ou une stack précise",
+  "Tâche simple transformée en suite inutile de recherches ou d’appels d’outils",
+  "Assistant qui explique ses limites au lieu de tenter une action concrète",
+  "Information personnelle inventée, mal vérifiée ou redemandée après avoir été donnée",
+  "Problème de connexion à Hermes V2 analysé côté serveur alors que le Mac est le client"
+ ],
+ "not_for": [
+  "Déboguer une API, un service ou une application précise sans enjeu lié au mode opératoire de W.Alter",
+  "Mettre en œuvre l’architecture mémoire Jarvis en détail",
+  "Rechercher une identité ou un handle selon la procédure de recherche dédiée",
+  "Modifier les thèmes du dashboard"
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "name": "hosted-mcp-oauth",
+ "sha": "c475c0bcd2960244a2db350a95406c5c5ba68587007069d80a7e63dced77c8d8",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00065357325,
+ "summary": "Use when connecting or fixing a hosted HTTP MCP server that requires OAuth from Hermes, especially on a headless or SSH host.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Connecte-moi le MCP Higgsfield à Hermes.",
+  "Ajoute ce serveur MCP distant avec OAuth, pas avec une clé API.",
+  "Je suis en SSH et Hermes n'arrive pas à ouvrir le navigateur pour le login MCP, on fait comment ?",
+  "Hermes me donne une URL d'autorisation puis ça redirige vers localhost sur mon laptop. Je te colle quoi ?",
+  "J'ai fini le login OAuth dans le navigateur, voilà l'URL de callback : tu peux terminer la connexion ?",
+  "Le MCP est dans la config mais je veux vérifier qu'il marche vraiment, pas juste qu'il est ajouté.",
+  "Après /new, Higgsfield me redemande de m'authentifier alors que j'ai déjà fait le OAuth, c'est normal ?",
+  "J'ai `redirect_uri does not match any of the OAuth 2.0 Client's pre-registered redirect urls` avec Higgsfield.",
+  "mcporter me sort `Invalid scope requested` pour Higgsfield : trouve une façon fiable de connecter le MCP.",
+  "Quand je fais `hermes mcp list`, j'ai `TypeError: string indices must be integers`. Tu peux réparer l'entrée MCP puis tester ?",
+  "Les outils MCP n'apparaissent pas dans ma session après l'authentification. Il faut recharger quoi ?",
+  "Le token OAuth Higgsfield a expiré et je veux réauthentifier sans redémarrer Hermes."
+ ],
+ "intents_en": [
+  "Connect this hosted MCP with OAuth.",
+  "Finish the MCP login from my SSH session.",
+  "I have the localhost callback URL; complete the OAuth flow.",
+  "Test whether the remote MCP is connected.",
+  "Fix Higgsfield OAuth redirect errors."
+ ],
+ "entities": [
+  "Hermes",
+  "hosted HTTP MCP",
+  "OAuth",
+  "Higgsfield",
+  "https://mcp.higgsfield.ai/mcp",
+  "hermes mcp add",
+  "hermes mcp login",
+  "hermes mcp test",
+  "hermes mcp list",
+  "/reload-mcp",
+  "mcporter",
+  "mcp_servers",
+  "config.yaml",
+  "127.0.0.1",
+  "localhost",
+  "/callback",
+  "script",
+  "PTY",
+  "~/.hermes/mcp-tokens/",
+  "scripts/higgsfield_fifo_auth.py",
+  "/tmp/higgsfield_code",
+  "Tailscale"
+ ],
+ "symptoms": [
+  "Hermes cannot open a browser or reports no cached OAuth tokens.",
+  "OAuth redirects to 127.0.0.1 on a different machine from the Hermes host.",
+  "`redirect_uri does not match any of the OAuth 2.0 Client's pre-registered redirect urls`",
+  "`Invalid scope requested` from mcporter discovery.",
+  "`TypeError: string indices must be integers` from `hermes mcp list`.",
+  "OAuth prompts again after starting a new Hermes session.",
+  "OAuth succeeds but MCP tools do not appear in the active session."
+ ],
+ "not_for": [
+  "Connecting native MCP servers that do not use hosted HTTP OAuth.",
+  "Setting up an MCP server that authenticates only with a static API key.",
+  "General Hermes installation or SSH access troubleshooting.",
+  "Using Higgsfield model IDs or querying its model catalog unrelated to MCP authentication."
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "name": "hermes-provider-mastery",
+ "sha": "d44f960a55386bb082af6187caa91edb08dff275c6c46e7691394a9ab229a412",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00086790825,
+ "summary": "Use when configuring or debugging Hermes LLM providers, credentials, auxiliary models, validation warnings, request payloads, or token costs.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute ce nouveau provider dans Hermes et configure le modèle par défaut avec sa clé API.",
+  "J’ai un 401 sur title_generation alors que le chat principal fonctionne, tu peux regarder la config provider/auxiliary ?",
+  "Pourquoi Hermes n’arrive pas à trouver la clé quand auxiliary.provider est sur auto ?",
+  "La commande /model me dit “could not reach” pour mon modèle Kie.ai, mais les appels marchent. C’est un faux warning ?",
+  "Tu peux vérifier quel provider et quelle URL sont vraiment utilisés dans la dernière requête Hermes ?",
+  "Configure le curator avec Gemini Flash, et vérifie le nom exact du modèle.",
+  "Mes subagents partent encore sur l’ancien modèle : où régler delegation.provider et delegation.model ?",
+  "Je veux réduire les tokens envoyés à chaque appel. Est-ce que tool_search vaut le coup dans ma config ?",
+  "Explique-moi ce qui compose le payload Hermes et ce qui coûte le plus cher en tokens.",
+  "Grok apparaît dans le picker Hermes : comment savoir si mon compte peut vraiment l’utiliser ?",
+  "Le proxy Hermes renvoie encore un 402 spending-limit, c’est normal même avec xai-oauth ?",
+  "J’ai changé de fournisseur, mais les services vision et compression semblent encore utiliser l’ancien. Comment vérifier et corriger leurs overrides ?"
+ ],
+ "intents_en": [
+  "Set up a new Hermes LLM provider.",
+  "Debug 401s from auxiliary models.",
+  "Fix a custom-provider model validation warning.",
+  "Check actual provider and endpoint used by a request.",
+  "Reduce Hermes payload tokens with tool_search."
+ ],
+ "entities": [
+  "Hermes",
+  "config.yaml",
+  "model.default",
+  "model.provider",
+  "providers.<name>",
+  "auxiliary.title_generation",
+  "auxiliary.vision",
+  "auxiliary.compression",
+  "auxiliary.curator",
+  "delegation.model",
+  "delegation.provider",
+  "key_env",
+  "Hermes .env",
+  "vault",
+  "tool_search",
+  "tool_describe",
+  "tool_call",
+  "hermes config set",
+  "hermes model --refresh",
+  "hermes auth status",
+  "hermes proxy",
+  "xai-oauth",
+  "XAI_API_KEY",
+  "Kie.ai",
+  "request_dump_*.json"
+ ],
+ "symptoms": [
+  "Auxiliary service returns HTTP 401 while the main chat model works",
+  "Provider or API key resolution silently falls back to the main provider",
+  "“could not reach … API to validate” warning for a working custom model",
+  "Model selection succeeds but inference returns HTTP 403",
+  "Proxy request returns HTTP 402 personal-team-blocked:spending-limit",
+  "tool_search auto mode does not activate",
+  "Unexpectedly large token usage from tool schemas or request payload"
+ ],
+ "not_for": [
+  "Debugging Hermes gateway or systemd service startup failures",
+  "Managing conversation history or general context-window trimming",
+  "Building an AI agent or changing its persona and system prompt",
+  "Using a provider’s web app or bypassing its API access, entitlement, or spending limits"
+ ]
+}

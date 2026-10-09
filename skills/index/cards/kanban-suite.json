@@ -1,0 +1,45 @@
+{
+ "name": "kanban-suite",
+ "sha": "775dfbeca11eb36c1671ef19e9c4271abee8f47c40bae75d4cd2c7904b4337f2",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000355905,
+ "summary": "Use when Monsieur veut découper un chantier en cartes Kanban, déléguer l’exécution à des workers et coordonner leur avancement.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Découpe ce gros chantier en cartes indépendantes et organise le board.",
+  "Lance les workers sur les tâches du sprint, avec le contexte et les critères d’acceptation.",
+  "Fais le point sur les cartes, répartis celles qui restent et coordonne la suite.",
+  "On a plusieurs features à sortir en parallèle : prépare les lanes et délègue le boulot.",
+  "Le worker a fini, synthétise son rapport et dis-moi ce qui bloque encore.",
+  "J’ai une épique trop grosse, transforme-la en petites tâches testables.",
+  "Tu peux orchestrer l’implémentation sans toucher au code toi-même ?",
+  "Les agents se marchent dessus sur ce projet ; organise le travail par cartes et périmètres.",
+  "Crée un plan de livraison Kanban pour cette refonte et envoie les sous-tâches aux workers.",
+  "Le board n’avance plus, regarde les tâches bloquées et redispatche proprement.",
+  "Pour chaque worker, passe les specs utiles et demande un retour avec fichiers modifiés et tests.",
+  "On reprend le chantier d’hier : vérifie l’état des cartes et coordonne les prochaines exécutions."
+ ],
+ "intents_en": [
+  "Break this epic into Kanban cards and assign workers.",
+  "Coordinate the agents and report blocked tasks.",
+  "Delegate the implementation across independent work lanes.",
+  "Review worker reports and summarize remaining issues.",
+  "Plan the board and dispatch the next tasks."
+ ],
+ "entities": [
+  "Kanban board",
+  "orchestrator",
+  "Worker",
+  "delegate_task",
+  "references/orchestrator.md",
+  "references/worker.md",
+  "TDD"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Directly editing code or running tests as the execution worker.",
+  "General project planning that does not involve Kanban task coordination or delegated workers.",
+  "Operating a specific CI/CD platform, cloud provider, or deployment service."
+ ]
+}

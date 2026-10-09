@@ -1,0 +1,67 @@
+{
+ "name": "evaluating-llms-harness",
+ "sha": "3fe0bc4e338a4ef7347ac122352ab2c40adb26be453d84c647cd4670f45abf91",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008346195,
+ "summary": "Use when Monsieur veut benchmarker, comparer ou suivre des modèles LLM avec lm-evaluation-harness et des scores standardisés.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Tu peux benchmarker mon modèle sur MMLU, GSM8K et HellaSwag ?",
+  "Comment je lance lm-eval sur mon checkpoint Hugging Face ?",
+  "Compare ces deux modèles avec les mêmes benchmarks et fais-moi un tableau des scores.",
+  "Je veux suivre la progression de mes checkpoints pendant le training, tu me proposes un script ?",
+  "Fais-moi une commande lm_eval pour évaluer Mistral sur le suite standard.",
+  "Les résultats de mon modèle sont différents de ceux du paper, qu’est-ce que je dois vérifier ?",
+  "L’évaluation MMLU prend des heures, comment accélérer avec vLLM ?",
+  "J’ai un out of memory quand je lance GSM8K, quels paramètres je réduis ?",
+  "Je veux mesurer les capacités de raisonnement et de code de mon LLM, quels benchmarks lm-eval choisir ?",
+  "Comment évaluer mon modèle servi par une API OpenAI-compatible avec le harness ?",
+  "lm-eval refuse de lancer HumanEval, il faut activer quoi ?",
+  "On peut faire une évaluation reproductible de mes modèles et sauvegarder les prédictions individuelles ?"
+ ],
+ "intents_en": [
+  "Benchmark my model on MMLU and GSM8K",
+  "Compare these LLM checkpoints with lm-eval",
+  "Speed up evaluation using vLLM",
+  "Track benchmark scores during training",
+  "Evaluate an API model with the harness"
+ ],
+ "entities": [
+  "lm-eval",
+  "lm-evaluation-harness",
+  "EleutherAI",
+  "Hugging Face Transformers",
+  "vLLM",
+  "MMLU",
+  "GSM8K",
+  "HellaSwag",
+  "TruthfulQA",
+  "ARC",
+  "HumanEval",
+  "MBPP",
+  "PIQA",
+  "OpenAI API",
+  "Anthropic API",
+  "Hugging Face Open LLM Leaderboard",
+  "lm_eval",
+  "--tasks",
+  "--num_fewshot",
+  "--output_path",
+  "--log_samples",
+  "--confirm_run_unsafe_code"
+ ],
+ "symptoms": [
+  "L’évaluation est trop lente",
+  "CUDA out of memory pendant l’évaluation",
+  "Les scores diffèrent de ceux publiés dans un paper",
+  "lm-eval refuse d’exécuter HumanEval ou MBPP sans confirmation",
+  "Les résultats de benchmark ne sont pas sauvegardés au chemin attendu"
+ ],
+ "not_for": [
+  "Évaluer la qualité conversationnelle avec MT-Bench ou AlpacaEval",
+  "Mesurer la fairness, la calibration ou l’efficacité avec HELM",
+  "Créer uniquement un jeu d’évaluation métier sans utiliser lm-eval",
+  "Entraîner ou fine-tuner un modèle LLM"
+ ]
+}

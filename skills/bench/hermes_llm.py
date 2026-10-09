@@ -53,6 +53,9 @@ def main() -> None:
     ap.add_argument("--dev", type=int, default=100)
     ap.add_argument("--model", default="openai/gpt-6-luna")
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--session", action="store_true", help="also tell the model which skills were loaded earlier")
+    ap.add_argument("--ids", default="", help="file of case ids to run instead of the benchmark sample")
+    ap.add_argument("--tag", default="", help="suffix for the output file")
     a = ap.parse_args()
     cases, corpus = load()
     if a.corpus == "active":
@@ -60,15 +63,25 @@ def main() -> None:
     names = {s["name"] for s in corpus}
     system = index(corpus)
     tag = a.model.split("/")[-1]
-    out = DATA / f"llm_{a.corpus}_hermes-index_{tag}.jsonl"
+    out = DATA / f"llm_{a.corpus}_hermes-index{'+session' if a.session else ''}_{tag}{a.tag}.jsonl"
     done = {json.loads(line)["id"] for line in open(out)} if out.exists() else set()
-    todo = [c for c in sample(cases, a.dev) if c["id"] not in done]
+    if a.ids:
+        ids = set(open(a.ids).read().split())
+        todo = [c for c in cases if c["id"] in ids and c["id"] not in done]
+    elif out.name.startswith("llm_full_") or "+session" in out.name:  # same case sample as the first run
+        ids = {json.loads(line)["id"] for line in open(DATA / "llm_active_hermes-index_gpt-6-luna.jsonl")}
+        todo = [c for c in cases if c["id"] in ids and c["id"] not in done]
+    else:
+        todo = [c for c in sample(cases, a.dev) if c["id"] not in done]
     print(f"{len(todo)} to run, index {len(system)} chars", file=sys.stderr)
 
     def run(c: dict):
         ctx = c.get("context") or {}
         convo = (f"[previous user message]\n{ctx.get('prev_user', '')}\n[previous assistant message]\n"
                  f"{ctx.get('prev_assistant', '')}\n[current user message]\n{c['query']}")
+        if a.session and c.get("session_skills"):
+            loaded = sorted(c["session_skills"], key=c["session_skills"].get)
+            convo = f"[skills already loaded earlier in this conversation, most recent first]\n{', '.join(loaded)}\n" + convo
         t0 = time.perf_counter()
         try:
             r = llm.chat([{"role": "system", "content": system}, {"role": "user", "content": f"{convo}\n\n{ASK}"}],

@@ -1,0 +1,60 @@
+{
+ "name": "telegram-delivery-operations",
+ "sha": "cfb26c1b3765a9436510d086f1748681feb0cf490a857a05c9a1a87b367c8c5f",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000381447,
+ "summary": "Use when sending or troubleshooting Telegram media, formatted messages, tables, or delivery verification.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Envoie cette image sur Telegram.",
+  "Balance le fichier original sur Telegram, sans compression.",
+  "Tu peux envoyer la vidéo avec une légende courte ?",
+  "Le MEDIA:/... n’a rien envoyé, fais le fallback proprement et vérifie.",
+  "Pourquoi mon tableau s’affiche avec les pipes au lieu d’être structuré ?",
+  "Mets-moi ces infos dans un tableau Telegram lisible sur téléphone.",
+  "Formate ce message Telegram en HTML plutôt qu’en Markdown.",
+  "Tu peux vérifier que le message et la pièce jointe sont bien arrivés ?",
+  "Ça a répondu 200, mais je ne vois rien dans le chat : vérifie la livraison.",
+  "Découpe le texte pour que la légende respecte la limite Telegram.",
+  "Envoie le PDF dans le bon chat, mais ne montre pas le token.",
+  "Pour le message de coûts dont on parlait, garde bien les tarifs par seconde, image et vidéo séparés."
+ ],
+ "intents_en": [
+  "Send this image on Telegram.",
+  "Deliver the original file without compression.",
+  "Check why the Telegram table renders as plain text.",
+  "Verify the media actually arrived in the chat.",
+  "Format this as a readable Telegram rich message."
+ ],
+ "entities": [
+  "Telegram",
+  "Hermes",
+  "MEDIA:/absolute/path",
+  "Telegram Bot API",
+  "sendDocument",
+  "sendPhoto",
+  "sendMessage",
+  "Markdown",
+  "HTML",
+  "Rich Messages",
+  "chat ID",
+  "bot token",
+  "JSON ok flag",
+  "message_id",
+  "references/curator-telegram-archive-routes.md"
+ ],
+ "symptoms": [
+  "MEDIA marker appears to succeed but nothing arrives",
+  "Telegram pipe table renders literally",
+  "HTTP request accepted but no message is visible",
+  "Caption exceeds the active limit",
+  "Media arrives compressed when original quality was expected"
+ ],
+ "not_for": [
+  "Creating a Telegram bot or configuring webhook infrastructure",
+  "Generating or editing the image or video itself",
+  "Writing general Telegram content unrelated to delivery or formatting",
+  "Managing Telegram groups, users, or permissions"
+ ]
+}

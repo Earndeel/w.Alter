@@ -1,0 +1,48 @@
+{
+ "name": "writing-plans",
+ "sha": "10f90617ee2ab1a78f157a48b9006d15a82761e2316bf6b360857c14a748a0d5",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000508167,
+ "summary": "Use when turning a software feature or complex requirement into a detailed, bite-sized implementation plan with files, code, tests, and commands.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi un plan d'implémentation pour cette feature, avec les fichiers précis à modifier.",
+  "Avant de coder, découpe ça en petites tâches testables avec les commandes de vérification.",
+  "Prépare un plan que je peux filer à un subagent, il doit avoir zéro contexte.",
+  "Comment on devrait implémenter cette demande ? Explore le repo et écris un plan détaillé.",
+  "Fais le plan TDD pour ajouter l'auth, tests d'abord puis implémentation.",
+  "Cette feature a l'air simple mais je veux un plan clair, avec les chemins et le code à écrire.",
+  "Découpe le refacto en étapes de 2-5 minutes et indique quoi commit à chaque fois.",
+  "Écris le plan dans docs/plans avec l'architecture, les tests et comment vérifier que ça marche.",
+  "Ton plan est trop vague : précise les fichiers exacts, les commandes et les résultats attendus.",
+  "Ajoute les edge cases et l'intégration au plan, sans prévoir des trucs inutiles pour plus tard.",
+  "Je vais déléguer le dev : donne-moi les tâches dans l'ordre avec tout le contexte nécessaire.",
+  "OK pour l'approche, maintenant transforme les critères d'acceptation en plan de mise en œuvre."
+ ],
+ "intents_en": [
+  "Write a step-by-step implementation plan for this feature.",
+  "Break this requirement into small, testable coding tasks.",
+  "Create a detailed plan with exact files, code, and test commands.",
+  "Prepare an implementation plan I can hand to a subagent.",
+  "Turn these acceptance criteria into a TDD plan."
+ ],
+ "entities": [
+  "Hermes tools",
+  "search_files",
+  "read_file",
+  "pytest",
+  "git",
+  "docs/plans/",
+  "subagent-driven-development",
+  "test-driven-development",
+  "requesting-code-review"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Implementing the feature or making code changes directly",
+  "Writing tests as a standalone TDD task",
+  "Reviewing completed code for correctness or quality",
+  "Delegating and executing implementation tasks"
+ ]
+}

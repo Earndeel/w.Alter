@@ -1,0 +1,71 @@
+{
+ "name": "comfyui",
+ "sha": "f2982ebbe4d772eba9f09fbc0905b10541c9897cc2c450687bf648771c443bfe",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00089859825,
+ "summary": "Use when Monsieur veut installer ou piloter ComfyUI, gérer ses modèles/nœuds ou lancer et suivre un workflow de génération image, vidéo ou audio.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Installe-moi ComfyUI sur cette machine.",
+  "ComfyUI ne démarre plus, tu peux vérifier ce qui coince ?",
+  "On part sur Comfy Cloud plutôt qu'en local, comment je le configure ?",
+  "Lance ce workflow Flux avec ce prompt et mets les images dans outputs.",
+  "Tu peux faire de l'image-to-image avec cette photo dans ComfyUI ?",
+  "Fais-moi 8 variantes avec des seeds différentes.",
+  "Quels paramètres je peux modifier dans ce workflow JSON ?",
+  "Il me manque des nodes ou des modèles pour ce workflow, tu peux vérifier et installer les dépendances ?",
+  "Ajoute le custom node dont j'ai besoin et vérifie qu'il est bien installé.",
+  "La génération tourne encore ? Montre-moi la progression en direct.",
+  "Le job ComfyUI a échoué, récupère l'erreur à partir du prompt_id.",
+  "Je veux générer une vidéo Wan depuis un prompt, tu peux lancer le workflow ComfyUI ?"
+ ],
+ "intents_en": [
+  "Install and launch ComfyUI.",
+  "Run this ComfyUI workflow with my prompt.",
+  "Check which workflow parameters I can change.",
+  "Install the missing ComfyUI nodes and models.",
+  "Monitor the job and fetch its error logs."
+ ],
+ "entities": [
+  "ComfyUI",
+  "comfy-cli",
+  "Comfy Cloud",
+  "COMFY_CLOUD_API_KEY",
+  "Fal.ai",
+  "Cloudflare Named Tunnels",
+  "Stable Diffusion",
+  "SDXL",
+  "Flux",
+  "SD3",
+  "Wan",
+  "AnimateDiff",
+  "Hunyuan Video",
+  "AudioCraft",
+  "ControlNet",
+  "REST API",
+  "WebSocket",
+  "/api/prompt",
+  "/api/view",
+  "/ws",
+  "127.0.0.1:8188",
+  "comfy launch",
+  "run_workflow.py",
+  "run_batch.py",
+  "extract_schema.py"
+ ],
+ "symptoms": [
+  "ComfyUI server is unreachable",
+  "Missing custom nodes or model dependencies",
+  "Workflow JSON is in editor format and cannot be executed",
+  "Generation is stuck or fails with a prompt_id",
+  "Out-of-memory errors or insufficient VRAM",
+  "No usable GPU detected"
+ ],
+ "not_for": [
+  "Demander uniquement une idée de prompt ou une direction artistique, sans utiliser ComfyUI.",
+  "Générer une image avec un autre outil ou service sans rapport avec ComfyUI.",
+  "Retoucher une image dans un éditeur graphique classique.",
+  "Développer un modèle d'IA générative ou entraîner un modèle de fondation."
+ ]
+}

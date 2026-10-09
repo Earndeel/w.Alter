@@ -1,0 +1,69 @@
+{
+ "name": "multi-model-coder-router",
+ "sha": "ec4b5be08c35e08b52e469728258f88bc864da62a3da97f73f705cf29aea2198",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000737847,
+ "summary": "Use when concevoir ou configurer le routage multi-modèles de W.Alter/Hermes pour coder, déléguer avec contexte minimal et vérifier les résultats.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Aide-moi à monter un système de coding workers pour W.Alter, avec un maker et un checker.",
+  "Comment router les tâches de code vers Claude, Gemini ou Kimi selon le type de boulot ?",
+  "Je veux que mes agents de code aient juste le contexte et les secrets nécessaires, pas tout le payload Hermes.",
+  "Fais-moi une architecture pour déléguer les bugs et les features à des workers isolés.",
+  "On peut créer un spawn_coder qui choisit le modèle, ouvre un worktree et vérifie les tests ?",
+  "Mon coder dit que c’est fini mais personne ne lance les tests : il faut rendre la vérification obligatoire.",
+  "Je veux séparer les credentials Cloudflare staging, prod et Stripe selon la mission.",
+  "Comment faire une capsule de contexte minimale pour envoyer un ticket à un agent de code ?",
+  "Regarde comment construire un routeur dry-run pour mes requêtes W.Alter, sans lancer d’agents ni modifier la config.",
+  "Le routeur envoie mes demandes de review au coder parce qu’elles contiennent « backend » ou « repo » ; comment corriger les priorités ?",
+  "Ajoute de la télémétrie au router, mais sans enregistrer les requêtes complètes ni les secrets.",
+  "Je veux faire évoluer le système par étapes : profils spécialisés d’abord, plusieurs runtimes ensuite, puis routing basé sur les résultats."
+ ],
+ "intents_en": [
+  "Design a multi-model coding router for W.Alter.",
+  "Route coding tasks to specialized workers by task type.",
+  "Give coding agents minimal context and scoped credentials.",
+  "Add independent verification before reporting code changes as done.",
+  "Build a dry-run router policy and safe telemetry."
+ ],
+ "entities": [
+  "W.Alter",
+  "Hermes",
+  "Claude Opus",
+  "Claude Code",
+  "Codex",
+  "Gemini",
+  "Gemini Flash",
+  "Kimi",
+  "Sonnet",
+  "delegate_task",
+  "spawn_coder",
+  "route_coding_task",
+  "smart_model_routing",
+  "~/.hermes/config/router_brain.yaml",
+  "worktree",
+  "maker",
+  "checker",
+  "capability broker",
+  "context capsule",
+  "credential_scope",
+  "tool_scope",
+  "verification_commands",
+  "telemetry JSONL",
+  "dry-run classifier"
+ ],
+ "symptoms": [
+  "Les prompts de review sont routés vers l’implémentation à cause de mots comme « code », « backend » ou « repo ».",
+  "Les workers reçoivent tout le prompt Hermes ou des secrets sans rapport avec la mission.",
+  "L’agent déclare une tâche terminée sans preuve ni résultats de tests.",
+  "Le routeur lance des agents ou modifie la configuration pendant un test dry-run.",
+  "Les logs de routage contiennent des requêtes brutes ou des secrets."
+ ],
+ "not_for": [
+  "Implémenter ou corriger directement une feature dans un dépôt.",
+  "Exécuter un déploiement Cloudflare ou Stripe sur un environnement réel.",
+  "Effectuer une revue de code ponctuelle sans concevoir le système de routage.",
+  "Répondre à une recherche documentaire générale sans mettre en place un routeur."
+ ]
+}

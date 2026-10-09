@@ -1,0 +1,73 @@
+{
+ "name": "telegram-notification-delivery",
+ "sha": "6c002c38d2f371dc9acbe6194e8b7e0a5f9f8b2755f29f3492fad2992d82beb8",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00079836075,
+ "summary": "Use when sending results, alerts, or voice messages through Telegram, or diagnosing bot delivery, token, chat ID, and gateway issues.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Envoie ce résumé sur mon Telegram.",
+  "Tu peux notifier le channel maison quand l'analyse est terminée ?",
+  "Fais-moi un message Telegram lisible avec les infos importantes de ce JSON.",
+  "Le texte dépasse la limite, découpe-le pour Telegram stp.",
+  "J'ai une erreur 400 quand j'envoie le résultat au bot, tu peux corriger ça ?",
+  "Le bot répond plus, vérifie le token et remets la gateway en route.",
+  "Trouve le chat ID de la personne qui m'a écrit sur Telegram.",
+  "Envoie ce texte en vocal avec une voix française.",
+  "Le TTS a timeout, passe par edge-tts et envoie le mp3 sur Telegram.",
+  "J'ai généré un fichier ogg, envoie-le comme message vocal avec une petite légende.",
+  "Ça me met 403 Forbidden quand j'essaie de notifier le groupe, regarde le chat ID et l'accès du bot.",
+  "Pour les prochaines analyses, envoie juste le résumé au bot @walter_0002_bot, sans markdown qui casse."
+ ],
+ "intents_en": [
+  "Send this result to Telegram.",
+  "Notify my Telegram channel when the pipeline finishes.",
+  "Fix the bot's 400 error when sending this message.",
+  "Find the Telegram chat ID for this user.",
+  "Send this French text as a voice message."
+ ],
+ "entities": [
+  "Telegram Bot API",
+  "sendMessage",
+  "sendVoice",
+  "sendAudio",
+  "getMe",
+  "getUpdates",
+  "@walter_0002_bot",
+  "chat ID 1146774717",
+  "TELEGRAM_BOT_TOKEN",
+  "/root/.hermes/.env",
+  "/root/.hermes/config.yaml",
+  "/root/.hermes/state.db",
+  "/tmp/hermes_gateway.log",
+  "/root/.hermes/gateway_state.json",
+  "/root/.hermes/gateway.pid",
+  "hermes gateway run",
+  "hermes config set",
+  "execute_code",
+  "curl",
+  "edge-tts",
+  "text_to_speech",
+  "fr-FR-HenriNeural",
+  "MarkdownV2",
+  "sendMessage 4096-character limit"
+ ],
+ "symptoms": [
+  "Telegram API returns 400 Bad Request",
+  "Telegram API returns 401 Unauthorized",
+  "Telegram API returns 403 Forbidden",
+  "Telegram bot stops responding",
+  "TELEGRAM_BOT_TOKEN is empty or masked as ***",
+  "Long messages are rejected or truncated",
+  "MarkdownV2 formatting causes send failures",
+  "text_to_speech times out",
+  "An MP3 file fails when sent with sendVoice"
+ ],
+ "not_for": [
+  "Creating or managing Telegram bots, commands, or webhook integrations",
+  "General pipeline analysis or generating the analysis content itself",
+  "Producing or editing audio unrelated to Telegram delivery",
+  "Recovering non-Telegram services or gateways"
+ ]
+}

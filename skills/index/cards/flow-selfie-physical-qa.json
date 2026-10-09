@@ -1,0 +1,65 @@
+{
+ "name": "flow-selfie-physical-qa",
+ "sha": "2e6e85f8607c1b2690d63cb0e60cc7ec2e298b69cfd16edf5db86241e92fdc81",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000413622,
+ "summary": "Use when generating or retrying a selfie video and checking that the camera POV, gestures, dialogue, and selected output are physically credible.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Vérifie que cette vidéo Flow fait vraiment selfie, pas quelqu’un qui me filme avec mon téléphone.",
+  "On voit le dos du téléphone dans le rendu, c’est censé être un selfie ?",
+  "Le bras sort bizarrement du cadre et on voit le téléphone : contrôle le POV physique.",
+  "Le geste avec le panneau manque. Fais une variante à partir de la bonne image selfie et compare avant de choisir.",
+  "La main libre se transforme en téléphone quand il prend le dossier. Vérifie les frames autour de l’entrée du prop.",
+  "Écoute le dialogue : il doit s’arrêter exactement après la question, sans phrase en rab.",
+  "Tu peux couper le filler après la question si la coupe reste propre et synchronisée ?",
+  "Le retry est autorisé maintenant, lance-le avec un script fermé et vérifie le résultat.",
+  "Garde la version où le POV est bon comme fallback, même si le geste du panneau est raté.",
+  "Dans Flow, le panneau compte reste ouvert après Échap. Ferme-le avec le contrôle observé, puis reprends.",
+  "J’ai sélectionné l’ingrédient mais Settings ne s’ouvre pas. Attends que la chip apparaisse avant de cliquer.",
+  "Retrouve le nouveau média Flow correspondant au prompt exact, vérifie qu’il n’était pas dans le baseline et télécharge-le pour le QA."
+ ],
+ "intents_en": [
+  "Check whether this generated video is physically a selfie.",
+  "The phone back is visible; audit the camera POV.",
+  "Retry the missing panel gesture from the successful selfie still.",
+  "Verify the exact dialogue and remove extra filler if a clean cut is possible.",
+  "Find and QA the newly generated Flow media."
+ ],
+ "entities": [
+  "Flow",
+  "selfie video",
+  "native video",
+  "timestamped frames",
+  "ASR",
+  "Flow composer",
+  "Settings",
+  "ingredient chip",
+  "account panel",
+  "Close account panel",
+  "project inventory",
+  "media ID",
+  "attempt baseline",
+  "editor media",
+  "signed resource",
+  "QA paths"
+ ],
+ "symptoms": [
+  "Visible complete phone back, phone, or camera module in the supposed selfie",
+  "Mirror reflection or third-party camera/operator apparent",
+  "Foreshortened filming arm or hand/device geometry is unclear",
+  "Free-hand prop morphs into a phone",
+  "Required panel gesture is missing or targets the wrong place",
+  "Extra filler follows the exact requested question",
+  "Escape does not close the Flow account panel",
+  "Settings click is swallowed immediately after ingredient selection",
+  "New thumbnail appears but prompt or media ID does not match the attempt"
+ ],
+ "not_for": [
+  "Generating ordinary non-selfie video or choosing a video concept",
+  "General Flow account, billing, or credit management",
+  "Writing dialogue unrelated to checking a generated clip",
+  "Editing footage unrelated to selfie POV or this generation workflow"
+ ]
+}

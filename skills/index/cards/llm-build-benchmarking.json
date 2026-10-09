@@ -1,0 +1,58 @@
+{
+ "name": "llm-build-benchmarking",
+ "sha": "b331731c822fa9f986b2f1b7f141262a6408a3acf1ba888046110b3b492859fb",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000414711,
+ "summary": "Use when comparing coding models, providers, reasoning levels, or agent harnesses on the same build task with isolated runs and verified results.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Compare Claude et GPT sur la meme tache de build, avec un benchmark propre.",
+  "Fais un benchmark de ces deux modeles et verifie vraiment les artefacts, pas juste leurs reponses.",
+  "Le modele dit que c'est buildé, mais comment confirmer que ça marche ?",
+  "Compare les providers sur notre projet, en gardant les memes prompts et les memes outils.",
+  "Relance le benchmark avec un workspace vide pour chaque candidat.",
+  "J'ai besoin des coûts réels et des tokens par modele, y compris les tokens en cache.",
+  "Est-ce que ce run a vraiment utilisé le provider prévu ? Vérifie les métadonnées de routage.",
+  "Compare le reasoning low et high sur ce build, sans mélanger les durées des runs ratés.",
+  "Le benchmark a échoué à cause du provider : classe-le en DNF, pas comme un mauvais résultat du modèle.",
+  "Mesure la vitesse des agents sur la même phase et donne les timestamps de départ et de fin.",
+  "Vérifie le build, les tests et le comportement lancé avant de noter la qualité.",
+  "On peut comparer les screenshots, ou il faut aussi tester l'appli en fonctionnement ?"
+ ],
+ "intents_en": [
+  "Benchmark two coding models on the same build task.",
+  "Verify the provider actually used for this run.",
+  "Compare reasoning levels with isolated workspaces.",
+  "Check the build and runtime, not just the model's claims.",
+  "Report token usage, cost, and completion status."
+ ],
+ "entities": [
+  "llm-build-benchmarking",
+  "Git repositories",
+  "isolated workspaces",
+  "runtime profiles",
+  "model providers",
+  "reasoning levels",
+  "agent harnesses",
+  "Hermes profiles",
+  "Kie GPT-5.6",
+  "Codex CLI",
+  "references/kie-gpt56-hermes-codex.md"
+ ],
+ "symptoms": [
+  "Candidate claims it built and verified the artifact, but there is no independent execution evidence.",
+  "The configured model label conflicts with persisted provider or request metadata.",
+  "A profile clone routes to a stale endpoint instead of the intended provider.",
+  "A candidate workspace contains files left over from a smoke test or failed run.",
+  "An HTML shell loads but references a missing script.",
+  "A high-reasoning stream times out while idle.",
+  "Provider aborts prevent a candidate run from completing."
+ ],
+ "not_for": [
+  "Implementing or debugging the build artifact itself.",
+  "Choosing a model without running a controlled build comparison.",
+  "Comparing general-purpose chat quality rather than autonomous coding on a shared task.",
+  "Benchmarking infrastructure performance without comparing coding candidates."
+ ]
+}

@@ -1,0 +1,62 @@
+{
+ "name": "ondemand-services",
+ "sha": "7f84131500718187bcfeb60e42b56d5ce74d7912fd44701ca8db59836ce3f857",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00045829575,
+ "summary": "Use when checking, starting, stopping, or debugging heavy services managed on demand with idle timeouts and dependencies.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Lance ComfyUI stp",
+  "Tu peux démarrer MiroShark ?",
+  "Pourquoi Neo4j est pas dispo ?",
+  "Check le status des services on-demand",
+  "Ollama tourne encore ?",
+  "Arrête ComfyUI, j’en ai plus besoin",
+  "Stoppe tous les services à la demande",
+  "Le watchdog idle marche bien ? Vérifie pourquoi le service reste lancé",
+  "Framelens répond plus, tu peux regarder s’il est démarré et le relancer ?",
+  "MiroShark me renvoie une erreur, assure-toi que Neo4j est aussi démarré",
+  "Je veux vraiment mettre ComfyUI en pause, tunnel compris",
+  "Regarde les timeouts idle et dis-moi pourquoi Ollama s’est arrêté"
+ ],
+ "intents_en": [
+  "Start ComfyUI on demand",
+  "Check on-demand service status",
+  "Stop all on-demand services",
+  "Why is Neo4j unavailable?",
+  "Debug the idle watchdog"
+ ],
+ "entities": [
+  "ondemand.sh",
+  "ComfyUI",
+  "miroshark-backend",
+  "MiroShark",
+  "Neo4j",
+  "Ollama",
+  "Framelens",
+  "systemd",
+  "ondemand-watchdog.timer",
+  "ondemand-watchdog.service",
+  "/usr/local/bin/ondemand.sh",
+  "/etc/systemd/system/ondemand-watchdog.service",
+  "/etc/systemd/system/ondemand-watchdog.timer",
+  "/run/ondemand/",
+  "cloudflared-comfy",
+  "miroshark-tunnel",
+  "ports 8188, 5001, 7474, 11434, 5002"
+ ],
+ "symptoms": [
+  "A managed service is unavailable because it is stopped",
+  "A service stays running after being idle",
+  "The watchdog does not stop idle services",
+  "ComfyUI or MiroShark tunnel returns 502",
+  "MiroShark backend is unavailable because Neo4j is stopped"
+ ],
+ "not_for": [
+  "Managing always-on services such as Asterisk or Hermes",
+  "Debugging application-level errors inside ComfyUI or Ollama",
+  "Configuring systemd socket activation or port proxies",
+  "Managing Docker containers or Cloudflare tunnels generally"
+ ]
+}

@@ -1,0 +1,51 @@
+{
+ "name": "simplify-code",
+ "sha": "db8ae6630a2bc6d7473e2611ef655ed2499e8a7e60af04907bcb9dc71f821fa0",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00073574325,
+ "summary": "Use when Monsieur explicitly asks to simplify, clean up, or review recent code changes and apply worthwhile refactors.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Simplifie mes changements récents et applique les nettoyages utiles.",
+  "Tu peux faire un /simplify sur ce que je viens de coder ?",
+  "Nettoie le diff avant que je fasse le commit, sans partir à la chasse aux bugs.",
+  "Revois mes changements côté duplication, qualité et perf, puis corrige ce qui est sûr.",
+  "J’ai ajouté pas mal de code dans src, tu peux simplifier ça ?",
+  "Fais juste un rapport sur les améliorations possibles, ne touche à rien pour l’instant.",
+  "Concentre-toi sur l’efficacité pour cette passe de simplification.",
+  "Simplifie le dernier commit et lance les tests ciblés après les corrections.",
+  "Regarde les changements staged seulement et enlève les trucs redondants.",
+  "Le diff est gros : tu peux nettoyer uniquement le dossier api ?",
+  "On vient de finir cette feature, fais une passe de cleanup sans réécrire tout le module.",
+  "T’as fini les corrections ? Maintenant regarde si le code peut être plus simple, surtout les duplications."
+ ],
+ "intents_en": [
+  "Simplify my recent changes.",
+  "Run /simplify on this diff.",
+  "Clean up the staged changes.",
+  "Review for duplication and unnecessary complexity.",
+  "Do a dry-run cleanup report; don't edit anything."
+ ],
+ "entities": [
+  "git diff",
+  "git diff HEAD",
+  "git diff --staged",
+  "git diff HEAD~1",
+  "git diff main...HEAD",
+  "delegate_task",
+  "AGENTS.md",
+  "CLAUDE.md",
+  "HERMES.md",
+  "targeted tests",
+  "linter",
+  "type check"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Hunting for correctness bugs or conducting a dedicated code review.",
+  "Implementing a new feature or making unrelated changes.",
+  "Automatically cleaning up code after every edit without an explicit request.",
+  "Applying risky public API, concurrency, or shared-infrastructure changes without Monsieur’s approval."
+ ]
+}

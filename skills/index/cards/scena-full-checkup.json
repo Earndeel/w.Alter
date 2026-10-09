@@ -1,0 +1,70 @@
+{
+ "name": "scena-full-checkup",
+ "sha": "82b34e1299f75f2536f55cd539b398e4f6da36be8cb41dbf8772f3655706845f",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00059392575,
+ "summary": "Use when Monsieur veut un checkup complet de Scena sur Cloudflare, avant/après déploiement ou pour confirmer l’état production.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi un checkup complet de Scena, on en est où ?",
+  "Tu peux vérifier l’état du projet Scena en prod ?",
+  "Après le déploiement, check que tout tourne bien : API, DB, pages et Stripe.",
+  "Scena est vraiment prêt pour la prod ? Fais le tour complet avant de me répondre.",
+  "Regarde si les trois bases D1 et les derniers jobs sont OK.",
+  "J’ai un doute sur l’état de Scena, vérifie les workers, les secrets et les endpoints.",
+  "Fais-moi le status de Scena, surtout Sentinel et les incidents récents.",
+  "Les pages Scena et Connect répondent bien ? Vérifie aussi le domaine API.",
+  "Avant qu’on fasse de gros changements, relève l’état actuel complet de Scena.",
+  "Le déploiement est passé, mais je veux un vrai smoke test de Scena, pas juste le worker.",
+  "Tu peux confirmer que Google auth, les routes admin et le webhook Stripe sont opérationnels ?",
+  "Petit checkup Scena stp : jobs bloqués, risque Sentinel, DNS, sécurité et readiness."
+ ],
+ "intents_en": [
+  "Run a full Scena production checkup.",
+  "Check whether Scena is ready for production.",
+  "Verify Scena after the deployment.",
+  "What is the current status of Scena?",
+  "Check Scena's Cloudflare services and databases."
+ ],
+ "entities": [
+  "Scena",
+  "Cloudflare",
+  "Wrangler",
+  "scena-api",
+  "scena-db",
+  "scena-saas-db",
+  "scena-ops-db",
+  "D1",
+  "Scena Sentinel",
+  "Scena Connect",
+  "scena-portal",
+  "scena-admin",
+  "api.walter-ai.cloud",
+  "scena.walter-ai.cloud",
+  "admin-scena.walter-ai.cloud",
+  "scena-connect",
+  "Stripe webhook",
+  "Google OAuth",
+  "npm test",
+  "CLOUDFLARE_API_TOKEN",
+  "workers.dev",
+  "cfargotunnel.com"
+ ],
+ "symptoms": [
+  "API health or ping endpoint does not return 200",
+  "Admin routes return unexpected authentication errors",
+  "Scena Pages are unavailable or serve incorrect content",
+  "Sentinel's latest run has medium or high risk",
+  "Video or image jobs appear stuck",
+  "Stripe webhook is disabled or points to the wrong URL",
+  "Google OAuth does not redirect to accounts.google.com",
+  "Scena API DNS points to cfargotunnel.com instead of the Worker"
+ ],
+ "not_for": [
+  "Deploying Scena or implementing a new feature",
+  "Debugging a specific OAuth failure in depth",
+  "Repairing or migrating production database schemas",
+  "Building the full production-readiness audit beyond the status check"
+ ]
+}

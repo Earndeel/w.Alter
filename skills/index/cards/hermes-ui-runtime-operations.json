@@ -1,0 +1,70 @@
+{
+ "name": "hermes-ui-runtime-operations",
+ "sha": "802fd096436067a1649207c7ee37264a11bccdd1ffe5aa732489ba8cb10476af",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000514107,
+ "summary": "Use when diagnosing or changing Hermes profiles, UI surfaces, sessions, voice paths, or context-runtime behavior and verifying the active layer.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux regarder pourquoi mon profil Hermes actif n'est pas celui que j'ai configuré ?",
+  "Change le thème dans le dashboard, mais vérifie que c'est bien celui affiché après refresh.",
+  "J'ai modifié le thème Desktop dans les sources : faut rebuild ou relancer quoi exactement ?",
+  "Mes anciennes conversations ont disparu de la Home, elles sont où dans la liste complète des sessions ?",
+  "Le TUI est bloqué dans tmux, tu peux diagnostiquer sans tuer mon process actuel ?",
+  "Pourquoi les réponses Hermes se compactent en boucle alors qu'il reste du contexte ?",
+  "Vérifie quel HERMES_HOME et quel gateway tourne vraiment, le CLI semble utiliser une autre install.",
+  "La voix répète l'identité de Hermes et lit les logs à voix haute, corrige le passage vers le TTS.",
+  "J'ai ajouté un thème utilisateur mais il ne s'affiche pas, tu peux vérifier le renderer actif ?",
+  "Le dashboard répond en HTTP mais l'interface ne bouge pas : regarde API, WebSocket et rendu séparément.",
+  "Tu peux vérifier que la session garde le bon profil et le bon modèle après compression ?",
+  "J'ai changé la config, comment savoir si elle est juste écrite ou déjà prise en compte par le gateway ?"
+ ],
+ "intents_en": [
+  "Check which Hermes profile and gateway are active.",
+  "Debug a theme change that does not appear in the UI.",
+  "Find sessions missing from the recent-chat view.",
+  "Diagnose repeated context compaction.",
+  "Fix voice output that includes raw logs."
+ ],
+ "entities": [
+  "Hermes",
+  "HERMES_HOME",
+  "Hermes profiles",
+  "Hermes Desktop",
+  "Electron",
+  "Dashboard",
+  "TUI",
+  "Ink",
+  "React",
+  "tmux",
+  "cmux",
+  "WebSocket",
+  "localStorage",
+  "gateway",
+  "profile config",
+  "SOUL.md",
+  "session list",
+  "context compression",
+  "provider prompt",
+  "STT",
+  "TTS",
+  "wake-word",
+  "push-to-talk"
+ ],
+ "symptoms": [
+  "Old chats appear missing from Home",
+  "Theme loads but does not render",
+  "Dashboard HTTP works but UI does not update",
+  "TUI is stuck or fails to attach",
+  "Repeated compaction without progress",
+  "Voice output repeats Hermes identity or reads technical logs",
+  "CLI and running gateway appear to use different installations"
+ ],
+ "not_for": [
+  "Building or debugging unrelated Hermes skills and workflows",
+  "Changing provider credentials or model behavior without a UI/runtime issue",
+  "General OS, browser, or network administration unrelated to Hermes surfaces",
+  "Creating or editing conversation content rather than diagnosing session display or continuity"
+ ]
+}

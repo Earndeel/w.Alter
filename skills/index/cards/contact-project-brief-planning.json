@@ -1,0 +1,54 @@
+{
+ "name": "contact-project-brief-planning",
+ "sha": "715f39f5cfcac687cc120fff04a4a57a996533a619a757af443a318cd934a19b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005816745,
+ "summary": "Use when Monsieur wants a contact's messages and files turned into an evidence-backed project brief and approval-gated execution plan.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Regarde les échanges avec ce contact et prépare-moi un brief projet avec les points sûrs et les questions à valider.",
+  "Tu peux retrouver ce que le client demande dans ses derniers messages et me proposer les étapes, sans rien lancer ?",
+  "Fais le point sur la conversation Beeper avec Marc : livrables, budget, deadline et ce qui reste flou.",
+  "Il m’a envoyé des vocaux et des fichiers pour le projet. Analyse tout et prépare un plan avec des validations étape par étape.",
+  "J’ai un doute sur ce qu’on lui a promis. Compare ses messages, les pièces jointes et la page liée, puis signale les contradictions.",
+  "Prépare le brief pour la vidéo dont il parle dans le chat, mais distingue bien ses demandes de tes propositions.",
+  "C’est quoi exactement le scope demandé par cette cliente ? Fais-moi une synthèse courte et dis-moi quelle décision je dois valider en premier.",
+  "Reprends les messages récents de ce contact, vérifie les dates et les assets, et transforme ça en plan de prod avec des gates.",
+  "Le client parle d’un claim de financement et d’un badge. Vérifie les sources et propose une version de repli conforme, sans décider à ma place.",
+  "J’ai juste besoin de savoir ce qu’il attend, ce qui manque et le prochain feu vert à donner.",
+  "Tu as pris en compte le vocal ? Si non, transcris-le et mets à jour le brief et les étapes à valider.",
+  "Avant de produire quoi que ce soit, fais-moi le brief complet depuis son chat et liste les approbations nécessaires."
+ ],
+ "intents_en": [
+  "Turn this contact's chat into a project brief and gated plan.",
+  "Review the messages and attachments; flag unknowns before production.",
+  "What does the client want, and what do I need to approve first?",
+  "Compare the request with the linked sources and flag contradictions.",
+  "Include the voice notes and propose next steps without executing."
+ ],
+ "entities": [
+  "Beeper",
+  "private chats",
+  "sortKey",
+  "voice notes",
+  "audio/ogg",
+  "UTC",
+  "Bangkok time (UTC+7)",
+  "project brief",
+  "execution plan",
+  "approval gates",
+  "attachments",
+  "PDFs",
+  "landing pages",
+  "transcription",
+  "gating-checklist.md"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Creating or producing project assets before Monsieur approves the relevant gates.",
+  "Sending messages, publishing, submitting forms, spending money, or making irreversible changes.",
+  "Building a relationship dossier or general profile of the contact.",
+  "Writing an implementation plan for a codebase."
+ ]
+}

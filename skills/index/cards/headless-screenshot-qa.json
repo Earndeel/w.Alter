@@ -1,0 +1,69 @@
+{
+ "name": "headless-screenshot-qa",
+ "sha": "2c6082d95fd72a3a894bdfd32f2d88cee9cd20ffefe3f8f79fa057e397df0394",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007232445,
+ "summary": "Use when browser_navigate is unavailable and a local HTML page or frontend needs visual QA before delivery.",
+ "kind": "workflow",
+ "intents_fr": [
+  "browser_navigate est encore en 404, tu peux vérifier visuellement ma landing page locale ?",
+  "Fais un screenshot de ce HTML et dis-moi si le hero rend bien.",
+  "Le navigateur hébergé est down. Lance Playwright sur mon prototype et check le rendu desktop/mobile.",
+  "Tu m’as dit que Camofox ne répondait pas : utilise Chromium local pour inspecter la page avant livraison.",
+  "Les sections du bas ont l’air vides sur la capture, regarde si c’est vraiment le CSS ou juste les reveals.",
+  "Mon screenshot full page fait 8000px, découpe-le pour que tu puisses vérifier les sections correctement.",
+  "Peux-tu mesurer le DOM aussi ? Je veux être sûr que la section est là avant de retoucher le design.",
+  "Vérifie la version locale du dashboard, avec une capture hero, mobile et page complète.",
+  "Le menu Student space doit aller sur /app, teste les différents liens et regarde aussi les erreurs console.",
+  "J’ai un souci de débordement sur mobile, mesure le panneau et les enfants en 390px au lieu de masquer l’overflow.",
+  "Le smoke test du test lab a l’air bloqué après enqueue ; vérifie que les runs arrivent bien à accepted ou rejected.",
+  "Avant que je livre le portail statique, passe les routes en desktop et mobile et check les liens, les formulaires et les assets."
+ ],
+ "intents_en": [
+  "Check my local landing page visually; the hosted browser is down.",
+  "Capture desktop and mobile screenshots of this HTML prototype.",
+  "The lower sections look blank in the screenshot—verify whether they rendered.",
+  "Slice the tall full-page screenshot and inspect the sections.",
+  "Test the local SPA routes and interactions before delivery."
+ ],
+ "entities": [
+  "Playwright",
+  "Chromium",
+  "browser_navigate",
+  "Camofox",
+  "terminal",
+  "process",
+  "python3 -m http.server",
+  "scripts/qa_screenshot.py",
+  "vision_analyze",
+  "IntersectionObserver",
+  "PIL",
+  "hero.png",
+  "full_revealed.png",
+  "mobile.png",
+  "dom_measure.json",
+  "Student space",
+  "/app",
+  "/audio/",
+  "Vite",
+  "React",
+  "8765",
+  "8766"
+ ],
+ "symptoms": [
+  "browser_navigate returns 404 or is unavailable",
+  "Camofox is down or no remote browser is available",
+  "Below-the-fold sections appear blank in a headless screenshot",
+  "A vision model reports missing sections in a very tall screenshot",
+  "Local server exits with OSError: [Errno 98] Address already in use",
+  "HTTP probe returns 000",
+  "Mobile layout has scrollWidth greater than clientWidth"
+ ],
+ "not_for": [
+  "The hosted browser_navigate works and can inspect the page directly.",
+  "The artifact is a full application that needs framework-native integration testing rather than local HTML capture.",
+  "Only confirming that a file was written is needed.",
+  "Visual redesign or writing the HTML/CSS itself is the main task."
+ ]
+}

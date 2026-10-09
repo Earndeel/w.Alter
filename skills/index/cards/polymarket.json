@@ -1,0 +1,53 @@
+{
+ "name": "polymarket",
+ "sha": "3d091185188db2e1e022d5d97fa527fb937d30bec107b9a082347276f1676449",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00038181825,
+ "summary": "Use when Monsieur wants Polymarket event odds, market prices, orderbooks, trading volume, or historical price movements.",
+ "kind": "procedure",
+ "intents_fr": [
+  "C'est quoi les odds sur Polymarket pour une victoire de X ?",
+  "Cherche les marchés Polymarket sur l'élection et donne-moi les probabilités.",
+  "Tu peux vérifier le prix Yes/No actuel sur ce marché ?",
+  "Quelles sont les chances que le Bitcoin dépasse 150k cette année, selon Polymarket ?",
+  "Compare les volumes et les prix des marchés sur la Fed.",
+  "Regarde le carnet d'ordres Polymarket pour ce market.",
+  "Le marché a bougé depuis hier ? Montre-moi l'historique des prix.",
+  "Trouve le marché Polymarket correspondant à cette question et donne les cotes actuelles.",
+  "C'est combien en probabilité le scénario d'un cessez-le-feu avant juin ?",
+  "Tu peux suivre l'évolution des odds Polymarket sur le prochain lancement de Starship ?",
+  "Les prix affichés veulent dire quoi exactement, 0,65 c'est 65 % ?",
+  "Donne-moi les marchés ouverts sur ce sujet avec leur volume en dollars."
+ ],
+ "intents_en": [
+  "What are the Polymarket odds for this event?",
+  "Find markets about the election and show current probabilities.",
+  "Check the current Yes/No prices and volume.",
+  "Show the order book for this market.",
+  "How have Polymarket prices moved over time?"
+ ],
+ "entities": [
+  "Polymarket",
+  "Gamma API",
+  "gamma-api.polymarket.com",
+  "CLOB API",
+  "clob.polymarket.com",
+  "Data API",
+  "data-api.polymarket.com",
+  "public-search",
+  "outcomePrices",
+  "clobTokenIds",
+  "conditionId",
+  "USDC",
+  "scripts/polymarket.py",
+  "references/api-endpoints.md"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Placing bets or trades on Polymarket",
+  "Wallet setup, crypto authentication, or EIP-712 signing",
+  "General forecasting without querying prediction-market data",
+  "Trading advice or recommendations about what position to take"
+ ]
+}

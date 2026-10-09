@@ -1,0 +1,58 @@
+{
+ "name": "baoyu-infographic",
+ "sha": "834108fb249a0a1f41de6ac215828e67f534f4940eb13b6e977b4a5d5382a76a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0006930495,
+ "summary": "Use when Monsieur veut transformer un texte, fichier, URL ou sujet en infographie ou résumé visuel généré.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi une infographie avec ce texte.",
+  "Tu peux me faire un résumé visuel de ce doc ?",
+  "Crée une info graphique sur les étapes de lancement de mon projet.",
+  "J’ai mis le contenu dans ce fichier, transforme-le en infographie.",
+  "À partir de cette URL, fais-moi une grande visualisation claire.",
+  "Fais une infographie en format portrait, en français, style fait main.",
+  "Compare ces deux offres dans une infographie simple.",
+  "J’aimerais un visuel qui montre le process étape par étape.",
+  "Tu peux faire une grande image avec beaucoup d’infos, mais qui reste lisible ?",
+  "Reprends les chiffres de ce rapport et mets-les dans un dashboard visuel, sans les modifier.",
+  "Pour le contenu que je viens d’envoyer, choisis le meilleur layout et le style qui va avec.",
+  "L’infographie générée ne correspond pas au texte : refais-la en gardant les données exactement."
+ ],
+ "intents_en": [
+  "Turn this text into an infographic.",
+  "Make a visual summary of this report.",
+  "Create a portrait infographic from this file.",
+  "Visualize these steps as a process diagram.",
+  "Make a high-density information graphic from this content."
+ ],
+ "entities": [
+  "baoyu-infographic",
+  "image_generate",
+  "clarify",
+  "write_file",
+  "infographic/",
+  "analysis.md",
+  "structured-content.md",
+  "prompts/infographic.md",
+  "infographic.png",
+  "bento-grid",
+  "dense-modules",
+  "linear-progression",
+  "binary-comparison",
+  "dashboard",
+  "craft-handmade",
+  "corporate-memphis",
+  "portrait",
+  "landscape",
+  "square"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Créer une illustration décorative sans objectif de présenter ou structurer des informations.",
+  "Rédiger ou résumer un texte sans produire d’infographie.",
+  "Modifier des données, statistiques ou citations pour les rendre plus convaincantes.",
+  "Créer un graphique interactif ou un tableau de bord logiciel."
+ ]
+}

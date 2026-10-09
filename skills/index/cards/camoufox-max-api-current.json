@@ -1,0 +1,71 @@
+{
+ "name": "camoufox-max-api-current",
+ "sha": "dd0e5b3563b2d74aba156118e7afec704ac2da74e21546fc961280c0a0f4d293",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000577467,
+ "summary": "Use when calling, debugging, or smoke-testing the active Camoufox Max HTTP API on localhost:9377.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Teste le serveur Camoufox Max sur le port 9377 et dis-moi si tout est OK.",
+  "C'est quoi les routes actuelles pour ouvrir un tab et naviguer ?",
+  "J'ai un 404 sur /tabs, tu peux verifier le contrat actif et l'adapter Hermes ?",
+  "Fais le smoke test complet, avec screenshot et cleanup du tab meme si ca plante.",
+  "Le snapshot Camoufox renvoie [no accessibility tree available], c'est normal ou il faut corriger ?",
+  "Peux-tu tester /tab/click et /tab/type avec les refs du snapshot ?",
+  "Le browser worker ne repond plus depuis le reload, verifie les routes singulieres et les aliases legacy.",
+  "J'ai besoin d'un exemple curl pour creer une session de navigation, aller sur une URL et fermer le tab.",
+  "Verifie que /health renvoie bien ok: true avant que je relance mon service.",
+  "Sur cette page Kie.ai, recupere le contenu complet, les tarifs et les FAQ, pas juste ce qui est visible dans l'onglet actif.",
+  "Le modele dans l'URL ne correspond pas au modele affiche dans le Playground; documente les deux et extrais la page.",
+  "Pour cette page dynamique, verifie l'UI avec le snapshot puis recupere aussi le HTML et fais une extraction Markdown durable."
+ ],
+ "intents_en": [
+  "Smoke-test Camoufox Max on localhost:9377.",
+  "What are the current singular tab routes?",
+  "Check why the legacy tabs endpoint returns 404.",
+  "Verify the snapshot and screenshot lifecycle, then close the tab.",
+  "Extract the full content and pricing from this dynamic page."
+ ],
+ "entities": [
+  "Camoufox Max",
+  "localhost:9377",
+  "http://127.0.0.1:9377",
+  "/health",
+  "/tab/new",
+  "/tab/navigate",
+  "/tab/snapshot",
+  "/tab/screenshot",
+  "/tab/click",
+  "/tab/type",
+  "/tab/scroll",
+  "/tab/evaluate",
+  "/tab/close",
+  "/session/cookies",
+  "/tabs",
+  "/sessions/...",
+  "/root/.hermes/camoufox-max/server-max.js",
+  "/root/.hermes/hermes-agent/tools/browser_camofox.py",
+  "Hermes",
+  "Playwright Firefox",
+  "browser_navigate",
+  "browser_snapshot",
+  "browser_click",
+  "Kie.ai"
+ ],
+ "symptoms": [
+  "HTTP 404 on legacy /tabs or /sessions/... routes",
+  "/health does not return HTTP 200 with ok: true",
+  "Tab navigation or screenshot fails during the smoke test",
+  "Screenshot response has no base64 PNG buffer",
+  "Snapshot reports [no accessibility tree available]",
+  "Snapshot has no usable refs for visible interactive elements",
+  "Playwright Firefox does not expose page.accessibility.snapshot()"
+ ],
+ "not_for": [
+  "General browser automation unrelated to the Camoufox Max server contract.",
+  "Google Flow video generation or reference-conditioned clip workflows.",
+  "A standalone extraction of static content that does not use the Camoufox dynamic-page workflow.",
+  "Installing or configuring a different browser provider or remote API."
+ ]
+}

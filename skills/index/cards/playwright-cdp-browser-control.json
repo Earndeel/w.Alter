@@ -1,0 +1,72 @@
+{
+ "name": "playwright-cdp-browser-control",
+ "sha": "c45f02008aa68fccaf6b5fcdd68f3f2abcd5881e629d0de9cde3b1254e127c3f",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00090453825,
+ "summary": "Use when native browser tools fail or persistent Chromium sessions are needed for real browser interaction via Playwright CDP.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Le navigateur natif bloque, tu peux piloter Chromium avec Playwright ?",
+  "Connecte-toi au webtop en CDP et remplis le formulaire.",
+  "J'ai besoin de garder les cookies Google entre les sessions, utilise le profil persistant.",
+  "Clique sur ce bouton et vérifie que la page confirme bien la création du compte.",
+  "La page est une SPA et page.fill ne met pas à jour le formulaire, essaie via CDP.",
+  "Tu peux prendre une capture d'écran de ce que Chromium affiche ?",
+  "Le site me déconnecte à chaque fois, reprends la session déjà ouverte sans effacer les cookies.",
+  "Le clic Playwright time out sur l'élément hors écran, trouve une autre façon de cliquer.",
+  "Le webtop CDP ne répond plus, vérifie l'IP du conteneur et relance Chromium.",
+  "J'ai déjà une session Google ouverte dans Brave sur mon Mac : connecte-toi dessus via le tunnel SSH.",
+  "Continue le flux OAuth dans le navigateur persistant, la connexion Google devrait être conservée.",
+  "Il faut interagir avec le site, pas juste récupérer son HTML : passe par le vrai navigateur."
+ ],
+ "intents_en": [
+  "Use Playwright CDP; native browser tools failed.",
+  "Control Chromium in the webtop container.",
+  "Reuse the browser's persistent login cookies.",
+  "Fill and submit this SPA form in the real browser.",
+  "Connect to my Mac's Brave session through CDP."
+ ],
+ "entities": [
+  "Playwright",
+  "CDP",
+  "Chromium",
+  "webtop Docker container",
+  "computer_use",
+  "terminal",
+  "start-chromium-cdp.sh",
+  "port 9223",
+  "port 9222",
+  "socat",
+  "noVNC",
+  "Selkies",
+  "Brave",
+  "Chrome",
+  "SSH tunnel",
+  "Tailscale",
+  "Google OAuth",
+  "Vast.ai API",
+  "Bitwarden",
+  "reCAPTCHA",
+  "undetected-chromedriver",
+  "/tmp/chro-cdp",
+  "/tmp/chrome-google-profile",
+  "~/.hermes/chrome-profiles/google-main",
+  "connect_over_cdp"
+ ],
+ "symptoms": [
+  "Native browser tools fail or cannot interact with the page.",
+  "Playwright connection to CDP is refused or times out.",
+  "page.fill does not trigger React or SPA form validation.",
+  "Click times out because an element is outside the viewport.",
+  "A login session or cookies need to persist across browser runs.",
+  "Chromium fails to start with SingletonLock: Permission denied.",
+  "A site interaction requires a real browser session rather than fetch-only access."
+ ],
+ "not_for": [
+  "Routine navigation or clicks that work with native browser tools.",
+  "Fetch-only scraping when no browser interaction or session is needed.",
+  "Solving a CAPTCHA as a standalone task without browser-control needs.",
+  "Manual visible desktop interaction when the user must enter payment details."
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "name": "hermes-desktop-debug",
+ "sha": "57ff23a77e4d844bf1521214ac9555c7d29ea2acc77360d3edcd4b9b48d1e01b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00068500575,
+ "summary": "Use when Hermes V2 on macOS shows a blank screen, boot loop, connection/auth failure, or cannot reach its remote backend via Tailscale.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Hermes V2 m’affiche une page blanche sur le Mac, tu peux diagnostiquer ?",
+  "Mon app Hermes desktop boucle au démarrage depuis la mise à jour.",
+  "J’ai une erreur ECONNREFUSED dans Hermes V2, on vérifie quoi ?",
+  "Le dashboard répond, mais l’app Mac n’arrive pas à se connecter.",
+  "J’ai changé le token remote et maintenant Hermes me refuse l’accès.",
+  "Tu peux lancer le script de diagnostic Hermes desktop sur le Mac ?",
+  "Pourquoi mes variables HERMES_DESKTOP_REMOTE_URL et TOKEN sont vides dans l’app ?",
+  "Le backend marche en curl mais j’ai toujours une fenêtre blanche dans Hermes.",
+  "Tailscale est up, mais Hermes n’atteint plus le dashboard, check le serve et les services.",
+  "J’ai fait launchctl setenv puis relancé l’app, mais elle reprend encore localhost:9119.",
+  "Tu peux vérifier si le renderer dist/index.html manque dans le bundle Hermes V2 ?",
+  "J’ai modifié le dashboard, est-ce qu’un Cmd+Q suffit ou c’est le service distant qu’il faut recharger ?"
+ ],
+ "intents_en": [
+  "Hermes V2 is stuck on a white screen on my Mac.",
+  "Debug an ECONNREFUSED from the desktop app.",
+  "Check why the app rejects my remote session token.",
+  "Hermes cannot reach the dashboard over Tailscale.",
+  "Which Hermes process needs restarting for this desktop fix?"
+ ],
+ "entities": [
+  "Hermes V2",
+  "Electron",
+  "macOS",
+  "HERMES_DESKTOP_REMOTE_URL",
+  "HERMES_DESKTOP_REMOTE_TOKEN",
+  "HERMES_DASHBOARD_SESSION_TOKEN",
+  "launchctl",
+  "Tailscale",
+  "MagicDNS",
+  "tailscale serve",
+  "hermes-dashboard.service",
+  "hermes-gateway",
+  "web_server.py",
+  "main.cjs",
+  "dist/index.html",
+  "app.asar.unpacked",
+  "hermes desktop --force-build",
+  "scripts/diagnose.sh",
+  "/api/status",
+  "/api/config",
+  "/api/ws",
+  "localhost:9119",
+  "127.0.0.1:9119",
+  "8787"
+ ],
+ "symptoms": [
+  "Silent white or blank Electron window",
+  "Boot loop or app hangs during startup",
+  "ECONNREFUSED",
+  "HERMES_DESKTOP_REMOTE_URL is set but HERMES_DESKTOP_REMOTE_TOKEN is not",
+  "HTTP 401 from the remote backend",
+  "HTTP 400 on Tailscale or MagicDNS connections",
+  "App keeps connecting to stale localhost:9119",
+  "Missing app.asar.unpacked/dist/index.html"
+ ],
+ "not_for": [
+  "Debugging general Hermes gateway or dashboard failures unrelated to the macOS desktop app",
+  "Building or changing unrelated Electron UI features",
+  "Diagnosing general Tailscale networking unrelated to Hermes desktop connectivity",
+  "Restarting shared services just to refresh a UI label without approval"
+ ]
+}

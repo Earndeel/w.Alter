@@ -1,0 +1,68 @@
+{
+ "name": "coder-profile",
+ "sha": "2b7585ef5b0d5821b87407e7c6cc37e79f5b7c6af3ec9d4197d0fd0a531d70b9",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00084959325,
+ "summary": "Use when a coding task should be handed to the hephaestus Hermes worker while W.Alter remains the user-facing orchestrator.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Passe cette tâche de code à hephaestus, reste l’interlocuteur et donne-moi le suivi.",
+  "Tu peux corriger le bug dans le repo avec le worker coding ?",
+  "Lance une mission hephaestus pour réparer le webhook, avec les tests à vérifier.",
+  "Fais reviewer cette PR par le profil dédié, surtout côté sécurité.",
+  "J’ai une feature frontend à implémenter dans le projet, délègue-la au bon profil.",
+  "Ça va prendre un moment, lance le coder en async et donne-moi le mission_id.",
+  "Tu peux exécuter la mission en synchrone et me résumer le résultat ?",
+  "Le profil coder a changé de nom ? Configure bien hephaestus partout.",
+  "Les routes de modèles dans la config ont l’air ignorées, tu peux vérifier le routage réel ?",
+  "J’ai une erreur 401 sur le routage Kimi pour le debug, regarde le fallback du worker.",
+  "Vas-y, délègue le fix dont on parlait au worker.",
+  "Comment vérifier que hephaestus choisit bien le modèle backend et que les tests passent ?"
+ ],
+ "intents_en": [
+  "Delegate this bug fix to hephaestus.",
+  "Run the coding mission asynchronously and give me its status.",
+  "Have the worker review this PR for security issues.",
+  "Check why the coding profile routing is falling back.",
+  "Keep me as the user-facing orchestrator."
+ ],
+ "entities": [
+  "Hermes",
+  "hephaestus",
+  "default profile",
+  "super-stack",
+  "spawn_super_coder_async.py",
+  "run_super_coder.py",
+  "super_coder_status.py",
+  "profile_router.py",
+  "init_coder_project.py",
+  "agent_feedback.py",
+  "smart_model_routing",
+  "Kie.ai",
+  "kie-claude",
+  "KIE_API_KEY",
+  "CODER.md",
+  ".hermes/coder-project.json",
+  "HERMES_HOME",
+  "mimo-v2.5-pro",
+  "kimi-k2.6",
+  "claude-opus-4-7",
+  "deepseek-v4-flash"
+ ],
+ "symptoms": [
+  "No module named 'agent.smart_model_routing'",
+  "Configured model routes appear inert",
+  "Coding tasks silently fall back to another provider or model",
+  "Kimi debug routing returns 401 or exhausted credentials",
+  "Claude route returns 404 or activates fallback",
+  "Profile is still named coder in a config path or script",
+  "delegate_task keeps using the model cached at session start"
+ ],
+ "not_for": [
+  "Implementing a code change directly without handing it to the coding worker",
+  "General Hermes profile architecture unrelated to coding delegation",
+  "Managing API credentials or provider integrations outside the hephaestus coding setup",
+  "Deploying a project or operating its production services"
+ ]
+}

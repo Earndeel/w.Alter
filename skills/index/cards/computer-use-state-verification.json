@@ -1,0 +1,67 @@
+{
+ "name": "computer-use-state-verification",
+ "sha": "ab4786d9e8d6bb77291eeece8cd769cbecd5fc2534d5aab361dfc302d6c874fc",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000623502,
+ "summary": "Use when restoring or verifying a desktop UI layout, pane position, visibility, or other persistent visual state.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Remets les panneaux comme avant et vérifie que c’est vraiment revenu.",
+  "La sidebar est encore du mauvais côté, corrige le layout et montre-moi une capture.",
+  "Tu m’as dit que c’était restauré, mais l’écran n’a pas changé. Vérifie l’état réel.",
+  "Remets les sessions à gauche et les fichiers à droite, sans laisser l’éditeur de layout ouvert.",
+  "Peux-tu prouver que les deux panneaux sont visibles et du bon côté ?",
+  "J’ai dû faire plusieurs swaps, remets la disposition par défaut plutôt que de deviner.",
+  "Le bouton dit Hide right sidebar, mais je crois que les panneaux sont inversés. Vérifie.",
+  "La dernière manip a déplacé les panes ; compare avec la capture de départ et restaure.",
+  "Ferme le popover, puis confirme avec une nouvelle capture que le layout est correct.",
+  "Le clic a renvoyé unverifiable : ne le répète pas à l’aveugle, inspecte ce qui s’affiche.",
+  "Sur ma capture, les flèches montrent les éléments à remettre en place. Regarde précisément ça.",
+  "Avant de dire que c’est bon, vérifie l’AX et la géométrie visible, puis termine proprement la session."
+ ],
+ "intents_en": [
+  "Restore the desktop layout and verify it visually.",
+  "Check whether the sidebars are actually on the correct sides.",
+  "Compare the current panes with the baseline screenshot.",
+  "The reset said confirmed, but the layout still looks wrong.",
+  "Close the overlay and prove the final UI state."
+ ],
+ "entities": [
+  "Hermes Desktop",
+  "CuaDriver",
+  "get_window_state",
+  "accessibility (AX) snapshot",
+  "element_token",
+  "background AX",
+  "background pixel",
+  "foreground action",
+  "layout editor",
+  "Reset",
+  "Default",
+  "Done",
+  "Swap sidebar sides",
+  "SESSIONS",
+  "New session",
+  "Show projects",
+  "project/file rail",
+  "window id",
+  "app pid",
+  "PNG screenshot",
+  "debug crosshair"
+ ],
+ "symptoms": [
+  "Action result is `unverifiable`",
+  "A click reports `confirmed` but the layout appears unchanged",
+  "Sidebar labels look correct while panes are mirrored",
+  "A stale screenshot or AX snapshot disagrees with the current UI",
+  "A layout editor, popover, tooltip, or cursor overlay remains visible",
+  "Pixel clicks land on the wrong control"
+ ],
+ "not_for": [
+  "General desktop tasks that do not change or verify persistent UI state",
+  "Explaining an application’s features without inspecting or changing its layout",
+  "Closing or killing the user’s application",
+  "Automating non-UI workflows such as API calls or file processing"
+ ]
+}

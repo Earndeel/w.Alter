@@ -1,0 +1,65 @@
+{
+ "name": "mcp-provider-operations",
+ "sha": "0de6eda84f4450c728eb4902f2e6e09d700bc0697d468ddbbba332deaa571b1f",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00044649,
+ "summary": "Use when onboarding or debugging a remote HTTP/streamable MCP provider, including OAuth, headless login, auth, schema, and verification.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Aide-moi à connecter ce provider MCP distant à Hermes.",
+  "Le login OAuth du MCP bloque sur mon serveur headless, on regarde ?",
+  "Comment je fais le callback localhost sans navigateur sur la machine ?",
+  "J'ai une URL MCP avec un token dedans, comment la configurer sans exposer le secret ?",
+  "Le provider répond à initialize mais son outil marche pas, tu peux diagnostiquer ?",
+  "Faut que j'ajoute ce serveur MCP en HTTP, tu peux vérifier sa doc et ses tools ?",
+  "Mon OAuth dit redirect mismatch, je dois changer quoi ?",
+  "La connexion MCP time out pendant l'autorisation, on reprend proprement ?",
+  "J'ai changé le redirect et Hermes garde l'ancien client/token, comment nettoyer et reconnecter ?",
+  "Le schéma du tool a l'air d'attendre mode et params : tu peux vérifier avant qu'on l'appelle ?",
+  "Le provider refuse mes scopes. Vérifie l'erreur exacte avant de toucher à l'auth.",
+  "Tu peux faire un test minimal non sensible, puis recharger le MCP et confirmer que ça marche dans une nouvelle session ?"
+ ],
+ "intents_en": [
+  "Set up this remote MCP provider in Hermes.",
+  "Debug headless OAuth for my MCP server.",
+  "Why does initialize work but the tool call fail?",
+  "Check this provider's live tool schema before configuring it.",
+  "Help me verify the MCP connection safely."
+ ],
+ "entities": [
+  "Hermes",
+  "remote MCP",
+  "HTTP",
+  "streamable MCP",
+  "OAuth",
+  "PKCE",
+  "MCP-Session-Id",
+  "initialize",
+  "tools/list",
+  "mode",
+  "params",
+  "Tailscale",
+  "localhost redirect",
+  "hermes mcp test",
+  "Hermes token location",
+  "references/curator-mcp-archive-routes.md"
+ ],
+ "symptoms": [
+  "redirect mismatch",
+  "invalid scope",
+  "stale OAuth state",
+  "OAuth authorization timeout",
+  "provider rejection",
+  "MCP transport failure",
+  "tool schema or argument validation error",
+  "initialize succeeds but the requested tool fails",
+  "missing MCP-Session-Id"
+ ],
+ "not_for": [
+  "Building or coding a new MCP server or tool.",
+  "Configuring local stdio MCP providers.",
+  "General OAuth setup unrelated to a remote MCP provider.",
+  "Using a provider's tools to perform an unrelated task."
+ ]
+}

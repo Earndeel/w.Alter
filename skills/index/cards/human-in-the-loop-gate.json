@@ -1,0 +1,59 @@
+{
+ "name": "human-in-the-loop-gate",
+ "sha": "bdeb3ec28ed36f32e73065c3d225922c49c851faacc87765724dfab8195960ae",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000436887,
+ "summary": "Use when a browser workflow reaches a password, MFA, CAPTCHA, consent, payment, or other sensitive step Monsieur must complete himself.",
+ "kind": "procedure",
+ "intents_fr": [
+  "La page de login est prête, demande-moi de saisir le mot de passe moi-même avant de continuer.",
+  "J’ai un code MFA à entrer dans le navigateur, fais le handoff proprement.",
+  "Le site me demande un CAPTCHA : arrête-toi et laisse-moi le compléter.",
+  "Avant de valider le paiement, attends ma confirmation dans le navigateur.",
+  "Je dois accepter les conditions légales moi-même, prépare la page puis passe-moi la main.",
+  "Le flow OAuth demande mon consentement, ne clique pas à ma place.",
+  "Il faut vérifier mon numéro par SMS, guide-moi sans me demander le code ici.",
+  "La page demande une pièce d’identité, stoppe avant l’envoi et laisse-moi décider.",
+  "Bitwarden peut autofill sur ce domaine, mais seulement si tu me fais approuver cet autofill précis.",
+  "J’ai terminé l’étape manuelle, reprends et vérifie que je suis bien connecté.",
+  "J’ai cliqué sur reprendre mais la page a changé : rafraîchis l’état avant de toucher à quoi que ce soit.",
+  "Annule, je ne veux pas continuer avec cette demande de mot de passe."
+ ],
+ "intents_en": [
+  "Pause before I enter the password.",
+  "Hand the MFA code step back to me.",
+  "Let me complete the CAPTCHA in the browser.",
+  "Wait for my approval before confirming payment.",
+  "I completed the manual step; verify the account state."
+ ],
+ "entities": [
+  "browser",
+  "clarify tool",
+  "Bitwarden",
+  "OAuth",
+  "CAPTCHA",
+  "MFA",
+  "OTP",
+  "passkey",
+  "recovery code",
+  "API key",
+  "password"
+ ],
+ "symptoms": [
+  "Password, OTP, MFA, passkey, or recovery-code field is ready",
+  "CAPTCHA or phone/email verification is required",
+  "OAuth consent or legal terms require acceptance",
+  "Payment confirmation is awaiting approval",
+  "Browser asks for identity-document submission",
+  "Bitwarden requests a vault unlock or security challenge",
+  "Page state changed after the human action",
+  "Authentication success is unclear or unverified"
+ ],
+ "not_for": [
+  "Ordinary browsing or form entry that involves no sensitive value or security boundary",
+  "Retrieving, revealing, or typing a password through Bitwarden CLI or another vault interface",
+  "General browser automation unrelated to a human approval handoff",
+  "Recovering from account lockouts or troubleshooting authentication failures"
+ ]
+}

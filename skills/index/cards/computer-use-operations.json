@@ -1,0 +1,73 @@
+{
+ "name": "computer-use-operations",
+ "sha": "7587ab833b571eb3973b30c4bb719886f14313049ec54e5f8a4353c401274d23",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00076816575,
+ "summary": "Use when operating, debugging, extending, or benchmarking Computer Use with verified UI state, safe retries, or remote Mac access.",
+ "kind": "workflow",
+ "intents_fr": [
+  "W.Alter a cliqué mais on n'a aucune preuve que l'action a marché : vérifie l'état avant de dire que c'est fait.",
+  "Le CuaDriver me renvoie une capture vide alors que les permissions sont accordées, tu peux diagnostiquer ça proprement ?",
+  "Je veux piloter mon Mac depuis le VPS Hermes, comment valider le tunnel, la session GUI et les permissions avant de toucher à l'interface ?",
+  "Après un timeout sur un clic distant, est-ce que tu peux le retenter ? Vérifie d'abord si l'action a déjà été appliquée.",
+  "Le snapshot AX est bon mais la capture écran n'est pas valide : qu'est-ce qu'on peut encore faire sans passer aux coordonnées ?",
+  "J'ai ajouté un backend/plugin Computer Use et je veux qu'il survive aux updates Hermes, teste aussi le chemin de config.",
+  "Les fenêtres sont mal détectées, il choisit la barre de titre au lieu de la vraie fenêtre. Comment fiabiliser le ciblage ?",
+  "On a remis la disposition par défaut, mais comment confirmer avec une capture fraîche et les ancres AX qu'il ne reste pas de modal ?",
+  "Fais-moi un benchmark Computer Use sérieux, pas juste le temps de réponse du modèle : mesure aussi fiabilité et faux succès.",
+  "Le driver dit « confirmed » mais l'écran n'a pas bougé. Ne relance pas le clic à l'aveugle, fais un readback.",
+  "Pour mon changement de routing vision, je veux garder la stratégie de capture indépendante du modèle auxiliaire et vérifier les deux modes.",
+  "W.Alter a ouvert une fenêtre ou changé le focus pendant l'opération ; vérifie le scope demandé et restaure seulement ce qui vient de la tâche."
+ ],
+ "intents_en": [
+  "Verify the UI state after a Computer Use action.",
+  "Debug CuaDriver capture and Accessibility reliability.",
+  "Safely control a remote Mac from the Hermes VPS.",
+  "Make a Computer Use plugin update-safe.",
+  "Benchmark end-to-end Computer Use reliability and latency."
+ ],
+ "entities": [
+  "Computer Use",
+  "Hermes",
+  "CuaDriver",
+  "AX",
+  "TCC",
+  "Accessibility",
+  "Screen Recording",
+  "SSH",
+  "Tailscale",
+  "MCP",
+  "ScreenCaptureKit",
+  "backend factory",
+  "plugin backend",
+  "strategy registry",
+  "config.yaml",
+  "computer_use schema",
+  "Mac loopback CuaDriver endpoint",
+  "VPS",
+  "snapshot ID",
+  "PID",
+  "window_id",
+  "screenshot_frame_valid",
+  "tree_markdown",
+  "absorbed-source-routing.md",
+  "computer-use-operations.md"
+ ],
+ "symptoms": [
+  "Capture écran vide, noire ou invalide malgré des permissions accordées",
+  "AX renvoie une fenêtre vide ou des éléments obsolètes",
+  "Fenêtre cible hors écran, mauvaise fenêtre sélectionnée ou focus inattendu",
+  "Action marquée « confirmed » ou « unverifiable » sans changement d'état observable",
+  "Timeout après dispatch distant, complétion inconnue",
+  "Pilote personnalisé ignoré ou fallback silencieux vers le backend intégré",
+  "Dimensions Retina incohérentes ou coordonnées décalées",
+  "Benchmark rapide mais capture invalide ou taux de faux succès élevé"
+ ],
+ "not_for": [
+  "Rédiger ou exécuter des macros d'interface sans vérification de l'état résultant.",
+  "Résoudre un problème général de réseau ou SSH sans lien avec le pilotage distant d'une interface.",
+  "Choisir uniquement un modèle de vision ou comparer ses performances sans benchmark Computer Use de bout en bout.",
+  "Réinitialiser ou supprimer des bases de données d'état Hermes sans identifier le chemin runtime actif."
+ ]
+}

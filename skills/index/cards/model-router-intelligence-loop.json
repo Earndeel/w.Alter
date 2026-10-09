@@ -1,0 +1,69 @@
+{
+ "name": "model-router-intelligence-loop",
+ "sha": "28bc60b49979099dc90c8cf6e04602141c9a905c96e108ddd8337d954fe1b68b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00086939325,
+ "summary": "Use when Monsieur wants to research, test, score, or safely update W.Alter's model routing using benchmarks, prices, offers, and community signals.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Mets à jour la matrice de routage de W.Alter avec les derniers benchmarks et les vrais coûts par tâche.",
+  "Quel modèle tu choisirais pour le coding, le raisonnement et les tâches agentiques, en tenant compte du prix ?",
+  "Surveille les nouveaux crédits gratuits et les offres providers, mais vérifie les quotas et les risques de facturation.",
+  "Les tests payants sont suspendus pour l'instant ; continue quand même la recherche et remplis la DB avec les sources.",
+  "Compare les modèles dans Design Arena, mais sépare bien les catégories et les vues Preference vs Price.",
+  "On devrait automatiser la veille des modèles : définis d'abord les boucles, les schémas et le dry-run avant de créer des cronjobs.",
+  "Le leaderboard dit que ce modèle est top, mais est-ce qu'il vaut vraiment le coût pour notre usage ?",
+  "Regarde ce qui se dit sur X et Reddit à propos de ce modèle, et distingue les retours vérifiés du hype.",
+  "Prépare un diff pour changer le routeur Hermes, avec les compromis, le rollback et ce qui demande mon approbation.",
+  "J'ai une erreur de crédits chez le provider : propose une matrice de tests sans lancer d'appels payants.",
+  "Est-ce que cette route OpenRouter est fiable, ou le provider revendeur modifie le comportement du modèle ?",
+  "Le tableau du routeur est vide, analyse quand même les benchmarks et les prix, mais précise si les décisions finales manquent."
+ ],
+ "intents_en": [
+  "Update W.Alter's model routing matrix.",
+  "Compare models by task, quality, and cost.",
+  "Find safe free credits and provider offers.",
+  "Research models without running paid tests.",
+  "Prepare a staged router config proposal."
+ ],
+ "entities": [
+  "W.Alter",
+  "Hermes",
+  "Artificial Analysis",
+  "Cost per Intelligence Index Task",
+  "Design Arena",
+  "OpenRouter",
+  "X/Twitter",
+  "Reddit",
+  "PostgreSQL",
+  "model_router schema",
+  "walter_router",
+  "router_scores",
+  "aa-pareto-model-optimizer/scripts/router.py",
+  "~/.hermes/cache/aa-pareto/router_matrix.json",
+  "~/.hermes/cache/aa-pareto/router_matrix.csv",
+  "scripts/scrape_aa_cost_per_task.py",
+  "Camoufox Max",
+  "Scrapling",
+  "Aider",
+  "SWE-bench",
+  "Terminal-Bench",
+  "LiveCodeBench",
+  "GPQA",
+  "MMLU-Pro"
+ ],
+ "symptoms": [
+  "Provider returns a billing or credit error during a model test.",
+  "Direct Design Arena API requests return HTTP 403 or transient 400 errors.",
+  "The router_scores table is empty or appears stale.",
+  "A model ranks highly in one Design Arena view but poorly in another.",
+  "Hosted endpoint returns null or empty content, malformed JSON, or broken tool calls."
+ ],
+ "not_for": [
+  "Looking up the exact ID or spelling of a model without evaluating its routing value.",
+  "Configuring Hermes cron mechanics after the loop design is settled.",
+  "Running a one-off benchmark comparison without building or updating router intelligence.",
+  "Monitoring free model offers alone without connecting them to router decisions."
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "name": "weights-and-biases",
+ "sha": "a94b0654888d31d4f24eef4a68538629f304a2f8b2606aba4707d5d639732cd8",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008514495,
+ "summary": "Use when Monsieur wants to track, compare, visualize, sweep, or version ML experiments and models with Weights & Biases.",
+ "kind": "integration",
+ "intents_fr": [
+  "Ajoute W&B à ma boucle d'entraînement PyTorch pour logger loss, accuracy et hyperparamètres.",
+  "Comment je connecte mon script à wandb.ai et je retrouve l'URL du run ?",
+  "Mes métriques ne remontent pas dans le dashboard, tu peux vérifier mon logging W&B ?",
+  "Je veux comparer les runs de ce projet par learning rate et batch size.",
+  "Fais-moi un sweep bayésien W&B pour trouver les meilleurs hyperparamètres.",
+  "Je veux lancer 50 essais avec wandb.agent, tu me montres comment organiser la fonction train ?",
+  "Comment sauvegarder mon checkpoint PyTorch dans W&B comme artifact ?",
+  "Versionne ce dataset et ce modèle avec des artifacts W&B, qu'on garde la lineage.",
+  "Comment je récupère la dernière version du dataset depuis W&B avant de lancer l'entraînement ?",
+  "Je veux publier le modèle validé dans le model registry avec un alias production.",
+  "Le réseau est instable sur le serveur : je peux lancer W&B offline puis sync les runs après ?",
+  "Branche W&B à mon fine-tuning Hugging Face, et fais remonter les métriques et checkpoints."
+ ],
+ "intents_en": [
+  "Log my training metrics to Weights & Biases.",
+  "Set up a W&B hyperparameter sweep.",
+  "Track and compare experiment runs in W&B.",
+  "Version my model checkpoints with W&B Artifacts.",
+  "Register the best model in the W&B model registry."
+ ],
+ "entities": [
+  "Weights & Biases",
+  "W&B",
+  "wandb",
+  "wandb.ai",
+  "WANDB_API_KEY",
+  "WANDB_MODE",
+  "wandb.init",
+  "wandb.log",
+  "wandb.finish",
+  "wandb.sweep",
+  "wandb.agent",
+  "wandb.Artifact",
+  "wandb.Table",
+  "wandb sync",
+  "PyTorch",
+  "Hugging Face Transformers",
+  "PyTorch Lightning",
+  "Keras",
+  "TensorFlow",
+  "model registry",
+  "Artifacts",
+  "sweeps",
+  "dashboards"
+ ],
+ "symptoms": [
+  "Les métriques d'entraînement n'apparaissent pas dans le dashboard W&B.",
+  "Le run W&B n'est pas associé au bon projet.",
+  "Les runs ou hyperparamètres sont difficiles à comparer.",
+  "Les essais du sweep ne démarrent pas ou ne récupèrent pas la config.",
+  "Le checkpoint ou le dataset n'est pas disponible comme artifact.",
+  "Impossible de synchroniser les runs lancés en mode offline."
+ ],
+ "not_for": [
+  "Déboguer ou optimiser la boucle d'entraînement du modèle sans besoin de W&B.",
+  "Choisir une architecture ou évaluer la qualité d'un modèle sans suivi W&B.",
+  "Déployer un modèle en production ou gérer son infrastructure de serving.",
+  "Configurer un autre outil de tracking d'expériences, comme MLflow."
+ ]
+}

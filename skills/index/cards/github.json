@@ -1,0 +1,65 @@
+{
+ "name": "github",
+ "sha": "7e63f45fc983c6de8115a684266215e9e782a46fc54fd0996678fb1ee2891b5a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000474705,
+ "summary": "Use when Monsieur veut gérer GitHub avec gh : auth, issues, dépôts, pull requests, reviews, CI ou merge.",
+ "kind": "workflow",
+ "intents_fr": [
+  "gh me dit que je suis pas connecté, tu peux réparer l'auth ?",
+  "Configure GitHub sur cette nouvelle machine, avec gh login.",
+  "Crée une issue pour le bug dont on vient de parler et assigne-la-moi.",
+  "Y a déjà une issue là-dessus ? Cherche avant d'en créer une.",
+  "Ajoute le label bug à cette issue et ferme-la, c'est corrigé.",
+  "Pousse ma branche et ouvre une PR avec un résumé propre.",
+  "Tu peux vérifier la CI de la PR ? Dis-moi si tous les checks sont vraiment verts.",
+  "Fusionne la PR si les checks passent, puis confirme qu'elle est bien mergée.",
+  "Prends l'issue #42 et fais le cycle complet jusqu'à une PR vérifiée.",
+  "Regarde cette PR, lis les commentaires et fais-moi une review avec les problèmes importants.",
+  "Clone le repo, crée un fork et configure les remotes comme il faut.",
+  "Prépare une release GitHub pour la nouvelle version."
+ ],
+ "intents_en": [
+  "Fix my gh authentication.",
+  "Create and assign a GitHub issue.",
+  "Open a PR and check CI.",
+  "Review this pull request.",
+  "Clone the repo and set up remotes."
+ ],
+ "entities": [
+  "GitHub",
+  "gh CLI",
+  "gh api",
+  "gh auth status",
+  "gh login",
+  "gh issue view",
+  "gh issue list --search",
+  "gh pr view",
+  "gh pr list --search",
+  "gh pr checks",
+  "pull requests",
+  "issues",
+  "code reviews",
+  "CI",
+  "repositories",
+  "forks",
+  "remotes",
+  "releases",
+  "SSH",
+  "tokens"
+ ],
+ "symptoms": [
+  "gh auth status échoue",
+  "gh CLI indique que l'utilisateur n'est pas authentifié",
+  "Impossible de créer ou consulter une issue ou une PR",
+  "Les checks CI d'une PR sont en échec ou leur état est inconnu",
+  "Le statut de merge ou de release n'est pas confirmé"
+ ],
+ "not_for": [
+  "Inspecter ou modifier le code local sans action GitHub",
+  "Implémenter une fonctionnalité ou corriger un bug dans le code",
+  "Demander une review de son propre code sans gérer GitHub",
+  "Résoudre un problème CI local sans consulter les checks GitHub"
+ ]
+}

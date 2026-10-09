@@ -1,0 +1,66 @@
+{
+ "name": "llama-cpp",
+ "sha": "d09d4f8f2774ddd6c28c80900e2b1a4ec78322f8b6512c21c6dedb9231202df7",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000716067,
+ "summary": "Use when Monsieur veut découvrir, choisir, lancer ou optimiser une inférence locale llama.cpp avec des modèles GGUF.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Trouve-moi un bon modèle GGUF pour llama.cpp, plutôt léger.",
+  "Je peux faire tourner quel quant sur ma machine avec 16 Go de RAM ?",
+  "Donne-moi la commande llama-server pour ce repo Hugging Face.",
+  "Quels fichiers GGUF sont dispo dans ce repo, avec leur taille ?",
+  "Je veux tester un modèle local sur mon Mac Apple Silicon, tu me guides ?",
+  "Tu prendrais Q4_K_M ou Q5_K_M pour mon usage ?",
+  "Le modèle est déjà sur HF, trouve-moi le bon fichier et la commande pour le lancer.",
+  "Comment je lance llama.cpp sur le GPU NVIDIA plutôt que tout faire sur CPU ?",
+  "J'ai un GGUF en local : fais-moi un exemple Python avec llama-cpp-python.",
+  "Mon serveur llama.cpp tourne, c'est quoi la requête curl pour tester l'API compatible OpenAI ?",
+  "Dans la réponse d'avant, tu m'as proposé un GGUF : vérifie les quants et la taille exacte des fichiers.",
+  "Ça rame pas mal avec llama.cpp, aide-moi à régler les threads et les couches GPU."
+ ],
+ "intents_en": [
+  "Find a GGUF model for llama.cpp.",
+  "Which quant fits my RAM?",
+  "Give me a llama-server command for this HF repo.",
+  "List the GGUF files and sizes in this repo.",
+  "Run a local model with llama-cpp-python."
+ ],
+ "entities": [
+  "llama.cpp",
+  "llama-cli",
+  "llama-server",
+  "llama-cpp-python",
+  "GGUF",
+  "Hugging Face Hub",
+  "HF Local Apps",
+  "llama-server -hf",
+  "--hf-repo",
+  "--hf-file",
+  "Q4_K_M",
+  "Q5_K_M",
+  "Q6_K",
+  "Q8_0",
+  "IQ",
+  "mmproj-*.gguf",
+  "https://huggingface.co/models?apps=llama.cpp",
+  "https://huggingface.co/api/models/<repo>/tree/main?recursive=true",
+  "http://localhost:8080/v1/chat/completions",
+  "GGML_CUDA",
+  "GGML_METAL"
+ ],
+ "symptoms": [
+  "llama-server ou llama-cli ne trouve pas le fichier GGUF",
+  "Le modèle ne tient pas dans la RAM ou la VRAM",
+  "Inférence lente sur CPU ou GPU",
+  "Le repo Hugging Face contient plusieurs fichiers GGUF et le bon quant est incertain",
+  "L'API locale /v1/chat/completions ne répond pas comme prévu"
+ ],
+ "not_for": [
+  "Entraîner ou fine-tuner un modèle avec Transformers",
+  "Déployer une API d'inférence cloud sans llama.cpp ni GGUF",
+  "Choisir un modèle uniquement pour l'utiliser avec Ollama",
+  "Convertir des poids Transformers en GGUF lorsqu'un GGUF existe déjà dans le repo"
+ ]
+}

@@ -1,0 +1,71 @@
+{
+ "name": "anti-bot-navigation",
+ "sha": "2d88403a50c35fd2f55c0ffd3340a32112477f51261e9f88db7943976af31bb5",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007455195,
+ "summary": "Use when browsing or scraping a site blocked by anti-bot protection; choose Camoufox, Brave Mac CDP, or visible Webtop and handle CAPTCHA or cookies.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Va sur ce site et récupère les infos, ça bloque avec Cloudflare.",
+  "Le scraping se fait détecter par DataDome, tu peux changer de navigateur ?",
+  "Essaie Camoufox pour cette page, puis passe sur Brave Mac si le captcha bloque.",
+  "J'ai un hCaptcha, tu peux le résoudre ou me demander de le faire ?",
+  "Ouvre le site dans le Webtop, je veux voir ce qui se passe.",
+  "Google Lens me renvoie 403, trouve une autre méthode pour la recherche par image.",
+  "Injecte mes cookies Brave pour accéder au compte sur le site.",
+  "Le Turnstile tourne en boucle, tu peux tenter avec un vrai navigateur ?",
+  "Pourquoi ça bloque encore ? Vérifie les tunnels et le navigateur anti-bot.",
+  "Récupère les données sur ce site protégé, avec des interactions moins robotiques.",
+  "Tu peux m'envoyer le lien Telegram pour que je passe le captcha moi-même ?",
+  "Pour Facebook, utilise les cookies Brave mais n'ouvre pas d'onglet sur mon Mac sans me demander."
+ ],
+ "intents_en": [
+  "Scrape this Cloudflare-protected site.",
+  "Switch browsers to get past DataDome.",
+  "Solve the CAPTCHA or ask me to take over.",
+  "Open the protected page visibly in Webtop.",
+  "Inject my Brave cookies for authenticated browsing."
+ ],
+ "entities": [
+  "Camoufox",
+  "Brave Mac CDP",
+  "Webtop Chromium",
+  "human_sim.py",
+  "captcha_solver.py",
+  "Scrapling",
+  "Playwright",
+  "Groq Whisper",
+  "2Captcha",
+  "Telegram SOS",
+  "Selkies",
+  "Tailscale",
+  "port 9377",
+  "port 9378",
+  "port 9223",
+  "port 9226",
+  "port 9222",
+  "~/.hermes/scripts/human_sim.py",
+  "~/.hermes/scripts/captcha_solver.py",
+  "~/.hermes/scripts/mac-brave-walter.sh",
+  "https://100.91.35.121:3001",
+  "DataDome",
+  "Cloudflare Turnstile",
+  "Google Lens"
+ ],
+ "symptoms": [
+  "Cloudflare challenge or Turnstile stuck",
+  "DataDome blocks navigation",
+  "hCaptcha or reCAPTCHA appears",
+  "Google Lens returns 403",
+  "Browser automation is detected",
+  "Repeated rate limiting during scraping",
+  "Authenticated page rejects injected cookies"
+ ],
+ "not_for": [
+  "General authenticated browsing without anti-bot issues",
+  "Extracting Brave cookies from SQLite in detail",
+  "Scraping social media content workflows",
+  "Solving unrelated website or network outages"
+ ]
+}

@@ -1,0 +1,71 @@
+{
+ "name": "hermes-ghost-session-cleanup",
+ "sha": "815575bace79cbca1d7c795e872ac29f4f653ebb8da9bc12d718c77a54da17a6",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005856345,
+ "summary": "Use when Hermes state.db accumulates unclosed ghost sessions and you need automatic cleanup in SessionDB.create_session().",
+ "kind": "procedure",
+ "intents_fr": [
+  "J’ai des centaines de sessions fantômes dans state.db, tu peux corriger ça proprement ?",
+  "Hermes laisse des sessions ouvertes sans ended_at après un crash. Ajoute le nettoyage automatique au bon endroit.",
+  "Il faut patcher hermes_state.py pour supprimer les sessions vides trop anciennes à chaque création de session.",
+  "On a parlé des sessions orphelines : fais le correctif dans create_session(), pas avec un cron.",
+  "Les sessions du gateway s’accumulent même quand aucun message n’a été envoyé. Comment empêcher ça ?",
+  "Nettoie les ghosts existants dans la base, puis mets en place le cleanup pour les prochaines sessions.",
+  "Je veux que le fix couvre CLI, Telegram et gateway, avec un seul point d’entrée.",
+  "Après le patch, redémarre le gateway Hermes pour qu’il charge le nouveau code.",
+  "Attention à ne pas supprimer les sessions qui ont des messages ; ajoute une période de grâce d’une heure.",
+  "Mes sessions sans ended_at restent dans la DB après un SIGKILL. Les handlers ne suffisent pas, corrige la cause.",
+  "J’ai encore des demandes d’approbation alors que approvals.mode est yolo. Vérifie aussi command_allowlist dans la config.",
+  "Tu peux regarder les sessions fantômes Hermes et me donner les commandes pour appliquer le fix sur le serveur ?"
+ ],
+ "intents_en": [
+  "Clean up orphaned Hermes sessions automatically.",
+  "Patch SessionDB.create_session to remove old empty sessions.",
+  "Ghost sessions are piling up in state.db after crashes.",
+  "Delete existing empty sessions and restart the Hermes gateway.",
+  "Why does yolo mode still ask for approval? Check command_allowlist."
+ ],
+ "entities": [
+  "Hermes",
+  "SessionDB",
+  "create_session()",
+  "_cleanup_ghost_sessions()",
+  "end_session()",
+  "hermes_state.py",
+  "/root/.hermes/hermes-agent/hermes_state.py",
+  "state.db",
+  "/root/.hermes/state.db",
+  "sessions",
+  "messages",
+  "ended_at",
+  "started_at",
+  "end_reason",
+  "_execute_write",
+  "SQLite",
+  "WAL",
+  "CLI",
+  "Telegram",
+  "gateway",
+  "hermes gateway run --replace",
+  "/tmp/hermes_gateway.log",
+  "/root/.hermes/config.yaml",
+  "approvals.mode",
+  "command_allowlist"
+ ],
+ "symptoms": [
+  "Hundreds of sessions with ended_at IS NULL",
+  "Sessions with no messages remain open in state.db",
+  "Ghost sessions accumulate after crashes, SIGKILL, or abandoned starts",
+  "Sessions are created but never closed with end_session()",
+  "Gateway or CLI restarts leave orphan session records",
+  "Approval prompts appear despite approvals.mode: yolo"
+ ],
+ "not_for": [
+  "Recovering or editing conversation content in sessions that contain messages",
+  "General Hermes gateway installation or configuration unrelated to ghost sessions",
+  "Designing a scheduled cron-based database cleanup job",
+  "Debugging unrelated SQLite corruption or database lock failures"
+ ]
+}

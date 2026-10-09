@@ -1,0 +1,61 @@
+{
+ "name": "hermes-custom-provider-validation",
+ "sha": "16e451ae9d804853f0a98a4d54ed122764d09aa48494f0d07db217d03a822a35",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000508167,
+ "summary": "Use when Hermes /model warns that a configured custom chat_completions model may be invalid because its provider lacks /v1/models.",
+ "kind": "procedure",
+ "intents_fr": [
+  "J'ai un warning quand je fais /model avec kie-gemini-flash, alors que le modèle répond bien. Tu peux corriger ça ?",
+  "Hermes arrive pas à valider mon modèle Kie.ai, ça dit qu'il n'est peut-être pas valide. C'est un faux positif ?",
+  "Après le changement de provider, /model affiche « could not reach » pour gemini-3-5-flash. Comment on enlève ce warning ?",
+  "Mon endpoint custom renvoie 404 sur /v1/models, mais les requêtes chat marchent. Faut patcher Hermes ?",
+  "Tu peux appliquer le fix de validation dans hermes_cli/models.py pour les modèles déclarés dans la config ?",
+  "J'ai encore l'alerte de validation sur mon provider chat_completions. Vérifie le patch et le nom de l'import.",
+  "J'ai fait hermes update et le warning Kie.ai est revenu. Tu peux remettre le correctif ?",
+  "J'ai ajouté le modèle à providers.kie-gemini-flash.models mais Hermes le marque toujours invalide.",
+  "Le patch semble ne rien changer, pourtant j'ai modifié models.py. Tu peux vérifier load_config et redémarrer le gateway ?",
+  "Je crois que models est enregistré comme une chaîne dans mon config.yaml au lieu d'une liste YAML. Tu peux m'aider à corriger ça pour /model ?",
+  "Pour mon provider Gemini avec une URL par modèle, Hermes ne devrait pas appeler /v1/models. Corrige la validation sans casser les autres providers.",
+  "Le modèle fonctionne, mais le message « If the service isn't down, this model may not be valid » revient à chaque fois. On règle ça comment ?"
+ ],
+ "intents_en": [
+  "Fix Hermes /model validation for my Kie.ai Gemini provider.",
+  "The model works, but Hermes warns it may be invalid.",
+  "My custom endpoint returns 404 for /v1/models; patch the validation.",
+  "Restore the Hermes validation patch after an update.",
+  "Check why the configured provider model is still rejected."
+ ],
+ "entities": [
+  "Hermes",
+  "hermes_cli/models.py",
+  "hermes_cli.config",
+  "load_config",
+  "hermes gateway restart",
+  "hermes update",
+  "/model",
+  "/v1/models",
+  "api_mode: chat_completions",
+  "anthropic_messages",
+  "Kie.ai",
+  "kie-gemini-flash",
+  "gemini-3-5-flash",
+  "providers",
+  "config.yaml",
+  "references/kie-gemini-endpoints.md"
+ ],
+ "symptoms": [
+  "could not reach the <provider> API to validate `<model>`",
+  "If the service isn't down, this model may not be valid.",
+  "Custom provider returns 404 for /v1/models",
+  "The model works, but Hermes /model reports it may be invalid",
+  "Validation warning returns after hermes update"
+ ],
+ "not_for": [
+  "Fixing a provider that cannot actually generate chat completions",
+  "Adding or configuring unrelated Hermes providers",
+  "Troubleshooting invalid API keys or authentication failures",
+  "Changing Gemini model behavior or prompt settings"
+ ]
+}

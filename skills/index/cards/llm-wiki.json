@@ -1,0 +1,68 @@
+{
+ "name": "llm-wiki",
+ "sha": "bb9f8664ac816c052c2bad47584c33a4c835ced5197883c0f4368ed8028d0b4b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008727345,
+ "summary": "Use when creating, updating, querying, or auditing a persistent interlinked Markdown research wiki.",
+ "kind": "workflow",
+ "intents_fr": [
+  "On démarre un wiki pour mes recherches IA ?",
+  "Ajoute cet article à mon wiki et relie-le aux pages qui existent déjà.",
+  "J’ai collé mes notes de réunion, tu peux les intégrer dans la base ?",
+  "Dans mon wiki, qu’est-ce qu’on sait déjà sur les modèles open source ?",
+  "Fais une synthèse des pages sur l’inférence et garde-la dans le wiki si ça vaut le coup.",
+  "Tu peux checker mon wiki ? Je veux voir les liens cassés et les pages orphelines.",
+  "J’ai déjà une page sur Karpathy ou faut en créer une ? Regarde avant de modifier.",
+  "La source a changé depuis la dernière fois : réingère-la et signale ce qui a dérivé.",
+  "Mets à jour les notes avec ce papier, et indique les contradictions avec ce qu’on avait.",
+  "Mon index ne reflète plus les pages récentes, tu peux remettre le wiki d’équerre ?",
+  "C’est quoi la différence entre ces deux approches, d’après mes notes ?",
+  "On reprend le wiki existant : lis le schéma, l’index et les dernières entrées du log avant d’ajouter quoi que ce soit."
+ ],
+ "intents_en": [
+  "Start a research wiki for my notes.",
+  "Add this paper to the wiki and cross-link it.",
+  "What does my wiki say about open models?",
+  "Audit the wiki for broken links and orphan pages.",
+  "Update the existing page with this new source."
+ ],
+ "entities": [
+  "Karpathy's LLM Wiki",
+  "WIKI_PATH",
+  "HERMES_HOME",
+  "~/wiki",
+  "SCHEMA.md",
+  "index.md",
+  "log.md",
+  "raw/",
+  "raw/articles/",
+  "raw/papers/",
+  "raw/transcripts/",
+  "raw/assets/",
+  "entities/",
+  "concepts/",
+  "comparisons/",
+  "queries/",
+  "web_extract",
+  "read_file",
+  "search_files",
+  "execute_code",
+  "Obsidian",
+  "wikilinks",
+  "sha256"
+ ],
+ "symptoms": [
+  "Broken wikilinks point to pages that do not exist.",
+  "Wiki pages are missing from index.md.",
+  "Pages have no inbound links and appear orphaned.",
+  "Wiki content may be stale or source files have drifted.",
+  "Conflicting claims or contested pages need review."
+ ],
+ "not_for": [
+  "Setting up or managing a general Obsidian vault without a research wiki workflow.",
+  "Finding or reading papers without integrating them into a persistent wiki.",
+  "Answering a one-off research question when no existing wiki is involved.",
+  "General-purpose note taking unrelated to a structured, interlinked knowledge base."
+ ]
+}

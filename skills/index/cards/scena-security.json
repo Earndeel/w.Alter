@@ -1,0 +1,70 @@
+{
+ "name": "scena-security",
+ "sha": "2305ef306e8017d6636f929173c5af1de7a2c5aea5f086d0237d6ae9d7d9f23d",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00073005075,
+ "summary": "Use when Monsieur demande un audit sécurité ou couche données de Scena sur Workers/D1, avec constats P0/P1/P2 en lecture seule.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi un audit sécurité complet de Scena, en read-only, avec les risques P0/P1/P2.",
+  "Tu peux vérifier la couche données de Scena avant qu’on onboarde un nouveau partenaire Scena Connect ?",
+  "On vient d’ajouter des webhooks provider : passe en revue leur auth, les signatures et l’idempotence.",
+  "J’ai un doute sur l’isolation entre tenants dans Scena, tu peux tracer les guards et les accès D1 ?",
+  "Audit rapide des crédits et du billing : est-ce qu’il y a des races ou des doubles remboursements ?",
+  "Regarde le CORS, l’auth et les secrets du Worker Scena, mais ne touche à rien.",
+  "Le webhook Stripe pourrait être rejoué ? Vérifie la vérification HMAC et la déduplication des events.",
+  "On fait notre checkpoint sécurité trimestriel Scena : inspecte le Worker, les schémas D1 et les migrations.",
+  "J’ai peur qu’un callback_url permette du SSRF depuis le Worker. Tu peux vérifier le chemin complet ?",
+  "Les callbacks provider peuvent-ils valider une tâche sans signature, ou rembourser deux fois si on les rejoue ?",
+  "Vérifie aussi le ReAct loop : une tool call mal formée peut-elle faire tomber tout le tour de l’agent ?",
+  "Le bootstrap D1 a l’air cassé. Audite les schemas et migrations et distingue le souci de déploiement d’une faille exploitable."
+ ],
+ "intents_en": [
+  "Audit Scena's security posture read-only.",
+  "Review D1 tenant isolation and access controls.",
+  "Check provider webhook signatures and replay protection.",
+  "Audit credits, billing, and race conditions.",
+  "Review SSRF and callback URL validation."
+ ],
+ "entities": [
+  "Scena",
+  "Scena Connect",
+  "Cloudflare Workers",
+  "Cloudflare Pages",
+  "D1",
+  "wrangler.toml",
+  "workers/api/src/index.ts",
+  "workers/api/src/auth.ts",
+  "workers/api/src/agent.ts",
+  "workers/api/src/saas_connect.ts",
+  "workers/api/src/pipeline_runner.ts",
+  "d1/schema.sql",
+  "d1/schema-v2.sql",
+  "d1/migrations/*.sql",
+  "Stripe",
+  "Telegram",
+  "KIE",
+  "PiAPI",
+  "fal",
+  "scripts/verify-schemas.py",
+  "P0",
+  "P1",
+  "P2"
+ ],
+ "symptoms": [
+  "Webhook provider accepté sans signature ou rejouable",
+  "Crédits débités ou remboursés deux fois",
+  "Données, jobs ou médias visibles entre tenants",
+  "Callback URL susceptible de déclencher un SSRF",
+  "Route d’auth ou d’admin accessible sans guard attendu",
+  "Migration ou schéma D1 qui échoue sur une base vierge",
+  "Un tool call mal formé fait échouer tout le tour de l’agent"
+ ],
+ "not_for": [
+  "Effectuer des corrections ou déployer des changements de sécurité",
+  "Réaliser un checkup général de Scena sans objectif sécurité ou couche données",
+  "Construire une nouvelle intégration ou implémenter un endpoint webhook",
+  "Mener un test de pénétration destructif ou lancer des écritures en production"
+ ]
+}

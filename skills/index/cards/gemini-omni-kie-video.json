@@ -1,0 +1,68 @@
+{
+ "name": "gemini-omni-kie-video",
+ "sha": "0364e73457f9d7261ed2d889981ce067acc1a475ca01894417333bb17a47cccc",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00058229325,
+ "summary": "Use when generating, extending, pricing, or debugging Gemini Omni Flash videos through the Kie.ai API.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Génère-moi une vidéo avec Gemini Omni via Kie.ai, en 16:9 et en 1080p.",
+  "Comment je lance un job gemini-omni-video avec l’API Kie ?",
+  "Tu peux me donner le payload pour créer une vidéo de 8 secondes à partir de cette image ?",
+  "Je veux prolonger ce clip avec Gemini Omni, c’est quoi la bonne méthode sur Kie.ai ?",
+  "J’ai un failCode 400 avec « The uploaded audio was flagged by Google safety review », comment je contourne ça ?",
+  "Pourquoi mon poll sur getTaskDetail renvoie 404 pour mon job vidéo Kie ?",
+  "La vidéo est finie, où je récupère les resultUrls dans la réponse de recordInfo ?",
+  "Compare-moi le prix Gemini Omni Flash entre Google, Kie.ai et Fal.ai, surtout en 1080p.",
+  "Ça coûte combien une génération de 4 secondes en 4K sur Kie ?",
+  "Avec video_list, je peux choisir la durée de la suite ou le modèle la décide tout seul ?",
+  "Je veux que le plan suivant reparte exactement de la dernière frame : image_urls et FIRST_FRAME, ça marche comment ?",
+  "Mon clip source a de la voix et l’extension est bloquée ; faut-il envoyer une version sans audio ?"
+ ],
+ "intents_en": [
+  "Generate a video with Gemini Omni on Kie.ai.",
+  "How do I poll a Kie.ai video task?",
+  "Extend a clip with Gemini Omni Flash.",
+  "Compare Gemini Omni video pricing across providers.",
+  "Why was my input video blocked by Google's safety review?"
+ ],
+ "entities": [
+  "Gemini Omni Flash",
+  "gemini-omni-flash-preview",
+  "gemini-omni-video",
+  "Kie.ai",
+  "api.kie.ai",
+  "/api/v1/jobs/createTask",
+  "/api/v1/jobs/recordInfo",
+  "taskId",
+  "video_list",
+  "image_urls",
+  "FIRST_FRAME",
+  "audio_ids",
+  "character_ids",
+  "resultUrls",
+  "creditsConsumed",
+  "failMsg",
+  "failCode",
+  "ffmpeg",
+  "catbox.moe",
+  "Google API",
+  "Fal.ai",
+  "Flow",
+  "Interactions API"
+ ],
+ "symptoms": [
+  "getTaskDetail returns 404",
+  "The uploaded audio was flagged by Google safety review",
+  "failCode: 400",
+  "Video extension drifts from the source clip",
+  "The duration parameter is ignored when video_list is present"
+ ],
+ "not_for": [
+  "General Gemini or Claude/GPT provider setup and pricing unrelated to video generation",
+  "Generating videos through Fal.ai or other providers rather than Kie.ai",
+  "Using Flow's stateful video prolongation workflow",
+  "General video editing or ffmpeg tasks unrelated to Gemini Omni on Kie.ai"
+ ]
+}

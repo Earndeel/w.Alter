@@ -1,0 +1,70 @@
+{
+ "name": "ssh-resilient-mac-vps",
+ "sha": "ffb9fa585ac4d6811fe7c0471dee02e2d1b002e909cdfa676942ad7195cec321",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0009390645,
+ "summary": "Use when SSH Mac↔VPS sessions drop on Wi-Fi changes and need reliable reconnects via autossh, Tailscale, keepalives, or tmux.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Mon SSH vers le VPS casse dès que le Wi-Fi décroche, tu peux le rendre résilient ?",
+  "J’ai encore un broken pipe dans cmux après être passé du Wi-Fi à la 4G.",
+  "Configure autossh sur mon Mac pour qu’il reconnecte le tunnel tout seul.",
+  "Comment garder ma session Hermes vivante quand la connexion SSH tombe ?",
+  "Le tmux tourne toujours sur le VPS mais j’ai perdu l’affichage, je fais quoi ?",
+  "Mets les keepalive SSH corrects sur mon Mac, ça time out au bout de quelques minutes.",
+  "Après une coupure réseau, mes fenêtres cmux restent mortes. Tu peux automatiser leur reconnexion ?",
+  "Je veux que le tunnel vers w-alter survive aux changements de réseau et au redémarrage du Mac.",
+  "J’ai changé de hotspot et mes connexions SSH sont toutes tombées, comment éviter ça la prochaine fois ?",
+  "Peux-tu vérifier pourquoi walter-ts ne passe pas par le tunnel autossh ?",
+  "Le Mac n’arrive plus à se reconnecter au VPS après la veille, regarde la config Tailscale et SSH.",
+  "On avait parlé d’autossh et de tmux : tu peux me remettre une config persistante avec launchd ?"
+ ],
+ "intents_en": [
+  "Make my Mac-to-VPS SSH reconnect after Wi-Fi drops.",
+  "Set up autossh with launchd on my Mac.",
+  "My cmux SSH sessions get a broken pipe after network changes.",
+  "Keep my tmux session usable when SSH disconnects.",
+  "Tune SSH keepalives over Tailscale."
+ ],
+ "entities": [
+  "SSH",
+  "autossh",
+  "Tailscale",
+  "tmux",
+  "cmux",
+  "launchd",
+  "w-alter",
+  "walter-ts",
+  "hermes",
+  "lucass-macbook-pro-15",
+  "100.127.150.1",
+  "100.91.35.121",
+  "localhost:2222",
+  "ServerAliveInterval",
+  "ServerAliveCountMax",
+  "TCPKeepAlive",
+  "AUTOSSH_GATETIME",
+  "com.walter.autossh.plist",
+  "com.walter.cmux-reconnect.plist",
+  "cmux-reconnect.sh",
+  "launchctl",
+  "brew",
+  "ssh-keygen",
+  "authorized_keys"
+ ],
+ "symptoms": [
+  "Broken pipe",
+  "SSH timeout after Wi-Fi or network changes",
+  "Connection reset or connection closed",
+  "cmux panes left at a local shell prompt after disconnect",
+  "tmux session survives on the VPS but terminal display is lost",
+  "SSH tunnel does not reconnect automatically"
+ ],
+ "not_for": [
+  "Debugging VPS services or application errors unrelated to SSH connectivity",
+  "General SSH key creation or access setup without a resilience or reconnect goal",
+  "Managing tmux workflows unrelated to surviving a dropped SSH connection",
+  "Configuring Tailscale for general VPN or device-networking use"
+ ]
+}

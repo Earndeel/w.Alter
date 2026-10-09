@@ -1,0 +1,68 @@
+{
+ "name": "tldraw-automation",
+ "sha": "1c3a651cc3b9662c9375759533beb8993293593a4fe2d72d88814fea87e4f04a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005351445,
+ "summary": "Use when automating tldraw-offline across a remote Mac/VPS, generating diagrams programmatically, or fixing its API-scope and shape-prop errors.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi une mindmap dans tldraw avec les infos que je viens de te donner.",
+  "Génère le diagramme directement dans tldraw-offline, pas dans un autre outil.",
+  "tldraw tourne sur mon Mac et Hermes sur le VPS : comment je relie les deux ?",
+  "Tu peux automatiser tldraw à distance avec le tunnel SSH et Tailscale ?",
+  "J’ai une erreur « Unexpected property » quand je mets fontSize sur une forme geo, tu corriges ?",
+  "Pourquoi api.getScreenshot marche pas dans mon appel /api/doc/.../exec ?",
+  "Fais un schéma de gauche à droite avec des rectangles et des flèches, puis vérifie le rendu.",
+  "Récupère une capture du canvas tldraw sur le Mac pour que tu puisses l’analyser.",
+  "Le token tldraw a expiré après le redémarrage de l’app, remets l’automatisation en marche.",
+  "J’ai déjà installé et configuré tldraw-offline, utilise-le pour ce diagramme au lieu de changer d’outil.",
+  "Le script crée bien les formes, mais comment je les relie proprement dans le canvas ?",
+  "Rappelle-moi quel endpoint utiliser pour appeler api.getScreenshot et pourquoi /exec ne le voit pas."
+ ],
+ "intents_en": [
+  "Generate a mind map directly in tldraw.",
+  "Automate tldraw on my Mac from the VPS.",
+  "Fix the geo shape Unexpected property error.",
+  "Why is api undefined in the document exec endpoint?",
+  "Capture and retrieve a screenshot from remote tldraw."
+ ],
+ "entities": [
+  "tldraw-offline",
+  "tldraw",
+  "Hermes",
+  "Mac",
+  "VPS",
+  "Tailscale",
+  "SSH",
+  "ssh tunnel",
+  "localhost:7236",
+  "server.json",
+  "/tmp/tldraw_token.txt",
+  "/api/doc/:id/exec",
+  "/api/search",
+  "api.getScreenshot()",
+  "api.getDocs()",
+  "editor",
+  "helpers",
+  "createShapeId",
+  "toRichText",
+  "geo",
+  "fontSize",
+  "SCP",
+  "vision_analyze",
+  "excalidraw"
+ ],
+ "symptoms": [
+  "Unexpected property error when setting fontSize on a geo shape",
+  "api is not defined in /api/doc/:id/exec",
+  "Screenshot filePath points to a path on the remote Mac",
+  "tldraw API calls fail after the app restarts because the token expired",
+  "Hermes on the VPS cannot reach tldraw running on the Mac"
+ ],
+ "not_for": [
+  "General tldraw API reference without remote automation or programmatic generation; load tldraw-offline.",
+  "Creating diagrams in Excalidraw or another canvas tool.",
+  "General SSH, Tailscale, or Mac administration unrelated to tldraw."
+ ]
+}

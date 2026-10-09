@@ -1,0 +1,54 @@
+{
+ "name": "gmail-mailbox-analysis",
+ "sha": "361d813a7e6368770a77421767626f1179821ec9651b21fac9b2e527596baea0",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000600732,
+ "summary": "Use when Monsieur veut inventorier, auditer ou analyser un ou plusieurs comptes Gmail en lecture seule, avec couverture complète et analyse des fils.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fais-moi un audit complet de ma boîte Gmail, sans rien modifier.",
+  "Résume ce qui demande mon attention dans tous mes mails, pas seulement la boîte de réception.",
+  "Analyse tout mon Gmail et repère les demandes sans réponse, les urgences et les actions à faire.",
+  "Tu peux me faire l’inventaire de mes mails, avec les volumes, les expéditeurs principaux et les tendances ?",
+  "Regarde aussi les spams et la corbeille : je veux vraiment tout le mailbox.",
+  "Compare mes deux comptes Gmail, mais garde bien les résultats séparés par adresse.",
+  "J’ai une autre boîte Gmail à inclure dans l’analyse, comment on l’autorise sans toucher à mon compte actuel ?",
+  "Fais le point sur les mails financiers et de sécurité reçus ces derniers mois.",
+  "Est-ce que tu peux repérer les fils où quelqu’un attend une réponse de ma part, en lisant tout le thread ?",
+  "Ton résumé couvre bien tous les mails ? Dis-moi combien ont été inventoriés et s’il y a eu des erreurs.",
+  "J’ai l’impression que des demandes importantes sont noyées dans les newsletters, passe toute la boîte au crible.",
+  "Analyse mon Gmail en lecture seule et donne-moi aussi ce qui est en attente chez les autres."
+ ],
+ "intents_en": [
+  "Audit my entire Gmail mailbox read-only.",
+  "Find unanswered requests across all my mail.",
+  "Include spam and trash in the mailbox inventory.",
+  "Analyze both Gmail accounts separately.",
+  "Report mailbox coverage and retrieval failures."
+ ],
+ "entities": [
+  "Gmail",
+  "Gmail API",
+  "users.getProfile",
+  "users.labels.list",
+  "users.messages.list",
+  "users.messages.get",
+  "threadId",
+  "includeSpamTrash",
+  "gmail.readonly",
+  "OAuth",
+  "Workspace delegation",
+  "~/.hermes/google_accounts/<account>/google_token.json",
+  "email-inbox-triage",
+  "google-workspace",
+  "evidence-and-execution-operations"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Rédiger ou envoyer une réponse, créer un brouillon, archiver, supprimer ou modifier des mails.",
+  "Trier uniquement quelques messages récents dans la boîte de réception.",
+  "Configurer de façon générique l’accès aux API Google Workspace.",
+  "Analyser des boîtes mail qui ne sont pas des comptes Gmail."
+ ]
+}

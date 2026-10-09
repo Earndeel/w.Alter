@@ -1,0 +1,62 @@
+{
+ "name": "torrent-harvest",
+ "sha": "c147e6cd41872792b51de6feda53fa1a9b68042ba639d2b5abecd7c3df022cf7",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00063946575,
+ "summary": "Use when Monsieur veut chercher un torrent sur plusieurs indexeurs et comparer les résultats pour trouver le meilleur magnet.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Trouve-moi un torrent pour Interstellar, avec le meilleur magnet.",
+  "Tu peux chercher Dune en 1080p et me sortir le lien magnet le plus seedé ?",
+  "Je cherche la version française de ce film, lance une recherche torrent.",
+  "Y a quoi comme torrents pour la dernière saison de Severance ?",
+  "Cherche cet anime sur les indexeurs et privilégie la VF si elle existe.",
+  "Le lien que j'avais trouvé est mort, tu peux m'en trouver un autre ?",
+  "Donne-moi les meilleurs résultats torrent pour ce jeu, si possible un repack FitGirl.",
+  "Fais un scan général pour ce titre et classe-moi les magnets du meilleur au moins bon.",
+  "Tu m'avais trouvé une version CAM, refais la recherche mais sans les versions pourries.",
+  "Cherche le torrent du documentaire dont on parlait au tour précédent.",
+  "J'ai juste le titre, pas le nom exact : cherche quand même sur plusieurs sites.",
+  "Tu peux me renvoyer le magnet du résultat en 2160p avec le plus de seeders ?"
+ ],
+ "intents_en": [
+  "Find the best torrent magnet for this movie.",
+  "Search multiple torrent indexes for this series.",
+  "Look for a French 1080p release.",
+  "Find a well-seeded torrent for this anime.",
+  "Get me the best FitGirl repack result."
+ ],
+ "entities": [
+  "torrent-harvest",
+  "/root/hermes_workspace/kaeydcrqyhbhfzcjvzfnwy/torrent-harvest/",
+  "harvest.py",
+  "sites.json",
+  "apibay",
+  "yts",
+  "movies-api.accel.li",
+  "solidtorrents",
+  "nyaa",
+  "knaben",
+  "bitsearch",
+  "torlock",
+  "fitgirl-repacks.site",
+  "torrentfunk",
+  "torrentdownloads.pro",
+  "EZTV",
+  "TPB",
+  "tpb-tor",
+  "127.0.0.1:9050",
+  "magnet",
+  "--type",
+  "--limit",
+  "--json"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Télécharger ou lancer un torrent déjà choisi.",
+  "Configurer un client BitTorrent ou résoudre ses problèmes de réseau.",
+  "Chercher des fichiers directs ou des services de streaming.",
+  "Ajouter ou dépanner une nouvelle source torrent dans sites.json."
+ ]
+}

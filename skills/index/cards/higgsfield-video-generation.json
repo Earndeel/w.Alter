@@ -1,0 +1,73 @@
+{
+ "name": "higgsfield-video-generation",
+ "sha": "63b7a3c7611d122bf6364066d6c30f40bc8fe982cf7aedee9a04bbf2db2d66e7",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00082583325,
+ "summary": "Use when Monsieur veut générer une image ou une vidéo avec Higgsfield, choisir un modèle, ou dépanner son MCP, son OAuth ou ses appels API.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Génère-moi une vidéo avec Higgsfield à partir de ce prompt.",
+  "Tu peux faire une image 4K avec Nano Banana sur Higgsfield ?",
+  "Quel modèle Higgsfield est dispo sur mon compte pour une vidéo cinématique ?",
+  "Fais une vidéo Kling en 16:9, huit secondes.",
+  "Ça me coûte combien de générer cette vidéo ?",
+  "Le MCP Higgsfield ne répond plus, tu peux le reconnecter ?",
+  "J’ai « expected object, received undefined » sur generate_video, corrige l’appel.",
+  "Kling me renvoie « Something went wrong » : vérifie le model ID et les paramètres.",
+  "J’ai une erreur only_mcp_usage_on_trial_is_available alors que j’ai des crédits.",
+  "hermes mcp login Higgsfield échoue en headless, comment renouveler le token ?",
+  "Le transport MCP est down mais j’ai encore un token : passe par l’API JSON-RPC en curl.",
+  "Le token marche pour lister les modèles, mais generate_video dit Invalid or expired token. On fait quoi ?"
+ ],
+ "intents_en": [
+  "Generate a video with Higgsfield from this prompt.",
+  "Which Higgsfield video models can my account use?",
+  "Fix my generate_video params wrapper error.",
+  "Reconnect the Higgsfield MCP transport.",
+  "Renew Higgsfield OAuth and call the API with curl."
+ ],
+ "entities": [
+  "Higgsfield",
+  "mcp-higgsfield",
+  "models_explore",
+  "generate_video",
+  "kling3_0",
+  "kling3_0_turbo",
+  "kling-v1-6",
+  "gemini_omni",
+  "veo3_1",
+  "seedance_2_0",
+  "cinematic_studio_3_0",
+  "cinematic_studio_2_5",
+  "nano_banana_2",
+  "higgsfield CLI",
+  "hermes mcp",
+  "mcp.higgsfield.ai",
+  "OAuth 2.1 PKCE",
+  "SSH tunnel",
+  "port 8766",
+  "higgsfield auth login",
+  "higgsfield auth token",
+  "higgsfield workspace list --json",
+  "~/.hermes/mcp-tokens/higgsfield.tokens.json",
+  "JSON-RPC",
+  "curl"
+ ],
+ "symptoms": [
+  "MCP server 'higgsfield' transport is down; reconnect requested",
+  "Invalid input: expected object, received undefined",
+  "Something went wrong",
+  "only_mcp_usage_on_trial_is_available",
+  "Invalid or expired token",
+  "no cached tokens found",
+  "hermes mcp test signale l’absence de token",
+  "appels MCP vides ou bloqués"
+ ],
+ "not_for": [
+  "Écrire ou améliorer un prompt vidéo sans demande de génération Higgsfield.",
+  "Monter, éditer ou sous-titrer une vidéo déjà générée.",
+  "Générer des médias avec un autre fournisseur ou outil que Higgsfield.",
+  "Gérer les comptes, abonnements ou paiements Higgsfield au-delà de vérifier modèles et crédits."
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "name": "hermes-agent-skill-authoring",
+ "sha": "a0bba326cfa3798c75215414ca8a97745c1fd31883ebc1eaf29ca4c4ff681fe1",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008945145,
+ "summary": "Use when adding or editing a committed Hermes-Agent SKILL.md and validating its repo structure, tests, and generated docs.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute cette skill dans le repo Hermes, sur ma branche, avec le bon frontmatter.",
+  "Je veux qu'on shippe ce workflow avec hermes-agent : crée le SKILL.md in-repo, pas dans mon home.",
+  "Peux-tu mettre à jour la skill existante sous skills/ et vérifier les conventions du repo ?",
+  "La skill est presque prête, tu peux faire la checklist frontmatter, tests et docs avant le commit ?",
+  "Fais-moi une skill optionnelle pour ce workflow, et suis les règles AGENTS.md.",
+  "On a besoin d'une nouvelle skill Hermes dans ce repo. Regarde d'abord les skills voisines pour éviter un doublon.",
+  "J'ai modifié la description de SKILL.md, quelles docs faut régénérer et comment éviter d'embarquer le bruit du générateur ?",
+  "Tu as utilisé skill_manage create, mais je voulais le fichier dans le repo. Corrige ça et mets-le au bon endroit.",
+  "Le reviewer a rejeté ma skill : description trop longue et author incorrect. Peux-tu la remettre aux normes hardline ?",
+  "Ajoute les tests requis pour cette skill et lance la commande de test indiquée dans les conventions.",
+  "Est-ce qu'on la met dans skills/ ou optional-skills/ ? C'est une skill spécialisée qui doit être commitée.",
+  "La nouvelle skill n'apparaît pas dans la session actuelle après l'écriture, c'est normal ? Vérifie aussi le reste de la procédure."
+ ],
+ "intents_en": [
+  "Add this skill to the Hermes repo.",
+  "Fix the SKILL.md frontmatter to meet repo standards.",
+  "Create an optional in-repo skill and its tests.",
+  "Regenerate the skill docs without unrelated changes.",
+  "Review this committed skill before I open a PR."
+ ],
+ "entities": [
+  "hermes-agent",
+  "SKILL.md",
+  "AGENTS.md",
+  "skills/",
+  "optional-skills/",
+  "skill_manage(action='create')",
+  "skill_manage(action='patch')",
+  "write_file",
+  "patch",
+  "search_files",
+  "read_file",
+  "terminal",
+  "tools/skill_manager_tool.py",
+  "tests/skills/test_<skill>_skill.py",
+  "scripts/run_tests.sh",
+  "website/scripts/generate-skill-docs.py",
+  "website/sidebars.ts",
+  ".env.example",
+  "git add",
+  "pytest",
+  "related_skills",
+  "frontmatter",
+  "platforms"
+ ],
+ "symptoms": [
+  "Validation fails because SKILL.md has leading whitespace before the opening ---.",
+  "The reviewer rejects a description longer than 60 characters.",
+  "A generated skill docs page is missing or appears orphaned from the sidebar.",
+  "The docs generator creates unrelated changes across many skill pages.",
+  "A related_skills entry points to a skill that does not exist in the repo.",
+  "The newly written skill is not visible to the current session's skill loader."
+ ],
+ "not_for": [
+  "Creating a personal skill under ~/.hermes/skills/ with skill_manage create.",
+  "Writing the actual code or implementing the workflow the skill will describe.",
+  "Requesting a code review without authoring or editing an in-repo SKILL.md.",
+  "Installing or running an already-published optional skill."
+ ]
+}

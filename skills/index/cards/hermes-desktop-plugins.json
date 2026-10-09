@@ -1,0 +1,70 @@
+{
+ "name": "hermes-desktop-plugins",
+ "sha": "271b97cbffe2d05f59c1b8c121a7b770439c90fde9019f7a32de69ce8f47ee11",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000716562,
+ "summary": "Use when Monsieur veut créer ou modifier un plugin UI pour Hermes Desktop : pane, widget, commande, raccourci, route ou thème.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi un plugin Hermes Desktop avec un petit panneau pour afficher mes tâches.",
+  "Ajoute un widget dans la status bar qui montre l’état du gateway.",
+  "Je veux une commande dans ⌘K pour ouvrir directement ma page de suivi.",
+  "Comment je peux ajouter un pane sous la conversation sans modifier l’app Hermes ?",
+  "Crée un plugin desktop qui affiche les sessions actives et se met à jour avec les events.",
+  "Le plugin doit avoir une page à lui, avec une entrée dans la sidebar. Tu peux me monter ça ?",
+  "Ajoute un raccourci clavier pour lancer mon action, et rends-le reconfigurable.",
+  "J’ai besoin d’un panneau canvas qui redimensionne proprement quand je bouge les panes.",
+  "Mon plugin Hermes ne charge pas, j’ai un toast d’erreur après l’avoir déposé. Aide-moi à corriger le fichier.",
+  "Peux-tu ajouter une préférence persistante au plugin et quelques traductions anglais/français ?",
+  "Fais un plugin opt-in dans les réglages, désactivé par défaut, avec un petit dashboard.",
+  "Je veux brancher l’UI du plugin à son backend Python via ctx.rest et ctx.socket, avec un fallback polling."
+ ],
+ "intents_en": [
+  "Create a Hermes Desktop pane plugin.",
+  "Add a status bar widget to the app.",
+  "Register a command in the command palette.",
+  "Build a plugin page with sidebar navigation.",
+  "Fix my desktop plugin load error."
+ ],
+ "entities": [
+  "Hermes desktop app",
+  "@hermes/plugin-sdk",
+  "react",
+  "react/jsx-runtime",
+  "$HERMES_HOME/desktop-plugins/",
+  "~/.hermes/desktop-plugins/",
+  "~/.hermes/profiles/<profile>/",
+  "templates/plugin.js",
+  "plugin.js",
+  "host.request",
+  "host.onEvent",
+  "ctx.register",
+  "ctx.rest",
+  "ctx.socket",
+  "/api/plugins/<id>",
+  "~/.hermes/plugins/<id>/dashboard/plugin_api.py",
+  "plugins.enabled",
+  "PALETTE_AREA",
+  "KEYBINDS_AREA",
+  "ROUTES_AREA",
+  "SIDEBAR_NAV_AREA",
+  "Contribute",
+  "React Query",
+  "Reload desktop plugins"
+ ],
+ "symptoms": [
+  "Plugin <name> failed to load",
+  "Le plugin ne s’affiche pas après avoir déposé plugin.js",
+  "Le pane reste vide ou se redimensionne mal",
+  "Erreur de parsing liée à JSX dans plugin.js",
+  "ReferenceError au rendu d’un composant UI",
+  "Les données du plugin ne se mettent pas à jour en direct"
+ ],
+ "not_for": [
+  "Créer un plugin Python général dans ~/.hermes/plugins/ sans interface Hermes Desktop.",
+  "Modifier le code source ou les vues intégrées de l’application Hermes elle-même.",
+  "Écrire une skill Hermes ou configurer une commande CLI/gateway sans UI desktop.",
+  "Construire une application web autonome sans utiliser le SDK de plugins Hermes."
+ ]
+}

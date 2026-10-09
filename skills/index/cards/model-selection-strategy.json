@@ -1,0 +1,59 @@
+{
+ "name": "model-selection-strategy",
+ "sha": "01f143c370912027031c731cf6bbbb00db721da8aed06f5faf339274cd875237",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000552717,
+ "summary": "Use when choosing or routing an LLM by task, quality, latency, and cost across OpenRouter, Kie.ai, and Codex.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Quel modele tu mettrais par defaut pour mes taches agentiques ?",
+  "Compare DeepSeek V4 Pro et Luna pour coder et utiliser des tools, surtout niveau cout.",
+  "Je veux router les taches simples vers le moins cher et garder Opus pour les cas critiques, tu ferais comment ?",
+  "Pour du raisonnement multi-etapes un peu costaud, je prends quel modele chez Kie.ai ?",
+  "Est-ce que GPT-5.6 Luna vaut le surcout par rapport a DeepSeek V4 Pro ?",
+  "J'ai besoin de choisir un modele pour une grosse volumetrie de code, recherche et fichiers. Priorite au cout.",
+  "Pourquoi tu me conseilles Luna plutot que Sol maintenant ? Les scores ont change ?",
+  "Fais-moi une strategie de routing selon le type de tache, avec le meilleur compromis qualite/prix.",
+  "Je veux du tool-use avec GPT-5.6, je passe par OpenRouter, Kie ou Codex ?",
+  "Le Codex refuse GPT-5.6, c'est normal ? Quel provider utiliser a la place ?",
+  "Pour du texte et du raisonnement pur, on choisit avec l'Agentic Index ou l'Intelligence Index ?",
+  "Suite a notre choix de modele, verifie le provider, le nom du modele et le cout attendu avant que je change le routing."
+ ],
+ "intents_en": [
+  "Which model should handle high-volume agentic tasks?",
+  "Compare Luna and DeepSeek on cost and tool use.",
+  "Route critical tasks to the best available model.",
+  "Is GPT-5.6 supported through Codex?",
+  "Choose a model for complex multi-step reasoning."
+ ],
+ "entities": [
+  "OpenRouter",
+  "Kie.ai",
+  "Codex",
+  "DeepSeek V4 Pro",
+  "GPT-5.6 Luna",
+  "GPT-5.6 Sol",
+  "GPT-5.6 Terra",
+  "Claude Opus 5",
+  "Claude Sonnet 5",
+  "Agentic Index",
+  "Intelligence Index",
+  "aa-pareto-model-optimizer",
+  "Hermes",
+  "kie-gpt",
+  "Responses API",
+  "Chat Completions",
+  "function_call",
+  "function_call_output"
+ ],
+ "symptoms": [
+  "not supported when using Codex with a ChatGPT account"
+ ],
+ "not_for": [
+  "Scraping or refreshing live model scores and prices",
+  "Computing the Pareto frontier itself",
+  "Configuring a provider or implementing routing changes",
+  "General model-quality analysis unrelated to selecting a model for a task"
+ ]
+}

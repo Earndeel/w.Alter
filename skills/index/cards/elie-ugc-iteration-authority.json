@@ -1,0 +1,53 @@
+{
+ "name": "elie-ugc-iteration-authority",
+ "sha": "315cd1b780df0266fd3e3a2b0804db35bdc6f961392a22388d15ad58a167d055",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000337887,
+ "summary": "Use when iterating Elie's UGC videos: assess failed generations, make scoped retries, compare candidates, and proceed when quality gates pass.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Relance la vidéo UGC d'Elie, le selfie POV est pas bon.",
+  "Le bénéfice commercial manque encore, corrige ça et retente.",
+  "Continue les générations pour Elie jusqu'à avoir le meilleur résultat, pas besoin de me redemander à chaque retry.",
+  "Y a une parole non souhaitée dans cette version : diagnostique et regen si nécessaire.",
+  "La morphologie distrait trop, fais une nouvelle passe pour la vidéo UGC.",
+  "Compare les candidats Elie et garde le meilleur, avec les reçus de coût.",
+  "Tu peux corriger juste le cadrage en post-prod ou il faut régénérer ?",
+  "La vidéo est presque bonne, ne bloque pas sur le geste de pointage si c'est juste une préférence éditoriale.",
+  "On a encore raté le POV caméra selfie. Fais une autre itération dans le scope du brief.",
+  "Garde une trace des coûts et explique ce qui a foiré avant de relancer.",
+  "Est-ce que cette version passe les quality gates ? Si oui, passe en post-prod au lieu de boucler.",
+  "Pour Elie's UGC, privilégie le meilleur rendu, mais ne change pas de provider ou de modèle sans me demander."
+ ],
+ "intents_en": [
+  "Retry Elie's UGC video; the selfie POV is wrong.",
+  "Compare the candidates and keep the best version.",
+  "Fix the unwanted speech and regenerate if needed.",
+  "Track costs and diagnose each failed generation.",
+  "Move to post-production once the quality gates pass."
+ ],
+ "entities": [
+  "Elie",
+  "Elie UGC",
+  "UGC video",
+  "generation iterations",
+  "cost receipts",
+  "post-production",
+  "quality gates",
+  "selfie camera POV"
+ ],
+ "symptoms": [
+  "Wrong selfie camera POV",
+  "Missing commercial benefit",
+  "Unwanted speech",
+  "Distracting morphology",
+  "Candidate quality varies across generations"
+ ],
+ "not_for": [
+  "Iteration authorization for projects other than Elie's UGC",
+  "Buying credits or approving additional spend",
+  "Switching providers or models",
+  "Publishing the finished video"
+ ]
+}

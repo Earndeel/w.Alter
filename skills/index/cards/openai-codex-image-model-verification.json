@@ -1,0 +1,53 @@
+{
+ "name": "openai-codex-image-model-verification",
+ "sha": "7f9915f52a8807a3c5a600d096b9bc513584bd3bb5307d343a741212e669c74e",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000368775,
+ "summary": "Use when checking live OpenAI/Codex image-model IDs, official availability, and what the active Hermes integration exposes.",
+ "kind": "procedure",
+ "intents_fr": [
+  "C'est quoi les modèles d'image OpenAI dispo en ce moment ?",
+  "Vérifie si le nouveau modèle image est vraiment accessible dans mon setup Codex.",
+  "Est-ce que GPT-Image-1 est officiellement dispo et sélectionnable ici ?",
+  "Tu peux comparer la doc OpenAI avec les modèles que Hermes expose ?",
+  "J'ai vu passer un nouveau modèle d'image, vérifie son ID exact et les APIs supportées.",
+  "Codex me propose pas ce modèle image, regarde si c'est normal.",
+  "On utilise quel backend image dans la config Hermes, et image_gen est activé ?",
+  "Le modèle annoncé par OpenAI est-il déjà accepté par notre provider, ou c'est juste dans la doc ?",
+  "Vérifie les quality tiers : c'est des vrais IDs API ou des noms virtuels côté intégration ?",
+  "La liste locale est peut-être vieille, compare-la avec les sources upstream avant de conclure.",
+  "Pourquoi ce modèle d'image n'apparaît pas dans Codex alors qu'OpenAI vient de l'annoncer ?",
+  "Sans rien modifier ni lancer de génération, dis-moi ce qui est officiellement dispo et ce qu'on peut vraiment choisir ici."
+ ],
+ "intents_en": [
+  "Check which OpenAI image models are available now.",
+  "Verify whether this image model is exposed in Hermes.",
+  "Compare official model support with the active Codex integration.",
+  "Check the exact model ID and supported image APIs.",
+  "Is this quality tier a real API model ID or a local alias?"
+ ],
+ "entities": [
+  "OpenAI",
+  "Codex",
+  "Hermes",
+  "Image API",
+  "Responses API",
+  "image_gen",
+  "OpenAI developer changelog",
+  "model pages",
+  "active image backend",
+  "model enumerator",
+  "upstream integration source",
+  "model IDs",
+  "quality settings",
+  "virtual quality-tier IDs"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Generating or editing an image",
+  "Changing Hermes configuration or enabling image_gen",
+  "Updating Hermes or installing a new provider integration",
+  "Choosing an image-generation prompt or improving image quality"
+ ]
+}

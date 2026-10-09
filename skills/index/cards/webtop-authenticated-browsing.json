@@ -1,0 +1,70 @@
+{
+ "name": "webtop-authenticated-browsing",
+ "sha": "5cb809c552dc9a99f907c2c85fed1d8799c4b7be89dfed89e406cf60c2419006",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00092755575,
+ "summary": "Use when a logged-in site must be browsed with Mac Brave cookies, anti-bot handling, or visible clicks, typing, scrolling and screenshots.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Ouvre cette page avec ma session Brave, je suis déjà connecté sur mon Mac.",
+  "Tu peux récupérer mes cookies Brave et te connecter à ce site pour moi ?",
+  "Facebook me bloque en headless, passe par Camoufox avec ma session.",
+  "J’aimerais voir le navigateur pendant que tu fais les clics, lance-le sur le Webtop.",
+  "Prends une capture d’écran de la page une fois connecté.",
+  "Va sur cette page et télécharge le document avec ma session.",
+  "Continue dans l’onglet connecté et clique sur le bouton pour valider.",
+  "Cloudflare me met un CAPTCHA ; essaie avec Camoufox, sans réutiliser le cf_clearance.",
+  "Le site me demande de me reconnecter alors que je suis connecté dans Brave, injecte les cookies du domaine.",
+  "Ouvre-le moi sur mon Mac, pas besoin de m’envoyer un lien Webtop.",
+  "Fais une recherche sur la page, tape « pixel », puis descends dans les résultats.",
+  "Webtop Chromium ferme la page quand je navigue, tu peux reprendre avec Camoufox ?"
+ ],
+ "intents_en": [
+  "Browse this site using my logged-in Brave session.",
+  "Extract my Brave cookies and inject them into Camoufox.",
+  "Facebook blocks headless browsing; use Camoufox.",
+  "Show me the authenticated browser on Webtop.",
+  "Take a screenshot and click through the logged-in page."
+ ],
+ "entities": [
+  "Mac Brave",
+  "Camoufox",
+  "Webtop Chromium",
+  "Playwright",
+  "CDP",
+  "SSH",
+  "vault",
+  "Camoufox API",
+  "Selkies",
+  "noVNC",
+  "Facebook",
+  "Cloudflare",
+  "DataDome",
+  "brave-walter",
+  "port 9222",
+  "port 9223",
+  "port 9226",
+  "port 9377",
+  "port 9378",
+  "port 3100",
+  "https://<host>:3001",
+  "cf_clearance",
+  "localStorage"
+ ],
+ "symptoms": [
+  "Headless browsing is blocked by an anti-bot check or CAPTCHA.",
+  "Cloudflare protection prevents the page from loading normally.",
+  "Facebook closes the Chromium page.",
+  "Google shows a CAPTCHA in Webtop Chromium.",
+  "The site opens logged out despite an active Brave session.",
+  "TargetClosedError after creating a new browser context.",
+  "Cookie import returns HTTP 413 Payload Too Large."
+ ],
+ "not_for": [
+  "Getting an API token and making direct API calls with curl.",
+  "Setting up or installing the Camoufox browser service itself.",
+  "Automating a site that does not require authentication or browser interaction.",
+  "Using Mac Brave CDP directly to control visible tabs."
+ ]
+}

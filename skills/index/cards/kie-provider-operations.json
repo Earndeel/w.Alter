@@ -1,0 +1,64 @@
+{
+ "name": "kie-provider-operations",
+ "sha": "5af4847ee0563e30968062bb0851b8cf396a99076c8d663c5f5f3479126b428e",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000454014,
+ "summary": "Use when setting up or troubleshooting Kie.ai image, video, LLM, upload, polling, cost, or generated-artifact operations.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Configure Kie.ai pour générer des images, tu peux vérifier le bon modèle et le schéma ?",
+  "Mon upload de référence est fait, aide-moi à lancer la génération et à récupérer le fichier.",
+  "La vidéo Kie est en 202 mais j’ai juste un job ID : comment suivre la tâche sans la relancer ?",
+  "Kie me renvoie 404 avec getTaskDetail, c’est quoi le bon polling pour un modèle Market ?",
+  "Vérifie que Seedream est bien le modèle image et pas Seedance avant que je lance ça.",
+  "J’ai besoin d’éditer cette image avec Kie en utilisant deux références locales.",
+  "Tu peux contrôler les crédits et le coût de cette vidéo Kie.ai ?",
+  "La tâche dit success, mais le rendu n’a pas la durée ni l’audio demandés : vérifie le fichier.",
+  "Mon appel Kie passe en HTTP, mais comment confirmer quel modèle a réellement tourné ?",
+  "Ne relance pas la vidéo, le poller a planté : retrouve le job et récupère son résultat.",
+  "Compare le contrat LLM Kie avec notre appel Anthropic Messages, les champs ne sont pas interchangeables.",
+  "L’image générée est bloquée par la modération ; diagnostique l’échec et vérifie l’artefact avant livraison."
+ ],
+ "intents_en": [
+  "Set up Kie.ai image generation.",
+  "Poll a Kie Market video task.",
+  "Check Kie credits and generation costs.",
+  "Verify a downloaded Kie video artifact.",
+  "Debug Kie upload or model contract errors."
+ ],
+ "entities": [
+  "Kie.ai",
+  "Kie provider catalog",
+  "Kie file upload host",
+  "Market models",
+  "recordInfo",
+  "getTaskDetail",
+  "Seedance",
+  "Seedream",
+  "Anthropic Messages",
+  "OpenAI Responses",
+  "OpenRouter video catalog",
+  "202 Accepted",
+  "task ID",
+  "ffprobe",
+  "video decode",
+  "audio checks",
+  "artifact QA"
+ ],
+ "symptoms": [
+  "getTaskDetail returns 404",
+  "Video request returns 202 with a job ID",
+  "Task reports success but the requested media is missing",
+  "HTTP request succeeds but the actual model is unverified",
+  "Moderation blocks image generation",
+  "Polling or local connection fails after submission",
+  "Downloaded media has incorrect duration, dimensions, FPS, or audio"
+ ],
+ "not_for": [
+  "General image or video editing unrelated to Kie.ai",
+  "Choosing a creative concept or writing prompts without Kie provider operations",
+  "General OpenRouter chat-model setup",
+  "Managing credentials for unrelated services"
+ ]
+}

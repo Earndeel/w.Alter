@@ -1,0 +1,69 @@
+{
+ "name": "hermes-memory-plugin",
+ "sha": "927b0dfd8ca05d3d829e17e4d16d5d4ebd049a667d6f87b595d93d5bb25d0a6b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008653095,
+ "summary": "Use when building, configuring, or debugging a custom Hermes Agent MemoryProvider plugin for semantic long-term memory.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Je veux créer un MemoryProvider custom pour Hermes, tu me guides sur la structure ?",
+  "C’est quoi exactement l’interface ABC MemoryProvider et les méthodes obligatoires ?",
+  "Fais-moi le squelette du plugin mémoire dans plugins/memory, avec les bons fichiers.",
+  "Je veux brancher LanceDB à Hermes pour faire de la mémoire vectorielle, comment on s’y prend ?",
+  "Mon plugin n’est pas détecté au démarrage, vérifie la structure et l’activation dans config.yaml.",
+  "J’ai un souci avec initialize() et les kwargs hermes_home/platform, tu peux regarder le lifecycle ?",
+  "Comment exposer memory_recall comme tool avec get_tool_schemas et handle_tool_call ?",
+  "Je veux ajouter Gemini Embedding ou un fallback local fastembed à mon provider, quelles modifs faire ?",
+  "Le changement de dimension des embeddings casse ma table LanceDB, donne-moi l’ordre des étapes pour migrer.",
+  "Après sync_turn, zéro fait n’est stocké dans la mémoire, tu vois quoi à corriger dans l’extraction ?",
+  "Mon memory tool intégré et le plugin LanceDB ne se synchronisent pas, il faut implémenter quel hook ?",
+  "J’ai installé le plugin et ses dépendances, comment l’activer proprement et redémarrer le gateway ?"
+ ],
+ "intents_en": [
+  "Create a custom Hermes MemoryProvider plugin.",
+  "Explain the MemoryProvider ABC and lifecycle.",
+  "Add LanceDB vector memory to Hermes.",
+  "Debug a plugin that is not detected at startup.",
+  "Switch the plugin embedding backend and vector dimension."
+ ],
+ "entities": [
+  "Hermes Agent",
+  "MemoryProvider",
+  "plugins/memory/<name>/",
+  "plugin.yaml",
+  "config.yaml",
+  "config.json",
+  "agent.memory_provider",
+  "LanceDB",
+  "fastembed",
+  "Gemini Embedding 2",
+  "gemini-embedding-2-preview",
+  "gemini-embedding-001",
+  "Google Generative Language API",
+  "memory_recall",
+  "get_tool_schemas()",
+  "handle_tool_call()",
+  "sync_turn()",
+  "on_session_end()",
+  "on_memory_write()",
+  "hermes memory setup",
+  "hermes config set memory.provider",
+  "$HERMES_HOME",
+  "gateway"
+ ],
+ "symptoms": [
+  "Plugin absent ou non activé au démarrage",
+  "sync_turn stocke zéro fait",
+  "Erreur de dimension de vecteur après changement d’embedder",
+  "handle_tool_call renvoie une erreur car le résultat n’est pas une chaîne JSON",
+  "LanceDB update échoue avec des valeurs SQL ou des arguments positionnels",
+  "Erreur de dépendance ou pip absent dans le venv du gateway"
+ ],
+ "not_for": [
+  "Modifier uniquement MEMORY.md, USER.md ou SOUL.md du système mémoire intégré",
+  "Utiliser les outils mémoire existants sans créer ni configurer de plugin",
+  "Déboguer un problème général du gateway sans lien avec un MemoryProvider",
+  "Configurer un fournisseur de compression LLM ou résumer des conversations"
+ ]
+}

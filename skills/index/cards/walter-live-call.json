@@ -1,0 +1,72 @@
+{
+ "name": "walter-live-call",
+ "sha": "5496049afbb3487e9290f16d07899f97fdec4dd39d6d2ed16c6c113c5b0c5068",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0009123345,
+ "summary": "Use when setting up, using, or troubleshooting W.Alter live voice calls through the browser or SIP/Asterisk and Gemini Live.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Je veux appeler W.Alter depuis mon iPhone, je dois composer quoi ?",
+  "Le site call.walter-ai.cloud ne capte plus mon micro, tu peux vérifier le chemin audio ?",
+  "Linphone n’arrive plus à joindre Hermes, regarde l’enregistrement SIP et Asterisk.",
+  "On peut remettre en route l’appel vocal Gemini Live sur l’Oracle ?",
+  "L’appel se connecte mais j’entends des coupures et du grésillement, ça vient du jitter buffer ?",
+  "Tu peux tester l’extension 999 puis vérifier que l’extension 200 arrive bien sur Hermes ?",
+  "J’ai déployé un changement dans l’app de call, pense au cache AudioWorklet et aux scripts.",
+  "Pourquoi l’appel Linphone reste rejeté alors que le trunk était enregistré hier ?",
+  "Je veux que W.Alter m’appelle proactivement, vérifie l’Originate AMI et le bridge.",
+  "Le navigateur affiche l’appel mais W.Alter ne répond plus après un voice_router, regarde les logs.",
+  "C’est quoi déjà le chemin de l’appel entre Safari, Gemini et Hermes ?",
+  "On avait testé le bridge SIP direct : tu peux retrouver pourquoi l’appel sortant faisait une boucle ?"
+ ],
+ "intents_en": [
+  "Set up W.Alter live calling on my iPhone.",
+  "Troubleshoot the browser voice call audio.",
+  "Check why the Linphone SIP trunk is rejected.",
+  "Verify the Asterisk-to-Gemini voice bridge.",
+  "Investigate the SIP 482 loop on outbound calls."
+ ],
+ "entities": [
+  "W.Alter",
+  "call.walter-ai.cloud",
+  "Linphone",
+  "Asterisk",
+  "Oracle Cloud VM",
+  "Gemini Live",
+  "Hermes",
+  "OpenClaw",
+  "SIP",
+  "RTP",
+  "ARI",
+  "AMI",
+  "Cloudflare Tunnel",
+  "Tailscale",
+  "voice-router.service",
+  "hermes-bridge.service",
+  "hermes-voice-call.service",
+  "hermes_voice_bridge.py",
+  "voice_router_service.py",
+  "/opt/openclaw/hermes_voice_bridge.py",
+  "/root/.hermes/voice-call",
+  "sip.linphone.org",
+  "gemini-3.1-flash-live-preview",
+  "port 5060",
+  "port 12110"
+ ],
+ "symptoms": [
+  "Linphone trunk registration shows Rejected",
+  "SIP 482 Loop Detected",
+  "Call connects but audio has gaps or crackling",
+  "Browser call has no microphone input or audio playback",
+  "Asterisk call reaches the bridge but Gemini does not respond",
+  "Voice-router call succeeds but the caller hears no completion confirmation",
+  "AudioWorklet changes appear to have no effect because of browser caching"
+ ],
+ "not_for": [
+  "General Hermes or OpenClaw tasks unrelated to live voice calls",
+  "Managing Telegram routing or the outer router without a voice-call issue",
+  "General Oracle Cloud administration unrelated to the call stack",
+  "Changing W.Alter’s core business decisions or deep-agent policies"
+ ]
+}

@@ -1,0 +1,55 @@
+{
+ "name": "creative-ideation",
+ "sha": "ac853cd491c8624f5a7db234822240707785e2f1f8b4d1c03070bd45681edd79",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00054467325,
+ "summary": "Use when Monsieur veut des idées concrètes de projets, sans direction ou sous contrainte créative, pour coder, créer ou fabriquer.",
+ "kind": "procedure",
+ "intents_fr": [
+  "J’ai envie de construire un truc mais aucune idée, tu me proposes quoi ?",
+  "Balance-moi trois idées de projets cool pour ce week-end.",
+  "Je m’ennuie, trouve-moi un petit truc à fabriquer.",
+  "J’ai envie de coder un outil utile, mais je sais pas lequel.",
+  "Donne-moi une idée de projet un peu bizarre, pas encore une todo app.",
+  "Je veux faire un truc avec les APIs que j’utilise déjà, sans réinventer la roue.",
+  "Je bosse sur [projet] et j’ai besoin d’une idée créative à prototyper cet aprem.",
+  "Je suis cramé, trouve-moi un projet ambitieux dans le concept mais faisable vite.",
+  "Une idée de truc à faire avec mon Raspberry Pi ?",
+  "Et si je voulais faire un projet artistique plutôt qu’un outil ?",
+  "La deuxième idée me parle, tu peux me la préciser ?",
+  "J’apprends Rust : propose trois projets pour m’entraîner, avec une contrainte sympa."
+ ],
+ "intents_en": [
+  "Give me a project idea.",
+  "I want to build something but have no direction.",
+  "Suggest a weird weekend project.",
+  "Inspire me with a useful tool idea.",
+  "Give me a creative project constraint."
+ ],
+ "entities": [
+  "references/full-prompt-library.md",
+  "Solve your own itch",
+  "Automate the annoying thing",
+  "The CLI tool that should exist",
+  "Nothing new except glue",
+  "Frankenstein week",
+  "Subtract",
+  "High concept, low effort",
+  "Blatantly copy something",
+  "One million of something",
+  "Make something that dies",
+  "Do a lot of math",
+  "Text is the universal interface",
+  "Start at the punchline",
+  "Hostile UI",
+  "Take two"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Implémenter ou déboguer un projet déjà choisi.",
+  "Rédiger un cahier des charges détaillé pour une idée existante.",
+  "Recommander des produits ou services à acheter plutôt que proposer un projet à créer.",
+  "Faire une étude de marché ou valider la rentabilité d’une idée."
+ ]
+}

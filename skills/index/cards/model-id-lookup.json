@@ -1,0 +1,57 @@
+{
+ "name": "model-id-lookup",
+ "sha": "79a8c65786b2fed7ce1012e803df986ca1f8a541d03eeb23ef66b5f0d9f478ae",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00051522075,
+ "summary": "Use when choosing, validating, or troubleshooting an OpenRouter model ID before use, delegation, or a scheduled job.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux verifier l'ID OpenRouter de Gemini 3.1 Pro avant que je le lance ?",
+  "Je veux utiliser Claude Sonnet 4 pour cette tache, trouve le bon model ID.",
+  "C'est quoi l'ID exact de o3 sur OpenRouter ?",
+  "Avant le delegate_task, valide le modele que je t'ai demande.",
+  "Ajoute ce modele au cronjob, mais verifie son ID avant.",
+  "OpenRouter me dit model not found, peux-tu regarder si l'ID est bon ?",
+  "J'ai une erreur 404 avec gemini 2.5 flash, verifie le model ID et dis-moi quoi corriger.",
+  "Le lancement renvoie 402, c'est le modele qui n'existe pas ou un souci de credits ? Pas de substitution sans me demander.",
+  "Je voulais le Pro, pas le Flash : verifie le bon ID, ne downgrade pas en douce.",
+  "Tu avais propose un modele pour la delegation au tour precedent ; peux-tu confirmer qu'il existe bien sur OpenRouter avant de l'utiliser ?",
+  "Cherche les modeles OpenRouter qui correspondent a « Claude Sonnet 4 » et demande-moi lequel si y en a plusieurs.",
+  "Vérifie en direct l'ID exact de GPT-4o et donne-moi les alternatives similaires si tu ne le trouves pas."
+ ],
+ "intents_en": [
+  "Verify this model ID on OpenRouter before using it.",
+  "Find the exact OpenRouter ID for Claude Sonnet 4.",
+  "Check why this model returns a 404.",
+  "Validate the model before setting the delegate override.",
+  "A 402 occurred; check credits, don't silently switch models."
+ ],
+ "entities": [
+  "OpenRouter",
+  "https://openrouter.ai/api/v1/models",
+  "OPENROUTER_API_KEY",
+  "delegate_task",
+  "cronjob",
+  "scripts/model_lookup.py",
+  "google/gemini-3.1-pro-preview",
+  "google/gemini-2.5-flash",
+  "anthropic/claude-sonnet-4",
+  "openai/gpt-4o",
+  "openai/o3"
+ ],
+ "symptoms": [
+  "model not found",
+  "HTTP 404",
+  "HTTP 402",
+  "Requested model does not exist",
+  "Model ID uncertain or guessed",
+  "Requested model appears to have been silently downgraded or substituted"
+ ],
+ "not_for": [
+  "Comparing model quality or choosing a model without an OpenRouter ID lookup",
+  "Fixing API keys, general OpenRouter connectivity, or unrelated API errors",
+  "Changing model parameters such as prompts or max_tokens",
+  "Resolving an insufficient-credit balance beyond reporting it and offering alternatives"
+ ]
+}

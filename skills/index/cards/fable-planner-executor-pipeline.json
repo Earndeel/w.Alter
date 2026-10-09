@@ -1,0 +1,70 @@
+{
+ "name": "fable-planner-executor-pipeline",
+ "sha": "6ac84d73963025fbc671580bb44aac752285dbab0b474d6f20e271294309c163",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000620532,
+ "summary": "Use when running or debugging the Fable 5 planner → isolated Hermes executor pipeline, including model routing, reports, usage, failures, and replanning.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Lance le pipeline Fable sur cette tache et verifie les livrables.",
+  "Fable a fini avec exit 0 mais le rapport dit pas completed, tu peux debugger ?",
+  "Comment je lance fable_pipeline.py avec un task-file, un workdir et les fichiers report et usage ?",
+  "Separe le planning et l'execution Hermes pour cette demande.",
+  "Le rapport EXECUTION_REPORT est invalide ou il reprend juste le schema, regarde le parsing.",
+  "Pourquoi mon usage-file reste vide apres hermes chat ?",
+  "Verifie que le run utilise bien le modele et le provider que j'ai choisis, sans fallback silencieux.",
+  "Compare le cout par tache de Sonnet et DeepSeek sur le pipeline; ne change pas le modele par defaut sans A/B.",
+  "L'executor est bloque, est-ce qu'on doit demander un replan a Fable ?",
+  "Refais le plan a partir du report bloque, mais garde les artefacts et l'usage du premier essai.",
+  "J'ai eu une erreur d'outil deux fois avec l'executor budget, passe au modele premium en escalade.",
+  "Lance les tests du pipeline puis un end-to-end avec verification des hashes."
+ ],
+ "intents_en": [
+  "Run the Fable planner-executor pipeline for this task.",
+  "Debug why the executor report is invalid.",
+  "Check Hermes usage accounting and model routing.",
+  "Replan from the blocked execution report.",
+  "A/B test executor models before changing the default."
+ ],
+ "entities": [
+  "Fable 5",
+  "Hermes",
+  "pxpipe",
+  "Kie.ai",
+  "OpenRouter",
+  "fable_pipeline.py",
+  "PLAN_CONTRACT",
+  "EXECUTION_REPORT",
+  "claude-fable-5",
+  "claude-sonnet-5",
+  "deepseek/deepseek-v4-pro",
+  "custom:kie-pxpipe",
+  "127.0.0.1:47822",
+  "/root/.hermes/skills/devops/pxpipe-planning-proxy/scripts/fable_pipeline.py",
+  "/root/.hermes/skills/devops/pxpipe-planning-proxy/tests/test_fable_pipeline.py",
+  "HERMES_HOME",
+  "hermes chat -Q -q",
+  "--max-turns",
+  "--usage-file",
+  "state.db",
+  "report.replan-1.json",
+  "usage.attempt-1.json",
+  "usage.attempt-1.raw.txt"
+ ],
+ "symptoms": [
+  "hermes chat leaves the requested usage file empty",
+  "Parser accepts an echoed schema instead of the final EXECUTION_REPORT",
+  "Executor exits 0 but report status is not completed",
+  "Report is blocked and replan_needed is true",
+  "Custom-provider cost is reported as unknown",
+  "Requested deliverables are missing or fail byte/hash checks",
+  "Executor repeatedly fails tools or returns an invalid report"
+ ],
+ "not_for": [
+  "General Hermes setup or unrelated agent configuration",
+  "Standalone model benchmark research without a pipeline A/B test",
+  "General pxpipe or Kie.ai proxy troubleshooting outside the Fable executor pipeline",
+  "Tasks that only need a plan, without running or debugging this pipeline"
+ ]
+}

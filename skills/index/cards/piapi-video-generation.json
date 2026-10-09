@@ -1,0 +1,70 @@
+{
+ "name": "piapi-video-generation",
+ "sha": "6102cc51d9fed8165d4b5df4daf2cf3748dc2959aa3a8513bc8412c9ab85fa9b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00088919325,
+ "summary": "Use when integrating, migrating to, or troubleshooting PiAPI's unified API for asynchronous video generation models.",
+ "kind": "integration",
+ "intents_fr": [
+  "Passe notre génération vidéo de Fal.ai à PiAPI.",
+  "Ajoute PiAPI comme provider vidéo dans le pipeline.",
+  "Comment je lance un job Kling avec l'API PiAPI ?",
+  "Branche Seedance 2 fast sur notre endpoint de génération.",
+  "J'ai un 403 Cloudflare quand j'appelle PiAPI en Python, tu vois pourquoi ?",
+  "Le job reste Pending, comment gérer le polling et synchroniser le résultat ?",
+  "Mappe les statuts PiAPI vers les statuts internes compatibles Fal.",
+  "Ajoute Veo3 à notre config PiAPI, avec la génération audio.",
+  "Pour une vidéo avec une image de départ, quels champs envoyer à Kling ?",
+  "PiAPI renvoie Completed mais je ne retrouve pas l'URL de la vidéo.",
+  "On migre fal_client, adapte le submit et le check status pour PiAPI.",
+  "Configure un webhook PiAPI pour recevoir la vidéo quand le rendu est fini, sans clic sur Sync."
+ ],
+ "intents_en": [
+  "Integrate PiAPI for video generation.",
+  "Migrate our video jobs from Fal.ai to PiAPI.",
+  "Submit and poll a Kling task through PiAPI.",
+  "Troubleshoot PiAPI's Cloudflare 403 in Python.",
+  "Configure PiAPI webhooks for completed video jobs."
+ ],
+ "entities": [
+  "PiAPI.ai",
+  "https://api.piapi.ai/api/v1/task",
+  "X-API-Key",
+  "WAlter-Pipeline/1.0",
+  "Fal.ai",
+  "fal_client",
+  "Kling",
+  "Seedance 2",
+  "Veo3",
+  "Wan 2.6 / WanX",
+  "Hailuo",
+  "Sora 2",
+  "Hunyuan",
+  "veo31-api",
+  "video_generation",
+  "omni_video_generation",
+  "veo3-video",
+  "veo3-video-fast",
+  "Pending",
+  "Processing",
+  "Completed",
+  "Failed",
+  "Staged"
+ ],
+ "symptoms": [
+  "HTTP 403 / Cloudflare error 1010 when calling PiAPI with urllib",
+  "PiAPI task is stuck in Pending or Processing",
+  "Seedance request fails because mode is missing",
+  "Kling text-to-video request fails with an empty image_url",
+  "Completed response has no video URL at the top level",
+  "PiAPI video URL expires before it is downloaded",
+  "Status casing or mapping breaks the internal job state"
+ ],
+ "not_for": [
+  "Writing a video prompt without implementing or configuring a provider",
+  "Image generation through PiAPI or choosing image-generation fallbacks",
+  "General video editing, rendering, or post-production",
+  "Integrating unrelated APIs or non-video machine-learning models"
+ ]
+}

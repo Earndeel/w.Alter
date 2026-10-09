@@ -1,0 +1,59 @@
+{
+ "name": "telegram-image-delivery",
+ "sha": "3c9abe330e8bbb3c58a09ee47eb55aad9ef3e83a85c599024c18733f1b685b62",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000375012,
+ "summary": "Use when Monsieur veut envoyer une image, capture d’écran ou un fichier dans Telegram et que le message texte ne suffit pas.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Envoie cette capture sur Telegram.",
+  "Tu peux me partager l’image dans Telegram ?",
+  "Envoie le fichier à Monsieur sur Telegram, stp.",
+  "Mets cette image dans le chat Telegram.",
+  "Je ne vois rien, tu peux réessayer autrement ?",
+  "L’image n’est pas arrivée, vérifie l’envoi.",
+  "Envoie la capture en pleine résolution, sans compression.",
+  "Partage le screenshot avec une petite légende.",
+  "Tu m’as envoyé le texte, mais pas le fichier.",
+  "Peux-tu envoyer le PNG sur Telegram plutôt que juste me donner le chemin ?",
+  "La photo est trop compressée : renvoie-la en document pour garder la qualité originale.",
+  "Envoie-moi ce visuel sur Telegram et confirme que l’envoi a bien marché."
+ ],
+ "intents_en": [
+  "Send this screenshot to me on Telegram.",
+  "Share the image in the Telegram chat.",
+  "Send the file without compression.",
+  "Nothing arrived after the MEDIA attempt.",
+  "Send the photo and verify delivery."
+ ],
+ "entities": [
+  "Telegram",
+  "Hermes",
+  "send_message",
+  "MEDIA:",
+  "Telegram Bot API",
+  "sendPhoto",
+  "sendDocument",
+  "execute_code",
+  "curl",
+  "Python requests",
+  "/root/.hermes/.env",
+  "caption",
+  "chat ID",
+  "message_id"
+ ],
+ "symptoms": [
+  "MEDIA: ne produit aucune erreur, mais rien n’arrive dans Telegram",
+  "Le destinataire ne voit pas l’image après une tentative MEDIA:",
+  "send_message ne permet pas de joindre un fichier",
+  "La photo envoyée est compressée ou perd en résolution",
+  "L’envoi doit être confirmé par une réponse Bot API ok: True et un message_id"
+ ],
+ "not_for": [
+  "Envoyer uniquement un message texte ou une notification Telegram",
+  "Trouver ou générer une image qui n’existe pas encore",
+  "Modifier, redimensionner ou retoucher une image",
+  "Diagnostiquer un problème général de bot ou de chat ID sans besoin d’envoyer un média"
+ ]
+}

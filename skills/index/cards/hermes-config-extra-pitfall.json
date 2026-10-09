@@ -1,0 +1,58 @@
+{
+ "name": "hermes-config-extra-pitfall",
+ "sha": "2f4730be9fa046bca6524c2cfecd392c6c6eaa7bc3bc2fd85e366fbb1c7108a0",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000351747,
+ "summary": "Use when fixing Hermes gateway adapter host/port settings that are ignored because they sit outside the platform's extra config.",
+ "kind": "reference",
+ "intents_fr": [
+  "Pourquoi mon api_server écoute encore sur le port par défaut alors que j’ai mis 9120 ?",
+  "Corrige ma config Hermes, host et port ont l’air ignorés par la gateway.",
+  "Le dashboard affiche pas le même port que celui où le gateway écoute, tu vois d’où ça vient ?",
+  "Dans config.yaml, je dois mettre host et port où pour l’adapter api_server ?",
+  "J’ai configuré api_server avec host: 0.0.0.0 et port: 9120, mais ça reste sur 8642.",
+  "Vérifie si ma config gateway est bonne, j’ai peut-être mis les clés au mauvais niveau.",
+  "Le host de mon adapter ne change pas, Hermes retombe sur sa valeur par défaut.",
+  "Faut-il mettre cors_origins et key dans extra aussi pour api_server ?",
+  "Mon plugin gateway ignore la config host/port, c’est le même piège que api_server ?",
+  "J’ai déplacé port sous extra et ça marche : explique-moi pourquoi.",
+  "Petit check de config : api_server.enabled est bon, mais le port annoncé est faux.",
+  "Peux-tu patcher la section gateway.platforms.api_server pour qu’elle écoute sur 0.0.0.0:9120 ?"
+ ],
+ "intents_en": [
+  "Why is api_server still using the default port?",
+  "Fix my Hermes gateway host and port config.",
+  "The dashboard port differs from the listening port.",
+  "Where do host and port belong in api_server config?",
+  "Does this plugin adapter also require host and port under extra?"
+ ],
+ "entities": [
+  "Hermes",
+  "api_server",
+  "gateway",
+  "config.yaml",
+  "gateway/config.py",
+  "load_gateway_config",
+  "extra",
+  "host",
+  "port",
+  "key",
+  "cors_origins",
+  "DEFAULT_PORT",
+  "DEFAULT_HOST",
+  "8642",
+  "9120"
+ ],
+ "symptoms": [
+  "Adapter silently ignores top-level host and port",
+  "api_server listens on DEFAULT_PORT 8642 instead of configured port",
+  "Dashboard status endpoint reports a port different from the actual listening port",
+  "Adapter falls back to DEFAULT_HOST"
+ ],
+ "not_for": [
+  "General Hermes gateway installation or startup troubleshooting",
+  "Configuring unrelated gateway keys such as allow_from or require_mention",
+  "Debugging network, firewall, or port-forwarding issues"
+ ]
+}

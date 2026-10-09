@@ -1,0 +1,71 @@
+{
+ "name": "touchdesigner-mcp",
+ "sha": "5fd56d0485f3c425830f3d1d0ee8a34ca1b19305e0fb18b8c8de8ac7b1cdbe8b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00088053075,
+ "summary": "Use when Monsieur veut créer, modifier, déboguer ou capturer un projet TouchDesigner en le pilotant via twozero MCP.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fais-moi une anim générative dans TouchDesigner.",
+  "Tu peux monter un réseau TOP pour ce visuel ?",
+  "Branche l’audio sur le shader pour que ça réagisse à la musique.",
+  "Le GLSL sort tout noir, regarde ce qui cloche dans TouchDesigner.",
+  "Ajoute un feedback avec un peu de glow, mais vérifie d’abord les paramètres des ops.",
+  "Je veux exporter cette animation en .mov depuis TD, en ProRes si possible.",
+  "Le MCP TouchDesigner répond plus, tu peux vérifier la connexion twozero sur le port 40404 ?",
+  "Reprends le réseau déjà ouvert et ajoute une sortie vidéo propre.",
+  "Tu peux me montrer un screenshot de la sortie et vérifier les erreurs du projet ?",
+  "J’ai une erreur tdAttributeError sur un node, inspecte-le avant de continuer.",
+  "Construis-moi une petite scène 3D interactive dans TouchDesigner, avec des paramètres animés.",
+  "Le recording est vide : check le FPS, le rendu du shader et la config d’export."
+ ],
+ "intents_en": [
+  "Build a generative visual in TouchDesigner.",
+  "Make the GLSL shader audio-reactive.",
+  "Debug the TouchDesigner network errors.",
+  "Export the animation as a ProRes video.",
+  "Check whether the twozero MCP connection is up."
+ ],
+ "entities": [
+  "TouchDesigner",
+  "twozero MCP",
+  "twozero.tox",
+  "404zero.com",
+  "port 40404",
+  "td_create_operator",
+  "td_set_operator_pars",
+  "td_get_par_info",
+  "td_get_hints",
+  "td_get_network",
+  "td_get_operator_info",
+  "td_get_errors",
+  "td_get_perf",
+  "td_get_screenshot",
+  "td_execute_python",
+  "GLSL TOP",
+  "AudioSpectrum CHOP",
+  "CHOP to TOP",
+  "Feedback TOP",
+  "MovieFileOut TOP",
+  "ProRes",
+  "mjpa",
+  "setup.sh",
+  "/tmp/output.mov"
+ ],
+ "symptoms": [
+  "twozero MCP ne répond pas sur localhost:40404",
+  "tdAttributeError sur un opérateur",
+  "shader GLSL noir ou sans sortie",
+  "FPS à 0 et export vidéo vide",
+  "« Not enough sources » sur un Feedback TOP",
+  "« Cook dependency loop » sur un Feedback TOP",
+  "AudioSpectrum produit trop d’échantillons ou un spectre inutilisable"
+ ],
+ "not_for": [
+  "Créer une animation vidéo avec Manim plutôt que TouchDesigner.",
+  "Générer une vidéo ASCII à partir d’un fichier.",
+  "Installer ou dépanner un autre serveur MCP sans rapport avec twozero.",
+  "Monter ou éditer une vidéo déjà exportée dans un logiciel de montage."
+ ]
+}

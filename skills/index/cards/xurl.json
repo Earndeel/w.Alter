@@ -1,0 +1,68 @@
+{
+ "name": "xurl",
+ "sha": "21868de1bf73a1d6c993c2800eb26abdd0152fca3da9713ad6636f5de38600dc",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00086073075,
+ "summary": "Use when Monsieur veut lire ou agir sur X/Twitter avec xurl : posts, recherche, interactions, DM, médias ou API v2.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Publie ça sur X : « On avance bien sur le lancement, plus d'infos bientôt ».",
+  "Réponds à ce post en disant qu'on est d'accord, mais demande les chiffres.",
+  "Retrouve les posts récents sur #buildinpublic et sors-m'en dix.",
+  "Tu peux me montrer mes mentions et mon dernier timeline ?",
+  "Like et repost ce post-là.",
+  "Envoie un DM à @marie pour lui proposer un call demain.",
+  "Mets cette image avec le texte « Nouveau projet en approche » sur mon compte X.",
+  "Supprime le tweet que j'ai publié tout à l'heure, celui sur le lancement.",
+  "Qui est @XDevelopers ? Et regarde ses derniers posts si tu peux.",
+  "J'ai un 401 sur toutes mes commandes xurl, tu peux vérifier ce qui cloche ?",
+  "Le login OAuth a marché mais les commandes échouent toujours, aide-moi à remettre le bon app par défaut.",
+  "Fais une recherche des posts de @client sur notre produit, puis prépare une réponse au dernier."
+ ],
+ "intents_en": [
+  "Post this on X.",
+  "Search X for recent posts about our launch.",
+  "Send a DM to this account.",
+  "Upload this image and attach it to a tweet.",
+  "Why is xurl returning 401?"
+ ],
+ "entities": [
+  "X",
+  "Twitter",
+  "xurl",
+  "X API v2",
+  "xurl auth status",
+  "xurl auth oauth2",
+  "xurl auth default",
+  "xurl post",
+  "xurl reply",
+  "xurl quote",
+  "xurl search",
+  "xurl timeline",
+  "xurl mentions",
+  "xurl dm",
+  "xurl media upload",
+  "xurl media status",
+  "xurl whoami",
+  "~/.xurl",
+  "developer.x.com",
+  "api.x.com"
+ ],
+ "symptoms": [
+  "401 Unauthorized sur les requêtes xurl",
+  "Auth errors après un OAuth réussi",
+  "unauthorized_client pendant OAuth",
+  "UsernameNotFound ou 403 sur /2/users/me après OAuth",
+  "client-forbidden ou client-not-enrolled",
+  "CreditsDepleted",
+  "media processing failed lors d'un upload d'image",
+  "Erreur 429 de rate limit"
+ ],
+ "not_for": [
+  "Lire X en mode recherche Grok avec x_search, sans passer par l'API xurl.",
+  "Publier ou gérer des comptes sur Instagram, LinkedIn ou d'autres réseaux sociaux.",
+  "Créer ou renouveler des identifiants secrets directement dans le chat.",
+  "Utiliser le CLI tiers x-cli/xitter à la place de xurl."
+ ]
+}

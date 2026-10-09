@@ -1,0 +1,72 @@
+{
+ "name": "hermes-gateway-systemd-debug",
+ "sha": "29c4e155be85ec16766895d5660fd8be5029bb00668b9df849fc3d2ff5374357",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00071000325,
+ "summary": "Use when diagnosing or fixing hermes-gateway systemd failures, duplicate/orphan processes, restart loops, or stale-network outages.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Mon hermes-gateway.service ne démarre plus, tu peux regarder ?",
+  "J’ai une erreur 200/CHDIR avec permission denied dans journalctl, comment je corrige ça ?",
+  "Le gateway redémarre en boucle et systemd affiche activating (auto-restart).",
+  "Je vois signal=KILL au démarrage, est-ce que le --replace dans ExecStart fout le bazar ?",
+  "J’ai trois services qui essaient de lancer le même gateway, on garde lequel ?",
+  "systemd dit inactive mais Telegram répond encore. Tu peux vérifier s’il y a un processus orphelin ?",
+  "Mon gateway tourne depuis des semaines et Telegram plus les appels LLM n’arrivent plus à sortir, alors que curl marche.",
+  "Le service hermes-gateway est masked et failed : c’est vraiment cassé ou il tourne ailleurs ?",
+  "Avant de démasquer le service, vérifie si un hermes gateway run manuel est encore vivant.",
+  "Tu peux remettre systemd en charge du gateway sans créer une guerre de processus ?",
+  "Mets-moi un watchdog systemd pour relancer le gateway s’il tombe.",
+  "Le bot Telegram renvoie InvalidToken, tu peux vérifier la config du token Hermes ?"
+ ],
+ "intents_en": [
+  "Fix hermes-gateway CHDIR permission denied",
+  "Why is the gateway restarting with signal KILL?",
+  "Check for duplicate or orphaned gateway processes",
+  "Gateway is masked but Telegram still works",
+  "Set up a systemd watchdog for the gateway"
+ ],
+ "entities": [
+  "hermes-gateway.service",
+  "hermes-agent.service",
+  "systemd",
+  "journalctl",
+  "systemctl",
+  "loginctl",
+  "gateway run",
+  "--replace",
+  "/etc/systemd/system/hermes-gateway.service",
+  "~/.config/systemd/user/",
+  "/root/.hermes",
+  "/root/.hermes/logs/gateway.log",
+  "/root/.hermes/scripts/gateway-watchdog.sh",
+  "XDG_RUNTIME_DIR",
+  "TELEGRAM_BOT_TOKEN",
+  "Telegram",
+  "Discord",
+  "api.telegram.org",
+  "hermes_cli.main",
+  "gateway-watchdog.timer",
+  "gateway-watchdog.service",
+  "StartRequestRepeatedTooQuickly"
+ ],
+ "symptoms": [
+  "status=200/CHDIR",
+  "Permission denied while changing to WorkingDirectory",
+  "activating (auto-restart)",
+  "signal=KILL",
+  "Gateway already running (PID XXXX)",
+  "StartRequestRepeatedTooQuickly",
+  "systemd inactive while a gateway process is alive",
+  "systemd unit masked but gateway may still be serving traffic",
+  "Repeated Telegram connection failures and APIConnectionError while curl works",
+  "InvalidToken"
+ ],
+ "not_for": [
+  "Diagnosing system-wide crash loops, memory pressure, or SSH lockout across multiple services",
+  "General Telegram bot setup or feature development unrelated to the gateway service",
+  "Fixing unrelated Hermes CLI, LLM provider, or application errors",
+  "Changing gateway configuration beyond service operation and the Telegram bot token"
+ ]
+}

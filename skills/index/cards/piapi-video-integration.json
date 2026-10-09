@@ -1,0 +1,69 @@
+{
+ "name": "piapi-video-integration",
+ "sha": "145378f2a5ca7671ac22002f7e756ec59f892159b514b5ff672b378b0d0de20f",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00065802825,
+ "summary": "Use when integrating PiAPI.ai video generation into a service with model-specific submit and polling logic.",
+ "kind": "integration",
+ "intents_fr": [
+  "Integre PiAPI pour generer des videos dans mon pipeline, avec submit puis polling.",
+  "Ajoute PiAPI comme provider video a notre API, je veux pouvoir choisir Kling ou Veo3.",
+  "Comment appeler l'endpoint PiAPI pour lancer une generation et recuperer le resultat ?",
+  "Fais-moi le client Python PiAPI avec auth par API key et gestion des statuts.",
+  "On a un 403 Cloudflare avec urllib sur PiAPI, tu vois ce qui manque ?",
+  "Branche Seedance 2.0 a l'integration PiAPI, avec ses modes et ses refs image/video.",
+  "Je veux ajouter Kling 3.0 via PiAPI, quels parametres envoyer pour le submit ?",
+  "Peux-tu mettre en place le polling PiAPI en background avec un callback quand la video est prete ?",
+  "Le job PiAPI reste en Processing : implemente la gestion des statuts et du timeout.",
+  "Ajoute le mapping des statuts PiAPI vers nos statuts internes, genre in_queue et completed.",
+  "On peut unifier Kling, Seedance et Veo3 derriere les deux endpoints PiAPI ?",
+  "Verifie le calcul du cout PiAPI : c'est par seconde et faut distinguer frozen de consume, non ?"
+ ],
+ "intents_en": [
+  "Integrate PiAPI video generation into my service.",
+  "Build a Python submit-and-poll client for PiAPI.",
+  "Add Kling and Seedance support through PiAPI.",
+  "Fix PiAPI urllib requests returning Cloudflare 403.",
+  "Map PiAPI task statuses and handle polling timeouts."
+ ],
+ "entities": [
+  "PiAPI.ai",
+  "https://api.piapi.ai/api/v1/task",
+  "X-API-Key",
+  "User-Agent",
+  "urllib.request",
+  "kling",
+  "kling-turbo",
+  "seedance-2",
+  "seedance-2-fast",
+  "veo3",
+  "sora2",
+  "Wan",
+  "Hailuo",
+  "Hunyuan",
+  "Luma",
+  "video_generation",
+  "omni_video_generation",
+  "veo3-video",
+  "veo3-video-fast",
+  "task_id",
+  "video_url",
+  "Pending",
+  "Processing",
+  "Completed",
+  "Failed"
+ ],
+ "symptoms": [
+  "PiAPI renvoie 403 (error code: 1010) avec urllib",
+  "Une tâche PiAPI reste en Processing ou Pending",
+  "Le submit PiAPI échoue faute de version Kling ou de mode Seedance",
+  "Le polling expire avant que la génération vidéo soit terminée"
+ ],
+ "not_for": [
+  "Écrire ou améliorer le prompt créatif d'une vidéo sans intégrer PiAPI",
+  "Intégrer directement les API Kling, Seedance, Veo3 ou OpenAI sans passer par PiAPI",
+  "Monter, convertir ou héberger une vidéo déjà générée",
+  "Gérer la facturation générale du compte PiAPI sans logique de génération vidéo"
+ ]
+}

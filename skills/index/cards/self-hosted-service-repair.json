@@ -1,0 +1,72 @@
+{
+ "name": "self-hosted-service-repair",
+ "sha": "4a9c43d35713fbd2c7b5f22c2cccdffb86607137144a4b378814833fe9b3d0e5",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007148295,
+ "summary": "Use when diagnosing or safely repairing a self-hosted service across remote hosts, from access and backups through deployment changes and client-level verification.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Mon Vaultwarden répond mais Bitwarden sync plus, tu peux checker sans toucher aux données ?",
+  "J’ai une erreur de compatibilité entre mon client et le serveur, aide-moi à vérifier les versions avant de changer quoi que ce soit.",
+  "Le service est down sur mon VPS, retrouve le bon host et dis-moi d’abord si on a un accès admin.",
+  "gcloud compute ssh me renvoie Permission denied (publickey), je fais quoi sans bricoler la VM à l’aveugle ?",
+  "Le container est unhealthy mais l’appli a l’air de répondre, vérifie le healthcheck et le proxy avant de redémarrer.",
+  "Faut upgrader mon service Docker : fais un plan avec backup, snapshot et rollback, sans supprimer les volumes.",
+  "J’ai modifié le compose, comment je confirme que le container a vraiment pris le nouveau healthcheck ?",
+  "La tâche planifiée n’arrive plus à joindre la base du container, vérifie son endpoint et teste les SELECT sans sortir de données.",
+  "Cloud Shell est ouvert mais le contrôle à distance marche peut-être pas : valide le terminal avant toute commande qui modifie la VM.",
+  "Le endpoint public marche, ça veut dire qu’on a bien accès au serveur pour l’admin ?",
+  "Après la réparation, vérifie aussi le login et le sync depuis le client, pas juste le HTTP.",
+  "On ne sait pas quel volume ou quel compose est utilisé : inspecte le déploiement en lecture seule et arrête-toi si c’est pas clair."
+ ],
+ "intents_en": [
+  "Safely repair my self-hosted Docker service.",
+  "Check why Bitwarden cannot sync with my Vaultwarden server.",
+  "Verify SSH access before changing the remote VM.",
+  "Plan a backed-up service upgrade with rollback.",
+  "Diagnose an unhealthy container without restarting it blindly."
+ ],
+ "entities": [
+  "Bitwarden",
+  "Vaultwarden",
+  "Docker",
+  "Docker Compose",
+  "systemd",
+  "Google Cloud",
+  "Cloud Shell",
+  "gcloud",
+  "SSH",
+  "VM",
+  "DNS",
+  "firewall",
+  "TLS",
+  "reverse proxy",
+  "healthcheck",
+  "docker inspect",
+  "docker ps",
+  "docker volume ls",
+  "docker compose pull",
+  "docker compose up -d",
+  "docker compose ps",
+  "/opt",
+  "/srv",
+  "NetworkSettings.Ports"
+ ],
+ "symptoms": [
+  "Permission denied (publickey)",
+  "Client cannot authenticate, sync, or decrypt existing records",
+  "Container reports unhealthy while the application still responds",
+  "Scheduled script cannot connect to the database",
+  "Loopback health probe redirects to HTTPS",
+  "Public endpoint responds but administrative access is unavailable",
+  "Cloud console screenshot is black or unreadable",
+  "Remote control reports an Accessibility or System Events error"
+ ],
+ "not_for": [
+  "Routine client-only troubleshooting when the self-hosted server is not involved",
+  "Building a new service or deployment from scratch",
+  "Routine cloud provisioning unrelated to repairing an existing service",
+  "Executing autonomous jobs or scheduled ingestion without their dedicated verification references"
+ ]
+}

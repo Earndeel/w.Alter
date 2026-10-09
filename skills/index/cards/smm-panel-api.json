@@ -1,0 +1,67 @@
+{
+ "name": "smm-panel-api",
+ "sha": "9fca67529e82cae80c21ab4e6bcb56620f4abbc4b25b0fbab6a0518e6a8fe5ad",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00058650075,
+ "summary": "Use when Monsieur veut intégrer ou appeler une API de panel SMM pour lister les services, commander, suivre les commandes ou vérifier le solde.",
+ "kind": "integration",
+ "intents_fr": [
+  "Tu peux me lister les services TikTok dispo sur SMMFlare ?",
+  "Passe 10k vues sur cette vidéo avec le panel, et vérifie le prix avant.",
+  "C’est quoi le statut de la commande SMM 12345 ?",
+  "Regarde combien il reste sur le solde SMMFlare avant qu’on commande.",
+  "Fais-moi un script curl pour ajouter des likes Instagram via l’API du panel.",
+  "J’ai besoin d’un petit MCP qui expose les services, les commandes et le suivi SMM.",
+  "La commande est en Partial, tu peux checker les remains et voir si un refill est possible ?",
+  "On peut annuler ces commandes ? Voilà les IDs : 123, 124, 125.",
+  "Tu peux chercher les services YouTube actuels et leurs tarifs ? Ne reprends pas les anciens IDs.",
+  "Mon appel à /api/v2 me renvoie une erreur, vérifie le format POST et les paramètres envoyés.",
+  "Ajoute des vues TikTok en drip-feed, genre plusieurs runs espacés de 30 minutes.",
+  "Le panel me répond qu’il n’y a pas assez de crédits : vérifie le balance et explique-moi ce qui bloque."
+ ],
+ "intents_en": [
+  "List current TikTok services from SMMFlare",
+  "Place an order through the SMM panel API",
+  "Check the status of an SMM order",
+  "Check my panel API balance",
+  "Build an MCP wrapper for an SMM panel"
+ ],
+ "entities": [
+  "SMMFlare",
+  "smmflare.com/api/v2",
+  "SMM panel APIs",
+  "API key",
+  "vault:smmflare/api_key",
+  "POST",
+  "application/x-www-form-urlencoded",
+  "services",
+  "add",
+  "status",
+  "balance",
+  "refill",
+  "refill_status",
+  "cancel",
+  "curl",
+  "MCP server",
+  "TikTok",
+  "Instagram",
+  "YouTube",
+  "order ID",
+  "service ID",
+  "drip-feed"
+ ],
+ "symptoms": [
+  "API response says the balance is insufficient",
+  "Order status is Pending, Partial, or remains unchanged",
+  "The API call fails because required form parameters are missing",
+  "A previously used service ID no longer returns the expected service",
+  "The panel returns an error when requesting /api/v2"
+ ],
+ "not_for": [
+  "Creating or managing social media posts directly on TikTok, Instagram, or YouTube",
+  "Building an audience through organic content strategy",
+  "Extracting browser session cookies to access unrelated sites",
+  "Integrating APIs for analytics or ad platforms rather than SMM panels"
+ ]
+}

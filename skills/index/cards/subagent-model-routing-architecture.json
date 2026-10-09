@@ -1,0 +1,68 @@
+{
+ "name": "subagent-model-routing-architecture",
+ "sha": "c14860d36ce5336e04535611ccb999658fa285dd301f3a732d67fea4aa39bf1c",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00061224075,
+ "summary": "Use when checking how Hermes delegate_task selects a subagent model and what the caller can or cannot control.",
+ "kind": "reference",
+ "intents_fr": [
+  "Je peux choisir le modèle dans l’appel à delegate_task ?",
+  "Pourquoi mon sous-agent n’utilise pas le modèle que j’ai demandé ?",
+  "Y a un champ model dans tasks[] ou pas ?",
+  "Vérifie comment Hermes route vraiment le modèle des subagents, côté code.",
+  "Je veux envoyer une tâche à Claude et une autre à MiMo depuis le même orchestrateur, c’est possible ?",
+  "J’ai modifié le YAML mais le worker tourne toujours sur l’ancien modèle.",
+  "Le sous-agent hérite du provider du parent, ou du routing configuré dans le profil ?",
+  "Tu peux m’expliquer ce que delegate_task contrôle exactement pour le modèle, le contexte et les tools ?",
+  "Même en background=true, le modèle est choisi comment ?",
+  "Mon appel Python passe model=..., mais j’ai l’impression que c’est ignoré. C’est attendu ?",
+  "Comment je confirme quel modèle a vraiment été utilisé par le child agent ?",
+  "Si je veux des modèles différents selon les tâches, quelle architecture Hermes recommande ?"
+ ],
+ "intents_en": [
+  "Can delegate_task choose the child model?",
+  "Why is my subagent using the wrong model?",
+  "Is model supported in tasks[]?",
+  "How does async delegation resolve the model?",
+  "How can I route different tasks to different models?"
+ ],
+ "entities": [
+  "Hermes Agent",
+  "W.Alter",
+  "delegate_task",
+  "DELEGATE_TASK_SCHEMA",
+  "tools/delegate_tool.py",
+  "tools/async_delegation.py",
+  "_resolve_delegation_credentials",
+  "_build_child_agent",
+  "_run_single_child",
+  "AIAgent",
+  "CLI_CONFIG",
+  "config.yaml",
+  "~/.hermes/profiles/",
+  "provider",
+  "model",
+  "base_url",
+  "api_mode",
+  "ACP",
+  "acp_command",
+  "acp_args",
+  "OPENAI_API_KEY",
+  "MINIMAX_API_KEY",
+  "DASHSCOPE_API_KEY",
+  "hermes-gateway"
+ ],
+ "symptoms": [
+  "Le sous-agent utilise un autre modèle que prévu.",
+  "Le paramètre model= semble ignoré par delegate_task.",
+  "Une modification du YAML n’a aucun effet avant redémarrage du gateway.",
+  "L’appel async renvoie un champ model qui ne correspond pas au modèle demandé dans l’appel."
+ ],
+ "not_for": [
+  "Configurer pas à pas les blocs de routing YAML ou redémarrer le gateway.",
+  "Concevoir l’architecture complète des profils orchestrateur et spécialistes.",
+  "Configurer les providers, leurs clés API ou la résolution générale des credentials.",
+  "Réaliser une requête API directe ponctuelle sans passer par un subagent."
+ ]
+}

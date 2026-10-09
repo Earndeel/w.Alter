@@ -1,0 +1,70 @@
+{
+ "name": "hermes-tui-customization",
+ "sha": "92fb0943a27e20bc9ee1bcd3a55fb72f6935539ab5a85b80363e0316436ae65d",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00094265325,
+ "summary": "Use when Monsieur wants to change Hermes TUI appearance, message rendering, skin colors, or thinking/tool display in its Ink source.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Change les couleurs de mon Hermes TUI, je veux un theme plus bleu.",
+  "Comment je fais pour avoir des bulles arrondies a droite pour mes messages ?",
+  "Le prefixe de W.Alter et celui de mes messages sont moches, je les change ou ?",
+  "J'ai modifie mon skin YAML mais les couleurs du TUI bougent pas, tu peux regarder le mapping ?",
+  "Je voudrais afficher les appels tools comme des sous-accordeons individuels, pas une liste plate.",
+  "Mets les sections thinking et tools repliees par defaut, et activity cachee.",
+  "Les emojis de mes tools s'affichent pas dans le header, comment on les ajoute ?",
+  "On peut limiter le raisonnement visible a deux lignes dans l'interface ?",
+  "Retrouve-moi le composant qui affiche les messages assistant et explique comment le personnaliser.",
+  "Apres restore-tui-design, mon champ emoji a disparu de types.ts. Qu'est-ce qu'il faut verifier et sauvegarder ?",
+  "Je veux changer le texte de bienvenue, le prompt ⚡ et les faces du spinner dans mon skin.",
+  "Dans le TUI les liens affichent juste un titre, je veux voir les URLs brutes. Quel composant modifier ?"
+ ],
+ "intents_en": [
+  "Change the Hermes TUI colors and theme.",
+  "Add right-aligned rounded bubbles for user messages.",
+  "Make each tool call collapsible in the TUI.",
+  "Show tool emojis in the collapsed tools header.",
+  "Where do I change the TUI message rendering?"
+ ],
+ "entities": [
+  "Hermes TUI",
+  "W.Alter",
+  "Ink",
+  "React",
+  "hermes-agent/ui-tui/src/",
+  "theme.ts",
+  "fromSkin()",
+  "domain/roles.ts",
+  "components/messageLine.tsx",
+  "components/markdown.tsx",
+  "components/thinking.tsx",
+  "domain/details.ts",
+  "SECTION_DEFAULTS",
+  "tui_gateway/server.py",
+  "~/.hermes/skins/",
+  "config.yaml",
+  "display.sections",
+  "tool_emojis",
+  "ToolTrail",
+  "TreeNode",
+  "HERMES_TUI_LIGHT",
+  "HERMES_TUI_RESUME",
+  "~/.hermes/tui-overrides/",
+  "~/.hermes/scripts/restore-tui-design.sh"
+ ],
+ "symptoms": [
+  "User messages render as flat lines instead of chat bubbles.",
+  "Skin colors do not appear in the TUI as expected.",
+  "Tool emojis are missing from active tools or the collapsed tools header.",
+  "Thinking or tool sections open or collapse with the wrong defaults.",
+  "Links show an underlined title instead of the raw URL.",
+  "A TUI restore strips custom fields such as emoji from types.ts."
+ ],
+ "not_for": [
+  "Changing Hermes agent behavior, prompts, or backend tool logic.",
+  "Installing or upgrading Hermes or configuring its gateway connection.",
+  "Changing terminal emulator colors or shell prompt themes.",
+  "Using runtime /details commands without changing TUI defaults or source."
+ ]
+}

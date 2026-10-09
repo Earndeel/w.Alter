@@ -1,0 +1,53 @@
+{
+ "name": "sdlc-review",
+ "sha": "565c1ddb4f18fe2371ed72893f2f7bec46e34f4f451768ef9546e08356e85f68",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005910795,
+ "summary": "Use when a Kanban task enters the review lane with a review_requested handoff and needs an independent, evidence-based verdict.",
+ "kind": "workflow",
+ "intents_fr": [
+  "La tâche est passée en review, vérifie le handoff et donne ton verdict.",
+  "Tu peux reviewer ce qui vient d’être livré sur la carte Kanban ?",
+  "L’implémenteur a demandé une review : contrôle les critères et les tests avant d’approuver.",
+  "Regarde le diff indépendamment du résumé et dis-moi si ça passe.",
+  "La review précédente a demandé des changements, vérifie qu’ils sont bien corrigés cette fois.",
+  "Teste vraiment le comportement annoncé, ne te contente pas de croire le handoff.",
+  "Si tu trouves un bug corrigeable, détaille-le dans la carte et renvoie-la à l’implémenteur.",
+  "Est-ce que je dois approuver, demander des changements ou escalader cette tâche ?",
+  "Vérifie chaque critère d’acceptation et garde des preuves concrètes pour le verdict.",
+  "La tâche est bloquée sur une décision humaine, identifie ce qu’il faut escalader.",
+  "Fais la review du livrable, mais ne touche pas à l’implémentation.",
+  "C’est le troisième passage en review : audite le résultat par rapport à la demande originale et aux corrections précédentes."
+ ],
+ "intents_en": [
+  "Review the Kanban handoff and decide whether to approve it.",
+  "Independently verify the submitted work before closing the task.",
+  "Check whether the requested changes were fixed in this review round.",
+  "Return this task to the implementer with actionable findings.",
+  "Escalate the review if a human decision is required."
+ ],
+ "entities": [
+  "Kanban review lane",
+  "review_requested",
+  "kanban_show",
+  "kanban_comment",
+  "kanban_complete",
+  "kanban_request_changes",
+  "kanban_block",
+  "read_file",
+  "search_files",
+  "terminal",
+  "acceptance criteria",
+  "review_outcome",
+  "reviewer_checks",
+  "changes_requested"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Implementing or editing the deliverable as the reviewer.",
+  "Doing ordinary implementation work on a separate downstream review card.",
+  "Running an ad-hoc parallel review fan-out outside the Kanban review lane.",
+  "Completing a task without independently checking its deliverable and evidence."
+ ]
+}

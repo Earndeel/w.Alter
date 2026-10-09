@@ -1,0 +1,66 @@
+{
+ "name": "gitlawb-mimo-provider",
+ "sha": "21d71beef30963e9a4dec68925e6fb1d19e84527ec43e116ddf47731e049adc9",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000639342,
+ "summary": "Use when configuring, selecting, or troubleshooting Xiaomi MiMo models through GitLawb OpenGateway in Hermes or OpenAI-compatible clients.",
+ "kind": "integration",
+ "intents_fr": [
+  "Configure GitLawb comme provider MiMo dans Hermes.",
+  "Je veux tester mimo-v2.5-pro via OpenGateway, donne-moi la commande.",
+  "Passe mon modèle par défaut sur GitLawb avec mimo-v2-flash.",
+  "OpenRouter est à sec, je peux utiliser MiMo gratuitement via GitLawb ?",
+  "J'ai une erreur 401 « API key required » avec l'endpoint MiMo, je vérifie quoi ?",
+  "GitLawb renvoie 402 Insufficient credits : c'est ma config ou leurs crédits ?",
+  "Le /models répond mais les chat completions renvoient 402, tu peux diagnostiquer ?",
+  "Ajoute la config Hermes pour utiliser GitLawb avec ma clé GITLAWB_API_KEY.",
+  "Je veux revenir à mon provider précédent après avoir essayé GitLawb, quelles commandes ?",
+  "C'est quoi l'endpoint compatible OpenAI de GitLawb pour les modèles Xiaomi MiMo ?",
+  "Les crédits GitLawb sont revenus ? Je voudrais lancer un test avant de basculer un service dessus.",
+  "Je cherche le MiMo ultraspeed chez GitLawb, il est dispo ou il faut faire une demande chez Xiaomi ?"
+ ],
+ "intents_en": [
+  "Set up GitLawb MiMo in Hermes.",
+  "Test mimo-v2.5-pro through OpenGateway.",
+  "Why am I getting a 402 Insufficient credits error?",
+  "Fix the API key required 401 error.",
+  "Is MiMo ultraspeed available through GitLawb?"
+ ],
+ "entities": [
+  "GitLawb",
+  "OpenGateway",
+  "Xiaomi MiMo",
+  "mimo-v2.5-pro",
+  "mimo-v2.5",
+  "mimo-v2-pro",
+  "mimo-v2-flash",
+  "mimo-v2-omni",
+  "mimo-v2.5-pro-ultraspeed",
+  "https://opengateway.gitlawb.com/v1/xiaomi-mimo",
+  "GITLAWB_API_KEY",
+  "gitlawb/api_key",
+  "Hermes",
+  "OpenClaude",
+  "OpenRouter",
+  "XIAOMI_API_KEY",
+  "token-plan-sgp.xiaomimimo.com",
+  "platform.xiaomimimo.com/ultraspeed",
+  "ultraspeed.xiaomimimo.com",
+  "hermes chat",
+  "hermes config set"
+ ],
+ "symptoms": [
+  "401 API key required",
+  "402 Insufficient credits",
+  "429 rate limit",
+  "Chat completions return 402 while /models still works",
+  "Variable latency from the Fly.io-hosted endpoint"
+ ],
+ "not_for": [
+  "Applying for Xiaomi's mimo-v2.5-pro-ultraspeed access or using its application form",
+  "Configuring Xiaomi's direct API with XIAOMI_API_KEY",
+  "General MiMo prompting or model capability questions unrelated to GitLawb setup",
+  "General OpenRouter setup unrelated to GitLawb fallback"
+ ]
+}

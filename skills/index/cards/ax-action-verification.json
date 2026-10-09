@@ -1,0 +1,65 @@
+{
+ "name": "ax-action-verification",
+ "sha": "192b15fe913e05ecdae8416f40ea1abe3a94b16add65866c1530b460a2b81c11",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005722695,
+ "summary": "Use when an AX action reaches the desktop driver but its effect is unverifiable and needs one bounded readback.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Le clic AX est bien parti, mais le backend renvoie effect=unverifiable : comment vérifier que ça a changé ?",
+  "Ajoute une vérification post-action AX, sans screenshot ni vision.",
+  "Mon smoke Computer Use passe l’action mais ne prouve pas la mutation. Il faut contrôler quoi ?",
+  "Le token a changé après le clic : ça suffit comme preuve ou pas ?",
+  "Fais le readback AX une seule fois si l’action est unverifiable, et pas de retry automatique.",
+  "J’ai un ok=true du driver, mais je sais pas si le contrôle a vraiment bougé. Vérifie le postcondition.",
+  "Peux-tu corriger le fingerprint AX pour ignorer les générations et tokens, mais détecter un changement de valeur ou d’état ?",
+  "Le smoke doit prouver une vraie mutation avec un native ref, sans clic coordonné, capture ou vision.",
+  "On a repris une deuxième observation avant l’action et le ref est devenu stale. Quelle séquence respecter ?",
+  "Le contrôle n’a pas changé après le readback ; renvoie un échec au LLM, ne reclique pas.",
+  "Vérifie que le reducer du smoke traite bien blind_coordinate_click=false comme un critère requis.",
+  "L’action a marché, mais la restauration du layout a échoué : garde la preuve initiale et signale que l’UI reste modifiée."
+ ],
+ "intents_en": [
+  "Verify an AX action that returned unverifiable.",
+  "Add one targeted AX readback, with no automatic retry.",
+  "Check whether a smoke test proves an observable UI mutation.",
+  "Ignore token changes when comparing AX snapshots.",
+  "Fix the smoke evidence aggregate for negative safety criteria."
+ ],
+ "entities": [
+  "AX",
+  "Hermes LLM",
+  "Computer Use",
+  "accessibility snapshot",
+  "native ref",
+  "element_token",
+  "pid",
+  "window_id",
+  "effect=unverifiable",
+  "verified",
+  "action_reached_driver",
+  "result_verified",
+  "semantic fingerprint",
+  "blind_coordinate_click",
+  "screenshot",
+  "vision",
+  "bring_to_front",
+  "references/minimal-active-smoke.md"
+ ],
+ "symptoms": [
+  "effect=unverifiable",
+  "Driver reports ok=true but the UI effect is unknown",
+  "A fresh token or generation is being mistaken for proof of change",
+  "The smoke action reached the driver but result_verified is false",
+  "A stale-generation ref is dispatched",
+  "The UI is unchanged after the AX readback",
+  "The smoke aggregate fails when blind_coordinate_click is false"
+ ],
+ "not_for": [
+  "Planning or carrying out ordinary computer-use tasks",
+  "Recovering a failed or stale computer-use driver action",
+  "Verifying changes through screenshots or visual inspection",
+  "Writing app-specific labels or runtime click recipes"
+ ]
+}

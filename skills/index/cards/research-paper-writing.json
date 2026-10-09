@@ -1,0 +1,57 @@
+{
+ "name": "research-paper-writing",
+ "sha": "8496718ccf6739502acb01cb98a5fe04639a79e4fd3fa8f3c9b87b0cdbb97aad",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000860112,
+ "summary": "Use when conceiving, experimenting on, writing, revising, or submitting an ML/AI research paper for a conference or workshop.",
+ "kind": "workflow",
+ "intents_fr": [
+  "On part de ce repo et de mes résultats : aide-moi à cadrer le papier pour NeurIPS.",
+  "Écris-moi un premier draft de l’intro et de l’abstract pour notre méthode.",
+  "Tu peux vérifier les related work et les citations ? Je veux pas de refs inventées.",
+  "J’ai des résultats mais je sais pas quelles expériences manquent pour défendre nos claims.",
+  "Prépare un plan d’expériences avec baselines, ablations et seeds, en gardant un œil sur le budget.",
+  "Le reviewer demande une comparaison de plus : aide-moi à décider quoi lancer et comment répondre.",
+  "Relis le papier comme un reviewer ICLR et dis-moi les points faibles avant soumission.",
+  "On convertit notre papier du template ICML au format ACL, tu peux adapter le LaTeX ?",
+  "Fais le ménage dans le draft, harmonise la notation et vérifie que chaque claim a des preuves.",
+  "Je veux soumettre à COLM : prépare les sections et la checklist de soumission à partir du repo.",
+  "On a une étude utilisateurs pour le papier NLP, aide-moi à concevoir l’évaluation et l’analyse.",
+  "Le papier est accepté, prépare les livrables : poster, slides et release du code."
+ ],
+ "intents_en": [
+  "Draft an ICML paper from this repo and its results.",
+  "Plan experiments to support our paper's claims.",
+  "Check related work and verify every citation.",
+  "Review this draft like a NeurIPS reviewer.",
+  "Revise the paper for the rebuttal and submission."
+ ],
+ "entities": [
+  "NeurIPS",
+  "ICML",
+  "ICLR",
+  "ACL",
+  "AAAI",
+  "COLM",
+  "LaTeX",
+  "Overleaf",
+  "Git",
+  "arXiv",
+  "Semantic Scholar",
+  "CrossRef",
+  "DOI",
+  "Exa MCP",
+  "BibTeX",
+  "SciencePlots",
+  "references/citation-workflow.md",
+  "templates/"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Générer uniquement un résumé grand public d’un article déjà publié.",
+  "Chercher un article sans l’intégrer à une revue de littérature ou à un projet de papier.",
+  "Déboguer ou développer une fonctionnalité logicielle sans objectif de recherche ou de publication.",
+  "Rédiger un billet de blog ou un texte marketing sans exigences de publication scientifique."
+ ]
+}

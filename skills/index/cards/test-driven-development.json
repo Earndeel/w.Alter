@@ -1,0 +1,52 @@
+{
+ "name": "test-driven-development",
+ "sha": "c4dcae20adb88c9392d7e1b2210844933417288bb40ad845faa9542b9755c0a7",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00065802825,
+ "summary": "Use when adding features, fixing bugs, refactoring, or changing behavior: write a failing test first, then implement and verify RED-GREEN-REFACTOR.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute cette feature en TDD, test d’abord puis code.",
+  "On fait ça proprement : commence par un test qui échoue.",
+  "Corrige le bug, mais écris d’abord un test qui le reproduit.",
+  "J’ai fait l’implémentation. Aide-moi à repartir en test-first.",
+  "Refactorise ce module sans changer son comportement, avec tests avant chaque modif.",
+  "Le test passe direct, c’est normal ou il teste rien ?",
+  "Fais un cycle RED-GREEN-REFACTOR sur le cas où la requête échoue.",
+  "Pas de code de prod tant qu’on n’a pas vu le test échouer.",
+  "Ajoute les tests pour cette modif, mais un comportement à la fois, pas toute une pile d’un coup.",
+  "Le bug est corrigé à la main ; écris le test de régression et reprends la correction en TDD.",
+  "Vérifie que le test échoue pour la bonne raison, puis implémente le minimum pour le faire passer.",
+  "Délègue l’implémentation, en imposant test qui échoue, code minimal, puis suite complète."
+ ],
+ "intents_en": [
+  "Implement this feature test-first.",
+  "Fix the bug with a failing regression test first.",
+  "Refactor this code using RED-GREEN-REFACTOR.",
+  "The test passes immediately; help me check it.",
+  "Enforce strict TDD for the delegated implementation."
+ ],
+ "entities": [
+  "pytest",
+  "terminal",
+  "delegate_task",
+  "tests/",
+  "RED-GREEN-REFACTOR",
+  "TDD"
+ ],
+ "symptoms": [
+  "Le test passe dès le premier lancement",
+  "Le code de production a été écrit avant le test",
+  "Les tests ont été ajoutés après l’implémentation",
+  "Un test de régression manque pour un bug corrigé",
+  "La suite échoue après une modification",
+  "Les tests vérifient surtout des mocks ou des détails d’implémentation"
+ ],
+ "not_for": [
+  "Diagnostiquer méthodiquement une panne sans procédure test-first",
+  "Faire une revue de code sans demande de modification",
+  "Écrire uniquement de la configuration ou du code généré sans accord préalable",
+  "Concevoir une stratégie globale de QA ou de déploiement"
+ ]
+}

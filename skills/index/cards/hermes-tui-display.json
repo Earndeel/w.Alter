@@ -1,0 +1,69 @@
+{
+ "name": "hermes-tui-display",
+ "sha": "e10cdd2261cbf6a3e68fda82630c21dd96eb3a9d75ca4e973ca78051e609f814",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000878922,
+ "summary": "Use when Monsieur wants to modify or debug Hermes --tui’s Ink/React display: glyphs, branding, reasoning panels, tool emojis, or slash-command rendering.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Change les icônes user/assistant dans le TUI Hermes, je veux un rendu plus minimal.",
+  "Comment remplacer le caducée ⚕ par le logo W.ALTER partout dans le TUI ?",
+  "Je veux voir le thinking inline au lieu du panneau repliable, tu peux patcher ça ?",
+  "Les emojis de mes tools restent ⚡ malgré le registry, trouve où ça bloque.",
+  "Le tool emoji s’affiche au démarrage mais disparaît dans la trail une fois l’appel fini.",
+  "Enlève le glyph assistant et corrige l’espace vide qui reste avant le texte.",
+  "Peux-tu changer le prompt, l’icône et le goodbye du TUI Hermes ?",
+  "Mon slash command apparaît dans l’autocomplete mais ne fait rien dans le TUI, vérifie le dispatch.",
+  "La commande marche en CLI mais pas dans Hermes --tui, regarde les couches gateway/frontend.",
+  "J’ai modifié les couleurs et les icônes mais rien ne change après le build.",
+  "Pourquoi je vois encore l’ancien branding ? Il y a peut-être plusieurs processus TUI lancés.",
+  "Je veux personnaliser l’affichage Ink de Hermes sans écraser mes changements W.ALTER existants."
+ ],
+ "intents_en": [
+  "Customize Hermes TUI role glyphs.",
+  "Show reasoning inline instead of collapsible.",
+  "Fix tool emojis missing from the TUI.",
+  "Change Hermes TUI branding and prompt icon.",
+  "Debug a slash command that fails only in TUI."
+ ],
+ "entities": [
+  "Hermes --tui",
+  "Ink",
+  "React",
+  "~/.hermes/hermes-agent/ui-tui/src/",
+  "domain/roles.ts",
+  "theme.ts",
+  "components/thinking.tsx",
+  "components/appChrome.tsx",
+  "components/appLayout.tsx",
+  "components/messageLine.tsx",
+  "components/streamingAssistant.tsx",
+  "ui-tui/src",
+  "tui_gateway/server.py",
+  "agent/display.py",
+  "get_tool_emoji",
+  "COMMAND_REGISTRY",
+  "hermes_cli/commands.py",
+  "createSlashHandler.ts",
+  "GATEWAY_KNOWN_COMMANDS",
+  "npm run build",
+  "dist/entry.js",
+  "EMOJI_FRAMES",
+  "ToolTrail"
+ ],
+ "symptoms": [
+  "Tool emojis always fall back to ⚡ despite registry settings.",
+  "Completed tool trail lines have no emoji.",
+  "Empty role glyph leaves a blank three-character spacer.",
+  "Thinking text is truncated at 140 characters.",
+  "Slash command appears in autocomplete but does not work.",
+  "TUI still shows old branding or display changes after rebuilding."
+ ],
+ "not_for": [
+  "Changing tool behavior or implementing a new backend tool.",
+  "Customizing Hermes CLI display outside --tui.",
+  "General Hermes installation or upgrade troubleshooting.",
+  "Explaining reasoning content without changing how it is rendered."
+ ]
+}

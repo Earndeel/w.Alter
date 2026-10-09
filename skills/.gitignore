@@ -1,2 +1,5 @@
 bench/data/
 __pycache__/
+index/cache/
+index/model/
+index/judged/

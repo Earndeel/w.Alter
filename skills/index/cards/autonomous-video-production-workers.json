@@ -1,0 +1,71 @@
+{
+ "name": "autonomous-video-production-workers",
+ "sha": "295a4d586d4b063f11338f5552f78d4d0871fef7db909d37a1298a77484025fb",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008311545,
+ "summary": "Use when creating, isolating, configuring, or auditing a Hermes worker for queued, reference-based video production and delivery.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Monte-moi un profil Hermes isolé pour produire les vidéos de la queue Google Sheets.",
+  "Je veux un worker vidéo autonome qui prenne les références, génère les livrables et les dépose sur Drive.",
+  "Crée le profil sans reprendre ma mémoire perso ni mes autres skills.",
+  "Tu peux vérifier que ce worker est vraiment isolé et qu'il n'a que les outils nécessaires ?",
+  "Branche la queue Sheets/Drive, mais commence par valider les accès en lecture seule.",
+  "J'ai le skill de reconstruction en Markdown, c'est le vrai fichier : installe-le dans le profil et audite les références.",
+  "Passe en revue les étapes du worker : il faut qu'il puisse reprendre un job après un plantage sans tout refaire.",
+  "Vérifie que la livraison ne coche FINISHED qu'après le QA, l'upload Drive et la relecture du résultat.",
+  "Ajoute un adapter image qui utilise vraiment les images de référence, pas juste un prompt avec le nom du fichier.",
+  "Le provider vidéo n'est pas configuré, dis-moi ce qui manque et ne devine ni endpoint ni clé.",
+  "Avant de lancer la prod, teste ffmpeg, ffprobe, yt-dlp et les scripts sans déclencher de génération payante.",
+  "On a découpé le pipeline en plusieurs skills : audite qu'aucune règle de reconstruction importante n'a disparu."
+ ],
+ "intents_en": [
+  "Create an isolated Hermes video-production worker.",
+  "Audit the worker's queue-to-Drive delivery workflow.",
+  "Configure read-only Google Sheets and Drive validation.",
+  "Check that provider adapters fail closed when unconfigured.",
+  "Verify semantic coverage after splitting the production skill."
+ ],
+ "entities": [
+  "Hermes",
+  "Hermes profile manager",
+  "SOUL.md",
+  "config.yaml",
+  ".env",
+  "auth.json",
+  "Google Sheets",
+  "Google Drive",
+  "OAuth",
+  "ffmpeg",
+  "ffprobe",
+  "Python",
+  "yt-dlp",
+  "video-reference-reconstruction",
+  "video_gen",
+  "image_materialize",
+  "video_generate",
+  "video_status",
+  "video_download",
+  "GSHEET_<spreadsheet-id>_ROW_<row-number>",
+  "RESULT",
+  "FINISHED",
+  "qa_policy.json",
+  "creative_preferences.json"
+ ],
+ "symptoms": [
+  "A worker exposes unrelated tools or appears to inherit personal profile memory.",
+  "The Sheets values API reports that the service is disabled while Drive access works.",
+  "A finished queue row has an empty result, or a result is written without verified delivery.",
+  "A target image is treated as materialized even though the provider only received a filename in a prompt.",
+  "A video stage emits generic prompts instead of a provider-ready timeline.",
+  "A resumed job restarts completed upstream stages after a downstream failure.",
+  "A provider adapter has no explicit endpoint or credentials but reports a successful receipt."
+ ],
+ "not_for": [
+  "Generic Hermes profile setup unrelated to video production.",
+  "Casual analysis or reconstruction of a single video.",
+  "Running the production queue to generate and deliver specific videos.",
+  "Choosing creative direction or reviewing a finished video without configuring the worker."
+ ]
+}

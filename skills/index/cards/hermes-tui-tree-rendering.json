@@ -1,0 +1,70 @@
+{
+ "name": "hermes-tui-tree-rendering",
+ "sha": "c900f0f6c84014eda81d1250702dded177ffcd77b9df2bde9fa0797e635f60b7",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00059318325,
+ "summary": "Use when changing Hermes TUI thinking/tool tree rails, tool emojis, duration labels, or boxed and right-aligned user messages.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Peux-tu corriger l’affichage de l’arbre thinking/tools dans le TUI Hermes ?",
+  "Le rail vertical a des trous entre les appels d’outils, tu peux réparer ça ?",
+  "Je veux le style continu avec les ┌, ├, └ et les │ comme dans l’exemple.",
+  "Ajoute les bons emojis aux outils dans le tree, en cohérence avec le registre Python.",
+  "Les appels terminal et execute_code devraient avoir leur emoji 💻 dans l’interface.",
+  "Peux-tu modifier ToolTrail pour afficher les outils comme des sous-branches du thinking ?",
+  "Après la mise à jour Hermes, comment restaurer mes overrides TUI ?",
+  "Les durées d’exécution apparaissent dans les libellés d’outils, enlève-les de l’affichage.",
+  "Mets les messages utilisateur dans une boîte alignée à droite, comme avant.",
+  "Je veux ajuster le rendu des segments streamingAssistant et leur passage vers ToolTrail.",
+  "Entre deux tools, il faut garder une ligne spacer avec le rail, pas un blanc.",
+  "J’ai touché à messageLine.tsx et le tree est cassé : quels fichiers et quelle commande de build utiliser ?"
+ ],
+ "intents_en": [
+  "Fix gaps in the Hermes TUI tool tree rails.",
+  "Update tool emoji mapping in ToolTrail.",
+  "Box and right-align user messages in the TUI.",
+  "Remove execution durations from tool labels.",
+  "Restore TUI overrides and rebuild after a Hermes update."
+ ],
+ "entities": [
+  "Hermes TUI",
+  "ToolTrail",
+  "TreeBranch",
+  "treeLead",
+  "toolEmoji()",
+  "splitToolDuration()",
+  "thinking.tsx",
+  "messageLine.tsx",
+  "streamingAssistant.tsx",
+  "ui-tui/src/components/thinking.tsx",
+  "ui-tui/src/components/messageLine.tsx",
+  "ui-tui/src/components/streamingAssistant.tsx",
+  "tools/*.py",
+  "skill_view",
+  "skill_manage",
+  "read_file",
+  "write_file",
+  "search_files",
+  "terminal",
+  "execute_code",
+  "browser_navigate",
+  "~/.hermes/tui-overrides/",
+  "~/.hermes/scripts/restore-tui-design.sh",
+  "npm run build"
+ ],
+ "symptoms": [
+  "Le rail vertical │ a des trous entre thinking et les outils.",
+  "Des lignes spacer apparaissent sans préfixe │.",
+  "Les tool calls n’ont pas le préfixe │└ attendu.",
+  "Les emojis affichés ne correspondent pas aux outils.",
+  "La durée d’exécution reste dans le libellé d’un outil.",
+  "Les messages utilisateur ne sont plus encadrés ou alignés à droite."
+ ],
+ "not_for": [
+  "Modifier le comportement ou l’implémentation des outils Python eux-mêmes.",
+  "Changer le contenu ou la logique des réponses du modèle.",
+  "Configurer le terminal ou le shell hors du rendu TUI.",
+  "Créer ou modifier les compétences Hermes sans lien avec leur affichage."
+ ]
+}
