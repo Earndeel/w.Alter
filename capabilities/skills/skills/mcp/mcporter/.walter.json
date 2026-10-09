@@ -5,7 +5,7 @@
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",
- "origin": "hermes-agent",
- "owner": "walter",
+ "origin": "hermes-repo",
+ "owner": "upstream",
  "store_sha": "e3ca4b5d30013bbeea9026d8d9ce6fab90136a5a2b7301aedadb3946dd4cda80"
 }

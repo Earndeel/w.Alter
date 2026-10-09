@@ -6,7 +6,7 @@
   "state": "archived"
  },
  "imported_at": "2026-10-09T17:16:23+00:00",
- "origin": "hermes-archive",
- "owner": "walter",
+ "origin": "hermes-repo",
+ "owner": "upstream",
  "store_sha": "59604e2839eaaa24d0d1da82643f07fe40594088f1b1554f3f0a7152fffae939"
 }
