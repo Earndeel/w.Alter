@@ -5,8 +5,8 @@
   "state": "archived"
  },
  "imported_at": "2026-10-09T17:16:22+00:00",
- "origin": "hermes-archive-restored",
- "owner": "walter",
+ "origin": "hermes-repo",
+ "owner": "upstream",
  "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
  "store_sha": "a1771072b02aa6afd6cab48faae7d7f6ac632b09a05e3d0f7817676e000bd792"
 }
