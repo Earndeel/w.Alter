@@ -27,14 +27,14 @@ def codex_ready() -> bool:
         return False
 
 
-def editor(prompt: str, timeout: int = 900, effort: str = "high") -> str | None:
+def editor(prompt: str, timeout: int = 900, effort: str = "high", model: str | None = None) -> str | None:
     """One-shot completion through `codex exec` (read-only sandbox, ephemeral, no repo). None if unavailable."""
     if not codex_ready():
         return None
     with tempfile.TemporaryDirectory(prefix="walter-curator-") as d:
         out = Path(d) / "last.txt"
         cmd = ["codex", "exec", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only",
-               "-m", EDITOR_MODEL, "-c", f"model_reasoning_effort={effort}", "-o", str(out), "-"]
+               "-m", model or EDITOR_MODEL, "-c", f"model_reasoning_effort={effort}", "-o", str(out), "-"]
         try:
             r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=timeout, cwd=d)
         except subprocess.TimeoutExpired:
