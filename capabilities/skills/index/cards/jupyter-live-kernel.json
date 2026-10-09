@@ -1,0 +1,64 @@
+{
+ "name": "jupyter-live-kernel",
+ "sha": "5eb40567439d0504900866aeafa547a6085f50ffa68be07d3277f0b1c16fe2ae",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00055605825,
+ "summary": "Use when Monsieur needs iterative Python exploration with variables and state preserved in a live Jupyter kernel.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Lance-moi un kernel Jupyter pour tester ça étape par étape.",
+  "Je veux explorer ce CSV avec pandas, afficher les colonnes puis vérifier quelques lignes.",
+  "Continue dans le même kernel, garde les variables qu'on a déjà créées.",
+  "Tu peux regarder ce que contient mon DataFrame et me sortir un aperçu ?",
+  "Fais-moi un petit REPL Python vivant, je vais tester plusieurs pistes.",
+  "Le notebook est ouvert : exécute ce bout de code et on regarde le résultat avant la suite.",
+  "J'ai une API à explorer, teste quelques appels en Python sans tout refaire à chaque fois.",
+  "Peux-tu inspecter les variables du notebook et me montrer un aperçu de results ?",
+  "Modifie cette cellule du notebook, puis on itère sur le calcul.",
+  "Mon premier run a timeout, réessaie une fois que le kernel a démarré.",
+  "Vérifie tout le notebook de haut en bas avec un kernel propre et sauvegarde les outputs.",
+  "Je veux explorer ce dataset et ajuster le code au fur et à mesure, pas lancer un script one-shot."
+ ],
+ "intents_en": [
+  "Explore this DataFrame interactively.",
+  "Keep the Python kernel state between runs.",
+  "Start a live Jupyter REPL for these experiments.",
+  "Inspect the notebook variables and preview a result.",
+  "Rerun the notebook from a clean kernel."
+ ],
+ "entities": [
+  "hamelnb",
+  "jupyter_live_kernel.py",
+  "JupyterLab",
+  "Jupyter kernel",
+  "uv",
+  "scratch.ipynb",
+  "jupyter-lab",
+  "Jupyter REST API",
+  "http://127.0.0.1:8888/api/sessions",
+  "port 8888",
+  "~/notebooks",
+  "/tmp/jupyter.log",
+  "execute",
+  "servers",
+  "notebooks",
+  "variables",
+  "contents",
+  "edit",
+  "restart-run-all",
+  "--compact"
+ ],
+ "symptoms": [
+  "The first execution times out while the kernel is initializing.",
+  "No live kernel session exists for the notebook.",
+  "A websocket operation times out after a kernel restart.",
+  "Notebook execution returns a JSON traceback with ename and evalue."
+ ],
+ "not_for": [
+  "One-shot Python scripts that need Hermes tools such as web search or file operations.",
+  "Shell commands, package installation, builds, or git operations.",
+  "Editing notebook files without running or exploring code in a live kernel.",
+  "General data-science explanations that do not require interactive Python execution."
+ ]
+}

@@ -1,0 +1,67 @@
+{
+ "name": "scena-frontend-qa",
+ "sha": "017df47ba0bec6569d639564115b6163de458617446ca21213ff1f876fc18827",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00062511075,
+ "summary": "Use when testing or debugging Scena’s tenant dashboard, admin control plane, or Operator Studio UI and API behavior.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Peux-tu faire la QA du dashboard Scena, le statut Telegram du client a l'air faux.",
+  "Le portail affiche des credits pas a jour, verifie le frontend et la route API.",
+  "J'ai modifie la navigation admin Scena, teste les onglets et les panneaux stp.",
+  "Le bouton de connexion du bot ne marche plus, regarde le contrat bot_token cote UI et API.",
+  "Tu peux tester l'isolation tenant sur /api/client/bot ? Je veux etre sur qu'on touche que la ligne du client.",
+  "Fais une passe QA responsive sur l'admin, surtout en 390px et sur les modales.",
+  "J'ai refait le Client Brain, verifie qu'il s'ouvre, se ferme et charge bien les donnees.",
+  "Dans Knowledge Hub le bouton template a l'air decoratif, teste son action avec l'API workflow.",
+  "Le panneau Workflow Runs reste vide. Verifie si c'est un vrai empty state ou un loader casse.",
+  "On a retire un panneau admin; cherche les vieux getElementById qui plantent encore au demarrage.",
+  "Peux-tu lancer les tests frontend Scena et verifier les screenshots desktop et mobile avant de dire que c'est bon ?",
+  "Le statut Telegram est connecte chez certains clients mais pas dans le dashboard. Trace le DOM jusqu'a la route et ajoute une regression."
+ ],
+ "intents_en": [
+  "QA the Scena tenant dashboard and Telegram status.",
+  "Test the admin tabs after the redesign.",
+  "Check the bot_token save flow and API contract.",
+  "Run responsive browser checks for Scena admin.",
+  "Verify Client Brain and Knowledge Hub interactions."
+ ],
+ "entities": [
+  "Scena",
+  "pages/portal/dashboard.html",
+  "pages/admin/index.html",
+  "pages/admin/operator.html",
+  "/dashboard",
+  "/operator",
+  "/api/client/bot",
+  "bot_token",
+  "telegram_bot_configured",
+  "Client Brain",
+  "Knowledge Hub",
+  "Operator Studio",
+  "Worker harness",
+  "headless-screenshot-qa",
+  "search_files",
+  "read_file",
+  "patch",
+  "terminal",
+  "390px"
+ ],
+ "symptoms": [
+  "Dashboard affiche un statut Telegram faux ou « Non connecté »",
+  "Crédits ou données client obsolètes ou manquants",
+  "Enregistrement du bot échoue avec telegram_bot_token au lieu de bot_token",
+  "Onglets admin qui ne répondent pas aux clics",
+  "Erreurs console après suppression d'un panneau",
+  "Client Brain bloqué par une modale ou un overlay",
+  "Workflow Runs vide sans état vide explicite",
+  "Débordement horizontal ou contenu mobile masqué"
+ ],
+ "not_for": [
+  "Déboguer la synchronisation générale entre le client d'authentification et Scena.",
+  "Effectuer un checkup complet des services Scena hors QA frontend.",
+  "Gérer les identifiants, tokens ou mots de passe de production.",
+  "Écrire directement dans la base de données de production."
+ ]
+}

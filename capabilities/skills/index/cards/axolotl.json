@@ -1,0 +1,62 @@
+{
+ "name": "axolotl",
+ "sha": "fafd4b37b9fceebd32d2265e1bd2f9cdef86120a01f6b9d73426ce7a4267d79b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005188095,
+ "summary": "Use when configuring, running, or debugging LLM fine-tuning with Axolotl YAML, including LoRA/QLoRA, preference training, and distributed setups.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux me faire un YAML Axolotl pour fine-tuner ce modèle en LoRA ?",
+  "Comment je configure QLoRA avec Axolotl sur mes GPUs ?",
+  "Mon entraînement Axolotl plante, tu peux m’aider à débugger la config ?",
+  "Je veux passer mon fine-tuning Axolotl de SFT à DPO, je change quoi ?",
+  "Ajoute le format de mon dataset à la config Axolotl stp",
+  "Axolotl supporte GRPO ? Comment lancer l’entraînement ?",
+  "J’ai 8 GPUs, comment régler context_parallel_size et le batch dans Axolotl ?",
+  "Tu peux vérifier si ce YAML Axolotl est correct avant que je lance le job ?",
+  "Le chargement de mon dataset ne marche pas avec Axolotl, voilà le format actuel",
+  "Comment activer FSDP dans Axolotl et sauvegarder le modèle complet ?",
+  "Je veux entraîner un modèle multimodal avec Axolotl, quelles options YAML il faut ?",
+  "La sauvegarde prend trop de place, Axolotl peut sortir un modèle compressé compatible vLLM ?"
+ ],
+ "intents_en": [
+  "Write an Axolotl LoRA config",
+  "Debug my Axolotl training run",
+  "Set up DPO training in Axolotl",
+  "Configure FSDP for Axolotl",
+  "Convert my dataset to an Axolotl format"
+ ],
+ "entities": [
+  "Axolotl",
+  "YAML",
+  "LoRA",
+  "QLoRA",
+  "DPO",
+  "KTO",
+  "ORPO",
+  "GRPO",
+  "SFT",
+  "Hugging Face",
+  "Transformers",
+  "Datasets",
+  "PEFT",
+  "Accelerate",
+  "DeepSpeed",
+  "PyTorch",
+  "FSDP",
+  "NCCL Tests",
+  "vLLM",
+  "context_parallel_size",
+  "micro_batch_size",
+  "save_compressed",
+  "Modal"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Servir un modèle déjà entraîné ou configurer une API d’inférence",
+  "Écrire une boucle de fine-tuning PyTorch sans Axolotl",
+  "Nettoyer ou annoter un dataset sans lien avec son format d’entraînement Axolotl",
+  "Choisir un fournisseur de GPU ou gérer une infrastructure cloud sans tâche Axolotl"
+ ]
+}

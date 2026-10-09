@@ -1,0 +1,44 @@
+{
+ "name": "plan",
+ "sha": "10eaaafc31da13a13b9dcb87ef08091ec9efbd1ea64a218f24dc1811e6fd8315",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000362142,
+ "summary": "Use when Monsieur veut un plan d’implémentation écrit dans .hermes/plans/ avant toute exécution ou modification du projet.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Planifie ça avant de toucher au code.",
+  "Fais-moi un plan d'implémentation, mais n'exécute rien.",
+  "/plan",
+  "Avant de coder, détaille les étapes, les fichiers concernés et les tests à lancer.",
+  "On va ajouter l'authentification à mon service : commence par un plan sauvegardé dans le repo.",
+  "Tu peux regarder le projet et préparer un plan, sans rien modifier d'autre ?",
+  "Je veux migrer l'API vers la nouvelle version. Fais d'abord le plan, pas de changements pour l'instant.",
+  "Ok pour le plan dont on parlait : inspecte les fichiers utiles et enregistre-le dans .hermes/plans.",
+  "Pas de commit ni de commandes qui modifient quoi que ce soit, juste un plan concret avec les risques.",
+  "Prépare un plan de correction pour ce bug, avec les tests de validation, mais ne le corrige pas encore.",
+  "Avant de lancer la refonte du dashboard, écris un plan avec les chemins exacts des fichiers à modifier.",
+  "Fais le plan dans le workspace, et après tu me donnes juste le chemin du fichier."
+ ],
+ "intents_en": [
+  "Plan this before making changes.",
+  "Write an implementation plan, but don't execute it.",
+  "Use /plan for this task.",
+  "Inspect the repo and save a concrete plan with files and tests.",
+  "No code changes or commits yet—just the plan."
+ ],
+ "entities": [
+  ".hermes/plans/",
+  "YYYY-MM-DD_HHMMSS-<slug>.md",
+  "write_file",
+  "active workspace",
+  "backend workspace"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Implementing the plan or editing project files",
+  "Running mutating commands, tests that alter state, commits, or pushes",
+  "Writing general documentation unrelated to a requested implementation plan",
+  "Executing an existing plan"
+ ]
+}

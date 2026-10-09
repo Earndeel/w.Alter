@@ -1,0 +1,51 @@
+{
+ "name": "nano-pdf",
+ "sha": "ab02d1b073182d32ffd852236f8c7816c1a6fbff64f7fd84f4b4d454da3f4643",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000323235,
+ "summary": "Use when Monsieur wants to correct or change text on a specific page of an existing PDF with nano-pdf.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Corrige les fautes dans ce PDF, page 2.",
+  "Change le titre de la première page du deck pour « Résultats Q3 ».",
+  "Remplace l’ancien nom du client par le nouveau dans le contrat, page 4.",
+  "Tu peux mettre la date à jour dans le rapport PDF ?",
+  "J’ai repéré une typo dans le PDF, corrige-la sans refaire tout le document.",
+  "Modifie le texte sur la page 3 du PDF dans mon dossier.",
+  "Le nom de Monsieur est mal écrit sur cette page, remplace-le par « Monsieur ».",
+  "Change juste le sous-titre de la page 1, ne touche pas au reste.",
+  "Le PDF est déjà prêt, je veux seulement corriger deux mots à la page 5.",
+  "Ça a modifié la mauvaise page, réessaie avec la numérotation décalée.",
+  "Vérifie que la correction est bien dans le PDF final après l’édition.",
+  "Comment installer et lancer nano-pdf pour changer une date dans un PDF ?"
+ ],
+ "intents_en": [
+  "Fix a typo on page 2 of this PDF.",
+  "Change the title on the first page.",
+  "Update the date in the existing PDF.",
+  "Replace the client name on page 4.",
+  "Verify the edited PDF after the text change."
+ ],
+ "entities": [
+  "nano-pdf",
+  "nano-pdf CLI",
+  "uv",
+  "pip",
+  "nano-pdf edit",
+  "PDF",
+  "nano-pdf --help",
+  "API key"
+ ],
+ "symptoms": [
+  "The edit changed the wrong page.",
+  "The requested text change is missing from the output PDF.",
+  "The PDF output file may not have changed after editing."
+ ],
+ "not_for": [
+  "Creating a new PDF or recreating an existing document from scratch.",
+  "Complex PDF layout redesign or extensive formatting changes.",
+  "Converting PDFs to other file formats.",
+  "Editing images or non-PDF documents."
+ ]
+}

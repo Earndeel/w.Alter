@@ -1,0 +1,60 @@
+{
+ "name": "evidence-to-execution-workflows",
+ "sha": "aca0bfed6ffe72053f69518fa6648b9944b621f76c3d8b3055c78165a8a7db83",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00054343575,
+ "summary": "Use when messages, meetings, or account records must become an evidence-backed brief or plan with explicit approval gates before action.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fais-moi le point sur mes mails et réunions de la semaine, avec les sources et ce qui reste à faire.",
+  "Prépare un brief fiable à partir de ces échanges, mais sépare bien les faits de tes propositions.",
+  "On a deux versions différentes de la deadline : retrouve les preuves et demande-moi de trancher avant de modifier quoi que ce soit.",
+  "Transforme les notes de réunion en actions, avec un responsable, une échéance et la source pour chacune.",
+  "Avant de répondre au client, vérifie tout l'historique et fais-moi valider le brouillon.",
+  "Tu peux me faire le tri dans la boîte : urgent, à répondre, en attente, décision ou juste pour info ?",
+  "Reprends le suivi du projet : cherche d'abord s'il existe déjà une tâche ou un ticket, ne crée rien sans mon accord.",
+  "Fais le bilan de la semaine et propose un plan réaliste selon mes dispos, les deadlines et les trucs en attente.",
+  "Prépare les étapes de validation du brief jusqu'à la livraison, et bloque si un jalon attend encore mon feu vert.",
+  "J'ai autorisé l'autre compte Google, pas celui-là : vérifie le bon profil et refais une lecture sans rien envoyer.",
+  "Le mail est parti ou pas ? Vérifie l'état côté fournisseur avant de réessayer.",
+  "Résume les pièces jointes et liens utiles pour le brief, mais signale clairement ce que tu n'as pas pu ouvrir."
+ ],
+ "intents_en": [
+  "Turn these emails into an evidence-backed action plan.",
+  "Reconcile the meeting notes before drafting a reply.",
+  "Prepare a weekly review with capacity-aware priorities.",
+  "Set approval gates before production starts.",
+  "Check which Google account contains the records."
+ ],
+ "entities": [
+  "Google Workspace",
+  "Google accounts",
+  "OAuth",
+  "inbox",
+  "meetings",
+  "calendars",
+  "tasks",
+  "tickets",
+  "projects",
+  "contacts",
+  "PDFs",
+  "voice notes",
+  "attachments",
+  "source assets"
+ ],
+ "symptoms": [
+  "Cross-account 404 when searching for a record",
+  "Conflicting owners, dates, or statuses across sources",
+  "Search results appear one-sided or truncated",
+  "An attachment or linked media is identified but unavailable",
+  "A send or write times out and its external state is unknown",
+  "A task may already exist, but its status is unclear"
+ ],
+ "not_for": [
+  "Retrieving records from a specific connector without evidence reconciliation or planning",
+  "Sending a message or editing records without a review and approval workflow",
+  "General project brainstorming without source records or execution gates",
+  "OAuth setup or token debugging as a standalone task"
+ ]
+}

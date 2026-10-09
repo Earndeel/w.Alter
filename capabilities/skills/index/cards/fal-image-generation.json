@@ -1,0 +1,71 @@
+{
+ "name": "fal-image-generation",
+ "sha": "401ddf2097e081e38ec53656678942faf8c5d4f13077d273816e7105b3009cf5",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007965045,
+ "summary": "Use when integrating or debugging Fal.ai image generation/edit APIs, especially model-specific payloads, async polling, and result handling.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Branche Fal.ai pour générer des images depuis un prompt.",
+  "Fais-moi l’intégration NanoBanana 2 text-to-image dans le Worker.",
+  "Je veux modifier cette image avec Fal, tu mets quoi comme payload ?",
+  "Pour NanoBanana edit, c’est image_url ou image_urls ?",
+  "J’ai un 422 sur fal-ai/nano-banana-2/edit, tu peux vérifier les champs ?",
+  "Le polling Fal me renvoie 405 sur la route edit, c’est quoi la bonne URL de résultat ?",
+  "Mon appel fal.run dépasse le timeout Cloudflare, passe ça en queue avec polling.",
+  "Tu peux ajouter les remboursements de crédits si la génération Fal échoue ?",
+  "Fal reçoit l’URL Wikimedia au lieu de notre proxy Telegram, corrige ça.",
+  "Le webhook Fal n’arrive pas toujours : mets le polling comme mécanisme principal.",
+  "On utilise Flux pour faire de l’image-à-image, donne-moi le bon paramètre et un exemple.",
+  "J’ai une clé Fal fournie par le client : assure-toi que le BYOK est utilisé avant la clé plateforme."
+ ],
+ "intents_en": [
+  "Integrate Fal.ai text-to-image generation.",
+  "Fix the NanoBanana edit 422 payload.",
+  "Poll Fal queue jobs and fetch their results.",
+  "Use Flux for image-to-image editing.",
+  "Refund credits when a Fal image job fails."
+ ],
+ "entities": [
+  "Fal.ai",
+  "NanoBanana 2",
+  "Flux Dev",
+  "Pollinations.ai",
+  "fal.run",
+  "queue.fal.run",
+  "fal-ai/nano-banana-2",
+  "fal-ai/nano-banana-2/edit",
+  "fal-ai/flux/dev/image-to-image",
+  "FAL_API_KEY",
+  "providerKeys.fal",
+  "image_urls",
+  "image_url",
+  "request_id",
+  "response_url",
+  "status_url",
+  "Cloudflare Workers",
+  "waitUntil",
+  "Telegram",
+  "proxy/media",
+  "image_jobs",
+  "credit_ledger",
+  "fal_request_id",
+  "curl"
+ ],
+ "symptoms": [
+  "422 response from nano-banana-2/edit",
+  "405 when fetching an edit job result URL",
+  "Fal sync request nears or exceeds the Cloudflare Worker timeout",
+  "Async Fal job remains uncollected because webhook delivery is unreliable",
+  "Generated image job fails without restoring credits",
+  "Fal receives an inaccessible source image URL instead of the proxy URL",
+  "Authentication errors from an invalid or exhausted Fal key"
+ ],
+ "not_for": [
+  "Writing or refining the image prompt without implementing the Fal API call",
+  "Video generation workflows such as Veo3 or MiniMax Video",
+  "General Telegram bot delivery unrelated to Fal image generation",
+  "Managing or provisioning Fal.ai accounts and API keys"
+ ]
+}

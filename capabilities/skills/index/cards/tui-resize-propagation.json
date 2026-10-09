@@ -1,0 +1,59 @@
+{
+ "name": "tui-resize-propagation",
+ "sha": "54edbe5d7afdf485009dd18537f6c3fb8f56319e3790287ca77f4bc2594cfe53",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00050136075,
+ "summary": "Use when Hermes TUI misses terminal resizes in nested cmux/SSH/tmux sessions and needs a SIGWINCH polling fallback.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Dans mon pane cmux, hermes --tui garde l'ancienne taille quand je resize, tu peux corriger ça ?",
+  "Le TUI de Hermes freeze au resize via SSH puis tmux, regarde la propagation de SIGWINCH.",
+  "J'ai des glitches d'affichage après avoir agrandi le terminal dans cmux → SSH → tmux.",
+  "On peut ajouter un fallback de polling pour que Ink détecte les changements de dimensions ?",
+  "Le resize marche en terminal direct mais pas dans mon setup imbriqué cmux/tmux.",
+  "Tu peux patcher terminalDimensions.ts pour émettre resize si les dimensions changent ?",
+  "Après le resize, Hermes reste coincé en 80x24 puis snap back avec un rendu bizarre.",
+  "C'est quoi la bonne correction côté TUI quand tmux ne forward pas SIGWINCH à Hermes ?",
+  "J'ai changé la taille du pane et stdout n'a pas envoyé resize; ajoute le polling raw à 250ms.",
+  "Vérifie aussi que le fix terminalDimensions survit aux updates Hermes avec les overrides.",
+  "Le resize est toujours cassé après une mise à jour, restaure l'override et rebuild le TUI stp.",
+  "Est-ce que allow-passthrough dans tmux règle le SIGWINCH, ou faut patcher le TUI ?"
+ ],
+ "intents_en": [
+  "Fix Hermes TUI resize detection inside nested cmux, SSH, and tmux.",
+  "Add a polling fallback when SIGWINCH is not propagated.",
+  "The TUI stays at its old size after resizing a multiplexer pane.",
+  "Make Ink receive resize events when terminal dimensions change.",
+  "Restore the terminalDimensions override after a Hermes update."
+ ],
+ "entities": [
+  "Hermes",
+  "hermes --tui",
+  "cmux",
+  "tmux",
+  "SSH",
+  "SIGWINCH",
+  "Ink",
+  "Node.js stdout resize event",
+  "ui-tui/src/lib/terminalDimensions.ts",
+  "clampStdoutDimensions()",
+  "EmittableStream",
+  "250ms polling interval",
+  "/root/.hermes/tui-overrides/terminalDimensions.ts",
+  "ensure-tui-design.sh",
+  "restore-tui-design.sh"
+ ],
+ "symptoms": [
+  "Hermes TUI remains at its old dimensions after terminal resize",
+  "TUI snaps back to the new size with visual glitches",
+  "Resize works in a direct terminal but not through nested cmux/SSH/tmux",
+  "stdout resize handlers do not fire when pane dimensions change"
+ ],
+ "not_for": [
+  "Changing tmux pane sizes or configuring general tmux key bindings",
+  "Fixing unrelated TUI rendering or layout bugs",
+  "Configuring SSH connectivity or terminal escape-sequence passthrough",
+  "Implementing resize handling in applications other than the Hermes TUI"
+ ]
+}

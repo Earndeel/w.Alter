@@ -1,0 +1,69 @@
+{
+ "name": "gsap-frontend",
+ "sha": "cb289100f270c04402029e9657e26c5e27274d0737fba84d2ee9df0a4ebbfb85",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00086815575,
+ "summary": "Use when building frontend or landing-page animations with GSAP, especially scroll-driven effects, timelines, SVG/text plugins, or React/vanilla integration.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais une anim GSAP pour cette landing, avec une intro qui claque.",
+  "Ajoute un ScrollTrigger avec pin et scrub sur la section projets.",
+  "Tu peux séquencer ces reveals avec une timeline GSAP et des labels ?",
+  "Je veux que les cartes arrivent au scroll, avec un stagger propre.",
+  "Le texte doit se révéler lettre par lettre, tu le ferais en SplitText ?",
+  "Fais un morph entre ces deux formes SVG au scroll.",
+  "J’ai besoin d’une transition FLIP quand on réorganise les cards.",
+  "Intègre GSAP dans ce composant React sans laisser de triggers actifs après le démontage.",
+  "Le scroll smooth et le parallax ne marchent pas sur ma page vanilla, tu peux corriger ça ?",
+  "Les plugins GSAP me font des 404 depuis jsdelivr, comment je les charge en local ?",
+  "Les animations sont un peu décevantes, on peut ajouter du SplitText et un effet DrawSVG ?",
+  "Avant de coder la landing de mon projet, pars direct sur GSAP et ses plugins, pas plusieurs versions vanilla basiques."
+ ],
+ "intents_en": [
+  "Build a GSAP scroll-pinned landing page.",
+  "Sequence these reveals in a GSAP timeline.",
+  "Add SplitText animations to this headline.",
+  "Integrate ScrollTrigger safely in my React component.",
+  "Load GSAP plugins locally for a vanilla site."
+ ],
+ "entities": [
+  "GSAP",
+  "GreenSock",
+  "ScrollTrigger",
+  "ScrollSmoother",
+  "ScrollToPlugin",
+  "Flip",
+  "Draggable",
+  "SplitText",
+  "ScrambleTextPlugin",
+  "MorphSVGPlugin",
+  "DrawSVGPlugin",
+  "MotionPathPlugin",
+  "CustomEase",
+  "Observer",
+  "@gsap/react",
+  "Motion",
+  "React",
+  "Vite",
+  "Cloudflare Pages",
+  "wrangler",
+  "node_modules/gsap/dist/",
+  "js/",
+  "#smooth-wrapper",
+  "#smooth-content"
+ ],
+ "symptoms": [
+  "GSAP premium plugins return 404 from jsdelivr or unpkg.",
+  "ScrollTrigger animations do not clean up after a React component unmounts.",
+  "ScrollSmoother does not work because the wrapper or content structure is missing.",
+  "A scramble effect displays raw HTML tags or removes inline markup.",
+  "ScrollTrigger.batch is configured with unsupported animation or scrub options.",
+  "SVG morphing fails on circles, rectangles, or polygons that are not paths."
+ ],
+ "not_for": [
+  "React hover, gesture, or simple enter/exit animations best handled by Motion.",
+  "Static frontend styling or layout work with no animation requirements.",
+  "Backend development or deployment tasks unrelated to GSAP animation setup."
+ ]
+}

@@ -1,0 +1,68 @@
+{
+ "name": "clerk-auth-landing-page",
+ "sha": "5bae3b45fe6563e9420d6fee813a1b72120bd970a34499a9dc61e52d398fbac1",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000623997,
+ "summary": "Use when adding Clerk sign-in to a static landing page and provisioning users through a separate backend or Cloudflare Worker.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute Clerk à ma landing page statique et crée le compte côté backend après le signup.",
+  "Je veux le login inline dans login.html, pas une popup Clerk.",
+  "Branche l’auth Clerk sur ma page Cloudflare Pages, puis provisionne le bot après connexion.",
+  "Le signup marche mais le client et son dashboard ne sont pas créés, tu peux regarder le flux ?",
+  "Fais une page de connexion HTML séparée pour mon site statique, avec Clerk en CDN.",
+  "Quand un utilisateur se reconnecte avec le même email, retrouve son compte existant au lieu d’en créer un deuxième.",
+  "J’ai une erreur CORS entre la page Cloudflare et mon API Worker après le login Clerk.",
+  "Tu peux vérifier quelle version de Clerk CDN utiliser pour mountSignIn ?",
+  "Le bouton se lance avant que Clerk soit prêt, ajoute un chargement propre au clic.",
+  "Après auth, envoie le token Clerk au backend pour créer le bot et attribuer les crédits.",
+  "Ma landing ne doit pas embarquer le SDK Clerk, juste renvoyer vers /login.html : adapte ça.",
+  "Les appels API échouent sans message et l’overlay de login ne s’affiche plus, vérifie le CORS et les appels au chargement."
+ ],
+ "intents_en": [
+  "Add Clerk auth to my static landing page.",
+  "Mount Clerk sign-in inline from the CDN.",
+  "Provision a backend user after Clerk signup.",
+  "Fix CORS between my login page and Cloudflare Worker.",
+  "Avoid duplicate backend accounts for returning users."
+ ],
+ "entities": [
+  "Clerk",
+  "Clerk JS CDN",
+  "jsDelivr",
+  "mountSignIn",
+  "mountSignUp",
+  "Clerk.load",
+  "Clerk.session.getToken",
+  "Clerk.openSignIn",
+  "Cloudflare Pages",
+  "Cloudflare Workers",
+  "/login.html",
+  "/api/signup",
+  "/api/me",
+  "CORS",
+  "publishable key",
+  "JWT",
+  "backend provisioning webhook",
+  "bot provisioning",
+  "credits",
+  "dashboard"
+ ],
+ "symptoms": [
+  "Clerk.mountSignIn is not a function",
+  "new Clerk(key) fails",
+  "Clerk.load is not ready when the script onload fires",
+  "ERR_FAILED on frontend API requests",
+  "Login overlay does not render after API calls fail",
+  "Signup creates duplicate backend users",
+  "User authenticates but bot, credits, or dashboard are not provisioned",
+  "Sign-in click shows a blank or unresponsive modal"
+ ],
+ "not_for": [
+  "Building a general-purpose Clerk application with a framework or server-rendered pages",
+  "Setting up Clerk organizations, billing, or unrelated authentication providers",
+  "Designing a static landing page without authentication or backend provisioning",
+  "Implementing general Cloudflare Worker admin endpoints unrelated to signup or auth"
+ ]
+}

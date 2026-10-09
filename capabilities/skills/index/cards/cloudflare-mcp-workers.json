@@ -1,0 +1,68 @@
+{
+ "name": "cloudflare-mcp-workers",
+ "sha": "ca8601fb947fab8047907f108e92bd733a324a9f3cca67010888911d7d0d30ae",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00092310075,
+ "summary": "Use when Monsieur veut gérer, déployer ou dépanner des ressources Cloudflare via mcporter/MCP, Wrangler ou l’API Cloudflare.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Déploie ce Worker sur Cloudflare, le fichier est prêt.",
+  "Tu peux me lister mes Workers et me dire lequel sert mon API ?",
+  "Ajoute une route Cloudflare pour envoyer api.mondomaine.fr vers mon Worker.",
+  "Mon déploiement Cloudflare plante, tu peux regarder l’erreur et le corriger ?",
+  "Mets cette clé API dans les secrets du Worker, pas dans le code.",
+  "Crée une base D1 pour le projet et initialise les tables.",
+  "Je veux servir mon site statique depuis R2 avec un Worker devant.",
+  "Ajoute un cron qui lance ce Worker toutes les six heures.",
+  "Le token Cloudflare du MCP ne marche plus, trouve le souci et passe par le bon fallback.",
+  "Tu peux vérifier les analytics Cloudflare de mon Worker depuis hier ?",
+  "Stocke le cache de mon app dans KV et branche-le au Worker.",
+  "J’ai l’erreur 10000 avec mcporter et Cloudflare, règle l’auth et redéploie."
+ ],
+ "intents_en": [
+  "Deploy this Worker to Cloudflare.",
+  "List my Cloudflare Workers.",
+  "Set up an R2 bucket and serve it through a Worker.",
+  "Fix the Cloudflare MCP authentication error.",
+  "Add a cron trigger to this Worker."
+ ],
+ "entities": [
+  "Cloudflare",
+  "mcporter",
+  "@cloudflare/mcp-server-cloudflare",
+  "Wrangler",
+  "Cloudflare API v4",
+  "Workers",
+  "KV",
+  "R2",
+  "D1",
+  "Durable Objects",
+  "Queues",
+  "Workers AI",
+  "Workflows",
+  "Zones",
+  "DNS",
+  "Routes",
+  "Cron Triggers",
+  "Secrets",
+  "Service Bindings",
+  "Worker Patterns Factory",
+  "wrangler.toml",
+  "/root/.mcporter/mcporter.json",
+  "/root/config/mcporter.json"
+ ],
+ "symptoms": [
+  "Cloudflare MCP authentication error 10000",
+  "mcporter ne trouve pas sa configuration",
+  "Le token Cloudflare est refusé ou expiré",
+  "Erreur Wrangler liée au bundling ou au contenu du répertoire",
+  "Erreur 10021 lors du déploiement d’un script JavaScript inline"
+ ],
+ "not_for": [
+  "Gérer des services cloud autres que Cloudflare",
+  "Développer une application sans déploiement ni gestion de ressources Cloudflare",
+  "Gérer le DNS ou l’hébergement chez un autre fournisseur",
+  "Configurer Hermes ou un serveur MCP sans lien avec Cloudflare"
+ ]
+}

@@ -1,0 +1,60 @@
+{
+ "name": "hermes-desktop-setup",
+ "sha": "aa6966808a71924b724500f77d2c2884fb45fd7c66fb3d8a987b0f22f5ddcf14",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000497871,
+ "summary": "Use when Hermes V2 sur Mac n'arrive pas à joindre un serveur distant et qu'il faut diagnostiquer token, variables d'environnement ou forwarding.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Mon app Hermes sur le Mac n'arrive pas à se connecter au serveur distant, tu peux checker ?",
+  "J'ai `HERMES_DESKTOP_REMOTE_URL is set but HERMES_DESKTOP_REMOTE_TOKEN is not`, je règle ça où ?",
+  "Hermes me sort `connect ECONNREFUSED 127.0.0.1:9119` depuis le Mac, aide-moi à réparer la connexion.",
+  "On avait configuré Hermes Desktop en remote, mais là ça ne connecte plus. Tu peux vérifier le tunnel et le forward ?",
+  "Le Dashboard est sur le serveur et mon app Mac ne le voit pas via Tailscale. C'est quoi la bonne architecture ?",
+  "J'ai mis l'URL distante dans Hermes, mais il réclame encore un token. Quelle variable manque sur mon Mac ?",
+  "Le WebSocket de l'app Hermes se coupe quand je la laisse idle, tu peux regarder le relay local ?",
+  "Je veux reconnecter Hermes V2 Desktop au serveur distant sans exposer le Dashboard publiquement.",
+  "Ça marchait hier, maintenant `127.0.0.1:9119` refuse la connexion. Le forward côté serveur est peut-être tombé ?",
+  "J'ai lancé Hermes sur le Mac mais il part en gateway locale au lieu du serveur remote, comment éviter ça ?",
+  "Après le bootstrap local, le renderer quitte avec exitCode 15. C'est le souci de connexion remote ou autre chose ?",
+  "Tu m'avais fait configurer le remote Hermes : rappelle-moi comment vérifier les variables et le tunnel SSH."
+ ],
+ "intents_en": [
+  "Fix Hermes Desktop remote connection on my Mac.",
+  "Why is Hermes getting ECONNREFUSED on port 9119?",
+  "Set the missing remote token environment variable.",
+  "Check the SSH tunnel and Tailscale forwarding for Hermes.",
+  "Keep the Hermes remote WebSocket alive when idle."
+ ],
+ "entities": [
+  "Hermes V2",
+  "Hermes Desktop",
+  "Mac",
+  "Electron",
+  "Dashboard",
+  "HERMES_DESKTOP_REMOTE_URL",
+  "HERMES_DESKTOP_REMOTE_TOKEN",
+  "127.0.0.1:9119",
+  "SSH tunnel",
+  "Tailscale forwarder",
+  "macOS relay",
+  "WebSockets",
+  "Gatekeeper",
+  "references/connection-chain.md"
+ ],
+ "symptoms": [
+  "`HERMES_DESKTOP_REMOTE_URL is set but HERMES_DESKTOP_REMOTE_TOKEN is not`",
+  "`connect ECONNREFUSED 127.0.0.1:9119`",
+  "Hermes Desktop ne se connecte plus au serveur distant",
+  "Le WebSocket distant se ferme quand il reste idle",
+  "Hermes démarre une gateway locale alors que le mode remote est attendu",
+  "Renderer killed (exitCode 15) après le bootstrap local"
+ ],
+ "not_for": [
+  "Configurer une gateway Hermes uniquement locale, sans connexion distante",
+  "Déboguer un crash macOS Gatekeeper du renderer sans symptôme de connexion remote",
+  "Publier ou sécuriser un Dashboard accessible publiquement",
+  "Déployer ou administrer un serveur Hermes sans lien avec l'app desktop Mac"
+ ]
+}

@@ -1,0 +1,52 @@
+{
+ "name": "xitter",
+ "sha": "c25e0d6bef1bf83a816c51334fa9316c3bff8da8a0a150b4e0265b2a250139dc",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000458271,
+ "summary": "Use when X/Twitter actions need the x-cli fallback because xurl cannot be installed.",
+ "kind": "procedure",
+ "intents_fr": [
+  "xurl s'installe pas, tu peux poster ça sur X avec l'autre outil ?",
+  "Publie ce message sur mon compte Twitter, on a confirmé que xurl est indisponible.",
+  "Fais une recherche X sur « IA open source » avec x-cli, xurl ne marche pas ici.",
+  "Tu peux checker mon profil X ? xurl n'est pas installable sur cette machine.",
+  "Regarde mes mentions avec le fallback x-cli, stp.",
+  "Retrouve mes bookmarks Twitter, le skill xurl n'a pas pu être installé.",
+  "Réponds à ce tweet depuis mon compte — utilise x-cli, xurl est bloqué.",
+  "Cherche les derniers posts sur mon projet et résume-les, on doit passer par x-cli.",
+  "Mon compte X a reçu des réponses ? xurl est indisponible, vérifie avec le fallback.",
+  "Envoie ce tweet maintenant avec x-cli, puisque xurl ne peut pas être installé.",
+  "Tu peux voir qui je suis sur X ? Quand je dis mon compte, je parle bien du mien.",
+  "Cherche sur Twitter les annonces de lancement de cette semaine ; xurl est impossible à installer, passe par x-cli."
+ ],
+ "intents_en": [
+  "Post this on X using x-cli; xurl can't be installed.",
+  "Search X for this topic with the fallback CLI.",
+  "Check my X mentions; xurl is unavailable.",
+  "Show my Twitter bookmarks using x-cli.",
+  "Look up my X profile with the fallback."
+ ],
+ "entities": [
+  "X",
+  "Twitter",
+  "x-cli",
+  "xurl",
+  "uv",
+  "X_API_KEY",
+  "X_API_SECRET",
+  "X_BEARER_TOKEN",
+  "X_ACCESS_TOKEN",
+  "X_ACCESS_TOKEN_SECRET",
+  "Infatoshi/x-cli",
+  "uv tool install git+https://github.com/Infatoshi/x-cli.git"
+ ],
+ "symptoms": [
+  "xurl cannot be installed on the target system"
+ ],
+ "not_for": [
+  "X/Twitter actions when xurl is installable; use the xurl skill instead.",
+  "Read-only X search through Grok; use the x_search tool.",
+  "General social-media tasks on platforms other than X/Twitter."
+ ]
+}

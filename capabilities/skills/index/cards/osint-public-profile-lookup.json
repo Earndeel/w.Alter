@@ -1,0 +1,72 @@
+{
+ "name": "osint-public-profile-lookup",
+ "sha": "fbad465a2ad9a8b43c9796f9a2d60f41cb8adfed2c702eea6408b67499b78336",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00058056075,
+ "summary": "Use when researching a contact’s public social profiles from a handle or Beeper clues without an authenticated browser session.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux retrouver les réseaux de ce contact à partir de son handle Insta ?",
+  "Cherche ce qu’on peut voir publiquement sur @hamoni14, sans te connecter.",
+  "Depuis cette convo Beeper, trouve les profils sociaux qui correspondent à cette personne.",
+  "Regarde si ce compte Instagram privé a des followers, et ce que Google indexe.",
+  "Tu peux vérifier si son TikTok est actif ou si c’est juste un compte coquille ?",
+  "J’ai l’ID Instagram dans les métadonnées Beeper, tu peux retrouver à quel profil il correspond ?",
+  "Fais un petit OSINT public sur ce contact, mais sans login ni scraping qui bloque.",
+  "Google trouve son Insta privé : cherche aussi les posts publics qui le taguent et les taggueurs.",
+  "Brave me renvoie 422 SUBSCRIPTION_TOKEN_INVALID, passe par une autre route pour chercher son profil.",
+  "Les miroirs Insta sont bloqués ; essaie les méthodes qui marchent depuis le VPS et note les limites.",
+  "Tu peux récupérer sa photo de profil Beeper depuis mon Mac via le tailnet et la ranger pour le Kardex ?",
+  "Fais le point sur son empreinte publique et ajoute les infos confirmées et les gaps au Kardex."
+ ],
+ "intents_en": [
+  "Find this contact's public social profiles from their handle.",
+  "Check an Instagram profile without logging in.",
+  "See whether this TikTok account is active.",
+  "Find public posts tagging this handle.",
+  "Record confirmed OSINT findings and gaps in Kardex."
+ ],
+ "entities": [
+  "Beeper",
+  "Instagram",
+  "TikTok",
+  "Threads",
+  "X",
+  "Facebook",
+  "Google",
+  "SerpApi MCP",
+  "mcp__serpapi__search",
+  "google_light",
+  "google_images",
+  "TikTok embed",
+  "curl",
+  "SSH",
+  "SCP",
+  "tailnet",
+  "Kardex",
+  "hindsight-pg",
+  "kardex.contacts",
+  "kardex.relationship_events",
+  "kardex.open_loops",
+  "kardex.identity_clusters",
+  "/root/Downloads/kardex_media/"
+ ],
+ "symptoms": [
+  "Brave API returns 422 SUBSCRIPTION_TOKEN_INVALID.",
+  "Instagram web_profile_info returns “Please wait a few minutes”.",
+  "Instagram mirrors return 403 or a Cloudflare challenge.",
+  "tikwm.com shows a Cloudflare challenge.",
+  "TikTok embed shows zero videos and zero followers.",
+  "Threads embed loads but contains no user data.",
+  "Bing or DuckDuckGo results for a small-account handle are noisy or irrelevant.",
+  "Public X or Facebook search returns 404 or no results.",
+  "The localhost:2222 SSH tunnel is down."
+ ],
+ "not_for": [
+  "Analyzing Beeper conversation content or message history.",
+  "Accessing private accounts or using authenticated sessions.",
+  "General web research unrelated to identifying a contact’s public social profiles.",
+  "Updating Kardex with unverified claims or performing unrelated database maintenance."
+ ]
+}

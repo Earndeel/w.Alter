@@ -1,0 +1,67 @@
+{
+ "name": "kie-image-generation-operations",
+ "sha": "52c5cbd96fea974b103a8c587bc44ef12d7e87fb2a02e816b62f9a5c7b54969c",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00069812325,
+ "summary": "Use when generating or editing images with Kie.ai, especially with references, batches, model comparisons, moderation failures, or verified delivery.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Génère-moi 5 portraits UGC avec ces images de référence, en gardant le même visage.",
+  "Peux-tu retoucher cette image avec Kie et me renvoyer le fichier final ?",
+  "Lance plusieurs variantes en parallèle, mais garde les mêmes traits du personnage.",
+  "Compare Seedream et Nano Banana sur exactement le même prompt et les mêmes références.",
+  "Une image a été refusée par la modération ; adapte le brief sans chercher à contourner les filtres.",
+  "Le batch s'est arrêté au milieu : récupère les résultats avec les task IDs déjà lancés, ne relance pas tout.",
+  "Je veux du 9:16 strict. Vérifie les dimensions des fichiers avant de me les livrer.",
+  "J'ai choisi cette image comme référence pour la suite : conserve aussi les sheets du personnage et des expressions.",
+  "Les sourires ne ressemblent pas à la sheet, surtout les dents. Fais un test d'identité plus rigoureux.",
+  "Upload ces références locales sur Kie une fois, puis réutilise leurs URLs pour toutes les variantes.",
+  "J'ai une erreur sur createTask, tu peux vérifier le slug du modèle et le payload attendu par Kie ?",
+  "Migre le backend Scena de l'ancien provider vers Kie, mais ne fais aucun déploiement ni changement distant sans mon accord."
+ ],
+ "intents_en": [
+  "Generate image variants with Kie from these reference images.",
+  "Compare Seedream and Nano Banana using the same prompt.",
+  "Resume polling these Kie task IDs and download completed images.",
+  "Make sure every delivered image is exactly 9:16.",
+  "Adapt this rejected image prompt to compliant editorial imagery."
+ ],
+ "entities": [
+  "Kie.ai",
+  "Kie Market API",
+  "Seedream",
+  "Nano Banana",
+  "kie/api_key",
+  "POST /api/file-stream-upload",
+  "https://kieai.redpandaai.co/api/file-stream-upload",
+  "POST /api/v1/jobs/createTask",
+  "https://api.kie.ai/api/v1/jobs/createTask",
+  "GET /api/v1/jobs/recordInfo",
+  "taskId",
+  "createTime",
+  "completeTime",
+  "costTime",
+  "creditsConsumed",
+  "failMsg",
+  "MEDIA:",
+  "Scena",
+  "Cloudflare Workers",
+  "D1",
+  "R2"
+ ],
+ "symptoms": [
+  "A Kie task is rejected by moderation.",
+  "A batch collector exits after the first failed task, hiding successful outputs.",
+  "A collector is interrupted while provider-side jobs are still running.",
+  "An output is 4:3 or landscape despite a prompt requesting 9:16.",
+  "The output resembles the character but changes teeth, eyes, scars, or other identity details.",
+  "A task returns an error or unexpected result because the model slug or payload fields are wrong."
+ ],
+ "not_for": [
+  "General image editing that does not use Kie.ai.",
+  "Writing or refining image prompts without generating or editing images.",
+  "Deploying Scena changes or performing remote Cloudflare writes without Monsieur's explicit approval.",
+  "Video generation or video editing workflows."
+ ]
+}

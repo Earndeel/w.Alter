@@ -1,0 +1,57 @@
+{
+ "name": "product-price-monitor",
+ "sha": "4cedb857840ef3005e4a0ce4a7aa0cbe1b731511b23c4104c6415517a94760ef",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005153445,
+ "summary": "Use when Monsieur veut suivre un prix ou une disponibilité dans le temps et recevoir une alerte selon un seuil ou une condition.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Surveille ce laptop et préviens-moi s’il passe sous les 1000 € tout compris.",
+  "Tu peux suivre ces vols pour Montréal et m’alerter dès qu’un tarif avec bagage descend sous 500 € ?",
+  "Check régulièrement si cet hôtel propose une chambre remboursable, et dis-moi quand c’est le cas.",
+  "Mets une alerte sur cette annonce, je veux savoir si le prix baisse.",
+  "Préviens-moi quand les billets pour ce concert sont disponibles, même si le prix change.",
+  "Pour celui dont on parlait, suis la version 16 Go chez ce vendeur, pas les autres variantes.",
+  "Le prix affiché est hors frais : tu peux surveiller le total avec livraison et taxes ?",
+  "Le suivi est en place ? Je ne veux pas recevoir dix fois la même alerte si l’offre ne change pas.",
+  "Reprends la surveillance du vol qu’on a choisi, mêmes dates et même classe, et alerte-moi sous 450 € tout compris.",
+  "Tu m’as alerté, mais c’était le mauvais modèle. Suis uniquement la taille 256 Go, chez le vendeur officiel.",
+  "Regarde si cette chambre devient annulable gratuitement. Pas besoin de m’écrire si rien ne change.",
+  "Quand le prix repasse sous 80 €, envoie-moi le lien, le prix avec frais et l’heure où tu l’as vérifié."
+ ],
+ "intents_en": [
+  "Track this item and alert me below €100.",
+  "Watch these flights for an all-in fare under $500.",
+  "Notify me when a refundable room is available.",
+  "Monitor this listing for price drops.",
+  "Resume the watch for the exact variant we discussed."
+ ],
+ "entities": [
+  "web_extract",
+  "browser_navigate",
+  "cronjob",
+  "price-watch",
+  "~/.hermes/price-watches/<watch-slug>.json",
+  "product price",
+  "flight fare",
+  "hotel room",
+  "listing",
+  "availability",
+  "all-in price",
+  "currency conversion",
+  "shipping",
+  "taxes",
+  "fees",
+  "refundability",
+  "cooldown",
+  "notification destination"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Demander le prix actuel une seule fois, sans suivi ni alerte.",
+  "Comparer des produits ou recommander quoi acheter.",
+  "Acheter, réserver ou garantir qu’un article est en stock.",
+  "Chercher un itinéraire ou une adresse sur une carte."
+ ]
+}

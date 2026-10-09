@@ -1,0 +1,70 @@
+{
+ "name": "hermes-multi-agent-profiles",
+ "sha": "8277293a29c7a94eb4be0ab08485f9c39f063e99093d72908620ff4440d2aff5",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000900702,
+ "summary": "Use when configuring Hermes specialist profiles, model routing, agent memory, or orchestration and feedback loops.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Configure mes profils Hermes avec un worker code et un worker recherche.",
+  "Je veux router les tâches frontend et backend vers des modèles différents, tu règles ça ?",
+  "Ajoute Aphrodite et Ares comme profils Hermes, avec leurs rôles et leurs skills.",
+  "Mon smart_model_routing a l'air inactif, trouve une solution de routing externe.",
+  "Crée le profil hephaestus et vérifie qu'il a les bons providers et credentials.",
+  "Comment éviter que mes workers reçoivent toute la conversation ? Je veux leur passer juste une capsule de tâche.",
+  "Mets en place le store des agents avec SOUL.md et EVOLUTION.md pour mes profils.",
+  "Après chaque tâche, je veux que l'agent garde les leçons apprises dans son fichier d'évolution.",
+  "Le worker dit Invalid API Key depuis que j'ai créé le profil prometheus, corrige la config.",
+  "Les profils ont toutes les skills et ça gonfle le contexte : aide-moi à faire une whitelist propre.",
+  "Je veux un orchestrateur qui découpe les tâches, choisit le modèle, réessaie si ça rate et me rend un rapport JSON.",
+  "J'ai modifié delegation.model mais ça n'a rien changé. Il faut redémarrer la session ou c'est un autre réglage ?"
+ ],
+ "intents_en": [
+  "Set up Hermes specialist profiles with model routing.",
+  "Create an external router for Hermes profiles.",
+  "Add SOUL.md and EVOLUTION.md agent memory.",
+  "Build a task capsule workflow for worker agents.",
+  "Fix profile credentials and provider configuration."
+ ],
+ "entities": [
+  "Hermes",
+  "W.Alter",
+  "hephaestus",
+  "prometheus",
+  "aphrodite",
+  "ares",
+  "SOUL.md",
+  "EVOLUTION.md",
+  "agent store",
+  "Kanban",
+  "smart_model_routing",
+  "profile_router.py",
+  "task_orchestrator.py",
+  "agent_feedback.py",
+  "~/.hermes/scripts/",
+  "~/.hermes/profiles/",
+  "~/.hermes/agents/",
+  "Kie.ai",
+  "kie-claude",
+  "KIE_API_KEY",
+  "agency-agents",
+  "auth.json",
+  "hermes profile"
+ ],
+ "symptoms": [
+  "ModuleNotFoundError: No module named 'agent.smart_model_routing'",
+  "Invalid API Key after creating a profile",
+  "A new profile has an empty credential_pool or returns 401",
+  "Changing delegation.model has no effect in the current session",
+  "Cron jobs keep using the profile default model instead of the delegation model",
+  "Worker profiles have the full skill catalog and excessive prompt context",
+  "Orchestrator reports success although expected files or tests are missing"
+ ],
+ "not_for": [
+  "Implementing or debugging application code inside a repository",
+  "Designing a Kanban board or managing individual task cards",
+  "Configuring a standalone cron job or scheduled task unrelated to profile orchestration",
+  "General Hermes usage that does not involve profiles, routing, agent stores, or worker orchestration"
+ ]
+}

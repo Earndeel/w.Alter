@@ -1,0 +1,72 @@
+{
+ "name": "hermes-delegate-task-routing",
+ "sha": "1f913c9893e36eee8065f0d73fb32e13e4011cfaa43d763c90d7357abfd1748d",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007653195,
+ "summary": "Use when delegate_task subagents need a different provider/model or keep silently inheriting the parent model despite config changes.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Je veux que delegate_task utilise Gemini au lieu du modèle principal, tu peux régler ça ?",
+  "Mes sous-agents tournent encore sur le modèle du parent alors que j’ai changé delegation.model.",
+  "J’ai mis le provider dans config.yaml mais Hermes l’ignore, trouve le bug.",
+  "Comment router les delegate_task vers OpenRouter avec le bon modèle ?",
+  "J’ai une erreur Invalid API Key sur les subagents depuis que j’ai changé de provider.",
+  "Vérifie pourquoi mon subagent n’utilise pas gemini-2.5-pro après le redémarrage.",
+  "Le champ model de delegate_task ne marche pas quand je le passe à l’appel. C’est normal ?",
+  "Peux-tu patcher delegate_tool.py pour que config.yaml soit bien pris en compte ?",
+  "J’ai mis OPENROUTER_API_KEY dans le .env, mais le subagent n’a toujours pas de clé API.",
+  "Après changement de delegation.provider, le résultat JSON indique toujours l’ancien modèle.",
+  "Est-ce que delegation.model change aussi le modèle de mes cron jobs ou de mes workers Kanban ?",
+  "Mon provider s’appelle gitlawb dans providers, pas xiaomi : aide-moi à configurer le routage des sous-agents et à vérifier que ça fonctionne."
+ ],
+ "intents_en": [
+  "Route delegate_task to Gemini instead of the parent model.",
+  "Why are subagents ignoring delegation.model in config.yaml?",
+  "Patch delegate_tool.py to load the YAML delegation settings.",
+  "Diagnose an Invalid API Key for delegate_task.",
+  "Verify that the subagent result reports the configured model."
+ ],
+ "entities": [
+  "Hermes",
+  "delegate_task",
+  "subagents",
+  "delegation.model",
+  "delegation.provider",
+  "delegation.base_url",
+  "delegation.api_key",
+  "config.yaml",
+  "delegate_tool.py",
+  "_load_config()",
+  "CLI_CONFIG",
+  "hermes_cli.config.load_config",
+  "resolve_runtime_provider()",
+  "AIAgent",
+  "OPENROUTER_API_KEY",
+  "GEMINI_API_KEY",
+  "OpenRouter",
+  "Gemini AI Studio",
+  "gemini-2.5-pro",
+  "gemini-3-flash-preview",
+  "providers_allowed",
+  "providers_ignored",
+  "providers_order",
+  "terminal(background=True)",
+  "process(action=\"poll\")"
+ ],
+ "symptoms": [
+  "Subagents silently inherit the parent model despite delegation.model being set.",
+  "Changes to config.yaml appear to have no effect until the gateway or TUI is restarted.",
+  "delegate_task results report the wrong model.",
+  "Invalid API Key after changing delegation.provider.",
+  "resolve_runtime_provider() returns an empty API key.",
+  "OPENROUTER_API_KEY exists in ~/.hermes/.env but is missing from the gateway process environment.",
+  "The selected provider is blocked by providers_ignored or providers_allowed."
+ ],
+ "not_for": [
+  "Changing the model used by cron jobs.",
+  "Changing the model used by Kanban workers or a direct Hermes profile session.",
+  "Passing model/provider as per-call parameters to delegate_task.",
+  "Parallel shell tasks that do not need subagent reasoning; use terminal background jobs instead."
+ ]
+}

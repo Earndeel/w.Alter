@@ -1,0 +1,68 @@
+{
+ "name": "pxpipe-planning-proxy",
+ "sha": "58adcd584c8b3cc0b2f4b0977fffd4a78700c26141d067ba3b8ae7baea020c12",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008034345,
+ "summary": "Use when Monsieur veut configurer, évaluer ou lancer pxpipe pour planifier avec Fable 5 via Kie.ai Claude en maîtrisant le coût des prompts.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Configure-moi pxpipe avec Kie.ai et Claude Fable 5.",
+  "On envoie ce prompt en texte ou via pxpipe ? Il fait combien de chars ?",
+  "Rappelle-moi le seuil de rentabilité et le coût fixe d’une page pxpipe.",
+  "Lance le pipeline Fable 5 planner puis Sonnet pour cette tâche.",
+  "J’ai un gros contexte à envoyer au planner, remplis la page avec fill_page.py.",
+  "pxpipe me renvoie 401, tu peux vérifier l’auth Kie.ai ?",
+  "J’ai un 403 Cloudflare avec Kie, il manque quoi dans la requête ?",
+  "Le vieux proxy Python compresse mal : donne-moi la bonne config du pxpipe Node.",
+  "Comment je démarre pxpipe en production et je vérifie son dashboard ?",
+  "Pour ce payload de 8k chars, pxpipe vaut le coup ou pas ?",
+  "Le planning Fable est bloqué, relance une fois et garde les rapports d’usage.",
+  "Je veux tester l’architecture planner/executor avec mon contexte brut, tu me prépares ça ?"
+ ],
+ "intents_en": [
+  "Set up pxpipe with Kie.ai Claude.",
+  "Should this prompt use text or pxpipe?",
+  "Run the Fable 5 planner pipeline.",
+  "Fill a pxpipe page with the payload assembler.",
+  "Debug Kie.ai 401 or Cloudflare 403 errors."
+ ],
+ "entities": [
+  "pxpipe",
+  "teamchong",
+  "Kie.ai",
+  "Claude Fable 5",
+  "Claude Opus 4.8",
+  "Claude Sonnet 5",
+  "Hermes",
+  "custom:kie-pxpipe",
+  "Anthropic Messages API",
+  "ANTHROPIC_UPSTREAM",
+  "PXPIPE_MODELS",
+  "PORT 47821",
+  "port 47822",
+  "/root/pxpipe",
+  "/root/pxpipe-openrouter",
+  "fill_page.py",
+  "fable_pipeline.py",
+  "PLAN_CONTRACT",
+  "EXECUTION_REPORT",
+  "templates/planner-payload.md",
+  "HERMES_HOME",
+  "/tmp/pxpipe.log",
+  "/tmp/pxpipe_dump"
+ ],
+ "symptoms": [
+  "Kie.ai répond 401 quand la requête utilise x-api-key au lieu de Bearer",
+  "Cloudflare renvoie 403 sans User-Agent",
+  "Le proxy Python ne compresse qu’à environ 3 caractères par token",
+  "pxpipe coûte plus cher que le texte pour un payload court ou une page peu remplie",
+  "Les streams SSE sont coupés par Cloudflare sur Kie.ai"
+ ],
+ "not_for": [
+  "Exécuter une tâche nécessitant le tool calling de Fable 5 : c’est un planner, pas un executor.",
+  "Déboguer une intégration Anthropic sans pxpipe ni Kie.ai.",
+  "Utiliser le proxy Python pxpipe-openrouter déconseillé.",
+  "Faire du streaming SSE via Kie.ai."
+ ]
+}

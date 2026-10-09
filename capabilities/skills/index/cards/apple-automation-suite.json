@@ -1,0 +1,53 @@
+{
+ "name": "apple-automation-suite",
+ "sha": "2c475a63332a7107f756f1dbff71f284d62be8631b9557fd5046551137ce48f9",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000374814,
+ "summary": "Use when Monsieur wants to automate macOS Notes, Reminders, Find My, iMessage, or desktop input with AppleScript and CLI tools.",
+ "kind": "integration",
+ "intents_fr": [
+  "Ajoute-moi un rappel dans Rappels pour relancer le client demain matin.",
+  "Tu peux créer une note Apple Notes avec ces points et la mettre en forme ?",
+  "Envoie un iMessage à Julie pour lui dire que le build est prêt.",
+  "Retrouve la dernière position connue de mon Mac avec Localiser.",
+  "Comment je peux cliquer sur ce bouton du Mac depuis le terminal ?",
+  "Fais une capture d’écran du bureau dans /tmp/screen.png.",
+  "J’ai besoin d’automatiser Notes et Rappels sur mon Mac, tu me guides ?",
+  "Liste mes rappels en retard et modifie celui sur la facture pour vendredi.",
+  "Peux-tu lire une conversation Messages et retrouver le dernier message de Paul ?",
+  "Le script AppleScript pour envoyer un message ne marche pas, regarde comment faire avec Messages.",
+  "Je veux piloter une app macOS sans souris, avec osascript ou cliclick.",
+  "Comment récupérer les infos de localisation d’un appareil depuis Localiser ?"
+ ],
+ "intents_en": [
+  "Create a reminder on my Mac.",
+  "Add and format a note in Apple Notes.",
+  "Send an iMessage from the terminal.",
+  "Find a device's last known location with Find My.",
+  "Automate clicks and screenshots on macOS."
+ ],
+ "entities": [
+  "macOS",
+  "AppleScript",
+  "osascript",
+  "Apple Notes",
+  "Reminders",
+  "Find My",
+  "iMessage",
+  "Messages",
+  "screencapture",
+  "cliclick",
+  "System Events",
+  "SQLite",
+  "/tmp/screen.png",
+  "OSA"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Automating Windows or Linux desktop environments.",
+  "Managing non-Apple cloud notes or task services.",
+  "Building a general-purpose messaging app or server.",
+  "Finding a device through live network tracking outside macOS Find My data."
+ ]
+}

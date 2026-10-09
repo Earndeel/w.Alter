@@ -1,0 +1,72 @@
+{
+ "name": "scena-portal-authenticated-debugging",
+ "sha": "7f7b3fdd09688ffb7e77c466c73752a5f5d476e033243e20e3183ff3bf27b5ed",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000720522,
+ "summary": "Use when debugging Scena's authenticated portal, user-to-client identity mapping, Telegram bot status, or live UI verification.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Sur Scena, le dashboard me dit que Telegram n'est pas connecté alors que le bot répond. Tu peux vérifier ?",
+  "Pourquoi mon compte connecté n'est pas associé au bon client ou matricule dans le portail Scena ?",
+  "Le bouton de connexion du bot échoue, regarde le contrat entre le dashboard et le Worker.",
+  "J'ai un « Token required » quand je connecte le bot Telegram à Scena.",
+  "La page affiche toujours « Non connecté » après avoir configuré le bot, tu peux tracer le GET /api/client/bot ?",
+  "Vérifie si le bot est configuré sur le client Scena de mon compte, sans afficher le token.",
+  "Le webhook Telegram reçoit les updates ? Vérifie son routage par matricule et l'état du client.",
+  "J'ai l'impression que mon login Google et mon utilisateur Telegram pointent vers deux clients différents. Tu peux confirmer dans D1 ?",
+  "Depuis le dernier changement, le texte du dashboard authentifié est illisible et le thème est bizarre, tu peux diagnostiquer ça ?",
+  "Le portail a l'air de servir l'ancien CSS en prod. Vérifie le cache et le déploiement Scena, mais ne déploie rien sans me demander.",
+  "Tu as trouvé le souci de statut Telegram ? Fais aussi le test dans un vrai navigateur avec ma session, pas avec un mock.",
+  "Le navigateur renvoie 200 sur l'API mais l'interface garde son état par défaut. Trace les réponses et le rendu authentifiés."
+ ],
+ "intents_en": [
+  "Debug Scena's Telegram status in the signed-in dashboard.",
+  "Check which Scena client is linked to my account.",
+  "Trace the portal bot API request and Worker route.",
+  "Verify the authenticated portal UI in a real browser session.",
+  "Check whether a production CSS change is hidden by Pages caching."
+ ],
+ "entities": [
+  "Scena",
+  "scena-portal",
+  "scena.walter-ai.cloud",
+  "/root/projects/scena-cloudflare",
+  "pages/portal/",
+  "workers/api/src/",
+  "Cloudflare Pages",
+  "Cloudflare D1",
+  "Telegram Bot API",
+  "Telegram webhook",
+  "Playwright",
+  "search_files",
+  "read_file",
+  "terminal",
+  "scena_session",
+  "/api/auth/get-session",
+  "/api/client/me",
+  "/api/client/bot",
+  "/webhook/telegram/{matricule}",
+  "clients.user_id",
+  "clients.telegram_bot_token",
+  "env.TELEGRAM_BOT_TOKEN",
+  "getMe",
+  "getWebhookInfo"
+ ],
+ "symptoms": [
+  "Dashboard shows Telegram as « Non connecté » although the bot responds.",
+  "POST /api/client/bot returns 400 « Token required ».",
+  "Bot status API returns success but the UI remains in its default state.",
+  "Signed-in user resolves to the wrong client, email, or matricule.",
+  "Telegram webhook receives no updates or does not set telegram_chat_id.",
+  "Authenticated portal has invisible text, inconsistent colors, or stale CSS.",
+  "Production custom domain serves old assets despite a successful deployment.",
+  "Browser session, /api/client/me, and dashboard identity disagree."
+ ],
+ "not_for": [
+  "Deploying unrelated Cloudflare Workers or Pages projects.",
+  "General Telegram bot feature development unrelated to Scena portal identity or status.",
+  "Resetting passwords or recovering credentials for a Scena account.",
+  "Making unrequested production database changes or exposing bot tokens."
+ ]
+}

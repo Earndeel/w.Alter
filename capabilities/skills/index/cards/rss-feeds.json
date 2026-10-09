@@ -1,0 +1,66 @@
+{
+ "name": "rss-feeds",
+ "sha": "d450723f8905d4cf05600e67b3a6d1d8f1eeb42eb373e3b66e45b93da70639da",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005341545,
+ "summary": "Use when Monsieur veut lire, découvrir ou suivre des nouveautés via un flux RSS, Atom ou JSON Feed.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Quoi de neuf sur le blog de Simon Willison ?",
+  "Lis-moi les 10 derniers articles de ce site.",
+  "Est-ce que ce site a un flux RSS ?",
+  "Trouve les flux disponibles derrière cette page et dis-moi lequel correspond aux articles.",
+  "Récupère les dernières releases de ce repo GitHub.",
+  "Tu peux me sortir les nouveaux posts de ce Substack depuis le 1er septembre ?",
+  "Surveille ce blog chaque semaine et fais-moi un digest des nouveaux articles.",
+  "J’ai l’URL d’un podcast, trouve son flux et liste les derniers épisodes.",
+  "Y a quoi de nouveau sur cette chaîne YouTube ?",
+  "Lis le feed Hacker News sur ce sujet et trie les résultats du plus récent au plus ancien.",
+  "Le site a sûrement un RSS, tu peux vérifier ? Je veux juste les titres, dates et liens.",
+  "Le flux me renvoie une page HTML au lieu d’articles : découvre le bon flux derrière l’URL."
+ ],
+ "intents_en": [
+  "Read the latest posts from this feed.",
+  "Does this site have an RSS feed?",
+  "Find the feed behind this page.",
+  "Show recent GitHub releases.",
+  "Get entries published since this date."
+ ],
+ "entities": [
+  "RSS 2.0",
+  "RSS 1.0/RDF",
+  "Atom",
+  "JSON Feed",
+  "scripts/feed.py",
+  "terminal",
+  "web_extract",
+  "cronjob_manage",
+  "blogwatcher",
+  "GitHub releases.atom",
+  "GitHub commits.atom",
+  "GitHub tags.atom",
+  "Reddit .rss",
+  "YouTube feeds/videos.xml",
+  "hnrss.org",
+  "rss.arxiv.org",
+  "Substack",
+  "Medium",
+  "WordPress",
+  "Ghost",
+  "sitemap.xml"
+ ],
+ "symptoms": [
+  "no feed found",
+  "L’URL renvoie une page HTML au lieu d’un flux",
+  "Le flux Reddit est limité à environ une requête par minute",
+  "Le flux est bloqué par Cloudflare ou renvoie une erreur 403",
+  "Les entrées sans date sont absentes des résultats --since"
+ ],
+ "not_for": [
+  "Lire le texte intégral d’un article : utiliser web_extract sur le lien de l’entrée.",
+  "Gérer une base persistante de lecture/non-lecture sur de nombreux flux : utiliser blogwatcher.",
+  "Lire Reddit en contournant son délai de requêtes : utiliser reddit-reading.",
+  "Récupérer une page protégée qui renvoie 403 : utiliser blocked-page-recovery."
+ ]
+}

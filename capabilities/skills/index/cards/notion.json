@@ -1,0 +1,61 @@
+{
+ "name": "notion",
+ "sha": "d9ec2f337eb759410901a19b62f6c6d5f2b11521d2bac6c1aa12a7dc1da4e341",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00086790825,
+ "summary": "Use when Monsieur wants to search, read, create, update, or query Notion pages, databases, or blocks through the Notion API.",
+ "kind": "integration",
+ "intents_fr": [
+  "Ajoute ça dans Notion stp.",
+  "Retrouve ma page Notion sur l'inventaire et résume-la.",
+  "Cherche dans Notion la note sur le CRM Beeper.",
+  "Crée une entrée dans ma base Inventaire avec ces infos.",
+  "Mets le statut de cette tâche à Done dans Notion.",
+  "Tu peux ajouter ce texte à la page Notion du projet ?",
+  "Liste toutes les entrées actives de cette base, pas juste les 100 premières.",
+  "La page a l'air vide, tu peux vérifier aussi les toggles, colonnes et tableaux ?",
+  "J'ai une erreur 401 sur l'API Notion, regarde la clé dans le .env ou le vault.",
+  "Pourquoi Notion me dit que Status n'est pas une propriété ? Vérifie le schéma de la base.",
+  "Récupère les pages qui correspondent à « idées lancement » et donne-moi leurs liens.",
+  "Dans la base, filtre les éléments pas terminés et trie-les par date décroissante."
+ ],
+ "intents_en": [
+  "Search my Notion workspace for this page.",
+  "Add this as a new item in my Notion database.",
+  "Update the status on that Notion page.",
+  "Fetch all database results, including later pages.",
+  "Read the nested tables and toggles on this page."
+ ],
+ "entities": [
+  "Notion API",
+  "Notion",
+  "curl",
+  "NOTION_API_KEY",
+  "~/.hermes/.env",
+  "vault get notion/api_key",
+  "Notion-Version: 2025-09-03",
+  "https://api.notion.com/v1/search",
+  "/v1/pages",
+  "/v1/blocks",
+  "/v1/data_sources",
+  "database_id",
+  "data_source_id",
+  "next_cursor",
+  "Inventaire",
+  "Beeper CRM"
+ ],
+ "symptoms": [
+  "401 unauthorized from the Notion API",
+  "400 error: property is not a property that exists",
+  "Search or database results appear incomplete after 100 items",
+  "A Notion page appears empty despite containing toggles, columns, or tables",
+  "jq fails when handling accented Notion property names"
+ ],
+ "not_for": [
+  "Editing or organizing content manually in the Notion app without using its API",
+  "Syncing Beeper or another service with Notion beyond the procedures in the referenced CRM sync guide",
+  "Managing non-Notion databases or files",
+  "General project planning or writing content that does not need Notion access"
+ ]
+}

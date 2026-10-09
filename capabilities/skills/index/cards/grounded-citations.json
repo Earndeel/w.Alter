@@ -1,0 +1,65 @@
+{
+ "name": "grounded-citations",
+ "sha": "f3f6d58da04be2a2a4f02362b71b416d64df1231f9b94fbdddd0ae297ab2f370",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007870995,
+ "summary": "Use when une réponse ou un document s’appuie sur des infos récupérées et doit citer des sources vérifiables, avec preuves pour les sujets sensibles.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi un résumé de l’actu sur l’IA avec les sources.",
+  "Compare ces deux outils et cite les pages qui appuient chaque point.",
+  "Prépare un brief markdown sur le marché actuel, je veux pouvoir vérifier les chiffres.",
+  "Tu peux fact-checker cette affirmation ? C’est important, ajoute les extraits exacts des sources.",
+  "Fais une recherche web sur les retours utilisateurs, en séparant les avis Reddit des faits confirmés.",
+  "Rédige-moi une note sur les dernières règles européennes, avec citations et sources à la fin.",
+  "Ajoute les références à ce document, et vérifie qu’elles correspondent bien aux liens récupérés.",
+  "Les sources disent pas la même chose : montre les deux versions et explique laquelle est la mieux étayée.",
+  "Prépare un rapport pour Monsieur, avec les sources intégrées dans le texte, pas juste une liste de liens.",
+  "J’ai besoin d’un état des lieux récent de X, regarde plusieurs types de sources et signale les trous.",
+  "Vérifie les citations de mon draft, je veux pas de liens inventés ni de chiffres sans preuve.",
+  "Pour cette réponse courte, mets les citations inline et le bloc Sources à la fin."
+ ],
+ "intents_en": [
+  "Summarize the latest research with verifiable citations.",
+  "Fact-check this claim and include exact supporting quotes.",
+  "Compare these products and cite each source.",
+  "Verify the citations and sources in this draft.",
+  "Research current developments across multiple source types."
+ ],
+ "entities": [
+  "sources.py",
+  "web_search",
+  "web_extract",
+  "browser_navigate",
+  "terminal",
+  "reddit-reading",
+  "rss-feeds",
+  "youtube-content",
+  "xurl",
+  "HERMES_HOME",
+  "HERMES_CITATION_LEDGER",
+  "~/.hermes/skills/research/grounded-citations/scripts/sources.py",
+  "cache/citations/ledger.json",
+  "sources.py reset",
+  "sources.py add",
+  "sources.py ingest",
+  "sources.py quote",
+  "sources.py list",
+  "sources.py render",
+  "sources.py verify",
+  "arxiv"
+ ],
+ "symptoms": [
+  "Une citation [n] n’existe pas dans le ledger.",
+  "Le bloc Sources ne correspond pas aux sources citées.",
+  "La vérification échoue faute de preuves verbatim.",
+  "Un draft contient des affirmations externes sans provenance déclarée."
+ ],
+ "not_for": [
+  "Recherche bibliographique BibTeX pour un article de conférence : utiliser arxiv.",
+  "Écriture créative ou conversation informelle sans faits récupérés.",
+  "Simple lookup de syntaxe ou de version pendant une tâche de code.",
+  "Récupérer ou résumer une vidéo, un fil Reddit ou un flux RSS sans produire une réponse sourcée."
+ ]
+}

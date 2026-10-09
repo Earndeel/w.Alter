@@ -1,0 +1,69 @@
+{
+ "name": "godmode",
+ "sha": "ca266c0a7ea3d0b9e16a2189248db3562f1458b95bc00447aacb87dc6df6ba42",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00092285325,
+ "summary": "Use when Monsieur veut jailbreaker ou red-team un LLM via API avec GODMODE, Parseltongue, préfill, obfuscation ou course multi-modèles.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Jailbreak Claude via l’API, tu me guides ?",
+  "Comment bypass les safety filters de GPT avec GODMODE ?",
+  "Mets en place le jailbreak persistant dans ma config Hermes.",
+  "Parseltongue, ça marche comment pour obfusquer une requête ?",
+  "Le modèle refuse encore : tente une escalade d’encodage.",
+  "Fais courir plusieurs modèles OpenRouter et garde la réponse la moins filtrée.",
+  "Tu peux adapter un template GODMODE à Gemini ?",
+  "J’ai un refus de Claude malgré mon prompt, on teste quoi ensuite ?",
+  "Ajoute le prefill.json et le system prompt dans mon setup Hermes, puis dis-moi comment annuler.",
+  "Je veux red-teamer les refus de MiMo V2 Pro ; quelles méthodes ont été testées ?",
+  "C’est quoi L1B3RT4S ou CL4R1T4S ? Donne-moi la méthode pour ce modèle.",
+  "Pour mon test autorisé, compare Parseltongue, ST3GG et GLOSSOPETRAE et propose une stratégie."
+ ],
+ "intents_en": [
+  "Jailbreak Claude through its API.",
+  "Set up persistent GODMODE in Hermes.",
+  "Obfuscate this prompt with Parseltongue.",
+  "Race OpenRouter models for the least-filtered answer.",
+  "Help red-team a model's refusal behavior."
+ ],
+ "entities": [
+  "G0DM0D3",
+  "GODMODE CLASSIC",
+  "Parseltongue",
+  "ULTRAPLINIAN",
+  "GLOSSOPETRAE",
+  "ST3GG",
+  "L1B3RT4S",
+  "CL4R1T4S",
+  "MiMo V2 Pro",
+  "Hermes",
+  "OpenRouter",
+  "Claude",
+  "GPT",
+  "Gemini",
+  "Grok",
+  "DeepSeek",
+  "Llama",
+  "Qwen",
+  "Mistral",
+  "~/.hermes/config.yaml",
+  "~/.hermes/prefill.json",
+  "HERMES_EPHEMERAL_SYSTEM_PROMPT",
+  "OPENROUTER_API_KEY",
+  "scripts/load_godmode.py",
+  "scripts/parseltongue.py"
+ ],
+ "symptoms": [
+  "Le modèle répond « I cannot » ou refuse la requête.",
+  "Le filtre bloque certains mots-clés avant que le modèle réponde.",
+  "Le modèle ajoute des avertissements, disclaimers ou renvois au lieu de répondre.",
+  "Les réglages de system prompt ou de préfill ne prennent pas effet avant le redémarrage d’Hermes."
+ ],
+ "not_for": [
+  "Modifier durablement les poids d’un modèle open-weight avec OBLITERATUS.",
+  "Configurer une intégration API ordinaire sans objectif de red-team ou de jailbreak.",
+  "Détecter et analyser des refus sans chercher à tester des techniques de contournement.",
+  "Régler un problème Hermes sans rapport avec les prompts, préfills ou filtres de modèles."
+ ]
+}

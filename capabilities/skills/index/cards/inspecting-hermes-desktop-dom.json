@@ -1,0 +1,63 @@
+{
+ "name": "inspecting-hermes-desktop-dom",
+ "sha": "5cbce418d62fd45bf54acab1d69fbfd8dd9f5b9531a03c007e96876c3e33b73f",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00061050825,
+ "summary": "Use when inspecting the running Hermes desktop DOM, computed CSS, winning style rules, selectors, or renderer console via CDP.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux vérifier dans le DOM live pourquoi le padding de ce composant ne change pas ?",
+  "J’ai modifié le CSS de la desktop, regarde si ça s’applique vraiment dans hgui.",
+  "C’est quoi la valeur calculée de --radius-scalar sur la fenêtre Hermes qui tourne ?",
+  "Trouve quel selector gagne sur les liens des messages assistant, je veux arrêter de patcher au hasard.",
+  "Tu peux vérifier si le composer est bien rendu et me donner son data-slot ?",
+  "Le style est toujours pareil après mon changement, inspecte le nœud et ses parents avant que je touche aux autres call sites.",
+  "Regarde les erreurs console du renderer, je n’arrive pas à les copier.",
+  "On a un hgui lancé avec npm run dev : vérifie la largeur calculée du thread viewport.",
+  "Je veux un selector stable pour le profile rail, pas un querySelector fragile.",
+  "Le CDP répond pas sur 9222, vérifie la config et ne relance surtout pas mon app.",
+  "Peux-tu lancer une instance isolée pour lire le DOM sans toucher à ma session Hermes ?",
+  "J’ai changé une règle Tailwind, dis-moi si elle est héritée ou si une autre règle CSS prend le dessus."
+ ],
+ "intents_en": [
+  "Inspect the live Hermes desktop DOM over CDP.",
+  "Check which CSS rule wins in the running app.",
+  "Verify that my UI change actually rendered.",
+  "Read the renderer console errors.",
+  "Find a stable selector for this component."
+ ],
+ "entities": [
+  "apps/desktop",
+  "hgui",
+  "npm run dev",
+  "Chrome DevTools Protocol",
+  "CDP",
+  "127.0.0.1:9222",
+  "HERMES_DESKTOP_CDP_PORT",
+  "HERMES_DESKTOP_DEV_SERVER",
+  "HERMES_HOME",
+  "apps/desktop/scripts/eval.mjs",
+  "apps/desktop/scripts/perf/lib/cdp.mjs",
+  "CDP.connect",
+  "SELECTORS",
+  "data-slot",
+  "getComputedStyle",
+  "electron",
+  "npm run perf:serve",
+  "HERMES_DESKTOP_CDP_PORT=off"
+ ],
+ "symptoms": [
+  "A CSS change appears to have no effect in the running app.",
+  "An element's computed style differs from the expected value.",
+  "The renderer reports console errors that are hard to copy.",
+  "The CDP version endpoint returns an empty response.",
+  "A selector does not find the expected rendered component."
+ ],
+ "not_for": [
+  "Visual judgment of whether a UI looks good; use a screenshot or the user's eyes.",
+  "Performance profiling or heap investigation.",
+  "Debugging non-DOM application or backend behavior.",
+  "Inspecting a packaged app or an unpackaged Electron app without a dev server."
+ ]
+}

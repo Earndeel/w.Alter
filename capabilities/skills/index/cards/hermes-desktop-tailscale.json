@@ -1,0 +1,71 @@
+{
+ "name": "hermes-desktop-tailscale",
+ "sha": "cfb6db546a9dbfe369f6a4fb94407f077272422c17f60c55f39e6cd9e02a1294",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0006940395,
+ "summary": "Use when connecting or repairing the Hermes V2 Mac desktop over Tailscale without an SSH tunnel, including HTTP/WebSocket auth and forwarder supervision.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Configure Hermes V2 sur mon Mac pour passer par Tailscale, plus par le tunnel SSH.",
+  "Le tunnel SSH tombe dès que le Mac s'endort : on met le desktop en direct sur Tailscale ?",
+  "J'ai HTTP 200 sur /api/status mais /api/config renvoie 401, tu peux corriger les patches ?",
+  "Le dashboard répond, mais Hermes affiche « Could not connect to Hermes gateway ».",
+  "La connexion marche sauf le Chat : /api/ws renvoie 403 avec l'IP Tailscale.",
+  "Après l'update, encore un problème de gateway Hermes sur le Mac, vérifie les patches et le forwarder.",
+  "Peux-tu installer les quatre patches dans web_server.py pour l'accès Tailscale ?",
+  "Mon socat sur le port 9119 meurt quand je redémarre le dashboard, rends-le persistant avec systemd.",
+  "Configure connection.json dans Application Support/Hermes avec l'URL Tailscale.",
+  "J'ai un 400 sur /api/status avec le Host Tailscale, quel patch manque ?",
+  "J'ai patché web_server.py mais le comportement n'a pas changé ; vérifie qu'on ne teste pas un vieux process.",
+  "Le desktop V2 se connecte, mais après redémarrage du serveur il ne retrouve plus le dashboard."
+ ],
+ "intents_en": [
+  "Connect the Hermes Mac app directly over Tailscale.",
+  "Fix HTTP 401s on the Tailscale dashboard connection.",
+  "The chat WebSocket gets 403; repair Hermes desktop auth.",
+  "Make the socat forwarder survive dashboard restarts and updates.",
+  "Set up Hermes V2 connection.json for my Tailscale server."
+ ],
+ "entities": [
+  "Hermes V2",
+  "Hermes desktop",
+  "Tailscale",
+  "web_server.py",
+  "_TAILSCALE_ACCEPTED_HOSTS",
+  "_is_accepted_host",
+  "_require_token",
+  "auth_middleware",
+  "_ws_auth_reason",
+  "/api/status",
+  "/api/config",
+  "/api/ws",
+  "socat",
+  "systemd",
+  "hermes-forwarder-9119.service",
+  "hermes-dashboard.service",
+  "port 9119",
+  "port 8787",
+  "connection.json",
+  "~/Library/Application Support/Hermes/",
+  "HERMES_DASHBOARD_SESSION_TOKEN",
+  "ss -tlnp",
+  "systemctl --user",
+  "curl"
+ ],
+ "symptoms": [
+  "SSH tunnel drops when the Mac sleeps",
+  "HTTP 400 on /api/status with a Tailscale Host header",
+  "HTTP 200 on /api/status but HTTP 401 on /api/config",
+  "WebSocket /api/ws returns HTTP 403 while /api/status returns 200",
+  "Desktop reports “Could not connect to Hermes gateway”",
+  "socat forwarder dies or stops working after a dashboard restart or update",
+  "Patched code appears inactive because an old process still owns the port"
+ ],
+ "not_for": [
+  "Diagnosing a mismatch between the dashboard-reported API server port and the gateway's actual port; use hermes-config-extra-pitfall.",
+  "General Hermes desktop installation or unrelated Mac app issues.",
+  "General Tailscale setup, device enrollment, or network troubleshooting unrelated to Hermes dashboard access.",
+  "Configuring SSH tunnels as the preferred connection method."
+ ]
+}

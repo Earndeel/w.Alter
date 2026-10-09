@@ -1,0 +1,71 @@
+{
+ "name": "ssh-mac-remote-control",
+ "sha": "0896344cf1071d98d81aa371edd9d6fce407caad81639739685b3d5b4757e664",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0009534195,
+ "summary": "Use when connecting to or managing Monsieur’s Mac remotely from a VPS over Tailscale, or keeping SSH/cmux sessions alive after network drops.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Comment je me connecte en SSH à mon Mac depuis le VPS ?",
+  "Remets-moi l’accès distant au Mac via Tailscale, je n’arrive plus à me connecter.",
+  "La connexion SSH au Mac saute dès que le Wi-Fi coupe : configure autossh et launchd pour que ça revienne tout seul.",
+  "Mes sessions cmux sont mortes après une coupure réseau, tu peux les reconnecter sans fermer les workspaces ?",
+  "Vérifie la config SSH entre le VPS et le Mac, et durcis l’accès avec les clés Tailscale.",
+  "Le tunnel sur le port 2222 est tombé, comment je reprends la main directement sur le Mac ?",
+  "Je veux un raccourci cmux qui ouvre un nouveau TUI Hermes dans le même workspace, sans dupliquer la session actuelle.",
+  "Depuis SSH, ma capture d’écran du Mac est toute noire. C’est quoi le souci et quelle méthode utiliser ?",
+  "Active le partage d’écran/VNC sur le Mac à distance et dis-moi comment m’y connecter.",
+  "J’ai collé la clé SSH depuis Telegram, tu peux vérifier qu’elle n’a pas perdu le + ?",
+  "Peux-tu remettre le launchd de reconnexion cmux ? Après le retour du réseau, tous les shells restent cassés.",
+  "Je veux sécuriser sshd sur le Mac : désactiver les mots de passe et limiter les utilisateurs autorisés."
+ ],
+ "intents_en": [
+  "Set up SSH access to my Mac over Tailscale.",
+  "Keep the Mac SSH tunnel alive with autossh and launchd.",
+  "Reconnect broken cmux sessions after a network drop.",
+  "Harden SSH access to the Mac.",
+  "Why are SSH screenshots from my Mac black?"
+ ],
+ "entities": [
+  "Mac",
+  "VPS",
+  "Tailscale",
+  "SSH",
+  "autossh",
+  "cmux",
+  "launchd",
+  "tmux",
+  "Hermes",
+  "Beeper",
+  "Remote Login",
+  "authorized_keys",
+  "sshd_config.d/99-walter-hardening.conf",
+  "com.walter.autossh.plist",
+  "com.walter.cmux-reconnect.plist",
+  "~/bin/cmux-reconnect.sh",
+  "walter-ts",
+  "port 2222",
+  "ports 18789 and 18792",
+  "screencapture",
+  "cliclick",
+  "Remote Management",
+  "VNC port 5900",
+  "Bitwarden",
+  "ssh-keygen"
+ ],
+ "symptoms": [
+  "SSH connections die when the network drops.",
+  "cmux sessions show broken pipe, connection closed, or connection reset.",
+  "The autossh tunnel or port 2222 is down.",
+  "Remote screencapture produces an all-black image.",
+  "SSH key authentication fails after a key was pasted or copied.",
+  "A cmux shortcut mirrors the existing TUI instead of opening a fresh session."
+ ],
+ "not_for": [
+  "General Linux VPS SSH setup or administration unrelated to connecting to the Mac.",
+  "Debugging Tailscale networking between devices when Mac SSH access and tunnels are not involved.",
+  "General Hermes or Beeper configuration unrelated to remote Mac access.",
+  "Local Mac GUI automation that does not involve remote access from the VPS."
+ ]
+}

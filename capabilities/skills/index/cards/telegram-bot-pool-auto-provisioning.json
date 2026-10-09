@@ -1,0 +1,59 @@
+{
+ "name": "telegram-bot-pool-auto-provisioning",
+ "sha": "de2bc8f9f78e37438dd029f6518c44fb20d9bbc93bd7f7e479459ebb1b584e78",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000466587,
+ "summary": "Use when provisioning a unique Telegram bot for each SaaS client by assigning pre-created bots from a token pool at signup.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Je veux attribuer automatiquement un bot Telegram à chaque nouveau client de Scena.",
+  "Comment mettre en place un pool de bots Telegram pour les inscriptions ?",
+  "Prépare le système pour créer les bots à la main puis les distribuer automatiquement aux clients.",
+  "Un client vient de s'inscrire : assigne-lui un bot disponible et renvoie son lien t.me.",
+  "Ajoute une table en base pour stocker les tokens des bots et leur statut.",
+  "Tu peux vérifier les tokens Telegram avant de les ajouter au pool ?",
+  "On a créé les bots Scena Slot, comment les enregistrer et les rendre disponibles ?",
+  "Le client est supprimé, libère son bot pour qu'il puisse être réattribué.",
+  "On n'a plus de bot dispo à l'inscription, gère ce cas proprement.",
+  "Reprends le flow d'auto-provisioning dont on parlait : bot, environnement client et lien Telegram.",
+  "Il faut aussi envoyer un message de bienvenue avec le bot attribué au client.",
+  "Comment éviter qu'un même bot soit attribué à deux clients en même temps ?"
+ ],
+ "intents_en": [
+  "Assign a Telegram bot to each new client.",
+  "Set up a pool of pre-created bot tokens.",
+  "Validate a bot token before adding it to the pool.",
+  "Release the client's bot when their account is deleted.",
+  "Provision a client and return their Telegram bot link."
+ ],
+ "entities": [
+  "@BotFather",
+  "Telegram Bot API",
+  "bot_pool",
+  "SQLite",
+  "getMe",
+  "sendMessage",
+  "assign_bot",
+  "validate_token",
+  "release_bot",
+  "auto_provision",
+  "Scena Slot 1",
+  "scena_slot1_bot",
+  "https://api.telegram.org",
+  "https://t.me/"
+ ],
+ "symptoms": [
+  "No available bots",
+  "Telegram getMe rejects the token",
+  "A new signup has no bot assigned",
+  "Two clients receive the same bot",
+  "The bot pool is running low"
+ ],
+ "not_for": [
+  "Creating Telegram bots programmatically through an API",
+  "Building a general-purpose Telegram chatbot or its conversation logic",
+  "Configuring webhook or polling infrastructure for bot updates",
+  "Managing unrelated client signup or billing flows"
+ ]
+}

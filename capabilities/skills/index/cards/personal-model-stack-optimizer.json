@@ -1,0 +1,58 @@
+{
+ "name": "personal-model-stack-optimizer",
+ "sha": "49e1d7b5fed2c4d4c7a9cb086cb6b4c17327f9ad0cc5c79d9573672a6eaf0721",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005257395,
+ "summary": "Use when Monsieur wants a live, cost-aware ranking of the best models for his Codex, Kie.ai and OpenRouter stack.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Tu peux me refaire le meilleur stack de modèles avec mes providers ?",
+  "Quel modèle je garde en daily driver entre DeepSeek et les GPT ?",
+  "Compare les modèles dispo chez Kie.ai et OpenRouter, avec les vrais coûts.",
+  "Je veux réduire la facture sans trop perdre en qualité : refais le classement.",
+  "Lequel est le meilleur pour les tâches avec beaucoup de tool use ?",
+  "Mets à jour le comparatif avec les scores Artificial Analysis du moment.",
+  "J'hésite à garder Opus 5 et GPT-5.6 Luna, tu peux regarder si ça vaut le coût ?",
+  "Fais-moi une shortlist de quatre modèles : usage quotidien, outils, tâches complexes et qualité max.",
+  "Pourquoi tu recommandes Luna plutôt que Sol ? Vérifie les deux indexes et les contraintes de mes providers.",
+  "Kie.ai est vraiment beaucoup plus lent pour l'usage interactif ? Intègre le streaming et le coût dans le choix.",
+  "Le classement précédent est peut-être périmé, tu peux le refaire avec les données live et justifier les exclusions ?",
+  "J'ai besoin du meilleur modèle pour les clients, mais sans payer un upgrade disproportionné."
+ ],
+ "intents_en": [
+  "Pick the best models across my providers.",
+  "Refresh my cost-aware model stack ranking.",
+  "Find my best daily driver and tool-use specialist.",
+  "Compare live Intelligence and Agentic Index scores.",
+  "Recommend four models with provider constraints included."
+ ],
+ "entities": [
+  "OpenRouter",
+  "Kie.ai",
+  "Codex",
+  "Artificial Analysis",
+  "Intelligence Index",
+  "Agentic Index",
+  "DeepSeek V4 Pro",
+  "DeepSeek V4 Flash",
+  "GPT-5.6 Luna",
+  "GPT-5.6 Sol",
+  "GPT-5.5",
+  "Claude Opus 5",
+  "Claude Opus 4.8",
+  "Claude Sonnet 5",
+  "Claude Fable 5",
+  "scripts/pareto.py",
+  "references/agentic-index-extraction.md",
+  "references/intel-vs-agentic-delta.md",
+  "openai/gpt-5.6-luna"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Looking up a model's exact API identifier without comparing the stack.",
+  "Scraping or reporting Intelligence Index and cost data alone.",
+  "Running a benchmark on one model without recommending a provider stack.",
+  "Choosing a model outside Monsieur's providers, such as Gemini, Grok or Kimi, unless specifically requested."
+ ]
+}

@@ -1,0 +1,59 @@
+{
+ "name": "web-research-operations",
+ "sha": "20c11e377f44c3fe55c7a9863128e893db53dcf4e598e6ee675ea8fc80b0344a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000438075,
+ "summary": "Use when researching public-web sources, extracting evidence, monitoring entities, or investigating public profiles with citations and uncertainty.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi une recherche sourcée sur cette boîte, avec les faits importants et les liens.",
+  "Tu peux vérifier si cette info est encore vraie et me donner la source exacte ?",
+  "J’ai un 403 sur cette page, trouve une autre façon autorisée de récupérer le contenu.",
+  "Surveille les annonces de ces concurrents depuis un mois, mais garde seulement les événements vraiment importants.",
+  "Cherche le profil public de cette personne et dis-moi ce qui est confirmé vs juste probable.",
+  "Compare ces deux articles : ils ne donnent pas la même date, lequel est fiable ?",
+  "Récupère les infos de ces pages et fais-moi un tableau avec titre, date, URL et éléments utiles.",
+  "La page est dynamique et ton extraction a l’air vide : vérifie que tu lis bien le contenu, pas juste le shell.",
+  "Fais une analyse de ce corpus de conversations, en tenant compte des messages manquants et des limites de l’échantillon.",
+  "Tu m’as donné des chiffres, mais je veux les sources exactes et savoir ce qui reste à vérifier.",
+  "Regarde ce qu’on trouve publiquement sur ce projet, sans supposer que deux profils similaires sont la même personne.",
+  "La recherche précédente n’a pas abouti à cause du paywall : note le blocage et vois s’il existe une source primaire accessible."
+ ],
+ "intents_en": [
+  "Find evidence-backed sources for this claim.",
+  "Extract key facts from these public pages.",
+  "Monitor this company for material news.",
+  "Investigate this public profile cautiously.",
+  "Compare sources and cite the exact evidence."
+ ],
+ "entities": [
+  "public web",
+  "canonical source",
+  "source URL",
+  "browser page",
+  "public profile",
+  "OSINT",
+  "conversation corpus",
+  "403",
+  "429",
+  "WAF",
+  "paywall",
+  "geo-restricted content"
+ ],
+ "symptoms": [
+  "403 Forbidden",
+  "429 Too Many Requests",
+  "WAF or anti-bot interstitial",
+  "Paywall or login page instead of requested content",
+  "Geo-restricted page",
+  "Dynamic page returns an empty or stale shell",
+  "Search result snippet does not match the requested source"
+ ],
+ "not_for": [
+  "Writing or editing copy without a web-research task",
+  "Accessing private accounts or bypassing authentication",
+  "Building or debugging a web scraper",
+  "Inferring sensitive traits or confirming identity from profile resemblance alone"
+ ]
+}

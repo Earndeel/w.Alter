@@ -1,0 +1,73 @@
+{
+ "name": "scena-video-factory",
+ "sha": "85a006a8c525e066c52babab8ebbcb3f6552d5b4a59ae93d1f5b36e4ecf8882c",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00097878825,
+ "summary": "Use when building, debugging, deploying, or operating Scena’s multi-tenant video-agent SaaS, pipeline, provider integrations, or client portal.",
+ "kind": "workflow",
+ "intents_fr": [
+  "On reprend Scena : regarde pourquoi le pipeline reste en waiting_async après l’envoi à Kie.",
+  "Ajoute le webhook Fal pour reprendre le pipeline vidéo, sans casser le callback Kie.",
+  "Je veux déployer le portail self-service Scena Connect sur Pages, c’est quoi déjà le bon projet Wrangler ?",
+  "Le client a mis sa clé Fal en BYOK. Vérifie qu’elle est bien déchiffrée et utilisée avant la clé globale.",
+  "Fais-moi le point sur l’architecture actuelle de Scena : Better Auth, Kimi, D1, Workers et les providers vidéo.",
+  "Le HEAD sur l’URL de la vidéo renvoie 403, mais le fichier existe. Corrige la validation de la source.",
+  "On a une limite de subrequests Cloudflare pendant la génération des sheets : trouve un contournement propre.",
+  "Je veux tester POST /api/saas/pipeline et suivre le statut jusqu’au webhook de fin.",
+  "Pourquoi le résultat Kie n’a pas de video_url dans output ? Retrouve où Scena doit lire l’URL.",
+  "Prépare les régressions saas-connect et pipeline-runner après la migration Fal + Kie.",
+  "Ajoute une connexion client avec provider et clés BYOK, puis explique comment afficher la clé une seule fois.",
+  "Scena ne doit plus utiliser Clerk ni Gemini : vérifie que le portail et l’orchestrateur sont bien passés à Better Auth et OpenRouter."
+ ],
+ "intents_en": [
+  "Debug Scena’s async video pipeline.",
+  "Deploy the Scena Connect Pages portal.",
+  "Check Fal and Kie BYOK routing.",
+  "Fix the Cloudflare pipeline webhook flow.",
+  "Review the current Scena auth and LLM stack."
+ ],
+ "entities": [
+  "Scena",
+  "/root/projects/scena-cloudflare/",
+  "workers/api/src/pipeline_runner.ts",
+  "pages/admin",
+  "pages/connect",
+  "wrangler",
+  "Cloudflare Workers",
+  "Cloudflare D1",
+  "Cloudflare Pages",
+  "Better Auth",
+  "OpenRouter",
+  "moonshotai/kimi-k2.6",
+  "Fal.ai",
+  "Kie.ai",
+  "PiAPI",
+  "Stripe",
+  "Telegram",
+  "POST /api/saas/pipeline",
+  "GET /api/saas/pipeline/:id/status",
+  "/webhook/pipeline/fal-video",
+  "/webhook/pipeline/kie-video",
+  "saas_pipeline_runs",
+  "scena-admin",
+  "scena-connect",
+  "tests/pipeline-runner.test.mjs"
+ ],
+ "symptoms": [
+  "Pipeline reste en waiting_async après la soumission vidéo",
+  "Webhook reçu mais le pipeline ne reprend pas",
+  "Erreur de limite de subrequests Cloudflare",
+  "HEAD renvoie 403 ou 405 pour une vidéo pourtant accessible",
+  "URL vidéo absente de output.video_url dans le résultat Kie",
+  "Clé BYOK ignorée au profit de la clé globale",
+  "ERR_INVALID_TYPESCRIPT_SYNTAX avec node --experimental-strip-types",
+  "Échec de déploiement Pages à cause d’un nom de projet incorrect"
+ ],
+ "not_for": [
+  "Créer ou monter une vidéo sans intervenir sur Scena ou son pipeline.",
+  "Développer un bot Telegram indépendant de la plateforme Scena.",
+  "Gérer une facturation Stripe sans lien avec les comptes ou abonnements Scena.",
+  "Configurer un workflow vidéo uniquement dans ComfyUI, sans intégration Scena."
+ ]
+}

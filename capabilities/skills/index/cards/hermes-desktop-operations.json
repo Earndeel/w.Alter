@@ -1,0 +1,71 @@
+{
+ "name": "hermes-desktop-operations",
+ "sha": "e0aa1be570446c546052431f67f7a60992ce804eac4f843584e3aba742957436",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00073450575,
+ "summary": "Use when configuring, building, or troubleshooting Hermes Desktop, especially remote connections, renderer state, themes, plugins, and recovery.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Mon Hermes Desktop ouvre une fenetre blanche, tu peux diagnostiquer ?",
+  "Configure Hermes Desktop pour se connecter a mon backend sur le VPS en SSH.",
+  "J'ai un 400 Invalid Host quand j'accede a Hermes via Tailscale, comment corriger sans ouvrir le Dashboard au public ?",
+  "Hermes me met en setup alors que le gateway tourne. Verifie la connexion et le token.",
+  "Depuis la veille de mon Mac, Hermes renvoie ECONNREFUSED. Tu peux regarder le tunnel avant de relancer quoi que ce soit ?",
+  "Comment faire un build Hermes Desktop compatible avec mon Mac Intel ?",
+  "Les themes que j'ai configures ne s'affichent pas dans l'app. Verifie le profil actif et le rendu reel.",
+  "Ajoute mon theme perso sans ecraser les autres themes ni mes preferences.",
+  "Tu peux me sortir l'inventaire des plugins Hermes integres, installes dans le profil et vraiment actifs ?",
+  "L'interface Hermes affiche encore les anciens providers apres ma mise a jour, trouve quel processus doit etre recharge.",
+  "Le status API repond 200 mais l'app n'arrive pas a se connecter. Teste aussi une route protegee et le WebSocket.",
+  "Je veux inspecter le DOM de la fenetre Hermes en live, mais sans tuer ni relancer mon app actuelle."
+ ],
+ "intents_en": [
+  "Debug a blank Hermes Desktop window.",
+  "Set up Hermes Desktop with a remote SSH backend.",
+  "Fix a Tailscale Host-header error without weakening authentication.",
+  "Check why Hermes Desktop is stuck in setup or returns 401.",
+  "Inspect the live renderer theme and plugin inventory."
+ ],
+ "entities": [
+  "Hermes Desktop",
+  "Electron",
+  "Dashboard",
+  "gateway",
+  "SSH",
+  "Tailscale",
+  "WebSocket",
+  "CDP",
+  "HERMES_DESKTOP_REMOTE_URL",
+  "HERMES_DESKTOP_REMOTE_TOKEN",
+  "/api/status",
+  "connection.json",
+  "HERMES_HOME",
+  "app.asar",
+  "app.asar.unpacked",
+  "desktop-plugins",
+  "Local Storage",
+  "Session Storage",
+  "GPUCache",
+  "hermes serve",
+  "desktop-diagnose.sh",
+  "hermes-v2-launcher.sh",
+  "verify-exact-theme-surfaces.js"
+ ],
+ "symptoms": [
+  "Blank or white window",
+  "400 Invalid Host",
+  "401 Unauthorized",
+  "Setup or offline loop",
+  "ECONNREFUSED after sleep",
+  "Authenticated WebSocket resets while idle",
+  "Stale labels, providers, or themes",
+  "Theme settings saved but not visible in the rendered UI"
+ ],
+ "not_for": [
+  "Generic Electron app development unrelated to Hermes Desktop",
+  "General Hermes agent or backend configuration unrelated to the desktop client",
+  "Generic VPS, SSH, or Tailscale administration without a Hermes Desktop connection issue",
+  "Dashboard theme changes that do not involve the Electron desktop renderer"
+ ]
+}

@@ -1,0 +1,58 @@
+{
+ "name": "computer-use-benchmarking",
+ "sha": "d7ba5df6341a40060b3fae6f00db4665d613d148c021bc6db906ed00be92c0e9",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00051992325,
+ "summary": "Use when comparing vision models for real Computer Use latency, screen-reading accuracy, action reliability, or desktop-agent routing.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Compare-moi ces modèles pour lire des captures d’écran dans Hermes.",
+  "Lequel est le plus rapide pour la perception GUI, en conditions réelles ?",
+  "Je veux benchmarker mon modèle vision fast contre le modèle reasoning avant de choisir le primary.",
+  "Fais un test propre de screenshot-to-action latency, avec les mêmes conditions pour chaque modèle.",
+  "J’ai vu un leaderboard qui dit que ce modèle est plus rapide : ça vaut quoi dans le vrai chemin Hermes ?",
+  "Le modèle lit bien l’écran mais clique parfois à côté. Comment mesurer sa fiabilité avant de le router ?",
+  "On peut tester si le modèle vision rapide peut être le primary, avec un fallback si ça bloque ?",
+  "Les médianes ont l’air bonnes, mais il y a eu un run très lent. Compare aussi les valeurs brutes et les pics.",
+  "Benchmarke la perception et les actions séparément, je ne veux pas confondre lecture d’écran et clic fiable.",
+  "Je veux savoir quel modèle garder pour les actions sensibles et lequel utiliser pour observer souvent.",
+  "Le test précédent n’avait qu’une capture réussie : qu’est-ce qu’il faut mesurer pour parler de vrai Computer Use ?",
+  "Teste ça dans un sandbox, pas sur mon bureau live, et vérifie l’état après chaque action."
+ ],
+ "intents_en": [
+  "Benchmark vision models for real GUI use.",
+  "Compare end-to-end screenshot latency in Hermes.",
+  "Test whether a fast vision model is safe as primary.",
+  "Measure click reliability separately from screen reading.",
+  "Choose a model and fallback for desktop-agent routing."
+ ],
+ "entities": [
+  "Hermes",
+  "Computer Use",
+  "vision models",
+  "model IDs",
+  "provider routes",
+  "OpenRouter",
+  "Hermes CLI",
+  "Hermes API",
+  "screenshot fixtures",
+  "reasoning effort",
+  "timeout",
+  "vision-model-benchmarking.md",
+  "contract-vs-live-agent-benchmark.md"
+ ],
+ "symptoms": [
+  "Le modèle lit l’écran mais clique à côté.",
+  "La latence réelle est bien supérieure au temps annoncé par le provider.",
+  "Un run a un pic de latence ou un timeout.",
+  "Le modèle répond sans restituer toutes les valeurs visibles dans la capture.",
+  "Le fallback n’a pas été testé sur des actions réelles."
+ ],
+ "not_for": [
+  "Choisir un modèle uniquement à partir de benchmarks génériques ou de débits de tokens.",
+  "Configurer l’usage quotidien de Computer Use sans comparer les modèles.",
+  "Chercher l’identifiant d’un modèle ou vérifier un registre provider sans benchmark.",
+  "Exécuter des actions sur le bureau réel pour tester des permissions, paiements ou données personnelles."
+ ]
+}

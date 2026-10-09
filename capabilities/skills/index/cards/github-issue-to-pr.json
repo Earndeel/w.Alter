@@ -1,0 +1,61 @@
+{
+ "name": "github-issue-to-pr",
+ "sha": "f9cf8d1757eedce42fc7050d13e5bf250e3615536c2865f40e7e86fc3f358615",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00052165575,
+ "summary": "Use when Monsieur wants a GitHub issue investigated, implemented, tested, and carried through to a PR with verified, honestly reported CI.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fixe l'issue #123 et ouvre une PR.",
+  "Tu peux prendre ce bug GitHub du ticket jusqu'à une PR avec les tests ?",
+  "Implémente la feature demandée dans l'issue, vérifie qu'il n'y a pas déjà une PR.",
+  "L'issue est toujours d'actualité ? Lis les commentaires et corrige le vrai problème.",
+  "Fais le nécessaire pour l'issue #42 et dis-moi l'état réel de la CI.",
+  "Prends ce ticket : reproduis le bug, ajoute un test qui échoue avant le fix, puis ouvre la PR.",
+  "La PR a été créée pour l'issue, mais est-ce que les checks passent vraiment ?",
+  "Quelqu'un a commenté sur l'issue depuis : vérifie les dernières infos avant de coder.",
+  "Ne te contente pas de corriger cet appel, cherche aussi les cas similaires dans le repo.",
+  "On a une demande de feature dans GitHub, tu peux l'implémenter proprement et faire le suivi jusqu'à la PR ?",
+  "La CI rouge vient de nos changements ou elle échoue déjà sur la branche principale ?",
+  "Quand la PR sera mergée, ajoute un commentaire sur l'issue avec le lien et un petit résumé."
+ ],
+ "intents_en": [
+  "Fix issue #123 and open a PR.",
+  "Take this GitHub bug from report to tested pull request.",
+  "Implement the feature request and check for duplicate PRs.",
+  "Verify the PR checks and report the actual CI state.",
+  "Read the issue thread, fix the bug, and link the PR."
+ ],
+ "entities": [
+  "GitHub Issues",
+  "GitHub Pull Requests",
+  "GitHub Actions",
+  "gh",
+  "gh issue view",
+  "gh pr list",
+  "gh pr checks",
+  "gh run view --log-failed",
+  "git",
+  "git log",
+  "AGENTS.md",
+  "systematic-debugging",
+  "test-driven-development",
+  "github-pr-workflow",
+  "requesting-code-review"
+ ],
+ "symptoms": [
+  "GitHub issue describes a reproducible bug or missing feature",
+  "Issue thread contains newer decisions or root-cause details",
+  "Potential duplicate PRs or recent fixes need checking",
+  "Regression test passes even when the fix is removed",
+  "PR checks are pending or failing and need diagnosis",
+  "Unclear whether a CI failure comes from the change, baseline, or infrastructure"
+ ],
+ "not_for": [
+  "Reviewing an existing PR without implementing an issue",
+  "Answering a code question that requests no repository change",
+  "Handling PR mechanics alone when no issue-to-implementation workflow is needed",
+  "Fixing CI infrastructure unrelated to an issue-driven code change"
+ ]
+}

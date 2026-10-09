@@ -1,0 +1,66 @@
+{
+ "name": "conversational-workflow-orchestration",
+ "sha": "58d175e3ee92ed54a0e14de8fdb9de411c42eeb99ad21fe9b6bf8686e214fd1b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00075752325,
+ "summary": "Use when designing, implementing, or debugging gated conversational workflows that collect a brief, get explicit approval, then execute ordered steps.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Mets en place un workflow qui collecte les besoins, fait valider le brief, puis lance la production seulement après mon go.",
+  "Le bot lance la génération dès qu’on joint un média. Ajoute une vraie gate d’approbation, pas juste une consigne dans le prompt.",
+  "Je veux deux confirmations distinctes : valider le récap sans facturer, puis autoriser explicitement l’exécution.",
+  "Pourquoi un simple « Je valide » repart sur le mauvais workflow ? Il faut router depuis le projet préparé, non ?",
+  "Un vieux run waiting_async contamine la conversation suivante. Aide-moi à retrouver le run et le job réellement actifs.",
+  "Bloque les tools si le run attend une validation, ou si le tool appelé ne correspond pas à l’étape courante.",
+  "Fais les tests RED→GREEN pour les arguments JSON malformés et les exceptions pendant l’exécution d’un tool.",
+  "Après un échec de soumission async, le run passe quand même en pending. Corrige la transition et préserve l’état durable.",
+  "Le récap doit permettre de modifier audience, format, durée, quantité et CTA, et calculer le coût total avec les variantes.",
+  "On utilise Scena sur Telegram avec Workers et D1 : structure le parcours intake → validation → lancement → revue.",
+  "On a encore un éditeur de workflow canvas qui ne correspond pas au runtime. Retire-le sans casser les skills ni les gates.",
+  "Prépare la séquence de tests avant déploiement : transitions, approvals, tools, jobs async, puis dry run."
+ ],
+ "intents_en": [
+  "Build a validation-first conversational workflow.",
+  "Separate brief approval from launch approval.",
+  "Debug stale async runs leaking into the prompt.",
+  "Test ordered steps and tool-call failure handling.",
+  "Remove a placeholder workflow editor without breaking execution."
+ ],
+ "entities": [
+  "Scena",
+  "Cloudflare Workers",
+  "Cloudflare D1",
+  "Telegram",
+  "conversational-workflow-orchestration",
+  "references/scena-telegram-pattern.md",
+  "references/payload-forensics-stale-runs.md",
+  "references/composable-skills-and-gates.md",
+  "references/tool-call-fault-containment.md",
+  "references/live-production-conversation-audit.md",
+  "Valider",
+  "Modifier",
+  "Régénérer",
+  "RED→GREEN",
+  "workflow run",
+  "workflow step",
+  "prepared project",
+  "async job"
+ ],
+ "symptoms": [
+  "Un média joint déclenche une exécution sans approbation explicite.",
+  "La validation du brief lance une génération ou facture des crédits.",
+  "Un message court comme « Je valide » sélectionne le mauvais workflow.",
+  "Un ancien run waiting_async apparaît dans une conversation sans rapport.",
+  "Un tool non autorisé fait avancer l’étape ou modifie l’état du run.",
+  "Des arguments de tool malformés interrompent le tour ou désalignent les résultats.",
+  "Une soumission async échouée est malgré tout marquée pending.",
+  "Le récap annonce un coût qui ne tient pas compte du nombre de variantes."
+ ],
+ "not_for": [
+  "Implémenter un générateur créatif ou un provider de génération sans orchestration conversationnelle.",
+  "Concevoir un éditeur libre de graphes quand le runtime n’exécute pas ces graphes.",
+  "Déployer une application sans concevoir ni tester ses gates, états ou transitions.",
+  "Rédiger uniquement le contenu d’un brief ou d’un récap, sans workflow logiciel à implémenter."
+ ]
+}

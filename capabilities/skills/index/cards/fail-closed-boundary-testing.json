@@ -1,0 +1,63 @@
+{
+ "name": "fail-closed-boundary-testing",
+ "sha": "2ea3432f4e993bb1b264e0fee6d4fea57fec3870c995b9a2dfdb751de067ba8b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000612612,
+ "summary": "Use when testing fail-closed authorization or audit boundaries, especially failures after execution or unsafe daemon startup configuration.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute un test où l’audit échoue seulement sur l’écriture de clôture, après le dispatch.",
+  "Le broker me renvoie denied alors que la commande a tourné : teste cette frontière.",
+  "Fais le test avec un audit qui réussit au premier append et plante au deuxième.",
+  "Vérifie que le grant one-shot est consommé si le dispatch est refusé avant l’exécution.",
+  "Je veux couvrir les résultats FAILED et UNKNOWN quand l’audit de fin échoue.",
+  "Teste que l’executor a bien tourné et que audit_complete vaut false après l’échec de clôture.",
+  "Garde le fail-closed avant dispatch, mais ne transforme pas un échec post-dispatch en refus préalable.",
+  "Écris d’abord le test RED pour le bug d’audit, puis corrige et lance toute la suite.",
+  "Le daemon doit refuser une config invalide avant de binder son socket ; ajoute les tests.",
+  "Teste les entrypoints node_main et broker_main : erreur de config, stderr et code de sortie 1.",
+  "Ajoute un mode --check qui construit les services sans démarrer le serveur bloquant.",
+  "Pourquoi argparse me renvoie SystemExit 2 au lieu de mon erreur de config ? Teste le chemin fail-closed."
+ ],
+ "intents_en": [
+  "Test audit failure after dispatch.",
+  "Cover fail-closed authorization boundaries.",
+  "Verify the executor ran despite a closing audit failure.",
+  "Test daemon config rejection before socket bind.",
+  "Keep pre-dispatch denials fail-closed."
+ ],
+ "entities": [
+  "fail-closed-boundary-testing",
+  "privilege broker",
+  "one-shot approval store",
+  "AuditChain",
+  "FlakyAudit",
+  "BrokerExecution",
+  "audit_complete",
+  "node_main",
+  "broker_main",
+  "client_main",
+  "--check",
+  "UnixRpcServer",
+  "ConfigError",
+  "ClientProtocolError",
+  "RpcRemoteError",
+  "walter-device-node",
+  "references/cli-daemon-entrypoint-patterns.md"
+ ],
+ "symptoms": [
+  "Post-dispatch audit failure is reported as a pre-dispatch denial.",
+  "Executor ran, but caller receives a denial exception instead of the real outcome.",
+  "Closing audit entry is missing while audit_complete is incorrectly true.",
+  "argparse raises SystemExit(2) instead of returning the configured error code.",
+  "Daemon binds a socket before rejecting unsafe configuration.",
+  "socket parent permissions are too broad"
+ ],
+ "not_for": [
+  "Implementing authorization or audit-chain features without testing their failure boundaries.",
+  "General CLI or daemon development unrelated to fail-closed behavior.",
+  "Testing ordinary executor success paths when no authorization or audit boundary is involved.",
+  "Changing walter-device-node-specific module wiring beyond the entrypoint patterns in scope."
+ ]
+}

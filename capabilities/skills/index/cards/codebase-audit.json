@@ -1,0 +1,66 @@
+{
+ "name": "codebase-audit",
+ "sha": "d8ccb9f53cb227a8ae9d2f277952799ffb1f0d487b2488f7cf70f7b9f4092484",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00081543825,
+ "summary": "Use when Monsieur demande un audit approfondi et en lecture seule d’un codebase : qualité, architecture, sécurité, préparation prod ou couverture.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi un audit complet de ce repo, sans modifier aucun fichier.",
+  "Tu peux évaluer si ce service est prêt pour la production ? Cite les fichiers et les lignes.",
+  "Passe l’architecture de mon projet au crible et sors les risques prioritaires.",
+  "J’ai ajouté un nouveau tool pour mon agent : vérifie le contrat schema-dispatcher-backend et les tests, sans toucher au code.",
+  "Regarde la couverture des flows critiques et dis-moi précisément ce qui n’est pas testé.",
+  "Peux-tu auditer la sécurité de ce codebase en lecture seule ?",
+  "Après l’incident d’hier, cherche les faiblesses structurelles qui ont pu contribuer au problème.",
+  "Évalue ce lot .tar.gz indépendamment : ne pars pas des chiffres annoncés, reproduis les vérifications.",
+  "Compare ce plugin aux exigences du gate et dis-moi ce qui manque avant upgrade.",
+  "Fais une matrice phases existantes / réutilisables / manquantes pour ce projet.",
+  "Le README prétend que le smoke test E2E est livré : vérifie si c’est vraiment automatisé dans le repo.",
+  "On prépare une grosse refacto ; établis d’abord un état des lieux de la dette technique, des tests et du CI, sans rien changer."
+ ],
+ "intents_en": [
+  "Audit this codebase read-only.",
+  "Assess whether this service is production-ready.",
+  "Review the architecture and prioritize risks.",
+  "Check test coverage gaps for critical flows.",
+  "Independently verify the claims in this release bundle."
+ ],
+ "entities": [
+  "codebase",
+  "repository",
+  "Git",
+  "pytest",
+  "ruff",
+  "package.json",
+  "CI/CD",
+  "GitHub Actions",
+  "SQL",
+  "migrations",
+  "OpenAPI",
+  "wrangler.toml",
+  "LLM tools",
+  "JSON schema",
+  "dispatcher",
+  "backend",
+  "computer_use",
+  ".tar.gz",
+  "plugin",
+  "E2E"
+ ],
+ "symptoms": [
+  "Tests verts mais fonctionnalités absentes du chemin de production",
+  "Écarts entre schémas, seeds, constantes et documentation",
+  "Flows critiques sans tests ou branches de routage non couvertes",
+  "Contrat d’un tool annoncé mais impossible à satisfaire depuis son schéma",
+  "Claims E2E ou de livraison sans automatisation ni transport réel",
+  "Arbre de travail qui change pendant l’audit ou absence de baseline reproductible"
+ ],
+ "not_for": [
+  "Revue ligne par ligne d’une PR : utiliser code-review.",
+  "Modification de fichiers, ajout de fonctionnalités ou correction de bugs.",
+  "Débogage ciblé d’une erreur isolée sans demande d’évaluation globale.",
+  "Planification d’une refonte sans audit préalable du codebase."
+ ]
+}

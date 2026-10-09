@@ -1,0 +1,53 @@
+{
+ "name": "competitor-news-monitor",
+ "sha": "e915116d618373f169e24d66ef256070e3797d42246410a56d7f4953a7eccc41",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000415107,
+ "summary": "Use when setting up or running recurring, cited monitoring for material news about named competitors or companies.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Surveille nos concurrents chaque semaine et envoie-moi les actus importantes.",
+  "Fais un digest des annonces récentes de Mistral et d'Anthropic, avec les sources.",
+  "Préviens-moi si Notion change ses prix ou lance un nouveau produit.",
+  "Mets en place une veille sur ces boîtes : [liste], surtout financement, partenariats et recrutements de dirigeants.",
+  "T'as vu du nouveau chez nos concurrents depuis la dernière veille ?",
+  "Le digest de lundi n'est pas arrivé, tu peux vérifier la veille concurrentielle ?",
+  "Ajoute les incidents de sécurité et les changements de tarifs au suivi de cette entreprise.",
+  "Ne me remonte que les annonces vraiment importantes, pas dix articles sur le même lancement.",
+  "Planifie une veille mensuelle sur les concurrents de notre service, avec un résumé sourcé.",
+  "Pourquoi tu n'as rien signalé cette semaine ? Vérifie aussi si une source de veille est en panne.",
+  "Reprends le suivi à partir du dernier cutoff réussi et indique les actus confirmées.",
+  "Fais tourner la veille existante et dis-moi ce qui a changé, pourquoi c'est important et à quel point c'est fiable."
+ ],
+ "intents_en": [
+  "Monitor these competitors weekly.",
+  "Alert me about pricing changes or product launches.",
+  "Create a cited competitor news digest.",
+  "Check the existing company watch.",
+  "Track funding, partnerships, and executive moves."
+ ],
+ "entities": [
+  "competitor-news-monitor",
+  "competitor-watch",
+  "~/.hermes/competitor-watches/",
+  "cronjob",
+  "rss-feeds",
+  "blogwatcher",
+  "reddit-reading",
+  "web_search",
+  "web_extract"
+ ],
+ "symptoms": [
+  "Scheduled competitor-watch tick is due",
+  "Competitor digest is missing or unexpectedly empty",
+  "Multiple articles appear to describe the same company announcement",
+  "A watched source failed, leaving news coverage uncertain"
+ ],
+ "not_for": [
+  "One-off research on a company without recurring monitoring",
+  "Reading or summarizing feeds without assessing materiality",
+  "Generic webpage change monitoring",
+  "Uncited speculation about a company's strategy"
+ ]
+}

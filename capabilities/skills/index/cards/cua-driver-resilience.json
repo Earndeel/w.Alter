@@ -1,0 +1,72 @@
+{
+ "name": "cua-driver-resilience",
+ "sha": "bd6f50fe7c3a2e2a36a4fa3bf49ed28e6b356c4cf62d83f6ca6e48f9f6788322",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00079167825,
+ "summary": "Use when CuaDriver/AX window targeting or screen capture is black, stale, partial, mismatched, or unreliable and needs safe diagnosis.",
+ "kind": "procedure",
+ "intents_fr": [
+  "CuaDriver me renvoie un screenshot noir, tu peux diagnostiquer ça ?",
+  "La capture est partielle alors que screen recording est autorisé, regarde le souci côté AX/CuaDriver.",
+  "La fenêtre ciblée est pas la bonne, vérifie le pid, window_id et les bounds avant de cliquer.",
+  "J'ai un px_frame_mismatch, faut comprendre si c'est le mauvais window ou une capture invalide.",
+  "Les permissions TCC disent OK mais l'image est stale, check les trois verdicts séparément.",
+  "Le get_window_state revient vide, regarde si le bridge a perdu les elements ou si la capture est vraiment en erreur.",
+  "On a un AXWindow dans le markdown mais elements=[] : surtout ne fabrique pas un élément cliquable, trouve pourquoi.",
+  "Après mon clic l'état est unverifiable, relis une capture fraîche avant de retenter l'action.",
+  "CuaDriver refuse sa fenêtre d'autorisation, cible l'app réelle sans contourner la sécurité.",
+  "La fenêtre du browser est marquée off-screen alors que le process tourne, valide qu'il y a une vraie fenêtre exploitable.",
+  "Peux-tu fiabiliser le normalizer des réponses CuaDriver, avec les cas structuredContent et les erreurs de frame ?",
+  "Fais le diagnostic read-only d'abord : pas de prompt macOS ni de capture probe qui ouvre une autorisation."
+ ],
+ "intents_en": [
+  "CuaDriver screenshots are black; diagnose capture integrity.",
+  "AX window targeting selects the wrong window.",
+  "TCC says screen recording is allowed but frames are invalid.",
+  "Normalize structuredContent and direct CuaDriver responses.",
+  "A click is unverifiable; inspect a fresh snapshot before retrying."
+ ],
+ "entities": [
+  "CuaDriver",
+  "Hermes",
+  "AX",
+  "macOS TCC",
+  "accessibility permission",
+  "screen_recording",
+  "check_permissions",
+  "list_windows",
+  "get_window_state",
+  "start_session",
+  "end_session",
+  "launch_app",
+  "bring_to_front",
+  "screenshot_frame_valid",
+  "screenshot_error",
+  "capture_valid",
+  "capture_coverage",
+  "snapshot_id",
+  "element_token",
+  "element_index",
+  "structuredContent",
+  "px_frame_mismatch",
+  "snapshot_id_required",
+  "scripts/run_tests.sh"
+ ],
+ "symptoms": [
+  "Black, partial, stale, or geometrically mismatched screenshot",
+  "px_frame_mismatch",
+  "ax_window_unresolved",
+  "snapshot_id_required",
+  "screen_recording_capturable=null",
+  "Empty or missing elements despite AX markdown",
+  "Driver reports an unverifiable effect",
+  "Process is running but no substantive on-screen window is available"
+ ],
+ "not_for": [
+  "Generic browser scraping or public-web research",
+  "Routine desktop interaction when CuaDriver capture and targeting work normally",
+  "Legacy v7 screen-server operation, except as a passive diagnostic fallback",
+  "General macOS permissions setup that does not involve CuaDriver capture or targeting"
+ ]
+}

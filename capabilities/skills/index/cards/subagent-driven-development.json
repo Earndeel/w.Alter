@@ -1,0 +1,53 @@
+{
+ "name": "subagent-driven-development",
+ "sha": "20cfa135bf1391f61f1fdbe7729704ce06ef2e3d5e17d8ff5f86ad7d9ab7dd29",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00070381575,
+ "summary": "Use when executing an implementation plan with fresh delegate_task subagents and mandatory spec-then-quality reviews.",
+ "kind": "workflow",
+ "intents_fr": [
+  "J'ai le plan de la feature, execute-le avec des subagents et review chaque tache.",
+  "Tu peux lancer l'implementation de ce plan en deleguant les taches independantes ?",
+  "Fais coder chaque etape par un subagent, puis controle d'abord la spec et ensuite la qualite.",
+  "Le plan est dans docs/plans/auth-feature.md : prends-le et avance tache par tache avec des reviews.",
+  "Je veux que tu implementes ca sans tout faire dans le meme contexte, avec un subagent frais par tache.",
+  "Les taches du plan sont independantes, tu peux les dispatcher et verifier les changements avant de passer a la suite ?",
+  "Le reviewer a trouve des ecarts avec la spec, organise les corrections et relance la review avant de continuer.",
+  "On a fini toutes les taches, fais faire une review d'integration et lance la suite de tests.",
+  "Peux-tu suivre le workflow delegate_task pour cette implementation, TDD compris ?",
+  "J'ai deja les specs et le plan, pas besoin d'en refaire un : delegue l'execution et garde les deux niveaux de review.",
+  "Le subagent a pose une question sur le comportement attendu ; reponds-lui avec le contexte puis laisse-le continuer.",
+  "Ca touche plusieurs fichiers : evite les implementers en parallele sur les memes fichiers et valide chaque tache avant la suivante."
+ ],
+ "intents_en": [
+  "Execute this plan with subagents and two-stage reviews.",
+  "Delegate each implementation task, then review spec compliance and code quality.",
+  "Run the existing plan task by task using fresh subagents.",
+  "Have subagents implement the tasks with TDD and review each result.",
+  "Finish the plan, run an integration review, and verify the full test suite."
+ ],
+ "entities": [
+  "delegate_task",
+  "todo",
+  "pytest",
+  "git",
+  "git diff",
+  "terminal",
+  "file",
+  "writing-plans",
+  "requesting-code-review",
+  "test-driven-development",
+  "systematic-debugging",
+  "docs/plans/feature-plan.md",
+  "references/context-budget-discipline.md",
+  "references/gates-taxonomy.md"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Creating an implementation plan from requirements when no plan exists.",
+  "Implementing a single small change directly without task delegation or review orchestration.",
+  "Requesting a standalone code review without executing a plan.",
+  "Debugging an existing failure as the primary task."
+ ]
+}

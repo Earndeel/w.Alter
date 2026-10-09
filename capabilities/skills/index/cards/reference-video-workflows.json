@@ -1,0 +1,66 @@
+{
+ "name": "reference-video-workflows",
+ "sha": "52f0e6f3f483455eb121d31a96b3a5d42cc972c007b056394c6c86dc62f0a7ff",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000435006,
+ "summary": "Use when references, character sheets, existing clips, or brand assets must guide video generation, adaptation, extension, review, or delivery QA.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fais une vidéo avec cette character sheet, en gardant bien son identité.",
+  "J’ai un clip existant : prolonge-le à partir de la dernière pose sans casser la continuité.",
+  "Tu peux vérifier si la vidéo générée respecte les refs, le logo et les vêtements ?",
+  "Reprends le projet vidéo en cours, regarde son statut et évite de relancer une génération si elle est déjà finie.",
+  "À partir de ces boards et de ce brief, prépare les plans et les actions dans le temps.",
+  "Le premier plan doit reprendre exactement cette image, tu choisis quel mode i2v ?",
+  "J’ai une référence personnage et une référence décor : fais un anchor propre avant de lancer la vidéo.",
+  "Pourquoi tu veux régénérer ? Le poller a planté mais la tâche provider est peut-être encore en cours.",
+  "Fais-moi le QA complet du rendu : durée, fps, codecs, audio, identité et transitions.",
+  "Le rendu est prêt ? Vérifie le fichier local, pas juste la thumbnail ou le lien provider.",
+  "Adapte ce clip aux assets de marque, mais ne déforme pas le perso pour rentrer dans le ratio.",
+  "Avant de lancer la génération payante, confirme le modèle, les refs, le prompt et le coût."
+ ],
+ "intents_en": [
+  "Generate a video using this character reference.",
+  "Extend this clip from its final pose.",
+  "QA the render against the supplied references.",
+  "Resume the existing video task without regenerating.",
+  "Verify the local video file before delivery."
+ ],
+ "entities": [
+  "reference video",
+  "character sheets",
+  "environment boards",
+  "reference-to-video",
+  "I2V",
+  "first-frame I2V",
+  "UGC",
+  "provider/model",
+  "task ID",
+  "project URL",
+  "PREGEN approval",
+  "ffprobe",
+  "contact sheet",
+  "storyboard",
+  "SAR",
+  "FPS",
+  "codecs",
+  "audio",
+  "native media marker",
+  "curator-reference-video-archive-routes.md"
+ ],
+ "symptoms": [
+  "Local poller failed, but provider task may still be queued or complete.",
+  "A thumbnail, provider URL, or task state is being treated as proof of a finished video.",
+  "Generated video has identity drift, altered clothing, or inconsistent environment.",
+  "Render contains unwanted text, diagrams, logos, watermarks, extra people, or anatomy defects.",
+  "Video duration, frame rate, dimensions, codecs, or audio do not match expectations.",
+  "Extension has a broken boundary or misplaced final audio instruction.",
+  "Aspect-ratio conversion stretches character geometry."
+ ],
+ "not_for": [
+  "Creating a standalone still image or character sheet without a video workflow.",
+  "General video editing unrelated to reference-driven generation, adaptation, extension, or QA.",
+  "Delivering or uploading a file remotely without exact write/readback verification."
+ ]
+}

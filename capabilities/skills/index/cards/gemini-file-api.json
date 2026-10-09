@@ -1,0 +1,60 @@
+{
+ "name": "gemini-file-api",
+ "sha": "6fb68b13776be3206f555b4243817654f7b7d439823b6b707ed6e3c2e5219240",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00052982325,
+ "summary": "Use when Monsieur veut envoyer un fichier vidéo, audio, image ou document à Gemini pour analyse native, surtout s’il est volumineux.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Analyse cette vidéo de démo et dis-moi ce qui se passe.",
+  "Tu peux transcrire cet audio avec Gemini ?",
+  "J’ai un mp4 de 40 Mo à résumer, envoie-le à Gemini.",
+  "Comment je fais pour uploader ce fichier sur le Gemini File API ?",
+  "Regarde cette vidéo et relève les étapes du tuto.",
+  "Peux-tu analyser ces images avec Gemini sans les encoder en base64 ?",
+  "La vidéo est trop lourde pour mon appel API, passe par l’upload natif de Gemini.",
+  "J’ai uploadé le fichier, faut attendre quoi avant de lancer l’analyse ?",
+  "Fais-moi un résumé de cet enregistrement audio, avec les points importants.",
+  "Gemini peut analyser ce document volumineux ? Envoie-le via son File API.",
+  "L’upload a l’air fini mais le fichier est encore PROCESSING, je fais quoi ensuite ?",
+  "Reprends le fichier dont on parlait et demande à Gemini d’en extraire les infos clés."
+ ],
+ "intents_en": [
+  "Analyze this video with Gemini.",
+  "Upload this large audio file to Gemini.",
+  "Transcribe this recording using the Gemini File API.",
+  "Summarize the uploaded product demo.",
+  "Send this file to Gemini without base64 encoding."
+ ],
+ "entities": [
+  "Gemini File API",
+  "Gemini",
+  "GEMINI_API_KEY",
+  "~/.hermes/hindsight/hybrid-search.env",
+  "generativelanguage.googleapis.com",
+  "/upload/v1beta/files",
+  "/v1beta/files/{name}",
+  "generateContent",
+  "models/gemini-2.5-flash-lite",
+  "models/gemini-2.5-flash",
+  "models/gemini-2.0-flash",
+  "file_uri",
+  "file_data",
+  "PROCESSING",
+  "ACTIVE",
+  "urllib",
+  "requests"
+ ],
+ "symptoms": [
+  "Un fichier volumineux est impraticable à envoyer en base64.",
+  "Un fichier uploadé reste à l’état PROCESSING avant l’analyse.",
+  "L’analyse vidéo via OpenRouter est lente ou nécessite un encodage base64."
+ ],
+ "not_for": [
+  "Analyser directement du texte sans fichier multimédia.",
+  "Entraîner ou déployer un modèle Gemini.",
+  "Gérer des fichiers avec une API de stockage autre que Gemini File API.",
+  "Résoudre des problèmes généraux de clé API ou de facturation Gemini."
+ ]
+}

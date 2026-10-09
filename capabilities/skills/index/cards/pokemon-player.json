@@ -1,0 +1,71 @@
+{
+ "name": "pokemon-player",
+ "sha": "8e611a65654769924da5a3bd8d7a1b4c1e58e857bf0d6ffaa1218386681033a1",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000657657,
+ "summary": "Use when Monsieur wants W.Alter to play or resume a Pokémon game through the headless emulator, with live dashboard, screenshots, saves, and gameplay actions.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Lance Pokémon Rouge et joue pour moi.",
+  "On reprend ma partie Pokémon là où on en était ?",
+  "Tu peux démarrer Pokémon avec ma ROM .gb ?",
+  "Fais jouer l’IA à Pokémon, je veux regarder.",
+  "Continue jusqu’à Argenta, mais sauvegarde avant le champion.",
+  "J’ai quitté le jeu hier, recharge la sauvegarde et reprends.",
+  "Tu peux m’envoyer le lien du dashboard pour voir la partie ?",
+  "Là je suis bloqué devant une falaise dans Pokémon, regarde l’écran et trouve le chemin.",
+  "Mon équipe est mal en point, va au Centre Pokémon avant de continuer.",
+  "Sauvegarde avant le combat contre mon rival, puis lance le combat.",
+  "Relance le serveur Pokémon, le dashboard ne répond plus.",
+  "J’ai ma ROM FireRed, démarre le jeu et avance jusqu’au prochain objectif."
+ ],
+ "intents_en": [
+  "Play Pokemon Red for me.",
+  "Resume my saved Pokemon game.",
+  "Start the emulator with my ROM.",
+  "Let me watch the AI play Pokemon.",
+  "Save before the next gym battle."
+ ],
+ "entities": [
+  "pokemon-agent",
+  "NousResearch/pokemon-agent",
+  "PyBoy",
+  "Python 3.10+",
+  "uv",
+  "/home/teknium/pokemon-agent",
+  ".venv",
+  "roms/pokemon_red.gb",
+  ".gb",
+  ".gbc",
+  ".gba",
+  "pokemon-agent serve",
+  "localhost:9876",
+  "/health",
+  "/state",
+  "/screenshot",
+  "/action",
+  "/save",
+  "/load",
+  "/saves",
+  "--rom",
+  "--port",
+  "--load-state",
+  "localhost.run",
+  "vision_analyze",
+  "/tmp/pokemon.png"
+ ],
+ "symptoms": [
+  "Le personnage semble bloqué ou se déplace dans la mauvaise direction.",
+  "La position RAM reste sur l’ancienne carte après une porte ou un escalier.",
+  "Le dialogue ne progresse pas ou son indicateur RAM ne correspond pas à l’écran.",
+  "Le dashboard de jeu ne s’ouvre plus après un redémarrage.",
+  "L’état de la partie ou les PV doivent être vérifiés avant une action risquée."
+ ],
+ "not_for": [
+  "Répondre à une question générale sur les Pokémon ou leurs types sans jouer à une partie.",
+  "Télécharger, fournir ou chercher une ROM Pokémon.",
+  "Créer ou modifier un jeu Pokémon ou un émulateur.",
+  "Jouer à un autre jeu que Pokémon avec un émulateur."
+ ]
+}

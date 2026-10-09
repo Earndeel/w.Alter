@@ -1,0 +1,71 @@
+{
+ "name": "docker-integration",
+ "sha": "d4fbac6a2c2b1209736d7b10d2975e3b1aa8156b213b996fd932923c50e4e985",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000539352,
+ "summary": "Use when Monsieur needs to build, run, configure, or troubleshoot Docker containers, images, Compose, ports, volumes, or container networking.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux me donner la commande Docker pour lancer ce conteneur avec le port 8080 exposé ?",
+  "Mon docker compose ne démarre plus, tu peux regarder la config et corriger ça ?",
+  "Comment je rebuild l’image et je relance le service sans me planter ?",
+  "Le conteneur démarre puis s’arrête, aide-moi à trouver pourquoi dans les logs.",
+  "J’ai un conflit de port avec Docker, comment je vois ce qui écoute déjà ?",
+  "Je veux monter ce dossier du host dans le container, tu me fais le volume dans le compose ?",
+  "docker-compose plante depuis la mise à jour Docker 29, c’est quoi le fix ?",
+  "Les packages workspace disparaissent du node_modules dans mon build Docker, tu vois l’ordre à corriger ?",
+  "Le port répond mais la requête HTTP reste bloquée indéfiniment depuis le container.",
+  "Comment je rentre dans le shell du container qui tourne pour inspecter les fichiers ?",
+  "Je peux nettoyer les vieilles images Docker sans supprimer les containers utilisés ?",
+  "Le service dépend de la base, mais Compose le lance trop tôt : ajoute un healthcheck et règle l’attente."
+ ],
+ "intents_en": [
+  "Build and run this Docker image.",
+  "Debug my Docker Compose startup failure.",
+  "Expose a container port and mount a host volume.",
+  "Why do requests to my published Docker port hang?",
+  "Fix docker-compose on Docker 29."
+ ],
+ "entities": [
+  "Docker",
+  "Docker Compose",
+  "docker-compose",
+  "docker-compose.yml",
+  "Dockerfile",
+  "docker build",
+  "docker run",
+  "docker ps",
+  "docker logs",
+  "docker exec",
+  "docker rm",
+  "docker images",
+  "docker system prune",
+  "docker compose up",
+  "docker compose down",
+  "docker-proxy",
+  "docker.socket",
+  "/usr/local/lib/docker/cli-plugins",
+  "node:20",
+  "node:20-slim",
+  "docker-compose.prod.yml",
+  "node_modules",
+  "workspace tarballs",
+  "docker network host"
+ ],
+ "symptoms": [
+  "DockerException: Error while fetching server API version: Not supported URL scheme http+docker",
+  "Container exits or fails during startup",
+  "Published port accepts TCP connections but HTTP or data hangs",
+  "docker-proxy shows the -use-listen-fd flag",
+  "Port binding fails because the host port is already in use",
+  "Workspace packages disappear from node_modules during the Docker build",
+  "Volume permissions prevent the container from reading or writing files"
+ ],
+ "not_for": [
+  "Deploying or orchestrating workloads on Kubernetes",
+  "Configuring cloud infrastructure or CI/CD pipelines beyond Docker build and run steps",
+  "Debugging application code unrelated to its container or image",
+  "Managing host services or firewall rules unrelated to Docker networking"
+ ]
+}

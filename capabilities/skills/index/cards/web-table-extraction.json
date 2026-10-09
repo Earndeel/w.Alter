@@ -1,0 +1,65 @@
+{
+ "name": "web-table-extraction",
+ "sha": "67d410a94c8715bfa39b108a3cbd49cc71216187ba6c629c3157ec3fda9f7cda",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000514602,
+ "summary": "Use when a public webpage has a ranking, pricing grid, comparison, or dataset that must be extracted completely despite a truncated or incomplete preview.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Récupère tout le tableau de cette page, l’aperçu s’arrête au milieu.",
+  "Tu peux me sortir le classement complet avec les valeurs exactes, pas juste les lignes visibles ?",
+  "Compare ces prix et vérifie qu’on a bien toutes les lignes du tableau.",
+  "Là, le navigateur ne montre que les premières entrées : va chercher le reste dans la page.",
+  "Fais-moi le tableau complet des pays pour 2023, en précisant si c’est du nominal ou du PPA.",
+  "Les chiffres affichés sont abrégés en M et en B ; récupère les valeurs complètes et normalise les unités.",
+  "Tu m’as donné un classement, mais est-ce qu’il manque des territoires ou des pays ? Vérifie la source.",
+  "Sur cette page de prix de modèles, distingue les tarifs input/output et le rabais annoncé.",
+  "Le modèle est marqué not_found, mais tu as vérifié sa page directe et le catalogue derrière ?",
+  "La page de tarifs est dynamique : récupère toutes les pages de l’API et dis-moi l’heure de vérification.",
+  "Traduis les noms pour mon tableau, mais garde aussi les libellés originaux pour qu’on puisse contrôler.",
+  "Refais l’extraction proprement : source, date des données, unité, nombre de lignes et exclusions."
+ ],
+ "intents_en": [
+  "Extract the complete table; the preview is truncated.",
+  "Verify every row in this public pricing grid.",
+  "Get the full ranking with exact values and units.",
+  "Check whether the table includes territories or missing countries.",
+  "Query the dynamic catalog and verify the model prices."
+ ],
+ "entities": [
+  "public webpages",
+  "HTML tables",
+  "browser snapshots",
+  "HTTP fetch",
+  "HTML parser",
+  "Scrapling",
+  "interactive browser",
+  "JavaScript-backed catalogs",
+  "structured catalog endpoints",
+  "model detail pages",
+  "Kie.ai pricing-table API",
+  "GDP rankings",
+  "pricing grids",
+  "nominal GDP",
+  "GDP per capita",
+  "PPP",
+  "input rates",
+  "output rates"
+ ],
+ "symptoms": [
+  "Browser snapshot truncates table rows",
+  "Page preview shows only part of a ranking",
+  "Visible values are abbreviated",
+  "Parallel tables have different years or metrics",
+  "Dynamic pricing page exposes no usable prices",
+  "A model slug is marked not_found despite a possible detail page",
+  "Extracted row count or ranking order does not match the source"
+ ],
+ "not_for": [
+  "Choosing which web research or extraction route to use before a table source is identified",
+  "Extracting unstructured prose or summarizing a webpage",
+  "Scraping private pages or bypassing access controls",
+  "Creating a static pricing benchmark for live, changing prices"
+ ]
+}

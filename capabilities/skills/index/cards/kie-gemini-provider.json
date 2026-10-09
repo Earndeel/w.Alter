@@ -1,0 +1,68 @@
+{
+ "name": "kie-gemini-provider",
+ "sha": "a6e7fd56edbf06d2ed9a44936b6bf7e32c08acd6f7a9a765459a342e005a0361",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007024545,
+ "summary": "Use when configuring or debugging Kie.ai Gemini models as Hermes providers, including endpoint quirks, /model validation, and Cloudflare 403 errors.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Configure Gemini 3.1 Pro de Kie.ai dans Hermes stp.",
+  "Je veux ajouter Gemini 3.5 Flash comme provider Hermes, tu me donnes le bon config.yaml ?",
+  "Mon endpoint Kie Gemini renvoie 404, c'est quoi l'URL exacte avec le /v1 ?",
+  "Pourquoi gemini-3-1-pro me renvoie 422 page does not exist ?",
+  "Le /model refuse mon modèle Kie.ai alors qu'il est dans la config, comment corriger la validation ?",
+  "J'ai un 403 Your request was blocked avec Kie et Gemini dans Hermes, c'est le filtre de sécurité Google ?",
+  "En curl ça marche mais depuis Hermes j'ai PermissionDeniedError 403. Tu peux m'aider à trouver le souci ?",
+  "Je dois mettre gemini-3-5-flash-openai dans le champ model aussi ou seulement dans l'URL ?",
+  "Est-ce que le provider Kie Gemini supporte les images, les tools et le streaming ?",
+  "J'ai patché hermes_cli/models.py mais /model affiche toujours l'avertissement, faut redémarrer quoi ?",
+  "Le changement de User-Agent règle le blocage Cloudflare de Kie.ai ? Où faire le patch pour que /model le garde aussi ?",
+  "Kie Gemini fait du prompt caching ou chaque appel refacture tout le contexte ?"
+ ],
+ "intents_en": [
+  "Set up Kie.ai Gemini in Hermes.",
+  "Why does gemini-3-1-pro return 422?",
+  "Fix the Kie Gemini /model validation warning.",
+  "Hermes gets a 403 from Kie.ai but curl works.",
+  "Which Kie Gemini features does Hermes support?"
+ ],
+ "entities": [
+  "Kie.ai",
+  "Hermes",
+  "Gemini 3.1 Pro",
+  "Gemini 3.5 Flash",
+  "Gemini 3 Flash",
+  "Gemini 2.5 Flash",
+  "api.kie.ai",
+  "/gemini-3.1-pro/v1/chat/completions",
+  "/gemini-3-5-flash-openai/v1/chat/completions",
+  "/v1/models",
+  "KIE_API_KEY",
+  "config.yaml",
+  "hermes_cli/models.py",
+  "agent/agent_runtime_helpers.py",
+  "create_openai_client()",
+  "hermes",
+  "curl",
+  "OpenAI Python client",
+  "Cloudflare WAF",
+  "SSE",
+  "CachedContent"
+ ],
+ "symptoms": [
+  "422 page does not exist for gemini-3-1-pro",
+  "404 when the endpoint URL is missing /v1",
+  "Hermes /model validation warning because Kie.ai returns 404 for /v1/models",
+  "HTTP 403: Your request was blocked",
+  "PermissionDeniedError with Kie.ai in Hermes",
+  "curl succeeds but the OpenAI Python client request is blocked",
+  "Streaming failed before delivery: Your request was blocked"
+ ],
+ "not_for": [
+  "Generating videos or images with other Kie.ai services.",
+  "Configuring non-Kie Gemini providers or Google’s native Gemini API for Hermes.",
+  "General Hermes installation or provider configuration unrelated to Kie.ai Gemini.",
+  "Diagnosing Gemini content safety refusals rather than Kie.ai Cloudflare WAF blocks."
+ ]
+}

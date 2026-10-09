@@ -1,0 +1,60 @@
+{
+ "name": "model-value-analysis",
+ "sha": "a6dcf8b794744ff84f40fc8f157ef32082a14bf57aa52afa6f3e88f794cd9f61",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00089340075,
+ "summary": "Use when comparing LLM value by task type, weighing benchmark quality against cost, or checking whether a model justifies its price.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Quels modèles valent vraiment le coup en ce moment, qualité et coût compris ?",
+  "Compare le coût vs intelligence des modèles pour du coding et du reasoning.",
+  "Est-ce que Claude Opus justifie son prix face à une option moins chère ?",
+  "C'est quoi le meilleur rapport qualité-prix pour des tâches agentiques ?",
+  "Fais-moi un classement des modèles par valeur pour extraction, compression et maths.",
+  "Pour notre pipeline, le modèle premium vaut-il le surcoût ou le gain est trop faible ?",
+  "Et côté Agentic, lesquels ont le meilleur score par dollar ?",
+  "Compare les modèles sur le coût AA par tâche et leur intelligence, pas juste le prix au million de tokens.",
+  "Je veux les frontières de Pareto Intelligence et Agentic avec les coûts qui correspondent à chaque axe.",
+  "Le modèle moins cher a l'air assez bon : est-ce qu'il tient la route sur GDPval, TerminalBench et TAU2 ?",
+  "Tu peux vérifier si ce modèle vaut son prix, en séparant le coût API réel du coût par tâche du benchmark AA ?",
+  "Fais une shortlist cost-first, mais garde les modèles dominés ou plus chers visibles si c'est un vrai upgrade qualité."
+ ],
+ "intents_en": [
+  "Which LLMs are the best value for coding?",
+  "Does this model justify its price?",
+  "Compare cost versus intelligence by task type.",
+  "Show the Intelligence and Agentic Pareto frontiers.",
+  "Find the best-value models for reasoning and extraction."
+ ],
+ "entities": [
+  "Artificial Analysis (AA)",
+  "AA cost_per_task",
+  "AA Intelligence Index",
+  "AA Agentic Index",
+  "GDPval-AA",
+  "TerminalBench",
+  "TAU2",
+  "Kie.ai",
+  "model-benchmark-comparison",
+  "aa-intel-vs-cost-scraper",
+  "aa-pareto-model-optimizer",
+  "aa_analysis.py",
+  "extract_recharts.py",
+  "vault get artificialanalysis/api_key",
+  "/root/.hermes/skills/mlops/model-benchmark-comparison/scripts/aa_analysis.py",
+  "/root/.hermes/skills/aa-intel-vs-cost-scraper/scripts/extract_recharts.py",
+  "DeepSeek V4 Pro",
+  "GPT-5.6 Luna",
+  "GPT-5.6 Sol",
+  "Grok 4.5",
+  "Claude Opus 5"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Trouver un remplacement pour un workload précis sans analyser le rapport coût-valeur.",
+  "Comparer uniquement les benchmarks de modèles, sans coût ni valeur par tâche.",
+  "Calculer la facture d'une requête API individuelle sans analyse comparative de modèles.",
+  "Déboguer l'extraction Recharts du coût AA par tâche."
+ ]
+}

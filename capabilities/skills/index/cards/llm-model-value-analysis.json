@@ -1,0 +1,46 @@
+{
+ "name": "llm-model-value-analysis",
+ "sha": "a475002eee92308cf73a6d5466648eeca7d5f6146abc1444f5a72f86124da9eb",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0004183245,
+ "summary": "Use when Monsieur veut vérifier, comparer ou choisir un modèle LLM selon qualité, coût réel, vitesse, contexte et usage.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux checker Claude Sonnet pour mes usages ?",
+  "GLM-5.2, ça vaut quoi vraiment niveau intelligence/prix ?",
+  "Compare-moi GPT et Gemini pour coder, avec le coût réel.",
+  "C’est quoi le meilleur modèle pour faire du frontend propre ?",
+  "Lequel tu prendrais pour des agents qui utilisent des tools ?",
+  "Et par rapport à Sonnet, celui-là est plus rapide ou juste moins cher ?",
+  "Fais-moi un classement des modèles pour analyser de gros documents.",
+  "Je veux réduire la facture API sans trop perdre en qualité : tu choisirais quoi ?",
+  "Tu peux vérifier ce modèle ? J’ai vu qu’il était numéro 1 sur un benchmark.",
+  "Pour du chat rapide avec mes clients, quel modèle a le meilleur rapport qualité/prix ?",
+  "Compare les variantes thinking et non-thinking, je sais pas laquelle prendre.",
+  "Le modèle est bon sur le papier, mais est-ce qu’il tient la route en usage réel pour coder et faire de la recherche ?"
+ ],
+ "intents_en": [
+  "Check this model's real value.",
+  "Compare these models for coding cost and quality.",
+  "Which model is best for long documents?",
+  "Find the best intelligence-to-cost ratio.",
+  "Is this model worth the price for agents?"
+ ],
+ "entities": [
+  "Artificial Analysis",
+  "Intelligence Index",
+  "OpenRouter",
+  "Design Arena",
+  "coding leaderboards",
+  "agent/tool-use benchmarks",
+  "GLM-5.2"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Looking up the exact operational model ID to configure in an API or tool.",
+  "Setting up provider credentials, API integrations, or deployment.",
+  "Writing prompts or designing an application workflow for a chosen model.",
+  "Debugging a specific API error or production outage."
+ ]
+}

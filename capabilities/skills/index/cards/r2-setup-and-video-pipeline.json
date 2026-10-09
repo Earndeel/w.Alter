@@ -1,0 +1,72 @@
+{
+ "name": "r2-setup-and-video-pipeline",
+ "sha": "b23f136a22015b2066af373a1fadc954abe501540d8b4994b4c7867e12e15177",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007608645,
+ "summary": "Use when setting up Cloudflare R2 video storage, deploying an upload Worker, or sending uploaded videos and frames to OpenRouter for analysis.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Tu peux me setup R2 pour stocker les videos de W.Alter ?",
+  "Comment je cree un bucket Cloudflare R2 et je l'active ?",
+  "Fais-moi le Worker pour uploader une video vers R2, avec un endpoint POST.",
+  "J'ai besoin d'un pipeline video : upload R2, analyse OpenRouter, puis suppression du fichier.",
+  "On peut envoyer une URL R2 et des frames a OpenRouter au lieu de mettre toute la video en base64 ?",
+  "wrangler me renvoie error 10042 quand je cree le bucket, tu sais quoi faire ?",
+  "J'ai une erreur 10405 en deployant le Worker, c'est le token Cloudflare ?",
+  "Le token Cloudflare est read-only, comment je le remplace pour deployer ?",
+  "L'upload marche pas depuis Python, les URLs r2.dev me renvoient 403.",
+  "Ajoute l'extraction de 12 frames avec ffmpeg avant l'analyse de la video.",
+  "Mon Worker walter-r2-upload est pret, comment je l'appelle pour envoyer une video ?",
+  "Tu peux verifier le setup R2 puis brancher l'analyse video avec OpenRouter et nettoyer le bucket apres ?"
+ ],
+ "intents_en": [
+  "Set up R2 video storage and upload.",
+  "Deploy a Worker endpoint to upload videos to R2.",
+  "Analyze an R2-hosted video with OpenRouter.",
+  "Fix Cloudflare R2 or Wrangler setup errors.",
+  "Extract key frames, analyze the video, then delete it from R2."
+ ],
+ "entities": [
+  "Cloudflare R2",
+  "Wrangler",
+  "Cloudflare Dashboard",
+  "Cloudflare API token",
+  "Workers Edit",
+  "Pages Write",
+  "R2 bucket",
+  "walter-analysis",
+  "walter-r2-upload",
+  "Cloudflare Worker",
+  "wrangler.toml",
+  "index.js",
+  "/root/.mcporter/mcporter.json",
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_ACCOUNT_ID",
+  "workers.dev",
+  "r2.dev",
+  "curl",
+  "ffmpeg",
+  "ffprobe",
+  "OpenRouter",
+  "video_url",
+  "qwen/qwen3.6-plus:free",
+  "video_analysis"
+ ],
+ "symptoms": [
+  "Error 10042: Please enable R2 through the Cloudflare Dashboard",
+  "Error 10015: No route matches this url",
+  "Error 10405: Method not allowed for this authentication scheme",
+  "Error 10000 when deploying Pages",
+  "Error 8000096 on Pages deployments",
+  "urllib returns 403 Forbidden for pub-*.r2.dev URLs",
+  "wrangler says You are not authenticated despite CLOUDFLARE_API_TOKEN being set",
+  "Video upload fails when the request body exceeds the 100 MB Workers limit"
+ ],
+ "not_for": [
+  "General Cloudflare DNS, domain, or Pages configuration unrelated to video storage.",
+  "Analyzing a video that is already available to OpenRouter without setting up R2 or this pipeline.",
+  "Building a general-purpose video editing or transcoding workflow.",
+  "Creating or managing OpenRouter API keys unrelated to video analysis."
+ ]
+}

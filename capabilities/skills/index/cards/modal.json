@@ -1,0 +1,70 @@
+{
+ "name": "modal",
+ "sha": "91c0baaaf36edf265810bc165425d748161fff175bd0c27dbc938e24d6a73918",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00066347325,
+ "summary": "Use when Monsieur wants to run GPU ML workloads, deploy autoscaling model APIs, or process batch jobs on Modal without managing servers.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Comment je lance un script Python sur un GPU Modal ?",
+  "Mets-moi en place une API d’inférence qui scale à zéro sur Modal.",
+  "Je veux tester un modèle Hugging Face sur un A100 sans gérer de machine, tu me montres ?",
+  "Mon `modal run` échoue, aide-moi à déployer ça.",
+  "Comment je garde les poids du modèle dans un Volume Modal entre deux exécutions ?",
+  "On peut faire tourner le traitement de mes images en parallèle sur Modal ?",
+  "Je voudrais un job Modal qui tourne tous les jours à minuit.",
+  "L’API est lente au premier appel : comment réduire les cold starts sur Modal ?",
+  "Je veux exposer mon modèle avec FastAPI sur Modal, donne-moi le squelette.",
+  "Le GPU est OOM pendant l’inférence, je passe sur quelle config Modal ?",
+  "Tu peux préparer l’image Modal avec CUDA, PyTorch et mes dépendances ?",
+  "Et pour le token Hugging Face, je le mets où dans Modal ?"
+ ],
+ "intents_en": [
+  "Run this ML job on a Modal GPU.",
+  "Deploy my model as an autoscaling API on Modal.",
+  "Help debug my Modal deployment.",
+  "Schedule a batch inference job on Modal.",
+  "Reduce cold starts for my Modal endpoint."
+ ],
+ "entities": [
+  "Modal",
+  "modal",
+  "modal>=0.64.0",
+  "modal setup",
+  "modal run",
+  "modal serve",
+  "modal deploy",
+  "modal app logs",
+  "modal.App",
+  "modal.Image",
+  "modal.Volume",
+  "modal.Secret",
+  "modal.fastapi_endpoint",
+  "modal.asgi_app",
+  "modal.batched",
+  "modal.Cron",
+  "modal.Period",
+  "T4",
+  "L4",
+  "A10G",
+  "L40S",
+  "A100",
+  "H100",
+  "H200",
+  "B200"
+ ],
+ "symptoms": [
+  "GPU out of memory (OOM) pendant le chargement ou l’inférence",
+  "Cold start latency élevée sur le premier appel",
+  "Échec de build de l’image ou incompatibilité CUDA/dépendances",
+  "Timeout lors d’un job ou d’une requête",
+  "Besoin d’exécuter un workload ML sans GPU local ni infrastructure persistante"
+ ],
+ "not_for": [
+  "Orchestrer une architecture complexe à plusieurs services avec Kubernetes",
+  "Louer un pod GPU persistant avec état durable plutôt qu’un workload serverless",
+  "Réserver une instance GPU dédiée de longue durée",
+  "Optimiser l’orchestration et les coûts entre plusieurs clouds"
+ ]
+}

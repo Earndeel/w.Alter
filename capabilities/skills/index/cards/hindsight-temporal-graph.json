@@ -1,0 +1,70 @@
+{
+ "name": "hindsight-temporal-graph",
+ "sha": "a3fd3f092af8b5f35ef07350c9cbf83ab79d28324ff78cdc928f078f35e45b9c",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00062016075,
+ "summary": "Use when adding, auditing, or debugging a PG-first temporal graph and provenance sidecar for Hindsight memory.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute un graphe temporel à Hindsight sans remplacer PostgreSQL ni Qdrant.",
+  "Comment intégrer un comportement Graphiti-like dans Hindsight en gardant /recall compatible ?",
+  "Les anciennes infos restent actives après une mise à jour : corrige les faits zombies et les supersessions.",
+  "Conçois le schéma PostgreSQL pour les épisodes, la provenance, les entités et les edges Hindsight.",
+  "Fais une migration idempotente pour le sidecar de graphe, avec dry-run et rollback.",
+  "Audite l’intégration provenance : est-ce qu’on garde bien la source des facts sans stocker les transcripts bruts ?",
+  "Branche episode_id sur le write path et enregistre la provenance lors des inserts, refresh et merges.",
+  "Ajoute le contexte du graphe au recall sans toucher à results[] ni casser la compatibilité client.",
+  "Le recall ne retrouve pas les relations entre faits et entités : regarde le CTE récursif et les banques global/walter.",
+  "J’ai une erreur de conflit de noms dans un ON CONFLICT PL/pgSQL, tu peux corriger la migration ?",
+  "Les side effects du graphe font échouer les writes mémoire : ajoute des savepoints ou une protection d’exception.",
+  "Vérifie le backfill par bank, le cycle de vie des facts, les tests de recall et le plan de rollback."
+ ],
+ "intents_en": [
+  "Add a temporal graph sidecar to Hindsight.",
+  "Audit provenance and fact supersession in PostgreSQL.",
+  "Make the Hindsight graph migration idempotent.",
+  "Add graph context to recall without breaking results.",
+  "Debug zombie facts and lifecycle edges."
+ ],
+ "entities": [
+  "Hindsight",
+  "Graphiti",
+  "PostgreSQL",
+  "Qdrant",
+  "/recall",
+  "memory_facts",
+  "memory_events",
+  "memory_outbox",
+  "hindsight_episodes",
+  "hindsight_fact_provenance",
+  "hindsight_fact_entities",
+  "hindsight_edges",
+  "v_hindsight_active_edges",
+  "walter",
+  "global",
+  "hindsight_normalize_entity_name",
+  "hindsight_upsert_entity",
+  "hindsight_upsert_edge",
+  "hindsight_link_fact_entities",
+  "hindsight_record_fact_provenance",
+  "hindsight_link_fact_lifecycle",
+  "hindsight_backfill_fact_graph",
+  "PL/pgSQL",
+  "recursive CTE"
+ ],
+ "symptoms": [
+  "Ancien fait toujours canonique ou actif après supersession",
+  "Recall renvoie les faits mais pas leur provenance ou leurs relations",
+  "Les facts pertinents sont manqués quand la requête contient plusieurs mots",
+  "Erreur PL/pgSQL de variable ambiguë dans ON CONFLICT",
+  "Les écritures mémoire échouent à cause d’une opération optionnelle du graphe",
+  "La migration échoue à la réexécution ou le backfill ne crée aucun lien"
+ ],
+ "not_for": [
+  "Remplacer PostgreSQL comme source de vérité ou migrer le stockage principal de Hindsight",
+  "Remplacer Qdrant ou écrire l’état canonique du graphe directement dans Qdrant",
+  "Déboguer une panne Qdrant sans rapport avec le sidecar temporel",
+  "Concevoir un graphe général sans provenance ni cycle de vie des facts Hindsight"
+ ]
+}

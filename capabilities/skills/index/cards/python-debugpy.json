@@ -1,0 +1,70 @@
+{
+ "name": "python-debugpy",
+ "sha": "af5feb976184ba27b81cdf8bb2b9180e43597d318aef88494212620a90d49b8d",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000847737,
+ "summary": "Use when a Python bug needs interactive inspection, stepping, post-mortem locals, or remote debugging of a running process.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux m’aider à debugger ce test Python ? Le traceback ne montre pas pourquoi la valeur est fausse.",
+  "Comment je mets un breakpoint et je regarde les variables locales avec pdb ?",
+  "Lance ce script sous pdb sans modifier le code, je veux avancer ligne par ligne.",
+  "Le test plante dans la suite : je veux tomber dans pdb exactement au moment de l’exception.",
+  "Mon pytest avec --pdb reste bloqué, c’est à cause du runner ? Comment le lancer en interactif ?",
+  "J’ai un KeyError, aide-moi à inspecter le dict et la stack au point où ça casse.",
+  "Le gateway Python tourne déjà et déconne, je peux m’attacher avec debugpy sans le redémarrer ?",
+  "Comment j’attache VS Code au process Python avec debugpy sur le port 5678 ?",
+  "Mon tui_gateway est un subprocess de hermes --tui et je peux pas le relancer proprement : comment le tracer ?",
+  "Le bug est dans le _SlashWorker ou son enfant PTY, pas dans le process principal ; comment je pose un remote-pdb dedans ?",
+  "Mon handler asyncio deadlock, je veux voir la stack et les tâches en cours.",
+  "J’ai ajouté breakpoint() mais il ne s’arrête jamais, tu vérifies PYTHONBREAKPOINT et le contexte d’exécution ?"
+ ],
+ "intents_en": [
+  "Debug this Python test interactively with pdb.",
+  "Attach debugpy to the running Python process.",
+  "Inspect locals after this exception.",
+  "Step through the script without editing its source.",
+  "Why does pdb hang under my test runner?"
+ ],
+ "entities": [
+  "pdb",
+  "debugpy",
+  "DAP",
+  "breakpoint()",
+  "python -m pdb",
+  "python -m debugpy",
+  "pytest --pdb",
+  "pytest --trace",
+  "scripts/run_tests.sh",
+  "run_tests_parallel.py",
+  "remote-pdb",
+  "debugpy.listen",
+  "debugpy.wait_for_client",
+  "127.0.0.1:5678",
+  "127.0.0.1:4444",
+  "VS Code",
+  "Cursor",
+  "Zed",
+  "hermes --tui",
+  "tui_gateway",
+  "gateway/run.py",
+  "_SlashWorker",
+  "PYTHONBREAKPOINT",
+  "/proc/sys/kernel/yama/ptrace_scope",
+  "ss -tlnp"
+ ],
+ "symptoms": [
+  "pytest --pdb hangs or shows no interactive prompt under a captured or parallel runner",
+  "breakpoint() is never hit",
+  "The process hangs at debugpy.wait_for_client()",
+  "debugpy cannot attach to the target PID because ptrace injection is blocked",
+  "A long-running gateway or child process misbehaves but cannot be restarted cleanly"
+ ],
+ "not_for": [
+  "A quick value check that print() or logging.debug can solve",
+  "Failures already explained by pytest --showlocals and a long traceback",
+  "JavaScript or Node.js debugging with node-inspect-debugger",
+  "General bug diagnosis that does not require an interactive Python debugger"
+ ]
+}

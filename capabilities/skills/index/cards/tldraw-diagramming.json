@@ -1,0 +1,64 @@
+{
+ "name": "tldraw-diagramming",
+ "sha": "9a89dabfbc34b130d041a4b8b7a65f168edec8801984d6bb91f751cb670f9d46",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005861295,
+ "summary": "Use when Monsieur veut créer ou structurer dans tldraw offline un mindmap, flowchart, organigramme ou schéma d’architecture avec nœuds et connecteurs.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi un mindmap dans tldraw pour organiser ces idées.",
+  "Tu peux dessiner le flowchart de ce process dans le canvas tldraw ?",
+  "Crée un schéma d’architecture avec les services et leurs connexions.",
+  "Mets-moi ça en organigramme dans tldraw.",
+  "Je veux des flèches en angle droit, pas des courbes.",
+  "Ajoute les branches et sous-branches à ce mindmap, en gardant une mise en page lisible.",
+  "Peux-tu refaire ce diagramme avec des nœuds alignés et des connecteurs propres ?",
+  "Le bend me fait des courbes, comment faire des flèches en coude dans tldraw ?",
+  "Les connecteurs ne rendent pas bien, arrange les angles et l’espacement.",
+  "Transforme cette liste d’étapes en diagramme dans tldraw, avec les décisions et les sorties.",
+  "Continue le schéma qu’on a commencé dans tldraw et ajoute les dépendances entre composants.",
+  "Fais ça directement dans tldraw offline, ne bascule pas sur Excalidraw."
+ ],
+ "intents_en": [
+  "Make a mind map in tldraw.",
+  "Create a flowchart in the tldraw canvas.",
+  "Draw an architecture diagram with connected nodes.",
+  "Use right-angle elbow arrows between the boxes.",
+  "Organize these ideas as a tldraw diagram."
+ ],
+ "entities": [
+  "tldraw",
+  "tldraw offline",
+  "tldraw-offline",
+  "HTTP API",
+  "/exec",
+  "arrow shapes",
+  "geo shapes",
+  "createShape",
+  "updateShape",
+  "createShapeId",
+  "toRichText",
+  "bend",
+  "handles",
+  "getScreenshot",
+  "server.json",
+  "/tmp/tldraw_token.txt",
+  "SSH tunnel",
+  "port 7236",
+  "references/elbow-mindmap.py",
+  "Excalidraw"
+ ],
+ "symptoms": [
+  "Setting bend creates Bézier curves instead of right-angle elbows.",
+  "The handles property is rejected by createShape.",
+  "The line type does not support endArrowhead.",
+  "Unexpected property error when passing fontSize to a geo shape."
+ ],
+ "not_for": [
+  "Freehand drawing or illustration rather than structured node-and-connector diagrams.",
+  "Setting up or troubleshooting the tldraw offline API, token, or app availability.",
+  "Creating diagrams in Excalidraw when tldraw is unavailable.",
+  "Editing or explaining diagram content without generating or modifying a tldraw diagram."
+ ]
+}

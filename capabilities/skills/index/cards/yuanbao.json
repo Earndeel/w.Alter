@@ -1,0 +1,53 @@
+{
+ "name": "yuanbao",
+ "sha": "c37225ede6d75a92f2536f5779516eb811ce48a0cdd1b0b1888bd48225908225",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000448767,
+ "summary": "Use when Monsieur needs Yuanbao group details or members, an @mention, or a private DM sent to a group member.",
+ "kind": "integration",
+ "intents_fr": [
+  "C'est qui le proprio de ce groupe Yuanbao ?",
+  "Tu peux me donner le nombre de membres ici ?",
+  "Cherche Léa dans les membres et dis-moi son pseudo exact.",
+  "Liste les bots et assistants Yuanbao du groupe.",
+  "Fais-moi la liste de tous les membres de la Pai.",
+  "Tu peux @mentionner元宝 et lui dire qu'on l'attend ?",
+  "艾特一下 Paul pour qu'il regarde le dernier message.",
+  "Peux-tu ping le bon Alex dans le groupe ?",
+  "Envoie un DM à Mei pour lui dire que le fichier est prêt.",
+  "私信给 @用户aea3 发个 hello。",
+  "Tu as trouvé plusieurs personnes avec ce nom : laquelle je voulais contacter ?",
+  "Envoie cette image en privé à Lin depuis le groupe."
+ ],
+ "intents_en": [
+  "Who owns this Yuanbao group?",
+  "Find Alex and @mention them.",
+  "List the bots in this group.",
+  "DM Mei to say the file is ready.",
+  "How many members are in this Pai?"
+ ],
+ "entities": [
+  "Yuanbao",
+  "元宝",
+  "Pai (派)",
+  "group_code",
+  "chat_id",
+  "yb_query_group_info",
+  "yb_query_group_members",
+  "yb_send_dm",
+  "find",
+  "list_bots",
+  "list_all",
+  "@mention",
+  "DM",
+  "media_files"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Managing group settings, roles, or membership",
+  "Sending messages through a non-Yuanbao service",
+  "Creating a Yuanbao group",
+  "General questions unrelated to group information, members, mentions, or DMs"
+ ]
+}

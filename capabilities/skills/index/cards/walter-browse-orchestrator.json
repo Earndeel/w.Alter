@@ -1,0 +1,47 @@
+{
+ "name": "walter-browse-orchestrator",
+ "sha": "1bfbe8ee5073954ee162e3325f4c1cd5586087632d2b0675e8d5626478546816",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000419067,
+ "summary": "Use when a task needs web search, current information, URL reading, structured extraction, site interaction, or a personal web session via walter_browse.",
+ "kind": "procedure",
+ "intents_fr": [
+  "C’est quoi les dernières nouvelles sur [sujet] ?",
+  "Tu peux chercher sur le web des sources fiables pour [question] ?",
+  "Lis cette page et résume-moi l’essentiel : [URL]",
+  "Compare les prix et les offres sur ces deux pages.",
+  "Va voir sur le site les horaires d’ouverture de ce resto.",
+  "Récupère les prix, les modèles et les délais de livraison sur cette page.",
+  "Tu peux chercher où acheter ça et me donner les liens ?",
+  "Connecte-toi à mon compte et vérifie le statut de ma commande.",
+  "Sur mon compte, retrouve la facture de mars.",
+  "Ça marche pas, trouve une autre page officielle qui confirme l’info.",
+  "Tu m’avais trouvé une page là-dessus : tu peux vérifier si l’info est toujours à jour ?",
+  "Cherche les résultats via un proxy FR, comme demandé."
+ ],
+ "intents_en": [
+  "Search the web for current prices.",
+  "Read and summarize this URL.",
+  "Compare these product listings.",
+  "Check my account for the latest order status.",
+  "Find official sources for this claim."
+ ],
+ "entities": [
+  "walter_browse",
+  "query",
+  "url",
+  "objective",
+  "expected_fields",
+  "required_fields",
+  "session_id",
+  "search-lite"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Questions that can be answered from context or memory without web access.",
+  "Native Mac actions such as using Finder, an OS dialog, or browser chrome; use computer_use.",
+  "Explicit debugging of a specific web backend.",
+  "Manual scraping or browser automation with curl, Playwright, selectors, or similar tools."
+ ]
+}

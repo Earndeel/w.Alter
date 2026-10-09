@@ -1,0 +1,68 @@
+{
+ "name": "p5js",
+ "sha": "e1f81dc9343d947d869384c5aad50aff8c0a517a2140a3e9390bc81b996be963",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008083845,
+ "summary": "Use when Monsieur wants a p5.js browser sketch, generative artwork, interactive visualization, animation, shader, or 2D/3D canvas export.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi une œuvre générative en p5.js, un peu organique et sombre.",
+  "Tu peux coder un sketch p5.js animé pour le site de W.Alter ?",
+  "Je veux un fond interactif avec des particules qui suivent la souris.",
+  "Fais une visualisation de ces données en canvas, avec un rendu plus artistique qu'un graphique classique.",
+  "Tu peux transformer cette image en mosaïque de points avec p5.js ?",
+  "J'aimerais une boucle vidéo hypnotique, exportable en MP4, avec du texte cinétique.",
+  "Fais-moi une scène 3D WebGL dans le navigateur, avec une lumière douce et une caméra qui bouge.",
+  "Ajoute une réaction au micro : les formes et les couleurs doivent suivre le son.",
+  "Le rendu actuel fait trop exercice de tuto, tu peux le rendre vraiment plus travaillé et cohérent ?",
+  "Comment je sors une image PNG haute résolution de ce sketch ?",
+  "Le canvas reste noir dans le navigateur, tu peux vérifier le HTML et le rendu ?",
+  "On peut reprendre le sketch d'avant et ajouter une interaction au clic sans casser l'animation ?"
+ ],
+ "intents_en": [
+  "Make a generative p5.js artwork.",
+  "Build an interactive particle sketch.",
+  "Create a browser-based WebGL scene.",
+  "Export this p5.js animation as an MP4.",
+  "Make a shader-based visual that reacts to audio."
+ ],
+ "entities": [
+  "p5.js",
+  "p5.js 1.11.3",
+  "p5.js 2.x",
+  "p5.sound.js",
+  "p5.js-svg",
+  "p5.brush",
+  "p5.grain",
+  "CCapture.js",
+  "Puppeteer",
+  "Node.js",
+  "ffmpeg",
+  "GLSL",
+  "WebGL",
+  "HTML canvas",
+  "templates/viewer.html",
+  "saveCanvas()",
+  "saveGif()",
+  "saveFrames()",
+  "createGraphics()",
+  "randomSeed()",
+  "noiseSeed()",
+  "scripts/render.sh",
+  "scripts/serve.sh",
+  "scripts/export-frames.js"
+ ],
+ "symptoms": [
+  "Le canvas reste noir ou vide dans le navigateur.",
+  "Le sketch rame ou ne tient pas la fréquence d'images visée.",
+  "L'export PNG, GIF ou MP4 est flou, incomplet ou ne démarre pas.",
+  "Le rendu ressemble à un exemple de tutoriel plutôt qu'à une pièce finie."
+ ],
+ "not_for": [
+  "Créer une vidéo explicative ou une animation de présentation avec Manim.",
+  "Dessiner ou modifier un diagramme vectoriel dans Excalidraw.",
+  "Produire une animation vidéo ASCII à partir d'un clip.",
+  "Construire une application web complète avec backend, comptes ou logique métier."
+ ]
+}

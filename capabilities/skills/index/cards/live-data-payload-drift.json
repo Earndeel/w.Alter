@@ -1,0 +1,62 @@
+{
+ "name": "live-data-payload-drift",
+ "sha": "0551db39a10a51ad857f51f3910f25674839c9bb26c14db857276fbc75d5dbbe",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005603895,
+ "summary": "Use when a live-data cron succeeds but its artifact is stale, empty, or unexpectedly small after an upstream payload shape change.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Le cron tourne en ok mais le generated_at de latest.json bouge plus, tu peux diagnostiquer ?",
+  "AA Pareto me sort encore le snapshot d'hier alors que le refresh a réussi.",
+  "J'ai une erreur « RSC payload did not contain a models array » depuis ce matin, aide-moi à réparer l'extraction.",
+  "Le nombre de modèles a chuté d'un coup dans le refresh Intelligence, regarde si le payload a changé.",
+  "Le scrape Next.js récupère toujours la même data depuis plusieurs jours, faut vérifier le parser et le cron.",
+  "Tu peux relancer le daily refresh à la main et confirmer que l'artifact est bien frais ?",
+  "Le wrapper sort exit 0 mais latest.json est vieux, on a probablement un souci silencieux dans la chaîne fetch-parse.",
+  "Je vois que le préfixe RSC est passé de c: à d:, corrige ça sans hardcoder la nouvelle forme.",
+  "Vérifie que les deux parse paths, agentic et intelligence, utilisent bien le decodeur générique.",
+  "La frontier générée a beaucoup moins de lignes que d'habitude et le cron dit ok. Tu peux réconcilier les artifacts ?",
+  "On peut pas juste scraper le chart visible ? Il me manque des modèles dans le snapshot AA.",
+  "Après ton fix, teste le wrapper avec /usr/bin/python3 et vérifie les timestamps, les counts et les artifacts dérivés."
+ ],
+ "intents_en": [
+  "The cron says success but the data is stale.",
+  "Debug the RSC models-array extraction error.",
+  "Fix the parser for the changed flight prefix.",
+  "Check why the refresh returned far fewer rows.",
+  "Verify all artifacts after the live-data refresh."
+ ],
+ "entities": [
+  "AA Pareto pipeline",
+  "cronjob list",
+  "no_agent=True",
+  "generated_at",
+  "latest.json",
+  "scripts/*_daily_refresh.py",
+  "/usr/bin/python3",
+  "Next.js",
+  "RSC",
+  "__next_f.push",
+  "flight payload",
+  "strip_rsc_prefix",
+  "Agentic",
+  "Intelligence",
+  "headlineValue",
+  "references/rsc-payload-debugging.md"
+ ],
+ "symptoms": [
+  "Cron reports ok but generated_at is frozen",
+  "last_status: error despite an apparently working wrapper",
+  "RSC payload did not contain a models array",
+  "Refresh returns far fewer rows than the known baseline",
+  "Repeated stale snapshot despite successful runs",
+  "Derived artifacts have mismatched timestamps or counts"
+ ],
+ "not_for": [
+  "Building a new live-data collector from scratch",
+  "General cron scheduling or wrapper failures unrelated to payload parsing",
+  "Scraping a visible comparison chart as the primary data source",
+  "Optimizing the AA Pareto model or cost frontier"
+ ]
+}

@@ -1,0 +1,67 @@
+{
+ "name": "kanban-codex-lane",
+ "sha": "bc029017ade22cf9eb634ed755f4120d1820d153f3c9185ba5671ba66fd54e35",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008613495,
+ "summary": "Use when a Hermes Kanban worker wants Codex to implement a scoped change in an isolated worktree, with Hermes retaining review, tests, and task handoff.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Sur cette carte Kanban, fais bosser Codex sur l’implémentation, mais garde la main sur la tâche.",
+  "Tu peux lancer Codex dans un worktree séparé pour ce ticket, puis vérifier toi-même son diff et les tests ?",
+  "Codex a fini son patch : regarde ce qui est récupérable, lance les tests côté Hermes et prépare le handoff.",
+  "Je veux utiliser Codex comme lane d’implémentation pour cette refacto, sans lui donner accès au board.",
+  "Le worker Hermes peut déléguer cette migration à Codex ? Il faut isoler les changements et réconcilier avant de merger.",
+  "Codex tourne depuis un moment sur le ticket ; surveille la session et tue-la si elle dépasse le budget.",
+  "Avant de marquer Done, vérifie le patch de Codex et ajoute le résultat de la lane dans metadata.codex_lane.",
+  "Pour ce ticket du prediction-market-bot, prépare le prompt Codex avec les contraintes PMB obligatoires et les commandes de vérification.",
+  "J’ai un petit fix à faire sur la tâche Kanban : est-ce que ça vaut le coup de lancer Codex ou c’est plus sûr en direct ?",
+  "Codex a touché des fichiers hors scope et propose une modif des risk gates. Rejette ce qui n’est pas sûr et documente pourquoi.",
+  "La lane Codex a timeout, mais il y a peut-être un patch utile dans le worktree : inspecte-le sans accepter son auto-évaluation.",
+  "Termine le ticket après avoir cherry-pické uniquement les commits acceptés, relancé les tests et nettoyé le worktree temporaire."
+ ],
+ "intents_en": [
+  "Run Codex as an isolated lane for this Kanban task.",
+  "Review Codex's diff and rerun the tests yourself.",
+  "Codex timed out; inspect the worktree and record the outcome.",
+  "Prepare a PMB-safe Codex prompt for this ticket.",
+  "Keep Hermes in charge of the Kanban handoff."
+ ],
+ "entities": [
+  "Hermes",
+  "Codex CLI",
+  "Kanban",
+  "kanban_show",
+  "kanban_heartbeat",
+  "kanban_complete",
+  "kanban_block",
+  "prediction-market-bot",
+  "PMB",
+  "git worktree",
+  "codex exec",
+  "/goal",
+  "codex features list",
+  "codex features enable goals",
+  "OPENAI_API_KEY",
+  "~/.codex/auth.json",
+  "scripts/run_tests.sh",
+  "metadata.codex_lane",
+  "HERMES_KANBAN_TASK",
+  "PTY",
+  "tmux"
+ ],
+ "symptoms": [
+  "Codex reports success, but Hermes has not reviewed the diff or rerun tests.",
+  "Codex is running in a shared or dirty checkout instead of an isolated worktree.",
+  "The Codex lane is stalled, timed out, or producing no useful output.",
+  "Codex attempts to modify files outside the allowed scope.",
+  "The patch touches secrets, live order entry, market orders, or risk gates.",
+  "The task handoff is missing codex_lane outcome, tests, or rejected_reason metadata."
+ ],
+ "not_for": [
+  "Research-only Kanban tasks that need a written handoff rather than a code diff.",
+  "Directly editing a small change when spawning Codex is slower or less safe.",
+  "Letting Codex update Kanban lifecycle state or declare the task complete.",
+  "Production changes involving secrets, credentials, private user data, or live order entry."
+ ]
+}

@@ -1,0 +1,57 @@
+{
+ "name": "hindsight-memory-consistency",
+ "sha": "58eed959e50472998da1245d68261ff44522997bc2a0220d9dfd1d7faa4a69b4",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0004544595,
+ "summary": "Use when auditing or repairing Hindsight PostgreSQL↔Qdrant recall-index drift using active memory_facts, not raw memory_units.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux verifier si Hindsight est clean entre Postgres et Qdrant ?",
+  "Est-ce qu'on a du drift sur l'index de memoire Hindsight ?",
+  "Compare les memory_facts actifs avec les points Qdrant, pas les memory_units.",
+  "Pourquoi le nombre de memory_units est bien plus grand que les memories dans Qdrant ? C'est normal ?",
+  "L'index de recall ne semble pas a jour, tu peux auditer la sync PG vers Qdrant ?",
+  "J'ai des facts en erreur de sync, relance le worker et verifie le resultat.",
+  "Des faits invalides ou superseded ressortent encore en recherche Hindsight, nettoie Qdrant.",
+  "Tu as regarde le health du worker ? Je veux les manquants, les inactifs presents et les erreurs.",
+  "Le rapport dit que les UUID PG ne matchent pas les IDs Qdrant : c'est vraiment un probleme ?",
+  "Verifie aussi l'outbox pending, les embeddings NULL et les doublons exacts dans memory_units.",
+  "On a corrige la sync Hindsight hier; confirme que les actifs manquants et les erreurs sont a zero.",
+  "Les memory_links sont enormes : est-ce que ca prouve un souci de coherence PG-Qdrant ?"
+ ],
+ "intents_en": [
+  "Check Hindsight PG-to-Qdrant drift.",
+  "Audit the active memory_facts search index.",
+  "Repair unsynced Hindsight facts.",
+  "Remove inactive facts still indexed in Qdrant.",
+  "Verify sync health and pending outbox rows."
+ ],
+ "entities": [
+  "Hindsight",
+  "PostgreSQL",
+  "Qdrant",
+  "memories",
+  "memory_units",
+  "memory_facts",
+  "memory_outbox",
+  "memory_links",
+  "pg_memory_id",
+  "qdrant_sync_status",
+  "PG-to-Qdrant sync worker",
+  "uuid.UUID(md5(fact_id).hexdigest())"
+ ],
+ "symptoms": [
+  "Active memory_facts are missing from Qdrant.",
+  "Superseded, invalidated, expired, historical, or archived facts remain in Qdrant.",
+  "PG sync status shows qdrant_sync_status='error'.",
+  "Sync worker reports less than 100% coverage or sync errors.",
+  "memory_outbox has pending rows."
+ ],
+ "not_for": [
+  "Comparing raw memory_units counts with Qdrant as a drift test.",
+  "Investigating memory_links size or graph density as a storage issue.",
+  "General Hindsight recall-quality tuning unrelated to PG↔Qdrant consistency.",
+  "Repairing unrelated PostgreSQL or Qdrant infrastructure failures."
+ ]
+}

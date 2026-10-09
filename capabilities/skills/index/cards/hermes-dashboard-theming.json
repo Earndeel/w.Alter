@@ -1,0 +1,66 @@
+{
+ "name": "hermes-dashboard-theming",
+ "sha": "1730845aeaec8516d661fe79e7b23c27066cb1b8ea3fa27e51ba6b6d70e939b5",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000431838,
+ "summary": "Use when creating or debugging a custom theme for the Hermes web dashboard, including YAML, palette, customCSS, and theme discovery.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi un theme sombre perso pour le dashboard Hermes.",
+  "Comment je change les couleurs du dashboard web Hermes ?",
+  "Ajoute un theme dans ~/.hermes/dashboard-themes, avec un fond noir et des panneaux gris.",
+  "Mon theme YAML est bien dans le dossier mais Hermes le voit pas, tu peux debug ?",
+  "J'ai change la palette et redemarre, mais le fond du dashboard n'a pas bouge.",
+  "Tu peux me faire un exemple de fichier YAML avec les bonnes cles pour un theme Hermes ?",
+  "Le texte a disparu depuis que j'ai mis foreground en hex, comment je corrige ca ?",
+  "Mon customCSS ne s'applique pas au dashboard, regarde comment Hermes l'injecte.",
+  "Pourquoi mon theme perso est ignore alors que son fichier est bien la ?",
+  "J'ai modifie les couleurs, faut faire un hard refresh ou relancer l'app ?",
+  "Dans config.yaml, je mets quoi pour selectionner mon theme du dashboard ?",
+  "Je parle du dashboard web Hermes, pas du TUI : comment forcer le background sur toute la page ?"
+ ],
+ "intents_en": [
+  "Create a custom Hermes dashboard theme.",
+  "My dashboard theme YAML isn't being discovered.",
+  "The palette changes don't show up after restart.",
+  "How do I override dashboard colors with custom CSS?",
+  "Why is my theme being silently skipped?"
+ ],
+ "entities": [
+  "Hermes",
+  "Hermes web dashboard",
+  "config.yaml",
+  "dashboard.theme",
+  "~/.hermes/dashboard-themes/",
+  "custom theme YAML",
+  "palette",
+  "customCSS",
+  "background",
+  "midground",
+  "foreground",
+  "warmGlow",
+  "hermes_cli/web_server.py",
+  "_normalise_theme_definition",
+  "_discover_user_themes",
+  "_BUILTIN_DASHBOARD_THEMES",
+  "hermes-theme-custom-css",
+  "rgba()",
+  "Ctrl+Shift+R",
+  "ui-tui/src/theme.ts"
+ ],
+ "symptoms": [
+  "The theme file exists but is not discovered by Hermes.",
+  "Palette changes do not render after restart.",
+  "A user theme is silently skipped.",
+  "Dashboard background remains unchanged.",
+  "Text disappears after setting foreground to a bare hex value.",
+  "Theme changes appear stale in the desktop app."
+ ],
+ "not_for": [
+  "Changing or debugging Hermes TUI themes.",
+  "Building dashboard features or changing dashboard layout.",
+  "General YAML configuration unrelated to dashboard themes.",
+  "Troubleshooting unrelated Hermes server or API failures."
+ ]
+}

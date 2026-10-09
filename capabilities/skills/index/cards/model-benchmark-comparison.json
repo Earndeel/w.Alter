@@ -1,0 +1,68 @@
+{
+ "name": "model-benchmark-comparison",
+ "sha": "4f831da1ca872120491fd66c144e1a6b422de2ef61ffe8b5c927f2093173b809",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00090478575,
+ "summary": "Use when Monsieur wants to compare, replace, or route LLMs by task, quality, speed, context window, provider availability, or cost.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Quel modèle remplacerait celui-là pour faire de la compression moins chère ?",
+  "Pourquoi j'ai un 404 avec qwen3.6-plus:free, tu peux me trouver une alternative dispo ?",
+  "Compare les modèles pour extraire du JSON en français, je veux surtout du recall et une réponse rapide.",
+  "On peut optimiser le routing de mes modèles selon le coût et la latence ?",
+  "Pour résumer les conversations, c'est quoi le meilleur modèle pas cher avec un grand contexte ?",
+  "Je veux remplacer Claude pour cette tâche, trouve-moi un modèle moins cher sans trop perdre en qualité.",
+  "Tu peux comparer Gemini Flash Lite, DeepSeek V4 Flash et les autres pour l'extraction ?",
+  "Mon modèle actuel est lent et rate des champs dans le JSON : lequel tester à la place ?",
+  "Quel modèle choisir pour du raisonnement et de la consolidation, quitte à payer un peu plus ?",
+  "Regarde les benchmarks et les prix, puis dis-moi le meilleur rapport qualité-prix pour mon cas.",
+  "Pour mon agent, compare les modèles sur de vraies tâches agentiques, pas juste le tool calling.",
+  "Est-ce que Gemini Flash Lite est accessible gratuitement sur AI Studio ou je dois passer par OpenRouter ?"
+ ],
+ "intents_en": [
+  "Find a cheaper model for conversation compression.",
+  "Compare LLMs for fast, reliable JSON extraction.",
+  "Which model should replace my current reasoning model?",
+  "Optimize model routing for cost and latency.",
+  "Compare agent models using real-world task benchmarks."
+ ],
+ "entities": [
+  "Artificial Analysis",
+  "artificialanalysis.ai",
+  "Artificial Analysis v2 API",
+  "OpenRouter",
+  "Google AI Studio",
+  "Gemini",
+  "DeepSeek",
+  "Qwen",
+  "Claude",
+  "GPT",
+  "MiMo",
+  "MiniMax",
+  "GDPval-AA",
+  "TAU2",
+  "IFBench",
+  "Terminal-Bench",
+  "vault",
+  "artificial-analysis/api_key",
+  "openrouter/api_key",
+  "gemini/api_key",
+  "model_benchmark.py",
+  "aa_analysis.py",
+  "https://artificialanalysis.ai/leaderboards/models",
+  "https://artificialanalysis.ai/evaluations/gdpval-aa"
+ ],
+ "symptoms": [
+  "404 sur un identifiant de modèle OpenRouter, par exemple qwen3.6-plus:free",
+  "Modèle trop lent, trop cher, ou insuffisamment fiable pour la tâche",
+  "Extraction JSON malformée ou avec trop peu de faits",
+  "Limites de débit sur le free tier AI Studio"
+ ],
+ "not_for": [
+  "Déboguer une intégration ou un appel API de modèle sans comparer de modèles",
+  "Mettre en place un pipeline d'inférence ou déployer un modèle",
+  "Comparer des modèles non-LLM ou des benchmarks sans rapport avec le choix d'un LLM",
+  "Configurer la prise en charge vidéo dans OpenRouter"
+ ]
+}

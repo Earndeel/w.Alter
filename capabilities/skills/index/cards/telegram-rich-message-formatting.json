@@ -1,0 +1,55 @@
+{
+ "name": "telegram-rich-message-formatting",
+ "sha": "a18734f8459c4bd104b1f9eaa30632f1eaac8a55408c43618e5a4d95f1ec8af1",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000408474,
+ "summary": "Use when Telegram needs a readable table, comparison, headings, quotes, or other structured Rich Message formatting.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Envoie-moi ça sur Telegram sous forme de tableau.",
+  "Tu peux comparer ces offres dans un tableau lisible sur Telegram ?",
+  "Mon tableau s'affiche avec les | au lieu d'être mis en forme, tu peux corriger ça ?",
+  "Fais un Rich Message Telegram avec un titre, une citation et les détails repliables.",
+  "Mets les prix par vidéo et par seconde dans des colonnes séparées, stp.",
+  "Le message est accepté par l'API, mais sur mon téléphone le rendu est tout cassé.",
+  "Comment activer les Rich Messages dans l'adaptateur Telegram de Hermes ?",
+  "Tu peux vérifier si notre route Telegram utilise bien sendRichMessage ?",
+  "J'ai besoin d'un comparatif compact pour Telegram, avec les unités et les variantes des modèles.",
+  "Le tableau est trop large sur mobile : réduis les colonnes ou sépare-le en deux.",
+  "Si Telegram ne supporte pas ce format sur cette route, fais-moi un fallback HTML lisible.",
+  "Teste l'envoi d'un petit tableau sur Telegram et vérifie le rendu, pas juste la réponse HTTP."
+ ],
+ "intents_en": [
+  "Send this as a Telegram table.",
+  "Why are the Markdown table pipes showing literally?",
+  "Check whether Telegram Rich Messages are enabled.",
+  "Format this comparison for Telegram mobile.",
+  "Test the rendered Telegram table, not just the API response."
+ ],
+ "entities": [
+  "Telegram",
+  "Hermes Telegram adapter",
+  "Telegram Bot API",
+  "Rich Messages",
+  "sendRichMessage",
+  "sendMessage",
+  "telegram.extra.rich_messages",
+  "MarkdownV2",
+  "HTML",
+  "RichBlockTable",
+  "references/telegram-bot-api-rich-messages.md"
+ ],
+ "symptoms": [
+  "Pipe-separated table appears literally in the Telegram message",
+  "Message is accepted by the Bot API but renders incorrectly",
+  "Table is too wide or unreadable on a phone screen",
+  "Current Telegram route appears to expose only sendMessage"
+ ],
+ "not_for": [
+  "Sending ordinary Telegram text with no structured layout",
+  "Building or deploying a Telegram bot or its adapter",
+  "Writing the data or analysis that will go into a table",
+  "Formatting tables for platforms other than Telegram"
+ ]
+}

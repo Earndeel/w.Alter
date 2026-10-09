@@ -1,0 +1,71 @@
+{
+ "name": "hermes-context-management",
+ "sha": "4b5e0d1ccf21b2a23a669d239e5d68362eaa6d5d591c515c68c3583b3cb1dcf8",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00088919325,
+ "summary": "Use when diagnosing Hermes context bloat, failed or missing compression, prompt injection duplication, or token-heavy sessions.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Pourquoi mon contexte Hermes explose aussi vite ?",
+  "Tu peux regarder ce qui bouffe les tokens dans cette session ?",
+  "La compression se déclenche pas alors que je suis à plus de 100k tokens, tu diagnostiques ?",
+  "J’ai changé le modèle de compression dans config.yaml mais rien n’a bougé.",
+  "J’ai ce log « No auxiliary LLM provider for compression » : comment je corrige ça ?",
+  "J’ai mis Gemini avec Groq, ça peut expliquer que les résumés de contexte disparaissent ?",
+  "Hermes oublie des trucs après la compression, tu peux vérifier le compresseur live ?",
+  "C’est quoi la différence entre context_compressor.py et trajectory_compressor.py ?",
+  "Mes SOUL.md, USER.md et MEMORY.md se répètent partout. On peut auditer le prompt injecté et nettoyer ça ?",
+  "Les résultats de search_files et les sorties terminal font gonfler mes sessions, comment trouver les plus gros payloads ?",
+  "Le sous-agent finit sur « maximum iterations ... couldn't summarize » avec une APIConnectionError ; tu peux trouver si c’est le timeout ou le provider ?",
+  "J’ai mis à jour MEMORY.md mais Hermes utilise encore l’ancienne version dans la session : c’est normal ?"
+ ],
+ "intents_en": [
+  "Why is my Hermes context growing so fast?",
+  "Debug why live compression never triggers.",
+  "Check whether my compression provider supports this model.",
+  "Audit duplicated SOUL, USER, and MEMORY prompt content.",
+  "Find which tool outputs are bloating the session."
+ ],
+ "entities": [
+  "Hermes Agent",
+  "agent/context_compressor.py",
+  "trajectory_compressor.py",
+  "run_agent.py",
+  "gateway/run.py",
+  "~/.hermes/state.db",
+  "~/.hermes/config.yaml",
+  "~/.hermes/logs/agent.log",
+  "~/.hermes/logs/errors.log",
+  "~/.hermes/SOUL.md",
+  "~/.hermes/memories/USER.md",
+  "~/.hermes/memories/MEMORY.md",
+  "auxiliary.compression",
+  "search_files",
+  "terminal",
+  "read_file",
+  "skills_list",
+  "Gemini",
+  "Groq",
+  "OpenRouter",
+  "GPT-5.5",
+  "Hindsight",
+  "hermes gateway restart",
+  "/reset"
+ ],
+ "symptoms": [
+  "No auxiliary LLM provider for compression — summaries will be unavailable.",
+  "Context is dropped without summary.",
+  "Compression does not trigger despite 100K+ tokens.",
+  "Old tool output cleared to save context space",
+  "maximum iterations (N) but couldn't summarize",
+  "APIConnectionError",
+  "Repeated API call failures with Connection error"
+ ],
+ "not_for": [
+  "Compressing JSONL training trajectories as a standalone batch task.",
+  "General Hermes installation or gateway setup unrelated to context issues.",
+  "Debugging ordinary provider outages that do not affect context or summary generation.",
+  "Editing project instructions for task behavior without investigating prompt injection or bloat."
+ ]
+}

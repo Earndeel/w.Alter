@@ -1,0 +1,67 @@
+{
+ "name": "hermes-theming",
+ "sha": "c4e100c1914bd340e148c623354afa0e753673b872bb9d18d8782dfd27ed0d25",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000482922,
+ "summary": "Use when Monsieur wants to add, change, or troubleshoot a Hermes theme on the dashboard, desktop app, or TUI.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Change le fond du dashboard Hermes, je veux un truc plus sombre.",
+  "J’ai modifié la couleur mais ça bouge pas, faut rebuild ou juste refresh ?",
+  "Ajoute un thème YAML pour le dashboard Hermes avec ces couleurs.",
+  "Où je dois mettre le fichier de thème pour l’interface web ?",
+  "Tu peux ajouter mon thème dans l’app desktop Hermes v2 ?",
+  "J’ai changé presets.ts, pourquoi le thème apparaît toujours pas dans Settings → Appearance ?",
+  "Je veux importer un thème VS Code dans Hermes desktop, ça se fait comment ?",
+  "Le thème dashboard marche pas dans l’app Electron, c’est censé être partagé ?",
+  "Pour Hermes TUI, c’est quel fichier qu’il faut modifier pour le thème ?",
+  "On avait parlé du fond du dashboard : j’ai fait le YAML, comment je l’active maintenant ?",
+  "J’ai changé dashboard.theme mais je vois encore l’ancien thème après reload.",
+  "Explique-moi vite fait la différence entre les thèmes dashboard, desktop et TUI, et où les éditer."
+ ],
+ "intents_en": [
+  "Change the Hermes dashboard theme.",
+  "Add a desktop theme preset.",
+  "Why didn't my theme change take effect?",
+  "Where do I put a custom dashboard YAML theme?",
+  "How do I change the Hermes TUI colors?"
+ ],
+ "entities": [
+  "Hermes",
+  "/dashboard",
+  "Hermes v2",
+  "hermes tui",
+  "~/.hermes/dashboard-themes/<name>.yaml",
+  "apps/desktop/src/themes/presets.ts",
+  "apps/desktop/src/themes/vscode.ts",
+  "ui-tui/src/theme.ts",
+  "hermes_cli/web_server.py",
+  "_BUILTIN_DASHBOARD_THEMES",
+  "BUILTIN_THEMES",
+  "_discover_user_themes()",
+  "_normalise_theme_definition()",
+  "dashboard.theme",
+  "VS Code themes",
+  "Electron",
+  "YAML",
+  "TypeScript",
+  "customCSS",
+  "npm run build",
+  "npm run dev",
+  "Settings → Appearance"
+ ],
+ "symptoms": [
+  "Changed background color has no effect",
+  "Dashboard theme changes do not appear in the desktop app",
+  "Desktop theme does not appear in Settings → Appearance",
+  "Dashboard still shows the old theme after changing dashboard.theme",
+  "Custom theme YAML is not listed by the dashboard"
+ ],
+ "not_for": [
+  "Changing unrelated dashboard layout, widgets, or functionality",
+  "Debugging general Electron build failures unrelated to themes",
+  "Writing CSS for a non-Hermes website",
+  "Changing Hermes configuration unrelated to dashboard.theme"
+ ]
+}

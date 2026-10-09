@@ -1,0 +1,64 @@
+{
+ "name": "ai-model-research",
+ "sha": "f8e8a081905813a839b6f4b526fa20a1e64be7f2775525bdcc8453b91a78497c",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00054789075,
+ "summary": "Use when Monsieur veut identifier un LLM nouveau ou anonyme, vérifier ses spécifications ou évaluer le sentiment communautaire avant de l’adopter.",
+ "kind": "procedure",
+ "intents_fr": [
+  "C’est quoi ce modèle stealth sur OpenRouter ?",
+  "Tu sais qui est derrière Ox Alpha ?",
+  "Y a un nouveau modèle qui vient d’apparaître sur OpenRouter, tu peux enquêter ?",
+  "Hunter Alpha, ça vaut quoi en vrai ?",
+  "Vérifie les specs annoncées pour ce modèle : contexte, prix et modalités.",
+  "Le provider dit zero data retention : on peut leur faire confiance ?",
+  "Tu peux voir ce que Reddit et X en pensent avant que je l’intègre ?",
+  "J’ai vu passer des rumeurs que ce modèle serait MiMo, tu peux évaluer les preuves ?",
+  "L’API OpenRouter renvoie 404 pour le modèle, mais je le vois dans la liste : c’est quoi le bon moyen de vérifier ?",
+  "Le modèle est gratuit en preview, tu penses qu’on peut compter sur ce prix pour le budget ?",
+  "Fais-moi un point honnête sur ce nouveau LLM : ce qui est vérifié, les rumeurs et les retours utilisateurs.",
+  "Il y a des tests concrets ou juste des gens qui disent qu’il ressemble à tel autre modèle ?"
+ ],
+ "intents_en": [
+  "Who is behind this stealth model?",
+  "Check the real specs for this new OpenRouter model.",
+  "What are people on Reddit saying about it?",
+  "Is the provider's zero-retention claim verified?",
+  "Compare the identity theories and evidence."
+ ],
+ "entities": [
+  "OpenRouter",
+  "OpenRouter models API",
+  "GET https://openrouter.ai/api/v1/models",
+  "stealth/*",
+  "Ox Alpha",
+  "Hunter Alpha",
+  "Reddit",
+  "X/Twitter",
+  "x_search",
+  "Arctic Shift",
+  "https://arctic-shift.photon-reddit.com/api/comments/search",
+  "PullPush",
+  "https://api.pullpush.io/reddit/search/comment/",
+  "EQ-Bench",
+  "MiMo V3",
+  "GLM 5.3",
+  "model-id-lookup",
+  "blocked-page-recovery"
+ ],
+ "symptoms": [
+  "Un modèle inconnu apparaît sous un identifiant stealth/*",
+  "L’endpoint OpenRouter par ID renvoie 404 alors que le modèle figure dans la liste",
+  "Une page de modèle OpenRouter est bloquée par un challenge",
+  "Les affirmations du provider sur les modalités, le prix ou la rétention ne sont pas confirmées",
+  "x_search échoue avec une erreur spending-limit",
+  "Reddit renvoie 403 lors de la recherche de discussions"
+ ],
+ "not_for": [
+  "Résoudre un identifiant exact de modèle pour l’utiliser dans une application",
+  "Récupérer une page web bloquée sans analyser l’identité d’un modèle",
+  "Comparer des modèles déjà identifiés pour choisir lequel utiliser",
+  "Déboguer une intégration OpenRouter ou appeler un modèle en production"
+ ]
+}

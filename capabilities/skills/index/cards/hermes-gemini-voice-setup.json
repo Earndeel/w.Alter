@@ -1,0 +1,68 @@
+{
+ "name": "hermes-gemini-voice-setup",
+ "sha": "09135fef64582968eff700dcea2a143a6c1d33b44c28543f0947ef3bca27802d",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008776845,
+ "summary": "Use when Monsieur veut configurer ou dépanner Gemini comme STT/TTS vocal dans Hermes, notamment pour les messages vocaux Telegram.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute Gemini pour transcrire les vocaux Telegram dans Hermes.",
+  "Configure le STT Gemini 3.1 Flash Lite et le TTS Gemini dans mon Hermes.",
+  "Les vocaux Telegram arrivent vides, tu peux vérifier la transcription Gemini ?",
+  "J'ai mis provider: gemini dans config.yaml mais Hermes ne transcrit toujours rien.",
+  "Fais parler Hermes avec Gemini TTS, en voix Algenib si possible.",
+  "On avait parlé de la voix Gemini : installe le SDK et configure STT/TTS dans Hermes.",
+  "Pourquoi j'ai `No STT provider available` alors que Gemini est configuré ?",
+  "Vérifie que le code Gemini est bien présent dans transcription_tools.py et tts_tool.py.",
+  "Mes messages vocaux font `msg=''` dans agent.log, regarde le pipeline Gemini.",
+  "Configure la clé Gemini pour Hermes, vérifie sa résolution et teste la transcription.",
+  "Le TTS Gemini renvoie pas un OGG utilisable par Telegram, corrige la conversion audio.",
+  "Relance le gateway après la mise en place de Gemini et vérifie que STT et TTS fonctionnent."
+ ],
+ "intents_en": [
+  "Set up Gemini STT and TTS in Hermes.",
+  "Transcribe Telegram voice messages with Gemini.",
+  "Fix Gemini STT returning empty transcripts.",
+  "Configure Hermes to speak with Gemini TTS.",
+  "Verify the Gemini voice integration and restart the gateway."
+ ],
+ "entities": [
+  "Hermes Agent",
+  "Gemini",
+  "google-genai",
+  "Gemini 3.1 Flash Lite",
+  "gemini-3.1-flash-lite-preview",
+  "Gemini 3.1 Flash TTS",
+  "gemini-3.1-flash-tts-preview",
+  "Telegram",
+  "STT",
+  "TTS",
+  "transcription_tools.py",
+  "tts_tool.py",
+  "config.yaml",
+  "GEMINI_API_KEY",
+  "GOOGLE_API_KEY",
+  "/root/.hermes/lancedb-gemini/config.json",
+  "/root/.hermes/.env",
+  "/root/.hermes/hermes-agent",
+  "ffmpeg",
+  "Algenib",
+  "hermes gateway run --replace"
+ ],
+ "symptoms": [
+  "Telegram voice messages show `msg=''` in agent.log",
+  "`No STT provider available` although Gemini is configured",
+  "Gemini provider resolves but transcription returns no transcript",
+  "`No Gemini API key`",
+  "`google-genai not installed`",
+  "Gemini TTS returns no audio data",
+  "Telegram cannot play the generated audio"
+ ],
+ "not_for": [
+  "Configurer Gemini comme modèle de chat ou fournisseur LLM dans Hermes",
+  "Dépanner la réception ou l'envoi Telegram sans lien avec les vocaux Gemini",
+  "Configurer un autre fournisseur STT ou TTS comme OpenAI ou ElevenLabs",
+  "Mettre en place Gemini Live ou une conversation audio temps réel"
+ ]
+}

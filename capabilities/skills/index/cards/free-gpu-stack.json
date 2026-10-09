@@ -1,0 +1,70 @@
+{
+ "name": "free-gpu-stack",
+ "sha": "f19bc7d83d6f87d79d8ff195068589d6778d5d1084f134bbd872be2a801f24a5",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000889317,
+ "summary": "Use when choosing, pricing, authenticating, or running GPU inference/training on Modal, Kaggle, Colab, GCP, Lightning, HF Spaces, or Vast.ai.",
+ "kind": "reference",
+ "intents_fr": [
+  "C’est quoi le meilleur GPU gratuit pour lancer une inference vite fait ?",
+  "Je veux louer un H100 pour faire tourner ce modèle, tu peux comparer Vast.ai et Modal ?",
+  "Comment je configure Modal sur la VM et je lance mon script avec un T4 ?",
+  "Kaggle me limite à 30h par semaine, y a une autre option gratuite ?",
+  "Colab se déconnecte tout le temps, je peux faire tourner ça où à la place ?",
+  "Tu me donnes les commandes pour chercher un 4090 pas cher sur Vast.ai ?",
+  "J’ai une erreur Permission denied (publickey) sur ma nouvelle instance Vast.ai, je dois faire quoi ?",
+  "Le modèle recommande un H100 : un 4090 suffit ou je vais perdre beaucoup de temps ? Vérifie les benchmarks.",
+  "Je veux faire tourner une démo Gradio avec un GPU gratuit, HF Spaces ça suffit ?",
+  "Comment arrêter les frais Vast.ai quand je n’utilise plus le GPU, sans perdre mon setup ?",
+  "On reprend la génération 3D : quel GPU et quel provider pour TRELLIS.2, et combien ça coûterait par image ?",
+  "J’ai besoin de GPU pour entraîner un modèle lourd, compare les options et les étapes d’auth."
+ ],
+ "intents_en": [
+  "Find a free GPU for inference.",
+  "Compare Modal and Vast.ai pricing.",
+  "Launch a GPU instance on Vast.ai.",
+  "Choose a GPU for a model that recommends H100.",
+  "Stop Vast.ai charges without losing my setup."
+ ],
+ "entities": [
+  "Modal",
+  "Kaggle",
+  "Google Colab",
+  "Google Cloud Platform",
+  "Lightning AI",
+  "Hugging Face Spaces",
+  "Vast.ai",
+  "modal",
+  "kaggle",
+  "gcloud",
+  "lightning",
+  "huggingface-cli",
+  "vastai",
+  "T4",
+  "RTX 4090",
+  "H100",
+  "H200",
+  "TRELLIS.2",
+  "modal/token_id",
+  "modal/token_secret",
+  "huggingface/token",
+  "~/.kaggle/kaggle.json",
+  "~/.ssh/id_ed25519.pub",
+  "ssh4.vast.ai"
+ ],
+ "symptoms": [
+  "Permission denied (publickey) when connecting to a new Vast.ai instance",
+  "Vast.ai instance stuck in created state",
+  "Colab GPU session disconnects after a few hours",
+  "Modal cold start takes 5–15 seconds",
+  "GPU unavailable because of a cloud quota",
+  "Vast.ai SSH times out during long-running commands"
+ ],
+ "not_for": [
+  "Debugging or optimizing model code unrelated to GPU provider setup",
+  "Choosing hosted inference APIs that do not require renting or configuring a GPU",
+  "General cloud hosting for CPU-only services",
+  "Detailed TRELLIS.2 generation instructions beyond selecting and provisioning its GPU"
+ ]
+}

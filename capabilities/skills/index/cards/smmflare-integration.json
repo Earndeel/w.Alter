@@ -1,0 +1,66 @@
+{
+ "name": "smmflare-integration",
+ "sha": "26959114e5ff1b7bad16e8480eda94662c1734c1701dc5236731131f2b94409a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005197995,
+ "summary": "Use when Monsieur veut consulter le solde ou les services SMMFlare, commander de l’engagement social ou gérer une commande via l’API.",
+ "kind": "integration",
+ "intents_fr": [
+  "Check le solde de mon compte SMMFlare.",
+  "Tu peux me lister les services TikTok dispo et leurs prix ?",
+  "Commande 10k vues sur cette video TikTok avec SMMFlare.",
+  "Prends des likes pour ce lien, regarde d’abord les services et le tarif.",
+  "Je veux des followers TikTok, trouve un service adapte et passe la commande.",
+  "La commande SMMFlare est en cours ou terminee ?",
+  "Verifie le status de l’order 123456.",
+  "Tu peux demander un refill pour cette commande ?",
+  "Annule les commandes en attente sur SMMFlare.",
+  "Pourquoi ma commande passe pas ? Mon solde est peut-etre a zero.",
+  "J’ai besoin de ma cle API SMMFlare, tu peux la generer depuis mon compte ?",
+  "Le site me renvoie « Unable to verify your domain submission » quand je genere la cle, debloque ca."
+ ],
+ "intents_en": [
+  "Check my SMMFlare balance.",
+  "List available TikTok services and prices.",
+  "Order views for this TikTok video.",
+  "Check the status of my SMMFlare order.",
+  "Generate my SMMFlare API key."
+ ],
+ "entities": [
+  "SMMFlare",
+  "https://smmflare.com/api/v2",
+  "SMMFlare REST API",
+  "vault get smmflare/api_key",
+  "balance",
+  "services",
+  "add",
+  "status",
+  "refill",
+  "cancel",
+  "TikTok",
+  "service IDs 9556, 9574-9603",
+  "PHPSESSID",
+  "_csrf",
+  "webtop-authenticated-browsing",
+  "references/smmflare-cookie-workflow.md",
+  "Brave Cookies DB",
+  "macos/brave_keychain_key",
+  "PBKDF2",
+  "AES-128-CBC",
+  "/account/newkey"
+ ],
+ "symptoms": [
+  "Unable to verify your domain submission",
+  "API key input displays ***",
+  "POST /account/newkey returns a 302 redirect",
+  "SMMFlare account balance is $0",
+  "Order fails because the service ID is invalid or changed"
+ ],
+ "not_for": [
+  "Creating or planning social media content",
+  "Using TikTok’s own API or managing a TikTok account",
+  "Adding funds to SMMFlare through its website",
+  "General browser cookie extraction unrelated to SMMFlare"
+ ]
+}

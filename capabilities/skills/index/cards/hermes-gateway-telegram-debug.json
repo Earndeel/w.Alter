@@ -1,0 +1,65 @@
+{
+ "name": "hermes-gateway-telegram-debug",
+ "sha": "63a299dd72c02f3e25543cc2e6537a4491e8fe354493affc59df88161dee38af",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007192845,
+ "summary": "Use when Hermes Gateway ne se connecte pas à Telegram, rejette le bot token ou reprend une session Telegram obsolète.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Mon bot Telegram se connecte plus au gateway Hermes, tu peux checker ?",
+  "J’ai une erreur InvalidToken alors que le token BotFather est bon.",
+  "Hermes affiche TELEGRAM_BOT_TOKEN=*** dans le .env, comment je répare ça ?",
+  "Le gateway tourne mais Telegram reste disconnected, regarde les logs stp.",
+  "J’envoie /new sur Telegram et il repart sur l’ancien debug, c’est quoi le souci ?",
+  "Mes messages CLI et Telegram partagent la même session, sépare-les.",
+  "Tu peux nettoyer les sessions Telegram stale puis relancer le gateway ?",
+  "J’ai changé le token mais Hermes continue de le rejeter, vérifie le .env et les doublons.",
+  "Le gateway semble planté, redémarre-le proprement sans perdre le fil du diagnostic.",
+  "gateway_state.json dit token rejected, mais le bot répond encore : vérifie l’état réel.",
+  "Après le restart, confirme que Telegram est connected et que mon user ID est autorisé.",
+  "Le token a peut-être été tronqué avec les numéros de ligne dans le fichier, tu peux corriger ça ?"
+ ],
+ "intents_en": [
+  "Fix the Hermes Telegram gateway connection.",
+  "The bot token is rejected even though it is valid.",
+  "Telegram keeps resuming a stale session.",
+  "Restart the gateway and verify Telegram is connected.",
+  "Check why the Telegram token in .env is masked or truncated."
+ ],
+ "entities": [
+  "Hermes Gateway",
+  "Telegram",
+  "BotFather",
+  "TELEGRAM_BOT_TOKEN",
+  "TELEGRAM_ALLOWED_USERS",
+  "hermes config set",
+  "hermes gateway run --replace",
+  "/root/.hermes/.env",
+  "/root/.hermes/config.yaml",
+  "/root/.hermes/state.db",
+  "/root/.hermes/gateway_state.json",
+  "/root/.hermes/gateway.pid",
+  "/root/.hermes/gateway.log",
+  "/root/.hermes/hermes-agent/",
+  "/root/.local/bin/hermes",
+  "Telegram Bot API getMe",
+  "group_sessions_per_user"
+ ],
+ "symptoms": [
+  "telegram.error.InvalidToken: The token was rejected by the server",
+  "TELEGRAM_BOT_TOKEN=***",
+  "TELEGRAM_BOT_TOKEN contains ... or is truncated",
+  "gateway_state.json shows token rejected or disconnected",
+  "Telegram replies with old debug commands or previous conversation context",
+  "Telegram /new does not clear the stale workflow",
+  "Telegram and CLI messages attach to the same session",
+  "Gateway process is running but Telegram is not connected"
+ ],
+ "not_for": [
+  "Créer un bot Telegram ou obtenir un token auprès de BotFather",
+  "Développer les fonctionnalités conversationnelles du bot",
+  "Diagnostiquer les connexions d’autres plateformes que Telegram",
+  "Résoudre des problèmes généraux de réseau ou de serveur sans lien avec Hermes Gateway"
+ ]
+}

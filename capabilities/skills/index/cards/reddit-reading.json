@@ -1,0 +1,60 @@
+{
+ "name": "reddit-reading",
+ "sha": "ca8d020e00c0c8f9a9c6ab8692e6b6c7cae31aa83e8d513e2086be480b25d157",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00055878075,
+ "summary": "Use when Monsieur wants to read Reddit subreddits, search posts, inspect threads/comments, or check a user's activity.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Qu'est-ce que r/LocalLLaMA dit sur les agents IA en ce moment ?",
+  "Cherche des discussions Reddit sur Hermes Agent, surtout dans les subs pertinents.",
+  "Tu peux me résumer ce thread Reddit ? https://www.reddit.com/r/example/comments/abc123/example/",
+  "Regarde les posts récents de u/spez.",
+  "Trouve-moi les threads Reddit les plus utiles sur le sujet, pas juste les titres.",
+  "Qu'est-ce qui est tendance sur r/MachineLearning aujourd'hui ?",
+  "Fais une recherche sur Reddit pour « open source AI » dans r/LocalLLaMA, triée par récent.",
+  "Le lien Reddit renvoie une page de vérification. Tu peux quand même lire le thread ?",
+  "Compare ce que les gens racontent dans les commentaires de ces discussions Reddit.",
+  "Sur r/selfhosted, cherche des retours sur les outils de monitoring.",
+  "Je veux suivre ce que cette personne publie sur Reddit : u/exampleuser.",
+  "On a déjà parlé de ce post ? Lis-le et donne-moi les points importants avec le lien source."
+ ],
+ "intents_en": [
+  "Search Reddit for discussions about local AI agents.",
+  "Summarize this Reddit thread and its comments.",
+  "What's trending on r/selfhosted?",
+  "Find recent posts by this Reddit user.",
+  "Read this Reddit URL; the browser is blocked."
+ ],
+ "entities": [
+  "Reddit",
+  "subreddits",
+  "Reddit search",
+  "threads",
+  "comments",
+  "user activity",
+  "scripts/reddit.py",
+  "doctor",
+  "REDDIT_CLIENT_ID",
+  "REDDIT_CLIENT_SECRET",
+  "~/.hermes/.env",
+  "Atom feeds",
+  "OAuth client_credentials",
+  "reddit.com",
+  "r/LocalLLaMA"
+ ],
+ "symptoms": [
+  "Reddit URLs return 403 from the server",
+  "Reddit shows a “Prove your humanity” wall",
+  "browser_navigate or web_extract cannot read a Reddit page",
+  "Reddit .json endpoints return 403 or an empty shell",
+  "Anonymous feed requests hit a 429 rate limit"
+ ],
+ "not_for": [
+  "Posting, voting, messaging, or other actions requiring a Reddit user account",
+  "Recovering old archived pages when the thread is no longer available",
+  "Reading or researching other social networks such as X",
+  "Long-term Reddit monitoring without app credentials"
+ ]
+}

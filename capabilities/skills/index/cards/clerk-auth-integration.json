@@ -1,0 +1,69 @@
+{
+ "name": "clerk-auth-integration",
+ "sha": "bc69d497df343d583fc44bed2dbfe6d2ced69601bbce7efbbc8128e5fe7256f0",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0006306795,
+ "summary": "Use when adding or debugging Clerk sign-in, OAuth, or user matching for a static site and Flask backend.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute une connexion Clerk avec Google sur ma landing page statique.",
+  "Tu peux intégrer Clerk à mon app Flask, avec le login et la création de compte ?",
+  "Je veux une modale de login Clerk qui renvoie vers /app.html après connexion.",
+  "Comment je charge clerk-js proprement avec ma publishable key ?",
+  "window.Clerk est undefined après le chargement du script, tu peux corriger ça ?",
+  "J’ai l’erreur Cannot read properties of undefined sur Clerk.load, faut attendre comment ?",
+  "Mets Clerk en thème sombre pour que le widget colle au design du site.",
+  "Mon frontend sur app.example.com n’arrive pas à appeler l’API Flask sur api.example.com, Failed to fetch.",
+  "Quand un utilisateur se connecte avec Clerk, retrouve d’abord son client existant par email dans la base.",
+  "On a plusieurs projets : je veux utiliser le même compte Clerk et les mêmes providers OAuth partout.",
+  "Les appels API Clerk depuis le serveur font 403 ; est-ce que je dois faire l’auth côté frontend ?",
+  "J’ai une clé pk_test qui se décode avec un caractère bizarre à la fin, aide-moi à configurer le domaine Clerk."
+ ],
+ "intents_en": [
+  "Add Clerk sign-in to my static site.",
+  "Integrate Clerk auth with my Flask backend.",
+  "Fix window.Clerk being undefined on page load.",
+  "Configure CORS for my Clerk-authenticated frontend.",
+  "Reuse one Clerk OAuth setup across multiple projects."
+ ],
+ "entities": [
+  "Clerk",
+  "clerk-js",
+  "Flask",
+  "Google OAuth",
+  "GitHub OAuth",
+  "Apple OAuth",
+  "publishable key",
+  "secret key",
+  "Clerk domain",
+  "pk_test_*",
+  "pk_live_*",
+  "sk_test_*",
+  "sk_live_*",
+  "window.Clerk",
+  "window.__clerk_publishable_key",
+  "clerk_id",
+  "clients",
+  "client_id",
+  "notes",
+  "app.example.com",
+  "api.example.com",
+  "/login.html",
+  "/app.html"
+ ],
+ "symptoms": [
+  "window.Clerk is undefined",
+  "Cannot read properties of undefined (reading 'load')",
+  "Failed to fetch",
+  "403 on server-side Clerk API calls",
+  "Clerk widget fails to initialize",
+  "Clerk sign-in or sign-up does not return to the site"
+ ],
+ "not_for": [
+  "Implementing authentication with providers other than Clerk.",
+  "Building a full user-management or authorization system unrelated to Clerk.",
+  "Fixing general Flask API bugs that are not caused by Clerk auth or CORS.",
+  "Managing OAuth provider credentials directly in Google, GitHub, or Apple dashboards."
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "name": "hermes-desktop-v2-ssh",
+ "sha": "c07e0fa560b2ca7940a785867ee008ed239ca7a86ac043aab5159c9ff78481cd",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00053774325,
+ "summary": "Use when Monsieur veut installer, lancer ou dépanner Hermes Desktop V2 sur Mac via le tunnel SSH vers le dashboard du VPS hermes.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Comment je lance Hermes V2 sur mon Mac Intel en remote ?",
+  "Installe Hermes Desktop V2 sans toucher à ma V1.",
+  "Tu peux me remettre le launcher hermes-v2 dans /usr/local/bin ?",
+  "Le tunnel SSH vers le dashboard ne monte plus, tu regardes ?",
+  "J’ai lancé hermes-v2 mais l’app ne se connecte pas au VPS.",
+  "C’est quoi déjà la commande pour ouvrir la V2 ?",
+  "Le port 9119 est occupé, comment je relance proprement le tunnel ?",
+  "Je veux builder le DMG Mac x64 de Hermes Desktop V2.",
+  "Hermes V2 affiche une alerte au premier lancement, je fais quoi ?",
+  "Ferme le tunnel SSH Hermes V2, il tourne encore en arrière-plan.",
+  "La V2 ne trouve plus walter-ts depuis mon Mac, quelles vérifications faire ?",
+  "On peut utiliser l’app Electron officielle en remote vers le dashboard hermes sur le VPS, sans lancer hermes serve en local ?"
+ ],
+ "intents_en": [
+  "Launch Hermes Desktop V2 remotely on my Mac.",
+  "Install V2 without replacing the existing app.",
+  "Fix the SSH tunnel to the Hermes VPS dashboard.",
+  "Build the official Mac x64 desktop DMG.",
+  "Stop the Hermes V2 tunnel."
+ ],
+ "entities": [
+  "Hermes Desktop V2",
+  "NousResearch/hermes-agent",
+  "Hermes V2.app",
+  "/Applications/Hermes V2.app",
+  "HermesDesktop.app",
+  "/usr/local/bin/hermes-v2",
+  "hermes-v2-launcher.sh",
+  "Hermes-0.17.0-mac-x64.dmg",
+  "/tmp/hermes-agent/apps/desktop",
+  "npm install",
+  "npm run dist:mac",
+  "HERMES_DESKTOP_REMOTE_URL",
+  "HERMES_DESKTOP_REMOTE_TOKEN",
+  "hermes dashboard",
+  "hermes serve",
+  "SSH",
+  "walter-ts",
+  "~/.ssh/config",
+  "Tailscale",
+  "100.91.35.121",
+  "localhost:9119",
+  "127.0.0.1:8787",
+  "/tmp/hermes-v2-tunnel.lock",
+  "/tmp/hermes-v2-ssh-ctrl"
+ ],
+ "symptoms": [
+  "Hermes V2 ne se connecte pas au dashboard distant.",
+  "Le tunnel SSH vers walter-ts échoue ou se ferme.",
+  "Le launcher ne détecte pas le dashboard après 20 secondes.",
+  "Le port local 9119 est déjà occupé.",
+  "L’app Electron demande une confirmation d’ouverture au premier lancement."
+ ],
+ "not_for": [
+  "Utiliser ou administrer Hermes Desktop V1.",
+  "Dépanner le dashboard Hermes lui-même lorsqu’il ne tourne pas sur le VPS.",
+  "Configurer un nouveau serveur Hermes ou ses fournisseurs de modèles.",
+  "Créer un tunnel SSH générique sans lien avec Hermes Desktop V2."
+ ]
+}

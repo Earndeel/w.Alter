@@ -1,0 +1,69 @@
+{
+ "name": "evidence-and-execution-operations",
+ "sha": "00a66809d825ae2a0c98b6843fb44c915a949ddf327ccad5f38172f627e11ab8",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007717545,
+ "summary": "Use when turning software, research, messages, meetings, records, or provider operations into verified actions with evidence and approval gates.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fais une recherche web fiable là-dessus, avec des sources primaires et des citations vérifiables.",
+  "J’ai ce bug, reproduis-le, trouve une hypothèse testable et corrige sans toucher au reste.",
+  "Relis le diff comme reviewer indépendant et donne-moi les constats reproductibles, sans modifier les fichiers.",
+  "Prépare le déploiement, mais vérifie le rollback et confirme que le service fonctionne après redémarrage.",
+  "Analyse toute ma boîte Gmail pour ce sujet, avec les threads complets et les limites de couverture.",
+  "Résume cette réunion en séparant décisions, propositions, blocages et actions avec responsables et échéances.",
+  "Fais le point hebdo sur mes projets, tâches, mails et calendrier, puis propose un plan réaliste.",
+  "Rédige la réponse dans le contexte du thread, mais ne l’envoie pas sans mon accord.",
+  "Vérifie pourquoi le modèle ou le provider échoue avant de relancer des appels payants.",
+  "Le job média a l’air terminé : valide le fichier final et vérifie que le destinataire peut vraiment le récupérer.",
+  "Remplis ce formulaire à partir des justificatifs, sans inventer de chiffres, puis contrôle le PDF rendu.",
+  "J’ai autorisé l’envoi : fais l’action une seule fois et vérifie l’état exact côté destinataire."
+ ],
+ "intents_en": [
+  "Research this with verifiable primary sources.",
+  "Reproduce the bug, fix it, and run the tests.",
+  "Review the diff without changing anything.",
+  "Analyze the full Gmail mailbox and report coverage.",
+  "Send only after approval, then verify delivery."
+ ],
+ "entities": [
+  "Hermes",
+  "HERMES_HOME",
+  "Gmail",
+  "Gmail API",
+  "users.getProfile",
+  "gmail.readonly",
+  "scripts/gmail_readonly_oauth.py",
+  "React",
+  "OAuth",
+  "API",
+  "browser session",
+  "provider",
+  "model ID",
+  "endpoint",
+  "tenant",
+  "worktree",
+  "Downloads",
+  "RTP",
+  "PDF",
+  "Range requests"
+ ],
+ "symptoms": [
+  "403 Forbidden",
+  "429 Too Many Requests",
+  "WAF or bot interstitial",
+  "Paywall or login wall",
+  "Provider validation or not-found failure",
+  "Authentication succeeds but the operation fails",
+  "Job accepted but no valid artifact is available",
+  "Attachment exists but recipient cannot download or play it",
+  "HTTP 200 OK but no two-way audio or confirmed delivery"
+ ],
+ "not_for": [
+  "Simple connector or API data retrieval with no evidence synthesis or consequential action.",
+  "Unverified brainstorming or general advice that does not require source-backed findings.",
+  "Sending, publishing, spending, deleting, or filing without explicit task-specific approval.",
+  "Provider-specific command instructions alone; pair this workflow with the relevant connector or API skill."
+ ]
+}

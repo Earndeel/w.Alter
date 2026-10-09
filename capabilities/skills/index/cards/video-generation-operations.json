@@ -1,0 +1,63 @@
+{
+ "name": "video-generation-operations",
+ "sha": "ea49bbb8f9994bea0c5bdf1f26b890a4dbef63b6d26ff42fda9a5123018661df",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005747445,
+ "summary": "Use when Monsieur veut générer, orchestrer ou contrôler une vidéo IA, avec références, workers, choix de modèle ou QA du rendu.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Génère-moi une vidéo IA de 8 secondes en 16:9, mais vérifie le modèle et le prix avant de lancer.",
+  "Tu peux faire un plan avec cette image en référence et garder le même personnage jusqu’à la fin ?",
+  "Le worker a répondu OK, mais où est le fichier vidéo final ? Vérifie qu’il est bien lisible.",
+  "Compare les modèles vidéo hébergés et le self-hosted pour notre volume, en comptant aussi les GPU et les retries.",
+  "J’ai plusieurs plans à générer : définis les règles de continuité et contrôle les transitions, pas juste les images fixes.",
+  "La vidéo a fini de tourner, tu peux checker le son, la durée, les dimensions et les artefacts avant livraison ?",
+  "Ça bloque en polling depuis un moment — regarde l’état du job et distingue timeout, échec provider et rendu incomplet.",
+  "Fais un brief de plan avec le sujet, la caméra, le mouvement, la lumière et ce qu’il ne faut surtout pas montrer.",
+  "Le visage change entre les plans et le texte est illisible. Fais une vraie QA et note les timestamps concernés.",
+  "Avant de relancer, vérifie si le job précédent a vraiment échoué ou s’il a déjà produit un résultat.",
+  "Pour le hero du site, regarde le crop mobile, la lisibilité, le poids du fichier et le comportement en boucle.",
+  "Prends ces refs pour analyser le rendu : donne-moi les observations avec timestamps, puis sépare ça de tes suggestions créatives."
+ ],
+ "intents_en": [
+  "Generate an AI video and verify the deliverable.",
+  "Use these images as references for a consistent multi-shot video.",
+  "Check why the video worker job is stuck or missing its artifact.",
+  "Compare hosted and self-hosted video generation costs.",
+  "QA the video for visual continuity, audio, and format."
+ ],
+ "entities": [
+  "video-generation-operations",
+  "AI video generation",
+  "provider workers",
+  "reference assets",
+  "shot brief",
+  "model selection",
+  "provider API",
+  "job record",
+  "correlation ID",
+  "callbacks",
+  "GPU",
+  "self-hosting",
+  "media QA",
+  "video artifact",
+  "storage",
+  "rendering"
+ ],
+ "symptoms": [
+  "Le job reste bloqué en polling ou dépasse le délai.",
+  "Le worker confirme la soumission, mais aucun fichier final n’est disponible.",
+  "La vidéo téléchargée ne décode pas ou son format ne correspond pas à la demande.",
+  "Le visage ou l’identité dérive entre les plans.",
+  "Les objets se transforment, les transitions sautent ou la caméra est discontinue.",
+  "Le texte est incorrect ou l’action demandée manque.",
+  "L’audio est absent, désynchronisé, coupé ou contient des artefacts."
+ ],
+ "not_for": [
+  "Monter manuellement une vidéo existante ou créer un simple montage.",
+  "Générer uniquement une image fixe ou retoucher une image.",
+  "Écrire un scénario ou des textes publicitaires sans lancer ni contrôler de génération vidéo.",
+  "Déployer un service web général sans lien avec des workers de génération vidéo."
+ ]
+}

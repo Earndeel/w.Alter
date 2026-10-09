@@ -1,0 +1,59 @@
+{
+ "name": "subscription-refund",
+ "sha": "05662cd24e5ea405db92abf063e237873b924dfdf8f5256dfd6eed4e9ca048fb",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000437184,
+ "summary": "Use when Monsieur needs to cancel a SaaS subscription, identify a charge, request an EU-law refund, or escalate a refund refusal.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Annule mon abonnement à ce SaaS et demande le remboursement du dernier prélèvement.",
+  "J'ai été débité par Hailuo mais je n'utilise plus le service, tu peux contester ça ?",
+  "Retrouve dans Gmail le prélèvement de NANONOBLE et prépare un mail au support pour récupérer l'argent.",
+  "Ils m'ont renouvelé l'abonnement sans me prévenir. Fais la demande de remboursement avec les textes européens.",
+  "Tu peux résilier l'abonnement, sans accepter leur offre de rétention, et vérifier que le renouvellement auto est coupé ?",
+  "Le bouton d'annulation est planqué dans une popup, aide-moi à arrêter cet abonnement.",
+  "J'ai envoyé ma demande de remboursement il y a dix jours et ils refusent de répondre : quelle est l'étape suivante ?",
+  "Le prélèvement date de la semaine dernière, mais je n'ai utilisé aucun crédit. Rédige la réclamation au support.",
+  "Cherche le débit SaaS dans mes mails, annule le compte et demande le remboursement.",
+  "Le site propose une réduction pour rester, refuse-la et continue la résiliation.",
+  "J'ai un débit que je ne reconnais pas : trouve le nom de la société derrière ce service et vérifie l'abonnement.",
+  "C'est bon, ils n'ont pas répondu depuis une semaine : prépare l'escalade auprès de ma banque."
+ ],
+ "intents_en": [
+  "Cancel my SaaS subscription and request a refund.",
+  "Find this subscription charge in Gmail and dispute it.",
+  "They renewed me without notice; ask for a refund under EU consumer law.",
+  "Decline the retention offer and verify auto-renewal is off.",
+  "Support has not replied; help me escalate the refund claim."
+ ],
+ "entities": [
+  "Gmail",
+  "Camoufox",
+  "Mac Brave cookies",
+  "web-service-browser",
+  "google-workspace",
+  "Ant Design modals",
+  "Gmail OAuth",
+  "Directive (EU) 2011/83",
+  "Code de la consommation L.221-18",
+  "Code de la consommation L.215-1 à L.215-3",
+  "NANONOBLE",
+  "Hailuo",
+  "chargeback bancaire"
+ ],
+ "symptoms": [
+  "Prélèvement SaaS automatique sans rappel avant renouvellement",
+  "Abonnement toujours actif malgré une demande de résiliation",
+  "Bouton d'annulation masqué par une popup ou une modal",
+  "Offre de rétention affichée pendant la résiliation",
+  "Bouton « Resume » visible après annulation",
+  "Erreur Gmail 403 insufficientPermissions lors de l'envoi"
+ ],
+ "not_for": [
+  "Résilier un abonnement sans prélèvement ni demande de remboursement",
+  "Contester une fraude bancaire sans lien avec un abonnement SaaS",
+  "Dépanner Gmail OAuth ou Camoufox de façon générale",
+  "Traiter une demande de remboursement pour un achat matériel ou une commande ponctuelle"
+ ]
+}

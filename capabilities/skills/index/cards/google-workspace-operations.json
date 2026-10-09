@@ -1,0 +1,59 @@
+{
+ "name": "google-workspace-operations",
+ "sha": "f6884b7eed123281675b373618385c25d75553902b8fd4876fcdd5762400c40a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000369666,
+ "summary": "Use when Monsieur needs Gmail intelligence, Google account/OAuth setup or routing, or a verified read-only Google Workspace operation.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Cherche dans mes Gmail les offres de boulot remote reçues ce mois-ci.",
+  "J’ai deux comptes Google, regarde dans le bon et dis-moi lequel tu as utilisé.",
+  "Tu peux retrouver les mails qui parlent de cette facture, sans rien envoyer ?",
+  "Ajoute mon autre adresse Gmail, mais ne touche pas au token du compte principal.",
+  "Le consentement Google est passé, vérifie que l’accès à la boîte marche vraiment.",
+  "Pourquoi j’ai un 404 quand tu ouvres ce message ? C’est peut-être pas le bon compte.",
+  "Fais le tri dans les invitations reçues : les vraies opportunités, pas les concours ou les vieux trucs.",
+  "Cherche dans tous les dossiers, avec une période précise, et garde les preuves pour chaque résultat.",
+  "Je veux connecter Gmail seulement, pas donner accès à Drive ou Calendar.",
+  "Tu as trouvé des pistes ? Indique le compte source, les critères bloquants et ce que tu n’as pas fait.",
+  "Le callback OAuth ne marche pas ; vérifie le client et l’URI de redirection.",
+  "Retrouve le mail de Monsieur Dupont, mais garde exactement l’adresse et l’identifiant que je t’ai donnés."
+ ],
+ "intents_en": [
+  "Search my Gmail for recent invoices.",
+  "Check which Google account this mailbox belongs to.",
+  "Add a second Gmail account without replacing the primary token.",
+  "Verify that Gmail OAuth access actually works.",
+  "Review remote job leads across my authorized accounts."
+ ],
+ "entities": [
+  "Google Workspace",
+  "Gmail",
+  "Google OAuth",
+  "Google identity",
+  "OAuth client",
+  "registered redirect URI",
+  "callback exchange",
+  "isolated home/profile",
+  "access scopes",
+  "users.getProfile",
+  "Gmail API",
+  "message IDs",
+  "in:anywhere",
+  "MIME"
+ ],
+ "symptoms": [
+  "Gmail message returns 404 when accessed",
+  "OAuth consent succeeded but mailbox access is unverified",
+  "Callback exchange fails",
+  "Unexpected account or mailbox is being used",
+  "Search returns no results for a complex query"
+ ],
+ "not_for": [
+  "Managing Google Calendar events or availability",
+  "Editing or organizing Drive, Sheets, or Docs",
+  "Sending or modifying email without separate approval",
+  "General Gmail composition or troubleshooting unrelated to account identity and routing"
+ ]
+}

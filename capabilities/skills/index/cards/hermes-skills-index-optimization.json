@@ -1,0 +1,61 @@
+{
+ "name": "hermes-skills-index-optimization",
+ "sha": "ef1ffcb8845d2f6ef30ef616223eec1e3746c8c9768de9f81cb7865276f626b4",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00062981325,
+ "summary": "Use when auditing, implementing, or debugging Hermes skills-index progressive disclosure and token reduction.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Tu peux mesurer combien de tokens prend notre index de skills Hermes ?",
+  "Comment on passe de la liste complete des skills a un index par categories ?",
+  "Je veux reduire le system prompt, tu peux mettre en place skill_search et skill_view ?",
+  "Pourquoi Hermes envoie encore toutes les descriptions de skills a chaque appel ?",
+  "On a plus de 50 skills et skill_search est dispo, mais l'index compact s'active pas.",
+  "Fais-moi un audit des descriptions trop longues dans les skills.",
+  "Le cache du skills prompt me montre l'ancienne version, comment je le purge ?",
+  "Tu peux verifier si le tool skill_search est bien ajoute au toolset skills et discoverable ?",
+  "On devrait mettre Qdrant ou des embeddings pour chercher les skills ?",
+  "J'ai ajoute le tool mais il apparait pas dans available_tools, tu regardes le gate et le check_fn ?",
+  "Comment tester les changements de build_skills_system_prompt sans garder le snapshot en cache ?",
+  "Compare l'ancien index complet avec le compact et dis-moi combien de tokens on economise."
+ ],
+ "intents_en": [
+  "Audit the Hermes skills index token cost.",
+  "Enable compact category-only skills indexing.",
+  "Debug why skill_search is not activating compact mode.",
+  "Clear the skills prompt cache after an index change.",
+  "Evaluate whether skill search needs embeddings."
+ ],
+ "entities": [
+  "Hermes",
+  "skill_search",
+  "skill_view",
+  "tools/skill_search.py",
+  "toolsets.py",
+  "agent/prompt_builder.py",
+  "build_skills_system_prompt()",
+  "agent/system_prompt.py",
+  "tools/tool_search.py",
+  "tools/registry.py",
+  "discover_builtin_tools()",
+  "agent/skill_utils.py",
+  "EXCLUDED_SKILL_DIRS",
+  ".skills_prompt_snapshot.json",
+  "available_tools",
+  "skills toolset",
+  "Qdrant"
+ ],
+ "symptoms": [
+  "The full skills index is still in the system prompt despite skill_search being available.",
+  "Compact mode does not activate when the skills toolset is loaded.",
+  "The skills prompt shows stale content after skills or descriptions changed.",
+  "TypeError when joining the mocked Hermes home path with a file path."
+ ],
+ "not_for": [
+  "Searching for a skill to handle an ordinary user task.",
+  "Writing or editing the contents of an individual skill.",
+  "Optimizing MCP or plugin tool schemas unrelated to the skills index.",
+  "Installing or configuring Qdrant for a separate semantic search system."
+ ]
+}

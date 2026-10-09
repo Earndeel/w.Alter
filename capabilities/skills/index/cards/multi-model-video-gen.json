@@ -1,0 +1,71 @@
+{
+ "name": "multi-model-video-gen",
+ "sha": "98fee62408783edbf7b49bdfeea4dfec9bef77a63c93f30ba8832b07247f8731",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00053106075,
+ "summary": "Use when extending or troubleshooting the ad-video pipeline to configure multiple Fal.ai models and generate, submit, or sync video jobs.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Ajoute Kling et Runway comme modèles dans le pipeline vidéo.",
+  "Je veux pouvoir choisir le modèle de génération vidéo depuis le dashboard.",
+  "Comment créer un nouveau modèle Fal.ai avec son endpoint, son prompt et son schema ?",
+  "Le pipeline est encore hardcodé sur Kling, rends-le multi-modèle.",
+  "Fais la migration DB pour les champs génériques de job vidéo, sans casser les anciennes colonnes Kling.",
+  "Le bouton Generate doit produire le payload pour Veo, puis je veux pouvoir le soumettre et synchroniser le job.",
+  "Ajoute les routes API génériques pour lister, créer, modifier et supprimer les modèles vidéo.",
+  "Le serveur Higgsfield MCP ne répond plus, utilise le fallback pour générer la vidéo.",
+  "J’ai seulement des résultats digest avec mcp_higgsfield, ça fait deux appels : on fait quoi ?",
+  "Pourquoi le sync ne reprend pas l’endpoint configuré dans le modèle ou dans le payload ?",
+  "J’ai ajouté un modèle dans le dashboard mais il n’apparaît pas dans la liste.",
+  "Garde prompt.md et schema.md séparés, et vérifie la compatibilité avec les anciennes routes Kling."
+ ],
+ "intents_en": [
+  "Add another video model to the pipeline.",
+  "Make the video generator model-selectable.",
+  "Create a Fal.ai model config, prompt, and schema.",
+  "Submit and sync a video generation job.",
+  "Higgsfield MCP is down; use the fallback."
+ ],
+ "entities": [
+  "W.Alter",
+  "Fal.ai",
+  "fal_client",
+  "Higgsfield MCP",
+  "mcp_higgsfield_generate_video",
+  "Runway",
+  "Pika",
+  "Kling",
+  "Veo",
+  "models/",
+  "config.json",
+  "prompt.md",
+  "schema.md",
+  "modules/model_runner.py",
+  "app/models.py",
+  "app/kling.py",
+  "video_analysis",
+  "model_id",
+  "model_payloads",
+  "job_status",
+  "job_request_id",
+  "job_result",
+  "job_error",
+  "/api/models",
+  "/api/generate/<card_id>/<model_id>",
+  "/api/submit/<card_id>"
+ ],
+ "symptoms": [
+  "Digest-only results from mcp_higgsfield_* across 2+ consecutive calls",
+  "Video generation is hardcoded to Kling",
+  "A newly added model does not appear in the dashboard selector",
+  "Job status or results are missing from generic fields",
+  "Submit or sync uses the wrong Fal.ai endpoint"
+ ],
+ "not_for": [
+  "Writing ad concepts or video scripts without changing the generation pipeline",
+  "Editing a single video prompt without adding or configuring a model",
+  "General-purpose image generation",
+  "Troubleshooting unrelated Flask or database features"
+ ]
+}

@@ -1,0 +1,61 @@
+{
+ "name": "camoufox-browser-operations",
+ "sha": "94df480b72d374eedae7ec3879516a6f340ec5b0f224c7fb53baef1f30ca96c2",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000473715,
+ "summary": "Use when operating Camoufox for browser sessions, authenticated or anti-bot automation, React SPAs, crash recovery, or stealth checks.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Lance Camoufox Max et verifie que le navigateur est vraiment pret avant d'ouvrir le site.",
+  "Le serveur Camoufox repond mais j'ai pas de browser vivant, tu peux diagnostiquer le health et le port actif ?",
+  "Ouvre une session Camoufox isolee et va sur mon dashboard, puis confirme que la page charge.",
+  "Sur cette SPA React, le clic passe mais le champ ne prend pas la valeur. Fais l'interaction correctement.",
+  "Le site garde mon ancienne route quand je navigue avec Camoufox, il faut mettre le hook avant la navigation ?",
+  "J'ai un 503 apres le submit : recupere le navigateur sans renvoyer deux fois l'action.",
+  "Camoufox a crashe pendant le scraping, redemarre une fois et retente la meme operation.",
+  "Fais le check stealth : webdriver, user-agent, plugins, WebGL, timezone, WebRTC et IP, sans conclure trop vite.",
+  "Je veux verifier si mes parametres Camoufox sont coherents avec l'IP et le user-agent.",
+  "Utilise les cookies de ma session Brave si c'est permis, mais ne touche pas a mon Brave ouvert.",
+  "La page est dans une iframe cross-origin et l'evaluation DOM ne marche pas, tente les controles souris/clavier navigateur.",
+  "Quand tu as fini, prends un snapshot ou une capture, verifie le contenu cible et ferme proprement l'onglet."
+ ],
+ "intents_en": [
+  "Check Camoufox health and active port before opening a tab.",
+  "Run an isolated authenticated Camoufox browser session.",
+  "Fix React input interaction in a Camoufox SPA.",
+  "Recover from a Camoufox crash without duplicating the action.",
+  "Audit Camoufox stealth signals and report limitations."
+ ],
+ "entities": [
+  "Camoufox",
+  "Camoufox Max",
+  "/health",
+  "/tab/*",
+  "Node",
+  "Python",
+  "Brave",
+  "CDP",
+  "React",
+  "WebDriver",
+  "WebGL",
+  "WebRTC",
+  "CAPTCHA",
+  "references/curator-camoufox-archive-routes.md"
+ ],
+ "symptoms": [
+  "A Node process is listening but no browser is live.",
+  "Camoufox returns 503 or a retry signal.",
+  "A React input ignores assigned values.",
+  "A SPA keeps the wrong route after navigation.",
+  "Camoufox crashes during a browser operation.",
+  "A cross-origin frame cannot be controlled through DOM evaluation.",
+  "Stealth checks disagree across user-agent, WebGL, timezone, or IP."
+ ],
+ "not_for": [
+  "General-purpose scraping that does not use Camoufox.",
+  "Managing or automating the user's live Brave profile or CDP session.",
+  "Bypassing CAPTCHA or site access controls outside an approved boundary.",
+  "Writing application code unrelated to browser operation or verification."
+ ]
+}

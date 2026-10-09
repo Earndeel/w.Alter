@@ -1,0 +1,63 @@
+{
+ "name": "github-code-review",
+ "sha": "ea276233dd0f2f47f3caaf9fc6bc9e11b7ffd3afb82bb5ba1bf77cda92082de3",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00079613325,
+ "summary": "Use when Monsieur wants a code diff or GitHub pull request reviewed, findings reported, or inline comments and a formal review posted.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux review la PR #42 et me dire s'il y a des trucs bloquants ?",
+  "Regarde cette PR GitHub avant que je la merge : https://github.com/acme/api/pull/18",
+  "Fais une review du diff sur ma branche avant le push.",
+  "Tu peux vérifier mes changements locaux, surtout la sécurité et les tests ?",
+  "J'ai ouvert une PR, check le code et poste les commentaires directement dessus.",
+  "La review de la PR est faite ? Tu peux demander les changements s'il y a des bugs sérieux.",
+  "Regarde les fichiers modifiés de la pull request et laisse des commentaires ligne par ligne.",
+  "Est-ce que tu peux approuver la PR si tout est clean, sinon me résumer les problèmes ?",
+  "Le diff te semble bon ? Vérifie aussi les cas limites et les secrets qui auraient pu être commités.",
+  "On m'a demandé de review la PR 73, fais le tour du diff, des checks et des tests si possible.",
+  "Pourquoi ma PR n'a pas encore de review ? Ajoute un résumé et les commentaires pertinents sur GitHub.",
+  "Avant que je push, passe sur les changements de ce repo et classe les retours en critiques, warnings et suggestions."
+ ],
+ "intents_en": [
+  "Review PR #42 and leave inline comments.",
+  "Check my local diff before I push.",
+  "Review this pull request and request changes if needed.",
+  "Approve the PR if the code looks good.",
+  "Check the diff for security issues and missing tests."
+ ],
+ "entities": [
+  "GitHub",
+  "git",
+  "gh",
+  "GitHub REST API",
+  "GitHub token",
+  "GITHUB_TOKEN",
+  "pull requests",
+  "PR diff",
+  "inline review comments",
+  "formal reviews",
+  "gh pr view",
+  "gh pr diff",
+  "gh pr checkout",
+  "gh pr review",
+  "gh pr comment",
+  "gh api",
+  "git diff",
+  "git fetch",
+  "pytest",
+  "ruff",
+  "HERMES_HOME",
+  "github-auth",
+  "github-pr-workflow",
+  "review-output-template.md"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Créer une pull request ou gérer son cycle de vie sans demander de revue de code.",
+  "Configurer l'authentification GitHub ou résoudre seul un problème d'accès.",
+  "Déboguer ou modifier une fonctionnalité sans demande de revue du diff ou de la PR.",
+  "Revoir du code sans lien avec un dépôt Git ou une pull request GitHub."
+ ]
+}

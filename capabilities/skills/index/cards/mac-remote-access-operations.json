@@ -1,0 +1,64 @@
+{
+ "name": "mac-remote-access-operations",
+ "sha": "954571b81b4baa41454e71d14b49ae550813fd607e885f14b5fa8ad54914c8b2",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00049599,
+ "summary": "Use when packaging, securing, enabling, verifying, or transferring files to a third-party Mac over Tailscale, SSH, and Screen Sharing.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Prépare un package pour que je puisse accéder au Mac de mon client via Tailscale, sans lui ouvrir tout mon réseau.",
+  "Je veux donner un accès SSH temporaire au Mac d’un pote : tu me fais une procédure propre avec un switch ON/OFF ?",
+  "Le client a lancé le .command, mais l’accès ne marche pas. On vérifie Tailscale, SSH et les permissions Screen Sharing séparément ?",
+  "Fais-moi le zip transparent pour activer l’accès distant sur son Mac, avec une seule demande de mot de passe sudo.",
+  "Comment je limite l’ACL pour que son Mac ne puisse joindre que les destinations SSH et VNC autorisées ?",
+  "Le Mac distant peut initier du trafic vers mon tailnet, c’est normal ? Vérifie l’isolation avant que j’envoie le package.",
+  "Ajoute ma clé SSH au package de façon idempotente et explique au client l’étape manuelle pour Screen Sharing.",
+  "Je dois choisir une clé Tailscale réutilisable ou éphémère pour ce client : tu me conseilles quoi et comment documenter sa durée de vie ?",
+  "Son Mac est déjà configuré. Je dois lui envoyer une archive : donne-moi les vérifications de hash, taille et transfert via un peer tailnet direct.",
+  "Gatekeeper bloque le .command chez le client. Quelles instructions je lui donne sans transformer ça en installateur ?",
+  "On avait utilisé autossh et un tunnel inversé dans une ancienne recette. Pour ce nouveau package tiers, on garde ça ou pas ?",
+  "Après activation, teste l’accès SSH et VNC indépendamment, puis confirme que le bouton OFF coupe bien l’accès."
+ ],
+ "intents_en": [
+  "Package secure SSH and VNC access to a client's Mac.",
+  "Set up a deny-by-default Tailscale ACL for a friend's Mac.",
+  "Verify SSH, Screen Sharing, and the package's OFF switch.",
+  "Transfer an archive to an already configured Mac and verify its hashes.",
+  "Replace the old reverse-tunnel recipe with the current secure setup."
+ ],
+ "entities": [
+  "macOS",
+  "Tailscale",
+  "SSH",
+  "VNC",
+  "Screen Sharing",
+  "Tailscale ACL",
+  "Tailscale tags",
+  "Tailscale auth keys",
+  "SSH public key",
+  "sudo",
+  ".command",
+  "zip",
+  "Gatekeeper",
+  "launchd",
+  "TCC",
+  "tailnet",
+  "hash verification",
+  "curator-mac-remote-archive-routes.md"
+ ],
+ "symptoms": [
+  "Gatekeeper blocks the .command package.",
+  "SSH is unreachable after enabling remote access.",
+  "VNC or Screen Sharing fails while SSH works.",
+  "The client Mac can reach unauthorized tailnet destinations.",
+  "The package's OFF switch does not disable access.",
+  "The transferred archive has a hash or size mismatch."
+ ],
+ "not_for": [
+  "General Mac administration or troubleshooting unrelated to third-party remote access.",
+  "Building persistent reverse tunnels, autossh, cron, or phone-home access.",
+  "Automating launchd or TCC permissions outside a package that explicitly needs a user-session helper.",
+  "Extracting credentials from a recipient's browser."
+ ]
+}

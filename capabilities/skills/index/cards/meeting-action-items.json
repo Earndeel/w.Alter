@@ -1,0 +1,56 @@
+{
+ "name": "meeting-action-items",
+ "sha": "723f403a58d7d86c074b5480a9496dcacd1cac7b0a72c72af4ae553cd8fca2da",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00041721075,
+ "summary": "Use when Monsieur has meeting notes or a transcript and needs cited decisions, accountable actions, reconciled tickets, or a follow-up draft.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Extrais les décisions et les actions de ces notes, avec les citations.",
+  "Qui s'est engagé à faire quoi pendant la réunion ?",
+  "Fais-moi le compte rendu et la liste des owners, sans inventer les deadlines.",
+  "Prépare le follow-up pour l'équipe, mais ne l'envoie pas.",
+  "Transforme ce transcript en tickets et vérifie d'abord s'ils existent déjà dans le board.",
+  "On a déjà parlé de ça au dernier point : compare les notes avec les tickets ouverts pour éviter les doublons.",
+  "J'ai l'impression qu'on n'a pas vraiment décidé ça. Sépare les décisions des propositions.",
+  "Ajoute les actions dans Notion après m'avoir montré ce que tu comptes créer ou modifier.",
+  "Pour chaque action, indique le responsable, l'échéance, les dépendances et la source dans le transcript.",
+  "Le transcript est incomplet : résume ce qui est fiable et signale les passages incertains.",
+  "Mets à jour les tickets approuvés et renvoie-moi les liens avec les owners et les dates vérifiés.",
+  "Quelles questions restent sans réponse et quel serait le prochain checkpoint ?"
+ ],
+ "intents_en": [
+  "Extract cited decisions and action items from these meeting notes.",
+  "Who owns each follow-up, and what are the confirmed due dates?",
+  "Draft minutes and a follow-up message, but don't send them.",
+  "Check the project board for duplicates before creating tickets.",
+  "Separate decisions from proposals and flag unresolved owners."
+ ],
+ "entities": [
+  "meeting notes",
+  "transcripts",
+  "read_file",
+  "Notion",
+  "GitHub Issues",
+  "project board",
+  "tickets",
+  "tasks",
+  "follow-up email",
+  "follow-up chat"
+ ],
+ "symptoms": [
+  "Meeting notes contain actions but no clear owners or deadlines",
+  "Unclear whether a discussion point was decided or merely proposed",
+  "Recurring meeting notes may lead to duplicate tickets",
+  "Transcript gaps or uncertain transcription need to be surfaced",
+  "Existing ticket owner, date, or status conflicts with the meeting notes",
+  "A write timed out and may have created a duplicate record"
+ ],
+ "not_for": [
+  "Retrieving meeting recordings or transcripts from Teams",
+  "Sending minutes or creating tickets before Monsieur approves",
+  "General project-board administration unrelated to meeting follow-through",
+  "Inventing owners, deadlines, or decisions absent from the meeting evidence"
+ ]
+}

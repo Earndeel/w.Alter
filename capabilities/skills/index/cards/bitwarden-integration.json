@@ -1,0 +1,69 @@
+{
+ "name": "bitwarden-integration",
+ "sha": "a132b18a202383074fd04734ff577e5ffd6a3555d24caf73a1fbf2b13c54cc8a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00076197825,
+ "summary": "Use when Monsieur needs W.Alter to sync or search Bitwarden credentials, retrieve MFA, manage vault items, diagnose an empty vault, or browse with authenticated cookies.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Retrouve le login Bitwarden pour mon serveur",
+  "Cherche dans mon vault l'entrée pour AWS, mais affiche juste les comptes possibles",
+  "Donne-moi le mot de passe de l'entrée exacte que je viens de choisir",
+  "J'ai ajouté un accès dans Bitwarden sur mon tel, pourquoi W.Alter le voit pas ?",
+  "Tu peux sync le vault avant de chercher les identifiants ?",
+  "Il me faut le code MFA AWS maintenant, pas dans 10 minutes",
+  "Ajoute ces identifiants au vault Bitwarden, pas juste dans la session",
+  "Fais une sauvegarde chiffrée de mon Bitwarden avant qu'on touche au serveur",
+  "Mon vault est vide sur l'iPhone, le navigateur et le desktop. Vérifie si les données sont encore sur le serveur avant de réinstaller quoi que ce soit",
+  "Le client Bitwarden sync mais l'interface reste vide, tu peux diagnostiquer la compatibilité Vaultwarden ?",
+  "On doit mettre à jour mon Vaultwarden et le SSH sur la VM bloque : suis la procédure de recovery sans perdre les données",
+  "J'ai accès aux cookies Brave sur le Mac, injecte-les dans Camoufox pour ouvrir le site déjà connecté"
+ ],
+ "intents_en": [
+  "Find the Bitwarden login for this service.",
+  "Sync my vault before searching for the new entry.",
+  "Get the current AWS MFA code from Bitwarden.",
+  "Make an encrypted backup of my Bitwarden vault.",
+  "Use my Brave cookies to open the site in Camoufox."
+ ],
+ "entities": [
+  "Bitwarden",
+  "Vaultwarden",
+  "W.Alter Vault",
+  "bw CLI",
+  "bw-unlock",
+  "vault",
+  "Camoufox",
+  "Brave",
+  "AWS MFA",
+  "GCP",
+  "Cloud Shell",
+  "Hermes",
+  "vault.json.age",
+  "~/.hermes/bin/bw-unlock",
+  "~/.hermes/bin/aws-mfa",
+  "~/.hermes/backups/bitwarden",
+  "~/Library/Application Support/Bitwarden/data.json",
+  "bw sync",
+  "bw list items",
+  "bw get item",
+  "bw get totp",
+  "bw export",
+  "/api/config",
+  "/alive"
+ ],
+ "symptoms": [
+  "Bitwarden clients show an empty vault",
+  "Newly added vault entries are missing from bw search",
+  "Bitwarden sync succeeds but the client UI cannot decrypt or display items",
+  "bw unlock hangs or returns an authentication error",
+  "Vaultwarden SSH access is blocked during a compatibility update"
+ ],
+ "not_for": [
+  "Searching all credential sources beyond Bitwarden; use vault-lookup",
+  "General server administration unrelated to Bitwarden or Vaultwarden",
+  "Creating or debugging browser automation unrelated to authenticated cookie injection",
+  "Managing credentials in another password manager"
+ ]
+}

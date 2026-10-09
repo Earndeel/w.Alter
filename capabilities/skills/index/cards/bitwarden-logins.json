@@ -1,0 +1,65 @@
+{
+ "name": "bitwarden-logins",
+ "sha": "2be531bbf0827c4802004bac1e8c9bb205742e669ab6cfdefbc9d8396b3200b5",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000405504,
+ "summary": "Use when creating an account, logging in, or handling a password, authenticator code, or passkey prompt in a browser with Bitwarden.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Connecte-moi à ce site avec mon Bitwarden.",
+  "Crée un compte sur ce service, génère et sauvegarde le mot de passe.",
+  "Le site me demande mon mot de passe, tu peux te connecter ?",
+  "Je suis bloqué à l’étape du code 2FA, aide-moi à finir le login.",
+  "Inscris-moi sur ce site avec mon adresse habituelle.",
+  "Utilise le code d’authentification Bitwarden pour valider la connexion.",
+  "Le mot de passe est refusé à la création du compte, réessaie avec un format compatible.",
+  "Le login demande un passkey : je dois faire quoi ?",
+  "Retrouve mes identifiants pour ce domaine et connecte-moi.",
+  "Le code 2FA n’est pas dans Bitwarden, regarde si tu peux le récupérer par mail.",
+  "Ça me demande encore un code après le mot de passe, termine la connexion.",
+  "Ajoute ce nouveau service à mes comptes Bitwarden et confirme l’inscription."
+ ],
+ "intents_en": [
+  "Log me in with Bitwarden.",
+  "Create an account and save its login.",
+  "Fill in my password and 2FA code.",
+  "Find my credentials for this website.",
+  "The site is asking for a passkey."
+ ],
+ "entities": [
+  "Bitwarden",
+  "walter-secrets",
+  "secret_search",
+  "secret_fill",
+  "secret_create_login",
+  "secret_capture_totp",
+  "secret_reveal",
+  "browser_type",
+  "browser_vault_fill",
+  "browser_vault_enter_code",
+  "browser_vault_save_login",
+  "TOTP",
+  "2FA",
+  "passkeys",
+  "Camofox",
+  "Chromium CDP",
+  "W.Alter – Comptes créés",
+  "{{bw:<id>:password}}"
+ ],
+ "symptoms": [
+  "The website asks for a username or password.",
+  "A sign-up form requires a new password and confirmation.",
+  "The site prompts for an authenticator or 2FA code.",
+  "The authenticator code is unavailable in Bitwarden.",
+  "The site rejects the generated password format.",
+  "Bitwarden refuses to fill because the page origin is not a saved URL.",
+  "The site asks for a passkey or device approval."
+ ],
+ "not_for": [
+  "Recovering or changing an account password outside the browser login or sign-up flow.",
+  "Bypassing a website's origin check or phishing protections.",
+  "Approving a passkey on Monsieur's device without his involvement.",
+  "Using local browser-vault tools to store credentials instead of Bitwarden."
+ ]
+}

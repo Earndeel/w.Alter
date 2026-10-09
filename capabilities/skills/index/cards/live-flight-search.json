@@ -1,0 +1,53 @@
+{
+ "name": "live-flight-search",
+ "sha": "cf25fbdc9fed30e295d64f9362bf792d6600a453103e45c4dd6b97a121b47875",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005742495,
+ "summary": "Use when Monsieur wants live flight prices, availability, or a cheapest/simplest itinerary compared across dates or airports.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Trouve-moi le vol le moins cher de Paris à Tokyo fin août, compare les dates.",
+  "Tu peux regarder les prix en direct pour un aller simple Lyon–Lisbonne la semaine du 12 ?",
+  "Quels jours sont les moins chers pour faire Montréal-Paris en octobre ?",
+  "Compare les options pour aller à Londres vendredi ou samedi, avec au plus une escale.",
+  "Je veux le trajet le plus simple, pas forcément le moins cher, pour aller à Rome en juin.",
+  "Et si j’arrive à Genève plutôt qu’à Lyon, ça vaut le coup avec le transfert ?",
+  "Refais la recherche en incluant un bagage en soute et deux passagers.",
+  "Tu m’as donné un prix : c’est bien disponible aujourd’hui, et sur quelle date exactement ?",
+  "Cherche sur toute la dernière semaine de septembre, pas juste le 24.",
+  "L’escale de 55 minutes, c’est le même billet ou je dois récupérer mes bagages ?",
+  "Mon adaptateur de recherche Google Flights casse depuis le changement de schéma, tu peux diagnostiquer et comparer proprement avant/après ?",
+  "Benchmarke les adaptateurs de recherche de vols à processus égal, avec les mêmes dates et contraintes, pour voir lequel est le plus fiable."
+ ],
+ "intents_en": [
+  "Find live fares across these dates.",
+  "Compare the cheapest flight days in August.",
+  "Show the simplest itinerary, not just the cheapest.",
+  "Check whether the alternate airport is worth the transfer.",
+  "Debug and fairly benchmark my flight-search adapter."
+ ],
+ "entities": [
+  "SerpAPI MCP",
+  "Google Flights",
+  "tools/call",
+  "search tool",
+  "engine=google_flights",
+  "best_flights",
+  "other_flights",
+  "references/serpapi-flight-mcp.md",
+  "references/self-healing-and-benchmarking.md"
+ ],
+ "symptoms": [
+  "The search returns only best_flights and may be missing cheaper options.",
+  "A multi-airport query returns candidates for the wrong arrival airport.",
+  "The SerpAPI search call fails because parameters are in the wrong place.",
+  "Flight prices are compared across dates without scanning the requested date window."
+ ],
+ "not_for": [
+  "Booking or purchasing a flight ticket.",
+  "Hotel, car-rental, or general destination research.",
+  "A static explanation of routes without checking live fares.",
+  "Ground-transfer planning unrelated to comparing flight arrival airports."
+ ]
+}

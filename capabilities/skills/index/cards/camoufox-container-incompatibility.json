@@ -1,0 +1,62 @@
+{
+ "name": "camoufox-container-incompatibility",
+ "sha": "7ce258abba4a215145078de1a2673eea3b913b0e3be849cb37b10561543e96be",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00053130825,
+ "summary": "Use when diagnosing Camoufox launch failures in Docker/webtop, especially better-sqlite3 ESM bindings or Firefox HOME ownership errors.",
+ "kind": "reference",
+ "intents_fr": [
+  "Camoufox démarre pas dans mon container webtop, tu vois d’où ça vient ?",
+  "J’ai « Could not locate the bindings file » avec camoufox-js dans Docker, comment je débloque ça ?",
+  "J’ai rebuild better-sqlite3 mais Camoufox échoue toujours sur les bindings, c’est normal ?",
+  "Firefox me sort « Running as root » dans le container, comment corriger le HOME ?",
+  "Même avec --user abc et HOME=/config, j’ai l’erreur de ownership. Tu peux regarder ?",
+  "MOZ_ALLOW_ROOT=1 ne change rien, Camoufox refuse toujours de se lancer dans webtop.",
+  "Est-ce que ça vaut le coup de patcher bindings.js pour faire marcher Camoufox en container ?",
+  "Le fichier better_sqlite3.node existe pourtant, pourquoi l’import ESM de Camoufox le trouve pas ?",
+  "On peut faire tourner Camoufox dans Docker sur mon VPS ARM ou c’est mort ?",
+  "Je veux l’anti-détection dans le container, mais Camoufox plante au lancement : quelle option j’ai ?",
+  "Tu m’avais parlé de Chromium CDP pour webtop ; c’est bien l’alternative à Camoufox dans Docker ?",
+  "J’ai besoin de Camoufox avec noVNC : je le mets dans le container ou sur l’hôte avec Xvfb ?"
+ ],
+ "intents_en": [
+  "Why won't Camoufox launch in my Docker container?",
+  "Camoufox can't locate better-sqlite3 bindings in webtop.",
+  "Firefox reports a HOME ownership error when starting Camoufox.",
+  "Does rebuilding better-sqlite3 fix the ESM binding error?",
+  "What's the container-safe alternative to Camoufox?"
+ ],
+ "entities": [
+  "Camoufox",
+  "camoufox-js",
+  "Docker",
+  "linuxserver/webtop",
+  "Chromium CDP",
+  "better-sqlite3",
+  "bindings",
+  "Firefox",
+  "Node.js",
+  "ESM",
+  "Xvfb",
+  "noVNC",
+  "hermes-camoufox-setup",
+  "webtop-chromium-cdp",
+  "HOME",
+  "PUID",
+  "MOZ_ALLOW_ROOT"
+ ],
+ "symptoms": [
+  "Could not locate the bindings file",
+  "Running as root in a regular user's session is not supported",
+  "$HOME is /config which is owned by abc",
+  "Camoufox binary refuses to start in the container",
+  "better_sqlite3.node exists, but the ESM import still fails"
+ ],
+ "not_for": [
+  "Installing or configuring Camoufox to run directly on the host",
+  "Setting up Chromium CDP automation in webtop",
+  "General Docker or webtop troubleshooting unrelated to Camoufox",
+  "Choosing or configuring anti-detection fingerprints"
+ ]
+}

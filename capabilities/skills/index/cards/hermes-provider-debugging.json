@@ -1,0 +1,72 @@
+{
+ "name": "hermes-provider-debugging",
+ "sha": "e487baddae054c87a3eb6c61bd1cf73fee1c7c248a978fb35129a563387c5e64",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00060506325,
+ "summary": "Use when Hermes auxiliary services or model calls fail due to provider, API-key resolution, declaration, or fallback-chain configuration.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Hermes me sort « Auxiliary title generation failed: HTTP 401 », tu peux debugger ?",
+  "Le modèle principal marche, mais les subagents se prennent des 401. On regarde quoi ?",
+  "J’ai une erreur de clé API sur la vision dans Hermes, alors que le chat répond normalement.",
+  "Tu peux vérifier pourquoi Hermes utilise OpenRouter alors que j’ai configuré Xiaomi ?",
+  "Dans les logs je vois provider resolution failed, aide-moi à trouver quelle config cloche.",
+  "Le title generation ne marche plus depuis que j’ai changé le provider, tu peux checker la chaîne de clés ?",
+  "J’ai mis provider: auto pour l’auxiliaire, mais il a l’air de reprendre le provider du modèle principal. Normal ?",
+  "Hermes dit Invalid API Key pour la compression. Vérifie d’abord la vault et le key_env stp.",
+  "J’ai déclaré Xiaomi avec un base_url, le modèle principal fonctionne, mais les services auxiliaires n’arrivent pas à résoudre la clé.",
+  "Tu peux comparer la config Hermes avec les requêtes réelles ? Je soupçonne que le base_url est écrasé par la déclaration providers.",
+  "Le fallback semble marcher pour le modèle principal mais pas pour vision et title_generation, comment on configure ça ?",
+  "J’ai une 401 intermittente dans ~/.hermes/logs/agent.log : trouve le provider réellement appelé et vois si la clé vient de la vault ou du .env."
+ ],
+ "intents_en": [
+  "Debug Hermes auxiliary service 401s.",
+  "Why does the main model work but subagents fail?",
+  "Check which provider Hermes actually calls.",
+  "Fix Hermes API key resolution and key_env.",
+  "Help configure auxiliary provider fallbacks."
+ ],
+ "entities": [
+  "Hermes",
+  "providers",
+  "auxiliary",
+  "title_generation",
+  "vision",
+  "compression",
+  "fallback_providers",
+  "provider: auto",
+  "Xiaomi MiMo",
+  "OpenRouter",
+  "GitLawb proxy",
+  "Anthropic",
+  "vault",
+  "vault search",
+  "vault get",
+  "key_env",
+  "XIAOMI_API_KEY",
+  "config.yaml",
+  ".env",
+  "~/.hermes/logs/agent.log",
+  "~/.hermes/sessions/request_dump_*.json",
+  "hermes config",
+  "hermes status",
+  "base_url"
+ ],
+ "symptoms": [
+  "Auxiliary title generation failed: HTTP 401: Invalid API Key",
+  "Auxiliary services return HTTP 401 while the main model works",
+  "Vision, compression, or subagents fail although the main chat works",
+  "Provider resolution errors in logs",
+  "Hermes calls a different provider or URL than the configuration suggests",
+  "provider: auto silently falls back to the main model provider",
+  "Fallback works for the main model but not for auxiliary services",
+  "Vault and .env appear to contain different API keys"
+ ],
+ "not_for": [
+  "Debugging Hermes gateway or systemd service startup and availability",
+  "Changing prompts, agent behavior, or subagent task logic",
+  "General API-provider selection unrelated to Hermes configuration",
+  "Diagnosing an invalid or expired key when all providers and services fail"
+ ]
+}

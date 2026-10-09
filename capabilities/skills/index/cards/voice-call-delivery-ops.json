@@ -1,0 +1,60 @@
+{
+ "name": "voice-call-delivery-ops",
+ "sha": "979e4e92e42e492ec23c7854b4ed4f08ba3834e911bf80963bfc268a8a54768f",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00036333,
+ "summary": "Use when Monsieur asks W.Alter to call him or deliver a one-shot spoken message, with verified call status and audio fallback.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Appelle-moi et dis-moi que le déploiement est terminé.",
+  "Tu peux me passer un coup de fil pour confirmer ?",
+  "Envoie-moi ça à la voix, pas juste en texte.",
+  "Fais sonner mon Linphone et lis ce petit message.",
+  "Dis-moi oralement quand la sauvegarde est finie.",
+  "Le call a marché ou ça a juste lancé l'appel ?",
+  "Essaie de m'appeler une fois, et si je réponds pas envoie le vocal.",
+  "Fais un message vocal court pour me prévenir que le service est revenu.",
+  "Tu m'as dit que tu appelais, mais j'ai rien reçu : vérifie si l'appel a vraiment été répondu.",
+  "Lance un appel Asterisk avec ce message, puis confirme avec les logs ou le CDR que l'audio a été délivré.",
+  "Prépare le vocal d'abord ; si le SIP n'aboutit pas, donne-moi le fichier audio.",
+  "Appelle-moi pour une vraie conversation, pas juste pour lire une phrase."
+ ],
+ "intents_en": [
+  "Call me and read this short message.",
+  "Send me a spoken confirmation.",
+  "Did the call actually get answered?",
+  "Try once, then send the audio if I don't pick up.",
+  "Verify the Asterisk call before saying it succeeded."
+ ],
+ "entities": [
+  "W.Alter",
+  "Asterisk",
+  "SIP",
+  "PJSIP",
+  "Linphone",
+  "TTS",
+  "ffmpeg",
+  "MEDIA:<path>",
+  "/var/lib/asterisk/sounds/custom/",
+  "core show channels concise",
+  "CDR",
+  "PJSIP history",
+  "asterisk -rx",
+  "channel originate",
+  "Playback(custom/walter-message)"
+ ],
+ "symptoms": [
+  "Asterisk originate returns without useful status",
+  "Channel appears briefly in AppDial2((Outgoing Line))",
+  "No ANSWERED row in the CDR",
+  "Linphone or SIP does not answer",
+  "Call rings or starts but audio delivery is unconfirmed"
+ ],
+ "not_for": [
+  "Ongoing conversation over the phone; use the browser-direct call path when available.",
+  "General TTS generation without a request to deliver a spoken message.",
+  "Troubleshooting unrelated Asterisk or SIP infrastructure issues.",
+  "Text-only notifications or chat messages."
+ ]
+}

@@ -1,0 +1,71 @@
+{
+ "name": "hermes-runtime-routing",
+ "sha": "c0d053cf74acf1d9122518bd65fb232cdd8dca43b23734c263b3dcb437c16085",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005267295,
+ "summary": "Use when diagnosing or changing Hermes model/provider routes, tool delegation, picker catalogs, or request payload and cache behavior.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Hermes envoie ce modèle au mauvais endpoint, tu peux tracer le routage ?",
+  "Ajoute ce provider au picker sans changer le modèle par défaut.",
+  "Le modèle est visible dans la liste mais les requêtes partent chez le mauvais provider.",
+  "Peux-tu vérifier le payload exact que Hermes envoie après middleware ?",
+  "Mon delegate_task ignore le modèle que je lui passe, regarde la route réelle.",
+  "J'ai regroupé des providers dans le picker et maintenant certains modèles ne répondent plus.",
+  "Les cache read tokens restent bloqués alors que le prompt grossit, tu peux diagnostiquer ça ?",
+  "Hermes dit que l'outil est dispo mais ne le choisit jamais : il faut chercher ou décrire l'outil avant ?",
+  "Avant de modifier la config, vérifie les IDs modèle et provider dans le registre live.",
+  "J'ai changé le routing hier, fais un test end-to-end et confirme l'endpoint, le body et la réponse.",
+  "On peut compacter l'historique envoyé au provider sans toucher au ledger brut ni casser les tool calls ?",
+  "Le probe direct du provider marche, mais Hermes échoue sur le streaming ; compare les deux chemins."
+ ],
+ "intents_en": [
+  "Route this Hermes model to the correct provider.",
+  "Debug why the picker model hits the wrong endpoint.",
+  "Inspect the actual request payload Hermes sends.",
+  "Check delegated model routing for delegate_task.",
+  "Diagnose Hermes prompt-cache behavior."
+ ],
+ "entities": [
+  "Hermes",
+  "delegate_task",
+  "tool_search",
+  "tool_describe",
+  "tool_call",
+  "provider",
+  "model ID",
+  "API mode",
+  "endpoint/base URL",
+  "auth/header rules",
+  "picker",
+  "TUI",
+  "Desktop picker",
+  "named profiles",
+  "include_unconfigured",
+  "cache_control",
+  "state_db://",
+  "state storage",
+  "runtime gateway",
+  "stream normalizer",
+  "YAML",
+  "request payload",
+  "tool-call/result pairing"
+ ],
+ "symptoms": [
+  "Model visible but routed to the wrong endpoint",
+  "Model absent from the picker or duplicate/stale picker rows",
+  "Direct provider probe succeeds but Hermes request fails",
+  "delegate_task ignores or rejects route/model/provider fields",
+  "Cache read stays frozen while input grows",
+  "Tool schema is present but the tool is not selected",
+  "Unit tests pass but the live request differs",
+  "Provider rejects payload or stream/tool-call response shape"
+ ],
+ "not_for": [
+  "General Hermes installation, setup, or unrelated agent configuration",
+  "Auditing the harness or agent behavior without a runtime routing or payload issue",
+  "Provider-specific recipes when the shared routing procedure does not apply",
+  "Implementing the backend capability behind a tool façade"
+ ]
+}

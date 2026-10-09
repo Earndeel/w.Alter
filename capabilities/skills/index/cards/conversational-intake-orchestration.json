@@ -1,0 +1,65 @@
+{
+ "name": "conversational-intake-orchestration",
+ "sha": "8bef0b17aa1d0b14b129df4d51808ba55cdf04a4edf66cb6c38c11d72ce82b5e",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007177995,
+ "summary": "Use when designing or debugging chat intake flows that mix structured fields, agent dialogue, resumable context, and safe approval gates.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Sur Scena, le bot prend ma question comme une note dans le brief au lieu d’y répondre. Tu peux regarder le routage ?",
+  "Comment garder les boutons Telegram après une réponse libre de l’agent pendant l’onboarding ?",
+  "Le client dit « pourquoi ce format ? » et le flow avance comme s’il avait répondu au champ. Il faut corriger ça.",
+  "Je veux qu’une demande comme « passe en 3:4 » modifie le brief, mais qu’une objection reste une conversation. Tu peux cadrer les règles ?",
+  "Le bot répète tout le récap à chaque message et ça fait formulaire rigide. Trouve où ça coince.",
+  "Ajoute le prénom du client dans les réponses, mais uniquement depuis son profil et sans le répéter partout.",
+  "Comment empêcher une question ou un « je ne comprends pas » de lancer la génération ou de consommer des crédits ?",
+  "Après plusieurs échanges, l’assistant oublie le projet. Vérifie la mémoire, le résumé roulant et la reprise des tours récents.",
+  "Le flow doit répondre à l’objection puis revenir à l’étape en cours sans perdre le clavier ni changer l’état. Comment le tester ?",
+  "Regarde si la branche guidée et les messages après transcription vocale utilisent bien le même modèle que le chat normal.",
+  "Le client trouve les réponses trop longues et trop formelles. Je veux un contrat clair de 1 à 2 phrases, testé sur les vrais payloads.",
+  "On peut ajouter des tests qui vérifient qu’une question ne modifie pas le brief, ne crée pas de projet et ne déclenche aucun outil, mais que « je valide » passe par le vrai gate ?"
+ ],
+ "intents_en": [
+  "Fix a chat intake bot that stores questions as brief notes.",
+  "Keep the current inline keyboard after an agent reply.",
+  "Separate field edits from objections and conversational questions.",
+  "Test that intake questions cannot trigger production tools.",
+  "Check model routing and memory across guided and voice flows."
+ ],
+ "entities": [
+  "Scena",
+  "Telegram",
+  "inline keyboards",
+  "guided intake",
+  "project brief",
+  "intake state machine",
+  "agent continuation envelope",
+  "client profile",
+  "OpenRouter",
+  "model ID",
+  "reasoning effort",
+  "speech-to-text",
+  "Worker",
+  "health endpoint",
+  "references/scena-telegram-guided-intake.md",
+  "references/client-facing-response-style.md",
+  "references/openrouter-model-reasoning-contract.md"
+ ],
+ "symptoms": [
+  "Questions ou objections enregistrées comme notes du brief",
+  "Récapitulatif répété à chaque tour",
+  "Le flow avance après une question au lieu de préserver l’étape",
+  "Le clavier inline disparaît après une réponse de l’agent",
+  "Une question déclenche la génération ou consomme des crédits",
+  "Le brief ou le contexte projet est oublié après plusieurs échanges",
+  "Réponses client trop longues, formelles ou répétitives",
+  "La branche guidée ou vocale utilise un modèle différent du chat normal"
+ ],
+ "not_for": [
+  "Créer le contenu ou les assets d’un projet après approbation",
+  "Concevoir un formulaire purement déterministe sans dialogue agent",
+  "Configurer uniquement la transcription vocale sans routage vers l’agent",
+  "Rédiger des réponses client sans modifier ni tester le flow d’intake"
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "name": "gguf",
+ "sha": "e82c6e54829a03524fe3958103b77b73ce70e2ea9a71d61234c0cb3664d5b413",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008108595,
+ "summary": "Use when convertir, quantifier ou faire tourner un modèle GGUF avec llama.cpp sur CPU, Apple Silicon ou GPU grand public.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Comment je convertis mon modèle Hugging Face en GGUF puis en Q4_K_M ?",
+  "Je veux faire tourner un LLM en local sur mon Mac M2 sans dépendre d'un GPU NVIDIA.",
+  "Quelle quantization GGUF choisir pour mon 7B avec 8 Go de RAM ?",
+  "Tu peux me donner les commandes llama.cpp pour convertir et quantifier ce modèle ?",
+  "Mon modèle GGUF prend trop de place, je peux le passer en Q3 ou Q4 sans trop perdre en qualité ?",
+  "J'ai déjà le fichier f16.gguf, c'est quoi la suite pour le lancer sur CPU ?",
+  "Le modèle est trop lent sur mon laptop, comment régler les threads et l'offload GPU ?",
+  "Comment utiliser une imatrix pour améliorer la qualité de ma quantization Q4 ?",
+  "J'ai une erreur out of memory avec llama-cli, je réduis quoi en premier ?",
+  "Ça charge lentement, tu m'avais dit de tester mmap : quelle commande exacte ?",
+  "Je veux exposer mon modèle GGUF avec une API compatible OpenAI sur le port 8080.",
+  "Et pour le modèle dont on parlait juste avant, tu prendrais Q4_K_M ou Q5_K_M pour mon Mac ?"
+ ],
+ "intents_en": [
+  "Convert a Hugging Face model to GGUF and quantize it.",
+  "Run a GGUF model locally on Apple Silicon.",
+  "Choose a quantization for limited RAM.",
+  "Serve a GGUF model with llama.cpp.",
+  "Fix llama.cpp out-of-memory errors."
+ ],
+ "entities": [
+  "GGUF",
+  "llama.cpp",
+  "llama-quantize",
+  "llama-imatrix",
+  "llama-cli",
+  "llama-server",
+  "llama-cpp-python",
+  "Hugging Face",
+  "LM Studio",
+  "Ollama",
+  "text-generation-webui",
+  "koboldcpp",
+  "Q2_K",
+  "Q3_K_M",
+  "Q4_K_M",
+  "Q5_K_M",
+  "Q6_K",
+  "Q8_0",
+  "imatrix",
+  "Metal",
+  "CUDA",
+  "Modelfile",
+  "port 8080",
+  "convert_hf_to_gguf.py"
+ ],
+ "symptoms": [
+  "Out of memory lors du chargement ou de l'inférence",
+  "Le modèle GGUF charge très lentement",
+  "Qualité médiocre après une quantization bas bits",
+  "Inférence trop lente sur CPU ou Apple Silicon",
+  "Le serveur llama.cpp ne répond pas sur le port configuré"
+ ],
+ "not_for": [
+  "Quantifier pour un déploiement NVIDIA optimisé avec AWQ, GPTQ ou TensorRT-LLM.",
+  "Quantification Hugging Face avec bitsandbytes ou HQQ.",
+  "Entraîner ou fine-tuner un modèle.",
+  "Déployer une API de production sans lien avec llama.cpp ou GGUF."
+ ]
+}

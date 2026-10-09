@@ -1,0 +1,70 @@
+{
+ "name": "hermes-agent",
+ "sha": "c54878e1a7cd1fd53e93bffb7943c1fe2f014acdab5e070a406387a9ee5e9721",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0006192945,
+ "summary": "Use when configuring, using, troubleshooting, or extending Hermes Agent and its profiles, gateway, tools, or multi-agent workflows.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Comment j’installe Hermes Agent sur cette machine ?",
+  "Hermes ne démarre plus depuis la mise à jour, tu peux regarder ?",
+  "Je veux configurer un nouveau provider dans Hermes, on procède comment ?",
+  "Où je change le modèle utilisé par mon profil Hermes ?",
+  "Ajoute un tool ou une skill à Hermes, mais vérifie d’abord la config active.",
+  "Le gateway Hermes ne répond plus, trouve pourquoi et relance-le proprement.",
+  "Je veux faire bosser plusieurs agents Hermes en parallèle : profiles, subagents ou Kanban ?",
+  "Mon OAuth Hermes a expiré, aide-moi à reconnecter le bon compte sans toucher aux autres profils.",
+  "Comment configurer la voix, le STT et le TTS dans Hermes ?",
+  "J’ai changé config.yaml mais Hermes utilise toujours l’ancienne valeur, c’est normal ?",
+  "On peut modifier le code de Hermes pour ajouter un tool ? Je veux aussi lancer les tests.",
+  "Hermes affiche une erreur d’authentification et je ne sais pas quel profil ou quel fichier de credentials il utilise."
+ ],
+ "intents_en": [
+  "Help me set up Hermes Agent.",
+  "Troubleshoot my Hermes gateway.",
+  "Configure a provider for Hermes.",
+  "Should I use Hermes profiles or subagents?",
+  "Help me extend Hermes and run its tests."
+ ],
+ "entities": [
+  "Hermes Agent",
+  "Nous Research",
+  "Hermes CLI",
+  "gateway",
+  "profiles",
+  "config.yaml",
+  ".env",
+  "get_hermes_home()",
+  "skill_view",
+  "AGENTS.md",
+  "MCP",
+  "OAuth",
+  "Kanban",
+  "cron",
+  "subagents",
+  "SSH",
+  "Anthropic-native providers",
+  "Kie.ai",
+  "xAI",
+  "OpenAI Codex",
+  "STT",
+  "TTS",
+  "cmux",
+  "references/full-guide.md",
+  "references/procedure-troubleshooting.md"
+ ],
+ "symptoms": [
+  "Hermes CLI behavior differs from the expected version or help output.",
+  "The gateway fails to start, respond, or persist across sessions.",
+  "Hermes keeps using stale settings after a configuration change.",
+  "Authentication fails or appears to use the wrong profile or account.",
+  "A tool, skill, MCP integration, or provider is unavailable.",
+  "Delegated agents or spawned profiles use an unexpected model or configuration."
+ ],
+ "not_for": [
+  "Configuring Claude Code, Codex, or OpenCode without Hermes.",
+  "General AI-agent design questions unrelated to operating Hermes Agent.",
+  "Using a provider's API directly outside Hermes."
+ ]
+}

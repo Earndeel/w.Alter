@@ -1,0 +1,66 @@
+{
+ "name": "feature-scope-triage",
+ "sha": "94a5400128253edb971cade8e0c69951c29c4ca66ce887de5f2b7dcc7638ef70",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00058278825,
+ "summary": "Use when deciding whether to build, defer, or cancel a low-use or cross-boundary software feature before implementation.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute un wake word entre mon Mac et la VM distante.",
+  "On pourrait streamer le micro du client vers le backend ? Je ne vais pas tant l’utiliser, ça vaut le coup ?",
+  "Cette petite option touche l’UI, le gateway et le worker, tu peux cadrer le scope avant qu’on code ?",
+  "Je veux une feature hands-free, mais pas un nouveau protocole à maintenir pour un truc que j’utilise une fois par mois.",
+  "La solution actuelle est manuelle. Est-ce qu’on a vraiment besoin d’ajouter WebRTC et un daemon natif ?",
+  "Ça commence à toucher les permissions caméra sur chaque OS : on continue ou on garde le chemin actuel ?",
+  "C’est trop de galère, laisse tomber cette feature.",
+  "Stop, je ne vais pas assez m’en servir. Annule les changements de cette tentative sans toucher au reste.",
+  "Avant d’implémenter, compare le chemin manuel, un spike rapide et la version durable.",
+  "Le petit bouton demande maintenant une API, du reconnect et du buffering. On fixe une limite de complexité ?",
+  "La faisabilité est incertaine, mais je veux savoir si ça change vraiment la décision avant de lancer un spike.",
+  "J’ai dit pas maintenant : arrête les recherches et vérifie seulement que le diff de cette feature est propre."
+ ],
+ "intents_en": [
+  "Should we build this rarely used feature?",
+  "Scope this cross-boundary feature before coding.",
+  "Compare a manual path, a spike, and a durable build.",
+  "Stop and revert only the changes from this feature attempt.",
+  "Is a new transport worth maintaining for this convenience?"
+ ],
+ "entities": [
+  "UI/client",
+  "remote backend",
+  "gateway",
+  "backend worker",
+  "API",
+  "WebSocket",
+  "WebRTC",
+  "microphone",
+  "camera",
+  "browser media APIs",
+  "native dependencies",
+  "OS permissions",
+  "persistent daemons",
+  "Mac client",
+  "remote VM",
+  "wake word",
+  "git status --short",
+  "git diff",
+  "writing-plans",
+  "spike",
+  "systematic-debugging",
+  "plan"
+ ],
+ "symptoms": [
+  "A convenience feature unexpectedly requires a new transport or protocol.",
+  "A low-use feature spans three or more runtime boundaries.",
+  "Implementation scope grows to include native packages, OS permissions, or reconnect and cleanup behavior.",
+  "The user says « je ne vais pas tant l’utiliser », « trop de galère », « laisse tomber », « stop » or « pas maintenant »."
+ ],
+ "not_for": [
+  "Implementing an approved feature after its scope and complexity budget are accepted.",
+  "Writing a detailed implementation plan for an already-approved build.",
+  "Diagnosing an existing software failure.",
+  "Running a feasibility spike when the feature’s value and decision are already settled."
+ ]
+}

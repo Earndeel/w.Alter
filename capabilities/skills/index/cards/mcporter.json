@@ -1,0 +1,69 @@
+{
+ "name": "mcporter",
+ "sha": "e3ca4b5d30013bbeea9026d8d9ce6fab90136a5a2b7301aedadb3946dd4cda80",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005796945,
+ "summary": "Use when Monsieur needs to discover, configure, authenticate, call, debug, or generate CLI/types for MCP servers with mcporter.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Liste-moi les serveurs MCP dispo avec mcporter.",
+  "Comment je vois le schema des tools de Linear ?",
+  "Appelle l'outil linear.list_issues pour l'équipe ENG, limite à 5.",
+  "Je veux tester ce serveur MCP HTTP sans l'ajouter à ma config.",
+  "Lance ce serveur MCP en stdio juste pour cette requête.",
+  "Tu peux ajouter ce serveur dans mcporter.json ?",
+  "Le login OAuth du serveur MCP bloque, comment je relance l'auth ?",
+  "mcporter n'arrive pas à se connecter au serveur, aide-moi à débugger.",
+  "Génère-moi un CLI pour ce serveur MCP.",
+  "Je voudrais les types TypeScript de ce serveur, en mode client.",
+  "J'ai une erreur 10000 avec Cloudflare et mon Global API Key, c'est quoi le souci ?",
+  "Le serveur Cloudflare MCP plante au démarrage ; il faut quelles variables ou quels arguments ?"
+ ],
+ "intents_en": [
+  "List my configured MCP servers with mcporter.",
+  "Call this MCP tool from the terminal.",
+  "Authenticate to this MCP server with OAuth.",
+  "Debug my mcporter server connection.",
+  "Generate TypeScript types from an MCP server."
+ ],
+ "entities": [
+  "mcporter",
+  "MCP",
+  "npx",
+  "npm",
+  "mcporter.json",
+  "/root/.hermes/mcp/mcporter.json",
+  "mcporter list",
+  "mcporter call",
+  "mcporter auth",
+  "mcporter config",
+  "mcporter daemon",
+  "mcporter generate-cli",
+  "mcporter inspect-cli",
+  "mcporter emit-ts",
+  "HTTP MCP servers",
+  "stdio MCP servers",
+  "OAuth",
+  "Cloudflare MCP server",
+  "@cloudflare/mcp-server-cloudflare",
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_API_KEY",
+  "wrangler deploy",
+  "mcpfinder.dev",
+  "mcp.so"
+ ],
+ "symptoms": [
+  "mcporter cannot connect to an MCP server",
+  "OAuth login is stuck or fails",
+  "A stdio MCP server crashes on connect",
+  "Authentication error (code 10000) from Cloudflare worker tools",
+  "mcporter config validation fails because the top-level key is wrong"
+ ],
+ "not_for": [
+  "Calling tools through Hermes native MCP instead of the mcporter CLI",
+  "Using a provider's API directly without an MCP server",
+  "Deploying Cloudflare Workers with wrangler as the main task",
+  "Building an MCP server from scratch"
+ ]
+}

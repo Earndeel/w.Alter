@@ -1,0 +1,60 @@
+{
+ "name": "walter-computer-use",
+ "sha": "9eff41a2bdffeccb508220da0ed4063120233757167d67bbe3ac9f5531771e34",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000418671,
+ "summary": "Use when Monsieur needs Walter Operator to inspect or manipulate a local or remote GUI, app, dialog, device, or file picker.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ouvre Safari et va sur la fenêtre qui est déjà ouverte.",
+  "Tu peux cliquer sur le bouton Export dans Blender et me dire ce qui se passe ?",
+  "La fenêtre Finder est cachée, retrouve-la et sélectionne le dossier du projet.",
+  "J'ai une popup de permission sur le Mac, regarde ce qu'elle demande avant de faire quoi que ce soit.",
+  "Dans Notes, crée une note avec ce texte et vérifie qu'elle est bien là.",
+  "Le dialogue de fichier ne s'ouvre pas, observe l'écran et dis-moi où ça bloque.",
+  "Passe dans Réglages Système et montre-moi l'écran des permissions pour l'app.",
+  "Tape cette commande dans la fenêtre déjà ouverte, puis vérifie le résultat à l'écran.",
+  "Tu peux fermer le menu qui masque le bouton et me dire ce qui reste affiché ?",
+  "Dans Blender, clique sur le champ de recherche et cherche « camera ».",
+  "Le Mac affiche une erreur après mon clic, regarde le message et rapporte-le-moi sans improviser.",
+  "Reprends où on en était : vérifie si la fenêtre de Safari a changé après mon dernier message."
+ ],
+ "intents_en": [
+  "Open and focus the Notes window.",
+  "Inspect the permission dialog before proceeding.",
+  "Click the export button in Blender and report what appears.",
+  "Find the open folder in Finder.",
+  "Check whether the Safari window changed."
+ ],
+ "entities": [
+  "Walter Operator",
+  "computer_use",
+  "skill_view",
+  "Safari",
+  "Notes",
+  "Blender",
+  "Finder",
+  "System Settings",
+  "references/actions/launch-focus.md",
+  "references/actions/dialogs-permissions.md",
+  "references/actions/input-verification.md",
+  "references/device-context.md",
+  "references/apps/safari.md",
+  "references/apps/notes.md",
+  "references/apps/blender.md",
+  "references/apps/finder.md",
+  "references/apps/system-settings.md"
+ ],
+ "symptoms": [
+  "A popup, permission prompt, or error is visible.",
+  "The expected window is missing, hidden, or changed.",
+  "A dialog or file picker will not open.",
+  "The result of a click or keystroke needs local verification."
+ ],
+ "not_for": [
+  "Public-web research or looking up external documentation.",
+  "Planning the user's overall goal or deciding whether the task is complete.",
+  "Making changes through APIs, shell automation, or backend services instead of GUI interaction."
+ ]
+}

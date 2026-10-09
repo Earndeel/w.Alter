@@ -1,0 +1,69 @@
+{
+ "name": "live-network-extraction",
+ "sha": "1af3319673a83933604ae1d73f73fb2c993d6f398ef5231d7f86cfddb460ede9",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005455395,
+ "summary": "Use when Monsieur needs to validate a JSON-first web extractor against real public targets and report evidence, not just fixture results.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Valide mon extracteur sur de vrais sites, pas juste sur les fixtures.",
+  "Tu peux lancer une matrice LIVE avec des cibles publiques de plusieurs types ?",
+  "Le test passe en local mais je veux savoir si ça marche vraiment sur le web.",
+  "Compare les réponses JSON de sites voyage, e-commerce et contenu avec notre extracteur.",
+  "On a des fixtures qui passent : comment prouver que le pipeline réseau tient en prod ?",
+  "J'ai un HTTP 200 mais zéro résultat utile, vérifie le gate sémantique.",
+  "Ajoute le support des réponses JSON renvoyées directement par le document, pas seulement xhr/fetch.",
+  "Ce site est bloqué : distingue le blocage d'un dataset vide et garde une trace pour le fallback.",
+  "Inspecte le vrai payload et ajuste les alias de champs sans deviner le schéma.",
+  "Fais tourner le panel/API aussi, puis vérifie que les runs actifs retombent à zéro.",
+  "Le rapport doit montrer l'endpoint, le statut, le score, la latence et les champs matchés pour chaque cible.",
+  "On peut tester le scraper sur une vraie API publique sans passer par un navigateur lourd ?"
+ ],
+ "intents_en": [
+  "Validate the extractor against live websites.",
+  "Run a cross-site live JSON test matrix.",
+  "Compare real payload shapes and semantic gates.",
+  "Report blocked targets separately from empty results.",
+  "Verify the panel and API path end to end."
+ ],
+ "entities": [
+  "JSON-first web extractor",
+  "LIVE validation",
+  "browser/session pool",
+  "xhr",
+  "fetch",
+  "document JSON responses",
+  "HTTP method and status",
+  "semantic minimum-field gate",
+  "relevance scoring",
+  "normalized records",
+  "evidence report",
+  "public unauthenticated targets",
+  "travel search",
+  "accommodation",
+  "commerce",
+  "social",
+  "editorial/content search",
+  "public API",
+  "panel/API path",
+  "fixtures",
+  "DOM extraction",
+  "robots guidance",
+  "latency"
+ ],
+ "symptoms": [
+  "Fixtures pass but real-site compatibility is unknown",
+  "HTTP 200 response produces no semantically useful records",
+  "Candidate payload has valid data but fails required-field checks",
+  "Block page or telemetry is being mistaken for extracted records",
+  "Timed-out or rejected targets are hidden by aggregate results",
+  "LIVE run leaves active runs nonzero or browser console errors"
+ ],
+ "not_for": [
+  "Implementing fetchers, sessions, or parsing with Scrapling APIs",
+  "Extracting data from a static HTML table when no network validation is needed",
+  "Bypassing anti-bot protections as the primary task",
+  "Writing fixture-only parser unit tests"
+ ]
+}

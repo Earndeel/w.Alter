@@ -1,0 +1,57 @@
+{
+ "name": "gemini-omni-video-operations",
+ "sha": "242ee6bad844616427fd149265745670063c4459d0bab5bcacaf960db81a10c7",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00045144,
+ "summary": "Use when Monsieur wants to generate or extend a Gemini Omni video, run the Kie.ai job, or verify the output and clip continuity.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Génère-moi cette vidéo avec Gemini Omni, en 9:16 et 1080p.",
+  "Tu peux prolonger le clip avec cette image de la dernière frame ?",
+  "Fais une suite au premier clip en gardant le même perso, la tenue et la caméra.",
+  "On avait parlé d’une vidéo Gemini : lance le job sur Kie et donne-moi le résultat.",
+  "Vérifie le modèle et l’endpoint actuels avant que je dépense des crédits.",
+  "Le clip 2 repart bizarrement, tu peux revoir les prompts et la jonction avec le clip 1 ?",
+  "J’ai l’impression que le visage change entre les deux vidéos, check la continuité stp.",
+  "Récupère le MP4 du job et contrôle durée, dimensions, fps, audio et décodage.",
+  "Kie me renvoie un taskId ; comment on suit le job jusqu’à ce qu’il soit terminé ?",
+  "L’extension vidéo bloque à cause de l’audio. On peut essayer avec une image de référence à la place ?",
+  "L’extraction de la dernière frame ou l’upload a planté : reprends à partir du premier clip, sans le payer deux fois.",
+  "Est-ce que cette méthode fait une vraie continuation de la vidéo ou juste une extension guidée par une référence ?"
+ ],
+ "intents_en": [
+  "Generate a video with Gemini Omni.",
+  "Extend this clip using its last frame.",
+  "Check continuity between the two generated clips.",
+  "Run and poll the Kie video generation job.",
+  "Validate the downloaded MP4 and its metadata."
+ ],
+ "entities": [
+  "Gemini Omni Flash",
+  "Kie.ai",
+  "Google Flow",
+  "Google Interactions API",
+  "POST /api/v1/jobs/createTask",
+  "GET /api/v1/jobs/recordInfo?taskId=...",
+  "previous_interaction_id",
+  "video_list",
+  "[# Sources <FIRST_FRAME>@Image1]",
+  "FIRST_FRAME",
+  "MP4"
+ ],
+ "symptoms": [
+  "Google safety block in video-edit mode when input speech or audio is present",
+  "Kie task does not reach a terminal state or its result URL is missing",
+  "Downloaded MP4 is empty, fails to decode, or has unexpected metadata",
+  "The second clip changes the face, eyes, mouth, texture, pose, wardrobe, or framing",
+  "A visible cut or mismatch appears at the clip junction",
+  "Last-frame extraction or reference-image upload fails"
+ ],
+ "not_for": [
+  "General video editing unrelated to Gemini Omni generation or extension",
+  "Assuming Kie REST provides stateful continuation through previous_interaction_id",
+  "Choosing a provider or comparing prices without performing a generation task",
+  "Extending video in a region where video editing is unavailable"
+ ]
+}

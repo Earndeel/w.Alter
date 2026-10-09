@@ -1,0 +1,62 @@
+{
+ "name": "manim-video",
+ "sha": "f1ab0167c8430694d0c0f2e69a1472b73ba7bc995b65990ca408eb63c04301f3",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00080578575,
+ "summary": "Use when Monsieur veut concevoir, coder et rendre une animation pédagogique Manim sur des maths, algorithmes, données ou systèmes.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Fais-moi une anim 3Blue1Brown pour expliquer les séries de Fourier.",
+  "Tu peux transformer cette preuve en vidéo Manim, avec les équations qui se construisent étape par étape ?",
+  "J’aimerais visualiser Dijkstra sur un petit graphe, avec les distances qui évoluent.",
+  "Le rendu Manim est prêt ? Il faudrait assembler les scènes et sortir le mp4 final.",
+  "Mon animation est toute tassée et les labels se chevauchent, tu peux revoir la mise en scène ?",
+  "On peut faire une vidéo qui explique notre architecture, les composants qui apparaissent puis les connexions ?",
+  "Fais un petit data story animé à partir de ces métriques, pas juste des slides.",
+  "Le rendu plante sur MathTex, tu peux corriger le script et vérifier le LaTeX ?",
+  "Ajoute une narration à l’animation et synchronise-la avec les révélations visuelles.",
+  "Pour la suite de la vidéo, garde la même palette et le même rythme que la scène précédente.",
+  "J’ai ce papier de recherche : fais-en une explication animée claire, avec le résultat principal comme aha moment.",
+  "Tu peux reprendre l’anim en 3D, avec une surface qui tourne pour montrer le concept ?"
+ ],
+ "intents_en": [
+  "Make a 3Blue1Brown-style explainer for Fourier series.",
+  "Animate this proof step by step in Manim.",
+  "Visualize Dijkstra's algorithm on a graph.",
+  "Render and stitch these Manim scenes into an MP4.",
+  "Turn this research paper into an animated explainer."
+ ],
+ "entities": [
+  "Manim Community Edition",
+  "Manim CE v0.20+",
+  "Python",
+  "LaTeX",
+  "MathTex",
+  "ffmpeg",
+  "ElevenLabs",
+  "Qwen3-TTS",
+  "manim",
+  "manim -ql",
+  "manim -qh",
+  "script.py",
+  "plan.md",
+  "concat.txt",
+  "final.mp4",
+  "media/videos/script/480p15/",
+  "3Blue1Brown"
+ ],
+ "symptoms": [
+  "MathTex échoue à rendre une équation LaTeX.",
+  "Les mobjects se chevauchent ou sortent du cadre.",
+  "Le rendu plante sur une animation ou un mobject.",
+  "Les scènes ont des couleurs, une typo ou un rythme incohérents.",
+  "Les clips Manim ne sont pas assemblés en une vidéo finale."
+ ],
+ "not_for": [
+  "Monter ou découper une vidéo existante sans créer d’animation Manim.",
+  "Créer une présentation statique ou une infographie sans animation.",
+  "Produire une animation 2D générale sans contenu pédagogique mathématique ou technique.",
+  "Développer une application web interactive de visualisation."
+ ]
+}

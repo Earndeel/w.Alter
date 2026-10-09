@@ -1,0 +1,67 @@
+{
+ "name": "petdex",
+ "sha": "ad9af06534d52f38cdd6adb755c710803c3dabb889c8cf7f5f39582ffeac8f58",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00064342575,
+ "summary": "Use when Monsieur veut parcourir, installer, choisir, redimensionner, désactiver ou dépanner les mascottes animées Petdex de Hermes.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Mets-moi une mascotte Petdex sur Hermes, plutôt un chat.",
+  "Je peux voir les pets disponibles ? Cherche un truc genre robot.",
+  "Installe le pet hibou et active-le.",
+  "Change la mascotte active pour celle que je viens d’installer.",
+  "Tu peux me montrer à quoi ressemble ce pet dans le terminal ?",
+  "La mascotte est beaucoup trop grosse, réduis sa taille.",
+  "Comment je coupe le pet sans le désinstaller ?",
+  "En fait enlève la mascotte actuelle de mes pets installés.",
+  "Mon pet ne s’affiche pas dans Hermes, tu peux diagnostiquer ?",
+  "J’ai activé Petdex mais je ne vois rien dans le TUI, ça vient du terminal ?",
+  "Le pet s’affiche juste comme une ligne de pixels depuis mes changements, tu regardes ?",
+  "Trouve-moi une mascotte style maid ou robot, installe la meilleure et vérifie qu’elle marche."
+ ],
+ "intents_en": [
+  "Install and select a Petdex mascot for Hermes.",
+  "Browse Petdex for a cat or robot pet.",
+  "Preview my active terminal pet.",
+  "Resize or disable my Hermes pet.",
+  "Troubleshoot why my mascot is not showing."
+ ],
+ "entities": [
+  "Petdex",
+  "Hermes",
+  "hermes pets",
+  "petdex.dev",
+  "github.com/crafter-station/petdex",
+  "config.yaml",
+  "display.pet",
+  "HERMES_HOME/pets/",
+  "hermes pets list",
+  "hermes pets install",
+  "hermes pets select",
+  "hermes pets scale",
+  "hermes pets show",
+  "hermes pets off",
+  "hermes pets remove",
+  "hermes pets doctor",
+  "Kitty",
+  "Ghostty",
+  "WezTerm",
+  "iTerm2",
+  "sixel",
+  "Pillow"
+ ],
+ "symptoms": [
+  "Mascotte absente dans le terminal, le TUI ou l’application desktop",
+  "Le pet ne s’affiche pas malgré son activation",
+  "Le rendu graphique du terminal ne fonctionne pas",
+  "Le pet ne montre qu’une seule ligne de pixels",
+  "hermes pets doctor ne signale pas que le pet est prêt"
+ ],
+ "not_for": [
+  "Créer ou dessiner de nouveaux sprites de mascotte",
+  "Modifier le code du TUI pour changer la disposition ou l’intégration des composants",
+  "Installer des pets avec le CLI npm petdex dans ~/.codex/pets",
+  "Dépanner l’affichage général du terminal sans rapport avec Petdex"
+ ]
+}

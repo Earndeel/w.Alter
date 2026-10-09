@@ -1,0 +1,72 @@
+{
+ "name": "clerk-auth",
+ "sha": "099548cf4c33e6a287a1905881dc363244a04080c7e41291065c65bc0eadd041",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000684387,
+ "summary": "Use when adding or debugging Clerk login, signup, OAuth, or JWT auth on a static site, landing page, or Flask/API backend.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute Clerk sur cette landing page, avec login et signup Google.",
+  "Je veux un /login.html séparé avec le formulaire Clerk intégré.",
+  "Le mountSignIn est undefined, tu peux corriger mon intégration ?",
+  "J'ai une erreur window.Clerk is undefined au chargement, regarde le CDN.",
+  "Fais-moi le setup Clerk v4 pour monter le widget directement dans la page.",
+  "Avec Clerk v5, comment je lance le login en popup au lieu du mount inline ?",
+  "Tu peux décoder cette publishable key pour retrouver le domaine Clerk ?",
+  "Mets le formulaire Clerk en dark theme avec les couleurs de mon site.",
+  "Il faut envoyer le JWT Clerk dans les appels API de mon frontend.",
+  "Mon frontend ne peut pas appeler l'API Flask, j'ai Failed to fetch et une erreur CORS.",
+  "Ajoute la vérification du token Clerk côté Flask et l'endpoint signup qui provisionne le client.",
+  "On peut utiliser le même compte Clerk et la même clé pour l'auth de mes différents projets ?"
+ ],
+ "intents_en": [
+  "Add Clerk sign-in to this static page.",
+  "Fix mountSignIn not being available.",
+  "Decode this Clerk publishable key.",
+  "Set up Clerk JWT auth and CORS for Flask.",
+  "Provision a client after Clerk signup."
+ ],
+ "entities": [
+  "Clerk",
+  "Clerk JS SDK",
+  "jsdelivr",
+  "publishable key",
+  "secret key",
+  "Clerk domain",
+  "mountSignIn",
+  "mountSignUp",
+  "openSignIn",
+  "Clerk.load()",
+  "JWT",
+  "OAuth",
+  "Google",
+  "GitHub",
+  "Apple",
+  "static HTML",
+  "landing page",
+  "Flask",
+  "Cloudflare Workers",
+  "CORS",
+  "Authorization: Bearer",
+  "/api/signup",
+  "clients database",
+  "pk_test_*",
+  "sk_test_*"
+ ],
+ "symptoms": [
+  "window.Clerk is undefined",
+  "Cannot read properties of undefined (reading 'load')",
+  "mountSignIn is not a function",
+  "Failed to fetch",
+  "CORS error or missing Access-Control-Allow-Origin",
+  "403 on server-side Clerk API calls",
+  "Clerk widget never loads or remains stuck"
+ ],
+ "not_for": [
+  "Building a custom authentication system without Clerk.",
+  "General Flask deployment or server provisioning unrelated to Clerk signup.",
+  "Debugging OAuth providers or redirect configuration outside Clerk.",
+  "Designing a landing page without adding or troubleshooting authentication."
+ ]
+}

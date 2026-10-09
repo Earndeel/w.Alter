@@ -1,0 +1,55 @@
+{
+ "name": "conversational-workflow-operations",
+ "sha": "6c64c7328aff65acbf16851feb1e95bf632d08d9e5171fcc502c946324863b90",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000471339,
+ "summary": "Use when designing or fixing chat intake, multimodal brief collection, workflow readiness, approval gates, or safe execution handoffs.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Mets en place un intake conversationnel qui transforme les réponses en brief validé.",
+  "Le bot prend chaque message comme une nouvelle info, même quand je pose juste une question : corrige ça.",
+  "Comment gérer une objection sans perdre le parcours guidé et les choix déjà faits ?",
+  "Ajoute la validation du brief, puis une approbation séparée avant de lancer le run.",
+  "On peut laisser le modèle décider tout seul que le brief est prêt ?",
+  "Les images envoyées dans le chat ne remontent pas au modèle, tu peux revoir le handoff ?",
+  "Pour les vocaux, il faut transcrire puis reprendre dans la même conversation, pas ouvrir un autre flow.",
+  "Après une modif confirmée du brief, le plan doit être invalidé et recalculé.",
+  "Le run repart avec un vieux workflow ID; vérifie le chargement du brief et les gates avant exécution.",
+  "Une erreur d’outil ne doit ni avancer l’état ni relancer une génération payante, regarde la logique.",
+  "J’ai besoin de tests qui vérifient le vrai payload envoyé et les transitions persistées, pas juste le code source.",
+  "Le worker reste bloqué sur une étape sans outil; prévois une transition déterministe."
+ ],
+ "intents_en": [
+  "Design a conversational intake that builds a durable brief.",
+  "Keep questions and objections from being recorded as field updates.",
+  "Require separate brief validation and execution approval.",
+  "Pass images and transcribed voice through the same conversation flow.",
+  "Prevent stale runs, failed tools, and duplicate paid actions."
+ ],
+ "entities": [
+  "D1",
+  "Telegram",
+  "Worker",
+  "workflow ID",
+  "brief snapshot",
+  "voice transcription adapter",
+  "curator-conversation-archive-routes.md"
+ ],
+ "symptoms": [
+  "The agent marks a brief ready without deterministic validation.",
+  "A question or objection is mistakenly saved as a brief update.",
+  "Image context is lost across guided text turns.",
+  "Voice transcription starts a separate conversation flow.",
+  "A changed input does not invalidate the existing plan.",
+  "A run starts without explicit approval or uses a stale workflow ID.",
+  "A failed tool advances workflow state or triggers a duplicate paid action.",
+  "A no-tool step remains pending indefinitely."
+ ],
+ "not_for": [
+  "Implementing a standalone feature unrelated to conversational intake or workflow gates.",
+  "Looking up exact historical intake, Telegram, planner, or tool-failure recipes outside this skill’s class-level guidance.",
+  "Choosing project requirements or approving a run on Monsieur’s behalf.",
+  "General-purpose database, deployment, or Worker debugging unrelated to conversation workflows."
+ ]
+}

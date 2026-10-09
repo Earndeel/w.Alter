@@ -1,0 +1,70 @@
+{
+ "name": "webtop-chromium-cdp",
+ "sha": "8cd478b844e68e66564ab3f6e96738c8f042179f9819160edd28c5507db4a2ed",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00071569575,
+ "summary": "Use when setting up or troubleshooting Webtop Chromium CDP, including persistent startup, port forwarding, browser access, and profile locks.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Configure le CDP Chromium dans mon container Webtop.",
+  "Tu peux me remettre le Webtop avec Chromium qui démarre au boot ?",
+  "Le port 9223 répond pas, vérifie le CDP dans webtop.",
+  "Comment je rends le lancement de Chromium persistant après un restart du container ?",
+  "J’ai des Singleton locks dans Chromium, corrige ça sans perdre mes sessions.",
+  "Faut utiliser le vrai profil Chromium pour garder mes cookies, pas le profil temporaire.",
+  "Le Selkies marche pas, donne-moi l’URL d’accès au desktop Webtop.",
+  "Configure s6-overlay correctement pour lancer Chromium après Xvfb.",
+  "Ajoute un cron pour relancer le script start-chromium.sh dans le container.",
+  "Pourquoi le redémarrage Webtop a cassé Selkies et nginx ?",
+  "Vérifie que Chromium écoute bien sur 9222 et que socat expose 9223.",
+  "J’ai un conflit sur le port 3000 avec Hermes, remappe le noVNC sur 3100."
+ ],
+ "intents_en": [
+  "Set up Chromium CDP in my Webtop container.",
+  "Make Chromium start reliably after Webtop restarts.",
+  "Fix stale Chromium Singleton locks without losing my sessions.",
+  "Check whether Webtop CDP is reachable on port 9223.",
+  "Configure s6-overlay and cron for persistent Chromium startup."
+ ],
+ "entities": [
+  "Webtop",
+  "Chromium",
+  "CDP",
+  "Docker",
+  "s6-overlay v3",
+  "socat",
+  "Selkies",
+  "noVNC",
+  "Xvfb",
+  "cron",
+  "Playwright",
+  "Hermes",
+  "lscr.io/linuxserver/webtop:ubuntu-xfce",
+  "3100",
+  "3001",
+  "9222",
+  "9223",
+  "/config/custom/start-chromium.sh",
+  "/config/custom/webtop-chromium-start.sh",
+  "/config/.config/chromium/",
+  "/etc/s6-overlay/s6-rc.d/svc-chromium/",
+  "~/.hermes/scripts/start-chromium-cdp.sh",
+  "https://100.91.35.121:3001/"
+ ],
+ "symptoms": [
+  "curl http://localhost:9223/json/version fails or returns no Browser",
+  "Chromium fails to start because of Singleton lock files",
+  "WebSocket connections rejected due to origin mismatch",
+  "Chromium CDP binds only to 127.0.0.1 in the container",
+  "Selkies, nginx, dbus, or xorg fail to start after adding svc-chromium",
+  "Chromium starts with no cookies or logged-in sessions",
+  "GPU or rendering crashes inside the container"
+ ],
+ "not_for": [
+  "Automating browser actions, forms, or React apps with Playwright once CDP is available",
+  "Managing Cloudflare DNS through its REST API",
+  "Troubleshooting Hostinger account credentials or login sessions",
+  "General Webtop desktop usage unrelated to Chromium CDP"
+ ]
+}

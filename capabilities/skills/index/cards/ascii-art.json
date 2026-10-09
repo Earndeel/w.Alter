@@ -1,0 +1,57 @@
+{
+ "name": "ascii-art",
+ "sha": "8ed8ab9a345e1c06237c8dd3cfd9cdafef822292b3758db4b3493347ec0327d4",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00071396325,
+ "summary": "Use when Monsieur wants ASCII art made, formatted, or converted from text, an image, or a QR request.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Fais-moi une bannière ASCII avec le texte W.Alter.",
+  "Tu peux écrire « bonjour » en gros style figlet ?",
+  "Mets ce message dans une bulle cowsay, avec Tux si possible.",
+  "Fais un cadre sympa autour de ce texte, plutôt style parchemin.",
+  "Refais le titre en plus compact, ça dépasse dans mon terminal.",
+  "Convertis cette image en ASCII, largeur 60 caractères max.",
+  "J’ai une image PNG, tu peux me la transformer en art ASCII avec les caractères braille ?",
+  "Tu connais un dessin ASCII de dragon ? Cherche-moi une version sympa.",
+  "Fais-moi un QR code ASCII pour https://example.com.",
+  "Ajoute un effet arc-en-ciel à cette bannière pour le terminal.",
+  "Le rendu pyfiglet n’est pas installé chez moi : trouve une autre façon de générer le texte.",
+  "Tu peux me faire un petit chat en art texte, sans outil si besoin ?"
+ ],
+ "intents_en": [
+  "Make an ASCII banner for W.Alter.",
+  "Put this message in a cowsay bubble.",
+  "Convert this PNG into ASCII art.",
+  "Create an ASCII QR code for this URL.",
+  "Find a dragon ASCII drawing."
+ ],
+ "entities": [
+  "pyfiglet",
+  "figlet",
+  "asciified API",
+  "cowsay",
+  "cowthink",
+  "boxes",
+  "TOIlet",
+  "ascii-image-converter",
+  "jp2a",
+  "ascii.co.uk",
+  "GitHub Octocat API",
+  "qrenco.de",
+  "wttr.in",
+  "curl",
+  "python -m pyfiglet",
+  "toilet",
+  "ascii-image-converter",
+  "jp2a"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Creating or editing a polished graphic logo or illustration.",
+  "Editing, resizing, or retouching an image as an image.",
+  "Generating a QR code as a downloadable image file.",
+  "Providing a weather forecast or interpreting weather conditions."
+ ]
+}

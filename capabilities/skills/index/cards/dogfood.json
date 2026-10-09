@@ -1,0 +1,61 @@
+{
+ "name": "dogfood",
+ "sha": "aab80d77ff70f74009b07dbfe5316b98c29c6e861d49ed171021b46365bcb715",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0006069195,
+ "summary": "Use when Monsieur veut explorer une web app dans le navigateur, trouver des bugs, capturer des preuves et produire un rapport QA.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Teste cette app en dogfooding et fais-moi un rapport de bugs : https://exemple.com",
+  "Tu peux explorer https://exemple.com, surtout le signup et le login, et noter ce qui casse ?",
+  "Le checkout a l’air bizarre depuis le dernier déploiement. Vérifie le flow et prends des screenshots des problèmes.",
+  "Fais un QA exploratoire de tout le site, avec les erreurs console et les étapes pour reproduire chaque bug.",
+  "Teste le formulaire de contact avec des champs vides, des valeurs invalides et du texte un peu chelou.",
+  "Sur le dashboard qu’on regardait juste avant, tu peux tester les filtres et la navigation et me sortir les bugs ?",
+  "J’ai repéré un bouton qui ne répond pas sur la page pricing. Explore le reste de la page aussi et documente les soucis.",
+  "Fais un tour rapide sur https://exemple.com : responsive, liens cassés, erreurs visibles et console.",
+  "Tu as trouvé des problèmes hier sur le parcours d’inscription ; refais un passage et vérifie les cas limites.",
+  "Teste la recherche avec une requête vide, des caractères spéciaux et aucun résultat, puis mets les findings dans un report.md.",
+  "Peux-tu faire le QA de cette nouvelle web app et sauvegarder le rapport et les captures dans ./qa-sortie ?",
+  "Le site a l’air cassé après la release. Parcours les flows principaux, classe les bugs par sévérité et montre-moi les preuves."
+ ],
+ "intents_en": [
+  "Explore this web app and write a bug report.",
+  "Dogfood the signup and checkout flows.",
+  "Check this page for visual bugs and console errors.",
+  "Test edge cases and capture screenshots of issues.",
+  "Re-test the dashboard and document anything broken."
+ ],
+ "entities": [
+  "browser_navigate",
+  "browser_snapshot",
+  "browser_click",
+  "browser_type",
+  "browser_vision",
+  "browser_console",
+  "browser_scroll",
+  "browser_back",
+  "browser_press",
+  "./dogfood-output",
+  "report.md",
+  "screenshots/",
+  "MEDIA:<screenshot_path>",
+  "references/issue-taxonomy.md",
+  "templates/dogfood-report-template.md"
+ ],
+ "symptoms": [
+  "Un bouton ou un lien ne répond pas",
+  "Une page ou un élément s’affiche mal",
+  "Une erreur JavaScript apparaît dans la console",
+  "Un formulaire accepte des valeurs invalides ou bloque une soumission valide",
+  "Un flow comme l’inscription ou le checkout ne se termine pas",
+  "Un état vide, une page 404 ou une erreur inattendue apparaît"
+ ],
+ "not_for": [
+  "Corriger ou modifier le code source des bugs trouvés",
+  "Écrire ou exécuter des tests unitaires ou une suite de tests automatisés",
+  "Réaliser un audit de sécurité ou un test de pénétration",
+  "Tester une API sans interface web dans le navigateur"
+ ]
+}

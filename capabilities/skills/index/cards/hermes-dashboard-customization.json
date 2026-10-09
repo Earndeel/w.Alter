@@ -1,0 +1,69 @@
+{
+ "name": "hermes-dashboard-customization",
+ "sha": "985da8b35e5165704320babdef503e2d9c97f5e7c9dbdd0ad93fb92f0d5e15d2",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000640332,
+ "summary": "Use when extending or debugging the Hermes dashboard’s FastAPI backend, React UI, themes, build, or restart process.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute un endpoint API au dashboard Hermes et branche-le dans le frontend.",
+  "Je veux une nouvelle page dans le dashboard, tu peux faire le backend et le React ?",
+  "Comment j’ajoute un panneau détail avec édition et sauvegarde dans l’interface ?",
+  "Ajoute un thème perso au dashboard Hermes, avec les bonnes couleurs et la typo.",
+  "Peux-tu porter mon skin TUI en thème du dashboard ?",
+  "Le bouton Save est coupé quand la fenêtre est étroite, corrige l’UI du dashboard.",
+  "J’ai modifié la page Skills, comment je rebuild et relance le dashboard proprement ?",
+  "Le build du dashboard plante avec `tsc: not found`, je fais quoi ?",
+  "J’ai ajouté un thème dans presets.ts, mais il n’apparaît pas dans la liste : qu’est-ce que j’ai oublié ?",
+  "Le dashboard ne sert plus le nouveau frontend après mes changements, rebuild et restart-le.",
+  "Je veux ajouter l’édition du contenu des skills depuis le dashboard, API comprise.",
+  "Le port 9119 est encore occupé après le stop, aide-moi à relancer le dashboard."
+ ],
+ "intents_en": [
+  "Add a dashboard API endpoint and UI.",
+  "Create a custom Hermes dashboard theme.",
+  "Fix the React dashboard build and restart it.",
+  "Add an editable detail panel to the dashboard.",
+  "Port my TUI skin to a dashboard theme."
+ ],
+ "entities": [
+  "Hermes Agent dashboard",
+  "hermes dashboard",
+  "hermes_cli/web_server.py",
+  "FastAPI",
+  "React",
+  "TypeScript",
+  "Vite",
+  "web/src/pages/",
+  "web/src/lib/api.ts",
+  "web/src/themes/presets.ts",
+  "web/src/themes/types.ts",
+  "hermes_cli/web_dist/",
+  "BUILTIN_THEMES",
+  "_BUILTIN_DASHBOARD_THEMES",
+  "dashboard.theme",
+  "9119",
+  "../node_modules/.bin/vite",
+  "tsc",
+  "web/node_modules/.bin/vite",
+  ".skills_prompt_snapshot.json",
+  "fuser -k 9119/tcp",
+  "--skip-build"
+ ],
+ "symptoms": [
+  "`tsc: not found` during dashboard build",
+  "Dashboard API or frontend feature is missing",
+  "A newly added theme does not appear in the theme list",
+  "Dashboard serves stale or missing frontend files after restart",
+  "Port 9119 reports address already in use",
+  "Action buttons are clipped on narrow or split screens",
+  "Theme warmGlow visibly tints the background"
+ ],
+ "not_for": [
+  "Changing Hermes agent behavior or system prompts unrelated to the dashboard UI",
+  "Customizing TUI skins without porting them to dashboard themes",
+  "General FastAPI or React development outside the Hermes dashboard",
+  "Using the dashboard as an end user without modifying its code or themes"
+ ]
+}

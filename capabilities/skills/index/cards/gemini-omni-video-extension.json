@@ -1,0 +1,65 @@
+{
+ "name": "gemini-omni-video-extension",
+ "sha": "553ac93bbae4f44f4cf26c38779174ad1365da312110c6fa22e9562a1ce47aaa",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005628645,
+ "summary": "Use when extending a Gemini Omni video through Kie.ai by using its last frame as a FIRST_FRAME image reference, with honest continuity checks.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Continue cette vidéo avec Gemini Omni sur Kie.ai à partir de sa dernière frame.",
+  "Comment je fais une extension de clip Gemini avec FIRST_FRAME ?",
+  "Enchaîne la vidéo, mais garde le même cadrage, la même personne et le même décor.",
+  "J’ai mon clip 1 : extrais la dernière image et lance le clip 2 avec Kie.",
+  "La jonction se voit trop, tu peux préparer les prompts de fin et de reprise ensemble ?",
+  "Je veux prolonger ce plan de 4 secondes en 1080p sans que le perso change de tête.",
+  "Le premier frame du deuxième clip est re-rendu, pas identique. C’est normal avec Gemini Omni via Kie ?",
+  "Fais la continuité avec une image de référence, pas avec video_list, pour éviter le tarif à 168 crédits.",
+  "Mon extraction de dernière frame a échoué ; reprends à cette étape sans regénérer le clip déjà payé.",
+  "Tu peux vérifier la vraie jonction en concaténant les clips bruts, sans fondu pour masquer la coupe ?",
+  "J’ai un 500 quand j’envoie mon MP4 dans image_urls, pourquoi ?",
+  "La génération est bloquée quand je fournis la vidéo avec son : on peut faire l’extension avec la dernière frame seulement ?"
+ ],
+ "intents_en": [
+  "Extend this Gemini Omni clip via Kie.ai using its last frame.",
+  "Continue the shot from a FIRST_FRAME image reference.",
+  "Help me prepare matching prompts for the clip handoff.",
+  "Check the raw cut between the two generated clips.",
+  "Resume frame extraction without paying to regenerate clip one."
+ ],
+ "entities": [
+  "Gemini Omni",
+  "Kie.ai",
+  "FIRST_FRAME",
+  "image_urls",
+  "video_list",
+  "ffmpeg",
+  "catbox.moe",
+  "Google Interactions API",
+  "previous_interaction_id",
+  "POST /api/v1/jobs/createTask",
+  "GET /api/v1/jobs/recordInfo?taskId=X",
+  "resultJson.resultUrls[0]",
+  "last_frame.jpg",
+  "Seedance 2.0",
+  "first_frame_url",
+  "last_frame_url",
+  "0x0.st",
+  "/api/v1/file/upload"
+ ],
+ "symptoms": [
+  "The first generated frame is re-rendered rather than pixel-identical.",
+  "A visible reset or cut appears at the clip junction.",
+  "Kie.ai returns a 500 when an MP4 URL is passed as image_urls.",
+  "Google Safety blocks generation when the input video contains audio.",
+  "ffmpeg exits successfully but last_frame.jpg is missing or empty.",
+  "Kie.ai /api/v1/file/upload returns 404.",
+  "0x0.st upload returns 503."
+ ],
+ "not_for": [
+  "Frame-perfect bridging with Seedance 2.0 native first_frame_url and last_frame_url.",
+  "True stateful video continuation through Google Interactions API and previous_interaction_id.",
+  "Adding crossfades or optical-flow morphs to conceal a cut unless explicitly requested.",
+  "General video generation unrelated to extending a Gemini Omni clip via Kie.ai."
+ ]
+}

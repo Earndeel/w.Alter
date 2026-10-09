@@ -1,0 +1,63 @@
+{
+ "name": "authenticated-usage-verification",
+ "sha": "e8f45416f3dc1480e5ce3d03f1ba84c8ffb49985006382886a8f53bdbc0cc5a2",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00067807575,
+ "summary": "Use when Monsieur needs a live, authenticated check of a service’s usage, quota, credits, plan limit, reset window, or authorized run cost.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux vérifier combien il me reste de crédits sur mon compte ?",
+  "Regarde mon quota actuel et la date de reset, directement dans le dashboard.",
+  "J’ai l’impression que ma limite hebdo a changé. Vérifie ce qui est affiché sur mon compte.",
+  "Combien d’usage il me reste sur ChatGPT Work ? Vérifie le compteur live, pas d’après tes notes.",
+  "Est-ce que mon plan Luna Max a une limite glissante ou un reset hebdomadaire ? Va voir la page Usage.",
+  "Peux-tu relever le solde de crédits et le quota restant ? Garde bien les deux mesures séparées.",
+  "Mon compteur n’a pas bougé après ma dernière requête. Vérifie le chiffre actuel, sans lancer d’autre requête.",
+  "Avant de tester, note le compteur actuel. Je t’autorise à faire un seul prompt minimal, puis à vérifier l’impact.",
+  "Le run de contrôle est terminé ; recharge la page Usage et compare avec la valeur d’avant.",
+  "Ça me coûte combien à la marge par requête ? Commence par vérifier les compteurs authentifiés et dis-moi si une seule mesure suffit.",
+  "Tu peux confirmer que tu es sur le bon compte et le bon modèle avant de relever mon usage ?",
+  "Le dashboard ne montre pas le quota dans le snapshot. Cherche la valeur visible dans le panneau Usage, sans exposer mes infos de compte."
+ ],
+ "intents_en": [
+  "Check my live authenticated usage and remaining quota.",
+  "How many credits are left on my account?",
+  "Verify my plan limit and reset window in the dashboard.",
+  "Record usage before and after one authorized test run.",
+  "Check whether the displayed usage counter changed after my run."
+ ],
+ "entities": [
+  "Camoufox-Max",
+  "ChatGPT Work",
+  "Luna Max",
+  "Usage",
+  "Plan",
+  "Account",
+  "GET /health",
+  "POST /session/cookies",
+  "POST /tab/new",
+  "POST /tab/navigate",
+  "POST /tab/snapshot",
+  "POST /tab/click",
+  "POST /tab/type",
+  "POST /tab/evaluate",
+  "POST /tab/close",
+  "DELETE /sessions/<temporary-user-id>",
+  "127.0.0.1:9377"
+ ],
+ "symptoms": [
+  "The usage or credits counter appears unchanged after a run.",
+  "The dashboard shows separate credits and weekly or rolling limits.",
+  "The Usage panel is missing from the semantic snapshot.",
+  "The service redirects to a marketing page instead of the authenticated product.",
+  "The browser reports an expected array, got undefined cookie payload error.",
+  "The authenticated session cannot be verified or the browser transport fails."
+ ],
+ "not_for": [
+  "Recovering an authenticated session or troubleshooting MFA and account access.",
+  "General authenticated browsing unrelated to usage, quotas, or cost verification.",
+  "Looking up public pricing without checking live account usage.",
+  "Changing billing settings, buying credits, upgrading, or resetting quotas."
+ ]
+}

@@ -1,0 +1,71 @@
+{
+ "name": "mcp-oauth-troubleshooting",
+ "sha": "f05d3e970f58f94b0cce6c20bb8bc5141824a26651fc5bd264ac328b4e02185a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000653202,
+ "summary": "Use when an OAuth-authenticated remote MCP server fails to connect or log in from a headless, SSH, TUI, or gateway Hermes host.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Aide-moi à connecter ce serveur MCP OAuth depuis mon VPS, j’ai pas de navigateur dessus.",
+  "Le login MCP affiche une URL localhost à la fin, je copie quoi dans le terminal ?",
+  "J’ai l’URL callback avec code et state, je fais quoi maintenant ?",
+  "Le provider me sort redirect_uri mismatch après plusieurs essais, tu peux regarder ?",
+  "hermes mcp login plante au bout de 40 secondes alors que je suis encore sur la page OAuth.",
+  "J’ai un State parameter mismatch, faut relancer toute l’auth ?",
+  "Le login OAuth est passé mais Hermes trouve aucun tool pour ce serveur.",
+  "J’ai bien un token dans mcp-tokens mais hermes mcp test dit qu’il n’y en a pas.",
+  "On peut éviter le copier-coller du callback ? Mon laptop et le serveur sont sur le même Tailscale.",
+  "Je suis en SSH sur mon host Hermes et le prompt pour coller l’URL callback n’apparaît pas.",
+  "Le callback localhost n’arrive pas jusqu’au serveur distant, comment terminer l’OAuth ?",
+  "J’ai ajouté le serveur dans mcp_servers, mais les tools remontent toujours pas dans ma session."
+ ],
+ "intents_en": [
+  "Fix remote MCP OAuth login on a headless VPS.",
+  "What do I do with the localhost callback URL?",
+  "OAuth redirect_uri mismatch after retrying MCP login.",
+  "Hermes MCP login times out during browser authorization.",
+  "OAuth succeeded, but the MCP tools are missing."
+ ],
+ "entities": [
+  "Hermes",
+  "remote HTTP MCP",
+  "OAuth",
+  "hermes mcp login",
+  "hermes mcp test",
+  "mcp_servers",
+  "config.yaml",
+  "mcp-tokens",
+  "mcp_oauth.py",
+  "_probe_single_server",
+  "connect_timeout",
+  "redirect_uri",
+  "localhost",
+  "127.0.0.1",
+  "PTY",
+  "SSH",
+  "Tailscale",
+  "curl",
+  "tools/list",
+  "tools/call",
+  "scripts/oauth-fifo-callback.py",
+  "scripts/oauth-tailscale-callback.py",
+  "references/higgsfield-oauth-headless.md",
+  "references/tailscale-oauth-bypass.md"
+ ],
+ "symptoms": [
+  "redirect_uri mismatch",
+  "State parameter mismatch",
+  "hermes mcp login exits after roughly 40 seconds",
+  "no cached tokens found",
+  "Browser callback to localhost cannot reach the remote host",
+  "OAuth completes but no MCP tools are discovered",
+  "Callback paste prompt is unavailable in SSH or TUI"
+ ],
+ "not_for": [
+  "Configuring or developing a non-OAuth MCP server",
+  "General MCP tool usage after the server is connected",
+  "Troubleshooting local stdio MCP servers",
+  "Managing OAuth for unrelated apps or services"
+ ]
+}

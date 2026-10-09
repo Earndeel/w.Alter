@@ -1,0 +1,71 @@
+{
+ "name": "evidence-integrity-verification",
+ "sha": "0ea126c386429f57771cc78869964776a9ce14bc7299f5ebb6abd55f23698f8a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0007747245,
+ "summary": "Use when independently checking release-review evidence by reproducing runtime, hashes, tests, artifacts, sanitization, metrics, or frontend visuals.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Peux-tu vérifier les preuves de cette release toi-même, pas juste croire le compte rendu ?",
+  "Le reviewer bloque sur un diff de schéma, mais il compare peut-être le mauvais checkout : trouve le vrai runtime.",
+  "Le hash SHA-256 annoncé ne correspond pas, retrouve la convention de sérialisation et vérifie le contenu.",
+  "Ils disent que les plugins ont la même surface entre les deux versions, reproduis ça dans des HERMES_HOME isolés.",
+  "Le benchmark a l'air vieux : compare l'artefact au générateur actuel et relance la suite de tests.",
+  "On me dit « 135 tests pass », vérifie le nombre réellement collecté et lance pytest.",
+  "Vérifie que tous les artefacts sont bien sanitizés, cherche aussi les IP, clés API et blobs suspects.",
+  "Ce métrique affiche unknown et not enforced : dis-moi si c'est une disclosure honnête ou un vrai bug.",
+  "Les totaux du rapport sont-ils dérivés des scénarios ou écrits en dur ? Recalcule chaque agrégat.",
+  "Regarde si l'artefact a changé pendant la review et dis-moi quel hash du générateur tu as évalué.",
+  "La capture fullPage est propre mais la page est moche en vrai : vérifie le rendu desktop et mobile après scroll.",
+  "Le test dit que l'état est restauré, mais vérifie qu'il remet bien la valeur originale et pas juste le row_count."
+ ],
+ "intents_en": [
+  "Reproduce the release evidence instead of trusting the review.",
+  "Verify the live runtime baseline and schema hash.",
+  "Check whether this benchmark artifact matches its committed generator.",
+  "Run the tests and independently validate the claimed pass count.",
+  "Review the frontend visually at desktop and mobile sizes."
+ ],
+ "entities": [
+  "SHA-256",
+  "pytest",
+  "HERMES_HOME",
+  "plugins.enabled",
+  "plugins",
+  "config.yaml",
+  "COMPUTER_USE_SCHEMA",
+  "registered_backends",
+  "registered_actions",
+  "OpenAI function schema",
+  "assert_sanitized()",
+  "ps",
+  "diff",
+  "sha256sum",
+  "grep",
+  "GSAP",
+  "IntersectionObserver",
+  "1440×900",
+  "390×844",
+  "references/digest-and-surface-reproduction.md",
+  "references/visual-rejection-recovery.md"
+ ],
+ "symptoms": [
+  "Claimed SHA-256 digest cannot be reproduced",
+  "Reviewer finding may be based on an editable checkout rather than the live release",
+  "Plugin discovery reports \"not enabled in config\"",
+  "Artifact contains fields absent from the current generator",
+  "Claimed green test suite fails or has a different test count",
+  "Artifact or generator changes during review",
+  "Reported aggregates do not match per-scenario evidence",
+  "Sanitized artifact contains possible PII or credential patterns",
+  "Frontend elements remain invisible in a fullPage capture",
+  "Restore test passes a proxy check while user data may have been clobbered"
+ ],
+ "not_for": [
+  "Implementing the release feature or fixing the code defects found",
+  "Routine code review that does not reproduce evidence",
+  "Deploying a frontend change without visual sign-off",
+  "Generating benchmark artifacts as a standalone task"
+ ]
+}

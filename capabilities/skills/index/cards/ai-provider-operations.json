@@ -1,0 +1,72 @@
+{
+ "name": "ai-provider-operations",
+ "sha": "301d43a246dc0040091b03524ee5aaa5484a5559f0a4b0728d2a3e1f24f49a2d",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00056571075,
+ "summary": "Use when configuring, routing, evaluating, or QA-checking LLM or media providers and their generated deliverables.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Tu peux vérifier si mon compte a vraiment accès à ce modèle avant que je change le routing ?",
+  "L’API répond OK mais le modèle demandé n’est pas invoqué, tu peux diagnostiquer où ça bloque ?",
+  "Compare ces deux providers sur les mêmes prompts et donne-moi latence, coût, erreurs et qualité.",
+  "J’ai un 429, vérifie quota et permissions avant de me faire retenter n’importe quoi.",
+  "Configure un fallback réversible pour ce provider, sans toucher à la prod avant mon accord.",
+  "Le job vidéo est marqué réussi, mais tu peux contrôler le fichier téléchargé et la qualité réelle ?",
+  "On reprend le job vidéo existant après l’interruption, ne lance pas un doublon.",
+  "Avant de lancer la génération payante, vérifie le modèle, la région, le format et le budget.",
+  "Les sous-titres et le rendu audio sont-ils conformes au brief, ou faut-il refaire une étape ?",
+  "Google Flow m’a sorti une vidéo avec le mauvais texte : vérifie le rendu et dis-moi quoi corriger.",
+  "Le lien de livraison s’ouvre chez moi, mais vérifie que le destinataire peut accéder au bon fichier.",
+  "Tu peux auditer toute la chaîne, du provider choisi jusqu’au livrable reçu, et séparer les causes si ça échoue ?"
+ ],
+ "intents_en": [
+  "Check whether this account can invoke the requested model.",
+  "Compare providers on latency, cost, errors, and quality.",
+  "Diagnose why the configured model is not actually being called.",
+  "Verify the generated media file against the brief before delivery.",
+  "Resume the existing provider job without creating a duplicate."
+ ],
+ "entities": [
+  "LLM providers",
+  "media providers",
+  "model IDs",
+  "provider catalogs",
+  "regions",
+  "accounts",
+  "IAM",
+  "entitlements",
+  "quotas",
+  "billing",
+  "API modes",
+  "endpoints",
+  "routing",
+  "fallbacks",
+  "adapters",
+  "correlation IDs",
+  "Google Flow",
+  "generation jobs",
+  "ASR",
+  "captions",
+  "media artifacts",
+  "provider-and-media-gates.md",
+  "flow-google-ui.md",
+  "project-scoped-iteration-authority.md"
+ ],
+ "symptoms": [
+  "401 or access-denied response",
+  "404 or model-not-found response",
+  "429 or throttling response",
+  "Authentication succeeds but the requested capability is unavailable",
+  "The adapter sends a different model or controls than requested",
+  "A job reports success but the downloaded artifact is invalid or incomplete",
+  "Generated media violates the brief or has incorrect text, audio, or captions",
+  "The recipient cannot access the delivered artifact"
+ ],
+ "not_for": [
+  "Writing or editing general-purpose prompts without provider setup or evaluation",
+  "Building unrelated application features or general deployment infrastructure",
+  "Creating media concepts or scripts without provider generation, artifact QA, or delivery",
+  "Managing secrets or account access outside an approved provider onboarding or diagnostic task"
+ ]
+}

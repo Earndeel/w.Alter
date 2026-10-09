@@ -1,0 +1,71 @@
+{
+ "name": "kardex",
+ "sha": "1c3f3294daf8572d36767fa1531db94497c2c86c139dc3c357e131b9dbd666fb",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000655182,
+ "summary": "Use when syncing Beeper contacts, extracting conversation context, or managing Kardex profiles, events, and follow-up actions.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Sync les messages Beeper de ce contact dans Kardex.",
+  "Tu peux lancer la synchro de tous mes chats Beeper ?",
+  "Fais un dry-run Kardex pour ce contact avant d’écrire en base.",
+  "Construis le profil Kardex de cette personne à partir de ses messages.",
+  "Tu peux extraire les événements et les trucs à relancer dans cette conversation ?",
+  "Mets à jour le contexte de contact pour Annie.",
+  "J’ai un nouveau contact Beeper, comment je l’ajoute dans Kardex ?",
+  "Pourquoi mon contact n’a pas son vrai nom dans Kardex, juste un handle genre cl_ld8228 ?",
+  "Vérifie les actions en attente et les prochains événements de mes contacts.",
+  "La synchro Beeper a importé plein de messages vides ou de doublons, tu peux regarder le nettoyage ?",
+  "On en est où sur Kardex : schéma, sync Beeper et génération des profils ?",
+  "Prépare le contexte Kardex de ce contact pour que le Context Builder puisse le charger avant un appel."
+ ],
+ "intents_en": [
+  "Sync a Beeper contact into Kardex.",
+  "Build this contact's Kardex profile.",
+  "Extract events and follow-ups from these messages.",
+  "Run a dry-run of the Beeper sync.",
+  "Check pending Kardex actions."
+ ],
+ "entities": [
+  "Kardex",
+  "Beeper",
+  "hindsight-pg",
+  "PostgreSQL schema kardex",
+  "Qdrant collection kardex_ctx",
+  "Jarvis Context Builder",
+  "Memory Gateway",
+  "beeper_sync.py",
+  "build_context.py",
+  "/root/.hermes/services/kardex/schema.sql",
+  "/root/.hermes/services/kardex/scripts/beeper_sync.py",
+  "/root/.hermes/services/kardex/scripts/build_context.py",
+  "172.17.0.4",
+  "port 5432",
+  "port 8891",
+  "port 8893",
+  "port 8897",
+  "llama-4-scout",
+  "OpenRouter",
+  "contacts",
+  "channels",
+  "messages",
+  "media",
+  "events",
+  "actions",
+  "sync_state"
+ ],
+ "symptoms": [
+  "Beeper handle appears instead of the contact's real name",
+  "Kardex contact profile is missing or out of date",
+  "Sync imports duplicate URLs, HTML, or empty messages",
+  "Event extraction produces an implausibly large number of matches",
+  "PostgreSQL connection fails when using localhost"
+ ],
+ "not_for": [
+  "Automatically replying to contacts or sending outbound messages",
+  "Syncing Gmail, IMAP, Android SMS, or native WhatsApp data",
+  "General fact retrieval or updates to W.Alter's public memory",
+  "Semantic search through the planned Qdrant collection"
+ ]
+}

@@ -1,0 +1,68 @@
+{
+ "name": "kie-gemini-api",
+ "sha": "f1e83fdb9f510a7ab31f45a2300cf7fa2b64a6e68a0b3b083f12d895bbb16781",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000595287,
+ "summary": "Use when Monsieur needs to call, configure, or debug Gemini models through Kie.ai's native generateContent API.",
+ "kind": "integration",
+ "intents_fr": [
+  "Comment j'appelle Gemini 3.5 Flash sur Kie.ai ?",
+  "Fais-moi le curl correct pour envoyer un prompt à Gemini via l'API Kie.",
+  "Je veux brancher Gemini sur Kie dans mon script Python, c'est quoi le format de requête ?",
+  "Mon appel Gemini sur Kie renvoie 422, tu peux vérifier l'endpoint et le model ID ?",
+  "J'ai un HTTP 200 mais un body vide avec Gemini, ça veut dire quoi ?",
+  "Gemini marche pas avec mon endpoint chat/completions Kie, trouve le bon format.",
+  "Pour gemini-3-flash-v1betamodels, faut utiliser le streaming ? Donne-moi un exemple.",
+  "Ajoute un system instruction et maxOutputTokens à ma requête Gemini Kie.",
+  "Comment je lis le texte et les usageMetadata dans la réponse de Kie Gemini ?",
+  "Je veux comparer les model IDs Gemini dispo sur Kie, lesquels répondent vraiment ?",
+  "Mon intégration consomme des crédits Kie, comment vérifier credits_consumed et les tokens de reasoning ?",
+  "Le modèle Gemini renvoie data: dans la réponse, comment je parse le SSE jusqu'à [DONE] ?"
+ ],
+ "intents_en": [
+  "Call Gemini 3.5 Flash through Kie.ai",
+  "Show me the correct Kie Gemini curl request",
+  "Why does my Kie Gemini request return an empty body?",
+  "Use streaming for this Gemini model on Kie",
+  "Parse Kie Gemini generateContent responses"
+ ],
+ "entities": [
+  "Kie.ai",
+  "Gemini",
+  "gemini-3-5-flash",
+  "gemini-3-flash-v1betamodels",
+  "generateContent",
+  "streamGenerateContent",
+  "https://api.kie.ai/gemini/v1/models/{model_id}:generateContent",
+  "https://api.kie.ai/gemini/v1/models/{model_id}:streamGenerateContent",
+  "/openai/v1/chat/completions",
+  "/gemini/v1/chat/completions",
+  "/chat/v1/messages",
+  "kie/api_key",
+  "https://docs.kie.ai",
+  "contents",
+  "parts",
+  "generationConfig",
+  "system_instruction",
+  "candidates",
+  "usageMetadata",
+  "thinkingTokenCount",
+  "credits_consumed",
+  "SSE",
+  "curl"
+ ],
+ "symptoms": [
+  "HTTP 422: model not supported",
+  "HTTP 422: page does not exist",
+  "HTTP 200 with content-length: 0",
+  "Gemini chat/completions endpoint returns 422",
+  "Streaming response ends with data: [DONE]"
+ ],
+ "not_for": [
+  "Appeler directement l'API Gemini de Google plutôt que Kie.ai",
+  "Générer des vidéos ou des images avec Kie.ai",
+  "Chercher ou configurer la clé API Kie dans le vault",
+  "Intégrer un modèle non-Gemini de Kie.ai"
+ ]
+}

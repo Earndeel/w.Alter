@@ -1,0 +1,69 @@
+{
+ "name": "universal-web-extraction-router",
+ "sha": "257c3460c76415bef6fe49ed2b9b1c025e54f56c001c5054c9a7e0653b961c38",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0008088795,
+ "summary": "Use when Monsieur asks to search, extract, monitor, or scrape public web data, with or without a known URL.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Cherche les derniers prix de ce produit sur le web.",
+  "Tu peux regarder ce qu'il y a sur cette page et me sortir les horaires ? https://example.com",
+  "Compare les offres de ces trois sites et mets-moi ça dans un tableau.",
+  "Trouve les infos récentes sur cette boîte, surtout les levées de fonds.",
+  "Extrait les titres, prix et liens de cette page stp.",
+  "Le site a changé ? Vérifie les tarifs et dis-moi ce qui a bougé.",
+  "Fais-moi une recherche web sur les concurrents de mon projet.",
+  "Récupère les résultats de cette page, je veux le nom, le prix et la disponibilité.",
+  "J'ai cette URL, tu peux me sortir les données en JSON ?",
+  "Va voir les dernières actus sur le sujet, pas juste des infos anciennes.",
+  "Scrape ces pages pour récupérer les fiches produits.",
+  "Le résultat est vide alors que la page s'ouvre bien, tu peux vérifier ?"
+ ],
+ "intents_en": [
+  "Search the web for current pricing.",
+  "Extract the names and prices from this URL.",
+  "Compare these sites and summarize the latest offers.",
+  "Check this page again and tell me what changed.",
+  "Collect product listings from these URLs."
+ ],
+ "entities": [
+  "walter_browse",
+  "web_search",
+  "tool_search",
+  "tool_describe",
+  "tool_call",
+  "Scrapling",
+  "Camoufox Max",
+  "Webtop",
+  "Webtop Chromium",
+  "brave-mac-cdp",
+  "http_probe",
+  "universal-scraper",
+  "Walter Browse",
+  "Hermes",
+  "Camoufox",
+  "Webtop CDP",
+  "port 9377",
+  "port 9223",
+  "port 9222",
+  "$HERMES_HOME/cache/universal-web-extraction/profiles.json",
+  "/root/.hermes/bin/universal-scraper",
+  "expected_fields",
+  "required_fields",
+  "BrowseSession"
+ ],
+ "symptoms": [
+  "A public page returns no extracted records despite loading",
+  "HTTP 403, 429, or 503",
+  "Cloudflare challenge or other bot-check markers",
+  "Page content appears to load dynamically and is missing from static HTML",
+  "Extraction returns success but misses required fields"
+ ],
+ "not_for": [
+  "Answering questions that need no public web lookup",
+  "Searching the web when the requested material is only in Monsieur's local files",
+  "Solving CAPTCHA or performing complex authenticated interactions",
+  "Providing visual interpretation of a page without using visual browser tools"
+ ]
+}

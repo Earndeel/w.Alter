@@ -1,0 +1,71 @@
+{
+ "name": "ad-video-pipeline",
+ "sha": "03f6d3b68f5fe1de42af53cd177ebd6d0cfbc92d89dced30b76ecc27dac7503a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00092879325,
+ "summary": "Use when creating a cosmetic or beauty video ad from a reference: analyze shots, generate with Kling, review, and deliver via Drive.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Tu peux refaire cette pub beauté à partir de ce lien Foreplay et l'adapter à notre produit ?",
+  "Analyse cette vidéo plan par plan et dis-moi ce qu'on peut garder pour une pub skincare.",
+  "J'ai mis une vidéo de référence dans Notion, lance le pipeline jusqu'à la génération Kling.",
+  "La pub doit faire 15 secondes max : découpe les plans et prépare le payload Kling.",
+  "Remplace le produit de la vidéo par le nôtre et garde le style UGC qui marche.",
+  "Le prompt Kling est prêt ? Il faut une femme, du 9:16 et les bons textes produit.",
+  "Pour cette version, la voix doit être générée par le modèle, pas ajoutée en post : corrige le brief et les prompts.",
+  "Kling a fini, tu peux vérifier les plans, les dialogues et le lip-sync avant de livrer ?",
+  "Le résultat est validé par Lucas, upload la vidéo finale sur le Drive et passe la carte Notion en Livrée.",
+  "Foreplay bloque le téléchargement de la référence, tu peux récupérer la vidéo autrement et continuer l'analyse ?",
+  "Le payload est généré mais je veux changer le mood et le plan produit avant de payer la génération.",
+  "On reprend la pub skincare de tout à l'heure : garde les références d'identité, mais refais les prises de dialogue avec l'audio natif."
+ ],
+ "intents_en": [
+  "Make a beauty ad from this Foreplay reference.",
+  "Analyze this video shot by shot for a skincare ad.",
+  "Generate the Kling payload for this Notion card.",
+  "Check the native audio and lip-sync before delivery.",
+  "Upload the approved final video to Google Drive."
+ ],
+ "entities": [
+  "Foreplay.co",
+  "Notion",
+  "Kling V3 Pro",
+  "Kling V3 Standard",
+  "Fal.ai",
+  "Nano Banana 2",
+  "@Element",
+  "Google Drive",
+  "OpenRouter",
+  "Gemini 3 Flash Preview",
+  "Qwen3.6 Plus",
+  "ffmpeg",
+  "yt-dlp",
+  "Webtop",
+  "CDP",
+  "mcporter",
+  "video_analysis",
+  "model_runner.py",
+  "models/kling_v3/",
+  "output/{video_id}/final.mp4",
+  "MediaFileUpload",
+  "/api/models",
+  "/api/generate/<card_id>/<model_id>",
+  "/api/submit/<card_id>",
+  "/api/sync/<card_id>"
+ ],
+ "symptoms": [
+  "Foreplay.co bloque le téléchargement ou renvoie une erreur anti-bot.",
+  "L'analyse ou la génération LLM expire ou reçoit des erreurs 429.",
+  "La génération Kling reste en file d'attente, échoue ou ne se synchronise pas.",
+  "Le payload Kling dépasse 15 secondes ou ne respecte pas le format multi-prompt.",
+  "La voix entendue ne correspond pas au dialogue approuvé ou le lip-sync est incorrect.",
+  "La vidéo finale manque de son natif, ou un doublage/TTS a été ajouté contrairement au brief."
+ ],
+ "not_for": [
+  "Monter ou retoucher une vidéo existante sans repartir d'une référence publicitaire.",
+  "Créer une image fixe ou un visuel produit sans génération vidéo.",
+  "Gérer une campagne publicitaire, son ciblage ou son budget de diffusion.",
+  "Transcrire ou traduire uniquement un fichier audio sans produire de publicité vidéo."
+ ]
+}

@@ -1,0 +1,66 @@
+{
+ "name": "grok-cli-integration",
+ "sha": "e227f45d4ffc0c4fe59c83aa01553da35b49df28d7249724dfeb1096e10c3e42",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00067807575,
+ "summary": "Use when Monsieur veut installer, authentifier ou intégrer le CLI officiel Grok dans Hermes, ou distinguer son accès par abonnement de l’API xAI facturée.",
+ "kind": "integration",
+ "intents_fr": [
+  "Comment je connecte Grok Build à Hermes avec mon abonnement ?",
+  "Installe le CLI officiel Grok et vérifie que le login OAuth marche.",
+  "Je veux lancer Grok en headless sur ce repo, tu me donnes la bonne commande ?",
+  "Le CLI grok marche en direct, mais Hermes me renvoie 402 : c’est quoi qui coince ?",
+  "J’ai un 402 personal-team-blocked sur api.x.ai ; ça veut dire que mon abonnement Grok CLI est bloqué aussi ?",
+  "Configure Grok comme worker de code autonome pour bosser sur mon projet.",
+  "Je veux utiliser Grok comme un modèle normal dans Hermes, pas juste lui déléguer des tâches de code.",
+  "Pourquoi grok models me dit que j’utilise XAI_API_KEY alors que j’ai fait grok login ?",
+  "Fais un smoke test Grok sans toucher à mes variables d’environnement globales.",
+  "Hermes peut appeler grok-build-0.1 avec le CLI, ou ce nom dans la liste des modèles ne garantit rien ?",
+  "Le proxy Grok répond 401 sur /v1/models, on peut vérifier si la route existe sans bricoler les headers ?",
+  "J’ai déjà des changements locaux dans Hermes : intègre le provider ACP sans écraser mon travail."
+ ],
+ "intents_en": [
+  "Set up Grok CLI OAuth for Hermes.",
+  "Run Grok headlessly as a coding worker.",
+  "Why does Hermes return 402 when the CLI works?",
+  "Use Grok as a regular Hermes model.",
+  "Check whether the CLI uses subscription OAuth or the xAI API key."
+ ],
+ "entities": [
+  "Grok Build CLI",
+  "grok",
+  "grok login",
+  "grok models",
+  "grok agent stdio",
+  "grok-4.5",
+  "grok-build-0.1",
+  "Hermes",
+  "ACP",
+  "xAI API",
+  "XAI_API_KEY",
+  "XAI_BASE_URL",
+  "https://api.x.ai/v1",
+  "https://cli-chat-proxy.grok.com/v1",
+  "~/.grok/auth.json",
+  "env -u",
+  "--no-auto-update",
+  "--always-approve",
+  "--output-format json",
+  "personal-team-blocked"
+ ],
+ "symptoms": [
+  "402 personal-team-blocked from api.x.ai",
+  "grok models reports: You are using XAI_API_KEY",
+  "CLI login appears successful but headless requests fail",
+  "Hermes rejects the Grok CLI proxy URL as an invalid xAI OAuth origin",
+  "GET /v1/models returns 401 auth_kind=none",
+  "Hermes cannot complete a request through the configured Grok proxy"
+ ],
+ "not_for": [
+  "Développer une intégration xAI API pay-as-you-go sans utiliser Grok Build CLI.",
+  "Résoudre un problème d’abonnement ou de connexion à l’interface web Grok.",
+  "Choisir un modèle Grok uniquement à partir d’un catalogue, sans configurer ni tester le CLI.",
+  "Déléguer une tâche de code à un autre agent sans intégration Grok."
+ ]
+}

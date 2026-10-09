@@ -1,0 +1,68 @@
+{
+ "name": "stable-diffusion",
+ "sha": "852804819c9815b1b7ee45123b5066c5896e6b5309d1c6effc1061fb804aaae8",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000843777,
+ "summary": "Use when generating or transforming images with Stable Diffusion via HuggingFace Diffusers, including inpainting, ControlNet, LoRA, and custom pipelines.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Genere-moi une image avec Stable Diffusion a partir de ce prompt.",
+  "Tu peux me faire un visuel SDXL en 1024x1024 pour le site ?",
+  "Comment je lance du text-to-image avec Diffusers sur le GPU ?",
+  "Fais une version aquarelle de cette photo avec img2img, sans trop changer la composition.",
+  "Je veux remplir juste la zone masquee de l'image, tu me montres comment faire l'inpainting ?",
+  "Peux-tu me generer 4 variantes de ce prompt avec le meme seed ?",
+  "Ajoute ControlNet pour garder les contours de mon croquis.",
+  "J'ai une LoRA de style, comment je la charge et regle son poids dans mon pipeline ?",
+  "La generation rame, on peut passer sur un scheduler plus rapide et moins d'etapes ?",
+  "Ca plante en CUDA out of memory quand je lance SDXL, quelles optimisations Diffusers activer ?",
+  "Les images sortent noires ou pleines de bruit, tu peux regarder mon pipeline Stable Diffusion ?",
+  "Je veux monter un pipeline de generation maison avec un modele HuggingFace et sauvegarder le resultat en PNG."
+ ],
+ "intents_en": [
+  "Generate an image with Stable Diffusion and Diffusers.",
+  "Turn this photo into a watercolor with img2img.",
+  "Inpaint the masked area using an SD pipeline.",
+  "Load a LoRA and generate images with it.",
+  "Fix CUDA out of memory during SDXL generation."
+ ],
+ "entities": [
+  "HuggingFace Diffusers",
+  "Stable Diffusion",
+  "SD 1.5",
+  "SDXL",
+  "Stable Diffusion 3",
+  "Flux",
+  "DiffusionPipeline",
+  "AutoPipelineForText2Image",
+  "AutoPipelineForImage2Image",
+  "AutoPipelineForInpainting",
+  "ControlNet",
+  "LoRA",
+  "PyTorch",
+  "CUDA",
+  "xFormers",
+  "EulerDiscreteScheduler",
+  "DPMSolverMultistepScheduler",
+  "LCMScheduler",
+  "stabilityai/stable-diffusion-xl-base-1.0",
+  "stable-diffusion-v1-5/stable-diffusion-v1-5",
+  "runwayml/stable-diffusion-inpainting",
+  "latent-consistency/lcm-lora-sdxl",
+  "pip install diffusers transformers accelerate torch"
+ ],
+ "symptoms": [
+  "CUDA out of memory pendant la generation",
+  "Images noires ou pleines de bruit",
+  "Generation trop lente",
+  "La generation ne respecte pas le prompt",
+  "Erreur de dtype ou de precision au chargement du modele"
+ ],
+ "not_for": [
+  "Generer des images via l'API DALL-E sans GPU",
+  "Creer des images dans Midjourney ou Leonardo.ai",
+  "Faire de la classification ou de la detection d'objets sans generation d'image",
+  "Retoucher une image avec un outil graphique classique sans modele de diffusion"
+ ]
+}

@@ -1,0 +1,67 @@
+{
+ "name": "x-research-pipeline",
+ "sha": "9fe08b5db572b333db572f15394141bfd5ab453d1030fe8e3dddaf8312c53880",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000920502,
+ "summary": "Use when Monsieur veut analyser des opinions sur X, extraire des posts ou lancer une veille de sujet, marque, personne ou compte.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Analyse ce que les gens pensent de Gemini 3.5 sur X, avec les points positifs et négatifs.",
+  "Tu peux me faire un sentiment analysis des réactions à cette release sur Twitter ?",
+  "Lance une veille X sur NousResearch, deux fois par jour, et préviens-moi si ça s’emballe.",
+  "Qu’est-ce qui se dit sur ma marque sur X en ce moment ? Je veux les thèmes et les critiques qui reviennent.",
+  "Récupère les derniers posts de @aimikoda et sors-moi les prompts intéressants.",
+  "Fais une recherche rapide sur X à propos de ce sujet, pas besoin d’un gros rapport.",
+  "La veille sur ce produit, elle en est où ? Compare avec le dernier snapshot.",
+  "Pourquoi le scrape X ne sort plus aucun post ? Les cookies ont peut-être expiré ?",
+  "Les résultats sont trop récents et pas pertinents : regarde les posts qui ont le plus d’engagement.",
+  "Peux-tu analyser les replies aussi ? C’est souvent là qu’on trouve les avis nuancés.",
+  "Récupère les posts des comptes officiels sur les nouveautés, avec les dates et les citations, puis mets le résultat dans Notion.",
+  "J’ai plusieurs sujets à suivre : configure une recherche séparée pour chacun et garde l’historique."
+ ],
+ "intents_en": [
+  "Analyze sentiment about this product on X.",
+  "Monitor this topic on Twitter and alert me to engagement spikes.",
+  "Extract the latest posts and prompts from this X account.",
+  "Find the most relevant reactions to this release on X.",
+  "Export the X research findings to Notion."
+ ],
+ "entities": [
+  "X",
+  "Twitter",
+  "x_search",
+  "Nitter RSS",
+  "Playwright",
+  "PostgreSQL",
+  "hindsight",
+  "hindsight-pg",
+  "x_research",
+  "Notion",
+  "Telegram",
+  "Tailscale",
+  "Brave",
+  "Google site:x.com",
+  "yt-dlp",
+  "Cloudflare Worker",
+  "R2",
+  "~/.hermes/scripts/x_research_scrape.py",
+  "~/.hermes/scripts/x_research_analyze.py",
+  "~/.hermes/scripts/x_research_db.py",
+  "/tmp/x_cookies.json",
+  "docker inspect hindsight-pg"
+ ],
+ "symptoms": [
+  "Le scraping ne retourne aucun post, possiblement à cause de cookies X expirés.",
+  "Les résultats X sont surtout récents, peu pertinents ou sans engagement.",
+  "Google site:x.com retourne zéro résultat.",
+  "Le container hindsight-pg a redémarré et son IP a changé.",
+  "Le scraping échoue avec une login wall ou Webtop Chromium plante sur X."
+ ],
+ "not_for": [
+  "Un simple résumé des derniers posts d’un compte sans replies, métriques ni analyse : utiliser plutôt Nitter RSS.",
+  "Une question générale sur X ou Twitter qui ne demande ni recherche ni extraction de contenu.",
+  "Une recherche web générale sans besoin de posts, réactions ou données provenant de X.",
+  "L’intégration de vidéos dans Notion prise isolément, sans pipeline de recherche X."
+ ]
+}

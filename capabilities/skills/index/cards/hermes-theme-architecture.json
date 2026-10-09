@@ -1,0 +1,67 @@
+{
+ "name": "hermes-theme-architecture",
+ "sha": "4eef13a2b92bb1cb2f58fe01ad436d849bb0b5be561bb372268535959add6fad",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005400945,
+ "summary": "Use when adding, changing, or troubleshooting Hermes v2 themes and choosing between dashboard YAML and desktop Electron localStorage or rebuild.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ajoute mon thème W.Alter au dashboard Hermes, avec un fichier YAML.",
+  "Je veux mettre un thème sombre dans l’app Hermes : je le mets où ?",
+  "J’ai créé `dashboard-themes/walter.yaml`, mais le thème n’apparaît pas dans l’app desktop.",
+  "Comment injecter un thème dans Hermes Desktop sans reconstruire l’Electron ?",
+  "J’ai modifié `presets.ts` sur le serveur, pourquoi ça n’a rien changé dans l’app installée ?",
+  "Tu peux me préparer un YAML de thème pour le dashboard Hermes v2 ?",
+  "Je veux ajouter un thème aux presets intégrés du client desktop, quelles étapes et quel rebuild ?",
+  "Le thème que j’ai importé en localStorage n’apparaît pas dans Settings > Appearance.",
+  "J’ai le même nom de thème en built-in et en user theme, lequel est pris en compte ?",
+  "Pour mon thème Hermes, c’est quoi la différence entre le dashboard web et la version Electron ?",
+  "Le client desktop a gardé l’ancien thème après mes changements dans le repo, c’est normal ?",
+  "Importe mon thème VS Code `.vsix` dans Hermes Desktop ou explique comment le faire."
+ ],
+ "intents_en": [
+  "Add a YAML theme to the Hermes dashboard.",
+  "Install a theme in the Electron desktop app without rebuilding.",
+  "Why does my dashboard theme have no effect on desktop?",
+  "Make a desktop theme built-in and rebuild the app.",
+  "My user theme is missing from Appearance settings."
+ ],
+ "entities": [
+  "Hermes v2",
+  "Hermes dashboard",
+  "Hermes Desktop",
+  "Electron",
+  "W.Alter",
+  "~/.hermes/dashboard-themes/*.yaml",
+  "dashboard-themes/walter.yaml",
+  "hermes_cli/web_server.py",
+  "_BUILTIN_DASHBOARD_THEMES",
+  "_discover_user_themes()",
+  "/api/dashboard/themes",
+  "apps/desktop/src/themes/presets.ts",
+  "BUILTIN_THEMES",
+  "localStorage",
+  "hermes-desktop-theme-v2",
+  "hermes-desktop-user-themes-v1",
+  "hermes-desktop-profile-themes-v1",
+  "Settings → Appearance",
+  "Command Center",
+  ".vsix",
+  "references/dashboard-theme-template.yaml",
+  "references/localstorage-injection.js"
+ ],
+ "symptoms": [
+  "A dashboard YAML theme has no effect on the desktop app.",
+  "Editing presets.ts does not change the installed Electron app.",
+  "A desktop theme does not appear in Settings → Appearance.",
+  "A user theme with a built-in name is overridden by the built-in.",
+  "The desktop still shows the old theme after source changes."
+ ],
+ "not_for": [
+  "General Hermes dashboard setup or web server troubleshooting unrelated to themes.",
+  "Designing a color palette without adding or configuring it in Hermes.",
+  "Building or packaging Electron features unrelated to theme presets.",
+  "Importing VS Code extensions for purposes other than desktop theme conversion."
+ ]
+}

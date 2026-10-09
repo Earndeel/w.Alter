@@ -1,0 +1,59 @@
+{
+ "name": "fal-openapi-schema-discovery",
+ "sha": "1155e04ced2b380cf111a525e6fbe8bb3959dca5d7b0fb0994d21e8ca00120f9",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0004658445,
+ "summary": "Use when finding exact Fal.ai model input parameters, types, defaults, enums, or required fields via the raw OpenAPI schema.",
+ "kind": "procedure",
+ "intents_fr": [
+  "C’est quoi les paramètres exacts de ce modèle Fal ?",
+  "Trouve-moi le schéma OpenAPI pour fal-ai/kling-video/v3/pro/text-to-video.",
+  "La doc Fal est pas à jour : quels champs et options sont vraiment acceptés ?",
+  "Je veux générer un payload valide pour Seedance 2.0, vérifie les champs requis.",
+  "Le MCP me montre pas les paramètres complets du modèle, tu peux récupérer le schéma brut ?",
+  "Quels sont les types, valeurs par défaut et enums de ce endpoint fal.ai ?",
+  "Pour mon générateur de payloads, récupère et stocke les schémas des modèles Fal dans la DB.",
+  "J’ai trouvé ce modèle avec list_models ; teste son endpoint OpenAPI et donne-moi ses inputs.",
+  "Le champ duration accepte quelles valeurs sur ce modèle vidéo ?",
+  "Y a un champ image_urls ou video_urls pour ce modèle ? Il me faut le vrai schéma.",
+  "Le modèle répond 403 quand je l’appelle : est-ce qu’on peut quand même lire son schéma ?",
+  "Attention, Seedance utilise bytedance/ sans fal-ai dans l’URL OpenAPI, tu peux vérifier l’ID exact ?"
+ ],
+ "intents_en": [
+  "Get the exact Fal model input schema.",
+  "Which parameters and enums does this endpoint accept?",
+  "Fetch the raw OpenAPI schema for this Fal model.",
+  "The MCP docs omit fields; find the required inputs.",
+  "Check the valid payload fields for Seedance 2.0."
+ ],
+ "entities": [
+  "Fal.ai",
+  "OpenAPI 3.0.4",
+  "https://fal.ai/api/openapi/queue/openapi.json",
+  "mcporter",
+  "fal.list_models",
+  "fal_client.submit()",
+  "endpoint_id",
+  "bytedance/seedance-2.0/reference-to-video",
+  "fal-ai/kling-video/v3/pro/text-to-video",
+  "xai/",
+  "components.schemas",
+  "Input schema",
+  "fal_endpoints",
+  "urllib.request"
+ ],
+ "symptoms": [
+  "MCP does not expose the model's full schema.",
+  "Fal.ai documentation is missing or outdated.",
+  "Unclear required fields, parameter types, defaults, or enum options.",
+  "Payload generation fails because accepted fields or values are unknown.",
+  "A model returns 403 on invocation, but its schema still needs discovery."
+ ],
+ "not_for": [
+  "Submitting a generation request to Fal.ai or debugging the generated media.",
+  "Finding models without inspecting their exact parameter schemas.",
+  "Resolving account access, billing, or permissions for a 403 response.",
+  "Documenting or calling non-Fal APIs."
+ ]
+}

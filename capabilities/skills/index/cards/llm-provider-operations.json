@@ -1,0 +1,65 @@
+{
+ "name": "llm-provider-operations",
+ "sha": "e4f0829e27727fb56966503124047f994ea5c1efc1d948dcd2c4eb8f33f346df",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00049764825,
+ "summary": "Use when configuring or verifying LLM providers, testing model access, comparing routes, or proposing evidence-based router changes.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Configure Bedrock pour ce modèle et vérifie que mon compte peut vraiment l'appeler.",
+  "J'ai un AccessDenied sur Claude dans AWS, tu peux trouver si c'est IAM, quota ou entitlement ?",
+  "Ajoute ce provider à mon routeur, mais commence par un smoke test sans toucher à la prod.",
+  "Compare ces deux modèles sur mes tâches de code : coût par succès, latence et qualité.",
+  "Le modèle apparaît dans le catalogue, pourquoi l'inférence échoue encore ?",
+  "Tu peux vérifier si ce endpoint est vraiment celui du provider officiel ou un proxy ?",
+  "Fais un benchmark équitable entre ces routes, mêmes prompts, outils et limites.",
+  "On a changé la config provider : redémarre le gateway et confirme quelle route répond.",
+  "Prépare une proposition de changement du router avec fallback, budget et rollback, sans l'appliquer.",
+  "J'ai des ThrottlingException depuis ce matin, regarde les quotas effectifs avant de réessayer.",
+  "Le bouton Marketplace est là, ça veut dire que mon compte a accès au modèle ?",
+  "Trouve les vrais model IDs, les prix actuels et les limites de cette API avant qu'on choisisse une route."
+ ],
+ "intents_en": [
+  "Verify my Bedrock model access.",
+  "Compare provider routes by cost and quality.",
+  "Check whether this endpoint is authentic.",
+  "Run a controlled model smoke test.",
+  "Propose a reversible router change."
+ ],
+ "entities": [
+  "AWS Bedrock",
+  "Anthropic",
+  "Artificial Analysis",
+  "Design Arena",
+  "LLM providers",
+  "model catalogs",
+  "model IDs",
+  "API endpoints",
+  "provider credentials",
+  "IAM",
+  "AWS regions",
+  "inference profiles",
+  "service quotas",
+  "Marketplace",
+  "LLM router",
+  "loopback adapter",
+  "Hermes gateway"
+ ],
+ "symptoms": [
+  "ValidationException",
+  "ResourceNotFoundException",
+  "AccessDeniedException",
+  "ThrottlingException",
+  "Model appears in catalog but inference fails",
+  "Unexpected provider or route metadata",
+  "Tool-call schema differs from the official provider",
+  "Provider configuration change has no effect after restart"
+ ],
+ "not_for": [
+  "Writing or debugging prompts for a task-specific application",
+  "Building or training a model",
+  "General AWS infrastructure administration unrelated to LLM access",
+  "Automatically editing production routing without approval"
+ ]
+}

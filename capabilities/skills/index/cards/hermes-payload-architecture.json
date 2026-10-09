@@ -1,0 +1,70 @@
+{
+ "name": "hermes-payload-architecture",
+ "sha": "10a698816d5b914c17324c8e51cd78101cb1073f4b34effbab1f4efea1cd664d",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00070876575,
+ "summary": "Use when diagnosing or redesigning Hermes prompt layers, context compaction, memory/skill/tool selection, or payload bloat.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Peux-tu auditer comment Hermes construit son payload avant l'appel au provider ?",
+  "Le prompt devient énorme : regarde où on peut réduire sans perdre le contexte utile.",
+  "Je veux que les vieux résumés restent de l'historique, pas des tâches à relancer. Comment on corrige ça ?",
+  "On peut revoir les couches static prefix, contexte dynamique et raw tail de W.Alter ?",
+  "Hindsight injecte trop de cartes, sélectionne seulement celles qui collent à la demande en cours.",
+  "Quand la conversation compresse, garde les derniers échanges bruts et des pointeurs pour retrouver les détails.",
+  "Les tool schemas prennent trop de place dans le payload. Fais un audit avec les tokens et les coûts.",
+  "Comment alléger l'index des skills sans empêcher Hermes de trouver le bon skill avec skill_view ?",
+  "Les vieux résultats d'outils gonflent l'historique ; résume-les sans casser les paires d'appels d'outils.",
+  "On a un souci de cache du préfixe : vérifie ce qui est statique et ce qui fuit du session state dedans.",
+  "Reprends l'audit du harness Hermes dont on parlait : couvre les transports et les étapes partagées, pas juste le provider du bug.",
+  "Le résumé dit encore « next steps » et l'agent repart tout seul sur un ancien chantier. Rends l'historique inerte."
+ ],
+ "intents_en": [
+  "Audit Hermes prompt payload composition.",
+  "Make compressed history inert, not actionable.",
+  "Reduce context bloat without losing recoverable evidence.",
+  "Optimize skill and tool schema injection.",
+  "Check static prefix caching and dynamic context selection."
+ ],
+ "entities": [
+  "Hermes Agent",
+  "W.Alter",
+  "Hindsight",
+  "SOUL.md",
+  "USER.md",
+  "config.yaml",
+  "skills.compact_categories",
+  "skill_view",
+  "state_db://",
+  "prompt-size",
+  "tools[]",
+  "Chat Completions",
+  "Responses/Codex",
+  "Anthropic",
+  "Bedrock",
+  "JSON-RPC",
+  "Gateway",
+  "session cwd",
+  "core_concierge",
+  "dev_work_session",
+  "web_research",
+  "browser_automation",
+  "automation",
+  "media"
+ ],
+ "symptoms": [
+  "Prompt or context token usage is unexpectedly high.",
+  "Old summaries cause the agent to resume work without a current request.",
+  "Static prefix cache reuse is poor or inconsistent.",
+  "Irrelevant memories, skills, or tool schemas appear in the request.",
+  "Provider reports tool-call pairing or message alternation errors.",
+  "Compression loses useful details or breaks recovery of exact evidence."
+ ],
+ "not_for": [
+  "Installing Hermes or debugging general host, network, or service availability issues.",
+  "Implementing a specific skill's task logic unrelated to prompt payload composition.",
+  "Choosing a provider or debugging a provider-only failure without auditing the Hermes harness.",
+  "Managing project tasks that historical context mentions when the latest message does not ask to resume them."
+ ]
+}

@@ -1,0 +1,66 @@
+{
+ "name": "codebase-inspection",
+ "sha": "f1760b2787809c3e11286c93d0fcc559d0ca81e098ba4c55fc5e1a1dfc05b29a",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0004217895,
+ "summary": "Use when Monsieur asks to measure a repository’s LOC, language mix, file counts, or code-versus-comment ratios with pygount.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux me donner le nombre de lignes de code dans ce repo ?",
+  "C’est quoi la répartition des langages dans mon projet ?",
+  "Combien de fichiers Python et combien de lignes de code au total ?",
+  "Fais-moi un état des lieux de la taille de ce codebase avec pygount.",
+  "Compare la part de code et de commentaires dans le dépôt.",
+  "Le repo est énorme ou c’est surtout node_modules qui gonfle ?",
+  "Tu peux sortir un résumé par langage, avec les fichiers et les lignes ?",
+  "Compte juste les fichiers TypeScript, sans scanner tout le reste.",
+  "J’ai besoin des métriques du dépôt au format JSON pour les traiter ensuite.",
+  "Le scan est interminable, t’as bien exclu .git, venv et les dossiers de build ?",
+  "Pourquoi les Markdown apparaissent comme des commentaires dans le rapport ?",
+  "Donne-moi les 20 fichiers avec le plus de lignes de code."
+ ],
+ "intents_en": [
+  "How many lines of code are in this repo?",
+  "Break down the codebase by language.",
+  "Count Python files and code lines only.",
+  "Show code versus comment ratios.",
+  "Export pygount metrics as JSON."
+ ],
+ "entities": [
+  "pygount",
+  "LOC",
+  "--folders-to-skip",
+  "--format=summary",
+  "--format=json",
+  "--suffix",
+  ".git",
+  "node_modules",
+  "venv",
+  ".venv",
+  "__pycache__",
+  ".cache",
+  "dist",
+  "build",
+  ".next",
+  ".tox",
+  ".eggs",
+  ".mypy_cache",
+  "coverage",
+  "vendor",
+  "third_party",
+  "wc -l"
+ ],
+ "symptoms": [
+  "pygount scans for a long time or appears to hang",
+  "Dependency or build directories inflate the reported totals",
+  "Markdown files show zero code lines",
+  "JSON line counts seem unexpectedly low"
+ ],
+ "not_for": [
+  "Reviewing code for bugs, security issues, or quality",
+  "Explaining repository architecture or how its code works",
+  "GitHub repository management, issues, or pull requests",
+  "Installing or configuring project dependencies"
+ ]
+}

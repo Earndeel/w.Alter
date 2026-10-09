@@ -1,0 +1,71 @@
+{
+ "name": "mac-computer-use-ssh",
+ "sha": "bac99f49b673e402d9a19b7cc166ab73852626d4a2059fd7d76836eab7b31308",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00076123575,
+ "summary": "Use when a task genuinely requires seeing or controlling Lucas's Mac GUI remotely over SSH, with approved clicks, typing, keys, scrolling, or dragging.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Ouvre les réglages sur mon Mac et change ça, tu peux piloter l'écran.",
+  "Regarde ce qu'il y a à l'écran de mon Mac et dis-moi où cliquer.",
+  "Clique sur le bouton dans l'app, puis vérifie que c'est bien passé.",
+  "Tu peux taper ce texte dans la fenêtre ouverte sur mon Mac ?",
+  "Fais le raccourci clavier Cmd Shift G sur le Mac.",
+  "Fais défiler la page jusqu'en bas et prends une capture pour vérifier.",
+  "Déplace ce fichier dans la fenêtre avec un drag-and-drop.",
+  "Le navigateur est ouvert sur mon Mac, fais l'action directement dans l'interface.",
+  "Je sais qu'on peut le faire en CLI, mais là il faut vraiment interagir avec l'app Mac.",
+  "La capture de mon écran est toute noire, tu peux checker les permissions ?",
+  "Les clics ne répondent plus sur le Mac, vérifie l'accessibilité et le tunnel SSH.",
+  "Le tunnel vers le screen server est tombé, remets-le puis regarde l'écran."
+ ],
+ "intents_en": [
+  "Click through this dialog on my Mac.",
+  "Take a screenshot and inspect my Mac screen.",
+  "Type this into the open Mac app.",
+  "Use the keyboard shortcut in the Mac GUI.",
+  "The remote Mac clicks are being ignored."
+ ],
+ "entities": [
+  "W.Alter Screen Server v7",
+  "SSH",
+  "localhost:18765",
+  "screencapture",
+  "cliclick",
+  "osascript",
+  "Vision AI",
+  "/screenshot",
+  "/health",
+  "/control-status",
+  "/request-control",
+  "/control-heartbeat",
+  "/release-control",
+  "/click",
+  "/doubleclick",
+  "/rightclick",
+  "/type",
+  "/key",
+  "/combo",
+  "/scroll",
+  "/drag",
+  "LaunchAgent",
+  "com.walter.screen-server.plist",
+  "~/.hermes/scripts/walter-screen-server.py",
+  "/tmp/walter-screen-server.log"
+ ],
+ "symptoms": [
+  "Black screenshots around 97–100 KB",
+  "cliclick clicks are ignored",
+  "Screen server health endpoint is unreachable",
+  "SSH tunnel to localhost:18765 has dropped",
+  "osascript error: Can't make {command} into type constant",
+  "Mac screen is locked or asleep, producing black captures"
+ ],
+ "not_for": [
+  "Tasks that can be done faster and more reliably with a CLI, API, or direct command",
+  "Web scraping or research in Lucas's active Brave session",
+  "Browser-only automation when the Brave CDP browser-control skill is the appropriate tool",
+  "Research on X/Twitter, which should use x_search"
+ ]
+}

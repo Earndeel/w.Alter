@@ -1,0 +1,64 @@
+{
+ "name": "hermes-live-compaction-debugging",
+ "sha": "d505f8006967a36749369fcc25d0b0f26880367cb4243d8165d22357843c0802",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.000550737,
+ "summary": "Use when Hermes Agent aborts during live conversation compaction or never sends the next provider request.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Hermes plante pendant la compaction live, tu peux diagnostiquer le traceback ?",
+  "Le run s'arrete quand il compresse l'historique et le prochain appel modele part jamais.",
+  "J'ai un IndexError dans context_compressor.py, regarde les bornes de compaction.",
+  "Le tour finit avec un assistant tool call puis des tool results; ca casse quand Hermes coupe le tail.",
+  "Tu peux rejouer la conversation exacte depuis state.db pour trouver le bug de compaction ?",
+  "On a deja le traceback du gateway: l'exception arrive avant _generate_summary, c'est quoi la suite ?",
+  "Le summary model renvoie une erreur HTTP pendant la compression, aide-moi a separer souci provider et bug local.",
+  "J'ai corrige le calcul de compress_start; quels tests de regression ajouter pour les paires tool_call/tool_result ?",
+  "La derniere fois tu disais de verifier si la requete summary etait partie. Voici le log, tu peux trancher ?",
+  "L'UI dit juste erreur de contexte, mais pas de nouvelle ligne de billing sur le main model. On inspecte quoi ?",
+  "Fais-moi une fixture qui reproduit le transcript Hermes avec les roles, tool_call_id et tool_calls dans le bon ordre.",
+  "Apres le patch, comment verifier qu'un transcript sans fenetre compressible ne lance pas le summary model ?"
+ ],
+ "intents_en": [
+  "Debug Hermes live compaction crashes.",
+  "Fix an invalid compression boundary.",
+  "Trace why the next model request is never sent.",
+  "Reproduce a tool-call tail compaction failure.",
+  "Test summary-model failures versus local compressor bugs."
+ ],
+ "entities": [
+  "Hermes Agent",
+  "agent/context_compressor.py",
+  "conversation_loop",
+  "conversation_compression",
+  "state.db",
+  "_generate_summary",
+  "gateway",
+  "summary model",
+  "main model",
+  "provider",
+  "base URL",
+  "tool_calls",
+  "tool_call_id",
+  "compress_start",
+  "compress_end",
+  "references/tool-tail-boundary-indexerror.md"
+ ],
+ "symptoms": [
+  "IndexError while calculating or scanning compaction boundaries",
+  "Run aborts during context compression",
+  "The next provider request is never sent",
+  "Transcript ends with an assistant tool call followed only by tool results",
+  "Summary request fails with HTTP, authentication, or timeout error",
+  "UI reports a context error but the traceback points to local boundary or message-scanning code",
+  "No main-model billing entry appears after a local compressor exception",
+  "Compaction produces malformed or orphaned tool pairs"
+ ],
+ "not_for": [
+  "Offline trajectory compression",
+  "Generic prompt-size or token-budget optimization",
+  "Debugging the main model or credentials without evidence a request reached it",
+  "General gateway crashes unrelated to live conversation compaction"
+ ]
+}

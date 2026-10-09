@@ -1,0 +1,65 @@
+{
+ "name": "domain-migration-with-deploy",
+ "sha": "a7247a9aa84d4859ab4a50013f4159a77a3070be8b2a377e064297ad08edbbe9",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00053304075,
+ "summary": "Use when migrating a service to a new domain across skill docs and project code, then verifying Cloudflare deployment readiness.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Remplace walter-ai.cloud par hermes-workspace.com dans les skills et le projet, puis vérifie que tout est clean.",
+  "Je migre mon domaine : cherche toutes les occurrences de l’ancien dans ~/.hermes/skills et dans le code.",
+  "Peux-tu faire le find-and-replace du domaine dans la doc des skills et le code, sans toucher aux artifacts ?",
+  "J’ai changé de domaine, mets à jour les URLs partout dans le projet et dis-moi ce qu’il reste.",
+  "Avant le déploiement Cloudflare, remplace l’ancien domaine et fais un dry-run Wrangler.",
+  "Les docs pointent encore vers walter-ai.cloud. Mets-les à jour aussi dans tous mes SKILL.md.",
+  "J’ai besoin de migrer scena-cloudflare vers le nouveau domaine. Vérifie aussi wrangler.toml et le cookie Domain.",
+  "Tu peux faire la migration et me dire si Wrangler est authentifié et si les secrets sont configurés ?",
+  "Le nouveau domaine est hermes-workspace.com. Remplace l’ancien dans le projet, mais ne lance pas le déploiement réel.",
+  "Il reste des URLs avec l’ancien domaine, trouve-les dans mes skills et mon code, remplace-les puis confirme qu’il n’en reste zéro.",
+  "Fais la migration pour chaque worker, nettoie dist avant le dry-run et donne-moi les commandes pour la suite.",
+  "J’ai changé le domaine du service : mets à jour les fichiers concernés, rebuild si nécessaire et vérifie que le déploiement Cloudflare est prêt."
+ ],
+ "intents_en": [
+  "Replace the old domain across skills and project code.",
+  "Migrate walter-ai.cloud to my new domain and verify no references remain.",
+  "Update all URLs, then run a Wrangler dry run.",
+  "Check Cloudflare auth and secrets after the domain migration.",
+  "Prepare the project for deployment on the new domain."
+ ],
+ "entities": [
+  "Cloudflare",
+  "Wrangler",
+  "wrangler deploy --dry-run",
+  "wrangler whoami",
+  "wrangler secret list",
+  "walter-ai.cloud",
+  "hermes-workspace.com",
+  "scena-cloudflare",
+  "~/.hermes/skills/",
+  "SKILL.md",
+  "wrangler.toml",
+  "BASE_URL",
+  "auth.ts",
+  "dist/",
+  "node_modules/",
+  "build/",
+  "__pycache__",
+  ".git",
+  "npm run build",
+  "Cloudflare Pages"
+ ],
+ "symptoms": [
+  "Old domain still appears in skill documentation or project files.",
+  "URLs or BASE_URL values still point to the previous domain.",
+  "Authentication cookies use the old domain.",
+  "Wrangler dry-run fails or uses a stale dist bundle.",
+  "Wrangler reports that login is required."
+ ],
+ "not_for": [
+  "Registering or purchasing a domain or changing DNS records.",
+  "Implementing application features unrelated to domain references.",
+  "Performing an unconditional production deployment without migration verification.",
+  "Debugging general Cloudflare outages or worker runtime errors."
+ ]
+}

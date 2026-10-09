@@ -1,0 +1,70 @@
+{
+ "name": "voice-architecture-v5",
+ "sha": "811ba02dd5bd22b75c1051e1ebbcb86ce34d53f6b26881f8fcfb296663a9115b",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00048304575,
+ "summary": "Use when diagnosing or changing W.Alter voice-call v5 architecture: Gemini Live STS, voice routing, async job queues, or transient updates.",
+ "kind": "reference",
+ "intents_fr": [
+  "Explique-moi l’architecture du voice call v5, du navigateur jusqu’à Hermes.",
+  "Gemini Live ne répond plus, tu peux vérifier le setup WebSocket et les tokens éphémères ?",
+  "Pourquoi les résultats de jobs arrivent dans le désordre pendant un appel vocal ?",
+  "Je veux comprendre comment voice_router garde le contexte quand il escalade vers Hermes.",
+  "Les updates intermédiaires parlent par-dessus Gemini, c’est quoi la logique de queue ?",
+  "On utilise quel endpoint Gemini Live déjà, BidiGenerateContent ou l’autre ?",
+  "Peux-tu revoir la config audio, le thinking level et la voix Algenib ?",
+  "J’ai une erreur 1011 quand la connexion vocale démarre, ça peut venir du spending cap ?",
+  "Les transcriptions ne marchent plus depuis le changement de config, elles doivent être où dans le setup ?",
+  "Comment le navigateur sait qu’un job est fini et qu’il peut envoyer le prochain résultat ?",
+  "Fais-moi le tour des services et des fichiers du voice call v5, je dois débugger une régression.",
+  "Les messages Running et Done de Hermes ne remontent pas dans l’appel, regarde le chemin des transient updates."
+ ],
+ "intents_en": [
+  "Explain the voice call v5 architecture.",
+  "Debug Gemini Live WebSocket setup.",
+  "Why are voice job results out of order?",
+  "Where are transient updates queued?",
+  "How does voice_router preserve call context?"
+ ],
+ "entities": [
+  "W.Alter Voice Call v5",
+  "Gemini Live STS",
+  "gemini-3.1-flash-live-preview",
+  "BidiGenerateContentConstrained",
+  "voice_router",
+  "Hermes",
+  "FastAPI",
+  "port 8765",
+  "port 12110",
+  "WebSocket",
+  "ephemeral tokens",
+  "POST /api/token",
+  "activeJobs",
+  "jobResultQueue",
+  "enqueueJobStart",
+  "enqueueJobResult",
+  "enqueueTransientUpdate",
+  "drainQueue",
+  "ConversationBuffer",
+  "TURN_COMPLETE",
+  "Algenib",
+  "/root/.hermes/voice-call/static/app.js",
+  "/root/.hermes/voice-call/static/geminilive.js",
+  "/root/.hermes/voice-call/server.py",
+  "/root/.hermes/services/voice_router_service.py"
+ ],
+ "symptoms": [
+  "Gemini Live WebSocket connections fail with code 1011",
+  "Voice job results arrive out of order or overlap speech",
+  "Transient updates are missing or spoken at the wrong time",
+  "Conversation context is lost when a voice request escalates to Hermes",
+  "Transcription fails because setup fields are nested incorrectly"
+ ],
+ "not_for": [
+  "General Gemini API usage outside the voice-call Live WebSocket",
+  "Writing or debugging unrelated Hermes tools and jobs",
+  "Changing voice persona or wording without modifying voice-call architecture",
+  "Browser or server deployment tasks unrelated to the voice-call system"
+ ]
+}

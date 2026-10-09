@@ -1,0 +1,59 @@
+{
+ "name": "maps",
+ "sha": "988e1abae1025100a9c5579af6f642884ea1afa71d051a8eb4aa55336464edbb",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00054714825,
+ "summary": "Use when Monsieur asks to geocode places, find nearby POIs, calculate routes or travel times, get turn-by-turn directions, or check a location’s timezone.",
+ "kind": "workflow",
+ "intents_fr": [
+  "Tu peux me trouver des restos italiens près du Colisée ?",
+  "C’est quoi les coordonnées de la tour Eiffel ?",
+  "Avec ces coordonnées, tu peux me dire l’adresse exacte ?",
+  "Trouve-moi une pharmacie à moins de 2 km de ce pin.",
+  "Qu’est-ce qu’il y a comme cafés et bars autour de Times Square ?",
+  "Combien de temps en voiture entre Paris et Lyon ?",
+  "Donne-moi la distance à vélo entre mon hôtel et la gare.",
+  "Comment je vais à pied du Big Ben au Tower Bridge ?",
+  "Je t’envoie ma position, tu peux repérer des restos pas loin ?",
+  "C’est dans quel fuseau horaire, Tokyo ?",
+  "Tu peux me sortir les restos dans le centre de Seattle, pas juste autour d’une adresse ?",
+  "Combien fait Manhattan en superficie, et tu peux chercher les musées dans la zone ?"
+ ],
+ "intents_en": [
+  "Find cafes near this location pin.",
+  "What are the coordinates of the Louvre?",
+  "How long is the drive from Paris to Lyon?",
+  "Give me walking directions to the station.",
+  "What timezone is this location in?"
+ ],
+ "entities": [
+  "OpenStreetMap",
+  "Nominatim",
+  "Overpass API",
+  "OSRM",
+  "TimeAPI.io",
+  "maps_client.py",
+  "~/.hermes/skills/maps/scripts/maps_client.py",
+  "search",
+  "reverse",
+  "nearby",
+  "distance",
+  "directions",
+  "timezone",
+  "area",
+  "bbox",
+  "Telegram location pins",
+  "latitude",
+  "longitude",
+  "maps_url",
+  "directions_url"
+ ],
+ "symptoms": [],
+ "not_for": [
+  "Live traffic conditions or traffic-aware arrival estimates.",
+  "Booking restaurants, hotels, taxis, or other places found on a map.",
+  "Displaying or editing custom maps and map images.",
+  "Verifying current opening hours when OSM data is missing or unclear; use web search."
+ ]
+}

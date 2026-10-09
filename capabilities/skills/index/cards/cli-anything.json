@@ -1,0 +1,62 @@
+{
+ "name": "cli-anything",
+ "sha": "aa56ce7335089ec57fa7ec16aecca017a86e2e940f2e2564a8c5cde5442c1295",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.0005539545,
+ "summary": "Use when a task needs software control and no existing tool, CLI, API, or MCP fits, so you must discover and use one CLI-Anything CLI.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Y a un CLI agent-friendly pour piloter Blender ? Cherche et utilise-le si rien d’autre ne le fait déjà.",
+  "Je dois modifier un diagramme DrawIO en ligne de commande, tu peux trouver le bon outil ?",
+  "Comment je lance ComfyUI depuis un CLI avec une sortie exploitable par l’agent ?",
+  "On n’a pas d’intégration native pour GIMP ? Regarde dans cli-hub et installe juste ce qu’il faut.",
+  "Trouve-moi un CLI pour chercher dans Exa, puis teste une requête en JSON.",
+  "Tu peux voir si cli-anything a quelque chose pour Obsidian ? Pas d’installation si on a déjà un outil adapté.",
+  "Le skill actuel ne sait pas piloter n8n. Cherche un CLI-Anything pour cette opération et lance-le.",
+  "J’ai besoin de faire ça dans un logiciel sans API ni MCP : vérifie les options et passe par CLI-Anything en dernier recours.",
+  "Comment je liste les CLIs disponibles et les prérequis de celui qui peut générer une image ?",
+  "L’installation de cli-hub bloque avec externally-managed-environment, tu peux régler ça proprement ?",
+  "Installe le CLI pour DrawIO seulement, puis donne-moi la commande pour exporter mon diagramme en JSON.",
+  "Le CLI-Anything Exa demande une clé ou il peut tourner sans identifiants ? Vérifie les prérequis avant de l’installer."
+ ],
+ "intents_en": [
+  "Find a CLI-Anything tool for Blender and use it.",
+  "Search cli-hub for a CLI to edit DrawIO diagrams.",
+  "Install only the CLI needed for this task.",
+  "Check prerequisites for the matching CLI before installing.",
+  "Use the CLI with machine-readable JSON output."
+ ],
+ "entities": [
+  "CLI-Anything",
+  "cli-hub",
+  "cli-anything-*",
+  "Blender",
+  "Exa",
+  "DrawIO",
+  "ComfyUI",
+  "n8n",
+  "Obsidian",
+  "GIMP",
+  "Zotero",
+  "browser",
+  "HKUDS/CLI-Anything",
+  "--json",
+  "PEP 668",
+  "PIP_BREAK_SYSTEM_PACKAGES=1",
+  "pipx",
+  "config.yaml",
+  "mcp_servers",
+  "hacker-feeds-cli"
+ ],
+ "symptoms": [
+  "No existing CLI, API, tool, or MCP covers the requested software capability",
+  "cli-hub install fails with an externally-managed-environment or --break-system-packages error",
+  "A CLI requires missing backend software, Node.js, or service credentials"
+ ],
+ "not_for": [
+  "Tasks already covered by an existing native tool, CLI, API, skill, or MCP",
+  "General software development unrelated to controlling software through CLI-Anything",
+  "Bulk or proactive installation of CLIs without a specific task"
+ ]
+}

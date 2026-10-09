@@ -1,0 +1,70 @@
+{
+ "name": "trl-fine-tuning",
+ "sha": "89f75587b29c29e3af135cb49929cae3339add1e6b55d10029f72aea20ded957",
+ "model": "openai/gpt-6-luna",
+ "version": "card-v1",
+ "cost_usd": 0.00078945075,
+ "summary": "Use when Monsieur veut entraîner ou aligner un LLM avec TRL : SFT, préférences DPO, PPO, GRPO ou reward model.",
+ "kind": "procedure",
+ "intents_fr": [
+  "Tu peux me faire un script TRL pour fine-tuner mon modèle avec du SFT ?",
+  "J’ai des paires chosen/rejected : comment je lance un DPOTrainer ?",
+  "On peut faire du GRPO sur mon modèle avec une reward function maison ?",
+  "Je veux monter le pipeline RLHF complet, du SFT jusqu’au PPO.",
+  "Comment entraîner un reward model avec mes données de préférences ?",
+  "J’ai une erreur OOM en DPO, tu peux m’aider à réduire la mémoire ?",
+  "Le DPO aligne mal les réponses, je règle beta à combien ?",
+  "Mon PPO est instable, regarde comment ajuster le KL et le cliprange.",
+  "Tu me donnes la commande trl grpo pour lancer l’entraînement sur mon dataset ?",
+  "Pour mes données prompt-completion, je prends SFT ou DPO avec TRL ?",
+  "Je veux faire du RL online sans exploser la VRAM, GRPO serait adapté ?",
+  "Le reward model n’apprend pas, qu’est-ce que je vérifie dans la loss et le dataset ?"
+ ],
+ "intents_en": [
+  "Train an LLM with TRL SFT.",
+  "Run DPO on chosen/rejected pairs.",
+  "Set up PPO with a reward model.",
+  "Use GRPO with a custom reward function.",
+  "Fix an OOM during TRL fine-tuning."
+ ],
+ "entities": [
+  "TRL",
+  "SFTTrainer",
+  "SFTConfig",
+  "DPOTrainer",
+  "DPOConfig",
+  "PPO",
+  "PPOConfig",
+  "GRPOTrainer",
+  "GRPOConfig",
+  "RewardTrainer",
+  "RewardConfig",
+  "transformers",
+  "datasets",
+  "peft",
+  "accelerate",
+  "torch",
+  "Hugging Face",
+  "trl-lib/Capybara",
+  "trl-lib/ultrafeedback_binarized",
+  "trl-lib/tldr",
+  "chosen/rejected",
+  "LoRA",
+  "QLoRA",
+  "trl dpo",
+  "trl grpo"
+ ],
+ "symptoms": [
+  "CUDA out of memory pendant l’entraînement DPO",
+  "L’alignement obtenu est mauvais malgré le DPO",
+  "La loss du reward model ne baisse pas",
+  "Entraînement PPO instable",
+  "Le modèle s’effondre ou génère des réponses répétitives en GRPO"
+ ],
+ "not_for": [
+  "Fine-tuning de base sans alignement ni méthodes RL, avec Hugging Face Trainer",
+  "Configuration YAML d’entraînement avec Axolotl",
+  "Fine-tuning LoRA rapide avec Unsloth",
+  "Déploiement ou inférence d’un modèle déjà entraîné"
+ ]
+}
