@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, "/opt/walter-memory")
 
 EDITOR_MODEL = "gpt-6.1-sol"                 # provisional holder of poste skills.editor
-JUDGE_MODEL = "anthropic/claude-sonnet-5.5"  # provisional holder of poste skills.judge (other family than editor)
+JUDGE_MODEL = "anthropic/claude-haiku-5.5"  # poste skills.judge: other family than the editor; losslessness is checked by script
 
 
 def codex_ready() -> bool:
@@ -46,12 +46,16 @@ def editor(prompt: str, timeout: int = 900, effort: str = "high", model: str | N
 
 def judge(prompt: str) -> dict | None:
     from walter_memory import llm
-    try:
-        res = llm.chat([{"role": "user", "content": prompt}], model=JUDGE_MODEL, processor="skills.judge",
-                       privacy_class="cloud_allowed", budget="recurring", timeout=180, purpose="curator review")
-    except Exception:
-        return None
-    return parse_json(res["content"])
+    for _ in range(2):  # one retry on a transport error or an unparsable answer
+        try:
+            res = llm.chat([{"role": "user", "content": prompt}], model=JUDGE_MODEL, processor="skills.judge",
+                           privacy_class="cloud_allowed", budget="recurring", timeout=180, purpose="curator review")
+        except Exception:
+            continue
+        out = parse_json(res["content"])
+        if out is not None and "ok" in out:
+            return out
+    return None
 
 
 def parse_json(text: str | None) -> dict | None:
