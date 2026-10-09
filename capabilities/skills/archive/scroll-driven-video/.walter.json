@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/scroll-driven-video",
+  "sha": "9791340dd82a2c6c081e70179ee9ab6f24a484aa572a1e838f615dbbe7bef219",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "9791340dd82a2c6c081e70179ee9ab6f24a484aa572a1e838f615dbbe7bef219"
+}

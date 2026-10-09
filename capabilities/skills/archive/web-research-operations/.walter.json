@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/web-research-operations",
+  "sha": "20c11e377f44c3fe55c7a9863128e893db53dcf4e598e6ee675ea8fc80b0344a",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "20c11e377f44c3fe55c7a9863128e893db53dcf4e598e6ee675ea8fc80b0344a"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/smm-panel-integration",
+  "sha": "eb1ebc38c941f834f3fe6353309f59c024130649951110f161c7bfdb8e89e4dc",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "eb1ebc38c941f834f3fe6353309f59c024130649951110f161c7bfdb8e89e4dc"
+}

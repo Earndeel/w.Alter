@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/tailscale-api-and-acl",
+  "sha": "fd02b8196d44c72bfff50622922be401c43adedb945567616ef254e54038c843",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "fd02b8196d44c72bfff50622922be401c43adedb945567616ef254e54038c843"
+}

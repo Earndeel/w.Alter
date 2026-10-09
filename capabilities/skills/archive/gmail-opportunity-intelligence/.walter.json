@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/gmail-opportunity-intelligence",
+  "sha": "a1aa4864807d6dca92026ccfceac45c69d1a43a0af89b4c1c2d3debd02f16371",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "a1aa4864807d6dca92026ccfceac45c69d1a43a0af89b4c1c2d3debd02f16371"
+}

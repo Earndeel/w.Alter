@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hindsight-memory-consistency",
+  "sha": "58eed959e50472998da1245d68261ff44522997bc2a0220d9dfd1d7faa4a69b4",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "58eed959e50472998da1245d68261ff44522997bc2a0220d9dfd1d7faa4a69b4"
+}

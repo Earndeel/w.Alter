@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-theme-architecture",
+  "sha": "4eef13a2b92bb1cb2f58fe01ad436d849bb0b5be561bb372268535959add6fad",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "4eef13a2b92bb1cb2f58fe01ad436d849bb0b5be561bb372268535959add6fad"
+}

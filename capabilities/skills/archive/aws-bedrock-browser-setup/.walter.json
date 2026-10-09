@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/aws-bedrock-browser-setup",
+  "sha": "bb89ab22b07a3e503260a3bff61eb28ecd41f049a52529f2f908e991aa03d2cb",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "bb89ab22b07a3e503260a3bff61eb28ecd41f049a52529f2f908e991aa03d2cb"
+}

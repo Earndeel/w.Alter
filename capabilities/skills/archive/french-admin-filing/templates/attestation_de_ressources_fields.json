@@ -1,0 +1,103 @@
+{
+  "pages": [
+    {"page_number": 1, "pdf_width": 595.2756, "pdf_height": 841.8898}
+  ],
+  "form_fields": [
+    {
+      "page_number": 1,
+      "description": "Nom",
+      "field_label": "Nom :",
+      "label_bounding_box": [57, 106, 82, 116],
+      "entry_bounding_box": [92, 102, 538, 118],
+      "entry_text": {"text": "JOUVENCON", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Prénom",
+      "field_label": "Prénom :",
+      "label_bounding_box": [57, 122, 97, 133],
+      "entry_bounding_box": [107, 118, 538, 135],
+      "entry_text": {"text": "Lucas", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Date de naissance",
+      "field_label": "Date de naissance :",
+      "label_bounding_box": [57, 140, 147, 150],
+      "entry_bounding_box": [157, 136, 538, 152],
+      "entry_text": {"text": "19/06/1996", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Adresse complète",
+      "field_label": "Adresse complète :",
+      "label_bounding_box": [57, 156, 146, 167],
+      "entry_bounding_box": [156, 152, 538, 169],
+      "entry_text": {"text": "42 MTE DES AUTRICHIENS, 69700 GIVORS", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Salaire net mensuel",
+      "field_label": "Salaire net mensuel :",
+      "label_bounding_box": [71, 230, 168, 241],
+      "entry_bounding_box": [178, 226, 538, 243],
+      "entry_text": {"text": "0", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Autres revenus professionnels",
+      "field_label": "Autres revenus professionnels :",
+      "label_bounding_box": [71, 247, 214, 258],
+      "entry_bounding_box": [224, 243, 538, 260],
+      "entry_text": {"text": "0", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Allocations chômage",
+      "field_label": "Allocations chômage :",
+      "label_bounding_box": [71, 298, 172, 309],
+      "entry_bounding_box": [182, 294, 538, 311],
+      "entry_text": {"text": "0", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Allocations familiales",
+      "field_label": "Allocations familiales :",
+      "label_bounding_box": [71, 315, 173, 326],
+      "entry_bounding_box": [183, 311, 538, 328],
+      "entry_text": {"text": "0", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Autres prestations",
+      "field_label": "Autres prestations :",
+      "label_bounding_box": [71, 332, 160, 343],
+      "entry_bounding_box": [170, 328, 538, 345],
+      "entry_text": {"text": "524", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Montant total",
+      "field_label": "Montant total :",
+      "label_bounding_box": [71, 383, 132, 394],
+      "entry_bounding_box": [142, 379, 538, 396],
+      "entry_text": {"text": "524", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Fait à",
+      "field_label": "Fait à :",
+      "label_bounding_box": [57, 451, 84, 460],
+      "entry_bounding_box": [90, 447, 300, 462],
+      "entry_text": {"text": "Givors", "font_size": 10}
+    },
+    {
+      "page_number": 1,
+      "description": "Le (date)",
+      "field_label": "Le :",
+      "label_bounding_box": [312, 451, 326, 460],
+      "entry_bounding_box": [332, 447, 538, 462],
+      "entry_text": {"text": "07/08/2026", "font_size": 10}
+    }
+  ]
+}

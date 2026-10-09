@@ -1,0 +1,12 @@
+{
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/pretext",
+  "sha": "89bf5cf3700b399f7de95f82620d2a7b27d61739346627e970582659ba1afb6c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "89bf5cf3700b399f7de95f82620d2a7b27d61739346627e970582659ba1afb6c"
+}

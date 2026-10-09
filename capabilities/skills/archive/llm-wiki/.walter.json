@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/llm-wiki",
+  "sha": "bb9f8664ac816c052c2bad47584c33a4c835ced5197883c0f4368ed8028d0b4b",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "bb9f8664ac816c052c2bad47584c33a4c835ced5197883c0f4368ed8028d0b4b"
+}

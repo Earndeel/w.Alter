@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/multimodal-vision-benchmarking",
+  "sha": "753a39b7ba8310be96b6e997af8e548dd09122514b000ec574dcb97c26c50afa",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "753a39b7ba8310be96b6e997af8e548dd09122514b000ec574dcb97c26c50afa"
+}

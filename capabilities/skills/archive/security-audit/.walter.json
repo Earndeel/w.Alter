@@ -1,0 +1,12 @@
+{
+ "domain": "software-development",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/security-audit",
+  "sha": "97af29cbf347aa2c1d606ded638eb3057b71e428d2771b9a556299864eb0f4b2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "97af29cbf347aa2c1d606ded638eb3057b71e428d2771b9a556299864eb0f4b2"
+}

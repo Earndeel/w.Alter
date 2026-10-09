@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/subagent-model-routing-architecture",
+  "sha": "c14860d36ce5336e04535611ccb999658fa285dd301f3a732d67fea4aa39bf1c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "c14860d36ce5336e04535611ccb999658fa285dd301f3a732d67fea4aa39bf1c"
+}

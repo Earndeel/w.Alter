@@ -1,0 +1,12 @@
+{
+ "domain": "software-development",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/multimodal-conversational-intake",
+  "sha": "b254a2c1a259850296e28308cdb558389b6f8c41e2866a558ef8f90683c424aa",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "b254a2c1a259850296e28308cdb558389b6f8c41e2866a558ef8f90683c424aa"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/tailscale-docker-access",
+  "sha": "5296de51916bc76d8b2932ca62d91c231d257c33cf3b322c93e53a019bdaf43a",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5296de51916bc76d8b2932ca62d91c231d257c33cf3b322c93e53a019bdaf43a"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-tui-tree-rendering",
+  "sha": "c900f0f6c84014eda81d1250702dded177ffcd77b9df2bde9fa0797e635f60b7",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "c900f0f6c84014eda81d1250702dded177ffcd77b9df2bde9fa0797e635f60b7"
+}

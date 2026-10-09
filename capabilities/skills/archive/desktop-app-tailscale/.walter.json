@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/desktop-app-tailscale",
+  "sha": "3d30e19df0efb274f1f8ae83e09cfeafff3e3d5ab8505e54a120185b2507066c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "3d30e19df0efb274f1f8ae83e09cfeafff3e3d5ab8505e54a120185b2507066c"
+}

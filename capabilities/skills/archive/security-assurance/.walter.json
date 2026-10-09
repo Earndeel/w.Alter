@@ -1,0 +1,12 @@
+{
+ "domain": "software-development",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/security-assurance",
+  "sha": "e90d6b21d5e1cd615201ff8384e92a7dd08602f609d9a2425d730404e56fb0ce",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e90d6b21d5e1cd615201ff8384e92a7dd08602f609d9a2425d730404e56fb0ce"
+}

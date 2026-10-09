@@ -1,0 +1,12 @@
+{
+ "domain": "email",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/gmail-mailbox-analysis",
+  "sha": "361d813a7e6368770a77421767626f1179821ec9651b21fac9b2e527596baea0",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "361d813a7e6368770a77421767626f1179821ec9651b21fac9b2e527596baea0"
+}

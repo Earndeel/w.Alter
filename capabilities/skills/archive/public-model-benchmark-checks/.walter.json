@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/public-model-benchmark-checks",
+  "sha": "e99369d37a978562528e13f4f13389e81aab632f0140127e81a0efbf4f1ad8b4",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e99369d37a978562528e13f4f13389e81aab632f0140127e81a0efbf4f1ad8b4"
+}

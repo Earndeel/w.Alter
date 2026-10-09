@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/deploy-rollback-audit",
+  "sha": "640fc480654c791d9d0b06179d47395cd51c1167b2aa93285a5987eb4ece4975",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "640fc480654c791d9d0b06179d47395cd51c1167b2aa93285a5987eb4ece4975"
+}

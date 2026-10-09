@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-plugin-auditing",
+  "sha": "db4c41ab352bad41b0ce6f97fe21a25450b8ee53a29984fc27f7a971efc9e2e5",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "db4c41ab352bad41b0ce6f97fe21a25450b8ee53a29984fc27f7a971efc9e2e5"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/piapi-video-integration",
+  "sha": "145378f2a5ca7671ac22002f7e756ec59f892159b514b5ff672b378b0d0de20f",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "145378f2a5ca7671ac22002f7e756ec59f892159b514b5ff672b378b0d0de20f"
+}

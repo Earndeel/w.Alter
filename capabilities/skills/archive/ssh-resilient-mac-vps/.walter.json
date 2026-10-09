@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/ssh-resilient-mac-vps",
+  "sha": "ffb9fa585ac4d6811fe7c0471dee02e2d1b002e909cdfa676942ad7195cec321",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "ffb9fa585ac4d6811fe7c0471dee02e2d1b002e909cdfa676942ad7195cec321"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-operations",
+  "sha": "bb8b68a49b62bb0717db3191138461522e737d43117bf5dfbc96b94643d3339f",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "bb8b68a49b62bb0717db3191138461522e737d43117bf5dfbc96b94643d3339f"
+}

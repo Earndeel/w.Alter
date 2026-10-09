@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/scena-portal-authenticated-debugging",
+  "sha": "7f7b3fdd09688ffb7e77c466c73752a5f5d476e033243e20e3183ff3bf27b5ed",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "7f7b3fdd09688ffb7e77c466c73752a5f5d476e033243e20e3183ff3bf27b5ed"
+}

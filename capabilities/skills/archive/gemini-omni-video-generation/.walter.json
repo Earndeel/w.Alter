@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/gemini-omni-video-generation",
+  "sha": "12d750f907ce5947ffd87a2d6a82629c8e874e07b1508efb0fccfd20491ae2f5",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "12d750f907ce5947ffd87a2d6a82629c8e874e07b1508efb0fccfd20491ae2f5"
+}

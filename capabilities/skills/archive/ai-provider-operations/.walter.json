@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/ai-provider-operations",
+  "sha": "301d43a246dc0040091b03524ee5aaa5484a5559f0a4b0728d2a3e1f24f49a2d",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "301d43a246dc0040091b03524ee5aaa5484a5559f0a4b0728d2a3e1f24f49a2d"
+}

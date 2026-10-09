@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/product-price-monitor",
+  "sha": "4cedb857840ef3005e4a0ce4a7aa0cbe1b731511b23c4104c6415517a94760ef",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "4cedb857840ef3005e4a0ce4a7aa0cbe1b731511b23c4104c6415517a94760ef"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "mcp",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/remote-mcp-provider-onboarding",
+  "sha": "d280bd106101e9468f42c48e53555e00c193f4fb5e5b33ae6c1cbd3fe373221e",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "d280bd106101e9468f42c48e53555e00c193f4fb5e5b33ae6c1cbd3fe373221e"
+}

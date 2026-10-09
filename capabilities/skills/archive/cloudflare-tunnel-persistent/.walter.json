@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/cloudflare-tunnel-persistent",
+  "sha": "466797888459732338bfc1fafeb220a5dc8b1e94c8d1b35d55047a7f97c86923",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "466797888459732338bfc1fafeb220a5dc8b1e94c8d1b35d55047a7f97c86923"
+}

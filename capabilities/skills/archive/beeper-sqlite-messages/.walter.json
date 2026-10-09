@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/beeper-sqlite-messages",
+  "sha": "53b8f47e3ac2d83f1033576163392f3ec3e294148791b10501237bf76e116b49",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "53b8f47e3ac2d83f1033576163392f3ec3e294148791b10501237bf76e116b49"
+}

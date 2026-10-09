@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hindsight-temporal-graph",
+  "sha": "a3fd3f092af8b5f35ef07350c9cbf83ab79d28324ff78cdc928f078f35e45b9c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "a3fd3f092af8b5f35ef07350c9cbf83ab79d28324ff78cdc928f078f35e45b9c"
+}

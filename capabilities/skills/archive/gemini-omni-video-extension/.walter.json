@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/gemini-omni-video-extension",
+  "sha": "553ac93bbae4f44f4cf26c38779174ad1365da312110c6fa22e9562a1ce47aaa",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "553ac93bbae4f44f4cf26c38779174ad1365da312110c6fa22e9562a1ce47aaa"
+}

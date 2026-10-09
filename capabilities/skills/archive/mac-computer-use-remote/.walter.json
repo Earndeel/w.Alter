@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/mac-computer-use-remote",
+  "sha": "b4d1e038c4bbf004b33c01ea263f30e1d36073d2b3bb3e6c10e27e8e998cd6ca",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "b4d1e038c4bbf004b33c01ea263f30e1d36073d2b3bb3e6c10e27e8e998cd6ca"
+}

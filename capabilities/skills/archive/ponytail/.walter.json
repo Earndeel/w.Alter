@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/ponytail",
+  "sha": "7b1d7164954f463cd9c012e79dd18f02eb4bb8fae66ecd339722bbd1741c5766",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "7b1d7164954f463cd9c012e79dd18f02eb4bb8fae66ecd339722bbd1741c5766"
+}

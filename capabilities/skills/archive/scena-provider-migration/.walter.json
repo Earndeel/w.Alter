@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/scena-provider-migration",
+  "sha": "b34797aa5ae1cb5ac21f83614adc2a808605ceb8c6151635ec1675690b3695e2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "b34797aa5ae1cb5ac21f83614adc2a808605ceb8c6151635ec1675690b3695e2"
+}

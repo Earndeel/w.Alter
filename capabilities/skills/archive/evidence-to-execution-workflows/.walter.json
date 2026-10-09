@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/evidence-to-execution-workflows",
+  "sha": "aca0bfed6ffe72053f69518fa6648b9944b621f76c3d8b3055c78165a8a7db83",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "aca0bfed6ffe72053f69518fa6648b9944b621f76c3d8b3055c78165a8a7db83"
+}

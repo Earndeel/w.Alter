@@ -1,0 +1,12 @@
+{
+ "domain": "media",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/gif-search",
+  "sha": "770eb818f6a1d27a5bb6c2b6adf2d211890e24e88a35d78179849edc34b99230",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "770eb818f6a1d27a5bb6c2b6adf2d211890e24e88a35d78179849edc34b99230"
+}

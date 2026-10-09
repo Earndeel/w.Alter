@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/suno-clerk-auth",
+  "sha": "5df60bfca072264c29b6605e41cc476751f951717c73bbfca10d9593294226f1",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5df60bfca072264c29b6605e41cc476751f951717c73bbfca10d9593294226f1"
+}
