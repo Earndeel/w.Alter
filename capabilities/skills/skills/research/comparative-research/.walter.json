@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/comparative-research",
+  "sha": "85f71baf46431902a60a72b2ab9932b1c0eb0e6361841ec92c44159abf0e1a20",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "85f71baf46431902a60a72b2ab9932b1c0eb0e6361841ec92c44159abf0e1a20"
+}

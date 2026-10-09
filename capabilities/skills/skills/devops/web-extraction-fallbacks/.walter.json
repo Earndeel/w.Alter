@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/web-extraction-fallbacks",
+  "sha": "29b24b6486387614a8bd506f97dfd2baf659dfd67a797dd7d897fda1ed7c291c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "29b24b6486387614a8bd506f97dfd2baf659dfd67a797dd7d897fda1ed7c291c"
+}

@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/camoufox-max-server",
+  "sha": "55da838c4c94b8dd9016abb615aeccd86eb06d9dff6aeb5d9e9e6eef41d58163",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "55da838c4c94b8dd9016abb615aeccd86eb06d9dff6aeb5d9e9e6eef41d58163"
+}

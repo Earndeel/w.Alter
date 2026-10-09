@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-host-header-pitfall",
+  "sha": "4db2b2a8e4f4b016840dd32c8b45d2844593c85b67b9aab8b8a028a5c32860cb",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "4db2b2a8e4f4b016840dd32c8b45d2844593c85b67b9aab8b8a028a5c32860cb"
+}

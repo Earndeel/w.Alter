@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/video-agent-factory",
+  "sha": "cfd24724aa56f933061cf87819814f593068d973b3838963c1c04b7c234af25e",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "cfd24724aa56f933061cf87819814f593068d973b3838963c1c04b7c234af25e"
+}

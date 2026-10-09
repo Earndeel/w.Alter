@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/authenticated-session-fallbacks",
+  "sha": "04dd95974a15732d3c5f04a32302b0f6fe3f87222f1f36441e014df75aa38d2d",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "04dd95974a15732d3c5f04a32302b0f6fe3f87222f1f36441e014df75aa38d2d"
+}

@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-prompt-payload-slimming",
+  "sha": "da042cee132815b25d621c9c3ac2ce92c4d47fe8ab99d1feb473a94894a4804b",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "da042cee132815b25d621c9c3ac2ce92c4d47fe8ab99d1feb473a94894a4804b"
+}

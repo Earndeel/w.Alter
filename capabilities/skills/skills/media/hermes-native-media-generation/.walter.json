@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-native-media-generation",
+  "sha": "9988c45d07cc0a213b6ab02b6c2c46e6ac877e1ef76c4cea0a209ee5bb20447b",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "9988c45d07cc0a213b6ab02b6c2c46e6ac877e1ef76c4cea0a209ee5bb20447b"
+}

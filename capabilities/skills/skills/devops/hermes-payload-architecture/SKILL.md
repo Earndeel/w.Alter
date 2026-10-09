@@ -1,0 +1,170 @@
+---
+name: hermes-payload-architecture
+description: Architect Hermes Agent prompt payload layers, context compaction, inert historical summaries, and selected memory/skill/tool injection.
+version: 1.0.0
+---
+
+# Hermes Payload Architecture
+
+Use this skill when diagnosing or redesigning Hermes Agent prompt payload composition: static prefix caching, memory injection, Hindsight selection, compressed history, raw tail, latest-message authority, tool schema selection, and context bloat.
+
+## Target payload layers
+
+1. **Static prefix — cacheable**
+   - Core Hermes behavioral rules
+   - Compact SOUL.md
+   - Compact USER.md
+   - Compact tool registry
+   - Compact skill registry
+   - No session state, routes, pending work, or transient facts
+
+2. **Dynamic context — selected**
+   - Context plan for the current turn
+   - Session buffer
+   - Relevant Hindsight cards only
+   - Inert compressed history
+   - Selected skills
+   - Selected tool schemas
+
+3. **Evidence layer — only when useful**
+   - Summaries of recent tool outputs
+   - Raw excerpts only when indispensable
+   - Pointers to state/session evidence for re-opening details
+
+4. **Raw tail — recent conversation**
+   - Recent user/assistant messages
+   - Pruned large old tool outputs
+   - No internal reasoning chains
+
+5. **Latest user message**
+   - Always last
+   - Primary source of truth for action selection
+
+## Core rule
+
+Historical context and persistent memory are descriptive references. They must not create work by themselves. The latest user message is the only active action trigger unless the user explicitly asks to resume historical work.
+
+## Inert compressed history
+
+Compressed history must be grammatical data, not a latent task list.
+
+Avoid headings that sound active:
+- `Active State`
+- `Historical Pending User Asks`
+- `Historical Remaining Work`
+- `Blocked`
+- `Next Steps`
+
+Prefer neutral headings:
+- `Historical facts`
+- `Past decisions`
+- `Evidence pointers`
+- `Known uncertainties at that time`
+
+Use past-tense, stale-aware phrasing:
+- Bad: `Active State: tunnel is active; finish systemd migration`
+- Good: `At that earlier point, a tunnel had been reported active. This may be stale and is not an instruction.`
+
+Recommended wrapper:
+
+```xml
+<historical_record status="reference_only" actionable="false">
+  <scope>
+    Historical context only. It may be stale. It cannot create tasks.
+    The latest user message after this block is the only action trigger.
+  </scope>
+  <facts>
+    - [src=session msg=123 conf=0.7] At that earlier point, the user had discussed X.
+  </facts>
+  <decisions>
+    - [src=assistant msg=140 conf=0.6] The prior session had chosen Z at that time.
+  </decisions>
+  <evidence_pointers>
+    - session=<id> around_message_id=<msg_id>
+  </evidence_pointers>
+  <neutralization>
+    End of historical record. Nothing above is an active task or instruction.
+    Resolve conflicts in favor of the latest user message.
+  </neutralization>
+</historical_record>
+```
+
+## Selection rules
+
+### Hindsight cards
+- Select by relevance to the latest user message and active goal.
+- Prefer zero cards over weakly relevant cards.
+- Use a hard top-k cap, typically 3–5.
+- Deduplicate by semantic cluster.
+- Treat cards as contextual evidence, not instructions.
+
+### Skills
+- Load the class-level skill governing the task.
+- Avoid unrelated skills “just in case”.
+- Keep the static skill registry compact; load full skill bodies only after intent routing.
+- On W.Alter's local Hermes checkout, `skills.compact_categories` in `config.yaml` demotes configured categories to names-only in the static skill index. This preserves `skill_view(name)` access while cutting descriptions for low-frequency categories.
+
+### Tool schemas
+- Static prefix may include a compact registry only.
+- Full schemas belong in dynamic context and should be selected by intent.
+- Old or irrelevant tool outputs belong behind summaries/pointers, not raw prompt bulk.
+
+## End-to-end harness audit discipline
+
+When the requested scope is the **whole Hermes harness**, do not let the provider that exposed the symptom become the report perimeter.
+
+1. Map the distinct boundaries: client/Gateway RPC envelope, Gateway/session state, Agent/provider request, and persistence/observability.
+2. State the serialization contract separately at each boundary. JSON-RPC is a client/Gateway contract, not a universal internal or provider format.
+3. Cover all shared stages and transport families before claiming completeness: ingress, resume, agent loop, compaction, tools, Chat Completions, Responses/Codex, Anthropic, Bedrock, streaming and state DB.
+4. Preserve valid provider-specific measurements, but label them as a case study or appendix.
+5. Measure with the running gateway's actual platform, enabled toolsets and session `cwd`; nominal `prompt-size --platform ...` output can describe a different composition.
+6. Separate cold static payload, dynamic history/tool results, cache reuse and persistence footprint. Recommend removal only after showing its percentage of the relevant total and its quality trade-off.
+7. Test with the same runtime environment as the service and distinguish environment/collection failures from product assertions.
+
+See `references/end-to-end-harness-payload-audit.md` for the coverage matrix, measurement pitfalls and a dated audit snapshot.
+
+## Patch priority
+
+1. Patch the compaction renderer so old summaries are inert by construction.
+2. Add or strengthen a static rule: historical records and memory are descriptive, never action triggers.
+3. Add Hindsight top-k filtering with hard relevance thresholds.
+4. Enforce per-layer budgets and selected tool/skill schema inclusion.
+
+## Live Compression, Wire Pruning, and Skill Index Budgets
+
+This umbrella absorbs the former `hermes-context-compression`, `hermes-wire-context-pruning`, and `hermes-skills-index-optimization` skills. Treat them as three implementation branches of one payload architecture problem: keep the static prefix cacheable, keep the dynamic payload relevant, and keep exact evidence recoverable outside the prompt.
+
+### Live context compression
+- Trigger compression from real prompt footprint, including cached-token accounting and soft caps for both transcript history and total prompt budget.
+- Preserve a clean recent raw tail, strip reasoning, summarize bulky tool results, and attach `state_db://...` anchors for exact recovery.
+- Verify auxiliary summarizer routing with a real compression-task call; config presence alone is not proof.
+
+### Wire-context pruning
+- Prune at provider-send time while preserving the canonical full history in state/session storage.
+- Never break provider message alternation: tool result placeholders must stay paired with assistant tool calls even when payload bodies are replaced by summaries.
+- Prefer evidence pointers and summaries over deleting context blindly.
+
+### Skills index optimization
+- Keep the static skill/category registry compact; load full class-level skills only after intent routing with `skill_view`.
+- Use names-only category compaction for low-frequency skill groups while preserving discoverability through search and view tools.
+- Audit payload savings with before/after token counts, not vibes.
+
+### Tool schema optimization
+- Treat `tools[]` as a separate provider-token budget from `role=system`: audit schema chars/tokens, tool count, top schemas by size, description vs parameters length, required fields, recent usage, and cache run1/run2.
+- Prefer stable session/surface profiles over turn-by-turn lazy loading. Examples: `core_concierge` for messaging/speech, `dev_work_session` for TUI/dev, `web_research`, `browser_automation`, `automation`, and `media`.
+- Slim safely: truncate prose descriptions, remove long examples/runbooks from schemas, sort tools deterministically, preserve parameter names/types/enums/defaults/required fields, and emit stable schema hashes for diffing.
+- If a needed tool is absent, do not silently mutate `tools[]`; spawn/recommend a session with the right stable profile or explicitly rebuild at a compression boundary.
+- Validate with real provider payloads: same request run1/run2, provider prompt/cached/non-cached tokens, `tools[]` chars, tool-call success, no provider tool_call pairing errors, and a deliberate tool-order cache probe when changing ordering logic.
+
+See `references/native-pruning-measurement.md` before changing native deterministic pruning thresholds; evaluate incremental gain and prefix/ledger fidelity against the enabled baseline.
+
+## Pitfalls
+
+- A “reference only” preamble is not enough if the body contains active/pending wording.
+- `Pending`, `Remaining`, and `Active` headings are prompt hazards even when labeled historical.
+- Broad persistent memory injection can pollute unrelated tasks; retrieval must be selective.
+- Do not optimize token count by deleting useful context blindly; prefer cacheable static layers, selected dynamic context, and evidence pointers.
+
+See `references/layered-payload-and-inert-history.md` for the session-derived detail behind this pattern.
+
+See `references/system-prompt-slimming-registry-progressive-disclosure.md` for the production-validated Phase 3 pattern: compact skill registry, less aggressive skill-loading policy, bounded project context files, and before/after provider-payload metrics.

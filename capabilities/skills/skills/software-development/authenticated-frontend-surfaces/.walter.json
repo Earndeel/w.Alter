@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/authenticated-frontend-surfaces",
+  "sha": "22ea64d520b314d82694e0d61a46c0c97a2ef26a608ff751f933c8624e580cb4",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "22ea64d520b314d82694e0d61a46c0c97a2ef26a608ff751f933c8624e580cb4"
+}

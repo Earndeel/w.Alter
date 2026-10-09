@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-harness-auditing",
+  "sha": "4559d38a44fc0fcbe7b1cbb9d4eef62fc13363d7e80ebf218e81a8ba8df3c224",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "4559d38a44fc0fcbe7b1cbb9d4eef62fc13363d7e80ebf218e81a8ba8df3c224"
+}
