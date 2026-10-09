@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/red-teaming/github-credential-scanner",
+  "sha": "13e9187346804aef3e7ef7aebbd8f8c7ab839b6ebc97b273024f9723bc7d15e9",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "13e9187346804aef3e7ef7aebbd8f8c7ab839b6ebc97b273024f9723bc7d15e9"
+}

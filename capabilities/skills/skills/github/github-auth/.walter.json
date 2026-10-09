@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/github/github-auth",
+  "sha": "87b9b0ba83583f06683bd1cfc36e9910584ec55e9b8a25b66a147aa5533929e4",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "87b9b0ba83583f06683bd1cfc36e9910584ec55e9b8a25b66a147aa5533929e4"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/webtop-chromium-cdp",
+  "sha": "8cd478b844e68e66564ab3f6e96738c8f042179f9819160edd28c5507db4a2ed",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "8cd478b844e68e66564ab3f6e96738c8f042179f9819160edd28c5507db4a2ed"
+}

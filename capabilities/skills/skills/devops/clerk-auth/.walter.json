@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/clerk-auth",
+  "sha": "099548cf4c33e6a287a1905881dc363244a04080c7e41291065c65bc0eadd041",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "099548cf4c33e6a287a1905881dc363244a04080c7e41291065c65bc0eadd041"
+}

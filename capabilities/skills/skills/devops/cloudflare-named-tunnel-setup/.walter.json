@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/cloudflare-named-tunnel-setup",
+  "sha": "fdf97c2543c6548bccb7cc58161be1a7be26615bfcbce376550c9f61fda9933b",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "fdf97c2543c6548bccb7cc58161be1a7be26615bfcbce376550c9f61fda9933b"
+}

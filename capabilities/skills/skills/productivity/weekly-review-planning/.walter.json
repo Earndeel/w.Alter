@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/weekly-review-planning",
+  "sha": "caa01ebb062d84a1353cb0be2957f99f486374d677d0669701ce74da95663acf",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "caa01ebb062d84a1353cb0be2957f99f486374d677d0669701ce74da95663acf"
+}

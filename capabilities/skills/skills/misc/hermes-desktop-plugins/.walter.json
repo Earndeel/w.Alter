@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/hermes-desktop-plugins",
+  "sha": "271b97cbffe2d05f59c1b8c121a7b770439c90fde9019f7a32de69ce8f47ee11",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "271b97cbffe2d05f59c1b8c121a7b770439c90fde9019f7a32de69ce8f47ee11"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/spike",
+  "sha": "3a7057035fd37d6f696f92f60580ada04dde8bff2ff75d70f1970bfd81ccce68",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "3a7057035fd37d6f696f92f60580ada04dde8bff2ff75d70f1970bfd81ccce68"
+}

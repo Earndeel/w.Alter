@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/cloudflare-pages-deploy",
+  "sha": "6e84e481b57ec59fa7dddbd0f41b79b6c5e25df25719614a04e1f8001703544f",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "6e84e481b57ec59fa7dddbd0f41b79b6c5e25df25719614a04e1f8001703544f"
+}

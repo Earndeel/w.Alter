@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/camoufox-max-api-current",
+  "sha": "dd0e5b3563b2d74aba156118e7afec704ac2da74e21546fc961280c0a0f4d293",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "dd0e5b3563b2d74aba156118e7afec704ac2da74e21546fc961280c0a0f4d293"
+}

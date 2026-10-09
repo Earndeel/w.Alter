@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/ssh-mac-remote-control",
+  "sha": "0896344cf1071d98d81aa371edd9d6fce407caad81639739685b3d5b4757e664",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "0896344cf1071d98d81aa371edd9d6fce407caad81639739685b3d5b4757e664"
+}

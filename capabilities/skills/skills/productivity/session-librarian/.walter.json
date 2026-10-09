@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/session-librarian",
+  "sha": "149043c438958a93377d16e101144875ce8263f9184899659b8276884b6307b3",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "149043c438958a93377d16e101144875ce8263f9184899659b8276884b6307b3"
+}

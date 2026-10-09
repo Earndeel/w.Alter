@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hermes-memory-plugin",
+  "sha": "927b0dfd8ca05d3d829e17e4d16d5d4ebd049a667d6f87b595d93d5bb25d0a6b",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "927b0dfd8ca05d3d829e17e4d16d5d4ebd049a667d6f87b595d93d5bb25d0a6b"
+}

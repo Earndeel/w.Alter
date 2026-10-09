@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/training/peft",
+  "sha": "9290f63a1a30b83db6c1a9c5b91d6119fecab330f981eb1d07abbfb3947d6d0e",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "9290f63a1a30b83db6c1a9c5b91d6119fecab330f981eb1d07abbfb3947d6d0e"
+}

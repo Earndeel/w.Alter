@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/inference/gguf",
+  "sha": "e82c6e54829a03524fe3958103b77b73ce70e2ea9a71d61234c0cb3664d5b413",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "e82c6e54829a03524fe3958103b77b73ce70e2ea9a71d61234c0cb3664d5b413"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/ad-pipeline/multi-model-video-gen",
+  "sha": "98fee62408783edbf7b49bdfeea4dfec9bef77a63c93f30ba8832b07247f8731",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "98fee62408783edbf7b49bdfeea4dfec9bef77a63c93f30ba8832b07247f8731"
+}

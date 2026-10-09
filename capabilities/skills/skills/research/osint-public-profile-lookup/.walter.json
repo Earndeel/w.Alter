@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/research/osint-public-profile-lookup",
+  "sha": "fbad465a2ad9a8b43c9796f9a2d60f41cb8adfed2c702eea6408b67499b78336",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "fbad465a2ad9a8b43c9796f9a2d60f41cb8adfed2c702eea6408b67499b78336"
+}

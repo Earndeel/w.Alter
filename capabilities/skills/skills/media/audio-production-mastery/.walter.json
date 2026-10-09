@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/media/audio-production-mastery",
+  "sha": "ab2e4eb30b772eac6a0c4d4e175f6b79fd8145e31a7ce5cca4345507ba44836a",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "ab2e4eb30b772eac6a0c4d4e175f6b79fd8145e31a7ce5cca4345507ba44836a"
+}

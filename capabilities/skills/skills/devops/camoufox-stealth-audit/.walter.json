@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/camoufox-stealth-audit",
+  "sha": "948ffbde9570f82a777a03559ddbc8ed497523ceacc0225d4792eaf915c47cb7",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "948ffbde9570f82a777a03559ddbc8ed497523ceacc0225d4792eaf915c47cb7"
+}

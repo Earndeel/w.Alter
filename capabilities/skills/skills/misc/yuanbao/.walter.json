@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/yuanbao",
+  "sha": "c37225ede6d75a92f2536f5779516eb811ce48a0cdd1b0b1888bd48225908225",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "c37225ede6d75a92f2536f5779516eb811ce48a0cdd1b0b1888bd48225908225"
+}

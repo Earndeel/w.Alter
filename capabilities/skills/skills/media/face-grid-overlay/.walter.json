@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/media/face-grid-overlay",
+  "sha": "6c81eb9e7887d04d719a533659d60ee4e679fcbb6e58b6a4ea867eadfdd7be56",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "6c81eb9e7887d04d719a533659d60ee4e679fcbb6e58b6a4ea867eadfdd7be56"
+}

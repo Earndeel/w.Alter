@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/autonomous-ai-agents/computer-use",
+  "sha": "a13cc1683cc406c6efb08920c144ca533bf4861897dfd319a31a78e168db144b",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "a13cc1683cc406c6efb08920c144ca533bf4861897dfd319a31a78e168db144b"
+}

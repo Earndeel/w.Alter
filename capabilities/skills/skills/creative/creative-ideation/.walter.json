@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/creative-ideation",
+  "sha": "ac853cd491c8624f5a7db234822240707785e2f1f8b4d1c03070bd45681edd79",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "ac853cd491c8624f5a7db234822240707785e2f1f8b4d1c03070bd45681edd79"
+}

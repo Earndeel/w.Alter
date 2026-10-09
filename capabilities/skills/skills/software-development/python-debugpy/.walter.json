@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/python-debugpy",
+  "sha": "af5feb976184ba27b81cdf8bb2b9180e43597d318aef88494212620a90d49b8d",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "af5feb976184ba27b81cdf8bb2b9180e43597d318aef88494212620a90d49b8d"
+}

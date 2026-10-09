@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/model-id-lookup",
+  "sha": "79a8c65786b2fed7ce1012e803df986ca1f8a541d03eeb23ef66b5f0d9f478ae",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "79a8c65786b2fed7ce1012e803df986ca1f8a541d03eeb23ef66b5f0d9f478ae"
+}

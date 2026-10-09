@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/comfyui-headless-deployment",
+  "sha": "8373daf0e67ce20a70129c7f3b2a79df95a6cb5489be0ea967444934e63d8023",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "8373daf0e67ce20a70129c7f3b2a79df95a6cb5489be0ea967444934e63d8023"
+}

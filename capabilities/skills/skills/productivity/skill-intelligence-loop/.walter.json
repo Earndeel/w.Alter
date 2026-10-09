@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/skill-intelligence-loop",
+  "sha": "cbaae56607292053fa7c5c899c283b3f54afe483326c3061c513625ff6197ed6",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "cbaae56607292053fa7c5c899c283b3f54afe483326c3061c513625ff6197ed6"
+}

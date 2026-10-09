@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/miroshark",
+  "sha": "9f783afa4a36a3b629c06704b5b942526497225252ca6f35930d5b8341e6aa93",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "9f783afa4a36a3b629c06704b5b942526497225252ca6f35930d5b8341e6aa93"
+}

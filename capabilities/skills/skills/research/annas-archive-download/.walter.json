@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/research/annas-archive-download",
+  "sha": "4f09d77e0bb2b6f25aebbb3f7f6983626122ebf1ac32b20651e08f60e809603d",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "4f09d77e0bb2b6f25aebbb3f7f6983626122ebf1ac32b20651e08f60e809603d"
+}

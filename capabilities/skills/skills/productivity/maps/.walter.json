@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/maps",
+  "sha": "988e1abae1025100a9c5579af6f642884ea1afa71d051a8eb4aa55336464edbb",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "988e1abae1025100a9c5579af6f642884ea1afa71d051a8eb4aa55336464edbb"
+}

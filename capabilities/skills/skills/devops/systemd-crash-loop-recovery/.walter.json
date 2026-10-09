@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/systemd-crash-loop-recovery",
+  "sha": "433825b0bb8eea696fc50847156b5ec3ceccd8b0ebfa876a85812d7a4ce5cb6a",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "433825b0bb8eea696fc50847156b5ec3ceccd8b0ebfa876a85812d7a4ce5cb6a"
+}

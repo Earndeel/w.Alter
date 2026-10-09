@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/scena-cloudflare-serverless",
+  "sha": "4b6f92d3a4461a50d8994a7020031ff9d1e38dde0e4d9cbb10d89951c7487fcd",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "4b6f92d3a4461a50d8994a7020031ff9d1e38dde0e4d9cbb10d89951c7487fcd"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/playwright-cdp-browser-control",
+  "sha": "c45f02008aa68fccaf6b5fcdd68f3f2abcd5881e629d0de9cde3b1254e127c3f",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "c45f02008aa68fccaf6b5fcdd68f3f2abcd5881e629d0de9cde3b1254e127c3f"
+}

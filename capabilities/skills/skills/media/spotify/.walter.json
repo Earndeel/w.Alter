@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/media/spotify",
+  "sha": "c72fc64f946601d40cb10295cd9a95fa823075155c968f104aa2e837db4c80bb",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "c72fc64f946601d40cb10295cd9a95fa823075155c968f104aa2e837db4c80bb"
+}

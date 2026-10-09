@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/anthropic-integration",
+  "sha": "0aa6c291d9bd5d8af3d65a0648bb0a668f28c5b38a97b22a236b9469bb437d76",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "0aa6c291d9bd5d8af3d65a0648bb0a668f28c5b38a97b22a236b9469bb437d76"
+}

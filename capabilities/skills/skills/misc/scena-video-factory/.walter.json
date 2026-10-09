@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/scena-video-factory",
+  "sha": "85a006a8c525e066c52babab8ebbcb3f6552d5b4a59ae93d1f5b36e4ecf8882c",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "85a006a8c525e066c52babab8ebbcb3f6552d5b4a59ae93d1f5b36e4ecf8882c"
+}

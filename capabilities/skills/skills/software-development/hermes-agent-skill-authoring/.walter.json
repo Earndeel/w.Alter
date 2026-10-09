@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/hermes-agent-skill-authoring",
+  "sha": "a0bba326cfa3798c75215414ca8a97745c1fd31883ebc1eaf29ca4c4ff681fe1",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "a0bba326cfa3798c75215414ca8a97745c1fd31883ebc1eaf29ca4c4ff681fe1"
+}

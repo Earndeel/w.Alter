@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/media/reference-video-fidelity",
+  "sha": "bef4fe81402a8caf36c12d67b98c43fda186782a59c5d3e217d81a63eb04fa6b",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "bef4fe81402a8caf36c12d67b98c43fda186782a59c5d3e217d81a63eb04fa6b"
+}

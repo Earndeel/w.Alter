@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/kie-gpt-image-25",
+  "sha": "498bca0df6fe3cdec487705e3397b3de4990a0a3c52ba62690b853878898f77f",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "498bca0df6fe3cdec487705e3397b3de4990a0a3c52ba62690b853878898f77f"
+}

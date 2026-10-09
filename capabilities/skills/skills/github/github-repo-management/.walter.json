@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/github/github-repo-management",
+  "sha": "e7d62bb5c8c6a755255a17ba1774e230cf6c16a5f5a1710cc4d8c51e4f74bde3",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "e7d62bb5c8c6a755255a17ba1774e230cf6c16a5f5a1710cc4d8c51e4f74bde3"
+}

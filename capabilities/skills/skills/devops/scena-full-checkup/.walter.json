@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/scena-full-checkup",
+  "sha": "82b34e1299f75f2536f55cd539b398e4f6da36be8cb41dbf8772f3655706845f",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "82b34e1299f75f2536f55cd539b398e4f6da36be8cb41dbf8772f3655706845f"
+}

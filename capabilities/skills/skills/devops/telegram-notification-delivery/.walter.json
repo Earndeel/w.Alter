@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/telegram-notification-delivery",
+  "sha": "6c002c38d2f371dc9acbe6194e8b7e0a5f9f8b2755f29f3492fad2992d82beb8",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "6c002c38d2f371dc9acbe6194e8b7e0a5f9f8b2755f29f3492fad2992d82beb8"
+}

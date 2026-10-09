@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/simplify-code",
+  "sha": "db8ae6630a2bc6d7473e2611ef655ed2499e8a7e60af04907bcb9dc71f821fa0",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "db8ae6630a2bc6d7473e2611ef655ed2499e8a7e60af04907bcb9dc71f821fa0"
+}

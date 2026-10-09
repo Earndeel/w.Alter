@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/research/aa-pareto-model-optimizer",
+  "sha": "d0b79a19135669d98449074ed6722ef55ee6043c85bba32d946bbdec2166a129",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "d0b79a19135669d98449074ed6722ef55ee6043c85bba32d946bbdec2166a129"
+}

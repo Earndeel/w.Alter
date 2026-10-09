@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/google-workspace",
+  "sha": "0377173f8d4280cc1b6ab8501a5a63ffc158deb3cdb463bce0cf713862d8060b",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "0377173f8d4280cc1b6ab8501a5a63ffc158deb3cdb463bce0cf713862d8060b"
+}

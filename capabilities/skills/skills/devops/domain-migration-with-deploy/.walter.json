@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/domain-migration-with-deploy",
+  "sha": "a7247a9aa84d4859ab4a50013f4159a77a3070be8b2a377e064297ad08edbbe9",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "a7247a9aa84d4859ab4a50013f4159a77a3070be8b2a377e064297ad08edbbe9"
+}

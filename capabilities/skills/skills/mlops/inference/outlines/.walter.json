@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/inference/outlines",
+  "sha": "8743f83557012c814566cf71bacd1c6c6ca7113a2b7814a8b026a17fe9915c69",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "8743f83557012c814566cf71bacd1c6c6ca7113a2b7814a8b026a17fe9915c69"
+}

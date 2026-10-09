@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/models/clip",
+  "sha": "02c811d69ee859707bf859a3283b070cbfec183fdfd8a97f592059d11d71823e",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "02c811d69ee859707bf859a3283b070cbfec183fdfd8a97f592059d11d71823e"
+}

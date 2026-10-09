@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/flask-dashboard-tailscale",
+  "sha": "668322cc6e615a32cb2d3ca285b8df8d93567d31649299cd93de4d1921356f26",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "668322cc6e615a32cb2d3ca285b8df8d93567d31649299cd93de4d1921356f26"
+}

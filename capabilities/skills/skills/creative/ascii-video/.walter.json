@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/ascii-video",
+  "sha": "b813d270abfdf507dc2b2c292f82dc61676fb2774bbf9437c3ba2a4018be59bd",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "b813d270abfdf507dc2b2c292f82dc61676fb2774bbf9437c3ba2a4018be59bd"
+}

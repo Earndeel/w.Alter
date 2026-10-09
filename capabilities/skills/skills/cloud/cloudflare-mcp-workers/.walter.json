@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/cloud/cloudflare-mcp-workers",
+  "sha": "ca8601fb947fab8047907f108e92bd733a324a9f3cca67010888911d7d0d30ae",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "ca8601fb947fab8047907f108e92bd733a324a9f3cca67010888911d7d0d30ae"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/kie-hermes-readonly-audit",
+  "sha": "8c58b1f09b2f7768af7fcdb18add6bbb26f6fce9b655cb3ef187e15dd335fca1",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "8c58b1f09b2f7768af7fcdb18add6bbb26f6fce9b655cb3ef187e15dd335fca1"
+}

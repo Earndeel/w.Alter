@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/linear",
+  "sha": "bc2c40cb03304a797e254ed9a28d7ca5ee8f3ba076391930547d8d1d055c0a8a",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "bc2c40cb03304a797e254ed9a28d7ca5ee8f3ba076391930547d8d1d055c0a8a"
+}

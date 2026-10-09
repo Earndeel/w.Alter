@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/camoufox-automation",
+  "sha": "01283568333c451f413c9ac433d737e79c5485bff81d44c541e0f283a6f3de12",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "01283568333c451f413c9ac433d737e79c5485bff81d44c541e0f283a6f3de12"
+}
