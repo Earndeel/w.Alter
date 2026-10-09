@@ -48,6 +48,9 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=20)
     ap.add_argument("--corpus", default="full")
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--inject", action="store_true",
+                    help="exact production injection format (name — summary), agent-model prompt")
+    ap.add_argument("--budget", default="backfill")
     a = ap.parse_args()
     cases, corpus = load()
     by_id = {c["id"]: c for c in cases}
@@ -56,7 +59,7 @@ def main() -> None:
     rows = [r for r in rows if r["corpus"] == a.corpus and by_id[r["id"]]["privacy_class"] != "local_only"]
     rows = list({r["id"]: r for r in rows}.values())
     tag = a.model.split("/")[-1] if a.method == "llm" else "rerank-4-fast"
-    out = DATA / f"{a.method}_{tag}_n{a.n}_{Path(a.dump).stem}.jsonl"
+    out = DATA / f"{a.method}{'-inject' if a.inject else ''}_{tag}_n{a.n}_{Path(a.dump).stem}.jsonl"
     done = {json.loads(line)["id"] for line in open(out)} if out.exists() else set()
     rows = [r for r in rows if r["id"] not in done]
     print(f"{len(rows)} to run -> {out.name}", file=sys.stderr)
@@ -81,6 +84,26 @@ def main() -> None:
                 llm._log(processor="bench.skills.cohere", model="cohere/rerank-4-fast", purpose="rerank",
                          budget="backfill", privacy_class="cloud_allowed", cost_usd=cost, status="ok")
             else:
+                if a.inject:
+                    block = ("Skills W.Alter candidats pour ce message (procédures testées sur cette VM, classées par "
+                             "pertinence probable). Si l'un correspond à la tâche, lis-le avec skill_read avant d'agir ; "
+                             "sinon ignore cette liste :\n" +
+                             "\n".join(f"- {n} — {((cards_mod.load(n) or {}).get('summary') or desc.get(n, ''))[:160]}"
+                                       for n in short))
+                    prompt = (f"You are W.Alter's agent. Conversation so far:\n[previous user message]\n"
+                              f"{ctx.get('prev_user', '')[-400:]}\n[your previous answer]\n{ctx.get('prev_assistant', '')[-500:]}"
+                              f"\n\n[new user message]\n{c['query'][:1500]}\n\n[context injected by the harness]\n{block}\n\n"
+                              "Before acting, which of these skills (if any) would you load with skill_read? Most useful "
+                              'first, at most 5. Answer with JSON only: {"skills": ["name", ...]}')
+                    res = llm.chat([{"role": "user", "content": prompt}], model=a.model,
+                                   processor="bench.skills.agent_pick", privacy_class="cloud_allowed",
+                                   budget=a.budget, timeout=90,
+                                   **({"reasoning": {"effort": "low"}} if "gpt" in a.model else {}))
+                    m = re.search(r"\{.*\}", res["content"], re.S)
+                    picked = [n for n in json.loads(m.group(0)).get("skills", []) if n in short] if m else []
+                    return {"id": r["id"], "corpus": a.corpus, "ranked": picked + [n for n in short if n not in picked],
+                            "picked": picked, "latency_ms": round(1000 * (time.perf_counter() - t0)),
+                            "cost_usd": res.get("cost_usd")}
                 convo = (f"[previous user message]\n{ctx.get('prev_user', '')[-400:]}\n[previous assistant message]\n"
                          f"{ctx.get('prev_assistant', '')[-500:]}\n[current user message]\n{c['query'][:1500]}")
                 cand = "\n".join(f"- {card_text(n, desc.get(n, ''), True)}" for n in short)
