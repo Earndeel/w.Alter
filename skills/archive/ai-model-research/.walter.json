@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/ai-model-research",
+  "sha": "f8e8a081905813a839b6f4b526fa20a1e64be7f2775525bdcc8453b91a78497c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "f8e8a081905813a839b6f4b526fa20a1e64be7f2775525bdcc8453b91a78497c"
+}

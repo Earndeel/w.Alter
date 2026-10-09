@@ -1,0 +1,12 @@
+{
+ "domain": "autonomous-ai-agents",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/ax-action-verification",
+  "sha": "192b15fe913e05ecdae8416f40ea1abe3a94b16add65866c1530b460a2b81c11",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "192b15fe913e05ecdae8416f40ea1abe3a94b16add65866c1530b460a2b81c11"
+}

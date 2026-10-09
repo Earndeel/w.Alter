@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-dashboard-customization",
+  "sha": "985da8b35e5165704320babdef503e2d9c97f5e7c9dbdd0ad93fb92f0d5e15d2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "985da8b35e5165704320babdef503e2d9c97f5e7c9dbdd0ad93fb92f0d5e15d2"
+}

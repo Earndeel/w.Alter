@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/atlas-cloud-image-gen",
+  "sha": "28887b6f0fcebf6af5bda5a1b702b558d67da2e14807250f0d0b2b6577cbf8a8",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "28887b6f0fcebf6af5bda5a1b702b558d67da2e14807250f0d0b2b6577cbf8a8"
+}

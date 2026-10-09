@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/gemini-file-api",
+  "sha": "6fb68b13776be3206f555b4243817654f7b7d439823b6b707ed6e3c2e5219240",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "6fb68b13776be3206f555b4243817654f7b7d439823b6b707ed6e3c2e5219240"
+}

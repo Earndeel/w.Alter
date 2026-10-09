@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/cloudflare-named-tunnel-custom-domains",
+  "sha": "04f863454814fb2dd2d154c77dcccdebf0143145f3c54f3e2eb56970919f0bee",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "04f863454814fb2dd2d154c77dcccdebf0143145f3c54f3e2eb56970919f0bee"
+}

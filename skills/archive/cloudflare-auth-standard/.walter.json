@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/cloudflare-auth-standard",
+  "sha": "97e7e221b9bd1f25d57450c28af8a6fcd861864bb660da0c6961601f6ea00a97",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "97e7e221b9bd1f25d57450c28af8a6fcd861864bb660da0c6961601f6ea00a97"
+}

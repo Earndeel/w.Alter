@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/scena-operations",
+  "sha": "5e856484b87dfe0444ca669aa037d084881971424e46cff1591cf1b8f0dc20e3",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5e856484b87dfe0444ca669aa037d084881971424e46cff1591cf1b8f0dc20e3"
+}

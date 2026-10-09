@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/french-admin-filing",
+  "sha": "91a062e3a61018812d08b884a17014a4e0b88b5c58eab41c66b48e50e61e0512",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "91a062e3a61018812d08b884a17014a4e0b88b5c58eab41c66b48e50e61e0512"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/authenticated-automation-operations",
+  "sha": "0e98fdadfd84046e9c8a2acc0cea94a0e7789e942b6d7b166c1dbf2e35bc67b9",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "0e98fdadfd84046e9c8a2acc0cea94a0e7789e942b6d7b166c1dbf2e35bc67b9"
+}

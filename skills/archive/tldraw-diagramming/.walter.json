@@ -1,0 +1,12 @@
+{
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/tldraw-diagramming",
+  "sha": "9a89dabfbc34b130d041a4b8b7a65f168edec8801984d6bb91f751cb670f9d46",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "9a89dabfbc34b130d041a4b8b7a65f168edec8801984d6bb91f751cb670f9d46"
+}

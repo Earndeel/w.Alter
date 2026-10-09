@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-profile-layout-migration",
+  "sha": "94fe9cc3c56829454b5c05ba1c1fff5aef5e82e4c9a9f57cf74be5b6790afc3d",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "94fe9cc3c56829454b5c05ba1c1fff5aef5e82e4c9a9f57cf74be5b6790afc3d"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/telegram-rich-message-formatting",
+  "sha": "a18734f8459c4bd104b1f9eaa30632f1eaac8a55408c43618e5a4d95f1ec8af1",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "a18734f8459c4bd104b1f9eaa30632f1eaac8a55408c43618e5a4d95f1ec8af1"
+}

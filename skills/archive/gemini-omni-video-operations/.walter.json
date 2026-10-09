@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/gemini-omni-video-operations",
+  "sha": "242ee6bad844616427fd149265745670063c4459d0bab5bcacaf960db81a10c7",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "242ee6bad844616427fd149265745670063c4459d0bab5bcacaf960db81a10c7"
+}

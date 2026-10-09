@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-tool-search-config",
+  "sha": "ef65bfdfe1dfad02d330cdcd9a94b54ddc18933614f7971faa3e52e3308513e8",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "ef65bfdfe1dfad02d330cdcd9a94b54ddc18933614f7971faa3e52e3308513e8"
+}

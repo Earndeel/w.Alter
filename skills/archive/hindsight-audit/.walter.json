@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hindsight-audit",
+  "sha": "5318f2040e376a4d7fcb84221528b3a04eecb5b2665fb7419f90e779c0cf1884",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5318f2040e376a4d7fcb84221528b3a04eecb5b2665fb7419f90e779c0cf1884"
+}

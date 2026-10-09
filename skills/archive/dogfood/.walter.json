@@ -1,0 +1,12 @@
+{
+ "domain": "software-development",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/dogfood",
+  "sha": "aab80d77ff70f74009b07dbfe5316b98c29c6e861d49ed171021b46365bcb715",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "aab80d77ff70f74009b07dbfe5316b98c29c6e861d49ed171021b46365bcb715"
+}

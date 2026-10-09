@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/credential-scope-verification",
+  "sha": "aea02d95375705d2ff5a6bf8bd4028fd6c1de6537384c4eafb6879c2381aafb3",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "aea02d95375705d2ff5a6bf8bd4028fd6c1de6537384c4eafb6879c2381aafb3"
+}

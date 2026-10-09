@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-nous-tool-gateway",
+  "sha": "6ecd3d18558606407b10bbc544e9aa4615a875aeb56b6aba1bd9ff989403a754",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "6ecd3d18558606407b10bbc544e9aa4615a875aeb56b6aba1bd9ff989403a754"
+}

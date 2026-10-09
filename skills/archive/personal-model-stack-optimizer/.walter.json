@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/personal-model-stack-optimizer",
+  "sha": "49e1d7b5fed2c4d4c7a9cb086cb6b4c17327f9ad0cc5c79d9573672a6eaf0721",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "49e1d7b5fed2c4d4c7a9cb086cb6b4c17327f9ad0cc5c79d9573672a6eaf0721"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/delegate-task-per-model",
+  "sha": "954659a8508c558c2e0b4cc671d021c91dd0d4c6045a3179686d1e45ddf717f1",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "954659a8508c558c2e0b4cc671d021c91dd0d4c6045a3179686d1e45ddf717f1"
+}

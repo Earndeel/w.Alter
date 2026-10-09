@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kie-provider-operations",
+  "sha": "5af4847ee0563e30968062bb0851b8cf396a99076c8d663c5f5f3479126b428e",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5af4847ee0563e30968062bb0851b8cf396a99076c8d663c5f5f3479126b428e"
+}

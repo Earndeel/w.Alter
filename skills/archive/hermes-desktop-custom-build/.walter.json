@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-custom-build",
+  "sha": "0a22adbdc3024996acf78b766ce368f8d0bf71ef0fd1d2eb413f2c51b5fca372",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "0a22adbdc3024996acf78b766ce368f8d0bf71ef0fd1d2eb413f2c51b5fca372"
+}

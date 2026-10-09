@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/camoufox-browser-operations",
+  "sha": "94df480b72d374eedae7ec3879516a6f340ec5b0f224c7fb53baef1f30ca96c2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "94df480b72d374eedae7ec3879516a6f340ec5b0f224c7fb53baef1f30ca96c2"
+}

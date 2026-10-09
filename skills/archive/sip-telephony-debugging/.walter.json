@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/sip-telephony-debugging",
+  "sha": "be5df3afcca5c03907ebb58c4065f8b8b906a7b42103af1a9da3a5a9b8828c66",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "be5df3afcca5c03907ebb58c4065f8b8b906a7b42103af1a9da3a5a9b8828c66"
+}

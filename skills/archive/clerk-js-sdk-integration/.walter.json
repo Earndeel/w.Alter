@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/clerk-js-sdk-integration",
+  "sha": "ae9d33b40fa400826a577cc7f84aca8dbcc2767ba4f5c7d2f4db135c263e6d8a",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "ae9d33b40fa400826a577cc7f84aca8dbcc2767ba4f5c7d2f4db135c263e6d8a"
+}

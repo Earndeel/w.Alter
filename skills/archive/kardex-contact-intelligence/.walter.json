@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kardex-contact-intelligence",
+  "sha": "24814eafb0bd11f508d26b2ca15b72c8b70a982f46df4d7cb46ae7525e5f98d1",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "24814eafb0bd11f508d26b2ca15b72c8b70a982f46df4d7cb46ae7525e5f98d1"
+}

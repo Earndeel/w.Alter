@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/research-evidence-operations",
+  "sha": "b4e23eb42b70df82b47e7da902cd244aaacef7a2db3f679c9af740f7305d1668",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "b4e23eb42b70df82b47e7da902cd244aaacef7a2db3f679c9af740f7305d1668"
+}

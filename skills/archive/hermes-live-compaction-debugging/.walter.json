@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-live-compaction-debugging",
+  "sha": "d505f8006967a36749369fcc25d0b0f26880367cb4243d8165d22357843c0802",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "d505f8006967a36749369fcc25d0b0f26880367cb4243d8165d22357843c0802"
+}

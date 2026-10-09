@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/uncensored-model-verification",
+  "sha": "92de8118a5d9c4dc0d8f3b0143dd098c9a2c61cb3981b58e9eb19f329fa35d3c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "92de8118a5d9c4dc0d8f3b0143dd098c9a2c61cb3981b58e9eb19f329fa35d3c"
+}

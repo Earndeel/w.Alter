@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/model-selection-strategy",
+  "sha": "01f143c370912027031c731cf6bbbb00db721da8aed06f5faf339274cd875237",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "01f143c370912027031c731cf6bbbb00db721da8aed06f5faf339274cd875237"
+}

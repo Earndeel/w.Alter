@@ -1,0 +1,16 @@
+# SSH config for Hermes Desktop app → VPS via Tailscale
+# Mac: ~/.ssh/config
+
+Host walter-ts
+    HostName localhost
+    Port 2222
+    User root
+    IdentityFile /Users/lucasjouvencon/Desktop/Keys/ssh-key-2025-12-10.key
+    ServerAliveInterval 10
+    ServerAliveCountMax 3
+
+# IMPORTANT:
+# - User MUST be root (ubuntu can't access /root/.hermes/ which is 700)
+# - No LocalForward lines (ports may conflict, causing exit code 255)
+# - IdentityFile must be absolute path (~ doesn't expand in GUI app context)
+# - Port 2222 is the autossh tunnel from VPS to Mac

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-escalation-prompt-patterns",
+  "sha": "a2938bc47c10c8dbf09b3f72ece49f0d64234c300598bff3e1957781f642c90d",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "a2938bc47c10c8dbf09b3f72ece49f0d64234c300598bff3e1957781f642c90d"
+}

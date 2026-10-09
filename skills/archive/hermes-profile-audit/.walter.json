@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-profile-audit",
+  "sha": "6c3ae6c5ead60e8739299b6fd1fc24dbf3c54d5f8af189adf80ad9ca28249ee3",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "6c3ae6c5ead60e8739299b6fd1fc24dbf3c54d5f8af189adf80ad9ca28249ee3"
+}

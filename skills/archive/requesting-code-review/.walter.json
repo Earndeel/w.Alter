@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/requesting-code-review",
+  "sha": "92020a7d0364cf211152daf01f8c9aaae1fadfb8d033457729d7e7d606c30deb",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "92020a7d0364cf211152daf01f8c9aaae1fadfb8d033457729d7e7d606c30deb"
+}

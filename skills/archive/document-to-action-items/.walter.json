@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/document-to-action-items",
+  "sha": "10e444c4b6fee5459ef7ec499136ec349cf47743708f7b3618c7fe2aeef04944",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "10e444c4b6fee5459ef7ec499136ec349cf47743708f7b3618c7fe2aeef04944"
+}

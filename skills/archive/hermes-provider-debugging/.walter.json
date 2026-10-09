@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-provider-debugging",
+  "sha": "e487baddae054c87a3eb6c61bd1cf73fee1c7c248a978fb35129a563387c5e64",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e487baddae054c87a3eb6c61bd1cf73fee1c7c248a978fb35129a563387c5e64"
+}

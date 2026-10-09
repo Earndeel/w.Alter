@@ -1,0 +1,12 @@
+{
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/tldraw-automation",
+  "sha": "1c3a651cc3b9662c9375759533beb8993293593a4fe2d72d88814fea87e4f04a",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "1c3a651cc3b9662c9375759533beb8993293593a4fe2d72d88814fea87e4f04a"
+}

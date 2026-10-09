@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/scena-frontend-qa",
+  "sha": "017df47ba0bec6569d639564115b6163de458617446ca21213ff1f876fc18827",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "017df47ba0bec6569d639564115b6163de458617446ca21213ff1f876fc18827"
+}

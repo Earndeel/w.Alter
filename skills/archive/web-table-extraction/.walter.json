@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/web-table-extraction",
+  "sha": "67d410a94c8715bfa39b108a3cbd49cc71216187ba6c629c3157ec3fda9f7cda",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "67d410a94c8715bfa39b108a3cbd49cc71216187ba6c629c3157ec3fda9f7cda"
+}

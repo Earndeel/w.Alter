@@ -1,0 +1,12 @@
+{
+ "domain": "autonomous-ai-agents",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/llm-tool-routing",
+  "sha": "8f384c0decfee6e2a643d5d2b4245cbc710dab061d2ef00e47026d1d9a3a2c12",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "8f384c0decfee6e2a643d5d2b4245cbc710dab061d2ef00e47026d1d9a3a2c12"
+}

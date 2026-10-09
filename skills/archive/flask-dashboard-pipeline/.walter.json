@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/flask-dashboard-pipeline",
+  "sha": "552e5829d95d9cd71458480728108b022a8d1696c237b8f6d023d5655a6c0da2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "552e5829d95d9cd71458480728108b022a8d1696c237b8f6d023d5655a6c0da2"
+}

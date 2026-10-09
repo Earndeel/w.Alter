@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/pxpipe-vision-compression",
+  "sha": "43d7b8f2ee18ccec139d03628d8f4e2612c60bc80114cbac7885299a1bb2c2a5",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "43d7b8f2ee18ccec139d03628d8f4e2612c60bc80114cbac7885299a1bb2c2a5"
+}

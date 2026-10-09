@@ -1,0 +1,12 @@
+{
+ "domain": "media",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/reference-conditioned-video-generation",
+  "sha": "238e876a1cfa875ff8505e49155fd3ee2fb7dfa574e219fe11bc5dbe82259ebd",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "238e876a1cfa875ff8505e49155fd3ee2fb7dfa574e219fe11bc5dbe82259ebd"
+}

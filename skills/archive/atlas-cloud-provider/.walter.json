@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/atlas-cloud-provider",
+  "sha": "10010a025befc0f461f43ea7644d9dc44ac2bb0247d1f857ab62aa95f0f07261",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "10010a025befc0f461f43ea7644d9dc44ac2bb0247d1f857ab62aa95f0f07261"
+}

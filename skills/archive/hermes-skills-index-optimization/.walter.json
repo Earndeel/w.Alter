@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-skills-index-optimization",
+  "sha": "ef1ffcb8845d2f6ef30ef616223eec1e3746c8c9768de9f81cb7865276f626b4",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "ef1ffcb8845d2f6ef30ef616223eec1e3746c8c9768de9f81cb7865276f626b4"
+}

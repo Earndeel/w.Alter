@@ -1,0 +1,12 @@
+{
+ "domain": "software-development",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/software-development-workflows",
+  "sha": "e7c59bbb486f1476a746ce85d438869d5a6e7914b734607d9b70687843f1dc07",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e7c59bbb486f1476a746ce85d438869d5a6e7914b734607d9b70687843f1dc07"
+}

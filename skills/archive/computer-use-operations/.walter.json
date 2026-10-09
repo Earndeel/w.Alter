@@ -1,0 +1,12 @@
+{
+ "domain": "autonomous-ai-agents",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/computer-use-operations",
+  "sha": "7587ab833b571eb3973b30c4bb719886f14313049ec54e5f8a4353c401274d23",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "7587ab833b571eb3973b30c4bb719886f14313049ec54e5f8a4353c401274d23"
+}

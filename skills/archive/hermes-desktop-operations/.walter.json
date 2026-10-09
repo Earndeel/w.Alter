@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-operations",
+  "sha": "e0aa1be570446c546052431f67f7a60992ce804eac4f843584e3aba742957436",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e0aa1be570446c546052431f67f7a60992ce804eac4f843584e3aba742957436"
+}
