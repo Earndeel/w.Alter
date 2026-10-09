@@ -67,15 +67,26 @@ def _copy(src: Path, dst: Path) -> None:
         store.write_sidecar(dst, keep)
 
 
+def _repo_skills() -> set[str]:
+    """Skills shipped in the Hermes repository (skills/ + optional-skills/): upstream even when not in the manifest."""
+    repo = Path("/root/.hermes/hermes-agent")
+    return {md.parent.name for d in ("skills", "optional-skills") for md in (repo / d).rglob("SKILL.md")}
+
+
 def _origin(name: str, bundled: set[str], hub: set[str]) -> tuple[str, str]:
-    if name in bundled:
+    if name in bundled or name in _REPO:
         return "hermes-bundled", "upstream"
     if name in hub:
         return "hermes-hub", "upstream"
     return "hermes-agent", "walter"
 
 
+_REPO: set[str] = set()
+
+
 def sync(dry_run: bool = False) -> dict:
+    global _REPO
+    _REPO = _repo_skills()
     bundled, hub = _bundled(), _hub()
     ours = {s.name: s for s in store.iter_skills(include_archived=True, include_drafts=False)}
     stats = {"imported": [], "fast_forward": [], "draft_conflict": [], "hermes_gone": [], "unchanged": 0}
