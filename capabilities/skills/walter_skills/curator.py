@@ -357,33 +357,100 @@ def _skill_bundle(s: store.Skill, limit: int = 60000) -> str:
     for p in sorted(s.path.rglob("*")):
         if p.is_file() and p.name not in ("SKILL.md", store.SIDECAR) and "__pycache__" not in p.parts:
             rel = p.relative_to(s.path)
-            txt = p.read_text(errors="replace") if p.suffix in (".md", ".txt", ".json", ".yaml", ".yml") else \
-                f"(file kept as-is: {p.stat().st_size} bytes)"
+            txt = p.read_text(errors="replace") if p.suffix in (".md", ".txt", ".json", ".yaml", ".yml", ".py", ".sh", ".sql", ".js", ".ts", ".mjs", ".toml", ".ini", ".cfg", ".html", ".css") else \
+                f"(binary file kept as-is: {p.stat().st_size} bytes)"
             parts.append(f"=== {s.name}/{rel} ===\n{txt[:12000]}")
     return "\n\n".join(parts)[:limit]
 
 
-EDIT_RULES = """Rules: keep every command, path, URL, port, env variable name, model id and script reference that still
-applies — or list it in "dropped" with a one-line reason. Distil narration into imperative rules (one clause of why).
+EDIT_RULES = """Rules: never add a fact, policy, value or step that is not in the sources. Keep every command, path, URL, port,
+env variable name, model id and script reference that still applies — or list it in "dropped" with a one-line reason. Distil narration into imperative rules (one clause of why).
 SKILL.md keeps the always-on rules (target < 12000 chars); topic depth goes to references/*.md files. Frontmatter:
 name, description (one line, starts with "Use when", the trigger class), optional metadata. Write in the language of
 the source (French or English). Return JSON only:
 {"skill_md": "<full SKILL.md>", "references": {"references/<file>.md": "<content>", ...}, "dropped": [{"item": "...", "reason": "..."}]}"""
 
 
-def edit_merge(a: store.Skill, b: store.Skill) -> dict | None:
-    prompt = (f"You maintain W.Alter's skill library (procedures an AI agent loads before acting). These two skills look "
-              f"similar. If they do NOT cover the same job (e.g. two different providers or tools), answer only "
-              f'{{"skip": "<reason>"}}. Otherwise merge them into ONE skill named `{a.name}` (the other, `{b.name}`, '
-              f"will be archived), keeping both specific procedures.\n{EDIT_RULES}\n\n{_skill_bundle(a)}\n\n{_skill_bundle(b)}")
-    return models.parse_json(models.editor(prompt))
+def _sections(md: str) -> tuple[str, str, list[tuple[str, str]]]:
+    """(frontmatter, intro before the first ## heading, [(heading line, section text incl. heading)])."""
+    m = re.match(r"(---\s*\n.*?\n---\s*\n)", md, re.S)
+    fm, body = (m.group(1), md[m.end():]) if m else ("", md)
+    parts = re.split(r"(?m)^(?=## )", body)
+    intro = parts[0] if parts and not parts[0].startswith("## ") else ""
+    secs = [(p.splitlines()[0], p) for p in parts if p.startswith("## ")]
+    return fm, intro, secs
 
 
 def edit_split(s: store.Skill) -> dict | None:
-    prompt = (f"You maintain W.Alter's skill library. `{s.name}` is too long ({len(s.body)} chars): every load costs "
-              f"the agent that many tokens. Restructure it: SKILL.md = the always-on rules and the map of references; "
-              f"move topic depth into references/ files. Do not lose anything.\n{EDIT_RULES}\n\n{_skill_bundle(s)}")
-    return models.parse_json(models.editor(prompt))
+    """The editor only PLANS: which sections move verbatim to which references/ file, plus a short always-on core.
+    Code moves the bytes — nothing can be paraphrased away."""
+    fm, intro, secs = _sections(s.body)
+    if len(secs) < 3:
+        return None
+    toc = "\n".join(f"{i}. {h} ({len(txt)} chars): {txt[len(h):len(h) + 200].strip()!r}" for i, (h, txt) in
+                    enumerate(secs))
+    prompt = (f"W.Alter skill `{s.name}` is {len(s.body)} chars; every load costs that many tokens. Plan a split. "
+              "Sections listed below will be MOVED VERBATIM by a script — you do not rewrite them. Decide: which "
+              "sections stay in SKILL.md (the rules needed on every use) and which move to which references/<topic>.md "
+              "file (group related sections, 2–8 files). Write `core`: <= 3000 chars of always-on rules, each one QUOTED "
+              "or minimally shortened from a sentence of the text (no inference, no new rule, no generalisation). Return JSON only: "
+              '{"core": "...", "keep": [section indexes], "moves": {"references/<file>.md": [section indexes]}, '
+              '"map": {"references/<file>.md": "one line: when to read it"}}\n\nSections:\n' + toc +
+              f"\n\nFull skill for context:\n{s.body[:60000]}")
+    plan = models.parse_json(models.editor(prompt, effort="medium"))
+    if not plan or not isinstance(plan.get("moves"), dict):
+        return None
+    keep = {int(i) for i in plan.get("keep", []) if str(i).isdigit() or isinstance(i, int)}
+    moved: dict[str, list[int]] = {}
+    for f, idx in plan["moves"].items():
+        f = "references/" + re.sub(r"[^a-z0-9_.-]", "-", Path(f).name.lower())
+        f = f if f.endswith(".md") else f + ".md"
+        moved[f] = [int(i) for i in idx if int(i) < len(secs) and int(i) not in keep]
+    placed = keep | {i for v in moved.values() for i in v}
+    keep |= set(range(len(secs))) - placed  # anything the plan forgot stays inline (never dropped)
+    refs = {f: "\n".join(secs[i][1].rstrip() + "\n" for i in sorted(ix)) for f, ix in moved.items() if ix}
+    if (s.path / "references").exists():
+        for f in list(refs):
+            if (s.path / f).exists():  # never overwrite an existing reference file: append
+                refs[f] = (s.path / f).read_text(errors="replace").rstrip() + "\n\n" + refs[f]
+    mapping = "\n".join(f"- `{f}` — {plan.get('map', {}).get(f, 'details')}" for f in refs)
+    skill_md = (fm + intro.rstrip() + "\n\n## Always-on rules\n\n" + plan.get("core", "").strip() + "\n\n" +
+                "".join(secs[i][1].rstrip() + "\n\n" for i in sorted(keep)) +
+                "## References (read with skill_read(name, file_path=...))\n\n" + mapping + "\n")
+    return {"skill_md": skill_md, "references": refs, "dropped": [], "added_text": plan.get("core", "")}
+
+
+def edit_merge(a: store.Skill, b: store.Skill) -> dict | None:
+    """Filing merge: `b` is kept verbatim under a/references/merged-<b>/ ; the editor only writes the new description
+    and a short "also covers" section (checked by the judge for invented facts)."""
+    prompt = (f"W.Alter skills `{a.name}` (kept) and `{b.name}` (to be filed inside it) look similar. If they do NOT "
+              f'cover the same job (e.g. different providers, tools or services), answer only {{"skip": "<reason>"}}. '
+              f"Otherwise `{b.name}` will be copied VERBATIM into references/merged-{b.name}/ of `{a.name}`. Write only: "
+              f"(1) `description`: one line starting with \"Use when\" covering both trigger classes; (2) `section`: "
+              f"a short markdown section '## Also covers ({b.name})' (<= 1500 chars) saying when to read "
+              f"references/merged-{b.name}/{b.name}.md and the rules that differ from `{a.name}` — restate only what is "
+              f"in the sources, no new facts. Its files will live at: "
+              + ", ".join(f"references/merged-{b.name}/{p.relative_to(b.path)}" for p in sorted(b.path.rglob("*"))
+                          if p.is_file() and p.name not in ("SKILL.md", store.SIDECAR))
+              + f" (use these exact paths). "
+              f'Return JSON only: {{"description": "...", "section": "..."}}\n\n'
+              f"{_skill_bundle(a, 30000)}\n\n{_skill_bundle(b, 30000)}")
+    res = models.parse_json(models.editor(prompt, effort="medium"))
+    if not res or res.get("skip"):
+        return res
+    fm, intro, secs = _sections(a.body)
+    desc = res.get("description", "").replace("\n", " ").strip()
+    if fm and desc:
+        fm = re.sub(r"(?m)^description:.*(\n(?:[ \t]+.*\n?)*)?", "description: " + json.dumps(desc, ensure_ascii=False) + "\n", fm,
+                    count=1)
+    skill_md = fm + intro + "".join(t for _, t in secs).rstrip() + "\n\n" + res.get("section", "").strip() + "\n"
+    files = {f"references/merged-{b.name}/{b.name}.md": b.body}
+    for p in sorted(b.path.rglob("*")):
+        if p.is_file() and p.name not in ("SKILL.md", store.SIDECAR) and "__pycache__" not in p.parts:
+            files[f"references/merged-{b.name}/{p.relative_to(b.path)}"] = (
+                p.read_text(errors="replace") if p.suffix in (".md", ".txt", ".json", ".yaml", ".yml", ".py", ".sh", ".sql", ".js", ".ts", ".mjs", ".toml", ".ini", ".cfg", ".html", ".css") else f"(binary, {p.stat().st_size} bytes)")
+    return {"skill_md": skill_md, "references": files, "dropped": [], "copy_dir": [str(b.path), f"references/merged-{b.name}"],
+            "added_text": desc + "\n" + res.get("section", "")}
 
 
 def edit_workflow(steps: list[store.Skill], evidence: dict) -> dict | None:
@@ -431,9 +498,18 @@ def _ledger(action: str, name: str | None, commit: str | None, evidence: dict) -
 
 def _write_skill_files(dst: Path, result: dict) -> None:
     (dst / "SKILL.md").write_text(result["skill_md"].rstrip() + "\n")
+    copied = None
+    if result.get("copy_dir"):  # filing merge: bytes-exact copy of the absorbed skill (binaries included)
+        src, rel = result["copy_dir"]
+        target = dst / rel
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(src, target, ignore=shutil.ignore_patterns(store.SIDECAR, "__pycache__"))
+        (target / "SKILL.md").rename(target / f"{Path(src).name}.md")
+        copied = rel
     for rel, content in (result.get("references") or {}).items():
         rel = rel.lstrip("/")
-        if not rel.startswith("references/") or ".." in rel:
+        if not rel.startswith("references/") or ".." in rel or (copied and rel.startswith(copied)):
             continue
         p = dst / rel
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -452,12 +528,14 @@ def _archive_in(root: Path, s: store.Skill, reason: str, extra: dict | None = No
     store.write_sidecar(dst, meta)
 
 
-def run(apply: bool | None = None, use_models: bool = True) -> dict:
+def run(apply: bool | None = None, use_models: bool = True, only: set[str] | None = None) -> dict:
     cfg = config()
     day = _now().strftime("%Y-%m-%d")
     mode = "active" if (apply if apply is not None else (cfg["mode"] == "active" and day >= cfg["shadow_until"])) \
         else "shadow"
     P = propose(cfg)
+    if only:
+        P = {k: (v if k in only or k in ("retired", "stale_cards", "hermes_drafts", "variants") else []) for k, v in P.items()}
     root = store.ROOT if mode == "active" else _worktree(day)
     by = {s.name: s for s in store.iter_skills(root=root)}
     done: dict[str, list] = defaultdict(list)
@@ -571,9 +649,23 @@ def _validate(kind: str, originals: list[store.Skill], target: store.Skill, res:
     if not res or not res.get("skill_md"):
         return {"accepted": False, "reason": "editor returned nothing"}
     before = "\n\n".join(_skill_bundle(s) for s in originals)
-    after = res["skill_md"] + "\n\n" + "\n\n".join(f"=== {k} ===\n{v}" for k, v in (res.get("references") or {}).items())
+    new_files = {k.lstrip("/"): v for k, v in (res.get("references") or {}).items()}
+    kept = {}  # files of the target that the edit leaves untouched still count as "after"
+    for p in sorted(target.path.rglob("*")):
+        rel = str(p.relative_to(target.path))
+        if p.is_file() and p.name not in ("SKILL.md", store.SIDECAR) and rel not in new_files and "__pycache__" not in p.parts:
+            kept[rel] = p.read_text(errors="replace") if p.suffix in (".md", ".txt", ".json", ".yaml", ".yml", ".py", ".sh", ".sql", ".js", ".ts", ".mjs", ".toml", ".ini", ".cfg", ".html", ".css") else f"(binary, {p.stat().st_size} bytes)"
+    after = res["skill_md"] + "\n\n" + "\n\n".join(f"=== {k} ===\n{v}" for k, v in {**kept, **new_files}.items())
     ll = lossless([before], after, res.get("dropped") or [])
-    rv = review(kind, before, after)
+    files = "\n".join(f"- {k} ({len(v)} chars{', new' if k in new_files else ''})" for k, v in {**kept, **new_files}.items())
+    rv = review(kind, f"ORIGINAL SKILL(S):\n{before[:50000]}",
+                "A script moved/copied the original content VERBATIM and verified that every command, path, URL, port, "
+                f"code line and variable of the original is present after the {kind} (lossless check: "
+                f"{'passed' if ll['ok'] else 'FAILED'}). Judge the result as an agent would use it: is the new SKILL.md "
+                "well structured (frontmatter kept, always-on rules first, every moved part reachable through an "
+                "explicit references/ link)? Does the NEW text written by the editor invent or alter any fact?\n\n"
+                f"NEW SKILL.md (complete):\n{res['skill_md'][:30000]}\n\nFILES AFTER:\n{files}\n\n"
+                f"TEXT WRITTEN BY THE EDITOR:\n{res.get('added_text') or '(see SKILL.md)'}")
     out = {"lossless": ll, "judge": rv, "retrieval": None}
     if not ll["ok"] or not (rv and rv.get("ok")):
         return out | {"accepted": False, "reason": "lossless" if not ll["ok"] else "judge"}
