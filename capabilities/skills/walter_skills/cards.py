@@ -67,9 +67,16 @@ def generate(s: store.Skill, model: str = MODEL) -> dict:
     body = mask(s.body[:BODY_CHARS]) + _files(s)
     prompt = (PROMPT.replace("{name}", s.name).replace("{domain}", s.domain or "-")
               .replace("{description}", mask(s.description)).replace("{body}", body))
-    r = llm.chat([{"role": "user", "content": prompt}], model=model, processor="skills.indexer",
-                 processor_version=VERSION, privacy_class="cloud_allowed", budget="backfill",
-                 purpose=f"card {s.name}", timeout=180, reasoning={"effort": "low"})
+    try:
+        r = llm.chat([{"role": "user", "content": prompt}], model=model, processor="skills.indexer",
+                     processor_version=VERSION, privacy_class="cloud_allowed", budget="backfill",
+                     purpose=f"card {s.name}", timeout=180, reasoning={"effort": "low"})
+    except Exception:  # OpenRouter floor/budget: same model through W.Alter's Codex subscription session
+        from . import models
+        text = models.editor(prompt, timeout=300, effort="low", model=model.split("/")[-1])
+        if not text:
+            raise
+        r, model = {"content": text, "cost_usd": 0.0}, "codex:" + model.split("/")[-1]
     m = re.search(r"\{.*\}", r["content"], re.S)
     card = json.loads(m.group(0))
     card = {k: card.get(k, [] if k != "summary" and k != "kind" else "") for k in

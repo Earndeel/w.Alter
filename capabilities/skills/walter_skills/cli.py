@@ -6,7 +6,8 @@
   catalog   refresh the Postgres catalogue (skills.catalog) from the store
   search    "message" [--context …] [--archived]
   read      name [--file path]
-  curate    curator report (shadow: checks + proposals, no change) → reports/curator-<date>.md
+  curate    curator run (config/curator.json: shadow until shadow_until, then active) [--apply|--shadow] [--no-models]
+  digest    weekly curator digest to Telegram (via `hermes send`)
   nightly   sync + cards + catalog + train (+ service reload) + curator report
 """
 from __future__ import annotations
@@ -64,7 +65,12 @@ def main() -> int:
     r = sub.add_parser("read")
     r.add_argument("name")
     r.add_argument("--file", default=None)
-    sub.add_parser("curate")
+    cu = sub.add_parser("curate")
+    cu.add_argument("--apply", action="store_true")
+    cu.add_argument("--shadow", action="store_true")
+    cu.add_argument("--no-models", action="store_true")
+    dg = sub.add_parser("digest")
+    dg.add_argument("--dry-run", action="store_true")
     sub.add_parser("nightly")
     a = ap.parse_args()
 
@@ -88,7 +94,15 @@ def main() -> int:
             return 1
         print(text)
     elif a.cmd == "curate":
-        print(json.dumps(curator.run()["summary"]))
+        apply = True if a.apply else (False if a.shadow else None)
+        r = curator.run(apply=apply, use_models=not a.no_models)
+        print(json.dumps(r["summary"]), r["branch"] or "master")
+    elif a.cmd == "digest":
+        text = curator.digest()
+        print(text)
+        if not a.dry_run:
+            subprocess.run(["/root/.hermes/hermes-agent/venv/bin/hermes", "send", "-t", "telegram", text],
+                           capture_output=True, text=True, timeout=120)
     elif a.cmd == "nightly":
         st = hermes_sync.sync()
         print("sync", {k: (v if isinstance(v, int) else len(v)) for k, v in st.items()})
@@ -98,6 +112,7 @@ def main() -> int:
         print("train", {k: v for k, v in engine.train().items() if k != "weights"})
         subprocess.run(["systemctl", "try-restart", "walter-skills"], check=False)
         print("curator", curator.run()["summary"])
+        subprocess.run(["systemctl", "try-restart", "walter-skills"], check=False)
     return 0
 
 
