@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/mac-remote-client-access",
+  "sha": "4e7b6a5b828835cc981ddbebb3f57b01e109f189d1fac46177a5c92651d20f82",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "4e7b6a5b828835cc981ddbebb3f57b01e109f189d1fac46177a5c92651d20f82"
+}

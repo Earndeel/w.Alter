@@ -1,0 +1,41 @@
+# Tailscale ACL — Client Isolation Pattern
+
+## Rule
+
+One-direction only: w-alter → clients. Clients cannot initiate ANYTHING.
+
+```jsonc
+{
+    "acls": [
+        {
+            "action": "accept",
+            "src":    ["tag:w-alter"],
+            "dst":    ["tag:w-alter-clients:22", "tag:w-alter-clients:5900"]
+        }
+    ],
+    "tagOwners": {
+        "tag:w-alter":         ["autogroup:admin"],
+        "tag:w-alter-clients": ["autogroup:admin"]
+    }
+}
+```
+
+## Effect Matrix
+
+| Initiateur      | Cible               | Résultat |
+|-----------------|---------------------|----------|
+| w-alter         | Client Mac (SSH/VNC)| ✅ OK    |
+| Client Mac      | w-alter             | ❌ Bloqué |
+| Client Mac      | User's Mac          | ❌ Bloqué |
+| Client Mac      | Any tailnet node    | ❌ Bloqué |
+| Client Mac      | Internet            | ✅ OK (hors tailnet) |
+
+No rule for `tag:w-alter-clients` → anything = deny by default.
+The client can only reply to established connections; it never opens new ones.
+
+## Auth Key Generation
+
+1. admin.tailscale.com → Settings → Keys → Generate auth key
+2. Ephemeral: YES
+3. Tag: `tag:w-alter-clients`
+4. Share key with friend (paste into script on first launch)

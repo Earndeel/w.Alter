@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/comfyui",
+  "sha": "f2982ebbe4d772eba9f09fbc0905b10541c9897cc2c450687bf648771c443bfe",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "f2982ebbe4d772eba9f09fbc0905b10541c9897cc2c450687bf648771c443bfe"
+}

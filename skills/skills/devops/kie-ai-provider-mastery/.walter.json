@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kie-ai-provider-mastery",
+  "sha": "c5327fcce4b7b588798cd066427724bbae3eb76fe70b722c180f754ae0f978df",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "c5327fcce4b7b588798cd066427724bbae3eb76fe70b722c180f754ae0f978df"
+}

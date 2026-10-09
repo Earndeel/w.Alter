@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-setup",
+  "sha": "aa6966808a71924b724500f77d2c2884fb45fd7c66fb3d8a987b0f22f5ddcf14",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "aa6966808a71924b724500f77d2c2884fb45fd7c66fb3d8a987b0f22f5ddcf14"
+}

@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kie-video-generation-operations",
+  "sha": "017ddadcc447f65cb81aaffe4db10964cc1489311fa4eb3dac6da5d749eb2f12",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "017ddadcc447f65cb81aaffe4db10964cc1489311fa4eb3dac6da5d749eb2f12"
+}

@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-model-picker",
+  "sha": "51fc8f7364622c31737c2178b58c863ce341a7f29222e3ff056806fcb7700246",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "51fc8f7364622c31737c2178b58c863ce341a7f29222e3ff056806fcb7700246"
+}

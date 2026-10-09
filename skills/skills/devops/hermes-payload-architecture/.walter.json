@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-payload-architecture",
+  "sha": "10a698816d5b914c17324c8e51cd78101cb1073f4b34effbab1f4efea1cd664d",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "10a698816d5b914c17324c8e51cd78101cb1073f4b34effbab1f4efea1cd664d"
+}
