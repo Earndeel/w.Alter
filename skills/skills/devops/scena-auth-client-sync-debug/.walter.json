@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/scena-auth-client-sync-debug",
+  "sha": "3fe1a3b22930bb8b5f77a4d231fa594de347ee5537824c281b7de6df36609cec",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "3fe1a3b22930bb8b5f77a4d231fa594de347ee5537824c281b7de6df36609cec"
+}

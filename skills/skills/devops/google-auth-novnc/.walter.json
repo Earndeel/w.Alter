@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/google-auth-novnc",
+  "sha": "cfc859465899ef6571395e60ddf82e9529606c3e86a50da37b6b183586597174",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "cfc859465899ef6571395e60ddf82e9529606c3e86a50da37b6b183586597174"
+}

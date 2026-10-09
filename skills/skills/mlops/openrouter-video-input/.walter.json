@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/openrouter-video-input",
+  "sha": "43356b386813a1c03b60d9f30ee858f6a9cf1d02e364b53604fc4bda6a2b9698",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "43356b386813a1c03b60d9f30ee858f6a9cf1d02e364b53604fc4bda6a2b9698"
+}

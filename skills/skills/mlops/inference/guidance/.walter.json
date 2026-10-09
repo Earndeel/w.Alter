@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/inference/guidance",
+  "sha": "125056d471ad831be0e8eb32ab62f2354923b75b88fa74dfbb299286c14ae57b",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "125056d471ad831be0e8eb32ab62f2354923b75b88fa74dfbb299286c14ae57b"
+}

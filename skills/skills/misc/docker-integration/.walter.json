@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/docker-integration",
+  "sha": "d4fbac6a2c2b1209736d7b10d2975e3b1aa8156b213b996fd932923c50e4e985",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "d4fbac6a2c2b1209736d7b10d2975e3b1aa8156b213b996fd932923c50e4e985"
+}

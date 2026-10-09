@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/plan",
+  "sha": "10eaaafc31da13a13b9dcb87ef08091ec9efbd1ea64a218f24dc1811e6fd8315",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "10eaaafc31da13a13b9dcb87ef08091ec9efbd1ea64a218f24dc1811e6fd8315"
+}

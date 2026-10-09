@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/vault-lookup",
+  "sha": "f3154a96f463aaf14ee454eac933f4603abc71dd89510138d6100b369602ee13",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "f3154a96f463aaf14ee454eac933f4603abc71dd89510138d6100b369602ee13"
+}

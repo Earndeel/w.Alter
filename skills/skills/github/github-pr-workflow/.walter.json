@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/github/github-pr-workflow",
+  "sha": "72e31dfea0e561766d7c4fb87f6a00c15409ede1d4f7a639cf058d8237717d71",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "72e31dfea0e561766d7c4fb87f6a00c15409ede1d4f7a639cf058d8237717d71"
+}

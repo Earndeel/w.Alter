@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/flask-static-files-debug",
+  "sha": "023cbba7c68597494962b6fa0587adc4cc6ebe63cbc4c9852ac071f23e021883",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "023cbba7c68597494962b6fa0587adc4cc6ebe63cbc4c9852ac071f23e021883"
+}

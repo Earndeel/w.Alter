@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/coder-profile/gsap-frontend",
+  "sha": "cb289100f270c04402029e9657e26c5e27274d0737fba84d2ee9df0a4ebbfb85",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "cb289100f270c04402029e9657e26c5e27274d0737fba84d2ee9df0a4ebbfb85"
+}

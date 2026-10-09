@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/smmflare-integration",
+  "sha": "26959114e5ff1b7bad16e8480eda94662c1734c1701dc5236731131f2b94409a",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "26959114e5ff1b7bad16e8480eda94662c1734c1701dc5236731131f2b94409a"
+}

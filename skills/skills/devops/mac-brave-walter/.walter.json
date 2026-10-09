@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/mac-brave-walter",
+  "sha": "a4e947cf9b6a35993c8a8e5d88218bad72b902e490a3eb487866502728af3ac8",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "a4e947cf9b6a35993c8a8e5d88218bad72b902e490a3eb487866502728af3ac8"
+}

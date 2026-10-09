@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hermes-context-management",
+  "sha": "4b5e0d1ccf21b2a23a669d239e5d68362eaa6d5d591c515c68c3583b3cb1dcf8",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "4b5e0d1ccf21b2a23a669d239e5d68362eaa6d5d591c515c68c3583b3cb1dcf8"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/scena-deploy-workflow",
+  "sha": "e7c4a4eabd42e23fbd5fea9c761f600e57c0897e46dff1c1369bddc4cea69742",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "e7c4a4eabd42e23fbd5fea9c761f600e57c0897e46dff1c1369bddc4cea69742"
+}

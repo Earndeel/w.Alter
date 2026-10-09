@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/inspecting-hermes-desktop-dom",
+  "sha": "5cbce418d62fd45bf54acab1d69fbfd8dd9f5b9531a03c007e96876c3e33b73f",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "5cbce418d62fd45bf54acab1d69fbfd8dd9f5b9531a03c007e96876c3e33b73f"
+}

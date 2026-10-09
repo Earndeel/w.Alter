@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/minimax-h3-native-ugc",
+  "sha": "bf21e58b2884f73faa5e9c43214bd8c5e5fbc126ca4d6f7eddc12bb390d81b2d",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "bf21e58b2884f73faa5e9c43214bd8c5e5fbc126ca4d6f7eddc12bb390d81b2d"
+}

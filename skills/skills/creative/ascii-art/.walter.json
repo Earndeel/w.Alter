@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/ascii-art",
+  "sha": "8ed8ab9a345e1c06237c8dd3cfd9cdafef822292b3758db4b3493347ec0327d4",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "8ed8ab9a345e1c06237c8dd3cfd9cdafef822292b3758db4b3493347ec0327d4"
+}

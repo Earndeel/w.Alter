@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/training/unsloth",
+  "sha": "157665b5c3e45bfa6ca6cba49acda74faa75d627dc42a206bfc6976b7c9ec795",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "157665b5c3e45bfa6ca6cba49acda74faa75d627dc42a206bfc6976b7c9ec795"
+}

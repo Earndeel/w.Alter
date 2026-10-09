@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/box",
+  "sha": "d82ccf0a12946d6a931641206809c5aa95798c46a0ea539a9d4f4eba259e4233",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "d82ccf0a12946d6a931641206809c5aa95798c46a0ea539a9d4f4eba259e4233"
+}

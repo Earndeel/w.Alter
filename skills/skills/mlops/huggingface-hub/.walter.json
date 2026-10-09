@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/huggingface-hub",
+  "sha": "d6dd4e8baefab2af0cc419a196a5feb1fe59e1e40c0710f6a68fbd668c9b82f4",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "d6dd4e8baefab2af0cc419a196a5feb1fe59e1e40c0710f6a68fbd668c9b82f4"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/test-driven-development",
+  "sha": "c4dcae20adb88c9392d7e1b2210844933417288bb40ad845faa9542b9755c0a7",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "c4dcae20adb88c9392d7e1b2210844933417288bb40ad845faa9542b9755c0a7"
+}

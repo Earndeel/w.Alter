@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/telegram-mini-app",
+  "sha": "158044023a79ea992ccead77b2111d6f99650d72b5e6a959cc35e5f2b885a067",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "158044023a79ea992ccead77b2111d6f99650d72b5e6a959cc35e5f2b885a067"
+}

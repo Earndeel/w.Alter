@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/multi-provider-image-gen",
+  "sha": "8cde589bbc3f7c605fe29ba80e6530a02cf4b05ea523b8a58e31738a5db5be23",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "8cde589bbc3f7c605fe29ba80e6530a02cf4b05ea523b8a58e31738a5db5be23"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hermes-ghost-session-cleanup",
+  "sha": "815575bace79cbca1d7c795e872ac29f4f653ebb8da9bc12d718c77a54da17a6",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "815575bace79cbca1d7c795e872ac29f4f653ebb8da9bc12d718c77a54da17a6"
+}

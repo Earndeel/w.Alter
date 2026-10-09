@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/stripe-dynamic-checkout",
+  "sha": "05edf3b5ed1a1819ef1644634ba67729fd26435a1e735d109a2e90799c84a7f5",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "05edf3b5ed1a1819ef1644634ba67729fd26435a1e735d109a2e90799c84a7f5"
+}

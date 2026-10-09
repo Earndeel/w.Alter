@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/anti-bot-navigation",
+  "sha": "2d88403a50c35fd2f55c0ffd3340a32112477f51261e9f88db7943976af31bb5",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "2d88403a50c35fd2f55c0ffd3340a32112477f51261e9f88db7943976af31bb5"
+}

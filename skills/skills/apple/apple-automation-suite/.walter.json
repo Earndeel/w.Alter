@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/apple/apple-automation-suite",
+  "sha": "2c475a63332a7107f756f1dbff71f284d62be8631b9557fd5046551137ce48f9",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "2c475a63332a7107f756f1dbff71f284d62be8631b9557fd5046551137ce48f9"
+}

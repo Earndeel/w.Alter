@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/pdf",
+  "sha": "419cd66dfb842adcdaaeb66d312302879698baf6a1d028b023a58a00edacf72e",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "419cd66dfb842adcdaaeb66d312302879698baf6a1d028b023a58a00edacf72e"
+}

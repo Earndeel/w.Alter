@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/free-model-offer-watchdog",
+  "sha": "fceabae5b0fcede664084c30d56f0aad4a8a89db236806484504f0717c44438a",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "fceabae5b0fcede664084c30d56f0aad4a8a89db236806484504f0717c44438a"
+}

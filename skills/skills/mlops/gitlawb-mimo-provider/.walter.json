@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/gitlawb-mimo-provider",
+  "sha": "21d71beef30963e9a4dec68925e6fb1d19e84527ec43e116ddf47731e049adc9",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "21d71beef30963e9a4dec68925e6fb1d19e84527ec43e116ddf47731e049adc9"
+}

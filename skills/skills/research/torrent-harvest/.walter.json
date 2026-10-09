@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/research/torrent-harvest",
+  "sha": "c147e6cd41872792b51de6feda53fa1a9b68042ba639d2b5abecd7c3df022cf7",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "c147e6cd41872792b51de6feda53fa1a9b68042ba639d2b5abecd7c3df022cf7"
+}

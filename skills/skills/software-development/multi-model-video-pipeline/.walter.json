@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/multi-model-video-pipeline",
+  "sha": "4cd261dc1dbbbb2475a717a1dd2f62991a8a6ac279937f6ad685f2d6f5227139",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "4cd261dc1dbbbb2475a717a1dd2f62991a8a6ac279937f6ad685f2d6f5227139"
+}

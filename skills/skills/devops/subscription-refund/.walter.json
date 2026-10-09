@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/subscription-refund",
+  "sha": "05662cd24e5ea405db92abf063e237873b924dfdf8f5256dfd6eed4e9ca048fb",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "05662cd24e5ea405db92abf063e237873b924dfdf8f5256dfd6eed4e9ca048fb"
+}

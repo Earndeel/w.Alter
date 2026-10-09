@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/cloud/modal",
+  "sha": "91c0baaaf36edf265810bc165425d748161fff175bd0c27dbc938e24d6a73918",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "91c0baaaf36edf265810bc165425d748161fff175bd0c27dbc938e24d6a73918"
+}

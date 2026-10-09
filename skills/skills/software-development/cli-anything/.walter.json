@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/cli-anything",
+  "sha": "aa56ce7335089ec57fa7ec16aecca017a86e2e940f2e2564a8c5cde5442c1295",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "aa56ce7335089ec57fa7ec16aecca017a86e2e940f2e2564a8c5cde5442c1295"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/social-media/camoufox-social-scrape",
+  "sha": "e17d08ed62ec4f2ab6c8c3cec91aad46e8116667aaca53b96b76646a18327621",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "e17d08ed62ec4f2ab6c8c3cec91aad46e8116667aaca53b96b76646a18327621"
+}

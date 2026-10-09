@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/baoyu-article-illustrator",
+  "sha": "32f12d4389447100abbb5991a42fcff2f43db767540caea1737354f8a489085f",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "32f12d4389447100abbb5991a42fcff2f43db767540caea1737354f8a489085f"
+}

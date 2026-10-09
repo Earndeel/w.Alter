@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/hermes-s6-container-supervision",
+  "sha": "d69b3c0c99d88e7e95f55caa0df467bd958e90678d73420f7d902070b9120534",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "d69b3c0c99d88e7e95f55caa0df467bd958e90678d73420f7d902070b9120534"
+}

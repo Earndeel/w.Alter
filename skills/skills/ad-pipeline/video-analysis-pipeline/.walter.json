@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/ad-pipeline/video-analysis-pipeline",
+  "sha": "2e19cb53b9f866a76cd9bf6ad6a01aacdd420ee6a08a761661ad7cb73e698f6e",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "2e19cb53b9f866a76cd9bf6ad6a01aacdd420ee6a08a761661ad7cb73e698f6e"
+}

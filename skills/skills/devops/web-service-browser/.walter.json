@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/web-service-browser",
+  "sha": "d0f840e71a20abfdb12fceec4c432348776b690f27bb8e9abcc988691939cccf",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "d0f840e71a20abfdb12fceec4c432348776b690f27bb8e9abcc988691939cccf"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/baoyu-comic",
+  "sha": "5a9f0fb07eafeeacbcd46d4c2d836f11e4fb797ed59b0222d9d614dd5c24eecd",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "5a9f0fb07eafeeacbcd46d4c2d836f11e4fb797ed59b0222d9d614dd5c24eecd"
+}

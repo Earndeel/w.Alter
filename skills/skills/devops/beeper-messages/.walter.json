@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/beeper-messages",
+  "sha": "5fac1128d766c4713ef6f57958df4a98ed077dbf87eff233e7a90a848bee5588",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "5fac1128d766c4713ef6f57958df4a98ed077dbf87eff233e7a90a848bee5588"
+}

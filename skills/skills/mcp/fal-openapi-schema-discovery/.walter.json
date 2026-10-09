@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mcp/fal-openapi-schema-discovery",
+  "sha": "1155e04ced2b380cf111a525e6fbe8bb3959dca5d7b0fb0994d21e8ca00120f9",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "1155e04ced2b380cf111a525e6fbe8bb3959dca5d7b0fb0994d21e8ca00120f9"
+}

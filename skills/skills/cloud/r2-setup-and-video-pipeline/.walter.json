@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/cloud/r2-setup-and-video-pipeline",
+  "sha": "b23f136a22015b2066af373a1fadc954abe501540d8b4994b4c7867e12e15177",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "b23f136a22015b2066af373a1fadc954abe501540d8b4994b4c7867e12e15177"
+}
