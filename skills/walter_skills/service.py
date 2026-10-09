@@ -43,7 +43,8 @@ class SearchIn(BaseModel):
     k: int = 5
     include_archived: bool = False
     mode: str = "search"  # search | inject | shadow (journal label only)
-    choose: bool = False  # stage 2: fast LLM picks among the shortlist (or none)
+    choose: bool = False  # optional stage 2 (separate LLM picks); off by default since 2026-10-09: the agent's own model chooses
+    need_threshold: float = 0.4  # local gate: below it, nothing is proposed for injection
     privacy_class: str = "cloud_allowed"  # of the message; local_only never leaves the VM (local ranking only)
 
 
@@ -86,7 +87,7 @@ def search(body: SearchIn) -> dict:
         results = picked + [r for r in results if r["name"] not in chosen]
     results = results[:k]
     inject = [r["name"] for r in results if r.get("chosen")] if stage == "chooser" else \
-        ([r["name"] for r in results[:3]] if (need is None or need >= 0.5) else [])
+        ([r["name"] for r in results if r["state"] == "active"] if (need is None or need >= body.need_threshold) else [])
     ms = round(1000 * (time.perf_counter() - t0))
     _journal(body, results, inject if body.mode in ("inject", "shadow") else [], ms, f"{e.version}/{stage}")
     return {"results": results, "inject": inject, "need": need, "stage": stage, "latency_ms": ms,
