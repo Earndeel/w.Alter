@@ -102,7 +102,8 @@ def _origin(name: str, bundled: set[str], hub: set[str]) -> tuple[str, str]:
 _REPO: set[str] = set()
 
 
-def sync(dry_run: bool = False) -> dict:
+def sync(dry_run: bool = False, names: set[str] | None = None) -> dict:
+    """Full pass (names=None) or only the given Hermes skills (event-driven)."""
     global _REPO
     _REPO = _repo_skills()
     bundled, hub = _bundled(), _hub()
@@ -111,6 +112,8 @@ def sync(dry_run: bool = False) -> dict:
              "hermes_gone": [], "unchanged": 0}
     src = hermes_active()
     for name, (d, category) in src.items():
+        if names is not None and name not in names:
+            continue
         h = store.tree_hash(d)
         mine = ours.get(name)
         origin, owner = _origin(name, bundled, hub)
@@ -147,7 +150,7 @@ def sync(dry_run: bool = False) -> dict:
                                   "Hermes changed a skill Walter also changed (manual merge)"):
             stats["drafted_patch" if kind == "hermes_patch" else "draft_conflict"].append(name)
             store.write_sidecar(mine.path, mine.meta | {"hermes": side | {"pending_sha": h}})
-    for name, s in ours.items():
+    for name, s in ([] if names is not None else ours.items()):
         side = s.meta.get("hermes") or {}
         if side.get("state") == "active" and name not in src:
             stats["hermes_gone"].append(name)
