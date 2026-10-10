@@ -1,35 +1,36 @@
 {
  "name": "mac-computer-use-ssh",
- "sha": "bac99f49b673e402d9a19b7cc166ab73852626d4a2059fd7d76836eab7b31308",
- "model": "openai/gpt-6-luna",
+ "sha": "71014488c26314bb70710372b55153a80266544677983bf1073efb085cddd457",
+ "model": "codex:gpt-6-luna",
  "version": "card-v1",
- "cost_usd": 0.00076123575,
- "summary": "Use when a task genuinely requires seeing or controlling Lucas's Mac GUI remotely over SSH, with approved clicks, typing, keys, scrolling, or dragging.",
+ "cost_usd": 0.0,
+ "summary": "Use when Monsieur needs visible control of his Mac through the SSH screen server: inspect screenshots, then click, type, scroll, or use keys.",
  "kind": "procedure",
  "intents_fr": [
-  "Ouvre les réglages sur mon Mac et change ça, tu peux piloter l'écran.",
-  "Regarde ce qu'il y a à l'écran de mon Mac et dis-moi où cliquer.",
-  "Clique sur le bouton dans l'app, puis vérifie que c'est bien passé.",
-  "Tu peux taper ce texte dans la fenêtre ouverte sur mon Mac ?",
-  "Fais le raccourci clavier Cmd Shift G sur le Mac.",
-  "Fais défiler la page jusqu'en bas et prends une capture pour vérifier.",
-  "Déplace ce fichier dans la fenêtre avec un drag-and-drop.",
-  "Le navigateur est ouvert sur mon Mac, fais l'action directement dans l'interface.",
-  "Je sais qu'on peut le faire en CLI, mais là il faut vraiment interagir avec l'app Mac.",
-  "La capture de mon écran est toute noire, tu peux checker les permissions ?",
-  "Les clics ne répondent plus sur le Mac, vérifie l'accessibilité et le tunnel SSH.",
-  "Le tunnel vers le screen server est tombé, remets-le puis regarde l'écran."
+  "Prends une capture de mon Mac et dis-moi ce qui est affiché.",
+  "Clique sur le bouton dans la fenêtre ouverte sur mon Mac.",
+  "Tape ce texte dans l’app sur le Mac.",
+  "Fais Cmd+Shift+G sur mon Mac et ouvre ce dossier.",
+  "Le screenshot est tout noir depuis le VPS, tu peux regarder ?",
+  "Les clics avec cliclick ne font rien, ça vient de quoi ?",
+  "Le tunnel SSH vers le screen server est tombé, comment le relancer ?",
+  "Peux-tu faire défiler cette page sur mon Mac puis vérifier le résultat ?",
+  "Glisse ce fichier dans cette fenêtre, après avoir regardé l’écran.",
+  "Utilise l’interface Mac pour terminer cette étape, il n’y a pas de commande CLI pratique.",
+  "J’ai une erreur osascript avec command dans le combo clavier, corrige la syntaxe.",
+  "Reprends le contrôle visible pour cette tâche et libère-le dès que tu as fini."
  ],
  "intents_en": [
-  "Click through this dialog on my Mac.",
-  "Take a screenshot and inspect my Mac screen.",
+  "Take a screenshot of my Mac.",
+  "Click the button on my Mac screen.",
   "Type this into the open Mac app.",
-  "Use the keyboard shortcut in the Mac GUI.",
-  "The remote Mac clicks are being ignored."
+  "The SSH screen server screenshot is black.",
+  "Use the Mac GUI to finish this task."
  ],
  "entities": [
   "W.Alter Screen Server v7",
-  "SSH",
+  "Mac",
+  "SSH tunnel",
   "localhost:18765",
   "screencapture",
   "cliclick",
@@ -42,30 +43,27 @@
   "/control-heartbeat",
   "/release-control",
   "/click",
-  "/doubleclick",
-  "/rightclick",
   "/type",
   "/key",
   "/combo",
   "/scroll",
   "/drag",
-  "LaunchAgent",
-  "com.walter.screen-server.plist",
-  "~/.hermes/scripts/walter-screen-server.py",
-  "/tmp/walter-screen-server.log"
+  "TCC Screen Recording",
+  "TCC Accessibility",
+  "Brave",
+  "LaunchAgent"
  ],
  "symptoms": [
-  "Black screenshots around 97–100 KB",
+  "Black screenshot around 97KB",
   "cliclick clicks are ignored",
-  "Screen server health endpoint is unreachable",
-  "SSH tunnel to localhost:18765 has dropped",
-  "osascript error: Can't make {command} into type constant",
-  "Mac screen is locked or asleep, producing black captures"
+  "Can't make {command} into type constant",
+  "SSH tunnel to localhost:18765 is unavailable",
+  "Screen capture is black while the Mac is locked or asleep"
  ],
  "not_for": [
-  "Tasks that can be done faster and more reliably with a CLI, API, or direct command",
-  "Web scraping or research in Lucas's active Brave session",
-  "Browser-only automation when the Brave CDP browser-control skill is the appropriate tool",
-  "Research on X/Twitter, which should use x_search"
+  "Scraping or researching websites in Mac Brave",
+  "X/Twitter research that should use x_search",
+  "Browser-only CDP automation covered by playwright-cdp-browser-control",
+  "Tasks that have a practical CLI or API route and do not need visible Mac interaction"
  ]
 }
