@@ -111,6 +111,7 @@ A "landing page rebuild" may need to integrate with the Worker's API endpoints (
 ## Related Skills and References
 
 - **[Working with Existing Projects](references/working-with-existing-projects.md)** — When the user says "the project exists", follow this discovery and integration workflow to avoid creating duplicates.
+- **[Production verification](references/production-verification.md)** — Verify the canonical production deployment, all static asset hashes, and the live app; distinguish client-specific HTTP failures from deployment failures.
 
 ## Pitfalls
 - **TUI URL display** — Cloudflare Pages URLs are long and may be hard to read in the Hermes TUI. After deploying:
