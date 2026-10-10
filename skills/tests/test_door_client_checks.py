@@ -114,3 +114,15 @@ def test_bundle_never_truncates_silently(tmp_path):
     shown = base.bundle(s, per_file=40000)
     assert "END-OF-FILE" not in shown and "display truncated" in shown and "the file is complete on disk" in shown
     assert "END-OF-FILE" in base.bundle(s, per_file=60000)
+
+
+def test_watch_maps_a_changed_file_to_its_skill(tmp_path, monkeypatch):
+    from walter_skills import watch
+    (tmp_path / "devops" / "beeper-messages" / "references").mkdir(parents=True)
+    (tmp_path / "devops" / "beeper-messages" / "SKILL.md").write_text("x")
+    (tmp_path / ".archive" / "old").mkdir(parents=True)
+    (tmp_path / ".archive" / "old" / "SKILL.md").write_text("x")
+    monkeypatch.setattr(watch, "HERMES", tmp_path)
+    assert watch._skill_of(tmp_path / "devops" / "beeper-messages" / "references" / "a.md") == "beeper-messages"
+    assert watch._skill_of(tmp_path / ".archive" / "old" / "SKILL.md") is None
+    assert watch._skill_of(tmp_path / ".usage.json") is None

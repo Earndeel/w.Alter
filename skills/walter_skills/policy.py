@@ -92,7 +92,8 @@ def expose(kind: str, message: str, *, context: str = "", session_id: str | None
             return _done(out, t0, runtime, session_id, msg, journal=False)
         seen, _ = _safe(lambda: registry.recently_shown(session_id, 50), (set(), 0))
         from .ranker import tokens
-        specific = " ".join(w for w in tokens(msg[-1500:] + " " + context) if w not in GENERIC_ERROR_WORDS and not w.isdigit())
+        # only the error's own words: the command line names tools and paths, not the symptom
+        specific = " ".join(w for w in tokens(msg[-1500:]) if w not in GENERIC_ERROR_WORDS and not w.isdigit())
         hits = [(n, s) for n, s in e.symptom_matches(specific) if s >= p["error_min_symptom"] and n not in seen]
         rows = [e.row(n, s, "active") for n, s in hits[:p["error_max"]]]
         if rows:
