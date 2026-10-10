@@ -188,7 +188,9 @@ release_control("task-123", lease["approval_token"])
 - **x_search for X research**: Use `x_search` tool (xAI Grok) for all X/Twitter research. Returns URLs + Grok synthesis. Don't scrape X via Mac Brave.
 
 ### Coordinates
-- **Retina coordinates**: Screen is 2880×1800, not 1440×900. Always use Retina coords.
+- **Retina screenshot pixels are not cliclick coordinates.** Read the actual screenshot dimensions and logical desktop bounds (for example `tell application "Finder" to get bounds of window of desktop`); convert screenshot coordinates proportionally before sending native clicks. For a 2880×1800 screenshot of a 1440×900 desktop, divide both axes by two. Never assume a fixed scale; multiple displays require their own bounds.
+- **Cropped vision results** are relative to the crop origin: add the crop offset before converting to logical desktop coordinates.
+- **Foreground target guard**: immediately before a global click, verify both the frontmost application and the exact target tab URL. Refuse the click if focus changed; do not click whatever application is now in front or silently steal focus.
 - **Coordinate system**: Origin (0,0) is top-left. x increases right, y increases down.
 
 ### Server Lifecycle
