@@ -80,8 +80,14 @@ def _draft(name: str, src: Path, sha: str, kind: str, domain: str, reason: str) 
         return False
     dst.parent.mkdir(parents=True, exist_ok=True)
     _copy(src, dst)
+    from .history import edit_evidence
+    try:
+        evidence = edit_evidence(name)
+    except Exception:
+        evidence = {}
     store.write_sidecar(dst, {"kind": kind, "target": name, "domain": domain, "runtime": "hermes", "reason": reason,
-                              "hermes": {"path": str(src), "sha": sha, "state": "active"}, "created_at": _now()})
+                              "evidence": evidence, "hermes": {"path": str(src), "sha": sha, "state": "active"},
+                              "created_at": _now()})
     return True
 
 
@@ -123,7 +129,7 @@ def sync(dry_run: bool = False) -> dict:
                     stats["drafted_new"].append(name)
             continue
         side = mine.meta.get("hermes") or {}
-        if side.get("sha") == h or side.get("pending_sha") == h:
+        if side.get("sha") == h or (side.get("pending_sha") == h and any(store.DRAFTS.glob(f"{name}@*-hermes-{h[:8]}"))):
             stats["unchanged"] += 1
             continue
         untouched = store.tree_hash(mine.path) == mine.meta.get("store_sha")

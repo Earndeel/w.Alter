@@ -4,6 +4,7 @@
   expose "message" [--runtime …] [--session …]    exactly what the policy would show
   read <name> [--file path]                       a skill (or one of its files)
   nightly [--only step,…]                         the nightly graph (see jobs.py)
+  quick                                           every 15 min: Hermes sync → judged drafts live → cards
   sync | cards | catalog | implicit | judge | sessions | train [--force] | curate [--apply|--shadow] | map | digest
   health                                          problems as JSON, exit 1 if any (5-min watchdog)
 """
@@ -28,7 +29,7 @@ def main() -> int:
     r.add_argument("name"); r.add_argument("--file", default=None)
     n = sub.add_parser("nightly")
     n.add_argument("--only", default="")
-    for c in ("sync", "cards", "catalog", "implicit", "judge", "sessions", "map", "digest", "health"):
+    for c in ("sync", "cards", "catalog", "implicit", "judge", "sessions", "map", "digest", "health", "quick"):
         sub.add_parser(c)
     t = sub.add_parser("train")
     t.add_argument("--force", action="store_true")
@@ -56,6 +57,9 @@ def main() -> int:
     elif a.cmd == "nightly":
         from . import jobs
         p(jobs.nightly(set(filter(None, a.only.split(","))) or None))
+    elif a.cmd == "quick":
+        from . import jobs
+        p(jobs.quick())
     elif a.cmd == "sync":
         from . import hermes_sync
         p({k: (v if isinstance(v, int) else v[:20]) for k, v in hermes_sync.sync().items()})

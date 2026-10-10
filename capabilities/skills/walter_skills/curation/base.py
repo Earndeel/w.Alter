@@ -45,13 +45,16 @@ class Context:
 
 # ── content helpers ───────────────────────────────────────────────────────────────────────────────────
 
-def bundle(s: store.Skill, limit: int = 60000) -> str:
-    parts = [f"=== {s.name}/SKILL.md ===\n{s.body}"]
+def bundle(s: store.Skill, limit: int = 150000, per_file: int = 40000) -> str:
+    """The skill as the editor/judge reads it. Never truncated silently: any cut is marked as display-only."""
+    def cut(text: str, n: int) -> str:
+        return text if len(text) <= n else text[:n] + f"\n[… display truncated here: {len(text) - n} more chars; the file is complete on disk …]"
+    parts = [f"=== {s.name}/SKILL.md ===\n{cut(s.body, per_file)}"]
     for p in sorted(s.path.rglob("*")):
         if p.is_file() and p.name not in ("SKILL.md", store.SIDECAR) and "__pycache__" not in p.parts:
-            txt = p.read_text(errors="replace")[:12000] if p.suffix in TEXT_SUFFIXES else f"(binary, {p.stat().st_size} bytes)"
+            txt = cut(p.read_text(errors="replace"), per_file) if p.suffix in TEXT_SUFFIXES else f"(binary, {p.stat().st_size} bytes)"
             parts.append(f"=== {s.name}/{p.relative_to(s.path)} ===\n{txt}")
-    return "\n\n".join(parts)[:limit]
+    return cut("\n\n".join(parts), limit)
 
 
 def sections(md: str) -> tuple[str, str, list[tuple[str, str]]]:
@@ -121,7 +124,8 @@ def review(kind: str, before: str, after: str) -> dict | None:
                  "before acting). Reject if any still-valid procedure, command, path, credential *location*, model id or "
                  "warning was lost or altered, if facts were invented, or if the result is less usable by an agent. "
                  'Return JSON only: {"ok": true|false, "issues": ["..."]}\n\n'
-                 f"BEFORE:\n{before[:60000]}\n\nAFTER:\n{after[:60000]}", require="ok", timeout=180)
+                 "Texts marked 'display truncated' are complete on disk: never treat a display cut as content loss.\n\n"
+                 f"BEFORE:\n{before}\n\nAFTER:\n{after}", require="ok", timeout=300)
     return obj
 
 

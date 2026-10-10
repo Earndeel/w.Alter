@@ -21,17 +21,40 @@ from walter_memory.logs import mask
 from . import config
 
 
+_ready: tuple[float, bool] = (0.0, False)
+
+
 def _codex_ready() -> bool:
+    """Is W.Alter's Codex session logged in? (checked at most once a minute)"""
+    global _ready
+    import time
+    if time.monotonic() - _ready[0] < 60:
+        return _ready[1]
     try:
         r = subprocess.run(["codex", "login", "status"], capture_output=True, text=True, timeout=20)
-        return r.returncode == 0 and "not logged in" not in (r.stdout + r.stderr).lower()
+        ok = r.returncode == 0 and "not logged in" not in (r.stdout + r.stderr).lower()
     except Exception:
-        return False
+        ok = False
+    _ready = (time.monotonic(), ok)
+    return ok
 
 
-def _codex(prompt: str, model: str, effort: str, timeout: int) -> str | None:
+def _codex(prompt: str, model: str, effort: str, timeout: int, processor: str = "skills") -> str | None:
     if not _codex_ready():
         return None
+    import time
+    t0 = time.perf_counter()
+    text = _codex_exec(prompt, model, effort, timeout)
+    try:  # Codex calls are accounted like the others (subscription: no per-token cost)
+        llm._log(processor=processor, provider="codex", model=model, purpose=processor, budget="recurring",
+                 privacy_class="cloud_allowed", status="ok" if text else "error", cost_usd=0,
+                 latency_ms=int((time.perf_counter() - t0) * 1000))
+    except Exception:
+        pass
+    return text
+
+
+def _codex_exec(prompt: str, model: str, effort: str, timeout: int) -> str | None:
     with tempfile.TemporaryDirectory(prefix="walter-skills-") as d:
         out = Path(d) / "last.txt"
         cmd = ["codex", "exec", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only", "-m", model,
@@ -57,7 +80,7 @@ def ask(poste: str, prompt: str, *, timeout: int = 900, processor: str | None = 
     prompt = mask(prompt)
     for route in config.poste(poste):
         if route["via"] == "codex":
-            text = _codex(prompt, route["model"], route.get("effort", "medium"), timeout)
+            text = _codex(prompt, route["model"], route.get("effort", "medium"), timeout, processor or f"skills.{poste}")
         elif route["via"] == "openrouter":
             text = _openrouter(prompt, route["model"], route.get("budget", "recurring"),
                                processor or f"skills.{poste}", min(timeout, 300))

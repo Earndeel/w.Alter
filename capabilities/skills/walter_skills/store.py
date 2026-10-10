@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import contextmanager
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -113,9 +114,27 @@ def git(*args: str, check: bool = True, root: Path | None = None) -> str:
     return r.stdout.strip()
 
 
+@contextmanager
+def write_lock():
+    """One git writer at a time across processes (service door, quick job, nightly, curation)."""
+    import fcntl
+    with open(ROOT / ".git" / "walter-skills.lock", "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def commit(message: str, paths: list[str] | None = None, author: str = "walter-skills",
            root: Path | None = None) -> str | None:
-    root = root or ROOT
+    if (root or ROOT) == ROOT:
+        with write_lock():
+            return _commit(message, paths, author, ROOT)
+    return _commit(message, paths, author, root)
+
+
+def _commit(message: str, paths: list[str] | None, author: str, root: Path) -> str | None:
     paths = [p for p in (paths or ["skills", "archive", "drafts"]) if (root / p).exists()]
     if not paths:
         return None
