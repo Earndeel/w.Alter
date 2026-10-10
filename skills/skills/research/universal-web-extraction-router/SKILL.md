@@ -86,6 +86,13 @@ metadata, not payloads, cookies, authorization headers, or raw request bodies.
 
 A HTTP 200 is not success. A route is usable only when at least one candidate
 contains all required fields and produces one or more normalized records.
+For article reading, verify that the returned content is the article body, not
+an `/api/comments` response: matching a generic `content` field can falsely
+pass the contract. Retry another extraction path when the semantic target is
+wrong even if the tool reports success. Check official article images when
+specifications may be in graphics; text-only extraction does not see them.
+A 256 KiB probe may truncate a long comparison page before its final rows;
+verify the full response before treating an absent feature as a negative fact.
 
 ## First-class Hermes tool
 
