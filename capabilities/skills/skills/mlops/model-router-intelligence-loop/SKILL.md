@@ -226,3 +226,27 @@ design weights.
 
 - `references/session-2026-06-router-loop.md` — conversation-derived architecture and initial loop design.
 - `references/designarena-camoufox-router-ingestion-2026-06.md` — session-tested Design Arena ingestion fallback via Camoufox and analysis caveats.
+
+## Analyser un cycle déterministe avec corrections limitées aux alias
+
+Quand la collecte et le calcul sont déjà terminés et que seules les corrections de noms sont autorisées :
+
+1. Lire l’état avec les chemins absolus :
+   ```bash
+   /opt/walter-router/bin/walter-router review
+   /opt/walter-router/bin/walter-router health
+   /opt/walter-router/bin/walter-router alias-list
+   ```
+   Le binaire peut être absent du PATH. Juger le succès d’après le code de sortie et le contenu : une enveloppe d’outil marquée « error » peut contenir une commande réussie avec `exit_code: 0`.
+2. Lire `/opt/walter-router/docs/TIERS.md`, `/opt/walter-router/config/knowledge.json` et `/opt/walter-router/walter_router/aliases.json`. Examiner au besoin une tâche avec `/opt/walter-router/bin/walter-router dossier <tâche>`.
+3. Vérifier chaque rapprochement sur une source officielle accessible. Exiger la même génération, variante et modalité ; une ressemblance de nom ne suffit pas. Une recherche vide ou un échec d’extraction ne prouve aucune équivalence. Si le backend indique qu’il ne prend pas en charge l’extraction, ne pas répéter cette opération ; utiliser une méthode de lecture autorisée ou laisser le candidat non résolu.
+4. Consulter la syntaxe avant toute correction :
+   ```bash
+   /opt/walter-router/bin/walter-router alias-add --help
+   ```
+   Ajouter seulement les équivalences étayées :
+   ```bash
+   /opt/walter-router/bin/walter-router alias-add <clé-source> <model_id-canonique> --reason '<preuve de même identité et URL officielle>'
+   ```
+5. Relire `alias-list` pour confirmer la paire enregistrée. Cette vérification confirme l’écriture, pas l’identité des modèles.
+6. Respecter strictement le périmètre de mutation : ne pas modifier directement la base, la configuration ou les fichiers du projet, ni lancer une collecte ou un recalcul. Sans autorisation distincte de produire un fichier de rapport, rendre l’analyse dans la réponse. Distinguer les constats du cycle, les alias effectivement corrigés et les candidats encore incertains.
