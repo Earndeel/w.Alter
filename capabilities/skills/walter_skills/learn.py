@@ -86,3 +86,98 @@ def judge_new_cases(max_cases: int = 60, days: int = 3, workers: int = 6) -> dic
                      "total_judged": len(judged_ids())}
     STATE.write_text(json.dumps(st, indent=1))
     return {"candidates": len(cases), "judged": n, "total_judged": st["total_judged"], "file": out.name}
+
+
+# ───────────────────────────── learner: drafts from sessions ─────────────────────────────
+
+LEARN_STATE = store.ROOT / "index" / "learner.json"
+SKIP_PLATFORMS = ("cron", "subagent", "oneshot", "curator", "prod_validation")
+
+
+def _session_digest(conn, session_id: str, limit: int = 22000) -> str:
+    rows = conn.execute("""select type, tool, text, status from walter_logs.events where session_id = %s
+                           and type in ('user/message', 'assistant/message', 'tool/call', 'tool/result')
+                           order by seq""", (session_id,)).fetchall()
+    parts = []
+    for r in rows:
+        txt = mask(r["text"] or "")
+        if r["type"] == "user/message":
+            parts.append(f"[USER] {txt[:1200]}")
+        elif r["type"] == "assistant/message":
+            parts.append(f"[ASSISTANT] {txt[:800]}")
+        elif r["type"] == "tool/call":
+            parts.append(f"[CALL {r['tool']}] {txt[:400]}")
+        elif r["status"] not in (None, "ok") or any(k in txt[:3000] for k in ("Traceback", "Error", "error:", "failed")):
+            parts.append(f"[RESULT {r['tool']} {r['status'] or ''}] {txt[:500]}")
+    text = "\n".join(parts)
+    return text if len(text) <= limit else text[:limit // 3] + "\n[…]\n" + text[-2 * limit // 3:]
+
+
+def mine_sessions(max_sessions: int = 3, hours: int = 48) -> dict:
+    """Recent busy sessions (≥ 12 tool calls, ≤ 1 skill read, cloud_allowed) → the editor proposes a new skill or a
+    patch of an existing one, or nothing → drafts/ via the write door → judged by the curator at night."""
+    from . import models, proposals
+    sys.path.insert(0, "/opt/walter-memory")
+    from walter_memory.db import connection
+    st = json.loads(LEARN_STATE.read_text()) if LEARN_STATE.exists() else {"seen": []}
+    seen = set(st.get("seen", []))
+    with connection() as conn:
+        cands = conn.execute(
+            """select s.session_id, s.runtime, s.platform, s.title,
+                      count(*) filter (where e.type = 'tool/call') as calls,
+                      count(*) filter (where e.type = 'tool/call' and e.tool in ('skill_view', 'mcp__walter__skill_read',
+                                                                                  'walter_skill_read', 'Skill')) as reads,
+                      count(*) filter (where e.type = 'user/message') as users
+               from walter_logs.sessions s join walter_logs.events e using (session_id)
+               where s.last_event_at > now() - make_interval(hours => %s) and s.privacy_class = 'cloud_allowed'
+                 and coalesce(s.platform, '') <> all(%s)
+               group by 1, 2, 3, 4 having count(*) filter (where e.type = 'tool/call') >= 12
+               order by calls desc limit 20""", (hours, list(SKIP_PLATFORMS))).fetchall()
+        cands = [c for c in cands if c["session_id"] not in seen and c["reads"] <= 1 and c["users"] >= 1][:max_sessions]
+        digests = {c["session_id"]: _session_digest(conn, c["session_id"]) for c in cands}
+    out = {"sessions": len(cands), "proposed": [], "patched": [], "skipped": [], "refused": []}
+    if not cands or not models.codex_ready():
+        return out | {"note": "nothing to mine" if not cands else "editor unavailable"}
+    e = engine.load_engine()
+    for c in cands:
+        dig = digests[c["session_id"]]
+        first_user = next((l[7:] for l in dig.splitlines() if l.startswith("[USER] ")), c["title"] or "")
+        related = e.search(first_user[:1500], k=8)
+        rel = "\n".join(f"- {r['name']}: {r['summary'][:180]}" for r in related)
+        prompt = (
+            "You are the learner of W.Alter's skill library (procedures an AI agent loads before acting, on "
+            "Monsieur's VM). Read this agent session digest. Decide whether it taught a REUSABLE procedure that the "
+            "library lacks (several steps, exact commands/paths/checks, pitfalls found the hard way). Existing related "
+            f"skills:\n{rel}\n\nAnswer with JSON only, one of:\n"
+            '{"action": "skip", "reason": "..."}\n'
+            '{"action": "patch", "target": "<existing skill name>", "section": "<markdown section to append, starting '
+            'with ## , imperative rules, exact commands>", "reason": "<what it adds + evidence from the session>"}\n'
+            '{"action": "new", "name": "<kebab-case>", "domain": "<devops|productivity|media|research|...>", '
+            '"skill_md": "<full SKILL.md: frontmatter name + description starting with Use when, then rules>", '
+            '"reason": "<recurring task + evidence>"}\n'
+            "Prefer skip over a weak skill; prefer patch over a near-duplicate new skill. Never include secret "
+            f"values, personal data or one-off narration.\n\nSESSION ({c['runtime']}/{c['platform']}, "
+            f"{c['calls']} tool calls):\n{dig}")
+        res = models.parse_json(models.editor(prompt, effort="medium"))
+        seen.add(c["session_id"])
+        if not res or res.get("action") == "skip":
+            out["skipped"].append({"session": c["session_id"], "reason": (res or {}).get("reason", "no answer")[:200]})
+            continue
+        try:
+            if res.get("action") == "new":
+                r = proposals.propose(res["name"], res["skill_md"], res.get("reason", "") + f" [session {c['session_id']}]",
+                                      domain=res.get("domain", ""), runtime="learner", session_id=c["session_id"])
+                out["proposed"].append({"name": res["name"], "draft": r["draft"]})
+            elif res.get("action") == "patch" and res.get("target"):
+                s = store.find(res["target"], include_archived=False)
+                if s is None:
+                    raise proposals.Refused(f"unknown target {res['target']}")
+                new_md = s.body.rstrip() + "\n\n" + res.get("section", "").strip() + "\n"
+                r = proposals.patch(res["target"], res.get("reason", "") + f" [session {c['session_id']}]",
+                                    skill_md=new_md, runtime="learner", session_id=c["session_id"])
+                out["patched"].append({"target": res["target"], "draft": r["draft"]})
+        except (proposals.Refused, KeyError) as ex:
+            out["refused"].append({"session": c["session_id"], "why": str(ex)[:200]})
+    st["seen"] = sorted(seen)[-2000:]
+    LEARN_STATE.write_text(json.dumps(st))
+    return out
