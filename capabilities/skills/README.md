@@ -20,16 +20,34 @@ Code, Codex and DSH are adapters. Plan: `/root/.hermes/docs/walter-memory/PLAN.m
                  │ door        the single way content enters (judged before it goes live)         │
                  └───────────────────────────────────────────────────────────────────────────────┘
   ports (no rules): api.py (HTTP :8891) · client.py (stdlib, fallback to the store) · MCP walter · hooks · Hermes plugin
+  events: consumer.py on the Walter bus (walter_memory.bus) — instant reactions, no timers
   jobs: jobs.nightly (04:10 UTC) — idempotent steps, one failure never blocks the others
 ```
+
+## Events (the Walter bus, not timers)
+
+Runtimes and modules speak to walter-skills through typed events in Postgres (`bus.events` + `pg_notify`), whatever
+the runtime. The hook adapter (`/opt/walter-core/hooks/walter_hook.py`) translates each runtime's own hooks; the
+write door emits too. `walter-skills-bus` runs two consumers, each with its own cursor (a stopped consumer catches up):
+
+| Event | Emitted by | walter-skills reacts |
+|---|---|---|
+| `skill.proposed` | the write door (MCP `skill_propose`/`skill_patch`, the learner) | consumer `walter-skills`: judge the draft → live + card (< 1 min) |
+| `skill.changed` | Hermes `on_skill_lifecycle` (created/patched/edited/…) | same, after syncing that skill from `~/.hermes/skills` |
+| `turn.ended` | Claude Code / DSH `Stop`, Hermes `on_session_end` (every turn), Codex `notify` | consumer `walter-skills-learning`: implicit labels for that session |
+| `session.ended` | Claude Code `SessionEnd`, Hermes `on_session_finalize` | same + the learner reads the session (may propose a skill) |
+
+Bursts are absorbed (a 10 s calm before a judgement). What bypasses the bus (a hand edit, a Hermes update) is caught
+by the hourly reconciliation (`jobs.quick`, run by the consumer when idle). Failed events stay in `bus.dead`;
+`walter-skills health` reports a consumer more than 15 min behind.
 
 ## What an agent sees (the agent's own model always decides what to open)
 
 | Tier | When | What |
 |---|---|---|
-| 0 | session start (Claude Code `SessionStart`, Hermes first turn) | the domain map, stable → provider-cached |
+| 0 | session start (Claude Code / DSH `SessionStart`, Hermes first turn) | the domain map, stable → provider-cached |
 | 1 | each user message | cards new for this session: 15, or 8 when the ranker is calibrated-confident; a workflow first, replacing its sub-skills; nothing on follow-ups and machine prompts |
-| 1e | after a failed command | at most 2 skills whose card *symptoms* match the specific words of the error |
+| 1e | after a FAILED command (Claude Code `PostToolUseFailure` or stderr, DSH `[exit code: N]`) | at most 2 skills whose card *symptoms* match the specific words of the error |
 | 2 | the agent's initiative | `skills_search` / `skill_read` (Hermes: `walter_skill_search` / `walter_skill_read`) |
 
 ## Resilience

@@ -35,20 +35,28 @@ def _cases_by_qid(since: str | None = None) -> dict[str, dict]:
 
 # 1 ── the model as judge ─────────────────────────────────────────────────────────────────────────────
 
-def implicit() -> dict:
-    """Read the journal of exposures back against what the agents then opened (walter_logs)."""
+def implicit(session_ids: list[str] | None = None) -> dict:
+    """Read the journal of exposures back against what the agents then opened (walter_logs).
+
+    session_ids given (bus: turn.ended / session.ended) → just those sessions, up to now; otherwise the nightly sweep
+    from the watermark. Labels are upserts and only ever add what was opened, so a later pass is harmless."""
     cfg = config.get("learning")
     mark = registry.get_state("implicit_watermark", "2026-10-10T00:00:00+00:00")
     al = aliases()
+    window = """select id, at, session_id, runtime, query_sha, injected,
+                       lead(at) over (partition by session_id order by at) as next_at
+                from skills.retrievals where mode = 'inject' and session_id is not null"""
     with registry.db() as c:
-        rows = c.execute("""select id, at, session_id, runtime, query_sha, injected,
-                                   lead(at) over (partition by session_id order by at) as next_at
-                            from skills.retrievals where mode = 'inject' and session_id is not null and at > %s
-                              and at < now() - interval '20 minutes' order by at""", (mark,)).fetchall()
+        if session_ids:
+            rows = c.execute(window + " and session_id = any(%s) order by at", (list(session_ids),)).fetchall()
+        else:
+            rows = c.execute(window + " and at > %s and at < now() - interval '20 minutes' order by at",
+                             (mark,)).fetchall()
     stats = Counter()
     last = mark
+    now = datetime.now(timezone.utc)
     for r in rows:
-        until = r["next_at"] or (r["at"] + timedelta(minutes=30))
+        until = r["next_at"] or min(r["at"] + timedelta(minutes=30), now)
         opened, searched = history.reads_after(r["session_id"], r["at"], until, al)
         shown = set(r["injected"] or [])
         ev = {"retrieval": r["id"], "runtime": r["runtime"]}
@@ -58,7 +66,8 @@ def implicit() -> dict:
         stats["miss"] += registry.put_labels(r["query_sha"], miss, "miss", cfg["miss_weight"], r["runtime"], ev)
         stats["exposures"] += 1
         last = r["at"].isoformat()
-    registry.set_state("implicit_watermark", last)
+    if not session_ids:
+        registry.set_state("implicit_watermark", last)
     return dict(stats)
 
 
@@ -159,9 +168,10 @@ def _digest(session_id: str, limit: int = 22000) -> str:
     return text if len(text) <= limit else text[:limit // 3] + "\n[…]\n" + text[-2 * limit // 3:]
 
 
-def drafts_from_sessions(max_sessions: int | None = None, hours: int = 48) -> dict:
+def drafts_from_sessions(max_sessions: int | None = None, hours: int = 48, session_ids: list[str] | None = None) -> dict:
     """Busy recent sessions (≥ 12 tool calls, ≤ 1 skill read, cloud_allowed) → the editor proposes a new skill, a
-    patch, or nothing → the write door → judged by curation at night."""
+    patch, or nothing → the write door (→ skill.proposed → judged within a minute).
+    session_ids given (bus: session.ended) → only those; otherwise the nightly pass over the last `hours`."""
     from . import door, store
     from .retrieval import engine
     max_sessions = max_sessions or config.get("curation")["learner_sessions_per_night"]
@@ -173,9 +183,10 @@ def drafts_from_sessions(max_sessions: int | None = None, hours: int = 48) -> di
                       count(*) filter (where e.type = 'tool/call' and e.tool = any(%s)) as reads
                from walter_logs.sessions s join walter_logs.events e using (session_id)
                where s.last_event_at > now() - make_interval(hours => %s) and s.privacy_class = 'cloud_allowed'
-                 and coalesce(s.platform, '') <> all(%s)
+                 and coalesce(s.platform, '') <> all(%s) and (%s::text[] is null or s.session_id = any(%s::text[]))
                group by 1, 2, 3, 4 having count(*) filter (where e.type = 'tool/call') >= 12
-               order by calls desc limit 20""", (list(history.SKILL_TOOLS), hours, list(SKIP_PLATFORMS))).fetchall()
+               order by calls desc limit 20""", (list(history.SKILL_TOOLS), hours if not session_ids else 24 * 30,
+                                                 list(SKIP_PLATFORMS), session_ids, session_ids)).fetchall()
     cands = [x for x in cands if x["session_id"] not in seen and x["reads"] <= 1][:max_sessions]
     out = {"sessions": len(cands), "new": [], "patch": [], "skip": [], "refused": []}
     if not cands or not postes.available("editor"):

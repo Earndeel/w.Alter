@@ -110,6 +110,17 @@ def health() -> tuple[list[str], dict]:
             problems.append(f"{len(stale)} skills have out-of-date trigger cards")
     except Exception as e:
         problems.append(f"walter-skills registry unreachable: {type(e).__name__}")
+    try:  # the bus consumers (walter_skills.consumer): a stalled one means skills/learning stopped reacting
+        from walter_memory import bus
+        from .consumer import CONSUMERS
+        for c, _, _ in CONSUMERS:
+            m[f"bus:{c.name}"] = lg = bus.lag(c.name, c.types)
+            if lg["oldest_s"] > 900:
+                problems.append(f"bus consumer {c.name} is {lg['oldest_s'] // 60} min behind ({lg['pending']} events)")
+            if lg["dead_24h"]:
+                problems.append(f"bus consumer {c.name}: {lg['dead_24h']} failed events in 24 h (bus.dead)")
+    except Exception as e:
+        problems.append(f"walter bus unreachable: {type(e).__name__}")
     drafts = [p for p in store.DRAFTS.iterdir() if p.is_dir()] if store.DRAFTS.exists() else []
     m["drafts_pending"] = len(drafts)
     if len(drafts) > 40:

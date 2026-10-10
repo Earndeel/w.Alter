@@ -1,6 +1,8 @@
 """Write door refusals, client fallback ladder, curation checks, holdout split, ranker round-trip."""
 import subprocess
 
+import zlib
+
 import numpy as np
 import pytest
 
@@ -87,7 +89,12 @@ def test_ranker_trains_scores_and_round_trips():
         model_name = "fake"
 
         def __call__(self, texts):
-            v = np.array([[hash((t, i)) % 97 for i in range(16)] for t in texts], dtype=np.float32) + 1
+            # a hashed bag of words: deterministic (Python's hash() is salted per process and made this test flip)
+            # and, like a real encoder, texts sharing words are close
+            v = np.full((len(texts), 64), 0.01, dtype=np.float32)
+            for row, t in enumerate(texts):
+                for w in t.lower().replace("-", " ").split():
+                    v[row, zlib.crc32(w.encode()) % 64] += 1
             return v / np.linalg.norm(v, axis=1, keepdims=True)
 
         def cached(self, texts, tag):
@@ -116,13 +123,45 @@ def test_bundle_never_truncates_silently(tmp_path):
     assert "END-OF-FILE" in base.bundle(s, per_file=60000)
 
 
-def test_watch_maps_a_changed_file_to_its_skill(tmp_path, monkeypatch):
-    from walter_skills import watch
-    (tmp_path / "devops" / "beeper-messages" / "references").mkdir(parents=True)
-    (tmp_path / "devops" / "beeper-messages" / "SKILL.md").write_text("x")
-    (tmp_path / ".archive" / "old").mkdir(parents=True)
-    (tmp_path / ".archive" / "old" / "SKILL.md").write_text("x")
-    monkeypatch.setattr(watch, "HERMES", tmp_path)
-    assert watch._skill_of(tmp_path / "devops" / "beeper-messages" / "references" / "a.md") == "beeper-messages"
-    assert watch._skill_of(tmp_path / ".archive" / "old" / "SKILL.md") is None
-    assert watch._skill_of(tmp_path / ".usage.json") is None
+def test_bus_consumer_routes_events(monkeypatch):
+    """skill.changed from Hermes → sync of exactly those skills; drafts judged once per batch; learning splits
+    turn.ended (implicit only) from session.ended (implicit + learner)."""
+    from datetime import datetime, timedelta, timezone
+    from walter_skills import consumer
+    calls = {}
+    monkeypatch.setattr(consumer.hermes_sync, "sync", lambda names: calls.setdefault("sync", names) and {})
+    monkeypatch.setattr(consumer.curation, "run", lambda **kw: calls.setdefault("drafts", []).append(kw) or
+                        {"summary": {"done": 0}})
+    monkeypatch.setattr(consumer.cards, "refresh", lambda skills: 0)
+    monkeypatch.setattr(consumer.store, "iter_skills", lambda: [])
+    monkeypatch.setattr(consumer.jobs, "catalog", lambda: 0)
+    monkeypatch.setattr(consumer.registry, "ledger", lambda *a, **k: None)
+    monkeypatch.setattr(consumer.learning, "implicit", lambda session_ids: calls.setdefault("implicit", session_ids)
+                        and {"implicit": 1})
+    monkeypatch.setattr(consumer.learning, "drafts_from_sessions",
+                        lambda session_ids, max_sessions: calls.setdefault("learner", session_ids) and {})
+    ev = lambda i, t, src, sub: {"id": i, "type": t, "source": src, "subject": sub,  # noqa: E731
+                                 "at": datetime.now(timezone.utc) - timedelta(minutes=5), "payload": {}}
+    consumer.react([ev(1, "skill.changed", "hermes", "a"), ev(2, "skill.changed", "hermes", "b"),
+                    ev(3, "skill.proposed", "claude_code", "c")])
+    assert calls["sync"] == {"a", "b"} and len(calls["drafts"]) == 1
+    consumer.learn([ev(4, "turn.ended", "dsh", "dsh/vm/s1"), ev(5, "session.ended", "hermes", "hermes/main/s2")])
+    assert calls["implicit"] == ["dsh/vm/s1", "hermes/main/s2"] and calls["learner"] == ["hermes/main/s2"]
+
+
+
+def test_hook_adapter_only_sends_failed_commands_and_cleans_dsh_prompts():
+    """Regressions found on 2026-10-10: a SUCCESSFUL command printing 'Traceback' was treated as an error; dsh glues
+    the contexts our hook injected into the next prompt (the domain map drowned the user's message)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("walter_hook", "/opt/walter-core/hooks/walter_hook.py")
+    h = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(h)
+    ok = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_response": {"stdout": "Traceback (most recent", "stderr": ""}}
+    assert h.failed_output(ok) == ""
+    assert h.failed_output({"hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "error": "Exit code 1\nboom"})
+    assert h.failed_output({"hook_event_name": "PostToolUse", "tool_name": "bash", "tool_response": "out\n[exit code: 2]"})
+    assert h.failed_output({"hook_event_name": "PostToolUse", "tool_name": "bash", "tool_response": "fine"}) == ""
+    glued = h.ours("dsh", "Bibliothèque de skills…") + "Pourquoi Beeper renvoie 404 ?" + h.ours("dsh", "La commande a échoué")
+    assert h.OWN.sub(" ", glued).strip() == "Pourquoi Beeper renvoie 404 ?"
+    assert h.ours("claude_code", "x") == "x" and h.ours("dsh", "") == ""
