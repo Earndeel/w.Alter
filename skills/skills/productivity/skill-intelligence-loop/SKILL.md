@@ -283,3 +283,58 @@ After each loop run:
 2. `hermes curator status` — verify curator received grades
 3. `ls ~/.hermes/skill-audit/` — verify report written
 4. Spot-check 2-3 patched skills for correctness
+
+## Diagnose a shrinking library before changing Curator policy
+
+1. Separate the two Curators: Hermes owns `~/.hermes/skills`; walter-skills owns `/opt/walter-skills`. Do not interpret one library's managed count as the total number of available skills.
+
+2. Inspect Hermes lifecycle reports and provenance before running a mutation:
+```bash
+/root/.hermes/hermes-agent/venv/bin/hermes curator status
+/root/.hermes/hermes-agent/venv/bin/hermes curator usage
+/root/.hermes/hermes-agent/venv/bin/hermes curator list-unmanaged
+```
+Treat `created_by: agent` in `.usage.json` as an explicit management marker. Do not infer eligibility from directory location or treat unmanaged skills as missing.
+
+3. Reconcile active files, archived files, telemetry and ledger actions:
+```bash
+python3 - <<'PY'
+from pathlib import Path
+from collections import Counter
+import json
+root = Path('/root/.hermes/skills')
+active = [p for p in root.rglob('SKILL.md')
+          if not any(part.startswith('.') for part in p.relative_to(root).parts)]
+archive = root / '.archive'
+archived = list(archive.rglob('SKILL.md')) if archive.exists() else []
+usage = json.loads((root / '.usage.json').read_text())
+ledger = [json.loads(line) for line in (root / '.curator_ledger.jsonl').read_text().splitlines()
+          if line.strip()]
+print('active files:', len(active), 'archived files:', len(archived))
+print('provenance/state:', Counter((str(v.get('created_by')), str(v.get('state')))
+                                  for v in usage.values()))
+print('ledger actor/action:', Counter((r.get('actor'), r.get('action')) for r in ledger))
+for r in ledger:
+    evidence = r.get('evidence') or {}
+    if r.get('action') == 'delete' or evidence.get('absorbed_into'):
+        print(r.get('ts'), r.get('actor'), r.get('action'), r.get('skill'),
+              'absorbed_into:', evidence.get('absorbed_into'))
+PY
+```
+Trace consolidation destinations through `evidence.absorbed_into`; verify that the destination exists and retains the useful procedure. Compare dated `~/.hermes/logs/curator/*/run.json` reports. Distinguish archival, consolidation, deletion and provenance exclusion before proposing restoration or policy changes.
+
+4. Back up affected files under `/root/.hermes/backups/` before modifying them. Prefer quarantine or restoration review over deletion. Extend Hermes through plugins rather than patching its upstream checkout.
+
+5. Submit shared-library improvements through `skill_propose` or `skill_patch`, which create drafts. Use this draft-review preview for walter-skills:
+```bash
+cd /opt/walter-skills
+/opt/walter-memory/venv/bin/python - <<'PY'
+import json
+from walter_skills import curator
+r = curator.run(apply=False, only={'drafts'})
+print(json.dumps(r['summary']))
+for key in ('drafts_accepted', 'drafts_rejected', 'drafts_pending', 'hermes_conflicts'):
+    print(key, r['done'].get(key, []))
+PY
+```
+Check pending decisions and Hermes conflicts before treating a draft as accepted; a shadow review does not publish changes.
