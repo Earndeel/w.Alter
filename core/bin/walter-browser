@@ -1,0 +1,127 @@
+#!/opt/walter-core/venv/bin/python -I
+"""walter-browser — drive a Camoufox Max session (127.0.0.1:9377) from any agent, as Monsieur when logged in.
+
+  walter-browser [-s SESSION] login SITE          log the session in with Monsieur's cookies (browser_auth; metadata only)
+  walter-browser [-s SESSION] new [NAME]          open a tab (becomes the current tab of the session)
+  walter-browser [-s SESSION] nav URL             navigate the current tab
+  walter-browser [-s SESSION] url                 current URL
+  walter-browser [-s SESSION] snap [REGEX]        accessibility snapshot (lines matching REGEX only)
+  walter-browser [-s SESSION] click REF | clickxy X Y | type REF TEXT | ktype REF TEXT | press KEY
+  walter-browser [-s SESSION] shot OUT.png        screenshot
+  walter-browser [-s SESSION] eval EXPR           run JS in the page, print JSON result
+  walter-browser [-s SESSION] upload CSS FILE     put a local file into an <input type=file> (DataTransfer + change)
+  walter-browser [-s SESSION] fetch URL OUT       download through the authenticated context (labs.google, *.googleusercontent.com)
+  walter-browser [-s SESSION] close
+
+SESSION defaults to $WALTER_BROWSER_SESSION or "default". The current tab id lives in ~/.cache/walter-browser/.
+Cookies are never exported by this tool: there is deliberately no command to read the session's cookie jar.
+"""
+from __future__ import annotations
+
+import argparse
+import base64
+import json
+import mimetypes
+import os
+import re
+import sys
+from pathlib import Path
+
+import httpx
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+CAMOUFOX = os.environ.get("WALTER_CAMOUFOX_URL", "http://127.0.0.1:9377")
+STATE = Path.home() / ".cache" / "walter-browser"
+
+
+def post(session: str, path: str, body: dict, timeout: float = 120) -> httpx.Response:
+    r = httpx.post(CAMOUFOX + path, json={"userId": session, **body}, timeout=timeout)
+    if r.status_code >= 400:
+        sys.exit(f"HTTP {r.status_code} {path}: {r.text[:400]}")
+    return r
+
+
+def tab(session: str) -> str:
+    f = STATE / f"{session}.tab"
+    if not f.exists():
+        sys.exit(f"no current tab for session '{session}': run `walter-browser -s {session} new` first")
+    return f.read_text().strip()
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("-s", "--session", default=os.environ.get("WALTER_BROWSER_SESSION", "default"))
+    ap.add_argument("cmd")
+    ap.add_argument("args", nargs="*")
+    a = ap.parse_args()
+    s, cmd, args = a.session, a.cmd, a.args
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+    if cmd == "login":
+        import browser_auth
+        print(json.dumps(browser_auth.login(args[0], s, client="walter-browser"), ensure_ascii=False, indent=2))
+    elif cmd == "new":
+        t = post(s, "/tab/new", {"listItemId": args[0] if args else "main"}).json()["tabId"]
+        (STATE / f"{s}.tab").write_text(t)
+        print(t)
+    elif cmd == "nav":
+        print(post(s, "/tab/navigate", {"tabId": tab(s), "url": args[0]}).json().get("url"))
+    elif cmd == "url":
+        print(post(s, "/tab/evaluate", {"tabId": tab(s), "expression": "location.href"}).json().get("result"))
+    elif cmd == "snap":
+        snap = post(s, "/tab/snapshot", {"tabId": tab(s)}).json().get("snapshot", "")
+        if args:
+            for line in re.split(r"\\n|\n", snap):
+                if re.search(args[0], line):
+                    print(line[:300])
+        else:
+            print(snap[:12000])
+    elif cmd == "click":
+        print(post(s, "/tab/click", {"tabId": tab(s), "ref": args[0]}).text[:300])
+    elif cmd == "clickxy":
+        print(post(s, "/tab/click-at", {"tabId": tab(s), "x": float(args[0]), "y": float(args[1])}).text[:300])
+    elif cmd == "type":
+        print(post(s, "/tab/type", {"tabId": tab(s), "ref": args[0], "text": args[1]}).text[:300])
+    elif cmd == "ktype":
+        if "\n" in args[1]:
+            sys.exit("ktype refuses newlines (Enter can submit forms); send one line")
+        print(post(s, "/tab/keyboard-type", {"tabId": tab(s), "ref": args[0], "text": args[1]}, timeout=300).text[:300])
+    elif cmd == "press":
+        print(post(s, "/tab/keyboard-press", {"tabId": tab(s), "key": args[0]}).text[:300])
+    elif cmd == "shot":
+        Path(args[0]).write_bytes(base64.b64decode(post(s, "/tab/screenshot", {"tabId": tab(s)}).json()["buffer"]))
+        print(args[0])
+    elif cmd == "eval":
+        print(json.dumps(post(s, "/tab/evaluate", {"tabId": tab(s), "expression": args[0]}, timeout=180).json(),
+                         ensure_ascii=False)[:20000])
+    elif cmd == "upload":
+        selector, path = args[0], Path(args[1])
+        data = base64.b64encode(path.read_bytes()).decode()
+        mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        js = ("(()=>{const i=document.querySelector(%s); if(!i) return 'no input';"
+              "const b=Uint8Array.from(atob(%s),c=>c.charCodeAt(0));"
+              "const f=new File([b],%s,{type:%s}); const dt=new DataTransfer(); dt.items.add(f);"
+              "i.files=dt.files; i.dispatchEvent(new Event('input',{bubbles:true}));"
+              "i.dispatchEvent(new Event('change',{bubbles:true})); return 'set '+f.name+' '+f.size})()"
+              % (json.dumps(selector), json.dumps(data), json.dumps(path.name), json.dumps(mime)))
+        print(post(s, "/tab/evaluate", {"tabId": tab(s), "expression": js}, timeout=180).json())
+    elif cmd == "fetch":
+        r = post(s, "/tab/fetch-binary", {"tabId": tab(s), "url": args[0]}, timeout=300)
+        ct = r.headers.get("content-type", "")
+        if ct.startswith("application/json"):
+            d = r.json()
+            data = base64.b64decode(d.get("base64") or d.get("buffer") or d.get("data") or "")
+            ct = d.get("contentType") or d.get("content_type") or ct
+        else:
+            data = r.content
+        Path(args[1]).write_bytes(data)
+        print(json.dumps({"out": args[1], "bytes": len(data), "content_type": ct}))
+    elif cmd == "close":
+        print(post(s, "/tab/close", {"tabId": tab(s)}).text)
+        (STATE / f"{s}.tab").unlink(missing_ok=True)
+    else:
+        sys.exit(f"unknown command {cmd}; see --help")
+
+
+if __name__ == "__main__":
+    main()
