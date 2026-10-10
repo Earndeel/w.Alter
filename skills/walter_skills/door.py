@@ -61,6 +61,19 @@ def _files(files: dict | None) -> dict[str, str]:
     return out
 
 
+_PROD_ROOT = store.ROOT  # tests swap store.ROOT for a tmp repo: only the real store announces on the bus
+
+
+def _announce(d: Path, kind: str, name: str, runtime: str | None, session_id: str | None) -> dict:
+    """skill.proposed on the Walter bus → the walter-skills consumer judges it within a minute (fail-open: the
+    hourly reconciliation picks up a draft whose announcement was lost)."""
+    rel = str(d.relative_to(store.ROOT))
+    if store.ROOT == _PROD_ROOT:
+        from walter_memory import bus
+        bus.emit("skill.proposed", runtime or "agent", name, {"draft": rel, "kind": kind, "session_id": session_id})
+    return {"draft": rel, "status": "pending: judged by the curator within a minute, then live if accepted"}
+
+
 def _draft_dir(name: str, kind: str, runtime: str | None) -> Path:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
     tag = re.sub(r"[^a-z0-9]+", "-", (runtime or "agent").lower()).strip("-")[:20]
@@ -90,7 +103,7 @@ def propose(name: str, skill_md: str, reason: str, files: dict | None = None, do
                             "description": fm.get("description"), "created_at": datetime.now(timezone.utc).isoformat()})
     c = store.commit(f"draft (new) {name} from {runtime or 'agent'}: {reason.strip()[:120]}", paths=["drafts"],
                      author="walter-skills-door")
-    return {"draft": str(d.relative_to(store.ROOT)), "commit": c, "status": "pending curator review (nightly)"}
+    return {**_announce(d, "new", name, runtime, session_id), "commit": c}
 
 
 def patch(name: str, reason: str, skill_md: str | None = None, file_path: str | None = None,
@@ -121,4 +134,4 @@ def patch(name: str, reason: str, skill_md: str | None = None, file_path: str | 
                             "session_id": session_id, "created_at": datetime.now(timezone.utc).isoformat()})
     c = store.commit(f"draft (patch) {name}/{changed} from {runtime or 'agent'}: {reason.strip()[:120]}",
                      paths=["drafts"], author="walter-skills-door")
-    return {"draft": str(d.relative_to(store.ROOT)), "commit": c, "status": "pending curator review (nightly)"}
+    return {**_announce(d, "patch", name, runtime, session_id), "commit": c}

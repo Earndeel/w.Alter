@@ -25,7 +25,8 @@ warning warn info debug stderr stdout exit modulenotfounderror importerror keyer
 attributeerror syntaxerror nameerror runtimeerror oserror filenotfounderror permissionerror connectionerror
 indexerror assertionerror jsondecodeerror unicodedecodeerror import""".split())
 ERROR_MARKERS = ("Traceback (most recent call last)", "Error:", "ERROR", "error:", "FAILED", "Permission denied",
-                 "No such file or directory", "command not found", "Connection refused", "fatal:", "HTTP 4", "HTTP 5")
+                 "No such file or directory", "command not found", "Connection refused", "fatal:", "HTTP 4", "HTTP 5",
+                 "[exit code:", "Exit code ", "Failed to", "failed to", "Exception")  # the hooks only send failed commands
 
 
 @dataclass
