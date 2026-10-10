@@ -1,28 +1,17 @@
-"""Trigger cards (poste skills.indexer): for each skill, how a user would actually ask for it.
+"""Trigger cards (poste indexer): for each skill, how Monsieur would actually ask for it.
 
-A card is derived from the skill content only (never from user queries — that is the learner's job), keyed by the
-skill's content hash, so it is regenerated when the skill changes. Stored in index/cards/<name>.json (git-tracked,
-small). Skill text is secret-masked before it leaves the VM; calls go through walter_memory.llm (budget + ledger).
+Derived from the skill content only (never from user messages — that is the learning loop's job), keyed by the
+content hash, regenerated when the skill changes, stored in the registry (skills.cards).
 """
 from __future__ import annotations
 
-import json
-import re
-import sys
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
-from . import store
+from . import postes, registry, store
 
-sys.path.insert(0, "/opt/walter-memory")
-from walter_memory import llm  # noqa: E402
-from walter_memory.logs import mask  # noqa: E402
-
-CARDS = store.ROOT / "index" / "cards"
-MODEL = "openai/gpt-6-luna"  # provisional holder of poste skills.indexer (Walter Router), see PLAN P10.2
 VERSION = "card-v1"
 BODY_CHARS = 14000
-
+FIELDS = ("summary", "kind", "intents_fr", "intents_en", "entities", "symptoms", "not_for")
 PROMPT = """You index one procedural skill of W.Alter, the personal AI agent of Monsieur (French; he writes informal
 French, often without accents, sometimes mixing English; he refers to his own services and projects by name).
 Read the skill and write the card that lets a retriever recognise, from one user message plus the previous turn,
@@ -38,74 +27,36 @@ Return JSON only:
  "symptoms": ["error messages or observable symptoms that should lead here (max 10, [] if none)"],
  "not_for": ["max 4 nearby tasks this skill does NOT cover"]
 }
-
-Skill name: {name}
-Domain: {domain}
-Description: {description}
-
-SKILL.md (+ file list):
-{body}"""
-
-
-def card_path(name: str) -> Path:
-    return CARDS / f"{name}.json"
-
-
-def load(name: str) -> dict | None:
-    p = card_path(name)
-    return json.loads(p.read_text()) if p.exists() else None
+"""
 
 
 def _files(s: store.Skill) -> str:
-    files = [str(p.relative_to(s.path)) for p in sorted(s.path.rglob("*")) if p.is_file()
-             and p.name not in ("SKILL.md", store.SIDECAR)]
+    files = [str(p.relative_to(s.path)) for p in sorted(s.path.rglob("*"))
+             if p.is_file() and p.name not in ("SKILL.md", store.SIDECAR) and "__pycache__" not in p.parts]
     return ("\n\nFiles: " + ", ".join(files[:40])) if files else ""
 
 
-def generate(s: store.Skill, model: str = MODEL) -> dict:
-    sha = store.tree_hash(s.path)
-    body = mask(s.body[:BODY_CHARS]) + _files(s)
-    prompt = (PROMPT.replace("{name}", s.name).replace("{domain}", s.domain or "-")
-              .replace("{description}", mask(s.description)).replace("{body}", body))
-    try:
-        r = llm.chat([{"role": "user", "content": prompt}], model=model, processor="skills.indexer",
-                     processor_version=VERSION, privacy_class="cloud_allowed", budget="backfill",
-                     purpose=f"card {s.name}", timeout=180, reasoning={"effort": "low"})
-    except Exception:  # OpenRouter floor/budget: same model through W.Alter's Codex subscription session
-        from . import models
-        text = models.editor(prompt, timeout=300, effort="low", model=model.split("/")[-1])
-        if not text:
-            raise
-        r, model = {"content": text, "cost_usd": 0.0}, "codex:" + model.split("/")[-1]
-    m = re.search(r"\{.*\}", r["content"], re.S)
-    card = json.loads(m.group(0))
-    card = {k: card.get(k, [] if k != "summary" and k != "kind" else "") for k in
-            ("summary", "kind", "intents_fr", "intents_en", "entities", "symptoms", "not_for")}
-    return {"name": s.name, "sha": sha, "model": model, "version": VERSION, "cost_usd": r.get("cost_usd"), **card}
+def generate(s: store.Skill) -> tuple[dict | None, str | None]:
+    prompt = (PROMPT + f"\nSkill name: {s.name}\nDomain: {s.domain or '-'}\nDescription: {s.description}\n\n"
+              f"SKILL.md (+ file list):\n{s.body[:BODY_CHARS]}{_files(s)}")
+    card, route = postes.ask_json("indexer", prompt, require="summary", timeout=300)
+    if not card:
+        return None, None
+    return {k: card.get(k, "" if k in ("summary", "kind") else []) for k in FIELDS}, route
 
 
-def build(skills: list[store.Skill], workers: int = 8, force: bool = False) -> dict:
-    CARDS.mkdir(parents=True, exist_ok=True)
-    todo = []
-    for s in skills:
-        c = load(s.name)
-        if force or not c or c.get("sha") != store.tree_hash(s.path) or c.get("version") != VERSION:
-            todo.append(s)
-    stats = {"todo": len(todo), "ok": 0, "error": 0, "cost_usd": 0.0}
+def refresh(skills: list[store.Skill] | None = None, workers: int = 8) -> dict:
+    """(Re)generate the cards of new or changed skills; returns counts."""
+    skills = skills if skills is not None else list(store.iter_skills(include_archived=True))
+    have = registry.cards()
+    todo = [s for s in skills if have.get(s.name, {}).get("sha") != store.tree_hash(s.path)]
 
     def one(s):
-        try:
-            return s, generate(s), None
-        except Exception as e:  # noqa: BLE001
-            return s, None, str(e)[:200]
+        card, route = generate(s)
+        if card:
+            registry.put_card(s.name, store.tree_hash(s.path), card, route, VERSION)
+        return bool(card)
 
     with ThreadPoolExecutor(workers) as ex:
-        for s, card, err in ex.map(one, todo):
-            if card:
-                card_path(s.name).write_text(json.dumps(card, ensure_ascii=False, indent=1) + "\n")
-                stats["ok"] += 1
-                stats["cost_usd"] += card.get("cost_usd") or 0
-            else:
-                stats["error"] += 1
-                print("card error", s.name, err, file=sys.stderr)
-    return stats
+        ok = sum(ex.map(one, todo))
+    return {"todo": len(todo), "ok": ok, "failed": len(todo) - ok}
