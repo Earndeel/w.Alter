@@ -73,6 +73,18 @@ def _repo_skills() -> set[str]:
     return {md.parent.name for d in ("skills", "optional-skills") for md in (repo / d).rglob("SKILL.md")}
 
 
+def _draft(name: str, src: Path, sha: str, kind: str, domain: str, reason: str) -> bool:
+    """Hermes' change → drafts/<name>@<kind>-hermes-<sha8> for the curator (once per Hermes version)."""
+    dst = store.DRAFTS / f"{name}@{kind.replace('_', '-')}-hermes-{sha[:8]}"
+    if dst.exists():
+        return False
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    _copy(src, dst)
+    store.write_sidecar(dst, {"kind": kind, "target": name, "domain": domain, "runtime": "hermes", "reason": reason,
+                              "hermes": {"path": str(src), "sha": sha, "state": "active"}, "created_at": _now()})
+    return True
+
+
 def _origin(name: str, bundled: set[str], hub: set[str]) -> tuple[str, str]:
     if name in bundled or name in _REPO:
         return "hermes-bundled", "upstream"
@@ -89,46 +101,46 @@ def sync(dry_run: bool = False) -> dict:
     _REPO = _repo_skills()
     bundled, hub = _bundled(), _hub()
     ours = {s.name: s for s in store.iter_skills(include_archived=True, include_drafts=False)}
-    stats = {"imported": [], "fast_forward": [], "draft_conflict": [], "hermes_gone": [], "unchanged": 0}
+    stats = {"imported": [], "drafted_new": [], "drafted_patch": [], "fast_forward": [], "draft_conflict": [],
+             "hermes_gone": [], "unchanged": 0}
     src = hermes_active()
     for name, (d, category) in src.items():
         h = store.tree_hash(d)
         mine = ours.get(name)
+        origin, owner = _origin(name, bundled, hub)
         if mine is None:
-            stats["imported"].append(name)
-            if not dry_run:
-                dst = store.SKILLS / (category or "misc") / name
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                _copy(d, dst)
-                origin, owner = _origin(name, bundled, hub)
-                store.write_sidecar(dst, {"origin": origin, "owner": owner, "imported_at": _now(),
-                                          "hermes": {"path": str(d), "sha": h, "state": "active"},
-                                          "store_sha": store.tree_hash(dst)})
+            if owner == "upstream":  # shipped with Hermes: imported as is
+                stats["imported"].append(name)
+                if not dry_run:
+                    dst = store.SKILLS / (category or "misc") / name
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    _copy(d, dst)
+                    store.write_sidecar(dst, {"origin": origin, "owner": owner, "imported_at": _now(),
+                                              "hermes": {"path": str(d), "sha": h, "state": "active"},
+                                              "store_sha": store.tree_hash(dst)})
+            else:  # written by the Hermes agent: reviewed by the curator like any agent proposal
+                if not dry_run and _draft(name, d, h, "new", category, "created by the Hermes agent (skill_manage)"):
+                    stats["drafted_new"].append(name)
             continue
         side = mine.meta.get("hermes") or {}
-        if side.get("sha") == h:
+        if side.get("sha") == h or side.get("pending_sha") == h:
             stats["unchanged"] += 1
             continue
         untouched = store.tree_hash(mine.path) == mine.meta.get("store_sha")
-        if untouched and mine.state == "active":
+        if mine.meta.get("owner") == "upstream" and untouched and mine.state == "active":
             stats["fast_forward"].append(name)
             if not dry_run:
                 _copy(d, mine.path)
-                meta = mine.meta | {"hermes": side | {"sha": h, "path": str(d), "state": "active",
-                                                      "synced_at": _now()}}
+                meta = mine.meta | {"hermes": side | {"sha": h, "path": str(d), "state": "active", "synced_at": _now()}}
                 meta["store_sha"] = store.tree_hash(mine.path)
                 store.write_sidecar(mine.path, meta)
-        else:
-            stats["draft_conflict"].append(name)
-            if not dry_run:
-                dst = store.DRAFTS / f"{name}@hermes-{h[:8]}"
-                if not dst.exists():
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    _copy(d, dst)
-                    store.write_sidecar(dst, {"kind": "hermes_update", "target": name, "domain": mine.domain,
-                                              "hermes": {"path": str(d), "sha": h}, "created_at": _now()})
-                meta = mine.meta | {"hermes": side | {"pending_sha": h}}
-                store.write_sidecar(mine.path, meta)
+            continue
+        kind = "hermes_patch" if untouched and mine.state == "active" else "hermes_update"
+        if not dry_run and _draft(name, d, h, kind, mine.domain,
+                                  "patched by the Hermes agent" if kind == "hermes_patch" else
+                                  "Hermes changed a skill Walter also changed (manual merge)"):
+            stats["drafted_patch" if kind == "hermes_patch" else "draft_conflict"].append(name)
+            store.write_sidecar(mine.path, mine.meta | {"hermes": side | {"pending_sha": h}})
     for name, s in ours.items():
         side = s.meta.get("hermes") or {}
         if side.get("state") == "active" and name not in src:
