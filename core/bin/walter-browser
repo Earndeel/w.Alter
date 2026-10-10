@@ -117,6 +117,25 @@ def main() -> None:
             data = r.content
         Path(args[1]).write_bytes(data)
         print(json.dumps({"out": args[1], "bytes": len(data), "content_type": ct}))
+    elif cmd == "hookdl":  # record the URLs the page downloads (anchor clicks, window.open), incl. blob: exports
+        js = ("(()=>{window.__dl=window.__dl||[];if(!window.__dlHooked){const oc=HTMLAnchorElement.prototype.click;"
+              "HTMLAnchorElement.prototype.click=function(){window.__dl.push(this.href);return oc.call(this)};"
+              "const oo=window.open;window.open=function(u){window.__dl.push(String(u));return oo.apply(this,arguments)};"
+              "window.__blobs={};const co=URL.createObjectURL;URL.createObjectURL=function(o){const u=co.call(URL,o);"
+              "window.__blobs[u]=o;return u};URL.revokeObjectURL=function(){};"
+              "window.__dlHooked=true}return 'hooked, '+window.__dl.length+' captured'})()")
+        print(post(s, "/tab/evaluate", {"tabId": tab(s), "expression": js}).json().get("result"))
+    elif cmd == "savedl":  # save the last captured page download (blob: or same-origin URL) to OUT
+        js = ("(async()=>{const u=(window.__dl||[]).slice(-1)[0];if(!u)return '';const o=(window.__blobs||{})[u];"
+              "const b=o?await o.arrayBuffer():await (await fetch(u)).arrayBuffer();"
+              "let s='';const a=new Uint8Array(b);for(let i=0;i<a.length;i+=32768)"
+              "s+=String.fromCharCode.apply(null,a.subarray(i,i+32768));return btoa(s)})()")
+        b64 = post(s, "/tab/evaluate", {"tabId": tab(s), "expression": js}, timeout=300).json().get("result") or ""
+        if not b64:
+            sys.exit("no captured download: run hookdl, then trigger the download in the page")
+        data = base64.b64decode(b64)
+        Path(args[0]).write_bytes(data)
+        print(json.dumps({"out": args[0], "bytes": len(data)}))
     elif cmd == "wait":  # let a page/render settle between steps
         import time
         time.sleep(min(float(args[0]), 600))
