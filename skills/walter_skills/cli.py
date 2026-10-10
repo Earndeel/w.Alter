@@ -10,6 +10,8 @@
   digest    weekly curator digest to Telegram (via `hermes send`)
   judge     label recent real cases with the judge (the truth the retriever learns from) [--max N]
   nightly   sync + cards + catalog + judge new cases + train (+ service reload) + curator
+  learn     mine recent busy sessions for new skills / patches → drafts (editor via Codex) [--max N]
+  health    problems as JSON, exit 1 if any (used by the 5-min watchdog)
 """
 from __future__ import annotations
 
@@ -49,6 +51,41 @@ def catalog() -> int:
     return n
 
 
+def health() -> tuple[list[str], dict]:
+    import urllib.request
+    from datetime import datetime, timezone
+    problems, m = [], {}
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8891/health", timeout=10) as r:  # noqa: S310
+            m["service"] = json.loads(r.read())
+    except Exception as e:
+        problems.append(f"walter-skills service down: {type(e).__name__}")
+    show = subprocess.run(["systemctl", "show", "walter-skills-nightly", "-p", "ExecMainStatus",
+                           "-p", "ExecMainExitTimestamp"], capture_output=True, text=True).stdout
+    vals = dict(line.split("=", 1) for line in show.splitlines() if "=" in line)
+    m["nightly_status"] = vals.get("ExecMainStatus")
+    if vals.get("ExecMainStatus") not in (None, "", "0"):
+        problems.append(f"walter-skills nightly failed (status {vals.get('ExecMainStatus')})")
+    ts = vals.get("ExecMainExitTimestamp", "").strip()
+    if ts:
+        try:
+            last = datetime.strptime(" ".join(ts.split()[1:3]), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            m["nightly_age_h"] = round((datetime.now(timezone.utc) - last).total_seconds() / 3600, 1)
+            if m["nightly_age_h"] > 30:
+                problems.append(f"walter-skills nightly has not run for {m['nightly_age_h']} h")
+        except ValueError:
+            pass
+    drafts = [p for p in store.DRAFTS.iterdir() if p.is_dir()] if store.DRAFTS.exists() else []
+    m["drafts_pending"] = len(drafts)
+    if len(drafts) > 40:
+        problems.append(f"{len(drafts)} skill drafts waiting for the curator")
+    stale = [s.name for s in store.iter_skills() if (cards.load(s.name) or {}).get("sha") != store.tree_hash(s.path)]
+    m["stale_cards"] = len(stale)
+    if len(stale) > 10:
+        problems.append(f"{len(stale)} skills have out-of-date trigger cards")
+    return problems, m
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="walter-skills")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -76,6 +113,10 @@ def main() -> int:
     jg.add_argument("--max", type=int, default=60)
     jg.add_argument("--days", type=int, default=3)
     sub.add_parser("nightly")
+    sub.add_parser("health")
+    ln = sub.add_parser("learn")
+    ln.add_argument("--max", type=int, default=3)
+    ln.add_argument("--hours", type=int, default=48)
     a = ap.parse_args()
 
     if a.cmd == "sync":
@@ -107,6 +148,12 @@ def main() -> int:
         if not a.dry_run:
             subprocess.run(["/root/.hermes/hermes-agent/venv/bin/hermes", "send", "-t", "telegram", text],
                            capture_output=True, text=True, timeout=120)
+    elif a.cmd == "learn":
+        print(json.dumps(learn.mine_sessions(max_sessions=a.max, hours=a.hours), ensure_ascii=False))
+    elif a.cmd == "health":
+        problems, m = health()
+        print(json.dumps({"problems": problems, "metrics": m}, default=str))
+        return 1 if problems else 0
     elif a.cmd == "judge":
         print(json.dumps(learn.judge_new_cases(max_cases=a.max, days=a.days)))
     elif a.cmd == "nightly":
@@ -119,6 +166,10 @@ def main() -> int:
             print("judge", learn.judge_new_cases())
         except Exception as e:  # never block the nightly on the judge
             print("judge error", type(e).__name__, str(e)[:200])
+        try:
+            print("learn", learn.mine_sessions())
+        except Exception as e:
+            print("learn error", type(e).__name__, str(e)[:200])
         print("train", {k: v for k, v in engine.train().items() if k != "weights"})
         subprocess.run(["systemctl", "try-restart", "walter-skills"], check=False)
         print("curator", curator.run()["summary"])
