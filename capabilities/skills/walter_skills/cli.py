@@ -8,7 +8,8 @@
   read      name [--file path]
   curate    curator run (config/curator.json: shadow until shadow_until, then active) [--apply|--shadow] [--no-models]
   digest    weekly curator digest to Telegram (via `hermes send`)
-  nightly   sync + cards + catalog + train (+ service reload) + curator report
+  judge     label recent real cases with the judge (the truth the retriever learns from) [--max N]
+  nightly   sync + cards + catalog + judge new cases + train (+ service reload) + curator
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ import json
 import subprocess
 import sys
 
-from . import cards, curator, engine, hermes_sync, store
+from . import cards, curator, engine, hermes_sync, learn, store
 
 
 def catalog() -> int:
@@ -71,6 +72,9 @@ def main() -> int:
     cu.add_argument("--no-models", action="store_true")
     dg = sub.add_parser("digest")
     dg.add_argument("--dry-run", action="store_true")
+    jg = sub.add_parser("judge")
+    jg.add_argument("--max", type=int, default=60)
+    jg.add_argument("--days", type=int, default=3)
     sub.add_parser("nightly")
     a = ap.parse_args()
 
@@ -103,12 +107,18 @@ def main() -> int:
         if not a.dry_run:
             subprocess.run(["/root/.hermes/hermes-agent/venv/bin/hermes", "send", "-t", "telegram", text],
                            capture_output=True, text=True, timeout=120)
+    elif a.cmd == "judge":
+        print(json.dumps(learn.judge_new_cases(max_cases=a.max, days=a.days)))
     elif a.cmd == "nightly":
         st = hermes_sync.sync()
         print("sync", {k: (v if isinstance(v, int) else len(v)) for k, v in st.items()})
         print("cards", cards.build(list(store.iter_skills(include_archived=True))))
         store.commit("cards refresh", paths=["index/cards"])
         print("catalog", catalog())
+        try:
+            print("judge", learn.judge_new_cases())
+        except Exception as e:  # never block the nightly on the judge
+            print("judge error", type(e).__name__, str(e)[:200])
         print("train", {k: v for k, v in engine.train().items() if k != "weights"})
         subprocess.run(["systemctl", "try-restart", "walter-skills"], check=False)
         print("curator", curator.run()["summary"])

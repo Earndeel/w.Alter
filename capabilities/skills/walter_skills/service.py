@@ -44,7 +44,7 @@ class SearchIn(BaseModel):
     include_archived: bool = False
     mode: str = "search"  # search | inject | shadow (journal label only)
     choose: bool = False  # optional stage 2 (separate LLM picks); off by default since 2026-10-09: the agent's own model chooses
-    need_threshold: float = 0.4  # local gate: below it, nothing is proposed for injection
+    need_threshold: float = 0.0  # local gate disabled 2026-10-10 (blocked 35 % of needed cases on judged data); kept for logs
     privacy_class: str = "cloud_allowed"  # of the message; local_only never leaves the VM (local ranking only)
 
 
@@ -112,7 +112,7 @@ def search(body: SearchIn) -> dict:
         if n_prev:  # ongoing session: only new skills that rank high, never a deep refill of the list
             fresh = [n for n in fresh if ranked.index(n) < (12 if len(body.message.split()) >= 6 else 8)]
             if len(body.message.split()) < 6:  # short follow-up ("continue", "ok vas-y"): only if clearly needed
-                fresh = fresh[:3] if (need is None or need >= 0.6) else []
+                fresh = []  # the skills of the ongoing task were already proposed
         inject = fresh
     ms = round(1000 * (time.perf_counter() - t0))
     _journal(body, results, inject if body.mode in ("inject", "shadow") else [], ms, f"{e.version}/{stage}")
