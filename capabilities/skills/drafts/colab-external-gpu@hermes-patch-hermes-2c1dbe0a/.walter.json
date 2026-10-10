@@ -1,0 +1,13 @@
+{
+ "created_at": "2026-10-10T21:17:21+00:00",
+ "domain": "cloud",
+ "hermes": {
+  "path": "/root/.hermes/skills/cloud/colab-external-gpu",
+  "sha": "2c1dbe0a68b1b2048202c297714c2aabfe7881ec3e38be742b614123b1a1f519",
+  "state": "active"
+ },
+ "kind": "hermes_patch",
+ "reason": "patched by the Hermes agent",
+ "runtime": "hermes",
+ "target": "colab-external-gpu"
+}
