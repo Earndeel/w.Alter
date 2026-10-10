@@ -9,7 +9,9 @@
 ## Initialisation et contrôles
 - Si l'onglet est déjà sur Colab, une navigation ne changeant que le fragment peut laisser la SPA intacte sans initialiser MCP. Forcer une navigation complète avec un paramètre query non secret unique, en préservant le fragment officiel. Le dialogue d'approbation, le clic explicite et `get_notebook_connection_info` prouvent la connexion ; un port ouvert ou `tools/list` seul ne la prouve pas.
 - Traverser les shadow roots pour les boutons Material. Cibler le bouton natif dans `shadowRoot` si le composant hôte ne transmet pas le clic.
-- Si le snapshot borné omet un menu tardif, cibler rôle/nom exact dans le DOM profond. Un menu Closure peut réagir à `mousedown`/`mouseup` plutôt qu'au seul `.click()` synthétique. Éviter les coordonnées aveugles.
+- Privilégier un clic natif sur la référence du snapshot pour les menus ; si le snapshot borné omet un menu tardif, cibler rôle/nom exact dans le DOM profond. Un menu Closure peut réagir à `mousedown`/`mouseup` plutôt qu'au seul `.click()` synthétique. Éviter les coordonnées aveugles.
+- Attendre explicitement l'apparition des contrôles après l'ouverture d'un dialogue : l'absence immédiate du radio A100 peut être une course de rendu, pas une indisponibilité GPU. Lire ensuite son état `disabled` avant toute allocation.
+- Inspecter le solde via `Runtime → View resources`, même sans runtime connecté ; le bouton `Additional connection options` n'est pas une voie fiable dans cet état. Séparer solde vérifié, type sélectionné et matériel réellement attribué.
 
 ## Allocation vérifiable et bornée
 - Lorsqu'un test matériel est autorisé, utiliser seulement un notebook privé de test déjà identifié. Vérifier l'identifiant et le contenu de la cellule avant son exécution.
