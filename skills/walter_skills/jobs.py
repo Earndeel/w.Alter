@@ -24,6 +24,26 @@ def catalog() -> int:
     return registry.refresh_catalog(rows)
 
 
+def curation_always_active() -> dict:
+    """Operators that are safe to apply on master even during the shadow period (drafts: judged one by one)."""
+    from . import config
+    ops = set(config.get("curation").get("always_active", []))
+    return curation.run(apply=True, only=ops)["summary"] if ops else {}
+
+
+def curation_rest() -> dict:
+    from . import config
+    ops = {op.name for op in curation.OPERATORS} - set(config.get("curation").get("always_active", []))
+    return curation.run(only=ops)["summary"]
+
+
+QUICK = [  # every 15 minutes: what agents and Hermes just changed goes live within minutes, judged
+    ("sync", lambda: {k: (v if isinstance(v, int) else len(v)) for k, v in hermes_sync.sync().items()}),
+    ("drafts", curation_always_active),
+    ("cards", cards.refresh),
+    ("catalog", catalog),
+]
+
 STEPS = [
     ("sync", lambda: {k: (v if isinstance(v, int) else len(v)) for k, v in hermes_sync.sync().items()}),
     ("cards", cards.refresh),
@@ -31,17 +51,18 @@ STEPS = [
     ("implicit", learning.implicit),
     ("judge", learning.judge),
     ("sessions", learning.drafts_from_sessions),
-    ("curation", lambda: curation.run()["summary"]),
+    ("drafts", curation_always_active),
+    ("curation", curation_rest),
     ("cards_after", cards.refresh),
     ("train", learning.train_and_promote),
     ("domain_map", lambda: len(domains.build())),
 ]
 
 
-def nightly(only: set[str] | None = None) -> dict:
+def nightly(only: set[str] | None = None, steps=None, key: str = "nightly") -> dict:
     started = datetime.now(timezone.utc).isoformat()
     out = {}
-    for name, fn in STEPS:
+    for name, fn in steps or STEPS:
         if only and name not in only:
             continue
         t0 = time.time()
@@ -51,10 +72,13 @@ def nightly(only: set[str] | None = None) -> dict:
             out[name] = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:300]}", "s": round(time.time() - t0)}
     state = {"started": started, "finished": datetime.now(timezone.utc).isoformat(),
              "failed": [k for k, v in out.items() if not v["ok"]], "steps": out}
-    registry.set_state("nightly", state)
-    registry.ledger("jobs", "nightly", None, None, {"failed": state["failed"],
-                                                    "seconds": {k: v["s"] for k, v in out.items()}})
+    registry.set_state(key, state)
+    registry.ledger("jobs", key, None, None, {"failed": state["failed"], "seconds": {k: v["s"] for k, v in out.items()}})
     return state
+
+
+def quick() -> dict:
+    return nightly(steps=QUICK, key="quick")
 
 
 def health() -> tuple[list[str], dict]:

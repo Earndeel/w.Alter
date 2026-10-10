@@ -258,17 +258,24 @@ class Drafts:
                 verdict = base.review("new skill proposed by an agent", f"REASON: {p.get('reason')}",
                                       "Accept only a reusable procedure (not a log or diary), specific and actionable "
                                       "(commands, paths, checks), well formed (frontmatter name + 'Use when' description), "
-                                      "with no secret value and no personal data.\n\n" + base.bundle(draft, 40000))
+                                      "with no secret value and no personal data.\n\n" + base.bundle(draft))
         elif kind in ("patch", "hermes_patch") and target in sk:
             changed = p.get("changed", "SKILL.md") if kind == "patch" else None
             old = (sk[target].path / changed).read_text(errors="replace") if changed and (sk[target].path / changed).exists() \
-                else base.bundle(sk[target], 40000)
-            new = (d / changed).read_text(errors="replace") if changed else base.bundle(draft, 40000)
+                else base.bundle(sk[target])
+            new = (d / changed).read_text(errors="replace") if changed else base.bundle(draft)
             lost = sorted(base.atoms(old) - base.atoms(new))[:40]
-            verdict = base.review(f"{kind} of {target}", f"REASON + EVIDENCE: {p.get('reason')}\n\nCURRENT:\n{old}",
-                                  f"Items that disappear: {lost or 'none'} — each must be justified by the reason. "
-                                  f"Accept only a fix/completion consistent with the reason, with no secret value.\n\n"
-                                  f"PROPOSED:\n{new}")
+            ev = p.get("evidence") or {}
+            asked = ("This change was made by Monsieur's own agent (Hermes) in his session. His requests there:\n- "
+                     + "\n- ".join(ev.get("requests") or ["(not found)"])) if kind == "hermes_patch" else \
+                f"REASON + EVIDENCE GIVEN BY THE AGENT: {p.get('reason')}"
+            verdict = base.review(
+                f"{kind} of {target}", f"{asked}\n\nCURRENT VERSION:\n{old}",
+                "Accept unless the new version: contains a secret value or personal data, is a session log instead of "
+                "a procedure, or loses a still-valid procedure that it does not replace "
+                f"(items that disappear: {lost or 'none'}). Do NOT require external proof of new facts: the author is "
+                "Monsieur's agent working on his live system; you cannot verify facts, only integrity and usability."
+                f"\n\nPROPOSED VERSION:\n{new}")
         else:
             verdict = {"ok": False, "issues": [f"{target} is not an active skill"]}
         if verdict and verdict.get("ok"):

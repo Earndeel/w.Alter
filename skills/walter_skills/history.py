@@ -120,3 +120,21 @@ def reads_after(session_id: str, since, until, aliases: dict[str, str]) -> tuple
             if n and n not in opened:
                 opened.append(n)
     return opened, searched
+
+
+def edit_evidence(skill: str, max_messages: int = 4) -> dict:
+    """The most recent agent session that changed a skill (skill_manage / write door): its id and Monsieur's last
+    requests in that session (masked) — the evidence that a change was asked for."""
+    from walter_memory.logs import mask
+    from .registry import db
+    with db() as conn:
+        row = conn.execute(
+            """select session_id, seq from walter_logs.events where type = 'tool/call' and tool = 'skill_manage'
+               and text like %s order by occurred_at desc limit 1""", (f'%"{skill}"%',)).fetchone()
+        if not row:
+            return {}
+        msgs = conn.execute("""select text from walter_logs.events where session_id = %s and type = 'user/message'
+                               and seq < %s order by seq desc limit %s""",
+                            (row["session_id"], row["seq"], max_messages)).fetchall()
+    return {"session_id": row["session_id"],
+            "requests": [mask(m["text"] or "")[:800] for m in reversed(msgs)]}

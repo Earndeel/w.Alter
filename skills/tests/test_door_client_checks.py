@@ -103,3 +103,14 @@ def test_ranker_trains_scores_and_round_trips():
     s = score(r, features(c, r, "messages beeper de sophie"))
     assert c.names[int(np.argmax(s))] == "beeper-messages"
     assert Ranker.loads(r.dumps()).weights == r.weights
+
+
+def test_bundle_never_truncates_silently(tmp_path):
+    d = tmp_path / "big-skill"
+    (d / "references").mkdir(parents=True)
+    (d / "SKILL.md").write_text("---\nname: big-skill\ndescription: Use when x\n---\nbody\n")
+    (d / "references" / "long.md").write_text("x" * 50000 + "END-OF-FILE")
+    s = store._load(d, "active", "")
+    shown = base.bundle(s, per_file=40000)
+    assert "END-OF-FILE" not in shown and "display truncated" in shown and "the file is complete on disk" in shown
+    assert "END-OF-FILE" in base.bundle(s, per_file=60000)
