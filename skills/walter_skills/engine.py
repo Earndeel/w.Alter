@@ -49,7 +49,8 @@ def judged_labels() -> dict[str, dict]:
         for line in open(f):
             if line.strip():
                 r = json.loads(line)
-                labels.setdefault(r["id"], {}).update(r["labels"])
+                if isinstance(r.get("labels"), dict):
+                    labels.setdefault(r["id"], {}).update(r["labels"])
     return labels
 
 
@@ -87,9 +88,10 @@ def train_gate(idx: Index, al: dict[str, str], labels: dict[str, dict], negative
     from sklearn.linear_model import LogisticRegression
     from sklearn.metrics import roc_auc_score
     allc = history.cases(al, negatives=True)
-    pos = [c for c in allc if c["gold"] and not (c["qid"] in labels and not any(v == 2 for v in labels[c["qid"]].values()))]
-    neg = [c for c in allc if not c["gold"]] + [c for c in allc if c["qid"] in labels
-                                                and not any(v == 2 for v in labels[c["qid"]].values())]
+    # judged cases are the truth (2 = needs a skill); unjudged ones fall back to "an agent opened a skill"
+    pos = [c for c in allc if (any(v == 2 for v in labels[c["qid"]].values()) if c["qid"] in labels else c["gold"])]
+    neg = [c for c in allc if (not any(v == 2 for v in labels[c["qid"]].values()) if c["qid"] in labels
+                                else not c["gold"])]
     random.Random(5).shuffle(neg)
     data = sorted([(c, 1) for c in pos] + [(c, 0) for c in neg[:negatives]], key=lambda x: x[0]["ts"])
     X, y = [], []
