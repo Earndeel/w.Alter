@@ -1,6 +1,4 @@
-.worktrees/
-__pycache__/
 bench/data/
-index/cache/
-index/judged/
-index/model/
+__pycache__/
+.cache/
+.worktrees/

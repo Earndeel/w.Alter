@@ -1,17 +1,11 @@
-"""walter-skills CLI.
+"""walter-skills CLI — operator's view of the module.
 
-  sync      Hermes → store (one-way; Hermes keeps its own skills and curator)
-  cards     (re)generate trigger cards for new/changed skills (poste skills.indexer)
-  train     rebuild the learned retriever from walter_logs + judged labels
-  catalog   refresh the Postgres catalogue (skills.catalog) from the store
-  search    "message" [--context …] [--archived]
-  read      name [--file path]
-  curate    curator run (config/curator.json: shadow until shadow_until, then active) [--apply|--shadow] [--no-models]
-  digest    weekly curator digest to Telegram (via `hermes send`)
-  judge     label recent real cases with the judge (the truth the retriever learns from) [--max N]
-  nightly   sync + cards + catalog + judge new cases + train (+ service reload) + curator
-  learn     mine recent busy sessions for new skills / patches → drafts (editor via Codex) [--max N]
-  health    problems as JSON, exit 1 if any (used by the 5-min watchdog)
+  search "message" [--context …] [--archived]      ranking as the agents get it
+  expose "message" [--runtime …] [--session …]    exactly what the policy would show
+  read <name> [--file path]                       a skill (or one of its files)
+  nightly [--only step,…]                         the nightly graph (see jobs.py)
+  sync | cards | catalog | implicit | judge | sessions | train [--force] | curate [--apply|--shadow] | map | digest
+  health                                          problems as JSON, exit 1 if any (5-min watchdog)
 """
 from __future__ import annotations
 
@@ -20,160 +14,82 @@ import json
 import subprocess
 import sys
 
-from . import cards, curator, engine, hermes_sync, learn, store
-
-
-def catalog() -> int:
-    sys.path.insert(0, "/opt/walter-memory")
-    from walter_memory.db import connection
-    n = 0
-    with connection() as conn:
-        names = []
-        for s in store.iter_skills(include_archived=True, include_drafts=True):
-            c = cards.load(s.name) or {}
-            sha = store.tree_hash(s.path)
-            conn.execute(
-                """insert into skills.catalog (name, state, domain, owner, origin, description, summary, path,
-                                               content_sha, card_sha, meta, updated_at)
-                   values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
-                   on conflict (name) do update set state = excluded.state, domain = excluded.domain,
-                     owner = excluded.owner, origin = excluded.origin, description = excluded.description,
-                     summary = excluded.summary, path = excluded.path, content_sha = excluded.content_sha,
-                     card_sha = excluded.card_sha, meta = excluded.meta,
-                     updated_at = case when skills.catalog.content_sha is distinct from excluded.content_sha
-                                       or skills.catalog.state is distinct from excluded.state
-                                       then now() else skills.catalog.updated_at end""",
-                (s.name, s.state, s.domain, s.meta.get("owner"), s.meta.get("origin"), s.description[:2000],
-                 c.get("summary"), str(s.path), sha, c.get("sha"), json.dumps(s.meta)))
-            names.append(s.name)
-            n += 1
-        conn.execute("delete from skills.catalog where not (name = any(%s))", (names,))
-    return n
-
-
-def health() -> tuple[list[str], dict]:
-    import urllib.request
-    from datetime import datetime, timezone
-    problems, m = [], {}
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:8891/health", timeout=10) as r:  # noqa: S310
-            m["service"] = json.loads(r.read())
-    except Exception as e:
-        problems.append(f"walter-skills service down: {type(e).__name__}")
-    show = subprocess.run(["systemctl", "show", "walter-skills-nightly", "-p", "ExecMainStatus",
-                           "-p", "ExecMainExitTimestamp"], capture_output=True, text=True).stdout
-    vals = dict(line.split("=", 1) for line in show.splitlines() if "=" in line)
-    m["nightly_status"] = vals.get("ExecMainStatus")
-    if vals.get("ExecMainStatus") not in (None, "", "0"):
-        problems.append(f"walter-skills nightly failed (status {vals.get('ExecMainStatus')})")
-    ts = vals.get("ExecMainExitTimestamp", "").strip()
-    if ts:
-        try:
-            last = datetime.strptime(" ".join(ts.split()[1:3]), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-            m["nightly_age_h"] = round((datetime.now(timezone.utc) - last).total_seconds() / 3600, 1)
-            if m["nightly_age_h"] > 30:
-                problems.append(f"walter-skills nightly has not run for {m['nightly_age_h']} h")
-        except ValueError:
-            pass
-    drafts = [p for p in store.DRAFTS.iterdir() if p.is_dir()] if store.DRAFTS.exists() else []
-    m["drafts_pending"] = len(drafts)
-    if len(drafts) > 40:
-        problems.append(f"{len(drafts)} skill drafts waiting for the curator")
-    stale = [s.name for s in store.iter_skills() if (cards.load(s.name) or {}).get("sha") != store.tree_hash(s.path)]
-    m["stale_cards"] = len(stale)
-    if len(stale) > 10:
-        problems.append(f"{len(stale)} skills have out-of-date trigger cards")
-    return problems, m
-
 
 def main() -> int:
     ap = argparse.ArgumentParser(prog="walter-skills")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("sync")
-    c = sub.add_parser("cards")
-    c.add_argument("--force", action="store_true")
-    t = sub.add_parser("train")
-    t.add_argument("--log-weight", type=float, default=0.0)
-    sub.add_parser("catalog")
     s = sub.add_parser("search")
-    s.add_argument("message")
-    s.add_argument("--context", default="")
-    s.add_argument("--archived", action="store_true")
-    s.add_argument("-k", type=int, default=5)
+    s.add_argument("message"); s.add_argument("--context", default=""); s.add_argument("--archived", action="store_true")
+    s.add_argument("-k", type=int, default=8)
+    x = sub.add_parser("expose")
+    x.add_argument("message"); x.add_argument("--context", default=""); x.add_argument("--runtime", default="cli")
+    x.add_argument("--session"); x.add_argument("--first", action="store_true"); x.add_argument("--kind", default="message")
     r = sub.add_parser("read")
-    r.add_argument("name")
-    r.add_argument("--file", default=None)
+    r.add_argument("name"); r.add_argument("--file", default=None)
+    n = sub.add_parser("nightly")
+    n.add_argument("--only", default="")
+    for c in ("sync", "cards", "catalog", "implicit", "judge", "sessions", "map", "digest", "health"):
+        sub.add_parser(c)
+    t = sub.add_parser("train")
+    t.add_argument("--force", action="store_true")
     cu = sub.add_parser("curate")
-    cu.add_argument("--apply", action="store_true")
-    cu.add_argument("--shadow", action="store_true")
-    cu.add_argument("--no-models", action="store_true")
-    dg = sub.add_parser("digest")
-    dg.add_argument("--dry-run", action="store_true")
-    jg = sub.add_parser("judge")
-    jg.add_argument("--max", type=int, default=60)
-    jg.add_argument("--days", type=int, default=3)
-    sub.add_parser("nightly")
-    sub.add_parser("health")
-    ln = sub.add_parser("learn")
-    ln.add_argument("--max", type=int, default=3)
-    ln.add_argument("--hours", type=int, default=48)
+    cu.add_argument("--apply", action="store_true"); cu.add_argument("--shadow", action="store_true")
+    cu.add_argument("--only", default="")
     a = ap.parse_args()
+    p = lambda o: print(json.dumps(o, ensure_ascii=False, indent=1, default=str))  # noqa: E731
 
-    if a.cmd == "sync":
-        st = hermes_sync.sync()
-        print(json.dumps({k: (v if isinstance(v, int) else v[:20] + (["…"] if len(v) > 20 else [])) for k, v in st.items()}))
-    elif a.cmd == "cards":
-        print(json.dumps(cards.build(list(store.iter_skills(include_archived=True)), force=a.force)))
-    elif a.cmd == "train":
-        print(json.dumps(engine.train(log_weight=a.log_weight), indent=1, default=str))
-    elif a.cmd == "catalog":
-        print(f"{catalog()} skills in skills.catalog")
-    elif a.cmd == "search":
-        e = engine.load_engine()
-        for row in e.search(a.message, a.context, k=a.k, include_archived=a.archived):
-            print(f"{row['score']:8.3f}  {row['state']:8} {row['name']:40} {row['summary'][:90]}")
+    if a.cmd == "search":
+        from . import policy
+        for row in policy.search(a.message, a.context, a.k, a.archived, runtime="cli"):
+            print(f"{row['score']:8.3f}  {row['state']:8} {row['name']:42} {row['summary'][:90]}")
+    elif a.cmd == "expose":
+        from . import policy
+        e = policy.expose(a.kind, a.message, context=a.context, session_id=a.session, runtime=a.runtime, first_turn=a.first)
+        print(f"[{e.mode} · {e.reason} · {e.latency_ms} ms]\n{e.text}")
     elif a.cmd == "read":
-        text = engine.read_skill(a.name, a.file)
+        from .retrieval import read_skill
+        text = read_skill(a.name, a.file)
         if text is None:
             print(f"unknown: {a.name}", file=sys.stderr)
             return 1
         print(text)
-    elif a.cmd == "curate":
-        apply = True if a.apply else (False if a.shadow else None)
-        r = curator.run(apply=apply, use_models=not a.no_models)
-        print(json.dumps(r["summary"]), r["branch"] or "master")
-    elif a.cmd == "digest":
-        text = curator.digest()
-        print(text)
-        if not a.dry_run:
-            subprocess.run(["/root/.hermes/hermes-agent/venv/bin/hermes", "send", "-t", "telegram", text],
-                           capture_output=True, text=True, timeout=120)
-    elif a.cmd == "learn":
-        print(json.dumps(learn.mine_sessions(max_sessions=a.max, hours=a.hours), ensure_ascii=False))
-    elif a.cmd == "health":
-        problems, m = health()
-        print(json.dumps({"problems": problems, "metrics": m}, default=str))
-        return 1 if problems else 0
-    elif a.cmd == "judge":
-        print(json.dumps(learn.judge_new_cases(max_cases=a.max, days=a.days)))
     elif a.cmd == "nightly":
-        st = hermes_sync.sync()
-        print("sync", {k: (v if isinstance(v, int) else len(v)) for k, v in st.items()})
-        print("cards", cards.build(list(store.iter_skills(include_archived=True))))
-        store.commit("cards refresh", paths=["index/cards"])
-        print("catalog", catalog())
-        try:
-            print("judge", learn.judge_new_cases())
-        except Exception as e:  # never block the nightly on the judge
-            print("judge error", type(e).__name__, str(e)[:200])
-        try:
-            print("learn", learn.mine_sessions())
-        except Exception as e:
-            print("learn error", type(e).__name__, str(e)[:200])
-        print("train", {k: v for k, v in engine.train().items() if k != "weights"})
-        subprocess.run(["systemctl", "try-restart", "walter-skills"], check=False)
-        print("curator", curator.run()["summary"])
-        subprocess.run(["systemctl", "try-restart", "walter-skills"], check=False)
+        from . import jobs
+        p(jobs.nightly(set(filter(None, a.only.split(","))) or None))
+    elif a.cmd == "sync":
+        from . import hermes_sync
+        p({k: (v if isinstance(v, int) else v[:20]) for k, v in hermes_sync.sync().items()})
+    elif a.cmd == "cards":
+        from . import cards
+        p(cards.refresh())
+    elif a.cmd == "catalog":
+        from . import jobs
+        print(f"{jobs.catalog()} skills in skills.catalog")
+    elif a.cmd in ("implicit", "judge", "sessions"):
+        from . import learning
+        p({"implicit": learning.implicit, "judge": learning.judge, "sessions": learning.drafts_from_sessions}[a.cmd]())
+    elif a.cmd == "train":
+        from . import learning
+        p(learning.train_and_promote(force=a.force))
+    elif a.cmd == "curate":
+        from . import curation
+        apply = True if a.apply else (False if a.shadow else None)
+        p(curation.run(apply=apply, only=set(filter(None, a.only.split(","))) or None))
+    elif a.cmd == "map":
+        from . import domains
+        domains.build()
+        print(domains.render("skills_search"))
+    elif a.cmd == "digest":
+        from . import curation
+        text = curation.digest()
+        print(text)
+        subprocess.run(["/root/.hermes/hermes-agent/venv/bin/hermes", "send", "-t", "telegram", text],
+                       capture_output=True, text=True, timeout=120)
+    elif a.cmd == "health":
+        from . import jobs
+        problems, m = jobs.health()
+        p({"problems": problems, "metrics": m})
+        return 1 if problems else 0
     return 0
 
 
