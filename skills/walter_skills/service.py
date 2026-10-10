@@ -62,6 +62,20 @@ def _journal(body: SearchIn, results: list[dict], injected: list[str], ms: int, 
         pass
 
 
+def _recently_injected(session_id: str | None, turns: int = 3) -> tuple[set[str], int]:
+    """Skills already proposed to this session in its last `turns` injections (and how many injections it had)."""
+    if not session_id:
+        return set(), 0
+    try:
+        with connection() as conn:
+            rows = conn.execute("""select injected from skills.retrievals where session_id = %s and mode = 'inject'
+                                   and at > now() - interval '6 hours' order by at desc limit %s""",
+                                (session_id, turns)).fetchall()
+    except Exception:
+        return set(), 0
+    return {n for r in rows for n in (r["injected"] or [])}, len(rows)
+
+
 @app.post("/v1/search")
 def search(body: SearchIn) -> dict:
     t0 = time.perf_counter()
@@ -86,8 +100,20 @@ def search(body: SearchIn) -> dict:
         picked = [by[n] | {"chosen": True} for n in chosen]
         results = picked + [r for r in results if r["name"] not in chosen]
     results = results[:k]
-    inject = [r["name"] for r in results if r.get("chosen")] if stage == "chooser" else \
-        ([r["name"] for r in results if r["state"] == "active"] if (need is None or need >= body.need_threshold) else [])
+    if stage == "chooser":
+        inject = [r["name"] for r in results if r.get("chosen")]
+    elif need is not None and need < body.need_threshold:
+        inject = []
+    else:
+        # only what is new for this session: not proposed in its last 3 injections, not read in the last 2 turns
+        seen, n_prev = _recently_injected(body.session_id) if body.mode == "inject" else (set(), 0)
+        ranked = [r["name"] for r in results if r["state"] == "active"]
+        fresh = [n for n in ranked if n not in seen and session.get(n, 99) > 1]
+        if n_prev:  # ongoing session: only new skills that rank high, never a deep refill of the list
+            fresh = [n for n in fresh if ranked.index(n) < (12 if len(body.message.split()) >= 6 else 8)]
+            if len(body.message.split()) < 6:  # short follow-up ("continue", "ok vas-y"): only if clearly needed
+                fresh = fresh[:3] if (need is None or need >= 0.6) else []
+        inject = fresh
     ms = round(1000 * (time.perf_counter() - t0))
     _journal(body, results, inject if body.mode in ("inject", "shadow") else [], ms, f"{e.version}/{stage}")
     return {"results": results, "inject": inject, "need": need, "stage": stage, "latency_ms": ms,
