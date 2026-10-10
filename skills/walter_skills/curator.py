@@ -476,6 +476,128 @@ def review(kind: str, before: str, after: str) -> dict | None:
     return models.judge(prompt)
 
 
+
+# ───────────────────────────── drafts (agents' proposals) ─────────────────────────────
+
+def process_drafts(root: Path, mode: str, use_models: bool) -> dict[str, list]:
+    """Review drafts/: new skills and patches proposed by agents through the write door (proposals.py).
+    Accepted → live (new skill under skills/<domain>/<name>, patch applied); rejected → removed from drafts/ (kept in
+    git history + ledger). Hermes conflict drafts (kind hermes_update) are reported, not auto-merged."""
+    out: dict[str, list] = defaultdict(list)
+    ddir = root / "drafts"
+    if not ddir.exists():
+        return out
+    active = {s.name: s for s in store.iter_skills(root=root)}
+    from .retrieve import Encoder
+    enc = Encoder("minishlab/potion-multilingual-128M")
+    names = list(active)
+    mat = enc([f"{n.replace('-', ' ')}: {(cards_mod.load(n) or {}).get('summary', '')} {active[n].description}"
+               for n in names]) if names else None
+    for d in sorted(p for p in ddir.iterdir() if (p / "SKILL.md").exists()):
+        meta = store.read_sidecar(d)
+        kind, target = meta.get("kind"), meta.get("target")
+        entry = {"draft": d.name, "kind": kind, "target": target, "runtime": meta.get("runtime"),
+                 "reason": (meta.get("reason") or "")[:300]}
+        if kind == "hermes_update":
+            out["hermes_conflicts"].append(entry)
+            continue
+        if not use_models:
+            out["drafts_pending"].append(entry)
+            continue
+        body = (d / "SKILL.md").read_text(errors="replace")
+        if kind == "new":
+            if target in active or (root / "archive" / target).exists():
+                verdict = {"ok": False, "issues": [f"{target} already exists"]}
+            else:
+                v = enc([f"{target.replace('-', ' ')}: {meta.get('description') or ''}"])[0]
+                sims = (mat @ v) if mat is not None else np.array([])
+                top = int(np.argmax(sims)) if len(sims) else None
+                near = names[top] if top is not None and sims[top] >= 0.85 else None
+                verdict = review(
+                    "new skill proposed by an agent",
+                    f"REASON GIVEN BY THE AGENT: {meta.get('reason')}\n" +
+                    (f"CLOSEST EXISTING SKILL ({near}, very similar):\n{active[near].body[:15000]}" if near else
+                     "No very similar skill exists."),
+                    "Accept only if it is a reusable procedure (not a one-off log or a diary), specific to Monsieur's "
+                    "tools/infra/projects or a clear general method, well formed (frontmatter name + 'Use when' "
+                    "description), actionable (commands, paths, checks), contains no secret values and no personal "
+                    "data, and does not duplicate the closest existing skill (if it does, reject: it should be a patch "
+                    f"of that skill).\n\nPROPOSED SKILL ({target}):\n{_skill_bundle(store._load(d, 'draft', ''), 40000)}")
+        elif kind == "hermes_patch":
+            s = active.get(target)
+            if s is None:
+                verdict = {"ok": False, "issues": [f"{target} is not an active skill any more"]}
+            else:
+                old_b, new_b = _skill_bundle(s, 40000), _skill_bundle(store._load(d, "draft", ""), 40000)
+                lost = sorted(atoms(old_b) - atoms(new_b))[:40]
+                verdict = review(
+                    "patch made by the Hermes agent while using the skill",
+                    f"CURRENT {target}:\n{old_b}",
+                    "Accept unless the new version loses still-valid procedures, adds secret values, or turns the "
+                    f"skill into a session log. Items that disappear: {lost or 'none'}.\n\nNEW {target}:\n{new_b}")
+        elif kind == "patch":
+            s = active.get(target)
+            changed = meta.get("changed", "SKILL.md")
+            if s is None:
+                verdict = {"ok": False, "issues": [f"{target} is not an active skill any more"]}
+            else:
+                old = (s.path / changed).read_text(errors="replace") if (s.path / changed).exists() else ""
+                new = (d / changed).read_text(errors="replace")
+                lost = sorted(atoms(old) - atoms(new))[:40]
+                verdict = review(
+                    "patch proposed by an agent that used the skill",
+                    f"REASON + EVIDENCE GIVEN BY THE AGENT: {meta.get('reason')}\n\nCURRENT {target}/{changed}:\n"
+                    f"{old[:40000]}",
+                    "Accept only if the change fixes or completes the skill consistently with the reason, keeps every "
+                    "still-valid procedure, adds no secret value, and does not turn it into a session log. Items of "
+                    f"the current text that disappear: {lost or 'none'} — each must be justified by the reason "
+                    f"(obsolete/wrong).\n\nPROPOSED {target}/{changed}:\n{new[:40000]}")
+        else:
+            verdict = {"ok": False, "issues": [f"unknown draft kind {kind!r}"]}
+        entry["judge"] = verdict
+        if verdict and verdict.get("ok"):
+            if kind == "new":
+                dst = root / "skills" / (meta.get("domain") or "learned") / target
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(d), str(dst))
+                side = {"origin": "hermes-agent" if meta.get("runtime") == "hermes" else "agent-proposal",
+                        "owner": "walter", "proposed_by": meta.get("runtime"), "session_id": meta.get("session_id"),
+                        "reason": meta.get("reason"), "accepted_at": _now().isoformat(timespec="seconds")}
+                if meta.get("hermes"):
+                    side["hermes"] = meta["hermes"]
+                store.write_sidecar(dst, side)
+                side["store_sha"] = store.tree_hash(dst)
+                store.write_sidecar(dst, side)
+            elif kind == "hermes_patch":
+                s = active[target]
+                keep_meta = s.meta
+                shutil.rmtree(s.path)
+                shutil.move(str(d), str(s.path))
+                hermes = (keep_meta.get("hermes") or {}) | (meta.get("hermes") or {})
+                hermes.pop("pending_sha", None)
+                new_meta = keep_meta | {"hermes": hermes}
+                store.write_sidecar(s.path, new_meta)
+                store.write_sidecar(s.path, new_meta | {"store_sha": store.tree_hash(s.path)})
+            else:
+                s = active[target]
+                changed = meta.get("changed", "SKILL.md")
+                (s.path / changed).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(d / changed, s.path / changed)
+                shutil.rmtree(d)
+            c = store.commit(f"curator: accept {kind} {target} from {meta.get('runtime')} ({meta.get('reason', '')[:100]})",
+                             root=root, author="walter-curator", paths=["skills", "drafts"])
+            out["drafts_accepted"].append(entry | {"commit": c})
+            if mode == "active":
+                _ledger(f"draft_{kind}", target, c, entry)
+        else:
+            shutil.rmtree(d)
+            c = store.commit(f"curator: reject {kind} {target} ({'; '.join((verdict or {}).get('issues', ['no verdict']))[:150]})",
+                             root=root, author="walter-curator", paths=["drafts"])
+            out["drafts_rejected"].append(entry | {"commit": c})
+            if mode == "active":
+                _ledger(f"draft_{kind}_rejected", target, c, entry)
+    return out
+
 # ───────────────────────────── apply ─────────────────────────────
 
 def _worktree(day: str) -> Path:
@@ -632,6 +754,10 @@ def run(apply: bool | None = None, use_models: bool = True, only: set[str] | Non
                                  root=root, author="walter-curator")
                 if mode == "active":
                     _ledger("workflow", name, c, entry)
+
+    if not only or "drafts" in only:
+        for k, v in process_drafts(root, mode, use_models).items():
+            done[k].extend(v)
 
     summary = {"mode": mode, "editor": "codex:" + models.EDITOR_MODEL if editor_ok else "unavailable",
                "proposed": {k: len(v) for k, v in P.items()}, "done": {k: len(v) for k, v in done.items()}}

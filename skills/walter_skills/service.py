@@ -17,7 +17,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
-from . import engine, history
+from . import engine, history, proposals
 
 sys.path.insert(0, "/opt/walter-memory")
 from walter_memory.db import connection  # noqa: E402
@@ -106,6 +106,44 @@ def skill(name: str, file_path: str | None = None, runtime: str | None = None, s
     except Exception:
         pass
     return text
+
+
+class ProposeIn(BaseModel):
+    name: str
+    skill_md: str
+    reason: str
+    files: dict[str, str] | None = None
+    domain: str = ""
+    runtime: str | None = None
+    session_id: str | None = None
+
+
+class PatchIn(BaseModel):
+    name: str
+    reason: str
+    skill_md: str | None = None
+    file_path: str | None = None
+    content: str | None = None
+    runtime: str | None = None
+    session_id: str | None = None
+
+
+def _door(fn, **kw) -> dict:
+    try:
+        with _lock:  # one writer at a time (git)
+            return {"ok": True} | fn(**kw)
+    except proposals.Refused as e:
+        return {"ok": False, "refused": str(e)}
+
+
+@app.post("/v1/skills/propose")
+def propose(body: ProposeIn) -> dict:
+    return _door(proposals.propose, **body.model_dump())
+
+
+@app.post("/v1/skills/patch")
+def patch(body: PatchIn) -> dict:
+    return _door(proposals.patch, **body.model_dump())
 
 
 @app.get("/health")
