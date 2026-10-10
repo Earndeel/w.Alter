@@ -6,12 +6,14 @@ capabilities without importing Hermes internals:
 
   memory_recall / memory_retain / memory_reflect  → Hindsight (Postgres + pgvector), bank "walter"
   walter_profile                                  → USER.md / SOUL.md / MEMORY.md
-  skills_search / skill_read                      → Hermes procedural skills (~/.hermes/skills)
+  skills_search / skill_read                      → W.Alter skills (walter-skills service :8891, store /opt/walter-skills)
   ask_hermes                                      → delegate a task to the live Hermes agent (all its tools)
   memory_search / memory_events                   → unified search (knowledge + evidence) / canonical event history
   person_lookup                                   → Kardex social card (relationship metrics, accounts, groups)
   memory_context                                  → budgeted context block for a request (P6 context engine)
   vault_search / vault_get / vault_put            → Raw Vault: every non-text raw file (Google Drive + PG catalog)
+  browser_session / browser_sites                 → Camoufox session logged in as Monsieur (his Brave cookies,
+                                                    injected server-side; agents never see a cookie value)
   walter_health                                   → status of the stack services
 
 Each tool talks to a public HTTP API or a file, never to Hermes' Python modules, so `hermes update`
@@ -24,7 +26,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -37,7 +38,6 @@ HINDSIGHT_URL = os.environ.get("WALTER_HINDSIGHT_URL", "http://127.0.0.1:8888")
 BANK = os.environ.get("WALTER_BANK_ID", "walter")
 HERMES_API_URL = os.environ.get("WALTER_HERMES_API_URL", "http://127.0.0.1:8642")
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
-SKILLS_DIR = HERMES_HOME / "skills"
 STACK_UNITS = [
     "hindsight-api", "walter-voice-memory", "walter-memory-gateway", "raw-vault-s3", "hermes-bridge", "voice-router",
     "hermes-dashboard", "cloudflared-tunnel", "docker",
@@ -65,30 +65,6 @@ def _hindsight(path: str, body: dict, timeout: float = 60.0) -> dict:
     if r.status_code >= 400:
         raise RuntimeError(f"Hindsight {path} → HTTP {r.status_code}: {r.text[:300]}")
     return r.json()
-
-
-def _frontmatter(text: str) -> dict:
-    m = re.match(r"^---\n(.*?)\n---", text, re.S)
-    if not m:
-        return {}
-    out = {}
-    for line in m.group(1).splitlines():
-        if ":" in line and not line.startswith(" "):
-            k, v = line.split(":", 1)
-            out[k.strip()] = v.strip().strip('"')
-    return out
-
-
-def _skills() -> list[dict]:
-    items = []
-    for f in sorted(SKILLS_DIR.rglob("SKILL.md")):
-        try:
-            meta = _frontmatter(f.read_text(errors="replace")[:4000])
-        except OSError:
-            continue
-        items.append({"name": meta.get("name") or f.parent.name, "description": meta.get("description", ""),
-                      "tags": meta.get("tags", ""), "path": str(f)})
-    return items
 
 
 mcp = FastMCP("walter-core", instructions=(
@@ -155,28 +131,61 @@ def walter_profile() -> str:
     return "\n\n".join(parts)
 
 
-@mcp.tool()
-def skills_search(query: str = "", limit: int = 15) -> str:
-    """Search W.Alter's procedural skills (how-tos for the user's tools, infra and workflows).
-    Empty query lists the first skills. Read one with skill_read before doing that kind of task."""
-    words = [w for w in query.lower().split() if w]
-    scored = []
-    for s in _skills():
-        hay = f"{s['name']} {s['description']} {s['tags']}".lower()
-        score = sum(hay.count(w) + 3 * (w in s["name"].lower()) for w in words) if words else 1
-        if score:
-            scored.append((score, s))
-    scored.sort(key=lambda x: -x[0])
-    return "\n".join(f"- {s['name']}: {s['description'][:200]}" for _, s in scored[:max(1, int(limit))]) or "No skill matched."
+from walter_skills import client as skills_client  # walter-skills adapter: transport only, fallback to the git store
 
 
 @mcp.tool()
-def skill_read(name: str) -> str:
-    """Read the full SKILL.md of a W.Alter skill by name (as returned by skills_search)."""
-    for s in _skills():
-        if s["name"] == name or Path(s["path"]).parent.name == name:
-            return Path(s["path"]).read_text(errors="replace")[:60000]
-    return f"Unknown skill '{name}'. Use skills_search."
+def skills_search(query: str = "", limit: int = 8, context: str = "", include_archived: bool = False) -> str:
+    """Find the W.Alter skills (tested procedures for Monsieur's tools, infra, projects and workflows) that match an
+    intent. Pass the user's request as `query` (any language, plain words) and optionally the previous turn as
+    `context`. Read the chosen skill with skill_read before acting. include_archived=True also searches retired
+    skills (marked [archived])."""
+    rows = skills_client.search(query, context, max(1, min(int(limit), 20)), include_archived, runtime=f"mcp-{CLIENT_TAG}")
+    return "\n".join(f"- {x['name']}{' [archived]' if x.get('state') == 'archived' else ''}: {x.get('summary', '')[:220]}"
+                     for x in rows) or "No skill matched."
+
+
+@mcp.tool()
+def skill_read(name: str, file_path: str = "") -> str:
+    """Read the full SKILL.md of a W.Alter skill by name (as returned by skills_search), or one of its linked files
+    (references/…, scripts/…) with file_path."""
+    text = skills_client.read(name, file_path, runtime=f"mcp-{CLIENT_TAG}")
+    return text[:60000] if text else f"Unknown skill or file '{name}' {file_path}. Use skills_search."
+
+
+def _skills_door(kind: str, body: dict) -> str:
+    d = skills_client.write(kind, body | {"runtime": CLIENT_TAG})
+    if not d.get("ok"):
+        return f"Refused: {d.get('refused') or d}"
+    return f"Draft recorded ({d['draft']}). The walter-skills watcher judges it within a minute (judge + checks); if accepted it is live right away."
+
+
+@mcp.tool()
+def skill_propose(name: str, skill_md: str, reason: str, files_json: str = "", domain: str = "",
+                  session_id: str = "") -> str:
+    """Propose a NEW W.Alter skill after solving a task that will recur (a procedure that took several steps, a fix
+    found the hard way, a workflow Monsieur asked for). skill_md = full SKILL.md with frontmatter (name: <name>,
+    description: one line starting with "Use when …"), then the procedure as imperative rules with exact commands,
+    paths and checks. Never paste secrets: say where they live. files_json = optional JSON {"references/x.md": "…",
+    "scripts/y.sh": "…"}. Goes to drafts; judged within a minute before it is live."""
+    try:
+        files = json.loads(files_json) if files_json.strip() else None
+    except json.JSONDecodeError as e:
+        return f"files_json is not valid JSON: {e}"
+    return _skills_door("propose", {"name": name, "skill_md": skill_md, "reason": reason, "files": files,
+                                    "domain": domain, "session_id": session_id or None})
+
+
+@mcp.tool()
+def skill_patch(name: str, reason: str, skill_md: str = "", file_path: str = "", content: str = "",
+                session_id: str = "") -> str:
+    """Fix or improve an existing W.Alter skill when it proved wrong, outdated or incomplete while you used it (a
+    command that failed, a path that moved, a missing step, a pitfall). Give either the full corrected skill_md, or
+    file_path + content to replace one linked file (references/…, scripts/…). reason = what was wrong + evidence.
+    Goes to drafts; judged within a minute before it is live."""
+    return _skills_door("patch", {"name": name, "reason": reason, "skill_md": skill_md or None,
+                                  "file_path": file_path or None, "content": content or None,
+                                  "session_id": session_id or None})
 
 
 @mcp.tool()
@@ -327,6 +336,29 @@ def vault_put(path: str, source: str = "", captured_at: str = "", links: list[st
     for link in links or []:
         args += ["--link", link]
     return _walter_memory(*args)
+
+
+@mcp.tool()
+def browser_session(site: str, session: str = "", verify: bool = True) -> str:
+    """Open (or refresh) a Camoufox browser session logged in as Monsieur on a site (google, meta, linkedin, x…; see
+    browser_sites), so you can use a web interface on his behalf. His current Brave cookies are copied from his Mac,
+    decrypted and injected server-side: only metadata comes back (cookie counts, authenticated yes/no), never a value.
+    Then drive the browser with the Camoufox HTTP API on 127.0.0.1:9377 (/tab/new, /tab/navigate, /tab/snapshot,
+    /tab/click, /tab/keyboard-type, /tab/fetch-binary, /tab/close) using userId = the returned session name.
+    session: [a-z0-9_-] name, default '<site>-me'. Call again whenever the site shows a sign-in page."""
+    import browser_auth
+    try:
+        return json.dumps(browser_auth.login(site, session, client=CLIENT_TAG, verify=verify), ensure_ascii=False)
+    except Exception as e:
+        return f"browser_session failed: {e}"
+
+
+@mcp.tool()
+def browser_sites() -> str:
+    """Sites browser_session can log into (name → cookie domains, login check URL). Add one in
+    /opt/walter-core/browser_sites.json (no secret in it)."""
+    import browser_auth
+    return json.dumps(browser_auth.sites(), ensure_ascii=False)
 
 
 @mcp.tool()
