@@ -4,6 +4,7 @@
 
 - Préparer code, fichiers, paramètres et hashes sur l'agent avant l'allocation ; utiliser le plus petit accélérateur explicitement choisi qui suffit à la charge, jamais une substitution silencieuse. Une allocation GPU peut consommer des compute units dès la préparation : aucun achat et aucune consommation sont des contrats distincts.
 - Employer le MCP officiel dans une session navigateur autorisée, puis l'interface Fichiers Colab pour les petits fichiers. Conserver OAuth côté agent : ne pas injecter de refresh token, ne pas exposer un serveur de fichiers public et ne pas appeler drive.mount pour ce chemin.
+- Sérialiser les commandes pour un même notebook avec un verrou local non bloquant conservé jusqu'après cleanup : deux vérifications de zéro session peuvent se croiser puis se supprimer mutuellement. Refuser le second job avant construction du navigateur ; ne pas lancer d'outil bas niveau ni intervenir manuellement pendant un cycle.
 - Lire le runtime et toutes les sessions avant de modifier le type ou d'allouer ; refuser toute session préexistante. Un status doit lire seulement UI/resources, jamais initialiser une cellule ou ouvrir une connexion de calcul.
 - Réserver un store local simple sans symlink ni parent symlink. Inspecter nom/taille/SHA256 avant upload : skip si identique, refuser la collision différente ou un objet symlink. Vérifier à nouveau après transfert.
 - Borne avant réseau : exiger la taille mesurée côté runtime et SHA256 avant download ; contrôler blob/chunks et récupérer vers un fichier temporaire sans écrasement. Les SDK/UI peuvent tamponner la réponse entière : une borne sink n'est pas une garantie de mémoire réseau.
@@ -20,5 +21,9 @@
 - Les anciens scripts de preuve peuvent être incompatibles avec un contrat récemment durci (taille pin, status sans initialisation, ownership cellule). Ne pas les relancer aveuglément : revoir leurs appels avant une nouvelle autorisation live.
 
 ## Implantation
+
+Entrée canonique : `/opt/walter-colab/on_demand.py job SCRIPT --input PATH --output NAME --device cpu --timeout-seconds 60 --result-dir PATH`. Les paramètres input/output sont répétables. Le CLI borne chaque fichier à 80 MiB, revalide hashes et sources, refuse les collisions non identiques et sérialise par notebook. Les GPU T4/L4/A100 exigent `--allow-included-units` et un solde positif vivant ; ce flag autorise les unités présentes, jamais un achat ni une garantie de zéro consommation. Le timeout (1..3600) borne le subprocess, pas le cycle entier ; zéro retour seulement après job réussi et suppression vérifiée. Les erreurs controller sont JSON sur stderr. `run.py status` n'alloue pas ; les autres sous-commandes bas niveau peuvent allouer sans supprimer et ne remplacent pas le CLI canonique.
+
+Valider le CLI réel en CPU avec un input/output hashé, puis un timeout volontaire et zéro session après chaque cycle. Ne pas multiplier les probes GPU pour tester le contrôle. Distinguer le délai total de cycle de la durée cellule : regrouper les tâches utiles dans un seul processus pour amortir allocation/transfert, sans serveur ni keep-alive. Les protections Python finally ne survivent pas à une VM/processus contrôleur mort ; ne pas promettre une libération garantie dans ce cas.
 
 Le contrôleur et le runbook sont dans /opt/walter-colab ; les preuves d'exécution sont séparées des contrats et des tests locaux. Traiter les chemins comme points de découverte, vérifier les fichiers actuels avant usage et ne pas reprendre un état historique du solde ou du GPU comme état présent.
