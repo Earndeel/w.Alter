@@ -2,7 +2,7 @@
 
 ## Cycle sûr
 
-- Préparer code, fichiers, paramètres et hashes sur l'agent avant l'allocation ; utiliser le plus petit accélérateur explicitement choisi qui suffit à la charge, jamais une substitution silencieuse. Une allocation GPU peut consommer des compute units dès la préparation : aucun achat et aucune consommation sont des contrats distincts.
+- Préparer code, fichiers, paramètres et hashes sur l'agent avant l'allocation ; choisir explicitement un accélérateur suffisant selon les unités par résultat utile mesurées sur la charge complète, jamais automatiquement le plus petit GPU ni une substitution silencieuse. Comparer taux vivant et temps alloué, préparation/chargement/transferts inclus, à qualité égale ; un GPU plus puissant peut être plus économique s'il compense son taux par sa vitesse. Optimiser la consommation n'exige pas qu'elle soit nulle ; un test CPU ne prouve pas le choix GPU optimal.
 - Employer le MCP officiel dans une session navigateur autorisée, puis l'interface Fichiers Colab pour les petits fichiers. Conserver OAuth côté agent : ne pas injecter de refresh token, ne pas exposer un serveur de fichiers public et ne pas appeler drive.mount pour ce chemin.
 - Sérialiser les commandes pour un même notebook avec un verrou local non bloquant conservé jusqu'après cleanup : deux vérifications de zéro session peuvent se croiser puis se supprimer mutuellement. Refuser le second job avant construction du navigateur ; ne pas lancer d'outil bas niveau ni intervenir manuellement pendant un cycle.
 - Lire le runtime et toutes les sessions avant de modifier le type ou d'allouer ; refuser toute session préexistante. Un status doit lire seulement UI/resources, jamais initialiser une cellule ou ouvrir une connexion de calcul.
