@@ -1,6 +1,7 @@
 {
  "hermes": {
   "path": "/root/.hermes/skills/cloud/colab-external-gpu",
+  "pending_sha": "dbd8b52a584af8af85273b8a09e444095de42de9dde53c5fa27243d872fa0f01",
   "sha": "3a1104ca73a9bc404f23f4902658b22c8dc220f1dfdc63249bfe759e16ecc157",
   "state": "active"
  },
