@@ -8,14 +8,16 @@ At real decision points (first call of a turn, in long sessions, where walter-co
   3. a judge grades each answer against gold: correct / recoverable / wrong / unknown.
 Pass: walter-context retention (correct + recoverable) is not significantly below full-history retention.
 
-Calls go through walter_memory.llm (privacy guard, budget 'backfill', accounting). Default is --estimate (no call).
-  walter-context quality [--samples 30] [--model openai/gpt-6-luna] [--run]
+Calls go through walter_memory.llm (privacy guard, budget 'backfill', accounting). The model is the Walter Router's
+OpenRouter route for --task (decision 2026-10-11: no model id in code), or --model. Default is an estimate (no call).
+  walter-context quality [--samples 30] [--task document | --model <openrouter id>] [--run]
 """
 from __future__ import annotations
 
 import argparse
 import json
 import random
+import subprocess
 import sys
 from pathlib import Path
 
@@ -87,6 +89,16 @@ def points(conn, cfg, samples: int, seed: int) -> list[tuple[str, list[dict], li
     return out
 
 
+def routed(task: str) -> tuple[str, float | None]:
+    """The Walter Router's OpenRouter route for a task: (model id, blended USD per M tokens)."""
+    out = subprocess.run(["/opt/walter-router/bin/walter-router", "pick", task], capture_output=True, text=True,
+                         timeout=120, check=True).stdout
+    for ex in json.loads(out).get("execution") or []:
+        if ex.get("provider") == "openrouter":
+            return ex["model"], ex.get("blended_1m")
+    raise SystemExit(f"no OpenRouter route for task {task!r}: pass --model")
+
+
 def _json(text: str):
     text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     return json.loads(text[text.find("["):text.rfind("]") + 1])
@@ -96,7 +108,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="walter-context quality")
     ap.add_argument("--samples", type=int, default=30)
     ap.add_argument("--probes", type=int, default=4)
-    ap.add_argument("--model", default="openai/gpt-6-luna")
+    ap.add_argument("--task", default="document", help="Walter Router task whose OpenRouter route is used")
+    ap.add_argument("--model", help="OpenRouter model id (overrides the router)")
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--run", action="store_true", help="really call the model (spends the backfill budget)")
     ap.add_argument("--json")
@@ -104,17 +117,19 @@ def main(argv=None) -> int:
     from walter_memory import llm
     from walter_memory.db import connection
     cfg = load()
+    model, per_m = (a.model, None) if a.model else routed(a.task)
     with connection() as conn:
         pts = points(conn, cfg, a.samples, a.seed)
     full_tok = sum(len(flatten(f)) // 4 for _, f, _ in pts)
     wc_tok = sum(len(flatten(w)) // 4 for _, _, w in pts)
-    est = {"samples": len(pts), "input_tokens_est": 2 * full_tok + wc_tok, "full_mean": full_tok // max(1, len(pts)),
+    est = {"model": model, "samples": len(pts), "input_tokens_est": 2 * full_tok + wc_tok,
+           "usd_est": round((2 * full_tok + wc_tok) / 1e6 * per_m, 2) if per_m else None, "full_mean": full_tok // max(1, len(pts)),
            "walter_context_mean": wc_tok // max(1, len(pts)),
            "balance_usd": llm.account_balance(), "budget": llm.budget_status("backfill")}
     print(json.dumps(est, default=str, indent=2))
     if not a.run:
         return 0
-    ask = lambda prompt, purpose: llm.chat([{"role": "user", "content": prompt}], model=a.model,  # noqa: E731
+    ask = lambda prompt, purpose: llm.chat([{"role": "user", "content": prompt}], model=model,  # noqa: E731
                                            processor="walter-context.quality", privacy_class="cloud_allowed",
                                            budget="backfill", purpose=purpose)["content"]
     tally = {"full": {}, "walter-context": {}}
