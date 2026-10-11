@@ -1,0 +1,4 @@
+name: walter-context
+version: 0.1.0
+description: "walter-context — the payload of every model call, cache first (projection: record | compact | live), originals via context_recover"
+author: W.Alter

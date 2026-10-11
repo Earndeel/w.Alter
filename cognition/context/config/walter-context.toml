@@ -1,0 +1,89 @@
+# walter-context — the ONLY place for tunables (code holds no magic numbers).
+# Profiles are priors: the replay bench (bench/replay.py) is what justifies changing them.
+
+[projection]
+keep_turns = 1               # completed turns kept verbatim after a boundary, besides the live turn
+live_keep_steps = 4          # emergency mid-turn cut: last assistant steps of the live turn kept verbatim
+tool_keep_chars = 600        # compact zone: tool outputs up to this size stay verbatim (a digest would not pay)
+excerpt_chars = 280          # compact zone: excerpt kept from a compacted tool output
+args_chars = 240             # compact zone: tool-call arguments longer than this are clipped
+text_clip_chars = 6000       # compact zone: user / assistant text longer than this keeps head + tail
+record_user_chars = 1200     # record zone: user request per turn
+record_assistant_chars = 900 # record zone: final assistant answer per turn
+record_actions = 12          # record zone: actions listed per turn before "+n more"
+user_label = "User"
+assistant_label = "Assistant"
+
+[policy]
+horizon_calls = 12           # prior for cached reuses after a boundary; replaced by the session's own calls-per-turn
+min_gain_tokens = 6000       # a boundary must remove at least this much
+compact_share = 0.4          # fold the compact zone into the record when it exceeds this share of the effective budget
+record_share = 0.3           # condense the record (oldest turns brief, then omitted) beyond this share, down to half
+regret_tokens = 4000         # mid-turn, weigh moves again only after the payload grew this much over budget
+emergency_share = 0.92       # host-side compression only above this share of the context window (should never fire)
+
+# Model profiles: first `match` (fnmatch on the lower-cased model id) wins; the last one is the default.
+# effective_budget = where quality starts to suffer (not the advertised window); hard_budget = never exceed.
+# cache: prefix (automatic prefix cache) | breakpoints (explicit markers) | none.  Costs are relative to input = 1.
+[[model]]
+match = "gpt-6*"
+effective_budget = 96000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 900
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "gpt-5*"
+effective_budget = 80000
+hard_budget = 140000
+cache = "prefix"
+cache_ttl_s = 900
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "claude-*"
+effective_budget = 120000
+hard_budget = 180000
+cache = "breakpoints"
+cache_ttl_s = 300
+cached_cost = 0.10
+write_cost = 1.25
+
+[[model]]
+match = "gemini-*"
+effective_budget = 64000
+hard_budget = 200000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.25
+write_cost = 1.0
+
+[[model]]
+match = "*deepseek*"
+effective_budget = 64000
+hard_budget = 110000
+cache = "prefix"
+cache_ttl_s = 3600
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "*glm*"
+effective_budget = 64000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 600
+cached_cost = 0.20
+write_cost = 1.0
+
+[[model]]
+match = "*"
+effective_budget = 64000
+hard_budget = 100000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.25
+write_cost = 1.0

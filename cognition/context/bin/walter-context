@@ -1,0 +1,2 @@
+#!/bin/sh
+cd /opt/walter-context && PGPASSFILE=/root/.pgpass PYTHONPATH=/opt/walter-context:/opt/walter-memory exec /opt/walter-memory/venv/bin/python -m walter_context.cli "$@"
