@@ -1,0 +1,21 @@
+{
+ "created_at": "2026-10-11T17:06:50+00:00",
+ "domain": "cloud",
+ "evidence": {
+  "requests": [
+   "Des qu'on va brancher le gpu pour les générations avec qwen ou H3, faut que ce soit deja tout pret pour economiser un max de creditcollab",
+   "Pourquoi on a pas de comfy.ui pour les worflow ?",
+   "Oui pas forcement d'interface graphique tant que ça marche et que je peux parler avec toi pour modifier les worflows, et tu peux me faire une sythese de ceux ci"
+  ],
+  "session_id": "hermes/main/20261011_163334_4c8224"
+ },
+ "hermes": {
+  "path": "/root/.hermes/skills/cloud/colab-external-gpu",
+  "sha": "41c78c844d3e67e62e896d0034865c36157d0359835b68f3c658acf533452de7",
+  "state": "active"
+ },
+ "kind": "hermes_patch",
+ "reason": "patched by the Hermes agent",
+ "runtime": "hermes",
+ "target": "colab-external-gpu"
+}
