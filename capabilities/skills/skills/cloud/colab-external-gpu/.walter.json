@@ -1,12 +1,11 @@
 {
  "hermes": {
   "path": "/root/.hermes/skills/cloud/colab-external-gpu",
-  "pending_sha": "73e8859f681727f030e89d74c59fe42f8246b6ebf4fef48e91f5bf5c6a335971",
-  "sha": "a4f91f7e31cb4aff8cba3fede12aec766c81b02abe3397acc9c0f29119f1394c",
+  "sha": "73e8859f681727f030e89d74c59fe42f8246b6ebf4fef48e91f5bf5c6a335971",
   "state": "active"
  },
  "imported_at": "2026-10-10T04:11:29+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
- "store_sha": "a4f91f7e31cb4aff8cba3fede12aec766c81b02abe3397acc9c0f29119f1394c"
+ "store_sha": "73e8859f681727f030e89d74c59fe42f8246b6ebf4fef48e91f5bf5c6a335971"
 }
