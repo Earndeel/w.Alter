@@ -1,0 +1,11 @@
+{
+ "base_sha": "1da0d404cdcf6b96d61a76884a57bc8d80d5595f6bc431b1c8ef4d4f2e923f46",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-12T03:44:30.543708+00:00",
+ "domain": "mlops",
+ "kind": "patch",
+ "reason": "Ajoute une procédure récurrente de revue limitée aux alias. La session montre une correction confirmée dans alias-list, puis un review affichant encore 25 candidats ; le calcul artificiel 25−1 a présenté un effet non observé. Elle montre aussi une écriture de rapport malgré l’interdiction de modifier les fichiers et une justification d’identité fondée sur un suffixe supposé descriptif. [session hermes/main/20261012_033701_472ed4]",
+ "runtime": "learner",
+ "session_id": "hermes/main/20261012_033701_472ed4",
+ "target": "walter-model-router"
+}
