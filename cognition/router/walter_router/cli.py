@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from . import aliases_admin, alerts, changes, media_exec, choose, collect, db, dossier, execution, intent, knowledge, review
+from . import subscriptions
 from . import select as sel
 
 
@@ -108,9 +109,15 @@ def health() -> dict:
             issues.append("aucun dossier de tâche pour le dernier refresh réussi")
         providers = {r["provider"]: {"ok": r["ok"], "checked_at": r["checked_at"], "detail": r["detail"]}
                      for r in conn.execute("select * from models.provider_status")}
+        subs = subscriptions.state(conn)
     warnings = [f'provider {p} indisponible au dernier test : {v["detail"][:100]}' for p, v in providers.items()
                 if not v["ok"]]
-    return {"ok": not issues, "issues": issues, "warnings": warnings, "providers": providers, "last_run": ok_run and {"run_id": ok_run["run_id"],
+    warnings += [f'abonnement {s["plan"]} : compteur non lu récemment' if s["status"] == "unknown" else
+                 f'abonnement {s["plan"]} : {s["used_percent"]:.0f} % utilisé ({s["status"]})'
+                 for s in subs if s["status"] != "ok"]
+    return {"ok": not issues, "issues": issues, "warnings": warnings, "providers": providers,
+            "subscriptions": {s["id"]: {"status": s["status"], "used_percent": s["used_percent"]} for s in subs},
+            "last_run": ok_run and {"run_id": ok_run["run_id"],
             "finished_at": ok_run["finished_at"]}, "sources_age_h": sources, "dossiers": dossiers}
 
 
@@ -146,11 +153,13 @@ def feedback(conn, model: str, rating: int, task: str | None, note: str | None) 
 
 def subscription_fallback(conn, task: str, exclude: str | None = None) -> dict | None:
     """Best model of the task (weighted composite) that the subscription (Codex) can run, with the reasoning level
-    measured on the task's primary board."""
+    measured on the task's primary board. None when that subscription's quota is spent."""
     from . import scoring
-    subs = {r["model_id"] for r in conn.execute("""select distinct o.model_id from models.offers o
-                                                  join models.latest_snapshots s using (snapshot_id)
-                                                  where o.access = 'subscription' and o.interface = 'chat'""")}
+    rows = conn.execute("""select distinct o.model_id, o.provider from models.offers o
+                           join models.latest_snapshots s using (snapshot_id)
+                           where o.access = 'subscription' and o.interface = 'chat'""").fetchall()
+    subs = {r["model_id"] for r in rows
+            if subscriptions.route_status(conn, r["provider"])["status"] != "exhausted"}
     for c in scoring.composite(conn, task):
         if c["model_id"] in subs and c["model_id"] != exclude:
             variants = [b["variant"] for b in c["boards"].values() if b.get("variant")]
@@ -233,6 +242,10 @@ def main(argv: list[str] | None = None) -> int:
     lb.add_argument("--json", action="store_true")
     pl = sub.add_parser("publish-library", help="rebuild and deploy https://library.walter-ai.cloud (Cloudflare Access)")
     pl.add_argument("--no-deploy", action="store_true")
+    sb = sub.add_parser("subscriptions", help="Monsieur's subscriptions: quota meters, status, plan values")
+    sb.add_argument("action", nargs="?", choices=["show", "refresh", "calibrate"], default="show")
+    sb.add_argument("sub_id", nargs="?", help="calibrate: subscription id (anthropic-pro)")
+    sb.add_argument("percent", nargs="?", type=float, help="calibrate: weekly %% shown by the vendor")
     sub.add_parser("status")
     sub.add_parser("health", help="exit 1 when the router is not fed or not usable")
     pr = sub.add_parser("probe", help="tiny live call per provider (Kie, OpenRouter, Arnict)")
@@ -331,6 +344,14 @@ def main(argv: list[str] | None = None) -> int:
                 out = aliases_admin.listing()
             elif args.cmd == "review":
                 out = review.digest(conn)
+            elif args.cmd == "subscriptions":
+                if args.action == "refresh":
+                    subscriptions.refresh(conn, args.sub_id)
+                elif args.action == "calibrate":
+                    if not args.sub_id or args.percent is None:
+                        p.error("calibrate needs <sub_id> <percent>")
+                    subscriptions.calibrate(conn, args.sub_id, args.percent)
+                out = subscriptions.state(conn)
             elif args.cmd == "publish-library":
                 from . import library
                 out = library.publish(conn, deploy=not args.no_deploy)

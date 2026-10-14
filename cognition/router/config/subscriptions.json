@@ -1,0 +1,59 @@
+{
+  "_doc": "Monsieur's subscriptions (declared by him). Source of truth for walter_router/subscriptions.py: what each plan includes, how its usage meter is read, when its routes stop being used, and what the plan is worth at API list prices (published third-party measurements, dated and sourced). Readings go to models.subscription_usage.",
+  "subscriptions": [
+    {
+      "id": "openai-plus",
+      "vendor": "OpenAI",
+      "plan": "ChatGPT Plus",
+      "price_usd_month": 20,
+      "declared": "2026-10-14",
+      "route_provider": "codex",
+      "execution": "hermes",
+      "models_note": "Every model of the live Codex account catalogue (models.offers, provider codex, access subscription).",
+      "meter": {"source": "codex_usage_api", "note": "Hermes agent/account_usage.py (chatgpt.com/backend-api usage endpoint, read-only). Plus has a weekly window only (no 5-hour window) since 2026-09-29."},
+      "policy": {
+        "reserve_percent": 85,
+        "exhausted_percent": 98,
+        "note": "Sub-tasks routed by walter_run stop using the subscription at reserve_percent of any window, so the rest stays for the Hermes conversation itself (GPT-6.1 Sol on Codex); at exhausted_percent the subscription route goes last everywhere."
+      },
+      "plan_values": [
+        {"model_id": "gpt-6-1-sol", "usd_month": 211, "basis": "measured", "workload": "agentic, 96.6 % cache reads",
+         "source": "SemiAnalysis, Anthropic Subscriptions Offer 5x+ More Value Than OpenAI (2026-10-05)",
+         "url": "https://newsletter.semianalysis.com/p/anthropic-subscriptions-offer-5x"},
+        {"model_id": "gpt-6-astra", "usd_month": 162, "basis": "measured", "workload": "agentic, 96.6 % cache reads",
+         "source": "SemiAnalysis (2026-10-05), via explainx.ai",
+         "url": "https://www.explainx.ai/blog/semianalysis-claude-vs-chatgpt-subscription-api-value-limit-testing-2026"},
+        {"model_id": "gpt-6-astra", "usd_month": 285, "basis": "projected", "workload": "agentic coding, one unlogged window",
+         "source": "InventiveHQ, How Much Codex Does a ChatGPT Plan Buy? (2026-10)",
+         "url": "https://inventivehq.com/blog/codex-subscription-usage-measured"}
+      ]
+    },
+    {
+      "id": "anthropic-pro",
+      "vendor": "Anthropic",
+      "plan": "Claude Pro",
+      "price_usd_month": 20,
+      "since": "2026-09-26",
+      "declared": "2026-10-14",
+      "route_provider": null,
+      "execution": "interactive",
+      "execution_note": "Used by Monsieur in Claude Code (desktop app sessions on the VM). Not callable by Hermes: no Claude login on the VM, and Anthropic reserves subscription credentials for its own apps.",
+      "models": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+      "excluded": {"claude-fable-5-1": "Fable is not included in Pro: pay-as-you-go usage credits at API price."},
+      "meter": {
+        "source": "estimate_claude_code_logs",
+        "note": "Estimated from the Claude Code transcripts on the VM (~/.claude/projects): weighted units = input + cache writes + 5 x output, cache reads ~free (SemiAnalysis: no meter movement after 500M cache-read tokens; Wokey: output 4-7x input). Rolling 7 days, the weekly limit binds before the 5-hour one. Sessions run outside the VM are not seen.",
+        "weights": {"input": 1, "cache_write": 1, "cache_read": 0, "output": 5},
+        "weekly_capacity_units": 30700000,
+        "capacity_basis": "prior from SemiAnalysis Pro / Opus 5.5 (1,178 $/month at 0.399 $/M blended = 2.95 B tokens/month: 76.8 M cache writes + 11.8 M input + 8.9 M output = 133 M units/month = 30.7 M/week). Replace with `walter-router subscriptions calibrate anthropic-pro <weekly %>` read on claude.ai > Settings > Usage."
+      },
+      "policy": {"reserve_percent": 85, "exhausted_percent": 98},
+      "plan_values": [
+        {"model_id": "claude-opus-5-5", "usd_month": 1178, "basis": "measured", "workload": "agentic, 96.6 % cache reads",
+         "source": "SemiAnalysis (2026-10-05)", "url": "https://newsletter.semianalysis.com/p/anthropic-subscriptions-offer-5x"},
+        {"model_id": "claude-opus-5-5", "usd_month": 736, "basis": "measured", "workload": "559 Pro accounts, 84 % cache reads",
+         "source": "Wokey.ai weekly tracker (week 2026-10-05 to 10-12)", "url": "https://wokey.ai/claude-usage-limits"}
+      ]
+    }
+  ]
+}
