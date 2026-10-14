@@ -1,6 +1,15 @@
 {
   "_doc": "How each media favourite is called. kie: market path per mode + where images go; openrouter: the OpenRouter model id (generic /api/v1/videos or /api/v1/images). prompt_style: how the economic model rewrites Monsieur's request for this model.",
   "models": {
+    "wan-3": {
+      "kind": "video",
+      "kie": {"t2v": "wan/3-0-video", "i2v": "wan/3-0-video", "r2v": "wan/3-0-video",
+              "first_frame": "first_frame_url", "references": "reference_image_urls"},
+      "openrouter": "alibaba/wan-3.0",
+      "defaults": {"resolution": "720p"},
+      "prompt_style": "A vivid English video prompt: subject, action and motion, camera movement, setting, lighting, sound if relevant. Keep every requested element.",
+      "_note": "Kie wan/3-0-video (docs.kie.ai/market/wan/3-0-video.md, 2026-10-14): 2-30 s, 480P/720P/1080P (default 1080P = 0.16 $/s, hence 720p), audio on by default, nsfw_checker off by default."
+    },
     "gpt-image-2-5-sunburst": {
       "kind": "image",
       "kie": {"t2i": "gpt-image-2-5-sunburst-text-to-image", "i2i": "gpt-image-2-5-sunburst-image-to-image", "images": "input_urls"},

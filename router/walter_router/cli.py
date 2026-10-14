@@ -174,6 +174,14 @@ def with_execution(conn, out: dict) -> dict:
             fb_model, _, fb_variant = fallback.partition("/")
             out["execution"] += [{**r, "fallback_for": out["model_id"]}
                                  for r in execution.routes(conn, fb_model, fb_variant)]
+    elif out.get("model_id") and task and task["interface"] in ("video", "image", "audio", "music"):
+        from . import media_exec   # media: provider order of the model, then the category's fallback model
+        cfg = media_exec._models().get(out["model_id"]) or {}
+        mode = {"text_to_video": "t2v", "image_to_video": "i2v", "text_to_image": "t2i", "image_edit": "i2i"}.get(out["task"])
+        out["providers"] = media_exec.choose_provider(conn, out["model_id"], task["interface"], None,
+                                                      bool((cfg.get("kie") or {}).get(mode)),
+                                                      media_exec.openrouter_id(conn, out["model_id"]))
+        out["fallback_models"] = media_exec.fallback_models(conn, out["task"], out.get("role"), out["model_id"], mode)
     return out
 
 
