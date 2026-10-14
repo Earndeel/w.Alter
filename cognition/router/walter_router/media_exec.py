@@ -142,7 +142,8 @@ def openrouter_id(conn, model_id: str) -> str | None:
 def choose_provider(conn, model_id: str, interface: str, resolution: str | None, has_kie_path: bool,
                     or_id: str | None) -> list[str]:
     """Monsieur's order for paid media: Kie if it has the model and is not > 25 % dearer than OpenRouter at this
-    resolution, then OpenRouter (last when its credit is exhausted)."""
+    resolution, then OpenRouter (last when its credit is exhausted). A provider the last probe saw down
+    (models.provider_status) goes last."""
     offers = sel.load_offers(conn, sel.latest_snapshots(conn)).get(model_id, [])
 
     def price(provider: str) -> float | None:
@@ -151,17 +152,58 @@ def choose_provider(conn, model_id: str, interface: str, resolution: str | None,
              and (not resolution or not o.get("resolution") or o["resolution"].lower() == resolution.lower())]
         return min(p) if p else None
 
-    or_down = conn.execute("select ok from models.provider_status where provider = 'openrouter'").fetchone()
-    or_down = bool(or_down) and or_down["ok"] is False
+    status = {r["provider"]: r["ok"] for r in conn.execute("select provider, ok from models.provider_status")}
+    or_down, kie_down = status.get("openrouter") is False, status.get("kie") is False
     kie_p, or_p = price("kie"), price("openrouter")
     order = []
-    if has_kie_path and (or_p is None or kie_p is None or kie_p <= or_p * execution.KIE_MAX_PREMIUM or or_down):
+    if has_kie_path and not (kie_down and or_id) and \
+            (or_p is None or kie_p is None or kie_p <= or_p * execution.KIE_MAX_PREMIUM or or_down):
         order.append("kie")
     if or_id:
         order.append("openrouter")
     if has_kie_path and "kie" not in order:
         order.append("kie")
     return order
+
+
+def fallback_models(conn, task: str, role: str | None, model_id: str, mode: str | None = None, n: int = 2) -> list[str]:
+    """Models to try when every provider of `model_id` failed (Monsieur, 2026-10-14: one fallback per category).
+    Declared first (knowledge.json roles.<role>.fallback), then the task's composite order among models that
+    have an executor for the mode and a callable price; for a ratio/budget role (watch = dominance) only models at
+    most FALLBACK_COST_X times the favourite's price, unless none is."""
+    from . import knowledge
+    from .scoring import composite
+    declared = ((knowledge.load().get("roles") or {}).get(role or "default") or {}).get("fallback")
+    out = [m for m in ([declared] if isinstance(declared, str) else (declared or [])) if m != model_id]
+    t = conn.execute("select interface, modes from models.tasks where task = %s", (task,)).fetchone()
+    if not t:
+        return out[:n]
+    offers = sel.load_offers(conn, sel.latest_snapshots(conn))
+
+    def unit(m: str) -> float | None:
+        p = [o["norm_price"] for o in offers.get(m, []) if o["interface"] == t["interface"]
+             and o.get("offer_kind") == "generation" and o.get("norm_price") is not None]
+        return min(p) if p else None
+
+    pref = conn.execute("select watch from models.preferences where task = %s and role = %s",
+                        (task, role or "default")).fetchone()
+    ref = unit(model_id)
+    cands = []
+    for c in composite(conn, task):
+        m = c["model_id"]
+        cfg = _models().get(m)
+        if m == model_id or m in out or not cfg or unit(m) is None:
+            continue
+        if mode and not ((cfg.get("kie") or {}).get(mode) or (cfg.get("openrouter") and mode != "r2v")):
+            continue
+        cands.append(m)
+    if pref and pref["watch"] == "dominance" and ref:   # ratio / budget role: stay in the same price class
+        cheap = [m for m in cands if unit(m) <= ref * FALLBACK_COST_X]
+        cands = cheap + sorted((m for m in cands if m not in cheap), key=unit)
+    return (out + cands)[:n]
+
+
+FALLBACK_COST_X = 2.0
 
 
 # --- submit / poll --------------------------------------------------------------------------------------
@@ -239,7 +281,8 @@ def _download(urls: list[str], b64: list[str], folder: Path, stem: str, auth: di
 
 def generate(conn, request: str, task: str | None = None, role: str | None = None, image_urls: list[str] | None = None,
              aspect_ratio: str | None = None, duration: int | None = None, resolution: str | None = None,
-             paid_fallback: bool = False, craft: bool = True, _depth: int = 0) -> dict:
+             paid_fallback: bool = False, craft: bool = True, _depth: int = 0, model: str | None = None,
+             _fallback: bool = True) -> dict:
     from .cli import route as route_request
     from . import choose, knowledge
     d = choose.pick(conn, task, role=role) if (task and role) else route_request(conn, request, task)
@@ -247,6 +290,8 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
     t = conn.execute("select * from models.tasks where task = %s", (task,)).fetchone()
     if not t or t["interface"] not in ("image", "video", "music", "audio"):
         return {"error": f"not a media task: {task}", "decision": {k: d.get(k) for k in ("task", "model_id")}}
+    if model:   # a fallback model (or a forced one) for the same task and role
+        d = {**d, "model_id": model, "mode": None}
     model_id, cfg = d["model_id"], _models().get(d["model_id"])
     if not cfg:
         return {"error": f"no media executor configured for {model_id}", "decision": d.get("model_id")}
@@ -268,6 +313,7 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
         if ref.get("urls"):
             references, mode = ref["urls"][:1], "r2v"
             steps.append({"step": "reference", "model": ref.get("model_id"), "files": ref.get("files")})
+    resolution = resolution or (cfg.get("defaults") or {}).get("resolution")
     kie_path = (cfg.get("kie") or {}).get(mode)
     or_id = openrouter_id(conn, model_id)
     order = choose_provider(conn, model_id, t["interface"], resolution, bool(kie_path), or_id)
@@ -314,4 +360,11 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
                                  "model": kie_path if provider == "kie" else or_id, "ok": False, "kind": kind,
                                  "seconds": round(time.monotonic() - t0, 1)})
             conn.commit()
+    if _fallback and _depth == 0:
+        for fb in fallback_models(conn, task, d.get("role"), model_id, mode):
+            r = generate(conn, request, task=task, role=d.get("role"), image_urls=image_urls, aspect_ratio=aspect_ratio,
+                         duration=duration, resolution=None, paid_fallback=True, craft=craft, model=fb, _fallback=False)
+            if r.get("files"):
+                return {**r, "fallback_from": model_id, "errors": errors + (r.get("errors") or [])}
+            errors += r.get("errors") or [r.get("error", "")]
     return {"error": "every provider failed", "model_id": model_id, "errors": errors, "steps": steps}

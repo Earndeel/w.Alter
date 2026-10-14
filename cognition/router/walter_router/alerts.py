@@ -557,7 +557,24 @@ def _challenger_group(conn, group: list[dict]) -> list[str]:
             mark = "✔" if b["challenger"] > b["pinned"] else "✖"
             version = f" (version {b['variant']})" if b.get("variant") and b["variant"] not in ("", "default") else ""
             lines.append(f"• {_board_fr(name)} : {b['challenger']:.0f} contre {b['pinned']:.0f} {mark}{version}")
-    return lines + [""] + _price_lines(c, current)
+    return lines + [""] + _price_lines(c, current) + _route_line(conn, a0, c)
+
+
+def _route_line(conn, a: dict, c: dict) -> list[str]:
+    """'🔁 Fournisseurs : Kie → OpenRouter · Secours : Wan 3' for a media model (what would run if adopted)."""
+    if c["interface"] not in ("video", "image", "audio", "music"):
+        return []
+    from . import media_exec
+    try:
+        cfg = media_exec._models().get(a["subject"]) or {}
+        mode = {"text_to_video": "t2v", "image_to_video": "i2v", "text_to_image": "t2i", "image_edit": "i2i"}.get(a["task"])
+        order = media_exec.choose_provider(conn, a["subject"], c["interface"], None,
+                                           bool((cfg.get("kie") or {}).get(mode)), media_exec.openrouter_id(conn, a["subject"]))
+        fb = media_exec.fallback_models(conn, a["task"], a.get("role"), a["subject"], mode, n=1)
+    except Exception:  # noqa: BLE001 — the line is informative only
+        return []
+    route = " → ".join(catalog.PROVIDERS.get(p, p) for p in order) or "aucun branché"
+    return [f"🔁 Fournisseurs : {route}" + (f" · Secours : {_name(conn, fb[0])}" if fb else "")]
 
 
 def render(alerts: list[dict], conn=None, typed: bool = False) -> str:
