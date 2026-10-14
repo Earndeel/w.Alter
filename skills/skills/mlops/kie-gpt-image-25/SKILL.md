@@ -60,7 +60,13 @@ Kie's live GPT Image 2.5 page lists these fields:
 - `27:16`, `16:27`, `9:8`, and `8:9` are 1K-only; the other listed ratios support 2K/4K.
 - For 2K/4K transparent output, Kie's page says the prompt must describe an isolated subject with no backdrop/scenery/shadow; I2I prompts should explicitly request subject extraction and transparent background.
 
-Kie's public GPT Image 2.5 page exposes UI fields but defers the exact request endpoint and API request format to model-specific API documentation. Do not infer end-to-end compatibility from catalog presence alone. Confirm the current model-specific docs before making a paid generation request.
+## API contract discovery and recoverable generation
+
+- Discover model-specific documentation links in `https://docs.kie.ai/llms.txt` before guessing a path. GPT Image 2.5 docs live under `/market/gpt/`, not `/market/gpt-image-2-5/`; the latter can be a 404 despite a large HTML response. Try Walter Browse first and use the Markdown source for contract verification when extraction fails.
+- Read `https://docs.kie.ai/market/gpt/gpt-image-2-5-sunburst-image-to-image.md` and `https://docs.kie.ai/market/gpt/gpt-image-2-5-flare-image-to-image.md` for the respective OpenAPI specifications. Submit `POST https://api.kie.ai/api/v1/jobs/createTask` with `model` and `input` containing the exact `prompt`, `input_urls`, and explicitly chosen `aspect_ratio`, `resolution`, and `background`. Check the JSON `code`, not HTTP 200 alone. Never use a generic image tool that cannot select the requested variant.
+- Upload local references through `https://kieai.redpandaai.co/api/file-stream-upload` using Bearer auth, multipart `file`, and `uploadPath`/`fileName`. Read back the returned URL and compare SHA-256 to the original before submitting it; preserve the unchanged full reference when also adding a same-source face crop.
+- Persist each task ID, exact payload, reference hashes, and model in a manifest immediately after submission. Collect through `GET /api/v1/jobs/recordInfo?taskId=...`; read back the exact ID, model and nested `param.input`, which may itself be a JSON string. Never replay an ambiguous timed-out paid POST.
+- Require terminal `state=success`, decode `resultJson.resultUrls`, download the actual image, and verify its format, dimensions, expected count and visual fidelity before delivery. Keep `creditsConsumed` from the provider; do not fabricate billing from missing fields. For Desktop delivery use `MEDIA:/absolute/path`, not a localhost server or a promise to retrieve it later.
 
 ## Scena adapter mismatch to check
 
