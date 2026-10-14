@@ -118,11 +118,11 @@ def memory_reflect(question: str, budget: str = "mid") -> str:
 
 @mcp.tool()
 def walter_profile() -> str:
-    """Return the user's curated profile (USER.md), W.Alter's identity/style rules (walter-identity, the
+    """Return the user's curated profile (USER.md), W.Alter's identity/style rules (walter-soul, the
     runtime-neutral render) and the critical memory buffer (MEMORY.md). Small; safe to load at the start of a session."""
     parts = []
     for label, path in (("USER.md", HERMES_HOME / "memories" / "USER.md"),
-                        ("W.Alter identity", Path("/opt/walter-identity/build/agent.md")),
+                        ("W.Alter identity", Path("/opt/walter-soul/build/agent.md")),
                         ("MEMORY.md", HERMES_HOME / "memories" / "MEMORY.md")):
         try:
             parts.append(f"## {label}\n{path.read_text(errors='replace').strip()}")
