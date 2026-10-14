@@ -5,6 +5,8 @@ measured #1 when it differs, providers in order with prices, the fallback model,
 """
 from __future__ import annotations
 
+import re
+
 from . import catalog, choose, media_exec, scoring
 from . import select as sel
 
@@ -20,8 +22,10 @@ def _name(conn, mid: str | None) -> str:
     if not mid:
         return "—"
     r = conn.execute("select display_name from models.canonical where model_id = %s", (mid,)).fetchone()
-    if r and r["display_name"] and r["display_name"] != mid:
-        return r["display_name"]
+    name = r["display_name"] if r else None
+    if name and name != mid and not re.fullmatch(r"[a-z0-9.\-]+", name):   # a real name, not a slug like 'muse-wonder-1.0'
+        return name
+    mid = re.sub(r"(?<=\d)-(?=\d)", ".", name or mid)   # version digits: 1-0 -> 1.0
     # no display name (e.g. a Design Arena-only id 'muse-wonder-1.0'): readable fallback 'Muse Wonder 1.0'
     return " ".join(w.upper() if len(w) <= 3 and not w[:1].isdigit() and w.isalpha() and w in ("gpt", "ai") else
                     (w if w[:1].isdigit() else w.capitalize()) for w in mid.replace("_", "-").split("-"))
@@ -90,6 +94,11 @@ def rows(conn) -> list[dict]:
         sel_row = conn.execute("""select model_id, reasons from models.selection where run_id = (select run_id from
                                   models.latest_run) and task = %s and level = 'best' and rank = 1""", (task,)).fetchone()
         comp = scoring.composite(conn, task) if task != "general" else []
+        if iface == "decisions":
+            raw = conn.execute("""select max(b.score) s from models.benchmarks b where b.benchmark = 'aa_decision'
+                                  and b.snapshot_id = (select snapshot_id from models.latest_snapshots where kind = 'aa_decision')
+                                  and b.model_id = %s""", (mid,)).fetchone() if mid else None
+            row["score_raw"] = round(raw["s"], 1) if raw and raw["s"] else None
         if iface == "decisions":   # the AA Decision Index also lists LLMs: compare decision models only
             need = set(e["modes"] or [])
             comp = [c for c in comp if any(o["interface"] == "decisions" and need <= set(o.get("modes") or [])
@@ -140,6 +149,8 @@ def rows(conn) -> list[dict]:
             row["providers"] = f'OpenRouter {catalog.money(o[0]["price_in_1m"])} $/M' if o else "OpenRouter"
             row["fallback"] = "Mercury Decide (gratuit) → Clef"
             row["subscription"] = "—"
+        if row.get("score_raw") is not None:
+            row["score"] = row.pop("score_raw")
         out.append(row)
     return out
 
@@ -310,10 +321,11 @@ def publish(conn, deploy: bool = True) -> dict:
     import shutil
     from . import library_i18n, library_page
     html = library_page.render(conn, rows(conn), _context(conn))   # French page; v2 (Muse Wonder) rejected 2026-10-14
-    (SITE / "index.html").write_text(html)
-    (SITE / "en").mkdir(exist_ok=True)                              # English page, same layout (translation pass)
-    (SITE / "en" / "index.html").write_text(library_i18n.to_english(html))
-    shutil.rmtree(SITE / "v1", ignore_errors=True)
+    (SITE / "index.html").write_text(library_i18n.to_english(html))   # English by default (Monsieur, 2026-10-14)
+    (SITE / "fr").mkdir(exist_ok=True)                                  # French page at /fr/, same layout
+    (SITE / "fr" / "index.html").write_text(html)
+    for old in ("v1", "en"):
+        shutil.rmtree(SITE / old, ignore_errors=True)
     if not deploy:
         return {"built": len(html)}
     r = subprocess.run([CF, "--", "wrangler", "pages", "deploy", ".", "--project-name", "walter-library",

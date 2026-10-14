@@ -120,7 +120,7 @@ def _text(t: str) -> str:
 
 
 def _tag(tag: str) -> str:
-    tag = re.sub(r'(placeholder|title|aria-label)="([^"]*)"', lambda m: f'{m.group(1)}="{_text(m.group(2))}"', tag)
+    tag = re.sub(r'(placeholder|title|aria-label|data-label)="([^"]*)"', lambda m: f'{m.group(1)}="{_text(m.group(2))}"', tag)
     if "data-tip=" in tag:   # chart tooltip JSON: "c":"0,02"
         tag = re.sub(r'(&quot;c&quot;: &quot;)(\d+),(\d+)', r"\1\2.\3", tag)
     return tag
@@ -128,7 +128,7 @@ def _tag(tag: str) -> str:
 
 def to_english(html: str) -> str:
     html = html.replace('<html lang="fr">', '<html lang="en">', 1)
-    html = html.replace('data-lang="fr" class="on"', 'data-lang="fr"').replace('data-lang="en"', 'data-lang="en" class="on"', 1)
+    html = html.replace('data-lang="fr" class="on"', 'data-lang="fr"').replace('data-lang="en">', 'data-lang="en" class="on">', 1)
     head, sep, rest = html.partition("<script>")
     script, sep2, tail = rest.partition("</script>")
     out, in_style = [], False
