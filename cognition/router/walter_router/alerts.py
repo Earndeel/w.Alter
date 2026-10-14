@@ -177,6 +177,25 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
                     {"pinned": p["pinned_model_id"], "note": "favourite absent from every leaderboard of this task"},
                     status_for_new, p["role"])
             continue
+        # Monsieur (2026-10-14): one board is not enough (Grok Imagine 1.5 'agent' led Arena t2v while MiniMax H3
+        # stays far ahead overall). A challenger must beat the favourite on the task's weighted composite of all
+        # boards; the evidence keeps every board, lost ones included.
+        from .scoring import composite   # late import (scoring -> select)
+        comp = {c["model_id"]: c for c in composite(conn, p["task"], snaps)}
+        mine_c = comp.get(p["pinned_model_id"])
+        for model_id in list(found):
+            theirs = comp.get(model_id)
+            if mine_c and (not theirs or theirs["composite"] <= mine_c["composite"]):
+                del found[model_id]
+                continue
+            found[model_id]["composite"] = {"challenger": theirs and theirs["composite"],
+                                            "pinned": mine_c and mine_c["composite"],
+                                            "rank": list(comp).index(model_id) + 1 if theirs else None,
+                                            "pinned_rank": list(comp).index(p["pinned_model_id"]) + 1 if mine_c else None}
+            found[model_id]["all_boards"] = {
+                name: {"challenger": b.get("score"), "pinned": (mine_c["boards"].get(name) or {}).get("score") if mine_c
+                       else None, "variant": b.get("variant"), "unit": b.get("unit")}
+                for name, b in (theirs["boards"] if theirs else {}).items() if "score" in b}
         for model_id, ev in found.items():
             why = changes.changed(chg, model_id) + [f'{p["pinned_model_id"]} dégradé'
                                                      for _ in chg["nerf"].get(p["pinned_model_id"], [])[:1]]
@@ -458,7 +477,7 @@ BOARD_TASKS = {"text_to_video": "vidéo depuis texte", "image_to_video": "animat
 
 def _board_fr(key: str) -> str:
     """'Arena text_to_video' -> 'Arena vidéo depuis texte'."""
-    source, _, task = key.partition(" ")
+    source, _, task = key.rpartition(" ")
     return f"{source} {BOARD_TASKS.get(task, task.replace('_', ' '))}".strip()
 
 
@@ -504,21 +523,40 @@ def _challenger_group(conn, group: list[dict]) -> list[str]:
     task = conn.execute("select interface, modes from models.tasks where task = %s", (a0["task"],)).fetchone()
     c = catalog.card(conn, a0["subject"], task["interface"], task["modes"])
     origin = next((o for o in (_origin(a["evidence"]) for a in group) if o), None)
-    lines = [f'{catalog.icon(c)} {c["name"]}', " · ".join(x for x in (origin, _modes_fr(c["modes"])) if x),
-             "", "🏆 Meilleur que ton choix actuel"]
-    current, merged = None, {}
-    for a in group:   # same task, same current model, same gain: one line with all the roles
+    lines = [f'{catalog.icon(c)} {c["name"]}', " · ".join(x for x in (origin, _modes_fr(c["modes"])) if x)]
+    current, seen_tasks = None, set()
+    for a in group:   # Monsieur (2026-10-14): which router category, and the full comparison (won AND lost boards)
         e = a["evidence"]
         pinned = catalog.card(conn, e["pinned"], task["interface"], task["modes"])
         current = current or pinned
         label = conn.execute("select label from models.tasks where task = %s", (a["task"],)).fetchone()["label"]
-        best = max(e["boards"].items(), key=lambda kv: kv[1]["delta"])
-        rank = "1er" if best[1]["rank"] == 1 else f'{best[1]["rank"]}e'
-        key = (label, pinned["name"], f'{rank} sur {_board_fr(best[0])}, +{best[1]["delta"]:.0f} points')
-        merged.setdefault(key, []).append(ROLE_LABELS.get(e.get("role"), e.get("role") or ""))
-    for (label, pinned_name, gain), roles in merged.items():
-        roles = [r for r in roles if r]
-        lines += [f'• {label}{f" ({", ".join(roles)})" if roles else ""} — remplacerait {pinned_name}', f"  {gain}"]
+        pref = conn.execute("""select label, description from models.preferences where task = %s and role = %s""",
+                            (a["task"], a.get("role") or "default")).fetchone()
+        role = (pref and pref["label"]) or ("" if (a.get("role") or "default") == "default"
+                                            else ROLE_LABELS.get(a.get("role"), a.get("role")))
+        lines += ["", f"🎯 Catégorie du router : {label} › {role}" if role else f"🎯 Catégorie du router : {label}"]
+        if pref and pref["description"]:
+            lines.append(f"   {pref['description']}")
+        lines.append(f"   Aujourd'hui : {pinned['name']}")
+        if a["task"] in seen_tasks:
+            continue
+        seen_tasks.add(a["task"])
+        comp = e.get("composite") or {}
+        if comp.get("challenger") is not None and comp.get("pinned") is not None:
+            ranks = f" ({comp['rank']}e contre {comp['pinned_rank']}e)" if comp.get("rank") and comp.get("pinned_rank") else ""
+            lines += ["", f"📊 Score global : {comp['challenger']:.0f} contre {comp['pinned']:.0f}"
+                          f" pour {pinned['name']}{ranks}"]
+        boards = e.get("all_boards") or {k: {"challenger": v["score"], "pinned": v["pinned_score"],
+                                             "variant": v.get("variant")} for k, v in e["boards"].items()}
+        for name, b in boards.items():
+            if b.get("challenger") is None:
+                continue
+            if b.get("pinned") is None:
+                lines.append(f"• {_board_fr(name)} : {b['challenger']:.0f} ({pinned['name']} non classé)")
+                continue
+            mark = "✔" if b["challenger"] > b["pinned"] else "✖"
+            version = f" (version {b['variant']})" if b.get("variant") and b["variant"] not in ("", "default") else ""
+            lines.append(f"• {_board_fr(name)} : {b['challenger']:.0f} contre {b['pinned']:.0f} {mark}{version}")
     return lines + [""] + _price_lines(c, current)
 
 

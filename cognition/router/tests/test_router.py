@@ -72,8 +72,8 @@ def test_pinned_favourite_wins_over_computed_choice(conn):
 
 
 def test_challenger_flow_baseline_then_new_then_adopt(conn):
-    # Pin a weaker model: everything already better becomes 'baseline' (no message for those).
-    out = choose.set_preference(conn, "3d", pin="claude-opus-5-5")
+    # Pin a weaker model: everything already better (on the task composite) becomes 'baseline' (no message).
+    out = choose.set_preference(conn, "3d", pin="claude-opus-5")
     assert out["baseline_challengers"] > 0
     assert not [a for a in alerts.pending(conn) if a["kind"] == "challenger" and a["task"] == "3d"]
     # A model overtaking later is 'open' and gets rendered for Telegram.
@@ -85,7 +85,8 @@ def test_challenger_flow_baseline_then_new_then_adopt(conn):
     news = {"new": {"gpt-6-astra": ["nouveau sur da_models:3d"]}, "nerf": {}, "price_drop": {}}
     assert "3d:default:gpt-6-astra" in alerts.challengers(conn, "open", only_task="3d", chg=news)
     pend = [a for a in alerts.pending(conn) if a["task"] == "3d"]
-    assert pend and "Meilleur que ton choix actuel" in alerts.render(pend, conn)
+    assert pend and "Catégorie du router" in alerts.render(pend, conn)
+    assert pend[0]["evidence"]["composite"]["challenger"] > pend[0]["evidence"]["composite"]["pinned"]
     # Monsieur adopts it: it becomes the pinned favourite.
     alerts.verdict(conn, pend[0]["alert_id"], "adopted")
     assert choose.pick(conn, "3d")["model_id"] == "gpt-6-astra"
@@ -142,3 +143,13 @@ def test_notification_buttons_one_row_per_news():
     assert [[b["callback_data"] for b in r] for r in rows] == [["wr:a:3", "wr:d:3"], ["wr:d:4"]]
     assert all(len(b["callback_data"]) <= 64 for r in rows for b in r)
     assert rows[0][0]["text"] == "✅ Passer à gpt-6-luna" and rows[0][1]["text"] == "✖️ Garder gpt-6-1-sol"
+
+
+def test_one_board_is_not_enough(conn):
+    """2026-10-14: Grok Imagine 1.5 led one board (Arena t2v, 'agent' version) but MiniMax H3 is far ahead on the
+    composite: no challenger alert against H3."""
+    choose.set_preference(conn, "text_to_video", pin="minimax-h3", role="action", watch="dominance")
+    conn.execute("delete from models.alerts where kind = 'challenger' and task = 'text_to_video'")
+    news = {"new": {"grok-imagine-video-1-5": ["nouveau chez kie"]}, "nerf": {}, "price_drop": {}}
+    made = alerts.challengers(conn, "open", only_task="text_to_video", only_role="action", chg=news)
+    assert "text_to_video:action:grok-imagine-video-1-5" not in made
