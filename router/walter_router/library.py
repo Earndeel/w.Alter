@@ -12,6 +12,7 @@ PROV = {"openai-codex": "Codex (abonnement)", "codex": "Codex (abonnement)", "ki
         "openrouter": "OpenRouter", "arnict": "Arnict", "google-flow": "Flow"}
 MODES = {"text_to_video": "t2v", "image_to_video": "i2v", "text_to_image": "t2i", "image_edit": "i2i", "logo": "t2i",
          "graphic_design": "t2i", "music": "music", "tts": "tts", "video_edit": "v2v"}
+IMAGE_TOKENS = (1056, 4160)   # medium / high 1024x1024 output tokens (OpenAI gpt-image token tables)
 ROLE_ORDER = "case p.role when 'default' then 0 when 'L1' then 0 when 'L2' then 1 when 'L3' then 2 else 5 end"
 
 
@@ -36,7 +37,19 @@ def _media_price(offers: dict, mid: str, prov: str, interface: str) -> str:
     own = [o for o in offers.get(mid, []) if o["provider"] == prov and o["interface"] == interface
            and o.get("offer_kind") == "generation" and o.get("norm_price") is not None]
     if not own:
-        return "au token" if prov == "openrouter" and interface == "image" else ""
+        if prov == "openrouter" and interface == "image":   # billed per image-output token: estimate per image
+            tok = [float((o.get("pricing") or {}).get("image_output") or 0) for o in offers.get(mid, [])
+                   if o["provider"] == "openrouter" and o["interface"] == "image"]
+            tok = max(tok, default=0)
+            if tok:   # ~1 000 (medium) to ~4 000 (high) image tokens for 1024² (OpenAI image token tables)
+                return f"≈ {catalog.money(tok * IMAGE_TOKENS[0])}–{catalog.money(tok * IMAGE_TOKENS[1])} $/img estimé"
+            return "au token"
+        raw = [o for o in offers.get(mid, []) if o["provider"] == prov and o["interface"] == interface
+               and o.get("unit_price") and "token" in (o.get("unit") or "")]
+        if raw:   # token-priced audio (e.g. Gemini TTS on Kie: input / audio output per M tokens)
+            return " / ".join(f'{catalog.money(o["unit_price"])}' for o in sorted(raw, key=lambda o: o["unit_price"])[:2]) \
+                + " $/M tokens"
+        return ""
     lo, hi = min(o["norm_price"] for o in own), max(o["norm_price"] for o in own)
     unit = catalog.UNIT_SHORT.get(own[0].get("norm_unit") or "", "$")
     return f'{catalog.money(lo)}{"–" + catalog.money(hi) if hi != lo else ""} {unit}'
@@ -283,7 +296,8 @@ def publish(conn, deploy: bool = True) -> dict:
     library.walter-ai.cloud behind Cloudflare Access; site/functions/_middleware.js refuses every other host)."""
     import subprocess
     SITE.mkdir(exist_ok=True)
-    html = render_html(rows(conn), _context(conn))
+    from . import library_page
+    html = library_page.render(conn, rows(conn), _context(conn))
     (SITE / "index.html").write_text(html)
     if not deploy:
         return {"built": len(html)}

@@ -292,6 +292,25 @@ def _executable_first(conn, t: dict, ranked: list[dict], offers: dict) -> list[d
     return out
 
 
+def general_points(conn) -> list[dict]:
+    """Every callable model x reasoning level on the AA Intelligence Index with its real cost per AA task (the cloud
+    behind the L1/L2/L3 method) — for the library page's Pareto chart."""
+    snaps = latest_snapshots(conn)
+    offers = load_offers(conn, snaps)
+    if "aa" not in snaps:
+        return []
+    out = []
+    for b in conn.execute("""select model_id, variant, display_name, score, cost from models.benchmarks
+                             where snapshot_id = %s and benchmark = 'aa_intelligence'""", (snaps["aa"],)):
+        route = chat_route(offers.get(b["model_id"], []), b["cost"])
+        cost = (route.get("paid") or {}).get("cost")
+        if route["callable"] and cost:
+            out.append({"model_id": b["model_id"], "variant": b["variant"], "name": b["display_name"],
+                        "score": b["score"], "cost": cost, "provider": (route.get("paid") or {}).get("provider"),
+                        "subscription": bool(route.get("subscription"))})
+    return out
+
+
 def compute(conn) -> list[dict]:
     snaps = latest_snapshots(conn)
     offers = load_offers(conn, snaps)
