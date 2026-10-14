@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from . import identity, media
@@ -36,7 +37,8 @@ FLARESOLVERR = os.environ.get("WALTER_FLARESOLVERR", "http://127.0.0.1:8191/v1")
 ARENA_BOARDS = {"text": "text", "text/french": "text_french", "text/coding": "text_coding",
                 "text/creative-writing": "text_creative", "code/webdev": "webdev",
                 "code/image-to-webdev": "image_to_webdev", "vision": "vision", "document": "document",
-                "search": "search", "agent": "agent", "text-to-image": "text_to_image", "image-edit": "image_edit",
+                "search": "search", "agent": "agent", "text-to-image": "text_to_image",
+                "image/image-edit/single-image": "image_edit",   # moved there on 2026-10-10 (was image-edit)
                 "text-to-video": "text_to_video", "image-to-video": "image_to_video", "video-edit": "video_edit"}
 
 
@@ -81,10 +83,22 @@ def source_da() -> tuple[dict, datetime, str]:
 
 
 def fetch_text(url: str) -> str:
+    """A page, directly; through the local FlareSolverr when the site answers 403/503 (Cloudflare challenge —
+    Arena since 2026-10-14)."""
     req = Request(url, headers={"User-Agent": "Mozilla/5.0 (Walter-Router/1.0)", "Accept": "text/html"})
-    with urlopen(req, timeout=40) as resp:  # noqa: S310 (fixed https host)
-        raw = resp.read(MAX_BYTES + 1)
-    return raw.decode("utf-8", "replace")
+    try:
+        with urlopen(req, timeout=40) as resp:  # noqa: S310 (fixed https host)
+            raw = resp.read(MAX_BYTES + 1)
+        return raw.decode("utf-8", "replace")
+    except HTTPError as exc:
+        if exc.code not in (403, 503):
+            raise
+    body = json.dumps({"cmd": "request.get", "url": url, "maxTimeout": 90000}).encode()
+    with urlopen(Request(FLARESOLVERR, data=body, headers={"Content-Type": "application/json"}), timeout=150) as resp:  # noqa: S310
+        sol = json.loads(resp.read(MAX_BYTES))["solution"]
+    if sol.get("status") != 200:
+        raise ValueError(f"{url}: HTTP {sol.get('status')} through FlareSolverr")
+    return sol["response"]
 
 
 def _json_array(text: str, start: int) -> list:
