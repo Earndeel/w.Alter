@@ -19,9 +19,12 @@ ROLE_ORDER = "case p.role when 'default' then 0 when 'L1' then 0 when 'L2' then 
 def _name(conn, mid: str | None) -> str:
     if not mid:
         return "—"
-    r = conn.execute("select coalesce(display_name, model_id) as n from models.canonical where model_id = %s",
-                     (mid,)).fetchone()
-    return r["n"] if r else mid
+    r = conn.execute("select display_name from models.canonical where model_id = %s", (mid,)).fetchone()
+    if r and r["display_name"] and r["display_name"] != mid:
+        return r["display_name"]
+    # no display name (e.g. a Design Arena-only id 'muse-wonder-1.0'): readable fallback 'Muse Wonder 1.0'
+    return " ".join(w.upper() if len(w) <= 3 and not w[:1].isdigit() and w.isalpha() and w in ("gpt", "ai") else
+                    (w if w[:1].isdigit() else w.capitalize()) for w in mid.replace("_", "-").split("-"))
 
 
 def _chat_price(offers: dict, mid: str, prov: str) -> str:
@@ -304,9 +307,12 @@ def publish(conn, deploy: bool = True) -> dict:
     library.walter-ai.cloud behind Cloudflare Access; site/functions/_middleware.js refuses every other host)."""
     import subprocess
     SITE.mkdir(exist_ok=True)
-    from . import library_page
-    html = library_page.render(conn, rows(conn), _context(conn))
+    from . import library_page, library_page_v2
+    rs, ctx = rows(conn), _context(conn)
+    html = library_page_v2.render(conn, rs, ctx)      # main page: v2 (Muse Wonder design, 2026-10-14)
     (SITE / "index.html").write_text(html)
+    (SITE / "v1").mkdir(exist_ok=True)                 # previous editorial version, for comparison
+    (SITE / "v1" / "index.html").write_text(library_page.render(conn, rs, ctx))
     if not deploy:
         return {"built": len(html)}
     r = subprocess.run([CF, "--", "wrangler", "pages", "deploy", ".", "--project-name", "walter-library",
