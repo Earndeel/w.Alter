@@ -324,7 +324,7 @@
     }
   },
   "decision": {
-    "order": "free_first",
-    "_note": "Modèle de décision (intent + tri). Le meilleur vient du cycle 48 h (tâche 'decision', AA Decision Index). free_first = Clef puis Mercury Decide gratuit puis le meilleur (choix de Monsieur du 2026-10-04, allocation gratuite) ; best_first = le meilleur d'abord, les gratuits en secours."
+    "order": "best_first",
+    "_note": "Modèle de décision (intent + tri). Le meilleur vient du cycle 48 h (tâche 'decision', AA Decision Index). best_first (Monsieur, 2026-10-14) = le meilleur (Jev 1.13 aujourd'hui), puis Mercury Decide gratuit, puis Clef (Workers AI) en dernier recours ; free_first = l'inverse (choix du 2026-10-04)."
   }
 }
