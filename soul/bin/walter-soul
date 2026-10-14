@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""walter-identity — W.Alter's identity, owned by Walter, rendered for every runtime.
+"""walter-soul — W.Alter's identity, owned by Walter, rendered for every runtime.
 
 Sources (this repo, git): identity.md (who W.Alter is, tone — universal), rules.md (working rules for agents),
 runtimes/*.md (per-runtime adapters: tool names, write rules). Targets are generated, one-way:
@@ -7,12 +7,12 @@ runtimes/*.md (per-runtime adapters: tool names, write rules). Targets are gener
   hermes       → /root/.hermes/SOUL.md                       (Hermes loads it as its identity)
   claude-code  → /opt/walter-profiles/claude-code/CLAUDE.md  (Claude Code "W.Alter" profile = that cwd)
   codex        → /opt/walter-profiles/codex/AGENTS.md        (Codex "W.Alter" profile = that cwd)
-  voice        → /opt/walter-identity/build/voice.md         (read by the phone bridge at call setup)
-  agent        → /opt/walter-identity/build/agent.md         (MCP walter_profile, any other runtime)
+  voice        → /opt/walter-soul/build/voice.md         (read by the phone bridge at call setup)
+  agent        → /opt/walter-soul/build/agent.md         (MCP walter_profile, any other runtime)
 
-Usage: walter-identity render <target> | sync [--force] | check
+Usage: walter-soul render <target> | sync [--force] | check
 A target edited by hand since the last sync is never overwritten silently: sync refuses it (exit 2) and keeps a
-copy in /root/.hermes/backups/identity-drift/; port the change into the sources, then `sync --force`.
+copy in /root/.hermes/backups/soul-drift/; port the change into the sources, then `sync --force`.
 The git post-commit hook runs `sync`, so committing a change here is all it takes.
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE = ROOT / ".state"
-DRIFT = Path("/root/.hermes/backups/identity-drift")
+DRIFT = Path("/root/.hermes/backups/soul-drift")
 AGENT = ["identity.md", "rules.md", "runtimes/agent-cli.md"]
 TARGETS = {
     "hermes": (["identity.md", "rules.md", "runtimes/hermes.md"], Path("/root/.hermes/SOUL.md")),
@@ -48,7 +48,7 @@ def _include(m: re.Match) -> str:
 def render(target: str) -> str:
     parts, _ = TARGETS[target]
     body = "\n\n".join(INCLUDE.sub(_include, (ROOT / p).read_text().strip()) for p in parts)
-    return (f"<!-- GÉNÉRÉ par walter-identity ({target}) — ne pas éditer ici : sources dans {ROOT} -->\n"
+    return (f"<!-- GÉNÉRÉ par walter-soul ({target}) — ne pas éditer ici : sources dans {ROOT} -->\n"
             f"# W.Alter\n\n{body}\n")
 
 
@@ -67,7 +67,7 @@ def status(target: str) -> tuple[str, str]:
         return "ok", new
     last = STATE / f"{target}.sha256"
     if not last.exists():
-        return "new", new  # never synced: the current file predates walter-identity
+        return "new", new  # never synced: the current file predates walter-soul
     return ("stale" if _sha(cur) == last.read_text().strip() else "drift"), new
 
 
