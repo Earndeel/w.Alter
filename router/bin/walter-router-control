@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Manual trigger of the full Walter Router cycle, for the library page button (Monsieur, 2026-10-14).
+
+127.0.0.1:8896, reached only through the Cloudflare tunnel host router-control.walter-ai.cloud, itself behind a
+Cloudflare Access app that admits only the Pages project's service token. Every request also carries an HMAC
+(X-Walter-Ts, X-Walter-Sig = HMAC-SHA256(secret, ts + method + path), 5-minute window); secret in
+/opt/walter-router/.control.env (0600).
+  POST /run     start walter-router-refresh.service (the 48 h cycle) unless it runs or started < 10 min ago
+  GET  /status  running?, current step, last start/end, result
+"""
+import hashlib
+import hmac
+import json
+import re
+import subprocess
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+UNIT = "walter-router-refresh.service"
+ENV = Path("/opt/walter-router/.control.env")
+MIN_GAP_S = 600
+
+
+def secret() -> bytes:
+    for line in ENV.read_text().splitlines():
+        if line.startswith("CONTROL_SECRET="):
+            return line.split("=", 1)[1].strip().encode()
+    raise SystemExit("CONTROL_SECRET missing")
+
+
+def status() -> dict:
+    out = subprocess.run(["systemctl", "show", UNIT, "-p", "ActiveState,ExecMainStartTimestamp,ExecMainExitTimestamp,Result"],
+                         capture_output=True, text=True).stdout
+    p = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+    step = None
+    if p.get("ActiveState") == "activating":
+        log = subprocess.run(["journalctl", "-u", UNIT, "--since", "-2h", "-o", "cat", "--no-pager"],
+                             capture_output=True, text=True).stdout
+        steps = re.findall(r"\[cycle\] (\d/4[^\n]*|library page[^\n]*)", log)
+        step = steps[-1] if steps else "démarrage"
+    return {"running": p.get("ActiveState") == "activating", "step": step, "result": p.get("Result"),
+            "started": p.get("ExecMainStartTimestamp") or None, "finished": p.get("ExecMainExitTimestamp") or None}
+
+
+class H(BaseHTTPRequestHandler):
+    def _ok(self, code: int, obj: dict) -> None:
+        body = json.dumps(obj, ensure_ascii=False).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _auth(self) -> bool:
+        ts, sig = self.headers.get("X-Walter-Ts", ""), self.headers.get("X-Walter-Sig", "")
+        if not ts.isdigit() or abs(time.time() - int(ts)) > 300:
+            return False
+        want = hmac.new(secret(), f"{ts}{self.command}{self.path}".encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(want, sig)
+
+    def do_GET(self):  # noqa: N802
+        if self.path != "/status" or not self._auth():
+            return self._ok(404, {"error": "not found"})
+        self._ok(200, status())
+
+    def do_POST(self):  # noqa: N802
+        if self.path != "/run" or not self._auth():
+            return self._ok(404, {"error": "not found"})
+        st = status()
+        if st["running"]:
+            return self._ok(409, {**st, "message": "Un cycle est déjà en cours."})
+        started = subprocess.run(["systemctl", "show", UNIT, "-p", "ExecMainStartTimestampMonotonic", "--value"],
+                                 capture_output=True, text=True).stdout.strip()
+        uptime = float(Path("/proc/uptime").read_text().split()[0])
+        if started and started != "0" and uptime - int(started) / 1e6 < MIN_GAP_S:
+            return self._ok(429, {**st, "message": "Un cycle a démarré il y a moins de 10 minutes."})
+        subprocess.run(["systemctl", "start", "--no-block", UNIT], check=True)
+        time.sleep(1)
+        self._ok(202, {**status(), "message": "Cycle complet lancé."})
+
+    def log_message(self, fmt, *args):  # quiet, no headers in logs
+        print(f"{self.command} {self.path} -> {args[1] if len(args) > 1 else ''}", flush=True)
+
+
+if __name__ == "__main__":
+    ThreadingHTTPServer(("127.0.0.1", 8896), H).serve_forever()

@@ -16,8 +16,8 @@ from datetime import datetime, timezone
 from . import catalog, select as sel
 
 esc = html.escape
-TABS = [("home", "Vue d'ensemble"), ("chat", "Texte"), ("image", "Image"), ("video", "Vidéo"),
-        ("audio", "Audio & musique"), ("decisions", "Décision")]
+TABS = [("home", "🏠", "Vue d'ensemble"), ("chat", "💬", "Texte"), ("image", "🖼️", "Image"), ("video", "🎬", "Vidéo"),
+        ("audio", "🎧", "Audio & musique"), ("decisions", "🧭", "Décision")]
 TAB_OF = {"chat": "chat", "image": "image", "video": "video", "audio": "audio", "music": "audio", "decisions": "decisions"}
 LEVELS = {"L1": ("Économique", "Quotidien : réponses courtes, résumés, petites rédactions"),
           "L2": ("Intermédiaire", "Analyse en plusieurs étapes, comparaison, rédaction soignée"),
@@ -32,7 +32,10 @@ def _route(text: str | None) -> str:
     return '<span class="arr"> → </span>'.join(f'<span class="nw">{esc(p.strip())}</span>' for p in text.split("→"))
 
 
-def _chart(points: list[dict], frontier: list[dict], levels: dict[str, dict]) -> str:
+def _chart(points: list[dict], frontier: list[dict], levels: dict[str, dict], key: str = "cost") -> str:
+    points = [{**p, "cost": p[key]} for p in points if p.get(key)]
+    frontier = [{**p, "cost": p[key]} for p in frontier if p.get(key)]
+    levels = {k: {**p, "cost": p[key]} for k, p in levels.items() if p.get(key)}
     if not points:
         return '<p class="mute">Pas de données AA.</p>'
     W, H, L, R, T, B = 680, 430, 44, 16, 14, 40
@@ -68,11 +71,12 @@ def _chart(points: list[dict], frontier: list[dict], levels: dict[str, dict]) ->
         x, y = X(p["cost"]), Y(p["score"])
         g.append(f'<circle class="lv" cx="{x:.1f}" cy="{y:.1f}" r="5.5" data-tip="{tip(p)}"/>'
                  f'<text class="ll" x="{x - 9:.1f}" y="{y - 9:.1f}" text-anchor="end">{lvl}</text>')
-    return (f'<figure class="chart"><svg viewBox="0 0 {W} {H}" role="img" aria-label="Indice AA en fonction du coût '
+    axis = "coût réel par tâche AA (meilleur fournisseur)" if key == "cost" else "coût officiel par tâche AA (prix de référence)"
+    return (f'<figure class="chart" data-cost="{key}"{" hidden" if key != "cost" else ""}><svg viewBox="0 0 {W} {H}" role="img" aria-label="Indice AA en fonction du coût '
             f'réel par tâche">{"".join(g)}</svg><figcaption><span><i class="k1"></i>Modèles exécutables</span>'
             f'<span><i class="k2"></i>Frontière de Pareto</span><span><i class="k3"></i>Niveaux retenus</span>'
-            f'<span class="mute">Abscisse : coût réel par tâche AA, échelle logarithmique</span></figcaption>'
-            f'<div class="tip" id="tip"></div></figure>')
+            f'<span class="mute">Abscisse : {axis}, échelle logarithmique</span></figcaption>'
+            f'<div class="tip"></div></figure>')
 
 
 def _da(conn, rs: list[dict]) -> list[dict]:
@@ -149,12 +153,13 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
         effort = EFFORT.get(s["variant"], s["variant"])
         sub = card.get("subscription")
         cost = f'{catalog.money(s["real_cost"])} $' if s["real_cost"] else "—"
+        aa = (by.get((s["model_id"], s["variant"])) or {}).get("cost_aa")
+        cost_aa = f'{catalog.money(aa)} $' if aa else "—"
         lrows.append(
-            f'<tr><td class="lvl">{lvl}</td><td><div class="lname">{LEVELS[lvl][0]}</div>'
-            f'<div class="mute small">{LEVELS[lvl][1]}</div></td>'
+            f'<tr><td class="lvl">{lvl}</td><td><div class="lname">{LEVELS[lvl][0]}</div></td>'
             f'<td class="model">{esc((card.get("model") or "—").split(" (")[0])}<div class="mute small">réflexion {effort}</div></td>'
-            f'<td class="num">{f"{s["quality"]:.1f}".replace(".", ",")}</td><td class="num">{cost}</td></tr>'
-            f'<tr class="sub"><td></td><td colspan="4"><span class="mute">Fournisseurs</span> {_route(card.get("providers"))}'
+            f'<td class="num">{f"{s["quality"]:.1f}".replace(".", ",")}</td><td class="num">{cost_aa}</td><td class="num strong">{cost}</td></tr>'
+            f'<tr class="sub"><td></td><td colspan="5"><div class="mute desc">{LEVELS[lvl][1]}</div><span class="mute">Fournisseurs</span> {_route(card.get("providers"))}'
             + (f'<span class="mute sep2">Secours</span> {esc(card["fallback"])}' if card.get("fallback") not in (None, "—") else "")
             + (f'<span class="mute sep2">Abonnement</span> {esc(sub)}' if sub not in (None, "—") else "") + "</td></tr>")
     da_rows = []
@@ -167,7 +172,7 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
                        f'<td class="num">{r["rank"] or "—"}<span class="mute"> / {r["of"]}</span></td>'
                        f'<td class="num">{elo}</td>'
                        f'<td class="amber">{lead_txt}</td><td class="route">{_route(r.get("providers"))}</td></tr>')
-    panes = {k: [r for r in rs if r["task"] != "general" and TAB_OF.get(r["type"]) == k] for k, _ in TABS}
+    panes = {k: [r for r in rs if r["task"] != "general" and TAB_OF.get(r["type"]) == k] for k, _, _ in TABS}
     run_info = ctx.get("run") or {}
     when = run_info.get("finished_at") or run_info.get("started_at")
     when = when.astimezone(timezone.utc).strftime("%d/%m/%Y, %H:%M UTC") if when else "?"
@@ -179,10 +184,10 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
     down = ctx.get("down") or []
     down_txt = "; ".join(_board_fr(f'{catalog.BOARDS.get(d["subject"].split(":")[0], d["subject"].split(":")[0])} '
                                    f'{d["subject"].partition(":")[2]}') for d in down)
-    nav = "".join(f'<a href="#{k}" data-tab="{k}"{" class=on" if k == "home" else ""}>{n}'
-                  + (f'<sup>{len(panes[k])}</sup>' if k != "home" else "") + "</a>" for k, n in TABS)
-    tab_html = "".join(f'<section class="pane" data-pane="{k}" hidden><h2>{n}</h2>{_table(panes[k])}</section>'
-                       for k, n in TABS if k != "home")
+    nav = "".join(f'<a href="#{k}" data-tab="{k}"{" class=on" if k == "home" else ""}><span class="ic">{i}</span>{n}'
+                  + (f'<span class="ct">{len(panes[k])}</span>' if k != "home" else "") + "</a>" for k, i, n in TABS)
+    tab_html = "".join(f'<section class="pane" data-pane="{k}" hidden><h2>{i} {n}</h2>{_table(panes[k])}</section>'
+                       for k, i, n in TABS if k != "home")
     generated = datetime.now(timezone.utc).strftime("%d/%m/%Y, %H:%M UTC")
     return f"""<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -204,14 +209,23 @@ h1{{font:600 30px/1.15 Georgia,"Times New Roman",serif;letter-spacing:-.01em;mar
 margin-top:22px}}.figures div{{padding:12px 14px 12px 0}}.figures div+div{{border-left:1px solid var(--rule);padding-left:14px}}
 .figures b{{display:block;font-size:22px;font-weight:600;letter-spacing:-.01em}}.figures span{{color:var(--mute);font-size:12px}}
 .figures .hl b{{color:var(--amber)}}
-nav{{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--rule2)}}
-.navin{{display:flex;align-items:center;gap:26px;overflow-x:auto}}
-nav a{{color:var(--ink2);text-decoration:none;padding:14px 0 12px;border-bottom:2px solid transparent;white-space:nowrap;font-size:13.5px}}
-nav a:hover{{color:var(--ink)}}nav a.on{{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}}
-nav sup{{color:var(--mute);font-size:10px;margin-left:3px}}
+nav{{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--rule2);padding:12px 0}}
+.navin{{display:flex;align-items:center;gap:20px;overflow-x:auto}}
+.seg{{display:inline-flex;border:1px solid var(--rule2);border-radius:8px;padding:3px;background:var(--paper);gap:2px}}
+.seg a,.seg button{{display:inline-flex;align-items:center;gap:7px;color:var(--ink2);text-decoration:none;padding:7px 13px;
+border-radius:6px;white-space:nowrap;font:500 13.5px/1 inherit;font-family:inherit;border:0;background:none;cursor:pointer}}
+.seg a:hover,.seg button:hover{{background:var(--bg);color:var(--ink)}}
+.seg a.on,.seg button.on{{background:var(--ink);color:var(--paper)}}.seg .ic{{font-size:14px}}
+.seg .ct{{font-size:11px;padding:2px 6px;border-radius:999px;background:var(--bg);color:var(--mute);border:1px solid var(--rule)}}
+.seg a.on .ct{{background:transparent;color:var(--paper);border-color:rgba(255,255,255,.35)}}
+.small-seg{{margin:0 0 10px}}.small-seg button{{padding:5px 11px;font-size:12.5px}}
+.headrow{{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}}.desc{{margin-bottom:3px}}
+.run{{text-align:right;padding-top:18px}}#runbtn{{font:600 13px/1 inherit;font-family:inherit;padding:10px 16px;border-radius:7px;border:1px solid var(--ink);
+background:var(--ink);color:var(--paper);cursor:pointer}}#runbtn:hover{{opacity:.88}}#runbtn:disabled{{opacity:.5;cursor:default}}
+#runstate{{margin-top:6px;min-height:16px}}.strong{{font-weight:600}}
 .tools{{margin-left:auto;display:flex;gap:16px;align-items:center}}
 input[type=search]{{border:0;border-bottom:1px solid var(--rule2);background:transparent;color:var(--ink);padding:6px 2px;
-width:240px;font:inherit;outline:none}}input[type=search]:focus{{border-bottom-color:var(--ink)}}
+width:170px;font:inherit;outline:none}}input[type=search]:focus{{border-bottom-color:var(--ink)}}
 label.f{{font-size:13px;color:var(--ink2);white-space:nowrap}}
 main{{padding:28px 0 64px}}
 h2{{font:600 19px/1.3 Georgia,"Times New Roman",serif;margin:0 0 2px}}.dek{{color:var(--mute);margin:0 0 14px;font-size:13px}}
@@ -246,20 +260,22 @@ footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;paddi
 @media (max-width:600px){{.wrap{{padding:0 16px}}.figures{{grid-template-columns:repeat(2,1fr)}}.tools{{display:none}}
 .figures div{{border-left:0!important;padding-left:0!important}}}}
 </style></head><body>
-<div class="wrap"><header><div class="kicker">Walter Router</div><h1>Bibliothèque des modèles</h1>
-<div class="meta">Dernier cycle : {esc(when)}. Mise à jour toutes les 48 heures et après chacune de tes réponses.</div>
+<div class="wrap"><header><div class="headrow"><div><div class="kicker">Walter Router</div><h1>Bibliothèque des modèles</h1>
+<div class="meta">Dernier cycle : {esc(when)}. Mise à jour toutes les 48 heures et après chacune de tes réponses.</div></div>
+<div class="run"><button id="runbtn" type="button">▶ Lancer le cycle complet</button><div id="runstate" class="mute small"></div></div></div>
 <div class="figures">{"".join(f'<div class="{"hl" if lbl.startswith("Tes") else ""}"><b>{v}</b><span>{esc(lbl)}</span></div>' for lbl, v in figures)}</div>
 </header></div>
-<nav><div class="wrap navin">{nav}<div class="tools"><input type="search" id="q" placeholder="Rechercher">
+<nav><div class="wrap navin"><div class="seg" role="tablist">{nav}</div><div class="tools"><input type="search" id="q" placeholder="Rechercher">
 <label class="f"><input type="checkbox" id="diff"> Mes choix ≠ n°1</label></div></div></nav>
 <main class="wrap">
 {f'<p class="notice">Classement inaccessible : {esc(down_txt)}. Le router conserve sa dernière lecture valable pendant 21 jours.</p>' if down else ''}
 <section class="pane" data-pane="home">
-<div class="split"><div><h2>Niveaux de réflexion</h2><p class="dek">Optimum de Pareto calculé par ta méthode sur la frontière AA</p>
-<table class="levels"><colgroup><col style="width:34px"><col><col style="width:30%"><col style="width:76px"><col style="width:96px"></colgroup><thead><tr><th></th><th>Niveau</th><th>Modèle</th><th class="num">Indice AA</th><th class="num">Coût / tâche</th></tr></thead>
+<div class="split"><div><h2>🧠 Niveaux de réflexion</h2><p class="dek">Optimum de Pareto calculé par ta méthode sur la frontière AA</p>
+<table class="levels"><colgroup><col style="width:34px"><col style="width:120px"><col><col style="width:64px"><col style="width:84px"><col style="width:84px"></colgroup><thead><tr><th></th><th>Niveau</th><th>Modèle</th><th class="num">Indice AA</th><th class="num" title="Prix de référence publié par Artificial Analysis">Coût AA officiel</th><th class="num" title="Recalculé avec le prix du fournisseur utilisé">Coût réel</th></tr></thead>
 <tbody>{"".join(lrows)}</tbody></table></div>
-<div><h2>Indice d'intelligence et coût réel</h2><p class="dek">{len(pts)} combinaisons modèle × niveau de réflexion exécutables</p>{_chart(pts, frontier, levels)}</div></div>
-<div class="block"><h2>Spécialisations Design Arena</h2><p class="dek">Rang du modèle retenu sur le classement Design Arena de chaque tâche</p>
+<div><h2>📈 Indice d'intelligence et coût par tâche</h2><p class="dek">{len(pts)} combinaisons modèle × niveau de réflexion exécutables</p><div class="seg small-seg" id="costseg"><button data-cost="cost" class="on">Coût réel</button><button data-cost="cost_aa">Coût AA officiel</button></div>
+{_chart(pts, frontier, levels)}{_chart(pts, frontier, levels, "cost_aa")}</div></div>
+<div class="block"><h2>🎨 Spécialisations Design Arena</h2><p class="dek">Rang du modèle retenu sur le classement Design Arena de chaque tâche</p>
 <div class="tw"><table><thead><tr><th>Tâche</th><th>Modèle retenu</th><th class="num">Rang</th><th class="num">Score</th>
 <th>N°1 Design Arena, si différent</th><th>Fournisseurs</th></tr></thead><tbody>{"".join(da_rows)}</tbody></table></div></div>
 </section>
@@ -277,9 +293,21 @@ function filter(){{const s=(q.value||'').trim().toLowerCase();if((s||d.checked)&
 document.querySelectorAll('tbody tr[data-search]').forEach(r=>r.classList.toggle('hide',!((!s||r.dataset.search.includes(s))&&(!d.checked||r.dataset.differs==='1'))))}}
 links.forEach(a=>a.onclick=e=>{{e.preventDefault();show(a.dataset.tab);history.replaceState(null,'','#'+a.dataset.tab)}});
 q.oninput=filter;d.onchange=filter;
-const tip=document.getElementById('tip');document.querySelectorAll('[data-tip]').forEach(el=>{{
+document.querySelectorAll('#costseg button').forEach(b=>b.onclick=()=>{{
+document.querySelectorAll('#costseg button').forEach(x=>x.classList.toggle('on',x===b));
+document.querySelectorAll('figure.chart').forEach(f=>f.hidden=f.dataset.cost!==b.dataset.cost)}});
+document.querySelectorAll('[data-tip]').forEach(el=>{{const tip=el.closest('figure').querySelector('.tip');
 el.addEventListener('mouseenter',()=>{{const o=JSON.parse(el.dataset.tip);tip.innerHTML='<b>'+o.n+'</b><br>Indice '+o.s+' · '+o.c+' $ par tâche'+(o.p?' · '+o.p:'');tip.style.display='block'}});
 el.addEventListener('mousemove',e=>{{const r=tip.parentElement.getBoundingClientRect();tip.style.left=(e.clientX-r.left+12)+'px';tip.style.top=(e.clientY-r.top-8)+'px'}});
 el.addEventListener('mouseleave',()=>tip.style.display='none')}});
 show((location.hash||'#home').slice(1)||'home');
+const rb=document.getElementById('runbtn'),rs=document.getElementById('runstate');let poll=null;
+function fmt(t){{if(!t)return'';const d=new Date(t.replace(/^\\w+ /,''));return isNaN(d)?t:d.toLocaleString('fr-FR',{{dateStyle:'short',timeStyle:'short'}})}}
+async function state(){{try{{const r=await fetch('/api/status',{{cache:'no-store'}});const o=await r.json();
+if(o.running){{rb.disabled=true;rs.textContent='En cours depuis '+fmt(o.started)+' — '+(o.step||'')}}
+else{{rb.disabled=false;rs.textContent=o.finished?('Dernière exécution terminée le '+fmt(o.finished)+(o.result&&o.result!=='success'?' ('+o.result+')':'')):''; if(poll){{clearInterval(poll);poll=null;if(o.result==='success')setTimeout(()=>location.reload(),20000)}}}}
+if(o.running&&!poll)poll=setInterval(state,15000)}}catch(e){{rs.textContent='Statut indisponible'}}}}
+rb.onclick=async()=>{{if(!confirm('Lancer maintenant le cycle complet ? Collecte des classements, recalcul, analyse par le modèle économique, notifications et republication de cette page (20 à 60 minutes).'))return;
+rb.disabled=true;rs.textContent='Lancement…';try{{const r=await fetch('/api/run',{{method:'POST'}});const o=await r.json();rs.textContent=o.message||'';}}catch(e){{rs.textContent='Échec du lancement'}}setTimeout(state,1500)}};
+state();
 </script></body></html>"""
