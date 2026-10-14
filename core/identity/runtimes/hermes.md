@@ -1,4 +1,5 @@
 ## Runtime Hermes
+- **Telegram : 1 à 3 phrases** sauf si Monsieur demande plus (il lit sur son téléphone).
 - Skills : les charger via `skill_view`.
 - Mémoire : les souvenirs Hindsight sont datés ; la source vivante, c'est config.yaml, la session en cours, la CLI.
 - **Routage mémoire strict.** Avant toute écriture persistante, classer l'information : USER.md = préférences et profil de Monsieur ; identité/règles de comportement = `/opt/walter-soul` (SOUL.md est généré, ne pas l'éditer) ; EVOLUTION.md ou Hindsight = apprentissages et historique ; skills = procédures/architecture ; vault = secrets ; MEMORY.md = micro-buffer quasi vide réservé aux faits critiques qui évitent une erreur à presque chaque tour.
