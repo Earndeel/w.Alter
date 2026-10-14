@@ -61,6 +61,9 @@ def rows(conn) -> list[dict]:
             out.append({**row, "model": None, "warning": f"aucun modèle ({type(exc).__name__})"})
             continue
         mid = d.get("model_id")
+        if not mid:
+            out.append({**row, "model": None, "chosen_by": "calcul", "warning": "aucun modèle exécutable"})
+            continue
         sel_row = conn.execute("""select model_id, reasons from models.selection where run_id = (select run_id from
                                   models.latest_run) and task = %s and level = 'best' and rank = 1""", (task,)).fetchone()
         comp = scoring.composite(conn, task) if task != "general" else []
@@ -140,3 +143,152 @@ def render(rs: list[dict]) -> str:
         lines.append(f'   Fournisseurs : {r.get("providers") or "—"} · Secours : {r.get("fallback") or "—"}'
                      + (f' · Abonnement : {r["subscription"]}' if r.get("subscription") not in (None, "—") else ""))
     return "\n".join(lines).strip()
+
+
+# --- HTML page (Cloudflare Pages, behind Cloudflare Access; Monsieur 2026-10-14) -----------------------------
+
+def _context(conn) -> dict:
+    run = conn.execute("select run_id, started_at, finished_at from models.runs where status = 'ok' "
+                       "order by run_id desc limit 1").fetchone()
+    counts = {r["interface"]: r["n"] for r in conn.execute(
+        "select interface, count(distinct model_id) n from models.catalog group by 1")}
+    down = [dict(r) for r in conn.execute("""select subject, evidence from models.alerts where kind = 'board_down'
+                                             and status in ('open', 'notified') order by subject""")]
+    return {"run": dict(run) if run else {}, "counts": counts, "down": down,
+            "tracked": conn.execute("select count(*) n from models.canonical").fetchone()["n"]}
+
+
+def render_html(rs: list[dict], ctx: dict) -> str:
+    import html
+    import json as _json
+    from datetime import datetime, timezone
+    esc = html.escape
+    titles = {"chat": ("💬", "Texte"), "image": ("🖼️", "Image"), "video": ("🎬", "Vidéo"), "audio": ("🗣️", "Audio"),
+              "music": ("🎵", "Musique"), "decisions": ("🧭", "Décision")}
+    order = ["chat", "image", "video", "audio", "music", "decisions"]
+    badge = {"toi": ("star", "⭐ Ton choix"), "calcul": ("calc", "🤖 Calculé"),
+             "méthode des niveaux": ("tier", "📐 Méthode des niveaux")}
+
+    def chips(text: str | None) -> str:
+        if not text or text == "—":
+            return '<span class="muted">—</span>'
+        parts = [p.strip() for p in text.split("→")]
+        return '<span class="arrow">→</span>'.join(f'<span class="chip">{esc(p)}</span>' for p in parts)
+
+    sections = []
+    for t in order:
+        items = [r for r in rs if r["type"] == t]
+        if not items:
+            continue
+        cards = []
+        for r in items:
+            cls, label = badge.get(r.get("chosen_by") or "", ("calc", "🤖 Calculé"))
+            differs = bool(r.get("differs")) and r.get("chosen_by") == "toi"
+            search = " ".join(str(r.get(k) or "") for k in ("label", "category", "model", "providers", "fallback"))
+            body = [f'<div class="task">{esc(r["label"])}'
+                    + (f' <span class="cat">› {esc(r["category"])}</span>' if r.get("category") else "") + "</div>"]
+            if not r.get("model"):
+                body.append(f'<div class="model none">Aucun modèle</div><div class="warn">⚠️ {esc(r.get("warning") or "")}</div>')
+            else:
+                body.append(f'<div class="model">{esc(r["model"])}</div><span class="badge {cls}">{label}</span>'
+                            + (f'<span class="score">score {r["score"]}</span>' if r.get("score") is not None
+                               and r.get("chosen_by") != "méthode des niveaux" else ""))
+                if r.get("differs"):
+                    body.append(f'<div class="differs">≠ {esc(r["differs"])}</div>')
+                if r.get("warning"):
+                    body.append(f'<div class="warn">⚠️ {esc(r["warning"])}</div>')
+                body.append(f'<div class="row"><span class="k">Fournisseurs</span><span>{chips(r.get("providers"))}</span></div>')
+                body.append(f'<div class="row"><span class="k">Secours</span><span>{chips(r.get("fallback"))}</span></div>')
+                if r.get("subscription") not in (None, "—"):
+                    body.append(f'<div class="row"><span class="k">Abonnement</span><span class="chip sub">{esc(r["subscription"])}</span></div>')
+            cards.append(f'<article class="card{" differs-card" if differs else ""}" data-differs="{int(differs)}" '
+                         f'data-search="{esc(search.lower())}">' + "".join(body) + "</article>")
+        icon, name = titles.get(t, ("•", t))
+        sections.append(f'<section data-type="{t}"><h2>{icon} {name} <small>{len(items)}</small></h2>'
+                        f'<div class="grid">{"".join(cards)}</div></section>')
+    run = ctx.get("run") or {}
+    when = run.get("finished_at") or run.get("started_at")
+    when = when.astimezone(timezone.utc).strftime("%d/%m/%Y %H:%M UTC") if when else "?"
+    counts = ctx.get("counts") or {}
+    stats = " · ".join(f"{titles.get(k, ('', k))[1] or k} {counts[k]}" for k in order if k in counts)
+    from .alerts import _board_fr   # 'arena:image_edit' -> 'Arena retouche d'image'
+    def board(subject: str) -> str:
+        bench, _, task = subject.partition(":")
+        return _board_fr(f"{catalog.BOARDS.get(bench, bench)} {task}")
+    down = "".join(f'<li>⚠️ {esc(board(d["subject"]))} — {esc((d["evidence"] or {}).get("reason", ""))}</li>'
+                   for d in ctx.get("down") or [])
+    n_diff = sum(1 for r in rs if r.get("differs") and r.get("chosen_by") == "toi")
+    generated = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
+    return f"""<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>Walter Router — bibliothèque des modèles</title>
+<style>
+:root{{--bg:#f6f7f9;--card:#fff;--ink:#16181d;--muted:#6b7280;--line:#e5e7eb;--chip:#eef1f5;--star:#7c3aed;--calc:#2563eb;
+--tier:#0d9488;--amber:#b45309;--amberbg:#fff7ed;--red:#b91c1c;--redbg:#fef2f2;--green:#047857;--greenbg:#ecfdf5}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#0f1115;--card:#171a21;--ink:#e8eaed;--muted:#9aa3af;--line:#262b35;
+--chip:#222733;--amberbg:#2a1f10;--redbg:#2a1414;--greenbg:#0f241d}}}}
+*{{box-sizing:border-box}}body{{margin:0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+background:var(--bg);color:var(--ink)}}header{{padding:28px 24px 8px;max-width:1280px;margin:auto}}
+h1{{margin:0 0 4px;font-size:24px}}.sub{{color:var(--muted)}}main{{max-width:1280px;margin:auto;padding:0 24px 48px}}
+.tools{{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:16px 0}}
+input[type=search]{{flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
+background:var(--card);color:var(--ink);font-size:15px}}label{{color:var(--muted);user-select:none}}
+.tabs button{{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 12px;border-radius:999px;
+cursor:pointer;margin-right:4px}}.tabs button.on{{background:var(--ink);color:var(--bg)}}
+h2{{font-size:18px;margin:28px 0 12px}}h2 small{{color:var(--muted);font-weight:400}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}}
+.card{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}}
+.differs-card{{border-color:#f59e0b}}.task{{font-size:13px;color:var(--muted)}}.cat{{color:var(--ink);font-weight:600}}
+.model{{font-size:18px;font-weight:650;margin:4px 0 6px}}.model.none{{color:var(--red)}}
+.badge{{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;color:#fff;margin-right:6px}}
+.badge.star{{background:var(--star)}}.badge.calc{{background:var(--calc)}}.badge.tier{{background:var(--tier)}}
+.score{{font-size:12px;color:var(--muted)}}.differs{{margin-top:8px;padding:6px 8px;border-radius:8px;background:var(--amberbg);
+color:var(--amber);font-size:13px}}.warn{{margin-top:8px;padding:6px 8px;border-radius:8px;background:var(--redbg);color:var(--red);
+font-size:13px}}.row{{display:flex;gap:10px;margin-top:10px;font-size:13px;align-items:baseline}}
+.k{{flex:0 0 92px;color:var(--muted)}}.chip{{display:inline-block;background:var(--chip);border-radius:6px;padding:2px 7px;
+margin:2px 0}}.chip.sub{{background:var(--greenbg);color:var(--green)}}.arrow{{color:var(--muted);margin:0 4px}}
+.muted{{color:var(--muted)}}.down{{background:var(--redbg);color:var(--red);border-radius:12px;padding:10px 16px}}
+.down ul{{margin:4px 0;padding-left:18px}}footer{{color:var(--muted);font-size:12px;margin-top:32px}}
+.hide{{display:none!important}}
+</style></head><body>
+<header><h1>Walter Router — bibliothèque des modèles</h1>
+<div class="sub">Dernier cycle : {esc(when)} · {ctx.get("tracked", 0)} modèles suivis ({esc(stats)}) ·
+{n_diff} choix de ta part différents du n°1 mesuré</div></header>
+<main>
+{f'<div class="down"><b>Classements inaccessibles</b><ul>{down}</ul>Le router garde leur dernière lecture valable (21 jours).</div>' if down else ''}
+<div class="tools"><input type="search" id="q" placeholder="Chercher un modèle, une tâche, un fournisseur…">
+<label><input type="checkbox" id="diff"> seulement mes choix ≠ n°1</label></div>
+<div class="tabs" id="tabs"><button class="on" data-t="">Tout</button>{"".join(f'<button data-t="{t}">{titles[t][0]} {titles[t][1]}</button>' for t in order if any(r["type"] == t for r in rs))}</div>
+{"".join(sections)}
+<footer>⭐ Ton choix = modèle que tu as fixé ; « ≠ n°1 » = le mieux classé est un autre (raison indiquée). 🤖 Calculé = meilleur
+modèle exécutable selon les classements pondérés. 📐 Méthode des niveaux = L1/L2/L3 par ta méthode Pareto. Prix : texte en $
+par million de tokens (entrée/sortie), image par image, vidéo par seconde (plage selon la résolution). Généré le {generated}.</footer>
+</main>
+<script>
+const q=document.getElementById('q'),d=document.getElementById('diff');let tab='';
+function f(){{const s=q.value.trim().toLowerCase();document.querySelectorAll('section').forEach(sec=>{{let n=0;
+sec.querySelectorAll('.card').forEach(c=>{{const ok=(!s||c.dataset.search.includes(s))&&(!d.checked||c.dataset.differs==='1');
+c.classList.toggle('hide',!ok);if(ok)n++}});sec.classList.toggle('hide',!n||(tab&&sec.dataset.type!==tab))}})}}
+q.oninput=f;d.onchange=f;document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{{
+document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');tab=b.dataset.t;f()}});
+</script></body></html>"""
+
+
+SITE = __import__("pathlib").Path(__file__).resolve().parent.parent / "site"
+CF = "/root/.hermes/scripts/walter-cloudflare"
+
+
+def publish(conn, deploy: bool = True) -> dict:
+    """Rebuild site/index.html and deploy it to Cloudflare Pages (project walter-library, served only on
+    library.walter-ai.cloud behind Cloudflare Access; site/functions/_middleware.js refuses every other host)."""
+    import subprocess
+    SITE.mkdir(exist_ok=True)
+    html = render_html(rows(conn), _context(conn))
+    (SITE / "index.html").write_text(html)
+    if not deploy:
+        return {"built": len(html)}
+    r = subprocess.run([CF, "--", "wrangler", "pages", "deploy", ".", "--project-name", "walter-library",
+                        "--branch", "main", "--commit-dirty=true"], cwd=SITE, capture_output=True, text=True,
+                       timeout=300)
+    tail = [line for line in (r.stdout + r.stderr).splitlines() if line.strip()][-1:]
+    return {"built": len(html), "deployed": r.returncode == 0, "detail": tail}

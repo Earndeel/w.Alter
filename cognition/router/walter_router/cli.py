@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 import subprocess
 import sys
 
@@ -230,6 +231,8 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--role", help="with a short number covering several roles: only this one")
     lb = sub.add_parser("library", help="the model library: per task/category model, chooser, providers, fallback")
     lb.add_argument("--json", action="store_true")
+    pl = sub.add_parser("publish-library", help="rebuild and deploy https://library.walter-ai.cloud (Cloudflare Access)")
+    pl.add_argument("--no-deploy", action="store_true")
     sub.add_parser("status")
     sub.add_parser("health", help="exit 1 when the router is not fed or not usable")
     pr = sub.add_parser("probe", help="tiny live call per provider (Kie, OpenRouter, Arnict)")
@@ -328,6 +331,9 @@ def main(argv: list[str] | None = None) -> int:
                 out = aliases_admin.listing()
             elif args.cmd == "review":
                 out = review.digest(conn)
+            elif args.cmd == "publish-library":
+                from . import library
+                out = library.publish(conn, deploy=not args.no_deploy)
             elif args.cmd == "library":
                 from . import library
                 rs = library.rows(conn)
@@ -347,6 +353,10 @@ def main(argv: list[str] | None = None) -> int:
                 out = rows
             else:
                 out = alerts.verdict(conn, args.alert_id, args.decision, args.note, args.role)
+                import subprocess   # the library page follows Monsieur's answer (background, non-blocking)
+                wr = Path(__file__).resolve().parent.parent / "bin" / "walter-router"   # after this command's commit
+                subprocess.Popen(["sh", "-c", f'sleep 5; "{wr}" publish-library'],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             conn.commit()
     json.dump(out, sys.stdout, indent=1, ensure_ascii=False, default=str)
     print()
