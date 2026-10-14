@@ -264,3 +264,6 @@ gratuit → meilleur, choix du 2026-10-04) ou `best_first` (meilleur → gratuit
 https://library.walter-ai.cloud — `walter-router library` en page web (Cloudflare Pages `walter-library`, Cloudflare
 Access : e-mail de Monsieur seulement ; les adresses `*.pages.dev` répondent 404). Republiée en fin de cycle 48 h et
 après chaque verdict (`publish-library`).
+Bouton « Lancer le cycle complet » : /api/run → router-control.walter-ai.cloud (Access, jeton de service) →
+`walter-router-control` (127.0.0.1:8896, HMAC) → `walter-router-refresh.service`. Refus si un cycle tourne ou a démarré
+il y a moins de 10 minutes.
