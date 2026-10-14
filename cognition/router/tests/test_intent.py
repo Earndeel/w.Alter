@@ -50,7 +50,9 @@ def test_forwarding_router_model_is_refused(conn, monkeypatch):
 
 
 def test_chain_falls_back_to_the_next_decision_model(conn, monkeypatch):
+    """best_first (2026-10-14): the cycle's best (paid, OpenRouter) fails, e.g. HTTP 402 → Mercury Decide free."""
     calls = []
+    chain = intent.chain(conn)
 
     def fake_cloudflare(model, payload, timeout):
         calls.append(model)
@@ -59,6 +61,8 @@ def test_chain_falls_back_to_the_next_decision_model(conn, monkeypatch):
     def fake_urlopen(req, timeout):
         body = json.loads(req.data)
         calls.append(body["model"])
+        if body["model"] == chain[0] and not body["model"].endswith(":free"):
+            raise RuntimeError("HTTP Error 402: Payment Required")
         answers = {n: {"choice": next(iter(q["criteria"])), "confidence": 0.9, "probabilities": {}}
                    for n, q in body["questions"].items()}
         return _Resp(json.dumps({"model": "inception/mercury-decide-x", "answers": answers}).encode())
@@ -67,4 +71,6 @@ def test_chain_falls_back_to_the_next_decision_model(conn, monkeypatch):
     monkeypatch.setattr(intent, "urlopen", fake_urlopen)
     monkeypatch.setattr(intent.collect, "_env_value", lambda name: "k")
     out = intent.classify(conn, "une pub vidéo")
-    assert calls[:2] == ["cloudflare/clef", "inception/mercury-decide:free"] and out["fallback_errors"]
+    assert chain[-2:] == ("inception/mercury-decide:free", "cloudflare/clef") or chain[0] == "cloudflare/clef"
+    assert "inception/mercury-decide:free" in calls and out["model"].startswith("inception/mercury-decide")
+    assert out["fallback_errors"]
