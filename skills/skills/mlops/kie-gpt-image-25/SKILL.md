@@ -25,6 +25,16 @@ When Monsieur provides prompt wording and asks to use or retain it, pass that te
 
 When likeness matters and the supplied reference is a multi-view character sheet, a full-sheet input can dilute facial identity—especially at 1K. Without changing a user-specified exact prompt, prepare a clean close-up face crop from the same sheet and include it alongside the full sheet in `input_urls` when the endpoint supports multiple references. Inspect the generated face against the reference before claiming identity fidelity; report drift plainly.
 
+## Reference roles and moderation diagnosis
+
+- Verify reference contents visually before assigning face/product roles; upload numbering does not establish their order in `input_urls`.
+- When an adult sensual-fashion brief uses an age-ambiguous face, confirm adulthood before generating the sensual treatment.
+- After repeated moderation failures, do not repay another whole batch. When live testing is authorized, bound diagnosis to genuinely neutral controls: text-only still life, fully clothed portrait from the face reference, and product-only image from the garment reference. Keep original inputs unchanged; never disguise them to evade filtering.
+- Separate successful endpoint/reference controls from the requested composition: independent reference acceptance does not prove that the combined worn-garment scene will pass.
+- Label a clothed presentation with a separately displayed product as a changed composition, not success at making the subject wear it.
+- Check garment construction against a magnified original before adding verbal constraints; do not invent hardware or fabric panels from a blurry detail. Compare face geometry and garment geometry separately, and disclose remaining drift.
+- When reusing a collector, inspect actual function signatures and manifest keys first. Derive expected counts from the submitted jobs, and validate pixels against each job's requested resolution rather than assuming every diagnostic is a five-image 2K batch.
+
 ## Verify live availability first
 
 Query Kie's public model-path catalog at `https://api.kie.ai/api/v1/playground/model-paths` and filter for `gpt-image`. The catalog is the authority for callable path IDs; the product page is `https://kie.ai/gpt-image-2-5`.
