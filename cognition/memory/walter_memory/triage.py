@@ -7,7 +7,8 @@ with urgency (now / today / later), category and needs_reply.
 1. Context Lite, privacy-safe: thread kind (1:1 / group), network, how active and reciprocal the thread is (from
    core.events), whether Monsieur already answered, whether he is mentioned, the last few messages of the thread
    (pseudonymised by walter_memory.llm for redacted_cloud; text dropped entirely for local_only).
-2. Decision model: Clef (Cloudflare Workers AI, free allocation) through walter_memory.llm.decide.
+2. Decision model through walter_memory.llm.decide: Mercury Decide free (OpenRouter), Clef (Workers AI) as fallback
+   (2026-10-14, AA Decision Index).
 3. Monsieur's deterministic rules (config/triage_rules.json): muted / VIP threads and people, groups only when
    mentioned or urgent, silence hours (Asia/Bangkok), e-mail categories never notified, hourly cap.
 One decision per thread per run (the latest incoming message); every other incoming event of the burst is
