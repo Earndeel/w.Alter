@@ -123,7 +123,7 @@ def _table(rs: list[dict]) -> str:
             f'<td class="origin{" mine" if r.get("chosen_by") == "toi" else ""}">{origin}</td>'
             f'<td class="num">{score}</td><td class="route">{_route(r.get("providers"))}</td>'
             f'<td>{_route(r.get("fallback"))}</td>'
-            f'<td>{esc(r["subscription"]) if r.get("subscription") not in (None, "—") else ""}</td></tr>')
+            f'<td class="nw">{esc(r["subscription"]) if r.get("subscription") not in (None, "—") else ""}</td></tr>')
     return f'<div class="tw"><table class="lib">{head}<tbody>{"".join(body)}</tbody></table></div>'
 
 
@@ -158,7 +158,7 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
         lrows.append(
             f'<tr><td class="lvl">{lvl}</td><td><div class="lname">{LEVELS[lvl][0]}</div></td>'
             f'<td class="model">{esc((card.get("model") or "—").split(" (")[0])}<div class="mute small">réflexion {effort}</div></td>'
-            f'<td class="num">{f"{s["quality"]:.1f}".replace(".", ",")}</td><td class="num">{cost_aa}</td><td class="num strong">{cost}</td></tr>'
+            f'<td class="num" data-label="Indice AA">{f"{s["quality"]:.1f}".replace(".", ",")}</td><td class="num" data-label="Coût AA officiel">{cost_aa}</td><td class="num strong" data-label="Coût réel">{cost}</td></tr>'
             f'<tr class="sub"><td></td><td colspan="5"><div class="mute desc">{LEVELS[lvl][1]}</div><span class="mute">Fournisseurs</span> {_route(card.get("providers"))}'
             + (f'<span class="mute sep2">Secours</span> {esc(card["fallback"])}' if card.get("fallback") not in (None, "—") else "")
             + (f'<span class="mute sep2">Abonnement</span> {esc(sub)}' if sub not in (None, "—") else "") + "</td></tr>")
@@ -210,7 +210,7 @@ margin-top:22px}}.figures div{{padding:12px 14px 12px 0}}.figures div+div{{borde
 .figures b{{display:block;font-size:22px;font-weight:600;letter-spacing:-.01em}}.figures span{{color:var(--mute);font-size:12px}}
 .figures .hl b{{color:var(--amber)}}
 nav{{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--rule2);padding:12px 0}}
-.navin{{display:flex;align-items:center;gap:20px;overflow-x:auto}}
+.navin{{display:flex;align-items:center;gap:20px;flex-wrap:wrap}}.seg[role=tablist]{{max-width:100%;overflow-x:auto;scrollbar-width:none}}
 .seg{{display:inline-flex;border:1px solid var(--rule2);border-radius:8px;padding:3px;background:var(--paper);gap:2px}}
 .seg a,.seg button{{display:inline-flex;align-items:center;gap:7px;color:var(--ink2);text-decoration:none;padding:7px 13px;
 border-radius:6px;white-space:nowrap;font:500 13.5px/1 inherit;font-family:inherit;border:0;background:none;cursor:pointer}}
@@ -227,7 +227,7 @@ background:var(--ink);color:var(--paper);cursor:pointer}}#runbtn:hover{{opacity:
 input[type=search]{{border:0;border-bottom:1px solid var(--rule2);background:transparent;color:var(--ink);padding:6px 2px;
 width:170px;font:inherit;outline:none}}input[type=search]:focus{{border-bottom-color:var(--ink)}}
 label.f{{font-size:13px;color:var(--ink2);white-space:nowrap}}
-main{{padding:28px 0 64px}}
+main.wrap{{padding-top:30px;padding-bottom:64px}}
 h2{{font:600 19px/1.3 Georgia,"Times New Roman",serif;margin:0 0 2px}}.dek{{color:var(--mute);margin:0 0 14px;font-size:13px}}
 .notice{{color:var(--red);font-size:13px;margin:0 0 22px;padding:8px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}}
 .split{{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:40px}}
@@ -236,13 +236,13 @@ text-transform:uppercase;color:var(--mute);padding:8px 10px 8px 0;border-bottom:
 td{{padding:10px 10px 10px 0;border-bottom:1px solid var(--rule);vertical-align:top}}
 .num{{text-align:right;white-space:nowrap}}th.num{{text-align:right}}
 .levels td{{border-bottom:0;padding-bottom:2px}}.levels tr.sub td{{border-bottom:1px solid var(--rule);padding-top:0;padding-bottom:12px;
-font-size:12.5px;color:var(--ink2)}}.lvl{{font-weight:700;font-size:15px;width:34px}}.lname{{font-weight:600}}
+font-size:12.5px;color:var(--ink2)}}.lvl{{font-weight:700;font-size:15px;width:34px}}.lname{{font-weight:600;white-space:nowrap}}
 .model{{font-weight:600}}.levels .model{{white-space:nowrap}}.small{{font-size:12px;font-weight:400}}.mute{{color:var(--mute)}}.sep2{{margin-left:14px}}
 .arr{{color:var(--mute)}}.nw{{white-space:nowrap}}.amber{{color:var(--amber);font-size:12.5px}}
 .lib td.task{{width:17%;font-weight:600}}.lib .cat{{font-weight:400;color:var(--ink2)}}.lib td.route{{font-size:12.5px}}
 .lib td{{font-size:13px}}.origin{{color:var(--mute);white-space:nowrap}}.origin.mine{{color:var(--ink);font-weight:600}}
 .n-amber{{font-weight:400;font-size:12px;color:var(--amber);margin-top:3px}}.n-red{{font-weight:400;font-size:12px;color:var(--red);margin-top:3px}}
-tr.diff td{{background:var(--amberbg)}}.tw{{overflow-x:auto}}
+tr.diff td{{background:var(--amberbg)}}.tw{{overflow-x:auto;-webkit-overflow-scrolling:touch}}.tw table.lib{{min-width:980px}}.tw table{{min-width:720px}}.tw table.levels{{min-width:0}}
 .chart{{margin:0;position:relative}}.chart svg{{width:100%;height:auto;display:block}}
 .gl{{stroke:var(--rule);stroke-width:1}}.ax{{stroke:var(--ink);stroke-width:1}}.tk{{fill:var(--mute);font-size:11px}}
 .pt{{fill:var(--pt)}}.fr{{fill:none;stroke:var(--c1);stroke-width:2}}.fp{{fill:var(--c1);stroke:var(--surface);stroke-width:2}}
@@ -259,7 +259,15 @@ footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;paddi
 .lang a.on{{color:var(--ink);font-weight:600;border-bottom:1px solid var(--ink)}}.lang .sep{{margin:0 8px;color:var(--mute)}}
 @media (max-width:980px){{.split{{grid-template-columns:1fr}}.figures{{grid-template-columns:repeat(3,1fr)}}
 .figures div:nth-child(4){{border-left:0;padding-left:0}}}}
-@media (max-width:600px){{.wrap{{padding:0 16px}}.figures{{grid-template-columns:repeat(2,1fr)}}.tools{{display:none}}
+@media (max-width:1100px){{.tools{{margin-left:0;width:100%;justify-content:space-between}}input[type=search]{{flex:1}}}}
+@media (max-width:600px){{.levels thead{{display:none}}.levels tr:not(.sub){{display:flex;flex-wrap:wrap;align-items:baseline}}
+.levels tr:not(.sub) td{{border:0;padding:12px 0 0}}.levels td.lvl{{width:34px}}.levels tr:not(.sub) td:nth-child(2){{flex:1}}
+.levels colgroup{{display:none}}.levels td{{width:auto!important}}.levels td.lvl{{flex:0 0 34px}}.levels{{table-layout:auto}}
+.levels td.model{{flex:0 0 100%;padding:4px 0 0 34px!important;white-space:normal}}
+.levels td.num{{flex:1 1 0;min-width:0;text-align:left;padding:10px 0 0 34px!important}}.levels td.num+td.num{{padding-left:12px!important}}
+.levels td.num::before{{content:attr(data-label);display:block;color:var(--mute);font-size:11px;font-weight:400;letter-spacing:.04em;text-transform:uppercase}}
+.levels tr.sub td{{padding-left:34px}}.levels tr.sub td:first-child{{display:none}}}}
+@media (max-width:600px){{.wrap{{padding:0 16px}}.figures{{grid-template-columns:repeat(2,1fr)}}
 .figures div{{border-left:0!important;padding-left:0!important}}}}
 </style></head><body>
 <div class="wrap"><header><div class="headrow"><div><div class="kicker">Walter Router</div><h1>Bibliothèque des modèles</h1></div>
@@ -271,8 +279,8 @@ footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;paddi
 {f'<p class="notice">Classement inaccessible : {esc(down_txt)}. Le router conserve sa dernière lecture valable pendant 21 jours.</p>' if down else ''}
 <section class="pane" data-pane="home">
 <div class="split"><div><h2>🧠 Niveaux de réflexion</h2><p class="dek">Optimum de Pareto calculé par ta méthode sur la frontière AA</p>
-<table class="levels"><colgroup><col style="width:34px"><col style="width:120px"><col><col style="width:64px"><col style="width:84px"><col style="width:84px"></colgroup><thead><tr><th></th><th>Niveau</th><th>Modèle</th><th class="num">Indice AA</th><th class="num" title="Prix de référence publié par Artificial Analysis">Coût AA officiel</th><th class="num" title="Recalculé avec le prix du fournisseur utilisé">Coût réel</th></tr></thead>
-<tbody>{"".join(lrows)}</tbody></table></div>
+<div class="tw"><table class="levels"><colgroup><col style="width:34px"><col style="width:120px"><col><col style="width:64px"><col style="width:84px"><col style="width:84px"></colgroup><thead><tr><th></th><th>Niveau</th><th>Modèle</th><th class="num">Indice AA</th><th class="num" title="Prix de référence publié par Artificial Analysis">Coût AA officiel</th><th class="num" title="Recalculé avec le prix du fournisseur utilisé">Coût réel</th></tr></thead>
+<tbody>{"".join(lrows)}</tbody></table></div></div>
 <div><h2>📈 Indice d'intelligence et coût par tâche</h2><p class="dek">{len(pts)} combinaisons modèle × niveau de réflexion exécutables</p><div class="seg small-seg" id="costseg"><button data-cost="cost" class="on">Coût réel</button><button data-cost="cost_aa">Coût AA officiel</button></div>
 {_chart(pts, frontier, levels)}{_chart(pts, frontier, levels, "cost_aa")}</div></div>
 <div class="block"><h2>🎨 Spécialisations Design Arena</h2><p class="dek">Rang du modèle retenu sur le classement Design Arena de chaque tâche</p>
@@ -286,10 +294,10 @@ Classements recalculés le {esc(when)} ; cycle complet automatique toutes les 48
 pondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Une ligne surlignée signale un choix de ta part différent du n°1 mesuré, avec la raison.
 Prix : texte en dollars par million de tokens (entrée/sortie), image par image, vidéo par seconde (plage selon la résolution) ;
 « estimé » lorsque le fournisseur facture au token. Page générée le {generated}.
-<div class="lang"><a href="/" data-lang="fr" class="on">Français</a><span class="sep">·</span><a href="/en/" data-lang="en">English</a></div></footer></div>
+<div class="lang"><a href="/" data-lang="en">English</a><span class="sep">·</span><a href="/fr/" data-lang="fr" class="on">Français</a></div></footer></div>
 <script>
 (function(){{const want=localStorage.getItem('walterLang'),here=document.documentElement.lang;
-if(want&&want!==here){{location.replace((want==='en'?'/en/':'/')+location.hash);return}}
+if(want&&want!==here){{location.replace((want==='fr'?'/fr/':'/')+location.hash);return}}
 document.querySelectorAll('.lang a').forEach(a=>a.addEventListener('click',()=>localStorage.setItem('walterLang',a.dataset.lang)))}})();
 const links=document.querySelectorAll('nav a[data-tab]'),panes=document.querySelectorAll('.pane'),q=document.getElementById('q'),
 d=document.getElementById('diff');let cur='home';
@@ -306,6 +314,7 @@ el.addEventListener('mouseenter',()=>{{const o=JSON.parse(el.dataset.tip);tip.in
 el.addEventListener('mousemove',e=>{{const r=tip.parentElement.getBoundingClientRect();tip.style.left=(e.clientX-r.left+12)+'px';tip.style.top=(e.clientY-r.top-8)+'px'}});
 el.addEventListener('mouseleave',()=>tip.style.display='none')}});
 show((location.hash||'#home').slice(1)||'home');
+window.addEventListener('hashchange',()=>show((location.hash||'#home').slice(1)||'home'));
 const rb=document.getElementById('runbtn'),rs=document.getElementById('runstate');let poll=null;
 function fmt(t){{if(!t)return'';const d=new Date(t.replace(/^\\w+ /,''));return isNaN(d)?t:d.toLocaleString('fr-FR',{{dateStyle:'short',timeStyle:'short'}})}}
 async function state(){{try{{const r=await fetch('/api/status',{{cache:'no-store'}});const o=await r.json();

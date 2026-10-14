@@ -11,7 +11,7 @@ def test_english_page_has_no_french_left():
     with db.connect() as conn:
         html = library_page.render(conn, library.rows(conn), library._context(conn))
     en = library_i18n.to_english(html)
-    assert '<html lang="en">' in en and 'data-lang="en" class="on"' in en
+    assert '<html lang="en">' in en and 'data-lang="en" class="on"' in en and 'data-lang="fr" class="on"' not in en
     text = re.sub(r"<style.*?</style>|<script.*?</script>", "", en, flags=re.S)
     text = re.sub(r'data-search="[^"]*"', "", text)
     words = set(re.findall(r"[A-Za-zÀ-ÿ']+", re.sub(r"<[^>]+>", " ", text)))
