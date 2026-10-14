@@ -55,6 +55,13 @@ def _media_price(offers: dict, mid: str, prov: str, interface: str) -> str:
     return f'{catalog.money(lo)}{"–" + catalog.money(hi) if hi != lo else ""} {unit}'
 
 
+def sel_model_id(route: dict) -> str:
+    """Canonical model id of an execution route ('openai/gpt-6.1-sol', 'gpt-6-1-sol' -> 'gpt-6-1-sol')."""
+    from . import identity
+    m = route.get("model_id") or route.get("model") or ""
+    return identity.normalize("openrouter", m)[0] if "/" in m else identity.canon(m.replace(".", "-"))
+
+
 def rows(conn) -> list[dict]:
     from .cli import with_execution   # late import (cli -> library)
     offers = sel.load_offers(conn, sel.latest_snapshots(conn))
@@ -109,7 +116,8 @@ def rows(conn) -> list[dict]:
             main, fb = [r for r in ex if not r.get("fallback_for")], [r for r in ex if r.get("fallback_for")]
             row["providers"] = " → ".join(f'{PROV.get(r["hermes_provider"], r["hermes_provider"])} '
                                           f'{_chat_price(offers, mid, r["hermes_provider"])}'.strip() for r in main)
-            row["fallback"] = (f'{fb[0]["model"]}{" " + fb[0]["reasoning"] if fb[0].get("reasoning") else ""} via '
+            fb_name = _name(conn, sel_model_id(fb[0])) if fb else ""
+            row["fallback"] = (f'{fb_name}{" " + fb[0]["reasoning"] if fb[0].get("reasoning") else ""} via '
                                f'{PROV.get(fb[0]["hermes_provider"], fb[0]["hermes_provider"])}') if fb else "—"
             row["subscription"] = "Codex" if any(r["access"] == "subscription" for r in main) else \
                 ("Codex (secours)" if any(r["access"] == "subscription" for r in fb) else "—")
