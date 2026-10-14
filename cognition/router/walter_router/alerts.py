@@ -7,7 +7,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from . import catalog, changes, media
+from . import catalog, changes, collect, media
 from . import select as sel
 
 HERMES = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "hermes-agent" / "venv" / "bin" / "hermes"
@@ -413,12 +413,11 @@ def _block(conn, a: dict) -> list[str]:
         role = ROLE_LABELS.get(e.get("role"), "")
         gains = ", ".join(f'+{b["delta"]:.0f} {_short_board(k)} (#{b["rank"]})' for k, b in e["boards"].items())
         return [f'🆕 {n} · {task["label"]}{f" ({role})" if role else ""}', _head(c), _money_line(c),
-                f'📈 dépasse {pinned} : {gains}', _why(e), f'→ « adopter {n} » ou « ignorer {n} »']
+                f'📈 dépasse {pinned} : {gains}', _why(e)]
     if a["kind"] == "new_best":
         c = catalog.card(conn, a["subject"], task["interface"], task["modes"])
         return [f'🆕 {n} · {task["label"]} — nouveau n°1, utilisé désormais', _head(c), _money_line(c),
-                f'📈 dépasse {e["previous_name"]} : {e["score"]:.0f} vs {e["previous_score"] or 0:.0f}', _why(e),
-                f'→ « ignorer {n} » pour garder {e["previous_name"]}']
+                f'📈 dépasse {e["previous_name"]} : {e["score"]:.0f} vs {e["previous_score"] or 0:.0f}', _why(e)]
     if a["kind"] == "tier":
         model_id, _, variant = a["subject"].partition("/")
         c = catalog.card(conn, model_id, "chat")
@@ -428,13 +427,13 @@ def _block(conn, a: dict) -> list[str]:
         return [f'📐 {n} · Niveau texte {e["level"]}', f'{_head(c)} ({variant})',
                 f'📊 {_fr(e["score"], 1)} AA · {_fr(e["real_cost"], 3)} $/tâche',
                 f'📈 remplacerait {cur_name}' + (f' ({_fr(e["current_score"], 1)} AA)' if e.get("current_score") else ""),
-                _why(e), f'→ « adopter {n} » ou « ignorer {n} »']
+                _why(e)]
     if a["kind"] == "nerf":
         c = catalog.card(conn, a["subject"], task["interface"] if task else "chat")
         drops = " ; ".join(f'{_short_board(d["board"].replace(":", " "))} {d["before"]:.0f} → {d["after"]:.0f}'
                            for d in e["drops"][:3])
         return [f'📉 {n} · Dégradation — {c["name"]} ({e["active_as"]}, {task["label"] if task else a["task"]})',
-                f'   {drops}', f'→ le routeur réévalue au prochain cycle ; « ignorer {n} » pour masquer']
+                f'   {drops}', '→ le routeur réévalue au prochain cycle']
     if a["kind"] == "pareto":
         model_id, _, variant = a["subject"].partition("/")
         c = catalog.card(conn, model_id, "chat")
@@ -468,7 +467,7 @@ def _challenger_group(conn, group: list[dict]) -> list[str]:
         gains.setdefault(pinned, f'+{best[1]["delta"]:.0f} {_short_board(best[0])} (#{best[1]["rank"]})')
     lines = [f'🆕 {n} · {_head(c)}', _money_line(c), "📈 dépasse :"]
     lines += [f'   • {p} ({" ; ".join(sorted(set(r)))}) — {gains[p]}' for p, r in beats.items()]
-    lines += [_why(a0["evidence"]), f'→ « adopter {n} » (ou « adopter {n} <rôle> ») · « ignorer {n} »']
+    lines += [_why(a0["evidence"])]
     return lines
 
 
@@ -482,7 +481,77 @@ def render(alerts: list[dict], conn=None) -> str:
         lines = _challenger_group(conn, group) if key[0] == "challenger" else _block(conn, group[0])
         blocks.append("\n".join(x for x in lines if x))
     day = datetime.now(timezone.utc).strftime("%d/%m")
-    return f"Walter Router — nouveautés du {day}\n\n" + "\n\n".join(blocks)
+    return (f"Walter Router — nouveautés du {day}\n\n" + "\n\n".join(blocks)
+            + "\n\nRéponds avec les boutons (ou « adopter N » / « ignorer N »).")
+
+
+# Buttons (Monsieur, 2026-10-14): one row per piece of news; the Hermes plugin walter-router handles the clicks
+# (callback data 'wr:<a|d>:<ref>[:<role>]' → `walter-router verdict`).
+BUTTONS = {"challenger": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d")),
+           "tier": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d")),
+           "new_best": (("👍 OK", "a"), ("↩️ Garder l'ancien", "d")),
+           "pareto": (("👍 Noté", "a"), ("✖️ Ignorer", "d")),
+           "nerf": (("👁️ Masquer", "d"),)}
+
+
+def keyboard(conn, alerts: list[dict]) -> list[list[dict]]:
+    groups: dict[tuple, list[dict]] = {}
+    for a in alerts:
+        groups.setdefault(_group_key(conn, a), []).append(a)
+    rows = []
+    for group in groups.values():
+        a0 = group[0]
+        n = a0.get("ref") or a0["alert_id"]
+        rows.append([{"text": f"{label} · {n}", "callback_data": f"wr:{code}:{n}"}
+                     for label, code in BUTTONS.get(a0["kind"], (("✖️ Ignorer", "d"),))])
+        roles = sorted({a.get("role") or "" for a in group} - {""})
+        if a0["kind"] == "challenger" and len(roles) > 1:   # one model beating several roles: adopt one role only
+            rows.append([{"text": f"✅ {n} · {ROLE_LABELS.get(r, r)}"[:40], "callback_data": f"wr:a:{n}:{r}"[:64]}
+                         for r in roles][:4])
+    return rows
+
+
+TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
+
+
+def telegram(method: str, payload: dict) -> dict:
+    """Bot API call with the gateway's own bot (token from /root/.hermes/.env, never logged)."""
+    from urllib.request import Request, urlopen
+    token = collect._env_value("TELEGRAM_BOT_TOKEN")
+    if not token:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN missing")
+    req = Request(TELEGRAM_API.format(token=token, method=method), data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json"})
+    with urlopen(req, timeout=30) as resp:  # noqa: S310 (fixed host)
+        out = json.loads(resp.read())
+    if not out.get("ok"):
+        raise RuntimeError(f"telegram {method}: {out.get('description')}")
+    return out["result"]
+
+
+def home_chat() -> str:
+    """Monsieur's Telegram chat = the gateway's home channel (top-level TELEGRAM_HOME_CHANNEL in config.yaml)."""
+    import re
+    m = re.search(r"^TELEGRAM_HOME_CHANNEL:\s*'?(-?\d+)'?\s*$", (HERMES.parents[3] / "config.yaml").read_text(), re.M)
+    chat = m.group(1) if m else collect._env_value("TELEGRAM_HOME_CHANNEL")
+    if not chat:
+        raise RuntimeError("no Telegram home channel")
+    return chat
+
+
+def send_with_buttons(text: str, rows: list[list[dict]]) -> None:
+    chunks, cur = [], ""
+    for block in text.split("\n\n"):                 # Telegram: 4096 chars per message; buttons on the last one
+        if cur and len(cur) + len(block) + 2 > 3900:
+            chunks.append(cur); cur = ""
+        cur = f"{cur}\n\n{block}" if cur else block
+    chunks.append(cur)
+    chat = home_chat()
+    for i, c in enumerate(chunks):
+        payload = {"chat_id": chat, "text": c, "disable_web_page_preview": True}
+        if i == len(chunks) - 1 and rows:
+            payload["reply_markup"] = {"inline_keyboard": rows}
+        telegram("sendMessage", payload)
 
 
 def _assign_refs(conn, alerts: list[dict]) -> list[dict]:
@@ -509,10 +578,13 @@ def notify(conn, dry_run: bool = False) -> dict:
     alerts = _assign_refs(conn, alerts)
     text = render(alerts, conn)
     if dry_run:
-        return {"sent": 0, "dry_run": text}
-    out = subprocess.run([str(HERMES), "send", "-t", "telegram", text], capture_output=True, text=True, timeout=120)
-    if out.returncode != 0:
-        return {"sent": 0, "error": (out.stderr or out.stdout)[-300:]}
+        return {"sent": 0, "dry_run": text, "buttons": keyboard(conn, alerts)}
+    try:
+        send_with_buttons(text, keyboard(conn, alerts))
+    except Exception as exc:  # noqa: BLE001 — text-only fallback (typed answers still work)
+        out = subprocess.run([str(HERMES), "send", "-t", "telegram", text], capture_output=True, text=True, timeout=120)
+        if out.returncode != 0:
+            return {"sent": 0, "error": f"buttons: {exc}; text: {(out.stderr or out.stdout)[-300:]}"}
     ids = [a["alert_id"] for a in alerts]
     conn.execute("update models.alerts set status = 'notified', notified_at = now() where alert_id = any(%s)", (ids,))
     return {"sent": len(ids)}
