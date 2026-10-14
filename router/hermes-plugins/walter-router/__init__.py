@@ -382,12 +382,57 @@ ROUTING_RULE = (
 )
 
 
+def _home_chat() -> str | None:
+    """Monsieur's Telegram chat (gateway home channel); only he may press the buttons."""
+    m = re.search(r"^TELEGRAM_HOME_CHANNEL:\s*'?(-?\d+)'?\s*$",
+                  (Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "config.yaml").read_text(), re.M)
+    return m.group(1) if m else os.environ.get("TELEGRAM_HOME_CHANNEL")
+
+
+def _wire_buttons(application: Any, adapter: Any) -> None:
+    """Buttons of the Walter Router notification (callback data 'wr:<a|d>:<ref>[:<role>]', sent by
+    /opt/walter-router alerts.notify): run `walter-router verdict`, then drop that row and append the outcome."""
+    from telegram import InlineKeyboardMarkup
+    from telegram.ext import CallbackQueryHandler
+
+    async def _on_button(update: Any, context: Any) -> None:
+        q = update.callback_query
+        home = _home_chat()
+        if not home or str(q.from_user.id) != home or str(q.message.chat.id) != home:
+            await q.answer("Non autorisé.")
+            return
+        _, code, ref, *role = q.data.split(":", 3)
+        cmd = ["verdict", ref, "adopted" if code == "a" else "dismissed"] + (["--role", role[0]] if role else [])
+        try:
+            await _cli(*cmd)
+        except Exception as exc:  # noqa: BLE001
+            await q.answer(f"Échec : {exc}"[:190], show_alert=True)
+            return
+        rows = q.message.reply_markup.inline_keyboard if q.message.reply_markup else []
+        clicked = next((b.text for row in rows for b in row if b.callback_data == q.data), q.data)
+        keep = [r for r in ([b for b in row if (b.callback_data or "").split(":")[2:3] != [ref]] for row in rows) if r]
+        try:
+            await q.edit_message_text(f"{q.message.text}\n\n→ {clicked}",
+                                      reply_markup=InlineKeyboardMarkup(keep) if keep else None,
+                                      disable_web_page_preview=True)
+        except Exception as exc:  # noqa: BLE001 — the verdict is recorded even if the edit fails
+            logger.warning("WALTER_ROUTER button edit failed: %s", exc)
+        await q.answer(f"Enregistré : {clicked}"[:190])
+
+    application.add_handler(CallbackQueryHandler(_on_button, pattern=r"^wr:[ad]:\d+"))
+
+
 def register(ctx: Any) -> None:
     if callable(getattr(ctx, "register_system_prompt_section", None)) and os.environ.get(CHILD_ENV) != "1":
         try:
             ctx.register_system_prompt_section("walter-router.routing-rule", ROUTING_RULE)
         except Exception as exc:  # noqa: BLE001
             logger.error("WALTER_ROUTER_DEGRADED system_prompt_section: %s", exc)
+    if callable(getattr(ctx, "register_telegram_handler", None)) and os.environ.get(CHILD_ENV) != "1":
+        try:
+            ctx.register_telegram_handler(_wire_buttons)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("WALTER_ROUTER_DEGRADED telegram buttons: %s", exc)
     if not callable(getattr(ctx, "register_tool", None)):
         logger.error("WALTER_ROUTER_DEGRADED register_tool_missing")
         return

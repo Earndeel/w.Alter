@@ -132,3 +132,11 @@ def test_dominance_watch_ignores_better_but_dearer_models(conn):
                              and kind = 'challenger' and subject not like '%%:unmeasured'"""):
         e = a["evidence"]
         assert e["unit_cost"] <= e["pinned_unit_cost"] and e["score"] > e["pinned_score"]
+
+
+def test_notification_buttons_one_row_per_news():
+    from walter_router import alerts
+    rows = alerts.keyboard(None, [{"alert_id": 1, "kind": "tier", "ref": 3, "role": "L2"},
+                                  {"alert_id": 2, "kind": "nerf", "ref": 4, "role": ""}])
+    assert [[b["callback_data"] for b in r] for r in rows] == [["wr:a:3", "wr:d:3"], ["wr:d:4"]]
+    assert all(len(b["callback_data"]) <= 64 for r in rows for b in r)
