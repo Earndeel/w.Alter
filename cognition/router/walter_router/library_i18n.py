@@ -1,0 +1,148 @@
+"""English version of the library page (Monsieur, 2026-10-14: « une version anglaise et française à choisir en bas »).
+
+A translation pass over the final French HTML, so both pages share exactly the same layout: phrase table applied to
+text nodes and to a few attributes (placeholder, title, aria-label), French decimals → English in text and chart
+tooltips, JS strings and date locale, `lang` attribute and the selector state. Any French label added later stays
+French until listed here (tests check the English page for leftover French words).
+"""
+from __future__ import annotations
+
+import re
+
+# Longest first is enforced at load time; exact substrings.
+PHRASES = {
+    # header / nav / tools
+    "Bibliothèque des modèles — Walter Router": "Model library — Walter Router",
+    "Bibliothèque des modèles": "Model library",
+    "▶ Lancer le cycle complet": "▶ Run the full cycle",
+    "Vue d'ensemble": "Overview", "Audio & musique": "Audio & music", "Décision": "Decision", "Texte": "Text",
+    "Vidéo": "Video", "Rechercher": "Search", "Mes choix ≠ n°1": "My picks ≠ #1",
+    # home
+    "🧠 Niveaux de réflexion": "🧠 Reasoning levels",
+    "Optimum de Pareto calculé par ta méthode sur la frontière AA": "Pareto optimum computed with your method on the AA frontier",
+    "📈 Indice d'intelligence et coût par tâche": "📈 Intelligence index and cost per task",
+    "combinaisons modèle × niveau de réflexion exécutables": "runnable model × reasoning-level combinations",
+    "Coût AA officiel": "Official AA cost", "Coût réel": "Real cost", "Indice AA": "AA index",
+    "Prix de référence publié par Artificial Analysis": "Reference price published by Artificial Analysis",
+    "Recalculé avec le prix du fournisseur utilisé": "Recomputed with the price of the provider in use",
+    "Modèles exécutables": "Runnable models", "Frontière de Pareto": "Pareto frontier", "Niveaux retenus": "Selected levels",
+    "Abscisse : ": "X axis: ", "coût réel par tâche AA (meilleur fournisseur)": "real cost per AA task (best provider)",
+    "coût officiel par tâche AA (prix de référence)": "official cost per AA task (reference price)",
+    ", échelle logarithmique": ", log scale", "Indice AA en fonction du coût réel par tâche": "AA index vs real cost per task",
+    "🎨 Spécialisations Design Arena": "🎨 Design Arena specialisations",
+    "Rang du modèle retenu sur le classement Design Arena de chaque tâche":
+        "Rank of the selected model on each task's Design Arena leaderboard",
+    "N°1 Design Arena, si différent": "Design Arena #1, if different", "Modèle retenu": "Selected model",
+    "Classement inaccessible : ": "Leaderboard unreachable: ",
+    "Le router conserve sa dernière lecture valable pendant 21 jours.": "The router keeps its last valid reading for 21 days.",
+    "Pas de données AA.": "No AA data.",
+    # levels
+    "Économique": "Economy", "Intermédiaire": "Intermediate", "Haut de gamme": "High end",
+    "Quotidien : réponses courtes, résumés, petites rédactions": "Everyday: short answers, summaries, small writing",
+    "Analyse en plusieurs étapes, comparaison, rédaction soignée": "Multi-step analysis, comparison, careful writing",
+    "Raisonnement profond, synthèse, enjeu important": "Deep reasoning, synthesis, high stakes",
+    "réflexion très élevée": "reasoning: very high", "réflexion maximale": "reasoning: maximum",
+    "réflexion moyenne": "reasoning: medium", "réflexion élevée": "reasoning: high", "réflexion faible": "reasoning: low",
+    "Fournisseurs (ordre, prix)": "Providers (order, price)", "Fournisseurs": "Providers", "Secours": "Fallback",
+    "Abonnement": "Subscription", "Niveau": "Level", "Modèle": "Model", "Tâche": "Task", "Origine": "Origin",
+    "Rang": "Rank",
+    # origins
+    "Ton choix": "Your pick", "Calculé": "Computed", "Méthode Pareto": "Pareto method", "Aucun modèle": "No model",
+    # task labels (models.tasks)
+    "Code / back-end / agentique": "Code / back-end / agentic", "Visualisation de données": "Data visualisation",
+    "Modèle de décision avec image (navigation, traitement d'images en masse)":
+        "Decision model with images (browsing, bulk image processing)",
+    "Modèle de décision (routage d'intention, tri)": "Decision model (intent routing, triage)",
+    "Analyse de document / PDF": "Document / PDF analysis", "Site web / landing": "Website / landing page",
+    "Application full-stack (agent)": "Full-stack app (agent)", "Jeu (canvas / HTML5)": "Game (canvas / HTML5)",
+    "Texte général (niveaux L1/L2/L3)": "General text (levels L1/L2/L3)", "Graphisme / affiche": "Graphic design / poster",
+    "Retouche / édition d'image": "Image retouching / editing", "Animer une image": "Animate an image",
+    "Logo / identité visuelle": "Logo / visual identity", "Application mobile (agent)": "Mobile app (agent)",
+    "Musique": "Music", "Recherche web": "Web search", "Conversation vocale temps réel": "Real-time voice conversation",
+    "SVG / vectoriel": "SVG / vector", "Vidéo depuis texte": "Text to video", "Voix (lecture)": "Voice (text to speech)",
+    "Composant d'interface": "UI component", "Édition de vidéo": "Video editing", "Analyse d'image": "Image analysis",
+    "Météo": "Weather", "Calcul": "Calculation",
+    # categories (models.preferences)
+    "Budget / brouillon": "Budget / draft", "Équilibré": "Balanced", "Premium / cinématique": "Premium / cinematic",
+    # data notes
+    "n°1 mesuré : ": "measured #1: ", "(pas de fournisseur branché)": "(no provider wired)",
+    "(proposé par aucun de nos fournisseurs)": "(offered by none of our providers)",
+    "Codex (abonnement) inclus": "Codex (subscription) included", "via Codex (abonnement)": "via Codex (subscription)",
+    "Flow à la main": "Flow, by hand", "(si payant)": "(if paid)", "$/img estimé": "$/img estimated",
+    "$/requête": "$/request", "(gratuit)": "(free)", "Codex (secours)": "Codex (fallback)",
+    "Gemini AI Pro (crédits Flow)": "Gemini AI Pro (Flow credits)", "aucun modèle exécutable": "no runnable model",
+    "AA ne teste pas encore la vision : classé sur l'index texte, parmi ceux qui lisent les images":
+        "AA does not test vision yet: ranked on the text index, among models that read images",
+    "pas encore classée sur ce benchmark": "not ranked on this benchmark yet", "version supérieure de ": "newer version of ",
+    "Arena retouche d'image": "Arena image editing",
+    # footer
+    "Modèles suivis": "Models tracked",
+    "Classements recalculés le ": "Leaderboards recomputed on ",
+    " ; cycle complet automatique toutes les 48 heures, page republiée après chacune de tes réponses.":
+        "; full cycle every 48 hours, page republished after each of your answers.",
+    "Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements\npondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Une ligne surlignée signale un choix de ta part différent du n°1 mesuré, avec la raison.":
+        "Origin: “Your pick” = model you set; “Computed” = best runnable model on the weighted leaderboards; “Pareto "
+        "method” = levels L1, L2, L3. A highlighted row marks a pick of yours that differs from the measured #1, with the reason.",
+    "Prix : texte en dollars par million de tokens (entrée/sortie), image par image, vidéo par seconde (plage selon la résolution) ;\n« estimé » lorsque le fournisseur facture au token.":
+        "Prices: text in dollars per million tokens (input/output), images per image, video per second (range by "
+        "resolution); “estimated” when the provider bills per token.",
+    "Page générée le ": "Page generated on ",
+}
+# words that must never survive in the English page (checked by the tests)
+FRENCH_MARKERS = ("Fournisseur", "Secours", "Abonnement", "Modèle", "Tâche", "réflexion", "Calculé", "mesuré",
+                  "Économique", "Vidéo", "Coût", "Rechercher", "Lancer", "généré", "estimé", "Équilibré")
+JS = {
+    "Cycle en cours — ": "Cycle running — ", "'démarrage'": "'starting'", "Dernier cycle complet : ": "Last full cycle: ",
+    "' (échec)'": "' (failed)'", "Statut indisponible": "Status unavailable",
+    "Lancer maintenant le cycle complet ? Collecte des classements, recalcul, analyse par le modèle économique, notifications et republication de cette page (20 à 60 minutes).":
+        "Run the full cycle now? Leaderboard collection, recomputation, analysis by the economy model, notifications and "
+        "republication of this page (20 to 60 minutes).",
+    "Lancement…": "Starting…", "Échec du lancement": "Launch failed", "'fr-FR'": "'en-GB'",
+    "'Indice '": "'Index '", "' $ par tâche'": "' $ per task'",
+}
+STEPS = {"1/4 collecte des classements": "1/4 collecting leaderboards", "2/4 recalcul": "2/4 recomputing",
+         "3/4 analyse par le modèle économique": "3/4 analysis by the economy model",
+         "4/4 recalcul final et notifications": "4/4 final recomputation and notifications",
+         "publication de la page": "publishing the page"}
+PHRASES.update({k.replace("'", "&#x27;"): v.replace("'", "&#x27;") for k, v in list(PHRASES.items()) if "'" in k})
+PHRASES.update({k.replace("&", "&amp;"): v.replace("&", "&amp;") for k, v in list(PHRASES.items()) if "&" in k and "&#" not in k})
+_ORDER = sorted(PHRASES, key=len, reverse=True)
+_DECIMAL = re.compile(r"(?<=\d),(?=\d)")
+_DATE = re.compile(r"\b(\d{2})/(\d{2})/(\d{4}), (\d{2}:\d{2}) UTC")
+
+
+def _text(t: str) -> str:
+    for fr in _ORDER:
+        if fr in t:
+            t = t.replace(fr, PHRASES[fr])
+    t = _DATE.sub(lambda m: f"{m.group(3)}-{m.group(2)}-{m.group(1)} {m.group(4)} UTC", t)
+    return _DECIMAL.sub(".", t)
+
+
+def _tag(tag: str) -> str:
+    tag = re.sub(r'(placeholder|title|aria-label)="([^"]*)"', lambda m: f'{m.group(1)}="{_text(m.group(2))}"', tag)
+    if "data-tip=" in tag:   # chart tooltip JSON: "c":"0,02"
+        tag = re.sub(r'(&quot;c&quot;: &quot;)(\d+),(\d+)', r"\1\2.\3", tag)
+    return tag
+
+
+def to_english(html: str) -> str:
+    html = html.replace('<html lang="fr">', '<html lang="en">', 1)
+    html = html.replace('data-lang="fr" class="on"', 'data-lang="fr"').replace('data-lang="en"', 'data-lang="en" class="on"', 1)
+    head, sep, rest = html.partition("<script>")
+    script, sep2, tail = rest.partition("</script>")
+    out, in_style = [], False
+    for part in re.split(r"(<[^>]+>)", head):
+        if part.startswith("<"):
+            in_style = part.startswith("<style") or (in_style and not part.startswith("</style"))
+            out.append(_tag(part))
+        else:
+            out.append(part if in_style else _text(part))
+    for fr, en in sorted(JS.items(), key=lambda kv: -len(kv[0])):
+        script = script.replace(fr, en)
+    for fr, en in STEPS.items():
+        script = script.replace(f"'{fr}'", f"'{en}'")
+    script = script.replace("rs.textContent='Cycle running — '+(o.step||'starting')",
+                            "rs.textContent='Cycle running — '+(STEPS_EN[o.step]||o.step||'starting')")
+    steps_js = "const STEPS_EN=" + __import__("json").dumps(STEPS, ensure_ascii=False) + ";"
+    return "".join(out) + sep + steps_js + script + sep2 + tail

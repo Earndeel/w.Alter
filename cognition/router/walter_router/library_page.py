@@ -255,6 +255,8 @@ figcaption i{{display:inline-block;width:8px;height:8px;border-radius:50%;margin
 font-size:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.08)}}
 .block{{margin-top:44px}}[hidden]{{display:none!important}}.hide{{display:none!important}}
 footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;padding:16px 0 40px;line-height:1.6}}
+.lang{{margin-top:14px;font-size:13px}}.lang a{{color:var(--ink2);text-decoration:none;padding:2px 0}}.lang a:hover{{color:var(--ink)}}
+.lang a.on{{color:var(--ink);font-weight:600;border-bottom:1px solid var(--ink)}}.lang .sep{{margin:0 8px;color:var(--mute)}}
 @media (max-width:980px){{.split{{grid-template-columns:1fr}}.figures{{grid-template-columns:repeat(3,1fr)}}
 .figures div:nth-child(4){{border-left:0;padding-left:0}}}}
 @media (max-width:600px){{.wrap{{padding:0 16px}}.figures{{grid-template-columns:repeat(2,1fr)}}.tools{{display:none}}
@@ -283,13 +285,17 @@ footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;paddi
 Classements recalculés le {esc(when)} ; cycle complet automatique toutes les 48 heures, page republiée après chacune de tes réponses.</div>Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements
 pondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Une ligne surlignée signale un choix de ta part différent du n°1 mesuré, avec la raison.
 Prix : texte en dollars par million de tokens (entrée/sortie), image par image, vidéo par seconde (plage selon la résolution) ;
-« estimé » lorsque le fournisseur facture au token. Page générée le {generated}.</footer></div>
+« estimé » lorsque le fournisseur facture au token. Page générée le {generated}.
+<div class="lang"><a href="/" data-lang="fr" class="on">Français</a><span class="sep">·</span><a href="/en/" data-lang="en">English</a></div></footer></div>
 <script>
-const links=document.querySelectorAll('nav a'),panes=document.querySelectorAll('.pane'),q=document.getElementById('q'),
+(function(){{const want=localStorage.getItem('walterLang'),here=document.documentElement.lang;
+if(want&&want!==here){{location.replace((want==='en'?'/en/':'/')+location.hash);return}}
+document.querySelectorAll('.lang a').forEach(a=>a.addEventListener('click',()=>localStorage.setItem('walterLang',a.dataset.lang)))}})();
+const links=document.querySelectorAll('nav a[data-tab]'),panes=document.querySelectorAll('.pane'),q=document.getElementById('q'),
 d=document.getElementById('diff');let cur='home';
 function show(t){{cur=t;links.forEach(a=>a.classList.toggle('on',a.dataset.tab===t));panes.forEach(p=>p.hidden=p.dataset.pane!==t);filter()}}
 function filter(){{const s=(q.value||'').trim().toLowerCase();if((s||d.checked)&&cur==='home'){{show(d.checked?'video':'chat');return}}
-document.querySelectorAll('tbody tr[data-search]').forEach(r=>r.classList.toggle('hide',!((!s||r.dataset.search.includes(s))&&(!d.checked||r.dataset.differs==='1'))))}}
+document.querySelectorAll('tbody tr[data-search]').forEach(r=>r.classList.toggle('hide',!((!s||(r.dataset.search+' '+r.textContent.toLowerCase()).includes(s))&&(!d.checked||r.dataset.differs==='1'))))}}
 links.forEach(a=>a.onclick=e=>{{e.preventDefault();show(a.dataset.tab);history.replaceState(null,'','#'+a.dataset.tab)}});
 q.oninput=filter;d.onchange=filter;
 document.querySelectorAll('#costseg button').forEach(b=>b.onclick=()=>{{
