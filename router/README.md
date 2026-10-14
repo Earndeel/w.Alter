@@ -118,6 +118,25 @@ BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local Fla
 - **Health**: `walter-router health` (exit 1 when not fed), shown in walter-core `walter_health`;
   `walter-router-failure.service` (OnFailure of the refresh) sends one Telegram message.
 
+## Subscriptions (2026-10-14)
+Monsieur's plans are declared in `config/subscriptions.json` (today ChatGPT Plus 20 $ and Claude Pro 20 $): what each
+includes, how its usage meter is read, its policy, and what it is worth at API list prices (published measurements:
+SemiAnalysis 2026-10-05, Wokey, InventiveHQ — dated, sourced, `pays_per_api_dollar` = price / value).
+`walter_router/subscriptions.py` reads the meters into `models.subscription_usage` (view `latest_subscription_usage`):
+- **ChatGPT Plus**: live Codex usage API through Hermes' own fetcher (read-only; weekly window only on Plus).
+- **Claude Pro**: no Claude login on the VM (and Anthropic keeps subscription credentials to its own apps), so it is
+  **interactive only** (Claude Code) and its weekly meter is **estimated** from the Claude Code transcripts: units =
+  input + cache writes + 5 x output (cache reads ~free), rolling 7 days, over a capacity prior from SemiAnalysis.
+  `walter-router subscriptions calibrate anthropic-pro <weekly %>` (the % shown on claude.ai) replaces the prior.
+Status per plan: `ok` < reserve_percent (85) ≤ `reserve` < exhausted_percent (98) ≤ `exhausted`; `unknown` when no
+fresh reading (fail-open). `execution.routes`: a subscription route stays first while `ok`, goes **after the paid
+routes** in `reserve` (the rest is kept for the Hermes conversation, which runs on the same Codex quota), **last**
+when `exhausted`; every subscription route carries its `quota`. The subscription fallback of specialised tasks is
+skipped when exhausted. Tiers are unchanged (TIERS.md: a subscription makes a run free, it does not rank models).
+Meters are re-read by `walter-router-quota.service` (Walter bus consumer on `turn.ended`/`session.ended`: Hermes and
+Codex turns → ChatGPT Plus, Claude Code turns → Claude Pro; settle 20 s, at most every 2 / 5 min; sweep every 30 min).
+`walter-router subscriptions [refresh]` shows state + values; `health` warns on reserve / exhausted / unread meters.
+
 ## Cloudflare access (decision model Clef)
 `intent.py` calls Clef on Cloudflare Workers AI with `CLOUDFLARE_AI_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` from
 `~/.hermes/.env` (scoped token « W.Alter — Workers AI (walter-router intent) », permission Workers AI Read, created
