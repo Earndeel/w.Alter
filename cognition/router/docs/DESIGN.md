@@ -250,3 +250,12 @@ abonnement d'abord, Kie, OpenRouter en dernier.
 2. Conversations de l'app Mac (profil `wild`) dans la mémoire, en `local_only` : oui / non.
 3. Tri des événements : qui compte comme « personne importante », heures de silence, sujets à surveiller.
 4. Images reçues / générées : Raw Vault + lien signé temporaire servi par la VM pour Kie (proposé) ou envoi chez Kie.
+
+## Modèle de décision suivi par le cycle (2026-10-14)
+AA a publié le **Decision Index v1.0** (2026-10-13) : AA-Omniscience-Decision (précision + non-hallucination, « je ne
+sais pas »), HLE-MultiChoice, When2Call (décisions d'appel d'outil), WildGuardTest ; temps et coût par million de tâches.
+Source `aa_decision` (page d'évaluation, flux Next.js, sans navigateur) → `models.benchmarks` ; tâche interne
+`decision` (interface `decisions`, jamais proposée au classifieur ni aux agents) → meilleur modèle appelable via l'API
+Decisions d'OpenRouter, recalculé toutes les 48 h, nouveautés / nerfs notifiés selon les règles habituelles.
+`intent.chain()` lit ce meilleur modèle ; `knowledge.json` `decision.order` : `free_first` (Clef → Mercury Decide
+gratuit → meilleur, choix du 2026-10-04) ou `best_first` (meilleur → gratuits en secours).

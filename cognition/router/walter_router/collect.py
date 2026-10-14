@@ -28,6 +28,9 @@ MM_TASKS = {"provider_voice": "tts", "index": "speech_to_speech"}
 KIE_DIMENSION_FIXES = {("claude-opus-5-5", "claude-opus-5"): "output"}
 ARENA_URL = "https://arena.ai/leaderboard/"
 BRIDGEBENCH_URL = "https://www.bridgebench.ai/leaderboard"
+# AA Decision Index (v1.0, 2026-10-13): decision models (typed answers + probabilities) and LLM references on
+# AA-Omniscience-Decision, HLE-MultiChoice, When2Call and WildGuardTest; accuracy, time and cost per 1M tasks.
+AA_DECISION_URL = "https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index"
 FLARESOLVERR = os.environ.get("WALTER_FLARESOLVERR", "http://127.0.0.1:8191/v1")  # local, behind Cloudflare sites
 # Arena.ai page -> board key stored in models.benchmarks.task (benchmark = 'arena')
 ARENA_BOARDS = {"text": "text", "text/french": "text_french", "text/coding": "text_coding",
@@ -176,6 +179,28 @@ def source_bridgebench() -> tuple[dict, datetime, str]:
     return {"rows": rows}, now(), BRIDGEBENCH_URL
 
 
+def rsc_text(page: str) -> str:
+    """Concatenated Next.js flight payload (self.__next_f.push([1, "..."])) of a server-rendered page."""
+    chunks = re.findall(r'self\.__next_f\.push\(\[1,"(.*?)"\]\)', page, re.S)
+    return "".join(json.loads('"' + c + '"') for c in chunks)
+
+
+def aa_decision_rows(page: str) -> list[dict]:
+    text = rsc_text(page)
+    i = text.find('{"contestants":')
+    if i < 0:
+        raise ValueError("aa_decision: no contestants in page")
+    rows, _ = json.JSONDecoder().raw_decode(text[i + len('{"contestants":'):])
+    return rows
+
+
+def source_aa_decision() -> tuple[dict, datetime, str]:
+    rows = aa_decision_rows(fetch_text(AA_DECISION_URL))
+    if len([r for r in rows if r.get("kind") == "decisionModel"]) < 5:
+        raise ValueError(f"aa_decision: only {len(rows)} rows parsed")
+    return {"rows": rows}, now(), AA_DECISION_URL
+
+
 def source_arena() -> tuple[dict, datetime, str]:
     boards, errors = {}, {}
     for path, key in ARENA_BOARDS.items():
@@ -302,7 +327,7 @@ def source_declared() -> tuple[dict, datetime, str]:
     return {"offers": doc["offers"]}, now(), str(DECLARED)
 
 
-SOURCES = {"aa": source_aa, "mm": source_mm, "da": source_da, "arena": source_arena, "bridgebench": source_bridgebench,
+SOURCES = {"aa": source_aa, "aa_decision": source_aa_decision, "mm": source_mm, "da": source_da, "arena": source_arena, "bridgebench": source_bridgebench,
            "openrouter": source_openrouter, "kie": source_kie, "codex": source_codex,
            "declared": source_declared, "hermes_providers": source_hermes_providers}
 
@@ -411,6 +436,20 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
                                  released=None, extra=extra,
                                  meta={"open_weights": None if not lic else lic.strip().lower() != "proprietary",
                                        "license": lic}))
+    elif kind == "aa_decision":
+        for r in doc["rows"]:
+            score = _num(r.get("indexScore"))
+            if score is None or not r.get("slug"):
+                continue
+            mid, variant = identity.normalize("aa_decision", r["slug"], r.get("name"))
+            if r.get("kind") == "decisionModel":
+                variant = ""   # 'GPT-6 Luna (Decisions)' is a product, not an effort tier
+            cost = _num(r.get("costPerTaskUsd"))
+            rows.append(dict(benchmark="aa_decision", task="decision", external_key=r["slug"], model_id=mid,
+                             variant=variant, display_name=r.get("name"), score=score, score_unit="AA Decision Index",
+                             cost=cost * 1e6 if cost is not None else None, cost_unit="usd_per_1m_tasks", released=None,
+                             extra={"kind": r.get("kind"), "host": r.get("hostName"), "creator": r.get("creatorName"),
+                                    "time_per_task_ms": r.get("timePerTaskMs"), "scores": r.get("scores") or {}}))
     elif kind == "bridgebench":
         axes = {"oneShot": "one_shot"}
         for r in doc["rows"]:

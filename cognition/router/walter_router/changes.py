@@ -14,9 +14,9 @@ from . import select as sel
 
 MIN_GAP_H = 24
 PRICE_DROP = 0.15
-NERF = {"aa_intelligence": 2.0, "bridgebench": 30.0}   # Elo-type boards: NERF_ELO
+NERF = {"aa_intelligence": 2.0, "aa_decision": 2.0, "bridgebench": 30.0}   # Elo-type boards: NERF_ELO
 NERF_ELO = 15.0
-BENCH_KINDS = ("aa", "mm", "da", "arena", "bridgebench")
+BENCH_KINDS = ("aa", "aa_decision", "mm", "da", "arena", "bridgebench")
 OFFER_KINDS = ("openrouter", "kie", "hermes_providers")
 
 

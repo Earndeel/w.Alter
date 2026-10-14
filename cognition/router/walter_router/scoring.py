@@ -24,7 +24,7 @@ from . import select as sel
 SHRINK_K = 0.25
 FEEDBACK_POINTS = 3.0  # per net rating point from Monsieur on that task (capped at +/-3 -> +/-9 composite points)
 VOTES_HALF = 500.0
-BOARD_NAMES = {"aa_intelligence": "AA", "aa_mm": "AA", "da_models": "Design Arena", "da_agents": "Design Arena",
+BOARD_NAMES = {"aa_intelligence": "AA", "aa_decision": "AA Decision", "aa_mm": "AA", "da_models": "Design Arena", "da_agents": "Design Arena",
                "arena": "Arena", "bridgebench": "BridgeBench"}
 
 

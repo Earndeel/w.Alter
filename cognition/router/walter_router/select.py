@@ -16,7 +16,7 @@ from . import collect, media
 SKILL = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "skills/research/aa-pareto-model-optimizer/scripts"
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
 MEDIA_UNITS = {"image": "per image", "video": "per second", "audio": "per 1000 characters", "music": None}
-BENCH_KIND = {"aa_intelligence": "aa", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena",
+BENCH_KIND = {"aa_intelligence": "aa", "aa_decision": "aa_decision", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena",
               "bridgebench": "bridgebench"}
 
 
@@ -82,6 +82,15 @@ def _fields(o: dict) -> dict:
     price, unit = media.norm_price(o["interface"], o["unit_price"], o["unit"], o["offer_key"])
     return {"offer_kind": c["kind"], "modes": c["modes"], "resolution": c["resolution"],
             "norm_price": price if c["kind"] == "generation" else None, "norm_unit": unit}
+
+
+def decision_route(offers: list[dict]) -> dict[str, Any]:
+    """Cheapest Decisions-API offer (decision models are billed on input tokens only)."""
+    paid = [o for o in offers if o["interface"] == "decisions" and o.get("price_in_1m") is not None]
+    best = min(paid, key=lambda o: o["price_in_1m"], default=None)
+    route = {"provider": best["provider"], "offer_key": best["offer_key"], "cost": best["price_in_1m"],
+             "unit": "usd_per_1m_input_tokens"} if best else None
+    return {"callable": bool(best), "paid": route, "subscription": None}
 
 
 def media_route(offers: list[dict], interface: str, modes: list[str] | None = None) -> dict[str, Any]:
@@ -187,7 +196,8 @@ def _best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dic
                 primary[mid]["real_cost_unit"], primary[mid]["variant"]
         else:
             mo = offers.get(mid, [])
-            route = chat_route(mo, None) if t["interface"] == "chat" else media_route(mo, t["interface"], t["modes"])
+            route = chat_route(mo, None) if t["interface"] == "chat" else decision_route(mo) \
+                if t["interface"] == "decisions" else media_route(mo, t["interface"], t["modes"])
             if not route["callable"]:
                 continue
             cost, variant = (route["paid"] or {}).get("cost"), ""
@@ -234,6 +244,9 @@ def compute(conn) -> list[dict]:
                 cost_unit = "usd_per_aa_task" if list_cost is not None else None
                 if assumed:
                     route = {**route, "paid": {**(route["paid"] or {}), "cost_basis_effort_assumed": assumed}}
+            elif t["interface"] == "decisions":
+                route = decision_route(mo)
+                cost_unit = "usd_per_1m_input_tokens"
             else:
                 route = media_route(mo, t["interface"], t["modes"])
                 cost_unit = (route["paid"] or {}).get("unit")

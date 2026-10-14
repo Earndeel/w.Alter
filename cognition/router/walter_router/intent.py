@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from urllib.request import Request, urlopen
 
 from . import collect
@@ -23,7 +24,22 @@ MODEL = "~typesafe/jev-latest"
 # Same Decisions contract, tried in order when the previous one fails (e.g. HTTP 402 when the OpenRouter credit is
 # exhausted — the free model still answers). Eval 2026-10-04 on eval/intents_fr.json before being admitted.
 MODELS = ("cloudflare/clef", "inception/mercury-decide:free", MODEL)  # eval 2026-10-04: Clef 30/30 (Flash 29/30)
+FREE_FALLBACKS = ("inception/mercury-decide:free", "cloudflare/clef")  # free: survive an exhausted OpenRouter credit
 ACCEPTED_PREFIXES = ("typesafe/jev-", "inception/mercury-decide", "cloudflare/clef")
+KNOWLEDGE = Path(__file__).resolve().parent.parent / "config" / "knowledge.json"
+
+
+def chain(conn) -> tuple[str, ...]:
+    """Decision models to try, in order. The best one comes from the 48 h cycle (task 'decision', AA Decision Index,
+    callable Decisions-API offer); knowledge.json `decision.order` says where it goes:
+      best_first  best, then the free fallbacks (Mercury Decide free, Clef on Workers AI)
+      free_first  the free models first, the best last (Monsieur's choice of 2026-10-04: Clef, free allocation)"""
+    order = (json.loads(KNOWLEDGE.read_text()).get("decision") or {}).get("order", "free_first")
+    row = conn.execute("""select offer_key from models.selection where run_id = (select run_id from models.latest_run)
+                          and task = 'decision' and rank = 1""").fetchone()
+    best = row["offer_key"] if row and row["offer_key"] else MODEL
+    seq = (best, *FREE_FALLBACKS) if order == "best_first" else (*FREE_FALLBACKS[::-1], best)
+    return tuple(dict.fromkeys(seq))
 CF_RUN = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/{model}"
 
 
@@ -57,7 +73,7 @@ VIDEO_TASKS = ("text_to_video", "image_to_video")
 
 def _criteria(conn) -> tuple[dict, dict]:
     tasks = {r["task"]: r["intent_hint"] or f'{r["label"]} — {r["description"] or ""}'.strip(" —")
-             for r in conn.execute("select task, label, description, intent_hint from models.tasks order by task")}
+             for r in conn.execute("select task, label, description, intent_hint from models.tasks where interface <> 'decisions' order by task")}
     roles = {r["role"]: f'{r["label"] or r["role"]}: {r["description"] or r["note"] or ""}'
              for r in conn.execute("""select distinct on (role) role, label, description, note from models.preferences
                                       where task = any(%s) order by role, task""", (list(VIDEO_TASKS),))}
@@ -87,7 +103,11 @@ def classify(conn, request: str, timeout: float = 8.0, models: tuple | None = No
     t0 = time.monotonic()
     errors = []
     data = None
-    for model in (models or MODELS):
+    try:
+        models = models or chain(conn)
+    except Exception:  # noqa: BLE001 — no selection yet: the static order
+        models = MODELS
+    for model in models:
         payload = {"model": model, "state": {"request": request}, "questions": questions}
         try:
             if model.startswith("cloudflare/"):
@@ -103,7 +123,8 @@ def classify(conn, request: str, timeout: float = 8.0, models: tuple | None = No
     if data is None:
         raise RuntimeError("; ".join(errors))
     ms = int((time.monotonic() - t0) * 1000)
-    if not str(data.get("model", "")).startswith(ACCEPTED_PREFIXES) or data["model"].startswith("typesafe/jev-router"):
+    accepted = ACCEPTED_PREFIXES + tuple(m.lstrip("~").split(":")[0].removesuffix("-latest") for m in models)
+    if not str(data.get("model", "")).startswith(accepted) or data["model"].startswith("typesafe/jev-router"):
         raise ValueError(f"unexpected decision model {data.get('model')}")
     a = data["answers"]
     for name in questions:
