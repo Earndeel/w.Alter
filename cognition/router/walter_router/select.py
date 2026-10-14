@@ -306,7 +306,8 @@ def general_points(conn) -> list[dict]:
         cost = (route.get("paid") or {}).get("cost")
         if route["callable"] and cost:
             out.append({"model_id": b["model_id"], "variant": b["variant"], "name": b["display_name"],
-                        "score": b["score"], "cost": cost, "provider": (route.get("paid") or {}).get("provider"),
+                        "score": b["score"], "cost": cost, "cost_aa": b["cost"],
+                        "provider": (route.get("paid") or {}).get("provider"),
                         "subscription": bool(route.get("subscription"))})
     return out
 
