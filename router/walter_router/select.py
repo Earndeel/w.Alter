@@ -5,6 +5,8 @@ router and the skill can never disagree on what the frontier is.
 """
 from __future__ import annotations
 
+import re
+
 import importlib.util
 import json
 import os
@@ -34,6 +36,28 @@ LADDER = _load("router")
 def latest_snapshots(conn) -> dict[str, int]:
     return {r["kind"]: r["snapshot_id"] for r in conn.execute(
         "select distinct on (kind) kind, snapshot_id from models.snapshots order by kind, fetched_at desc, snapshot_id desc")}
+
+
+BOARD_GRACE_DAYS = 21
+
+
+def board_snapshot(conn, snaps: dict[str, int], benchmark: str, bench_task: str) -> int | None:
+    """Snapshot to read one board from: the latest of its source, or — when the board is empty there (page changed,
+    blocked) — the last snapshot that had it, within BOARD_GRACE_DAYS (the router keeps the last known ranking; a
+    'board_down' alert tells Monsieur)."""
+    kind = BENCH_KIND.get(benchmark)
+    sid = snaps.get(kind)
+    if sid is None:
+        return None
+    if conn.execute("select 1 from models.benchmarks where snapshot_id = %s and benchmark = %s and task = %s limit 1",
+                    (sid, benchmark, bench_task)).fetchone():
+        return sid
+    row = conn.execute("""select s.snapshot_id from models.snapshots s where s.kind = %s
+                          and s.fetched_at > now() - make_interval(days => %s)
+                          and exists (select 1 from models.benchmarks x where x.snapshot_id = s.snapshot_id
+                                      and x.benchmark = %s and x.task = %s)
+                          order by s.fetched_at desc limit 1""", (kind, BOARD_GRACE_DAYS, benchmark, bench_task)).fetchone()
+    return row["snapshot_id"] if row else sid
 
 
 def load_offers(conn, snaps: dict[str, int]) -> dict[str, list[dict]]:
@@ -84,9 +108,12 @@ def _fields(o: dict) -> dict:
             "norm_price": price if c["kind"] == "generation" else None, "norm_unit": unit}
 
 
-def decision_route(offers: list[dict]) -> dict[str, Any]:
-    """Cheapest Decisions-API offer (decision models are billed on input tokens only)."""
-    paid = [o for o in offers if o["interface"] == "decisions" and o.get("price_in_1m") is not None]
+def decision_route(offers: list[dict], modes: list[str] | None = None) -> dict[str, Any]:
+    """Cheapest Decisions-API offer (decision models are billed on input tokens only) that reads every input the
+    task needs besides text (e.g. 'image' for the vision decision task)."""
+    need = set(modes or [])
+    paid = [o for o in offers if o["interface"] == "decisions" and o.get("price_in_1m") is not None
+            and need <= set(o.get("modes") or [])]
     best = min(paid, key=lambda o: o["price_in_1m"], default=None)
     route = {"provider": best["provider"], "offer_key": best["offer_key"], "cost": best["price_in_1m"],
              "unit": "usd_per_1m_input_tokens"} if best else None
@@ -196,7 +223,7 @@ def _best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dic
                 primary[mid]["real_cost_unit"], primary[mid]["variant"]
         else:
             mo = offers.get(mid, [])
-            route = chat_route(mo, None) if t["interface"] == "chat" else decision_route(mo) \
+            route = chat_route(mo, None) if t["interface"] == "chat" else decision_route(mo, t["modes"]) \
                 if t["interface"] == "decisions" else media_route(mo, t["interface"], t["modes"])
             if not route["callable"]:
                 continue
@@ -216,6 +243,55 @@ def _best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dic
     return rows
 
 
+MEDIA_EXEC_INTERFACES = ("image", "video", "audio", "music")
+_VERSION = re.compile(r"^(.*?)-(\d+(?:-\d+)*)(?:-(.*))?$")
+
+
+def family(model_id: str) -> tuple[str, tuple, str] | None:
+    """'gpt-image-2-5-sunburst' -> ('gpt-image', (2, 5), 'sunburst'); 'gpt-image-2' -> ('gpt-image', (2,), '')."""
+    m = _VERSION.match(model_id)
+    if not m:
+        return None
+    return m.group(1), tuple(int(x) for x in m.group(2).split("-")), m.group(3) or ""
+
+
+def _executable_first(conn, t: dict, ranked: list[dict], offers: dict) -> list[dict]:
+    """Monsieur (2026-10-14, logo): the best measured model must be one Walter can run; and when a newer version of
+    it exists, runs and is not benchmarked on this task yet, it goes first with a warning (GPT Image 2 measured on
+    the logo board, GPT Image 2.5 Sunburst not yet: Sunburst, « version supérieure pas encore classée »)."""
+    from .media_exec import _models   # late import (media_exec -> select)
+    runnable = {m for m, c in _models().items() if c.get("kind") in ("image", "video", "audio", "music")}
+    pinned = {r["pinned_model_id"] for r in conn.execute("select pinned_model_id from models.preferences "
+                                                         "where pinned_model_id is not null")}
+    # 'measured' = on the task's own board (DA logo for logo), not only on a generic board it borrows weight from
+    sid = board_snapshot(conn, latest_snapshots(conn), t["quality_benchmark"], t["quality_task"])
+    measured = {r["model_id"] for r in conn.execute(
+        "select distinct model_id from models.benchmarks where snapshot_id = %s and benchmark = %s and task = %s",
+        (sid, t["quality_benchmark"], t["quality_task"]))} if sid else {r["model_id"] for r in ranked}
+    top_measured = [r for r in ranked if r["model_id"] in measured]
+    out = []
+    if top_measured:
+        top, fam = top_measured[0], family(top_measured[0]["model_id"])
+        newer = [m for m in runnable if m not in measured and fam and (f := family(m)) and f[0] == fam[0]
+                 and f[1] > fam[1] and any(o["interface"] == t["interface"] for o in offers.get(m, []))]
+        newer.sort(key=lambda m: (m in pinned, family(m)[1]), reverse=True)
+        if newer:
+            name = conn.execute("select coalesce(display_name, model_id) as n from models.canonical where model_id = %s",
+                                (newer[0],)).fetchone()
+            route = media_route(offers.get(newer[0], []), t["interface"], t["modes"])
+            paid = route.get("paid") or {}
+            out.append({**top, "model_id": newer[0], "variant": "", "display_name": name["n"] if name else newer[0],
+                        "quality": None, "real_cost": paid.get("cost"), "cost_unit": paid.get("unit"),
+                        "provider": paid.get("provider"), "offer_key": paid.get("offer_key"),
+                        "reasons": {"warning": f"version supérieure de {top['display_name']}, pas encore classée sur "
+                                               f"ce benchmark", "successor_of": top["model_id"],
+                                    "measured_quality": top["quality"]}})
+    out += [r for r in ranked if r["model_id"] in runnable and r["model_id"] not in {o["model_id"] for o in out}]
+    if not out:
+        return ranked   # nothing runnable: keep the measurement (the library shows « pas d'exécuteur »)
+    return out
+
+
 def compute(conn) -> list[dict]:
     snaps = latest_snapshots(conn)
     offers = load_offers(conn, snaps)
@@ -227,7 +303,8 @@ def compute(conn) -> list[dict]:
         if kind not in snaps:
             continue
         bench = list(conn.execute("""select * from models.benchmarks where snapshot_id = %s and benchmark = %s and task = %s""",
-                                  (snaps[kind], t["quality_benchmark"], t["quality_task"])))
+                                  (board_snapshot(conn, snaps, t["quality_benchmark"], t["quality_task"]),
+                                   t["quality_benchmark"], t["quality_task"])))
         cands = []
         for b in bench:
             mo = offers.get(b["model_id"], [])
@@ -245,7 +322,7 @@ def compute(conn) -> list[dict]:
                 if assumed:
                     route = {**route, "paid": {**(route["paid"] or {}), "cost_basis_effort_assumed": assumed}}
             elif t["interface"] == "decisions":
-                route = decision_route(mo)
+                route = decision_route(mo, t["modes"])
                 cost_unit = "usd_per_1m_input_tokens"
             else:
                 route = media_route(mo, t["interface"], t["modes"])
@@ -255,6 +332,8 @@ def compute(conn) -> list[dict]:
             cands.append({**b, "route": route, "real_cost": (route["paid"] or {}).get("cost"), "real_cost_unit": cost_unit})
         from .knowledge import tie_break  # late import: knowledge -> choose -> select
         ranked = tie_break(conn, t["task"], _best_by_composite(conn, t, snaps, offers, cands))
+        if t["interface"] in MEDIA_EXEC_INTERFACES and t["task"] != "general":
+            ranked = _executable_first(conn, t, ranked, offers)
         # Monsieur: specialised tasks keep only the best model (#2/#3 are useless); general keeps a short list.
         out += [{**r, "rank": i + 1} for i, r in enumerate(ranked[:5 if t["task"] == "general" else 1])]
         if not cands:

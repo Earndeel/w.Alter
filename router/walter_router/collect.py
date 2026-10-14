@@ -535,6 +535,8 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                                    "hf": m.get("hugging_face_id") or None,
                                    "context_length": m.get("context_length")},
                              **_media_fields(interface, "", None, None, inputs)))
+            if interface == "decisions":   # what a decision model can read besides text (image, audio, video)
+                rows[-1]["modes"] = sorted(x for x in inputs if x != "text")
             for entry in m.get("_display_pricing") or []:
                 if entry.get("kind") != "unit":
                     continue  # token-priced media (e.g. image output per M tokens) has no per-unit equivalent

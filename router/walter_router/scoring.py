@@ -60,12 +60,14 @@ def composite(conn, task: str, snaps: dict | None = None) -> list[dict]:
     acc: dict[str, dict] = {}
     for b in conn.execute("""select benchmark, bench_task, weight, is_primary from models.task_benchmarks
                              where task = %s and weight > 0 order by is_primary desc, weight desc""", (task,)).fetchall():
-        sid = snaps.get(sel.BENCH_KIND[b["benchmark"]])
+        sid = sel.board_snapshot(conn, snaps, b["benchmark"], b["bench_task"])
         if sid is None:
             continue
         rows = list(conn.execute("""select model_id, variant, display_name, score, score_unit, extra from models.benchmarks
                                    where snapshot_id = %s and benchmark = %s and task = %s""",
                                  (sid, b["benchmark"], b["bench_task"])))
+        if b["benchmark"] == "aa_decision":   # LLM reference rows would set the scale: rank decision models only
+            rows = [r for r in rows if (r["extra"] or {}).get("kind") == "decisionModel"]
         name = f'{BOARD_NAMES.get(b["benchmark"], b["benchmark"])} {b["bench_task"]}'
         for model_id, v in board_quality(rows).items():
             rel = _reliability(v["row"])
