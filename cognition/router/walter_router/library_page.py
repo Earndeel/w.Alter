@@ -202,7 +202,7 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
 body{{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
 -webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1,"lnum" 1}}
 .wrap{{max-width:1240px;margin:0 auto;padding:0 32px}}
-header{{padding:36px 0 0}}.kicker{{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}}
+header{{padding:32px 0 22px}}.foot-figs{{color:var(--ink2);margin-bottom:8px}}.kicker{{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}}
 h1{{font:600 30px/1.15 Georgia,"Times New Roman",serif;letter-spacing:-.01em;margin:6px 0 4px}}
 .meta{{color:var(--mute);font-size:13px}}
 .figures{{display:grid;grid-template-columns:repeat(6,1fr);border-top:2px solid var(--ink);border-bottom:1px solid var(--rule);
@@ -220,7 +220,7 @@ border-radius:6px;white-space:nowrap;font:500 13.5px/1 inherit;font-family:inher
 .seg a.on .ct{{background:transparent;color:var(--paper);border-color:rgba(255,255,255,.35)}}
 .small-seg{{margin:0 0 10px}}.small-seg button{{padding:5px 11px;font-size:12.5px}}
 .headrow{{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}}.desc{{margin-bottom:3px}}
-.run{{text-align:right;padding-top:18px}}#runbtn{{font:600 13px/1 inherit;font-family:inherit;padding:10px 16px;border-radius:7px;border:1px solid var(--ink);
+.run{{text-align:right;padding-top:4px}}#runbtn{{font:600 13px/1 inherit;font-family:inherit;padding:10px 16px;border-radius:7px;border:1px solid var(--ink);
 background:var(--ink);color:var(--paper);cursor:pointer}}#runbtn:hover{{opacity:.88}}#runbtn:disabled{{opacity:.5;cursor:default}}
 #runstate{{margin-top:6px;min-height:16px}}.strong{{font-weight:600}}
 .tools{{margin-left:auto;display:flex;gap:16px;align-items:center}}
@@ -260,13 +260,11 @@ footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;paddi
 @media (max-width:600px){{.wrap{{padding:0 16px}}.figures{{grid-template-columns:repeat(2,1fr)}}.tools{{display:none}}
 .figures div{{border-left:0!important;padding-left:0!important}}}}
 </style></head><body>
-<div class="wrap"><header><div class="headrow"><div><div class="kicker">Walter Router</div><h1>Bibliothèque des modèles</h1>
-<div class="meta">Dernier cycle : {esc(when)}. Mise à jour toutes les 48 heures et après chacune de tes réponses.</div></div>
+<div class="wrap"><header><div class="headrow"><div><div class="kicker">Walter Router</div><h1>Bibliothèque des modèles</h1></div>
 <div class="run"><button id="runbtn" type="button">▶ Lancer le cycle complet</button><div id="runstate" class="mute small"></div></div></div>
-<div class="figures">{"".join(f'<div class="{"hl" if lbl.startswith("Tes") else ""}"><b>{v}</b><span>{esc(lbl)}</span></div>' for lbl, v in figures)}</div>
 </header></div>
 <nav><div class="wrap navin"><div class="seg" role="tablist">{nav}</div><div class="tools"><input type="search" id="q" placeholder="Rechercher">
-<label class="f"><input type="checkbox" id="diff"> Mes choix ≠ n°1</label></div></div></nav>
+<label class="f"><input type="checkbox" id="diff"> Mes choix ≠ n°1 <span class="mute">({n_diff})</span></label></div></div></nav>
 <main class="wrap">
 {f'<p class="notice">Classement inaccessible : {esc(down_txt)}. Le router conserve sa dernière lecture valable pendant 21 jours.</p>' if down else ''}
 <section class="pane" data-pane="home">
@@ -281,7 +279,8 @@ footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;paddi
 </section>
 {tab_html}
 </main>
-<div class="wrap"><footer>Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements
+<div class="wrap"><footer><div class="foot-figs">{" · ".join(f"{esc(lbl)} {v}" for lbl, v in figures if not lbl.startswith("Tes"))}.
+Classements recalculés le {esc(when)} ; cycle complet automatique toutes les 48 heures, page republiée après chacune de tes réponses.</div>Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements
 pondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Une ligne surlignée signale un choix de ta part différent du n°1 mesuré, avec la raison.
 Prix : texte en dollars par million de tokens (entrée/sortie), image par image, vidéo par seconde (plage selon la résolution) ;
 « estimé » lorsque le fournisseur facture au token. Page générée le {generated}.</footer></div>
@@ -304,8 +303,8 @@ show((location.hash||'#home').slice(1)||'home');
 const rb=document.getElementById('runbtn'),rs=document.getElementById('runstate');let poll=null;
 function fmt(t){{if(!t)return'';const d=new Date(t.replace(/^\\w+ /,''));return isNaN(d)?t:d.toLocaleString('fr-FR',{{dateStyle:'short',timeStyle:'short'}})}}
 async function state(){{try{{const r=await fetch('/api/status',{{cache:'no-store'}});const o=await r.json();
-if(o.running){{rb.disabled=true;rs.textContent='En cours depuis '+fmt(o.started)+' — '+(o.step||'')}}
-else{{rb.disabled=false;rs.textContent=o.finished?('Dernière exécution terminée le '+fmt(o.finished)+(o.result&&o.result!=='success'?' ('+o.result+')':'')):''; if(poll){{clearInterval(poll);poll=null;if(o.result==='success')setTimeout(()=>location.reload(),20000)}}}}
+if(o.running){{rb.disabled=true;rs.textContent='Cycle en cours — '+(o.step||'démarrage')}}
+else{{rb.disabled=false;rs.textContent=o.finished?('Dernier cycle complet : '+fmt(o.finished)+(o.result&&o.result!=='success'?' (échec)':'')):''; if(poll){{clearInterval(poll);poll=null;if(o.result==='success')setTimeout(()=>location.reload(),20000)}}}}
 if(o.running&&!poll)poll=setInterval(state,15000)}}catch(e){{rs.textContent='Statut indisponible'}}}}
 rb.onclick=async()=>{{if(!confirm('Lancer maintenant le cycle complet ? Collecte des classements, recalcul, analyse par le modèle économique, notifications et republication de cette page (20 à 60 minutes).'))return;
 rb.disabled=true;rs.textContent='Lancement…';try{{const r=await fetch('/api/run',{{method:'POST'}});const o=await r.json();rs.textContent=o.message||'';}}catch(e){{rs.textContent='Échec du lancement'}}setTimeout(state,1500)}};

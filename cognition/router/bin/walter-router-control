@@ -37,8 +37,10 @@ def status() -> dict:
     if p.get("ActiveState") == "activating":
         log = subprocess.run(["journalctl", "-u", UNIT, "--since", "-2h", "-o", "cat", "--no-pager"],
                              capture_output=True, text=True).stdout
-        steps = re.findall(r"\[cycle\] (\d/4[^\n]*|library page[^\n]*)", log)
-        step = steps[-1] if steps else "démarrage"
+        steps = re.findall(r"\[cycle\] (\d)/4|\[cycle\] (library page)", log)
+        names = {"1": "1/4 collecte des classements", "2": "2/4 recalcul", "3": "3/4 analyse par le modèle économique",
+                 "4": "4/4 recalcul final et notifications", "library page": "publication de la page"}
+        step = names.get((steps[-1][0] or steps[-1][1]) if steps else "", "démarrage")
     return {"running": p.get("ActiveState") == "activating", "step": step, "result": p.get("Result"),
             "started": p.get("ExecMainStartTimestamp") or None, "finished": p.get("ExecMainExitTimestamp") or None}
 
