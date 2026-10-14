@@ -85,7 +85,7 @@ def test_challenger_flow_baseline_then_new_then_adopt(conn):
     news = {"new": {"gpt-6-astra": ["nouveau sur da_models:3d"]}, "nerf": {}, "price_drop": {}}
     assert "3d:default:gpt-6-astra" in alerts.challengers(conn, "open", only_task="3d", chg=news)
     pend = [a for a in alerts.pending(conn) if a["task"] == "3d"]
-    assert pend and "dépasse" in alerts.render(pend, conn)
+    assert pend and "Meilleur que ton choix actuel" in alerts.render(pend, conn)
     # Monsieur adopts it: it becomes the pinned favourite.
     alerts.verdict(conn, pend[0]["alert_id"], "adopted")
     assert choose.pick(conn, "3d")["model_id"] == "gpt-6-astra"
@@ -136,7 +136,9 @@ def test_dominance_watch_ignores_better_but_dearer_models(conn):
 
 def test_notification_buttons_one_row_per_news():
     from walter_router import alerts
-    rows = alerts.keyboard(None, [{"alert_id": 1, "kind": "tier", "ref": 3, "role": "L2"},
-                                  {"alert_id": 2, "kind": "nerf", "ref": 4, "role": ""}])
+    rows = alerts.keyboard(None, [{"alert_id": 1, "kind": "tier", "ref": 3, "role": "L2", "subject": "gpt-6-luna/max",
+                                   "evidence": {"current": "gpt-6-1-sol/medium"}},
+                                  {"alert_id": 2, "kind": "nerf", "ref": 4, "role": "", "subject": "minimax-h3"}])
     assert [[b["callback_data"] for b in r] for r in rows] == [["wr:a:3", "wr:d:3"], ["wr:d:4"]]
     assert all(len(b["callback_data"]) <= 64 for r in rows for b in r)
+    assert rows[0][0]["text"] == "✅ Passer à gpt-6-luna" and rows[0][1]["text"] == "✖️ Garder gpt-6-1-sol"
