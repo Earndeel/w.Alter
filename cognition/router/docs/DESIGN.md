@@ -259,3 +259,8 @@ Source `aa_decision` (page d'évaluation, flux Next.js, sans navigateur) → `mo
 Decisions d'OpenRouter, recalculé toutes les 48 h, nouveautés / nerfs notifiés selon les règles habituelles.
 `intent.chain()` lit ce meilleur modèle ; `knowledge.json` `decision.order` : `free_first` (Clef → Mercury Decide
 gratuit → meilleur, choix du 2026-10-04) ou `best_first` (meilleur → gratuits en secours).
+
+## Page « bibliothèque » (2026-10-14)
+https://library.walter-ai.cloud — `walter-router library` en page web (Cloudflare Pages `walter-library`, Cloudflare
+Access : e-mail de Monsieur seulement ; les adresses `*.pages.dev` répondent 404). Republiée en fin de cycle 48 h et
+après chaque verdict (`publish-library`).
