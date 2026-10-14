@@ -3,4 +3,4 @@ __pycache__/
 .pytest_cache/
 site/index.html
 .control.env
-site/v1/
+site/en/

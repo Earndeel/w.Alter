@@ -307,12 +307,13 @@ def publish(conn, deploy: bool = True) -> dict:
     library.walter-ai.cloud behind Cloudflare Access; site/functions/_middleware.js refuses every other host)."""
     import subprocess
     SITE.mkdir(exist_ok=True)
-    from . import library_page, library_page_v2
-    rs, ctx = rows(conn), _context(conn)
-    html = library_page_v2.render(conn, rs, ctx)      # main page: v2 (Muse Wonder design, 2026-10-14)
+    import shutil
+    from . import library_i18n, library_page
+    html = library_page.render(conn, rows(conn), _context(conn))   # French page; v2 (Muse Wonder) rejected 2026-10-14
     (SITE / "index.html").write_text(html)
-    (SITE / "v1").mkdir(exist_ok=True)                 # previous editorial version, for comparison
-    (SITE / "v1" / "index.html").write_text(library_page.render(conn, rs, ctx))
+    (SITE / "en").mkdir(exist_ok=True)                              # English page, same layout (translation pass)
+    (SITE / "en" / "index.html").write_text(library_i18n.to_english(html))
+    shutil.rmtree(SITE / "v1", ignore_errors=True)
     if not deploy:
         return {"built": len(html)}
     r = subprocess.run([CF, "--", "wrangler", "pages", "deploy", ".", "--project-name", "walter-library",
