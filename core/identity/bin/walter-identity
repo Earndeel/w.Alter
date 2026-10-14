@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""walter-identity — W.Alter's identity, owned by Walter, rendered for every runtime.
+
+Sources (this repo, git): identity.md (who W.Alter is, tone — universal), rules.md (working rules for agents),
+runtimes/*.md (per-runtime adapters: tool names, write rules). Targets are generated, one-way:
+
+  hermes       → /root/.hermes/SOUL.md                       (Hermes loads it as its identity)
+  claude-code  → /opt/walter-profiles/claude-code/CLAUDE.md  (Claude Code "W.Alter" profile = that cwd)
+  codex        → /opt/walter-profiles/codex/AGENTS.md        (Codex "W.Alter" profile = that cwd)
+  voice        → /opt/walter-identity/build/voice.md         (read by the phone bridge at call setup)
+  agent        → /opt/walter-identity/build/agent.md         (MCP walter_profile, any other runtime)
+
+Usage: walter-identity render <target> | sync [--force] | check
+A target edited by hand since the last sync is never overwritten silently: sync refuses it (exit 2) and keeps a
+copy in /root/.hermes/backups/identity-drift/; port the change into the sources, then `sync --force`.
+The git post-commit hook runs `sync`, so committing a change here is all it takes.
+"""
+from __future__ import annotations
+
+import hashlib
+import re
+import shutil
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+STATE = ROOT / ".state"
+DRIFT = Path("/root/.hermes/backups/identity-drift")
+AGENT = ["identity.md", "rules.md", "runtimes/agent-cli.md"]
+TARGETS = {
+    "hermes": (["identity.md", "rules.md", "runtimes/hermes.md"], Path("/root/.hermes/SOUL.md")),
+    "claude-code": (AGENT + ["runtimes/claude-code.md"], Path("/opt/walter-profiles/claude-code/CLAUDE.md")),
+    "codex": (AGENT + ["runtimes/codex.md"], Path("/opt/walter-profiles/codex/AGENTS.md")),
+    "voice": (["identity.md"], ROOT / "build" / "voice.md"),
+    "agent": (["identity.md", "rules.md"], ROOT / "build" / "agent.md"),
+}
+INCLUDE = re.compile(r"^\{\{include (\S+)\}\}$", re.M)
+
+
+def _include(m: re.Match) -> str:
+    try:
+        return Path(m.group(1)).read_text(errors="replace").strip()
+    except OSError as e:
+        return f"(indisponible : {e.strerror})"
+
+
+def render(target: str) -> str:
+    parts, _ = TARGETS[target]
+    body = "\n\n".join(INCLUDE.sub(_include, (ROOT / p).read_text().strip()) for p in parts)
+    return (f"<!-- GÉNÉRÉ par walter-identity ({target}) — ne pas éditer ici : sources dans {ROOT} -->\n"
+            f"# W.Alter\n\n{body}\n")
+
+
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def status(target: str) -> tuple[str, str]:
+    """→ (state, rendered). state: ok | stale (sources changed) | drift (edited by hand) | missing | new."""
+    out = TARGETS[target][1]
+    new = render(target)
+    if not out.exists():
+        return "missing", new
+    cur = out.read_text(errors="replace")
+    if cur == new:
+        return "ok", new
+    last = STATE / f"{target}.sha256"
+    if not last.exists():
+        return "new", new  # never synced: the current file predates walter-identity
+    return ("stale" if _sha(cur) == last.read_text().strip() else "drift"), new
+
+
+def sync(force: bool) -> int:
+    STATE.mkdir(exist_ok=True)
+    rc = 0
+    for target, (_, out) in TARGETS.items():
+        state, new = status(target)
+        if state == "ok":
+            print(f"{target:12} ok")
+            continue
+        if state in ("new", "drift"):  # keep what was there before writing over it
+            DRIFT.mkdir(parents=True, exist_ok=True)
+            keep = DRIFT / f"{target}-{time.strftime('%Y%m%d-%H%M%S')}-{out.name}"
+            shutil.copy2(out, keep)
+            if state == "drift" and not force:
+                print(f"{target:12} DRIFT: {out} edited by hand (copy: {keep}); port it into the sources, then sync --force")
+                rc = 2
+                continue
+        out.parent.mkdir(parents=True, exist_ok=True)
+        tmp = out.with_name(out.name + ".tmp")
+        tmp.write_text(new)
+        tmp.replace(out)
+        (STATE / f"{target}.sha256").write_text(_sha(new))
+        print(f"{target:12} written ({state}) → {out}")
+    return rc
+
+
+def check() -> int:
+    bad = 0
+    for target in TARGETS:
+        state, _ = status(target)
+        print(f"{target:12} {state}")
+        bad |= state != "ok"
+    return 1 if bad else 0
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) >= 2 and argv[0] == "render" and argv[1] in TARGETS:
+        sys.stdout.write(render(argv[1]))
+        return 0
+    if argv[:1] == ["sync"]:
+        return sync("--force" in argv)
+    if argv[:1] == ["check"]:
+        return check()
+    print(__doc__, file=sys.stderr)
+    return 64
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
