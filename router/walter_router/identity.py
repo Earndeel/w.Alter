@@ -12,7 +12,7 @@ from pathlib import Path
 TIERS = ("non-reasoning", "minimal", "low", "medium", "high", "xhigh", "max")
 VENDOR_PREFIXES = ("google-", "openai-", "anthropic-", "meta-", "microsoft-", "alibaba-", "bytedance-",
                    "black-forest-labs-")
-BENCHMARK_NAMESPACES = ("aa", "da", "mm", "arena", "bridgebench")
+BENCHMARK_NAMESPACES = ("aa", "aa_decision", "da", "mm", "arena", "bridgebench")
 _TIER_SUFFIX = re.compile(r"-(" + "|".join(TIERS) + r")$")
 _PAREN = re.compile(r"\(([^)]*)\)")
 _GLUED = re.compile(r"(?<![a-z0-9])([a-z]{3,})(\d)")      # wan2-7 -> wan-2-7, flux1-1 -> flux-1-1 (not h3, v2, o1)
@@ -84,7 +84,12 @@ def normalize(namespace: str, key: str, name: str | None = None) -> tuple[str, s
     if manual:
         return manual["model_id"], manual.get("variant", "")
     variant = ""
-    if namespace == "aa":
+    if namespace == "aa_decision":
+        # 'typesafe_jev-1-13', 'anthropic_claude-haiku-5-5-low' (host_model; LLM rows carry their effort like AA)
+        key = key.split("_", 1)[1] if "_" in key else key
+        _, variant = _variant_from_paren((name or "").split(",")[0] + (")" if "," in (name or "") else ""))
+        base = _TIER_SUFFIX.sub("", key)
+    elif namespace == "aa":
         # AA: slug carries the effort tier except for the default (max) row; the display name always does.
         _, variant = _variant_from_paren(name or "")
         base = _TIER_SUFFIX.sub("", key)

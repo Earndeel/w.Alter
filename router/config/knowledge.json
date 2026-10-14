@@ -322,5 +322,9 @@
       },
       "why": "Exécute des tâches longues avec outils : agentique et intelligence d'abord."
     }
+  },
+  "decision": {
+    "order": "free_first",
+    "_note": "Modèle de décision (intent + tri). Le meilleur vient du cycle 48 h (tâche 'decision', AA Decision Index). free_first = Clef puis Mercury Decide gratuit puis le meilleur (choix de Monsieur du 2026-10-04, allocation gratuite) ; best_first = le meilleur d'abord, les gratuits en secours."
   }
 }

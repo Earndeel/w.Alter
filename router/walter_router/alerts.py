@@ -12,7 +12,7 @@ from . import select as sel
 
 HERMES = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "hermes-agent" / "venv" / "bin" / "hermes"
 UNRANKED_DAYS = 30
-STALE_HOURS = {"aa": 60, "mm": 60, "da": 60, "arena": 60, "bridgebench": 60, "openrouter": 60, "kie": 60,
+STALE_HOURS = {"aa": 60, "aa_decision": 60, "mm": 60, "da": 60, "arena": 60, "bridgebench": 60, "openrouter": 60, "kie": 60,
                "codex": 60, "hermes_providers": 60, "declared": 24 * 365}  # 48 h cycle + 12 h margin
 
 
@@ -190,7 +190,7 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
 def unranked(conn) -> list[str]:
     """Models released recently on a provider with no measurement on any leaderboard yet (one alert per model)."""
     snaps = sel.latest_snapshots(conn)
-    bench_ids = [snaps[k] for k in ("aa", "mm", "da", "arena", "bridgebench") if k in snaps]
+    bench_ids = [snaps[k] for k in ("aa", "aa_decision", "mm", "da", "arena", "bridgebench") if k in snaps]
     created = []
     for o in conn.execute("""select o.model_id, o.interface, min(o.provider_created) as released
                              from models.offers o where o.snapshot_id = %s
