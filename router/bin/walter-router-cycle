@@ -37,4 +37,6 @@ fi
 
 echo "[cycle] 4/4 re-derive with the new name links, recompute, notify (only: a new model above an active one)"
 "$WR" refresh --skip-collect || exit 1
+echo "[cycle] library page https://library.walter-ai.cloud (Cloudflare Access)"
+"$WR" publish-library || echo "[cycle] library page not published (non-blocking)"
 exit 0
