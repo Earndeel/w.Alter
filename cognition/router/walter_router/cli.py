@@ -45,7 +45,7 @@ def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = Fal
                                     "tiers": alerts.tiers(conn, run_id, chg),
                                     "nerfs": alerts.nerfs(conn, run_id, chg),
                                     "pareto": alerts.pareto(conn, run_id, chg),
-                                    "stale": alerts.stale_sources(conn)}
+                                    "stale": alerts.stale_sources(conn), "boards_down": alerts.boards_down(conn)}
                 report["pruned_snapshots"] = collect.prune(conn)
                 conn.execute("update models.runs set status = 'ok', finished_at = now(), summary = %s::jsonb where run_id = %s",
                              (json.dumps(report, default=str), run_id))
@@ -228,6 +228,8 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("decision", choices=("adopted", "dismissed"))
     v.add_argument("--note")
     v.add_argument("--role", help="with a short number covering several roles: only this one")
+    lb = sub.add_parser("library", help="the model library: per task/category model, chooser, providers, fallback")
+    lb.add_argument("--json", action="store_true")
     sub.add_parser("status")
     sub.add_parser("health", help="exit 1 when the router is not fed or not usable")
     pr = sub.add_parser("probe", help="tiny live call per provider (Kie, OpenRouter, Arnict)")
@@ -326,6 +328,13 @@ def main(argv: list[str] | None = None) -> int:
                 out = aliases_admin.listing()
             elif args.cmd == "review":
                 out = review.digest(conn)
+            elif args.cmd == "library":
+                from . import library
+                rs = library.rows(conn)
+                if not args.json:
+                    print(library.render(rs))
+                    return 0
+                out = rs
             elif args.cmd == "tasks":
                 out = list(conn.execute("select task, label, interface from models.tasks where interface <> 'decisions' "
                                         "order by interface, task"))

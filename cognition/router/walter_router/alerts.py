@@ -36,7 +36,7 @@ def _unit_cost(offers: list[dict], interface: str, modes: list[str] | None = Non
 
 
 def _board_rows(conn, snaps: dict, benchmark: str, bench_task: str) -> list[dict]:
-    sid = snaps.get(sel.BENCH_KIND[benchmark])
+    sid = sel.board_snapshot(conn, snaps, benchmark, bench_task)
     if sid is None:
         return []
     return list(conn.execute("""select model_id, variant, display_name, score, score_unit, extra from models.benchmarks
@@ -241,6 +241,35 @@ def stale_sources(conn) -> list[str]:
     return created
 
 
+def boards_down(conn) -> list[str]:
+    """Monsieur (2026-10-14): tell him when a leaderboard used by a task can no longer be read — the whole source
+    stale for more than its limit, or one board empty in the latest snapshot while an earlier snapshot had rows
+    (Arena image-edit, 2026-10-10: the task silently lost its model). One alert per outage; closed on recovery."""
+    created = []
+    age = {r["kind"]: r for r in conn.execute("""select kind, max(fetched_at) as at, now() - max(fetched_at) as age
+                                                 from models.snapshots group by kind""")}
+    for b in conn.execute("""select benchmark, bench_task, array_agg(task order by task) as tasks
+                             from models.task_benchmarks where weight > 0 group by 1, 2""").fetchall():
+        kind = sel.BENCH_KIND.get(b["benchmark"])
+        if kind not in age:
+            continue
+        subject = f'{b["benchmark"]}:{b["bench_task"]}'
+        stale = age[kind]["age"].total_seconds() > STALE_HOURS.get(kind, 60) * 3600
+        last_ok = conn.execute("""select max(s.fetched_at) as at from models.snapshots s where s.kind = %s and exists
+                                  (select 1 from models.benchmarks x where x.snapshot_id = s.snapshot_id
+                                   and x.benchmark = %s and x.task = %s)""", (kind, b["benchmark"], b["bench_task"])).fetchone()["at"]
+        empty_now = last_ok is not None and last_ok < age[kind]["at"]
+        if stale or empty_now:
+            ev = {"board": subject, "tasks": b["tasks"], "last_ok": last_ok, "source": kind,
+                  "reason": "source inaccessible" if stale else "classement vide dans la dernière lecture"}
+            if _upsert(conn, "board_down", "", subject, ev, "open"):
+                created.append(subject)
+        else:
+            conn.execute("""update models.alerts set status = 'dismissed', verdict_note = 'auto: classement de nouveau lisible'
+                            where kind = 'board_down' and subject = %s and status in ('open', 'notified')""", (subject,))
+    return created
+
+
 def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]:
     """When Monsieur's method (nightly L1/L2/L3 in models.selection) designates another model x reasoning level than
     the declared tier, one alert per tier; he tests and adopts or ignores (never switched automatically)."""
@@ -378,7 +407,7 @@ def pending(conn) -> list[dict]:
     # Monsieur 2026-10-02: only « a new model ranks above one of our active models » — favourites ('challenger'),
     # text tiers ('tier'), auto-picked #1 of specialised tasks ('new_best'). No credit, staleness or podium news.
     return list(conn.execute("""select * from models.alerts where status = 'open'
-                                and kind in ('challenger', 'tier', 'new_best', 'nerf', 'pareto')
+                                and kind in ('challenger', 'tier', 'new_best', 'nerf', 'pareto', 'board_down')
                                 and not (kind = 'tier' and role = 'orchestrator')
                                 order by kind, task, alert_id"""))
 
@@ -460,6 +489,15 @@ def _block(conn, a: dict) -> list[str]:
         c = catalog.card(conn, model_id, "chat")
         return [f'💸 Entre dans la frontière de Pareto (texte)', f'{_head(c)} ({variant})',
                 f'📊 {_fr(e["score"], 1)} AA · {_fr(e["real_cost"], 3)} $/tâche', _why(e)]
+    if a["kind"] == "board_down":
+        board, _, btask = e["board"].partition(":")
+        labels = [r["label"] for r in conn.execute("select label from models.tasks where task = any(%s) order by label",
+                                                    (e["tasks"],))]
+        last = e.get("last_ok")
+        last = datetime.fromisoformat(str(last)).strftime("%d/%m") if last else "jamais"
+        return [f'⚠️ Classement inaccessible : {_board_fr(f"{catalog.BOARDS.get(board, board)} {btask}")}',
+                f'   {e["reason"]} — dernière lecture réussie : {last}',
+                f'   Tâches touchées : {", ".join(labels)}', '   → je tente de le réparer ; le router garde le dernier choix connu']
     return [f'• {a["kind"]} {a["subject"]}']
 
 
@@ -599,7 +637,8 @@ BUTTONS = {"challenger": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d"))
            "tier": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d")),
            "new_best": (("👍 OK", "a"), ("↩️ Garder l'ancien", "d")),
            "pareto": (("👍 Noté", "a"), ("✖️ Ignorer", "d")),
-           "nerf": (("👁️ Masquer", "d"),)}
+           "nerf": (("👁️ Masquer", "d"),),
+           "board_down": (("👁️ Vu", "d"),)}
 
 
 def keyboard(conn, alerts: list[dict]) -> list[list[dict]]:
@@ -637,6 +676,8 @@ def _button_text(conn, a: dict, label: str, code: str) -> str:
         return f"✖️ Garder {_name(conn, cur)}"[:48] if cur else label
     if a["kind"] == "new_best" and code == "d" and e.get("previous_name"):
         return f"↩️ Garder {e['previous_name']}"[:48]
+    if a["kind"] == "board_down":
+        return label
     return f"{label} · {_name(conn, (a.get('subject') or '').partition('/')[0])}".rstrip(" ·")[:48]
 
 

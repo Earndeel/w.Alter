@@ -135,7 +135,7 @@ def test_new_best_for_a_specialised_task_is_the_only_kind_of_news(conn):
     news = {"new": {"zz-newcomer": ["nouveau sur arena:text_coding"]}, "nerf": {}, "price_drop": {}}
     assert alerts.new_best(conn, new_run, news) == ["coding:zz-newcomer"]
     pend = alerts.pending(conn)
-    assert {a["kind"] for a in pend} <= {"challenger", "tier", "new_best"}
+    assert {a["kind"] for a in pend} - {"board_down"} <= {"challenger", "tier", "new_best"}   # + outages (2026-10-14)
     a = next(a for a in pend if a["kind"] == "new_best")
     assert "dépasse" in alerts.render([a], conn)
     alerts.verdict(conn, a["alert_id"], "dismissed")  # « ignorer » keeps the previous #1 pinned

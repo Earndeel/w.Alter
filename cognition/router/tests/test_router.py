@@ -153,3 +153,13 @@ def test_one_board_is_not_enough(conn):
     news = {"new": {"grok-imagine-video-1-5": ["nouveau chez kie"]}, "nerf": {}, "price_drop": {}}
     made = alerts.challengers(conn, "open", only_task="text_to_video", only_role="action", chg=news)
     assert "text_to_video:action:grok-imagine-video-1-5" not in made
+
+
+def test_successor_family_and_runnable_selection(conn):
+    """2026-10-14: the chosen model of a media task must be runnable (logo: GPT Image 2 measured first but not wired)."""
+    from walter_router import select as sel, media_exec
+    assert sel.family("gpt-image-2-5-sunburst") == ("gpt-image", (2, 5), "sunburst")
+    assert sel.family("gpt-image-2")[1] < sel.family("gpt-image-2-5-flare")[1]
+    best = conn.execute("""select model_id from models.selection where run_id = (select run_id from models.latest_run)
+                           and task = 'logo' and level = 'best' and rank = 1""").fetchone()
+    assert best and best["model_id"] in media_exec._models()
