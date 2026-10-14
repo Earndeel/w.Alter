@@ -151,34 +151,71 @@ def _redact_tree(value, names, mapping):
     return value
 
 
-def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, names: list[str] | None = None,
-           model: str = "clef", purpose: str | None = None, budget: str = "recurring", timeout: float = 30) -> dict:
-    """Typed decisions from Cloudflare Clef (Workers AI free daily allocation; scoped token CLOUDFLARE_AI_TOKEN).
-    local_only state is refused; redacted_cloud state is pseudonymised (strings, recursively) before leaving the VM.
-    Returns {"answers": {...}, "usage": {...}, "model": ...}."""
-    base = {"processor": processor, "processor_version": None, "provider": "cloudflare",
-            "model": f"@cf/cloudflare/{model}", "purpose": purpose,
-            "budget": budget, "privacy_class": privacy_class}
-    if privacy_class == "local_only":
-        _log(**base, status="refused_privacy")
-        raise PrivacyRefused(f"{processor}: local_only data cannot be sent to {model}")
-    if privacy_class == "redacted_cloud":
-        state = _redact_tree(state, names, {})
-    account, token = _hermes_env("CLOUDFLARE_ACCOUNT_ID"), _hermes_env("CLOUDFLARE_AI_TOKEN")
-    if not (account and token):
-        raise RuntimeError("Cloudflare Workers AI credentials missing (CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_AI_TOKEN)")
-    t0 = time.perf_counter()
-    try:
-        r = httpx.post(CF_RUN.format(account=account, model=model), headers={"Authorization": f"Bearer {token}"},
-                       json={"model": model, "state": state, "questions": questions}, timeout=timeout)
+DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
+# 2026-10-14 (AA Decision Index v1.0): Mercury Decide free is on our real-cost Pareto frontier (52.7, 0 $, reads
+# images) and dominates Clef (48.6, free allocation, rarely says "I don't know"); Clef stays as the last resort,
+# outside OpenRouter. Paid OpenRouter decision models respect the account floor of the budget.
+DECIDE_CHAIN = ("inception/mercury-decide:free", "cloudflare/clef")
+
+
+def _decide_once(model: str, state: dict, questions: dict, timeout: float) -> tuple[dict, str]:
+    if model.startswith("cloudflare/") or "/" not in model:
+        short = model.split("/", 1)[-1]
+        account, token = _hermes_env("CLOUDFLARE_ACCOUNT_ID"), _hermes_env("CLOUDFLARE_AI_TOKEN")
+        if not (account and token):
+            raise RuntimeError("Cloudflare Workers AI credentials missing (CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_AI_TOKEN)")
+        r = httpx.post(CF_RUN.format(account=account, model=short), headers={"Authorization": f"Bearer {token}"},
+                       json={"model": short, "state": state, "questions": questions}, timeout=timeout)
         data = r.json()
         if r.status_code >= 400 or not data.get("success"):
             raise RuntimeError(f"HTTP {r.status_code}: {str(data.get('errors'))[:300]}")
-    except Exception as e:
-        _log(**base, status="error", error=str(e)[:500], latency_ms=int((time.perf_counter() - t0) * 1000))
-        raise
-    res = data["result"]
-    tok = (res.get("usage") or {}).get("input_tokens") or 0
-    _log(**base, status="ok", latency_ms=int((time.perf_counter() - t0) * 1000), input_tokens=tok, output_tokens=0,
-         cost_usd=tok * CF_PRICE.get(model, 0.24) / 1e6)
-    return {"answers": res["answers"], "usage": res.get("usage") or {}, "model": f"cloudflare/{model}"}
+        res = data["result"]
+        tok = (res.get("usage") or {}).get("input_tokens") or 0
+        return {**res, "cost_usd": tok * CF_PRICE.get(short, 0.24) / 1e6, "input_tokens": tok}, "cloudflare"
+    r = httpx.post(DECISIONS_URL, headers={"Authorization": f"Bearer {_key()}"}, timeout=timeout,
+                   json={"model": model, "state": state, "questions": questions})
+    data = r.json()
+    if r.status_code >= 400 or "answers" not in data:
+        raise RuntimeError(f"HTTP {r.status_code}: {str(data.get('error', data))[:300]}")
+    usage = data.get("usage") or {}
+    return {**data, "cost_usd": usage.get("cost"), "input_tokens": usage.get("prompt_tokens") or usage.get("input_tokens")}, \
+        "openrouter"
+
+
+def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, names: list[str] | None = None,
+           model: str | None = None, models: tuple[str, ...] | None = None, purpose: str | None = None,
+           budget: str = "recurring", timeout: float = 30) -> dict:
+    """Typed decisions (System One contract: one call, a probability per option) from a decision model.
+    Tries `model` alone, else `models`, else DECIDE_CHAIN, in order ("vendor/model" = OpenRouter Decisions API,
+    "cloudflare/clef" or "clef" = Workers AI). local_only state is refused; redacted_cloud state is pseudonymised
+    (strings, recursively) before leaving the VM. Returns {"answers": {...}, "usage": {...}, "model": ...}."""
+    chain = (model,) if model else (models or DECIDE_CHAIN)
+    if privacy_class == "local_only":
+        _log(processor=processor, model=chain[0], purpose=purpose, budget=budget, privacy_class=privacy_class,
+             status="refused_privacy")
+        raise PrivacyRefused(f"{processor}: local_only data cannot be sent to {chain[0]}")
+    if privacy_class == "redacted_cloud":
+        state = _redact_tree(state, names, {})
+    errors = []
+    for m in chain:
+        free = m.endswith(":free") or m.startswith("cloudflare/") or "/" not in m
+        base = {"processor": processor, "model": m, "purpose": purpose, "budget": budget, "privacy_class": privacy_class,
+                "provider": "cloudflare" if m.startswith("cloudflare/") or "/" not in m else "openrouter"}
+        if not free:
+            bal = account_balance()
+            if bal is not None and bal < ACCOUNT_FLOOR_USD.get(budget, 1.0):
+                _log(**base, status="refused_budget", error=f"OpenRouter balance {bal:.2f} USD below floor")
+                errors.append(f"{m}: balance below floor")
+                continue
+        t0 = time.perf_counter()
+        try:
+            res, provider = _decide_once(m, state, questions, timeout)
+        except Exception as e:  # noqa: BLE001 — next decision model
+            _log(**base, status="error", error=str(e)[:500], latency_ms=int((time.perf_counter() - t0) * 1000))
+            errors.append(f"{m}: {str(e)[:120]}")
+            continue
+        _log(**base, status="ok", latency_ms=int((time.perf_counter() - t0) * 1000), input_tokens=res.get("input_tokens"),
+             output_tokens=0, cost_usd=res.get("cost_usd"))
+        return {"answers": res["answers"], "usage": res.get("usage") or {},
+                "model": res.get("model") if provider == "openrouter" and res.get("model") else m}
+    raise RuntimeError("no decision model answered: " + "; ".join(errors))
