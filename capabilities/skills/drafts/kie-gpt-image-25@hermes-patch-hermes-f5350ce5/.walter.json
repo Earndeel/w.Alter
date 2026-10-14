@@ -1,0 +1,19 @@
+{
+ "created_at": "2026-10-14T06:16:47+00:00",
+ "domain": "mlops",
+ "evidence": {
+  "requests": [
+   "Pour qwen on veut quelque chose de plus osé des prise de vue style boudoir, mais important de garder le visage et le maillot de bain. debrouille toi pour faire fonctionner sunburst"
+  ],
+  "session_id": "hermes/main/20261014_055832_b9e7cd"
+ },
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/kie-gpt-image-25",
+  "sha": "f5350ce5bcc6f35f8c10a5cd21f2602d82a82ec8e67e167ac5ff9d81c1bf86d1",
+  "state": "active"
+ },
+ "kind": "hermes_patch",
+ "reason": "patched by the Hermes agent",
+ "runtime": "hermes",
+ "target": "kie-gpt-image-25"
+}

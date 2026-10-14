@@ -1,6 +1,7 @@
 {
  "hermes": {
   "path": "/root/.hermes/skills/mlops/kie-gpt-image-25",
+  "pending_sha": "f5350ce5bcc6f35f8c10a5cd21f2602d82a82ec8e67e167ac5ff9d81c1bf86d1",
   "sha": "498bca0df6fe3cdec487705e3397b3de4990a0a3c52ba62690b853878898f77f",
   "state": "active"
  },
