@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -363,7 +364,8 @@ def pending(conn) -> list[dict]:
                                 order by kind, task, alert_id"""))
 
 
-ROLE_LABELS = {"value": "ratio", "budget": "budget", "action": "action"}
+ROLE_LABELS = {"value": "ratio", "budget": "budget", "action": "action", "default": "défaut", "premium": "premium",
+               "ugc": "UGC"}
 
 
 def _challenger_line(conn, a: dict) -> str:
@@ -412,11 +414,11 @@ def _block(conn, a: dict) -> list[str]:
         pinned = catalog.card(conn, e["pinned"], task["interface"], task["modes"])["name"]
         role = ROLE_LABELS.get(e.get("role"), "")
         gains = ", ".join(f'+{b["delta"]:.0f} {_short_board(k)} (#{b["rank"]})' for k, b in e["boards"].items())
-        return [f'🆕 {n} · {task["label"]}{f" ({role})" if role else ""}', _head(c), _money_line(c),
+        return [f'🆕 {task["label"]}{f" ({role})" if role else ""}', _head(c), _money_line(c),
                 f'📈 dépasse {pinned} : {gains}', _why(e)]
     if a["kind"] == "new_best":
         c = catalog.card(conn, a["subject"], task["interface"], task["modes"])
-        return [f'🆕 {n} · {task["label"]} — nouveau n°1, utilisé désormais', _head(c), _money_line(c),
+        return [f'🆕 {task["label"]} — nouveau n°1, utilisé désormais', _head(c), _money_line(c),
                 f'📈 dépasse {e["previous_name"]} : {e["score"]:.0f} vs {e["previous_score"] or 0:.0f}', _why(e)]
     if a["kind"] == "tier":
         model_id, _, variant = a["subject"].partition("/")
@@ -424,7 +426,7 @@ def _block(conn, a: dict) -> list[str]:
         cur = e.get("current", "")
         cur_id, _, cur_var = cur.partition("/")
         cur_name = catalog.card(conn, cur_id, "chat")["name"] + (f" ({cur_var})" if cur_var else "")
-        return [f'📐 {n} · Niveau texte {e["level"]}', f'{_head(c)} ({variant})',
+        return [f'📐 Niveau texte {e["level"]}', f'{_head(c)} ({variant})',
                 f'📊 {_fr(e["score"], 1)} AA · {_fr(e["real_cost"], 3)} $/tâche',
                 f'📈 remplacerait {cur_name}' + (f' ({_fr(e["current_score"], 1)} AA)' if e.get("current_score") else ""),
                 _why(e)]
@@ -432,14 +434,14 @@ def _block(conn, a: dict) -> list[str]:
         c = catalog.card(conn, a["subject"], task["interface"] if task else "chat")
         drops = " ; ".join(f'{_short_board(d["board"].replace(":", " "))} {d["before"]:.0f} → {d["after"]:.0f}'
                            for d in e["drops"][:3])
-        return [f'📉 {n} · Dégradation — {c["name"]} ({e["active_as"]}, {task["label"] if task else a["task"]})',
+        return [f'📉 Dégradation — {c["name"]} ({e["active_as"]}, {task["label"] if task else a["task"]})',
                 f'   {drops}', '→ le routeur réévalue au prochain cycle']
     if a["kind"] == "pareto":
         model_id, _, variant = a["subject"].partition("/")
         c = catalog.card(conn, model_id, "chat")
-        return [f'💸 {n} · Entre dans la frontière de Pareto (texte)', f'{_head(c)} ({variant})',
+        return [f'💸 Entre dans la frontière de Pareto (texte)', f'{_head(c)} ({variant})',
                 f'📊 {_fr(e["score"], 1)} AA · {_fr(e["real_cost"], 3)} $/tâche', _why(e)]
-    return [f'• {n} · {a["kind"]} {a["subject"]}']
+    return [f'• {a["kind"]} {a["subject"]}']
 
 
 def _group_key(conn, a: dict) -> tuple:
@@ -449,29 +451,78 @@ def _group_key(conn, a: dict) -> tuple:
     return ("challenger", a["subject"], iface and iface["interface"])
 
 
-def _challenger_group(conn, group: list[dict]) -> list[str]:
-    """One block for one new model that beats several of Monsieur's choices (roles, t2v and i2v…)."""
-    a0 = group[0]
-    n = a0.get("ref") or a0["alert_id"]
-    task = conn.execute("select interface, modes from models.tasks where task = %s", (a0["task"],)).fetchone()
-    c = catalog.card(conn, a0["subject"], task["interface"], task["modes"])
-    beats: dict[str, list[str]] = {}
-    gains: dict[str, str] = {}
-    for a in group:
-        e = a["evidence"]
-        pinned = catalog.card(conn, e["pinned"], task["interface"], task["modes"])["name"]
-        label = conn.execute("select label from models.tasks where task = %s", (a["task"],)).fetchone()["label"]
-        role = {"default": "défaut"}.get(e.get("role"), ROLE_LABELS.get(e.get("role"), e.get("role")))
-        beats.setdefault(pinned, []).append(f"{label.lower()}, {role}")
-        best = max(e["boards"].items(), key=lambda kv: kv[1]["delta"])
-        gains.setdefault(pinned, f'+{best[1]["delta"]:.0f} {_short_board(best[0])} (#{best[1]["rank"]})')
-    lines = [f'🆕 {n} · {_head(c)}', _money_line(c), "📈 dépasse :"]
-    lines += [f'   • {p} ({" ; ".join(sorted(set(r)))}) — {gains[p]}' for p, r in beats.items()]
-    lines += [_why(a0["evidence"])]
+BOARD_TASKS = {"text_to_video": "vidéo depuis texte", "image_to_video": "animation d'image", "text_to_image": "image",
+               "image_edit": "retouche d'image", "tts": "voix", "music": "musique", "text": "texte",
+               "text_coding": "code", "webdev": "web", "3d": "3D", "frontend": "front-end", "decision": "décision", "intelligence": "intelligence"}
+
+
+def _board_fr(key: str) -> str:
+    """'Arena text_to_video' -> 'Arena vidéo depuis texte'."""
+    source, _, task = key.partition(" ")
+    return f"{source} {BOARD_TASKS.get(task, task.replace('_', ' '))}".strip()
+
+
+def _modes_fr(modes: list[str]) -> str:
+    return ", ".join(media.MODE_LABELS.get(m, m) for m in ("t2i", "i2i", "t2v", "i2v", "r2v", "v2v") if m in modes)
+
+
+def _origin(e: dict) -> str | None:
+    """'nouveau chez kie' -> 'Nouveau chez Kie'."""
+    why = [str(w) for w in e.get("why") or []]
+    if not why:
+        return None
+    out = "; ".join(why[:2])
+    for k, v in catalog.PROVIDERS.items():
+        out = out.replace(f"chez {k}", f"chez {v}")
+    out = re.sub(r"nouveau sur (\w+):(\w+)", lambda m: "nouveau au classement "
+                 + _board_fr(f"{catalog.BOARDS.get(m.group(1), m.group(1))} {m.group(2)}"), out)
+    return out[:1].upper() + out[1:]
+
+
+def _price_lines(c: dict, current: dict | None = None) -> list[str]:
+    """One line per resolution with its cheapest provider, then the current model's entry price."""
+    items = [(r, v) for r, v in c["prices"].items() if r] or list(c["prices"].items())
+    if not items:
+        return [f"💰 {catalog.price_text(c)}"]
+    unit = catalog.UNIT_SHORT.get(items[0][1]["unit"] or "", "$")
+    per = {"$/s": "Prix par seconde", "$/img": "Prix par image"}.get(unit, f"Prix ({unit})")
+    lines = [f"💰 {per}"]
+    lines += [f"• {r or 'standard'} : {catalog.money(v['price'])} $ — {catalog.PROVIDERS.get(v['provider'], v['provider'])}"
+              for r, v in items[:5]]
+    if c["audio"] == [False, True]:
+        lines.append("  son en option")
+    if current and current["prices"]:
+        lo = min(v["price"] for v in current["prices"].values())
+        lines.append(f"• Actuel, {current['name']} : dès {catalog.money(lo)} $")
     return lines
 
 
-def render(alerts: list[dict], conn=None) -> str:
+def _challenger_group(conn, group: list[dict]) -> list[str]:
+    """One block for one new model that beats one or several of Monsieur's choices (Monsieur, 2026-10-14:
+    no reference numbers, one fact per line)."""
+    a0 = group[0]
+    task = conn.execute("select interface, modes from models.tasks where task = %s", (a0["task"],)).fetchone()
+    c = catalog.card(conn, a0["subject"], task["interface"], task["modes"])
+    origin = next((o for o in (_origin(a["evidence"]) for a in group) if o), None)
+    lines = [f'{catalog.icon(c)} {c["name"]}', " · ".join(x for x in (origin, _modes_fr(c["modes"])) if x),
+             "", "🏆 Meilleur que ton choix actuel"]
+    current, merged = None, {}
+    for a in group:   # same task, same current model, same gain: one line with all the roles
+        e = a["evidence"]
+        pinned = catalog.card(conn, e["pinned"], task["interface"], task["modes"])
+        current = current or pinned
+        label = conn.execute("select label from models.tasks where task = %s", (a["task"],)).fetchone()["label"]
+        best = max(e["boards"].items(), key=lambda kv: kv[1]["delta"])
+        rank = "1er" if best[1]["rank"] == 1 else f'{best[1]["rank"]}e'
+        key = (label, pinned["name"], f'{rank} sur {_board_fr(best[0])}, +{best[1]["delta"]:.0f} points')
+        merged.setdefault(key, []).append(ROLE_LABELS.get(e.get("role"), e.get("role") or ""))
+    for (label, pinned_name, gain), roles in merged.items():
+        roles = [r for r in roles if r]
+        lines += [f'• {label}{f" ({", ".join(roles)})" if roles else ""} — remplacerait {pinned_name}', f"  {gain}"]
+    return lines + [""] + _price_lines(c, current)
+
+
+def render(alerts: list[dict], conn=None, typed: bool = False) -> str:
     """One airy block per piece of news (Monsieur, 2026-10-04): what it is, its price, what it beats, why now."""
     groups: dict[tuple, list[dict]] = {}
     for a in alerts:
@@ -479,10 +530,12 @@ def render(alerts: list[dict], conn=None) -> str:
     blocks = []
     for key, group in groups.items():
         lines = _challenger_group(conn, group) if key[0] == "challenger" else _block(conn, group[0])
-        blocks.append("\n".join(x for x in lines if x))
+        if typed:   # no buttons (fallback): the short number to answer with
+            n = group[0].get("ref") or group[0]["alert_id"]
+            lines.append(f"→ « adopter {n} » ou « ignorer {n} »")
+        blocks.append("\n".join(x for x in lines if x is not None).strip())
     day = datetime.now(timezone.utc).strftime("%d/%m")
-    return (f"Walter Router — nouveautés du {day}\n\n" + "\n\n".join(blocks)
-            + "\n\nRéponds avec les boutons (ou « adopter N » / « ignorer N »).")
+    return f"Walter Router — nouveautés du {day}\n\n" + "\n\n━━━━━━━━━━\n\n".join(blocks)
 
 
 # Buttons (Monsieur, 2026-10-14): one row per piece of news; the Hermes plugin walter-router handles the clicks
@@ -502,13 +555,34 @@ def keyboard(conn, alerts: list[dict]) -> list[list[dict]]:
     for group in groups.values():
         a0 = group[0]
         n = a0.get("ref") or a0["alert_id"]
-        rows.append([{"text": f"{label} · {n}", "callback_data": f"wr:{code}:{n}"}
+        rows.append([{"text": _button_text(conn, a0, label, code), "callback_data": f"wr:{code}:{n}"}
                      for label, code in BUTTONS.get(a0["kind"], (("✖️ Ignorer", "d"),))])
         roles = sorted({a.get("role") or "" for a in group} - {""})
         if a0["kind"] == "challenger" and len(roles) > 1:   # one model beating several roles: adopt one role only
-            rows.append([{"text": f"✅ {n} · {ROLE_LABELS.get(r, r)}"[:40], "callback_data": f"wr:a:{n}:{r}"[:64]}
+            rows.append([{"text": f"✅ Seulement {ROLE_LABELS.get(r, r)}"[:40], "callback_data": f"wr:a:{n}:{r}"[:64]}
                          for r in roles][:4])
     return rows
+
+
+def _name(conn, model_id: str | None) -> str:
+    if not model_id or conn is None:
+        return model_id or ""
+    row = conn.execute("select coalesce(display_name, model_id) as n from models.canonical where model_id = %s",
+                       (model_id,)).fetchone()
+    return row["n"] if row else model_id
+
+
+def _button_text(conn, a: dict, label: str, code: str) -> str:
+    """'✅ Passer à Grok Imagine Video 1.5' / '✖️ Garder MiniMax H3' (names, not numbers: several news per message)."""
+    e = a.get("evidence") or {}
+    if a["kind"] in ("challenger", "tier"):
+        if code == "a":
+            return f"✅ Passer à {_name(conn, (a.get('subject') or '').partition('/')[0])}"[:48]
+        cur = e.get("pinned") or (e.get("current") or "").partition("/")[0]
+        return f"✖️ Garder {_name(conn, cur)}"[:48] if cur else label
+    if a["kind"] == "new_best" and code == "d" and e.get("previous_name"):
+        return f"↩️ Garder {e['previous_name']}"[:48]
+    return f"{label} · {_name(conn, (a.get('subject') or '').partition('/')[0])}".rstrip(" ·")[:48]
 
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
@@ -582,7 +656,8 @@ def notify(conn, dry_run: bool = False) -> dict:
     try:
         send_with_buttons(text, keyboard(conn, alerts))
     except Exception as exc:  # noqa: BLE001 — text-only fallback (typed answers still work)
-        out = subprocess.run([str(HERMES), "send", "-t", "telegram", text], capture_output=True, text=True, timeout=120)
+        out = subprocess.run([str(HERMES), "send", "-t", "telegram", render(alerts, conn, typed=True)],
+                             capture_output=True, text=True, timeout=120)
         if out.returncode != 0:
             return {"sent": 0, "error": f"buttons: {exc}; text: {(out.stderr or out.stdout)[-300:]}"}
     ids = [a["alert_id"] for a in alerts]
