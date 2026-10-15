@@ -1,0 +1,11 @@
+{
+ "base_sha": "5fac1128d766c4713ef6f57958df4a98ed077dbf87eff233e7a90a848bee5588",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-15T20:13:44.633957+00:00",
+ "domain": "devops",
+ "kind": "patch",
+ "reason": "Outdated, proven 2026-10-15: (1) says the Beeper API does not serve media and SSH is required — false, connectors/beeper.py fetches bytes via POST /v1/assets/download + GET /v1/assets/serve; (2) omits that media are already in the Raw Vault (core.objects + core.object_links; core.events.object_refs empty for Beeper), which led an agent to wrongly report 9 videos as missing; (3) ssh mac alias pointed at localhost:2222, occupied by the VM's own sshd since 2026-06-01 -> now direct Tailscale 100.127.150.1:22, tested OK; (4) adds view-once/reel recovery facts.",
+ "runtime": "claude_code",
+ "session_id": null,
+ "target": "beeper-messages"
+}
