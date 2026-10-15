@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-15T04:12:18.373128+00:00",
+ "description": "Use when changing W.Alter’s shared identity, communication rules, or generated personality profiles across Hermes, Claude Code, Codex, MCP and voice.",
+ "domain": "agent-configuration",
+ "kind": "new",
+ "reason": "The session established a distinct maintenance procedure for the new shared soul module: canonical sources versus generated profiles, sync/check across five outputs, technician versus W.Alter session scope, and a separately embedded voice constraint. Moving the global sentence limit into the Telegram supplement also exposed an obsolete CLI exception that needed removal. Existing listed skills do not specifically cover this cross-runtime identity workflow. [session claude_code/vm/148d4c3a-e5ae-4c9b-aff0-37da881c3d1d]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/148d4c3a-e5ae-4c9b-aff0-37da881c3d1d",
+ "target": "walter-soul-maintenance"
+}
