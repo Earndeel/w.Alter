@@ -87,7 +87,7 @@ PHRASES = {
     "par mois": "per month", "estimé, à calibrer": "estimated, to calibrate", "estimé": "estimated", "réel": "real",
     "non lu": "not read", "7 jours glissants": "rolling 7 days",
     "Capacité du forfait utilisé à 100 %": "Plan capacity at 100 % use", "× le prix": "× the price",
-    "Tokens par mois": "Tokens per month", "Tous les modèles du forfait": "Every model of the plan",
+    "Tokens par mois": "Tokens per month", "Forfait entier": "Whole plan",
     "Notre mesure": "Our measurement", " points de compteur": " meter points",
     "en cours : il faut 3 points de compteur dans une même semaine": "in progress: needs 3 meter points within one week",
     "à calibrer avec le pourcentage hebdomadaire affiché par claude.ai": "to calibrate with the weekly percentage shown by claude.ai",

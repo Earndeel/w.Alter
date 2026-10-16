@@ -173,19 +173,19 @@ def _subscriptions(conn) -> tuple[str, int]:
             nonlocal first
             mult = "—" if multiple is None else f"{multiple:g} ×".replace(".", ",")
             cap_rows.append(
-                f'<tr><td class="model">{esc(s["name"]) if first else ""}</td><td>{model}</td><td>{source}{note}</td>'
+                f'<tr><td class="model nw">{esc(s["name"]) if first else ""}</td><td class="nw">{model}</td><td>{source}{note}</td>'
                 f'<td class="num">{_usd(value)}</td><td class="num">{mult}</td>'
                 f'<td class="num">{_tok(tokens)}</td><td class="num strong">{_usd(per_m)}</td></tr>')
             first = False
         mine = s["measured_capacity"]
         if mine:
-            row("Tous les modèles du forfait", "Notre mesure", mine["month_usd"], mine["multiple"], None, None,
+            row("Forfait entier", "Notre mesure", mine["month_usd"], mine["multiple"], None, None,
                 f'<div class="mute small">{mine["points"]:.0f} points de compteur</div>')
         elif s["id"] == "openai-plus":
-            row("Tous les modèles du forfait", "Notre mesure", None, None, None, None,
+            row("Forfait entier", "Notre mesure", None, None, None, None,
                 '<div class="mute small">en cours : il faut 3 points de compteur dans une même semaine</div>')
         else:
-            row("Tous les modèles du forfait", "Notre mesure", None, None, None, None,
+            row("Forfait entier", "Notre mesure", None, None, None, None,
                 '<div class="mute small">à calibrer avec le pourcentage hebdomadaire affiché par claude.ai</div>')
         for v in s["semianalysis"]:
             row(esc(_name(conn, v["model_id"])), "SemiAnalysis", v["usd_month"], v["multiple"], v["tokens_month"],
@@ -399,7 +399,7 @@ if(want&&want!==here){{location.replace((want==='fr'?'/fr/':'/')+location.hash);
 document.querySelectorAll('.lang a').forEach(a=>a.addEventListener('click',()=>localStorage.setItem('walterLang',a.dataset.lang)))}})();
 const links=document.querySelectorAll('nav a[data-tab]'),panes=document.querySelectorAll('.pane'),q=document.getElementById('q'),
 d=document.getElementById('diff');let cur='home';
-function show(t){{cur=t;links.forEach(a=>a.classList.toggle('on',a.dataset.tab===t));panes.forEach(p=>p.hidden=p.dataset.pane!==t);filter()}}
+function show(t){{cur=t;links.forEach(a=>{{a.classList.toggle('on',a.dataset.tab===t);if(a.dataset.tab===t)a.scrollIntoView({{block:'nearest',inline:'nearest'}})}});panes.forEach(p=>p.hidden=p.dataset.pane!==t);filter()}}
 function filter(){{const s=(q.value||'').trim().toLowerCase();if((s||d.checked)&&cur==='home'){{show(d.checked?'video':'chat');return}}
 document.querySelectorAll('tbody tr[data-search]').forEach(r=>r.classList.toggle('hide',!((!s||(r.dataset.search+' '+r.textContent.toLowerCase()).includes(s))&&(!d.checked||r.dataset.differs==='1'))))}}
 links.forEach(a=>a.onclick=e=>{{e.preventDefault();show(a.dataset.tab);history.replaceState(null,'','#'+a.dataset.tab)}});

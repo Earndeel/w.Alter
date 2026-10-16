@@ -1,4 +1,4 @@
-"""Subscription meters on the Walter bus: after agent turns, re-read the meter of the subscription that turn used.
+"""Subscription meters on the Walter bus (information only): after agent turns, re-read the meter of the plan that turn used.
 
 Runs with the walter-memory interpreter (it owns the bus lib): `walter-router-quota.service`. A burst of turns gives
 one reading (settle), each meter at most every MIN_AGE_S; an idle sweep every 30 min catches weekly resets and usage
