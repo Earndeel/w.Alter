@@ -112,7 +112,7 @@ Ordre de priorité ✅ :
 4. Texte général → **niveau** L1 / L2 / L3 (méthode de Monsieur, `docs/TIERS.md`).
 5. Tâche spécialisée → **n°1** du score pondéré multi-benchmarks (pas de n°2/n°3).
 
-Puis **routes d'exécution** ✅ : abonnement Codex (tant que son quota le permet, §Abonnements) → Kie (si disponible et ≤ 1,25 × OpenRouter) → OpenRouter ;
+Puis **routes d'exécution** ✅ : abonnement Codex → Kie (si disponible et ≤ 1,25 × OpenRouter) → OpenRouter ;
 fournisseur en panne au dernier test ou peu fiable dans le journal → relégué ; repli déclaré (L3 → Astra xhigh via
 Codex ; tâche spécialisée → meilleur modèle de la tâche accessible par abonnement).
 
@@ -268,10 +268,8 @@ Bouton « Lancer le cycle complet » : /api/run → router-control.walter-ai.clo
 `walter-router-control` (127.0.0.1:8896, HMAC) → `walter-router-refresh.service`. Refus si un cycle tourne ou a démarré
 il y a moins de 10 minutes.
 
-## Abonnements (2026-10-14)
-Déclarés par Monsieur dans `config/subscriptions.json` : ChatGPT Plus (20 $, exécutable par Hermes via Codex) et
-Claude Pro (20 $, interactif seulement : Claude Code). Compteurs lus après chaque tour d'agent (bus Walter,
-`walter-router-quota`) : Codex = valeur réelle de l'API d'usage ; Claude Pro = estimation depuis les transcriptions
-Claude Code, calibrable avec le % affiché par claude.ai. Effet sur les routes : abonnement d'abord sous 85 %, après les
-routes payantes de 85 à 98 % (le reste est gardé pour la conversation Hermes), en dernier au-delà. Valeur de chaque
-forfait au prix API (SemiAnalysis, Wokey, InventiveHQ) gardée avec date et source : `walter-router subscriptions`.
+## Abonnements (2026-10-14) — information seulement
+Déclarés par Monsieur dans `config/subscriptions.json` : ChatGPT Plus (20 $, via Codex) et Claude Pro (20 $, Claude
+Code). Onglet 💳 de la bibliothèque, deux sources seulement : notre mesure (compteur hebdo réel pour ChatGPT, estimé
+pour Claude ; tokens réellement consommés valorisés au prix API ; capacité mesurée par point de compteur) et les
+valeurs publiées par SemiAnalysis. Aucun effet sur le routage ni sur les niveaux.
