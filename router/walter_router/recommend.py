@@ -74,7 +74,10 @@ def facts(conn, alert: dict, new: dict, cur: dict) -> dict:
                                         cur["name"]: evals.get(cur["model_id"], {}).get("tasks", "non testé")},
             "secours_en_place": "Mercury Decide (gratuit, OpenRouter) puis Clef (Workers AI, allocation gratuite)",
             "contexte": "Monsieur décide lui-même de chaque changement (boutons Telegram). Le router ne change jamais "
-                        "de modèle seul. Il préfère les choix Pareto à coût réel (gratuit = 0 $)."}
+                        "de modèle seul. Il préfère les choix Pareto à coût réel (gratuit = 0 $). Phase de construction "
+                        "(2026-10) : il passe surtout par Claude Code, pas par Hermes ; le faible volume mesuré via Hermes "
+                        "ne reflète pas l'usage à venir — raisonne sur la qualité, la vitesse et le coût par décision "
+                        "plutôt que sur ce volume."}
 
 
 def fallback_text(new: dict, cur: dict) -> str:
