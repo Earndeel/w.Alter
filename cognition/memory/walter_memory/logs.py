@@ -366,7 +366,24 @@ def parse_claude(w: Writer, d: dict, ref: str, st: dict) -> None:
           data={"injected": True, "origin": origin} if injected else None)
 
 
+CODEX_INJECTED = ("# AGENTS.md instructions", "<environment_context>", "<user_instructions>", "<app-context>",
+                  "<INSTRUCTIONS>", "<turn_aborted>")
+
+
+def _codex_seen(st: dict, role: str, text: str) -> bool:
+    """Old rollouts write a message twice (response_item message + event_msg user/agent_message): keep it once."""
+    import hashlib
+    key = role + ":" + hashlib.sha1(text.strip().encode()).hexdigest()[:16]
+    seen = st.setdefault("seen", [])
+    if key in seen:
+        return True
+    st["seen"] = (seen + [key])[-60:]
+    return False
+
+
 def parse_codex(w: Writer, d: dict, ref: str, st: dict) -> None:
+    """Codex rollouts, CLI and Desktop formats (2026-10-16: Codex Desktop writes messages only as response_item
+    messages, reasoning as response_item reasoning — mostly encrypted, sometimes with a summary)."""
     kind, p = d.get("type"), d.get("payload") or {}
     ts = _ts(d.get("timestamp") or p.get("timestamp"))
     if kind == "session_meta":
@@ -381,18 +398,43 @@ def parse_codex(w: Writer, d: dict, ref: str, st: dict) -> None:
     if sid not in w.sess:
         w.session(sid, runtime="codex", native_id=st["sid"])
     ptype, model = p.get("type"), st.get("model")
-    if kind == "turn_context":
-        if p.get("model") != st.get("model"):
-            st["model"] = p.get("model")
-            w.session(sid, runtime="codex", native_id=st["sid"], model=p.get("model"))
-        w.add(sid, "model/selection", ts, ref, model=p.get("model"),
-              data={"effort": p.get("effort"), "approval_policy": p.get("approval_policy"), "cwd": p.get("cwd")})
+    if kind == "turn_context" or (kind == "event_msg" and ptype == "thread_settings_applied"):
+        m = p.get("model") or (p.get("thread_settings") or {}).get("model")
+        if m and m != st.get("model"):
+            st["model"] = m
+            w.session(sid, runtime="codex", native_id=st["sid"], model=m)
+        if kind == "turn_context":
+            w.add(sid, "model/selection", ts, ref, model=m,
+                  data={"effort": p.get("effort"), "approval_policy": p.get("approval_policy"), "cwd": p.get("cwd")})
     elif kind == "event_msg" and ptype == "user_message":
-        w.add(sid, "user/message", ts, ref, text=p.get("message"), human=True)
+        if not _codex_seen(st, "user", p.get("message") or ""):
+            w.add(sid, "user/message", ts, ref, text=p.get("message"), human=True)
     elif kind == "event_msg" and ptype == "agent_message":
-        w.add(sid, "assistant/message", ts, ref, text=p.get("message"), model=model)
+        if not _codex_seen(st, "assistant", p.get("message") or ""):
+            w.add(sid, "assistant/message", ts, ref, text=p.get("message"), model=model)
+    elif kind == "response_item" and ptype == "message":
+        role, text = p.get("role"), _text(p.get("content")).strip()
+        if not text:
+            return
+        if role == "assistant":
+            if not _codex_seen(st, "assistant", text):
+                w.add(sid, "assistant/message", ts, ref, text=text, model=model)
+        elif role == "user":
+            injected = text.startswith(CODEX_INJECTED)
+            if injected or not _codex_seen(st, "user", text):
+                w.add(sid, "user/message", ts, ref, text=text, human=not injected,
+                      data={"injected": True} if injected else None)
+        else:   # developer / system context
+            w.add(sid, "developer/message", ts, ref, text=text, data={"role": role})
     elif kind == "event_msg" and ptype in ("agent_reasoning", "agent_reasoning_raw_content"):
         w.add(sid, "assistant/reasoning", ts, ref, text=p.get("text"), model=model)
+    elif kind == "response_item" and ptype == "reasoning":
+        summary = "\n".join(x.get("text", "") for x in p.get("summary") or [] if isinstance(x, dict)).strip()
+        if summary and not _codex_seen(st, "reasoning", summary):
+            w.add(sid, "assistant/reasoning", ts, ref, text=summary, model=model)
+        elif not summary:
+            w.add(sid, "assistant/reasoning", ts, ref, model=model,
+                  data={"encrypted": bool(p.get("encrypted_content")), "bytes": len(p.get("encrypted_content") or "")})
     elif kind == "event_msg" and ptype == "token_count":
         w.add(sid, "step/end", ts, ref, model=model, data={"usage": p.get("info")})
     elif kind == "response_item" and ptype in ("function_call", "custom_tool_call", "local_shell_call"):

@@ -111,3 +111,24 @@ def test_masked_password_does_not_retrigger_detector():
     masked = L.mask("mot de passe: Hunter2024")
     assert ("secret", "password_stmt") in privacy.detect(masked)          # the raw detector would fire
     assert not privacy.detect(L._MASKED.sub("", masked))                   # what classify() actually checks
+
+
+def test_codex_desktop_format_messages_and_encrypted_reasoning():
+    """Codex Desktop (2026-10): messages only as response_item messages; injected AGENTS.md; encrypted reasoning."""
+    w, st = FakeWriter(), {}
+    lines = [
+        {"type": "session_meta", "timestamp": TS, "payload": {"id": "d1", "originator": "Codex Desktop"}},
+        {"type": "response_item", "timestamp": TS, "payload": {"type": "message", "role": "user",
+                                                               "content": [{"type": "input_text", "text": "# AGENTS.md instructions\n..."}]}},
+        {"type": "response_item", "timestamp": TS, "payload": {"type": "message", "role": "user",
+                                                               "content": [{"type": "input_text", "text": "Calcule mon usage"}]}},
+        {"type": "response_item", "timestamp": TS, "payload": {"type": "reasoning", "summary": [], "encrypted_content": "gAAA"}},
+        {"type": "response_item", "timestamp": TS, "payload": {"type": "message", "role": "assistant",
+                                                               "content": [{"type": "output_text", "text": "Voici."}]}},
+        {"type": "event_msg", "timestamp": TS, "payload": {"type": "agent_message", "message": "Voici."}},   # duplicate
+    ]
+    for i, d in enumerate(lines):
+        L.parse_codex(w, d, f"o{i}", st)
+    assert [e["type"] for e in w.events] == ["user/message", "user/message", "assistant/reasoning", "assistant/message"]
+    assert w.events[0]["data"] == {"injected": True} and w.events[1]["turn"] == 1
+    assert w.events[2]["data"]["encrypted"] is True
