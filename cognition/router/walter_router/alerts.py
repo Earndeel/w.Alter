@@ -513,47 +513,35 @@ def _block(conn, a: dict) -> list[str]:
     return [f'• {a["kind"]} {a["subject"]}']
 
 
+SHORT_TASK = {"decision": "Routage d’intention", "decision_vision": "Décision avec image"}
+
+
 def _decision_block(conn, a: dict, task: dict) -> list[str]:
-    """Decision model news (Monsieur, 2026-10-16): intelligence, speed and price side by side with the model it
-    replaces, real price, and where it stands on the 3-axis Pareto frontier."""
+    """Decision model proposal, short (Monsieur, 2026-10-16: « trop gros, des informations inutiles »): who replaces
+    whom, the three axes side by side, a one-line verdict. Buttons do the rest."""
     from . import decision_pareto as dp
     e = a["evidence"]
     pts = dp.points(conn, task["modes"])
     by = {p["model_id"]: p for p in pts}
     new, cur = by.get(a["subject"]), by.get(e.get("previous") or e.get("pinned"))
-    title = f'🧭 {task["label"]} — nouveau n°1 proposé'
-    keep = cur["name"] if cur else _name(conn, e.get("previous") or e.get("pinned"))
-    if not new:
-        return [title, f'• {_name(conn, a["subject"])}', _why(e)]
+    label = SHORT_TASK.get(a["task"], task["label"])
+    if not new or not cur:
+        return [f'🧭 {label} : {_name(conn, a["subject"])} proposé']
+
     def fr(x, d=1):
         return f"{x:.{d}f}".replace(".", ",")
-    lines = [title, f'{new["name"]}' + (" · lit les images" if new["images"] else ""),
-             f"Le router garde {keep} tant que tu ne valides pas.", ""]
-    if cur:
-        lines += [f'Intelligence  {fr(new["index"])} contre {fr(cur["index"])} ({cur["name"]})',
-                  f'Vitesse       {new["ms"]:.0f} ms contre {cur["ms"]:.0f} ms',
-                  f'Prix          {fr(new["cost"])} $ contre {fr(cur["cost"])} $ par million de tâches']
+    lines = [f'🧭 {label} : {new["name"]} proposé à la place de {cur["name"]}',
+             f'Intelligence {fr(new["index"])} vs {fr(cur["index"])} · vitesse {new["ms"]:.0f} vs {cur["ms"]:.0f} ms'
+             f' · prix {fr(new["cost"])} vs {fr(cur["cost"])} $/M tâches']
+    if dp.dominates(new, cur):
+        lines.append("✔ Meilleur sur les 3 axes")
     else:
-        lines += [f'Intelligence  {fr(new["index"])}', f'Vitesse       {new["ms"]:.0f} ms',
-                  f'Prix          {fr(new["cost"])} $ par million de tâches']
-    if new["price_in_1m"] is not None:
-        lines.append(f'Tarif réel    OpenRouter {catalog.money(new["price_in_1m"])} $ par M tokens d’entrée')
-    v = dp.verdict(new, cur, pts)
-    lines.append("")
-    if v["beats_current_all"]:
-        lines.append(f'🏁 Pareto : domine {cur["name"]} sur les trois axes')
-    elif v["on_frontier"]:
-        lines.append("🏁 Pareto : sur la frontière (aucun modèle meilleur sur les trois axes à la fois)")
-    else:
-        lines.append(f'🏁 Pareto : hors frontière, dominé par {", ".join(p["name"] for p in v["dominated_by"][:3])}')
-    others = [p for p in v["frontier"] if p["model_id"] != new["model_id"]]
-    if others:
-        lines += ["", "Autres modèles sur la frontière (intelligence · vitesse · prix) :"]
-        lines += [f'• {p["name"]} — {fr(p["index"])} · {p["ms"]:.0f} ms · {fr(p["cost"])} $'
-                  + (f' ({p["free"]})' if p.get("free") else "") for p in others[:6]]
-    origin = _origin(e)
-    if origin:
-        lines += ["", f"🔎 {origin}"]
+        good = [w for w, ok in (("plus intelligent", new["index"] > cur["index"]), ("plus rapide", new["ms"] < cur["ms"]),
+                                ("moins cher", new["cost"] < cur["cost"])) if ok]
+        bad = [w for w, ko in ((f'{fr(new["cost"] / cur["cost"])}× plus cher', new["cost"] > cur["cost"]),
+                               (f'{fr(new["ms"] / cur["ms"])}× plus lent', new["ms"] > cur["ms"]),
+                               ("moins intelligent", new["index"] < cur["index"])) if ko]
+        lines.append("⚖ " + ", ".join(good).capitalize() + (", mais " + ", ".join(bad) if bad else ""))
     return lines
 
 
@@ -687,7 +675,7 @@ def render_each(alerts: list[dict], conn=None, typed: bool = False) -> list[str]
         if typed:
             n = group[0].get("ref") or group[0]["alert_id"]
             lines.append(f"→ « adopter {n} » ou « ignorer {n} »")
-        out.append(f"Walter Router — {day}\n\n" + "\n".join(x for x in lines if x is not None).strip())
+        out.append("\n".join(x for x in lines if x is not None).strip())
     return out
 
 
