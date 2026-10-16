@@ -530,9 +530,10 @@ def _decision_block(conn, a: dict, task: dict) -> list[str]:
 
     def fr(x, d=1):
         return f"{x:.{d}f}".replace(".", ",")
-    lines = [f'🧭 {label} : {new["name"]} proposé à la place de {cur["name"]}',
-             f'Intelligence {fr(new["index"])} vs {fr(cur["index"])} · vitesse {new["ms"]:.0f} vs {cur["ms"]:.0f} ms'
-             f' · prix {fr(new["cost"])} vs {fr(cur["cost"])} $/M tâches']
+    lines = [f'🧭 {label}', f'{new["name"]} proposé à la place de {cur["name"]}', "",
+             f'🧠 Intelligence : {fr(new["index"])} vs {fr(cur["index"])}',
+             f'⚡ Vitesse : {new["ms"]:.0f} ms vs {cur["ms"]:.0f} ms',
+             f'💰 Prix : {fr(new["cost"])} $ vs {fr(cur["cost"])} $ (par million de tâches)', ""]
     if dp.dominates(new, cur):
         lines.append("✔ Meilleur sur les 3 axes")
     else:
@@ -675,7 +676,7 @@ def render_each(alerts: list[dict], conn=None, typed: bool = False) -> list[str]
         if typed:
             n = group[0].get("ref") or group[0]["alert_id"]
             lines.append(f"→ « adopter {n} » ou « ignorer {n} »")
-        out.append("\n".join(x for x in lines if x is not None).strip())
+        out.append(f"W.Alter Router — {day}\n\n" + "\n".join(x for x in lines if x is not None).strip())
     return out
 
 
