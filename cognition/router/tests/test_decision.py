@@ -33,3 +33,14 @@ def test_rows_identities_and_costs():
 
 def test_namespace_registered():
     assert "aa_decision" in identity.BENCHMARK_NAMESPACES
+
+
+def test_pareto_three_axes():
+    from walter_router import decision_pareto as dp
+    a = {"model_id": "a", "index": 65, "ms": 93, "cost": 31.8}
+    b = {"model_id": "b", "index": 57.5, "ms": 127, "cost": 41.5}
+    c = {"model_id": "c", "index": 52, "ms": 500, "cost": 15}
+    assert dp.dominates(a, b) and not dp.dominates(a, c) and not dp.dominates(c, a)
+    assert [p["model_id"] for p in dp.frontier([a, b, c])] == ["a", "c"]
+    v = dp.verdict(a, b, [a, b, c])
+    assert v["beats_current_all"] and v["on_frontier"] and [p["model_id"] for p in v["dominates"]] == ["b"]

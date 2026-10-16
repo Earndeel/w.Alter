@@ -17,7 +17,7 @@ from . import catalog, select as sel
 
 esc = html.escape
 TABS = [("home", "🏠", "Vue d'ensemble"), ("chat", "💬", "Texte"), ("image", "🖼️", "Image"), ("video", "🎬", "Vidéo"),
-        ("audio", "🎧", "Audio & musique"), ("decisions", "🧭", "Décision")]
+        ("audio", "🎧", "Audio & musique"), ("decisions", "🧭", "Décision"), ("subs", "💳", "Abonnements")]
 TAB_OF = {"chat": "chat", "image": "image", "video": "video", "audio": "audio", "music": "audio", "decisions": "decisions"}
 LEVELS = {"L1": ("Économique", "Quotidien : réponses courtes, résumés, petites rédactions"),
           "L2": ("Intermédiaire", "Analyse en plusieurs étapes, comparaison, rédaction soignée"),
@@ -127,6 +127,100 @@ def _table(rs: list[dict]) -> str:
     return f'<div class="tw"><table class="lib">{head}<tbody>{"".join(body)}</tbody></table></div>'
 
 
+def _tok(n: float | None) -> str:
+    if not n:
+        return "—"
+    return f"{n / 1e9:.2f} Md".replace(".", ",") if n >= 1e9 else f"{n / 1e6:.0f} M"
+
+
+def _usd(x: float | None) -> str:
+    return "—" if x is None else (f"{x:,.0f} $".replace(",", " ") if x >= 100 else f"{catalog.money(x)} $")
+
+
+def _subscriptions(conn) -> tuple[str, int]:
+    """Subscriptions pane (information only): our measurement on Monsieur's account + SemiAnalysis' plan values."""
+    from . import subscriptions
+    from .library import _name
+    try:
+        subs = subscriptions.state(conn)
+        semi = subscriptions.doc()["semianalysis"]
+    except Exception as exc:  # noqa: BLE001 — the page must still publish
+        return f'<p class="notice">Abonnements indisponibles : {esc(type(exc).__name__)}</p>', 0
+    usage_rows, cap_rows = [], []
+    for s in subs:
+        m, u = s["meter"], s["usage_7d"]
+        if not m:
+            meter, reset = '<span class="mute">non lu</span>', "—"
+        elif m["estimated"]:
+            meter = (f'≈ {m["used_percent"]:.0f} %<div class="mute small">estimé'
+                     + ("" if m["calibrated"] else ", à calibrer") + "</div>")
+            reset = '<span class="mute">7 jours glissants</span>'
+        else:
+            meter = f'{m["used_percent"]:.0f} %<div class="mute small">réel</div>'
+            reset = m["resets_at"].astimezone(timezone.utc).strftime("%d/%m/%Y, %H:%M UTC") if m["resets_at"] else "—"
+        cached = u["tokens"]["cache_read"] / u["total_tokens"] * 100 if u["total_tokens"] else None
+        usage_rows.append(
+            f'<tr><td class="model">{esc(s["name"])}<div class="mute small">{esc(s["vendor"])}</div></td>'
+            f'<td class="num">{s["price_usd_month"]} $<div class="mute small">par mois</div></td>'
+            f'<td>{esc(s["execution"])}</td><td class="num">{meter}</td><td class="nw">{reset}</td>'
+            f'<td class="num">{_tok(u["total_tokens"])}</td>'
+            f'<td class="num">{"—" if cached is None else f"{cached:.0f} %"}</td>'
+            f'<td class="num">{_usd(u["api_value_usd"])}</td>'
+            f'<td class="num strong">{_usd(s["usd_per_m_at_pace"])}</td></tr>')
+        first = True
+
+        def row(model: str, source: str, value, multiple, tokens, per_m, note: str = "") -> None:
+            nonlocal first
+            mult = "—" if multiple is None else f"{multiple:g} ×".replace(".", ",")
+            cap_rows.append(
+                f'<tr><td class="model">{esc(s["name"]) if first else ""}</td><td>{model}</td><td>{source}{note}</td>'
+                f'<td class="num">{_usd(value)}</td><td class="num">{mult}</td>'
+                f'<td class="num">{_tok(tokens)}</td><td class="num strong">{_usd(per_m)}</td></tr>')
+            first = False
+        mine = s["measured_capacity"]
+        if mine:
+            row("Tous les modèles du forfait", "Notre mesure", mine["month_usd"], mine["multiple"], None, None,
+                f'<div class="mute small">{mine["points"]:.0f} points de compteur</div>')
+        elif s["id"] == "openai-plus":
+            row("Tous les modèles du forfait", "Notre mesure", None, None, None, None,
+                '<div class="mute small">en cours : il faut 3 points de compteur dans une même semaine</div>')
+        else:
+            row("Tous les modèles du forfait", "Notre mesure", None, None, None, None,
+                '<div class="mute small">à calibrer avec le pourcentage hebdomadaire affiché par claude.ai</div>')
+        for v in s["semianalysis"]:
+            row(esc(_name(conn, v["model_id"])), "SemiAnalysis", v["usd_month"], v["multiple"], v["tokens_month"],
+                v["usd_per_m_full"])
+        for model, why in s["excluded"].items():
+            row(esc(_name(conn, model)), '<span class="mute">—</span>', None, None, None, None,
+                f'<div class="mute small">{esc(EXCLUDED.get(why, why))}</div>')
+    share = f'{semi["workload_mix"]["cache_read"] * 100:.1f}'.replace(".", ",")
+    date = semi["date"]
+    return (
+        '<h2>💳 Abonnements</h2><p class="dek">Ce que tes forfaits valent au prix API : notre mesure sur ton compte et '
+        'les chiffres publiés par SemiAnalysis. Information seulement, le routage ne change pas.</p>'
+        '<h3>Compteur et consommation des 7 derniers jours</h3>'
+        '<div class="tw"><table><thead><tr><th>Abonnement</th><th class="num">Prix</th><th>Utilisé par</th>'
+        '<th class="num">Compteur hebdo</th><th>Remise à zéro</th><th class="num">Tokens</th>'
+        '<th class="num">Lus en cache</th><th class="num">Valeur API</th><th class="num">Coût du million à ton rythme</th>'
+        f'</tr></thead><tbody>{"".join(usage_rows)}</tbody></table></div>'
+        '<h3 class="block">Capacité du forfait utilisé à 100 %</h3>'
+        '<div class="tw"><table><thead><tr><th>Abonnement</th><th>Modèle</th><th>Source</th>'
+        '<th class="num">Valeur API par mois</th><th class="num">× le prix</th><th class="num">Tokens par mois</th>'
+        f'<th class="num">Coût du million</th></tr></thead><tbody>{"".join(cap_rows)}</tbody></table></div>'
+        '<p class="mute small note">Valeur API = tokens réellement consommés, au prix catalogue de l’éditeur. '
+        'Tokens vus sur la VM : Hermes et Codex pour ChatGPT Plus, Claude Code pour Claude Pro. '
+        'Coût du million à ton rythme = prix de la semaine ÷ tokens de la semaine. '
+        'Notre mesure ChatGPT = valeur API consommée entre deux lectures du compteur ÷ points gagnés, ramenée à 100 % '
+        '(un plancher : l’usage hors de la VM fait monter le compteur sans tokens vus ici). '
+        'Compteur Claude estimé = entrée + écriture en cache + 5 × sortie, lectures en cache gratuites, sur une capacité '
+        'tirée de SemiAnalysis tant qu’il n’est pas calibré. '
+        f'SemiAnalysis, rapport du {date} : valeur du forfait entièrement utilisé, sur un usage agentique de {share} % '
+        'de lectures en cache ; tokens par mois = valeur ÷ prix moyen du million sur ce mélange.</p>'), len(subs)
+
+
+EXCLUDED = {"not included in Pro (usage credits at API price)": "non inclus dans Pro (crédits payés au prix API)"}
+
+
 def render(conn, rs: list[dict], ctx: dict) -> str:
     from .library import _name
     from .alerts import _board_fr
@@ -184,10 +278,13 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
     down = ctx.get("down") or []
     down_txt = "; ".join(_board_fr(f'{catalog.BOARDS.get(d["subject"].split(":")[0], d["subject"].split(":")[0])} '
                                    f'{d["subject"].partition(":")[2]}') for d in down)
+    subs_html, n_subs = _subscriptions(conn)
     nav = "".join(f'<a href="#{k}" data-tab="{k}"{" class=on" if k == "home" else ""}><span class="ic">{i}</span>{n}'
-                  + (f'<span class="ct">{len(panes[k])}</span>' if k != "home" else "") + "</a>" for k, i, n in TABS)
+                  + (f'<span class="ct">{n_subs if k == "subs" else len(panes[k])}</span>' if k != "home" else "")
+                  + "</a>" for k, i, n in TABS)
     tab_html = "".join(f'<section class="pane" data-pane="{k}" hidden><h2>{i} {n}</h2>{_table(panes[k])}</section>'
-                       for k, i, n in TABS if k != "home")
+                       for k, i, n in TABS if k not in ("home", "subs"))
+    tab_html += f'<section class="pane" data-pane="subs" hidden>{subs_html}</section>'
     generated = datetime.now(timezone.utc).strftime("%d/%m/%Y, %H:%M UTC")
     return f"""<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -253,7 +350,8 @@ figcaption i{{display:inline-block;width:8px;height:8px;border-radius:50%;margin
 .k1{{background:var(--pt)}}.k2{{background:var(--c1)}}.k3{{background:var(--c2)}}
 .tip{{position:absolute;display:none;pointer-events:none;background:var(--paper);border:1px solid var(--rule2);padding:6px 9px;
 font-size:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.08)}}
-.block{{margin-top:44px}}[hidden]{{display:none!important}}.hide{{display:none!important}}
+.block{{margin-top:44px}}h3{{font:600 15px/1.3 Georgia,"Times New Roman",serif;margin:18px 0 8px}}h3.block{{margin-top:36px}}
+.note{{max-width:900px;margin-top:18px;line-height:1.6}}[hidden]{{display:none!important}}.hide{{display:none!important}}
 footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;padding:16px 0 40px;line-height:1.6}}
 .lang{{margin-top:14px;font-size:13px}}.lang a{{color:var(--ink2);text-decoration:none;padding:2px 0}}.lang a:hover{{color:var(--ink)}}
 .lang a.on{{color:var(--ink);font-weight:600;border-bottom:1px solid var(--ink)}}.lang .sep{{margin:0 8px;color:var(--mute)}}

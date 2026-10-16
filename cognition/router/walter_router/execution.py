@@ -10,7 +10,7 @@ import time
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from . import collect, subscriptions
+from . import collect
 from . import select as sel
 
 # walter-router provider -> Hermes provider (config.yaml / built-in). Kie has one Hermes provider per protocol:
@@ -42,8 +42,6 @@ def _runnable(offer: dict) -> tuple[str, str, str] | None:
 # Monsieur's fallback order (2026-10-02): subscription (Codex) first, then Kie if available and not dearer than
 # OpenRouter by more than KIE_MAX_PREMIUM, then OpenRouter as the last resort. Arnict (unrestricted) ranks with Kie.
 PROVIDER_RANK = {"kie": 1, "kie-codex": 1, "arnict": 1, "openrouter": 3}
-# A subscription route by quota status (subscriptions.py): reserve → after the paid routes, exhausted → last.
-QUOTA_RANK = {"ok": 0, "unknown": 0, "reserve": 3.8, "exhausted": 9}
 KIE_MAX_PREMIUM = 1.25
 UNRELIABLE_MIN_RUNS, UNRELIABLE_FAIL_RATE, RELIABILITY_DAYS = 3, 0.5, 14
 
@@ -59,9 +57,8 @@ def reliability(conn, provider: str, model: str) -> dict:
 
 
 def routes(conn, model_id: str, variant: str = "", preferred: str | None = None) -> list[dict]:
-    """Every way Hermes can run this chat model, in Monsieur's order: subscription (while its quota lasts), Kie (if
-    not much dearer), OpenRouter last. Providers whose last probe failed, or that failed most recent real runs, go to
-    the end."""
+    """Every way Hermes can run this chat model, in Monsieur's order: subscription, Kie (if not much dearer),
+    OpenRouter last. Providers whose last probe failed, or that failed most recent real runs, go to the end."""
     snaps = sel.latest_snapshots(conn)
     status = {r["provider"]: r for r in conn.execute("select * from models.provider_status")}
     out = []
@@ -75,15 +72,13 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None)
         out.append({"provider": o["provider"], "hermes_provider": hp, "model": model,
                     "reasoning": REASONING.get(variant), "access": o["access"],
                     "blended_1m": sel.blended(o), "probe_ok": None if st is None else st["ok"],
-                    "unreliable": rel["unreliable"], "recent_runs": rel["runs"], "recent_failures": rel["failed"],
-                    **({"quota": subscriptions.route_status(conn, o["provider"])} if o["access"] == "subscription"
-                       else {})})
+                    "unreliable": rel["unreliable"], "recent_runs": rel["runs"], "recent_failures": rel["failed"]})
     or_price = min((r["blended_1m"] for r in out if r["hermes_provider"] == "openrouter" and r["blended_1m"]),
                    default=None)
 
     def rank(r: dict) -> float:
         if r["access"] == "subscription":
-            return QUOTA_RANK.get(r["quota"]["status"], 0)
+            return 0
         base = PROVIDER_RANK.get(r["hermes_provider"], 2)
         if base == 1 and r["provider"] == "kie" and or_price and r["blended_1m"] and \
                 r["blended_1m"] > or_price * KIE_MAX_PREMIUM:

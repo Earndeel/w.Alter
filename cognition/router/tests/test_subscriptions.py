@@ -3,75 +3,62 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-import pytest
+from walter_router import subscriptions
 
-from walter_router import db, execution, subscriptions
-
-POLICY = {"reserve_percent": 85, "exhausted_percent": 98}
 NOW = datetime(2026, 10, 14, 18, 0, tzinfo=timezone.utc)
-
-
-@pytest.fixture
-def conn():
-    with db.connect() as c:
-        yield c
-        c.rollback()
-
-
-@pytest.mark.parametrize("used,status", [(17, "ok"), (84.9, "ok"), (85, "reserve"), (97, "reserve"), (98, "exhausted")])
-def test_classify_thresholds(used, status):
-    w = [{"used_percent": used, "resets_at": NOW + timedelta(days=2), "source": "codex_usage_api", "age_s": 30}]
-    assert subscriptions.classify(w, POLICY, NOW)["status"] == status
-
-
-def test_classify_takes_the_fullest_window_and_ignores_a_passed_reset():
-    w = [{"used_percent": 99, "resets_at": NOW - timedelta(minutes=1), "source": "codex_usage_api", "age_s": 30},
-         {"used_percent": 40, "resets_at": NOW + timedelta(days=3), "source": "codex_usage_api", "age_s": 30}]
-    assert subscriptions.classify(w, POLICY, NOW) == {"status": "ok", "used_percent": 40.0}
-
-
-def test_classify_without_fresh_reading_is_unknown():
-    w = [{"used_percent": 99, "resets_at": None, "source": "codex_usage_api", "age_s": 7 * 3600}]
-    assert subscriptions.classify(w, POLICY, NOW)["status"] == "unknown"
-    assert subscriptions.classify([], POLICY, NOW)["status"] == "unknown"
+ROW = dict.fromkeys(subscriptions.KINDS, 0)
 
 
 def test_units_ignore_cache_reads_and_weight_output():
     weights = {"input": 1, "cache_write": 1, "cache_read": 0, "output": 5}
-    usage = {"input_tokens": 10, "cache_creation_input_tokens": 1000, "cache_read_input_tokens": 10 ** 9,
-             "output_tokens": 200}
-    assert subscriptions.units(usage, weights) == 10 + 1000 + 1000
+    row = {**ROW, "input": 10, "cache_write": 600, "cache_write_1h": 400, "cache_read": 10 ** 9, "output": 200}
+    assert subscriptions.units(row, weights) == 10 + 1000 + 1000
 
 
-def test_claude_estimate_dedupes_calls_and_keeps_plan_models(tmp_path):
-    def line(ts, mid, model, out):
+def test_claude_code_usage_dedupes_calls_and_splits_cache_writes(tmp_path):
+    def line(ts, mid, model, **usage):
         return json.dumps({"type": "assistant", "timestamp": ts, "requestId": f"r{mid}",
-                           "message": {"id": mid, "model": model, "usage": {"output_tokens": out}}})
-    recent = (NOW - timedelta(days=1)).isoformat()
-    old = (NOW - timedelta(days=8)).isoformat()
-    (tmp_path / "a.jsonl").write_text("\n".join([line(recent, 1, "claude-opus-5-5", 100),
-                                                 line(recent, 1, "claude-opus-5-5", 100),   # same call twice
-                                                 line(recent, 2, "claude-fable-5-1", 100),  # not in the plan
-                                                 line(old, 3, "claude-opus-5-5", 100)]))     # outside 7 days
-    weights = {"input": 1, "cache_write": 1, "cache_read": 0, "output": 5}
-    got = subscriptions.claude_units(NOW - timedelta(days=7), weights, ["claude-opus-5-5"], root=tmp_path)
-    assert (got["units"], got["calls"]) == (500, 1)
+                           "message": {"id": mid, "model": model, "usage": usage}})
+    recent, old = (NOW - timedelta(days=1)).isoformat(), (NOW - timedelta(days=8)).isoformat()
+    w = {"cache_creation_input_tokens": 100, "cache_creation": {"ephemeral_1h_input_tokens": 70}}
+    (tmp_path / "a.jsonl").write_text("\n".join([
+        line(recent, 1, "claude-opus-5-5", output_tokens=10, **w),
+        line(recent, 1, "claude-opus-5-5", output_tokens=10, **w),   # same call logged twice
+        line(old, 2, "claude-opus-5-5", output_tokens=10)]))          # outside the window
+    got = subscriptions.claude_code_usage(NOW - timedelta(days=7), root=tmp_path)
+    assert got == {"claude-opus-5-5": {**ROW, "output": 10, "cache_write": 30, "cache_write_1h": 70}}
 
 
-def test_values_give_what_monsieur_pays_per_api_dollar():
-    sub = {"price_usd_month": 20, "plan_values": [{"model_id": "m", "usd_month": 200}]}
-    assert subscriptions.values(sub)[0]["pays_per_api_dollar"] == 0.1
+def test_codex_cli_usage_takes_the_last_cumulative_count_and_splits_cached(tmp_path):
+    def tc(inp, cached, out):
+        return json.dumps({"type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {
+            "input_tokens": inp, "cached_input_tokens": cached, "cache_write_input_tokens": 0, "output_tokens": out}}}})
+    (tmp_path / "s.jsonl").write_text("\n".join([json.dumps({"type": "turn_context", "payload": {"model": "gpt-6.1-sol"}}),
+                                                 tc(100, 80, 5), tc(300, 250, 9)]))
+    got = subscriptions.codex_cli_usage(None, root=tmp_path)
+    assert got == {"gpt-6-1-sol": {**ROW, "input": 50, "cache_read": 250, "output": 9}}
 
 
-@pytest.mark.parametrize("status,first", [("ok", "openai-codex"), ("reserve", "kie-codex"),
-                                          ("exhausted", "kie-codex")])
-def test_routes_follow_the_quota(conn, monkeypatch, status, first):
-    monkeypatch.setattr(subscriptions, "route_status",
-                        lambda c, p: {"status": status, "used_percent": None, "sub_id": "openai-plus"})
-    rs = execution.routes(conn, "gpt-6-1-sol", "medium")
-    assert rs and rs[0]["hermes_provider"] == first
-    sub = [r for r in rs if r["access"] == "subscription"]
-    if status == "exhausted":
-        assert rs[-1]["access"] == "subscription"
-    elif status == "reserve":  # after the paid routes, but kept
-        assert sub and rs.index(sub[0]) > 0
+def test_priced_values_known_models_and_lists_the_others():
+    prices = {"m": {"input": 2, "output": 10, "cache_read": 0.1, "cache_write": 2.5, "cache_write_1h": 4}}
+    acc = {"m": {**ROW, "input": 1e6, "output": 1e6, "cache_read": 1e7}, "x": {**ROW, "output": 5}}
+    got = subscriptions.priced(acc, prices)
+    assert got["api_value_usd"] == 13.0 and got["unpriced_models"] == ["x"] and got["total_tokens"] == 12e6 + 5
+
+
+def test_blended_price_on_semianalysis_mix_matches_their_opus_figure():
+    opus = {"input": 4, "output": 20, "cache_read": 0.2, "cache_write": 5, "cache_write_1h": 8}
+    mix = {"cache_read": 0.966, "cache_write": 0.026, "input": 0.004, "output": 0.003}
+    assert abs(subscriptions.blended(opus, mix) - 0.399) < 0.001   # OrcaRouter's 0.399 $/M on the same mix
+
+
+def test_measured_point_value_needs_three_points_in_one_week():
+    reset = NOW + timedelta(days=3)
+
+    def r(pct, value, hours, resets=reset):
+        return {"used_percent": pct, "resets_at": resets, "read_at": NOW + timedelta(hours=hours),
+                "detail": {"cumulative_api_value_usd": value}}
+    assert subscriptions.measured_point_value([r(17, 100, 0), r(19, 104, 1)]) is None
+    got = subscriptions.measured_point_value([r(17, 100, 0), r(18, 101, 1), r(21, 110, 2),
+                                              r(2, 300, 3, resets=reset + timedelta(days=7))])
+    assert got["points"] == 4 and got["usd_per_point"] == 2.5 and got["week_usd"] == 250
