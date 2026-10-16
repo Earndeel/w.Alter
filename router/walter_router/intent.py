@@ -35,8 +35,13 @@ def chain(conn) -> tuple[str, ...]:
       best_first  best, then the free fallbacks (Mercury Decide free, Clef on Workers AI)
       free_first  the free models first, the best last (Monsieur's choice of 2026-10-04: Clef, free allocation)"""
     order = (json.loads(KNOWLEDGE.read_text()).get("decision") or {}).get("order", "free_first")
-    row = conn.execute("""select offer_key from models.selection where run_id = (select run_id from models.latest_run)
-                          and task = 'decision' and rank = 1""").fetchone()
+    # Monsieur's pinned decision model first (a new #1 is only proposed, 2026-10-16), else the cycle's #1
+    row = conn.execute("""select o.offer_key from models.preferences p join models.offers o on o.model_id = p.pinned_model_id
+                          join models.latest_snapshots s using (snapshot_id)
+                          where p.task = 'decision' and p.role = 'default' and o.interface = 'decisions'
+                          order by o.price_in_1m nulls last limit 1""").fetchone() or \
+        conn.execute("""select offer_key from models.selection where run_id = (select run_id from models.latest_run)
+                        and task = 'decision' and rank = 1""").fetchone()
     best = row["offer_key"] if row and row["offer_key"] else MODEL
     seq = (best, *FREE_FALLBACKS) if order == "best_first" else (*FREE_FALLBACKS[::-1], best)
     return tuple(dict.fromkeys(seq))

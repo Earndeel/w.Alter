@@ -131,16 +131,22 @@ def test_new_best_for_a_specialised_task_is_the_only_kind_of_news(conn):
                         values (%s, 'coding', 'best', %s, %s, %s, %s)""", (new_run, rank, mid, mid, q))
     conn.execute("delete from models.preferences where task = 'coding'")
     assert alerts.new_best(conn, new_run, {"new": {}, "nerf": {}, "price_drop": {}}) == []  # unchanged: silent
+    # …but never a silent switch (2026-10-16): the model in use is pinned until Monsieur decides
+    assert conn.execute("select pinned_model_id from models.preferences where task = 'coding'").fetchone()[
+        "pinned_model_id"] == old
+    conn.execute("delete from models.preferences where task = 'coding'")
     conn.execute("delete from models.alerts where kind = 'new_best' and subject = 'zz-newcomer'")
     news = {"new": {"zz-newcomer": ["nouveau sur arena:text_coding"]}, "nerf": {}, "price_drop": {}}
     assert alerts.new_best(conn, new_run, news) == ["coding:zz-newcomer"]
     pend = alerts.pending(conn)
     assert {a["kind"] for a in pend} - {"board_down"} <= {"challenger", "tier", "new_best"}   # + outages (2026-10-14)
     a = next(a for a in pend if a["kind"] == "new_best")
-    assert "dépasse" in alerts.render([a], conn)
-    alerts.verdict(conn, a["alert_id"], "dismissed")  # « ignorer » keeps the previous #1 pinned
+    assert "proposé" in alerts.render([a], conn)
     assert conn.execute("select pinned_model_id from models.preferences where task = 'coding'").fetchone()[
-        "pinned_model_id"] == old
+        "pinned_model_id"] == old                       # proposed, not switched
+    alerts.verdict(conn, a["alert_id"], "adopted")      # « Passer au nouveau » pins the newcomer
+    assert conn.execute("select pinned_model_id from models.preferences where task = 'coding'").fetchone()[
+        "pinned_model_id"] == "zz-newcomer"
 
 
 def test_unrestricted_pick_uses_an_unrestricted_model(conn):

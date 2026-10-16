@@ -56,8 +56,9 @@ def _order(rows: list[dict]) -> list[str]:
 
 
 def new_best(conn, run_id: int, chg: dict | None = None) -> list[str]:
-    """Specialised tasks use their #1 automatically. When a run's #1 differs from the previous run's #1 and scores
-    higher, Monsieur gets one line (the router already uses it; « ignorer N » keeps the previous one pinned)."""
+    """A new #1 for a specialised task is only PROPOSED (Monsieur, 2026-10-16: « je dois toujours appuyer sur le
+    bouton pour confirmer les changements de modèle »): the model in use is pinned at once, the message brings the
+    facts, and only his « Passer à … » button switches."""
     prev = conn.execute("""select run_id from models.runs where status = 'ok' and run_id < %s
                            order by run_id desc limit 1""", (run_id,)).fetchone()
     if not prev:
@@ -85,6 +86,9 @@ def new_best(conn, run_id: int, chg: dict | None = None) -> list[str]:
         ev = {"task_label": r["label"], "interface": r["interface"], "name": r["display_name"], "score": r["quality"],
               "previous": r["old_id"], "previous_name": r["old_name"], "previous_score": old_q and old_q["quality"],
               "why": why}
+        from .choose import set_preference
+        set_preference(conn, r["task"], pin=r["old_id"], watch="quality",
+                       note=f'Gardé en attendant la décision de Monsieur (proposition : {r["new_id"]}).')
         if _upsert(conn, "new_best", r["task"], r["new_id"], ev, "open" if why else "baseline") and why:
             created.append(f'{r["task"]}:{r["new_id"]}')
     return created
@@ -473,7 +477,8 @@ def _block(conn, a: dict) -> list[str]:
         return _decision_block(conn, a, task)
     if a["kind"] == "new_best":
         c = catalog.card(conn, a["subject"], task["interface"], task["modes"])
-        return [f'🆕 {task["label"]} — nouveau n°1, utilisé désormais', _head(c), _money_line(c),
+        return [f'🆕 {task["label"]} — nouveau n°1 proposé', _head(c), _money_line(c),
+                f'Le router garde {e["previous_name"]} tant que tu ne valides pas.',
                 f'📈 dépasse {e["previous_name"]} : {e["score"]:.0f} vs {e["previous_score"] or 0:.0f}', _why(e)]
     if a["kind"] == "tier":
         model_id, _, variant = a["subject"].partition("/")
@@ -516,13 +521,14 @@ def _decision_block(conn, a: dict, task: dict) -> list[str]:
     pts = dp.points(conn, task["modes"])
     by = {p["model_id"]: p for p in pts}
     new, cur = by.get(a["subject"]), by.get(e.get("previous") or e.get("pinned"))
-    title = (f'🧭 {task["label"]} — nouveau n°1, utilisé désormais' if a["kind"] == "new_best"
-             else f'🧭 {task["label"]} — meilleur que ton choix')
+    title = f'🧭 {task["label"]} — nouveau n°1 proposé'
+    keep = cur["name"] if cur else _name(conn, e.get("previous") or e.get("pinned"))
     if not new:
         return [title, f'• {_name(conn, a["subject"])}', _why(e)]
     def fr(x, d=1):
         return f"{x:.{d}f}".replace(".", ",")
-    lines = [title, f'{new["name"]}' + (" · lit les images" if new["images"] else ""), ""]
+    lines = [title, f'{new["name"]}' + (" · lit les images" if new["images"] else ""),
+             f"Le router garde {keep} tant que tu ne valides pas.", ""]
     if cur:
         lines += [f'Intelligence  {fr(new["index"])} contre {fr(cur["index"])} ({cur["name"]})',
                   f'Vitesse       {new["ms"]:.0f} ms contre {cur["ms"]:.0f} ms',
@@ -689,7 +695,7 @@ def render_each(alerts: list[dict], conn=None, typed: bool = False) -> list[str]
 # (callback data 'wr:<a|d>:<ref>[:<role>]' → `walter-router verdict`).
 BUTTONS = {"challenger": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d")),
            "tier": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d")),
-           "new_best": (("👍 OK", "a"), ("↩️ Garder l'ancien", "d")),
+           "new_best": (("✅ Passer au nouveau", "a"), ("✖️ Garder l'actuel", "d")),
            "pareto": (("👍 Noté", "a"), ("✖️ Ignorer", "d")),
            "nerf": (("👁️ Masquer", "d"),),
            "board_down": (("👁️ Vu", "d"),)}
@@ -723,10 +729,10 @@ def _name(conn, model_id: str | None) -> str:
 def _button_text(conn, a: dict, label: str, code: str) -> str:
     """'✅ Passer à Grok Imagine Video 1.5' / '✖️ Garder MiniMax H3' (names, not numbers: several news per message)."""
     e = a.get("evidence") or {}
-    if a["kind"] in ("challenger", "tier"):
+    if a["kind"] in ("challenger", "tier", "new_best"):
         if code == "a":
             return f"✅ Passer à {_name(conn, (a.get('subject') or '').partition('/')[0])}"[:48]
-        cur = e.get("pinned") or (e.get("current") or "").partition("/")[0]
+        cur = e.get("pinned") or e.get("previous") or (e.get("current") or "").partition("/")[0]
         return f"✖️ Garder {_name(conn, cur)}"[:48] if cur else label
     if a["kind"] == "new_best" and code == "d" and e.get("previous_name"):
         return f"↩️ Garder {e['previous_name']}"[:48]
@@ -841,6 +847,11 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
                      (decision, note, alert_id)).fetchone()
     if not a:
         raise KeyError(alert_id)
+    if a["kind"] == "new_best" and decision == "adopted":
+        from .choose import set_preference
+        set_preference(conn, a["task"], pin=a["subject"], watch="quality",
+                       note=f"Adopté par Monsieur (alerte {alert_id}).")
+        return {"alert_id": alert_id, "status": decision, "pinned": a["subject"]}
     if a["kind"] == "new_best" and decision == "dismissed":
         from .choose import set_preference
         set_preference(conn, a["task"], pin=a["evidence"]["previous"], watch="quality",
