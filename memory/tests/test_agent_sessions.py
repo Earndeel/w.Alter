@@ -45,3 +45,16 @@ def test_codex_exec_is_attributed_to_delegator():
     evs = A.parse_codex({"type": "response_item", "timestamp": TS, "payload": {"type": "function_call_output", "call_id": "k",
                                                                                "output": "x" * 50}}, 30, st)
     assert evs[0]["payload"]["tool"] == "shell" and evs[0]["payload"]["output_chars"] == 50
+
+
+def test_codex_desktop_messages_reach_core_events():
+    st = {}
+    A.parse_codex({"type": "session_meta", "payload": {"id": "d1", "originator": "Codex Desktop"}}, 0, st)
+    out = A.parse_codex({"type": "response_item", "timestamp": TS, "payload": {"type": "message", "role": "user",
+                         "content": [{"type": "input_text", "text": "Calcule mon usage"}]}}, 1, st)
+    assert [e["event_type"] for e in out] == ["message.sent"]
+    out = A.parse_codex({"type": "response_item", "timestamp": TS, "payload": {"type": "message", "role": "assistant",
+                         "content": [{"type": "output_text", "text": "Voici."}]}}, 2, st)
+    assert out[0]["event_type"] == "message.received"
+    assert A.parse_codex({"type": "event_msg", "timestamp": TS, "payload": {"type": "agent_message", "message": "Voici."}},
+                         3, st) == []   # same answer, older duplicate channel

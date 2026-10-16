@@ -127,6 +127,20 @@ def parse_claude(d: dict, offset: int, st: dict) -> list[dict]:
     return out
 
 
+CODEX_INJECTED = ("# AGENTS.md instructions", "<environment_context>", "<user_instructions>", "<app-context>",
+                  "<INSTRUCTIONS>", "<turn_aborted>")
+
+
+def _seen(st: dict, role: str, text: str) -> bool:
+    import hashlib
+    key = role + ":" + hashlib.sha1(text.strip().encode()).hexdigest()[:16]
+    seen = st.setdefault("seen", [])
+    if key in seen:
+        return True
+    st["seen"] = (seen + [key])[-60:]
+    return False
+
+
 def parse_codex(d: dict, offset: int, st: dict) -> list[dict]:
     """One Codex rollout line. st: sid, originator, model, last_user, pending function calls."""
     kind, p, ts = d.get("type"), d.get("payload") or {}, d.get("timestamp")
@@ -145,10 +159,28 @@ def parse_codex(d: dict, offset: int, st: dict) -> list[dict]:
         return [{**base, "event_type": "conversation.started", "source_id": f"session:{sid}:start", "actor": agent,
                  "payload": {"platform": "codex", "model": None, "title": None, "parent_session_id": None,
                              "originator": st.get("originator"), "cwd": st.get("cwd"), "cli_version": p.get("cli_version")}}]
-    if kind == "turn_context":
-        st["model"] = p.get("model") or st.get("model")
+    if kind == "turn_context" or (kind == "event_msg" and p.get("type") == "thread_settings_applied"):
+        st["model"] = p.get("model") or (p.get("thread_settings") or {}).get("model") or st.get("model")
         return []
     ptype = p.get("type")
+    if kind == "response_item" and ptype == "message" and p.get("role") in ("user", "assistant"):
+        # Codex Desktop (2026-10) writes messages only here; older rollouts write them here AND as event_msg
+        text = _text(p.get("content")).strip()
+        if not text or text.startswith(CODEX_INJECTED) or _seen(st, p["role"], text):
+            return []
+        if p["role"] == "user":
+            st["last_user"] = f"msg:{ref}"
+            return [{**base, "event_type": "message.sent", "source_id": f"msg:{ref}", "content": text,
+                     "actor": {**(MONSIEUR if interactive else DELEGATOR), "account": base["source_account"]},
+                     "payload": {"chat": chat, "session_id": sid, "message_id": ref, "role": "user", "cwd": st.get("cwd"),
+                                 "automated": not interactive, "attachments": []}}]
+        return [{**base, "event_type": "message.received", "source_id": f"msg:{ref}", "content": text,
+                 "reply_to": st.get("last_user"), "actor": agent,
+                 "payload": {"chat": chat, "session_id": sid, "message_id": ref, "role": "assistant",
+                             "model": st.get("model"), "attachments": []}}]
+    if kind == "event_msg" and ptype in ("user_message", "agent_message") and \
+            _seen(st, "user" if ptype == "user_message" else "assistant", p.get("message") or ""):
+        return []
     if kind == "event_msg" and ptype == "user_message" and (p.get("message") or "").strip():
         st["last_user"] = f"msg:{ref}"
         return [{**base, "event_type": "message.sent", "source_id": f"msg:{ref}", "content": p["message"].strip(),
