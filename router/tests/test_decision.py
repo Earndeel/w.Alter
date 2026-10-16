@@ -44,3 +44,12 @@ def test_pareto_three_axes():
     assert [p["model_id"] for p in dp.frontier([a, b, c])] == ["a", "c"]
     v = dp.verdict(a, b, [a, b, c])
     assert v["beats_current_all"] and v["on_frontier"] and [p["model_id"] for p in v["dominates"]] == ["b"]
+
+
+def test_fallback_recommendation_without_l1():
+    from walter_router import recommend
+    a = {"model_id": "a", "name": "A", "index": 65, "ms": 93, "cost": 31.8}
+    b = {"model_id": "b", "name": "B", "index": 57.5, "ms": 127, "cost": 41.5}
+    c = {"model_id": "c", "name": "C", "index": 53, "ms": 170, "cost": 16.5}
+    assert recommend.fallback_text(a, b).startswith("Passer à A")
+    assert recommend.fallback_text(a, c).startswith("Garder C")

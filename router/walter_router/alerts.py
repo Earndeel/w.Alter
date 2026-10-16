@@ -534,15 +534,8 @@ def _decision_block(conn, a: dict, task: dict) -> list[str]:
              f'🧠 Intelligence : {fr(new["index"])} vs {fr(cur["index"])}',
              f'⚡ Vitesse : {new["ms"]:.0f} ms vs {cur["ms"]:.0f} ms',
              f'💰 Prix : {fr(new["cost"])} $ vs {fr(cur["cost"])} $ (par million de tâches)', ""]
-    if dp.dominates(new, cur):
-        lines.append("✔ Meilleur sur les 3 axes")
-    else:
-        good = [w for w, ok in (("plus intelligent", new["index"] > cur["index"]), ("plus rapide", new["ms"] < cur["ms"]),
-                                ("moins cher", new["cost"] < cur["cost"])) if ok]
-        bad = [w for w, ko in ((f'{fr(new["cost"] / cur["cost"])}× plus cher', new["cost"] > cur["cost"]),
-                               (f'{fr(new["ms"] / cur["ms"])}× plus lent', new["ms"] > cur["ms"]),
-                               ("moins intelligent", new["index"] < cur["index"])) if ko]
-        lines.append("⚖ " + ", ".join(good).capitalize() + (", mais " + ", ".join(bad) if bad else ""))
+    from .recommend import recommendation   # written once by the router's L1 model from facts about the stack
+    lines.append(f"💡 {recommendation(conn, a, new, cur)}")
     return lines
 
 
