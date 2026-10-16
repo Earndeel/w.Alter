@@ -42,13 +42,18 @@ def card(conn, model_id: str, interface: str, modes: list[str] | None = None) ->
                               order by o.unit_price limit 1""", (model_id, interface)).fetchone()
         if raw:
             prices[""] = {"price": raw["unit_price"], "provider": raw["provider"], "unit": raw["unit"].strip().lower()}
+    price_in = row["price_in_1m"] if row else None
+    if interface == "decisions" and price_in is None:   # the catalog view prices chat only; decisions bill input tokens
+        p = conn.execute("""select min(o.price_in_1m) as p from models.offers o join models.latest_snapshots s
+                            using (snapshot_id) where o.model_id = %s and o.interface = 'decisions'""", (model_id,)).fetchone()
+        price_in = p["p"] if p else None
     return {"model_id": model_id, "interface": interface, "name": name["n"] if name else model_id,
             "modes": list(row["modes"]) if row else [], "providers": list(row["providers"]) if row else [],
             "released": row["released"] if row else None, "scores": row["scores"] if row else {},
             "prices": dict(sorted(prices.items(), key=lambda kv: media.resolution_rank(kv[0]))),
             "audio": sorted(a for a in audio if a is not None), "token_priced": token_priced,
             "content_policy": row["content_policy"] if row else "standard",
-            "price_in_1m": row["price_in_1m"] if row else None, "price_out_1m": row["price_out_1m"] if row else None,
+            "price_in_1m": price_in, "price_out_1m": row["price_out_1m"] if row else None,
             "subscriptions": list(row["subscriptions"]) if row and row["subscriptions"] else [],
             "open_weights": row["open_weights"] if row else None}
 
@@ -62,6 +67,8 @@ def money(x: float) -> str:
 
 
 def price_text(c: dict) -> str:
+    if c.get("interface") == "decisions" and c.get("price_in_1m") is not None:
+        return f'{money(c["price_in_1m"])} $ par M tokens d’entrée'
     if c.get("interface") == "chat" and c.get("price_in_1m") is not None:
         sub = " (inclus abonnement)" if c.get("subscriptions") else ""
         return f'{money(c["price_in_1m"])}/{money(c["price_out_1m"])} $ par M tokens{sub}'

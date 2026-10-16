@@ -109,14 +109,13 @@ def health() -> dict:
             issues.append("aucun dossier de tâche pour le dernier refresh réussi")
         providers = {r["provider"]: {"ok": r["ok"], "checked_at": r["checked_at"], "detail": r["detail"]}
                      for r in conn.execute("select * from models.provider_status")}
-        subs = subscriptions.state(conn)
+        subs = {r["sub_id"]: float(r["used_percent"]) for r in conn.execute(
+            """select sub_id, used_percent from models.latest_subscription_usage
+               where window_name = 'weekly' and source <> 'calibration'""")}
     warnings = [f'provider {p} indisponible au dernier test : {v["detail"][:100]}' for p, v in providers.items()
                 if not v["ok"]]
-    warnings += [f'abonnement {s["plan"]} : compteur non lu récemment' if s["status"] == "unknown" else
-                 f'abonnement {s["plan"]} : {s["used_percent"]:.0f} % utilisé ({s["status"]})'
-                 for s in subs if s["status"] != "ok"]
     return {"ok": not issues, "issues": issues, "warnings": warnings, "providers": providers,
-            "subscriptions": {s["id"]: {"status": s["status"], "used_percent": s["used_percent"]} for s in subs},
+            "subscriptions": subs,  # weekly % per plan, information only (no routing effect)
             "last_run": ok_run and {"run_id": ok_run["run_id"],
             "finished_at": ok_run["finished_at"]}, "sources_age_h": sources, "dossiers": dossiers}
 
@@ -153,13 +152,11 @@ def feedback(conn, model: str, rating: int, task: str | None, note: str | None) 
 
 def subscription_fallback(conn, task: str, exclude: str | None = None) -> dict | None:
     """Best model of the task (weighted composite) that the subscription (Codex) can run, with the reasoning level
-    measured on the task's primary board. None when that subscription's quota is spent."""
+    measured on the task's primary board."""
     from . import scoring
-    rows = conn.execute("""select distinct o.model_id, o.provider from models.offers o
-                           join models.latest_snapshots s using (snapshot_id)
-                           where o.access = 'subscription' and o.interface = 'chat'""").fetchall()
-    subs = {r["model_id"] for r in rows
-            if subscriptions.route_status(conn, r["provider"])["status"] != "exhausted"}
+    subs = {r["model_id"] for r in conn.execute("""select distinct o.model_id from models.offers o
+                                                  join models.latest_snapshots s using (snapshot_id)
+                                                  where o.access = 'subscription' and o.interface = 'chat'""")}
     for c in scoring.composite(conn, task):
         if c["model_id"] in subs and c["model_id"] != exclude:
             variants = [b["variant"] for b in c["boards"].values() if b.get("variant")]

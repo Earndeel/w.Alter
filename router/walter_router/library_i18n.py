@@ -75,6 +75,41 @@ PHRASES = {
         "AA does not test vision yet: ranked on the text index, among models that read images",
     "pas encore classée sur ce benchmark": "not ranked on this benchmark yet", "version supérieure de ": "newer version of ",
     "Arena retouche d'image": "Arena image editing",
+    # subscriptions tab
+    "Abonnements": "Subscriptions",
+    "Ce que tes forfaits valent au prix API : notre mesure sur ton compte et les chiffres publiés par SemiAnalysis. Information seulement, le routage ne change pas.":
+        "What your plans are worth at API prices: our measurement on your account and the figures published by "
+        "SemiAnalysis. Information only, routing is unchanged.",
+    "Compteur et consommation des 7 derniers jours": "Meter and usage over the last 7 days",
+    "Prix": "Price", "Utilisé par": "Used by", "Compteur hebdo": "Weekly meter", "Remise à zéro": "Resets", "Lus en cache": "Cache reads",
+    "Valeur API par mois": "API value per month", "Valeur API": "API value",
+    "Coût du million à ton rythme": "Cost per million at your pace", "Coût du million": "Cost per million",
+    "par mois": "per month", "estimé, à calibrer": "estimated, to calibrate", "estimé": "estimated", "réel": "real",
+    "non lu": "not read", "7 jours glissants": "rolling 7 days",
+    "Capacité du forfait utilisé à 100 %": "Plan capacity at 100 % use", "× le prix": "× the price",
+    "Tokens par mois": "Tokens per month", "Tous les modèles du forfait": "Every model of the plan",
+    "Notre mesure": "Our measurement", " points de compteur": " meter points",
+    "en cours : il faut 3 points de compteur dans une même semaine": "in progress: needs 3 meter points within one week",
+    "à calibrer avec le pourcentage hebdomadaire affiché par claude.ai": "to calibrate with the weekly percentage shown by claude.ai",
+    "non inclus dans Pro (crédits payés au prix API)": "not included in Pro (credits paid at API price)",
+    "Abonnements indisponibles : ": "Subscriptions unavailable: ",
+    "Valeur API = tokens réellement consommés, au prix catalogue de l’éditeur. ":
+        "API value = tokens actually used, at the vendor’s list price. ",
+    "Tokens vus sur la VM : Hermes et Codex pour ChatGPT Plus, Claude Code pour Claude Pro. ":
+        "Tokens seen on the VM: Hermes and Codex for ChatGPT Plus, Claude Code for Claude Pro. ",
+    "Coût du million à ton rythme = prix de la semaine ÷ tokens de la semaine. ":
+        "Cost per million at your pace = the week’s price ÷ the week’s tokens. ",
+    "Notre mesure ChatGPT = valeur API consommée entre deux lectures du compteur ÷ points gagnés, ramenée à 100 % (un plancher : l’usage hors de la VM fait monter le compteur sans tokens vus ici). ":
+        "Our ChatGPT measurement = API value used between two meter readings ÷ points gained, scaled to 100 % (a floor: "
+        "usage outside the VM moves the meter without tokens seen here). ",
+    "Compteur Claude estimé = entrée + écriture en cache + 5 × sortie, lectures en cache gratuites, sur une capacité tirée de SemiAnalysis tant qu’il n’est pas calibré. ":
+        "Estimated Claude meter = input + cache writes + 5 × output, cache reads free, over a capacity taken from "
+        "SemiAnalysis until it is calibrated. ",
+    "SemiAnalysis, rapport du ": "SemiAnalysis, report of ",
+    " : valeur du forfait entièrement utilisé, sur un usage agentique de ": ": value of the plan fully used, on an agentic workload with ",
+    " % de lectures en cache ; tokens par mois = valeur ÷ prix moyen du million sur ce mélange.":
+        " % cache reads; tokens per month = value ÷ average price per million on that mix.",
+    " Md": " B",
     # footer
     "Modèles suivis": "Models tracked",
     "Classements recalculés le ": "Leaderboards recomputed on ",
