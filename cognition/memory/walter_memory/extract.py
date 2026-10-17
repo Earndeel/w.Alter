@@ -10,7 +10,7 @@ import hashlib
 import json
 from datetime import timedelta
 
-from . import llm
+from . import llm, privacy
 from .db import connection
 
 PROCESSOR, VERSION = "l3.conversation_summary", "1"
@@ -68,15 +68,16 @@ def summarize_session(session_id: str, budget: str = "recurring") -> dict:
         tools = [r["tool"] for r in conn.execute("""select payload->>'tool' tool, count(*) from core.events
                     where source = 'hermes' and thread_id = %s and event_type = 'tool.called' group by 1 order by 2 desc limit 12""",
                                                  (session_id,)).fetchall()]
-        title = conn.execute("""select content from core.events where source = 'hermes' and thread_id = %s
+        title = conn.execute("""select content, privacy_class from core.events where source = 'hermes' and thread_id = %s
                                 and event_type = 'conversation.started'""", (session_id,)).fetchone()
     usable = [m for m in msgs if m["privacy_class"] != "local_only"]
     out = {"segments": 0, "items": 0, "cost_usd": 0.0}
     for si, seg in enumerate(_segments(usable)):
+        segment_class = privacy.strictest(*(m['privacy_class'] for m in seg))
         lines = [f"{i + 1}. [{'Monsieur' if m['event_type'] == 'message.sent' else 'W.Alter'} · {m['occurred_at']:%Y-%m-%d %H:%M}] "
                  f"{(m['content'] or '')[:4000]}" for i, m in enumerate(seg)]
         res = llm.chat([{"role": "user", "content": PROMPT.format(transcript="\n".join(lines), tools=", ".join(tools) or "aucun")}],
-                       model=MODEL, processor=PROCESSOR, processor_version=VERSION, privacy_class="cloud_allowed",
+                       model=MODEL, processor=PROCESSOR, processor_version=VERSION, privacy_class=segment_class,
                        budget=budget, purpose=f"session {session_id} segment {si}", response_format={"type": "json_object"},
                        reasoning={"effort": "low"}, max_tokens=6000)
         out["cost_usd"] += float(res["cost_usd"] or 0)
@@ -91,7 +92,7 @@ def summarize_session(session_id: str, budget: str = "recurring") -> dict:
                 "derived_by": PROCESSOR}
         rows = [{"kind": "summary", "content": data.get("summary") or "", "source_event_ids": ids,
                  "attributes": {"topics": data.get("topics") or [], "people": data.get("people") or [],
-                                "projects": data.get("projects") or [], "tools": tools, "title": title["content"] if title else None,
+                                "projects": data.get("projects") or [], "tools": tools, "title": title["content"] if title and title['privacy_class']=='cloud_allowed' else None,
                                 "segment": si, "from": str(seg[0]["occurred_at"]), "to": str(seg[-1]["occurred_at"])},
                  "ref": f"{session_id}:{si}:summary"}]
         for kind, key in (("decision", "decisions"), ("preference", "preferences"), ("fact", "facts"), ("open_loop", "open_loops")):
@@ -105,11 +106,11 @@ def summarize_session(session_id: str, budget: str = "recurring") -> dict:
                     continue
                 conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by, processor_version,
                                     model, prompt_hash, source_event_ids, source_refs, valid_from, privacy_class)
-                                values (%s,%s,%s,%s,%s,%s,%s,%s,%s::uuid[],%s,%s,'cloud_allowed')
+                                values (%s,%s,%s,%s,%s,%s,%s,%s,%s::uuid[],%s,%s,%s)
                                 on conflict (derived_by, (source_refs->>'ref')) where source_refs ? 'ref' do nothing""",
                              (r["kind"], r["content"], json.dumps(r["attributes"], ensure_ascii=False), base["status"],
                               base["derived_by"], VERSION, MODEL, PROMPT_HASH, r["source_event_ids"],
-                              json.dumps({"ref": r["ref"], "session": session_id}), seg[-1]["occurred_at"]))
+                              json.dumps({"ref": r["ref"], "session": session_id}), seg[-1]["occurred_at"],segment_class))
                 out["items"] += 1
         out["segments"] += 1
     return out
