@@ -166,11 +166,13 @@ def test_unlock_uses_password_environment_not_argv(tmp_path, monkeypatch):
         calls.append((argv, env))
         if argv[0] == 'age':
             return json.dumps({'services': {'bitwarden': {'master_password': FAKE}}})
+        if argv[:2] == ['bw', 'status']:
+            return json.dumps({'status':'locked'})
         return 'fake-session-token-not-live'
     monkeypatch.setattr(unlock, '_run', run)
     assert unlock.session() == 'fake-session-token-not-live'
     assert FAKE not in repr([c[0] for c in calls])
-    assert calls[1][1]['WALTER_BW_MASTER'] == FAKE
+    assert next(env for argv,env in calls if argv[:2] == ['bw','unlock'])['WALTER_BW_MASTER'] == FAKE
     assert cache.stat().st_mode & 0o777 == 0o600
 
 
@@ -194,3 +196,23 @@ def test_cli_local_reference_does_not_read_value(vault, monkeypatch, capsys):
     assert safe_main(['ref', ITEM, 'password']) == 0
     assert capsys.readouterr().out.strip() == 'walter-secret://bitwarden/' + ITEM + '/password'
     assert vault.reads == []
+
+
+def test_unlock_preserves_noninteractive_relogin_without_password_argv(tmp_path, monkeypatch):
+    monkeypatch.setattr(unlock.settings, 'SESSION', tmp_path/'session')
+    calls = []
+    def run(argv, *, env=None):
+        calls.append((argv, env))
+        if argv[0] == 'age':
+            return json.dumps({'services': {'bitwarden': {'master_password': FAKE}}})
+        if argv[:2] == ['bw','status']:
+            return json.dumps({'status':'unauthenticated'})
+        if argv[:2] == ['bw','unlock']:
+            return 'fake-session-token-not-live'
+        return ''
+    monkeypatch.setattr(unlock, '_run', run)
+    assert unlock.session() == 'fake-session-token-not-live'
+    login = next((argv,env) for argv,env in calls if argv[:2] == ['bw','login'])
+    assert '--passwordenv' in login[0]
+    assert login[1]['WALTER_BW_MASTER'] == FAKE
+    assert FAKE not in repr([argv for argv,env in calls])

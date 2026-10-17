@@ -1,7 +1,8 @@
 """Bitwarden bootstrap independent of an agent runtime. No values in diagnostics.
 
 Only --print/--sync return a local credential to another process, never an agent.
-The account must already be logged in; account creation/login remains maintenance.
+A disconnected account is re-authenticated using its configured bootstrap credentials.
+This preserves the existing local helper behavior; MFA prompts still fail closed.
 """
 from __future__ import annotations
 import json
@@ -44,13 +45,25 @@ def session() -> str:
                 pass
     raw = _run(['age', '-d', '-i', str(settings.VAULT_KEY), str(settings.VAULT_ENC)])
     try:
-        master = json.loads(raw)['services']['bitwarden']['master_password']
+        bootstrap = json.loads(raw)['services']['bitwarden']
+        master = bootstrap['master_password']
     except (KeyError, ValueError, TypeError):
         raise UnlockError('Bitwarden bootstrap credential unavailable') from None
+    # Preserve the former bootstrap helper's reconnect behavior. The account password
+    # remains in the child environment, and no command output crosses the local helper.
+    status = json.loads(_run(['bw', 'status', '--nointeraction']))
+    if status.get('status') == 'unauthenticated':
+        server = settings.setting('bitwarden', 'server', bootstrap.get('server_url'))
+        email = settings.setting('bitwarden', 'email', bootstrap.get('email'))
+        if not server or not email:
+            raise UnlockError('Bitwarden account configuration unavailable')
+        _run(['bw', 'config', 'server', server, '--nointeraction'])
+        _run(['bw', 'login', email, '--passwordenv', 'WALTER_BW_MASTER', '--nointeraction'],
+             env={**os.environ, 'WALTER_BW_MASTER': master, 'BW_NOINTERACTION': 'true'})
     # Environment prevents the master password from appearing in process argv.
     token = _run(['bw', 'unlock', '--passwordenv', 'WALTER_BW_MASTER', '--raw', '--nointeraction'],
                  env={**os.environ, 'WALTER_BW_MASTER': master, 'BW_NOINTERACTION': 'true'})
-    del raw, master
+    del raw, master, bootstrap
     if not token or '\n' in token:
         raise UnlockError('Bitwarden returned an invalid session')
     cache.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
