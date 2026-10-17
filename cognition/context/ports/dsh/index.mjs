@@ -91,6 +91,15 @@ export class WalterContextEngine extends BasicCompactionEngine {
   }
 
   async summarize(input, agent, signal) {
+    // DSH prepends the retained global system head before the selected region.
+    // Exempt exactly that one durable message, not every leading privileged role:
+    // the region itself may begin with a later system/developer instruction.
+    const headSeq = agent.session.surface.nodes[0];
+    const headEvent = headSeq === undefined ? null : agent.session.eventAt(headSeq);
+    const head = headEvent?.type === 'system/message' ? agent.session.deriveEventMessage(headEvent) : null;
+    const region = head && input.messages[0]?.id === head.id ? input.messages.slice(1) : input.messages;
+    if (region.some(message => message.role === 'system' || message.role === 'developer'))
+      throw new Error('walter-context: checkpoint span contains system/developer messages');
     const header = agent.session.requestHeader();
     const config = header?.config || agent.options;
     const info = await this.ctx.llm.resolveModelInfo(config.provider, config.model, signal);
