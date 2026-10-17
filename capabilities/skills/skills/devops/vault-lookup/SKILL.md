@@ -1,7 +1,7 @@
 ---
 name: vault-lookup
 description: "Architecture de sécurité W.Alter — vault, Bitwarden, cookies, SSH Mac, .env. Tous les accès sensibles centralisés."
-version: 2.0.0
+version: 2.1.0
 author: W.Alter
 metadata:
   hermes:
@@ -21,20 +21,20 @@ Tout ce qu'on ne veut pas voir tomber entre de mauvaises mains.
 │  vault.json  │  Bitwarden   │  .env     │  Cookies  │
 │  (age enc.)  │  (bw CLI)    │  (plain)  │  (Mac)    │
 ├──────────────┼──────────────┼───────────┼───────────┤
-│  API keys    │  950+ items  │  Runtime  │  Sessions │
+│  API keys    │  ~1 040 items│  Runtime  │  Sessions │
 │  Tokens      │  Passwords   │  env vars │  browser  │
 │  Secrets     │  Logins      │           │  auth     │
 ├──────────────┴──────────────┴───────────┴───────────┤
 │              Mac SSH (Tailscale)                     │
-│              Keychain → Cookies decrypt              │
+│      Sessions web : browser_session (côté serveur)   │
 └─────────────────────────────────────────────────────┘
 ```
 
 Ordre de priorité quand on cherche un secret :
 1. vault get service/field — toujours en premier
-2. Bitwarden bw get password item — backup / passwords web
+2. Bitwarden — via les outils `walter-secrets` (skill `bitwarden-logins`) ; `bw` à la main seulement en maintenance
 3. .env / env vars — runtime
-4. Cookies Mac Brave — sessions browser authentifiées
+4. Sessions web authentifiées — `browser_session` (cookies injectés côté serveur)
 
 ---
 
@@ -79,7 +79,7 @@ vault encrypt                      # Re-chiffrer après édition manuelle
 | huggingface | llm | token |
 | kaggle | custom | password, username |
 | kie | custom | api_key |
-| macos | custom | brave_keychain_key, lucas_password |
+| macos | custom | brave_keychain_key (héritée), lucas_password |
 | notion | productivity | api_key, token |
 | openai | custom | api_key |
 | openai_vault | llm | api_key |
@@ -107,14 +107,23 @@ cloudflare
 
 ## 2. Bitwarden (Personal Vault — bw CLI)
 
+**Priority: the `walter-secrets` tools.** For logins, passwords, TOTP and codes received by e-mail / message, use
+`secret_search` / `secret_fill` / `secret_otp` (skill `bitwarden-logins`): the value is filled where it is needed and
+never shows in the conversation. Module reference: `~/.hermes/plugins/walter-secrets/README.md`. The vault (~1 040
+entries, 14 thematic folders + « W.Alter – Clés API ») is filed and backed up automatically by `walter-secrets-sync`.
+
+**Manual `bw` (maintenance only, below)**: never let a secret reach the tool output. To pass a value to a command, use
+a placeholder `{{bw:<item id>:<field>}}` or `$(walter-secret get <item id> <field>)` inside the command; to check that
+an entry exists, list metadata only (name, username, URI) — never run `bw get password` / `bw get item` bare.
+
 Instance auto-hébergée : lucas-bitwarden.duckdns.org (HTTPS)
-Compte : lucas.jouvencon@gmail.com
-Master password : dans le vault → vault get bitwarden/master_password
+Compte : celui de Monsieur (e-mail dans `vault get bitwarden/email`)
+Mot de passe maître : stocké dans le coffre age W.Alter, entrée `bitwarden/master_password` (lire avec `vault get`)
 950+ items : passwords, logins, notes, API keys
 
-### Accès — méthode recommandée (helper bw-unlock)
+### Accès manuel — helper bw-unlock (maintenance)
 
-Le helper `~/.hermes/bin/bw-unlock` gère tout : login auto, unlock depuis le vault, cache de session valide. À utiliser en priorité.
+Le helper `~/.hermes/bin/bw-unlock` gère tout : login auto, unlock depuis le vault, cache de session valide. C'est la méthode à privilégier **parmi les méthodes manuelles de maintenance** ; pour l'usage courant, les outils `walter-secrets` passent avant.
 
 ```bash
 # Déverrouiller + exporter BW_SESSION dans le shell courant
@@ -128,7 +137,7 @@ BW_SESSION=$(~/.hermes/bin/bw-unlock --print)
 
 # Puis utiliser bw normalement
 bw list items --session "$BW_SESSION"
-bw get password "Nom de l'item" --session "$BW_SESSION"
+walter-secret get "<item id>" password | wc -c   # vérifier sans afficher ; pour l'utiliser : $(walter-secret get …) dans la commande
 ```
 
 Le helper réutilise la session cachée (`~/.hermes/vault/.bw_session_key`, mode 600) si elle est encore valide → déverrouillage instantané. Sinon il re-déverrouille depuis `vault get bitwarden/master_password`.
@@ -142,7 +151,7 @@ bw status
 
 # Login (première fois)
 bw config server https://lucas-bitwarden.duckdns.org
-bw login lucas.jouvencon@gmail.com "$(vault get bitwarden/master_password)"
+bw login "$(vault get bitwarden/email)" "$(vault get bitwarden/master_password)"
 
 # Unlock (session expirée) — le --raw final appartient à bw, PAS à vault
 BW_SESSION=$(bw unlock "$(vault get bitwarden/master_password)" --raw)
@@ -189,17 +198,7 @@ kardex contact <query>  # Cherche un contact par nom/alias
 kardex who <id>         # Affiche le profil d'un contact par ID
 ```
 
-Profil ID 0 (juin 2026) :
-
-| Champ | Valeur |
-|-------|--------|
-| canonical_name | Lucas |
-| aliases | Monsieur, boss, patron, earndeel |
-| location_current | Bangkok, Thailand (UTC+7) |
-| languages | fr, en |
-| occupation | entrepreneur tech / AI |
-| handles | x: @earndeel, sip: earndeel@sip.linphone.org, telegram: owner |
-| phone_numbers / emails | (vides — à compléter si besoin) |
+Le contenu du profil vit dans le Kardex (outil MCP `person_lookup`, CLI `kardex`) : ne jamais le recopier dans une fiche.
 
 Accès direct SQL si besoin :
 ```bash
@@ -207,7 +206,7 @@ docker exec hindsight-pg psql -U hindsight -d hindsight -x -c \
   "SELECT * FROM kardex.contacts WHERE id = 0;"
 ```
 
-DB : host 172.17.0.3:5432 (conteneur hindsight-pg), dbname/user/password = hindsight. Schema doc : `~/.hermes/services/kardex/`.
+Base : Postgres `hindsight-pg` sur 127.0.0.1:5433, base `hindsight` ; identifiants uniquement dans `/root/.pgpass` (jamais dans une fiche). Schema doc : `~/.hermes/services/kardex/`.
 
 NE PAS confondre avec un service vault — le Kardex vit dans PostgreSQL, pas dans vault.json.age. Pour les infos perso de Monsieur (téléphone, adresse, etc.), c'est le Kardex ID 0 la source de vérité, complétée par l'item Bitwarden "Lucas" (type 4, identité).
 
@@ -233,99 +232,20 @@ vault import-env
 ## 5. Accès Mac Brave (cookies + SSH)
 
 ### Connexion SSH
+`ssh mac` — alias défini dans `~/.ssh/config`, connexion directe par Tailscale (clé `~/.ssh/id_ed25519`). L'ancien tunnel
+inverse `localhost:2222` est abandonné (il tombait sur le sshd de la VM). Adresse et nom de la machine : `tailscale status`.
 
-Méthode principale : Tailscale direct
-ssh lucasjouvencon@100.127.150.1
-
-Config SSH dans ~/.ssh/config — pointe actuellement sur localhost:2222 (tunnel inverse). BUG connu : utiliser l'IP Tailscale directe 100.127.150.1 quand le tunnel ne marche pas.
-
-Clé SSH : ~/.ssh/id_ed25519
-
-Le Mac est actif sur Tailscale (lucass-macbook-pro-15, 100.127.150.1, exit node actif).
-
-### Extraction cookies Brave
-
-Les cookies Brave sont chiffrés AES-128-CBC. La clé de déchiffrement est dans le Keychain macOS, sauvegardée dans le vault.
-
-Pipeline complet :
-
-```python
-import hashlib, json, subprocess
-from Crypto.Cipher import AES
-
-# 1. Récupérer les cookies chiffrés depuis le Mac
-result = subprocess.run(
-    ["ssh", "lucasjouvencon@100.127.150.1",
-     'sqlite3 ~/Library/Application\\ Support/BraveSoftware/'
-     'Brave-Browser/Default/Cookies '
-     '"SELECT host_key, name, hex(encrypted_value), path, '
-     'is_secure, is_httponly, expires_utc '
-     'FROM cookies WHERE host_key LIKE \'%domaine%\'"'],
-    capture_output=True, text=True
-)
-
-# 2. Clé de déchiffrement (Keychain → vault)
-key = subprocess.run(
-    ["vault", "get", "macos/brave_keychain_key"],
-    capture_output=True, text=True
-).stdout.strip().encode()
-derived_key = hashlib.pbkdf2_hmac('sha1', key, b'saltysalt', 1003, dklen=16)
-
-# 3. Déchiffrer
-def decrypt(hex_str):
-    enc = bytes.fromhex(hex_str)
-    if enc[:3] == b'v10': enc = enc[3:]
-    elif enc[:4] == b'v11': enc = enc[4:]
-    iv, data = enc[:16], enc[16:]
-    cipher = AES.new(derived_key, AES.MODE_CBC, iv)
-    dec = cipher.decrypt(data)
-    pad = dec[-1]
-    if 1 <= pad <= 16 and all(b == pad for b in dec[-pad:]):
-        dec = dec[:-pad]
-    clean = dec[16:] if len(dec) > 16 else dec  # skip garbled first block
-    return bytes(b for b in clean if 32 <= b <= 126).decode('ascii')
-
-# 4. Parser et convertir au format Playwright
-cookies = []
-for line in result.stdout.strip().split('\n'):
-    parts = line.split('|')
-    if len(parts) < 7: continue
-    host, name, enc_hex, path, secure, httponly, expires = parts
-    val = decrypt(enc_hex)
-    c = {"name": name, "value": val, "domain": host, "path": path,
-         "secure": secure=='1', "httpOnly": httponly=='1'}
-    if expires and int(expires) > 0:
-        c["expires"] = int((int(expires)/1000000) - 11644473600)
-    cookies.append(c)
-```
-
-### Injection dans Camoufox
-
-```python
-from camoufox.sync_api import Camoufox
-
-with Camoufox(headless=True, humanize=True) as browser:
-    page = browser.new_page()
-    page.goto("https://target.com", wait_until="domcontentloaded", timeout=30000)
-    context = browser.contexts[0]
-    context.add_cookies(cookies)
-    page.goto("https://target.com/protected", wait_until="domcontentloaded")
-```
+### Sessions web authentifiées
+Ne jamais extraire ni déchiffrer les cookies soi-même (règle CLAUDE.md) : utiliser l'outil MCP `browser_session(site,
+session)` (cookies Brave injectés côté serveur, seules des métadonnées reviennent), puis `walter-browser`.
 
 ### Clés dans le vault
 
 | Clé | Usage |
 |-----|-------|
-| macos/brave_keychain_key | Clé PBKDF2 pour déchiffrer les cookies Brave |
-| macos/lucas_password | Mot de passe macOS (pour Keychain si besoin) |
+| macos/brave_keychain_key | **Héritée — ne plus utiliser** pour accéder aux cookies (voir `browser_session`) ; conservée pour le service côté serveur |
+| macos/lucas_password | Mot de passe de session macOS (administration du Mac uniquement) |
 
-### Pitfalls cookies
-
-- Chrome epoch : expires_utc est en microsecondes depuis 1601-01-01. Convertir : unix = int((chrome_us / 1000000) - 11644473600)
-- Premier bloc : les 16 premiers octets déchiffrés sont toujours du bruit (nonce partagé par domaine). Skip.
-- cf_clearance : N'JAMAIS injecter d'un navigateur à l'autre — Cloudflare le lie au fingerprint. Laisser Camoufox obtenir le sien.
-- Payload limit : max 512KB / 500 cookies par injection Camoufox.
-- Keychain via SSH : find-generic-password -w échoue avec error 36 (ACL non-interactif). La clé doit être dans le vault.
 
 ---
 
@@ -336,8 +256,8 @@ with Camoufox(headless=True, humanize=True) as browser:
 3. JAMAIS stocker le master password Bitwarden dans .env — uniquement dans le vault chiffré
 4. Toujours vérifier le vault AVANT de demander un credential à l'utilisateur
 5. Session Bitwarden : sauvegarder dans ~/.hermes/vault/.bw_session_key, pas dans la mémoire
-6. Cookies Mac : extraire uniquement sur demande, ne pas stocker en clair sur le VPS
-7. SSH Mac : utiliser Tailscale (100.127.150.1), pas le tunnel inverse localhost:2222 (fragile)
+6. Cookies Mac : jamais extraits à la main — `browser_session` uniquement
+7. SSH Mac : `ssh mac` (Tailscale direct), jamais l'ancien tunnel inverse localhost:2222
 
 ### Fluidité vs sécurité — le bon compromis
 
@@ -376,7 +296,7 @@ vault list --secrets
 
 # 4. Bitwarden (si session active)
 source ~/.hermes/vault/.bw_session_key 2>/dev/null
-bw get password "<item>" --session "$BW_SESSION" 2>/dev/null
+walter-secret search "<item>"   # métadonnées seulement ; valeur via {{bw:<id>:<champ>}}
 
 # 5. Variables d'environnement
 grep -ri "<keyword>" ~/.hermes/.env 2>/dev/null
