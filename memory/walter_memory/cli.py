@@ -33,6 +33,7 @@ def main(argv=None) -> None:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("stats")
     e = sub.add_parser("events"); e.add_argument("--source"); e.add_argument("--type", action="append")
+    e.add_argument("--cloud-safe", action="store_true", help="only cloud_allowed canonical events")
     e.add_argument("--thread"); e.add_argument("--since"); e.add_argument("--text"); e.add_argument("--limit", type=int, default=20)
     t = sub.add_parser("types"); t.add_argument("action", choices=["list", "sync"])
     o = sub.add_parser("objects"); o.add_argument("action", choices=["search", "get", "put", "stats"])
@@ -40,6 +41,8 @@ def main(argv=None) -> None:
     o.add_argument("--kind"); o.add_argument("--link", action="append", default=[]); o.add_argument("--captured")
     o.add_argument("--privacy", choices=["local_only", "redacted_cloud", "cloud_allowed"])
     o.add_argument("--limit", type=int, default=20)
+    o.add_argument("--cloud-safe", action="store_true", help="only cloud_allowed object metadata and bytes")
+    o.add_argument("--dest-dir", help="download directory (created only after privacy authorization)")
     n = sub.add_parser("note", help="record a note.recorded event (a statement an agent was told)")
     n.add_argument("content"); n.add_argument("--source", default="claude"); n.add_argument("--context", default="")
     n.add_argument("--tag", action="append", default=[])
@@ -84,15 +87,16 @@ def main(argv=None) -> None:
         cmd_stats(a)
     elif a.cmd == "events":
         _print(events.get_events(source=a.source, event_types=a.type, thread_id=a.thread, since=a.since, text=a.text,
-                                 limit=a.limit))
+                                 limit=a.limit, max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))
     elif a.cmd == "types":
         _print(types.list_types() if a.action == "list" else {"synced": types.sync_seed()})
     elif a.cmd == "objects":
         if a.action == "search":
             _print(objects.search(a.ref or "", kind=a.kind, source=a.source if a.source != "vault" else None,
-                                  limit=a.limit))
+                                  limit=a.limit, max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))
         elif a.action == "get":
-            print(objects.get_object(a.ref, a.dest))
+            print(objects.get_object(a.ref, a.dest, dest_dir=a.dest_dir,
+                                     max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))
         elif a.action == "stats":
             _print(objects.stats())
         else:
