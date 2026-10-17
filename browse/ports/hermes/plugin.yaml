@@ -1,0 +1,7 @@
+name: walter-browse
+version: 4.0.0
+description: "Walter Browse — general-purpose web tool (read/search/extract/capabilities/sessions)"
+author: W.Alter
+kind: standalone
+provides_tools:
+  - walter_browse

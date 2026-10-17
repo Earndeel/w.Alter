@@ -1,0 +1,7 @@
+#!/root/.venv/scrapling/bin/python
+"""Walter Browse CLI; no harness boot or imports."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "runtime"))
+from universal_router import main
+raise SystemExit(main())
