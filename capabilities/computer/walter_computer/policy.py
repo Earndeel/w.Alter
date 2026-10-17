@@ -1049,6 +1049,9 @@ class WalterPolicyMixin:
             raise _RUNTIME.VisualGeometryAmbiguous("targeted crop contains no pixels")
         if self._vision_sensor is None:
             raise RuntimeError("targeted vision sensor is not configured for this client")
+        fence = getattr(self, "_walter_result_fence", None)
+        if callable(fence):
+            fence()  # Reject a capture invalidated before any auxiliary model sees it.
         return self._vision_sensor(request, capture)
 
     def vision_target(

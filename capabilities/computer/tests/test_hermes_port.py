@@ -124,7 +124,7 @@ def test_human_takeover_discards_result_before_return():
     with patch.object(lease,'assert_agent_may_act',return_value=initial), \
          patch.object(lease,'get',side_effect=[initial,changed]), \
          patch.object(host,'_reject_unsafe',return_value=None), \
-         patch.object(hermes._NATIVE_SESSIONS,'backend',return_value=object()), \
+         patch.object(hermes._NATIVE_SESSIONS,'backend',return_value=type('Backend',(),{})()), \
          patch.object(host,'_dispatch',return_value='SYNTHETIC_PRIVATE_RESULT'):
         result=tool['handler']({'action':'list_apps'},session_id='test')
         assert 'human_has_control' in result
