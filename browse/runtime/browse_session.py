@@ -160,6 +160,17 @@ class SessionManager:
         self._lock = threading.RLock()
         self._live: dict[str, BrowseSession] = {}
 
+    def _session_dir(self, session_id: str) -> Path:
+        if not isinstance(session_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", session_id):
+            raise SessionError("invalid session id")
+        path = self.root / session_id
+        if path.is_symlink() or path.resolve().parent != self.root.resolve():
+            raise SessionError("session path escapes storage root")
+        for name in (STATE_FILENAME, STORAGE_FILENAME):
+            if (path / name).is_symlink():
+                raise SessionError("session state must not be a symlink")
+        return path
+
     # -- lifecycle ---------------------------------------------------------
 
     def create(
@@ -183,7 +194,7 @@ class SessionManager:
         with self._lock:
             if sid in self._live:
                 raise SessionError(f"session {sid} is already live")
-            session_dir = self.root / sid
+            session_dir = self._session_dir(sid)
             session_dir.mkdir(parents=True, exist_ok=True)
             session = BrowseSession(
                 id=sid,
@@ -201,7 +212,7 @@ class SessionManager:
 
     def load(self, session_id: str) -> BrowseSession:
         """Load a persisted session from disk (without warming any engine)."""
-        session_dir = self.root / session_id
+        session_dir = self._session_dir(session_id)
         state_path = session_dir / STATE_FILENAME
         if not state_path.exists():
             raise SessionError(f"persisted session {session_id} not found")
@@ -223,10 +234,11 @@ class SessionManager:
         return session
 
     def get(self, session_id: str) -> BrowseSession:
+        self._session_dir(session_id)
         with self._lock:
             if session_id in self._live:
                 return self._live[session_id]
-        if (self.root / session_id / STATE_FILENAME).exists():
+        if (self._session_dir(session_id) / STATE_FILENAME).exists():
             return self.load(session_id)
         raise SessionError(f"unknown session {session_id!r}")
 
@@ -240,7 +252,7 @@ class SessionManager:
         """Persist session metadata + cookies/storage. Explicit, scopéd, safe."""
         if not session.persistent:
             raise SessionError("refusing to persist a temporary session; make it persistent first")
-        session_dir = self.root / session.id
+        session_dir = self._session_dir(session.id)
         session_dir.mkdir(parents=True, exist_ok=True)
         meta = {
             "version": 1,
@@ -262,7 +274,7 @@ class SessionManager:
                 )
 
     def storage_state_path(self, session: BrowseSession) -> Path:
-        return self.root / session.id / STORAGE_FILENAME
+        return self._session_dir(session.id) / STORAGE_FILENAME
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -270,7 +282,7 @@ class SessionManager:
         """Force cleanup: drop live entry, engine hook, and (optionally) disk."""
         with self._lock:
             self._live.pop(session_id, None)
-        session_dir = self.root / session_id
+        session_dir = self._session_dir(session_id)
         if include_disk and session_dir.exists():
             shutil.rmtree(session_dir, ignore_errors=True)
 
@@ -293,6 +305,10 @@ class SessionManager:
             live = [s.summary() for s in self._live.values()]
         persisted = []
         for child in sorted(self.root.iterdir()):
+            try:
+                self._session_dir(child.name)
+            except SessionError:
+                continue
             state = child / STATE_FILENAME
             if state.exists():
                 try:
