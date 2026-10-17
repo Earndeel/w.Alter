@@ -21,11 +21,11 @@ def test_checkpoint_preserves_live_and_previous_turn_under_pressure():
     assert not plan(conversation(2), measured_tokens=200000, force=True)['needed']
 
 
-def test_checkpoint_summary_is_same_shared_record_as_projection():
+def test_checkpoint_summary_retains_original_refs_and_reduces_tool_traffic():
     from walter_context.layers import record
     messages = conversation(4)
     result = summarize(messages)
-    assert result['content'] == record(messages[1:], load().projection, None)['content']
+    assert all(m['content'] in result['content'] for m in messages if m['role']=='user')
     assert result['output_tokens'] < result['input_tokens']
     assert 'call_0_0' in result['content']
 
@@ -84,8 +84,14 @@ def test_hermes_public_port_budget_reset_and_usage():
     assert source == original and engine._session.profile.hard_budget == 12000
     engine.update_from_response({'input_tokens': 400, 'output_tokens': 50})
     assert engine.last_prompt_tokens == 400 and engine.last_completion_tokens == 50
+    engine.compression_count = 3
+    engine.update_from_response({'prompt_tokens': 15000, 'completion_tokens': 50, 'total_tokens': 15050})
+    assert engine.should_compress()
     engine.on_session_start('other')
     assert engine._session.calls == 0
+    assert (engine.last_prompt_tokens, engine.last_completion_tokens,
+            engine.last_total_tokens, engine.compression_count) == (0, 0, 0, 0)
+    assert not engine.should_compress()
 
 
 def test_quality_replay_rejects_a_chain_containing_non_cloud_events():

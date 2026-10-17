@@ -20,7 +20,8 @@ def dispatch(request: dict) -> dict:
         raise ValueError("messages must be a list of objects")
     op = request.get("op")
     if op == "summarize":
-        return checkpoint.summarize(messages)
+        return checkpoint.summarize(messages, model=str(request.get("model") or ""),
+                                    budget_tokens=int(request.get("budget_tokens") or 0))
     if op == "plan":
         return checkpoint.plan(messages, model=str(request.get("model") or ""),
                                measured_tokens=int(request.get("measured_tokens") or 0),
