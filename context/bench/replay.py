@@ -60,7 +60,7 @@ def chains(conn, days: int, min_calls: int, limit: int, runtime: str = "hermes")
     return [c for _, c in out[:limit]]
 
 
-def messages(conn, chain: list[dict]) -> tuple[list[dict], list[tuple[int, float, str]]]:
+def messages(conn, chain: list[dict], *, cloud_safe: bool = False) -> tuple[list[dict], list[tuple[int, float, str]]]:
     """OpenAI-format history of a chain + the calls: (index of the produced assistant message, unix time, model)."""
     msgs: list[dict] = [{"role": "system", "content": "S" * HEAD_CHARS}]
     calls: list[tuple[int, float, str]] = []
@@ -69,8 +69,10 @@ def messages(conn, chain: list[dict]) -> tuple[list[dict], list[tuple[int, float
     seen_calls: set[str] = set()
     previous: set[tuple[str, str]] = set()     # (type, text) of the parent session's messages
     for pos, sess in enumerate(chain):
-        evs = conn.execute("""select type, call_id, tool, text, occurred_at, model from walter_logs.events
+        evs = conn.execute("""select type, call_id, tool, text, occurred_at, model, privacy_class from walter_logs.events
                               where session_id = %s order by seq""", (sess["session_id"],)).fetchall()
+        if cloud_safe and any(e.get("privacy_class") != "cloud_allowed" for e in evs):
+            return [], []  # reject the whole chain; never split tool pairs or relabel private history
         copying = pos > 0                      # a compaction child starts with a copy of the parent's tail
         mine: set[tuple[str, str]] = set()
         for e in evs:
