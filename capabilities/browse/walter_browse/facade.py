@@ -12,6 +12,7 @@ import asyncio
 import ipaddress
 import json
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -223,8 +224,8 @@ def _validate_request(args: Any) -> dict[str, Any]:
 
     session_id_raw = args.get("session_id")
     session_id = str(session_id_raw).strip() if session_id_raw is not None else ""
-    if len(session_id) > 128:
-        raise ValueError("session_id is too long")
+    if session_id and not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", session_id):
+        raise ValueError("session_id must contain only letters, digits, underscores or hyphens")
 
     min_records = args.get("min_records", 1)
     if isinstance(min_records, bool) or not isinstance(min_records, int) or not 1 <= min_records <= _MAX_RECORDS:
