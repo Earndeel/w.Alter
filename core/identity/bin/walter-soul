@@ -32,6 +32,7 @@ TARGETS = {
     "hermes": (["identity.md", "rules.md", "runtimes/hermes.md"], Path("/root/.hermes/SOUL.md")),
     "claude-code": (AGENT + ["runtimes/claude-code.md"], Path("/opt/walter-profiles/claude-code/CLAUDE.md")),
     "codex": (AGENT + ["runtimes/codex.md"], Path("/opt/walter-profiles/codex/AGENTS.md")),
+    "dsh": (AGENT + ["runtimes/dsh.md"], Path("/opt/walter-profiles/dsh/AGENTS.md")),
     "voice": (["identity.md"], ROOT / "build" / "voice.md"),
     "agent": (["identity.md", "rules.md"], ROOT / "build" / "agent.md"),
 }
