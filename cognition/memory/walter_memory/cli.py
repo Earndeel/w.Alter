@@ -32,6 +32,7 @@ def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="walter-memory", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("stats")
+    sub.add_parser("agent-memory", help="runtime-neutral memory API; versioned JSON request on stdin")
     e = sub.add_parser("events"); e.add_argument("--source"); e.add_argument("--type", action="append")
     e.add_argument("--cloud-safe", action="store_true", help="only cloud_allowed canonical events")
     e.add_argument("--thread"); e.add_argument("--since"); e.add_argument("--text"); e.add_argument("--limit", type=int, default=20)
@@ -83,7 +84,15 @@ def main(argv=None) -> None:
     lg.add_argument("--json", action="store_true")
     a = p.parse_args(argv)
 
-    if a.cmd == "stats":
+    if a.cmd == "agent-memory":
+        from . import agent_memory
+        try:
+            _print(agent_memory.dispatch(json.load(sys.stdin)))
+        except Exception as exc:
+            _print({"status": "error", "error": type(exc).__name__,
+                    "text": "Agent memory operation failed; no unsafe fallback was used."})
+            raise SystemExit(1)
+    elif a.cmd == "stats":
         cmd_stats(a)
     elif a.cmd == "events":
         _print(events.get_events(source=a.source, event_types=a.type, thread_id=a.thread, since=a.since, text=a.text,
