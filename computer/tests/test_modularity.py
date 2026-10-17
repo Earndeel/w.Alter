@@ -253,3 +253,15 @@ def test_host_independent_input_blocks_run_before_transport(action,arguments):
     result=pool.call('A',action,arguments,grants={'read','input','foreground'})
     assert result['ok'] is False
     assert result.get('code') in {'unsafe_input_blocked','bring_to_front_requires_foreground'}
+
+
+def test_human_fence_prevents_auxiliary_vision_disclosure():
+    from walter_computer.types import CaptureResult
+    op=operator()
+    sent=[]
+    op._vision_sensor=lambda request,capture:sent.append(True)
+    def refuse(): raise RuntimeError('human lease changed')
+    op._walter_result_fence=refuse
+    with pytest.raises(RuntimeError,match='human lease changed'):
+        op._call_targeted_vision_sensor(object(),CaptureResult(mode='vision',width=1,height=1,png_b64='synthetic'))
+    assert not sent

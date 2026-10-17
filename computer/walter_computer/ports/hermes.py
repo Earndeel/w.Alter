@@ -293,6 +293,7 @@ def _override_handler(extra_actions):
                         raise lease.HumanHasControl('Human control changed; result discarded. Capture fresh state.')
                 fence()
                 backend = _NATIVE_SESSIONS.backend(host, session_id)
+                backend._walter_result_fence = fence
                 previous = getattr(backend, '_walter_latest_capture', None)
                 if action in extra_actions:
                     result = extra_actions[action][0](backend, args)
