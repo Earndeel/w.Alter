@@ -48,7 +48,8 @@ A checkpoint must fit `policy.record_share` of its effective budget (currently
 30%, estimated by the core). If full user text or the rendered record cannot fit,
 compaction fails explicitly. A `system` or `developer` message inside the selected
 history also causes refusal: its instruction role must not be erased by a plain
-user record. Leading head messages are outside the compacted span. DSH separately
+user record. Only the injected global system head is exempt, identified by its durable id.
+A privileged role at the first node of a manual/explicit region is also refused. DSH separately
 checks that the framed replacement is smaller using its token meter.
 
 A refused record or failed Python bridge closes the compaction bracket without a
@@ -73,10 +74,11 @@ paths. Peer dependencies resolve normally when installed as a package; this VM
 can resolve the host through `WALTER_DSH_PACKAGE` (default
 `/opt/dsh/package.json`). The supported and tested host is DSH 0.2.0-rc.2.
 
-`node /opt/walter-context/tests/test_dsh.mjs` runs five tests with actual DSH
+`node /opt/walter-context/tests/test_dsh.mjs` runs seven tests with actual DSH
 Session, CompactionEngine, ToolRuntime and replay. They cover a successful
 checkpoint, source recovery, intact raw events, Python failure, system/developer
-instruction refusal, abort and concurrent locking. Histories are synthetic;
+instruction refusal (including leading roles and manual compaction), abort and
+concurrent locking. Histories are synthetic;
 provider metadata and metering are fixtures and no external model is called.
 Python tests additionally check complete user-text retention through repeated
 checkpoints, all tool references and explicit budget refusal.

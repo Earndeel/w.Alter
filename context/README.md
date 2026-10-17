@@ -31,7 +31,9 @@ budget, using the core's approximate token estimator. With the current config,
 that share is 30%. If preservation cannot fit, compaction is refused instead of
 silently dropping constraints. An in-history `system` or `developer` message also
 refuses compaction: flattening its role into a user record would change authority.
-Leading system/developer messages remain outside the selected range.
+Automatic selection leaves leading head messages outside the selected range.
+The DSH port identifies the injected global system head by its durable id; every
+privileged role inside the replacement span is refused, including its first node.
 
 DSH independently validates tool pairing, locking, stable selection and that the
 framed replacement actually shrinks its source. A bridge failure, an oversized
@@ -108,7 +110,7 @@ cloud-safe sampling excludes entire chains containing events not classified
   Request-only projection must not rewrite an event-sourced host's immutable
   journal-derived requests.
 
-Qualification uses 24 Python tests and 5 Node tests. Node exercises real DSH
+Qualification uses 24 Python tests and 7 Node tests. Node exercises real DSH
 Session, CompactionEngine, ToolRuntime, transactions and replay with synthetic
 histories; provider metadata and metering are fixtures. The separate known-answer
 probe retains 13 textual facts/constraints directly and six tool results by

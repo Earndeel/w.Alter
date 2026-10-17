@@ -51,13 +51,16 @@ function fill(session, turns = 5, instructionRole = null) {
 }
 
 test('real DSH transaction: Walter checkpoint, raw originals, replay and recovery', async () => {
-  const {session,engine,agent,registered} = setup(); fill(session);
+  const {session,engine,agent,registered} = setup();
+  session.append('system/message',{message:createSystemMessage('PRESERVED_GLOBAL_HEAD')},{surfaceOp:'append'});
+  fill(session);
   const before = Array.from({length:session.seq},(_,n)=>session.eventAt(n));
   const live = session.deriveMessages().slice(-5);
   const result = await engine.compactIfNeeded(agent,'pressure',new AbortController().signal);
   assert.ok(result);
   assert.deepEqual(Array.from({length:before.length},(_,n)=>session.eventAt(n)),before);
   assert.deepEqual(session.deriveMessages().slice(-5),live);
+  assert.equal(session.deriveMessages()[0].content[0].text,'PRESERVED_GLOBAL_HEAD');
   const summary = session.eventAt(result.summarySeq);
   assert.equal(summary.data.provider,'walter-context');
   assert.equal(summary.data.model,'extractive-v1');
@@ -85,12 +88,43 @@ test('in-history system/developer instructions refuse compaction and preserve th
   for (const role of ['system','developer']) {
     const {session,engine,agent} = setup(); fill(session,5,role);
     const before = session.deriveMessages();
-    await assert.rejects(engine.compactIfNeeded(agent,'pressure',new AbortController().signal),/bridge exited/);
+    await assert.rejects(engine.compactIfNeeded(agent,'pressure',new AbortController().signal),/system\/developer/);
     assert.deepEqual(session.deriveMessages(),before);
     assert.equal(session.eventAt(session.seq-1).type,'compaction/end');
     assert.equal(Array.from({length:session.seq},(_,n)=>session.eventAt(n)).some(e=>e.type==='compaction/summary'),false);
     assert.ok(session.deriveMessages().some(m=>m.role===role&&m.content.some(b=>b.text==='CRITICAL_ROLE_INSTRUCTION')));
   }
+});
+
+test('privileged role at the beginning of a compactRegion span is refused', async () => {
+  for (const role of ['system','developer']) {
+    const {session,engine,agent} = setup();
+    session.append('system/message',{message:createSystemMessage('PRESERVED_GLOBAL_HEAD')},{surfaceOp:'append'});
+    session.append('user/message',createUserMessage({content:[{type:'text',text:'earlier request'}],source:{kind:'user'}}),{surfaceOp:'append'});
+    const message = role === 'system' ? createSystemMessage('LEADING_ROLE_INSTRUCTION') :
+      createDeveloperMessage({content:[{type:'text',text:'LEADING_ROLE_INSTRUCTION'}],source:{kind:'fixture'}});
+    const start = session.append(`${role}/message`,{message},{surfaceOp:'append'}).seq;
+    fill(session);
+    const before = session.deriveMessages();
+    const end = session.surface.nodes.at(-2);
+    await assert.rejects(engine.compactRegion(start,end,agent,new AbortController().signal),/system\/developer/);
+    assert.deepEqual(session.deriveMessages(),before);
+    assert.equal(session.eventAt(session.seq-1).type,'compaction/end');
+    assert.equal(Array.from({length:session.seq},(_,n)=>session.eventAt(n)).some(e=>e.type==='compaction/summary'),false);
+  }
+});
+
+test('manual compactNow refuses a leading developer after the retained system head', async () => {
+  const {session,engine,agent} = setup();
+  session.append('system/message',{message:createSystemMessage('PRESERVED_GLOBAL_HEAD')},{surfaceOp:'append'});
+  session.append('developer/message',{message:createDeveloperMessage({content:[{type:'text',text:'LEADING_DEVELOPER_INSTRUCTION'}],source:{kind:'fixture'}})},{surfaceOp:'append'});
+  fill(session);
+  session.append('turn/end',{turn:5,reason:{kind:'completed'}});
+  const before = session.deriveMessages();
+  await assert.rejects(engine.compactNow(agent,new AbortController().signal),/manual compaction could not produce/);
+  assert.deepEqual(session.deriveMessages(),before);
+  assert.equal(session.eventAt(session.seq-1).type,'compaction/end');
+  assert.equal(Array.from({length:session.seq},(_,n)=>session.eventAt(n)).some(e=>e.type==='compaction/summary'),false);
 });
 
 test('abort does not compact, and concurrent compaction is rejected by DSH lock', async () => {
