@@ -86,3 +86,11 @@ def test_hermes_public_port_budget_reset_and_usage():
     assert engine.last_prompt_tokens == 400 and engine.last_completion_tokens == 50
     engine.on_session_start('other')
     assert engine._session.calls == 0
+
+
+def test_quality_replay_rejects_a_chain_containing_non_cloud_events():
+    from bench.replay import messages
+    class Conn:
+        def execute(self,*args): return self
+        def fetchall(self): return [{'privacy_class':'local_only','text':'private fixture'}]
+    assert messages(Conn(),[{'session_id':'fixture'}],cloud_safe=True) == ([],[])

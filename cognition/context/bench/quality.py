@@ -63,7 +63,7 @@ def points(conn, cfg, samples: int, seed: int) -> list[tuple[str, list[dict], li
     MEMO.enabled = True
     cands = []
     for ch in chains(conn, 14, 15, 60):
-        msgs, calls = messages(conn, ch)
+        msgs, calls = messages(conn, ch, cloud_safe=True)
         now = [0.0]
         s = Session(cfg, clock=lambda: now[0])
         seen = None
