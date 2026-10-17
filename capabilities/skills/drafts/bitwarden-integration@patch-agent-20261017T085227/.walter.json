@@ -1,0 +1,11 @@
+{
+ "base_sha": "a132b18a202383074fd04734ff577e5ffd6a3555d24caf73a1fbf2b13c54cc8a",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-17T08:52:27.503322+00:00",
+ "domain": "devops",
+ "kind": "patch",
+ "reason": "3e soumission, corrige les deux points du juge : plus aucune adresse e-mail (ligne AWS → « the AWS root account ») et la section TOTP précise qu'elle est réservée à la maintenance/aux scripts, les connexions passant par secret_fill(totp). Fond identique aux soumissions précédentes (outils walter-secrets testés, sauvegarde automatique testée le 16/10, SSH public fermé vérifié le 16/10).",
+ "runtime": null,
+ "session_id": null,
+ "target": "bitwarden-integration"
+}
