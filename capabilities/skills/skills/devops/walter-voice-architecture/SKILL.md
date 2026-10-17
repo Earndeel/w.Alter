@@ -12,6 +12,27 @@ metadata:
 
 # W.Alter Voice & Routing Architecture
 
+## Current production topology — verified 2026-10-17
+
+This section supersedes the historical web-call, Qdrant and Jarvis topology below.
+The public call.walter-ai.cloud web call and hermes-voice-call were removed on 2026-10-01.
+Production is phone: Linphone -> sip:w.alter.ai@sip.linphone.org -> Asterisk ->
+Stasis(hermes_bridge) -> /opt/openclaw/hermes_voice_bridge.py -> Gemini Live.
+The bridge exposes memory_recall directly to walter-voice-memory on127.0.0.1:8897 and
+voice_router to127.0.0.1:12110 for web/actions/Hermes escalation. Thus the old absolute
+rule "no direct memory tool" below does not describe the current bridge.
+walter-voice-memory is a replaceable fast projection in PostgreSQL walter_voice,
+using local embeddings + pgvector and optional reranking. Qdrant, hybrid-search,
+Jarvis gateway and old write workers are retired: never restart them to satisfy this skill.
+Identity is generated from /opt/walter-soul; read current provider/model selection from
+Walter Router/configuration rather than relying on historical model names or prices.
+Use /root/.hermes/docs/walter-memory/{ARCHITECTURE,DECISIONS,RUNBOOK}.md as authoritative.
+Do not restart services merely to explain the architecture.
+
+## Historical design and incidents — verify before executing
+
+
+
 Walter s'est défini une architecture ou l'utilisateur interagit via voix temps reel avec la sensation de parler directement a W.Alter, tandis que les taches complexes s'executent en arriere-plan.
 
 ## 3-Tier Architecture
