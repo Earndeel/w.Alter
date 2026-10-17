@@ -85,6 +85,38 @@ def _service_price(offers: dict, mid: str, prov: str, iface: str) -> str:
     return ""
 
 
+BENCH_TASK = {  # bench_task -> (fr, en)
+    "text_to_video": ("vidéo depuis texte", "text to video"), "image_to_video": ("animation d'image", "image to video"),
+    "text_to_image": ("image", "text to image"), "image_edit": ("retouche d'image", "image editing"),
+    "video_edit": ("édition vidéo", "video editing"), "tts": ("voix", "text to speech"),
+    "speech_to_speech": ("conversation vocale", "speech to speech"), "text": ("texte", "text"),
+    "text_french": ("texte en français", "French text"), "text_coding": ("code", "coding"),
+    "webdev": ("développement web", "web development"), "document": ("documents", "documents"), "vision": ("vision", "vision"),
+    "3d": ("3D", "3D"), "dataviz": ("dataviz", "dataviz"), "website": ("sites web", "websites"),
+    "fullstack": ("full-stack", "full-stack"), "gamedev": ("jeux", "games"), "graphicdesign": ("graphisme", "graphic design"),
+    "logo": ("logo", "logo"), "mobileapps": ("applis mobiles", "mobile apps"), "svg": ("SVG", "SVG"),
+    "uicomponent": ("composants d'interface", "UI components"), "overall": ("global", "overall"),
+    "backend": ("back-end", "back-end"), "frontend": ("front-end", "front-end"),
+    "intelligence": ("Intelligence Index", "Intelligence Index"), "decision": ("Decision Index", "Decision Index"),
+    "wer": ("taux d'erreur (WER)", "word error rate"), "speed": ("vitesse", "speed"), "rerank": ("qualité", "quality"),
+    "rerank_speed": ("vitesse", "speed"), "embeddings": ("qualité", "quality"),
+    "retrieval_fr": ("recherche en français", "French retrieval"), "trustworthiness": ("fiabilité", "trustworthiness")}
+
+
+def boards_of(conn, task: str) -> tuple[str, str]:
+    """« Arena vidéo depuis texte 50 % · AA vidéo depuis texte 50 % » (fr, en): the weighted leaderboards behind the
+    task's score (Monsieur, 2026-10-17: show which benchmarks compare the models of a category)."""
+    fr, en = [], []
+    for b in conn.execute("""select benchmark, bench_task, weight from models.task_benchmarks where task = %s and weight > 0
+                             order by weight desc, benchmark""", (task,)):
+        src = catalog.BOARDS.get(b["benchmark"], b["benchmark"])
+        t_fr, t_en = BENCH_TASK.get(b["bench_task"], (b["bench_task"].replace("_", " "),) * 2)
+        w = f'{round(b["weight"] * 100)}\u202f%'
+        fr.append(f"{src} {t_fr} {w}")
+        en.append(f"{src} {t_en} {w}")
+    return " · ".join(fr), " · ".join(en)
+
+
 def rows(conn) -> list[dict]:
     from .cli import with_execution   # late import (cli -> library)
     offers = sel.load_offers(conn, sel.latest_snapshots(conn))
@@ -94,7 +126,8 @@ def rows(conn) -> list[dict]:
                               from models.tasks t left join models.preferences p using (task)
                               where t.interface <> 'tool' order by t.interface, t.task, {ROLE_ORDER}, p.priority"""):
         task, role, iface = e["task"], e["role"], e["interface"]
-        row = {"type": iface, "task": task, "label": e["label"],
+        bfr, ben = boards_of(conn, task)
+        row = {"type": iface, "task": task, "label": e["label"], "boards": bfr, "boards_en": ben,
                "category": e["role_label"] or ("" if role in (None, "default") else role),
                "warning": None}
         try:
