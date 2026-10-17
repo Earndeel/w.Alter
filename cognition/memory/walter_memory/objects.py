@@ -137,11 +137,20 @@ def find(ref: str) -> dict | None:
         return conn.execute(f"select * from core.objects where {col} = %s and purged_at is null", (ref,)).fetchone()
 
 
-def get_object(ref: str, dest: str | Path | None = None) -> Path:
-    """Download an object (id or sha256) to dest, verifying its sha256."""
+def get_object(ref: str, dest: str | Path | None = None, *, max_privacy: str = "local_only",
+               dest_dir: str | Path | None = None) -> Path:
+    """Download authorized bytes, then verify SHA256. Deny before filesystem or S3 access."""
     row = find(ref)
     if not row:
         raise FileNotFoundError(f"no vault object {ref}")
+    if row.get("privacy_class") not in privacy.allowed_classes(max_privacy):
+        raise PermissionError("vault object is not permitted for this privacy scope")
+    if dest_dir is not None:
+        if dest is not None:
+            raise ValueError("pass dest or dest_dir, not both")
+        directory = Path(dest_dir)
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        dest = directory
     out = Path(dest) if dest else Path.cwd() / safe_name(row["original_name"] or row["sha256"])
     if out.is_dir():
         out = out / safe_name(row["original_name"] or row["sha256"])
@@ -152,8 +161,10 @@ def get_object(ref: str, dest: str | Path | None = None) -> Path:
     return out
 
 
-def search(text: str = "", kind: str | None = None, source: str | None = None, limit: int = 20) -> list[dict]:
-    where, args = ["purged_at is null"], []
+def search(text: str = "", kind: str | None = None, source: str | None = None, limit: int = 20,
+           *, max_privacy: str = "local_only") -> list[dict]:
+    """Filter metadata and derived snippets before any object row leaves the library."""
+    where, args = ["purged_at is null", "privacy_class = any(%s)"], [privacy.allowed_classes(max_privacy)]
     if text:
         where.append("(to_tsvector('french', coalesce(derived_text,'') || ' ' || coalesce(original_name,''))"
                      " @@ websearch_to_tsquery('french', %s) or original_name ilike %s)")
