@@ -102,13 +102,21 @@ def _da(conn, rs: list[dict]) -> list[dict]:
 
 
 def _table(rs: list[dict]) -> str:
-    head = ('<thead><tr><th>Tâche</th><th>Modèle</th><th>Origine</th><th class="num">Score</th>'
+    head = ('<thead><tr><th>Tâche</th><th>Modèle</th><th>Origine</th><th class="num" title="Score /100 : moyenne pondérée des classements indiqués sous chaque tâche">Score</th>'
             '<th>Fournisseurs (ordre, prix)</th><th>Secours</th><th>Abonnement</th></tr></thead>')
     body, last = [], None
+    multi = {r["label"] for r in rs if r.get("category")}   # tasks split into categories get a group header row
     for r in rs:
         differs = bool(r.get("differs")) and r.get("chosen_by") == "toi"
-        task = esc(r["label"]) if r["label"] != last else ""
+        first = r["label"] != last
         last = r["label"]
+        bench = (f'<div class="bench" data-en="Leaderboards: {esc(r.get("boards_en") or "")}">'
+                 f'Classements : {esc(r["boards"])}</div>') if r.get("boards") else ""
+        if first and r["label"] in multi:
+            body.append(f'<tr class="grp"><td colspan="7"><span class="gname">{esc(r["label"])}</span>{bench}</td></tr>')
+            task = ""
+        else:
+            task = (esc(r["label"]) + bench) if first else ""
         cat = f'<div class="cat">{esc(r["category"])}</div>' if r.get("category") else ""
         notes = ""
         if r.get("differs"):
@@ -338,8 +346,11 @@ td{{padding:10px 10px 10px 0;border-bottom:1px solid var(--rule);vertical-align:
 font-size:12.5px;color:var(--ink2)}}.lvl{{font-weight:700;font-size:15px;width:34px}}.lname{{font-weight:600;white-space:nowrap}}
 .model{{font-weight:600}}.levels .model{{white-space:nowrap}}.small{{font-size:12px;font-weight:400}}.mute{{color:var(--mute)}}.sep2{{margin-left:14px}}
 .arr{{color:var(--mute)}}.nw{{white-space:nowrap}}.amber{{color:var(--amber);font-size:12.5px}}
-.lib td.task{{width:17%;font-weight:600}}.lib .cat{{font-weight:400;color:var(--ink2)}}.lib td.route{{font-size:12.5px}}
+.lib td.task{{width:21%;font-weight:600}}.lib .cat{{font-weight:400;color:var(--ink2)}}.lib td.route{{font-size:12.5px}}
 .lib td{{font-size:13px}}.origin{{color:var(--mute);white-space:nowrap}}.origin.mine{{color:var(--ink);font-weight:600}}
+.bench{{font-weight:400;font-size:11.5px;color:var(--mute);margin-top:3px;line-height:1.4}}
+tr.grp td{{padding:16px 0 6px;border-bottom:1px solid var(--rule2)}}tr.grp .gname{{font-weight:700;font-size:13.5px}}
+tr.grp .bench{{display:inline;margin-left:12px}}.lib td.task .cat{{font-weight:600;color:var(--ink)}}
 .n-amber{{font-weight:400;font-size:12px;color:var(--amber);margin-top:3px}}.n-red{{font-weight:400;font-size:12px;color:var(--red);margin-top:3px}}
 tr.diff td{{background:var(--amberbg)}}.tw{{overflow-x:auto;-webkit-overflow-scrolling:touch}}.tw table.lib{{min-width:980px}}.tw table{{min-width:720px}}.tw table.levels{{min-width:0}}
 .chart{{margin:0;position:relative}}.chart svg{{width:100%;height:auto;display:block}}
