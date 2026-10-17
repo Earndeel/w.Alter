@@ -1,0 +1,11 @@
+{
+ "base_sha": "a132b18a202383074fd04734ff577e5ffd6a3555d24caf73a1fbf2b13c54cc8a",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-17T08:50:25.481528+00:00",
+ "domain": "devops",
+ "kind": "patch",
+ "reason": "Re-soumission après refus : retrait des données personnelles et identifiants d'infrastructure (e-mail du compte remplacé par un placeholder, IP Tailscale et projet GCP renvoyés au README), nombre d'entrées cohérent (~1 040, 1 042 au 17/10). Fond inchangé : outils walter-secrets en priorité (testés), sauvegarde automatique (testée le 16/10), SSH public fermé (vérifié le 16/10).",
+ "runtime": null,
+ "session_id": null,
+ "target": "bitwarden-integration"
+}
