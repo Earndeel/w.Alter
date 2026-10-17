@@ -33,6 +33,7 @@ class Session:
         self.cfg = cfg or load()
         self.clock = clock
         self.model = model
+        self.budget_tokens = 0
         self.cache = Cache()
         self.reset()
 
@@ -56,9 +57,19 @@ class Session:
             self.last = ()                 # another model = another cache
             self.calibration = 1.0
 
+    def set_budget(self, budget_tokens: int) -> None:
+        """Honor a host's smaller request window without changing shared priors."""
+        self.budget_tokens = max(0, int(budget_tokens or 0))
+
     @property
     def profile(self) -> Profile:
-        return self.cfg.profile(self.model)
+        profile = self.cfg.profile(self.model)
+        if self.budget_tokens:
+            hard = min(profile.hard_budget, self.budget_tokens)
+            return replace(profile, hard_budget=hard,
+                           effective_budget=min(profile.effective_budget,
+                                                int(hard * self.cfg.policy.emergency_share)))
+        return profile
 
     # -- the hot path --------------------------------------------------------------------------------------------
     def select(self, messages: list[Message], base: Base | None = None) -> Selection:
