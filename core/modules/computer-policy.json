@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "authorization": "Local MCP clients enforce user-task authorization and their tool permission gates. Scopes are provisioned by the server administrator, never by tool arguments.",
+  "clients": {
+    "codex": ["read", "input", "foreground", "pixels"],
+    "claude": ["read", "input", "foreground", "pixels"],
+    "claude_code": ["read", "input", "foreground", "pixels"],
+    "claude-code": ["read", "input", "foreground", "pixels"],
+    "dsh": ["read", "input", "foreground", "pixels"],
+    "hermes": ["read", "input", "foreground", "pixels"]
+  }
+}

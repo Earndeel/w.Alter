@@ -1,0 +1,649 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "id": "core",
+      "root": "/opt/walter-core",
+      "anchors": [
+        "/opt/walter-core/server.py",
+        "/opt/walter-core/hooks/walter_hook.py"
+      ],
+      "requires": [],
+      "external": [],
+      "data": [],
+      "core_paths": [
+        "/opt/walter-core/walter_platform"
+      ],
+      "backup_paths": [
+        "/opt/walter-core",
+        "/root/.codex/config.toml",
+        "/root/.claude.json",
+        "/root/.claude/settings.json",
+        "/opt/dsh/home/cordis.patch.yml",
+        "/opt/dsh/home/walter-hooks.json",
+        "/usr/local/bin/walter"
+      ],
+      "interfaces": [
+        "MCP stdio",
+        "walter CLI"
+      ],
+      "bindings": {
+        "hermes": "native adapters + lifecycle hook (no duplicate MCP attachment)",
+        "dsh": "MCP + lifecycle adapter",
+        "codex": "MCP + lifecycle adapter",
+        "claude-code": "MCP + lifecycle adapter"
+      },
+      "limitations": [
+        "MCP client must reconnect to discover newly installed tools.",
+        "CLI attachment installs common MCP; context/model/lifecycle bindings are checked independently."
+      ],
+      "services": []
+    },
+    {
+      "id": "soul",
+      "root": "/opt/walter-soul",
+      "anchors": [
+        "/opt/walter-soul/identity.md",
+        "/opt/walter-soul/rules.md",
+        "/opt/walter-soul/bin/walter-soul"
+      ],
+      "requires": [],
+      "external": [],
+      "data": [
+        "identity sources",
+        "curated user profile"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/opt/walter-soul",
+        "/opt/walter-profiles",
+        "/root/.hermes/memories"
+      ],
+      "interfaces": [
+        "renderer",
+        "walter_profile MCP"
+      ],
+      "bindings": {
+        "hermes": "rendered SOUL.md",
+        "dsh": "rendered AGENTS.md + walter_profile MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [
+        "Profile and critical buffer retain compatibility locations under .hermes; no running Hermes required."
+      ],
+      "services": []
+    },
+    {
+      "id": "memory",
+      "root": "/opt/walter-memory",
+      "anchors": [
+        "/opt/walter-memory/walter_memory/events.py",
+        "/opt/walter-memory/walter_memory/objects.py"
+      ],
+      "requires": [],
+      "external": [
+        "PostgreSQL hindsight-pg:5433",
+        "pgvector",
+        "walter-llm for derived extraction"
+      ],
+      "data": [
+        "core.*",
+        "ingestion.*",
+        "privacy.*",
+        "search.*",
+        "system.*",
+        "kardex.*"
+      ],
+      "core_paths": [
+        "/opt/walter-memory/walter_memory/events.py",
+        "/opt/walter-memory/walter_memory/objects.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-memory",
+        "/root/.pgpass"
+      ],
+      "interfaces": [
+        "Python library",
+        "HTTP :8890",
+        "CLI",
+        "MCP"
+      ],
+      "bindings": {
+        "hermes": "Walter ingestion + Hindsight provider (legacy cognitive adapter)",
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [
+        "Hindsight is a replaceable cognitive implementation; current Hermes provider remains Hindsight.",
+        "Source connectors are host-specific adapters; native working stores stay owned by each harness."
+      ],
+      "services": [
+        "walter-memory-gateway"
+      ]
+    },
+    {
+      "id": "logs",
+      "root": "/opt/walter-memory",
+      "anchors": [
+        "/opt/walter-memory/walter_memory/logs.py",
+        "/opt/walter-memory/connectors/walter_logs.py"
+      ],
+      "requires": [
+        "memory"
+      ],
+      "external": [],
+      "data": [
+        "walter_logs.*"
+      ],
+      "core_paths": [
+        "/opt/walter-memory/walter_memory/logs.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-memory"
+      ],
+      "interfaces": [
+        "Writer",
+        "CLI",
+        "MCP"
+      ],
+      "bindings": {
+        "hermes": "source transcript watcher + lifecycle adapter",
+        "dsh": "source transcript watcher + lifecycle adapter",
+        "codex": "source transcript watcher + lifecycle adapter",
+        "claude-code": "source transcript watcher + lifecycle adapter"
+      },
+      "limitations": [
+        "Only traces made available by the harness can be archived; hidden reasoning cannot be reconstructed."
+      ],
+      "services": [
+        "walter-logs-watch"
+      ]
+    },
+    {
+      "id": "bus",
+      "root": "/opt/walter-memory",
+      "anchors": [
+        "/opt/walter-memory/walter_memory/bus.py"
+      ],
+      "requires": [
+        "memory"
+      ],
+      "external": [],
+      "data": [
+        "bus.*"
+      ],
+      "core_paths": [
+        "/opt/walter-memory/walter_memory/bus.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-memory"
+      ],
+      "interfaces": [
+        "Python emit/Consumer",
+        "Postgres LISTEN/NOTIFY"
+      ],
+      "bindings": {
+        "hermes": "lifecycle adapter",
+        "dsh": "lifecycle adapter",
+        "codex": "lifecycle adapter",
+        "claude-code": "lifecycle adapter"
+      },
+      "limitations": [],
+      "services": []
+    },
+    {
+      "id": "skills",
+      "root": "/opt/walter-skills",
+      "anchors": [
+        "/opt/walter-skills/walter_skills/api.py",
+        "/opt/walter-skills/config/walter-skills.toml"
+      ],
+      "requires": [
+        "bus"
+      ],
+      "external": [
+        "PostgreSQL skills schema",
+        "walter-llm for curation"
+      ],
+      "data": [
+        "git skill store",
+        "skills.*"
+      ],
+      "core_paths": [
+        "/opt/walter-skills/walter_skills/client.py",
+        "/opt/walter-skills/walter_skills/policy.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-skills"
+      ],
+      "interfaces": [
+        "HTTP :8891",
+        "stdlib client",
+        "MCP",
+        "Hermes plugin"
+      ],
+      "bindings": {
+        "hermes": "native walter-skills adapter and lifecycle hook",
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [],
+      "services": [
+        "walter-skills",
+        "walter-skills-bus"
+      ]
+    },
+    {
+      "id": "router",
+      "root": "/opt/walter-router",
+      "anchors": [
+        "/opt/walter-router/walter_router/cli.py"
+      ],
+      "requires": [],
+      "external": [
+        "PostgreSQL models schema",
+        "leaderboard/provider APIs"
+      ],
+      "data": [
+        "models.*",
+        "config"
+      ],
+      "core_paths": [
+        "/opt/walter-router/walter_router/db.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-router"
+      ],
+      "interfaces": [
+        "CLI",
+        "walter-llm task routes",
+        "MCP route lookup"
+      ],
+      "bindings": {
+        "hermes": "router plugin + auxiliary configuration adapter",
+        "dsh": "walter-llm provider",
+        "codex": "task lookup; primary model native",
+        "claude-code": "task lookup; primary model native"
+      },
+      "limitations": [
+        "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
+        "New model choices remain subject to Monsieur approval; no automatic switching introduced."
+      ],
+      "services": []
+    },
+    {
+      "id": "llm",
+      "root": "/opt/walter-llm",
+      "anchors": [
+        "/opt/walter-llm/gateway.py"
+      ],
+      "requires": [
+        "router",
+        "secrets"
+      ],
+      "external": [],
+      "data": [
+        "local consumer tokens",
+        "provider routing configuration"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/opt/walter-llm",
+        "/root/.hermes/walter-llm"
+      ],
+      "interfaces": [
+        "OpenAI-compatible :8894"
+      ],
+      "bindings": {
+        "dsh": "configured provider",
+        "hermes": "auxiliary/module calls; main provider host-owned",
+        "codex": "specialist module calls; primary native",
+        "claude-code": "specialist module calls; primary native"
+      },
+      "limitations": [],
+      "services": [
+        "walter-llm"
+      ]
+    },
+    {
+      "id": "context",
+      "root": "/opt/walter-context",
+      "anchors": [
+        "/opt/walter-context/walter_context/session.py",
+        "/opt/walter-context/ports/hermes/__init__.py",
+        "/opt/walter-context/ports/dsh/index.mjs"
+      ],
+      "requires": [],
+      "external": [
+        "Optional Walter Logs for Hermes journal recovery; DSH uses own raw journal"
+      ],
+      "data": [
+        "per-session projection epochs; recoverable originals in logs"
+      ],
+      "core_paths": [
+        "/opt/walter-context/walter_context"
+      ],
+      "backup_paths": [
+        "/opt/walter-context"
+      ],
+      "interfaces": [
+        "Python Session",
+        "Hermes ContextEngine adapter",
+        "DSH CompactionEngine adapter"
+      ],
+      "bindings": {
+        "hermes": "see live context.engine in harness check",
+        "dsh": "Walter compaction adapter",
+        "codex": "native compaction",
+        "claude-code": "native compaction"
+      },
+      "limitations": [
+        "DSH uses public compaction transactions; checkpoints retain all user text or refuse.",
+        "Hermes remains on walter-compress; walter-context projection is not activated.",
+        "Structural and known-answer tests do not certify semantic model quality."
+      ],
+      "services": []
+    },
+    {
+      "id": "secrets",
+      "root": "/opt/walter-secrets",
+      "anchors": [
+        "/opt/walter-secrets/walter_secrets/service.py",
+        "/opt/walter-secrets/walter_secrets/vault.py"
+      ],
+      "requires": [],
+      "external": [
+        "Bitwarden CLI",
+        "age recovery material"
+      ],
+      "data": [
+        "encrypted vault cache",
+        "reference metadata",
+        "sync configuration"
+      ],
+      "core_paths": [
+        "/opt/walter-secrets/walter_secrets/vault.py",
+        "/opt/walter-secrets/walter_secrets/service.py",
+        "/opt/walter-secrets/walter_secrets/masking.py",
+        "/opt/walter-secrets/walter_secrets/settings.py",
+        "/opt/walter-secrets/walter_secrets/unlock.py",
+        "/opt/walter-secrets/walter_secrets/otp.py",
+        "/opt/walter-secrets/walter_secrets/secrets_sync.py",
+        "/opt/walter-secrets/walter_secrets/vault_react.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-secrets",
+        "/root/.hermes/vault",
+        "/root/.config/Bitwarden CLI/data.json",
+        "/root/.hermes/logs/walter-secrets.jsonl",
+        "/root/.hermes/logs/walter-secrets-sync.status.json",
+        "/root/.hermes/logs/walter-secrets-sync.log"
+      ],
+      "interfaces": [
+        "safe MCP metadata/reference",
+        "local CLI exec/get",
+        "Hermes hooks"
+      ],
+      "bindings": {
+        "hermes": "shared core + placeholders/output masking + browser port",
+        "dsh": "safe MCP; local exec with host approvals",
+        "codex": "safe MCP; local exec with host approvals",
+        "claude-code": "safe MCP; local exec with host approvals"
+      },
+      "limitations": [
+        "Hermes browser-field fill is a host-specific adapter.",
+        "MCP never returns raw secret values; CLI exec suppresses child output."
+      ],
+      "services": [
+        "walter-secrets-sync"
+      ]
+    },
+    {
+      "id": "computer",
+      "root": "/opt/walter-computer",
+      "anchors": [
+        "/opt/walter-computer/walter_computer/__init__.py"
+      ],
+      "requires": [],
+      "external": [
+        "device-node driver",
+        "Mac over SSH/Tailscale",
+        "optional walter-llm vision"
+      ],
+      "data": [
+        "isolated ephemeral operator sessions"
+      ],
+      "core_paths": [
+        "/opt/walter-computer/walter_computer/operator.py",
+        "/opt/walter-computer/walter_computer/policy.py",
+        "/opt/walter-computer/walter_computer/config.py",
+        "/opt/walter-computer/walter_computer/driver.py",
+        "/opt/walter-computer/walter_computer/transport.py",
+        "/opt/walter-computer/walter_computer/types.py",
+        "/opt/walter-computer/walter_computer/runtime.py",
+        "/opt/walter-computer/walter_computer/observer.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-computer",
+        "/root/walter-computer-use",
+        "/root/.config/walter-device-node",
+        "/etc/tmpfiles.d/walter-computer.conf"
+      ],
+      "interfaces": [
+        "OperatorSessions",
+        "MCP computer_use",
+        "Hermes plugin"
+      ],
+      "bindings": {
+        "hermes": "plugin integration verified separately",
+        "dsh": "direct MCP",
+        "codex": "direct MCP",
+        "claude-code": "direct MCP"
+      },
+      "limitations": [
+        "No live desktop input is performed by health checks.",
+        "Pixel/vision/input permissions are explicit per call.",
+        "Standalone vision sensor unavailable until configured; native Hermes vision remains.",
+        "Cross-process device lock covers each atomic call, not an entire workflow."
+      ],
+      "services": []
+    },
+    {
+      "id": "browse",
+      "root": "/opt/walter-browse",
+      "anchors": [
+        "/opt/walter-browse/walter_browse/facade.py",
+        "/opt/walter-browse/runtime/universal_router.py"
+      ],
+      "requires": [],
+      "external": [
+        "Scrapling isolated environment",
+        "Camoufox :9377",
+        "optional Webtop CDP"
+      ],
+      "data": [
+        "shared session state",
+        "learned route profiles",
+        "result cache"
+      ],
+      "core_paths": [
+        "/opt/walter-browse/walter_browse",
+        "/opt/walter-browse/runtime/universal_router.py",
+        "/opt/walter-browse/runtime/browse_session.py",
+        "/opt/walter-browse/runtime/profile_index.py",
+        "/opt/walter-browse/runtime/result_cache.py",
+        "/opt/walter-browse/runtime/search_lite.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-browse"
+      ],
+      "interfaces": [
+        "shared request contract",
+        "CLI",
+        "MCP",
+        "Hermes plugin"
+      ],
+      "bindings": {
+        "hermes": "native walter-browse adapter to shared facade",
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [
+        "Legacy hermes_adapter.py is diagnostic adapter only, not imported by shared calls.",
+        "Browser authentication API remains a separate adapter in walter-core."
+      ],
+      "services": []
+    },
+    {
+      "id": "raw-vault",
+      "root": "/opt/walter-raw-vault",
+      "anchors": [
+        "/opt/walter-raw-vault/rawvault.py"
+      ],
+      "requires": [
+        "memory"
+      ],
+      "external": [
+        "rclone",
+        "Google Drive",
+        "S3 :8899"
+      ],
+      "data": [
+        "core.objects registry (memory-owned)",
+        "original bytes on Drive"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/opt/walter-raw-vault",
+        "/root/.config/rclone/rclone.conf",
+        "/root/.hermes/raw-vault"
+      ],
+      "interfaces": [
+        "memory objects library",
+        "S3",
+        "MCP"
+      ],
+      "bindings": {
+        "hermes": "Walter library/CLI through skills; shared canonical catalog",
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [],
+      "services": [
+        "raw-vault-s3"
+      ]
+    },
+    {
+      "id": "voice-memory",
+      "root": "/opt/walter-voice-memory",
+      "anchors": [
+        "/opt/walter-voice-memory/server.py"
+      ],
+      "requires": [
+        "memory"
+      ],
+      "external": [
+        "Hindsight",
+        "local embedding model"
+      ],
+      "data": [
+        "walter_voice.*"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/opt/walter-voice-memory"
+      ],
+      "interfaces": [
+        "HTTP :8897"
+      ],
+      "bindings": {
+        "voice": "low-latency recall service"
+      },
+      "limitations": [],
+      "services": [
+        "walter-voice-memory"
+      ]
+    },
+    {
+      "id": "voice",
+      "root": "/opt/openclaw",
+      "anchors": [
+        "/opt/openclaw/hermes_voice_bridge.py"
+      ],
+      "requires": [
+        "soul",
+        "voice-memory"
+      ],
+      "external": [
+        "Asterisk/SIP",
+        "Gemini Live",
+        "Hermes action delegation"
+      ],
+      "data": [
+        "SIP configuration",
+        "bridge state"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/opt/openclaw",
+        "/root/.hermes/services/voice_router_service.py",
+        "/etc/asterisk"
+      ],
+      "interfaces": [
+        "SIP phone",
+        "voice_router :12110"
+      ],
+      "bindings": {
+        "voice": "phone bridge",
+        "hermes": "explicit action delegate"
+      },
+      "limitations": [
+        "Hermes is the current selected action delegate; voice is not a Codex/Claude/DSH runtime replacement."
+      ],
+      "services": [
+        "hermes-bridge",
+        "voice-router"
+      ]
+    },
+    {
+      "id": "colab",
+      "root": "/opt/walter-colab",
+      "anchors": [
+        "/opt/walter-colab/on_demand.py",
+        "/opt/walter-colab/RUNBOOK.md"
+      ],
+      "requires": [],
+      "external": [
+        "official Colab MCP",
+        "browser authentication",
+        "Google Drive"
+      ],
+      "data": [
+        "immutable prepared artifacts and result evidence"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/opt/walter-colab"
+      ],
+      "interfaces": [
+        "on_demand.py CLI"
+      ],
+      "bindings": {
+        "hermes": "local CLI via host execution permissions",
+        "dsh": "local CLI via host execution permissions",
+        "codex": "local CLI via host execution permissions",
+        "claude-code": "local CLI via host execution permissions"
+      },
+      "limitations": [
+        "GPU remains blocked until prepared artifact validation; modularity work does not remove this guard.",
+        "No remote compute is allocated by modularity checks."
+      ],
+      "services": []
+    }
+  ]
+}

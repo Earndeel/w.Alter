@@ -4,7 +4,7 @@
 Any MCP client (Claude Code, Claude Desktop, Cursor, Codex, another Hermes...) gets the same
 capabilities without importing Hermes internals:
 
-  memory_recall / memory_retain / memory_reflect  → Hindsight (Postgres + pgvector), bank "walter"
+  memory_recall / memory_retain / memory_reflect  → Walter Memory canonical facade (privacy + Router synthesis)
   walter_profile                                  → USER.md / SOUL.md / MEMORY.md
   skills_search / skill_read                      → W.Alter skills (walter-skills service :8891, store /opt/walter-skills)
   ask_hermes                                      → delegate a task to the live Hermes agent (all its tools)
@@ -40,7 +40,7 @@ HERMES_API_URL = os.environ.get("WALTER_HERMES_API_URL", "http://127.0.0.1:8642"
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
 STACK_UNITS = [
     "hindsight-api", "walter-voice-memory", "walter-memory-gateway", "raw-vault-s3", "hermes-bridge", "voice-router",
-    "hermes-dashboard", "cloudflared-tunnel", "docker",
+    "walter-llm", "cloudflared-tunnel", "docker",   # hermes-dashboard removed 2026-10-16
 ]
 # Walter Memory (events, Raw Vault objects) runs in its own venv; called as a CLI so this server stays light.
 WALTER_MEMORY = ["/usr/local/bin/walter-memory"]
@@ -68,52 +68,49 @@ def _hindsight(path: str, body: dict, timeout: float = 60.0) -> dict:
 
 
 mcp = FastMCP("walter-core", instructions=(
-    "W.Alter is the user's personal AI agent (Hermes) running on this VM. These tools share its long-term "
+    "W.Alter is the user's modular capability stack on this VM. Use its connected modules across harnesses; keep the host runtime and permissions. These tools share its long-term "
     "memory and skills. The user is addressed as 'Monsieur' and works in French. Recalled memories are dated "
     "snapshots, not live state: verify current config/services before asserting them. Retain only durable "
     "facts about the user, their projects and decisions — never secrets, credentials or transient logs."))
 
 
+def _agent_memory(method: str, args: dict, timeout: float = 180) -> str:
+    """Transport only: privacy, retrieval, retention and reflection live in Walter Memory."""
+    payload = {"version": 1, "method": method, "args": args, "caller": CLIENT_TAG}
+    try:
+        result = subprocess.run([*WALTER_MEMORY, "agent-memory"], input=json.dumps(payload, ensure_ascii=False),
+                                capture_output=True, text=True, timeout=timeout)
+        # agent-memory errors are structured and never echo input or credentials.
+        if result.stdout.strip():
+            json.loads(result.stdout)
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return json.dumps({"status": "error", "text": "Walter Memory unavailable; no legacy fallback was used."})
+
+
 @mcp.tool()
 def memory_recall(query: str, budget: str = "mid", max_tokens: int = 2048) -> str:
-    """Search W.Alter's long-term memory about the user (preferences, projects, people, past decisions).
-    Use before answering anything personal or project-related. budget: low | mid | high (depth/latency)."""
-    body = {"query": query, "budget": budget if budget in BUDGETS else "mid", "max_tokens": int(max_tokens),
-            # junk/task-log memories flagged by the usefulness audit are kept but never recalled
-            "tag_groups": [{"not": {"tags": ["quarantine:noise"], "match": "any_strict"}}]}
-    data = _hindsight("/memories/recall", body)
-    results = data.get("results") or []
-    if not results:
-        return "No relevant memory."
-    lines = []
-    for i, item in enumerate(results, 1):
-        when = item.get("occurred_start") or item.get("mentioned_at") or ""
-        kind = item.get("type") or ""
-        lines.append(f"{i}. [{kind}{' · ' + when[:10] if when else ''}] {item.get('text', '').strip()}")
-    return "\n".join(lines)
+    """Retrieve budgeted, cloud-safe canonical knowledge and evidence from Walter Memory.
+    Returns source references; historical records may be stale. Uses local hybrid search,
+    excluding legacy cognitive rows without canonical provenance. budget: low | mid | high."""
+    return _agent_memory("recall", {"query": query, "budget": budget, "max_tokens": max_tokens})
 
 
 @mcp.tool()
 def memory_retain(content: str, context: str = "", tags: list[str] | None = None) -> str:
-    """Store a durable fact in W.Alter's memory so every agent (Hermes, Claude, voice) knows it.
-    content: a self-contained statement, e.g. "Monsieur prefers X because Y". Never store secrets."""
-    item = {"content": content, "context": context or f"noted by {CLIENT_TAG} via walter-core",
-            "tags": sorted({f"source:{CLIENT_TAG}", *(tags or [])})}
-    # Canonical record first (the statement as told, A1/§5), then Hindsight until the P5 router takes over.
-    note = _walter_memory("note", content, "--source", CLIENT_TAG, "--context", context,
-                          *[x for t in tags or [] for x in ("--tag", t)], timeout=60)
-    data = _hindsight("/memories", {"items": [item], "async": True})
-    return (f"Recorded as event ({'ok' if 'recorded' in note else note[:200]}); "
-            f"queued for memory (operation {data.get('operation_id') or data.get('id') or 'ok'}).")
+    """Record a durable fact once in Walter Memory's canonical event store, with module-owned privacy.
+    Search indexing is asynchronous. No direct copy is sent to the legacy Hindsight bank;
+    the result explicitly reports the projection state. Never submit credentials."""
+    return _agent_memory("retain", {"content": content, "context": context, "tags": tags or []})
 
 
 @mcp.tool()
 def memory_reflect(question: str, budget: str = "mid") -> str:
-    """Ask W.Alter's memory to reason over everything it knows and answer a synthetic question
-    (e.g. "What are Monsieur's current priorities?"). Slower than memory_recall."""
-    data = _hindsight("/reflect", {"query": question, "budget": budget if budget in BUDGETS else "mid"},
-                      timeout=180.0)
-    return data.get("text") or json.dumps(data, ensure_ascii=False)[:4000]
+    """Synthesize an answer from permitted canonical memory with source references, using Walter Router.
+    This is Walter Memory reflection, not legacy Hindsight reflect. Local-only questions are
+    refused; redacted questions are pseudonymised. Empty evidence makes no model call."""
+    return _agent_memory("reflect", {"question": question, "budget": budget}, timeout=240)
 
 
 @mcp.tool()
@@ -254,8 +251,8 @@ def memory_events(text: str = "", source: str = "", event_type: str = "", thread
     """Read W.Alter's canonical event history (what actually happened: messages, conversations with W.Alter,
     e-mails, calendar, files...). Exact substring search on content; filters: source (hermes, beeper, gmail,
     calendar, vault, claude…), event_type (message.received, message.sent, tool.called…), thread_id, since (ISO).
-    Use memory_recall for synthesised knowledge, this for the original record."""
-    args = ["events", "--limit", str(max(1, min(int(limit), 200)))]
+    Use memory_recall for synthesised knowledge, this for the original record. Only cloud_allowed rows are exposed."""
+    args = ["events", "--limit", str(max(1, min(int(limit), 200))), "--cloud-safe"]
     for flag, value in (("--text", text), ("--source", source), ("--type", event_type), ("--thread", thread_id),
                         ("--since", since)):
         if value:
@@ -308,8 +305,9 @@ def logs_get(session: str, seq: int) -> str:
 def vault_search(text: str = "", kind: str = "", source: str = "", limit: int = 20) -> str:
     """Search the Raw Vault: every raw file of the user's life that is not text (photos, screenshots, videos,
     voice notes, documents). Matches file names and derived text (OCR/transcripts/captions); empty text lists
-    the newest. kind: image|screenshot|video|audio|document|archive. Returns ids for vault_get."""
-    args = ["objects", "search", text, "--limit", str(int(limit))]
+    the newest permitted metadata. kind: image|screenshot|video|audio|document|archive.
+    Only cloud_allowed objects are exposed. Returns ids for vault_get."""
+    args = ["objects", "search", text, "--limit", str(max(1, min(int(limit), 100))), "--cloud-safe"]
     if kind:
         args += ["--kind", kind]
     if source:
@@ -320,9 +318,8 @@ def vault_search(text: str = "", kind: str = "", source: str = "", limit: int = 
 @mcp.tool()
 def vault_get(object_id: str, dest_dir: str = "/tmp/walter-vault") -> str:
     """Download one Raw Vault file (by id or sha256) to a local directory on the W.Alter VM, integrity-checked.
-    Returns the local path."""
-    Path(dest_dir).mkdir(parents=True, exist_ok=True, mode=0o700)
-    return _walter_memory("objects", "get", object_id, "--dest", dest_dir)
+    Returns the local path. Restricted objects are refused before any download or directory creation."""
+    return _walter_memory("objects", "get", object_id, "--dest-dir", dest_dir, "--cloud-safe")
 
 
 @mcp.tool()
@@ -387,6 +384,10 @@ def walter_health() -> str:
     st = os.statvfs("/")
     out.append(f"disk /: {100 - st.f_bavail * 100 // st.f_blocks}% used, {st.f_bavail * st.f_frsize >> 30} GiB free")
     return "\n".join(out)
+
+
+from walter_capabilities import register as register_capabilities
+register_capabilities(mcp, CLIENT_TAG, local_control="--http" not in sys.argv)
 
 
 if __name__ == "__main__":
