@@ -60,5 +60,23 @@ tests/            invariants: purity, append-only, cross-boundary prefix, record
   enabled instead of `walter-compress`, toolset `context_engine` on the platforms that should see `context_recover`.
   Each request logs `walter-context: {trace}` in agent.log; the A8 collector attaches it to the call
   (`system.agent_calls.context_engine/context_trace`).
-* **DSH / a future Walter runtime**: call `Session.select / observe / turn_complete` directly.
+* **DSH** (`ports/dsh`): real checkpoint backend through the public compaction service,
+  using the same core and tunables. Automatic selection/summary are Walter; durable
+  locking, replay, meter and manual range selection remain DSH. See `ports/dsh/README.md`.
+* **A future Walter runtime**: call `Session.select / observe / turn_complete` directly.
 * **Claude Code / Codex**: their compaction is theirs; they keep getting memory through the hook and the MCP.
+
+## Modularity verification — 2026-10-18
+
+`walter_context/checkpoint.py` and the versioned JSON/stdin `bridge.py` are the
+portable checkpoint interface for event-sourced hosts. They require only Python
+3.11+ stdlib; no `agent`, Hermes configuration, DSH JavaScript or database imports.
+Projection `Session` remains a separate public mode for hosts such as Hermes.
+Journal recovery optionally uses Walter Memory; it grants own-session access only
+to an exact session id, never a profile prefix, and disambiguates colliding call ids.
+The Hermes port honors smaller host context windows and resets disposable state
+on a new session. Hermes activation and semantic retention evaluation remain
+separate from the structural test suite and DSH installation.
+
+Verification: `python -m pytest -q tests` in Hermes' venv; `node tests/test_dsh.mjs`
+with DSH's peer dependencies installed. No test requires cloud model access.

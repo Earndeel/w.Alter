@@ -60,11 +60,12 @@ class WalterContextEngine(ContextEngine):
         self.threshold_percent = self._session.cfg.policy.emergency_share
         self.threshold_tokens = int(self.context_length * self.threshold_percent)
         self._session.set_model(model or "")
+        self._session.set_budget(self.context_length)
 
     def update_from_response(self, usage: Dict[str, Any]) -> None:
         usage = usage or {}
-        self.last_prompt_tokens = int(usage.get("prompt_tokens") or 0)
-        self.last_completion_tokens = int(usage.get("completion_tokens") or 0)
+        self.last_prompt_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+        self.last_completion_tokens = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
         self.last_total_tokens = int(usage.get("total_tokens") or 0)
         self._session.observe(usage)
 
@@ -88,6 +89,8 @@ class WalterContextEngine(ContextEngine):
     # -- every provider request ------------------------------------------------------------------------------------
     def select_context(self, request_messages: List[Dict[str, Any]], *, conversation_messages=None,
                        incoming_message=None, budget_tokens: int = 0) -> Optional[List[Dict[str, Any]]]:
+        if budget_tokens:
+            self._session.set_budget(budget_tokens)
         sel = self._session.select(request_messages, self._base(conversation_messages))
         trace = dict(sel.trace, session=self._session_id, profile=self._profile)
         logger.info("walter-context: %s", json.dumps(trace, separators=(",", ":")))
@@ -98,6 +101,7 @@ class WalterContextEngine(ContextEngine):
 
     # -- lifecycle -----------------------------------------------------------------------------------------------------
     def on_session_start(self, session_id: str, **kwargs) -> None:
+        self._session.reset()
         self._session_id = session_id or ""
         home = str(kwargs.get("hermes_home") or os.environ.get("HERMES_HOME") or "")
         parts = home.rstrip("/").split("/")
@@ -116,7 +120,7 @@ class WalterContextEngine(ContextEngine):
             return super().handle_tool_call(name, args, **kwargs)
         ref = str((args or {}).get("ref") or "").strip()
         cmd = [CLI, "recover", ref, "--offset", str(int((args or {}).get("offset") or 0)),
-               "--own", f"hermes/{self._profile}/"]
+               "--own", f"hermes/{self._profile}/{self._session_id}" if self._session_id else ""]
         try:
             out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             return out.stdout.strip() or json.dumps({"error": (out.stderr or "no output")[-400:]})

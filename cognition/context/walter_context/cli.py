@@ -21,7 +21,7 @@ def main(argv=None) -> int:
     r.add_argument("ref")
     r.add_argument("--offset", type=int, default=0)
     r.add_argument("--max-privacy", default="cloud_allowed", choices=["cloud_allowed", "redacted_cloud", "local_only"])
-    r.add_argument("--own", help="caller's session prefix: its own outputs are returned as first seen")
+    r.add_argument("--own", help="exact caller session id: its own outputs are returned as first seen")
     sub.add_parser("bench", help="replay bench: tokens, cache, cost (see bench/replay.py --help)")
     sub.add_parser("quality", help="retention probes, LLM-judged; --estimate by default (see bench/quality.py)")
     a = ap.parse_args(argv)
