@@ -69,6 +69,22 @@ def sel_model_id(route: dict) -> str:
     return identity.normalize("openrouter", m)[0] if "/" in m else identity.canon(m.replace(".", "-"))
 
 
+SERVICE_UNITS = {"per minute": "$/min", "per search": "$/recherche", "per 1m tokens": "$/M tokens", "per hour": "$/h"}
+
+
+def _service_price(offers: dict, mid: str, prov: str, iface: str) -> str:
+    own = [o for o in offers.get(mid, []) if o["provider"] == prov and o["interface"] == iface]
+    unit = [o for o in own if o.get("norm_price") is not None]
+    if unit:
+        o = min(unit, key=lambda o: o["norm_price"])
+        return f'{catalog.money(o["norm_price"])} {SERVICE_UNITS.get((o.get("norm_unit") or "").lower(), o.get("norm_unit") or "")}'.strip()
+    tok = [o for o in own if o.get("price_in_1m") is not None]
+    if tok:
+        return f'{catalog.money(min(o["price_in_1m"] for o in tok))} $/M tokens audio' if iface == "transcription" \
+            else f'{catalog.money(min(o["price_in_1m"] for o in tok))} $/M tokens'
+    return ""
+
+
 def rows(conn) -> list[dict]:
     from .cli import with_execution   # late import (cli -> library)
     offers = sel.load_offers(conn, sel.latest_snapshots(conn))
@@ -144,6 +160,14 @@ def rows(conn) -> list[dict]:
             fb = media_exec.fallback_models(conn, task, role, mid, mode, n=1) if cfg else []
             row["fallback"] = _name(conn, fb[0]) if fb else "—"
             row["subscription"] = "Gemini AI Pro (crédits Flow)" if flow else "—"
+        elif iface in ("transcription", "embedding", "rerank"):   # STT, embeddings, rerank (2026-10-17): priced per minute / search / M tokens
+            row["providers"] = " → ".join(
+                f'{PROV.get(p, p)} {_service_price(offers, mid, p, iface)}'.strip()
+                for p in dict.fromkeys(o["provider"] for o in offers.get(mid, []) if o["interface"] == iface)) or "—"
+            nxt = next((c["model_id"] for c in comp if c["model_id"] != mid
+                        and any(o["interface"] == iface for o in offers.get(c["model_id"], []))), None)
+            row["fallback"] = _name(conn, nxt) if nxt else "—"
+            row["subscription"] = "—"
         else:   # decisions
             o = [x for x in offers.get(mid, []) if x["interface"] == "decisions" and x.get("price_in_1m") is not None]
             row["providers"] = f'OpenRouter {catalog.money(o[0]["price_in_1m"])} $/M' if o else "OpenRouter"
