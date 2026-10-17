@@ -190,3 +190,29 @@ Class-level rules:
 
 - Skill hermes-multi-agent-profiles — overall multi-agent architecture, profiles
 - Skill hermes-provider-mastery — provider config patterns
+
+## Verify module routing through walter-llm
+
+1. Distinguish Hermes routing from module routing: `walter-router sync-hermes` configures Hermes; modules calling `127.0.0.1:8894` depend on `/opt/walter-llm/gateway.py`. A correct router choice does not prove the gateway executes that provider.
+2. Inspect the selected task and gateway implementation before changing routing:
+   ```bash
+   /opt/walter-router/bin/walter-router pick memory_extraction
+   rg -n 'codex|reasoning_effort|response_format|CHATGPT_DEFAULT_INSTRUCTIONS' /opt/walter-llm/gateway.py
+   ```
+3. Exercise the actual consuming module, then inspect recent successful gateway calls. Print only routing metadata:
+   ```bash
+   /opt/walter-llm/venv/bin/python - <<'PY'
+   import json
+   from collections import deque
+   with open('/root/.hermes/logs/walter-llm.jsonl') as f:
+       recent = deque(f, maxlen=100)
+   for line in recent:
+       r = json.loads(line)
+       if r.get('ok'):
+           print({k: r.get(k) for k in ('at', 'agent', 'task', 'provider', 'model', 'seconds')})
+   PY
+   ```
+   Confirm the provider actually used; a successful response can conceal fallback to a paid provider.
+4. For Codex routes, use W.Alter's own Codex CLI session read-only. Keep Hermes authentication separate, leave token refresh to the CLI, and never print authentication material.
+5. Test structured output at the consumer boundary. In this session, the Codex backend ignored the requested JSON response format; explicitly requesting JSON in the prompt restored usable output, but does not establish schema enforcement. Parse the result and validate the required structure before accepting it. Direct Responses experiments also required list-shaped `input` and returned a streaming iterator rather than an object with `.output`.
+6. After gateway changes, restart `walter-llm` and repeat real consumer checks, including Hindsight, L3 synthesis, profile compilation and Kardex extraction when affected. Compare provider, output validity and latency; do not accept an HTTP 200 alone as proof of correct routing.
