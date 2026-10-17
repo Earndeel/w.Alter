@@ -17,8 +17,10 @@ from . import catalog, select as sel
 
 esc = html.escape
 TABS = [("home", "🏠", "Vue d'ensemble"), ("chat", "💬", "Texte"), ("image", "🖼️", "Image"), ("video", "🎬", "Vidéo"),
-        ("audio", "🎧", "Audio & musique"), ("decisions", "🧭", "Décision"), ("subs", "💳", "Abonnements")]
-TAB_OF = {"chat": "chat", "image": "image", "video": "video", "audio": "audio", "music": "audio", "decisions": "decisions"}
+        ("audio", "🎧", "Audio & musique"), ("memory", "🔎", "Mémoire & recherche"), ("decisions", "🧭", "Décision"),
+        ("subs", "💳", "Abonnements")]
+TAB_OF = {"chat": "chat", "image": "image", "video": "video", "audio": "audio", "music": "audio", "decisions": "decisions",
+          "transcription": "audio", "embedding": "memory", "rerank": "memory"}   # services (2026-10-17)
 LEVELS = {"L1": ("Économique", "Quotidien : réponses courtes, résumés, petites rédactions"),
           "L2": ("Intermédiaire", "Analyse en plusieurs étapes, comparaison, rédaction soignée"),
           "L3": ("Haut de gamme", "Raisonnement profond, synthèse, enjeu important")}
