@@ -10,3 +10,11 @@ Walter Memory core (spec and decisions: `/root/.hermes/docs/walter-memory/`).
   (break-glass), `gateway` (HTTP 127.0.0.1:8890), `cli` (`walter-memory`).
 - `connectors/` — source connectors (P2).
 - `tests/` — `venv/bin/python -m pytest -q tests/`.
+
+- `ops/` — authoritative offsite backup/restore and maintenance scripts; installed entrypoints are symlinks.
+- `walter_memory.backup_bundle` — discover module sources and integration dependencies; consistent profile SQLite
+  snapshots; versioned SHA-256/mode/link manifest, Python package inventories and mandatory entrypoint checks.
+  PG (all schemas), main Hermes SQLite and existing Raw Vault objects are separate payloads. Verification does
+  not yet prove a complete install on a clean VM. See the operational runbook for encrypted restore commands.
+- `walter_memory.hygiene` — bounded, reversible PostgreSQL/Hindsight quarantine; dry-run by default, snapshots
+  before `--apply`. Canonical events and raw agent logs are never deleted by this maintenance.

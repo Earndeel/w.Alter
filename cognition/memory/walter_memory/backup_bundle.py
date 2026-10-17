@@ -8,6 +8,9 @@ import argparse,datetime,hashlib,io,json,os,pathlib,shlex,sqlite3,subprocess,tar
 
 MANIFEST='walter-backup-manifest.json'
 CORE_MODULES=('core','memory','router','skills','context','llm','soul','voice-memory','raw-vault')
+MODULE_ANCHORS={'core':'server.py','memory':'walter_memory/events.py','router':'walter_router/cli.py',
+                'skills':'walter_skills/api.py','context':'walter_context/session.py','llm':'gateway.py',
+                'soul':'identity.md','voice-memory':'server.py','raw-vault':'rawvault.py'}
 SKIP_PARTS={'venv','.venv','node_modules','__pycache__','.cache','.pytest_cache','.mypy_cache','.ruff_cache','.hermes-runtime'}
 SKIP_PREFIXES=('root/.hermes/hermes-agent/.git','opt/walter-voice-memory/models',
                'root/.hermes/skills/.curator_backups','opt/dsh/home/sessions')
@@ -25,6 +28,7 @@ def excluded(name):
 def inventory(root):
     """Mandatory core and integration anchors; optional roots are explicitly inventoried."""
     required={f'opt/walter-{m}' for m in CORE_MODULES}
+    required.update(f'opt/walter-{m}/{entry}' for m,entry in MODULE_ANCHORS.items())
     required.update(('root/.hermes/config.yaml','root/.hermes/.env','root/.pgpass',
                      'root/.hermes/walter-llm','root/.config/rclone/rclone.conf',
                      'root/.config/systemd/user/hermes-gateway.service',
@@ -104,30 +108,44 @@ def create(output,root=pathlib.Path('/'),sources=None,required=None,include_depe
     else:absent=[];required=required or sources
     for n in required:
         if not (root/n).exists():raise RuntimeError('required backup source missing: '+n)
-    entries={};snapshots=[]
+    entries={};snapshots=[];visited=set()
     output.parent.mkdir(parents=True,exist_ok=True)
     fd=os.open(output,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600);os.close(fd)
     try:
       with tarfile.open(output,'w',dereference=False) as archive:
+        def parents(name):
+            # Preserve private ancestor modes (.hermes/.ssh), without walking unrelated files.
+            # A symlinked ancestor is represented as its logical directory; explicit source
+            # symlinks are preserved by add(). This keeps leaf snapshots independently restorable.
+            for parent in reversed(pathlib.PurePosixPath(name).parents):
+                n=str(parent)
+                if n=='.' or n in entries:continue
+                st=(root/n).stat();info=tarfile.TarInfo(n);info.type=tarfile.DIRTYPE
+                info.mode=st.st_mode & 0o777;info.uid=st.st_uid;info.gid=st.st_gid;info.mtime=st.st_mtime
+                archive.addfile(info);entries[n]={'kind':'directory','mode':info.mode}
         def add(p,name):
-            if name in entries or excluded(name):return
+            if name in visited or excluded(name):return
+            visited.add(name);parents(name)
             info=archive.gettarinfo(str(p),arcname=name)
+            info.mode &= 0o7777
             if info.isfile():
                 with p.open('rb') as f:
                     before=os.fstat(f.fileno());reader=DigestReader(f);archive.addfile(info,reader);after=os.fstat(f.fileno())
                     if (before.st_size,before.st_mtime_ns)!=(after.st_size,after.st_mtime_ns):
                         raise RuntimeError('source changed during backup: '+name)
-                    entries[name]={'kind':'file','bytes':info.size,'sha256':reader.hash.hexdigest()}
+                    entries[name]={'kind':'file','bytes':info.size,'sha256':reader.hash.hexdigest(),'mode':info.mode}
             elif info.isdir():
-                archive.addfile(info);entries[name]={'kind':'directory'}
+                if name not in entries:archive.addfile(info)
+                entries[name]={'kind':'directory','mode':info.mode}
                 for child in sorted(p.iterdir()):add(child,name+'/'+child.name)
             elif info.issym() or info.islnk():
-                archive.addfile(info);entries[name]={'kind':'symlink','target':info.linkname}
+                archive.addfile(info);entries[name]={'kind':'symlink','target':info.linkname,'mode':info.mode}
             # Sockets/devices/pipes are not portable configuration payloads.
         for n in sources:add(root/n,n)
         # Consistent profile database copies, never an uncoordinated tar of SQLite/WAL.
         for db in sorted((root/'root/.hermes/profiles').glob('*/*.db')):
             name=str(db.relative_to(root))
+            if not any(name.startswith(n+'/') for n in sources):continue
             with tempfile.TemporaryDirectory() as tmp:
                 snap=pathlib.Path(tmp)/db.name
                 source=sqlite3.connect('file:'+str(db)+'?mode=ro',uri=True,timeout=20)
@@ -136,12 +154,13 @@ def create(output,root=pathlib.Path('/'),sources=None,required=None,include_depe
                 dest.close();source.close()
                 # Snapshot bypasses exclusion of the live database.
                 info=archive.gettarinfo(str(snap),arcname=name)
+                info.mode=db.stat().st_mode & 0o777
                 with snap.open('rb') as f:
                     reader=DigestReader(f);archive.addfile(info,reader)
-                entries[name]={'kind':'sqlite_snapshot','bytes':info.size,'sha256':reader.hash.hexdigest()};snapshots.append(name)
+                entries[name]={'kind':'sqlite_snapshot','bytes':info.size,'sha256':reader.hash.hexdigest(),'mode':info.mode};snapshots.append(name)
         missing=[n for n in required if n not in entries]
         if missing:raise RuntimeError('required paths not archived: '+', '.join(missing))
-        manifest={'version':1,'created_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        manifest={'version':2,'created_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   'sources':sources,'required':required,'optional_absent':absent,'entries':entries,
                   'sqlite_snapshots':snapshots,'python_packages':dependencies(root) if include_dependencies else {},
                   'separate_payloads':{'postgres':'all schemas, including walter_logs and module state',
@@ -167,18 +186,19 @@ def verify(path,expected_required=()):
             if item.isfile():
                 h=hashlib.sha256();f=archive.extractfile(item)
                 for chunk in iter(lambda:f.read(1024*1024),b''):h.update(chunk)
-                entries[name]={'sha256':h.hexdigest(),'bytes':item.size}
-            elif item.isdir():entries[name]={'kind':'directory'}
-            elif item.issym() or item.islnk():entries[name]={'kind':'symlink','target':item.linkname}
+                entries[name]={'sha256':h.hexdigest(),'bytes':item.size,'mode':item.mode}
+            elif item.isdir():entries[name]={'kind':'directory','mode':item.mode}
+            elif item.issym() or item.islnk():entries[name]={'kind':'symlink','target':item.linkname,'mode':item.mode}
             else:raise ValueError('unsupported archive member: '+name)
-    if not manifest or manifest.get('version')!=1:raise ValueError('missing/unsupported backup manifest')
+    if not manifest or manifest.get('version') not in (1,2):raise ValueError('missing/unsupported backup manifest')
     declared=manifest['entries']
     if set(declared)!=set(entries):raise ValueError('archive members differ from manifest')
     for name,record in declared.items():
         actual=entries[name]
         if record['kind'] in ('file','sqlite_snapshot'):
             if record['sha256']!=actual.get('sha256') or record['bytes']!=actual.get('bytes'):raise ValueError('checksum mismatch: '+name)
-        elif record!=actual:raise ValueError('member metadata mismatch: '+name)
+        elif any(actual.get(k)!=v for k,v in record.items()):raise ValueError('member metadata mismatch: '+name)
+        if 'mode' in record and record['mode']!=actual['mode']:raise ValueError('mode mismatch: '+name)
     missing=(set(manifest['required'])|set(expected_required))-set(entries)
     if missing:raise ValueError('required paths missing: '+', '.join(sorted(missing)))
     return {'ok':True,'entries':len(entries),'required':len(manifest['required']),
