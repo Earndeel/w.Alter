@@ -15,11 +15,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from universal_extractor import ExtractionResult, ExtractionSpec, result_shape_fingerprint
 
-try:  # Hermes is available in the normal runtime, not in the isolated Scrapling venv.
-    from hermes_constants import get_hermes_home
-except ImportError:  # pragma: no cover - exercised by the standalone venv
-    def get_hermes_home() -> Path:
-        return Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+from walter_paths import state_home as get_hermes_home
 
 
 INDEX_VERSION = 4
