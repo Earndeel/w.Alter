@@ -28,7 +28,7 @@ MAX_RESULTS = 8
 def _read_env_key(name: str) -> str:
     """Read a key from the Hermes .env without importing python-dotenv."""
     try:
-        env_path = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))) / ".env"
+        env_path = Path(os.environ.get("WALTER_BROWSE_ENV_FILE", "/opt/walter-browse/config/search.env"))
         for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
             line = line.strip()
             if line.startswith(f"{name}="):

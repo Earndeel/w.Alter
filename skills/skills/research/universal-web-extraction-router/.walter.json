@@ -1,12 +1,11 @@
 {
  "hermes": {
   "path": "/root/.hermes/skills/research/universal-web-extraction-router",
-  "pending_sha": "fce69779742a8b7a4b83bd2b38242a5a04040030412c2f47e125c6db1f30aaee",
-  "sha": "c68d95dcc10128aa6d677273fe7b7ca9f84a4122994b425ccbf61262024518bc",
+  "sha": "fce69779742a8b7a4b83bd2b38242a5a04040030412c2f47e125c6db1f30aaee",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
- "store_sha": "c68d95dcc10128aa6d677273fe7b7ca9f84a4122994b425ccbf61262024518bc"
+ "store_sha": "d27cbd1da14a057150faed133cfbd61eca1cb567f279d3669badb1002617e8da"
 }

@@ -21,11 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 
-try:  # Hermes runtime; isolated venv falls back to HOME/.hermes
-    from hermes_constants import get_hermes_home
-except ImportError:  # pragma: no cover
-    def get_hermes_home() -> Path:
-        return Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+from walter_paths import state_home as get_hermes_home
 
 
 try:  # pragma: no cover - fcntl is present on supported Linux/macOS runtimes
