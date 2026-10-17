@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from tools.computer_use.backend import ActionResult, CaptureResult as HostCaptureResult
 from tools.computer_use.cua_backend import CuaDriverBackend
 from ..policy import WalterPolicyMixin
+from ..device_lock import DeviceCallLock
 from ..policy import CaptureStrategy, CaptureTarget, SafeWindowStrategy, register_capture_strategy, compact_ax_state, _handle_launch_app_action, _handle_open_url_action, _handle_device_context_action, _handle_vision_target_action, _handle_click_visual_ref_action, _handle_targeted_verify_action
 from ..policy import _configured_driver_command as _driver_command
 
@@ -270,10 +271,21 @@ def _override_handler(extra_actions):
             mutates = (native is not None and native.destructive) or action in {
                 'launch_app', 'open_url', 'click_visual_ref'}
             scopes = ([action] if mutates else []) + (
-                ['bring_to_front'] if args.get('bring_to_front') or args.get('raise_window') else [])
+                ['bring_to_front'] if action in {'focus_app', 'launch_app', 'open_url'} or args.get('bring_to_front') or args.get('raise_window') else [])
             for scope in scopes:
-                if (error := host._request_approval(scope, args)) is not None:
+                if (error := host._request_approval(scope, {**args, 'delivery_mode': 'foreground'} if scope == 'bring_to_front' else args)) is not None:
                     return error
+            with DeviceCallLock().hold() as acquired:
+                if not acquired:
+                    return json.dumps({'ok': False, 'action': action, 'code': 'device_busy'})
+                return admitted_call(action, args, session_id, admitted)
+        except lease.HumanHasControl as exc:
+            return json.dumps({'ok': False, 'action': action, 'code': 'human_has_control', 'error': str(exc)})
+        except Exception as exc:
+            return json.dumps({'ok': False, 'action': action, 'code': 'walter_computer_error', 'error': str(exc)})
+
+    def admitted_call(action, args, session_id, admitted):
+        try:
             with _NATIVE_SESSIONS.lock:
                 lease.assert_agent_may_act()
                 def fence():

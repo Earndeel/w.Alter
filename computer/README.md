@@ -41,14 +41,14 @@ sessions.close()  # call on client shutdown
 
 `call` is synchronous. An async MCP server should run it in a worker thread.
 Session IDs must be namespaced by the authenticated caller/profile. State is
-isolated per session. Calls in one pool are serialized. Pools are bounded to 16
+isolated per session. Calls across pools/processes and the Hermes port share one nonblocking flock per device, held for one atomic call; contention returns `device_busy` before transport creation. Pools are bounded to 16
 sessions and discard entries idle longer than 15 minutes before processing a
 new call. `close` is an action and also a pool method.
 
 `grants` is trusted **per-call host policy**, not arbitrary unverified model
 output. Missing scopes return `authorization_required` before backend startup.
 All calls require `read`; input actions additionally require `input`; visible
-foreground/focus requires `foreground`. Capture, targeted verification and
+foreground/focus requires `foreground`; `focus_app`, `launch_app` and `open_url` always require it, including when no foreground flag is supplied. Capture, targeted verification and
 launch/open URL (which observe the resulting window) require `pixels`, because
 the current driver may produce pixels with AX. `vision_target` also requires
 `vision`, and an injected vision sensor. `mode=ax` suppresses the image in the
@@ -92,6 +92,12 @@ No real Mac screenshot, input or end-to-end desktop task was executed during
 this extraction. A later explicitly requested desktop operation is still needed
 to prove current Mac permissions and live driver behavior. The independent port
 supports one fixed enrolled CuaDriver route; it does not claim universal device
-registration. Cross-process clients rely on driver snapshot tokens; pool locking
-is process-local. The independent port's auxiliary vision sensor is injectable
+registration. The shared per-device lock does not reserve an entire workflow; after each call
+it is released. Driver snapshot tokens still guard individual native references.
+The private runtime lock directory is recreated at boot by the module-owned
+`ops/walter-computer.conf` linked under `/etc/tmpfiles.d`.
+`origin="autonomous"` is a trusted per-call option for unattended host jobs,
+activating user-presence collision refusal; interactive calls use
+`origin="foreground_user"`. Host input hard-blocks are also enforced by the
+independent facade, without importing Hermes. The independent port's auxiliary vision sensor is injectable
 and unavailable until a client supplies one. Hermes retains its existing sensor.

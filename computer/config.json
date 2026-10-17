@@ -9,5 +9,6 @@
       }
     }
   },
-  "device_node_python_path": "/root/walter-computer-use/src"
+  "device_node_python_path": "/root/walter-computer-use/src",
+  "device_lock_path": "/run/walter-computer/main-mac.lock"
 }
