@@ -1,0 +1,11 @@
+{
+ "base_sha": "2be531bbf0827c4802004bac1e8c9bb205742e669ab6cfdefbc9d8396b3200b5",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-17T07:10:35.536772+00:00",
+ "domain": "devops",
+ "kind": "patch",
+ "reason": "Deux procédures manquaient, toutes deux testées en réel. (1) 2026-10-17 : nouvel outil secret_otp (plugin walter-secrets, otp.py) qui récupère les codes à usage unique reçus par e-mail (Gmail en lecture seule) ou par message via Beeper (WhatsApp/Telegram/LINE…) et les remplit. Testé : un vrai code Welo Data retrouvé par e-mail en 5,7 s, filtrage par site validé (le message de « Maman » et un vieux code sont ignorés), CLI `walter-secret otp` OK, audit sans le code. La fiche disait seulement « ask Monsieur, or read the e-mail », ce qui fait lire tout le message au modèle. (2) 2026-10-16 : alias addy.io par compte créé (clé dans Bitwarden « W.Alter · addy », création/suppression d'alias testée HTTP 201/204), demande de Monsieur. Précision ajoutée : le plugin est actif depuis le 2026-10-16.",
+ "runtime": "claude",
+ "session_id": null,
+ "target": "bitwarden-logins"
+}
