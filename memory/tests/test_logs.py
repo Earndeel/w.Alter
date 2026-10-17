@@ -8,6 +8,24 @@ from walter_memory import logs as L  # noqa: E402
 TS = "2026-10-04T10:00:00Z"
 
 
+def test_runtime_and_checkpoint_identity_through_symlinked_home(tmp_path, monkeypatch):
+    """Codex Desktop's .codex points into .hermes/integrations/codex on the live VM."""
+    actual = tmp_path / "integrations" / "codex"
+    transcript = actual / "sessions" / "2026" / "10" / "17" / "rollout-example.jsonl"
+    transcript.parent.mkdir(parents=True)
+    transcript.write_text("{}\n")
+    alias = tmp_path / ".codex"
+    alias.symlink_to(actual, target_is_directory=True)
+    root = alias / "sessions"
+    monkeypatch.setattr(L, "ROOTS", {"codex": root})
+    logical = root / transcript.relative_to(actual / "sessions")
+    assert L.runtime_of(logical) == "codex"
+    assert L.runtime_of(transcript) == "codex"
+    assert L.transcript_source_path("codex", transcript) == logical
+    assert L.transcript_source_path("codex", logical) == logical
+    assert L.runtime_of(actual / "sessions-other" / "rollout.jsonl") is None
+
+
 class FakeWriter(L.Writer):
     """Writer without a database: records events in memory."""
 

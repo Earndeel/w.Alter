@@ -489,11 +489,21 @@ def transcript_files(runtime: str) -> list[Path]:
 
 def runtime_of(path: Path) -> str | None:
     p = str(path.resolve())
-    return next((r for r, root in ROOTS.items() if p.startswith(str(root) + "/")), None)
+    return next((r for r, root in ROOTS.items() if p.startswith(str(root.resolve()) + "/")), None)
+
+
+def transcript_source_path(runtime: str, path: Path) -> Path:
+    """Keep the historical checkpoint key across symlink and watcher path aliases."""
+    root = ROOTS[runtime]
+    try:
+        return root / path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return path
 
 
 def sync_transcript(conn, runtime: str, path: Path) -> dict:
     from connectors.agent_sessions import read_complete_lines, read_zstd_lines   # shared readers (offsets, zstd)
+    path = transcript_source_path(runtime, path)
     stream = f"{runtime}:{path}"
     cur = ingestion.get_checkpoint(CONNECTOR, stream)
     offset, st = int(cur.get("offset", 0)), cur.get("state") or {}
