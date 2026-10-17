@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-17T20:47:00.971230+00:00",
+ "description": "Vérifier et exploiter les modules Walter partagés entre Hermes, DSH, Codex et Claude Code, leurs ports et sauvegardes.",
+ "domain": "infrastructure",
+ "kind": "new",
+ "reason": "Procédure validée lors de la modularisation du 17/10/2026 UTC : 16 modules, 3 handshakes MCP réels, 24 tests contexte + 5 DSH, tests frontières/secrets/mémoire et contrat de sauvegarde. Évite de réintroduire des dépendances Hermes dans les noyaux ou de confondre configuration et activation.",
+ "runtime": "codex",
+ "session_id": null,
+ "target": "walter-shared-modules-operations"
+}
