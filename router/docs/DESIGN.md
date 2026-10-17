@@ -201,8 +201,22 @@ principes que les alertes modèles : jamais de bruit, une ligne claire, numéro 
 
 Seulement ce qui a **changé** depuis le cycle précédent : un **nouveau** modèle qui dépasse un modèle actif ; un
 modèle actif **dégradé** ; une **baisse de prix** qui fait entrer un modèle dans la frontière de Pareto. Un bloc par
-modèle, rôles groupés, numéros courts, « adopter 1 » / « adopter 1 action » / « ignorer 1 ». Jamais de comparaison
-statique, de crédit, de podium ou de rapport.
+modèle, rôles groupés. Jamais de comparaison statique, de crédit, de podium ou de rapport.
+
+Mise à jour 2026-10-16 (Monsieur) :
+- **un message Telegram par nouveauté**, en-tête « W.Alter Router — jj/mm », catégorie du router nommée, prix
+  OpenRouter affiché, pas de numéro de référence ;
+- **boutons** au lieu de réponses tapées (Bot API, `alerts.send_with_buttons`, rappel `wr:a|d:<alert_id>` traité par le
+  plugin Hermes `walter-router`, home chat seulement) : challenger / tier « ✅ Changer » / « ✖️ Garder l'actuel »,
+  new_best « ✅ Passer au nouveau » / « ✖️ Garder l'actuel », nerf « 👁️ Masquer », board_down « 👁️ Vu » ;
+- un challenger n'est retenu que s'il **bat le modèle en place sur le score global** de la tâche (composite pondéré),
+  pas sur un seul classement ;
+- **aucun changement de modèle automatique** : un nouveau n°1 est seulement proposé (le modèle en place est épinglé en
+  attendant) ; seul le bouton de Monsieur change le favori (`verdict`) ;
+- modèles de décision : comparaison Pareto sur 3 axes (AA Decision Index, ms par tâche, coût AA par million de tâches,
+  `decision_pareto.py`) et une **recommandation** écrite pour la stack de Monsieur par le modèle L1 à partir de faits
+  (`recommend.py`, stockée dans `alerts.evidence.reco`) ;
+- une source ou un classement devenu inaccessible → alerte `board_down` (le dernier relevé reste utilisé 21 jours).
 
 ---
 
@@ -229,7 +243,7 @@ statique, de crédit, de podium ou de rapport.
 ## 15. Garde-fous
 
 Secrets jamais affichés (coffre + `.env` 0600 ; Cloudflare via `walter-cloudflare`) ; classes de confidentialité
-respectées à chaque étape ; aucune bascule de favori sans « adopter » ; action externe = confirmation ; dépenses :
+respectées à chaque étape ; aucune bascule de favori sans le bouton de Monsieur ; action externe = confirmation ; dépenses :
 abonnement d'abord, Kie, OpenRouter en dernier.
 
 ---
@@ -257,8 +271,10 @@ sais pas »), HLE-MultiChoice, When2Call (décisions d'appel d'outil), WildGuard
 Source `aa_decision` (page d'évaluation, flux Next.js, sans navigateur) → `models.benchmarks` ; tâche interne
 `decision` (interface `decisions`, jamais proposée au classifieur ni aux agents) → meilleur modèle appelable via l'API
 Decisions d'OpenRouter, recalculé toutes les 48 h, nouveautés / nerfs notifiés selon les règles habituelles.
-`intent.chain()` lit ce meilleur modèle ; `knowledge.json` `decision.order` : `free_first` (Clef → Mercury Decide
-gratuit → meilleur, choix du 2026-10-04) ou `best_first` (meilleur → gratuits en secours).
+`intent.chain()` lit le modèle épinglé (sinon ce meilleur modèle) ; `knowledge.json` `decision.order` : `best_first`
+depuis le 2026-10-14 (modèle retenu → Mercury Decide gratuit → Clef sur Workers AI ; aujourd'hui TypeSafe Jev 1.13),
+`free_first` possible (Clef → Mercury → meilleur, choix du 2026-10-04). `decision_vision` = même index, modèles qui
+lisent les images (aujourd'hui Decider V1.1 27B ; navigation web rapide, tri d'images en masse).
 
 ## Page « bibliothèque » (2026-10-14)
 https://library.walter-ai.cloud — `walter-router library` en page web (Cloudflare Pages `walter-library`, Cloudflare

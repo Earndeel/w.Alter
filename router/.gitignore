@@ -4,3 +4,4 @@ __pycache__/
 site/index.html
 .control.env
 site/fr/
+site/.wrangler/
