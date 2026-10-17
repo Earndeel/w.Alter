@@ -68,3 +68,14 @@ The desktop label is ambiguous. A stopped remote gateway is only one possibility
 - **Cache persistence**: Electron cache survives app reinstalls. “It works from curl but not the app” → verify the Mac connection contract, then move renderer caches before deeper network debugging.
 - **Gateway silence**: a stopped gateway shows no visible error in the desktop app UI. Always check the dashboard status endpoint after a restart.
 - **Stale forward/app instances**: inspect ownership, PIDs, and bundle paths first. Prefer graceful service/app restarts; never kill all matching processes blindly, especially when one may be a user session or the supervised forward.
+
+
+## Headless backend after retiring the web dashboard (verified 2026-10-17)
+
+The Mac application still needs the Hermes API backend even when Monsieur has retired the browser dashboard. If Mac 127.0.0.1:9119 listens but its target 100.91.35.121:8788 refuses connections, check the VM units before resetting the app or its themes. Current deployment: hermes-desktop-backend.service runs the official `hermes serve --host 127.0.0.1 --port 8787` (headless; no dashboard SPA), and hermes-desktop-tailscale.service forwards ONLY 100.91.35.121:8788 to that loopback backend. Both are systemd-enabled. The legacy hermes-dashboard and hermes-socat-ts units remain retired; no public Cloudflare route is needed.
+
+Keep the existing Mac connection and token. VM authentication is loaded from /root/.hermes/desktop-backend.env (0600 EnvironmentFile), never inline in a unit and never printed. Backup before changing units/config. Monsieur explicitly authorized this private backend restoration on 2026-10-17; do not infer permission for additional public listeners or unrelated account changes.
+
+Verify from the Mac: /api/status returns 200, /api/sessions?limit=1 returns 401 without a token and 200 with the existing connection token in a header (do not print session content). An arbitrary Host must remain rejected (400). Relaunch the exact /Applications/Hermes V2.app gracefully when needed; ~/.hermes/logs/desktop.log must report `Remote Hermes backend is ready` without repeated boot failures. Preserve conversations, Cookies, Local Storage and appearance settings. The 2026-10-17 repair passed those checks after normal quit/relaunch.
+
+Before retiring a service, map its Desktop/API dependants: removing the browser UI must not silently remove the backend the Mac depends on. Include both units, the protected env file and the Mac relay contract in module/integration backup coverage. The older Host-header notes elsewhere in this skill are version-specific; inspect current source rather than relying on an environment allowlist.
