@@ -9,6 +9,7 @@ def tree(tmp):
     (mod/'venv').mkdir();(mod/'venv'/'binary').write_text('rebuild')
     link=root/'root/.hermes/plugins/memory';link.parent.mkdir(parents=True);link.symlink_to('/opt/walter-memory')
     p=root/'root/.hermes/profiles/wild';p.mkdir(parents=True)
+    (root/'root/.hermes').chmod(0o700)
     c=sqlite3.connect(p/'state.db');c.execute('create table messages(id integer,text text)');c.execute("insert into messages values(1,'example')");c.commit();c.close()
     return root
 
@@ -21,6 +22,8 @@ def test_bundle_preserves_modules_links_and_consistent_profile_state(tmp_path):
         assert 'opt/walter-memory/venv/binary' not in t.getnames()
         assert t.extractfile('opt/walter-memory/models/schema.py').read().startswith(b'code directory')
         assert t.getmember('root/.hermes/plugins/memory').issym()
+        assert t.getmember('root/.hermes').mode==0o700
+        assert t.getmember('root/.hermes/profiles/wild/state.db').mode==(root/'root/.hermes/profiles/wild/state.db').stat().st_mode & 0o777
         snap=tmp_path/'restored.db';snap.write_bytes(t.extractfile('root/.hermes/profiles/wild/state.db').read())
         c=sqlite3.connect(snap);assert c.execute('pragma quick_check').fetchone()[0]=='ok';assert c.execute('select count(*) from messages').fetchone()[0]==1;c.close()
 
@@ -32,6 +35,8 @@ def test_missing_required_integration_fails_before_archive(tmp_path):
 def test_inventory_discovers_new_modules_and_external_service_credentials(tmp_path):
     root=tmp_path/'root'
     for m in B.CORE_MODULES:(root/f'opt/walter-{m}').mkdir(parents=True)
+    for m,entry in B.MODULE_ANCHORS.items():
+        p=root/f'opt/walter-{m}'/entry;p.parent.mkdir(parents=True,exist_ok=True);p.write_text('example')
     (root/'opt/walter-new-module').mkdir()
     for name in ['root/.hermes/config.yaml','root/.hermes/.env','root/.pgpass',
                  'root/.hermes/walter-llm/module.env','root/.config/rclone/rclone.conf',
@@ -48,14 +53,15 @@ def test_inventory_discovers_new_modules_and_external_service_credentials(tmp_pa
 
 def test_verification_rejects_missing_member_and_content_corruption(tmp_path):
     root=tree(tmp_path);out=tmp_path/'bundle.tar';B.create(out,root,['opt/walter-memory'],['opt/walter-memory/code.py'],False)
-    for change in ['drop','corrupt']:
+    for change in ['drop','corrupt','permissions']:
         altered=tmp_path/(change+'.tar')
         with tarfile.open(out) as src,tarfile.open(altered,'w') as dst:
             for item in src:
                 data=src.extractfile(item).read() if item.isfile() else None
                 if item.name=='opt/walter-memory/code.py':
                     if change=='drop':continue
-                    data=b'X'*item.size
+                    if change=='corrupt':data=b'X'*item.size
+                    if change=='permissions':item.mode=0o777
                 dst.addfile(item,io.BytesIO(data) if data is not None else None)
         with pytest.raises(ValueError):B.verify(altered)
     with pytest.raises(ValueError,match='required paths missing'):B.verify(out,['opt/walter-missing'])
