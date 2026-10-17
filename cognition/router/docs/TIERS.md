@@ -27,7 +27,7 @@ Résultat du 2026-10-02 (identique au choix de Monsieur) :
 Repli déclaré de L3 : GPT-6 Astra xhigh via Codex (point juste en dessous sur la frontière).
 
 **Règles** : les niveaux en vigueur sont ceux déclarés (`config/knowledge.json` → `levels`). Si le calcul de nuit
-désigne un autre modèle/niveau, une seule alerte `tier` part sur Telegram ; Monsieur teste puis « adopter N »
-(le niveau est alors épinglé) ou « ignorer N ». Jamais de bascule automatique. Le niveau d'une demande (L1/L2/L3)
+désigne un autre modèle/niveau, une seule alerte `tier` part sur Telegram ; Monsieur teste puis appuie sur « ✅ Changer »
+(le niveau est alors épinglé) ou « ✖️ Garder l'actuel ». Jamais de bascule automatique. Le niveau d'une demande (L1/L2/L3)
 est choisi par Jev. Pour les tâches spécialisées (code, front, 3D, vision, document…), seul le n°1 du score
 pondéré multi-benchmarks est retenu.
