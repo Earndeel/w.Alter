@@ -1,0 +1,2 @@
+## Port DSH
+DSH fournit la boucle agent, le journal de travail et les permissions. Le fournisseur configuré `walter` utilise Walter LLM/Router ; les outils MCP, hooks mémoire/skills/journal et la compression `walter-context` constituent la composition Walter. La compression native `compaction-basic` est désactivée. Les outils shell/fichiers et fonctions non couvertes restent natifs. Les choix de modèles Walter et les limites de calcul ne sont pas modifiés par ce profil.
