@@ -1,0 +1,13 @@
+#!/usr/bin/python3
+from pathlib import Path
+import json
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from walter_computer.config import load_config
+from walter_computer.operator import ACTIONS
+if sys.argv[1:] not in ([], ['check']):
+    raise SystemExit('usage: walter-computer check')
+load_config()
+print(json.dumps({'ok': True, 'module':'walter-computer', 'version':'1.0.0',
+                  'independent_core': True, 'desktop_contacted': False,
+                  'actions':sorted(ACTIONS), 'auxiliary_vision':'client_injected'}))

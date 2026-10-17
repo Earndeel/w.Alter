@@ -1,0 +1,23 @@
+{
+  "project": "NousResearch/hermes-agent",
+  "revision": "8d57bfc2d7df6b117f577f459366241a06ab2c4c",
+  "files": [
+    {
+      "path": "/root/.hermes/hermes-agent/tools/computer_use/backend.py",
+      "sha256": "7d3dc902eede3795cc3d03535565ef4b0d48915583cedea9738c436aa7702434"
+    },
+    {
+      "path": "/root/.hermes/hermes-agent/tools/computer_use/cua_backend_parse.py",
+      "sha256": "15f5e3026adb22d278d6ab43b87c53be458cba5f0bdbe5fdf36a84856bf0fbc2"
+    },
+    {
+      "path": "/root/.hermes/hermes-agent/tools/computer_use/cua_backend_input.py",
+      "sha256": "98fa99729c8dd64b5ab5fa52e7003ef0ff5c3d9d510619a39f705d4eb0757c0b"
+    },
+    {
+      "path": "/root/.hermes/hermes-agent/tools/computer_use/cua_backend_capture.py",
+      "sha256": "731a29517596d9ea26a42696bea4daa41957d728282eb124c81f2d88f7b3e935"
+    }
+  ],
+  "adaptations": "Relative imports; injectable per-session configuration; no Hermes runtime imports."
+}

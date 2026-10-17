@@ -1,0 +1,13 @@
+[project]
+name = "walter-computer"
+version = "1.0.0"
+description = "Harness-independent atomic Computer Use policy and CuaDriver ports"
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["walter_computer*"]
