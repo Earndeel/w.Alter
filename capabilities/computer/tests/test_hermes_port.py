@@ -100,3 +100,32 @@ def test_new_mutation_and_foreground_scope_use_central_gate():
          patch.object(hermes._NATIVE_SESSIONS,'backend',side_effect=AssertionError('must not start')):
         assert tool['handler']({'action':'launch_app','app':'Demo','bring_to_front':True},session_id='test')=='FOREGROUND DENIED'
         assert [call.args[0] for call in approve.call_args_list]==['launch_app','bring_to_front']
+
+
+def test_override_uses_same_device_lock_as_independent_port():
+    from walter_computer.device_lock import DeviceCallLock
+    from tools.bot_desktop import lease
+    tool=_registered_override()
+    host=hermes._native_contract()
+    with DeviceCallLock().hold() as acquired:
+        assert acquired
+        with patch.object(lease,'assert_agent_may_act',return_value=type('Lease',(),{'epoch':1})()), \
+             patch.object(host,'_reject_unsafe',return_value=None), \
+             patch.object(hermes._NATIVE_SESSIONS,'backend',side_effect=AssertionError('must not start')):
+            assert 'device_busy' in tool['handler']({'action':'list_apps'},session_id='test')
+
+
+def test_human_takeover_discards_result_before_return():
+    tool=_registered_override()
+    host=hermes._native_contract()
+    from tools.bot_desktop import lease
+    initial=type('Lease',(),{'epoch':1})()
+    changed=type('Lease',(),{'epoch':2})()
+    with patch.object(lease,'assert_agent_may_act',return_value=initial), \
+         patch.object(lease,'get',side_effect=[initial,changed]), \
+         patch.object(host,'_reject_unsafe',return_value=None), \
+         patch.object(hermes._NATIVE_SESSIONS,'backend',return_value=object()), \
+         patch.object(host,'_dispatch',return_value='SYNTHETIC_PRIVATE_RESULT'):
+        result=tool['handler']({'action':'list_apps'},session_id='test')
+        assert 'human_has_control' in result
+        assert 'SYNTHETIC_PRIVATE_RESULT' not in result

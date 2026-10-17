@@ -10,6 +10,9 @@ import threading
 import re
 import time
 from .driver import DriverBackend
+from .device_lock import DeviceCallLock
+from .input_safety import reject_unsafe
+from .runtime import ActionOrigin
 from .policy import WalterPolicyMixin, _handle_device_context_action, _handle_launch_app_action, _handle_open_url_action, _handle_vision_target_action, _handle_click_visual_ref_action, _handle_targeted_verify_action
 
 class Operator(WalterPolicyMixin, DriverBackend):
@@ -29,7 +32,7 @@ def required_scopes(action, arguments):
     required = {'read'}
     if action in INPUT_ACTIONS:
         required.add('input')
-    if arguments.get('bring_to_front') or arguments.get('raise_window') or arguments.get('delivery_mode') == 'foreground':
+    if action in {'focus_app', 'launch_app', 'open_url'} or arguments.get('bring_to_front') or arguments.get('raise_window') or arguments.get('delivery_mode') == 'foreground':
         required.add('foreground')
     if action in {'capture', 'targeted_verify', 'launch_app', 'open_url'}:
         required.add('pixels')
@@ -72,21 +75,32 @@ class OperatorSessions:
     session-ID namespace and must close sessions at client shutdown. Idle
     sessions are reclaimed before calls (default 15 minutes).
     """
-    def __init__(self, factory, *, max_sessions=16, idle_seconds=900):
+    def __init__(self, factory, *, max_sessions=16, idle_seconds=900, lock_path=None):
         self.factory = factory
+        self.device_lock = DeviceCallLock(lock_path)
         self.max_sessions = max_sessions
         self.idle_seconds = idle_seconds
         self._sessions = {}
         self._lock = threading.RLock()
 
-    def call(self, session_id, action, arguments=None, *, grants=frozenset({'read'})):
+    def call(self, session_id, action, arguments=None, *, grants=frozenset({'read'}), origin=None):
         if not isinstance(session_id, str) or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}', session_id):
             raise ValueError('invalid session_id')
         args = dict(arguments or {})
         required = required_scopes(action, args)
+        if origin is not None:
+            origin = ActionOrigin(origin)
+        if refusal := reject_unsafe(action, args):
+            return {'ok': False, 'code': 'unsafe_input_blocked', 'action': action, **refusal}
         missing = required - frozenset(grants)
         if missing:
             return {'ok': False, 'code': 'authorization_required', 'action': action, 'required_scopes': sorted(missing)}
+        with self.device_lock.hold() as acquired:
+            if not acquired:
+                return {'ok': False, 'action': action, 'code': 'device_busy'}
+            return self._call_locked(session_id, action, args, origin)
+
+    def _call_locked(self, session_id, action, args, origin):
         with self._lock:
             now = time.monotonic()
             for stale, (_, accessed) in list(self._sessions.items()):
@@ -106,6 +120,8 @@ class OperatorSessions:
                     raise
                 self._sessions[session_id] = (backend, now)
             backend, _ = self._sessions[session_id]
+            if origin is not None:
+                backend._walter_origin = origin
             self._sessions[session_id] = (backend, now)
             try:
                 result = _dispatch(backend, action, args)
