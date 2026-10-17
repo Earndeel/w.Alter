@@ -1,7 +1,7 @@
 ---
 name: bitwarden-integration
 description: Bitwarden self-hosted integration with W.Alter — vault registration, bw CLI workflow, credential search, and authenticated browsing via cookie injection.
-version: 1.1.0
+version: 1.2.0
 author: W.Alter
 license: MIT
 metadata:
@@ -13,6 +13,17 @@ metadata:
 
 Self-hosted Bitwarden (Personal Vault / bw CLI) integrated with W.Alter's credential chain.
 
+## Start here (state 2026-10-17)
+
+- **Logging in, filling a password, a TOTP or a code received by e-mail / message: do not use `bw` by hand** — use
+  the `walter-secrets` tools (`secret_search`, `secret_fill`, `secret_otp`, `secret_create_login`…) as described in
+  the skill `bitwarden-logins`. They never put a value in the conversation and they check the site (anti-phishing).
+- Reference of the module: `~/.hermes/plugins/walter-secrets/README.md`; operations: RUNBOOK § Bitwarden — walter-secrets.
+- The vault is organised in 14 thematic folders + « W.Alter – Clés API »; new entries are filed automatically by the
+  vault watcher `walter-secrets-sync`, which also backs the vault up on every change.
+- Every `bw` command below is for **manual maintenance** (diagnosis, scripts, server recovery), never to bring a value
+  into the conversation: pass values with `{{bw:<item id>:<field>}}` or `$(walter-secret get …)` inside a command.
+
 ## Architecture
 
 ```
@@ -21,7 +32,7 @@ W.Alter Vault (vault.json.age)
   └─ bitwarden/server_url       →  bw config server
   └─ bitwarden/email            →  bw login
        ↓
-  Bitwarden Vault (986 items)
+  Bitwarden Vault (~1 040 items)
        ↓
   Credential search / retrieval
        ↓
@@ -36,7 +47,7 @@ Bitwarden credentials MUST be in the Hermes vault, not hardcoded or session-only
 # Register Bitwarden in vault (one-time setup)
 vault add bitwarden master_password "<master_password>"
 vault add bitwarden server_url "https://lucas-bitwarden.duckdns.org"
-vault add bitwarden email "lucas.jouvencon@gmail.com"
+vault add bitwarden email "<account e-mail>"
 ```
 
 **Pitfall**: If the master password only exists in session memory or Hindsight, it's fragile and non-transferable. Always register in the vault.
@@ -58,6 +69,11 @@ bw sync --session "$BW_SESSION" >/dev/null 2>&1  # REQUIRED before search
 Helper: `~/.hermes/bin/bw-unlock` supports `--print` (unlock only), `--sync` (unlock + sync), `--check` (status).
 
 ## Encrypted Backup
+
+**Automatic since 2026-10-16** — no manual export needed in normal operation: the watcher exports after every change
+and `walter-offsite-backup` every night (age-encrypted to the W.Alter recovery key, `~/.hermes/backups/bitwarden/vault-*.json.age`
++ Drive `W.Alter Backups/bitwarden`, restore tested monthly). Restore: `rclone cat "gdrive:W.Alter Backups/bitwarden/<f>.age" | age -d -i <recovery key>`
+→ Bitwarden JSON. The manual password-protected export below is only for a one-off copy (e.g. before a risky operation):
 
 Create a portable encrypted JSON export after syncing. Store it with restrictive permissions and never create a plaintext CSV/JSON backup:
 
@@ -91,11 +107,18 @@ See `references/vaultwarden-client-compatibility.md` for the concrete error sign
 
 ## Self-hosted Vaultwarden Server Recovery
 
+**Access since 2026-10-16**: public SSH is closed. Reach the VM through Tailscale (machine `bitwarden` in the tailnet)
+or, as a fallback, `gcloud compute ssh bitwarden --tunnel-through-iap` from Cloud Shell; details in the plugin README.
+Snapshot first (lowercase name). The temporary-user method below is only for when both are unavailable.
+
 Use `references/vaultwarden-recovery.md` when a self-hosted Vaultwarden server needs a client-compatibility update but host SSH access is blocked. The verified class-level workflow is: establish server truth and make an encrypted export; identify the exact GCP instance and zone; snapshot the boot disk with a lowercase name; recover access with a dedicated temporary key/user while preserving existing metadata; fall back to a temporary startup script plus controlled reset when metadata SSH is ignored; update only the Vaultwarden Compose service while preserving its data mount; verify `/api/config`, `/alive` HTTP 200, Docker health, and the image's OCI version; then restore metadata and remove every temporary credential.
 
 Operational guardrails: prefer CLI/API over GUI automation; if TCC or screen capture makes automation unreliable, switch to one short manual command at a time. Never use `set -e` in an interactive Cloud Shell block, never paste browser `@url:` metadata into the shell, and never report success from a GCP `Updated` line without a real SSH login and service-level checks.
 
 ## TOTP / MFA Retrieval
+
+**Maintenance / scripts only.** To log in, use `secret_fill(handle, field="totp")` (skill `bitwarden-logins`): the code is
+filled in the page and never shown. The commands below are for scripts that consume the code inside the same command.
 
 ```bash
 # Get current TOTP code for an item (by ID)
@@ -111,7 +134,7 @@ print(m.group(1) if m else 'NO TOTP')
 "
 ```
 
-**Helper: `~/.hermes/bin/aws-mfa`** — returns current 6-digit MFA code for AWS earndeel@gmail.com. Uses `bw-unlock --sync` + `bw get totp`. Item ID: `e790ded6-19e5-47a1-9998-25c7692131bf`.
+**Helper: `~/.hermes/bin/aws-mfa`** — returns current 6-digit MFA code for the AWS root account. Uses `bw-unlock --sync` + `bw get totp`. Item ID: `e790ded6-19e5-47a1-9998-25c7692131bf`.
 
 **Pitfall**: TOTP codes rotate every 30s. Always call `bw get totp` at the moment you need the code, not ahead of time.
 
@@ -147,22 +170,19 @@ for item in items:
 "
 ```
 
-### Get specific credential
-```bash
-bw get username "<item_name>" --session "$BW_SESSION"
-bw get password "<item_name>" --session "$BW_SESSION"
-```
+### Use a specific credential
+Never print it. In a command: `{{bw:<item id>:password}}` or `$(walter-secret get <item id> password)`; in a web page:
+`secret_fill(handle)`. Username only (not secret): `bw get username "<item id>" --session "$BW_SESSION"`.
 
 ### Safe retrieval when several items match
 Searches may return duplicate domains, old entries, reset-password entries, or multiple accounts. Never choose the first match and never print the full `bw get item` JSON: it can contain passwords, notes, TOTP secrets, and custom fields.
 
 1. After syncing, show only non-secret metadata: item ID, name, username, URI, type, and (if useful) revision date.
 2. If more than one candidate remains, ask Monsieur to select the exact account/entry before retrieving a secret. Do not compare or reveal passwords for all candidates.
-3. Retrieve only the selected item by stable item ID, not by a fuzzy name:
-   ```bash
-   bw get password "<selected_item_id>" --session "$BW_SESSION"
-   ```
-4. Return only the requested field, and mention the associated username/domain so the credential is not confused with a duplicate. A direct password request is sufficient authorization to retrieve that password; do not expose unrelated fields.
+3. Use only the selected item, by stable item ID (handle `bw:<id>`), never a fuzzy name: `secret_fill(handle)` in a page,
+   `{{bw:<id>:<field>}}` in a command.
+4. Monsieur explicitly asks to **see** a value → `secret_reveal(handle, field)` for that one field only (last resort),
+   naming the username/domain so it is not confused with a duplicate. Never reveal unrelated fields.
 
 A concise, reusable version of the metadata-first workflow is in `references/safe-retrieval.md`.
 
@@ -184,16 +204,11 @@ print(base64.b64encode(json.dumps(item).encode()).decode())
 " | bw create item --session "$BW_SESSION" --raw
 ```
 
-## Authenticated Browsing via Cookie Injection
+## Authenticated Browsing
 
-When a site requires authentication and you have Brave cookies on a remote Mac:
-
-1. **Extract cookies** via SSH: `sqlite3 ~/Library/Application\ Support/BraveSoftware/Brave-Browser/Default/Cookies "SELECT ..."`
-2. **Decrypt** with AES key from Keychain: `vault get macos/brave_keychain_key`
-3. **Inject into Camoufox**: `context.add_cookies(pw_cookies)`
-4. **Navigate**: authenticated session ready
-
-See `references/cookie-injection-patterns.md` in `vault-lookup` skill for the full AES decryption workflow.
+Use a web interface as Monsieur with the `walter` MCP tool `browser_session(site, session)` (his Brave cookies are
+injected server-side; only metadata comes back), then `walter-browser`. **Never extract or decrypt cookies yourself**
+(CLAUDE.md). A site that needs a password instead → `secret_fill`.
 
 ## Pitfalls
 
