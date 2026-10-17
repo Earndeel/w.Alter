@@ -11,7 +11,7 @@ from walter_memory import agent_memory as m
 def local(monkeypatch):
     class Conn:
         def execute(self,sql,args=()): return self
-        def fetchone(self): return {'privacy_class':'cloud_allowed','status':'derived','source_count':1,'sources_allowed':True}
+        def fetchone(self): return {'privacy_class':'cloud_allowed','content':'Public fixture decision','allowed':True}
     @contextmanager
     def connection(): yield Conn()
     monkeypatch.setattr(m,'connection',connection)

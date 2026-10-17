@@ -25,6 +25,20 @@ def excluded(name):
         if p.name.endswith(('.db','.db-wal','.db-shm')):return True
     return False
 
+def module_backup_paths(root):
+    """Read the composition contract without importing the capability server."""
+    registry=root/'opt/walter-core/modules/registry.json'
+    if not registry.exists():return []
+    data=json.loads(registry.read_text())
+    if data.get('version')!=1:raise RuntimeError('unsupported module registry version')
+    paths=set()
+    for module in data.get('modules',[]):
+        for value in [*module.get('backup_paths',[]),*module.get('anchors',[])]:
+            p=pathlib.PurePosixPath(value)
+            if not p.is_absolute() or '..' in p.parts:raise RuntimeError('unsafe module backup path')
+            paths.add(str(p).lstrip('/'))
+    return sorted(paths)
+
 def inventory(root):
     """Mandatory core and integration anchors; optional roots are explicitly inventoried."""
     required={f'opt/walter-{m}' for m in CORE_MODULES}
@@ -33,6 +47,7 @@ def inventory(root):
                      'root/.hermes/walter-llm','root/.config/rclone/rclone.conf',
                      'root/.config/systemd/user/hermes-gateway.service',
                      'opt/openclaw/hermes_voice_bridge.py'))
+    required.update(module_backup_paths(root))
     sources=set(required)
     for p in (root/'opt').glob('walter-*'):
         if p.is_dir():sources.add(str(p.relative_to(root)))
@@ -44,7 +59,7 @@ def inventory(root):
               'root/.hermes/google-accounts','root/.hermes/profiles','root/.hermes/hermes-agent',
               'root/.hermes/desktop-backend.env','root/.config/systemd/user','root/.cloudflared',
               'root/.ssh/config','root/.ssh/known_hosts','root/.codex/config.toml','root/.codex/auth.json',
-              'root/.codex/AGENTS.md','root/.claude/settings.json','root/CLAUDE.md',
+              'root/.codex/AGENTS.md','root/.claude/settings.json','root/.claude.json','root/CLAUDE.md',
               'etc/systemd/system','etc/asterisk','etc/logrotate.d/walter-hermes',
               'etc/iptables','etc/ssh/sshd_config.d','etc/rclone','usr/local/sbin','opt/openclaw','opt/dsh']
     absent=[]
@@ -88,7 +103,10 @@ def inventory(root):
 def dependencies(root):
     out={}
     envs=list((root/'opt').glob('walter-*/venv/bin/python'))
-    envs += [root/'root/.hermes/hermes-agent/venv/bin/python',root/'root/.hermes/hindsight-venv/bin/python']
+    envs += list((root/'opt').glob('walter-*/.venv/bin/python'))
+    envs += [root/'root/.hermes/hermes-agent/venv/bin/python',root/'root/.hermes/hindsight-venv/bin/python',
+             root/'root/walter-computer-use/.venv/bin/python',root/'root/.venv/scrapling/bin/python',
+             root/'opt/walter-colab/mcp/.venv/bin/python',root/'opt/walter-colab/python/bin/python']
     code='import importlib.metadata,json; print(json.dumps(sorted({(d.metadata["Name"],d.version) for d in importlib.metadata.distributions()})))'
     for p in envs:
         if p.exists():

@@ -2,7 +2,7 @@
 
 `walter_memory.agent_memory` owns the runtime-neutral `recall`, `retain` and `reflect` contract. MCP is only its JSON/stdin transport through `walter-memory agent-memory`.
 
-- `recall` uses local hybrid search, cloud-allowed candidates and current canonical-owner checks. A stale index cannot loosen the owner's class; derived items without original event provenance are excluded. It does not query the mixed legacy Hindsight bank.
+- `recall` uses local hybrid search, cloud-allowed candidates and current canonical-owner checks. A stale index cannot loosen the owner's class; derived items require valid canonical provenance from permitted events and/or objects; missing, retracted or purged sources are excluded. It does not query the mixed legacy Hindsight bank.
 - `retain` creates one classified canonical `note.recorded`, including context/tags in classification. The response explicitly says `search_projection: pending_indexer` and `cognitive_projection: not_requested`. No synchronous legacy-bank copy occurs.
 - `reflect` synthesizes permitted canonical evidence through the existing Router `memory_extraction` task and the common model accounting/budget/privacy client. Its provenance and the change from Hindsight reflection are explicit. Local-only questions are refused before embedding/model access; redacted questions stay pseudonymised in cloud-facing results. Missing evidence makes no model call.
 
