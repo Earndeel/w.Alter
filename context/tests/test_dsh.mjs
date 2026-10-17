@@ -6,7 +6,7 @@ const require = createRequire(process.env.WALTER_DSH_PACKAGE || '/opt/dsh/packag
 const {Context} = require('@deepseek-ai/cordis');
 const {Session} = require('@deepseek-ai/dsh-session');
 const {ToolRuntime} = require('@deepseek-ai/dsh-tools');
-const {createUserMessage,createAssistantMessage,createToolResultMessage} = require('@deepseek-ai/dsh-llm');
+const {createUserMessage,createAssistantMessage,createToolResultMessage,createSystemMessage,createDeveloperMessage} = require('@deepseek-ai/dsh-llm');
 
 function setup() {
   const ctx = new Context();
@@ -32,10 +32,15 @@ function setup() {
   session.append('request/header',{reason:'initial',header:{config:{provider:'walter',model:'coding'}}});
   return {ctx,session,engine,agent,registered};
 }
-function fill(session, turns = 5) {
+function fill(session, turns = 5, instructionRole = null) {
   for (let t=0;t<turns;t++) {
     session.append('turn/start',{turn:t});
     session.append('user/message',createUserMessage({content:[{type:'text',text:`request ${t}`}],source:{kind:'user'}}),{surfaceOp:'append'});
+    if (t === 1 && instructionRole) {
+      const message = instructionRole === 'system' ? createSystemMessage('CRITICAL_ROLE_INSTRUCTION') :
+        createDeveloperMessage({content:[{type:'text',text:'CRITICAL_ROLE_INSTRUCTION'}],source:{kind:'fixture'}});
+      session.append(`${instructionRole}/message`,{message},{surfaceOp:'append'});
+    }
     session.append('assistant/message',{turn:t,step:0,stream:[],message:createAssistantMessage({content:[{type:'tool-call',id:`call-${t}`,name:'read_file',arguments:'{}'}],source:{provider:'walter',model:'coding'}})},{surfaceOp:'append'});
     session.append('tool/result',{turn:t,step:0,message:createToolResultMessage({callId:`call-${t}`,content:[{type:'text',text:`evidence-${t} `+'z'.repeat(60000)}],isError:false})},{surfaceOp:'append'});
     session.append('assistant/message',{turn:t,step:1,stream:[],message:createAssistantMessage({content:[{type:'text',text:`answer ${t}`}],source:{provider:'walter',model:'coding'}})},{surfaceOp:'append'});
@@ -74,6 +79,18 @@ test('failed Python bridge closes the bracket without changing the surface', asy
   assert.deepEqual(session.deriveMessages(),before);
   assert.equal(session.eventAt(session.seq-1).type,'compaction/end');
   assert.match(session.eventAt(session.seq-1).data.error,/bridge unavailable/);
+});
+
+test('in-history system/developer instructions refuse compaction and preserve the surface', async () => {
+  for (const role of ['system','developer']) {
+    const {session,engine,agent} = setup(); fill(session,5,role);
+    const before = session.deriveMessages();
+    await assert.rejects(engine.compactIfNeeded(agent,'pressure',new AbortController().signal),/bridge exited/);
+    assert.deepEqual(session.deriveMessages(),before);
+    assert.equal(session.eventAt(session.seq-1).type,'compaction/end');
+    assert.equal(Array.from({length:session.seq},(_,n)=>session.eventAt(n)).some(e=>e.type==='compaction/summary'),false);
+    assert.ok(session.deriveMessages().some(m=>m.role===role&&m.content.some(b=>b.text==='CRITICAL_ROLE_INSTRUCTION')));
+  }
 });
 
 test('abort does not compact, and concurrent compaction is rejected by DSH lock', async () => {

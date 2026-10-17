@@ -91,7 +91,13 @@ export class WalterContextEngine extends BasicCompactionEngine {
   }
 
   async summarize(input, agent, signal) {
-    const result = await bridge({ op: 'summarize', messages: normalize(input.messages) }, signal);
+    const header = agent.session.requestHeader();
+    const config = header?.config || agent.options;
+    const info = await this.ctx.llm.resolveModelInfo(config.provider, config.model, signal);
+    const capacity = (info.context?.contextWindow || 0) - (config.maxTokens || info.defaultMaxTokens || 0);
+    if (info.context && capacity <= 0) throw new Error('walter-context: no checkpoint budget');
+    const result = await bridge({ op: 'summarize', messages: normalize(input.messages),
+      model: config.model, budget_tokens: Math.max(0, capacity) }, signal);
     signal?.throwIfAborted();
     this.ctx.logger.info(`walter-context: ${JSON.stringify({ mode: 'checkpoint', session: agent.session.id,
       input_messages: result.input_messages, input_tokens: result.input_tokens, output_tokens: result.output_tokens })}`);

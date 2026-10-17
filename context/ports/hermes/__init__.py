@@ -101,7 +101,7 @@ class WalterContextEngine(ContextEngine):
 
     # -- lifecycle -----------------------------------------------------------------------------------------------------
     def on_session_start(self, session_id: str, **kwargs) -> None:
-        self._session.reset()
+        self.on_session_reset()
         self._session_id = session_id or ""
         home = str(kwargs.get("hermes_home") or os.environ.get("HERMES_HOME") or "")
         parts = home.rstrip("/").split("/")
