@@ -1,0 +1,13 @@
+{
+  "computer_use": {
+    "ax_max_elements": 100,
+    "capture_strategy": "safe-window",
+    "walter": {
+      "driver_command": "/root/walter-computer-use/.venv/bin/walter-cua-remote",
+      "observer": {
+        "enabled": true
+      }
+    }
+  },
+  "device_node_python_path": "/root/walter-computer-use/src"
+}
