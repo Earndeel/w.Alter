@@ -1,12 +1,62 @@
 ---
 name: hermes-memory-ops
 category: devops
-description: Operational maintenance for W.Alter memory stack — cron routing, watchdogs, PG-Qdrant sync, VM cleanup, and architecture reference.
+description: Use when diagnosing or maintaining Walter Memory, PostgreSQL/pgvector, raw agent logs, backups, synthesis privacy or memory supervision.
 tags: [memory, hindsight, qdrant, postgresql, cron, maintenance, watchdog]
 created: 2026-06-07
 ---
 
 # Hermes Memory Operations
+
+## Current operating procedure — verified 2026-10-17
+
+This section supersedes the historical August architecture and commands below. Qdrant, hybrid-search,
+write-worker/write-bridge, pg-qdrant-sync, dream-cycle and Jarvis are retired since 2026-10-01.
+Do not restart them or install Qdrant clients to satisfy an old smoke test.
+
+1. Read /root/.hermes/docs/walter-memory/{ARCHITECTURE,DECISIONS,RUNBOOK}.md.
+   Durable truth is core.events + core.objects in hindsight-pg (127.0.0.1:5433).
+   Hindsight is replaceable cognition; Kardex is the social schema; vectors use PostgreSQL/pgvector.
+   Use Walter Memory lib/gateway for writes. Never patch the upstream Hermes checkout.
+2. Run /usr/local/bin/walter-memory health, systemctl status walter-logs-watch and
+   systemctl status walter-memory-gateway. Use PG via docker exec without printing secrets.
+   For Hermes gateway use systemctl --user, not the system service.
+3. Raw journal = walter_logs, across all runtimes including Hermes state.db/profiles and Codex.
+   core.events describes Monsieur's life. Do not mistake raw Vault exports for walter_logs backup.
+   PG dumps include both. Use the walter-logs-ingestion skill for coverage/checkpoint diagnosis.
+4. Maintenance: /opt/walter-memory/venv/bin/python -m walter_memory.hygiene --kind ephemeral --limit 200
+   is DRY-RUN by default; --apply snapshots prior tags, audits and adds quarantine:noise in Hindsight PG.
+   Never delete canonical/raw logs to clean recall noise. ephemeral-sweeper.service is versioned under
+   /opt/walter-memory/systemd; compatibility scripts are links to /opt/walter-memory/ops.
+5. After a memory repair run systemctl start memory-autopilot and inspect
+   /root/.hermes/logs/memory-autopilot/latest.json. Autopilot now incorporates walter-memory health
+   and cleanup failures; warning score90 was real on Oct17 (Beeper failed media, low provider balance).
+   Do not reinterpret a score alone as full business health.
+6. L3 synthesis must exclude local_only before the call, carry the strictest included source class
+   through walter_memory.llm and its derived item/search chunk, and omit private titles.
+   privacy.tighten_derived_sources defaults dry-run; apply only after metadata backup, tightening
+   derived/chunk classes and quarantining any previously published Hindsight projection.
+7. Backups: walter-pg-backup + walter-statedb-backup + walter-offsite-backup; monthly
+   walter-offsite-restore-test downloads/decrypts and restores PG into a disposable database,
+   checks main SQLite, module manifest and Bitwarden item count.
+   backup_bundle discovers all /opt/walter-* and integration configs, snapshots profile DBs,
+   inventories Python packages and verifies SHA-256, links, modes and mandatory entrypoints.
+   Venvs and rebuildable model weights are excluded. Raw Vault bytes already reside on Drive.
+   A verified bundle is not yet proof of a complete installation on a clean VM.
+8. Preserve Desktop's private API while removing dashboards: Mac localhost9119 -> Tailscale8788 ->
+   Hermes loopback8787. See hermes-desktop-recovery. Auth env must stay0600 and never be printed.
+
+Regression checks for this repair:
+cd /opt/walter-memory &&
+venv/bin/python -m pytest -q tests/test_backup_bundle.py tests/test_extract_privacy.py tests/test_hygiene.py tests/test_logs.py
+18 tests passed on 2026-10-17. Restore test succeeded that day: PG, main state.db, 12 modules,
+9 profile SQLite snapshots and 9 Python environment inventories.
+
+## Historical material below — August architecture, not an execution plan
+
+Keep the following incident descriptions and references for provenance. Any Qdrant, legacy port,
+provider/model, cron or deletion command below must be checked against the current runbook first.
+
 
 ## When to Use
 
@@ -325,4 +375,3 @@ Produce a report with these 9 sections, in French when the user requested French
 **Symptôme :** collection `entities` a des points mais `indexed_vectors_count: 0`.
 **Cause :** seuil d'indexation par défaut = 10 000 points. En dessous, c'est de la force brute.
 **Impact :** négligeable avec <1000 points.
-
