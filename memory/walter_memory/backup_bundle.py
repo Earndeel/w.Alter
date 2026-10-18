@@ -4,7 +4,7 @@ This module builds/verifies a tar payload; the offsite runner applies zstd + age
 It never prints file contents or credentials. Source state.db is backed up separately.
 """
 from __future__ import annotations
-import argparse,datetime,hashlib,io,json,os,pathlib,shlex,sqlite3,subprocess,tarfile,tempfile
+import argparse,datetime,hashlib,importlib.util,io,json,os,pathlib,shlex,sqlite3,subprocess,tarfile,tempfile
 
 MANIFEST='walter-backup-manifest.json'
 CORE_MODULES=('core','memory','router','skills','context','llm','soul','voice-memory','raw-vault')
@@ -25,8 +25,25 @@ def excluded(name):
         if p.name.endswith(('.db','.db-wal','.db-shm')):return True
     return False
 
+def contracts_check(root):
+    """Reject stale generated registries before writing a backup payload.
+
+    Old archives without a contract catalogue retain the v1 registry interface.
+    Only the pure compiler is loaded; no optional module or MCP server imports.
+    """
+    catalog=root/'opt/walter-core/modules/catalog.json'
+    if not catalog.exists():return {'legacy_registry':True}
+    compiler=pathlib.Path('/opt/walter-core/walter_platform/contracts.py')
+    if not compiler.is_file():raise RuntimeError('contract compiler unavailable')
+    spec=importlib.util.spec_from_file_location('_walter_backup_contracts',compiler)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    result=module.check(catalog,root=root,registry=catalog.with_name('registry.json'))
+    if not result['ok']:raise RuntimeError('module registry differs from owner contracts; regenerate before backup')
+    return result
+
 def module_backup_paths(root):
     """Read the composition contract without importing the capability server."""
+    contracts_check(root)
     registry=root/'opt/walter-core/modules/registry.json'
     if not registry.exists():return []
     data=json.loads(registry.read_text())
@@ -122,6 +139,7 @@ class DigestReader:
 
 def create(output,root=pathlib.Path('/'),sources=None,required=None,include_dependencies=True):
     root=pathlib.Path(root).resolve();output=pathlib.Path(output)
+    contract_state=contracts_check(root)
     if sources is None:sources,required,absent=inventory(root)
     else:absent=[];required=required or sources
     for n in required:
@@ -178,7 +196,8 @@ def create(output,root=pathlib.Path('/'),sources=None,required=None,include_depe
                 entries[name]={'kind':'sqlite_snapshot','bytes':info.size,'sha256':reader.hash.hexdigest(),'mode':info.mode};snapshots.append(name)
         missing=[n for n in required if n not in entries]
         if missing:raise RuntimeError('required paths not archived: '+', '.join(missing))
-        manifest={'version':2,'created_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        if contracts_check(root)!=contract_state:raise RuntimeError('module contracts changed during backup')
+        manifest={'contract_check':contract_state,'version':2,'created_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   'sources':sources,'required':required,'optional_absent':absent,'entries':entries,
                   'sqlite_snapshots':snapshots,'python_packages':dependencies(root) if include_dependencies else {},
                   'separate_payloads':{'postgres':'all schemas, including walter_logs and module state',
