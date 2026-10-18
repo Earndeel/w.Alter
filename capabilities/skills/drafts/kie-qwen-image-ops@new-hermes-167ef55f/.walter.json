@@ -1,0 +1,14 @@
+{
+ "created_at": "2026-10-18T17:22:01+00:00",
+ "domain": "productivity",
+ "evidence": {},
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/kie-qwen-image-ops",
+  "sha": "167ef55fc79c873fdae7afeb2971b6443f3ab71fa7c447192d95447680e3a3f4",
+  "state": "active"
+ },
+ "kind": "new",
+ "reason": "created by the Hermes agent (skill_manage)",
+ "runtime": "hermes",
+ "target": "kie-qwen-image-ops"
+}
