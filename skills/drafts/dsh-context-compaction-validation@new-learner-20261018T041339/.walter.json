@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-18T04:13:39.087797+00:00",
+ "description": "Use when changing or validating the Walter context adapter for DSH, especially automatic or manual compaction, privileged message preservation, replay, and recovery of original tool results.",
+ "domain": "context",
+ "kind": "new",
+ "reason": "The session reproduced a concrete DSH data-loss bug after earlier checks had passed: manual compaction could remove a system/developer instruction at the beginning of the selected span. Inspection established that DSH prepends a retained global system head to summarizer input, requiring a precise exemption and rejection of privileged messages in the actual replacement span. The adapter fix was deployed and seven real DSH transaction tests passed. This is a distinct context-adapter procedure beyond the listed Hermes skills. [session codex/Codex Desktop/01a149f0-ef77-7432-903c-14cf3106b66a]",
+ "runtime": "learner",
+ "session_id": "codex/Codex Desktop/01a149f0-ef77-7432-903c-14cf3106b66a",
+ "target": "dsh-context-compaction-validation"
+}
