@@ -36,15 +36,18 @@ def _env() -> dict:
     return {**env, **{k: v for k, v in os.environ.items() if k.startswith("RAW_VAULT_")}}
 
 
-def s3():
+def s3(config=None):
     global _s3
-    if _s3 is None:
+    if _s3 is None or config is not None:
         e = _env()
-        _s3 = boto3.client("s3", endpoint_url=e.get("RAW_VAULT_S3_ENDPOINT", "http://127.0.0.1:8899"),
+        client = boto3.client("s3", endpoint_url=e.get("RAW_VAULT_S3_ENDPOINT", "http://127.0.0.1:8899"),
                            aws_access_key_id=e["RAW_VAULT_S3_ACCESS_KEY"], aws_secret_access_key=e["RAW_VAULT_S3_SECRET_KEY"],
                            region_name="«secret:vault»",
-                           config=Config(s3={"addressing_style": "path"}, signature_version="s3v4",
+                           config=config or Config(s3={"addressing_style": "path"}, signature_version="s3v4",
                                          retries={"max_attempts": 5, "mode": "standard"}))
+        if config is not None:
+            return client
+        _s3 = client
     return _s3
 
 
@@ -91,12 +94,12 @@ def safe_name(name: str) -> str:
 
 def put_object(path: str | Path, source: str, *, source_ref: dict | None = None, captured_at: datetime | None = None,
                links: list[tuple[str, str]] | None = None, original_name: str | None = None,
-               privacy_class: str | None = None, zone: str | None = None, conn=None) -> dict:
+               privacy_class: str | None = None, zone: str | None = None, conn=None, storage_client=None) -> dict:
     """Store a file once (dedupe by sha256) in the right zone, register it, attach links. Returns the row."""
     if conn is None:
         with connection() as c:
             return put_object(path, source, source_ref=source_ref, captured_at=captured_at, links=links,
-                              original_name=original_name, privacy_class=privacy_class, zone=zone, conn=c)
+                              original_name=original_name, privacy_class=privacy_class, zone=zone, conn=c, storage_client=storage_client)
     path = Path(path)
     sha = sha256_file(path)
     name = original_name or path.name
@@ -115,7 +118,7 @@ def put_object(path: str | Path, source: str, *, source_ref: dict | None = None,
         # local_only always lands in the encrypted zone; callers may also ask for it explicitly (e.g. third-party media)
         zone = "secure" if cls == "local_only" or zone == "secure" else "clear"
         key = f"{source}/{when:%Y}/{when:%m}/{when:%Y%m%d-%H%M%S}_{sha[:8]}_{safe_name(name)}"
-        s3().upload_file(str(path), BUCKETS[zone], key, ExtraArgs={"ContentType": mime})
+        (storage_client or s3()).upload_file(str(path), BUCKETS[zone], key, ExtraArgs={"ContentType": mime})
         row = conn.execute(
             """insert into core.objects (sha256, size_bytes, mime, kind, storage_key, original_name, captured_at, source,
                                          source_ref, meta, privacy_class, storage_zone)

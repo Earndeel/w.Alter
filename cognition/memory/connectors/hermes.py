@@ -218,34 +218,12 @@ def sync_messages(db, conn, max_rows: int) -> tuple[int, int]:
     return seen, inserted
 
 
-def export_days(db) -> list[str]:
-    """D1: raw daily copy of state.db rows (all columns) in the Raw Vault, for complete past days not yet exported."""
-    cur = ingestion.get_checkpoint(CONNECTOR, "export")
-    first = db.execute("select min(timestamp) from messages").fetchone()[0]
-    day = date.fromisoformat(cur["last_day"]) + timedelta(days=1) if cur.get("last_day") else ts(first).date()
-    done = []
-    while day < datetime.now(timezone.utc).date():
-        start = datetime(day.year, day.month, day.day, tzinfo=timezone.utc).timestamp()
-        msgs = db.execute("select * from messages where timestamp >= ? and timestamp < ? order by id",
-                          (start, start + 86400)).fetchall()
-        sess = db.execute("select * from sessions where started_at >= ? and started_at < ?", (start, start + 86400)).fetchall()
-        if msgs or sess:
-            buf = io.BytesIO()
-            with zstandard.ZstdCompressor(level=12).stream_writer(buf, closefd=False) as w:
-                for kind, rows in (("session", sess), ("message", msgs)):
-                    for r in rows:
-                        w.write((json.dumps({"kind": kind, **dict(r)}, ensure_ascii=False, default=str) + "\n").encode())
-            with tempfile.TemporaryDirectory(dir="/var/tmp") as d:
-                p = Path(d) / f"hermes-state-{day:%Y%m%d}.jsonl.zst"
-                p.write_bytes(buf.getvalue())
-                # raw rows include tool outputs and secrets typed in conversations: encrypted zone only
-                objects.put_object(p, "hermes_export", captured_at=datetime(day.year, day.month, day.day, tzinfo=timezone.utc),
-                                   privacy_class="local_only",
-                                   source_ref={"state_db_day": str(day), "messages": len(msgs), "sessions": len(sess)})
-            done.append(str(day))
-        ingestion.set_checkpoint(CONNECTOR, "export", {"last_day": str(day)})
-        day += timedelta(days=1)
-    return done
+def export_days(db) -> dict:
+    """Compatibility entrypoint; the shared exporter owns profile/privacy/checkpoints."""
+    from walter_memory.hermes_export import VaultExports, export_profile
+    profile = PROFILE or "main"
+    with VaultExports(profile, not PROFILE) as store:
+        return export_profile(db, profile, store, temp_root="/var/tmp", default_profile=not PROFILE)
 
 
 def run_one(state_db: str, max_rows: int, export: bool) -> dict:
@@ -263,7 +241,7 @@ def run_one(state_db: str, max_rows: int, export: bool) -> dict:
                 break
         exported = export_days(db) if export else []
         return {"session_events": s, "rows_seen": total_seen, "events_inserted": total_ins,
-                "exported_days": len(exported)}
+                "exported_days": exported["exported_days"] if export else 0}
     finally:
         db.close()
 
@@ -273,6 +251,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max", type=int, default=50000, help="max state.db message rows per run")
     ap.add_argument("--export", action="store_true", help="also write the daily raw export to the Raw Vault")
+    ap.add_argument("--export-only", action="store_true", help="export without canonical ingestion")
+    ap.add_argument("--export-days", type=int, default=31, help="maximum nonempty past days per profile/run")
+    ap.add_argument("--export-seconds", type=int, default=900, help="time budget per profile")
     ap.add_argument("--all-profiles", action="store_true", help="also every ~/.hermes/profiles/<name>/state.db")
     a = ap.parse_args()
     targets = [("", STATE_DB)]
@@ -283,20 +264,44 @@ def main() -> None:
             if os.path.exists(path):
                 targets.append((name, f"file:{path}?mode=ro"))
     report = {}
+    failed = False
+    if a.export_only:
+        ingestion.register_connector("hermes_raw_export", "hermes", "pull",
+                                     "Encrypted raw daily archives of all Hermes profiles", timedelta(hours=26))
     for name, state_db in targets:
+        label = "main" if not name else "profile:" + name
         PROFILE, CONNECTOR = name, f"hermes:{name}" if name else "hermes"
         ingestion.register_connector(CONNECTOR, "hermes", "pull",
                                      f"W.Alter conversations from Hermes {'profile ' + name if name else 'main'} "
                                      "state.db (read-only)", timedelta(minutes=10))
         try:
-            report[name or "main"] = run_one(state_db, a.max, a.export and not name)
-            ingestion.mark_success(CONNECTOR)
+            if a.export_only:
+                from walter_memory.hermes_export import run
+                result = run(state_db, name or "main", default_profile=not name, max_days=a.export_days, max_seconds=a.export_seconds)
+                report[label] = result
+                failed = failed or bool(result["remaining_days"])
+            else:
+                report[name or "main"] = run_one(state_db, a.max, a.export)
+                ingestion.mark_success(CONNECTOR)
         except Exception as e:
-            ingestion.record_failure(CONNECTOR, f"{type(e).__name__}: {e}")
-            if not name:
-                raise
-            report[name] = {"error": f"{type(e).__name__}: {e}"[:200]}
+            if a.export_only:
+                # Raw rows can contain secrets: exception values never go to logs/model output.
+                failed = True
+                ingestion.record_failure("hermes_raw_export", type(e).__name__)
+                report[label] = {"error": type(e).__name__}
+            else:
+                ingestion.record_failure(CONNECTOR, f"{type(e).__name__}: {e}")
+                if not name:
+                    raise
+                report[name] = {"error": f"{type(e).__name__}: {e}"[:200]}
+    if a.export_only:
+        if not failed:
+            ingestion.mark_success("hermes_raw_export")
+        else:
+            ingestion.record_failure("hermes_raw_export", "raw export incomplete; retry resumes checkpoints")
     print(json.dumps(report))
+    if failed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
