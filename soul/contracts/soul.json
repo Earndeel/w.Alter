@@ -1,0 +1,122 @@
+{
+  "id": "soul",
+  "root": "/opt/walter-soul",
+  "anchors": [
+    "/opt/walter-soul/bin/walter-soul",
+    "/opt/walter-soul/contracts/soul.json",
+    "/opt/walter-soul/identity.md",
+    "/opt/walter-soul/rules.md"
+  ],
+  "requires": [],
+  "external": [],
+  "data": [
+    "identity sources",
+    "curated user profile"
+  ],
+  "core_paths": [],
+  "backup_paths": [
+    "/opt/walter-soul",
+    "/opt/walter-profiles",
+    "/root/.hermes/memories"
+  ],
+  "interfaces": [
+    "renderer",
+    "walter_profile MCP"
+  ],
+  "bindings": {
+    "hermes": "rendered SOUL.md",
+    "dsh": "rendered AGENTS.md + walter_profile MCP",
+    "codex": "common MCP",
+    "claude-code": "common MCP"
+  },
+  "limitations": [
+    "Profile and critical buffer retain compatibility locations under .hermes; no running Hermes required."
+  ],
+  "services": [],
+  "optional": [],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "soul",
+    "kind": "foundation",
+    "purpose": "Posséder l’identité commune et générer les profils des clients.",
+    "target_root": "/walter/soul",
+    "config_paths": [
+      "/opt/walter-soul/rules.md"
+    ],
+    "permissions": [
+      "écriture des profils générés"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "renderer",
+        "interface": "walter-soul sync/check",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "identity-sources",
+        "role": "owner",
+        "owner": "soul",
+        "durability": "canonical"
+      },
+      {
+        "id": "generated-profiles",
+        "role": "owner",
+        "owner": "soul",
+        "durability": "projection"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "render-consistency",
+        "assertion": "Une modification des sources produit des profils cohérents et détecte les retouches manuelles.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  }
+}
