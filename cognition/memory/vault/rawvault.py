@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Deprecated entry point (2026-10-01): the Raw Vault registry is now core.objects, implemented once in
-walter_memory.objects (/opt/walter-memory). This shim keeps the old CLI working:
+walter_memory.objects (Walter Memory). This shim keeps the old CLI working:
     rawvault.py put FILE --source S [--link type:id] [--captured ISO]  |  get ID [DEST]  |  search TEXT  |  stats
 """
 import os
