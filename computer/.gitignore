@@ -2,3 +2,6 @@ __pycache__/
 .pytest_cache/
 *.pyc
 gateway.env
+
+# Transitional links to the instance for processes started before 2026-10-19 (remove after Hermes restarts)
+/config.json
