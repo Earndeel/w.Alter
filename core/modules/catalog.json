@@ -68,6 +68,12 @@
       "manifest": "contracts/router.json"
     },
     {
+      "id": "runtime",
+      "target": "runtime",
+      "legacy": null,
+      "manifest": "contracts/runtime.json"
+    },
+    {
       "id": "secrets",
       "target": "secrets",
       "legacy": "/opt/walter-secrets",

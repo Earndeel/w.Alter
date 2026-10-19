@@ -106,6 +106,12 @@
       "mcp/src",
       "mcp/pyproject.toml",
       "mcp/uv.lock"
+    ],
+    "runtime": [
+      "README.md",
+      "requirements.lock",
+      "requirements-dev.lock",
+      "bin"
     ]
   },
   "restored_module_anchors": {

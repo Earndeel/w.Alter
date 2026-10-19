@@ -155,7 +155,7 @@ class CapabilityTests(unittest.TestCase):
             accepted = self.mcp.tools['model_route']('coding')
             self.assertEqual(json.loads(accepted)['model'], 'fictional-model')
             args, kwargs = run.call_args
-            self.assertEqual(args[0], ['/opt/walter-router/bin/walter-router', 'pick', 'coding'])
+            self.assertEqual(args[0], ['walter-router', 'pick', 'coding'])
             self.assertFalse(kwargs.get('shell', False))
 
     def test_browse_rejects_filesystem_session_identifiers_before_backend(self):

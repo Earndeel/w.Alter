@@ -15,6 +15,7 @@ Généré depuis les manifestes propriétaires. Les scénarios décrivent les cr
 | memory | capability | Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées. | — |
 | raw-vault | capability | Conserver les octets originaux et les relier au catalogue canonique. | memory |
 | router | capability | Choisir les modèles par poste avec décisions et coûts traçables. | — |
+| runtime | foundation | Fournir l’environnement Python partagé des modules Walter. | — |
 | secrets | capability | Gérer les références au coffre et injecter localement les valeurs autorisées. | — |
 | skills | capability | Gérer le contenu, la recherche, les propositions et la curation des procédures. | bus |
 | soul | foundation | Posséder l’identité commune et générer les profils des clients. | — |
@@ -231,6 +232,24 @@ Interfaces : CLI, walter-llm task routes, MCP route lookup.
 
 - Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.
 - New model choices remain subject to Monsieur approval; no automatic switching introduced.
+
+## runtime
+
+Fournir l’environnement Python partagé des modules Walter.
+
+Contrat 1.0.0; propriétaire : runtime.
+Racine actuelle : `/walter/runtime`. Cible : `/walter/runtime`.
+
+Interfaces : command walter-python.
+
+**Critères de validation :**
+
+- walter-python importe les dépendances déclarées dans le lock (unit)
+- aucun module n’appelle l’interpréteur d’un autre module (integration)
+
+**Limites déclarées :**
+
+- The venv is rebuilt from the lock, not exported; a dependency upgrade affects every consumer at once.
 
 ## secrets
 

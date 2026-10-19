@@ -28,7 +28,7 @@ def matrix():
         hp=harness.default_home(host);bindings=state['bindings'];mcp=state['common_mcp']
         identity=Path(spec['identity_source']) if spec['identity_scope']=='workspace' else hp/('SOUL.md' if host=='hermes' else 'AGENTS.md')
         plugins=set(bindings.get('plugins',[]))-set(data.get('plugins',{}).get('disabled',[])) if host=='hermes' else set()
-        expected={'memory':'hindsight','skills':'walter-skills','secrets':'walter-secrets','browse':'walter-browse','computer':'walter-computer-use','logs':'walter-logs'}
+        expected={'memory':'walter-memory','skills':'walter-skills','secrets':'walter-secrets','browse':'walter-browse','computer':'walter-computer-use','logs':'walter-logs'}
         for capability in CAPABILITIES:
             module=modules.get(MODULE[capability],{})
             anchors=module.get('anchors',[])
@@ -52,7 +52,7 @@ def matrix():
                 if capability=='memory':
                     provider=bindings.get('memory_provider')
                     selected=hp/'plugins'/str(provider)/'__init__.py'
-                    bound=provider in ('hindsight','walter-memory') and provider not in data.get('plugins',{}).get('disabled',[]) and selected.is_file()
+                    bound=provider=='walter-memory' and provider not in data.get('plugins',{}).get('disabled',[]) and selected.is_file()
                     refs.append(_file_evidence(selected))
                     limits.append('Provider plugin selected; canonical/privacy migration and live reload require their own proof.')
             else:bound=mcp

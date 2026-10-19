@@ -74,7 +74,7 @@ def check(host,home=None):
         result['bindings']={'computer_backend':data.get('computer_use',{}).get('backend'),
                             'context_engine':data.get('context',{}).get('engine'),
                             'memory_provider':data.get('memory',{}).get('provider'),
-                            'plugins':[x for x in enabled if x.startswith('walter-') or x=='hindsight']}
+                            'plugins':[x for x in enabled if x.startswith('walter-')]}
         result['common_mcp_required']=False
     return result
 

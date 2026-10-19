@@ -6,7 +6,7 @@ capabilities without importing Hermes internals:
 
   memory_recall / memory_retain / memory_reflect  → Walter Memory canonical facade (privacy + Router synthesis)
   walter_profile                                  → USER.md / SOUL.md / MEMORY.md
-  skills_search / skill_read                      → W.Alter skills (walter-skills service :8891, store /opt/walter-skills)
+  skills_search / skill_read                      → W.Alter skills (walter-skills service :8891)
   ask_hermes                                      → delegate a task to the live Hermes agent (all its tools)
   memory_search / memory_events                   → unified search (knowledge + evidence) / canonical event history
   person_lookup                                   → Kardex social card (relationship metrics, accounts, groups)
@@ -112,12 +112,18 @@ def memory_reflect(question: str, budget: str = "mid") -> str:
 
 
 @mcp.tool()
+def _soul_profile() -> Path:
+    """The runtime-neutral identity rendered by walter-soul, located through the path resolver."""
+    from walter_platform.paths import module_path
+    return module_path("soul", "build", "agent.md")
+
+
 def walter_profile() -> str:
     """Return the user's curated profile (USER.md), W.Alter's identity/style rules (walter-soul, the
     runtime-neutral render) and the critical memory buffer (MEMORY.md). Small; safe to load at the start of a session."""
     parts = []
     for label, path in (("USER.md", HERMES_HOME / "memories" / "USER.md"),
-                        ("W.Alter identity", Path("/opt/walter-soul/build/agent.md")),
+                        ("W.Alter identity", _soul_profile()),
                         ("MEMORY.md", HERMES_HOME / "memories" / "MEMORY.md")):
         try:
             parts.append(f"## {label}\n{path.read_text(errors='replace').strip()}")
@@ -372,7 +378,7 @@ def walter_health() -> str:
     except (OSError, KeyError, ValueError):
         out.append("memory autopilot: no report")
     try:  # Walter Router (model choice per task): fed, fresh, providers reachable
-        r = subprocess.run(["/opt/walter-router/bin/walter-router", "health"], capture_output=True, text=True, timeout=30)
+        r = subprocess.run(["walter-router", "health"], capture_output=True, text=True, timeout=30)
         h = json.loads(r.stdout)
         line = "walter-router: ok" if h["ok"] else "walter-router: KO — " + "; ".join(h["issues"][:3])
         if h.get("warnings"):

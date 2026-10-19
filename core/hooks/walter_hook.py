@@ -1,4 +1,4 @@
-#!/opt/walter-memory/venv/bin/python3
+#!/usr/local/bin/walter-python
 """walter_hook — W.Alter's automatic behaviours for any agent runtime (P8.3, plug ③ of a Walter module).
 
 One script, several hosts (the wire format is Claude Code's, which Hermes' shell hooks also speak):
@@ -42,8 +42,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 GATEWAY = os.environ.get("WALTER_MEMORY_URL", "http://127.0.0.1:8890")
-ENV_FILE = Path("/opt/walter-memory/.env")
-CONNECTOR = ["/opt/walter-memory/venv/bin/python3", "/opt/walter-memory/connectors/agent_sessions.py"]
+CONNECTOR = ["walter-memory", "agent-sessions"]   # Walter Memory CLI on the PATH
 LOG = Path("/root/.hermes/logs/walter-hook.log")
 BUDGET = {"profile": 0, "people": 300, "knowledge": 600, "evidence": 300}
 MIN_WORDS = 4
@@ -60,18 +59,15 @@ def log(msg: str) -> None:
 
 
 def _privacy():
-    """walter_memory.privacy loaded alone (stdlib only), without the package's DB imports."""
-    spec = importlib.util.spec_from_file_location("wm_privacy", "/opt/walter-memory/walter_memory/privacy.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """walter_memory.privacy (stdlib only; the package imports its DB modules lazily)."""
+    from walter_memory import privacy
+    return privacy
 
 
 def _token() -> str:
-    for line in ENV_FILE.read_text().splitlines():
-        if line.startswith("WALTER_MEMORY_GATEWAY_TOKEN="):
-            return line.split("=", 1)[1].strip().strip('"')
-    return ""
+    """The gateway credential, read by Walter Memory's public client."""
+    from walter_memory import client
+    return client.token()
 
 
 MACHINE_PROMPTS = ("<task-notification", "[SYSTEM NOTIFICATION", "Another Claude session sent a message",

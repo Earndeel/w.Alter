@@ -25,7 +25,6 @@
   "context": "walter-compress",
   "model": "preserved",
   "plugins": [
-    "hindsight",
     "walter-browse",
     "walter-compress",
     "walter-computer-use",

@@ -9,11 +9,12 @@ import atexit,asyncio,importlib,json,os,re,stat,subprocess,sys
 from pathlib import Path
 from mcp.types import ImageContent,TextContent,ToolAnnotations
 
-ROOTS={'browse':'/opt/walter-browse','secrets':'/opt/walter-secrets','computer':'/opt/walter-computer'}
 _pool=None
 
 def _module(which,name):
-    path=Path(ROOTS[which])
+    # The façade locates modules through the Walter path resolver, never by a hardcoded directory.
+    from walter_platform.paths import module_root
+    path=module_root(which)
     if not path.is_dir():raise ModuleNotFoundError('Walter module unavailable')
     if str(path) not in sys.path:sys.path.insert(0,str(path))
     return importlib.import_module(name)
@@ -86,7 +87,7 @@ def register(mcp,client='unknown',*,local_control=True):
         Does not change choices, buy credits or run a model. Codex/Claude keep their primary model."""
         if not re.fullmatch(r'[a-zA-Z0-9_-]{0,64}',task) or not re.fullmatch(r'[a-zA-Z0-9_-]{0,16}',level):
             return json.dumps({'ok':False,'error':'invalid task or level'})
-        args=['/opt/walter-router/bin/walter-router','pick',task] if task else ['/opt/walter-router/bin/walter-router','tasks']
+        args=['walter-router','pick',task] if task else ['walter-router','tasks']
         if task and level:args+=['--level',level]
         try:
             out=subprocess.run(args,capture_output=True,text=True,timeout=30)

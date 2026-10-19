@@ -18,8 +18,13 @@ from .harness_transaction import file_change, link_change, commit, rollback
 
 ROOT=Path(__file__).resolve().parents[1]
 COMPOSITIONS=ROOT/'compositions'
-CONTEXT='/opt/walter-context/ports/dsh/index.mjs'
-SKILL_DIR='/opt/walter-core/skills'
+SKILL_DIR=str(ROOT/'skills')
+
+
+def _context_port():
+    """DSH entry of walter-context, located through the path resolver."""
+    from .paths import module_path
+    return str(module_path('context','ports','dsh','index.mjs'))
 
 
 def definition(host):
@@ -152,8 +157,8 @@ def _plan(host,home=None,profile_dir=None):
         else:require(cp,'credentials')
         add(_dsh_patch(data,'credentials',{'path':str(cp)}))
         add(_dsh_patch(data,'compaction-basic',disabled=True))
-        add(_dsh_addition(data,{'id':'walter-context','name':CONTEXT}))
-        for dependency in (CONTEXT,'/opt/dsh/node_modules/@deepseek-ai/dsh/package.json','/opt/dsh/node_modules/@deepseek-ai/dsh-hooks-claude-code/package.json'):
+        add(_dsh_addition(data,{'id':'walter-context','name':_context_port()}))
+        for dependency in (_context_port(),'/opt/dsh/node_modules/@deepseek-ai/dsh/package.json','/opt/dsh/node_modules/@deepseek-ai/dsh-hooks-claude-code/package.json'):
             require(dependency,'dsh_runtime')
         if merged:text=yaml.safe_dump(data,sort_keys=False)
         elif additions:text=text.rstrip()+'\n'+yaml.safe_dump(additions,sort_keys=False)
@@ -162,8 +167,8 @@ def _plan(host,home=None,profile_dir=None):
         import yaml
         plugins=data.setdefault('plugins',{});enabled=plugins.setdefault('enabled',[]);disabled=plugins.get('disabled',[])
         memory_provider=data.get('memory',{}).get('provider')
-        wanted=[name for name in spec['plugins'] if name!='hindsight']
-        if memory_provider in ('hindsight','walter-memory'):wanted.append(memory_provider)
+        wanted=list(spec['plugins'])
+        if memory_provider=='walter-memory':wanted.append(memory_provider)   # Hindsight retired 2026-10-19
         else:prerequisites.append({'component':'memory_provider','available':False,'reason':'current provider has no declared Walter composition'})
         for name in wanted:
             if name in disabled:raise ValueError('required Hermes adapter explicitly disabled')

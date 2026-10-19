@@ -87,9 +87,14 @@ def report(*, scan=False, live=False, path=None):
         for m,declared in zip(modules,registry['modules']):
             m['services']={u:states.get(u,'unknown') for u in declared.get('services',[])}
             m['runtime_health']=('active' if all(x=='active' for x in m['services'].values()) else 'degraded') if m['services'] else 'no_dedicated_service'
-    return {'schema_version':1,'ok':all(m['installed'] and not m['forbidden_imports'] and m['runtime_health']!='degraded' for m in modules),
-            'scope':'installation/source boundaries and optional systemd state; functional health and end-to-end validation remain separate',
-            'modules':modules}
+    out={'schema_version':1,'ok':all(m['installed'] and not m['forbidden_imports'] and m['runtime_health']!='degraded' for m in modules),
+         'scope':'installation/source boundaries and optional systemd state; functional health and end-to-end validation remain separate',
+         'modules':modules}
+    if scan:
+        from .interconnect import scan as interconnect
+        out['interconnect']=interconnect()
+        out['ok']=out['ok'] and out['interconnect']['ok']
+    return out
 
 
 def backup_paths(path=None):

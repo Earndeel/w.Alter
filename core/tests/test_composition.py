@@ -19,7 +19,7 @@ def home(tmp_path,monkeypatch):
 
 @pytest.mark.parametrize('host',['codex','claude-code','dsh','hermes'])
 def test_preview_idempotent_install_and_full_rollback(home,host):
-    if host=='hermes':(home/'config.yaml').write_text('memory:\n  provider: hindsight\n')
+    if host=='hermes':(home/'config.yaml').write_text('memory:\n  provider: walter-memory\n')
     original={str(p):p.read_bytes() for p in home.rglob('*') if p.is_file()}
     before=list(home.rglob('*'))
     preview=c.install(host,home)
