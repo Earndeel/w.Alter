@@ -36,16 +36,17 @@ the live user turn plus `projection.keep_turns` completed turns.
 
 ## Retention and failure behavior
 
-Checkpoint rendering keeps the complete user text of the selected span, including
+Checkpoint rendering keeps the complete user and visible assistant text of the selected span, in chronological order, including
 any prior checkpoint, and every tool-result call id. Leading/trailing whitespace
 can be normalized. The shared `record_user_chars` clipping limit used by projection
-mode does not truncate checkpoint user text. Assistant answers and action details
-remain extractive and clipped; tool contents and reasoning are not copied in full.
+mode does not truncate checkpoint dialogue. This includes intermediate assistant
+explanations attached to tool calls. Action arguments remain clipped; tool contents
+and reasoning are not copied in full.
 Image/file blocks retain textual attachment references, not their visual/audio
 content. These losses can affect later answers.
 
 A checkpoint must fit `policy.record_share` of its effective budget (currently
-30%, estimated by the core). If full user text or the rendered record cannot fit,
+30%, estimated by the core). If full user/assistant text or the rendered record cannot fit,
 compaction fails explicitly. A `system` or `developer` message inside the selected
 history also causes refusal: its instruction role must not be erased by a plain
 user record. Only the injected global system head is exempt, identified by its durable id.
@@ -74,17 +75,21 @@ paths. Peer dependencies resolve normally when installed as a package; this VM
 can resolve the host through `WALTER_DSH_PACKAGE` (default
 `/opt/dsh/package.json`). The supported and tested host is DSH 0.2.0-rc.2.
 
-`node /opt/walter-context/tests/test_dsh.mjs` runs seven tests with actual DSH
+`node /opt/walter-context/tests/test_dsh.mjs` runs nine tests with actual DSH
 Session, CompactionEngine, ToolRuntime and replay. They cover a successful
 checkpoint, source recovery, intact raw events, Python failure, system/developer
 instruction refusal (including leading roles and manual compaction), abort and
 concurrent locking. Histories are synthetic;
 provider metadata and metering are fixtures and no external model is called.
-Python tests additionally check complete user-text retention through repeated
+Python tests additionally check complete user/assistant-text retention through repeated
 checkpoints, all tool references and explicit budget refusal.
 
-A separate 19-item exact-retention probe keeps 13 textual facts/constraints in the
-checkpoint and six tool results as references, with no silently omitted probe.
-This establishes those deterministic properties, not semantic answer quality or
-model compliance with every instruction. It does not qualify the different
-Hermes projection mode; Hermes remains on `walter-compress`.
+A versioned 14-case synthetic exact-retention corpus additionally checks long
+constraints, multilingual text, superseding decisions, consecutive messages,
+all tool references, attachment refs, middle/intermediate assistant explanations
+and explicit budget/role refusals. All pass. Nine accepted cases retain complete
+visible dialogue while reducing a tool-heavy fixture from 335,910 to 9,532
+estimated tokens; five cases refuse safely. This establishes those deterministic
+properties, not model answer quality or compliance with instructions. It does not
+qualify the different Hermes projection mode; Hermes remains on `walter-compress`.
+See `../../docs/ACCEPTANCE.md`.

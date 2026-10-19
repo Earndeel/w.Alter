@@ -9,7 +9,7 @@ not qualify the other.
 
 | Mode | Host interface | Model-visible retention | Durable source |
 | --- | --- | --- | --- |
-| Checkpoint | `checkpoint.plan` / `checkpoint.summarize`, versioned JSON/stdin bridge; DSH compaction service | Full user text in the selected span, including previous checkpoints, or explicit refusal. All tool-result call ids remain references. Assistant text, action details and tool contents are lossy. | DSH owns the append-only journal, replacement transaction and replay. |
+| Checkpoint | `checkpoint.plan` / `checkpoint.summarize`, versioned JSON/stdin bridge; DSH compaction service | Full user and visible assistant text in the selected span, including previous checkpoints, or explicit refusal. All tool-result call ids remain references. Action arguments are clipped; tool contents and reasoning are not copied in full. | DSH owns the append-only journal, replacement transaction and replay. |
 | Projection | `Session.select / observe / turn_complete / compact_all`; Hermes `ContextEngine` port | Cache-oriented `head → record → compact → live`. Older user/assistant text can be clipped, reduced to one line or omitted. | The host and Walter Logs own persistence. A recoverable source is not the same as a constraint visible to the model. |
 
 No mode has a general proof of semantic answer quality. Preserving text does not
@@ -24,7 +24,7 @@ selection retains the live user turn plus `projection.keep_turns` completed turn
 DSH supplies input capacity after reserving output tokens. Manual `/compact`
 selection remains DSH's policy; summary rendering still uses Walter.
 
-The extractive record preserves every user text without content truncation and
+The extractive record preserves every user and visible assistant text, in chronological order and without content truncation, and
 all tool-result call ids, including after repeated checkpoints. Boundary whitespace
 can be normalized. The result must fit `policy.record_share` of the effective
 budget, using the core's approximate token estimator. With the current config,
@@ -79,11 +79,13 @@ ports/hermes/         public ContextEngine port (currently inactive)
 ports/dsh/            public DSH compaction port
 bench/replay.py       local journal replay: sizes, simulated cache/cost, latency
 bench/quality.py      cloud-safe quality samples; estimate by default
+bench/acceptance.py   versioned synthetic exact-retention corpus, offline
 ```
 
 ```bash
 /opt/walter-context/bin/walter-context bench --a8 --sessions 40
 /opt/walter-context/bin/walter-context quality --samples 30
+/opt/walter-context/bin/walter-context acceptance
 /opt/walter-context/bin/walter-context recover <call-id> --offset 0
 /root/.hermes/hermes-agent/venv/bin/python -m pytest -q /opt/walter-context/tests
 node /opt/walter-context/tests/test_dsh.mjs
@@ -110,14 +112,20 @@ cloud-safe sampling excludes entire chains containing events not classified
   Request-only projection must not rewrite an event-sourced host's immutable
   journal-derived requests.
 
-Qualification uses 24 Python tests and 7 Node tests. Node exercises real DSH
+Qualification uses 27 Python tests and 9 Node tests. Node exercises real DSH
 Session, CompactionEngine, ToolRuntime, transactions and replay with synthetic
-histories; provider metadata and metering are fixtures. The separate known-answer
-probe retains 13 textual facts/constraints directly and six tool results by
-reference, including a constraint in the middle of a long user message. It also
-checks repeated checkpoints and refusal when preserved text exceeds budget.
-These checks made no cloud model calls and do not establish real-model answer
-quality or qualify the Hermes projection.
+histories, including repeated checkpoints and paged recovery of evidence in the
+middle of a large tool result. Provider metadata and metering are fixtures.
+
+The versioned 14-case synthetic acceptance corpus passes exact retention of user
+and visible assistant text, all tool references, input immutability, chronological
+superseding decisions and five expected refusals. On identical inputs the prior
+checkpoint failed the two assistant-detail cases; the current record keeps both
+answers, including an intermediate explanation attached to a tool call. Nine
+accepted cases shrink from about 335,910 to 9,532 estimated tokens (97.16%). This
+tool-heavy synthetic gain is not a prediction for real conversations. Tests make
+no model calls, measure no provider cache behavior, and do not establish semantic
+answer quality or qualify the Hermes projection. See `docs/ACCEPTANCE.md`.
 
 Design references: `/root/.hermes/docs/walter-memory/CONTEXT-ENGINE.md`,
 `HARNESS-CONTRACT.md`, `PLAN.md` and dated `DECISIONS.md` entries.
