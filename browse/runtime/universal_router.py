@@ -425,6 +425,7 @@ async def http_probe(
     *,
     timeout: float = _HTTP_PROBE_TIMEOUT,
     content_hints: Sequence[str] | None = None,
+    session: Any = None,
 ) -> dict[str, Any]:
     """Cheap GET probe that returns technical signals for routing.
 
@@ -461,7 +462,13 @@ async def http_probe(
     def _probe() -> None:
         request = urllib.request.Request(url, headers=_HTTP_PROBE_HEADERS, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            if session is not None:
+                from session_http import session_opener
+                opener = session_opener(session, url)
+                response_context = opener.open(request, timeout=timeout)
+            else:
+                response_context = urllib.request.urlopen(request, timeout=timeout)
+            with response_context as response:
                 result["status"] = response.status
                 result["content_type"] = str(response.headers.get("content-type") or "").lower()
                 result["redirect_target"] = response.geturl()
@@ -873,13 +880,16 @@ class UniversalRouter:
         if mode not in {"auto", "scrapling", "camoufox", "webtop"}:
             raise ValueError("mode must be auto, scrapling, camoufox, or webtop")
 
+        authenticated_session = session is not None and (session.identity != 'anonymous' or session.authenticated or session.cookie_count > 0)
+        if authenticated_session and mode != 'auto':
+            return RoutedResult(self._error_result(url, spec, 'authenticated browser adapter not qualified; use managed HTTP auto mode'), 'session-http', [])
         attempts: list[dict[str, Any]] = []
         last_result: ExtractionResult | None = None
         signals: dict[str, Any] | None = None
         probe: dict[str, Any] | None = None
         trace: list[str] = []
         downgrade: dict[str, Any] | None = None
-        profile_hit = self.profile_index.lookup(url, spec) if self.profile_index is not None else None
+        profile_hit = self.profile_index.lookup(url, spec) if self.profile_index is not None and not authenticated_session else None
         profile_summary = (
             profile_hit.summary()
             if profile_hit is not None
@@ -896,7 +906,7 @@ class UniversalRouter:
                     if token
                 }
             )
-            probe = await http_probe(url, content_hints=hints)
+            probe = await http_probe(url, content_hints=hints, **({"session": session} if authenticated_session else {}))
             signals = {
                 "status": probe.get("status"),
                 "content_type": probe.get("content_type"),
@@ -920,7 +930,7 @@ class UniversalRouter:
 
             # HTTP_DIRECT_PATH: score/extract straight from the probe body and
             # only fetch again if the body is missing or the contract fails.
-            body = probe.get("body")
+            body = probe.get("body") if probe.get("status") and 200 <= probe["status"] < 300 else None
             if probe.get("is_json") and body:
                 try:
                     direct_payload = json.loads(body)
@@ -943,7 +953,7 @@ class UniversalRouter:
                             url, spec, direct_started, [candidate]
                         )
                         if self._usable(direct_result):
-                            if self.profile_index is not None:
+                            if self.profile_index is not None and not authenticated_session:
                                 self.profile_index.observe(
                                     url,
                                     spec,
@@ -1011,7 +1021,7 @@ class UniversalRouter:
                                     url, spec, time.perf_counter(), [content_candidate]
                                 )
                                 if self._usable(content_result) and content_result.records:
-                                    if self.profile_index is not None:
+                                    if self.profile_index is not None and not authenticated_session:
                                         self.profile_index.observe(
                                             url,
                                             spec,
@@ -1037,7 +1047,7 @@ class UniversalRouter:
 
                     static_result = extract_static_html(url, body, spec)
                     if self._usable(static_result):
-                        if self.profile_index is not None:
+                        if self.profile_index is not None and not authenticated_session:
                             self.profile_index.observe(
                                 url,
                                 spec,
@@ -1070,6 +1080,10 @@ class UniversalRouter:
                         )
                 except ImportError:
                     pass  # static extractor unavailable: normal ladder
+
+        if authenticated_session:
+            return RoutedResult(self._error_result(url, spec, 'managed authenticated HTTP did not satisfy the contract; no anonymous fallback'),
+                                'session-http', [{'backend':'session-http', 'usable':False}], trace=trace, signals=signals, probe=probe)
 
         if mode == "auto":
             order = self._auto_order(
@@ -1414,7 +1428,7 @@ async def _run_cli(args: argparse.Namespace) -> int:
             try:
                 session = sctx.load(args.session_id)
             except SessionError:
-                session = None
+                raise SessionError('requested managed session unavailable; anonymous fallback refused') from None
         if session is None:
             session = sctx.create(
                 session_id=args.session_id,

@@ -1,0 +1,143 @@
+{
+  "id": "browse",
+  "root": "/opt/walter-browse",
+  "anchors": [
+    "/opt/walter-browse/contracts/browse.json",
+    "/opt/walter-browse/runtime/universal_router.py",
+    "/opt/walter-browse/walter_browse/facade.py"
+  ],
+  "requires": [],
+  "external": [
+    "Scrapling isolated environment",
+    "Camoufox :9377",
+    "optional Webtop CDP"
+  ],
+  "data": [
+    "shared session state",
+    "learned route profiles",
+    "result cache"
+  ],
+  "core_paths": [
+    "/opt/walter-browse/walter_browse",
+    "/opt/walter-browse/runtime/universal_router.py",
+    "/opt/walter-browse/runtime/browse_session.py",
+    "/opt/walter-browse/runtime/profile_index.py",
+    "/opt/walter-browse/runtime/result_cache.py",
+    "/opt/walter-browse/runtime/search_lite.py"
+  ],
+  "backup_paths": [
+    "/opt/walter-browse"
+  ],
+  "interfaces": [
+    "shared request contract",
+    "CLI",
+    "MCP",
+    "Hermes plugin"
+  ],
+  "bindings": {
+    "hermes": "native walter-browse adapter to shared facade",
+    "dsh": "common MCP",
+    "codex": "common MCP",
+    "claude-code": "common MCP"
+  },
+  "limitations": [
+    "Authenticated HTTP uses managed server-side cookies and refuses cross-origin redirects or anonymous fallback.",
+    "Authenticated interactive browser routes are not qualified by the HTTP fixture."
+  ],
+  "services": [],
+  "optional": [
+    "secrets",
+    "llm"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "browse",
+    "kind": "capability",
+    "purpose": "Rechercher, extraire et gérer les parcours web avec un moteur commun.",
+    "target_root": "/walter/browse",
+    "config_paths": [
+      "/opt/walter-browse/config"
+    ],
+    "permissions": [
+      "sessions de navigateur gérées",
+      "cookies et valeurs de coffre hors résultats"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "mcp",
+        "interface": "walter_browse/browser_session",
+        "access": "read",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "browse-sessions",
+        "role": "owner",
+        "owner": "browse",
+        "durability": "ephemeral"
+      },
+      {
+        "id": "browse-route-profiles",
+        "role": "owner",
+        "owner": "browse",
+        "durability": "configuration"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "public-extraction",
+        "assertion": "Une extraction publique passe par le noyau partagé sans processus agent Hermes.",
+        "scope": "live"
+      },
+      {
+        "id": "managed-auth",
+        "assertion": "Une session gérée permet un parcours autorisé sans divulguer ses identifiants.",
+        "scope": "live"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  }
+}
