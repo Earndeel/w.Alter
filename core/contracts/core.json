@@ -1,21 +1,20 @@
 {
   "id": "core",
-  "root": "/opt/walter-core",
   "anchors": [
-    "/opt/walter-core/contracts/core.json",
-    "/opt/walter-core/hooks/walter_hook.py",
-    "/opt/walter-core/server.py",
-    "/opt/walter-core/modules/catalog.json",
-    "/opt/walter-core/modules/registry.json"
+    "contracts/core.json",
+    "hooks/walter_hook.py",
+    "server.py",
+    "modules/catalog.json",
+    "modules/registry.json"
   ],
   "requires": [],
   "external": [],
   "data": [],
   "core_paths": [
-    "/opt/walter-core/walter_platform"
+    "walter_platform"
   ],
   "backup_paths": [
-    "/opt/walter-core",
+    ".",
     "/root/.codex/config.toml",
     "/root/.claude.json",
     "/root/.claude/settings.json",
@@ -48,9 +47,9 @@
     "owner": "core",
     "kind": "foundation",
     "purpose": "Exposer les capacités et installer les raccordements des harnesses.",
-    "target_root": "/walter/core",
+    "target_root": "core",
     "config_paths": [
-      "/opt/walter-core/modules/computer-policy.json"
+      "modules/computer-policy.json"
     ],
     "permissions": [
       "configurations clients",

@@ -239,7 +239,7 @@ def _inspect(bundle):
         for anchor in module['anchors']:
             if '/contracts/' in anchor and anchor.endswith('.json'):
                 p=_safe(bundle,'payload/'+anchor.lstrip('/'))
-                if json.loads(p.read_text())!=module:raise ValueError('release manifest differs from owner contract payload')
+                if contracts.expand(json.loads(p.read_text()),module['root'],module['contract']['target_root'])!=module:raise ValueError('release manifest differs from owner contract payload')
     core=next((v['root'] for v in m['modules']['modules'] if v['id']=='core'),'/opt/walter-core')
     catalog=_safe(bundle,'payload/'+core.lstrip('/')+'/modules/catalog.json')
     if catalog.is_file() and contracts.compile_registry(catalog,root=bundle/'payload')!=m['modules']:raise ValueError('release catalog differs from owner contracts')

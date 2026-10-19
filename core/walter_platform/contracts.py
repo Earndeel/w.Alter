@@ -9,7 +9,16 @@ import hashlib
 import json
 import math
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+
+try:
+    from . import paths as layout
+except ImportError:
+    # Loaded by file path, outside its package (backup bundles, restore drills): take the sibling resolver.
+    import importlib.util as _importlib_util
+    _spec = _importlib_util.spec_from_file_location('_walter_contracts_paths', Path(__file__).with_name('paths.py'))
+    layout = _importlib_util.module_from_spec(_spec)
+    _spec.loader.exec_module(layout)
 
 CATALOG = Path(__file__).resolve().parent.parent / 'modules' / 'catalog.json'
 IDENTIFIER = re.compile(r'[a-z][a-z0-9-]{0,63}\Z')
@@ -48,14 +57,31 @@ def _read(path):
     return data
 
 
-def validate(module):
-    """Validate a module's declarative contract, not its runtime qualification."""
+def contract_path(value):
+    """Owner manifests: relative paths live inside the module, absolute ones are external to it."""
+    _require(isinstance(value, str), 'contract path must be a string')
+    if value.startswith('/'):
+        return absolute_path(value)
+    try:
+        return layout.relative(value)
+    except ValueError:
+        raise ValueError('unsafe contract path') from None
+
+
+def validate(module, *, source=False):
+    """Validate a module's declarative contract, not its runtime qualification.
+
+    source=True accepts an owner manifest (paths relative to the module, no root); the default checks a
+    compiled registry entry, where every path is absolute.
+    """
+    check = contract_path if source else absolute_path
     name = module.get('id', '')
     _require(isinstance(name, str) and IDENTIFIER.fullmatch(name), 'invalid module id')
-    absolute_path(module.get('root'))
+    if not source or 'root' in module:
+        absolute_path(module.get('root'))
     for key in ('anchors', 'backup_paths', 'core_paths'):
         for value in _strings(module.get(key), key, nonempty=key != 'core_paths'):
-            absolute_path(value)
+            check(value)
     for key in ('requires', 'optional', 'external', 'services', 'data', 'limitations'):
         _strings(module.get(key), key)
     _strings(module.get('interfaces'), 'interfaces', nonempty=True)
@@ -66,11 +92,11 @@ def validate(module):
     _require(c.get('owner') == name, 'contract owner must be its module')
     _require(c.get('kind') in KINDS, 'invalid contract kind')
     _require(isinstance(c.get('purpose'), str) and bool(c['purpose'].strip()), 'contract purpose required')
-    absolute_path(c.get('target_root'))
+    check(c.get('target_root'))
     for key in ('permissions', 'invariants', 'errors', 'cancellation', 'migrations'):
         _strings(c.get(key), key, nonempty=True)
     for p in _strings(c.get('config_paths'), 'config_paths'):
-        absolute_path(p)
+        check(p)
     operations = c.get('operations')
     _require(isinstance(operations, list) and bool(operations), 'contract operations required')
     op_ids = set()
@@ -111,6 +137,55 @@ def validate(module):
     return module
 
 
+def expand(manifest, root, target_root):
+    """Compiled registry entry of an owner manifest located at ``root``. Absolute manifests are unchanged."""
+    _require(isinstance(manifest, dict), 'contract must be an object')
+    raw = json.loads(json.dumps(manifest))
+    base = PurePosixPath(str(root))
+    out = {'id': raw.pop('id', None), 'root': str(base)}
+    raw.pop('root', None)
+    for key in ('anchors', 'backup_paths', 'core_paths'):
+        if isinstance(raw.get(key), list):
+            raw[key] = [str(layout.join(base, v)) for v in raw[key]]
+    c = raw.get('contract')
+    if isinstance(c, dict):
+        if isinstance(c.get('config_paths'), list):
+            c['config_paths'] = [str(layout.join(base, v)) for v in c['config_paths']]
+        c['target_root'] = str(target_root)
+    out.update(raw)
+    return out
+
+
+def _manifest(entry, filesystem):
+    """(manifest path, compiled module) for a catalog entry, in either catalog form."""
+    if str(entry.get('manifest', '')).startswith('/'):
+        # Catalog v1 form (older archives): absolute manifest holding absolute paths.
+        path = absolute_path(entry.get('manifest'))
+        resolved = (filesystem / str(path).lstrip('/')).resolve()
+        _require(resolved.is_relative_to(filesystem), 'contract escapes filesystem root')
+        raw = _read(resolved)
+        if 'root' in raw:
+            return path, validate(raw)
+        # Relative owner manifest listed by an absolute path: the module root holds its contracts/ folder.
+        _require(path.parent.name == 'contracts', 'relative manifest must live in its module contracts folder')
+        raw = validate(raw, source=True)
+        target = raw['contract']['target_root']
+        target = absolute_path(target) if target.startswith('/') else layout.walter_root() / layout.relative(target)
+        return path, validate(expand(raw, path.parent.parent, target))
+    _require(isinstance(entry.get('target'), str), 'catalog target required')
+    if entry.get('legacy') is not None:
+        absolute_path(entry['legacy'])
+    base = PurePosixPath(str(layout.resolve(entry, filesystem=filesystem)))
+    path = base / layout.relative(entry.get('manifest', ''))
+    resolved = (filesystem / str(path).lstrip('/')).resolve()
+    _require(resolved.is_relative_to(filesystem), 'contract escapes filesystem root')
+    raw = validate(_read(resolved), source=True)
+    target = layout.target_root(entry)
+    _require(raw['contract']['target_root'] in (entry['target'], str(target)), 'contract target differs from catalog')
+    _require(raw.get('root') in (None, str(base)), 'contract root differs from its location')
+    return Path(str(path)), validate(expand(raw, base, target))
+
+
 def compile_registry(catalog=None, *, root='/'):
     """Compile owner manifests into the v1 registry consumed by existing clients."""
     doc = _read(Path(catalog or CATALOG))
@@ -123,11 +198,8 @@ def compile_registry(catalog=None, *, root='/'):
         _require(isinstance(entry, dict), 'invalid catalog entry')
         ident = entry.get('id')
         _require(isinstance(ident, str) and IDENTIFIER.fullmatch(ident) and ident not in ids, 'duplicate or invalid catalog module')
-        path = absolute_path(entry.get('manifest'))
+        path, module = _manifest(entry, filesystem)
         _require(str(path) not in paths, 'duplicate contract file')
-        resolved = (filesystem / str(path).lstrip('/')).resolve()
-        _require(resolved.is_relative_to(filesystem), 'contract escapes filesystem root')
-        module = validate(_read(resolved))
         _require(module['id'] == ident, 'catalog/module identity mismatch')
         _require(path.is_relative_to(absolute_path(module['root'])), 'manifest must belong to module root')
         _require(str(path) in module['anchors'], 'manifest must be a required backup anchor')

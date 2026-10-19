@@ -10,6 +10,8 @@ def main(argv=None):
     for name in ('check','render'):
         q=cs.add_parser(name);q.add_argument('--catalog');q.add_argument('--root',default='/')
         if name=='render':q.add_argument('--format',choices=('json','markdown'),default='json')
+    q=sub.add_parser('path');q.add_argument('module');q.add_argument('parts',nargs='*')
+    sub.add_parser('layout')
     sub.add_parser('matrix')
     sub.add_parser('doctor')
     q=sub.add_parser('export');q.add_argument('destination');q.add_argument('--apply',action='store_true');q.add_argument('--wheelhouse')
@@ -35,6 +37,12 @@ def main(argv=None):
                 out=contracts.compile_registry(a.catalog,root=a.root)
                 if a.format=='markdown':
                     print(contracts.render_markdown(out),end='');return 0
+        elif a.command=='path':
+            from . import paths
+            print(paths.module_path(a.module,*a.parts));return 0
+        elif a.command=='layout':
+            from . import paths
+            out=paths.layout()
         elif a.command=='matrix':
             from . import composition
             out=composition.matrix()

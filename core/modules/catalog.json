@@ -3,67 +3,99 @@
   "modules": [
     {
       "id": "browse",
-      "manifest": "/opt/walter-browse/contracts/browse.json"
+      "target": "browse",
+      "legacy": "/opt/walter-browse",
+      "manifest": "contracts/browse.json"
     },
     {
       "id": "bus",
-      "manifest": "/opt/walter-memory/contracts/bus.json"
+      "target": "memory",
+      "legacy": "/opt/walter-memory",
+      "manifest": "contracts/bus.json"
     },
     {
       "id": "colab",
-      "manifest": "/walter/colab/contracts/colab.json"
+      "target": "colab",
+      "legacy": "/opt/walter-colab",
+      "manifest": "contracts/colab.json"
     },
     {
       "id": "computer",
-      "manifest": "/opt/walter-computer/contracts/computer.json"
+      "target": "computer",
+      "legacy": "/opt/walter-computer",
+      "manifest": "contracts/computer.json"
     },
     {
       "id": "context",
-      "manifest": "/opt/walter-context/contracts/context.json"
+      "target": "context",
+      "legacy": "/opt/walter-context",
+      "manifest": "contracts/context.json"
     },
     {
       "id": "core",
-      "manifest": "/opt/walter-core/contracts/core.json"
+      "target": "core",
+      "legacy": "/opt/walter-core",
+      "manifest": "contracts/core.json"
     },
     {
       "id": "llm",
-      "manifest": "/opt/walter-llm/contracts/llm.json"
+      "target": "router/llm",
+      "legacy": "/opt/walter-llm",
+      "manifest": "contracts/llm.json"
     },
     {
       "id": "logs",
-      "manifest": "/opt/walter-memory/contracts/logs.json"
+      "target": "memory",
+      "legacy": "/opt/walter-memory",
+      "manifest": "contracts/logs.json"
     },
     {
       "id": "memory",
-      "manifest": "/opt/walter-memory/contracts/memory.json"
+      "target": "memory",
+      "legacy": "/opt/walter-memory",
+      "manifest": "contracts/memory.json"
     },
     {
       "id": "raw-vault",
-      "manifest": "/opt/walter-raw-vault/contracts/raw-vault.json"
+      "target": "memory/vault",
+      "legacy": "/opt/walter-raw-vault",
+      "manifest": "contracts/raw-vault.json"
     },
     {
       "id": "router",
-      "manifest": "/opt/walter-router/contracts/router.json"
+      "target": "router",
+      "legacy": "/opt/walter-router",
+      "manifest": "contracts/router.json"
     },
     {
       "id": "secrets",
-      "manifest": "/opt/walter-secrets/contracts/secrets.json"
+      "target": "secrets",
+      "legacy": "/opt/walter-secrets",
+      "manifest": "contracts/secrets.json"
     },
     {
       "id": "skills",
-      "manifest": "/opt/walter-skills/contracts/skills.json"
+      "target": "skills",
+      "legacy": "/opt/walter-skills",
+      "manifest": "contracts/skills.json"
     },
     {
       "id": "soul",
-      "manifest": "/opt/walter-soul/contracts/soul.json"
+      "target": "soul",
+      "legacy": "/opt/walter-soul",
+      "manifest": "contracts/soul.json"
     },
     {
       "id": "voice",
-      "manifest": "/opt/openclaw/contracts/voice.json"
+      "target": "voice",
+      "legacy": "/opt/openclaw",
+      "manifest": "contracts/voice.json"
     },
     {
       "id": "voice-memory",
-      "manifest": "/opt/walter-voice-memory/contracts/voice-memory.json"
+      "target": "voice/memory",
+      "legacy": "/opt/walter-voice-memory",
+      "manifest": "contracts/voice-memory.json"
     }
   ]
 }
