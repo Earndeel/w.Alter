@@ -178,3 +178,19 @@ def test_internal_postes_are_not_offered_to_the_intent_classifier(conn):
     from walter_router import intent
     tasks, _ = intent._criteria(conn)
     assert not {"summarization", "memory_extraction", "voice_assist", "stt", "embeddings", "rerank"} & set(tasks)
+
+
+def test_unranked_successor_is_saved_and_proposed(conn):
+    """A newer version leading a media task before its board ranks it has no score (2026-10-19 refresh failure)."""
+    task = conn.execute("select task from models.tasks where interface <> 'chat' and task <> 'general' limit 1").fetchone()["task"]
+    model = conn.execute("select model_id from models.canonical limit 1").fetchone()["model_id"]
+    run = conn.execute("insert into models.runs (status) values ('ok') returning run_id").fetchone()["run_id"]
+    sel.save(conn, run, [{"task": task, "level": "best", "rank": 1, "model_id": model, "variant": "", "display_name": model,
+                          "quality": None, "quality_unit": "Composite /100", "real_cost": None, "cost_unit": None,
+                          "provider": None, "offer_key": None, "subscription": None,
+                          "reasons": {"warning": "version supérieure", "measured_quality": 80.0}}])
+    row = conn.execute("select quality, reasons from models.selection where run_id = %s", (run,)).fetchone()
+    assert row["quality"] is None and row["reasons"]["measured_quality"] == 80.0
+    lines = alerts._block(conn, {"kind": "new_best", "subject": model, "task": task, "ref": "t1",
+                                 "evidence": {"previous_name": "Ancien", "score": None, "previous_score": 80.0, "why": []}})
+    assert any("pas encore classée" in line for line in lines if line)
