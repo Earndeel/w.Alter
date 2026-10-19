@@ -1,7 +1,8 @@
 """Minimal Google OAuth/REST helper for Walter Memory connectors (read-only scopes, no SDK).
 
-Token: /root/.hermes/raw-vault/google-walter-memory.json (0600) — refresh token for lucas.jouvencon@gmail.com with
-gmail.readonly + calendar.readonly, obtained with `python3 connectors/google_api.py exchange '<callback url>'`.
+Authorization: Walter's grant `google-memory` (walter-secrets, card in the instance's accounts/): it holds the OAuth
+client and the refresh token (gmail.readonly + calendar.readonly) and is the only one renewing the access token.
+First consent: `python3 connectors/google_api.py exchange '<callback url>'` writes the grant's token file.
 """
 from __future__ import annotations
 
@@ -10,35 +11,27 @@ import os
 import sys
 import time
 import urllib.parse
-from pathlib import Path
 
 import httpx
 
-CLIENT = Path("/root/.hermes/google-accounts/lucas-jouvenson/google_client_secret.json")
-TOKEN = Path("/root/.hermes/raw-vault/google-walter-memory.json")
-PENDING = Path("/root/.hermes/raw-vault/.oauth_pending_gmail.json")
+GRANT = "google-memory"
+
+
+def _grants():
+    from walter_secrets import grants   # walter-secrets public library, via the shared runtime
+    return grants
 
 
 def _client() -> dict:
-    return json.loads(CLIENT.read_text())["web"]
+    return json.loads(_grants().access(GRANT, "client"))
 
 
 class Google:
     def __init__(self):
-        self.tok = json.loads(TOKEN.read_text())
         self.http = httpx.Client(timeout=60)
 
     def _access(self) -> str:
-        if self.tok.get("expires_at", 0) - 60 < time.time():
-            c = _client()
-            r = self.http.post("https://oauth2.googleapis.com/token", data={
-                "client_id": c["client_id"], "client_secret": c["client_secret"],
-                "refresh_token": self.tok["refresh_token"], "grant_type": "refresh_token"})
-            r.raise_for_status()
-            d = r.json()
-            self.tok.update(access_token=d["access_token"], expires_at=time.time() + d["expires_in"])
-            old = os.umask(0o077); TOKEN.write_text(json.dumps(self.tok)); os.umask(old)
-        return self.tok["access_token"]
+        return _grants().access(GRANT)   # fresh access token; renewed by walter-secrets only
 
     def get(self, url: str, **params) -> dict:
         for attempt in range(5):
@@ -60,7 +53,9 @@ class SyncTokenExpired(RuntimeError):
 
 def exchange(callback_url: str) -> None:
     q = urllib.parse.parse_qs(urllib.parse.urlparse(callback_url).query)
-    p = json.loads(PENDING.read_text())
+    token = _grants().location(GRANT)
+    pending = token.with_name(".oauth_pending_gmail.json")
+    p = json.loads(pending.read_text())
     if q.get("state", [""])[0] != p["state"]:
         sys.exit("state mismatch")
     c = _client()
@@ -72,10 +67,10 @@ def exchange(callback_url: str) -> None:
     if not d.get("refresh_token"):
         sys.exit("no refresh token returned")
     old = os.umask(0o077)
-    TOKEN.write_text(json.dumps({"refresh_token": d["refresh_token"], "access_token": d["access_token"],
+    token.write_text(json.dumps({"refresh_token": d["refresh_token"], "access_token": d["access_token"],
                                  "expires_at": time.time() + d["expires_in"], "scope": d.get("scope")}))
     os.umask(old)
-    PENDING.unlink()
+    pending.unlink()
     print("ok, scopes:", d.get("scope"))
 
 
