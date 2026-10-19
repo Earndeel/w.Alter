@@ -10,10 +10,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
-sys.path.insert(0, "/root/.hermes/skills/research/universal-web-extraction-router/scripts")
-sys.path.insert(0, "/root/.hermes/plugins/walter-browse")
+MODULE_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(MODULE_ROOT / "runtime"))
+sys.path.insert(0, str(MODULE_ROOT))
 
 import hermes_adapter
 from browse_session import SessionManager
@@ -46,15 +48,30 @@ def ExtractionSpecForMigration() -> ExtractionSpec:
 
 
 def _load_plugin() -> Any:
-    """Load the plugin package by path (directory name contains a dash)."""
+    """This module's Hermes port (ports/hermes), the file installed as the Hermes plugin."""
     import importlib.util
 
-    plugin_dir = Path("/root/.hermes/plugins/walter-browse")
-    spec = importlib.util.spec_from_file_location("walter_browse_plugin", plugin_dir / "__init__.py")
+    spec = importlib.util.spec_from_file_location("walter_browse_plugin", MODULE_ROOT / "ports/hermes/__init__.py")
     module = importlib.util.module_from_spec(spec)
     assert spec is not None and spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+class CapturingCtx:
+    """A Hermes plugin context that records what the port registers."""
+
+    def __init__(self) -> None:
+        self.tools: list[dict] = []
+
+    def register_tool(self, **kwargs) -> None:
+        self.tools.append(kwargs)
+
+
+def _registered_handler():
+    ctx = CapturingCtx()
+    _load_plugin().register(ctx)
+    return ctx.tools[0]["handler"]
 
 
 class HermesPluginContractTests(unittest.TestCase):
@@ -73,16 +90,21 @@ class HermesPluginContractTests(unittest.TestCase):
         self.assertEqual(schema["parameters"].get("required"), [])
 
     def test_plugin_register_interface_exists(self) -> None:
-        plugin = _load_plugin()
+        """The port registers one async tool whose handler is Walter's own facade."""
+        from walter_browse import facade
 
-        self.assertTrue(callable(plugin.register))
-        self.assertTrue(callable(plugin._handle_walter_browse))
-        self.assertTrue(callable(plugin._check_requirements))
-        # register must accept a ctx with register_tool (feature-detected).
-        self.assertIn("register", dir(plugin))
+        ctx = CapturingCtx()
+        _load_plugin().register(ctx)
+        self.assertEqual(len(ctx.tools), 1)
+        tool = ctx.tools[0]
+        self.assertEqual(tool["name"], "walter_browse")
+        self.assertTrue(tool["is_async"])
+        self.assertIs(tool["handler"], facade.browse)
+        self.assertIs(tool["schema"], facade.WALTER_BROWSE_SCHEMA)
 
     def test_query_search_route_is_exclusive_with_url(self) -> None:
-        plugin = _load_plugin()
+        # Validation and routing belong to the Walter facade; the port only transports.
+        from walter_browse import facade as plugin
 
         # query alone → search-lite command.
         req = plugin._validate_request({"query": "météo Tokyo", "objective": "info actuelle"})
@@ -118,7 +140,9 @@ class HermesPluginContractTests(unittest.TestCase):
 
         # Must not raise: the plugin logs degradation instead of crashing
         # Hermes at startup when the plugin API changes.
-        plugin.register(NoRegisterCtx())
+        with self.assertLogs("walter_browse.hermes", level="WARNING") as logs:
+            self.assertFalse(plugin.register(NoRegisterCtx()))
+        self.assertIn("not registered", logs.output[0])
 
     def test_adapter_imports_all_components(self) -> None:
         report = run_startup_self_test()
@@ -212,20 +236,23 @@ class UpgradeSimulationTests(unittest.IsolatedAsyncioTestCase):
     fallback cleanly, and error explicitly only when truly incompatible."""
 
     async def test_hermes_passes_unknown_kwargs_to_handler(self) -> None:
-        """A future Hermes may pass extra kwargs; handler ignores them."""
-        plugin = _load_plugin()
+        """A future Hermes may pass extra kwargs; the registered handler ignores them (no network)."""
+        from walter_browse import facade
 
-        result = await plugin._handle_walter_browse(
-            {
-                "url": "https://httpbin.org/json",
-                "expected_fields": {"slideshow": ["slideshow"]},
-                "min_records": 1,
-            },
-            some_future_hermes_flag=True,
-            context_object={"v": 99},
-        )
-        payload = json.loads(result)
-        self.assertIn("success", payload)  # either success or explicit error
+        handler = _registered_handler()
+        canned = {"success": True, "records": [{"slideshow": "x"}], "route": "static"}
+        with patch.object(facade, "_run_router", return_value=canned) as run:
+            result = await handler(
+                {
+                    "url": "https://example.test/json",
+                    "expected_fields": {"slideshow": ["slideshow"]},
+                    "min_records": 1,
+                },
+                some_future_hermes_flag=True,
+                context_object={"v": 99},
+            )
+        run.assert_called_once()
+        self.assertIn("success", json.loads(result))
 
     def test_browser_backend_unavailable_does_not_crash(self) -> None:
         """Camoufox down => HTTP/static path still works (degradation)."""
@@ -299,9 +326,10 @@ class UpgradeSimulationTests(unittest.IsolatedAsyncioTestCase):
             pass
 
         try:
-            plugin.register(NoRegisterCtx())
+            registered = plugin.register(NoRegisterCtx())
         except Exception as exc:
             self.fail(f"register must degrade, not crash: {exc}")
+        self.assertFalse(registered)
 
     def test_cache_old_format_ignored(self) -> None:
         """A result cache file written by an older version (different shape)
