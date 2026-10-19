@@ -1,10 +1,11 @@
 """Contract checks against the installed host without starting a desktop session."""
+import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
 import pytest
 
-HERMES = Path('/root/.hermes/hermes-agent')
+HERMES = Path(os.environ.get('HERMES_HOME') or Path.home() / '.hermes') / 'hermes-agent'
 if not HERMES.exists():
     pytest.skip('optional installed Hermes contract', allow_module_level=True)
 sys.path.insert(0, str(HERMES))

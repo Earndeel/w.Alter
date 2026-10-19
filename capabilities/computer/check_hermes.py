@@ -1,10 +1,11 @@
-import sys, json, contextlib, io
+import sys, json, contextlib, io, os
 from pathlib import Path
-sys.path.insert(0,'/root/.hermes/hermes-agent')
+HERMES_HOME=Path(os.environ.get('HERMES_HOME') or Path.home()/'.hermes')
+sys.path.insert(0,str(HERMES_HOME/'hermes-agent'))
 from hermes_cli.plugins import PluginManager
 from hermes_cli.plugins_manifest import parse_manifest_file
 from tools.registry import registry
-root=Path('/root/.hermes/plugins/walter-computer-use')
+root=HERMES_HOME/'plugins'/'walter-computer-use'
 manifest=parse_manifest_file(root/'plugin.yaml',root,'user','')
 manager=PluginManager()
 manager._load_plugin(manifest)

@@ -455,7 +455,7 @@ class WalterPolicyMixin:
         self._walter_stalled_action: Optional[Dict[str, Any]] = None
         presence_config = Path(os.environ.get(
             "WALTER_REMOTE_CUA_CONFIG",
-            "/root/.config/walter-device-node/remote-cua.json",
+            str(Path.home() / ".config" / "walter-device-node" / "remote-cua.json"),
         ))
         presence_probe = _RUNTIME.FixedSshMacPresenceProbe(
             config_path=presence_config,
