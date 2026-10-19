@@ -109,6 +109,12 @@
         "role": "consumer",
         "owner": "bus",
         "durability": "canonical"
+      },
+      {
+        "id": "embedding-models",
+        "role": "consumer",
+        "owner": "memory",
+        "durability": "projection"
       }
     ],
     "migrations": [
