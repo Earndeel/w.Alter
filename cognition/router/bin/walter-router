@@ -1,2 +1,4 @@
 #!/bin/sh
-cd /opt/walter-router && exec /opt/walter-router/venv/bin/python -m walter_router.cli "$@"
+# Walter Router CLI: the interface other modules use (installed on the PATH as walter-router).
+root="$(dirname "$(readlink -f "$0")")/.."
+cd "$root" && exec "$root/venv/bin/python" -m walter_router.cli "$@"

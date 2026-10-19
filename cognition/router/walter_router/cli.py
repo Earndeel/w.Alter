@@ -260,6 +260,7 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--provider", help="only this status key (kie, kie-codex, openrouter, arnict)")
     pr.add_argument("--timeout", type=int, default=90)
     sub.add_parser("tasks", help="task keys, labels and interfaces (for tool descriptions)")
+    sub.add_parser("decision-chain", help="decision models to try, in order (consumed by walter-memory triage)")
     sub.add_parser("review", help="deterministic digest of the last cycle (input of the 48 h analysis agent)")
     aa = sub.add_parser("alias-add", help="link an unscored model id to the scored id it is (validated, with evidence)")
     aa.add_argument("key")
@@ -308,6 +309,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "migrate":
         out = {"applied": db.migrate()}
+    elif args.cmd == "decision-chain":
+        from . import intent
+        with db.connect() as conn:
+            out = {"chain": list(intent.chain(conn))}
     elif args.cmd == "refresh":
         out = refresh(notify=not args.no_notify, dry_run=args.dry_run, skip_collect=args.skip_collect)
     elif args.cmd == "status":
