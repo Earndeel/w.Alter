@@ -78,6 +78,15 @@ def config(module, name, *, base=None, catalog=None, filesystem='/'):
     return paths.module_path(module, 'config', name, catalog=catalog, filesystem=filesystem)
 
 
+def harness(name, base=None):
+    """Home of an agent runtime for this instance: declared in [harness] (e.g. a historical ~/.hermes), else
+    harness/<name> inside the instance."""
+    declared = manifest(base).get('harness', {}).get(name)
+    if declared is not None:
+        return Path(str(paths._safe_absolute(declared, 'harness home')))
+    return path('harness', name, base=base)
+
+
 def owner(base=None):
     """Who the instance serves, as the agents address them. Defaults keep the shipped software neutral."""
     o = dict(manifest(base)['owner'])
@@ -150,4 +159,5 @@ def show(base=None):
     return {'id': doc['id'], 'root': str(base), 'owner': {k: v for k, v in owner(base).items() if k in
             ('address', 'language', 'timezone')}, 'software': doc.get('software', {}),
             'accounts': sorted(p.stem for p in (base / 'accounts').glob('*.toml')),
+            'harness': {k: str(harness(k, base)) for k in doc.get('harness', {})},
             'markers': len(markers(base))}

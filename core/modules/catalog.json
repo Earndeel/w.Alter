@@ -67,7 +67,8 @@
       "id": "router",
       "target": "router",
       "legacy": "/opt/walter-router",
-      "manifest": "contracts/router.json"
+      "manifest": "contracts/router.json",
+      "neutral": true
     },
     {
       "id": "runtime",

@@ -116,6 +116,13 @@ class InstanceTests(unittest.TestCase):
         module = contracts.expand({'id': 'secrets', 'backup_paths': ['.', '@instance:backup']}, '/walter/secrets', '/walter/secrets')
         self.assertEqual(module['backup_paths'], ['/walter/secrets', '/srv/legacy/vault'])
 
+    def test_harness_home_declared_or_inside_the_instance(self):
+        self.assertEqual(instance.harness('hermes'), self.base / 'harness' / 'hermes')
+        (self.base / 'instance.toml').write_text(MANIFEST + '[harness]\nhermes = "/srv/legacy/.hermes"\nbad = "rel"\n')
+        self.assertEqual(instance.harness('hermes'), Path('/srv/legacy/.hermes'))
+        with self.assertRaises(ValueError):
+            instance.harness('bad')
+
     def test_markers_come_from_the_instance(self):
         self.assertEqual(instance.markers(), ['Alice Exemple', 'alice@example.org', 'exemple-corp', 'Madame'])
 

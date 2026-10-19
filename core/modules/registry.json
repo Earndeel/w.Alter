@@ -1386,10 +1386,10 @@
     },
     {
       "id": "router",
-      "root": "/opt/walter-router",
+      "root": "/walter/router",
       "anchors": [
-        "/opt/walter-router/contracts/router.json",
-        "/opt/walter-router/walter_router/cli.py"
+        "/walter/router/contracts/router.json",
+        "/walter/router/walter_router/cli.py"
       ],
       "requires": [],
       "external": [
@@ -1401,10 +1401,12 @@
         "config"
       ],
       "core_paths": [
-        "/opt/walter-router/walter_router/db.py"
+        "/walter/router/walter_router/db.py"
       ],
       "backup_paths": [
-        "/opt/walter-router"
+        "/walter/router",
+        "/instances/monsieur/config/router",
+        "/instances/monsieur/state/router"
       ],
       "interfaces": [
         "CLI",
@@ -1419,7 +1421,7 @@
       },
       "limitations": [
         "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
-        "New model choices remain subject to Monsieur approval; no automatic switching introduced."
+        "New model choices remain subject to the owner's approval; no automatic switching introduced."
       ],
       "services": [],
       "optional": [],

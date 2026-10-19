@@ -219,7 +219,7 @@ Interfaces : memory objects library, S3, MCP.
 Choisir les modèles par poste avec décisions et coûts traçables.
 
 Contrat 1.0.0; propriétaire : router.
-Racine actuelle : `/opt/walter-router`. Cible : `/walter/router`.
+Racine actuelle : `/walter/router`. Cible : `/walter/router`.
 
 Interfaces : CLI, walter-llm task routes, MCP route lookup.
 
@@ -231,7 +231,7 @@ Interfaces : CLI, walter-llm task routes, MCP route lookup.
 **Limites déclarées :**
 
 - Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.
-- New model choices remain subject to Monsieur approval; no automatic switching introduced.
+- New model choices remain subject to the owner's approval; no automatic switching introduced.
 
 ## runtime
 
