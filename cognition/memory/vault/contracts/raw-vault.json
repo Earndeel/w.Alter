@@ -1,0 +1,137 @@
+{
+  "id": "raw-vault",
+  "root": "/opt/walter-raw-vault",
+  "anchors": [
+    "/opt/walter-raw-vault/contracts/raw-vault.json",
+    "/opt/walter-raw-vault/rawvault.py"
+  ],
+  "requires": [
+    "memory"
+  ],
+  "external": [
+    "rclone",
+    "Google Drive",
+    "S3 :8899"
+  ],
+  "data": [
+    "core.objects registry (memory-owned)",
+    "original bytes on Drive"
+  ],
+  "core_paths": [],
+  "backup_paths": [
+    "/opt/walter-raw-vault",
+    "/root/.config/rclone/rclone.conf",
+    "/root/.hermes/raw-vault"
+  ],
+  "interfaces": [
+    "memory objects library",
+    "S3",
+    "MCP"
+  ],
+  "bindings": {
+    "hermes": "Walter library/CLI through skills; shared canonical catalog",
+    "dsh": "common MCP",
+    "codex": "common MCP",
+    "claude-code": "common MCP"
+  },
+  "limitations": [],
+  "services": [
+    "raw-vault-s3"
+  ],
+  "optional": [],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "raw-vault",
+    "kind": "capability",
+    "purpose": "Conserver les octets originaux et les relier au catalogue canonique.",
+    "target_root": "/walter/memory/vault",
+    "config_paths": [
+      "/root/.config/rclone/rclone.conf",
+      "/root/.hermes/raw-vault/s3.env"
+    ],
+    "permissions": [
+      "classification des objets",
+      "bucket chiffré pour local_only"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "mcp",
+        "interface": "vault_search/vault_get",
+        "access": "read",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "put",
+        "transport": "mcp",
+        "interface": "vault_put",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "raw-vault-bytes",
+        "role": "owner",
+        "owner": "raw-vault",
+        "durability": "external"
+      },
+      {
+        "id": "postgres:core",
+        "role": "consumer",
+        "owner": "memory",
+        "durability": "canonical"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "object-roundtrip",
+        "assertion": "Un objet synthétique est écrit, catalogué et relu avec son empreinte et sa confidentialité.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  }
+}
