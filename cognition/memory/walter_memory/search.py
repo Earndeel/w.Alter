@@ -224,6 +224,10 @@ def search(query: str, *, limit: int = 10, sources: list[str] | None = None, lab
                                where c.chunk_id = any(%s)""", (top,)).fetchall()
     by_id = {r["chunk_id"]: {**r, "score": scores[r["chunk_id"]]} for r in rows}
     results = [by_id[i] for i in top if i in by_id]
+    if max_privacy == 'cloud_allowed':
+        from .read_policy import filter_cloud_rows
+        with connection() as conn:
+            results = filter_cloud_rows(conn, results)
     if rerank and results:
         results = _rerank(query, results, limit)
     for r in results:
@@ -237,10 +241,17 @@ def search_norm(text: str) -> str:
 
 
 def _rerank(query: str, results: list[dict], limit: int) -> list[dict]:
-    """Cohere rerank through OpenRouter, only for rows allowed to leave the VM (local_only keep fused order)."""
-    cloud = [r for r in results if r["privacy_class"] != "local_only"]
+    """Rerank only current permitted canonical records; private queries stay local."""
+    from .read_policy import filter_cloud_rows, query_privacy
+    query_class = query_privacy(query)
+    if query_class == 'local_only':
+        return results
+    with connection() as conn:
+        cloud = filter_cloud_rows(conn, results)
     if not cloud:
         return results
+    if query_class == 'redacted_cloud':
+        query = privacy.redact(query)[0]
     from .llm import _key
     docs = []
     for r in cloud:

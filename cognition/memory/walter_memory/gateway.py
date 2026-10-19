@@ -89,6 +89,25 @@ class ContextIn(BaseModel):
     session_id: str | None = None
 
 
+class AgentMemoryIn(BaseModel):
+    version: int = 1
+    method: str
+    args: dict
+    caller: str = 'http-port'
+
+
+@app.post('/v1/agent-memory', dependencies=[Depends(auth)])
+def post_agent_memory(body: AgentMemoryIn):
+    """Same module contract as MCP/CLI, including canonical privacy checks."""
+    from . import agent_memory
+    try:
+        return agent_memory.dispatch(body.model_dump())
+    except (ValueError, TypeError, KeyError):
+        raise HTTPException(422, 'invalid agent memory request') from None
+    except Exception:
+        raise HTTPException(503, 'agent memory temporarily unavailable') from None
+
+
 @app.post("/v1/context", dependencies=[Depends(auth)])
 def post_context(body: ContextIn):
     import hashlib

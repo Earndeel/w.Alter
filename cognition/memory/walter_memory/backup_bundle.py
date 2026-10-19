@@ -11,9 +11,9 @@ CORE_MODULES=('core','memory','router','skills','context','llm','soul','voice-me
 MODULE_ANCHORS={'core':'server.py','memory':'walter_memory/events.py','router':'walter_router/cli.py',
                 'skills':'walter_skills/api.py','context':'walter_context/session.py','llm':'gateway.py',
                 'soul':'identity.md','voice-memory':'server.py','raw-vault':'rawvault.py'}
-SKIP_PARTS={'venv','.venv','node_modules','__pycache__','.cache','.pytest_cache','.mypy_cache','.ruff_cache','.hermes-runtime'}
+SKIP_PARTS={'.worktrees','venv','.venv','node_modules','__pycache__','.cache','.pytest_cache','.mypy_cache','.ruff_cache','.hermes-runtime'}
 SKIP_PREFIXES=('root/.hermes/hermes-agent/.git','opt/walter-voice-memory/models',
-               'root/.hermes/skills/.curator_backups','opt/dsh/home/sessions')
+               'walter/voice/memory/models', 'root/.hermes/skills/.curator_backups','opt/dsh/home/sessions')
 PROFILE_TRANSIENT={'cache','audio_cache','image_cache','images','sessions','sandboxes','workspace','logs','lsp'}
 
 def excluded(name):
@@ -58,12 +58,17 @@ def module_backup_paths(root):
 
 def inventory(root):
     """Mandatory core and integration anchors; optional roots are explicitly inventoried."""
-    required={f'opt/walter-{m}' for m in CORE_MODULES}
-    required.update(f'opt/walter-{m}/{entry}' for m,entry in MODULE_ANCHORS.items())
+    # Owner manifests define module paths. Static roots are legacy archive compatibility only.
+    if (root/'opt/walter-core/modules/catalog.json').exists():
+        required=set(module_backup_paths(root))
+    else:
+        required={f'opt/walter-{m}' for m in CORE_MODULES}
+        required.update(f'opt/walter-{m}/{entry}' for m,entry in MODULE_ANCHORS.items())
     required.update(('root/.hermes/config.yaml','root/.hermes/.env','root/.pgpass',
                      'root/.hermes/walter-llm','root/.config/rclone/rclone.conf',
-                     'root/.config/systemd/user/hermes-gateway.service',
-                     'opt/openclaw/hermes_voice_bridge.py'))
+                     'root/.config/systemd/user/hermes-gateway.service'))
+    if not (root/'opt/walter-core/modules/catalog.json').exists():
+        required.add('opt/openclaw/hermes_voice_bridge.py')
     required.update(module_backup_paths(root))
     sources=set(required)
     for p in (root/'opt').glob('walter-*'):
@@ -123,7 +128,7 @@ def dependencies(root):
     envs += list((root/'opt').glob('walter-*/.venv/bin/python'))
     envs += [root/'root/.hermes/hermes-agent/venv/bin/python',root/'root/.hermes/hindsight-venv/bin/python',
              root/'root/walter-computer-use/.venv/bin/python',root/'root/.venv/scrapling/bin/python',
-             root/'opt/walter-colab/mcp/.venv/bin/python',root/'opt/walter-colab/python/bin/python']
+             root/'opt/openclaw/venv/bin/python',root/'opt/walter-colab/mcp/.venv/bin/python',root/'opt/walter-colab/python/bin/python']
     code='import importlib.metadata,json; print(json.dumps(sorted({(d.metadata["Name"],d.version) for d in importlib.metadata.distributions()})))'
     for p in envs:
         if p.exists():
