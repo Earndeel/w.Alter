@@ -1195,6 +1195,12 @@
             "role": "owner",
             "owner": "memory",
             "durability": "projection"
+          },
+          {
+            "id": "embedding-models",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "projection"
           }
         ],
         "migrations": [
@@ -1751,6 +1757,12 @@
             "role": "consumer",
             "owner": "bus",
             "durability": "canonical"
+          },
+          {
+            "id": "embedding-models",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "projection"
           }
         ],
         "migrations": [
