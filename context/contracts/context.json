@@ -1,11 +1,10 @@
 {
   "id": "context",
-  "root": "/opt/walter-context",
   "anchors": [
-    "/opt/walter-context/contracts/context.json",
-    "/opt/walter-context/ports/dsh/index.mjs",
-    "/opt/walter-context/ports/hermes/__init__.py",
-    "/opt/walter-context/walter_context/session.py"
+    "contracts/context.json",
+    "ports/dsh/index.mjs",
+    "ports/hermes/__init__.py",
+    "walter_context/session.py"
   ],
   "requires": [],
   "external": [
@@ -15,10 +14,10 @@
     "per-session projection epochs; recoverable originals in logs"
   ],
   "core_paths": [
-    "/opt/walter-context/walter_context"
+    "walter_context"
   ],
   "backup_paths": [
-    "/opt/walter-context"
+    "."
   ],
   "interfaces": [
     "Python Session",
@@ -47,9 +46,9 @@
     "owner": "context",
     "kind": "capability",
     "purpose": "Construire le contexte et les checkpoints selon le contrat de chaque harness.",
-    "target_root": "/walter/context",
+    "target_root": "context",
     "config_paths": [
-      "/opt/walter-context/config/walter-context.toml"
+      "config/walter-context.toml"
     ],
     "permissions": [
       "limites du modèle et du harness",
