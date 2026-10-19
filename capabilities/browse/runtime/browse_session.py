@@ -48,6 +48,17 @@ _COOKIE_KEYS = ("name", "value", "domain", "path", "expires", "httpOnly", "secur
 _SENSITIVE_COOKIE_NAME = re.compile(r"(?i)(session|token|auth|secret|bearer|sid|csrf|xsrf|x-?api-?key)")
 
 
+def _private_json(path, payload):
+    temporary = path.with_name(path.name + '.' + uuid.uuid4().hex)
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o600)
+        with os.fdopen(fd, 'w') as stream:
+            json.dump(payload, stream, ensure_ascii=False)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _now() -> float:
     return time.time()
 
@@ -72,7 +83,7 @@ def cookies_for_domain(cookies: Sequence[Mapping[str, Any]], domain: str) -> lis
         cdomain = _safe_host(str(cookie.get("domain") or ""))
         if not cdomain:
             continue
-        if cdomain == target or cdomain.endswith("." + target) or target.endswith("." + cdomain):
+        if cdomain == target or (str(cookie.get('domain', '')).startswith('.') and target.endswith('.' + cdomain)):
             result.append({k: cookie.get(k) for k in _COOKIE_KEYS if k in cookie})
     return result
 
@@ -156,7 +167,7 @@ class SessionManager:
 
     def __init__(self, root: str | Path | None = None) -> None:
         self.root = Path(root) if root else get_hermes_home() / "cache" / "walter-sessions"
-        self.root.mkdir(parents=True, exist_ok=True)
+        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self._lock = threading.RLock()
         self._live: dict[str, BrowseSession] = {}
 
@@ -195,7 +206,7 @@ class SessionManager:
             if sid in self._live:
                 raise SessionError(f"session {sid} is already live")
             session_dir = self._session_dir(sid)
-            session_dir.mkdir(parents=True, exist_ok=True)
+            session_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
             session = BrowseSession(
                 id=sid,
                 identity=identity,
@@ -253,7 +264,8 @@ class SessionManager:
         if not session.persistent:
             raise SessionError("refusing to persist a temporary session; make it persistent first")
         session_dir = self._session_dir(session.id)
-        session_dir.mkdir(parents=True, exist_ok=True)
+        session_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        session_dir.chmod(0o700)
         meta = {
             "version": 1,
             "identity": session.identity,
@@ -267,11 +279,9 @@ class SessionManager:
             "updated_at": _iso(),
         }
         with self._lock:
-            (session_dir / STATE_FILENAME).write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
+            _private_json(session_dir / STATE_FILENAME, meta)
             if storage_state is not None:
-                (session_dir / STORAGE_FILENAME).write_text(
-                    json.dumps(storage_state, ensure_ascii=False), "utf-8"
-                )
+                _private_json(session_dir / STORAGE_FILENAME, storage_state)
 
     def storage_state_path(self, session: BrowseSession) -> Path:
         return self._session_dir(session.id) / STORAGE_FILENAME

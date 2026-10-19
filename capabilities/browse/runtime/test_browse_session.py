@@ -97,7 +97,7 @@ class SessionManagerTests(unittest.TestCase):
             {"name": "c", "value": "z", "domain": "other.org", "path": "/"},
         ]
         scoped = cookies_for_domain(cookies, "example.com")
-        self.assertEqual(len(scoped), 2)
+        self.assertEqual([cookie["name"] for cookie in scoped], ["a"])
         self.assertTrue(all(c["domain"] in (".example.com", "api.example.com") for c in scoped))
         self.assertTrue(all("value" in c for c in scoped))  # needed for HTTP replay
 
