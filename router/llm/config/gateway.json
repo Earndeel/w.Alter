@@ -1,0 +1,5 @@
+{
+  "_doc": "walter-llm shipped defaults. An instance overrides them in config/llm/gateway.json. Paths: absolute, ~/ or @instance/.",
+  "log": "@instance/logs/llm/walter-llm.jsonl",
+  "agents": "@instance/state/llm/agents.json"
+}
