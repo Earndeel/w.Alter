@@ -25,27 +25,43 @@ def excluded(name):
         if p.name.endswith(('.db','.db-wal','.db-shm')):return True
     return False
 
+def _core(root):
+    """walter-core's root inside ``root``, found through its interface (`walter path core`).
+
+    Archives made before the /walter layout keep core at opt/walter-core."""
+    try:
+        live=subprocess.run(['walter','path','core'],capture_output=True,text=True,timeout=30).stdout.strip()
+    except (OSError,subprocess.TimeoutExpired):
+        live=''
+    for rel in dict.fromkeys(x for x in (live.lstrip('/'),'opt/walter-core') if x):
+        modules=root/rel/'modules'
+        if (modules/'catalog.json').exists() or (modules/'registry.json').exists():return root/rel
+    return None
+
 def contracts_check(root):
     """Reject stale generated registries before writing a backup payload.
 
-    Old archives without a contract catalogue retain the v1 registry interface.
-    Only the pure compiler is loaded; no optional module or MCP server imports.
+    Old archives without a contract catalogue retain the v1 registry interface. The check is walter-core's
+    own command (`walter contracts check`); no core code is loaded here.
     """
-    catalog=root/'opt/walter-core/modules/catalog.json'
-    if not catalog.exists():return {'legacy_registry':True}
-    compiler=pathlib.Path('/opt/walter-core/walter_platform/contracts.py')
-    if not compiler.is_file():raise RuntimeError('contract compiler unavailable')
-    spec=importlib.util.spec_from_file_location('_walter_backup_contracts',compiler)
-    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-    result=module.check(catalog,root=root,registry=catalog.with_name('registry.json'))
-    if not result['ok']:raise RuntimeError('module registry differs from owner contracts; regenerate before backup')
+    core=_core(root)
+    catalog=core/'modules/catalog.json' if core else None
+    if catalog is None or not catalog.exists():return {'legacy_registry':True}
+    try:
+        r=subprocess.run(['walter','contracts','check','--catalog',str(catalog),'--root',str(root)],
+                         capture_output=True,text=True,timeout=120)
+        result=json.loads(r.stdout)
+    except (OSError,subprocess.TimeoutExpired,ValueError):
+        raise RuntimeError('contract check unavailable (walter contracts check)') from None
+    if not result.get('ok'):raise RuntimeError('module registry differs from owner contracts; regenerate before backup')
     return result
 
 def module_backup_paths(root):
     """Read the composition contract without importing the capability server."""
     contracts_check(root)
-    registry=root/'opt/walter-core/modules/registry.json'
-    if not registry.exists():return []
+    core=_core(root)
+    registry=core/'modules/registry.json' if core else None
+    if registry is None or not registry.exists():return []
     data=json.loads(registry.read_text())
     if data.get('version')!=1:raise RuntimeError('unsupported module registry version')
     paths=set()
@@ -59,7 +75,7 @@ def module_backup_paths(root):
 def inventory(root):
     """Mandatory core and integration anchors; optional roots are explicitly inventoried."""
     # Owner manifests define module paths. Static roots are legacy archive compatibility only.
-    if (root/'opt/walter-core/modules/catalog.json').exists():
+    if _core(root) is not None and (_core(root)/'modules/catalog.json').exists():
         required=set(module_backup_paths(root))
     else:
         required={f'opt/walter-{m}' for m in CORE_MODULES}
@@ -67,11 +83,11 @@ def inventory(root):
     required.update(('root/.hermes/config.yaml','root/.hermes/.env','root/.pgpass',
                      'root/.hermes/walter-llm','root/.config/rclone/rclone.conf',
                      'root/.config/systemd/user/hermes-gateway.service'))
-    if not (root/'opt/walter-core/modules/catalog.json').exists():
+    if _core(root) is None or not (_core(root)/'modules/catalog.json').exists():   # pre-catalog archives only
         required.add('opt/openclaw/hermes_voice_bridge.py')
     required.update(module_backup_paths(root))
     sources=set(required)
-    for p in (root/'opt').glob('walter-*'):
+    for p in [*(root/'opt').glob('walter-*'),*(root/'walter').glob('*')]:
         if p.is_dir():sources.add(str(p.relative_to(root)))
     optional=['root/.hermes/SOUL.md','root/.hermes/memories','root/.hermes/skills',
               'root/.hermes/plugins','root/.hermes/cron/jobs.json','root/.hermes/docs',

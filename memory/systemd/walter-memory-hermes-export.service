@@ -9,5 +9,5 @@ WorkingDirectory=/opt/walter-memory
 Environment=PGPASSFILE=/root/.pgpass
 Nice=10
 IOSchedulingClass=idle
-ExecStart=/opt/walter-memory/venv/bin/python3 connectors/hermes.py --export-only --all-profiles --export-days 31 --export-seconds 900
+ExecStart=/usr/local/bin/walter-python connectors/hermes.py --export-only --all-profiles --export-days 31 --export-seconds 900
 TimeoutStartSec=3h

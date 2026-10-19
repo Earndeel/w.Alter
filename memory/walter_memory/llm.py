@@ -92,7 +92,7 @@ def router_model(task: str, default: str) -> str:
     try:
         import json
         import subprocess
-        r = subprocess.run(["/opt/walter-router/bin/walter-router", "pick", task], capture_output=True, text=True,
+        r = subprocess.run(["walter-router", "pick", task], capture_output=True, text=True,
                            timeout=30)
         model = json.loads(r.stdout).get("openrouter_id") or default
     except Exception:  # noqa: BLE001
@@ -213,13 +213,10 @@ def decide_chain() -> tuple[str, ...]:
     if _ROUTER_CHAIN and time.time() - _ROUTER_CHAIN[0] < 600:
         return _ROUTER_CHAIN[1]
     try:
-        import sys
-        if "/opt/walter-router" not in sys.path:
-            sys.path.append("/opt/walter-router")
-        from walter_router import intent
-        from .db import connection
-        with connection() as conn:
-            chain = tuple(intent.chain(conn)) or DECIDE_CHAIN
+        import json
+        import subprocess
+        r = subprocess.run(["walter-router", "decision-chain"], capture_output=True, text=True, timeout=30)
+        chain = tuple(json.loads(r.stdout).get("chain") or ()) or DECIDE_CHAIN
     except Exception as e:  # noqa: BLE001 — the router is advice, not a dependency
         import logging
         logging.getLogger("walter.llm").warning("Walter Router decision chain unavailable, using DECIDE_CHAIN: %s", e)
