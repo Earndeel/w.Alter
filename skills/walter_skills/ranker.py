@@ -72,7 +72,9 @@ class Encoder:
         from fastembed import TextEmbedding
         cfg = config.get("retrieval")
         self.model_name = model
-        self.m = TextEmbedding(model, cache_dir=cfg["model_dir"], threads=4)
+        # Shared local models are owned by Walter Memory (resource embedding-models), reached through its library.
+        from walter_memory.search import MODEL_DIR
+        self.m = TextEmbedding(model, cache_dir=cfg.get("model_dir") or MODEL_DIR, threads=4)
         self.cache = Path(cfg["cache_dir"])
 
     @classmethod

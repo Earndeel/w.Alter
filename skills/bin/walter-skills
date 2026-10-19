@@ -1,2 +1,2 @@
 #!/bin/sh
-cd /opt/walter-skills && PGPASSFILE=/root/.pgpass exec /opt/walter-memory/venv/bin/python -m walter_skills.cli "$@"
+cd /opt/walter-skills && PGPASSFILE=/root/.pgpass exec /usr/local/bin/walter-python -m walter_skills.cli "$@"

@@ -90,7 +90,7 @@ def _router_routes(route: dict) -> list[dict]:
     if hit and time.time() - hit[0] < 600:
         return hit[1]
     try:
-        r = subprocess.run(["/opt/walter-router/bin/walter-router", "pick", "general", "--level", level],
+        r = subprocess.run(["walter-router", "pick", "general", "--level", level],
                            capture_output=True, text=True, timeout=60)
         d = json.loads(r.stdout)
     except Exception:
