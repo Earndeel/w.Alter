@@ -4,5 +4,5 @@
 set -e
 root="$(dirname "$(readlink -f "$0")")/.."
 cd "$root"
-/root/.venv/scrapling/bin/python -m unittest discover -s runtime -p 'test_*.py' "$@"
+"${WALTER_SCRAPLING_PYTHON:-$HOME/.venv/scrapling/bin/python}" -m unittest discover -s runtime -p 'test_*.py' "$@"
 walter-python -m pytest -q -p no:cacheprovider tests

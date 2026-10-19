@@ -32,7 +32,7 @@ from urllib.parse import urlsplit
 from walter_paths import state_home as get_hermes_home
 
 
-HOMES = {"/tmp", "/root/.camoufox-max-data"}
+HOMES = {"/tmp", str(Path.home() / ".camoufox-max-data")}
 
 # --------------------------------------------------------------------------
 # Public model
