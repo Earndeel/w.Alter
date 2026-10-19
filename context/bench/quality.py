@@ -91,7 +91,7 @@ def points(conn, cfg, samples: int, seed: int) -> list[tuple[str, list[dict], li
 
 def routed(task: str) -> tuple[str, float | None]:
     """The Walter Router's OpenRouter route for a task: (model id, blended USD per M tokens)."""
-    out = subprocess.run(["/opt/walter-router/bin/walter-router", "pick", task], capture_output=True, text=True,
+    out = subprocess.run(["walter-router", "pick", task], capture_output=True, text=True,
                          timeout=120, check=True).stdout
     for ex in json.loads(out).get("execution") or []:
         if ex.get("provider") == "openrouter":
