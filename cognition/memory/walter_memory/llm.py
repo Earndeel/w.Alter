@@ -16,6 +16,10 @@ from . import privacy
 from .db import connection
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+# Walter Router postes (2026-10-16): chat(poste=...) sends the call to the walter-llm gateway with model = the router
+# task; the router picks the model and its routes (Codex subscription, Kie, OpenRouter), the gateway holds the keys.
+GATEWAY_URL = "http://127.0.0.1:8894/v1/chat/completions"
+GATEWAY_TOKEN_FILE = Path("/root/.hermes/walter-llm/walter-memory.env")
 
 
 class PrivacyRefused(PermissionError):
@@ -76,13 +80,46 @@ def _log(**row) -> None:
                       "error": None, **row})
 
 
-def chat(messages: list[dict], *, model: str, processor: str, privacy_class: str, budget: str = "recurring",
-         names: list[str] | None = None, processor_version: str | None = None, purpose: str | None = None,
-         timeout: float = 180, **params) -> dict:
-    """OpenAI-style chat call through OpenRouter. Returns {"content", "usage", "cost_usd"}.
+_PICKS: dict[str, tuple[float, str]] = {}
+
+
+def router_model(task: str, default: str) -> str:
+    """OpenRouter id of Walter Router's model for a non-chat poste (rerank, stt…), cached 10 min; `default` when the
+    router is unreachable (the router is advice, never a dependency of a recall)."""
+    hit = _PICKS.get(task)
+    if hit and time.time() - hit[0] < 600:
+        return hit[1]
+    try:
+        import json
+        import subprocess
+        r = subprocess.run(["/opt/walter-router/bin/walter-router", "pick", task], capture_output=True, text=True,
+                           timeout=30)
+        model = json.loads(r.stdout).get("openrouter_id") or default
+    except Exception:  # noqa: BLE001
+        model = hit[1] if hit else default
+    _PICKS[task] = (time.time(), model)
+    return model
+
+
+def _gateway_token() -> str:
+    for line in GATEWAY_TOKEN_FILE.read_text().splitlines():
+        if line.startswith("WALTER_LLM_TOKEN="):
+            return line.split("=", 1)[1].strip()
+    raise RuntimeError(f"no WALTER_LLM_TOKEN in {GATEWAY_TOKEN_FILE}")
+
+
+def chat(messages: list[dict], *, model: str | None = None, poste: str | None = None, processor: str,
+         privacy_class: str, budget: str = "recurring", names: list[str] | None = None,
+         processor_version: str | None = None, purpose: str | None = None, timeout: float = 180, **params) -> dict:
+    """OpenAI-style chat call. Returns {"content", "usage", "cost_usd", "model", "provider"}.
+    poste: a Walter Router task (summarization, memory_extraction…) — the router chooses the model, the walter-llm
+    gateway runs its routes (preferred: Monsieur's rule, no hardcoded model). model: an explicit OpenRouter id.
     privacy_class: the strictest class of the data in messages. names: people names to pseudonymise."""
-    base = {"processor": processor, "processor_version": processor_version, "model": model, "purpose": purpose,
-            "budget": budget, "privacy_class": privacy_class}
+    if bool(model) == bool(poste):
+        raise ValueError("chat(): give exactly one of model= or poste=")
+    base = {"processor": processor, "processor_version": processor_version, "model": model or f"router:{poste}",
+            "purpose": purpose, "budget": budget, "privacy_class": privacy_class,
+            "provider": "walter-llm" if poste else "openrouter"}
     if privacy_class == "local_only":
         _log(**base, status="refused_privacy")
         raise PrivacyRefused(f"{processor}: local_only data cannot be sent to {model}")
@@ -90,7 +127,7 @@ def chat(messages: list[dict], *, model: str, processor: str, privacy_class: str
     if b and b["hard_stop"] and b["spent_usd"] >= b["limit_usd"]:
         _log(**base, status="refused_budget")
         raise BudgetExceeded(f"{budget} budget exhausted ({b['spent_usd']:.2f}/{b['limit_usd']} USD this month)")
-    bal = account_balance()
+    bal = None if poste else account_balance()   # a poste goes subscription / Kie first: no OpenRouter floor
     if bal is not None and bal < ACCOUNT_FLOOR_USD.get(budget, 1.0):
         _log(**base, status="refused_budget", error=f"OpenRouter balance {bal:.2f} USD below floor")
         raise BudgetExceeded(f"OpenRouter balance {bal:.2f} USD below the {budget} floor {ACCOUNT_FLOOR_USD.get(budget)} USD")
@@ -104,14 +141,22 @@ def chat(messages: list[dict], *, model: str, processor: str, privacy_class: str
         messages = red
     t0 = time.perf_counter()
     try:
-        r = httpx.post(OPENROUTER_URL, headers={"Authorization": f"Bearer {_key()}"}, timeout=timeout,
-                       json={"model": model, "messages": messages, "usage": {"include": True}, **params})
+        if poste:   # the router decides the reasoning level of the route
+            params.pop("reasoning", None)
+            r = httpx.post(GATEWAY_URL, headers={"Authorization": f"Bearer {_gateway_token()}"}, timeout=timeout,
+                           json={"model": poste, "messages": messages, **params})
+        else:
+            r = httpx.post(OPENROUTER_URL, headers={"Authorization": f"Bearer {_key()}"}, timeout=timeout,
+                           json={"model": model, "messages": messages, "usage": {"include": True}, **params})
         data = r.json()
         if r.status_code >= 400 or "choices" not in data:
-            raise RuntimeError(f"HTTP {r.status_code}: {str(data.get('error', data))[:300]}")
+            raise RuntimeError(f"HTTP {r.status_code}: {str(data.get('error') or data.get('detail') or data)[:300]}")
     except Exception as e:
         _log(**base, status="error", error=str(e)[:500], latency_ms=int((time.perf_counter() - t0) * 1000))
         raise
+    if poste:   # the route that answered ("kie/gpt-6-luna"), for the ledger and the derived items' provenance
+        prov, _, used = (r.headers.get("x-walter-route") or "walter-llm/").partition("/")
+        base.update(provider=prov, model=used or base["model"])
     usage = data.get("usage") or {}
     content = data["choices"][0]["message"].get("content") or ""
     if mapping:
@@ -119,7 +164,8 @@ def chat(messages: list[dict], *, model: str, processor: str, privacy_class: str
     _log(**base, status="ok", latency_ms=int((time.perf_counter() - t0) * 1000),
          input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),
          cached_tokens=(usage.get("prompt_tokens_details") or {}).get("cached_tokens"), cost_usd=usage.get("cost"))
-    return {"content": content, "usage": usage, "cost_usd": usage.get("cost")}
+    return {"content": content, "usage": usage, "cost_usd": usage.get("cost"), "model": base["model"],
+            "provider": base["provider"]}
 
 
 # --- structured decisions (System One contract) on Cloudflare Workers AI -------------------------------------
@@ -155,7 +201,31 @@ DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
 # 2026-10-14 (AA Decision Index v1.0): Mercury Decide free is on our real-cost Pareto frontier (52.7, 0 $, reads
 # images) and dominates Clef (48.6, free allocation, rarely says "I don't know"); Clef stays as the last resort,
 # outside OpenRouter. Paid OpenRouter decision models respect the account floor of the budget.
-DECIDE_CHAIN = ("inception/mercury-decide:free", "cloudflare/clef")
+DECIDE_CHAIN = ("inception/mercury-decide:free", "cloudflare/clef")   # fallback only: the router's chain comes first
+_ROUTER_CHAIN: tuple[float, tuple[str, ...]] | None = None
+
+
+def decide_chain() -> tuple[str, ...]:
+    """Decision models in Monsieur's order, read from Walter Router (2026-10-16): its pinned / best 'decision' model
+    from the 48 h cycle and `knowledge.json` decision.order (best_first since 2026-10-14), then the free fallbacks.
+    Cached 10 min; DECIDE_CHAIN when the router is unreachable, so a decision never depends on the router being up."""
+    global _ROUTER_CHAIN
+    if _ROUTER_CHAIN and time.time() - _ROUTER_CHAIN[0] < 600:
+        return _ROUTER_CHAIN[1]
+    try:
+        import sys
+        if "/opt/walter-router" not in sys.path:
+            sys.path.append("/opt/walter-router")
+        from walter_router import intent
+        from .db import connection
+        with connection() as conn:
+            chain = tuple(intent.chain(conn)) or DECIDE_CHAIN
+    except Exception as e:  # noqa: BLE001 — the router is advice, not a dependency
+        import logging
+        logging.getLogger("walter.llm").warning("Walter Router decision chain unavailable, using DECIDE_CHAIN: %s", e)
+        chain = DECIDE_CHAIN
+    _ROUTER_CHAIN = (time.time(), chain)
+    return chain
 
 
 def _decide_once(model: str, state: dict, questions: dict, timeout: float) -> tuple[dict, str]:
@@ -186,10 +256,10 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
            model: str | None = None, models: tuple[str, ...] | None = None, purpose: str | None = None,
            budget: str = "recurring", timeout: float = 30) -> dict:
     """Typed decisions (System One contract: one call, a probability per option) from a decision model.
-    Tries `model` alone, else `models`, else DECIDE_CHAIN, in order ("vendor/model" = OpenRouter Decisions API,
+    Tries `model` alone, else `models`, else Walter Router's decision chain (decide_chain()), in order ("vendor/model" = OpenRouter Decisions API,
     "cloudflare/clef" or "clef" = Workers AI). local_only state is refused; redacted_cloud state is pseudonymised
     (strings, recursively) before leaving the VM. Returns {"answers": {...}, "usage": {...}, "model": ...}."""
-    chain = (model,) if model else (models or DECIDE_CHAIN)
+    chain = (model,) if model else (models or decide_chain())
     if privacy_class == "local_only":
         _log(processor=processor, model=chain[0], purpose=purpose, budget=budget, privacy_class=privacy_class,
              status="refused_privacy")
