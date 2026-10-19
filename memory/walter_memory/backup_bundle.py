@@ -12,8 +12,8 @@ MODULE_ANCHORS={'core':'server.py','memory':'walter_memory/events.py','router':'
                 'skills':'walter_skills/api.py','context':'walter_context/session.py','llm':'gateway.py',
                 'soul':'identity.md','voice-memory':'server.py','raw-vault':'rawvault.py'}
 SKIP_PARTS={'.worktrees','venv','.venv','node_modules','__pycache__','.cache','.pytest_cache','.mypy_cache','.ruff_cache','.hermes-runtime'}
-SKIP_PREFIXES=('root/.hermes/hermes-agent/.git','opt/walter-voice-memory/models',
-               'walter/voice/memory/models', 'root/.hermes/skills/.curator_backups','opt/dsh/home/sessions')
+SKIP_PREFIXES=('root/.hermes/hermes-agent/.git','opt/walter-memory/models/embeddings',
+               'walter/memory/models/embeddings', 'root/.hermes/skills/.curator_backups','opt/dsh/home/sessions')
 PROFILE_TRANSIENT={'cache','audio_cache','image_cache','images','sessions','sandboxes','workspace','logs','lsp'}
 
 def excluded(name):

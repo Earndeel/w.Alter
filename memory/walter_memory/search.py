@@ -6,6 +6,7 @@ derived and rebuildable: `walter-memory index --rebuild`.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import re
 import threading
 import time
@@ -20,7 +21,8 @@ from .db import connection
 
 INDEXER_VERSION = "1"
 MODEL = os.environ.get("WALTER_MEMORY_EMBED_MODEL", "minishlab/potion-multilingual-128M")
-MODEL_DIR = os.environ.get("WALTER_MEMORY_MODEL_DIR", "/opt/walter-voice-memory/models")
+# Shared local embedding models, owned by this module (also read by walter-skills).
+MODEL_DIR = os.environ.get("WALTER_MEMORY_MODEL_DIR", str(Path(__file__).resolve().parents[1] / "models" / "embeddings"))
 TEXT_EVENT_TYPES = ("message.received", "message.sent", "message.edited", "email.received", "email.sent",
                     "calendar.event", "note.recorded", "person.met", "location.stay", "page.visited", "search.performed")
 CHUNK = 1500
