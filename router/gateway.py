@@ -4,13 +4,13 @@
     agent (DeepSeek Harness, Codex, scripts…) ──token──▶ walter-llm (127.0.0.1:8894)
         model = a Walter Router task ("coding", "document"…) or "auto"
         ├─ Walter Router  → ordered routes (provider, model, reasoning) for the task      [choice]
-        ├─ walter-secrets → provider key read from Monsieur's Bitwarden, kept in RAM here [secrets]
+        ├─ walter-secrets → provider key read from the instance's vault, kept in RAM here [secrets]
         └─ LiteLLM        → provider protocol (Anthropic, Responses, OpenAI-compatible)   [adapters]
 
 Agents never hold a provider key: they get a local per-agent token (sha256 in agents.json, 0600) that only allows
 model calls through here (DeepSeek Harness' own docs: file permissions cannot keep keys away from an agent whose
 tools run as the same user — a gateway can). Every attempt is logged (no content) to
-~/.hermes/logs/walter-llm.jsonl and to Walter Router's models.exec_log, so the router learns from these runs too.
+the instance's log (config gateway.json) and to Walter Router's models.exec_log, so the router learns from these runs too.
 A route that fails before its first token falls through to the next one.
 
 Run:   gateway.py serve                 (127.0.0.1:8894)
@@ -32,17 +32,34 @@ from pathlib import Path
 from fastapi import Request  # module level: FastAPI resolves endpoint annotations from module globals
 
 HERE = Path(__file__).resolve().parent
-AGENTS = HERE / "agents.json"
-LOG = Path("/root/.hermes/logs/walter-llm.jsonl")
 ROUTER = "walter-router"   # Walter Router CLI on the PATH
-SECRETS_MAP = Path("/root/.hermes/vault/secrets-map.json")
-sys.path.insert(0, "/root/.hermes/plugins/walter-secrets")
+
+
+def _walter(*args: str) -> str:
+    """Walter's public interface (`walter` on the PATH): module roots and the active instance."""
+    out = subprocess.run(["walter", *args], capture_output=True, text=True, timeout=30)
+    if out.returncode or not out.stdout.strip():
+        raise RuntimeError(f"walter {' '.join(args)} failed")
+    return out.stdout.strip()
+
+
+def _instance_path(value: str) -> Path:
+    if value == "@instance" or value.startswith("@instance/"):
+        return Path(_walter("instance", "path")) / value[len("@instance"):].lstrip("/")
+    return Path(value).expanduser()
+
+
+# Settings: the instance's config/llm/gateway.json, else the shipped default (log file, agent token hashes).
+_CONF = json.loads(Path(_walter("instance", "config", "llm", "gateway.json")).read_text())
+AGENTS = _instance_path(_CONF["agents"])
+LOG = _instance_path(_CONF["log"])
+sys.path.insert(0, _walter("path", "secrets"))   # walter-secrets public library (vault, mapping)
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36"
 DEFAULT_TASK = "coding"
 # Codex routes = W.Alter's OWN Codex subscription session, the one of its Codex CLI (~/.codex/auth.json, also used by
 # walter-skills), never Hermes' session. Read-only here: the Codex CLI stays the single writer of its rotating refresh
 # token — when the access token is about to expire, a tiny `codex exec` makes the CLI refresh it, then it is re-read.
-CODEX_AUTH = Path("/root/.codex/auth.json")
+CODEX_AUTH = Path.home() / ".codex" / "auth.json"
 CHATGPT_DIR = HERE / "chatgpt"                      # LiteLLM wants a token dir; nothing is ever stored there
 os.environ.setdefault("CHATGPT_TOKEN_DIR", str(CHATGPT_DIR))
 CODEX_REFRESH_MARGIN = 3600
@@ -59,7 +76,7 @@ _keys_lock = threading.Lock()
 
 
 def provider_key(env_name: str) -> str:
-    """Value of the Bitwarden item mapped to `env_name` (secrets-map.json), cached in this process only. A stale
+    """Value of the vault item mapped to `env_name` (walter_secrets.mapping), cached in this process only. A stale
     value is served while it is re-read in the background (a Bitwarden read takes seconds; a phone call cannot wait)."""
     with _keys_lock:
         hit = _keys.get(env_name)
@@ -73,12 +90,9 @@ def provider_key(env_name: str) -> str:
 
 
 def _read_key(env_name: str) -> str:
-    entries = json.loads(SECRETS_MAP.read_text())["entries"]
-    e = next((e for e in entries if e["target"].endswith(f":{env_name}") and e["target"].startswith("env:/root/.hermes/.env")),
-             None) or next((e for e in entries if e["target"].endswith(f":{env_name}")), None)
-    if not e:
-        raise LookupError(f"{env_name} is not in Bitwarden (secrets-map)")
-    from bwvault import VAULT, audit
+    from walter_secrets.mapping import entry
+    from walter_secrets.vault import VAULT, audit
+    e = entry(env_name)
     value = VAULT.value(e["item_id"], e["field"])
     audit("use", {"id": e["item_id"], "name": e["item"]}, e["field"], tool="walter-llm")
     with _keys_lock:
@@ -101,7 +115,7 @@ _refreshing: set[str] = set()
 
 
 def _refresh(task: str) -> dict:
-    """task = a router task, or task/LEVEL for one of Monsieur's text tiers ("general/L2")."""
+    """task = a router task, or task/LEVEL for one of the instance's text tiers ("general/L2")."""
     try:
         name, _, level = task.partition("/")
         d = _router("pick", name, *(["--level", level] if level else []))

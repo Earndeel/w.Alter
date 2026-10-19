@@ -16,7 +16,9 @@
   "core_paths": [],
   "backup_paths": [
     ".",
-    "/root/.hermes/walter-llm"
+    "@instance/config/llm",
+    "@instance/state/llm",
+    "@instance:backup"
   ],
   "interfaces": [
     "OpenAI-compatible :8894"
@@ -39,7 +41,10 @@
     "kind": "capability",
     "purpose": "Exécuter les appels modèles des consommateurs autorisés via les postes du Router.",
     "target_root": "router/llm",
-    "config_paths": [],
+    "config_paths": [
+      "config/gateway.json",
+      "@instance/config/llm/gateway.json"
+    ],
     "permissions": [
       "jeton local par consommateur",
       "clés fournisseur hors contexte modèle"
