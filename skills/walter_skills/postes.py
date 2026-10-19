@@ -5,6 +5,9 @@ A poste is an ordered list of routes in config/walter-skills.toml; the first rou
                      never Hermes' session, whose rotating refresh token must have a single writer.
   via = "openrouter" walter_memory.llm: privacy guard (local_only refused, redacted pseudonymised), monthly budget,
                      OpenRouter balance floor, ledger in system.model_calls.
+  via = "router"     Walter Router (2026-10-16): `level` = one of Monsieur's text tiers (task general); its Codex
+                     routes run through W.Alter's own Codex session as above, the others through walter_memory.llm
+                     poste=general/LEVEL (walter-llm gateway). The tier Monsieur adopts reaches the poste by itself.
 Every prompt is secret-masked before it leaves the VM.
 """
 from __future__ import annotations
@@ -75,19 +78,66 @@ def _openrouter(prompt: str, model: str, budget: str, processor: str, timeout: i
         return None
 
 
+_ROUTER: dict[str, tuple[float, list[dict]]] = {}
+
+
+def _router_routes(route: dict) -> list[dict]:
+    """A via="router" route expanded into concrete routes (cached 10 min; [] when the router is unreachable)."""
+    import time
+    level = route.get("level", "L1")
+    key = f"{level}|{route.get("budget", "recurring")}"
+    hit = _ROUTER.get(key)
+    if hit and time.time() - hit[0] < 600:
+        return hit[1]
+    try:
+        r = subprocess.run(["/opt/walter-router/bin/walter-router", "pick", "general", "--level", level],
+                           capture_output=True, text=True, timeout=60)
+        d = json.loads(r.stdout)
+    except Exception:
+        return hit[1] if hit else []
+    out, gateway = [], False
+    for e in d.get("execution") or []:
+        if e.get("hermes_provider") == "openai-codex":
+            out.append({"via": "codex", "model": e["model"], "effort": e.get("reasoning") or "medium"})
+        elif not gateway:   # the gateway runs every paid route of the tier in the router's order
+            out.append({"via": "gateway", "poste": f"general/{level}", "budget": route.get("budget", "recurring")})
+            gateway = True
+    _ROUTER[key] = (time.time(), out)
+    return out
+
+
+def _gateway(prompt: str, poste: str, budget: str, processor: str, timeout: int) -> str | None:
+    try:
+        r = llm.chat([{"role": "user", "content": prompt}], poste=poste, processor=processor,
+                     privacy_class="cloud_allowed", budget=budget, timeout=timeout, purpose=processor)
+        return r["content"]
+    except Exception:
+        return None
+
+
+def _routes(poste: str) -> list[dict]:
+    out = []
+    for route in config.poste(poste):
+        out += _router_routes(route) if route["via"] == "router" else [route]
+    return out
+
+
 def ask(poste: str, prompt: str, *, timeout: int = 900, processor: str | None = None) -> tuple[str | None, str | None]:
     """(answer, route used) — the first route of the poste that answers; (None, None) if none did."""
     prompt = mask(prompt)
-    for route in config.poste(poste):
+    for route in _routes(poste):
         if route["via"] == "codex":
             text = _codex(prompt, route["model"], route.get("effort", "medium"), timeout, processor or f"skills.{poste}")
         elif route["via"] == "openrouter":
             text = _openrouter(prompt, route["model"], route.get("budget", "recurring"),
                                processor or f"skills.{poste}", min(timeout, 300))
+        elif route["via"] == "gateway":
+            text = _gateway(prompt, route["poste"], route.get("budget", "recurring"),
+                            processor or f"skills.{poste}", min(timeout, 300))
         else:
             continue
         if text:
-            return text, f"{route['via']}:{route['model']}"
+            return text, f"{route['via']}:{route.get('model') or route.get('poste')}"
     return None, None
 
 
@@ -102,7 +152,7 @@ def ask_json(poste: str, prompt: str, *, require: str | None = None, retries: in
 
 
 def available(poste: str) -> bool:
-    return any(r["via"] == "openrouter" or (r["via"] == "codex" and _codex_ready()) for r in config.poste(poste))
+    return any(r["via"] in ("openrouter", "gateway") or (r["via"] == "codex" and _codex_ready()) for r in _routes(poste))
 
 
 def parse_json(text: str | None) -> dict | None:
