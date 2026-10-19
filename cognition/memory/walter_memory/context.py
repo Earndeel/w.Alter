@@ -76,18 +76,6 @@ def _card_lines(entity_id: str) -> list[str]:
     return lines
 
 
-def _dedupe(lines: list[str], threshold: float = 0.88) -> list[str]:
-    """Drop near-duplicates (legacy memories repeat the same fact with small variations)."""
-    if len(lines) < 2:
-        return lines
-    v = search.embed([re.sub(r"\s*\|.*$", "", l)[:400] for l in lines])
-    keep = []
-    for i in range(len(lines)):
-        if all(float(v[i] @ v[j]) < threshold for j in keep):
-            keep.append(i)
-    return [lines[i] for i in keep]
-
-
 def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "cloud_allowed",
                 include_profile: bool = True) -> dict:
     """Returns {"text": assembled block, "sections": {...}, "trace": {...}}."""
@@ -108,9 +96,12 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
         trace["sections"]["people"] = {"tokens": used, "ms": round((time.perf_counter() - t) * 1000)}
     if b["knowledge"] > 0:
         t = time.perf_counter()
-        res = search.search(query, limit=12, max_privacy=max_privacy, rerank=True)
+        # derived knowledge only (evidence has its own section); both lanes when knowledge is thin
+        res = search.dedupe(search.search(query, limit=12, lanes=("knowledge",), max_privacy=max_privacy, rerank=True))
+        if len(res) < 3:
+            res = search.dedupe(res + search.search(query, limit=12, max_privacy=max_privacy, rerank=True))
         lines = [f"- {r['text'].strip()} ({str(r['occurred_at'] or '')[:10]})" for r in res]
-        text, used = _clip(_dedupe(list(dict.fromkeys(lines))), b["knowledge"])
+        text, used = _clip(list(dict.fromkeys(lines)), b["knowledge"])
         if text:
             sections["knowledge"] = text
         trace["sections"]["knowledge"] = {"tokens": used, "candidates": len(res), "ms": round((time.perf_counter() - t) * 1000),
