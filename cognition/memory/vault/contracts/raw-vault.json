@@ -1,9 +1,8 @@
 {
   "id": "raw-vault",
-  "root": "/opt/walter-raw-vault",
   "anchors": [
-    "/opt/walter-raw-vault/contracts/raw-vault.json",
-    "/opt/walter-raw-vault/rawvault.py"
+    "contracts/raw-vault.json",
+    "rawvault.py"
   ],
   "requires": [
     "memory"
@@ -19,7 +18,7 @@
   ],
   "core_paths": [],
   "backup_paths": [
-    "/opt/walter-raw-vault",
+    ".",
     "/root/.config/rclone/rclone.conf",
     "/root/.hermes/raw-vault"
   ],
@@ -45,7 +44,7 @@
     "owner": "raw-vault",
     "kind": "capability",
     "purpose": "Conserver les octets originaux et les relier au catalogue canonique.",
-    "target_root": "/walter/memory/vault",
+    "target_root": "memory/vault",
     "config_paths": [
       "/root/.config/rclone/rclone.conf",
       "/root/.hermes/raw-vault/s3.env"
