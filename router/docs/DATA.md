@@ -1,7 +1,7 @@
 # Walter Router — data reference (2026-10-17)
 
 Everything the router knows lives in schema `models` of Postgres `hindsight-pg` (127.0.0.1:5433, db `hindsight`,
-password only in `/root/.pgpass`). Python access: `walter_router.db.connect()`. Each table and view also carries a
+password only in `~/.pgpass`). Python access: `walter_router.db.connect()`. Each table and view also carries a
 `COMMENT` (migration 022): `\d+ models.*` explains itself.
 
 Writes go through the router code only (`walter-router refresh`, `declare`, `prefer`, `verdict`, `feedback`,
@@ -28,7 +28,7 @@ failing source keeps its last good one (view `latest_snapshots`). Freshness: `wa
 | `kie` | Kie.ai market prices (credits → $) | api.kie.ai/client/v1/model-pricing |
 | `codex` | Models of W.Alter's ChatGPT/Codex subscription | read through Hermes (no price: subscription) |
 | `hermes_providers` | Live `/models` of OpenAI-compatible providers configured in Hermes (`config/providers.json`, today Arnict) | provider API, key from `~/.hermes/.env` sent as a header |
-| `declared` | Offers no API lists (web UIs, direct keys), declared by Monsieur | `config/declared_offers.json` |
+| `declared` | Offers no API lists (web UIs, direct keys), declared by the owner | `config/declared_offers.json` |
 
 ## 2. Identity
 | Table | Content |
@@ -45,15 +45,15 @@ Unmatched names are listed by `walter-router review` (`unmatched_candidates`) fo
 | `offers` | Callable and priced: `provider`, `offer_key`, `interface` (chat, image, video, audio, music, transcription, embedding, rerank, decisions…), `access` (paid / subscription / ui / free), `price_in_1m`/`price_out_1m` ($/M tokens) or `unit_price`+`unit`, media classification (`offer_kind`, `modes` t2i/i2i/t2v/i2v/r2v/v2v, `resolution`, `audio`), `norm_price`/`norm_unit` (video per second, image per image, voice per 1000 characters, STT per minute) |
 | `provider_status` | Last 5-token live probe per provider (`probe`), OpenRouter credit in `detail` |
 
-## 4. Tasks and Monsieur's knowledge
+## 4. Tasks and the owner's knowledge
 | Table | Content | Written by |
 |---|---|---|
 | `tasks` | The 33 tasks: label, `interface`, `default_objective`, `intent_hint` (for the classifier), `internal` (module postes never offered to the classifier), `requirements`, `consumers` | migrations + `declare` |
 | `task_benchmarks` | Which boards rank a task and their **weights** (`weight`, `is_primary`) — shown on the library page under each task | migrations |
-| `preferences` | Monsieur's choices per task / role: objective (`best_available`, `value`, `level`), pin (model, variant, provider), role label/description/signals (video roles), `watch` | `knowledge.json` via `declare`, `prefer`, `verdict` |
+| `preferences` | the owner's choices per task / role: objective (`best_available`, `value`, `level`), pin (model, variant, provider), role label/description/signals (video roles), `watch` | `knowledge.json` via `declare`, `prefer`, `verdict` |
 | `profiles` | What a model is *for*: strengths, weaknesses, workflow, effort, access / cost notes | `knowledge.json` |
-| `affinities` | Close calls: Monsieur's preferred model inside the tie margin | `knowledge.json` |
-| `feedback` | Monsieur's verdicts on a model (−2..2, ±3 composite points each, capped ±9) | `feedback`, tool `walter_feedback` |
+| `affinities` | Close calls: the owner's preferred model inside the tie margin | `knowledge.json` |
+| `feedback` | the owner's verdicts on a model (−2..2, ±3 composite points each, capped ±9) | `feedback`, tool `walter_feedback` |
 
 ## 5. Computed every refresh (one `run_id` per refresh)
 | Table / view | Content |
@@ -91,4 +91,4 @@ select provider, interface, price_in_1m, price_out_1m, unit_price, unit, norm_pr
 select at, task, provider, model, ok, seconds from models.exec_log where model_id = 'gpt-6-luna' order by at desc limit 20;
 ```
 CLI equivalents: `walter-router library` (the full table), `pick <task>`, `dossier <task>`, `status`, `health`,
-`alerts`, `review`. Web: https://library.walter-ai.cloud (English) and /fr/.
+`alerts`, `review`. Web: https://the instance library domain (host.json library_domain) (English) and /fr/.

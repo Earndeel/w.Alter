@@ -1,6 +1,6 @@
-# Les 3 niveaux texte — la méthode de Monsieur (2026-10-02)
+# Les 3 niveaux texte — la méthode de 2026-10-02
 
-Monsieur ne veut pas « le meilleur modèle » pour le texte courant, mais trois niveaux fonctionnels, chacun au
+The owner ne veut pas « le meilleur modèle » pour le texte courant, mais trois niveaux fonctionnels, chacun au
 meilleur rapport intelligence / prix. La méthode (code : `walter_router/tiers.py`, recalculée chaque nuit) :
 
 1. **Données** : chaque modèle appelable × chaque niveau de raisonnement (low … max), avec son score
@@ -16,7 +16,7 @@ meilleur rapport intelligence / prix. La méthode (code : `walter_router/tiers.p
 6. **L3 — haut de gamme** : parmi les points à moins de 5 points du meilleur score (la bande du plafond), celui
    qui rapporte **le plus de points par dollar ajouté depuis L2** — le moyen le moins cher d'atteindre le haut.
 
-Résultat du 2026-10-02 (identique au choix de Monsieur) :
+Résultat du 2026-10-02 (identique au choix du propriétaire) :
 
 | Niveau | Modèle | AA | $/tâche | Pourquoi |
 |---|---|---|---|---|
@@ -27,7 +27,7 @@ Résultat du 2026-10-02 (identique au choix de Monsieur) :
 Repli déclaré de L3 : GPT-6 Astra xhigh via Codex (point juste en dessous sur la frontière).
 
 **Règles** : les niveaux en vigueur sont ceux déclarés (`config/knowledge.json` → `levels`). Si le calcul de nuit
-désigne un autre modèle/niveau, une seule alerte `tier` part sur Telegram ; Monsieur teste puis appuie sur « ✅ Changer »
+désigne un autre modèle/niveau, une seule alerte `tier` part sur Telegram ; The owner teste puis appuie sur « ✅ Changer »
 (le niveau est alors épinglé) ou « ✖️ Garder l'actuel ». Jamais de bascule automatique. Le niveau d'une demande (L1/L2/L3)
 est choisi par Jev. Pour les tâches spécialisées (code, front, 3D, vision, document…), seul le n°1 du score
 pondéré multi-benchmarks est retenu.

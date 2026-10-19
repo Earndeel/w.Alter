@@ -15,9 +15,9 @@ from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from . import identity, media
+from . import identity, instance, media
 
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/root/.hermes"))
+HERMES_HOME = instance.hermes_home()
 CACHE = HERMES_HOME / "cache" / "aa-pareto"
 HERMES_PY = HERMES_HOME / "hermes-agent" / "venv" / "bin" / "python"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/models?output_modalities=all"
@@ -33,7 +33,7 @@ BRIDGEBENCH_URL = "https://www.bridgebench.ai/leaderboard"
 # AA-Omniscience-Decision, HLE-MultiChoice, When2Call and WildGuardTest; accuracy, time and cost per 1M tasks.
 AA_DECISION_URL = "https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index"
 FLARESOLVERR = os.environ.get("WALTER_FLARESOLVERR", "http://127.0.0.1:8191/v1")  # local, behind Cloudflare sites
-# Internal postes stt / rerank / embeddings (2026-10-16, Monsieur: « rajouter le reranking, embedding et STT »).
+# Internal postes stt / rerank / embeddings (2026-10-16, the owner: « rajouter le reranking, embedding et STT »).
 # AA Speech-to-Text: AA-WER index (lower = better, English datasets — AA publishes no French result), speed factor
 # (x real time) and price per 1000 audio minutes, per model x host, from the page's chart download tables.
 AA_STT_URL = "https://artificialanalysis.ai/speech-to-text"
@@ -395,7 +395,7 @@ def source_kie() -> tuple[dict, datetime, str]:
 
 
 def source_codex() -> tuple[dict, datetime, str]:
-    """Live Codex catalogue of Monsieur's ChatGPT account, read through Hermes (read-only; token never printed)."""
+    """Live Codex catalogue of the owner's ChatGPT account, read through Hermes (read-only; token never printed)."""
     code = ("import json; from hermes_cli.models import _codex_catalog; "
             "print(json.dumps(_codex_catalog('openai-codex', False)))")
     out = subprocess.run([str(HERMES_PY), "-c", code], cwd=str(HERMES_HOME / "hermes-agent"), capture_output=True,
@@ -445,7 +445,7 @@ def source_hermes_providers() -> tuple[dict, datetime, str]:
     return {"providers": out, "errors": errors}, now(), str(PROVIDERS_CONFIG)
 
 
-DECLARED = Path(__file__).resolve().parent.parent / "config" / "declared_offers.json"
+DECLARED = instance.config_path("declared_offers.json")
 
 
 def source_declared() -> tuple[dict, datetime, str]:

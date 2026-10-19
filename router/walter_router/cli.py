@@ -121,13 +121,13 @@ def health() -> dict:
 
 
 def notify_failure() -> dict:
-    """Called by systemd OnFailure: tell Monsieur on Telegram that the nightly refresh failed (one short message)."""
+    """Called by systemd OnFailure: tell the owner on Telegram that the nightly refresh failed (one short message)."""
     try:
         h = health()
         why = "; ".join(h["issues"][:3]) or "voir journalctl -u walter-router-refresh"
     except Exception as exc:  # noqa: BLE001 — the database itself may be the problem
         why = f"base injoignable ({type(exc).__name__})"
-    with db.connect() as conn:  # Monsieur wants no noise: only when two cycles in a row failed (4 days blind)
+    with db.connect() as conn:  # The owner wants no noise: only when two cycles in a row failed (4 days blind)
         last = [r["status"] for r in conn.execute("select status from models.runs order by run_id desc limit 2")]
     if last != ["failed", "failed"]:
         return {"sent": False, "reason": "single failure: health only"}
@@ -215,6 +215,28 @@ def route(conn, request: str, task: str | None = None, level: str | None = None)
     return {**out, "intent": jev}
 
 
+def _instance_env() -> int:
+    """HERMES_HOME, LOG, COLLECT_SCRIPT, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
+    rendered for the instance: its owner, its log folder), as shell assignments."""
+    import shlex
+    from . import instance
+    log = instance.host_path("log_dir")
+    log.mkdir(parents=True, exist_ok=True)
+    prompt = (Path(__file__).resolve().parent.parent / "config" / "analysis_prompt.md").read_text()
+    prompt = prompt.replace("{{log_dir}}", str(log))
+    rendered = subprocess.run(["walter", "instance", "render"], input=prompt, capture_output=True, text=True,
+                              timeout=30, check=True).stdout
+    (log / "analysis-prompt.md").write_text(rendered)
+    domain = instance.host().get("library_domain") or ""
+    values = {"HERMES_HOME": instance.hermes_home(), "LOG": log,
+              "COLLECT_SCRIPT": instance.host_path("collect_script") or "",
+              "CONTROL_ENV": instance.host_path("control_env") or "",
+              "LIBRARY_URL": f"https://{domain}" if domain else "", "ANALYSIS_PROMPT": log / "analysis-prompt.md"}
+    for k, v in values.items():
+        print(f"{k}={shlex.quote(str(v))}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="walter-router")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -228,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
     k.add_argument("--level", choices=choose.LEVELS)
     k.add_argument("--role", help="favourite role, e.g. action / value / budget")
     k.add_argument("--require", choices=sorted(choose.REQUIREMENTS), help="hard constraint (unrestricted, open_weights)")
-    f = sub.add_parser("prefer", help="record Monsieur's preference for a task")
+    f = sub.add_parser("prefer", help="record the owner's preference for a task")
     f.add_argument("task")
     f.add_argument("--objective", choices=("value", "best_available"))
     f.add_argument("--pin", help="favourite model as model_id[/variant], e.g. gpt-image-2-5-sunburst/max")
@@ -248,9 +270,9 @@ def main(argv: list[str] | None = None) -> int:
     hs = sub.add_parser("sync-hermes", help="write the router's postes into Hermes auxiliary jobs (compression…)")
     hs.add_argument("--apply", action="store_true", help="apply (config backup + graceful gateway restart)")
     hs.add_argument("--no-restart", action="store_true")
-    pl = sub.add_parser("publish-library", help="rebuild and deploy https://library.walter-ai.cloud (Cloudflare Access)")
+    pl = sub.add_parser("publish-library", help="rebuild and deploy the instance library page (host.json library_domain, Cloudflare Access)")
     pl.add_argument("--no-deploy", action="store_true")
-    sb = sub.add_parser("subscriptions", help="Monsieur's subscriptions: quota meters, status, plan values")
+    sb = sub.add_parser("subscriptions", help="the owner's subscriptions: quota meters, status, plan values")
     sb.add_argument("action", nargs="?", choices=["show", "refresh", "calibrate"], default="show")
     sb.add_argument("sub_id", nargs="?", help="calibrate: subscription id (anthropic-pro)")
     sb.add_argument("percent", nargs="?", type=float, help="calibrate: weekly %% shown by the vendor")
@@ -286,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--no-craft", action="store_true", help="send the request as the prompt")
     lg = sub.add_parser("log-exec", help="record one routed execution attempt (JSON)")
     lg.add_argument("entry")
-    fb = sub.add_parser("feedback", help="Monsieur's verdict on a model (rating -2..2)")
+    fb = sub.add_parser("feedback", help="the owner's verdict on a model (rating -2..2)")
     fb.add_argument("model", help="model_id, or 'last' for the model of the last successful routed run")
     fb.add_argument("rating", type=int, choices=range(-2, 3))
     fb.add_argument("--task")
@@ -305,8 +327,11 @@ def main(argv: list[str] | None = None) -> int:
     cl.add_argument("request")
     o = sub.add_parser("dossier", help="the task's pre-computed dossier (what the router reads)")
     o.add_argument("task")
+    sub.add_parser("instance-env", help="shell assignments of the instance bindings used by the cycle and the trigger")
     args = p.parse_args(argv)
 
+    if args.cmd == "instance-env":
+        return _instance_env()
     if args.cmd == "migrate":
         out = {"applied": db.migrate()}
     elif args.cmd == "decision-chain":
@@ -393,7 +418,7 @@ def main(argv: list[str] | None = None) -> int:
                 out = rows
             else:
                 out = alerts.verdict(conn, args.alert_id, args.decision, args.note, args.role)
-                import subprocess   # the library page follows Monsieur's answer (background, non-blocking)
+                import subprocess   # the library page follows the owner's answer (background, non-blocking)
                 wr = Path(__file__).resolve().parent.parent / "bin" / "walter-router"   # after this command's commit
                 subprocess.Popen(["sh", "-c", f'sleep 5; "{wr}" sync-hermes --apply; "{wr}" publish-library'],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)

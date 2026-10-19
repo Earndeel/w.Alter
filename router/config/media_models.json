@@ -1,5 +1,5 @@
 {
-  "_doc": "How each media favourite is called. kie: market path per mode + where images go; openrouter: the OpenRouter model id (generic /api/v1/videos or /api/v1/images). prompt_style: how the economic model rewrites Monsieur's request for this model.",
+  "_doc": "How each media favourite is called. kie: market path per mode + where images go; openrouter: the OpenRouter model id (generic /api/v1/videos or /api/v1/images). prompt_style: how the economic model rewrites the user's request for this model.",
   "models": {
     "wan-3": {
       "kind": "video",
@@ -14,7 +14,7 @@
       "kind": "image",
       "kie": {"t2i": "gpt-image-2-5-sunburst-text-to-image", "i2i": "gpt-image-2-5-sunburst-image-to-image", "images": "input_urls"},
       "openrouter": "openai/gpt-image-2.5-sunburst",
-      "prompt_style": "A detailed English image prompt: main subject, setting/background, lighting, composition and camera framing, style and mood. Keep EVERY element Monsieur asked for (the setting especially) and add nothing he would not want."
+      "prompt_style": "A detailed English image prompt: main subject, setting/background, lighting, composition and camera framing, style and mood. Keep EVERY element the user asked for (the setting especially) and add nothing he would not want."
     },
     "gpt-image-2-5-flare": {
       "kind": "image",

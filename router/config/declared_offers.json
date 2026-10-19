@@ -1,38 +1,4 @@
 {
-  "_doc": "Offers declared by Monsieur that no provider API lists (web interfaces, subscriptions). Only explicit declarations go here.",
-  "offers": [
-    {
-      "provider": "google-flow",
-      "offer_key": "flow:gemini-omni-flash-1-1",
-      "model": "gemini-omni-flash-1-1",
-      "interface": "video",
-      "access": "ui",
-      "declared": "2026-10-02",
-      "note": "Monsieur génère Gemini Omni Flash 1.1 dans l'interface web Flow avec les crédits mensuels gratuits de son abonnement Gemini AI Pro (déclaré 2026-10-02) ; usage UGC."
-    },
-    {
-      "provider": "google-ai-studio",
-      "offer_key": "gemini-api:gemini-3.1-flash-live-preview",
-      "model": "gemini-3-1-flash-live-high",
-      "interface": "audio",
-      "access": "paid",
-      "modes": [
-        "s2s"
-      ],
-      "unit_price": 0.023,
-      "unit": "per minute",
-      "pricing": {
-        "audio_in_per_min": 0.005,
-        "audio_out_per_min": 0.018,
-        "text_in_1m": 0.75,
-        "text_out_1m": 4.5,
-        "audio_in_1m": 3.0,
-        "audio_out_1m": 12.0,
-        "free_tier": true,
-        "source": "https://ai.google.dev/gemini-api/docs/pricing (relevé 2026-10-17)"
-      },
-      "declared": "2026-10-17",
-      "note": "Pont téléphone (/opt/openclaw/hermes_voice_bridge.py) : clé Gemini API directe, modèle gemini-3.1-flash-live-preview. Prix payant Google = 0,005 $/min audio entrant + 0,018 $/min audio sortant (≈ 0,023 $ par minute de conversation dans les deux sens) ; niveau gratuit disponible."
-    }
-  ]
+  "_doc": "Offers declared by the instance's owner that no provider API lists (web interfaces, subscriptions). Only explicit declarations go here; an instance keeps its own in config/router/declared_offers.json.",
+  "offers": []
 }

@@ -1,11 +1,11 @@
-"""Hermes auxiliary jobs follow Walter Router (2026-10-16, Monsieur: every W.Alter module that uses AI goes through
+"""Hermes auxiliary jobs follow Walter Router (2026-10-16, the owner: every W.Alter module that uses AI goes through
 the router's library).
 
 Hermes holds its own Codex subscription session (single writer of its OAuth token), so its auxiliary jobs are not sent
 through walter-llm: the router writes the poste's routes into config.yaml instead — first usable route as
 provider/model/reasoning_effort, the next ones as auxiliary.<job>.fallback_chain — through `hermes config set`
 (config backed up, gateway restarted gracefully only when something changed). Run at the end of every 48 h cycle and
-after each verdict, so a model Monsieur adopts reaches Hermes; the core of Hermes is never patched.
+after each verdict, so a model the owner adopts reaches Hermes; the core of Hermes is never patched.
 """
 from __future__ import annotations
 
@@ -15,18 +15,21 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-HERMES = Path("/root/.hermes/hermes-agent/venv/bin/hermes")
-HPY = Path("/root/.hermes/hermes-agent/venv/bin/python")  # has PyYAML (this venv does not)
-CONFIG = Path("/root/.hermes/config.yaml")
-# Hermes homes whose auxiliary jobs follow the router: the main agent and the profiles that set their own compression
-# (wild = macOS app, hephaestus); the other profiles inherit "auto" (their main model).
-HOMES = [Path("/root/.hermes"), Path("/root/.hermes/profiles/wild"), Path("/root/.hermes/profiles/hephaestus")]
-BACKUPS = Path("/root/.hermes/backups/config")
+from . import instance
+
+HERMES = instance.hermes_bin()
+HPY = instance.hermes_python()  # has PyYAML (this venv does not)
+CONFIG = instance.hermes_home() / "config.yaml"
+# Hermes homes whose auxiliary jobs follow the router: the main agent and the instance's profiles that set their own
+# compression (host.json hermes_profiles_following_router); the other profiles inherit "auto" (their main model).
+HOMES = [instance.hermes_home()] + [instance.hermes_home() / "profiles" / p
+                                    for p in instance.host().get("hermes_profiles_following_router", [])]
+BACKUPS = instance.hermes_home() / "backups" / "config"
 # Hermes auxiliary job -> router poste
 AUX_POSTES = {"compression": "summarization", "title_generation": "summarization"}
 # Hermes cron agent jobs with their own model -> (router task, level): light background agent work = tier L1
-CRON_JOBS = Path("/root/.hermes/cron/jobs.json")
-CRON_POSTES = {"13d0f88771cb": ("general", "L1")}   # Memory Dreaming (was gemini-3.5-flash on Google AI Studio)
+CRON_JOBS = instance.hermes_home() / "cron" / "jobs.json"
+CRON_POSTES = {k: tuple(v) for k, v in instance.host().get("cron_postes", {}).items()}   # job id -> (task, level)
 MAX_FALLBACKS = 2
 
 
@@ -113,7 +116,7 @@ def apply(conn, restart: bool = True) -> dict:
     import os
     for s in todo:
         env = {**os.environ, "HERMES_HOME": s["home"]}
-        if s["home"] != "/root/.hermes":
+        if s["home"] != str(instance.hermes_home()):
             shutil.copy2(Path(s["home"]) / "config.yaml", Path(s["home"]) / f"config.yaml.{ts}.pre-router-sync")
         for key, value in s["changes"].items():
             v = json.dumps(value) if isinstance(value, (list, dict)) else str(value)

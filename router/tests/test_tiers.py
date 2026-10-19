@@ -19,7 +19,7 @@ POINTS = [_p("gpt-6-luna", "high", 32.9, 0.009), _p("gpt-6-luna", "xhigh", 34.6,
           _p("claude-opus-5-5", "xhigh", 56.0, 1.384), _p("claude-opus-5-5", "max", 57.6, 2.393)]
 
 
-def test_method_reproduces_monsieurs_tiers():
+def test_method_reproduces_the_owners_tiers():
     t = tiers.compute(POINTS)
     assert (t["L1"]["model_id"], t["L1"]["variant"]) == ("gpt-6-luna", "max")
     assert (t["L2"]["model_id"], t["L2"]["variant"]) == ("gpt-6-1-sol", "medium")
@@ -69,7 +69,7 @@ def test_specialised_tasks_keep_only_the_best(conn):
 
 
 def test_static_orchestrator_comparison_is_never_news(conn):
-    """Astra vs Sol on poste criteria is a comparison between known models: never sent (Monsieur, 2026-10-04)."""
+    """Astra vs Sol on poste criteria is a comparison between known models: never sent (2026-10-04)."""
     conn.execute("""insert into models.alerts (kind, task, role, subject, evidence, status)
                     values ('tier', 'general', 'orchestrator', 'zz-model', '{}', 'open')""")
     assert not [a for a in alerts.pending(conn) if a["role"] == "orchestrator"]

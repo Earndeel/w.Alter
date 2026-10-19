@@ -1,4 +1,4 @@
-"""English version of the library page (Monsieur, 2026-10-14: « une version anglaise et française à choisir en bas »).
+"""English version of the library page (2026-10-14: « une version anglaise et française à choisir en bas »).
 
 A translation pass over the final French HTML, so both pages share exactly the same layout: phrase table applied to
 text nodes and to a few attributes (placeholder, title, aria-label), French decimals → English in text and chart

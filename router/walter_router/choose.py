@@ -1,13 +1,14 @@
-"""What the router (and the orchestrator) calls: pick the model for a task, Monsieur's preferences first."""
+"""What the router (and the orchestrator) calls: pick the model for a task, the owner's preferences first."""
 from __future__ import annotations
 
 from typing import Any
 
 from . import collect
 from . import select as sel
+from . import instance
 
 LEVELS = ("L1", "L2", "L3")
-# Effective content policy = Monsieur's profile override, else the detected one. 'permissive' models (reputedly
+# Effective content policy = the owner's profile override, else the detected one. 'permissive' models (reputedly
 # lenient, unverified) answer an unrestricted request only after every truly unrestricted one, flagged.
 POLICY = "coalesce(pr.content_policy, c.content_policy)"
 REQUIREMENTS = {"unrestricted": f"{POLICY} in ('unrestricted', 'permissive')", "open_weights": "c.open_weights"}
@@ -88,7 +89,7 @@ def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]
                               x["price_1m_blended"] or x["cost"] or 0))
     for x in cands:
         if require == "unrestricted" and x["content_policy"] == "permissive":
-            x["warning"] = "réputé permissif (déclaration de Monsieur), pas garanti sans restriction"
+            x["warning"] = f"réputé permissif (déclaration de {instance.owner()}), pas garanti sans restriction"
     if not cands:
         return {"task": t["task"], "mode": "none", "require": require,
                 "why": f"aucun modèle {require} appelable pour {t['interface']} chez les providers connus"}
@@ -98,7 +99,7 @@ def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]
 
 def pick(conn, task: str, level: str | None = None, role: str | None = None,
          require: str | None = None) -> dict[str, Any]:
-    """Monsieur's favourite for (task, role) first; otherwise the computed choice for the task's objective.
+    """The owner's favourite for (task, role) first; otherwise the computed choice for the task's objective.
 
     Without a role, the 'default' favourite is used and the other roles are listed so the orchestrator can
     switch on intent (e.g. an action scene -> role 'action').
@@ -114,7 +115,7 @@ def pick(conn, task: str, level: str | None = None, role: str | None = None,
     if role and role not in prefs:
         raise KeyError(f"no preference role '{role}' for {task}; known: {sorted(prefs)}")
     if task == "general" and not role and (level or "L1") in prefs:
-        role = level or "L1"  # Monsieur's declared text tiers (knowledge.json "levels")
+        role = level or "L1"  # the owner's declared text tiers (knowledge.json "levels")
     pref = prefs.get(role or "default")
     others = {r: {"model_id": p["pinned_model_id"], "note": p["note"]} for r, p in prefs.items()
               if r != (role or "default") and p["pinned_model_id"]}
@@ -150,8 +151,8 @@ def pick(conn, task: str, level: str | None = None, role: str | None = None,
 
 
 def _level_answer(conn, t: dict, level: str | None = None) -> dict[str, Any]:
-    """A background text poste (compression, extraction…) follows one of Monsieur's text tiers — his declared pin for
-    'general' at requirements.level, adopted by him, so the poste moves when he adopts a new tier. A tier model that
+    """A background text poste (compression, extraction…) follows one of the owner's text tiers — their declared pin for
+    'general' at requirements.level, adopted by them, so the poste moves when they adopt a new tier. A tier model that
     breaks a hard requirement of the poste (context window) hands over to the next tier up."""
     req = t.get("requirements") or {}
     want = level or req.get("level") or "L1"
@@ -164,13 +165,13 @@ def _level_answer(conn, t: dict, level: str | None = None) -> dict[str, Any]:
             continue
         return {**d, "task": t["task"], "level": lvl, "follows": {"task": "general", "level": lvl},
                 "source": f'level:{lvl}' + (f' ({d["source"]})' if d.get("source") else ""), "requirements": req,
-                "why": f'Poste de fond : niveau texte {lvl} de Monsieur (general/{lvl}). ' + (d.get("why") or "")}
+                "why": f'Poste de fond : niveau texte {lvl} de {instance.owner()} (general/{lvl}). ' + (d.get("why") or "")}
     return {"task": t["task"], "mode": "none", "why": f"aucun niveau texte {want}+ ne respecte {req}"}
 
 
 def set_preference(conn, task: str, objective: str | None = None, pin: str | None = None, provider: str | None = None,
                    note: str | None = None, role: str = "default", watch: str | None = None) -> dict:
-    """Record Monsieur's declaration. Pinning records every current challenger as 'baseline' (no alert for those)."""
+    """Record the owner's declaration. Pinning records every current challenger as 'baseline' (no alert for those)."""
     model_id, variant = (pin.split("/", 1) + [""])[:2] if pin else (None, "")
     if model_id:
         conn.execute("insert into models.canonical (model_id) values (%s) on conflict do nothing", (model_id,))

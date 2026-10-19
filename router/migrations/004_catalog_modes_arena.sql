@@ -1,4 +1,4 @@
--- Media catalogue, organised per model (2026-10-02, Monsieur):
+-- Media catalogue, organised per model (2026-10-02):
 --   * every offer says what it sells: generation mode(s) t2i/i2i/t2v/i2v/r2v/v2v, output resolution, audio, and a
 --     price in the comparable unit (video per second, image per image) -> models.offers new columns;
 --   * a readable name per model (models.canonical.display_name, best source wins);

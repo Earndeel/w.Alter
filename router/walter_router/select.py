@@ -14,8 +14,9 @@ from pathlib import Path
 from typing import Any
 
 from . import collect, media
+from . import instance
 
-SKILL = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "skills/research/aa-pareto-model-optimizer/scripts"
+SKILL = instance.hermes_home() / "skills/research/aa-pareto-model-optimizer/scripts"
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
 MEDIA_UNITS = media.NORM_UNITS   # image per image, video per second, voice per 1000 characters, stt per minute…
 BENCH_KIND = {"aa_intelligence": "aa", "aa_decision": "aa_decision", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena",
@@ -44,7 +45,7 @@ BOARD_GRACE_DAYS = 21
 def board_snapshot(conn, snaps: dict[str, int], benchmark: str, bench_task: str) -> int | None:
     """Snapshot to read one board from: the latest of its source, or — when the board is empty there (page changed,
     blocked) — the last snapshot that had it, within BOARD_GRACE_DAYS (the router keeps the last known ranking; a
-    'board_down' alert tells Monsieur)."""
+    'board_down' alert tells the owner)."""
     kind = BENCH_KIND.get(benchmark)
     sid = snaps.get(kind)
     if sid is None:
@@ -192,7 +193,7 @@ def _ladder(cands: list[dict], minimum_score: float, cost_cap: float) -> dict | 
 
 
 def _tier_rows(cands: list[dict]) -> list[dict]:
-    """Monsieur's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs."""
+    """The owner's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs."""
     from . import tiers  # late import keeps the module graph flat
     pts = [{**c, "cost": c["real_cost"]} for c in cands if c.get("real_cost")]
     t = tiers.compute(pts)
@@ -256,7 +257,7 @@ def family(model_id: str) -> tuple[str, tuple, str] | None:
 
 
 def _executable_first(conn, t: dict, ranked: list[dict], offers: dict) -> list[dict]:
-    """Monsieur (2026-10-14, logo): the best measured model must be one Walter can run; and when a newer version of
+    """The owner (2026-10-14, logo): the best measured model must be one Walter can run; and when a newer version of
     it exists, runs and is not benchmarked on this task yet, it goes first with a warning (GPT Image 2 measured on
     the logo board, GPT Image 2.5 Sunburst not yet: Sunburst, « version supérieure pas encore classée »)."""
     from .media_exec import _models   # late import (media_exec -> select)
@@ -356,7 +357,7 @@ def compute(conn) -> list[dict]:
         ranked = tie_break(conn, t["task"], _best_by_composite(conn, t, snaps, offers, cands))
         if t["interface"] in MEDIA_EXEC_INTERFACES and t["task"] != "general":
             ranked = _executable_first(conn, t, ranked, offers)
-        # Monsieur: specialised tasks keep only the best model (#2/#3 are useless); general keeps a short list.
+        # the owner: specialised tasks keep only the best model (#2/#3 are useless); general keeps a short list.
         out += [{**r, "rank": i + 1} for i, r in enumerate(ranked[:5 if t["task"] == "general" else 1])]
         if not cands:
             continue

@@ -1,7 +1,7 @@
-"""The model library as Monsieur reads it (2026-10-14): per task and category, the model in use, who chose it, the
+"""The model library as the owner reads it (2026-10-14): per task and category, the model in use, who chose it, the
 measured #1 when it differs, providers in order with prices, the fallback model, subscriptions, warnings.
 
-`walter-router library [--json]`. Text tiers L1/L2/L3 follow Monsieur's Pareto method (never flagged as « ≠ n°1 »).
+`walter-router library [--json]`. Text tiers L1/L2/L3 follow the owner's Pareto method (never flagged as « ≠ n°1 »).
 """
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import re
 
 from . import catalog, choose, media_exec, scoring
 from . import select as sel
+from . import instance
 
 PROV = {"openai-codex": "Codex (abonnement)", "codex": "Codex (abonnement)", "kie-codex": "Kie", "kie": "Kie",
         "openrouter": "OpenRouter", "arnict": "Arnict", "google-flow": "Flow"}
@@ -105,7 +106,7 @@ BENCH_TASK = {  # bench_task -> (fr, en)
 
 def boards_of(conn, task: str) -> tuple[str, str]:
     """« Arena vidéo depuis texte 50 % · AA vidéo depuis texte 50 % » (fr, en): the weighted leaderboards behind the
-    task's score (Monsieur, 2026-10-17: show which benchmarks compare the models of a category)."""
+    task's score (2026-10-17: show which benchmarks compare the models of a category)."""
     fr, en = [], []
     for b in conn.execute("""select benchmark, bench_task, weight from models.task_benchmarks where task = %s and weight > 0
                              order by weight desc, benchmark""", (task,)):
@@ -237,7 +238,7 @@ def render(rs: list[dict]) -> str:
     return "\n".join(lines).strip()
 
 
-# --- HTML page (Cloudflare Pages, behind Cloudflare Access; Monsieur 2026-10-14) -----------------------------
+# --- HTML page (Cloudflare Pages, behind Cloudflare Access; 2026-10-14) -----------------------------
 
 def _context(conn) -> dict:
     run = conn.execute("select run_id, started_at, finished_at from models.runs where status = 'ok' "
@@ -367,26 +368,38 @@ document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('on'));b
 
 
 SITE = __import__("pathlib").Path(__file__).resolve().parent.parent / "site"
-CF = "/root/.hermes/scripts/walter-cloudflare"
+CF = instance.host().get("cloudflare_cli", "")   # the instance's Cloudflare helper (publishing the page)
 
 
 def publish(conn, deploy: bool = True) -> dict:
-    """Rebuild site/index.html and deploy it to Cloudflare Pages (project walter-library, served only on
-    library.walter-ai.cloud behind Cloudflare Access; site/functions/_middleware.js refuses every other host)."""
+    """Rebuild the library page in the instance's build folder (host.json site_build) and deploy it to Cloudflare
+    Pages (project walter-library, served only on the instance's library_domain behind Cloudflare Access; the
+    functions shipped in site/functions refuse every other host). No domain or no Cloudflare helper = build only."""
     import subprocess
-    SITE.mkdir(exist_ok=True)
     import shutil
     from . import library_i18n, library_page
+    host = instance.host()
+    build = instance.host_path("site_build") or SITE
+    build.mkdir(parents=True, exist_ok=True)
+    fill = {"__LIBRARY_HOST__": host.get("library_domain") or "", "__CONTROL_ORIGIN__": host.get("control_origin") or ""}
+    shutil.rmtree(build / "functions", ignore_errors=True)
+    for src in (SITE / "functions").rglob("*.js"):          # shipped functions, instance hosts filled in
+        dest = build / src.relative_to(SITE)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        text = src.read_text()
+        for k, v in fill.items():
+            text = text.replace(k, v)
+        dest.write_text(text)
     html = library_page.render(conn, rows(conn), _context(conn))   # French page; v2 (Muse Wonder) rejected 2026-10-14
-    (SITE / "index.html").write_text(library_i18n.to_english(html))   # English by default (Monsieur, 2026-10-14)
-    (SITE / "fr").mkdir(exist_ok=True)                                  # French page at /fr/, same layout
-    (SITE / "fr" / "index.html").write_text(html)
+    (build / "index.html").write_text(library_i18n.to_english(html))   # English by default (2026-10-14)
+    (build / "fr").mkdir(exist_ok=True)                                  # French page at /fr/, same layout
+    (build / "fr" / "index.html").write_text(html)
     for old in ("v1", "en"):
-        shutil.rmtree(SITE / old, ignore_errors=True)
-    if not deploy:
-        return {"built": len(html)}
+        shutil.rmtree(build / old, ignore_errors=True)
+    if not deploy or not CF or not fill["__LIBRARY_HOST__"]:
+        return {"built": len(html), "deployed": False, "detail": [] if deploy is False else ["no library domain or Cloudflare helper for this instance"]}
     r = subprocess.run([CF, "--", "wrangler", "pages", "deploy", ".", "--project-name", "walter-library",
-                        "--branch", "main", "--commit-dirty=true"], cwd=SITE, capture_output=True, text=True,
+                        "--branch", "main", "--commit-dirty=true"], cwd=build, capture_output=True, text=True,
                        timeout=300)
     tail = [line for line in (r.stdout + r.stderr).splitlines() if line.strip()][-1:]
     return {"built": len(html), "deployed": r.returncode == 0, "detail": tail}

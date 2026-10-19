@@ -1,4 +1,4 @@
--- The router never needs the ~1 900 catalogued models: only Monsieur's favourites, the top picks per task and the
+-- The router never needs the ~1 900 catalogued models: only the owner's favourites, the top picks per task and the
 -- constrained (unrestricted) options. The full catalogue stays for watching (new top-3 entrants, overtaken
 -- favourites, price changes) — this view is the short list the router actually chooses from.
 begin;

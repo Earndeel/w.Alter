@@ -39,7 +39,7 @@ Le modèle de décision ne compare jamais de benchmarks : tout est tranché pend
                                      ▼
         ╔══════════════════ WALTER-ROUTER ═════════════════════════╗
         ║ 1. Décision (Clef)        intention → dimensions ✅/🔜    ║
-        ║ 2. Règles de Monsieur     favori, rôle, niveau ✅         ║
+        ║ 2. Règles du propriétaire     favori, rôle, niveau ✅         ║
         ║ 3. Lecture du précalculé  modèle + raisonnement ✅        ║
         ║ 4. Routes d'exécution     Codex → Kie → OpenRouter ✅     ║
         ║ 5. Politique de contexte  profondeur, sources, budget 🔜  ║
@@ -99,17 +99,17 @@ multimodal). **Confidentialité** : un contenu `local_only` n'est jamais envoyé
 Pas de scores continus « reasoning = 0,91 » : les modèles de décision choisissent bien, ils notent mal.
 
 **Escalade** 🔜 : confiance < 0,35 → l'orchestrateur reçoit le *brief* des rôles et tranche ; toujours ambigu →
-Walter demande à Monsieur. **Fast path** 🔜 : « merci », salutations, météo, calcul → R0 sans modèle lourd.
+Walter demande au propriétaire. **Fast path** 🔜 : « merci », salutations, météo, calcul → R0 sans modèle lourd.
 
 ---
 
 ## 6. Sélection (lecture du précalculé)
 
 Ordre de priorité ✅ :
-1. Monsieur nomme un modèle → il prime.
+1. The owner nomme un modèle → il prime.
 2. Contrainte dure (`unrestricted`, poids ouverts) → meilleur modèle qui la respecte.
 3. Rôle / favori de la tâche (vidéo par objectif, image = Sunburst, musique = Suno, voix = Gemini TTS).
-4. Texte général → **niveau** L1 / L2 / L3 (méthode de Monsieur, `docs/TIERS.md`).
+4. Texte général → **niveau** L1 / L2 / L3 (méthode du propriétaire, `docs/TIERS.md`).
 5. Tâche spécialisée → **n°1** du score pondéré multi-benchmarks (pas de n°2/n°3).
 
 Puis **routes d'exécution** ✅ : abonnement Codex → Kie (si disponible et ≤ 1,25 × OpenRouter) → OpenRouter ;
@@ -173,13 +173,13 @@ heure / lieu / agenda seulement si la dimension le demande.
 
 Implémenté dans walter-memory : `walter_memory/triage.py`, table `triage.decisions`, règles
 `/opt/walter-memory/config/triage_rules.json`, timer `walter-memory-triage` (10 min). Reste : livraison (résumé
-Telegram, brouillons de réponse) une fois les règles validées par Monsieur.
+Telegram, brouillons de réponse) une fois les règles validées par le propriétaire.
 
 
 Pour chaque nouvel événement ingéré (message reçu, mail, rendez-vous, photo…), une décision **Clef** sur le
 Context Lite de l'événement (métadonnées seules si `local_only`) : `ignorer` · `mémoriser` (déjà fait) ·
-`prévenir` Monsieur · `préparer` (brouillon de réponse, résumé) · `agir` (toujours avec confirmation pour une action
-externe). Règles de Monsieur (personnes importantes, sujets, horaires de silence) dans `knowledge.json` ; mêmes
+`prévenir` the owner · `préparer` (brouillon de réponse, résumé) · `agir` (toujours avec confirmation pour une action
+externe). Règles du propriétaire (personnes importantes, sujets, horaires de silence) dans `knowledge.json` ; mêmes
 principes que les alertes modèles : jamais de bruit, une ligne claire, numéro court pour répondre.
 
 ---
@@ -197,13 +197,13 @@ principes que les alertes modèles : jamais de bruit, une ligne claire, numéro 
 
 ---
 
-## 12. Notifications (règle de Monsieur, 2026-10-04) ✅
+## 12. Notifications (règle du propriétaire, 2026-10-04) ✅
 
 Seulement ce qui a **changé** depuis le cycle précédent : un **nouveau** modèle qui dépasse un modèle actif ; un
 modèle actif **dégradé** ; une **baisse de prix** qui fait entrer un modèle dans la frontière de Pareto. Un bloc par
 modèle, rôles groupés. Jamais de comparaison statique, de crédit, de podium ou de rapport.
 
-Mise à jour 2026-10-16 (Monsieur) :
+Mise à jour 2026-10-16 :
 - **un message Telegram par nouveauté**, en-tête « W.Alter Router — jj/mm », catégorie du router nommée, prix
   OpenRouter affiché, pas de numéro de référence ;
 - **boutons** au lieu de réponses tapées (Bot API, `alerts.send_with_buttons`, rappel `wr:a|d:<alert_id>` traité par le
@@ -212,9 +212,9 @@ Mise à jour 2026-10-16 (Monsieur) :
 - un challenger n'est retenu que s'il **bat le modèle en place sur le score global** de la tâche (composite pondéré),
   pas sur un seul classement ;
 - **aucun changement de modèle automatique** : un nouveau n°1 est seulement proposé (le modèle en place est épinglé en
-  attendant) ; seul le bouton de Monsieur change le favori (`verdict`) ;
+  attendant) ; seul le bouton du propriétaire change le favori (`verdict`) ;
 - modèles de décision : comparaison Pareto sur 3 axes (AA Decision Index, ms par tâche, coût AA par million de tâches,
-  `decision_pareto.py`) et une **recommandation** écrite pour la stack de Monsieur par le modèle L1 à partir de faits
+  `decision_pareto.py`) et une **recommandation** écrite pour la stack du propriétaire par le modèle L1 à partir de faits
   (`recommend.py`, stockée dans `alerts.evidence.reco`) ;
 - une source ou un classement devenu inaccessible → alerte `board_down` (le dernier relevé reste utilisé 21 jours).
 
@@ -225,14 +225,14 @@ Mise à jour 2026-10-16 (Monsieur) :
 - `models` ✅ — bibliothèque : identités, benchmarks, offres, catalogue, choix, dossiers, préférences, fiches,
   affinités, alertes, état des providers, journal d'exécution, retours.
 - `router` 🔜 — `dimensions` (versionnées), `decisions` (demande, contexte lite, réponse du modèle de décision),
-  `execution_plans`, `outcomes` (réussite, durée, coût, replis, corrections de Monsieur), `corrections` (tâche
+  `execution_plans`, `outcomes` (réussite, durée, coût, replis, corrections du propriétaire), `corrections` (tâche
   corrigée → mémoire des corrections du modèle de décision), `event_triage`.
 
 ---
 
 ## 14. Apprentissage
 
-- ✅ Fiabilité réelle (journal) ; ✅ retours de Monsieur (±3 points par note) ; ✅ rapprochements de noms par l'agent.
+- ✅ Fiabilité réelle (journal) ; ✅ retours du propriétaire (±3 points par note) ; ✅ rapprochements de noms par l'agent.
 - 🔜 Mémoire des corrections : une demande proche d'un cas corrigé reprend la correction avant le modèle de décision.
 - 🔜 Jeu de test qui grandit avec les vraies demandes corrigées ; l'agent de 48 h réécrit les définitions de tâches
   et ne garde un changement que s'il ne fait pas baisser le score.
@@ -243,7 +243,7 @@ Mise à jour 2026-10-16 (Monsieur) :
 ## 15. Garde-fous
 
 Secrets jamais affichés (coffre + `.env` 0600 ; Cloudflare via `walter-cloudflare`) ; classes de confidentialité
-respectées à chaque étape ; aucune bascule de favori sans le bouton de Monsieur ; action externe = confirmation ; dépenses :
+respectées à chaque étape ; aucune bascule de favori sans le bouton du propriétaire ; action externe = confirmation ; dépenses :
 abonnement d'abord, Kie, OpenRouter en dernier.
 
 ---
@@ -254,11 +254,11 @@ abonnement d'abord, Kie, OpenRouter en dernier.
 |---|---|---|
 | **V1 — Plan** | Dimensions v1 dans Clef ; ExecutionPlan complet ; schéma `router` (décisions, plans, résultats) ; fast path ; escalade | 100 % des requêtes routées produisent un plan tracé ; éval ≥ 95 % sur 50 demandes |
 | **V2 — Entrée** | Routeur avant le modèle Hermes (middleware, modèle par tour dans Codex, test raisonnement chiffré) ; politique de contexte branchée sur walter-memory | Une demande simple ne passe plus par Sol ; contexte modulé visible dans la trace |
-| **V3 — Environnement** | Tri des événements avec règles de Monsieur ; préparation de brouillons | Aucune notification inutile sur une semaine ; Monsieur valide les règles |
+| **V3 — Environnement** | Tri des événements avec règles du propriétaire ; préparation de brouillons | Aucune notification inutile sur une semaine ; The owner valide les règles |
 | **V4 — Maintenance pilotée** | Agent Luna chef de maintenance + commandes contrôlées ; données de performance OpenRouter | Nouveau modèle documenté avant son entrée dans les classements |
 | **V5 — Pareto personnel** | Mémoire des corrections, jeu de test vivant, coût/réussite réels | Choix ajustés par les résultats réels |
 
-## 17. Décisions ouvertes (à trancher par Monsieur)
+## 17. Décisions ouvertes (à trancher par le propriétaire)
 
 1. Ordre des étapes V1 → V5 (proposition : V1, V2, puis V3 ou V4).
 2. Conversations de l'app Mac (profil `wild`) dans la mémoire, en `local_only` : oui / non.
@@ -277,15 +277,15 @@ depuis le 2026-10-14 (modèle retenu → Mercury Decide gratuit → Clef sur Wor
 lisent les images (aujourd'hui Decider V1.1 27B ; navigation web rapide, tri d'images en masse).
 
 ## Page « bibliothèque » (2026-10-14)
-https://library.walter-ai.cloud — `walter-router library` en page web (Cloudflare Pages `walter-library`, Cloudflare
-Access : e-mail de Monsieur seulement ; les adresses `*.pages.dev` répondent 404). Republiée en fin de cycle 48 h et
+https://the instance library domain (host.json library_domain) — `walter-router library` en page web (Cloudflare Pages `walter-library`, Cloudflare
+Access : e-mail du propriétaire seulement ; les adresses `*.pages.dev` répondent 404). Republiée en fin de cycle 48 h et
 après chaque verdict (`publish-library`).
-Bouton « Lancer le cycle complet » : /api/run → router-control.walter-ai.cloud (Access, jeton de service) →
+Bouton « Lancer le cycle complet » : /api/run → the instance control host (host.json control_origin) (Access, jeton de service) →
 `walter-router-control` (127.0.0.1:8896, HMAC) → `walter-router-refresh.service`. Refus si un cycle tourne ou a démarré
 il y a moins de 10 minutes.
 
 ## Abonnements (2026-10-14) — information seulement
-Déclarés par Monsieur dans `config/subscriptions.json` : ChatGPT Plus (20 $, via Codex) et Claude Pro (20 $, Claude
+Déclarés par le propriétaire dans `config/subscriptions.json` : ChatGPT Plus (20 $, via Codex) et Claude Pro (20 $, Claude
 Code). Onglet 💳 de la bibliothèque, deux sources seulement : notre mesure (compteur hebdo réel pour ChatGPT, estimé
 pour Claude ; tokens réellement consommés valorisés au prix API ; capacité mesurée par point de compteur) et les
 valeurs publiées par SemiAnalysis. Aucun effet sur le routage ni sur les niveaux.

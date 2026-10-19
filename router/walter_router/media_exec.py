@@ -1,8 +1,8 @@
 """Direct media generation (image, video, music, voice) on the model the router picked.
 
-Flow: decision (role by objective, Monsieur's favourite) -> mode (t2i/i2i/t2v/i2v/r2v) -> prompt rewritten by the
+Flow: decision (role by objective, the owner's favourite) -> mode (t2i/i2i/t2v/i2v/r2v) -> prompt rewritten by the
 economic text tier following the model's prompt style -> optional workflow (Seedance premium: a reference still is
-generated first with the image favourite) -> provider in Monsieur's order (Kie when available and not more than
+generated first with the image favourite) -> provider in the owner's order (Kie when available and not more than
 25 % dearer than OpenRouter, OpenRouter otherwise; a UI-only route such as Flow is returned as manual unless a paid
 fallback is allowed) -> submit, poll, download -> models.exec_log.
 
@@ -24,15 +24,16 @@ from urllib.request import Request, urlopen
 
 from . import collect, execution
 from . import select as sel
+from . import instance
 
 CONFIG = Path(__file__).resolve().parent.parent / "config"
-OUT_DIR = Path("/root/.hermes/generated/walter-router")
+OUT_DIR = instance.hermes_home() / "generated" / "walter-router"
 UA = execution.UA
 KIE = "https://api.kie.ai"
 OPENROUTER = "https://openrouter.ai/api/v1"
 KIE_USD_PER_CREDIT = 0.005          # 6 credits = 0.03 $ (Sunburst 1K, 2026-10-02)
 TIMEOUTS = {"image": 360, "video": 1200, "music": 600, "audio": 300}
-HERMES = Path("/root/.hermes/hermes-agent/venv/bin/hermes")
+HERMES = instance.hermes_bin()
 
 
 def _models() -> dict:
@@ -102,7 +103,7 @@ def coerce(path: str, params: dict) -> dict:
 # --- prompt crafting (economic tier) --------------------------------------------------------------------
 
 def craft_prompt(conn, request: str, style: str | None) -> str:
-    """Rewrite Monsieur's request in the model's prompt style with the economic text tier (L1, via Hermes).
+    """Rewrite the owner's request in the model's prompt style with the economic text tier (L1, via Hermes).
     Falls back to the request itself."""
     if not style:
         return request
@@ -113,14 +114,13 @@ def craft_prompt(conn, request: str, style: str | None) -> str:
                       if r.get("probe_ok") is not False), None)
         if not route:
             return request
-        q = (f"Réécris cette demande de Monsieur en prompt pour un modèle génératif. Consigne de style : {style}\n"
+        q = (f"Réécris cette demande de {instance.owner()} en prompt pour un modèle génératif. Consigne de style : {style}\n"
              f"Réponds UNIQUEMENT par le prompt final, sans guillemets ni commentaire.\n\nDemande : {request}")
         cmd = [str(HERMES), "chat", "-q", q, "--oneshot", "-Q", "--provider", route["hermes_provider"], "-m",
                route["model"], "-t", "memory", "--max-turns", "1", "--source", "walter-router-prompt"]
         import os
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=180,
-                             env={**os.environ, "HOME": "/root", "HERMES_HOME": "/root/.hermes",
-                                  "WALTER_ROUTER_CHILD": "1"})
+                             env=instance.child_env(WALTER_ROUTER_CHILD="1"))
         lines = [ln for ln in re.sub(r"\x1b\[[0-9;]*m", "", out.stdout).splitlines()
                  if ln.strip() and not ln.startswith(("session_id:", "⚠", "Warning:")) and "hermes doctor" not in ln]
         text = "\n".join(lines).strip().strip('"')
@@ -141,7 +141,7 @@ def openrouter_id(conn, model_id: str) -> str | None:
 
 def choose_provider(conn, model_id: str, interface: str, resolution: str | None, has_kie_path: bool,
                     or_id: str | None) -> list[str]:
-    """Monsieur's order for paid media: Kie if it has the model and is not > 25 % dearer than OpenRouter at this
+    """The owner's order for paid media: Kie if it has the model and is not > 25 % dearer than OpenRouter at this
     resolution, then OpenRouter (last when its credit is exhausted). A provider the last probe saw down
     (models.provider_status) goes last."""
     offers = sel.load_offers(conn, sel.latest_snapshots(conn)).get(model_id, [])
@@ -167,7 +167,7 @@ def choose_provider(conn, model_id: str, interface: str, resolution: str | None,
 
 
 def fallback_models(conn, task: str, role: str | None, model_id: str, mode: str | None = None, n: int = 2) -> list[str]:
-    """Models to try when every provider of `model_id` failed (Monsieur, 2026-10-14: one fallback per category).
+    """Models to try when every provider of `model_id` failed (2026-10-14: one fallback per category).
     Declared first (knowledge.json roles.<role>.fallback), then the task's composite order among models that
     have an executor for the mode and a callable price; for a ratio/budget role (watch = dominance) only models at
     most FALLBACK_COST_X times the favourite's price, unless none is."""

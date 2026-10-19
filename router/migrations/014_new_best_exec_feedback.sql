@@ -1,6 +1,6 @@
--- 2026-10-02 (Monsieur): Telegram only when a new model ranks above one of the ACTIVE models ('new_best' for the
+-- 2026-10-02: Telegram only when a new model ranks above one of the ACTIVE models ('new_best' for the
 -- auto-picked #1 of a specialised task, 'challenger' for a favourite, 'tier' for a text tier). Plus the learning
--- loop: every routed execution is logged (reliability) and Monsieur's feedback on a model is kept (scoring).
+-- loop: every routed execution is logged (reliability) and the owner's feedback on a model is kept (scoring).
 begin;
 alter table models.alerts drop constraint if exists alerts_kind_check;
 alter table models.alerts add constraint alerts_kind_check
@@ -30,7 +30,7 @@ create table if not exists models.feedback (
     task        text,
     rating      int not null check (rating between -2 and 2),
     note        text,
-    source      text not null default 'monsieur'
+    source      text not null default 'owner'
 );
 
 insert into models.schema_migrations (version) values ('014_new_best_exec_feedback') on conflict do nothing;

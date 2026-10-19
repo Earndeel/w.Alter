@@ -1,6 +1,6 @@
 """Walter Router tools for Hermes (plugin; Hermes core is never patched).
 
-walter_route  which model/provider for a task, from Monsieur's favourites and the nightly model database
+walter_route  which model/provider for a task, from the owner's favourites and the nightly model database
               (/opt/walter-router, schema `models`): role by objective, route, workflow, cost, constraints.
 walter_run    runs a text sub-task on the routed model in a separate one-shot Hermes process
               (`hermes chat --oneshot --provider P -m M`, the public CLI — plugin tools receive no parent agent,
@@ -20,8 +20,8 @@ from typing import Any, Mapping
 
 logger = logging.getLogger(__name__)
 
-CLI = os.environ.get("WALTER_ROUTER_CLI", "/opt/walter-router/bin/walter-router")
-HERMES_BIN = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "hermes-agent" / "venv" / "bin" / "hermes"
+CLI = os.environ.get("WALTER_ROUTER_CLI", "walter-router")   # Walter Router command on the PATH
+HERMES_BIN = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes") / "hermes-agent" / "venv" / "bin" / "hermes"
 CHILD_ENV = "WALTER_ROUTER_CHILD"
 ALLOWED_TOOLSETS = ("web", "walter-web", "file", "terminal", "vision", "skills", "code_execution", "memory")
 DEFAULT_TOOLSETS = ["web", "walter-web", "file", "terminal"]
@@ -206,7 +206,7 @@ async def _handle_run(args: Mapping[str, Any], **_: Any) -> str:
                                    "output": text[-30000:]}, ensure_ascii=False)
         tried = {a["provider"] for a in attempts}
         if "openai-codex" not in tried and not (d.get("require") == "unrestricted" or d.get("unrestricted_signals")):
-            # Last resort: Monsieur's ChatGPT subscription (no per-call cost), flagged as a substitution.
+            # Last resort: the owner's ChatGPT subscription (no per-call cost), flagged as a substitution.
             ok, text = await _run_once(LAST_RESORT, prompt_file, toolsets, max_turns, budget)
             attempts.append({"provider": "openai-codex", "model": LAST_RESORT["model"], "ok": ok,
                              "last_resort": True})
@@ -226,11 +226,11 @@ async def _handle_run(args: Mapping[str, Any], **_: Any) -> str:
 ROUTE_SCHEMA = {
     "name": "walter_route",
     "description": (
-        "Which model (and provider) to use for a task, chosen by Walter Router from Monsieur's declared favourites "
+        "Which model (and provider) to use for a task, chosen by Walter Router from the owner's declared favourites "
         "and the nightly benchmark/price database. Call it BEFORE generating an image/video/voice/music or before "
         "delegating any substantial work, and follow its answer: model, provider, route, workflow steps to plan "
         "(e.g. Seedance needs reference images first), cost, warnings. For video the role depends on the objective "
-        "(premium, action, UGC, budget...). Pass Monsieur's request verbatim in `request`; leave `task` empty and "
+        "(premium, action, UGC, budget...). Pass the user's request verbatim in `request`; leave `task` empty and "
         "the intent classifier (Jev) picks task, video objective, level and constraints. Set `task` only to "
         "force it. If the chosen role looks wrong, use the `brief` to pick the right one. Tasks: " + TASK_HELP
     ),
@@ -239,7 +239,7 @@ ROUTE_SCHEMA = {
         "properties": {
             "task": {"type": "string", "enum": TASKS,
                      "description": "Optional: force the task family (otherwise classified from the request)."},
-            "request": {"type": "string", "description": "Monsieur's request, verbatim (French is fine)."},
+            "request": {"type": "string", "description": "The user's request, verbatim (French is fine)."},
             "require": {"type": "string", "enum": ["unrestricted", "open_weights"],
                         "description": "Hard constraint, only when the request needs it."},
             "level": {"type": "string", "enum": ["L1", "L2", "L3"],
@@ -262,7 +262,7 @@ RUN_SCHEMA = {
         "type": "object",
         "properties": {
             "task": {"type": "string", "enum": TASKS, "description": "Optional: force the task family."},
-            "request": {"type": "string", "description": "Monsieur's request verbatim (used for routing)."},
+            "request": {"type": "string", "description": "The user's request verbatim (used for routing)."},
             "goal": {"type": "string", "description": "Complete, self-contained instructions for the sub-agent."},
             "context": {"type": "string", "description": "Facts/files/excerpts the sub-agent needs."},
             "level": {"type": "string", "enum": ["L1", "L2", "L3"]},
@@ -320,14 +320,14 @@ async def _handle_generate(args: Mapping[str, Any], **_: Any) -> str:
 GENERATE_SCHEMA = {
     "name": "walter_generate",
     "description": (
-        "Generate an image, a video, a music track or a voice-over on the model Walter Router picks (Monsieur's "
+        "Generate an image, a video, a music track or a voice-over on the model Walter Router picks (the owner's "
         "favourite for the objective), with the prompt rewritten for that model by the economic text tier and the "
         "model's workflow applied (e.g. Seedance premium: a reference still first). Provider order: Kie when "
-        "available and not much dearer, OpenRouter otherwise. Returns local file paths (send them to Monsieur with "
+        "available and not much dearer, OpenRouter otherwise. Returns local file paths (send them to the user with "
         "MEDIA:<path>), cost and the prompt used. A UI-only choice (Omni via Flow credits) comes back as manual "
-        "unless paid_fallback=true. Pass Monsieur's request verbatim."),
+        "unless paid_fallback=true. Pass the user's request verbatim."),
     "parameters": {"type": "object", "properties": {
-        "request": {"type": "string", "description": "Monsieur's request, verbatim."},
+        "request": {"type": "string", "description": "The user's request, verbatim."},
         "task": {"type": "string", "enum": [t for t in TASKS if t in (
             "text_to_image", "image_edit", "logo", "graphic_design", "text_to_video", "image_to_video",
             "video_edit", "music", "tts")]},
@@ -340,12 +340,12 @@ GENERATE_SCHEMA = {
 
 VERDICT_SCHEMA = {
     "name": "walter_verdict",
-    "description": ("Monsieur's answer to a Walter Router Telegram message (« adopter 1 », « ignorer 2 », "
+    "description": ("The owner's answer to a Walter Router Telegram message (« adopter 1 », « ignorer 2 », "
                     "« adopter 1 action »): adopting a new model pins it for the roles it beats (or only the named "
                     "role); adopting a text tier pins it; ignoring a new #1 keeps the previous model."),
     "parameters": {"type": "object", "properties": {
         "alert_id": {"type": "integer", "description": "The short number shown in the message (1, 2, 3…)."},
-        "role": {"type": "string", "description": "Optional role named by Monsieur (premium, action, ugc, budget, "
+        "role": {"type": "string", "description": "Optional role named by the owner (premium, action, ugc, budget, "
                                                   "default, L1, L2, L3)."},
         "decision": {"type": "string", "enum": ["adopter", "ignorer"]},
         "note": {"type": "string"}}, "required": ["alert_id", "decision"]},
@@ -353,7 +353,7 @@ VERDICT_SCHEMA = {
 
 FEEDBACK_SCHEMA = {
     "name": "walter_feedback",
-    "description": ("Record Monsieur's opinion of a model's result (e.g. « ce rendu est nul », « super ce modèle »): "
+    "description": ("Record the owner's opinion of a model's result (e.g. « ce rendu est nul », « super ce modèle »): "
                     "rating -2..2, on the model of the last routed run unless he names one. It moves that model's "
                     "score for the task (+/-3 points per rating, capped) — benchmarks stay, his experience counts."),
     "parameters": {"type": "object", "properties": {
@@ -370,22 +370,22 @@ def _available() -> bool:
 
 
 ROUTING_RULE = (
-    "Walter Router — choix des modèles (règle de Monsieur). Pour générer une image, une vidéo, une musique ou une "
-    "voix, utilise walter_generate avec la demande de Monsieur mot pour mot (via tool_call si l'outil est différé) : "
+    "Walter Router — choix des modèles (règle du propriétaire). Pour générer une image, une vidéo, une musique ou une "
+    "voix, utilise walter_generate avec la demande de l'utilisateur mot pour mot (via tool_call si l'outil est différé) : "
     "il choisit le modèle favori selon l'objectif, rédige le prompt et renvoie les fichiers. Avant de confier un "
     "travail texte important (analyse longue, code, comparatif) à un sous-agent, utilise walter_route / walter_run. Ses favoris "
     "et rôles (premium, action, UGC, budget…) priment sur tout skill spécifique à un modèle ; un skill sert "
     "ensuite à exécuter le modèle choisi. Pour exécuter une sous-tâche texte sur le modèle choisi, utilise "
-    "walter_run. Si Monsieur nomme lui-même un modèle, son choix prime. Quand il répond « adopter N » ou "
+    "walter_run. Si l'utilisateur nomme lui-même un modèle, son choix prime. Quand il répond « adopter N » ou "
     "« ignorer N » à une alerte Walter Router, appelle walter_verdict ; quand il juge le résultat d'un modèle "
     "(« nul », « parfait »…), enregistre-le avec walter_feedback."
 )
 
 
 def _home_chat() -> str | None:
-    """Monsieur's Telegram chat (gateway home channel); only he may press the buttons."""
+    """The owner's Telegram chat (gateway home channel); only they may press the buttons."""
     m = re.search(r"^TELEGRAM_HOME_CHANNEL:\s*'?(-?\d+)'?\s*$",
-                  (Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "config.yaml").read_text(), re.M)
+                  (Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes") / "config.yaml").read_text(), re.M)
     return m.group(1) if m else os.environ.get("TELEGRAM_HOME_CHANNEL")
 
 

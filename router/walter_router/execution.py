@@ -39,7 +39,7 @@ def _runnable(offer: dict) -> tuple[str, str, str] | None:
     return (hp, offer["offer_key"], offer["provider"]) if hp else None
 
 
-# Monsieur's fallback order (2026-10-02): subscription (Codex) first, then Kie if available and not dearer than
+# the owner's fallback order (2026-10-02): subscription (Codex) first, then Kie if available and not dearer than
 # OpenRouter by more than KIE_MAX_PREMIUM, then OpenRouter as the last resort. Arnict (unrestricted) ranks with Kie.
 PROVIDER_RANK = {"kie": 1, "kie-codex": 1, "arnict": 1, "openrouter": 3}
 KIE_MAX_PREMIUM = 1.25
@@ -57,7 +57,7 @@ def reliability(conn, provider: str, model: str) -> dict:
 
 
 def routes(conn, model_id: str, variant: str = "", preferred: str | None = None) -> list[dict]:
-    """Every way Hermes can run this chat model, in Monsieur's order: subscription, Kie (if not much dearer),
+    """Every way Hermes can run this chat model, in the owner's order: subscription, Kie (if not much dearer),
     OpenRouter last. Providers whose last probe failed, or that failed most recent real runs, go to the end."""
     snaps = sel.latest_snapshots(conn)
     status = {r["provider"]: r for r in conn.execute("select * from models.provider_status")}

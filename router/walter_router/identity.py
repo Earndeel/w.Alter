@@ -9,6 +9,8 @@ import json
 import re
 from pathlib import Path
 
+from . import instance
+
 TIERS = ("non-reasoning", "minimal", "low", "medium", "high", "xhigh", "max")
 VENDOR_PREFIXES = ("google-", "openai-", "anthropic-", "meta-", "microsoft-", "alibaba-", "bytedance-",
                    "black-forest-labs-")
@@ -26,7 +28,7 @@ def canon(base: str) -> str:
     return _DOT_ZERO.sub(r"\1", _GLUED.sub(r"\1-\2", base))
 
 
-AUTO_ALIASES = Path(__file__).resolve().parent.parent / "config" / "aliases_auto.json"
+AUTO_ALIASES = instance.config_path("aliases_auto.json")   # the instance's learned links, else the shipped ones
 
 
 def _load_manual() -> dict:

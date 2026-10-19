@@ -1,49 +1,16 @@
 {
-  "_doc": "Monsieur's subscriptions (declared by him), for information only: no routing effect (Monsieur, 2026-10-14). Shown on the library page with two sources only: our own measurement (meters + the tokens W.Alter's runtimes really used, priced at list API rates) and SemiAnalysis' published plan values. Readings go to models.subscription_usage.",
+  "_doc": "the owner's subscriptions (declared by him), for information only: no routing effect (2026-10-14). Shown on the library page with two sources only: our own measurement (meters + the tokens W.Alter's runtimes really used, priced at list API rates) and SemiAnalysis' published plan values. Readings go to models.subscription_usage.",
   "semianalysis": {
     "report": "Anthropic Subscriptions Offer 5x+ More Value Than OpenAI",
     "date": "2026-10-05",
     "url": "https://newsletter.semianalysis.com/p/anthropic-subscriptions-offer-5x",
     "definition": "API-equivalent value = the plan's full monthly usage limit priced at first-party list API rates.",
-    "workload_mix": {"cache_read": 0.966, "cache_write": 0.026, "input": 0.004, "output": 0.003}
-  },
-  "subscriptions": [
-    {
-      "id": "openai-plus",
-      "vendor": "OpenAI",
-      "plan": "ChatGPT Plus",
-      "price_usd_month": 20,
-      "declared": "2026-10-14",
-      "execution": "Hermes (Codex)",
-      "meter": {"source": "codex_usage_api", "note": "Hermes agent/account_usage.py (Codex usage endpoint, read-only). Plus has a weekly window only."},
-      "usage_sources": ["hermes_codex", "codex_cli"],
-      "semianalysis_values": [
-        {"model_id": "gpt-6-1-sol", "usd_month": 211},
-        {"model_id": "gpt-6-astra", "usd_month": 162}
-      ]
-    },
-    {
-      "id": "anthropic-pro",
-      "vendor": "Anthropic",
-      "plan": "Claude Pro",
-      "price_usd_month": 20,
-      "since": "2026-09-26",
-      "declared": "2026-10-14",
-      "execution": "Claude Code",
-      "models": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
-      "excluded": {"claude-fable-5-1": "not included in Pro (usage credits at API price)"},
-      "meter": {
-        "source": "estimate_claude_code_logs",
-        "note": "No Claude login on the VM: weekly meter estimated from the Claude Code transcripts (~/.claude/projects). Units = input + cache writes + 5 x output, cache reads ~free (SemiAnalysis: no meter movement after 500M cache-read tokens). Rolling 7 days. Sessions run outside the VM are not seen.",
-        "weights": {"input": 1, "cache_write": 1, "cache_read": 0, "output": 5},
-        "weekly_capacity_units": 30700000,
-        "calibrated": false,
-        "capacity_basis": "prior from SemiAnalysis Pro / Opus 5.5 (1,178 $/month on their mix = 76.8 M cache writes + 11.8 M input + 8.9 M output per month = 30.7 M units/week). `walter-router subscriptions calibrate anthropic-pro <weekly %>` with the % shown on claude.ai replaces it."
-      },
-      "usage_sources": ["claude_code"],
-      "semianalysis_values": [
-        {"model_id": "claude-opus-5-5", "usd_month": 1178}
-      ]
+    "workload_mix": {
+      "cache_read": 0.966,
+      "cache_write": 0.026,
+      "input": 0.004,
+      "output": 0.003
     }
-  ]
+  },
+  "subscriptions": []
 }

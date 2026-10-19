@@ -1,4 +1,4 @@
--- Self-describing schema (Monsieur, 2026-10-17: « que tout soit bien documenté »). Reference: docs/DATA.md.
+-- Self-describing schema (2026-10-17: « que tout soit bien documenté »). Reference: docs/DATA.md.
 comment on schema models is 'Walter Router: model catalogue, leaderboards, prices, providers and per-task choice. Written only by /opt/walter-router (and walter-llm into exec_log). Reference: /opt/walter-router/docs/DATA.md';
 
 comment on table models.snapshots is 'One fetch of a source (kind = aa, mm, da, arena, bridgebench, aa_decision, aa_stt, agentset, mteb, openrouter, kie, codex, hermes_providers, declared); raw document kept, deduplicated by sha256, 30-day retention, latest per kind always kept';
@@ -9,10 +9,10 @@ comment on table models.offers is 'Callable, priced offers per snapshot: provide
 comment on table models.provider_status is 'Last live 5-token probe per provider (OpenRouter credit in detail); a failed provider goes last in routes';
 comment on table models.tasks is 'Router tasks: interface, default objective, intent_hint for the classifier, internal (module postes never offered to the classifier), requirements, consumers';
 comment on table models.task_benchmarks is 'Boards that rank each task and their weights (scoring.composite); shown under each task on the library page';
-comment on table models.preferences is 'Monsieur''s choices per task / role: objective, pinned model/variant/provider, role label, description and signals, watch. A change of favourite only through his verdict';
+comment on table models.preferences is 'the owner''s choices per task / role: objective, pinned model/variant/provider, role label, description and signals, watch. A change of favourite only through their verdict';
 comment on table models.profiles is 'What a model is for (knowledge.json): strengths, weaknesses, workflow, effort, access and cost notes';
-comment on table models.affinities is 'Close calls: Monsieur''s preferred model inside the tie margin (knowledge.json)';
-comment on table models.feedback is 'Monsieur''s verdicts on a model (-2..2), +/-3 composite points each, capped +/-9';
+comment on table models.affinities is 'Close calls: the owner''s preferred model inside the tie margin (knowledge.json)';
+comment on table models.feedback is 'the owner''s verdicts on a model (-2..2), +/-3 composite points each, capped +/-9';
 comment on table models.runs is 'One row per refresh: status and summary (sources, changes, alerts, notifications)';
 comment on table models.selection is 'Per refresh, task, level (best, value, L1-L3, frontier...) and rank: chosen model, variant, quality, real cost, provider, offer, subscription, reasons';
 comment on table models.dossiers is 'Per refresh and task: the JSON the router reads (boards and weights, roles, candidates with per-board evidence, routes, prices, rules)';

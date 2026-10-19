@@ -1,4 +1,4 @@
-"""Decision models on three axes (Monsieur, 2026-10-16): intelligence (AA Decision Index, higher), speed (median
+"""Decision models on three axes (2026-10-16): intelligence (AA Decision Index, higher), speed (median
 time per task, lower) and price (AA cost per 1M tasks, lower; real price = the Decisions-API offer per M input
 tokens, 0 for the free routes we use). A model is Pareto-optimal when no other model is at least as good on all three
 and strictly better on one. Used by the notification of a new decision model and by the library page.

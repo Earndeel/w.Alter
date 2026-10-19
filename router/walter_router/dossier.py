@@ -1,5 +1,5 @@
 """One JSON dossier per task, rebuilt at every refresh (models.dossiers): everything the router / orchestrator
-needs to decide in a single read — Monsieur's roles and model fiches first, then the weighted candidates with their
+needs to decide in a single read — the owner's roles and model fiches first, then the weighted candidates with their
 evidence, prices, access and constraints, and the decision rules in plain words."""
 from __future__ import annotations
 
@@ -7,15 +7,16 @@ import json
 from typing import Any
 
 from . import catalog, knowledge
+from . import instance
 
 RULES = [
-    "1. Les favoris de Monsieur priment : choisir le rôle qui correspond à l'objectif de la demande (signaux), "
+    "1. Les favoris de {owner} priment : choisir le rôle qui correspond à l'objectif de la demande (signaux), "
     "sinon le rôle « default ».",
     "2. Sans favori : prendre le premier candidat (score composite pondéré multi-benchmarks).",
-    "3. Égalité (écart dans la marge) : préférence de Monsieur, puis accès par abonnement (Codex, crédits Flow).",
+    "3. Égalité (écart dans la marge) : préférence de {owner}, puis accès par abonnement (Codex, crédits Flow).",
     "4. Workflow d'un modèle (références, prompt adapté…) : le planifier avant de générer.",
     "5. Demande sans restriction : uniquement un modèle 'unrestricted' (ou 'permissive' avec avertissement).",
-    "6. Ne jamais changer un favori sans l'accord de Monsieur.",
+    "6. Ne jamais changer un favori sans l'accord de {owner}.",
 ]
 
 
@@ -71,11 +72,11 @@ def build(conn, task: str, run_id: int, n: int = 8) -> dict[str, Any]:
             "boards": [{"board": f'{b["benchmark"]}:{b["bench_task"]}', "weight": b["weight"],
                         "primary": b["is_primary"]} for b in boards],
             "requirements": t.get("requirements") or {}, "consumers": t.get("consumers"),
-            "roles": roles, "candidates": cands, "ranking": ranking, "levels": levels, "rules": RULES, "run_id": run_id}
+            "roles": roles, "candidates": cands, "ranking": ranking, "levels": levels, "rules": [r.format(owner=instance.owner()) for r in RULES], "run_id": run_id}
 
 
 def _ranking(conn, t: dict, pinned: set[str], n: int) -> list[dict]:
-    """Every measured model of the task in composite order (callable or not), Monsieur's pinned models always shown
+    """Every measured model of the task in composite order (callable or not), the owner's pinned models always shown
     with their place: what a proposal would compare. `candidates` keeps the selection (#1 only for specialised tasks)."""
     from . import scoring
     from . import select as sel

@@ -1,6 +1,6 @@
 -- Walter Router — model catalogue the router picks from (schema `models` in hindsight-pg).
 -- Truth = raw provider/leaderboard snapshots; everything else is derived and rebuilt on each refresh,
--- except Monsieur's preferences and alert verdicts, which are never overwritten by automation.
+-- except the owner's preferences and alert verdicts, which are never overwritten by automation.
 begin;
 create schema if not exists models;
 
@@ -85,7 +85,7 @@ create table if not exists models.tasks (
     description       text
 );
 
--- Monsieur's preferences: always win over computed choices. Written only by an explicit declaration.
+-- The owner's preferences: always win over computed choices. Written only by an explicit declaration.
 create table if not exists models.preferences (
     task             text primary key references models.tasks,
     objective        text check (objective in ('value', 'best_available')),

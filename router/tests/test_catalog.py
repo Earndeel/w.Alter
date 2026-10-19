@@ -131,7 +131,7 @@ def test_new_best_for_a_specialised_task_is_the_only_kind_of_news(conn):
                         values (%s, 'coding', 'best', %s, %s, %s, %s)""", (new_run, rank, mid, mid, q))
     conn.execute("delete from models.preferences where task = 'coding'")
     assert alerts.new_best(conn, new_run, {"new": {}, "nerf": {}, "price_drop": {}}) == []  # unchanged: silent
-    # …but never a silent switch (2026-10-16): the model in use is pinned until Monsieur decides
+    # …but never a silent switch (2026-10-16): the model in use is pinned until the owner decides
     assert conn.execute("select pinned_model_id from models.preferences where task = 'coding'").fetchone()[
         "pinned_model_id"] == old
     conn.execute("delete from models.preferences where task = 'coding'")

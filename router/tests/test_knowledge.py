@@ -44,7 +44,7 @@ def test_unrestricted_video_request_is_flagged_on_a_permissive_model(conn):
     assert d["model_id"] == "minimax-h3" and d["warning"]
 
 
-def test_tie_goes_to_monsieurs_affinity(conn):
+def test_tie_goes_to_the_owners_affinity(conn):
     rows = [{"model_id": "mimo-v2-6-flash", "quality": 1453.7, "quality_unit": "Arena Elo", "subscription": None},
             {"model_id": "gpt-6-luna", "quality": 1443.8, "quality_unit": "Arena Elo", "subscription": "codex"}]
     out = knowledge.tie_break(conn, "general", rows)

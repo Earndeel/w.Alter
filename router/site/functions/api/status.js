@@ -6,7 +6,7 @@ async function relay(env, method, path) {
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(ts + method + path));
   const sig = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const res = await fetch("https://router-control.walter-ai.cloud" + path, {
+  const res = await fetch("__CONTROL_ORIGIN__" + path, {
     method,
     headers: { "User-Agent": "Mozilla/5.0 (walter-library relay)", "CF-Access-Client-Id": env.CF_ACCESS_CLIENT_ID, "CF-Access-Client-Secret": env.CF_ACCESS_CLIENT_SECRET,
                "X-Walter-Ts": ts, "X-Walter-Sig": sig },
