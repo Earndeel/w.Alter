@@ -274,8 +274,9 @@ def doctor_report() -> dict[str, Any]:
         import os as _os
         import sys as _sys
 
-        _sys.path.insert(0, "/root/.hermes/hermes-agent")
-        _os.environ.setdefault("HERMES_HOME", "/root/.hermes")
+        _hermes_home = _os.environ.get("HERMES_HOME") or _os.path.expanduser("~/.hermes")
+        _sys.path.insert(0, _os.path.join(_hermes_home, "hermes-agent"))
+        _os.environ.setdefault("HERMES_HOME", _hermes_home)
         from hermes_cli.config import load_config as _lc
         from hermes_cli.tools_config import _get_platform_tools as _gpt
         from hermes_cli.tools_config import _get_plugin_toolset_keys as _ptk

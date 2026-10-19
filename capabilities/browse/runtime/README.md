@@ -25,15 +25,15 @@ JSON-first, endpoint-agnostic extraction for dynamic pages.
 ## Run unit tests
 
 ```bash
-cd /root/.hermes/skills/research/universal-web-extraction-router/scripts
-/root/.venv/scrapling/bin/python -m unittest -v
+cd ~/.hermes/skills/research/universal-web-extraction-router/scripts
+~/.venv/scrapling/bin/python -m unittest -v
 ```
 
 ## Run the live Trip.com probe
 
 ```bash
-cd /root/.hermes/skills/research/universal-web-extraction-router/scripts
-/root/.venv/scrapling/bin/python run_live_trip.py
+cd ~/.hermes/skills/research/universal-web-extraction-router/scripts
+~/.venv/scrapling/bin/python run_live_trip.py
 ```
 
 The live report is written to `/tmp/universal-trip-extraction-report.json`. It stores response metadata and extracted fields, not cookies or complete response bodies.
@@ -44,8 +44,8 @@ The local panel exposes reproducible fixtures for several needs and a real
 network mode for the validated flight scenario:
 
 ```bash
-cd /root/.hermes/skills/research/universal-web-extraction-router/scripts
-/root/.venv/scrapling/bin/python panel_server.py
+cd ~/.hermes/skills/research/universal-web-extraction-router/scripts
+~/.venv/scrapling/bin/python panel_server.py
 ```
 
 Open `http://127.0.0.1:8766` and choose a profile:
@@ -80,7 +80,7 @@ URLs.
 The stable Hermes entrypoint is:
 
 ```bash
-/root/.hermes/bin/universal-scraper --url 'https://example.com/api' \
+~/.hermes/bin/universal-scraper --url 'https://example.com/api' \
   --expected-fields '{"title":["title","headline"]}' \
   --required-field title --mode auto --pretty
 ```
@@ -88,7 +88,7 @@ The stable Hermes entrypoint is:
 For the Trip.com hotel profile, the live URL can be tested directly:
 
 ```bash
-/root/.hermes/bin/universal-scraper \
+~/.hermes/bin/universal-scraper \
   --url 'https://www.trip.com/hotels/list?city=359&searchWord=Bangkok' \
   --profile hotel-availability --mode auto --pretty
 ```
@@ -96,7 +96,7 @@ For the Trip.com hotel profile, the live URL can be tested directly:
 For a detail page, pass the actual hotel URL supplied by Trip.com:
 
 ```bash
-/root/.hermes/bin/universal-scraper \
+~/.hermes/bin/universal-scraper \
   --url 'https://www.trip.com/hotels/detail/?cityId=...&hotelId=...' \
   --profile hotel-detail --mode auto --pretty
 ```

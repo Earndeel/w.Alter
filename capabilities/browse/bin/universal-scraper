@@ -1,4 +1,5 @@
-#!/root/.venv/scrapling/bin/python
+#!/bin/sh
+''''exec "${WALTER_SCRAPLING_PYTHON:-$HOME/.venv/scrapling/bin/python}" "$0" "$@" # '''
 """Walter Browse CLI; no harness boot or imports."""
 import sys
 from pathlib import Path

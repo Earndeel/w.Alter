@@ -25,7 +25,8 @@
     "runtime/search_lite.py"
   ],
   "backup_paths": [
-    "."
+    ".",
+    "@instance/state/browse"
   ],
   "interfaces": [
     "shared request contract",
@@ -56,7 +57,7 @@
     "purpose": "Rechercher, extraire et gérer les parcours web avec un moteur commun.",
     "target_root": "browse",
     "config_paths": [
-      "config"
+      "@instance/bootstrap/browse-search.env"
     ],
     "permissions": [
       "sessions de navigateur gérées",
