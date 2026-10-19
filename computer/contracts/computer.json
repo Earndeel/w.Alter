@@ -25,9 +25,10 @@
   ],
   "backup_paths": [
     ".",
-    "/root/walter-computer-use",
-    "/root/.config/walter-device-node",
-    "/etc/tmpfiles.d/walter-computer.conf"
+    "~/walter-computer-use",
+    "~/.config/walter-device-node",
+    "/etc/tmpfiles.d/walter-computer.conf",
+    "@instance/config/computer"
   ],
   "interfaces": [
     "OperatorSessions",
@@ -58,9 +59,9 @@
     "purpose": "Observer et manipuler un appareil avec des permissions et cibles explicites.",
     "target_root": "computer",
     "config_paths": [
-      "/root/.config/walter-device-node",
-      "config.json",
-      "gateway.env"
+      "~/.config/walter-device-node",
+      "config/config.json",
+      "@instance/config/computer/config.json"
     ],
     "permissions": [
       "read/input/foreground/pixels/vision accordés par le host",

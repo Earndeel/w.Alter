@@ -15,10 +15,14 @@ bounded recovery, observations, and the CuaDriver protocol port.
   backend extension registration. The original tool name/schema is retained and
   atomic Walter actions are appended. `allow_tool_override` is an explicit
   operator-owned setting. No Hermes checkout files are modified.
-- `/root/walter-computer-use`: declared device-node transport dependency, not a
-  harness dependency. Its SSH shim validates the enrolled device route and keys.
-  `/root/.config/walter-device-node/remote-cua.json` and the key files it references
-  must be included in encrypted backup coverage.
+- Device node (`~/walter-computer-use` of the service user): declared transport
+  dependency, not a harness dependency. Its SSH shim validates the enrolled device
+  route and keys. `~/.config/walter-device-node/remote-cua.json` and the key files
+  it references must be included in encrypted backup coverage.
+- Configuration: `config/config.json` is the shipped default (no device, vision
+  off). The instance's `config/computer/config.json` (`walter instance config
+  computer config.json`, or `WALTER_COMPUTER_CONFIG`) declares its device, driver
+  and the walter-llm token file; nothing personal stays in this module.
 
 The `capture`, `input`, `parse`, and basic type code originates in the installed
 NousResearch Hermes CuaDriver adapter and is now pinned module-owned source, with

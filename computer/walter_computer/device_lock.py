@@ -11,7 +11,8 @@ DEFAULT_LOCK = Path('/run/walter-computer/main-mac.lock')
 
 
 def configured_lock_path():
-    config_path = Path('/opt/walter-computer/config.json')
+    from .config import default_config_path
+    config_path = default_config_path()
     if config_path.exists():
         return Path(json.loads(config_path.read_text()).get('device_lock_path', str(DEFAULT_LOCK)))
     return DEFAULT_LOCK
