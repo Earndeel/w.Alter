@@ -1,11 +1,10 @@
 {
   "id": "soul",
-  "root": "/opt/walter-soul",
   "anchors": [
-    "/opt/walter-soul/bin/walter-soul",
-    "/opt/walter-soul/contracts/soul.json",
-    "/opt/walter-soul/identity.md",
-    "/opt/walter-soul/rules.md"
+    "bin/walter-soul",
+    "contracts/soul.json",
+    "identity.md",
+    "rules.md"
   ],
   "requires": [],
   "external": [],
@@ -15,7 +14,7 @@
   ],
   "core_paths": [],
   "backup_paths": [
-    "/opt/walter-soul",
+    ".",
     "/opt/walter-profiles",
     "/root/.hermes/memories"
   ],
@@ -40,9 +39,9 @@
     "owner": "soul",
     "kind": "foundation",
     "purpose": "Posséder l’identité commune et générer les profils des clients.",
-    "target_root": "/walter/soul",
+    "target_root": "soul",
     "config_paths": [
-      "/opt/walter-soul/rules.md"
+      "rules.md"
     ],
     "permissions": [
       "écriture des profils générés"
