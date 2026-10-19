@@ -50,16 +50,18 @@ always_active = ["drafts"]   # judged one by one, never destructive: applied on 
 max_moves = 400            # organise: folder moves per run (names never change)
 max_domain_size = 30       # organise: a domain larger than this (or 'misc') triggers a re-organisation
 
-# Model postes: ordered routes, first that answers wins. via = codex (W.Alter's own Codex subscription session: no
-# per-token cost, first choice everywhere) | openrouter (walter_memory.llm: privacy guard, budget, ledger — fallback only).
-# The judge is GPT through Codex too; its independence from the editor comes from the scripted checks (lossless,
-# retrieval) it complements, and from a different model (luna) than the editor (sol).
+# Model postes: ordered routes, first that answers wins. via = router (2026-10-16, Monsieur: every module goes through
+# Walter Router): `level` = one of Monsieur's text tiers, so the model follows the tier he adopts; Codex routes run in
+# W.Alter's own Codex session (no per-token cost), paid ones through the walter-llm gateway. The static codex /
+# openrouter routes after it only answer when the router is unreachable.
+# The judge's independence from the editor comes from the scripted checks (lossless, retrieval) it complements, and
+# from a different tier (L1, Luna today) than the editor (L2, Sol today).
 [postes.editor]
-routes = [{ via = "codex", model = "gpt-6.1-sol", effort = "medium" },
-          { via = "openrouter", model = "openai/gpt-6.1-sol", budget = "recurring" }]
+routes = [{ via = "router", level = "L2", budget = "recurring" },
+          { via = "codex", model = "gpt-6.1-sol", effort = "medium" }]
 [postes.indexer]
-routes = [{ via = "codex", model = "gpt-6-luna", effort = "low" },
-          { via = "openrouter", model = "openai/gpt-6-luna", budget = "backfill" }]
+routes = [{ via = "router", level = "L1", budget = "backfill" },
+          { via = "codex", model = "gpt-6-luna", effort = "low" }]
 [postes.judge]
-routes = [{ via = "codex", model = "gpt-6-luna", effort = "medium" },
-          { via = "openrouter", model = "anthropic/claude-haiku-5.5", budget = "recurring" }]
+routes = [{ via = "router", level = "L1", budget = "recurring" },
+          { via = "codex", model = "gpt-6-luna", effort = "medium" }]
