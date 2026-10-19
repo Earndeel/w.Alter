@@ -8,7 +8,7 @@ snapshot_dir = "/opt/walter-skills/.cache/snapshot"   # last-good registry snaps
 [retrieval]
 encoder = "minishlab/potion-multilingual-128M"        # chosen on the bench (MiniLM: same quality, 4x slower)
 learner = "hgb"                                         # fusion trained on judged + implicit labels
-model_dir = "/opt/walter-voice-memory/models"           # shared local embedding models
+model_dir = "/opt/walter-memory/models/embeddings"      # shared local embedding models, owned by walter-memory
 cache_dir = "/opt/walter-skills/.cache/embeddings"
 
 [policy]
