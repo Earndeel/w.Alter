@@ -122,7 +122,9 @@ def _beeper_get(path: str, token: str, **params) -> dict:
 
 
 def from_messages(terms: list[str], since: datetime, token: str | None = None) -> list[dict]:
-    token = token or subprocess.run(["vault", "get", "beeper/token"], capture_output=True, text=True, check=True).stdout.strip()
+    if not token:
+        from . import grants
+        token = grants.access("beeper")   # the owner's Beeper, through Walter's grant
     found = []
     d = _beeper_get("/v1/chats", token, limit=40)
     for chat in d.get("items") or []:
