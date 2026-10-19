@@ -266,6 +266,10 @@ class InterruptionPolicy:
             return InterruptionDecision(
                 "L1", False, True, True, False, "user_active_interference", active
             )
+        if origin is ActionOrigin.AUTONOMOUS and (active is None or presence is None or presence.screen_locked is None):
+            return InterruptionDecision(
+                'L1', False, False, True, False, 'presence_unknown', active
+            )
         return InterruptionDecision(
             "L1", True, collision, False, False,
             "user_active_interference" if collision else None,

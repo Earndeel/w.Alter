@@ -949,7 +949,7 @@ class WalterPolicyMixin:
             png_b64=png_b64,
             app=app or getattr(self, "_last_app", "") or "",
             image_mime_type=image_mime_type,
-            capture_valid=bool(png_b64 and image_mime_type),
+            capture_valid=bool(png_b64 and image_mime_type and not out.get('isError') and payload.get('capture_valid') is not False),
         )
         if png_b64:
             returned_width, returned_height = capture.width, capture.height

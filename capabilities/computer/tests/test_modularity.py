@@ -235,7 +235,7 @@ def test_independent_port_refuses_locked_screen_and_autonomous_collision():
         op.presence=SimpleNamespace(resolve=lambda **kwargs:presence)
         pool=OperatorSessions(lambda:op)
         pool.call('A','capture',{'mode':'ax','app':'Demo','pid':42,'window_id':7},grants={'read','pixels'})
-        result=pool.call('A','click',{'element':1},grants={'read','input'})
+        result=pool.call('A','click',{'element':1},grants={'read','input'},origin=origin)
         assert result['code']==code
         assert not any(name=='click' for name,_ in op._session.calls)
         pool.close()

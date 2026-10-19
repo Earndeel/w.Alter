@@ -7,6 +7,7 @@ import stat
 from .operator import Operator
 from .policy import _configured_driver_command
 from .transport import DriverSession
+from .vision import GatewayVisionSensor
 
 DEFAULT_CONFIG = Path('/opt/walter-computer/config.json')
 
@@ -28,4 +29,6 @@ def make_operator(config=None, *, vision_sensor=None):
     command = _configured_driver_command(config)
     if command is None:
         raise ValueError('computer_use.walter.driver_command is required')
+    if vision_sensor is None and config.get('vision', {}).get('enabled') is True:
+        vision_sensor = GatewayVisionSensor(config['vision'])
     return Operator(config=config, transport=DriverSession([command, 'mcp']), vision_sensor=vision_sensor)
