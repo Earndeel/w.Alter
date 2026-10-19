@@ -90,3 +90,15 @@ Additional source dependency: the watcher uses Walter Memory's bus/decision libr
 its configured module path; the age, bw and rclone executables are system dependencies.
 Folder classification may call its configured model through Walter Memory; no model is
 hardcoded here. The operational history of the first deployment is kept with that instance, not in this module.
+
+## Autorisations (grants)
+
+`walter_secrets.grants` tient le registre des autorisations de Walter : ses propres identités (bot Telegram,
+abonnement Codex, client Google Cloud, tunnels) et les accès délégués aux comptes du propriétaire (Gmail/Agenda,
+Beeper, Drive, cookies de navigation). Une fiche par autorisation dans `accounts/<id>.toml` de l'instance (sans
+secret : propriétaire, nature, droits, consommateurs, responsable du renouvellement) ; le secret est au coffre
+(`vault:<item>#<champ>`) ou, tant qu'il est à son emplacement historique, dans un fichier privé déclaré
+(`file:<chemin>[#clé.json]`). Les modules demandent `grants.access(id)` ou `walter-secret grant access <id>` ;
+seul le responsable déclaré renouvelle (OAuth ici, CLI du fournisseur pour Codex et rclone). Santé, sans valeur :
+`walter-secret grants`.
+
