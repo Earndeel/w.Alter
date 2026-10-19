@@ -1,4 +1,4 @@
-"""Monsieur's method for the three functional text tiers (declared 2026-10-02).
+"""The owner's method for the three functional text tiers (declared 2026-10-02).
 
 Input: every callable model x reasoning level with its AA Intelligence score and its real cost per AA task
 (AA list cost x cheapest-provider / list price ratio). Steps:
@@ -14,8 +14,8 @@ Input: every callable model x reasoning level with its AA Intelligence score and
    ceiling band.)
 
 On 2026-10-02 this gives L1 GPT-6 Luna max (38.1, 0.020 $), L2 GPT-6.1 Sol medium (47.8, 0.064 $), L3 Claude
-Opus 5.5 high (53.6, 0.73 $) — the tiers Monsieur had reached by hand. The method proposes; the declared tiers
-(knowledge.json "levels") stay until Monsieur adopts a proposal.
+Opus 5.5 high (53.6, 0.73 $) — the tiers the owner had reached by hand. The method proposes; the declared tiers
+(knowledge.json "levels") stay until the owner adopts a proposal.
 """
 from __future__ import annotations
 

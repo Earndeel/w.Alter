@@ -16,10 +16,11 @@ from pathlib import Path
 
 from . import knowledge, scoring
 from . import select as sel
+from . import instance
 
 BOARDS = {"intelligence": ("aa_intelligence", "intelligence"), "agentic": ("arena", "agent"),
           "reliability": ("bridgebench", "trustworthiness"), "speed": ("bridgebench", "speed")}
-HERMES_CONFIG = Path("/root/.hermes/config.yaml")
+HERMES_CONFIG = instance.hermes_home() / "config.yaml"
 
 
 def _board(conn, snaps: dict, benchmark: str, task: str) -> dict[str, float]:

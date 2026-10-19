@@ -1,6 +1,6 @@
 name: walter-router
 version: 0.4.0
-description: "Walter Router — best model per task (Monsieur's favourites first) and running a text sub-task on it"
+description: "Walter Router — best model per task (the owner's favourites first) and running a text sub-task on it"
 author: W.Alter
 kind: standalone
 provides_tools:

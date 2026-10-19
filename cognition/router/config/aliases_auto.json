@@ -1,5 +1,5 @@
 {
-  "_doc": "Name links added by the 48 h analysis agent (or Monsieur) through `walter-router alias-add`, each with its evidence. Merged into aliases.json \"*\" at load. Remove with `walter-router alias-remove <key>`.",
+  "_doc": "Name links added by the 48 h analysis agent (or the owner) through `walter-router alias-add`, each with its evidence. Merged into aliases.json \"*\" at load. Remove with `walter-router alias-remove <key>`.",
   "aliases": {
     "riverflow-v2-5-pro": {
       "model_id": "riverflow-2-5-pro",

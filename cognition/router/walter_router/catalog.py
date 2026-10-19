@@ -1,5 +1,5 @@
 """Model cards: what a model does, what it costs per resolution, where to call it and how it ranks — and the
-one-line rendering Monsieur reads on Telegram ("FLUX.3 Image — t2i/i2i — 1K 0,03 · 4K 0,12 $/img — OpenRouter")."""
+one-line rendering the owner reads on Telegram ("FLUX.3 Image — t2i/i2i — 1K 0,03 · 4K 0,12 $/img — OpenRouter")."""
 from __future__ import annotations
 
 from . import media

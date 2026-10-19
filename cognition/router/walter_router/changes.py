@@ -1,11 +1,11 @@
-"""What CHANGED since the previous cycle — the only thing worth a Telegram message (Monsieur, 2026-10-04).
+"""What CHANGED since the previous cycle — the only thing worth a Telegram message (2026-10-04).
 
 Three kinds of change, measured between the latest snapshot of each source and the previous snapshot collected at
 least MIN_GAP_H earlier (one cycle back), compared by the source's own external key (immune to our renames):
   new        a model appears on a leaderboard it was not on, or is newly listed by a provider
   nerf       a model's score on a leaderboard dropped by more than the board's threshold
   price_drop an offer of a model got cheaper by more than PRICE_DROP (same provider, same SKU)
-A static comparison between models already known ("Astra beats Sol on criteria X") is never news: if Monsieur did
+A static comparison between models already known ("Astra beats Sol on criteria X") is never news: if the owner did
 not choose it before, it was not interesting then and nothing has changed since.
 """
 from __future__ import annotations

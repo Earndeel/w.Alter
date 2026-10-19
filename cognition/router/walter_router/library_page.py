@@ -1,8 +1,8 @@
-"""Library web page (v3, Monsieur 2026-10-14: « le design fait trop IA, pas pro »).
+"""Library web page (v3, 2026-10-14: « le design fait trop IA, pas pro »).
 
 Editorial / market-terminal posture: paper background, black ink, one accent, hairline rules, dense tables with
 tabular figures, no emoji, no gradient, no pill badges. Home: the three reasoning levels (Pareto optimum of
-Monsieur's method) beside the AA chart, then the Design Arena specialisations. Tabs: Texte, Image, Vidéo,
+the owner's method) beside the AA chart, then the Design Arena specialisations. Tabs: Texte, Image, Vidéo,
 Audio & musique, Décision. Self-contained HTML; chart in inline SVG with hover. Chart palette validated with the
 dataviz validator: light #2a78d6 / #eb6834 on #ffffff, dark #3987e5 / #d95926 on #141414.
 """
@@ -148,7 +148,7 @@ def _usd(x: float | None) -> str:
 
 
 def _subscriptions(conn) -> tuple[str, int]:
-    """Subscriptions pane (information only): our measurement on Monsieur's account + SemiAnalysis' plan values."""
+    """Subscriptions pane (information only): our measurement on the owner's account + SemiAnalysis' plan values."""
     from . import subscriptions
     from .library import _name
     try:

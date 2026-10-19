@@ -1,7 +1,7 @@
--- Router tasks ("postes"). default_objective follows Monsieur's routing philosophy:
+-- Router tasks ("postes"). default_objective follows the owner's routing philosophy:
 --   general text work climbs the AA Pareto ladder (value: L1 anchor, L2 knee, L3 ceiling);
 --   a design domain escalates to that domain's Design Arena leader (best_available);
---   media defaults to value until Monsieur states a preference (image: best_available, declared 2026-10-02).
+--   media defaults to value until the owner states a preference (image: best_available, declared 2026-10-02).
 begin;
 insert into models.tasks (task, label, interface, quality_benchmark, quality_task, default_objective, description) values
   ('general',          'Texte général (niveaux L1/L2/L3)', 'chat',  'aa_intelligence', 'intelligence', 'value',          'Résumé, actualité, analyse, comparatif, rédaction'),
@@ -28,10 +28,10 @@ on conflict (task) do update set label = excluded.label, interface = excluded.in
   quality_benchmark = excluded.quality_benchmark, quality_task = excluded.quality_task,
   default_objective = excluded.default_objective, description = excluded.description;
 
--- Monsieur's declared preference (2026-10-02): images = always the best available, even if a better ratio exists.
+-- The owner's declared preference (2026-10-02): images = always the best available, even if a better ratio exists.
 insert into models.preferences (task, objective, note, declared_at)
 values ('text_to_image', 'best_available',
-        'Monsieur : pour les images, toujours le meilleur disponible, même s''il existe un meilleur ratio qualité/prix.',
+        'Déclaration : pour les images, toujours le meilleur disponible, même s''il existe un meilleur ratio qualité/prix.',
         '2026-10-02T00:00:00Z')
 on conflict (task) do nothing;
 

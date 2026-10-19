@@ -2,7 +2,7 @@
 
 Model catalogue + per-task model choice for W.Alter. Schema `models` in hindsight-pg (127.0.0.1:5433, creds in ~/.pgpass).
 **End-to-end design: `docs/DESIGN.md`** (two clocks, ExecutionPlan contract, roadmap V1–V5, open decisions).
-Text tiers method: `docs/TIERS.md`. Historical plan: `/root/projects/walter-model-router/docs/PLAN-v2.md`.
+Text tiers method: `docs/TIERS.md`.
 
 ## Cycle every 48 h (timer `walter-router-refresh`, `bin/walter-router-cycle`; was daily until 2026-10-02)
 1. benchmark collection (aa-pareto skill script; its daily Hermes cron 096741a21a32 is paused), 2. router refresh +
@@ -39,10 +39,10 @@ notifications, 3. analysis by the ECONOMIC text tier (L1 read from the router �
    (top 3 among models no dearer than the favourite for ratio / budget favourites). Telegram = one line per model
    (`catalog.line`: "🎬 name — modes — price per resolution — providers"; 🖼️ image, 🎬 video, 🗣️ voice,
    🎵 music, 💬 text, 🔓 unrestricted). Telegram via
-   `hermes send` only for challengers, stale sources, and unranked models in an interface Monsieur has a
+   `hermes send` only for challengers, stale sources, and unranked models in an interface the owner has a
    preference on. Pinning records already-better models as `baseline` (no message).
 
-## Monsieur's knowledge (`config/knowledge.json`, applied by `declare` and at every refresh)
+## the owner's knowledge (`config/knowledge.json`, applied by `declare` and at every refresh)
 Leaderboards rank; the knowledge file says what a model is *for*. `models.profiles` (strengths, workflow,
 effort direct|guided|workflow, access/cost notes, content policy override), favourite **roles** per objective in
 `models.preferences` (label, description, French request `signals`, priority) and `models.affinities` (close calls:
@@ -51,7 +51,7 @@ inside the tie margin — 1 AA point, 10 Elo — the preferred model, then a sub
 orchestrator can overrule the keyword match. Video today: default/équilibré H3 (Kie), premium Seedance 2.5
 (workflow: references + adapted prompt), action H3, UGC Omni 1.1 (Flow, Gemini AI Pro credits), budget Grok 1.5.
 
-## Text tiers (Monsieur's method — docs/TIERS.md)
+## Text tiers (the owner's method — docs/TIERS.md)
 L1 économique / L2 intermédiaire / L3 haut de gamme on the AA Pareto frontier of callable model x reasoning level at
 real provider cost (`tiers.py`): L1 = first knee above 35 AA, L2 = best pts per extra $ from L1, L3 = best pts per
 extra $ from L2 within 5 points of the ceiling. Declared tiers live in knowledge.json `levels`; a different nightly
@@ -61,9 +61,9 @@ result raises one `tier` alert (adopt/ignore). Specialised tasks keep only their
 `scoring.composite(task)`: each board of the task (`models.task_benchmarks.weight`) is put on 0-100 (linear from the
 board's median model = 0 to its leader = 100), weighted by weight x reliability (votes v/(v+500); provisional 0.5)
 and shrunk toward 50 when the evidence is thin (K = 0.25). The `best` level ranks callable models by this composite,
-then close calls (margin 1.5 composite points) go to Monsieur's affinity, then a subscription route.
+then close calls (margin 1.5 composite points) go to the owner's affinity, then a subscription route.
 Every refresh writes one JSON per task to `models.dossiers` (view `models.latest_dossiers`): boards and weights,
-Monsieur's roles with fiches/workflows, the top candidates with per-board evidence, routes, prices, open weights,
+the owner's roles with fiches/workflows, the top candidates with per-board evidence, routes, prices, open weights,
 content policy, affinity, the level picks, and the decision rules. `walter-router dossier <task>` prints it.
 BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local FlareSolverr (127.0.0.1:8191).
 
@@ -74,14 +74,14 @@ BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local Fla
   reason (`why`); `nerf` and `pareto` (text frontier entrant thanks to a release or price drop) are new kinds. The
   orchestrator fiche de poste is no longer notified (static comparison). One airy block per new model, all the roles
   it beats grouped, short numbers (`alerts.ref`) — « adopter 1 », « adopter 1 action », « ignorer 2 ».
-- **Telegram = model news only** (superseded by the line above for the trigger rule): `challenger` (a favourite overtaken from a top-3 place), `tier` (Monsieur's method
+- **Telegram = model news only** (superseded by the line above for the trigger rule): `challenger` (a favourite overtaken from a top-3 place), `tier` (the owner's method
   designates another text tier, or the orchestrator fiche de poste finds a clearly better orchestrator), `new_best`
   (a specialised task's auto-picked #1 changed and scores higher; « ignorer N » pins the previous one). No credit,
   staleness, podium or analysis messages; a cycle failure is reported only after two failed cycles in a row.
 - **Replies**: plugin tool `walter_verdict` (« adopter N » / « ignorer N »); adopting an orchestrator sets Hermes
   `model.default/provider` (config backup + graceful gateway restart).
 - **Learning**: `models.exec_log` (every routed attempt; a provider x model failing >= 50 % of its last >= 3 runs in
-  14 days is demoted), `models.feedback` + tool `walter_feedback` (Monsieur's verdicts move a model by +/-3 composite
+  14 days is demoted), `models.feedback` + tool `walter_feedback` (the owner's verdicts move a model by +/-3 composite
   points per net rating, capped +/-9).
 - **Fallback order**: subscription (Codex) -> Kie when available and <= 1.25 x OpenRouter's price -> OpenRouter; a
   specialised task whose #1 has no subscription route gets the best subscription model of that task appended.
@@ -120,8 +120,8 @@ BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local Fla
   `walter-router-failure.service` (OnFailure of the refresh) sends one Telegram message.
 
 ## Subscriptions (2026-10-14) — information only, no routing effect
-Monsieur's plans in `config/subscriptions.json` (ChatGPT Plus 20 $, Claude Pro 20 $), shown on the library page
-(tab 💳 Abonnements / Subscriptions) with two sources only (Monsieur, 2026-10-14):
+the owner's plans in `config/subscriptions.json` (ChatGPT Plus 20 $, Claude Pro 20 $), shown on the library page
+(tab 💳 Abonnements / Subscriptions) with two sources only (2026-10-14):
 - **Our measurement** (`walter_router/subscriptions.py`): the weekly meter — ChatGPT Plus real, from the Codex usage API
   through Hermes (read-only); Claude Pro estimated from the Claude Code transcripts (no Claude login on the VM): units =
   input + cache writes + 5 x output over a capacity, `walter-router subscriptions calibrate anthropic-pro <weekly %>`
@@ -137,13 +137,13 @@ Routing and tiers are unchanged.
 ## Cloudflare access (decision model Clef)
 `intent.py` calls Clef on Cloudflare Workers AI with `CLOUDFLARE_AI_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` from
 `~/.hermes/.env` (scoped token « W.Alter — Workers AI (walter-router intent) », permission Workers AI Read, created
-2026-10-04 with the global key). Any other Cloudflare work goes through `/root/.hermes/scripts/walter-cloudflare`
+2026-10-04 with the global key). Any other Cloudflare work goes through the instance's Cloudflare helper (host.json `cloudflare_cli`)
 (`check` / `-- <command>`): global key from Bitwarden « W.Alter · cloudflare », account e-mail from `.env`
 `CLOUDFLARE_EMAIL` (the vault item has no e-mail; an example e-mail from a skill gives 401/403).
 
-## Internal postes — every W.Alter module that uses AI (2026-10-16, Monsieur)
+## Internal postes — every W.Alter module that uses AI (2026-10-16)
 Tasks the modules call, never offered to the intent classifier (`models.tasks.internal`, `requirements`, `consumers`;
-migration 020): `summarization`, `memory_extraction` (objective `level` = Monsieur's text tier L1 from
+migration 020): `summarization`, `memory_extraction` (objective `level` = the owner's text tier L1 from
 `general`, filtered by `requirements.min_context` — they move when he adopts a new tier), `voice_assist` (BridgeBench
 speed primary and required, Arena French, BridgeBench trustworthiness; `requirements.reasoning = minimal` is applied to
 its routes), `stt`, `embeddings`, `rerank`. `pick` of a transcription / rerank / embedding poste returns `openrouter_id`. Hermes follows through `sync-hermes [--apply] [--no-restart]` (`hermes_sync.py`:
@@ -152,7 +152,7 @@ agent jobs in `CRON_POSTES`; run by the cycle and after each verdict); services 
 `general/L2`). `generate --task tts --voice V --style S` = Hermes TTS command provider. Module table: walter-memory
 RUNBOOK § Modules IA → Walter Router.
 
-**Service boards — stt, rerank, embeddings (2026-10-16, migration 021, Monsieur: « rajouter le reranking, embedding
+**Service boards — stt, rerank, embeddings (2026-10-16, migration 021, the owner: « rajouter le reranking, embedding
 et STT »).** Ranked like any task (`task_benchmarks` → `scoring.composite`, dossiers, challengers), still PINNED on the
 models in use (`watch = quality`): a better measured model is only proposed (« Changer »), never switched.
 - Sources (collected every cycle): `aa_stt` = artificialanalysis.ai/speech-to-text chart download tables (AA-WER,

@@ -87,7 +87,7 @@ def test_challenger_flow_baseline_then_new_then_adopt(conn):
     pend = [a for a in alerts.pending(conn) if a["task"] == "3d"]
     assert pend and "Catégorie du router" in alerts.render(pend, conn)
     assert pend[0]["evidence"]["composite"]["challenger"] > pend[0]["evidence"]["composite"]["pinned"]
-    # Monsieur adopts it: it becomes the pinned favourite.
+    # The owner adopts it: it becomes the pinned favourite.
     alerts.verdict(conn, pend[0]["alert_id"], "adopted")
     assert choose.pick(conn, "3d")["model_id"] == "gpt-6-astra"
 
@@ -165,8 +165,8 @@ def test_successor_family_and_runnable_selection(conn):
     assert best and best["model_id"] in media_exec._models()
 
 
-def test_level_poste_follows_monsieurs_text_tier(conn):
-    """Background postes (2026-10-16) take the 'general' tier Monsieur adopted, never a model of their own."""
+def test_level_poste_follows_the_owners_text_tier(conn):
+    """Background postes (2026-10-16) take the 'general' tier the owner adopted, never a model of their own."""
     tier = choose.pick(conn, "general", level="L1")
     for poste in ("summarization", "memory_extraction"):
         d = choose.pick(conn, poste)

@@ -1,5 +1,5 @@
 {
-  "_doc": "Monsieur's own model knowledge (dated declarations). Applied with `walter-router declare` (idempotent). Leaderboards rank; this file says what each model is FOR, what it demands, and which words of a request call for it. Signals are matched accent- and case-insensitively on whole words.",
+  "_doc": "The instance's model knowledge (dated declarations). Applied with `walter-router declare` (idempotent). Leaderboards rank; this file says what each model is FOR, what it demands, and which words of a request call for it. Signals are matched accent- and case-insensitively on whole words.",
   "profiles": {
     "seedance-2-5": {
       "strengths": [
@@ -20,7 +20,7 @@
         "Router le rendu sur le provider le moins cher à résolution égale (OpenRouter aujourd'hui ; 4K seulement chez OpenRouter)"
       ],
       "cost_note": "Le plus cher du panier : à réserver aux rendus qui le justifient.",
-      "note": "Monsieur (2026-10-02) : le top du top, mais demande un workflow avec création de références et un prompting adapté.",
+      "note": "2026-10-02 : le top du top, mais demande un workflow avec création de références et un prompting adapté.",
       "declared_at": "2026-10-02"
     },
     "minimax-h3": {
@@ -36,7 +36,7 @@
       ],
       "cost_note": "Meilleur ratio qualité/prix, surtout via Kie.ai.",
       "content_policy": "permissive",
-      "note": "Monsieur (2026-10-02) : bonne balance, meilleur ratio, très bon en scènes d'action ; open source et peut-être unrestricted (à vérifier).",
+      "note": "2026-10-02 : bonne balance, meilleur ratio, très bon en scènes d'action ; open source et peut-être unrestricted (à vérifier).",
       "declared_at": "2026-10-02"
     },
     "gemini-omni-flash-1-1": {
@@ -52,7 +52,7 @@
       ],
       "access_note": "Crédits mensuels gratuits via l'abonnement Gemini AI Pro, dans l'interface Flow (pas d'API).",
       "cost_note": "0 $ tant qu'il reste des crédits Flow du mois.",
-      "note": "Monsieur (2026-10-02) : très bon en UGC.",
+      "note": "2026-10-02 : très bon en UGC.",
       "declared_at": "2026-10-02"
     },
     "grok-imagine-video-1-5": {
@@ -68,7 +68,7 @@
         "Prompt direct ; 480p/720p via Kie"
       ],
       "cost_note": "Vraiment pas cher sur Kie, mais pas au niveau des autres.",
-      "note": "Monsieur (2026-10-02).",
+      "note": "2026-10-02.",
       "declared_at": "2026-10-02"
     },
     "gpt-6-luna": {
@@ -79,7 +79,7 @@
       ],
       "effort": "direct",
       "access_note": "Inclus dans l'abonnement ChatGPT (Codex).",
-      "note": "Monsieur (2026-10-02) : préféré à MiMo 2.6 Flash à niveau égal, surtout avec l'abonnement Codex.",
+      "note": "2026-10-02 : préféré à MiMo 2.6 Flash à niveau égal, surtout avec l'abonnement Codex.",
       "declared_at": "2026-10-02"
     }
   },
@@ -220,14 +220,7 @@
     ],
     "reason": "2026-10-02 : Omni 1.1 n'est plus le « meilleur ratio » (c'est H3) mais le choix UGC."
   },
-  "affinities": [
-    {
-      "model": "gpt-6-luna",
-      "scope": "*",
-      "weight": 1,
-      "reason": "Monsieur (2026-10-02) : préféré à MiMo 2.6 Flash au coude à coude, surtout via l'abonnement Codex."
-    }
-  ],
+  "affinities": [],
   "unrestricted_signals": [
     "sans censure",
     "uncensored",
@@ -265,7 +258,7 @@
     "music": "Composer ou générer une musique, une chanson, un jingle"
   },
   "levels": {
-    "_doc": "Monsieur's text tiers, determined by HIS METHOD (walter_router/tiers.py, docs/TIERS.md): strict AA Pareto frontier of callable model x reasoning level at real provider cost; L1 = first knee above 35 AA; L2 = best points-per-extra-dollar from L1; L3 = best points-per-extra-dollar from L2 within 5 points of the ceiling. Recomputed nightly; a different result raises one 'tier' alert, Monsieur adopts or ignores. pin = model_id/variant.",
+    "_doc": "The instance's text tiers, determined by the tier method (walter_router/tiers.py, docs/TIERS.md): strict AA Pareto frontier of callable model x reasoning level at real provider cost; L1 = first knee above 35 AA; L2 = best points-per-extra-dollar from L1; L3 = best points-per-extra-dollar from L2 within 5 points of the ceiling. Recomputed nightly; a different result raises one 'tier' alert, the owner adopts or ignores. pin = model_id/variant.",
     "general": {
       "L1": {
         "label": "Économique",
@@ -295,7 +288,7 @@
     }
   },
   "postes": {
-    "_doc": "Fiches de poste (2026-10-02): weights over model attributes (0-100 each, see walter_router/postes.py). min_context in tokens. The orchestrator poste is compared with the model Hermes actually runs; a clearly better one (>= margin points) is proposed to Monsieur, never switched automatically.",
+    "_doc": "Fiches de poste (2026-10-02): weights over model attributes (0-100 each, see walter_router/postes.py). min_context in tokens. The orchestrator poste is compared with the model Hermes actually runs; a clearly better one (>= margin points) is proposed to the owner, never switched automatically.",
     "orchestrator": {
       "label": "Orchestrateur de Walter",
       "margin": 3.0,
@@ -325,6 +318,6 @@
   },
   "decision": {
     "order": "best_first",
-    "_note": "Modèle de décision (intent + tri). Le meilleur vient du cycle 48 h (tâche 'decision', AA Decision Index). best_first (Monsieur, 2026-10-14) = le meilleur (Jev 1.13 aujourd'hui), puis Mercury Decide gratuit, puis Clef (Workers AI) en dernier recours ; free_first = l'inverse (choix du 2026-10-04)."
+    "_note": "Modèle de décision (intent + tri). Le meilleur vient du cycle 48 h (tâche 'decision', AA Decision Index). best_first (2026-10-14) = le meilleur (Jev 1.13 aujourd'hui), puis Mercury Decide gratuit, puis Clef (Workers AI) en dernier recours ; free_first = l'inverse (choix du 2026-10-04)."
   }
 }

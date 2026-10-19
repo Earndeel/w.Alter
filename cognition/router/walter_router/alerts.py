@@ -10,8 +10,9 @@ from pathlib import Path
 
 from . import catalog, changes, collect, media
 from . import select as sel
+from . import instance
 
-HERMES = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "hermes-agent" / "venv" / "bin" / "hermes"
+HERMES = instance.hermes_bin()
 UNRANKED_DAYS = 30
 STALE_HOURS = {"aa": 60, "aa_decision": 60, "mm": 60, "da": 60, "arena": 60, "bridgebench": 60, "openrouter": 60, "kie": 60,
                "codex": 60, "hermes_providers": 60, "declared": 24 * 365}  # 48 h cycle + 12 h margin
@@ -56,9 +57,9 @@ def _order(rows: list[dict]) -> list[str]:
 
 
 def new_best(conn, run_id: int, chg: dict | None = None) -> list[str]:
-    """A new #1 for a specialised task is only PROPOSED (Monsieur, 2026-10-16: « je dois toujours appuyer sur le
+    """A new #1 for a specialised task is only PROPOSED (2026-10-16: « je dois toujours appuyer sur le
     bouton pour confirmer les changements de modèle »): the model in use is pinned at once, the message brings the
-    facts, and only his « Passer à … » button switches."""
+    facts, and only their « Passer à … » button switches."""
     prev = conn.execute("""select run_id from models.runs where status = 'ok' and run_id < %s
                            order by run_id desc limit 1""", (run_id,)).fetchone()
     if not prev:
@@ -88,14 +89,14 @@ def new_best(conn, run_id: int, chg: dict | None = None) -> list[str]:
               "why": why}
         from .choose import set_preference
         set_preference(conn, r["task"], pin=r["old_id"], watch="quality",
-                       note=f'Gardé en attendant la décision de Monsieur (proposition : {r["new_id"]}).')
+                       note=f'Gardé en attendant la décision de {instance.owner()} (proposition : {r["new_id"]}).')
         if _upsert(conn, "new_best", r["task"], r["new_id"], ev, "open" if why else "baseline") and why:
             created.append(f'{r["task"]}:{r["new_id"]}')
     return created
 
 
 def top3(conn, status_for_new: str | None = None) -> list[str]:
-    """A model entering the top 3 of a leaderboard in a domain Monsieur watches (interfaces he has preferences on).
+    """A model entering the top 3 of a leaderboard in a domain the owner watches (interfaces they have preferences on).
     The first computation records the current podiums as 'baseline'."""
     if status_for_new is None:
         first = conn.execute("select not exists (select 1 from models.alerts where kind = 'top3') as f").fetchone()["f"]
@@ -133,7 +134,7 @@ def _raw_measure(theirs: dict, mine: dict) -> dict:
 
 def challengers(conn, status_for_new: str = "open", only_task: str | None = None,
                 only_role: str | None = None, chg: dict | None = None) -> list[str]:
-    """Models that overtake one of Monsieur's pinned favourites on any leaderboard of that task
+    """Models that overtake one of the owner's pinned favourites on any leaderboard of that task
     (models.task_benchmarks: AA, Design Arena, Arena.ai). One alert per challenger model, listing every board.
 
     watch = quality   -> any model scoring higher;
@@ -166,7 +167,7 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
 
         for b in boards:
             rows = _board_rows(conn, snaps, b["benchmark"], b["bench_task"])
-            # Relevance (Monsieur, 2026-10-02): only a challenger in the board's top 3 is worth a message —
+            # Relevance (2026-10-02): only a challenger in the board's top 3 is worth a message —
             # top 3 overall for a quality favourite, top 3 among models no dearer than the favourite for a
             # ratio / budget favourite.
             pool = rows if p["watch"] == "quality" else \
@@ -197,7 +198,7 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
                     {"pinned": p["pinned_model_id"], "note": "favourite absent from every leaderboard of this task"},
                     "baseline", p["role"])
             continue
-        # Monsieur (2026-10-14): one board is not enough (Grok Imagine 1.5 'agent' led Arena t2v while MiniMax H3
+        # 2026-10-14: one board is not enough (Grok Imagine 1.5 'agent' led Arena t2v while MiniMax H3
         # stays far ahead overall). A challenger must beat the favourite on the task's weighted composite of all
         # boards; the evidence keeps every board, lost ones included.
         from .scoring import composite   # late import (scoring -> select)
@@ -264,7 +265,7 @@ def stale_sources(conn) -> list[str]:
 
 
 def boards_down(conn) -> list[str]:
-    """Monsieur (2026-10-14): tell him when a leaderboard used by a task can no longer be read — the whole source
+    """2026-10-14: tell them when a leaderboard used by a task can no longer be read — the whole source
     stale for more than its limit, or one board empty in the latest snapshot while an earlier snapshot had rows
     (Arena image-edit, 2026-10-10: the task silently lost its model). One alert per outage; closed on recovery."""
     created = []
@@ -293,8 +294,8 @@ def boards_down(conn) -> list[str]:
 
 
 def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]:
-    """When Monsieur's method (nightly L1/L2/L3 in models.selection) designates another model x reasoning level than
-    the declared tier, one alert per tier; he tests and adopts or ignores (never switched automatically)."""
+    """When the owner's method (nightly L1/L2/L3 in models.selection) designates another model x reasoning level than
+    the declared tier, one alert per tier; they test and adopt or ignore (never switched automatically)."""
     run = {"run_id": run_id} if run_id else conn.execute("select run_id from models.latest_run").fetchone()
     if not run:
         return []
@@ -325,7 +326,7 @@ def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]
 
 
 def adopt_orchestrator(conn, model_id: str) -> dict:
-    """Monsieur adopted a new orchestrator: point Hermes model.default/provider at its first route (subscription
+    """The owner adopted a new orchestrator: point Hermes model.default/provider at its first route (subscription
     first), config backed up, gateway restarted gracefully."""
     import shutil
     from datetime import datetime, timezone
@@ -334,7 +335,8 @@ def adopt_orchestrator(conn, model_id: str) -> dict:
     if not route:
         raise RuntimeError(f"no usable route for {model_id}")
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    shutil.copy2("/root/.hermes/config.yaml", f"/root/.hermes/backups/config/config.yaml.{ts}.pre-orchestrator")
+    shutil.copy2(instance.hermes_home() / "config.yaml",
+                 instance.hermes_home() / "backups" / "config" / f"config.yaml.{ts}.pre-orchestrator")
     for key, value in (("model.default", route["model"]), ("model.provider", route["hermes_provider"])):
         subprocess.run([str(HERMES), "config", "set", key, value], check=True, capture_output=True, timeout=60)
     subprocess.run([str(HERMES), "gateway", "restart"], capture_output=True, timeout=1900)
@@ -416,9 +418,9 @@ def billing(conn) -> list[str]:
 
 
 def _watched_interfaces(conn) -> set[str]:
-    """Interfaces Monsieur has a declared preference on: new unranked releases there are worth a message."""
+    """Interfaces the owner has a declared preference on: new unranked releases there are worth a message."""
     # Text is governed by the tier method ('tier' alerts) and specialised tasks auto-pick their #1: no decision for
-    # Monsieur there, so no podium messages for chat.
+    # The owner there, so no podium messages for chat.
     return {r["interface"] for r in conn.execute(
         "select distinct t.interface from models.preferences p join models.tasks t using (task)")} - {"chat"}
 
@@ -426,7 +428,7 @@ def _watched_interfaces(conn) -> set[str]:
 def pending(conn) -> list[dict]:
     """What goes to Telegram. Unranked releases are recorded but never sent (too many, unproven): a new model is
     reported only when it ranks above an active model."""
-    # Monsieur 2026-10-02: only « a new model ranks above one of our active models » — favourites ('challenger'),
+    # 2026-10-02: only « a new model ranks above one of our active models » — favourites ('challenger'),
     # text tiers ('tier'), auto-picked #1 of specialised tasks ('new_best'). No credit, staleness or podium news.
     return list(conn.execute("""select * from models.alerts where status = 'open'
                                 and kind in ('challenger', 'tier', 'new_best', 'nerf', 'pareto', 'board_down')
@@ -532,7 +534,7 @@ SHORT_TASK = {"decision": "Routage d’intention", "decision_vision": "Décision
 
 
 def _decision_block(conn, a: dict, task: dict) -> list[str]:
-    """Decision model proposal, short (Monsieur, 2026-10-16: « trop gros, des informations inutiles »): who replaces
+    """Decision model proposal, short (2026-10-16: « trop gros, des informations inutiles »): who replaces
     whom, the three axes side by side, a one-line verdict. Buttons do the rest."""
     from . import decision_pareto as dp
     e = a["evidence"]
@@ -611,7 +613,7 @@ def _price_lines(c: dict, current: dict | None = None) -> list[str]:
 
 
 def _challenger_group(conn, group: list[dict]) -> list[str]:
-    """One block for one new model that beats one or several of Monsieur's choices (Monsieur, 2026-10-14:
+    """One block for one new model that beats one or several of the owner's choices (2026-10-14:
     no reference numbers, one fact per line)."""
     a0 = group[0]
     task = conn.execute("select interface, modes from models.tasks where task = %s", (a0["task"],)).fetchone()
@@ -619,7 +621,7 @@ def _challenger_group(conn, group: list[dict]) -> list[str]:
     origin = next((o for o in (_origin(a["evidence"]) for a in group) if o), None)
     lines = [f'{catalog.icon(c)} {c["name"]}', " · ".join(x for x in (origin, _modes_fr(c["modes"])) if x)]
     current, seen_tasks = None, set()
-    for a in group:   # Monsieur (2026-10-14): which router category, and the full comparison (won AND lost boards)
+    for a in group:   # 2026-10-14: which router category, and the full comparison (won AND lost boards)
         e = a["evidence"]
         pinned = catalog.card(conn, e["pinned"], task["interface"], task["modes"])
         current = current or pinned
@@ -686,7 +688,7 @@ def render(alerts: list[dict], conn=None, typed: bool = False) -> str:
 
 
 def render_each(alerts: list[dict], conn=None, typed: bool = False) -> list[str]:
-    """One message per piece of news (Monsieur, 2026-10-16: « 2 messages différents, pas un gros message »)."""
+    """One message per piece of news (2026-10-16: « 2 messages différents, pas un gros message »)."""
     groups: dict[tuple, list[dict]] = {}
     for a in alerts:
         groups.setdefault(_group_key(conn, a), []).append(a)
@@ -701,7 +703,7 @@ def render_each(alerts: list[dict], conn=None, typed: bool = False) -> list[str]
     return out
 
 
-# Buttons (Monsieur, 2026-10-14): one row per piece of news; the Hermes plugin walter-router handles the clicks
+# Buttons (2026-10-14): one row per piece of news; the Hermes plugin walter-router handles the clicks
 # (callback data 'wr:<a|d>:<ref>[:<role>]' → `walter-router verdict`).
 BUTTONS = {"challenger": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d")),
            "tier": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d")),
@@ -755,7 +757,7 @@ TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 
 
 def telegram(method: str, payload: dict) -> dict:
-    """Bot API call with the gateway's own bot (token from /root/.hermes/.env, never logged)."""
+    """Bot API call with the gateway's own bot (token from the Hermes .env of the instance, never logged)."""
     from urllib.request import Request, urlopen
     token = collect._env_value("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -770,7 +772,7 @@ def telegram(method: str, payload: dict) -> dict:
 
 
 def home_chat() -> str:
-    """Monsieur's Telegram chat = the gateway's home channel (top-level TELEGRAM_HOME_CHANNEL in config.yaml)."""
+    """The owner's Telegram chat = the gateway's home channel (top-level TELEGRAM_HOME_CHANNEL in config.yaml)."""
     import re
     m = re.search(r"^TELEGRAM_HOME_CHANNEL:\s*'?(-?\d+)'?\s*$", (HERMES.parents[3] / "config.yaml").read_text(), re.M)
     chat = m.group(1) if m else collect._env_value("TELEGRAM_HOME_CHANNEL")
@@ -795,7 +797,7 @@ def send_with_buttons(text: str, rows: list[list[dict]]) -> None:
 
 
 def _assign_refs(conn, alerts: list[dict]) -> list[dict]:
-    """Short numbers Monsieur can answer with (1, 2, 3…), unique among alerts still awaiting his answer."""
+    """Short numbers the owner can answer with (1, 2, 3…), unique among alerts still awaiting their answer."""
     used = {r["ref"] for r in conn.execute("""select ref from models.alerts where ref is not null
                                               and status = 'notified' and notified_at > now() - interval '30 days'""")}
     out, n, by_group = [], 1, {}
@@ -840,13 +842,13 @@ def notify(conn, dry_run: bool = False) -> dict:
 
 def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: str | None = None,
             _resolved: bool = False) -> dict:
-    """Record Monsieur's answer. 'adopted' on a challenger also pins the challenger as the new favourite."""
+    """Record the owner's answer. 'adopted' on a challenger also pins the challenger as the new favourite."""
     if decision not in ("adopted", "dismissed"):
         raise ValueError("decision must be adopted or dismissed")
     group = [] if _resolved else conn.execute("""select alert_id, role from models.alerts where ref = %s
                             and status = 'notified' and notified_at > now() - interval '30 days'""",
                                               (alert_id,)).fetchall()
-    if group:  # Monsieur answers with the short number of the message (one number = one model, maybe several roles)
+    if group:  # The owner answers with the short number of the message (one number = one model, maybe several roles)
         if role:
             group = [g for g in group if g["role"] == role] or group
         if len(group) > 1:
@@ -860,22 +862,22 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
     if a["kind"] == "new_best" and decision == "adopted":
         from .choose import set_preference
         set_preference(conn, a["task"], pin=a["subject"], watch="quality",
-                       note=f"Adopté par Monsieur (alerte {alert_id}).")
+                       note=f"Adopté par {instance.owner()} (alerte {alert_id}).")
         return {"alert_id": alert_id, "status": decision, "pinned": a["subject"]}
     if a["kind"] == "new_best" and decision == "dismissed":
         from .choose import set_preference
         set_preference(conn, a["task"], pin=a["evidence"]["previous"], watch="quality",
-                       note=f"Monsieur garde {a['evidence']['previous']} (alerte {alert_id} ignorée).")
+                       note=f"{instance.owner()} garde {a['evidence']['previous']} (alerte {alert_id} ignorée).")
         return {"alert_id": alert_id, "status": decision, "pinned": a["evidence"]["previous"]}
     if decision == "adopted" and a["kind"] == "tier" and a["role"] == "orchestrator":
         return {"alert_id": alert_id, "status": decision, **adopt_orchestrator(conn, a["subject"])}
     if decision == "adopted" and a["kind"] == "tier":
         from .choose import set_preference
         set_preference(conn, "general", pin=a["subject"], role=a["role"], watch="dominance",
-                       note=f"Niveau {a['role']} adopté par Monsieur (alerte {alert_id}), méthode des 3 niveaux.")
+                       note=f"Niveau {a['role']} adopté par {instance.owner()} (alerte {alert_id}), méthode des 3 niveaux.")
         return {"alert_id": alert_id, "status": decision, "pinned": a["subject"]}
     if decision == "adopted" and a["kind"] == "challenger" and ("boards" in a["evidence"] or "challenger" in a["evidence"]):
         from .choose import set_preference
         set_preference(conn, a["task"], pin=a["subject"], role=a["role"] or "default",
-                       note=f"Adopté par Monsieur (alerte {alert_id}). {note or ''}".strip())
+                       note=f"Adopté par {instance.owner()} (alerte {alert_id}). {note or ''}".strip())
     return {"alert_id": alert_id, "status": decision}

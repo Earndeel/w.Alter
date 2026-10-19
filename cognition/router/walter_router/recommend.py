@@ -1,8 +1,8 @@
-"""A recommendation in the proposal message (Monsieur, 2026-10-16: « à la place de 'meilleur sur les 3 axes', ajoute
+"""A recommendation in the proposal message (2026-10-16: « à la place de 'meilleur sur les 3 axes', ajoute
 ta recommandation personnelle par rapport à notre stack »).
 
 Written once per proposal by the router's own economic model (L1, GPT-6 Luna via the Codex subscription: no marginal
-cost) from FACTS about Monsieur's stack — what uses the task today, measured volume, per-call and monthly cost of both
+cost) from FACTS about the owner's stack — what uses the task today, measured volume, per-call and monthly cost of both
 options, fallbacks in place, the 3-axis comparison — then stored in the alert (never regenerated at each render).
 A deterministic sentence is used when the model is unreachable.
 """
@@ -15,8 +15,9 @@ import subprocess
 
 from . import execution
 from .alerts import HERMES
+from . import instance
 
-USES = {"decision": "comprendre les demandes de Monsieur et choisir le modèle (Walter Router, chaîne de décision : "
+USES = {"decision": f"comprendre les demandes de {instance.owner()} et choisir le modèle (Walter Router, chaîne de décision : "
                     "modèle retenu, puis Mercury Decide gratuit, puis Clef sur Workers AI)",
         "decision_vision": "aucun usage en production pour l'instant (prévu : navigation web rapide, tri d'images en masse)"}
 EVAL = __import__("pathlib").Path(__file__).resolve().parent.parent / "eval" / "decision_results.json"
@@ -35,7 +36,7 @@ def ask_l1(conn, prompt: str, source: str, timeout: int = 240) -> str | None:
     if route.get("reasoning"):
         cmd += ["--reasoning", route["reasoning"]]
     out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                         env={**os.environ, "HOME": "/root", "HERMES_HOME": "/root/.hermes", "WALTER_ROUTER_CHILD": "1"})
+                         env=instance.child_env(WALTER_ROUTER_CHILD="1"))
     lines = [ln for ln in re.sub(r"\x1b\[[0-9;]*m", "", out.stdout).splitlines()
              if ln.strip() and not ln.startswith(("session_id:", "⚠", "Warning:")) and "hermes doctor" not in ln]
     text = " ".join(lines).strip().strip('"')
@@ -73,7 +74,7 @@ def facts(conn, alert: dict, new: dict, cur: dict) -> dict:
             "test_maison_30_demandes": {new["name"]: evals.get(new["model_id"], {}).get("tasks", "non testé"),
                                         cur["name"]: evals.get(cur["model_id"], {}).get("tasks", "non testé")},
             "secours_en_place": "Mercury Decide (gratuit, OpenRouter) puis Clef (Workers AI, allocation gratuite)",
-            "contexte": "Monsieur décide lui-même de chaque changement (boutons Telegram). Le router ne change jamais "
+            "contexte": f"{instance.owner()[:1].upper()}{instance.owner()[1:]} décide lui-même de chaque changement (boutons Telegram). Le router ne change jamais "
                         "de modèle seul. Il préfère les choix Pareto à coût réel (gratuit = 0 $). Phase de construction "
                         "(2026-10) : il passe surtout par Claude Code, pas par Hermes ; le faible volume mesuré via Hermes "
                         "ne reflète pas l'usage à venir — raisonne sur la qualité, la vitesse et le coût par décision "
@@ -92,9 +93,9 @@ def recommendation(conn, alert: dict, new: dict, cur: dict) -> str:
     if (alert.get("evidence") or {}).get("reco"):
         return alert["evidence"]["reco"]
     f = facts(conn, alert, new, cur)
-    prompt = ("Tu conseilles Monsieur sur le choix d'un modèle pour son router personnel. Voici les faits, en JSON :\n"
+    prompt = (f"Tu conseilles {instance.owner()} sur le choix d'un modèle pour son router personnel. Voici les faits, en JSON :\n"
               f"{json.dumps(f, ensure_ascii=False)}\n\n"
-              "Donne TA recommandation en une ou deux phrases courtes, en français, en tutoyant Monsieur : commence par "
+              f"Donne TA recommandation en une ou deux phrases courtes, en français, en tutoyant {instance.owner()} : commence par "
               "« Passer à <nom> » ou « Garder <nom> », puis la raison qui compte vraiment pour SA stack (usage réel, "
               "volume, coût mensuel, vitesse, besoin d'images). Pas de chiffres déjà connus répétés inutilement, pas de "
               "liste, pas de guillemets. Ne dis « gratuit » ou « coût nul » que pour un modèle réellement gratuit ; un coût "

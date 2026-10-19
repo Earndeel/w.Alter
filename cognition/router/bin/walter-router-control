@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Manual trigger of the full Walter Router cycle, for the library page button (Monsieur, 2026-10-14).
+"""Manual trigger of the full Walter Router cycle, for the library page button (2026-10-14).
 
-127.0.0.1:8896, reached only through the Cloudflare tunnel host router-control.walter-ai.cloud, itself behind a
+127.0.0.1:8896, reached only through the instance's Cloudflare tunnel host (host.json control_origin), itself behind a
 Cloudflare Access app that admits only the Pages project's service token. Every request also carries an HMAC
 (X-Walter-Ts, X-Walter-Sig = HMAC-SHA256(secret, ts + method + path), 5-minute window); secret in
-/opt/walter-router/.control.env (0600).
+the instance's control_env file (0600).
   POST /run     start walter-router-refresh.service (the 48 h cycle) unless it runs or started < 10 min ago
   GET  /status  running?, current step, last start/end, result
 """
@@ -12,13 +12,23 @@ import hashlib
 import hmac
 import json
 import re
+import shlex
 import subprocess
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 UNIT = "walter-router-refresh.service"
-ENV = Path("/opt/walter-router/.control.env")
+def _control_env() -> Path:
+    """The instance's HMAC secret file (host.json control_env), through `walter-router instance-env`."""
+    out = subprocess.run(["walter-router", "instance-env"], capture_output=True, text=True, timeout=60, check=True).stdout
+    for line in out.splitlines():
+        if line.startswith("CONTROL_ENV="):
+            return Path(shlex.split(line.split("=", 1)[1])[0])
+    raise SystemExit("no control secret for this instance")
+
+
+ENV = _control_env()
 MIN_GAP_S = 600
 
 

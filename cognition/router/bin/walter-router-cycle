@@ -3,18 +3,23 @@
 # (3) analysis by the ECONOMIC text tier model (L1, read from the router: today GPT-6 Luna max via Codex), which
 # links renamed models (validated `alias-add`), (4) recompute + Telegram (only new models above an active one).
 # A failing step 1 keeps the last good caches (step 2 still runs); step 3 never blocks the cycle.
+# Instance bindings (Hermes home, log folder, collection script, rendered analysis prompt, library URL) come from
+# the active Walter instance through `walter-router instance-env`.
 set -uo pipefail
-export HOME=/root HERMES_HOME=/root/.hermes
-HPY=/root/.hermes/hermes-agent/venv/bin/python
-HERMES=/root/.hermes/hermes-agent/venv/bin/hermes
-WR=/opt/walter-router/bin/walter-router
-LOG=/root/.hermes/logs/walter-router
+WR=walter-router
+export HOME="${HOME:-$(getent passwd "$(id -un)" | cut -d: -f6)}"
+eval "$("$WR" instance-env)" || { echo "[cycle] no instance bindings"; exit 1; }
+export HERMES_HOME
+HPY="$HERMES_HOME/hermes-agent/venv/bin/python"
+HERMES="$HERMES_HOME/hermes-agent/venv/bin/hermes"
 mkdir -p "$LOG"
 day=$(date -u +%Y%m%d)
 
 echo "[cycle] 1/4 benchmark collection"
-timeout 2400 "$HPY" /root/.hermes/scripts/aa_pareto_daily_refresh.py > "$LOG/collect-$day.log" 2>&1 \
+if [ -z "$COLLECT_SCRIPT" ]; then echo "[cycle] no collection script for this instance: last caches kept"
+else timeout 2400 "$HPY" "$COLLECT_SCRIPT" > "$LOG/collect-$day.log" 2>&1 \
   || echo "[cycle] collection failed (exit $?) — last good caches kept, see $LOG/collect-$day.log"
+fi
 
 echo "[cycle] 2/4 router refresh (no message yet)"
 "$WR" refresh --no-notify || exit 1   # a failed refresh fails the unit (Telegram only after 2 failed cycles)
@@ -27,7 +32,7 @@ d = json.load(sys.stdin)
 r = next((e for e in d.get("execution", []) if e.get("probe_ok") is not False), None)
 print(r["hermes_provider"], r["model"], r.get("reasoning") or "") if r else print("", "", "")')
 if [ -z "$PROVIDER" ]; then echo "[cycle] no usable L1 route: analysis skipped"; else
-args=(chat --query-file /opt/walter-router/config/analysis_prompt.md --oneshot -Q --provider "$PROVIDER" -m "$MODEL"
+args=(chat --query-file "$ANALYSIS_PROMPT" --oneshot -Q --provider "$PROVIDER" -m "$MODEL"
       -t terminal,file,web --max-turns 30 --run-budget 900 --source walter-router-analysis)
 [ -n "$REASONING" ] && args+=(--reasoning "$REASONING")
 echo "[cycle] analysis model: $PROVIDER $MODEL ${REASONING:-}"
@@ -39,6 +44,6 @@ echo "[cycle] 4/4 re-derive with the new name links, recompute, notify (only: a 
 "$WR" refresh --skip-collect || exit 1
 echo "[cycle] Hermes auxiliary jobs follow the router's postes (only when a pick changed)"
 "$WR" sync-hermes --apply > "$LOG/sync-hermes-$day.json" 2>&1 || echo "[cycle] sync-hermes failed (non-blocking)"
-echo "[cycle] library page https://library.walter-ai.cloud (Cloudflare Access)"
+echo "[cycle] library page ${LIBRARY_URL:-(not published by this instance)} (Cloudflare Access)"
 "$WR" publish-library || echo "[cycle] library page not published (non-blocking)"
 exit 0

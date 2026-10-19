@@ -17,7 +17,9 @@
     "walter_router/db.py"
   ],
   "backup_paths": [
-    "."
+    ".",
+    "@instance/config/router",
+    "@instance/state/router"
   ],
   "interfaces": [
     "CLI",
@@ -32,7 +34,7 @@
   },
   "limitations": [
     "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
-    "New model choices remain subject to Monsieur approval; no automatic switching introduced."
+    "New model choices remain subject to the owner's approval; no automatic switching introduced."
   ],
   "services": [],
   "optional": [],

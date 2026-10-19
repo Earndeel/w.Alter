@@ -1,4 +1,4 @@
--- 2026-10-14 (Monsieur): (1) a decision category for image inputs (fast web navigation, bulk image processing):
+-- 2026-10-14: (1) a decision category for image inputs (fast web navigation, bulk image processing):
 -- same AA Decision Index, restricted to decision models that read images. (2) an alert when a leaderboard can no
 -- longer be read (Arena image-edit stopped returning rows on 2026-10-10 and nobody knew).
 begin;

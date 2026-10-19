@@ -9,7 +9,7 @@ import tempfile
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 
-from . import identity
+from . import identity, instance
 
 MIN_SIMILARITY = 0.6  # below: a rename (Hailuo 3 = MiniMax H3) — accepted only with a source URL in the reason
 
@@ -19,11 +19,15 @@ def _read() -> dict:
 
 
 def _write(doc: dict) -> None:
-    fd, tmp = tempfile.mkstemp(dir=identity.AUTO_ALIASES.parent, suffix=".json")
+    """Learned links belong to the instance: always written to its own copy, never to the shipped file."""
+    target = instance.own_file("aliases_auto.json")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=target.parent, suffix=".json")
     with os.fdopen(fd, "w") as fh:
         json.dump(doc, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
-    os.replace(tmp, identity.AUTO_ALIASES)
+    os.replace(tmp, target)
+    identity.AUTO_ALIASES = target
 
 
 def add(conn, key: str, model_id: str, reason: str, origin: str = "agent") -> dict:

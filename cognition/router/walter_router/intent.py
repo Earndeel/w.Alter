@@ -1,7 +1,7 @@
 """Intent classification with Jev (TypeSafe's structured decision model, through OpenRouter's Decisions API).
 
 One call answers four questions about a free-text request (~0.4 s, ~0.00005 $): task family, video objective
-(Monsieur's video roles), text level (L1/L2/L3) and whether an uncensored model is needed. The criteria come from
+(the owner's video roles), text level (L1/L2/L3) and whether an uncensored model is needed. The criteria come from
 the database (task labels/descriptions, role descriptions), so declaring a new role in knowledge.json teaches Jev
 the new objective without code. On any failure the caller falls back to keywords.
 
@@ -18,6 +18,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 from . import collect
+from . import instance
 
 URL = "https://openrouter.ai/api/alpha/decisions"
 MODEL = "~typesafe/jev-latest"
@@ -26,16 +27,16 @@ MODEL = "~typesafe/jev-latest"
 MODELS = ("cloudflare/clef", "inception/mercury-decide:free", MODEL)  # eval 2026-10-04: Clef 30/30 (Flash 29/30)
 FREE_FALLBACKS = ("inception/mercury-decide:free", "cloudflare/clef")  # free: survive an exhausted OpenRouter credit
 ACCEPTED_PREFIXES = ("typesafe/jev-", "inception/mercury-decide", "cloudflare/clef")
-KNOWLEDGE = Path(__file__).resolve().parent.parent / "config" / "knowledge.json"
+KNOWLEDGE = instance.config_path("knowledge.json")
 
 
 def chain(conn) -> tuple[str, ...]:
     """Decision models to try, in order. The best one comes from the 48 h cycle (task 'decision', AA Decision Index,
     callable Decisions-API offer); knowledge.json `decision.order` says where it goes:
       best_first  best, then the free fallbacks (Mercury Decide free, Clef on Workers AI)
-      free_first  the free models first, the best last (Monsieur's choice of 2026-10-04: Clef, free allocation)"""
+      free_first  the free models first, the best last (the owner's choice of 2026-10-04: Clef, free allocation)"""
     order = (json.loads(KNOWLEDGE.read_text()).get("decision") or {}).get("order", "free_first")
-    # Monsieur's pinned decision model first (a new #1 is only proposed, 2026-10-16), else the cycle's #1
+    # the owner's pinned decision model first (a new #1 is only proposed, 2026-10-16), else the cycle's #1
     row = conn.execute("""select o.offer_key from models.preferences p join models.offers o on o.model_id = p.pinned_model_id
                           join models.latest_snapshots s using (snapshot_id)
                           where p.task = 'decision' and p.role = 'default' and o.interface = 'decisions'

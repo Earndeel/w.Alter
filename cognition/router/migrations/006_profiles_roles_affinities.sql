@@ -1,10 +1,10 @@
--- Monsieur's model knowledge (2026-10-02): video is not "number 1, number 2" — the right model depends on the
+-- The owner's model knowledge (2026-10-02): video is not "number 1, number 2" — the right model depends on the
 -- objective (premium cinematic, action, UGC, budget...), on the workflow a model demands (Seedance 2.5: reference
 -- images + adapted prompting), on access (Omni 1.1 through Flow with the free monthly credits of Gemini AI Pro) and
 -- on content policy (MiniMax H3: open weights, reputedly permissive). Ties between close models go to his affinity
 -- (GPT-6 Luna, especially through the Codex subscription).
 begin;
--- One fiche per model: Monsieur's own knowledge, never derived from leaderboards.
+-- One fiche per model: the owner's own knowledge, never derived from leaderboards.
 create table if not exists models.profiles (
     model_id        text primary key references models.canonical,
     strengths       text[] not null default '{}',   -- tags: action, ugc, cinematic, realism, value...
@@ -15,7 +15,7 @@ create table if not exists models.profiles (
     cost_note       text,
     content_policy  text check (content_policy in ('standard', 'permissive', 'unrestricted')),  -- overrides canonical
     note            text,
-    source          text not null default 'monsieur',
+    source          text not null default 'owner',
     declared_at     timestamptz not null default now()
 );
 
@@ -25,7 +25,7 @@ alter table models.preferences add column if not exists description text;
 alter table models.preferences add column if not exists signals text[] not null default '{}';
 alter table models.preferences add column if not exists priority int not null default 0;  -- tie between roles
 
--- Close calls: inside the tie margin the model Monsieur prefers wins.
+-- Close calls: inside the tie margin the model the owner prefers wins.
 create table if not exists models.affinities (
     model_id    text not null references models.canonical,
     scope       text not null default '*',         -- task or '*'

@@ -1,4 +1,4 @@
--- 2026-10-02, Monsieur: (1) the three text tiers follow his method (walter_router/tiers.py); when the nightly
+-- 2026-10-02: (1) the three text tiers follow the owner's method (walter_router/tiers.py); when the nightly
 -- computation designates another model than the declared tier, he gets one 'tier' alert and decides.
 -- (2) specialised tasks: only the best model is useful (no #2/#3, no value ladder).
 begin;

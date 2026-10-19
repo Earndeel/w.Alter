@@ -1,4 +1,4 @@
--- Monsieur's subscriptions: usage meter readings (declared plans live in config/subscriptions.json).
+-- The owner's subscriptions: usage meter readings (declared plans live in config/subscriptions.json).
 begin;
 
 create table if not exists models.subscription_usage (

@@ -1,9 +1,9 @@
--- Monsieur keeps several favourites per task, one per use ("rôle"): video has a premium pick, a cheap
+-- The owner keeps several favourites per task, one per use ("rôle"): video has a premium pick, a cheap
 -- action-scene pick, a best-ratio pick and a budget pick. Each favourite has its own watch rule:
 --   quality   : alert when any model scores higher on the task leaderboard (premium / default favourites)
 --   dominance : alert only when a model scores higher AND costs no more per unit (ratio / budget picks)
 --   none      : never alert (no comparable measurement)
--- Offers can also be declared by Monsieur (e.g. Google Flow web UI): access 'ui' = usable by hand or through
+-- Offers can also be declared by the owner (e.g. Google Flow web UI): access 'ui' = usable by hand or through
 -- the browser, not through an API.
 begin;
 alter table models.preferences add column if not exists role text not null default 'default';

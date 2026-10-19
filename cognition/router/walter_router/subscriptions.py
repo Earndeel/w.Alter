@@ -1,4 +1,4 @@
-"""Monsieur's subscriptions — information only, no routing effect (Monsieur, 2026-10-14).
+"""The owner's subscriptions — information only, no routing effect (2026-10-14).
 
 Two sources, nothing else: our own measurement and SemiAnalysis (config/subscriptions.json).
   Our measurement
@@ -8,7 +8,7 @@ Two sources, nothing else: our own measurement and SemiAnalysis (config/subscrip
     usage      tokens W.Alter's runtimes really spent on each plan (Hermes + Codex CLI on ChatGPT, Claude Code on
                Claude), priced at list API rates → API value consumed and what a million tokens cost at this pace.
     capacity   ChatGPT: API value per meter point between two readings of the same week (Wokey / SemiAnalysis
-               method on Monsieur's account) → a full week, a full month. Claude: once calibrated.
+               method on the owner's account) → a full week, a full month. Claude: once calibrated.
   SemiAnalysis
     published API value of the plan per model (2026-10-05) and the tokens it buys on their agentic mix.
 """
@@ -23,12 +23,13 @@ from pathlib import Path
 
 from . import identity
 from . import select as sel
+from . import instance
 
-CONFIG = Path(__file__).resolve().parent.parent / "config" / "subscriptions.json"
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/root/.hermes"))
+CONFIG = instance.config_path("subscriptions.json")
+HERMES_HOME = instance.hermes_home()
 HERMES_PY = HERMES_HOME / "hermes-agent" / "venv" / "bin" / "python"
-CLAUDE_PROJECTS = Path(os.environ.get("CLAUDE_PROJECTS", "/root/.claude/projects"))
-CODEX_SESSIONS = Path(os.environ.get("CODEX_SESSIONS", "/root/.codex/sessions"))
+CLAUDE_PROJECTS = Path(os.environ.get("CLAUDE_PROJECTS") or Path.home() / ".claude" / "projects")
+CODEX_SESSIONS = Path(os.environ.get("CODEX_SESSIONS") or Path.home() / ".codex" / "sessions")
 WEEK = timedelta(days=7)
 MONTH_WEEKS = 30.44 / 7
 KINDS = ("input", "cache_read", "cache_write", "cache_write_1h", "output")
@@ -183,7 +184,7 @@ def priced(acc: dict, prices: dict) -> dict:
 # --- meters ---------------------------------------------------------------------------------------------------------
 
 def read_codex() -> list[dict]:
-    """Live Codex windows of Monsieur's ChatGPT account, through Hermes' own usage fetcher (read-only)."""
+    """Live Codex windows of the owner's ChatGPT account, through Hermes' own usage fetcher (read-only)."""
     code = ("import json; from agent.account_usage import fetch_account_usage; s = fetch_account_usage('openai-codex'); "
             "print(json.dumps(None if s is None else {'plan': s.plan, 'windows': [{'label': w.label, "
             "'used_percent': w.used_percent, 'reset_at': w.reset_at.isoformat() if w.reset_at else None} "
@@ -258,7 +259,7 @@ def refresh(conn, only: str | None = None, min_age_s: float = 0) -> dict:
 
 
 def calibrate(conn, sub_id: str, weekly_percent: float) -> dict:
-    """Monsieur read the weekly % on claude.ai: capacity = units of the last 7 days / that %. Written to the config."""
+    """The owner read the weekly % on claude.ai: capacity = units of the last 7 days / that %. Written to the config."""
     sub = get(sub_id)
     if sub["meter"]["source"] != "estimate_claude_code_logs":
         raise ValueError(f"{sub_id} is read from its vendor, nothing to calibrate")

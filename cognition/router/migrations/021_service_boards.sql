@@ -1,4 +1,4 @@
--- 2026-10-16 (Monsieur): « il faudra rajouter le reranking, embedding et STT dans walter router ». The three service
+-- 2026-10-16: « il faudra rajouter le reranking, embedding et STT dans walter router ». The three service
 -- postes of migration 020 get measured leaderboards and are ranked like any task (task_benchmarks weights ->
 -- scoring.composite, dossiers, challenger alerts). They stay PINNED on the models in use: a better measured model is
 -- only proposed (challenger, « Changer » button), never switched automatically.
@@ -13,7 +13,7 @@
 -- 'embeddings', which no offer carried: neither could rank a callable candidate.
 begin;
 update models.tasks set interface = 'transcription', quality_benchmark = 'aa_stt', quality_task = 'wer',
-    description = 'Transcrire les messages vocaux de Monsieur (français) : fidélité d''abord (AA-WER, mesuré en anglais : '
+    description = 'Transcrire les messages vocaux du propriétaire (français) : fidélité d''abord (AA-WER, mesuré en anglais : '
                   'AA ne publie pas de résultat français), puis vitesse. Modèles de transcription et modèles de chat qui '
                   'entendent l''audio.',
     requirements = requirements || '{"on_change": "Adopter un modèle de transcription dédié (Whisper, MAI, Scribe…) : le plugin Hermes gemini-stt appelle aujourd''hui chat/completions avec input_audio ; il devra appeler l''API de transcription d''OpenRouter."}'
@@ -27,8 +27,8 @@ update models.tasks set interface = 'embedding', quality_benchmark = 'agentset',
     description = 'Vecteurs de la mémoire Hindsight : qualité de recherche (ELO Agentset) et recherche en français (MTEB '
                   'MIRACL fr) ; seuls les modèles mesurés sur le classement principal sont rangés (revectoriser '
                   'ne se décide pas sur un seul test). Changer de modèle oblige à revectoriser toute la banque : '
-                  'jamais sans Monsieur.',
-    requirements = requirements || '{"require_primary": true, "on_change": "Changer de modèle d''embeddings = revectoriser toutes les banques Hindsight (walter, walter-shadow) : opération lourde, à planifier avec Monsieur. Hindsight garde son modèle dans sa configuration tant que ce n''est pas fait (walter-voice-memory n''est pas concerné : vecteurs locaux)."}'
+                  'jamais sans le propriétaire.',
+    requirements = requirements || '{"require_primary": true, "on_change": "Changer de modèle d''embeddings = revectoriser toutes les banques Hindsight (walter, walter-shadow) : opération lourde, à planifier avec the owner. Hindsight garde son modèle dans sa configuration tant que ce n''est pas fait (walter-voice-memory n''est pas concerné : vecteurs locaux)."}'
 where task = 'embeddings';
 
 insert into models.task_benchmarks (task, benchmark, bench_task, is_primary, weight, note) values

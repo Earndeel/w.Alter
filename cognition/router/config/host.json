@@ -1,0 +1,12 @@
+{
+  "_doc": "Host bindings of an instance (shipped default: none). An instance overrides this file in config/router/host.json. Paths: absolute, ~/ or @instance/. log_dir: cycle logs; collect_script: leaderboard collection (empty = skipped); control_env: HMAC secret of the manual trigger; control_origin / library_domain: where the library page and its trigger are served (empty = not published).",
+  "hermes_profiles_following_router": [],
+  "cron_postes": {},
+  "cloudflare_cli": "",
+  "library_domain": "",
+  "log_dir": "@instance/logs/router",
+  "collect_script": "",
+  "control_env": "@instance/bootstrap/router-control.env",
+  "control_origin": "",
+  "site_build": "@instance/state/router/site"
+}

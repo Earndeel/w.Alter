@@ -1,5 +1,5 @@
 -- 2026-10-14: AA Decision Index v1.0 (2026-10-13) joins the leaderboards. 'decision' is an INTERNAL task: the model
--- that understands Monsieur's intent and routes it (intent.py) and decides on environmental inputs (V3 triage).
+-- that understands the owner's intent and routes it (intent.py) and decides on environmental inputs (V3 triage).
 -- Interface 'decisions' (typed answers with probabilities, OpenRouter Decisions API / Workers AI); never offered to
 -- the intent classifier as a task family, never shown in the task list given to agents.
 begin;

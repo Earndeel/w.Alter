@@ -1,10 +1,10 @@
--- 2026-10-02, Monsieur:
+-- 2026-10-02:
 --   * a place for open-weights models (text, image, video...) and for unrestricted models (uncensored /
 --     abliterated fine-tunes, e.g. GLM 5.3 Flash Uncensored via Arnict AI on Hermes); the router can be asked for
 --     a model under one of these constraints (`pick --require unrestricted|open_weights`). An unrestricted
 --     fine-tune is rarely benchmarked: it inherits its base model's score, flagged as an estimate.
 --   * relevant notifications only: a new model is reported when it enters the top 3 of a leaderboard of a domain
---     Monsieur watches (alert kind 'top3'); unranked releases are recorded but never sent.
+--     the owner watches (alert kind 'top3'); unranked releases are recorded but never sent.
 begin;
 alter table models.canonical add column if not exists open_weights boolean;          -- null = unknown
 alter table models.canonical add column if not exists license text;

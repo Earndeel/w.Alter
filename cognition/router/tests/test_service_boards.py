@@ -97,7 +97,7 @@ def test_service_postes_rank_on_their_boards_and_stay_pinned():
         assert "revectoriser" in tasks["embeddings"]["requirements"]["on_change"]
         pins = {r["task"]: r["pinned_model_id"] for r in conn.execute(
             "select task, pinned_model_id from models.preferences where task in ('stt', 'rerank', 'embeddings')")}
-        assert len(pins) == 3 and all(pins.values())   # never switched by a refresh: only Monsieur's « Changer »
+        assert len(pins) == 3 and all(pins.values())   # never switched by a refresh: only the owner's « Changer »
         rerank = scoring.composite(conn, "rerank")
         if rerank:   # the 0.7 s recall budget excludes slower rerankers
             assert all((c.get("latency_ms") or 0) <= 700 for c in rerank)
