@@ -34,7 +34,7 @@ from fastapi import Request  # module level: FastAPI resolves endpoint annotatio
 HERE = Path(__file__).resolve().parent
 AGENTS = HERE / "agents.json"
 LOG = Path("/root/.hermes/logs/walter-llm.jsonl")
-ROUTER = "/opt/walter-router/bin/walter-router"
+ROUTER = "walter-router"   # Walter Router CLI on the PATH
 SECRETS_MAP = Path("/root/.hermes/vault/secrets-map.json")
 sys.path.insert(0, "/root/.hermes/plugins/walter-secrets")
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36"
