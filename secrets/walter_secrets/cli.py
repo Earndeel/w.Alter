@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""walter-secret — shell access to Monsieur's Bitwarden for W.Alter (root only).
+"""walter-secret — shell access to the owner's Bitwarden for W.Alter (root only).
 
   walter-secret get <item id|name> <field>     print the value (used by {{bw:…}} placeholders in terminal commands)
   walter-secret ref <item> <field>             value-free reference for local binding

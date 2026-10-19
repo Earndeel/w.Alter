@@ -2,10 +2,30 @@
 from __future__ import annotations
 import os
 from pathlib import Path
+import subprocess
 import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = Path(os.environ.get('WALTER_SECRETS_CONFIG', str(ROOT / 'config/walter-secrets.toml')))
+SHIPPED = ROOT / 'config/walter-secrets.toml'
+INSTANCE = '@instance'
+
+
+def _walter_instance(*args):
+    """The active Walter instance, asked through its public interface; None when unavailable."""
+    try:
+        out = subprocess.run(['walter', 'instance', *args], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return Path(out.stdout.strip()) if out.returncode == 0 and out.stdout.strip() else None
+
+
+def _config_path():
+    if os.environ.get('WALTER_SECRETS_CONFIG'):
+        return Path(os.environ['WALTER_SECRETS_CONFIG'])
+    return _walter_instance('config', 'secrets', 'walter-secrets.toml') or SHIPPED
+
+
+CONFIG_PATH = _config_path()
 try:
     with CONFIG_PATH.open('rb') as stream:
         CONFIG = tomllib.load(stream)
@@ -17,8 +37,19 @@ def setting(section: str, key: str, default=None):
     return CONFIG.get(section, {}).get(key, default)
 
 
+def expand(value: str | Path) -> Path:
+    """Absolute, ~/... or @instance/... (the active instance)."""
+    value = str(value)
+    if value == INSTANCE or value.startswith(INSTANCE + '/'):
+        root = _walter_instance('path')
+        if root is None:
+            raise RuntimeError('no active Walter instance for ' + value)
+        return root / value[len(INSTANCE):].lstrip('/')
+    return Path(value).expanduser()
+
+
 def path(key: str, default: str | Path) -> Path:
-    return Path(setting('paths', key, str(default))).expanduser()
+    return expand(setting('paths', key, str(default)))
 
 
 DATA_ROOT = path('legacy_data_root', Path.home() / '.hermes')
