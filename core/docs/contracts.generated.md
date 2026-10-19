@@ -25,7 +25,7 @@ Généré depuis les manifestes propriétaires. Les scénarios décrivent les cr
 Rechercher, extraire et gérer les parcours web avec un moteur commun.
 
 Contrat 1.0.0; propriétaire : browse.
-Racine actuelle : `/opt/walter-browse`. Cible : `/walter/browse`.
+Racine actuelle : `/walter/browse`. Cible : `/walter/browse`.
 
 Interfaces : shared request contract, CLI, MCP, Hermes plugin.
 

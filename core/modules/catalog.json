@@ -5,7 +5,8 @@
       "id": "browse",
       "target": "browse",
       "legacy": "/opt/walter-browse",
-      "manifest": "contracts/browse.json"
+      "manifest": "contracts/browse.json",
+      "neutral": true
     },
     {
       "id": "bus",
