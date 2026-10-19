@@ -1,10 +1,9 @@
 {
   "id": "skills",
-  "root": "/opt/walter-skills",
   "anchors": [
-    "/opt/walter-skills/config/walter-skills.toml",
-    "/opt/walter-skills/contracts/skills.json",
-    "/opt/walter-skills/walter_skills/api.py"
+    "config/walter-skills.toml",
+    "contracts/skills.json",
+    "walter_skills/api.py"
   ],
   "requires": [
     "bus"
@@ -18,11 +17,11 @@
     "skills.*"
   ],
   "core_paths": [
-    "/opt/walter-skills/walter_skills/client.py",
-    "/opt/walter-skills/walter_skills/policy.py"
+    "walter_skills/client.py",
+    "walter_skills/policy.py"
   ],
   "backup_paths": [
-    "/opt/walter-skills"
+    "."
   ],
   "interfaces": [
     "HTTP :8891",
@@ -50,9 +49,9 @@
     "owner": "skills",
     "kind": "capability",
     "purpose": "Gérer le contenu, la recherche, les propositions et la curation des procédures.",
-    "target_root": "/walter/skills",
+    "target_root": "skills",
     "config_paths": [
-      "/opt/walter-skills/config/walter-skills.toml"
+      "config/walter-skills.toml"
     ],
     "permissions": [
       "propositions en brouillon",
