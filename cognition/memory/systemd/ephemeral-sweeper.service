@@ -1,9 +1,0 @@
-[Unit]
-Description=W.Alter memory hygiene - reversible PostgreSQL quarantine of ephemeral run facts
-
-[Service]
-Type=oneshot
-WorkingDirectory=/opt/walter-memory
-ExecStart=/opt/walter-memory/venv/bin/python -m walter_memory.hygiene --kind ephemeral --apply --limit 200
-StandardOutput=append:/root/.hermes/logs/ephemeral-sweeper.log
-StandardError=append:/root/.hermes/logs/ephemeral-sweeper.log
