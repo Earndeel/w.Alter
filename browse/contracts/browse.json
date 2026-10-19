@@ -1,10 +1,9 @@
 {
   "id": "browse",
-  "root": "/opt/walter-browse",
   "anchors": [
-    "/opt/walter-browse/contracts/browse.json",
-    "/opt/walter-browse/runtime/universal_router.py",
-    "/opt/walter-browse/walter_browse/facade.py"
+    "contracts/browse.json",
+    "runtime/universal_router.py",
+    "walter_browse/facade.py"
   ],
   "requires": [],
   "external": [
@@ -18,15 +17,15 @@
     "result cache"
   ],
   "core_paths": [
-    "/opt/walter-browse/walter_browse",
-    "/opt/walter-browse/runtime/universal_router.py",
-    "/opt/walter-browse/runtime/browse_session.py",
-    "/opt/walter-browse/runtime/profile_index.py",
-    "/opt/walter-browse/runtime/result_cache.py",
-    "/opt/walter-browse/runtime/search_lite.py"
+    "walter_browse",
+    "runtime/universal_router.py",
+    "runtime/browse_session.py",
+    "runtime/profile_index.py",
+    "runtime/result_cache.py",
+    "runtime/search_lite.py"
   ],
   "backup_paths": [
-    "/opt/walter-browse"
+    "."
   ],
   "interfaces": [
     "shared request contract",
@@ -55,9 +54,9 @@
     "owner": "browse",
     "kind": "capability",
     "purpose": "Rechercher, extraire et gérer les parcours web avec un moteur commun.",
-    "target_root": "/walter/browse",
+    "target_root": "browse",
     "config_paths": [
-      "/opt/walter-browse/config"
+      "config"
     ],
     "permissions": [
       "sessions de navigateur gérées",
