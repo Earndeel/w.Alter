@@ -1,9 +1,8 @@
 {
   "id": "computer",
-  "root": "/opt/walter-computer",
   "anchors": [
-    "/opt/walter-computer/contracts/computer.json",
-    "/opt/walter-computer/walter_computer/__init__.py"
+    "contracts/computer.json",
+    "walter_computer/__init__.py"
   ],
   "requires": [],
   "external": [
@@ -15,17 +14,17 @@
     "isolated ephemeral operator sessions"
   ],
   "core_paths": [
-    "/opt/walter-computer/walter_computer/operator.py",
-    "/opt/walter-computer/walter_computer/policy.py",
-    "/opt/walter-computer/walter_computer/config.py",
-    "/opt/walter-computer/walter_computer/driver.py",
-    "/opt/walter-computer/walter_computer/transport.py",
-    "/opt/walter-computer/walter_computer/types.py",
-    "/opt/walter-computer/walter_computer/runtime.py",
-    "/opt/walter-computer/walter_computer/observer.py"
+    "walter_computer/operator.py",
+    "walter_computer/policy.py",
+    "walter_computer/config.py",
+    "walter_computer/driver.py",
+    "walter_computer/transport.py",
+    "walter_computer/types.py",
+    "walter_computer/runtime.py",
+    "walter_computer/observer.py"
   ],
   "backup_paths": [
-    "/opt/walter-computer",
+    ".",
     "/root/walter-computer-use",
     "/root/.config/walter-device-node",
     "/etc/tmpfiles.d/walter-computer.conf"
@@ -57,11 +56,11 @@
     "owner": "computer",
     "kind": "capability",
     "purpose": "Observer et manipuler un appareil avec des permissions et cibles explicites.",
-    "target_root": "/walter/computer",
+    "target_root": "computer",
     "config_paths": [
       "/root/.config/walter-device-node",
-      "/opt/walter-computer/config.json",
-      "/opt/walter-computer/gateway.env"
+      "config.json",
+      "gateway.env"
     ],
     "permissions": [
       "read/input/foreground/pixels/vision accordés par le host",
