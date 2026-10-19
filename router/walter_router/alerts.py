@@ -79,8 +79,8 @@ def new_best(conn, run_id: int, chg: dict | None = None) -> list[str]:
             from .scoring import composite
             prev_c = next((c["composite"] for c in composite(conn, r["task"]) if c["model_id"] == r["old_id"]), None)
             old_q = {"quality": prev_c} if prev_c is not None else None
-        if old_q and old_q["quality"] >= r["quality"]:
-            continue  # reshuffle by tie-break, not a better model
+        if old_q and r["quality"] is not None and old_q["quality"] >= r["quality"]:
+            continue  # reshuffle by tie-break, not a better model (an unranked newer version is always proposed)
         chg = chg or changes.events(conn)
         why = changes.changed(chg, r["new_id"]) + [f'{r["old_id"]} dégradé' for _ in chg["nerf"].get(r["old_id"], [])[:1]]
         ev = {"task_label": r["label"], "interface": r["interface"], "name": r["display_name"], "score": r["quality"],
@@ -493,7 +493,8 @@ def _block(conn, a: dict) -> list[str]:
         c = catalog.card(conn, a["subject"], task["interface"], task["modes"])
         return [f'🆕 {task["label"]} — nouveau n°1 proposé', _head(c), _money_line(c),
                 f'Le router garde {e["previous_name"]} tant que tu ne valides pas.',
-                f'📈 dépasse {e["previous_name"]} : {e["score"]:.0f} vs {e["previous_score"] or 0:.0f}', _why(e)]
+                (f'📈 dépasse {e["previous_name"]} : {e["score"]:.0f} vs {e["previous_score"] or 0:.0f}' if e.get("score") is not None
+                 else f'🧪 version plus récente de {e["previous_name"]}, pas encore classée sur ce benchmark'), _why(e)]
     if a["kind"] == "tier":
         model_id, _, variant = a["subject"].partition("/")
         c = catalog.card(conn, model_id, "chat")
