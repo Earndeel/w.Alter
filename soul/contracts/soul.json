@@ -3,23 +3,27 @@
   "anchors": [
     "bin/walter-soul",
     "contracts/soul.json",
-    "identity.md",
-    "rules.md"
+    "config/targets.toml",
+    "defaults/identity.md",
+    "defaults/rules.md"
   ],
   "requires": [],
   "external": [],
   "data": [
-    "identity sources",
-    "curated user profile"
+    "identity sources (instance)",
+    "curated user profile (instance)"
   ],
   "core_paths": [],
   "backup_paths": [
     ".",
-    "/opt/walter-profiles",
-    "/root/.hermes/memories"
+    "@instance/soul",
+    "@instance/config/soul",
+    "@instance/state/soul",
+    "@instance/profiles"
   ],
   "interfaces": [
     "renderer",
+    "walter-soul render/path/sync/check/init",
     "walter_profile MCP"
   ],
   "bindings": {
@@ -29,7 +33,7 @@
     "claude-code": "common MCP"
   },
   "limitations": [
-    "Profile and critical buffer retain compatibility locations under .hermes; no running Hermes required."
+    "An instance may keep historical target locations (harness homes, profile workspaces) through its targets override."
   ],
   "services": [],
   "optional": [],
@@ -38,10 +42,10 @@
     "version": "1.0.0",
     "owner": "soul",
     "kind": "foundation",
-    "purpose": "Posséder l’identité commune et générer les profils des clients.",
+    "purpose": "Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance.",
     "target_root": "soul",
     "config_paths": [
-      "rules.md"
+      "config/targets.toml"
     ],
     "permissions": [
       "écriture des profils générés"
