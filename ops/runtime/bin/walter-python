@@ -1,0 +1,4 @@
+#!/bin/sh
+# Walter's shared Python runtime (foundation module "runtime"). Modules run their Python through this
+# command, never through another module's interpreter.
+exec "$(dirname "$(readlink -f "$0")")/../venv/bin/python3" "$@"
