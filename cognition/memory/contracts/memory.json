@@ -147,6 +147,12 @@
         "role": "owner",
         "owner": "memory",
         "durability": "projection"
+      },
+      {
+        "id": "embedding-models",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "projection"
       }
     ],
     "migrations": [
