@@ -1,9 +1,8 @@
 {
   "id": "router",
-  "root": "/opt/walter-router",
   "anchors": [
-    "/opt/walter-router/contracts/router.json",
-    "/opt/walter-router/walter_router/cli.py"
+    "contracts/router.json",
+    "walter_router/cli.py"
   ],
   "requires": [],
   "external": [
@@ -15,10 +14,10 @@
     "config"
   ],
   "core_paths": [
-    "/opt/walter-router/walter_router/db.py"
+    "walter_router/db.py"
   ],
   "backup_paths": [
-    "/opt/walter-router"
+    "."
   ],
   "interfaces": [
     "CLI",
@@ -43,7 +42,7 @@
     "owner": "router",
     "kind": "capability",
     "purpose": "Choisir les modèles par poste avec décisions et coûts traçables.",
-    "target_root": "/walter/router",
+    "target_root": "router",
     "config_paths": [],
     "permissions": [
       "accord propriétaire pour changer un choix"
