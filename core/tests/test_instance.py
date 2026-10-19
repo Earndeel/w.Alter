@@ -102,6 +102,9 @@ class InstanceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             paths.join('/walter/soul', '@instance/../etc')
         self.assertFalse(paths.is_instance_path('@instances'))
+        self.assertEqual(str(paths.join('/walter/computer', '~/.config/x')), str(Path.home() / '.config/x'))
+        with self.assertRaises(ValueError):
+            paths.join('/walter/computer', '~/../etc')
 
     def test_markers_come_from_the_instance(self):
         self.assertEqual(instance.markers(), ['Alice Exemple', 'alice@example.org', 'exemple-corp', 'Madame'])

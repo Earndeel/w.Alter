@@ -23,7 +23,8 @@
       "id": "computer",
       "target": "computer",
       "legacy": "/opt/walter-computer",
-      "manifest": "contracts/computer.json"
+      "manifest": "contracts/computer.json",
+      "neutral": true
     },
     {
       "id": "context",

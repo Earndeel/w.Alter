@@ -374,10 +374,10 @@
     },
     {
       "id": "computer",
-      "root": "/opt/walter-computer",
+      "root": "/walter/computer",
       "anchors": [
-        "/opt/walter-computer/contracts/computer.json",
-        "/opt/walter-computer/walter_computer/__init__.py"
+        "/walter/computer/contracts/computer.json",
+        "/walter/computer/walter_computer/__init__.py"
       ],
       "requires": [],
       "external": [
@@ -389,20 +389,21 @@
         "isolated ephemeral operator sessions"
       ],
       "core_paths": [
-        "/opt/walter-computer/walter_computer/operator.py",
-        "/opt/walter-computer/walter_computer/policy.py",
-        "/opt/walter-computer/walter_computer/config.py",
-        "/opt/walter-computer/walter_computer/driver.py",
-        "/opt/walter-computer/walter_computer/transport.py",
-        "/opt/walter-computer/walter_computer/types.py",
-        "/opt/walter-computer/walter_computer/runtime.py",
-        "/opt/walter-computer/walter_computer/observer.py"
+        "/walter/computer/walter_computer/operator.py",
+        "/walter/computer/walter_computer/policy.py",
+        "/walter/computer/walter_computer/config.py",
+        "/walter/computer/walter_computer/driver.py",
+        "/walter/computer/walter_computer/transport.py",
+        "/walter/computer/walter_computer/types.py",
+        "/walter/computer/walter_computer/runtime.py",
+        "/walter/computer/walter_computer/observer.py"
       ],
       "backup_paths": [
-        "/opt/walter-computer",
+        "/walter/computer",
         "/root/walter-computer-use",
         "/root/.config/walter-device-node",
-        "/etc/tmpfiles.d/walter-computer.conf"
+        "/etc/tmpfiles.d/walter-computer.conf",
+        "/instances/monsieur/config/computer"
       ],
       "interfaces": [
         "OperatorSessions",
@@ -434,8 +435,8 @@
         "target_root": "/walter/computer",
         "config_paths": [
           "/root/.config/walter-device-node",
-          "/opt/walter-computer/config.json",
-          "/opt/walter-computer/gateway.env"
+          "/walter/computer/config/config.json",
+          "/instances/monsieur/config/computer/config.json"
         ],
         "permissions": [
           "read/input/foreground/pixels/vision accordés par le host",

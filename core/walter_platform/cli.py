@@ -12,7 +12,7 @@ def main(argv=None):
         if name=='render':q.add_argument('--format',choices=('json','markdown'),default='json')
     q=sub.add_parser('path');q.add_argument('module');q.add_argument('parts',nargs='*')
     sub.add_parser('layout')
-    q=sub.add_parser('instance');q.add_argument('instance_action',nargs='?',choices=('show','check','path','render'),default='show');q.add_argument('parts',nargs='*')
+    q=sub.add_parser('instance');q.add_argument('instance_action',nargs='?',choices=('show','check','path','render','config'),default='show');q.add_argument('parts',nargs='*')
     sub.add_parser('matrix')
     sub.add_parser('doctor')
     q=sub.add_parser('export');q.add_argument('destination');q.add_argument('--apply',action='store_true');q.add_argument('--wheelhouse')
@@ -48,6 +48,9 @@ def main(argv=None):
             from . import instance
             if a.instance_action=='path':
                 print(instance.path(*a.parts));return 0
+            if a.instance_action=='config':
+                if len(a.parts)!=2:raise ValueError('usage: walter instance config <module> <file>')
+                print(instance.config(*a.parts));return 0
             if a.instance_action=='render':
                 sys.stdout.write(instance.render(sys.stdin.read()));return 0
             out=instance.check() if a.instance_action=='check' else instance.show()

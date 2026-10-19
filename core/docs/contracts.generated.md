@@ -82,7 +82,7 @@ Interfaces : on_demand.py CLI.
 Observer et manipuler un appareil avec des permissions et cibles explicites.
 
 Contrat 1.0.0; propriétaire : computer.
-Racine actuelle : `/opt/walter-computer`. Cible : `/walter/computer`.
+Racine actuelle : `/walter/computer`. Cible : `/walter/computer`.
 
 Interfaces : OperatorSessions, MCP computer_use, Hermes plugin.
 

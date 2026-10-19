@@ -49,9 +49,12 @@ def is_instance_path(value):
 
 def join(root, value):
     """Expand a contract path: absolute values are external to the module and kept as they are;
-    ``@instance[/sub]`` designates the active instance (walter_platform.instance), never a fixed directory."""
+    ``@instance[/sub]`` designates the active instance (walter_platform.instance), never a fixed directory;
+    ``~/sub`` is the service user's home (never a literal /root)."""
     if isinstance(value, str) and value.startswith('/'):
         return _safe_absolute(value, 'contract path')
+    if isinstance(value, str) and value.startswith('~/'):
+        return _safe_absolute(str(Path.home() / relative(value[2:])), 'contract path')
     if is_instance_path(value):
         from . import instance
         rest = value[len(INSTANCE):].lstrip('/')
