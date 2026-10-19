@@ -1,0 +1,8 @@
+#!/bin/sh
+# Walter Browse tests, each suite with the interpreter it runs on in production:
+# runtime/ (unittest) on the isolated Scrapling environment, tests/ (pytest) on the Walter runtime.
+set -e
+root="$(dirname "$(readlink -f "$0")")/.."
+cd "$root"
+/root/.venv/scrapling/bin/python -m unittest discover -s runtime -p 'test_*.py' "$@"
+walter-python -m pytest -q -p no:cacheprovider tests
