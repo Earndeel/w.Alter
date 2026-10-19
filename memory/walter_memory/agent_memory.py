@@ -17,57 +17,32 @@ from .db import connection
 BUDGETS = {'low': (6, 1024), 'mid': (12, 2048), 'high': (20, 4096)}
 
 
+def _caller_source(caller):
+    if caller.startswith('hermes:'):
+        profile = caller.split(':', 1)[1]
+        return 'hermes', profile + ':walter-core', 'local_only' if profile == 'wild' else 'cloud_allowed'
+    aliases = {'claude-code': 'claude_code'}
+    source = aliases.get(caller, caller)
+    if source not in {'hermes', 'codex', 'claude_code', 'dsh', 'walter'}:
+        source = 'walter'
+    return source, 'walter-core', 'cloud_allowed'
+
+
 def _classify(text: str, *, caller: str = 'walter', context: str = '') -> str:
     detections = privacy.detect(text) + privacy.detect(context)
+    source, account, floor = _caller_source(caller)
     with connection() as conn:
-        cls, _ = privacy.classify(conn, {'source': caller, 'source_account': 'walter-core',
+        cls, _ = privacy.classify(conn, {'source': source, 'source_account': account,
                                         'event_type': 'note.recorded',
                                         'categories': {category for category, _ in detections}})
     # A secret must never depend on a missing/misconfigured category policy.
-    return privacy.strictest(cls, 'local_only' if any(c == 'secret' for c, _ in detections) else 'cloud_allowed')
+    return privacy.strictest(cls, floor, 'local_only' if any(c == 'secret' for c, _ in detections) else 'cloud_allowed')
 
 
-def _canonical_allowed(conn, row: dict) -> bool:
-    """Check current canonical privacy, all provenance, retractions and index freshness."""
-    if row.get('privacy_class') != 'cloud_allowed':
-        return False
-    kind, ref = row.get('kind'), row.get('ref_id')
-    if kind == 'event':
-        value = conn.execute("""select e.privacy_class, e.content,
-            not exists (select 1 from core.events r where r.event_type='event.retracted'
-              and r.payload @> jsonb_build_object('target_event_id',e.event_id::text)) as allowed
-            from core.events e where e.event_id=%s limit 1""", (ref,)).fetchone()
-    elif kind == 'object':
-        value = conn.execute("""select privacy_class,
-            coalesce(original_name,'') || E'\n' || coalesce(derived_text,'') as content,
-            (purged_at is null and status not in ('quarantined','purged','deleted')) as allowed
-            from core.objects where id=%s""", (ref,)).fetchone()
-    elif kind == 'derived':
-        value = conn.execute("""select d.privacy_class, d.content,
-            (d.status in ('derived','verified')
-             and coalesce(d.attributes->>'quarantined','false') not in ('true','1')
-             and cardinality(d.source_event_ids)+cardinality(d.source_object_ids)>0
-             and not exists (
-               select 1 from unnest(d.source_event_ids) src(event_id) where not exists (
-                 select 1 from core.events e where e.event_id=src.event_id and e.privacy_class='cloud_allowed'
-                 and not exists (select 1 from core.events r where r.event_type='event.retracted'
-                   and r.payload @> jsonb_build_object('target_event_id',e.event_id::text))))
-             and not exists (
-               select 1 from unnest(d.source_object_ids) src(id) where not exists (
-                 select 1 from core.objects o where o.id=src.id and o.privacy_class='cloud_allowed'
-                   and o.purged_at is null and o.status not in ('quarantined','purged','deleted')))) as allowed
-            from core.derived_items d where d.item_id=%s""", (ref,)).fetchone()
-    else:
-        return False
-    if not value or value['privacy_class'] != 'cloud_allowed' or not value.get('allowed'):
-        return False
-    # Mutable derived/object content can outlive an old search chunk. Never return that stale projection.
-    fragment=(row.get('text') or '').strip()
-    canonical=(value.get('content') or '').strip()
-    return bool(fragment and fragment in canonical)
+from .read_policy import canonical_allowed as _canonical_allowed
 
 
-def recall(query: str, budget: str = 'mid', max_tokens: int = 2048, *, caller: str = 'walter') -> dict:
+def recall(query: str, budget: str = 'mid', max_tokens: int = 2048, *, caller: str = 'walter', structured: bool = False) -> dict:
     count, cap = BUDGETS.get(budget, BUDGETS['mid'])
     cap = max(128, min(int(max_tokens), cap, 8192))
     cls = _classify(query, caller=caller)
@@ -90,7 +65,10 @@ def recall(query: str, budget: str = 'mid', max_tokens: int = 2048, *, caller: s
             if used + len(line) > cap * 4:
                 continue
             lines.append(line); used += len(line)
-            records.append({'ref': ref, 'privacy_class': 'cloud_allowed'})
+            record = {'ref': ref, 'privacy_class': 'cloud_allowed'}
+            if structured:
+                record.update(text=text, date=str(row.get('occurred_at') or '')[:10], score=float(row.get('score') or 0))
+            records.append(record)
             if len(records) >= count:
                 break
     return {'status': 'ok', 'backend': 'walter-memory', 'privacy_class': 'cloud_allowed',
@@ -104,13 +82,14 @@ def retain(content: str, context: str = '', tags: list[str] | None = None, *, ca
     if not content.strip():
         raise ValueError('content must be nonempty')
     now = datetime.now(timezone.utc)
-    event = {'event_type': 'note.recorded', 'source': caller, 'source_account': 'walter-core',
+    source, account, floor = _caller_source(caller)
+    event = {'event_type': 'note.recorded', 'source': source, 'source_account': account,
              'source_id': str(uuid.uuid4()), 'occurred_at': now, 'content': content,
-             'payload': {'context': context, 'tags': tags or []},
+             'payload': {'context': context, 'tags': tags or [], 'caller': caller},
              'actor': {'account': 'walter-core', 'external_id': caller, 'display_name': caller}}
     # Classification belongs to the module and includes context/tags, not to an adapter.
     with connection() as conn:
-        cls = privacy.classify_event(conn, event)
+        cls = privacy.strictest(privacy.classify_event(conn, event), floor)
         if any(c == 'secret' for c, _ in privacy.detect(content + '\n' + json.dumps(event['payload'], ensure_ascii=False))):
             cls = privacy.strictest(cls, 'local_only')
         event['privacy_class'] = cls

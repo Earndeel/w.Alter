@@ -51,3 +51,16 @@ def test_sqlite_counts_without_content(tmp_path):
     db=tmp_path/'state.db';c=sqlite3.connect(db)
     c.execute('create table messages(id integer, content text)');c.execute("insert into messages values(1,'synthetic')");c.commit();c.close()
     assert check_sqlite(db)=={'ok':True,'tables':1,'counts':{'messages':1}}
+
+
+def test_source_validation_distinguishes_knowledge_templates_and_executable_code(tmp_path):
+    from walter_memory.restore_drill import validate_sources,DrillError
+    root=tmp_path/'opt/walter-skills';root.mkdir(parents=True)
+    code=root/'service.py';code.write_text('valid = True\n')
+    example=root/'skills/example/templates/broken.py';example.parent.mkdir(parents=True)
+    example.write_text('bad = "unterminated\n')
+    report=validate_sources(tmp_path)
+    assert report['parsed']==1 and len(report['non_runtime_artifacts'])==1
+    code.write_text('runtime = "unterminated\n')
+    with pytest.raises(DrillError,match='restored Python source invalid: opt/walter-skills/service.py:1'):
+        validate_sources(tmp_path)

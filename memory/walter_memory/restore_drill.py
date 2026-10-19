@@ -89,6 +89,30 @@ def check_sqlite(path):
     finally:db.close()
 
 
+def validate_sources(restored):
+    """Parse executable module sources; archived skill examples are data, not imports."""
+    restored=Path(restored)
+    registry=restored/'opt/walter-core/modules/registry.json'
+    roots=({restored/m['root'].lstrip('/') for m in json.loads(registry.read_text())['modules']}
+           if registry.exists() else set((restored/'opt').glob('walter-*')))
+    parsed=0; artifacts=[]
+    for module in sorted(roots):
+        for source in module.rglob('*.py'):
+            rel=source.relative_to(module)
+            if source.is_symlink() or any(p in {'.git','venv','.venv','node_modules','__pycache__'} for p in rel.parts):
+                continue
+            knowledge=rel.parts[0] in {'skills','.worktrees'}
+            try:
+                ast.parse(source.read_bytes(),filename=str(source));parsed+=1
+            except SyntaxError as exc:
+                location=str(source.relative_to(restored))+':'+str(exc.lineno)
+                if knowledge:
+                    artifacts.append({'path':location,'type':'SyntaxError','scope':'non-runtime skill artifact'})
+                else:
+                    raise DrillError('restored Python source invalid: '+location) from None
+    return {'parsed':parsed,'non_runtime_artifacts':artifacts}
+
+
 def production_versions():
     versions={}
     for path in sorted(Path('/opt').glob('walter-*')):
@@ -144,12 +168,9 @@ def drill(report_path: Path, *, remote='gdrive:W.Alter Backups', image=None, scr
       report['main_sqlite']=check_sqlite(payloads['statedb'])
       report['profile_sqlite']={str(p.relative_to(restored)):check_sqlite(p)
                                for p in sorted((restored/'root/.hermes/profiles').glob('*/*.db'))}
-      # Parse restored module sources without executing credentials, callbacks or imports.
-      parsed=0
-      for module in sorted((restored/'opt').glob('walter-*')):
-          for source in module.rglob('*.py'):
-              if not source.is_symlink():ast.parse(source.read_bytes(),filename=str(source));parsed+=1
-      report['restored_python_sources_parsed']=parsed
+      validation=validate_sources(restored)
+      report['restored_python_sources_parsed']=validation['parsed']
+      report['non_runtime_artifacts']=validation['non_runtime_artifacts']
       image=image or command(['docker','inspect','hindsight-pg','--format','{{.Image}}']).decode().strip()
       report['postgres_image']=image
       data=work/'pgdata';data.mkdir(mode=0o700)

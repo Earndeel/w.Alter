@@ -1,0 +1,132 @@
+{
+  "id": "logs",
+  "root": "/opt/walter-memory",
+  "anchors": [
+    "/opt/walter-memory/connectors/walter_logs.py",
+    "/opt/walter-memory/contracts/logs.json",
+    "/opt/walter-memory/walter_memory/logs.py"
+  ],
+  "requires": [
+    "memory"
+  ],
+  "external": [],
+  "data": [
+    "walter_logs.*"
+  ],
+  "core_paths": [
+    "/opt/walter-memory/walter_memory/logs.py"
+  ],
+  "backup_paths": [
+    "/opt/walter-memory"
+  ],
+  "interfaces": [
+    "Writer",
+    "CLI",
+    "MCP"
+  ],
+  "bindings": {
+    "hermes": "source transcript watcher + lifecycle adapter",
+    "dsh": "source transcript watcher + lifecycle adapter",
+    "codex": "source transcript watcher + lifecycle adapter",
+    "claude-code": "source transcript watcher + lifecycle adapter"
+  },
+  "limitations": [
+    "Only traces made available by the harness can be archived; hidden reasoning cannot be reconstructed."
+  ],
+  "services": [
+    "walter-logs-watch"
+  ],
+  "optional": [],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "logs",
+    "kind": "foundation",
+    "purpose": "Conserver les traces accessibles de tous les harnesses dans un journal commun.",
+    "target_root": "/walter/memory",
+    "config_paths": [],
+    "permissions": [
+      "lecture cloud-safe",
+      "masquage des secrets avant écriture"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "mcp",
+        "interface": "logs_search/logs_timeline/logs_get",
+        "access": "read",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "ingest",
+        "transport": "library",
+        "interface": "walter_memory.logs",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "postgres:walter_logs",
+        "role": "owner",
+        "owner": "logs",
+        "durability": "canonical"
+      },
+      {
+        "id": "postgres:core",
+        "role": "consumer",
+        "owner": "memory",
+        "durability": "canonical"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "all-sources",
+        "assertion": "Les sources principales et profils sont collectés avec reprise idempotente après interruption.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "id": "bus",
+  "root": "/opt/walter-memory",
+  "anchors": [
+    "/opt/walter-memory/contracts/bus.json",
+    "/opt/walter-memory/walter_memory/bus.py"
+  ],
+  "requires": [
+    "memory"
+  ],
+  "external": [],
+  "data": [
+    "bus.*"
+  ],
+  "core_paths": [
+    "/opt/walter-memory/walter_memory/bus.py"
+  ],
+  "backup_paths": [
+    "/opt/walter-memory"
+  ],
+  "interfaces": [
+    "Python emit/Consumer",
+    "Postgres LISTEN/NOTIFY"
+  ],
+  "bindings": {
+    "hermes": "lifecycle adapter",
+    "dsh": "lifecycle adapter",
+    "codex": "lifecycle adapter",
+    "claude-code": "lifecycle adapter"
+  },
+  "limitations": [],
+  "services": [],
+  "optional": [],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "bus",
+    "kind": "foundation",
+    "purpose": "Livrer les événements entre modules et conserver les curseurs de traitement.",
+    "target_root": "/walter/memory",
+    "config_paths": [],
+    "permissions": [
+      "droits PostgreSQL du consommateur"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "event",
+        "interface": "walter_memory.bus.emit/Consumer",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "postgres:bus",
+        "role": "owner",
+        "owner": "bus",
+        "durability": "canonical"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "catch-up",
+        "assertion": "Un consommateur arrêté reprend depuis son curseur sans perdre les événements persistés.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  }
+}
