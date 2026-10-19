@@ -1,0 +1,105 @@
+{
+  "id": "runtime",
+  "anchors": [
+    "contracts/runtime.json",
+    "requirements.lock",
+    "bin/walter-python"
+  ],
+  "backup_paths": [
+    "README.md",
+    "requirements.lock",
+    "requirements-dev.lock",
+    "bin",
+    "contracts",
+    "/usr/local/bin/walter-python"
+  ],
+  "core_paths": [],
+  "requires": [],
+  "optional": [],
+  "external": [
+    "CPython 3.12 (/usr/bin/python3.12)",
+    "uv"
+  ],
+  "services": [],
+  "data": [
+    "exact Python dependency set shared by Walter modules"
+  ],
+  "limitations": [
+    "The venv is rebuilt from the lock, not exported; a dependency upgrade affects every consumer at once."
+  ],
+  "interfaces": [
+    "command walter-python"
+  ],
+  "bindings": {
+    "hermes": "not used (Hermes keeps its own venv)",
+    "dsh": "hooks run through walter-python",
+    "codex": "hooks run through walter-python",
+    "claude-code": "hooks run through walter-python"
+  },
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "runtime",
+    "kind": "foundation",
+    "purpose": "Fournir l’environnement Python partagé des modules Walter.",
+    "target_root": "runtime",
+    "config_paths": [],
+    "permissions": [
+      "aucune permission propre ; exécute le code du module appelant avec ses droits"
+    ],
+    "invariants": [
+      "Les consommateurs passent par la commande walter-python, jamais par le chemin du venv.",
+      "Le lock décrit exactement l’environnement installé."
+    ],
+    "errors": [
+      "Une dépendance absente fait échouer l’import du module appelant, sans repli silencieux."
+    ],
+    "cancellation": [
+      "Sans objet : pas de processus propre."
+    ],
+    "migrations": [
+      "Reconstruction du venv depuis le lock ; les consommateurs ne changent pas."
+    ],
+    "operations": [
+      {
+        "id": "run-python",
+        "access": "execute",
+        "transport": "cli",
+        "interface": "walter-python",
+        "timeout_seconds": 10800,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "python-runtime",
+        "role": "owner",
+        "owner": "runtime",
+        "durability": "projection"
+      }
+    ],
+    "recovery": {
+      "backup": [
+        "lock et commande sauvegardés ; venv exclu"
+      ],
+      "restore": [
+        "uv venv puis uv pip install depuis le lock"
+      ],
+      "verification": [
+        "walter-python importe psycopg, fastembed, numpy, fastapi"
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "imports",
+        "assertion": "walter-python importe les dépendances déclarées dans le lock",
+        "scope": "unit"
+      },
+      {
+        "id": "consumers",
+        "assertion": "aucun module n’appelle l’interpréteur d’un autre module",
+        "scope": "integration"
+      }
+    ]
+  }
+}
