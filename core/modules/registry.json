@@ -257,11 +257,11 @@
     },
     {
       "id": "colab",
-      "root": "/opt/walter-colab",
+      "root": "/walter/colab",
       "anchors": [
-        "/opt/walter-colab/RUNBOOK.md",
-        "/opt/walter-colab/contracts/colab.json",
-        "/opt/walter-colab/on_demand.py"
+        "/walter/colab/RUNBOOK.md",
+        "/walter/colab/contracts/colab.json",
+        "/walter/colab/on_demand.py"
       ],
       "requires": [],
       "external": [
@@ -274,7 +274,7 @@
       ],
       "core_paths": [],
       "backup_paths": [
-        "/opt/walter-colab"
+        "/walter/colab"
       ],
       "interfaces": [
         "on_demand.py CLI"
@@ -299,7 +299,7 @@
         "owner": "colab",
         "kind": "capability",
         "purpose": "Préparer et exécuter des travaux de calcul distant qualifiés.",
-        "target_root": "/walter/compute/colab",
+        "target_root": "/walter/colab",
         "config_paths": [],
         "permissions": [
           "validation de l’artefact avant allocation GPU",

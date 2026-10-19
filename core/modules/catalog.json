@@ -11,7 +11,7 @@
     },
     {
       "id": "colab",
-      "manifest": "/opt/walter-colab/contracts/colab.json"
+      "manifest": "/walter/colab/contracts/colab.json"
     },
     {
       "id": "computer",

@@ -64,7 +64,7 @@ Interfaces : Python emit/Consumer, Postgres LISTEN/NOTIFY.
 Préparer et exécuter des travaux de calcul distant qualifiés.
 
 Contrat 1.0.0; propriétaire : colab.
-Racine actuelle : `/opt/walter-colab`. Cible : `/walter/compute/colab`.
+Racine actuelle : `/walter/colab`. Cible : `/walter/colab`.
 
 Interfaces : on_demand.py CLI.
 
