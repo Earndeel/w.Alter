@@ -6,11 +6,38 @@ API. The checkpoint policy and rendering still belong here, not in the host.
 """
 from __future__ import annotations
 
-from dataclasses import replace
-
 from .config import Config, load
-from .layers import body_start, record
-from .wire import Message, tokens, turn_starts, text_of
+from .layers import body_start, RECORD_HEADER
+from . import digest
+from .wire import Message, tokens, turn_starts, text_of, calls
+
+
+def _record(body: list[Message], cfg: Config) -> str:
+    """Keep all visible dialogue in order; tool payloads stay behind their refs.
+
+    This is the checkpoint contract, not the lossy projection record. In
+    particular, intermediate assistant explanations are part of visible dialogue
+    and must not disappear merely because a later assistant answer exists.
+    """
+    parts=[RECORD_HEADER]
+    for message in body:
+        role=message.get('role')
+        text=text_of(message.get('content')).strip()
+        if role in ('user','assistant'):
+            if text:parts.append(f'## {role.title()}\n{text}')
+            if role=='assistant':
+                for cid,name,args in calls(message):
+                    parts.append('## Action\n'+digest.args_summary(name,args,cfg.projection.args_chars)+
+                                 (f' · ref {cid}' if cid else ''))
+        elif role=='tool':
+            ref=message.get('tool_call_id')
+            if not ref:raise ValueError('checkpoint tool output lacks a recoverable reference')
+            status=digest.status_of(text)
+            parts.append('## Tool result\nref '+str(ref)+(f' · {status}' if status else '')+
+                         ' — original output available through context_recover.')
+        else:
+            raise ValueError('checkpoint contains an unsupported message role')
+    return '\n\n'.join(parts)
 
 
 def plan(messages: list[Message], *, model: str = "", measured_tokens: int = 0,
@@ -49,17 +76,12 @@ def summarize(messages: list[Message], *, cfg: Config | None = None, model: str 
     profile = cfg.profile(model)
     budget = min(profile.effective_budget, budget_tokens) if budget_tokens > 0 else profile.effective_budget
     limit = int(budget * cfg.policy.record_share)
-    users = [text_of(m.get('content')) for m in body if m.get('role') == 'user']
+    dialogue = [m for m in body if m.get('role') in ('user','assistant')]
     # Includes previous checkpoints (DSH persists those as user messages). No heuristic
     # can reliably identify which sentence is a constraint: preserve the whole text.
-    if tokens([{'role':'user','content':'\n\n'.join(users)}]) > limit:
-        raise ValueError('checkpoint cannot preserve user constraints within its budget')
-    projection = replace(cfg.projection, record_user_chars=max(cfg.projection.record_user_chars,
-                         sum(len(x) for x in users) + 2 * len(users)))
-    out = record(body, projection, lambda m: text_of(m.get('content')))
-    refs = list(dict.fromkeys(str(m['tool_call_id']) for m in body if m.get('role') == 'tool' and m.get('tool_call_id')))
-    if refs:
-        out['content'] += '\n\nRecoverable original tool results: ' + ', '.join(refs)
+    if tokens([{'role':m['role'],'content':text_of(m.get('content'))} for m in dialogue]) > limit:
+        raise ValueError('checkpoint cannot preserve user constraints and assistant text within its budget')
+    out = {'role':'user','content':_record(body,cfg)}
     if tokens([out]) > limit:
         raise ValueError('checkpoint exceeds record budget; originals remain in the host journal')
     return {"version": 1, "engine": "walter-context", "mode": "checkpoint",

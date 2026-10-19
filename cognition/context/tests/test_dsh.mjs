@@ -32,8 +32,8 @@ function setup() {
   session.append('request/header',{reason:'initial',header:{config:{provider:'walter',model:'coding'}}});
   return {ctx,session,engine,agent,registered};
 }
-function fill(session, turns = 5, instructionRole = null) {
-  for (let t=0;t<turns;t++) {
+function fill(session, turns = 5, instructionRole = null, startTurn = 0) {
+  for (let t=startTurn;t<startTurn+turns;t++) {
     session.append('turn/start',{turn:t});
     session.append('user/message',createUserMessage({content:[{type:'text',text:`request ${t}`}],source:{kind:'user'}}),{surfaceOp:'append'});
     if (t === 1 && instructionRole) {
@@ -42,11 +42,11 @@ function fill(session, turns = 5, instructionRole = null) {
       session.append(`${instructionRole}/message`,{message},{surfaceOp:'append'});
     }
     session.append('assistant/message',{turn:t,step:0,stream:[],message:createAssistantMessage({content:[{type:'tool-call',id:`call-${t}`,name:'read_file',arguments:'{}'}],source:{provider:'walter',model:'coding'}})},{surfaceOp:'append'});
-    session.append('tool/result',{turn:t,step:0,message:createToolResultMessage({callId:`call-${t}`,content:[{type:'text',text:`evidence-${t} `+'z'.repeat(60000)}],isError:false})},{surfaceOp:'append'});
+    session.append('tool/result',{turn:t,step:0,message:createToolResultMessage({callId:`call-${t}`,content:[{type:'text',text:`evidence-${t} `+'z'.repeat(30000)+` MIDDLE_TOOL_EVIDENCE_${t} `+'z'.repeat(30000)}],isError:false})},{surfaceOp:'append'});
     session.append('assistant/message',{turn:t,step:1,stream:[],message:createAssistantMessage({content:[{type:'text',text:`answer ${t}`}],source:{provider:'walter',model:'coding'}})},{surfaceOp:'append'});
     session.append('turn/end',{turn:t,reason:{kind:'completed'}});
   }
-  session.append('turn/start',{turn:turns});
+  session.append('turn/start',{turn:startTurn+turns});
   session.append('user/message',createUserMessage({content:[{type:'text',text:'latest live request'}],source:{kind:'user'}}),{surfaceOp:'append'});
 }
 
@@ -72,6 +72,34 @@ test('real DSH transaction: Walter checkpoint, raw originals, replay and recover
   const events = Array.from({length:session.seq},(_,n)=>session.eventAt(n));
   const replay = Session.create(session.id,events);
   assert.deepEqual(replay.deriveMessages(),session.deriveMessages());
+});
+
+test('repeated real checkpoints retain old user constraints and recover middle tool evidence', async () => {
+  const {session,engine,agent} = setup();
+  const text='Initial constraint '+('context '.repeat(1600))+' KEEP_MIDDLE_USER_CONSTRAINT '+('tail '.repeat(900))+' end';
+  session.append('user/message',createUserMessage({content:[{type:'text',text}],source:{kind:'user'}}),{surfaceOp:'append'});
+  fill(session);
+  assert.ok(await engine.compactIfNeeded(agent,'pressure',new AbortController().signal));
+  assert.ok(JSON.stringify(session.deriveMessages()).includes('KEEP_MIDDLE_USER_CONSTRAINT'));
+  session.append('turn/end',{turn:5,reason:{kind:'completed'}});
+  fill(session,5,null,6);
+  assert.ok(await engine.compactIfNeeded(agent,'pressure',new AbortController().signal));
+  assert.ok(session.deriveMessages().some(m=>m.content.some(b=>b.type==='text'&&b.text.includes(text))));
+  let offset=0,full='';
+  do {
+    const page=recoverOwn(session,'call-0',offset);full+=page.content;offset=page.next_offset;
+  } while(offset!==null);
+  assert.ok(full.includes('MIDDLE_TOOL_EVIDENCE_0'));
+  const events=Array.from({length:session.seq},(_,n)=>session.eventAt(n));
+  assert.deepEqual(Session.create(session.id,events).deriveMessages(),session.deriveMessages());
+});
+
+test('multimodal normalization keeps durable attachment references without pretending visual retention', () => {
+  const m=normalize([{role:'user',content:[{type:'text',text:'Read the attachment.'},
+    {type:'file',attachment:{id:'synthetic-pdf',uri:'synthetic://fixture/document.pdf'}},
+    {type:'image',attachment:{id:'synthetic-image'}}]}])[0];
+  assert.match(m.content,/synthetic-pdf/);assert.match(m.content,/synthetic-image/);
+  assert.match(m.content,/synthetic:\/\/fixture\/document.pdf/);
 });
 
 test('failed Python bridge closes the bracket without changing the surface', async () => {

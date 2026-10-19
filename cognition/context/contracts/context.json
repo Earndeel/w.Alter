@@ -1,0 +1,135 @@
+{
+  "id": "context",
+  "root": "/opt/walter-context",
+  "anchors": [
+    "/opt/walter-context/contracts/context.json",
+    "/opt/walter-context/ports/dsh/index.mjs",
+    "/opt/walter-context/ports/hermes/__init__.py",
+    "/opt/walter-context/walter_context/session.py"
+  ],
+  "requires": [],
+  "external": [
+    "Optional Walter Logs for Hermes journal recovery; DSH uses own raw journal"
+  ],
+  "data": [
+    "per-session projection epochs; recoverable originals in logs"
+  ],
+  "core_paths": [
+    "/opt/walter-context/walter_context"
+  ],
+  "backup_paths": [
+    "/opt/walter-context"
+  ],
+  "interfaces": [
+    "Python Session",
+    "Hermes ContextEngine adapter",
+    "DSH CompactionEngine adapter"
+  ],
+  "bindings": {
+    "hermes": "see live context.engine in harness check",
+    "dsh": "Walter compaction adapter",
+    "codex": "native compaction",
+    "claude-code": "native compaction"
+  },
+  "limitations": [
+    "DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.",
+    "Hermes remains on walter-compress; walter-context projection is not activated.",
+    "Structural and known-answer tests do not certify semantic model quality."
+  ],
+  "services": [],
+  "optional": [
+    "logs",
+    "llm"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "context",
+    "kind": "capability",
+    "purpose": "Construire le contexte et les checkpoints selon le contrat de chaque harness.",
+    "target_root": "/walter/context",
+    "config_paths": [
+      "/opt/walter-context/config/walter-context.toml"
+    ],
+    "permissions": [
+      "limites du modèle et du harness",
+      "confidentialité des originaux récupérés"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "library",
+        "interface": "Session / ContextEngine / CompactionEngine",
+        "access": "read",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "context-session-state",
+        "role": "owner",
+        "owner": "context",
+        "durability": "ephemeral"
+      },
+      {
+        "id": "postgres:walter_logs",
+        "role": "consumer",
+        "owner": "logs",
+        "durability": "canonical"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "context-retention",
+        "assertion": "Les contraintes, instructions, références et budgets survivent aux checkpoints répétés ou l’opération est refusée.",
+        "scope": "integration"
+      },
+      {
+        "id": "semantic-quality",
+        "assertion": "Un corpus fixé à l’avance respecte les seuils de qualité, coût et rétention visible.",
+        "scope": "live"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  }
+}
