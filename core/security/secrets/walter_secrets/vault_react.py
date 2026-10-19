@@ -104,7 +104,6 @@ def domains(item: dict) -> list[str]:
 
 # ── filing ─────────────────────────────────────────────────────────────────────
 def _decide(item: dict, dom: str | None, thematic: dict[str, str]) -> tuple[str | None, float]:
-    sys.path.insert(0, str(settings.MEMORY_ROOT))
     from walter_memory import llm
     by_num = {name[:2]: name for name in thematic}
     criteria = {num: FOLDER_HINTS.get(num, name) for num, name in by_num.items()}

@@ -26,7 +26,6 @@ from .vault import SecretError
 
 from . import settings
 BEEPER_API = settings.setting("otp", "beeper_api", "http://127.0.0.1:23373")
-CONNECTORS = str(settings.MEMORY_ROOT / "connectors")
 KEYWORDS = re.compile(r"code|otp|pin|passcode|password|mot de passe|v[ée]rification|verify|confirm|s[ée]curit[ée]|"
                       r"security|login|connexion|sign[- ]?in|authenticat|รหัส|ยืนยัน|验证码|コード", re.I)
 CANDIDATE = re.compile(r"(?<![\w/.-])(?:[A-Z]{1,3}-)?(\d{3}[ -]?\d{3}|\d{4,8})(?![\w/-]|[.,]\d)")
@@ -74,9 +73,7 @@ def _matches(terms: list[str], *texts: str) -> bool:
 
 # ── e-mail ─────────────────────────────────────────────────────────────────────
 def _gmail():
-    if CONNECTORS not in sys.path:
-        sys.path.insert(0, CONNECTORS)
-    from google_api import Google
+    from walter_memory.google import Google   # Walter Memory public client, via the shared runtime
     return Google()
 
 
