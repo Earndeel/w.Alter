@@ -144,7 +144,7 @@ Interfaces : MCP stdio, walter CLI, CLI contracts, matrix, doctor, Declarative h
 Exécuter les appels modèles des consommateurs autorisés via les postes du Router.
 
 Contrat 1.0.0; propriétaire : llm.
-Racine actuelle : `/opt/walter-llm`. Cible : `/walter/router/llm`.
+Racine actuelle : `/walter/router/llm`. Cible : `/walter/router/llm`.
 
 Interfaces : OpenAI-compatible :8894.
 

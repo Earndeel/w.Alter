@@ -53,6 +53,16 @@ class InterconnectTests(unittest.TestCase):
         self.write('opt/walter-router/walter_router/x.py', 'MODELS = "/walter/memory/vault/objects"\n')
         self.assertEqual(self.scan()['pairs'], ['router -> raw-vault'])
 
+    def test_a_moved_nested_module_is_its_own_home(self):
+        # memory/vault moved inside memory: its files are scanned as raw-vault, not as memory's.
+        (self.fs / 'opt/walter-raw-vault').rmdir()
+        self.write('walter/memory/vault/rawvault.py', 'ROOT = "/opt/walter-raw-vault"\n')
+        self.write('walter/memory/walter_memory/objects.py', 'x = 1\n')
+        (self.fs / 'opt/walter-memory').rmdir()
+        self.assertTrue(self.scan()['ok'], self.scan())
+        self.write('walter/memory/walter_memory/objects.py', 'VAULT = "/walter/memory/vault/rawvault.py"\n')
+        self.assertEqual(self.scan()['pairs'], ['bus+memory -> raw-vault'])
+
     def test_modules_sharing_a_root_form_one_home(self):
         self.write('opt/walter-memory/walter_memory/bus.py', 'ROOT = "/opt/walter-memory"\n')
         self.assertTrue(self.scan()['ok'])

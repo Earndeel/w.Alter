@@ -37,10 +37,13 @@ def _homes(catalog=None, filesystem='/'):
     return homes
 
 
-def _files(root):
+def _files(root, nested=()):
+    """Text files of a module home; homes nested inside it (router/llm) are scanned as their own home."""
     base = Path(root)
+    nested = {Path(n) for n in nested}
     for folder, dirs, files in os.walk(base):
-        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not d.startswith('.'))
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not d.startswith('.')
+                         and Path(folder) / d not in nested)
         for name in sorted(files):
             p = Path(folder) / name
             if name in SKIP_FILES or p.suffix not in TEXT_SUFFIXES or p.is_symlink():
@@ -67,7 +70,8 @@ def scan(*, catalog=None, filesystem='/'):
         real = Path(filesystem) / root.lstrip('/')
         if not real.is_dir():
             continue
-        for f in _files(real):
+        nested = [Path(filesystem) / r.lstrip('/') for r, _ in homes.values() if r != root and r.startswith(root + '/')]
+        for f in _files(real, nested):
             try:
                 text = f.read_text(errors='replace')
             except OSError:

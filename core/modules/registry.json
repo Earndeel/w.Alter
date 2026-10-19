@@ -795,10 +795,10 @@
     },
     {
       "id": "llm",
-      "root": "/opt/walter-llm",
+      "root": "/walter/router/llm",
       "anchors": [
-        "/opt/walter-llm/contracts/llm.json",
-        "/opt/walter-llm/gateway.py"
+        "/walter/router/llm/contracts/llm.json",
+        "/walter/router/llm/gateway.py"
       ],
       "requires": [
         "router",
@@ -811,7 +811,9 @@
       ],
       "core_paths": [],
       "backup_paths": [
-        "/opt/walter-llm",
+        "/walter/router/llm",
+        "/instances/monsieur/config/llm",
+        "/instances/monsieur/state/llm",
         "/root/.hermes/walter-llm"
       ],
       "interfaces": [
@@ -835,7 +837,10 @@
         "kind": "capability",
         "purpose": "Exécuter les appels modèles des consommateurs autorisés via les postes du Router.",
         "target_root": "/walter/router/llm",
-        "config_paths": [],
+        "config_paths": [
+          "/walter/router/llm/config/gateway.json",
+          "/instances/monsieur/config/llm/gateway.json"
+        ],
         "permissions": [
           "jeton local par consommateur",
           "clés fournisseur hors contexte modèle"

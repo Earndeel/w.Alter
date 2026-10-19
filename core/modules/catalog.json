@@ -43,7 +43,8 @@
       "id": "llm",
       "target": "router/llm",
       "legacy": "/opt/walter-llm",
-      "manifest": "contracts/llm.json"
+      "manifest": "contracts/llm.json",
+      "neutral": true
     },
     {
       "id": "logs",
