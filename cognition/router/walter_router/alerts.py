@@ -756,12 +756,24 @@ def _button_text(conn, a: dict, label: str, code: str) -> str:
 TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 
 
+_BOT_TOKEN: list[str] = []
+
+
+def _bot_token() -> str:
+    """Walter's Telegram bot (grant `telegram-bot` of walter-secrets), read once per process, never logged."""
+    if not _BOT_TOKEN:
+        r = subprocess.run(["walter-secret", "grant", "access", "telegram-bot"], capture_output=True, text=True,
+                           timeout=120)
+        if r.returncode or not r.stdout.strip():
+            raise RuntimeError("Telegram bot grant unavailable (walter-secret grants telegram-bot)")
+        _BOT_TOKEN.append(r.stdout.strip())
+    return _BOT_TOKEN[0]
+
+
 def telegram(method: str, payload: dict) -> dict:
-    """Bot API call with the gateway's own bot (token from the Hermes .env of the instance, never logged)."""
+    """Bot API call with Walter's own bot (the one the Hermes gateway also serves)."""
     from urllib.request import Request, urlopen
-    token = collect._env_value("TELEGRAM_BOT_TOKEN")
-    if not token:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN missing")
+    token = _bot_token()
     req = Request(TELEGRAM_API.format(token=token, method=method), data=json.dumps(payload).encode(),
                   headers={"Content-Type": "application/json"})
     with urlopen(req, timeout=30) as resp:  # noqa: S310 (fixed host)

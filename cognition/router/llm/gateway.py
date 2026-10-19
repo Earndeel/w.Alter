@@ -57,13 +57,12 @@ LOG = _instance_path(_CONF["log"])
 sys.path.insert(0, _walter("path", "secrets"))   # walter-secrets public library (vault, mapping)
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36"
 DEFAULT_TASK = "coding"
-# Codex routes = W.Alter's OWN Codex subscription session, the one of its Codex CLI (~/.codex/auth.json, also used by
-# walter-skills), never Hermes' session. Read-only here: the Codex CLI stays the single writer of its rotating refresh
-# token — when the access token is about to expire, a tiny `codex exec` makes the CLI refresh it, then it is re-read.
-CODEX_AUTH = Path.home() / ".codex" / "auth.json"
+# Codex routes = W.Alter's OWN Codex subscription session (grant `codex-subscription` of walter-secrets, also used by
+# walter-skills), never Hermes' session. walter-secrets serves the access token and has the Codex CLI — the single
+# writer of its rotating refresh token — renew it before expiry.
+CODEX_GRANT = "codex-subscription"
 CHATGPT_DIR = HERE / "chatgpt"                      # LiteLLM wants a token dir; nothing is ever stored there
 os.environ.setdefault("CHATGPT_TOKEN_DIR", str(CHATGPT_DIR))
-CODEX_REFRESH_MARGIN = 3600
 # LiteLLM prepends the Codex CLI's coding-agent prompt (~1.7k tokens) to every call: a neutral one for module jobs
 os.environ.setdefault("CHATGPT_DEFAULT_INSTRUCTIONS", "You are a precise assistant for W.Alter's background jobs. Follow "
                       "the system and user instructions exactly; answer in the language of the request.")
@@ -195,47 +194,29 @@ def litellm_target(route: dict) -> dict | None:
     return None
 
 
-def _codex_tokens() -> dict:
-    return json.loads(CODEX_AUTH.read_text()).get("tokens") or {}
-
-
-def _jwt_exp(token: str) -> float:
-    import base64
-    part = token.split(".")[1]
-    return float(json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))).get("exp", 0))
-
-
-_codex_lock = threading.Lock()
-
-
 def codex_access_token() -> str:
-    """W.Alter's Codex CLI access token, refreshed through the CLI itself when it expires within the hour."""
-    tok = _codex_tokens().get("access_token") or ""
-    if tok and _jwt_exp(tok) - time.time() > CODEX_REFRESH_MARGIN:
-        return tok
-    with _codex_lock:
-        tok = _codex_tokens().get("access_token") or ""
-        if not tok or _jwt_exp(tok) - time.time() <= CODEX_REFRESH_MARGIN:
-            subprocess.run(["codex", "exec", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only",
-                            "-c", "model_reasoning_effort=low", "Réponds OK."], capture_output=True, timeout=180,
-                           cwd="/tmp")
-            tok = _codex_tokens().get("access_token") or ""
-    if not tok or _jwt_exp(tok) <= time.time():
-        raise RuntimeError("W.Alter's Codex session has no valid token (codex login)")
-    return tok
+    """W.Alter's Codex access token, from its grant (renewed through the Codex CLI by walter-secrets)."""
+    from walter_secrets import grants
+    return grants.access(CODEX_GRANT)
+
+
+def _codex_account_id() -> str:
+    from walter_secrets import grants
+    return grants.attribute(CODEX_GRANT, "account_id")
 
 
 def _install_codex_auth() -> None:
     """LiteLLM's chatgpt provider reads W.Alter's Codex CLI session (read-only) instead of its own device login."""
     from litellm.llms.chatgpt.authenticator import Authenticator
     Authenticator.get_access_token = lambda self: codex_access_token()
-    Authenticator.get_account_id = lambda self: _codex_tokens().get("account_id")
+    Authenticator.get_account_id = lambda self: _codex_account_id()
 
 
 def chatgpt_ready() -> bool:
     try:
-        return bool(_codex_tokens().get("access_token"))
-    except (OSError, ValueError):
+        from walter_secrets import grants
+        return grants.check(CODEX_GRANT)["ok"]
+    except Exception:  # noqa: BLE001 — readiness probe: any failure means not ready
         return False
 
 
