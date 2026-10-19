@@ -11,7 +11,7 @@ size, reference) — never tool outputs, never hidden reasoning, never system-in
 echoes, compaction summaries).
 
 Triggered by the runtimes' hooks (Claude Code Stop/PreCompact/SessionEnd, Codex `notify`) through
-/opt/walter-core/hooks/walter_hook.py — no timer. Incremental per file (byte offset of the last complete line) and
+walter-core's runtime hook (walter-memory agent-sessions) — no timer. Incremental per file (byte offset of the last complete line) and
 idempotent (source_id = line uuid / byte offset), so any run catches up whatever earlier runs missed.
 
   - DeepSeek Harness: /opt/dsh/home/sessions/<workspace>/session-*/session.v4.jsonl.zstd

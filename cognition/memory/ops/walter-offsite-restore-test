@@ -32,7 +32,7 @@ if ok != "ok": sys.exit(1)
 PY
 f=$(latest config); rclone copyto "$REMOTE/config/$f" "$WORK/$f"
 echo "config $f: checking module + integration coverage and all checksums"
-age -d -i "$KEY" "$WORK/$f" | zstd -q -d | PYTHONPATH=/opt/walter-memory /opt/walter-memory/venv/bin/python -m walter_memory.backup_bundle verify - --check-current
+age -d -i "$KEY" "$WORK/$f" | zstd -q -d | walter-python -m walter_memory.backup_bundle verify - --check-current
 f=$(latest bitwarden); rclone copyto "$REMOTE/bitwarden/$f" "$WORK/$f"
 age -d -i "$KEY" "$WORK/$f" | python3 -c 'import sys,json; n=len(json.load(sys.stdin)["items"]); print(f"bitwarden '"$f"': {n} items"); sys.exit(0 if n >= 100 else 1)'
 echo "offsite restore test OK"

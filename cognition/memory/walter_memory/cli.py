@@ -28,11 +28,28 @@ def cmd_stats(_a) -> None:
         })
 
 
+def _agent_sessions(args) -> None:
+    import importlib.util
+    import sys
+    from pathlib import Path
+    source = Path(__file__).resolve().parents[1] / "connectors" / "agent_sessions.py"
+    spec = importlib.util.spec_from_file_location("walter_memory_agent_sessions", source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    sys.argv = ["walter-memory agent-sessions", *args]
+    raise SystemExit(module.main())
+
+
 def main(argv=None) -> None:
+    import sys
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ["agent-sessions"]:   # the connector parses its own options
+        _agent_sessions(argv[1:])
     p = argparse.ArgumentParser(prog="walter-memory", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("stats")
     sub.add_parser("agent-memory", help="runtime-neutral memory API; versioned JSON request on stdin")
+    sub.add_parser("agent-sessions", help="ingest Claude Code / Codex / DSH transcripts (called by runtime hooks)")
     e = sub.add_parser("events"); e.add_argument("--source"); e.add_argument("--type", action="append")
     e.add_argument("--cloud-safe", action="store_true", help="only cloud_allowed canonical events")
     e.add_argument("--thread"); e.add_argument("--since"); e.add_argument("--text"); e.add_argument("--limit", type=int, default=20)

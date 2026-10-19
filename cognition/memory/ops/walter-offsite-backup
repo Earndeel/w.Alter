@@ -34,17 +34,17 @@ sdb=$(ls -1t /root/.hermes/backups/statedb/state-*.db.zst 2>/dev/null | head -1 
 # but the run exits 1 at the end so the unit shows failed. Added 2026-10-16.
 BW_FAILED=0
 BWDIR=/root/.hermes/backups/bitwarden
-if /opt/walter-memory/venv/bin/python3 /root/.hermes/plugins/walter-secrets/vault_react.py export "$BWDIR/vault-$TS.json.age"
+if walter-secret vault-export "$BWDIR/vault-$TS.json.age"   # Walter Secrets interface
 then
   rclone copyto "$BWDIR/vault-$TS.json.age" "$REMOTE/bitwarden/vault-$TS.json.age"   # already age-encrypted
   echo "pushed bitwarden/vault-$TS.json.age ($(du -h "$BWDIR/vault-$TS.json.age" | cut -f1))"
-  /opt/walter-memory/venv/bin/python3 -c 'import sys; sys.path.insert(0, "/root/.hermes/plugins/walter-secrets"); import vault_react; vault_react.prune_local()'
+  walter-secret vault-prune >/dev/null
 else
   BW_FAILED=1; echo "WARNING: bitwarden export failed" >&2
 fi
 
 # Fail closed: inventory modules + mutual integrations; verify every archived file.
-PYTHONPATH=/opt/walter-memory /opt/walter-memory/venv/bin/python -m walter_memory.backup_bundle create "$WORK/config-$TS.tar"
+walter-python -m walter_memory.backup_bundle create "$WORK/config-$TS.tar"
 zstd -q -T2 -10 --rm "$WORK/config-$TS.tar" -o "$WORK/config-$TS.tar.zst"
 push config "$WORK/config-$TS.tar.zst"
 

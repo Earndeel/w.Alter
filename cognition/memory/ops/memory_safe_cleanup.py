@@ -8,7 +8,7 @@ def main():
     p.add_argument('--max-qdrant-marker-delete',type=int,default=200,help=argparse.SUPPRESS)
     p.add_argument('--max-qdrant-invalidated-delete',type=int,default=500,help=argparse.SUPPRESS)
     p.add_argument('--output',default='/root/.hermes/logs/memory-autopilot/safe-cleanup-latest.json');p.add_argument('--json',action='store_true');a=p.parse_args()
-    cmd=['/opt/walter-memory/venv/bin/python','-m','walter_memory.hygiene','--kind','markers','--limit',str(a.max_pg_marker_delete)]
+    cmd=['/usr/local/bin/walter-python','-m','walter_memory.hygiene','--kind','markers','--limit',str(a.max_pg_marker_delete)]
     if a.apply:cmd.append('--apply')
     r=subprocess.run(cmd,cwd='/opt/walter-memory',capture_output=True,text=True,timeout=90)
     try:action=json.loads(r.stdout)

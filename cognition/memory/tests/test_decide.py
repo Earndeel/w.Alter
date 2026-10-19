@@ -32,17 +32,27 @@ def test_local_only_is_refused(monkeypatch):
 
 
 def test_chain_falls_back_when_router_unavailable(monkeypatch):
-    import builtins
-    real_import = builtins.__import__
+    """The router is reached through its `walter-router` command only; when it fails, the static chain is used."""
+    import subprocess
 
-    def no_router(name, *a, **k):
-        if name.startswith("walter_router"):
-            raise ImportError("router down")
-        return real_import(name, *a, **k)
+    def router_down(cmd, *a, **k):
+        assert cmd[:2] == ["walter-router", "decision-chain"]
+        raise FileNotFoundError("walter-router")
 
     monkeypatch.setattr(llm, "_ROUTER_CHAIN", None)
-    monkeypatch.setattr(builtins, "__import__", no_router)
+    monkeypatch.setattr(subprocess, "run", router_down)
     assert llm.decide_chain() == llm.DECIDE_CHAIN
+
+
+def test_chain_comes_from_the_router_command(monkeypatch):
+    import subprocess
+
+    class Done:
+        stdout = '{"chain": ["vendor/best", "inception/mercury-decide:free"]}'
+
+    monkeypatch.setattr(llm, "_ROUTER_CHAIN", None)
+    monkeypatch.setattr(subprocess, "run", lambda cmd, *a, **k: Done())
+    assert llm.decide_chain() == ("vendor/best", "inception/mercury-decide:free")
 
 
 def test_decide_uses_router_chain(monkeypatch):
