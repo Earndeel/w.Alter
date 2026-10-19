@@ -20,7 +20,11 @@
     "/root/.claude/settings.json",
     "/opt/dsh/home/cordis.patch.yml",
     "/opt/dsh/home/walter-hooks.json",
-    "/usr/local/bin/walter"
+    "/usr/local/bin/walter",
+    "@instance/instance.toml",
+    "@instance/config",
+    "@instance/accounts",
+    "@instance/bootstrap"
   ],
   "interfaces": [
     "MCP stdio",

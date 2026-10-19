@@ -92,8 +92,10 @@ def report(*, scan=False, live=False, path=None):
          'modules':modules}
     if scan:
         from .interconnect import scan as interconnect
+        from .neutrality import scan as neutrality
         out['interconnect']=interconnect()
-        out['ok']=out['ok'] and out['interconnect']['ok']
+        out['neutrality']=neutrality()
+        out['ok']=out['ok'] and out['interconnect']['ok'] and out['neutrality']['ok']
     return out
 
 

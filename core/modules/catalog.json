@@ -71,7 +71,8 @@
       "id": "runtime",
       "target": "runtime",
       "legacy": null,
-      "manifest": "contracts/runtime.json"
+      "manifest": "contracts/runtime.json",
+      "neutral": true
     },
     {
       "id": "secrets",

@@ -40,10 +40,23 @@ def walter_root():
     return _safe_absolute(os.environ.get('WALTER_ROOT') or DEFAULT_ROOT, 'WALTER_ROOT')
 
 
+INSTANCE = '@instance'
+
+
+def is_instance_path(value):
+    return isinstance(value, str) and (value == INSTANCE or value.startswith(INSTANCE + '/'))
+
+
 def join(root, value):
-    """Expand a contract path: absolute values are external to the module and kept as they are."""
+    """Expand a contract path: absolute values are external to the module and kept as they are;
+    ``@instance[/sub]`` designates the active instance (walter_platform.instance), never a fixed directory."""
     if isinstance(value, str) and value.startswith('/'):
         return _safe_absolute(value, 'contract path')
+    if is_instance_path(value):
+        from . import instance
+        rest = value[len(INSTANCE):].lstrip('/')
+        base = PurePosixPath(str(instance.root()))
+        return base / relative(rest) if rest else base
     rel = relative(value)
     return PurePosixPath(root) if str(rel) == '.' else PurePosixPath(root) / rel
 

@@ -62,6 +62,8 @@ def contract_path(value):
     _require(isinstance(value, str), 'contract path must be a string')
     if value.startswith('/'):
         return absolute_path(value)
+    if layout.is_instance_path(value):
+        return layout.join('/', value)
     try:
         return layout.relative(value)
     except ValueError:

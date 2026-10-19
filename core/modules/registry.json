@@ -677,7 +677,11 @@
         "/root/.claude/settings.json",
         "/opt/dsh/home/cordis.patch.yml",
         "/opt/dsh/home/walter-hooks.json",
-        "/usr/local/bin/walter"
+        "/usr/local/bin/walter",
+        "/instances/monsieur/instance.toml",
+        "/instances/monsieur/config",
+        "/instances/monsieur/accounts",
+        "/instances/monsieur/bootstrap"
       ],
       "interfaces": [
         "MCP stdio",
