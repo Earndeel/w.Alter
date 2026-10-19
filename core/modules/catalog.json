@@ -90,7 +90,8 @@
       "id": "soul",
       "target": "soul",
       "legacy": "/opt/walter-soul",
-      "manifest": "contracts/soul.json"
+      "manifest": "contracts/soul.json",
+      "neutral": true
     }
   ]
 }

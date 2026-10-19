@@ -1910,27 +1910,31 @@
     },
     {
       "id": "soul",
-      "root": "/opt/walter-soul",
+      "root": "/walter/soul",
       "anchors": [
-        "/opt/walter-soul/bin/walter-soul",
-        "/opt/walter-soul/contracts/soul.json",
-        "/opt/walter-soul/identity.md",
-        "/opt/walter-soul/rules.md"
+        "/walter/soul/bin/walter-soul",
+        "/walter/soul/contracts/soul.json",
+        "/walter/soul/config/targets.toml",
+        "/walter/soul/defaults/identity.md",
+        "/walter/soul/defaults/rules.md"
       ],
       "requires": [],
       "external": [],
       "data": [
-        "identity sources",
-        "curated user profile"
+        "identity sources (instance)",
+        "curated user profile (instance)"
       ],
       "core_paths": [],
       "backup_paths": [
-        "/opt/walter-soul",
-        "/opt/walter-profiles",
-        "/root/.hermes/memories"
+        "/walter/soul",
+        "/instances/monsieur/soul",
+        "/instances/monsieur/config/soul",
+        "/instances/monsieur/state/soul",
+        "/instances/monsieur/profiles"
       ],
       "interfaces": [
         "renderer",
+        "walter-soul render/path/sync/check/init",
         "walter_profile MCP"
       ],
       "bindings": {
@@ -1940,7 +1944,7 @@
         "claude-code": "common MCP"
       },
       "limitations": [
-        "Profile and critical buffer retain compatibility locations under .hermes; no running Hermes required."
+        "An instance may keep historical target locations (harness homes, profile workspaces) through its targets override."
       ],
       "services": [],
       "optional": [],
@@ -1949,10 +1953,10 @@
         "version": "1.0.0",
         "owner": "soul",
         "kind": "foundation",
-        "purpose": "Posséder l’identité commune et générer les profils des clients.",
+        "purpose": "Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance.",
         "target_root": "/walter/soul",
         "config_paths": [
-          "/opt/walter-soul/rules.md"
+          "/walter/soul/config/targets.toml"
         ],
         "permissions": [
           "écriture des profils générés"

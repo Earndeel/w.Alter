@@ -111,13 +111,18 @@ def memory_reflect(question: str, budget: str = "mid") -> str:
     return _agent_memory("reflect", {"question": question, "budget": budget}, timeout=240)
 
 
-@mcp.tool()
 def _soul_profile() -> Path:
-    """The runtime-neutral identity rendered by walter-soul, located through the path resolver."""
-    from walter_platform.paths import module_path
-    return module_path("soul", "build", "agent.md")
+    """The runtime-neutral identity walter-soul renders for the active instance, asked through its interface."""
+    try:
+        out = subprocess.run(["walter-soul", "path", "agent"], capture_output=True, text=True, timeout=30)
+        if out.returncode == 0 and out.stdout.strip():
+            return Path(out.stdout.strip())
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return Path("/nonexistent/walter-soul-agent-profile")
 
 
+@mcp.tool()
 def walter_profile() -> str:
     """Return the user's curated profile (USER.md), W.Alter's identity/style rules (walter-soul, the
     runtime-neutral render) and the critical memory buffer (MEMORY.md). Small; safe to load at the start of a session."""

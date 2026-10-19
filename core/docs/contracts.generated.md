@@ -18,7 +18,7 @@ Généré depuis les manifestes propriétaires. Les scénarios décrivent les cr
 | runtime | foundation | Fournir l’environnement Python partagé des modules Walter. | — |
 | secrets | capability | Gérer les références au coffre et injecter localement les valeurs autorisées. | — |
 | skills | capability | Gérer le contenu, la recherche, les propositions et la curation des procédures. | bus |
-| soul | foundation | Posséder l’identité commune et générer les profils des clients. | — |
+| soul | foundation | Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance. | — |
 
 ## browse
 
@@ -290,12 +290,12 @@ Interfaces : HTTP :8891, stdlib client, MCP, Hermes plugin.
 
 ## soul
 
-Posséder l’identité commune et générer les profils des clients.
+Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance.
 
 Contrat 1.0.0; propriétaire : soul.
-Racine actuelle : `/opt/walter-soul`. Cible : `/walter/soul`.
+Racine actuelle : `/walter/soul`. Cible : `/walter/soul`.
 
-Interfaces : renderer, walter_profile MCP.
+Interfaces : renderer, walter-soul render/path/sync/check/init, walter_profile MCP.
 
 **Critères de validation :**
 
@@ -304,4 +304,4 @@ Interfaces : renderer, walter_profile MCP.
 
 **Limites déclarées :**
 
-- Profile and critical buffer retain compatibility locations under .hermes; no running Hermes required.
+- An instance may keep historical target locations (harness homes, profile workspaces) through its targets override.
