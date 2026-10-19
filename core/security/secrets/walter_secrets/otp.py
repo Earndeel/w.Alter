@@ -1,6 +1,6 @@
-"""otp — one-time codes Monsieur receives by e-mail or by message (Beeper), for W.Alter's logins.
+"""otp — one-time codes the owner receives by e-mail or by message (Beeper), for W.Alter's logins.
 
-Decision 2026-10-17 (Monsieur): when a site sends its code by e-mail or SMS-like message instead of an authenticator
+Decision 2026-10-17: when a site sends its code by e-mail or SMS-like message instead of an authenticator
 app, W.Alter fetches it and fills it, like the iPhone does. Read-only, narrow by design:
   - only messages received AFTER `since` (default: the last 10 minutes), never older mail or chats;
   - only messages that mention the expected site (`hint`: its name or domain) in sender, subject or text;

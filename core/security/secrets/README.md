@@ -21,10 +21,12 @@ Hermes, DSH, Codex and Claude Code are **not** Python dependencies of the core.
   resolve to the same package, rather than independent copies of vault logic.
 
 No upstream Hermes files are patched. Its installed plugin entrypoint is a small adapter.
-`config/walter-secrets.toml` binds existing storage and service consumers. Current encrypted
-vault, session cache, audit, map and backup paths remain under `/root/.hermes`; that is a
-retained data location, not an import/runtime dependency. Moving those files is a separate
-migration. `WALTER_SECRETS_CONFIG` selects another deployment's configuration.
+`config/walter-secrets.toml` holds the shipped defaults (paths in the active instance, no
+vault server, no names). The instance's `config/secrets/walter-secrets.toml` (`walter instance
+config secrets walter-secrets.toml`) binds its vault server and account, storage, backup remote,
+owner names and service consumers; an instance may keep historical encrypted locations there.
+`WALTER_SECRETS_CONFIG` selects another configuration explicitly. Paths accept `~/...` and
+`@instance/...`.
 
 ## Public API
 
@@ -87,4 +89,4 @@ PYTHONPATH=. python -m pytest -q tests
 Additional source dependency: the watcher uses Walter Memory's bus/decision library at
 its configured module path; the age, bw and rclone executables are system dependencies.
 Folder classification may call its configured model through Walter Memory; no model is
-hardcoded here. Existing operational detail is retained in `docs-legacy.md` as history.
+hardcoded here. The operational history of the first deployment is kept with that instance, not in this module.

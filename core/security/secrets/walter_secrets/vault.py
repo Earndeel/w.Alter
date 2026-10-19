@@ -1,5 +1,5 @@
 """Bitwarden (self-hosted Vaultwarden) access for W.Alter — decision 2026-10-02: W.Alter has autonomous access to all of
-Monsieur's secrets (passwords, API keys, cards, identities, document scans); nobody else does.
+The owner's secrets (passwords, API keys, cards, identities, document scans); nobody else does.
 
 Values are meant to be USED, not read: tools and commands reference them with placeholders `{{bw:<item>:<field>}}`,
 resolved locally right before execution and masked again in every tool result. The model (and therefore its provider)

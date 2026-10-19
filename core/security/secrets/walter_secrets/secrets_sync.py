@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """walter-secrets-sync — Bitwarden is the source of truth for W.Alter's keys; the VM keeps a generated local copy.
 
-Decision 2026-10-02 (Monsieur): keys are managed in Bitwarden (folder "W.Alter – Clés API"); every change is applied
+Decision 2026-10-02: keys are managed in Bitwarden (folder "W.Alter – Clés API"); every change is applied
 to the VM automatically. The VM never reads Bitwarden at runtime: services keep reading their env files / the age
 vault, which this daemon rewrites — so W.Alter keeps working when Vaultwarden is down.
 

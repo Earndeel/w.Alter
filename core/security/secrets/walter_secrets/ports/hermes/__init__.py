@@ -1,4 +1,4 @@
-"""walter-secrets — W.Alter's autonomous access to Monsieur's Bitwarden (see bwvault.py for the policy).
+"""walter-secrets — W.Alter's autonomous access to the owner's Bitwarden (see bwvault.py for the policy).
 
 Tools: secret_search (metadata only), secret_file (decrypted attachment → tmpfs path), secret_reveal (value into the
 conversation — last resort). Hooks: placeholders `{{bw:<item>:<field>}}` in ANY tool's arguments are resolved right
@@ -129,12 +129,12 @@ def _secret_reveal(args: dict, **kw) -> str:
 SCHEMAS = {
     "secret_search": {
         "name": "secret_search",
-        "description": ("Search Monsieur's Bitwarden (all his passwords, API keys, bank cards, identities, document scans). "
+        "description": ("Search the owner's Bitwarden (all their passwords, API keys, bank cards, identities, document scans). "
                         "Returns metadata only (name, type, username, URLs, card brand/last4, field and attachment names) "
                         "and the item id. To USE a secret, put the placeholder {{bw:<id>:<field>}} in any tool argument "
                         "(terminal command, browser form value, HTTP header…): it is filled in locally at execution and "
                         "masked in results, so the value never enters the conversation. You may use any secret "
-                        "autonomously for Monsieur's tasks — no need to ask him."),
+                        "autonomously for the owner's tasks — no need to ask them."),
         "parameters": {"type": "object", "properties": {
             "query": {"type": "string", "description": "words matched against name, username, URL, field/attachment names"},
             "type": {"type": "string", "enum": ["login", "card", "identity", "note", "ssh_key"]},
@@ -176,7 +176,7 @@ def _secret_capture_totp(args: dict, **kw) -> str:
 
 SCHEMAS["secret_create_login"] = {
     "name": "secret_create_login",
-    "description": ("Create an account for Monsieur: generates a strong password, saves the login in his Bitwarden FIRST "
+    "description": ("Create an account for the owner: generates a strong password, saves the login in their Bitwarden FIRST "
                     "(folder 'W.Alter – Comptes créés'), then fills the password and confirmation fields of the sign-up "
                     "page open in the browser. The password never enters the conversation. Returns the handle for "
                     "secret_fill on later logins."),
@@ -206,7 +206,7 @@ def _secret_fill(args: dict, **kw) -> str:
 
 SCHEMAS["secret_fill"] = {
     "name": "secret_fill",
-    "description": ("Log in with Monsieur's Bitwarden: fills the password (field='password') or the current 2FA code "
+    "description": ("Log in with the owner's Bitwarden: fills the password (field='password') or the current 2FA code "
                     "(field='totp', generated from the saved authenticator key) into the page open in the browser. "
                     "Refuses when the page is not one of the login's saved sites (anti-phishing). Values never enter the "
                     "conversation. Find the handle with secret_search (handle = 'bw:' + id). Works with every browser engine."),
@@ -229,7 +229,7 @@ SCHEMAS["secret_otp"] = {
                     "Beeper) instead of an authenticator app: waits for that code (only messages received in the last "
                     "minutes that mention the site), then fills it into the code field of the page open in the browser. "
                     "Refuses when the page is not that site (anti-phishing). The code never enters the conversation. "
-                    "Real SMS are not available (no SMS account in Beeper): if nothing arrives, ask Monsieur."),
+                    "Real SMS are not available (no SMS account in Beeper): if nothing arrives, ask the owner."),
     "parameters": {"type": "object", "properties": {
         "site": {"type": "string", "description": "who sends the code: site name or domain (default: the page's site)"},
         "since_minutes": {"type": "number", "default": 10, "description": "how far back to look (the code was requested this long ago at most)"},

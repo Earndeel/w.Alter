@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""vault_react — what W.Alter does when Monsieur's Bitwarden vault changes (called by secrets_sync.py watch).
+"""vault_react — what W.Alter does when the owner's Bitwarden vault changes (called by secrets_sync.py watch).
 
-Decision 2026-10-16 (Monsieur): the vault must stay organised and backed up without him doing anything.
+Decision 2026-10-16: the vault must stay organised and backed up without the owner doing anything.
 
   file_new()      every new entry (no folder, or Walter's « W.Alter – Comptes créés » inbox) is filed into one of the
                   thematic folders: 1) card / identity / SSH key → « 01 · Identité… »; 2) same site as entries already
@@ -10,7 +10,7 @@ Decision 2026-10-16 (Monsieur): the vault must stay organised and backed up with
                   never a username, password or note. Not sure (< 0.6) → left where it is. Only `folderId` changes,
                   checked field by field after each move. « W.Alter – Clés API » is never touched.
   export(dest)    full JSON export, age-encrypted in memory to the W.Alter recovery key (never on disk in clear).
-  backup()        export + copy to Drive « W.Alter Backups/bitwarden » + local retention (all < 48 h, then the newest
+  backup()        export + copy to the configured remote (react.remote) + local retention (all < 48 h, then the newest
                   per day for 14 days). Also used by the nightly walter-offsite-backup.
 
   vault_react.py file [--dry]     file new entries now
@@ -37,14 +37,14 @@ H = settings.DATA_ROOT
 REC = settings.path("recovery_recipient", H / "vault/walter-recovery.pub")
 SESSION = settings.SESSION
 BACKUP_DIR = settings.path("backup_dir", H / "backups/bitwarden")
-REMOTE = "gdrive:W.Alter Backups/bitwarden"
+REMOTE = settings.setting("react", "remote", "")              # rclone destination of exports; empty = local only
 LOG = H / "logs/walter-secrets-sync.log"
 KEYS_FOLDER = "W.Alter – Clés API"
 INBOX_FOLDERS = {None, "W.Alter – Comptes créés"}
 IDENTITY_FOLDER = "01 · Identité, documents & clés"
-MIN_ITEMS = 100            # 1042 on 2026-10-16: a near-empty export means a broken session, not a real vault
+MIN_ITEMS = int(settings.setting("react", "min_items", 1))  # fewer items in an export = a broken session
 MAJORITY, MIN_CONFIDENCE = 0.6, 0.6
-SELF_NAMES = ["Lucas", "Jouvencon", "Jouvençon", "Jouvenson", "earndeel"]
+SELF_NAMES = list(settings.setting("react", "self_names", []))  # owner's names, pseudonymised before any model call
 FOLDER_HINTS = {           # what each thematic folder holds, for the decision model
     "01": "identity papers, bank cards, SSH keys, recovery kits",
     "02": "banks, payments, crypto exchanges and wallets, investing, insurance of money",
@@ -75,7 +75,7 @@ def log(msg: str) -> None:
 
 
 def _env() -> dict:
-    return {**os.environ, "HOME": "/root", "BW_SESSION": SESSION.read_text().strip(), "BW_NOINTERACTION": "true"}
+    return {**os.environ, "HOME": os.path.expanduser("~"), "BW_SESSION": SESSION.read_text().strip(), "BW_NOINTERACTION": "true"}
 
 
 def bw(*args: str, stdin: str | None = None, timeout: int = 120) -> str:
@@ -221,11 +221,11 @@ def backup() -> dict:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     dest = BACKUP_DIR / f"vault-{ts}.json.age"
     n = export(dest)
-    r = subprocess.run(["rclone", "copyto", str(dest), f"{REMOTE}/{dest.name}"], capture_output=True, text=True,
-                       timeout=600)
+    r = (subprocess.run(["rclone", "copyto", str(dest), f"{REMOTE}/{dest.name}"], capture_output=True, text=True,
+                        timeout=600) if REMOTE else None)
     pruned = prune_local()
-    res = {"items": n, "file": dest.name, "drive": r.returncode == 0, "pruned_local": len(pruned)}
-    log(f"backup {res}" + ("" if r.returncode == 0 else f" rclone: {r.stderr.strip()[:150]}"))
+    res = {"items": n, "file": dest.name, "drive": bool(r) and r.returncode == 0, "pruned_local": len(pruned)}
+    log(f"backup {res}" + ("" if r is None or r.returncode == 0 else f" rclone: {r.stderr.strip()[:150]}"))
     return res
 
 
