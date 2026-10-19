@@ -310,7 +310,6 @@ def watch() -> None:
     entries into their folder, (3) announce `vault.changed` on the Walter bus, then (4) once the vault has been calm
     for BACKUP_SETTLE seconds, take one encrypted backup (a burst of edits → one backup). See vault_react.py."""
     from . import vault_react
-    sys.path.insert(0, str(settings.MEMORY_ROOT))
     from walter_memory import bus
     last_rev, last_full, changed_at = None, 0.0, None
     log("watch started")

@@ -18,6 +18,18 @@ from .vault import VAULT, SecretError, audit  # noqa: E402
 def main(argv: list[str]) -> int:
     if argv and argv[0] in ("ref", "exec"):
         return safe_main(argv)
+    if argv and argv[0] in ("vault-export", "vault-prune"):
+        # Encrypted full-vault backups, used by the nightly offsite backup (walter-memory).
+        from pathlib import Path
+        from . import vault_react
+        if argv[0] == "vault-export" and len(argv) == 2:
+            print(f"bitwarden export: {vault_react.export(Path(argv[1]))} items")
+            return 0
+        if argv[0] == "vault-prune" and len(argv) == 1:
+            print(json.dumps(vault_react.prune_local(), ensure_ascii=False))
+            return 0
+        print("usage: walter-secret vault-export <dest.json.age> | vault-prune", file=sys.stderr)
+        return 2
     if not argv or argv[0] not in ("get", "search", "file", "otp"):
         print(__doc__, file=sys.stderr)
         return 2
