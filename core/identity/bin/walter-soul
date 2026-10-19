@@ -7,7 +7,6 @@ runtimes/*.md (per-runtime adapters: tool names, write rules). Targets are gener
   hermes       → /root/.hermes/SOUL.md                       (Hermes loads it as its identity)
   claude-code  → /opt/walter-profiles/claude-code/CLAUDE.md  (Claude Code "W.Alter" profile = that cwd)
   codex        → /opt/walter-profiles/codex/AGENTS.md        (Codex "W.Alter" profile = that cwd)
-  voice        → /opt/walter-soul/build/voice.md         (read by the phone bridge at call setup)
   agent        → /opt/walter-soul/build/agent.md         (MCP walter_profile, any other runtime)
 
 Usage: walter-soul render <target> | sync [--force] | check
@@ -33,7 +32,6 @@ TARGETS = {
     "claude-code": (AGENT + ["runtimes/claude-code.md"], Path("/opt/walter-profiles/claude-code/CLAUDE.md")),
     "codex": (AGENT + ["runtimes/codex.md"], Path("/opt/walter-profiles/codex/AGENTS.md")),
     "dsh": (AGENT + ["runtimes/dsh.md"], Path("/opt/walter-profiles/dsh/AGENTS.md")),
-    "voice": (["identity.md"], ROOT / "build" / "voice.md"),
     "agent": (["identity.md", "rules.md"], ROOT / "build" / "agent.md"),
 }
 INCLUDE = re.compile(r"^\{\{include (\S+)\}\}$", re.M)
