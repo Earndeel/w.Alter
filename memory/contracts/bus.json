@@ -1,9 +1,8 @@
 {
   "id": "bus",
-  "root": "/opt/walter-memory",
   "anchors": [
-    "/opt/walter-memory/contracts/bus.json",
-    "/opt/walter-memory/walter_memory/bus.py"
+    "contracts/bus.json",
+    "walter_memory/bus.py"
   ],
   "requires": [
     "memory"
@@ -13,10 +12,10 @@
     "bus.*"
   ],
   "core_paths": [
-    "/opt/walter-memory/walter_memory/bus.py"
+    "walter_memory/bus.py"
   ],
   "backup_paths": [
-    "/opt/walter-memory"
+    "."
   ],
   "interfaces": [
     "Python emit/Consumer",
@@ -37,7 +36,7 @@
     "owner": "bus",
     "kind": "foundation",
     "purpose": "Livrer les événements entre modules et conserver les curseurs de traitement.",
-    "target_root": "/walter/memory",
+    "target_root": "memory",
     "config_paths": [],
     "permissions": [
       "droits PostgreSQL du consommateur"
