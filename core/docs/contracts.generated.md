@@ -258,7 +258,7 @@ Gérer les références au coffre et injecter localement les valeurs autorisées
 Contrat 1.0.0; propriétaire : secrets.
 Racine actuelle : `/walter/secrets`. Cible : `/walter/secrets`.
 
-Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks.
+Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks, walter-secret grants / grant access, walter_secrets.grants.
 
 **Critères de validation :**
 

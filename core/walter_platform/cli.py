@@ -63,8 +63,9 @@ def main(argv=None):
         elif a.command=='doctor':
             from . import contracts
             out={'installation':registry.report(scan=True,live=True),'contracts':contracts.check(),
-                 'scope':'installation, source contracts and systemd; inspect matrix for qualification limits'}
-            out['ok']=out['installation']['ok'] and out['contracts']['ok']
+                 'grants':_grants(),
+                 'scope':'installation, source contracts, systemd and authorizations; inspect matrix for qualification limits'}
+            out['ok']=out['installation']['ok'] and out['contracts']['ok'] and out['grants']['ok']
         elif a.command in ('export','install','release'):
             from . import release
             if a.command=='export':out=release.build(a.destination,apply=a.apply,wheelhouse=a.wheelhouse)
@@ -85,6 +86,17 @@ def main(argv=None):
         # Config exceptions may quote secrets; expose only known validation failures.
         message=str(exc) if type(exc) is ValueError and not isinstance(exc,(json.JSONDecodeError,tomllib_error())) else type(exc).__name__
         print(json.dumps({'ok':False,'error':message}));return 1
+
+def _grants():
+    """Walter's authorizations, asked through walter-secrets' interface (metadata only)."""
+    import subprocess
+    try:
+        r=subprocess.run(['walter-secret','grants'],capture_output=True,text=True,timeout=180)
+        d=json.loads(r.stdout)
+    except (OSError,subprocess.TimeoutExpired,ValueError):
+        return {'ok':False,'problems':['walter-secret grants unavailable']}
+    return {'ok':d.get('ok',False),'count':len(d.get('grants',[])),
+            'problems':[f"{g['id']}: {p}" for g in d.get('grants',[]) for p in g.get('problems',[])]}
 
 def tomllib_error():
     import tomllib

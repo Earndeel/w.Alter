@@ -1650,12 +1650,15 @@
         "/root/.hermes/vault",
         "/root/.hermes/logs/walter-secrets.jsonl",
         "/root/.hermes/logs/walter-secrets-sync.status.json",
-        "/root/.hermes/logs/walter-secrets-sync.log"
+        "/root/.hermes/logs/walter-secrets-sync.log",
+        "/instances/monsieur/accounts"
       ],
       "interfaces": [
         "safe MCP metadata/reference",
         "local CLI exec/get",
-        "Hermes hooks"
+        "Hermes hooks",
+        "walter-secret grants / grant access",
+        "walter_secrets.grants"
       ],
       "bindings": {
         "hermes": "shared core + placeholders/output masking + browser port",
