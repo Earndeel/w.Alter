@@ -33,6 +33,19 @@ BRIDGEBENCH_URL = "https://www.bridgebench.ai/leaderboard"
 # AA-Omniscience-Decision, HLE-MultiChoice, When2Call and WildGuardTest; accuracy, time and cost per 1M tasks.
 AA_DECISION_URL = "https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index"
 FLARESOLVERR = os.environ.get("WALTER_FLARESOLVERR", "http://127.0.0.1:8191/v1")  # local, behind Cloudflare sites
+# Internal postes stt / rerank / embeddings (2026-10-16, Monsieur: « rajouter le reranking, embedding et STT »).
+# AA Speech-to-Text: AA-WER index (lower = better, English datasets — AA publishes no French result), speed factor
+# (x real time) and price per 1000 audio minutes, per model x host, from the page's chart download tables.
+AA_STT_URL = "https://artificialanalysis.ai/speech-to-text"
+AA_STT_TABLES = ("STT AA-WER vs Price", "STT AA-WER vs Speed Factor", "STT Speed Factor vs Price")
+# Agentset RAG leaderboards: pairwise ELO judged on retrieval tasks, average latency, nDCG@10, price per 1M tokens.
+AGENTSET_URLS = {"rerank": "https://agentset.ai/rerankers", "embeddings": "https://agentset.ai/embeddings"}
+# MTEB results repository: French retrieval = MIRACL hard negatives, subset fr (nDCG@10), for every embedding model
+# OpenRouter serves (matched by our normalised id). GitHub API (60 calls/h without a token): one listing + one per model.
+MTEB_API = "https://api.github.com/repos/embeddings-benchmark/results/contents/results"
+MTEB_RAW = "https://raw.githubusercontent.com/embeddings-benchmark/results/main/results"
+MTEB_FR = {"retrieval_fr": ("MIRACLRetrievalHardNegatives", "fr")}
+OPENROUTER_EMBEDDINGS_URL = "https://openrouter.ai/api/v1/models?output_modalities=embeddings"
 # Arena.ai page -> board key stored in models.benchmarks.task (benchmark = 'arena')
 ARENA_BOARDS = {"text": "text", "text/french": "text_french", "text/coding": "text_coding",
                 "text/creative-writing": "text_creative", "code/webdev": "webdev",
@@ -215,6 +228,105 @@ def source_aa_decision() -> tuple[dict, datetime, str]:
     return {"rows": rows}, now(), AA_DECISION_URL
 
 
+def aa_stt_rows(page: str) -> list[dict]:
+    """One row per model x host of AA's Speech-to-Text page: the chart download tables (WER vs price, WER vs speed,
+    speed vs price) joined on (Model, Provider)."""
+    text = rsc_text(page)
+    merged: dict[tuple[str, str], dict] = {}
+    for m in re.finditer(r'"downloadData":\{"data":\[', text):
+        try:
+            table = json.loads(_json_object(text, m.end() - len('{"data":[')))
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if table.get("fileName") not in AA_STT_TABLES:
+            continue
+        for r in table["data"]:
+            row = merged.setdefault((r["Model"], r.get("Provider") or ""), {"model": r["Model"], "provider": r.get("Provider")})
+            for src, dst in (("AA-WER Index", "wer"), ("Speed Factor", "speed_factor"), ("Price per 1k Min", "price_per_1k_min")):
+                if r.get(src) is not None:
+                    row[dst] = r[src]
+    return list(merged.values())
+
+
+def source_aa_stt() -> tuple[dict, datetime, str]:
+    rows = aa_stt_rows(fetch_text(AA_STT_URL))
+    if len([r for r in rows if r.get("wer") is not None]) < 20:
+        raise ValueError(f"aa_stt: only {len(rows)} rows parsed")
+    return {"rows": rows}, now(), AA_STT_URL
+
+
+def agentset_board(page: str) -> dict:
+    """Leaderboard entries embedded in an Agentset page (rank, name, ELO score, provider, licence, avgLatencyMs,
+    avgNdcg10, costPer1MTokens[, dimensions]), its 'Last updated' date and the detail-page slug of each name."""
+    text = rsc_text(page) or html.unescape(page)
+    m = re.search(r'"entries":\[', text)
+    if not m:
+        raise ValueError("agentset: no entries in page")
+    updated = re.search(r'Last updated: ","([^"]+)"', text)
+    slugs = dict(re.findall(r'"name":"([^"]+)","url":"https://agentset\.ai/(?:rerankers|embeddings)/([^"]+)"', text))
+    return {"entries": _json_array(text, m.end() - 1), "updated": updated and updated.group(1), "slugs": slugs}
+
+
+def source_agentset() -> tuple[dict, datetime, str]:
+    boards, errors = {}, {}
+    for key, url in AGENTSET_URLS.items():
+        try:
+            board = agentset_board(fetch_text(url))
+            if len(board["entries"]) < 5:
+                raise ValueError(f"only {len(board['entries'])} entries")
+            boards[key] = {"url": url, **board}
+        except Exception as exc:  # noqa: BLE001 — one missing board leaves the other usable
+            errors[key] = f"{type(exc).__name__}: {exc}"[:200]
+    if not boards:
+        raise ValueError(f"agentset: no board parsed: {errors}")
+    return {"boards": boards, "errors": errors}, now(), "https://agentset.ai/leaderboard"
+
+
+def _github_json(url: str) -> Any:
+    headers = {"User-Agent": "Walter-Router/1.0", "Accept": "application/vnd.github+json"}
+    token = _env_value("GITHUB_TOKEN")
+    if token:   # optional: lifts the 60 calls/h anonymous limit (header only, never logged)
+        headers["Authorization"] = f"Bearer {token}"
+    with urlopen(Request(url, headers=headers), timeout=60) as resp:  # noqa: S310 (fixed https host)
+        return json.loads(resp.read(MAX_BYTES))
+
+
+def source_mteb() -> tuple[dict, datetime, str]:
+    """MTEB French retrieval (MIRACL-HN fr, nDCG@10) of every embedding model OpenRouter serves that the MTEB results
+    repository has evaluated; the latest score per revision folder is kept (best revision chosen at parse time)."""
+    served = {identity.normalize("openrouter", m["id"])[0] for m in fetch_json(OPENROUTER_EMBEDDINGS_URL)["data"]
+              if ":" not in m["id"]}
+    dirs = [d["name"] for d in _github_json(MTEB_API) if d.get("type") == "dir"]
+    if len(dirs) < 100:
+        raise ValueError(f"mteb: only {len(dirs)} model folders listed")
+    rows, errors = [], {}
+    for d in dirs:
+        if identity.normalize("mteb", d)[0] not in served:
+            continue
+        try:
+            revisions = [r["name"] for r in _github_json(f"{MTEB_API}/{d}") if r.get("type") == "dir"]
+        except Exception as exc:  # noqa: BLE001
+            errors[d] = f"{type(exc).__name__}: {exc}"[:200]
+            continue
+        for rev in revisions:
+            for board, (task_name, subset) in MTEB_FR.items():
+                try:
+                    res = fetch_json(f"{MTEB_RAW}/{d}/{rev}/{task_name}.json")
+                except HTTPError as exc:
+                    if exc.code != 404:
+                        errors[f"{d}/{rev}"] = f"HTTP {exc.code}"
+                    continue
+                scores = [s["main_score"] for split in (res.get("scores") or {}).values() for s in split
+                          if s.get("hf_subset") == subset and s.get("main_score") is not None]
+                if scores:
+                    rows.append({"model": d, "revision": rev, "board": board, "task_name": task_name,
+                                 "subset": subset, "main_score": max(scores), "mteb_version": res.get("mteb_version"),
+                                 "date": res.get("date")})
+    if len({r["model"] for r in rows}) < 5:
+        raise ValueError(f"mteb: only {len(rows)} French scores ({errors})")
+    return {"rows": rows, "errors": errors}, now(), "https://github.com/embeddings-benchmark/results"
+
+
 def source_arena() -> tuple[dict, datetime, str]:
     boards, errors = {}, {}
     for path, key in ARENA_BOARDS.items():
@@ -256,7 +368,7 @@ def source_openrouter() -> tuple[dict, datetime, str]:
     if not doc.get("data"):
         raise ValueError("openrouter: empty catalogue")
     for m in doc["data"]:
-        if _or_interface(m) not in MEDIA_INTERFACES or ":" in m["id"] or m["id"].startswith(("openrouter/", "~")):
+        if _or_interface(m) not in UNIT_PRICED_INTERFACES or ":" in m["id"] or m["id"].startswith(("openrouter/", "~")):
             continue
         try:
             m["_display_pricing"] = display_pricing(fetch_text(f"https://openrouter.ai/{m['id']}"))
@@ -342,6 +454,7 @@ def source_declared() -> tuple[dict, datetime, str]:
 
 
 SOURCES = {"aa": source_aa, "aa_decision": source_aa_decision, "mm": source_mm, "da": source_da, "arena": source_arena, "bridgebench": source_bridgebench,
+           "aa_stt": source_aa_stt, "agentset": source_agentset, "mteb": source_mteb,
            "openrouter": source_openrouter, "kie": source_kie, "codex": source_codex,
            "declared": source_declared, "hermes_providers": source_hermes_providers}
 
@@ -464,6 +577,59 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
                              cost=cost * 1e6 if cost is not None else None, cost_unit="usd_per_1m_tasks", released=None,
                              extra={"kind": r.get("kind"), "host": r.get("hostName"), "creator": r.get("creatorName"),
                                     "time_per_task_ms": r.get("timePerTaskMs"), "scores": r.get("scores") or {}}))
+    elif kind == "aa_stt":
+        # Stored score is always "higher = better" (alerts, nerf and podium code rely on it): WER -> 100 - WER %.
+        for r in doc["rows"]:
+            name = identity.stt_name(r["model"], r.get("provider"))
+            mid, variant = identity.normalize("aa_stt", r["model"], r.get("provider"))
+            price = _num(r.get("price_per_1k_min"))
+            wer, speed = _num(r.get("wer")), _num(r.get("speed_factor"))
+            extra = {"host": r.get("provider"), "wer_pct": round(100 * wer, 3) if wer is not None else None,
+                     "speed_factor": speed, "price_per_1k_min": price, "language": "en"}
+            common = dict(external_key=f'{r["model"]} | {r.get("provider") or ""}', model_id=mid, variant=variant,
+                          display_name=name, cost=price / 1000 if price else None,   # 0 = no public price
+                          cost_unit="usd_per_audio_minute", released=None, extra=extra)
+            if wer is not None:
+                rows.append(dict(benchmark="aa_stt", task="wer", score=round(100 * (1 - wer), 3),
+                                 score_unit="AA-WER accuracy % (100 - WER)", **common))
+            if speed:
+                rows.append(dict(benchmark="aa_stt", task="speed", score=speed,
+                                 score_unit="AA STT speed factor (x real time)", **common))
+    elif kind == "agentset":
+        for board, b in doc["boards"].items():
+            for r in b["entries"]:
+                score, lat = _num(r.get("score")), _num(r.get("avgLatencyMs"))
+                if score is None:
+                    continue
+                mid, variant = identity.normalize("agentset", r["name"])
+                win = re.search(r"Win Rate: ([\d.]+)%", r.get("description") or "")
+                lic = r.get("license")
+                extra = {"rank": r.get("rank"), "organization": r.get("provider"), "license": lic, "latency_ms": lat,
+                         "ndcg10": r.get("avgNdcg10"), "dimensions": r.get("dimensions"),
+                         "win_rate": float(win.group(1)) if win else None, "updated": b.get("updated"),
+                         "slug": (b.get("slugs") or {}).get(r["name"])}
+                common = dict(external_key=r["name"], model_id=mid, variant=variant, display_name=r["name"],
+                              cost=_num(r.get("costPer1MTokens")) or None, cost_unit="usd_per_1m_tokens",
+                              released=None, extra=extra,
+                              meta={"open_weights": None if not lic else lic.strip().lower() != "proprietary",
+                                    "license": lic})
+                rows.append(dict(benchmark="agentset", task=board, score=score, score_unit="Agentset ELO", **common))
+                if lat:   # latency as a "higher = better" speed: requests per second at the measured latency
+                    rows.append(dict(benchmark="agentset", task=f"{board}_speed", score=round(1000 / lat, 3),
+                                     score_unit="Agentset speed (1000 / latency ms)", **common))
+    elif kind == "mteb":
+        best: dict[tuple[str, str], dict] = {}
+        for r in doc["rows"]:   # several revision folders of one model: its best published result
+            k = (r["board"], r["model"])
+            if k not in best or r["main_score"] > best[k]["main_score"]:
+                best[k] = r
+        for (board, folder), r in best.items():
+            mid, variant = identity.normalize("mteb", folder)
+            rows.append(dict(benchmark="mteb", task=board, external_key=folder, model_id=mid, variant=variant,
+                             display_name=folder.split("__", 1)[-1], score=round(100 * r["main_score"], 2),
+                             score_unit=f'MTEB nDCG@10 x100 ({r["task_name"]} {r["subset"]})', cost=None,
+                             cost_unit=None, released=None,
+                             extra={k: r.get(k) for k in ("revision", "task_name", "subset", "mteb_version", "date")}))
     elif kind == "bridgebench":
         axes = {"oneShot": "one_shot"}
         for r in doc["rows"]:
@@ -481,6 +647,9 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
 
 
 MEDIA_INTERFACES = ("image", "video", "audio", "music")
+# Services priced per unit on their OpenRouter page (transcription per second / hour, rerank per search): the API's
+# prompt "token" price of those models is that unit price, not a token price.
+UNIT_PRICED_INTERFACES = MEDIA_INTERFACES + ("transcription", "rerank")
 OR_BASE_UNITS = {"/M characters": "per character", "/M UTF-8 bytes": "per utf-8 byte", "/minute": "per second",
                  "/1K calls": "per call", "/M tokens": "per token"}
 _OR_OUTPUTS = {"video": "video", "image": "image", "audio": "audio", "speech": "audio", "transcription": "transcription",
@@ -537,10 +706,12 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
             pin, pout = _num(pr.get("prompt")), _num(pr.get("completion"))
             interface = _or_interface(m)
             created = datetime.fromtimestamp(m["created"], timezone.utc) if m.get("created") else None
-            is_media = interface in MEDIA_INTERFACES
+            # media models report 0/0 token prices in the API: that is not a price; neither is the prompt "token"
+            # price of a service whose page prices it per unit (whisper per second, MAI per hour, rerank per search)
+            is_media = interface in MEDIA_INTERFACES or (interface in UNIT_PRICED_INTERFACES and (
+                not pin or any(e.get("kind") == "unit" for e in m.get("_display_pricing") or [])))
             inputs = m.get("architecture", {}).get("input_modalities") or []
             rows.append(dict(provider="openrouter", offer_key=oid, model_id=mid, interface=interface, access="paid",
-                             # media models report 0/0 token prices in the API: that is not a price
                              price_in_1m=None if is_media or pin is None or pin < 0 else pin * 1e6,
                              price_out_1m=None if is_media or pout is None or pout < 0 else pout * 1e6,
                              unit_price=None, unit=None, provider_created=created, pricing=pr,
@@ -548,9 +719,22 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                              meta={"open_weights": True if m.get("hugging_face_id") else None, "license": None,
                                    "hf": m.get("hugging_face_id") or None,
                                    "context_length": m.get("context_length")},
-                             **_media_fields(interface, "", None, None, inputs)))
+                             # embeddings compare on their input price per 1M tokens
+                             **_media_fields(interface, "", pin * 1e6 if interface == "embedding" and pin else None,
+                                             "per 1m tokens" if interface == "embedding" else None, inputs)))
             if interface == "decisions":   # what a decision model can read besides text (image, audio, video)
                 rows[-1]["modes"] = sorted(x for x in inputs if x != "text")
+            if interface == "chat" and "audio" in inputs:
+                # a chat model that hears audio also transcribes (Hermes stt: Gemini Flash-Lite via chat/completions
+                # input_audio): one offer on the transcription interface, priced per 1M audio input tokens
+                aud = _num(pr.get("audio")) or pin
+                rows.append(dict(provider="openrouter", offer_key=f"{oid} | audio input", model_id=mid,
+                                 interface="transcription", access="paid",
+                                 price_in_1m=aud * 1e6 if aud and aud > 0 else None,
+                                 price_out_1m=pout * 1e6 if pout and pout > 0 else None, unit_price=None, unit=None,
+                                 provider_created=created, pricing={"audio": pr.get("audio"), "prompt": pr.get("prompt"),
+                                                                    "completion": pr.get("completion"), "via": "chat"},
+                                 **_media_fields("transcription", "audio input", None, None, inputs)))
             for entry in m.get("_display_pricing") or []:
                 if entry.get("kind") != "unit":
                     continue  # token-priced media (e.g. image output per M tokens) has no per-unit equivalent
@@ -633,13 +817,14 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
 
 # --- storage -------------------------------------------------------------------------------------------
 
-NAME_PRIORITY = {"openrouter": 1, "hermes_providers": 2, "aa": 3, "mm": 4, "bridgebench": 5, "arena": 6, "kie": 7, "da": 8}
+NAME_PRIORITY = {"openrouter": 1, "hermes_providers": 2, "aa": 3, "mm": 4, "bridgebench": 5, "arena": 6, "kie": 7, "da": 8,
+                 "aa_stt": 9, "agentset": 10, "mteb": 11}
 
 
 def _display_name(namespace: str, name: str | None) -> str | None:
     if not name or namespace not in NAME_PRIORITY:
         return None
-    if namespace in ("aa", "mm", "arena"):
+    if namespace in ("aa", "mm", "arena", "aa_stt"):
         name = re.sub(r"\s*\([^)]*\)", "", name).strip()  # effort tier / 'based on' notes are variants, not names
     return name if namespace != "kie" else name.split(",")[0].strip()
 

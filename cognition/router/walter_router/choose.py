@@ -120,6 +120,8 @@ def pick(conn, task: str, level: str | None = None, role: str | None = None,
               if r != (role or "default") and p["pinned_model_id"]}
     if pref and pref["pinned_model_id"]:
         return {**_pinned_answer(conn, t, pref), "other_roles": others}
+    if t["default_objective"] == "level":
+        return _level_answer(conn, t, level)
     if t["quality_benchmark"] is None:
         snaps = sel.latest_snapshots(conn)
         ids = [snaps[k] for k in collect.OFFER_KINDS if k in snaps]
@@ -145,6 +147,25 @@ def pick(conn, task: str, level: str | None = None, role: str | None = None,
                     "provider": row["subscription"] or row["provider"], "paid_fallback": row["provider"],
                     "real_cost": row["real_cost"], "cost_unit": row["cost_unit"], "run_id": run_id, "other_roles": others}
     return {"task": task, "mode": "none", "why": "no callable candidate in the latest run", "other_roles": others}
+
+
+def _level_answer(conn, t: dict, level: str | None = None) -> dict[str, Any]:
+    """A background text poste (compression, extraction…) follows one of Monsieur's text tiers — his declared pin for
+    'general' at requirements.level, adopted by him, so the poste moves when he adopts a new tier. A tier model that
+    breaks a hard requirement of the poste (context window) hands over to the next tier up."""
+    req = t.get("requirements") or {}
+    want = level or req.get("level") or "L1"
+    for lvl in LEVELS[LEVELS.index(want):]:
+        d = pick(conn, "general", level=lvl)
+        if not d.get("model_id"):
+            continue
+        ctx = conn.execute("select context_length from models.canonical where model_id = %s", (d["model_id"],)).fetchone()
+        if req.get("min_context") and ctx and ctx["context_length"] and ctx["context_length"] < req["min_context"]:
+            continue
+        return {**d, "task": t["task"], "level": lvl, "follows": {"task": "general", "level": lvl},
+                "source": f'level:{lvl}' + (f' ({d["source"]})' if d.get("source") else ""), "requirements": req,
+                "why": f'Poste de fond : niveau texte {lvl} de Monsieur (general/{lvl}). ' + (d.get("why") or "")}
+    return {"task": t["task"], "mode": "none", "why": f"aucun niveau texte {want}+ ne respecte {req}"}
 
 
 def set_preference(conn, task: str, objective: str | None = None, pin: str | None = None, provider: str | None = None,

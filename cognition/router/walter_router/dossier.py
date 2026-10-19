@@ -59,6 +59,9 @@ def build(conn, task: str, run_id: int, n: int = 8) -> dict[str, Any]:
                                 "marginal": (r["reasons"] or {}).get("marginal")}
                                for r in conn.execute("""select * from models.selection where run_id = %s and task = 'general'
                                                         and level = 'frontier' order by rank""", (run_id,))]}
+    ranking = None
+    if task != "general" and boards:
+        ranking = _ranking(conn, t, {r["model_id"] for r in roles if r.get("model_id")}, n)
     postes_doc = None
     if task == "general":
         from . import postes as postes_mod
@@ -67,7 +70,32 @@ def build(conn, task: str, run_id: int, n: int = 8) -> dict[str, Any]:
             "default_objective": t["default_objective"],
             "boards": [{"board": f'{b["benchmark"]}:{b["bench_task"]}', "weight": b["weight"],
                         "primary": b["is_primary"]} for b in boards],
-            "roles": roles, "candidates": cands, "levels": levels, "rules": RULES, "run_id": run_id}
+            "requirements": t.get("requirements") or {}, "consumers": t.get("consumers"),
+            "roles": roles, "candidates": cands, "ranking": ranking, "levels": levels, "rules": RULES, "run_id": run_id}
+
+
+def _ranking(conn, t: dict, pinned: set[str], n: int) -> list[dict]:
+    """Every measured model of the task in composite order (callable or not), Monsieur's pinned models always shown
+    with their place: what a proposal would compare. `candidates` keeps the selection (#1 only for specialised tasks)."""
+    from . import scoring
+    from . import select as sel
+    offers = sel.load_offers(conn, sel.latest_snapshots(conn))
+    out = []
+    for i, c in enumerate(scoring.composite(conn, t["task"])):
+        if i >= n and c["model_id"] not in pinned:
+            continue
+        mine = [o for o in offers.get(c["model_id"], []) if o["interface"] == t["interface"]]
+        route = sel.media_route(mine, t["interface"], t["modes"]) if t["interface"] != "chat" else None
+        out.append({"rank": i + 1, "model_id": c["model_id"], "composite": c["composite"],
+                    "pinned": c["model_id"] in pinned, "callable": bool(mine),
+                    "providers": sorted({o["provider"] for o in mine}),
+                    "price": (route or {}).get("paid") and {k: route["paid"].get(k) for k in ("cost", "unit", "provider")},
+                    "boards": {k: {x: v[x] for x in ("score", "unit", "rank", "of", "wer_pct", "latency_ms", "list_price",
+                                                     "price_unit", "host") if x in v} for k, v in c["boards"].items()}})
+    for m in sorted(pinned - {r["model_id"] for r in out}):
+        out.append({"rank": None, "model_id": m, "pinned": True, "measured": False,
+                    "note": "absent des classements de cette tâche (une variante proche peut l'être)"})
+    return out
 
 
 def build_all(conn, run_id: int) -> int:

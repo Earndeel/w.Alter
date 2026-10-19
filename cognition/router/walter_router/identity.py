@@ -12,7 +12,7 @@ from pathlib import Path
 TIERS = ("non-reasoning", "minimal", "low", "medium", "high", "xhigh", "max")
 VENDOR_PREFIXES = ("google-", "openai-", "anthropic-", "meta-", "microsoft-", "alibaba-", "bytedance-",
                    "black-forest-labs-")
-BENCHMARK_NAMESPACES = ("aa", "aa_decision", "da", "mm", "arena", "bridgebench")
+BENCHMARK_NAMESPACES = ("aa", "aa_decision", "da", "mm", "arena", "bridgebench", "aa_stt", "agentset", "mteb")
 _TIER_SUFFIX = re.compile(r"-(" + "|".join(TIERS) + r")$")
 _PAREN = re.compile(r"\(([^)]*)\)")
 _GLUED = re.compile(r"(?<![a-z0-9])([a-z]{3,})(\d)")      # wan2-7 -> wan-2-7, flux1-1 -> flux-1-1 (not h3, v2, o1)
@@ -66,6 +66,25 @@ def _variant_from_paren(name: str) -> tuple[str, str]:
     return _PAREN.sub("", name).strip(), variant
 
 
+_WHISPER_SHORT = re.compile(r"\(L, (v\d)(, Turbo)?\)")       # AA: 'Whisper (L, v3, Turbo)' = Whisper Large v3 Turbo
+_AGENTSET_VENDORS = ("cohere-", "voyage-ai-", "baai-", "openai-")   # 'Cohere Rerank 4 Pro' -> rerank-4-pro (API id)
+
+
+def _compact(text: str | None) -> str:
+    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
+def stt_name(model: str, host: str | None = None) -> str:
+    """AA Speech-to-Text row name without its host: 'Whisper (L, v3, Turbo), Groq' -> 'Whisper Large v3 Turbo',
+    'Parakeet TDT 0.6B V3, Togetherai' -> 'Parakeet TDT 0.6B V3' (the host is AA's Provider column)."""
+    name = _WHISPER_SHORT.sub(lambda m: f"Large {m.group(1)}" + (" Turbo" if m.group(2) else ""), model).strip()
+    head, sep, tail = name.rpartition(", ")
+    h, t = _compact(host), _compact(tail)
+    if sep and h and t and (t in h or h in t):
+        name = head
+    return name
+
+
 _UNRESTRICTED = re.compile(r"-(uncensored|unrestricted|abliterated|heretic|nsfw|venice-edition)\b")
 
 
@@ -101,6 +120,17 @@ def normalize(namespace: str, key: str, name: str | None = None) -> tuple[str, s
     elif namespace == "mm":
         base, variant = _variant_from_paren(key)
         base = slugify(base)
+    elif namespace == "aa_stt":
+        # 'Gemini 3.1 Flash-Lite Preview (Minimal)' -> gemini-3-1-flash-lite-preview / minimal; name = the host
+        base, variant = _variant_from_paren(stt_name(key, name))
+        base = slugify(base)
+    elif namespace == "agentset":
+        base = slugify(key)
+        for prefix in _AGENTSET_VENDORS:
+            if base.startswith(prefix):
+                base = base[len(prefix):]
+    elif namespace == "mteb":
+        base = slugify(key.split("__", 1)[-1])   # results folder 'Qwen__Qwen3-Embedding-8B' (org__model)
     elif namespace == "arena":
         # Arena display names: 'claude-opus-5.5-max', 'dreamina-seedance-2.5-720p', 'veo-3.1-audio-1080p',
         # 'gpt-image-2 (medium)', 'flux-3-video-20260811'.

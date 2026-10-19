@@ -17,9 +17,9 @@ from . import collect, media
 
 SKILL = Path(os.environ.get("HERMES_HOME", "/root/.hermes")) / "skills/research/aa-pareto-model-optimizer/scripts"
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
-MEDIA_UNITS = {"image": "per image", "video": "per second", "audio": "per 1000 characters", "music": None}
+MEDIA_UNITS = media.NORM_UNITS   # image per image, video per second, voice per 1000 characters, stt per minute…
 BENCH_KIND = {"aa_intelligence": "aa", "aa_decision": "aa_decision", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena",
-              "bridgebench": "bridgebench"}
+              "bridgebench": "bridgebench", "aa_stt": "aa_stt", "agentset": "agentset", "mteb": "mteb"}
 
 
 def _load(name: str):
@@ -316,7 +316,9 @@ def compute(conn) -> list[dict]:
     snaps = latest_snapshots(conn)
     offers = load_offers(conn, snaps)
     intel = _intelligence_index(conn, snaps, offers)
-    tasks = list(conn.execute("select * from models.tasks where quality_benchmark is not null"))
+    # 'level' postes follow a text tier of 'general' (choose.pick): nothing of their own to rank here
+    tasks = list(conn.execute("""select * from models.tasks where quality_benchmark is not null
+                                 and default_objective <> 'level'"""))
     out: list[dict] = []
     for t in tasks:
         kind = BENCH_KIND[t["quality_benchmark"]]

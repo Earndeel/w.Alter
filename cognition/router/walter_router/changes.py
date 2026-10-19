@@ -14,9 +14,12 @@ from . import select as sel
 
 MIN_GAP_H = 24
 PRICE_DROP = 0.15
-NERF = {"aa_intelligence": 2.0, "aa_decision": 2.0, "bridgebench": 30.0}   # Elo-type boards: NERF_ELO
+NERF = {"aa_intelligence": 2.0, "aa_decision": 2.0, "bridgebench": 30.0,   # Elo-type boards: NERF_ELO
+        # per board ('benchmark:task') when one source mixes scales: STT accuracy points, speed factors, req/s, nDCG
+        "aa_stt:wer": 1.0, "aa_stt:speed": 50.0, "agentset:rerank_speed": 0.5, "agentset:embeddings_speed": 0.5,
+        "mteb": 2.0}
 NERF_ELO = 15.0
-BENCH_KINDS = ("aa", "aa_decision", "mm", "da", "arena", "bridgebench")
+BENCH_KINDS = ("aa", "aa_decision", "mm", "da", "arena", "bridgebench", "aa_stt", "agentset", "mteb")
 OFFER_KINDS = ("openrouter", "kie", "hermes_providers")
 
 
@@ -50,7 +53,7 @@ def events(conn) -> dict:
                 if (r["benchmark"], r["task"]) in boards_before:  # a brand-new board is not a new model
                     out["new"].setdefault(r["model_id"], []).append(f"nouveau sur {board}")
                 continue
-            limit = NERF.get(r["benchmark"], NERF_ELO)
+            limit = NERF.get(board, NERF.get(r["benchmark"], NERF_ELO))
             if old[key] - r["score"] > limit:
                 out["nerf"].setdefault(r["model_id"], []).append(
                     {"board": board, "before": round(old[key], 1), "after": round(r["score"], 1)})

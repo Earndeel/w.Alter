@@ -282,7 +282,8 @@ def _download(urls: list[str], b64: list[str], folder: Path, stem: str, auth: di
 def generate(conn, request: str, task: str | None = None, role: str | None = None, image_urls: list[str] | None = None,
              aspect_ratio: str | None = None, duration: int | None = None, resolution: str | None = None,
              paid_fallback: bool = False, craft: bool = True, _depth: int = 0, model: str | None = None,
-             _fallback: bool = True) -> dict:
+             _fallback: bool = True, voice: str | None = None,
+             style: str | None = None) -> dict:
     from .cli import route as route_request
     from . import choose, knowledge
     d = choose.pick(conn, task, role=role) if (task and role) else route_request(conn, request, task)
@@ -329,9 +330,10 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
                     params = {"custom_mode": True, "instrumental": not re.search(r"parole|chant|voix|lyrics|vocal",
                                                                                  request, re.I),
                               "model": "V6", "style": prompt[:200], "title": request[:60], "duration": duration}
-                elif kind == "audio":
-                    params = {"speakers": [{"speaker_id": "Speaker 1", "voice_name": "Fola"}],
-                              "dialogue_turns": [{"speaker_id": "Speaker 1", "text": request}]}
+                elif kind == "audio":   # voice / style: Hermes TTS passes its persona (Algenib, butler style)
+                    turn = {"speaker_id": "Speaker 1", "text": request, **({"style": style} if style else {})}
+                    params = {"speakers": [{"speaker_id": "Speaker 1", "voice_name": voice or "Fola"}],
+                              "dialogue_turns": [turn]}
                 if image_urls:
                     field = cfg["kie"].get("images") if kind == "image" else cfg["kie"].get("first_frame")
                     params[field] = image_urls if field.endswith("urls") else image_urls[0]
@@ -363,7 +365,8 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
     if _fallback and _depth == 0:
         for fb in fallback_models(conn, task, d.get("role"), model_id, mode):
             r = generate(conn, request, task=task, role=d.get("role"), image_urls=image_urls, aspect_ratio=aspect_ratio,
-                         duration=duration, resolution=None, paid_fallback=True, craft=craft, model=fb, _fallback=False)
+                         duration=duration, resolution=None, paid_fallback=True, craft=craft, model=fb, _fallback=False,
+                         voice=voice, style=style)
             if r.get("files"):
                 return {**r, "fallback_from": model_id, "errors": errors + (r.get("errors") or [])}
             errors += r.get("errors") or [r.get("error", "")]

@@ -25,7 +25,7 @@ SHRINK_K = 0.25
 FEEDBACK_POINTS = 3.0  # per net rating point from Monsieur on that task (capped at +/-3 -> +/-9 composite points)
 VOTES_HALF = 500.0
 BOARD_NAMES = {"aa_intelligence": "AA", "aa_decision": "AA Decision", "aa_mm": "AA", "da_models": "Design Arena", "da_agents": "Design Arena",
-               "arena": "Arena", "bridgebench": "BridgeBench"}
+               "arena": "Arena", "bridgebench": "BridgeBench", "aa_stt": "AA STT", "agentset": "Agentset", "mteb": "MTEB"}
 
 
 def _reliability(row: dict) -> float:
@@ -63,7 +63,8 @@ def composite(conn, task: str, snaps: dict | None = None) -> list[dict]:
         sid = sel.board_snapshot(conn, snaps, b["benchmark"], b["bench_task"])
         if sid is None:
             continue
-        rows = list(conn.execute("""select model_id, variant, display_name, score, score_unit, extra from models.benchmarks
+        rows = list(conn.execute("""select model_id, variant, display_name, score, score_unit, cost, cost_unit, extra
+                                   from models.benchmarks
                                    where snapshot_id = %s and benchmark = %s and task = %s""",
                                  (sid, b["benchmark"], b["bench_task"])))
         if b["benchmark"] == "aa_decision":   # LLM reference rows would set the scale: rank decision models only
@@ -74,15 +75,30 @@ def composite(conn, task: str, snaps: dict | None = None) -> list[dict]:
             a = acc.setdefault(model_id, {"model_id": model_id, "wq": 0.0, "w": 0.0, "boards": {}})
             a["wq"] += b["weight"] * rel * v["q"]
             a["w"] += b["weight"] * rel
+            extra = v["row"]["extra"] or {}
             a["boards"][name] = {"score": round(v["row"]["score"], 1), "unit": v["row"]["score_unit"],
                                  "q": round(v["q"], 1), "rank": v["rank"], "of": v["of"], "weight": b["weight"],
                                  "reliability": round(rel, 2), "variant": v["row"]["variant"],
-                                 "primary": b["is_primary"]}
+                                 "primary": b["is_primary"],
+                                 # the measure behind a "higher = better" score (WER %, latency ms) and the list price
+                                 **{k: extra[k] for k in ("wer_pct", "latency_ms", "host") if extra.get(k) is not None},
+                                 **({"list_price": v["row"]["cost"], "price_unit": v["row"]["cost_unit"]}
+                                    if v["row"]["cost"] is not None else {})}
+            if extra.get("latency_ms") is not None:
+                a["latency_ms"] = min(a.get("latency_ms") or float("inf"), extra["latency_ms"])
     fb = {r["model_id"]: r["s"] for r in conn.execute(
         """select model_id, sum(rating) as s from models.feedback where (task = %s or task is null)
            and at > now() - interval '180 days' group by 1""", (task,))}
+    req = (conn.execute("select requirements from models.tasks where task = %s", (task,)).fetchone() or {}).get(
+        "requirements") or {}
     out = []
     for a in acc.values():
+        # a poste whose primary quality is a hard need (voice_assist: speed) ranks only models measured on it
+        if req.get("require_primary") and not any(b.get("primary") for b in a["boards"].values()):
+            continue
+        # a poste with a latency budget (rerank: voice recall, 0.7 s) never ranks a model measured slower than it
+        if req.get("max_latency_s") and a.get("latency_ms") and a["latency_ms"] > 1000 * req["max_latency_s"]:
+            continue
         score = (a["wq"] + SHRINK_K * 50) / (a["w"] + SHRINK_K)
         adj = FEEDBACK_POINTS * max(-3, min(3, fb.get(a["model_id"]) or 0))
         if adj:

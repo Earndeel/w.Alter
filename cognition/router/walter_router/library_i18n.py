@@ -16,7 +16,7 @@ PHRASES = {
     "Bibliothèque des modèles": "Model library",
     "▶ Lancer le cycle complet": "▶ Run the full cycle",
     "Vue d'ensemble": "Overview", "Audio & musique": "Audio & music", "Décision": "Decision", "Texte": "Text",
-    "Vidéo": "Video", "Rechercher": "Search", "Mes choix ≠ n°1": "My picks ≠ #1",
+    "Vidéo": "Video", "Mémoire & recherche": "Memory & search", "Rechercher": "Search", "$/recherche": "$/search", "Mes choix ≠ n°1": "My picks ≠ #1",
     # home
     "🧠 Niveaux de réflexion": "🧠 Reasoning levels",
     "Optimum de Pareto calculé par ta méthode sur la frontière AA": "Pareto optimum computed with your method on the AA frontier",
@@ -45,7 +45,8 @@ PHRASES = {
     "réflexion moyenne": "reasoning: medium", "réflexion élevée": "reasoning: high", "réflexion faible": "reasoning: low",
     "Fournisseurs (ordre, prix)": "Providers (order, price)", "Fournisseurs": "Providers", "Secours": "Fallback",
     "Abonnement": "Subscription", "Niveau": "Level", "Modèle": "Model", "Tâche": "Task", "Origine": "Origin",
-    "Rang": "Rank",
+    "Rang": "Rank", "Score /100 : moyenne pondérée des classements indiqués sous chaque tâche":
+        "Score /100: weighted average of the leaderboards listed under each task",
     # origins
     "Ton choix": "Your pick", "Calculé": "Computed", "Méthode Pareto": "Pareto method", "Aucun modèle": "No model",
     # task labels (models.tasks)
@@ -58,6 +59,12 @@ PHRASES = {
     "Texte général (niveaux L1/L2/L3)": "General text (levels L1/L2/L3)", "Graphisme / affiche": "Graphic design / poster",
     "Retouche / édition d'image": "Image retouching / editing", "Animer une image": "Animate an image",
     "Logo / identité visuelle": "Logo / visual identity", "Application mobile (agent)": "Mobile app (agent)",
+    "Résumé / compression de contexte": "Summarisation / context compression",
+    "Extraction mémoire structurée": "Structured memory extraction",
+    "Aide texte pendant un appel vocal": "Text helper during a phone call",
+    "Transcription (parole vers texte)": "Transcription (speech to text)",
+    "Vectorisation (embeddings)": "Embeddings",
+    "Reclassement de résultats (rerank)": "Result reranking",
     "Musique": "Music", "Recherche web": "Web search", "Conversation vocale temps réel": "Real-time voice conversation",
     "SVG / vectoriel": "SVG / vector", "Vidéo depuis texte": "Text to video", "Voix (lecture)": "Voice (text to speech)",
     "Composant d'interface": "UI component", "Édition de vidéo": "Video editing", "Analyse d'image": "Image analysis",
@@ -66,6 +73,7 @@ PHRASES = {
     "Budget / brouillon": "Budget / draft", "Équilibré": "Balanced", "Premium / cinématique": "Premium / cinematic",
     # data notes
     "n°1 mesuré : ": "measured #1: ", "(pas de fournisseur branché)": "(no provider wired)",
+    "pas de fournisseur branché": "no provider wired",
     "(proposé par aucun de nos fournisseurs)": "(offered by none of our providers)",
     "Codex (abonnement) inclus": "Codex (subscription) included", "via Codex (abonnement)": "via Codex (subscription)",
     "Flow à la main": "Flow, by hand", "(si payant)": "(if paid)", "$/img estimé": "$/img estimated",
@@ -163,6 +171,8 @@ def _tag(tag: str) -> str:
 
 def to_english(html: str) -> str:
     html = html.replace('<html lang="fr">', '<html lang="en">', 1)
+    # elements carrying their own English text (generated lists: leaderboards behind a task)
+    html = re.sub(r'<div class="bench" data-en="([^"]*)">[^<]*</div>', r'<div class="bench">\1</div>', html)
     html = html.replace('data-lang="fr" class="on"', 'data-lang="fr"').replace('data-lang="en">', 'data-lang="en" class="on">', 1)
     head, sep, rest = html.partition("<script>")
     script, sep2, tail = rest.partition("</script>")
