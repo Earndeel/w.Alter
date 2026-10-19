@@ -2,11 +2,667 @@
   "version": 1,
   "modules": [
     {
+      "id": "browse",
+      "root": "/opt/walter-browse",
+      "anchors": [
+        "/opt/walter-browse/contracts/browse.json",
+        "/opt/walter-browse/runtime/universal_router.py",
+        "/opt/walter-browse/walter_browse/facade.py"
+      ],
+      "requires": [],
+      "external": [
+        "Scrapling isolated environment",
+        "Camoufox :9377",
+        "optional Webtop CDP"
+      ],
+      "data": [
+        "shared session state",
+        "learned route profiles",
+        "result cache"
+      ],
+      "core_paths": [
+        "/opt/walter-browse/walter_browse",
+        "/opt/walter-browse/runtime/universal_router.py",
+        "/opt/walter-browse/runtime/browse_session.py",
+        "/opt/walter-browse/runtime/profile_index.py",
+        "/opt/walter-browse/runtime/result_cache.py",
+        "/opt/walter-browse/runtime/search_lite.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-browse"
+      ],
+      "interfaces": [
+        "shared request contract",
+        "CLI",
+        "MCP",
+        "Hermes plugin"
+      ],
+      "bindings": {
+        "hermes": "native walter-browse adapter to shared facade",
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [
+        "Authenticated HTTP uses managed server-side cookies and refuses cross-origin redirects or anonymous fallback.",
+        "Authenticated interactive browser routes are not qualified by the HTTP fixture."
+      ],
+      "services": [],
+      "optional": [
+        "secrets",
+        "llm"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "browse",
+        "kind": "capability",
+        "purpose": "Rechercher, extraire et gérer les parcours web avec un moteur commun.",
+        "target_root": "/walter/browse",
+        "config_paths": [
+          "/opt/walter-browse/config"
+        ],
+        "permissions": [
+          "sessions de navigateur gérées",
+          "cookies et valeurs de coffre hors résultats"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "walter_browse/browser_session",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "browse-sessions",
+            "role": "owner",
+            "owner": "browse",
+            "durability": "ephemeral"
+          },
+          {
+            "id": "browse-route-profiles",
+            "role": "owner",
+            "owner": "browse",
+            "durability": "configuration"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "public-extraction",
+            "assertion": "Une extraction publique passe par le noyau partagé sans processus agent Hermes.",
+            "scope": "live"
+          },
+          {
+            "id": "managed-auth",
+            "assertion": "Une session gérée permet un parcours autorisé sans divulguer ses identifiants.",
+            "scope": "live"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
+    },
+    {
+      "id": "bus",
+      "root": "/opt/walter-memory",
+      "anchors": [
+        "/opt/walter-memory/contracts/bus.json",
+        "/opt/walter-memory/walter_memory/bus.py"
+      ],
+      "requires": [
+        "memory"
+      ],
+      "external": [],
+      "data": [
+        "bus.*"
+      ],
+      "core_paths": [
+        "/opt/walter-memory/walter_memory/bus.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-memory"
+      ],
+      "interfaces": [
+        "Python emit/Consumer",
+        "Postgres LISTEN/NOTIFY"
+      ],
+      "bindings": {
+        "hermes": "lifecycle adapter",
+        "dsh": "lifecycle adapter",
+        "codex": "lifecycle adapter",
+        "claude-code": "lifecycle adapter"
+      },
+      "limitations": [],
+      "services": [],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "bus",
+        "kind": "foundation",
+        "purpose": "Livrer les événements entre modules et conserver les curseurs de traitement.",
+        "target_root": "/walter/memory",
+        "config_paths": [],
+        "permissions": [
+          "droits PostgreSQL du consommateur"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "event",
+            "interface": "walter_memory.bus.emit/Consumer",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "postgres:bus",
+            "role": "owner",
+            "owner": "bus",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "catch-up",
+            "assertion": "Un consommateur arrêté reprend depuis son curseur sans perdre les événements persistés.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
+    },
+    {
+      "id": "colab",
+      "root": "/opt/walter-colab",
+      "anchors": [
+        "/opt/walter-colab/RUNBOOK.md",
+        "/opt/walter-colab/contracts/colab.json",
+        "/opt/walter-colab/on_demand.py"
+      ],
+      "requires": [],
+      "external": [
+        "official Colab MCP",
+        "browser authentication",
+        "Google Drive"
+      ],
+      "data": [
+        "immutable prepared artifacts and result evidence"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/opt/walter-colab"
+      ],
+      "interfaces": [
+        "on_demand.py CLI"
+      ],
+      "bindings": {
+        "hermes": "local CLI via host execution permissions",
+        "dsh": "local CLI via host execution permissions",
+        "codex": "local CLI via host execution permissions",
+        "claude-code": "local CLI via host execution permissions"
+      },
+      "limitations": [
+        "GPU remains blocked until prepared artifact validation; modularity work does not remove this guard.",
+        "No remote compute is allocated by modularity checks."
+      ],
+      "services": [],
+      "optional": [
+        "raw-vault"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "colab",
+        "kind": "capability",
+        "purpose": "Préparer et exécuter des travaux de calcul distant qualifiés.",
+        "target_root": "/walter/compute/colab",
+        "config_paths": [],
+        "permissions": [
+          "validation de l’artefact avant allocation GPU",
+          "authentification Google existante"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "cli",
+            "interface": "on_demand.py",
+            "access": "execute",
+            "timeout_seconds": 1800,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "compute-artifacts",
+            "role": "owner",
+            "owner": "colab",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "compute-guard",
+            "assertion": "Une charge non qualifiée est refusée avant toute allocation de calcul.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
+    },
+    {
+      "id": "computer",
+      "root": "/opt/walter-computer",
+      "anchors": [
+        "/opt/walter-computer/contracts/computer.json",
+        "/opt/walter-computer/walter_computer/__init__.py"
+      ],
+      "requires": [],
+      "external": [
+        "device-node driver",
+        "Mac over SSH/Tailscale",
+        "optional walter-llm vision"
+      ],
+      "data": [
+        "isolated ephemeral operator sessions"
+      ],
+      "core_paths": [
+        "/opt/walter-computer/walter_computer/operator.py",
+        "/opt/walter-computer/walter_computer/policy.py",
+        "/opt/walter-computer/walter_computer/config.py",
+        "/opt/walter-computer/walter_computer/driver.py",
+        "/opt/walter-computer/walter_computer/transport.py",
+        "/opt/walter-computer/walter_computer/types.py",
+        "/opt/walter-computer/walter_computer/runtime.py",
+        "/opt/walter-computer/walter_computer/observer.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-computer",
+        "/root/walter-computer-use",
+        "/root/.config/walter-device-node",
+        "/etc/tmpfiles.d/walter-computer.conf"
+      ],
+      "interfaces": [
+        "OperatorSessions",
+        "MCP computer_use",
+        "Hermes plugin"
+      ],
+      "bindings": {
+        "hermes": "plugin integration verified separately",
+        "dsh": "direct MCP",
+        "codex": "direct MCP",
+        "claude-code": "direct MCP"
+      },
+      "limitations": [
+        "No desktop input in health checks.",
+        "Read, pixels, vision and input require explicit grants.",
+        "Cloud vision additionally requires host-only authorization for one exact window; default denied.",
+        "Workflow reservations are cross-process leases with bounded expiry; live Mac qualification tracked separately."
+      ],
+      "services": [],
+      "optional": [
+        "llm"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "computer",
+        "kind": "capability",
+        "purpose": "Observer et manipuler un appareil avec des permissions et cibles explicites.",
+        "target_root": "/walter/computer",
+        "config_paths": [
+          "/root/.config/walter-device-node",
+          "/opt/walter-computer/config.json",
+          "/opt/walter-computer/gateway.env"
+        ],
+        "permissions": [
+          "read/input/foreground/pixels/vision accordés par le host",
+          "autorisation de la tâche sur appareil"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "computer_use",
+            "access": "execute",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "operator-sessions",
+            "role": "owner",
+            "owner": "computer",
+            "durability": "ephemeral"
+          },
+          {
+            "id": "device-policy",
+            "role": "owner",
+            "owner": "computer",
+            "durability": "configuration"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "device-task",
+            "assertion": "Une tâche synthétique sur le Mac réussit sans accéder aux applications personnelles.",
+            "scope": "live"
+          },
+          {
+            "id": "device-concurrency",
+            "assertion": "Les cibles périmées et les accès concurrents non autorisés sont refusés.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
+    },
+    {
+      "id": "context",
+      "root": "/opt/walter-context",
+      "anchors": [
+        "/opt/walter-context/contracts/context.json",
+        "/opt/walter-context/ports/dsh/index.mjs",
+        "/opt/walter-context/ports/hermes/__init__.py",
+        "/opt/walter-context/walter_context/session.py"
+      ],
+      "requires": [],
+      "external": [
+        "Optional Walter Logs for Hermes journal recovery; DSH uses own raw journal"
+      ],
+      "data": [
+        "per-session projection epochs; recoverable originals in logs"
+      ],
+      "core_paths": [
+        "/opt/walter-context/walter_context"
+      ],
+      "backup_paths": [
+        "/opt/walter-context"
+      ],
+      "interfaces": [
+        "Python Session",
+        "Hermes ContextEngine adapter",
+        "DSH CompactionEngine adapter"
+      ],
+      "bindings": {
+        "hermes": "see live context.engine in harness check",
+        "dsh": "Walter compaction adapter",
+        "codex": "native compaction",
+        "claude-code": "native compaction"
+      },
+      "limitations": [
+        "DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.",
+        "Hermes remains on walter-compress; walter-context projection is not activated.",
+        "Structural and known-answer tests do not certify semantic model quality."
+      ],
+      "services": [],
+      "optional": [
+        "logs",
+        "llm"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "context",
+        "kind": "capability",
+        "purpose": "Construire le contexte et les checkpoints selon le contrat de chaque harness.",
+        "target_root": "/walter/context",
+        "config_paths": [
+          "/opt/walter-context/config/walter-context.toml"
+        ],
+        "permissions": [
+          "limites du modèle et du harness",
+          "confidentialité des originaux récupérés"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "library",
+            "interface": "Session / ContextEngine / CompactionEngine",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "context-session-state",
+            "role": "owner",
+            "owner": "context",
+            "durability": "ephemeral"
+          },
+          {
+            "id": "postgres:walter_logs",
+            "role": "consumer",
+            "owner": "logs",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "context-retention",
+            "assertion": "Les contraintes, instructions, références et budgets survivent aux checkpoints répétés ou l’opération est refusée.",
+            "scope": "integration"
+          },
+          {
+            "id": "semantic-quality",
+            "assertion": "Un corpus fixé à l’avance respecte les seuils de qualité, coût et rétention visible.",
+            "scope": "live"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
+    },
+    {
       "id": "core",
       "root": "/opt/walter-core",
       "anchors": [
+        "/opt/walter-core/contracts/core.json",
+        "/opt/walter-core/hooks/walter_hook.py",
         "/opt/walter-core/server.py",
-        "/opt/walter-core/hooks/walter_hook.py"
+        "/opt/walter-core/modules/catalog.json",
+        "/opt/walter-core/modules/registry.json"
       ],
       "requires": [],
       "external": [],
@@ -25,7 +681,10 @@
       ],
       "interfaces": [
         "MCP stdio",
-        "walter CLI"
+        "walter CLI",
+        "CLI contracts, matrix, doctor",
+        "Declarative harness compositions",
+        "Offline source release and staged installation"
       ],
       "bindings": {
         "hermes": "native adapters + lifecycle hook (no duplicate MCP attachment)",
@@ -37,98 +696,230 @@
         "MCP client must reconnect to discover newly installed tools.",
         "CLI attachment installs common MCP; context/model/lifecycle bindings are checked independently."
       ],
-      "services": []
+      "services": [],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "core",
+        "kind": "foundation",
+        "purpose": "Exposer les capacités et installer les raccordements des harnesses.",
+        "target_root": "/walter/core",
+        "config_paths": [
+          "/opt/walter-core/modules/computer-policy.json"
+        ],
+        "permissions": [
+          "configurations clients",
+          "permissions du harness"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "walter_modules",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "install",
+            "transport": "cli",
+            "interface": "walter harness install",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "harness-bindings",
+            "role": "owner",
+            "owner": "core",
+            "durability": "configuration"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "read-only-discovery",
+            "assertion": "Un module optionnel absent ne désactive pas les capacités restantes.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
     },
     {
-      "id": "soul",
-      "root": "/opt/walter-soul",
+      "id": "llm",
+      "root": "/opt/walter-llm",
       "anchors": [
-        "/opt/walter-soul/identity.md",
-        "/opt/walter-soul/rules.md",
-        "/opt/walter-soul/bin/walter-soul"
+        "/opt/walter-llm/contracts/llm.json",
+        "/opt/walter-llm/gateway.py"
       ],
-      "requires": [],
+      "requires": [
+        "router",
+        "secrets"
+      ],
       "external": [],
       "data": [
-        "identity sources",
-        "curated user profile"
+        "local consumer tokens",
+        "provider routing configuration"
       ],
       "core_paths": [],
       "backup_paths": [
-        "/opt/walter-soul",
-        "/opt/walter-profiles",
-        "/root/.hermes/memories"
+        "/opt/walter-llm",
+        "/root/.hermes/walter-llm"
       ],
       "interfaces": [
-        "renderer",
-        "walter_profile MCP"
+        "OpenAI-compatible :8894"
       ],
       "bindings": {
-        "hermes": "rendered SOUL.md",
-        "dsh": "rendered AGENTS.md + walter_profile MCP",
-        "codex": "common MCP",
-        "claude-code": "common MCP"
+        "dsh": "configured provider",
+        "hermes": "auxiliary/module calls; main provider host-owned",
+        "codex": "specialist module calls; primary native",
+        "claude-code": "specialist module calls; primary native"
       },
-      "limitations": [
-        "Profile and critical buffer retain compatibility locations under .hermes; no running Hermes required."
-      ],
-      "services": []
-    },
-    {
-      "id": "memory",
-      "root": "/opt/walter-memory",
-      "anchors": [
-        "/opt/walter-memory/walter_memory/events.py",
-        "/opt/walter-memory/walter_memory/objects.py"
-      ],
-      "requires": [],
-      "external": [
-        "PostgreSQL hindsight-pg:5433",
-        "pgvector",
-        "walter-llm for derived extraction"
-      ],
-      "data": [
-        "core.*",
-        "ingestion.*",
-        "privacy.*",
-        "search.*",
-        "system.*",
-        "kardex.*"
-      ],
-      "core_paths": [
-        "/opt/walter-memory/walter_memory/events.py",
-        "/opt/walter-memory/walter_memory/objects.py"
-      ],
-      "backup_paths": [
-        "/opt/walter-memory",
-        "/root/.pgpass"
-      ],
-      "interfaces": [
-        "Python library",
-        "HTTP :8890",
-        "CLI",
-        "MCP"
-      ],
-      "bindings": {
-        "hermes": "Walter ingestion + Hindsight provider (legacy cognitive adapter)",
-        "dsh": "common MCP",
-        "codex": "common MCP",
-        "claude-code": "common MCP"
-      },
-      "limitations": [
-        "Hindsight is a replaceable cognitive implementation; current Hermes provider remains Hindsight.",
-        "Source connectors are host-specific adapters; native working stores stay owned by each harness."
-      ],
+      "limitations": [],
       "services": [
-        "walter-memory-gateway"
-      ]
+        "walter-llm"
+      ],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "llm",
+        "kind": "capability",
+        "purpose": "Exécuter les appels modèles des consommateurs autorisés via les postes du Router.",
+        "target_root": "/walter/router/llm",
+        "config_paths": [],
+        "permissions": [
+          "jeton local par consommateur",
+          "clés fournisseur hors contexte modèle"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "http",
+            "interface": "OpenAI-compatible loopback :8894",
+            "access": "execute",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "model-consumer-tokens",
+            "role": "owner",
+            "owner": "llm",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:models",
+            "role": "consumer",
+            "owner": "router",
+            "durability": "configuration"
+          },
+          {
+            "id": "bitwarden-vault",
+            "role": "consumer",
+            "owner": "secrets",
+            "durability": "external"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "consumer-auth",
+            "assertion": "Un jeton absent ou invalide est refusé et un poste choisi utilise la route attendue.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
     },
     {
       "id": "logs",
       "root": "/opt/walter-memory",
       "anchors": [
-        "/opt/walter-memory/walter_memory/logs.py",
-        "/opt/walter-memory/connectors/walter_logs.py"
+        "/opt/walter-memory/connectors/walter_logs.py",
+        "/opt/walter-memory/contracts/logs.json",
+        "/opt/walter-memory/walter_memory/logs.py"
       ],
       "requires": [
         "memory"
@@ -159,87 +950,433 @@
       ],
       "services": [
         "walter-logs-watch"
-      ]
+      ],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "logs",
+        "kind": "foundation",
+        "purpose": "Conserver les traces accessibles de tous les harnesses dans un journal commun.",
+        "target_root": "/walter/memory",
+        "config_paths": [],
+        "permissions": [
+          "lecture cloud-safe",
+          "masquage des secrets avant écriture"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "logs_search/logs_timeline/logs_get",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "ingest",
+            "transport": "library",
+            "interface": "walter_memory.logs",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "postgres:walter_logs",
+            "role": "owner",
+            "owner": "logs",
+            "durability": "canonical"
+          },
+          {
+            "id": "postgres:core",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "all-sources",
+            "assertion": "Les sources principales et profils sont collectés avec reprise idempotente après interruption.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
     },
     {
-      "id": "bus",
+      "id": "memory",
       "root": "/opt/walter-memory",
       "anchors": [
-        "/opt/walter-memory/walter_memory/bus.py"
+        "/opt/walter-memory/contracts/memory.json",
+        "/opt/walter-memory/walter_memory/events.py",
+        "/opt/walter-memory/walter_memory/objects.py",
+        "/opt/walter-memory/walter_memory/client.py",
+        "/opt/walter-memory/walter_memory/read_policy.py",
+        "/opt/walter-memory/ports/hermes/__init__.py"
+      ],
+      "requires": [],
+      "external": [
+        "PostgreSQL hindsight-pg:5433",
+        "pgvector",
+        "walter-llm for derived extraction"
+      ],
+      "data": [
+        "core.*",
+        "ingestion.*",
+        "privacy.*",
+        "search.*",
+        "system.*",
+        "kardex.*"
+      ],
+      "core_paths": [
+        "/opt/walter-memory/walter_memory/events.py",
+        "/opt/walter-memory/walter_memory/objects.py"
+      ],
+      "backup_paths": [
+        "/opt/walter-memory",
+        "/root/.pgpass",
+        "/root/.hermes/plugins/walter-memory"
+      ],
+      "interfaces": [
+        "Python library",
+        "HTTP :8890",
+        "CLI",
+        "MCP"
+      ],
+      "bindings": {
+        "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
+        "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP",
+        "voice": "Authenticated canonical gateway through voice-memory HTTP port"
+      },
+      "limitations": [
+        "Canonical reads exclude stale, retracted, private and unprovenanced legacy cognitive rows.",
+        "Wild profile reads are refused by the cloud-safe port; local-only history remains local.",
+        "Existing desktop provider instances change on next session initialization; not force-restarted."
+      ],
+      "services": [
+        "walter-memory-gateway"
+      ],
+      "optional": [
+        "llm"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "memory",
+        "kind": "capability",
+        "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
+        "target_root": "/walter/memory",
+        "config_paths": [
+          "/opt/walter-memory/.env"
+        ],
+        "permissions": [
+          "classification de confidentialité",
+          "budget des traitements modèle"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "memory_recall",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "retain",
+            "transport": "mcp",
+            "interface": "memory_retain",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "reflect",
+            "transport": "mcp",
+            "interface": "memory_reflect",
+            "access": "execute",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "postgres:core",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "canonical"
+          },
+          {
+            "id": "postgres:ingestion",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:privacy",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:search",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "projection"
+          },
+          {
+            "id": "postgres:system",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:kardex",
+            "role": "owner",
+            "owner": "memory",
+            "durability": "projection"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "privacy-provenance",
+            "assertion": "Les lectures refusent les sources privées, purgées ou rétractées et les fragments périmés.",
+            "scope": "integration"
+          },
+          {
+            "id": "temporal-decisions",
+            "assertion": "Les décisions datées et remplacées ne sont pas présentées comme des instructions actuelles.",
+            "scope": "live"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
+    },
+    {
+      "id": "raw-vault",
+      "root": "/opt/walter-raw-vault",
+      "anchors": [
+        "/opt/walter-raw-vault/contracts/raw-vault.json",
+        "/opt/walter-raw-vault/rawvault.py"
       ],
       "requires": [
         "memory"
       ],
-      "external": [],
-      "data": [
-        "bus.*"
-      ],
-      "core_paths": [
-        "/opt/walter-memory/walter_memory/bus.py"
-      ],
-      "backup_paths": [
-        "/opt/walter-memory"
-      ],
-      "interfaces": [
-        "Python emit/Consumer",
-        "Postgres LISTEN/NOTIFY"
-      ],
-      "bindings": {
-        "hermes": "lifecycle adapter",
-        "dsh": "lifecycle adapter",
-        "codex": "lifecycle adapter",
-        "claude-code": "lifecycle adapter"
-      },
-      "limitations": [],
-      "services": []
-    },
-    {
-      "id": "skills",
-      "root": "/opt/walter-skills",
-      "anchors": [
-        "/opt/walter-skills/walter_skills/api.py",
-        "/opt/walter-skills/config/walter-skills.toml"
-      ],
-      "requires": [
-        "bus"
-      ],
       "external": [
-        "PostgreSQL skills schema",
-        "walter-llm for curation"
+        "rclone",
+        "Google Drive",
+        "S3 :8899"
       ],
       "data": [
-        "git skill store",
-        "skills.*"
+        "core.objects registry (memory-owned)",
+        "original bytes on Drive"
       ],
-      "core_paths": [
-        "/opt/walter-skills/walter_skills/client.py",
-        "/opt/walter-skills/walter_skills/policy.py"
-      ],
+      "core_paths": [],
       "backup_paths": [
-        "/opt/walter-skills"
+        "/opt/walter-raw-vault",
+        "/root/.config/rclone/rclone.conf",
+        "/root/.hermes/raw-vault"
       ],
       "interfaces": [
-        "HTTP :8891",
-        "stdlib client",
-        "MCP",
-        "Hermes plugin"
+        "memory objects library",
+        "S3",
+        "MCP"
       ],
       "bindings": {
-        "hermes": "native walter-skills adapter and lifecycle hook",
+        "hermes": "Walter library/CLI through skills; shared canonical catalog",
         "dsh": "common MCP",
         "codex": "common MCP",
         "claude-code": "common MCP"
       },
       "limitations": [],
       "services": [
-        "walter-skills",
-        "walter-skills-bus"
-      ]
+        "raw-vault-s3"
+      ],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "raw-vault",
+        "kind": "capability",
+        "purpose": "Conserver les octets originaux et les relier au catalogue canonique.",
+        "target_root": "/walter/memory/vault",
+        "config_paths": [
+          "/root/.config/rclone/rclone.conf",
+          "/root/.hermes/raw-vault/s3.env"
+        ],
+        "permissions": [
+          "classification des objets",
+          "bucket chiffré pour local_only"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "vault_search/vault_get",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "put",
+            "transport": "mcp",
+            "interface": "vault_put",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "raw-vault-bytes",
+            "role": "owner",
+            "owner": "raw-vault",
+            "durability": "external"
+          },
+          {
+            "id": "postgres:core",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "object-roundtrip",
+            "assertion": "Un objet synthétique est écrit, catalogué et relu avec son empreinte et sa confidentialité.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
     },
     {
       "id": "router",
       "root": "/opt/walter-router",
       "anchors": [
+        "/opt/walter-router/contracts/router.json",
         "/opt/walter-router/walter_router/cli.py"
       ],
       "requires": [],
@@ -272,85 +1409,91 @@
         "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
         "New model choices remain subject to Monsieur approval; no automatic switching introduced."
       ],
-      "services": []
-    },
-    {
-      "id": "llm",
-      "root": "/opt/walter-llm",
-      "anchors": [
-        "/opt/walter-llm/gateway.py"
-      ],
-      "requires": [
-        "router",
-        "secrets"
-      ],
-      "external": [],
-      "data": [
-        "local consumer tokens",
-        "provider routing configuration"
-      ],
-      "core_paths": [],
-      "backup_paths": [
-        "/opt/walter-llm",
-        "/root/.hermes/walter-llm"
-      ],
-      "interfaces": [
-        "OpenAI-compatible :8894"
-      ],
-      "bindings": {
-        "dsh": "configured provider",
-        "hermes": "auxiliary/module calls; main provider host-owned",
-        "codex": "specialist module calls; primary native",
-        "claude-code": "specialist module calls; primary native"
-      },
-      "limitations": [],
-      "services": [
-        "walter-llm"
-      ]
-    },
-    {
-      "id": "context",
-      "root": "/opt/walter-context",
-      "anchors": [
-        "/opt/walter-context/walter_context/session.py",
-        "/opt/walter-context/ports/hermes/__init__.py",
-        "/opt/walter-context/ports/dsh/index.mjs"
-      ],
-      "requires": [],
-      "external": [
-        "Optional Walter Logs for Hermes journal recovery; DSH uses own raw journal"
-      ],
-      "data": [
-        "per-session projection epochs; recoverable originals in logs"
-      ],
-      "core_paths": [
-        "/opt/walter-context/walter_context"
-      ],
-      "backup_paths": [
-        "/opt/walter-context"
-      ],
-      "interfaces": [
-        "Python Session",
-        "Hermes ContextEngine adapter",
-        "DSH CompactionEngine adapter"
-      ],
-      "bindings": {
-        "hermes": "see live context.engine in harness check",
-        "dsh": "Walter compaction adapter",
-        "codex": "native compaction",
-        "claude-code": "native compaction"
-      },
-      "limitations": [
-        "DSH uses public compaction transactions; checkpoints retain all user text or refuse.",
-        "Hermes remains on walter-compress; walter-context projection is not activated.",
-        "Structural and known-answer tests do not certify semantic model quality."
-      ],
-      "services": []
+      "services": [],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "router",
+        "kind": "capability",
+        "purpose": "Choisir les modèles par poste avec décisions et coûts traçables.",
+        "target_root": "/walter/router",
+        "config_paths": [],
+        "permissions": [
+          "accord propriétaire pour changer un choix"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "model_route",
+            "access": "read",
+            "timeout_seconds": 30,
+            "timeout_status": "implemented"
+          }
+        ],
+        "resources": [
+          {
+            "id": "postgres:models",
+            "role": "owner",
+            "owner": "router",
+            "durability": "configuration"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "route-selection",
+            "assertion": "Un poste renvoie le choix actif et un poste inconnu échoue explicitement sans sélection arbitraire.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
     },
     {
       "id": "secrets",
       "root": "/opt/walter-secrets",
       "anchors": [
+        "/opt/walter-secrets/contracts/secrets.json",
         "/opt/walter-secrets/walter_secrets/service.py",
         "/opt/walter-secrets/walter_secrets/vault.py"
       ],
@@ -399,181 +1542,381 @@
       ],
       "services": [
         "walter-secrets-sync"
-      ]
+      ],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "secrets",
+        "kind": "capability",
+        "purpose": "Gérer les références au coffre et injecter localement les valeurs autorisées.",
+        "target_root": "/walter/secrets",
+        "config_paths": [
+          "/root/.hermes/vault"
+        ],
+        "permissions": [
+          "approbations locales pour utilisation",
+          "aucune valeur brute via MCP"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "secret_search/secret_reference",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "inject",
+            "transport": "cli",
+            "interface": "walter-secret exec",
+            "access": "execute",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "bitwarden-vault",
+            "role": "owner",
+            "owner": "secrets",
+            "durability": "external"
+          },
+          {
+            "id": "vault-cache",
+            "role": "owner",
+            "owner": "secrets",
+            "durability": "projection"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "no-secret-leak",
+            "assertion": "Références, erreurs et sorties des processus ne divulguent pas les valeurs du coffre.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
     },
     {
-      "id": "computer",
-      "root": "/opt/walter-computer",
+      "id": "skills",
+      "root": "/opt/walter-skills",
       "anchors": [
-        "/opt/walter-computer/walter_computer/__init__.py"
+        "/opt/walter-skills/config/walter-skills.toml",
+        "/opt/walter-skills/contracts/skills.json",
+        "/opt/walter-skills/walter_skills/api.py"
       ],
-      "requires": [],
+      "requires": [
+        "bus"
+      ],
       "external": [
-        "device-node driver",
-        "Mac over SSH/Tailscale",
-        "optional walter-llm vision"
+        "PostgreSQL skills schema",
+        "walter-llm for curation"
       ],
       "data": [
-        "isolated ephemeral operator sessions"
+        "git skill store",
+        "skills.*"
       ],
       "core_paths": [
-        "/opt/walter-computer/walter_computer/operator.py",
-        "/opt/walter-computer/walter_computer/policy.py",
-        "/opt/walter-computer/walter_computer/config.py",
-        "/opt/walter-computer/walter_computer/driver.py",
-        "/opt/walter-computer/walter_computer/transport.py",
-        "/opt/walter-computer/walter_computer/types.py",
-        "/opt/walter-computer/walter_computer/runtime.py",
-        "/opt/walter-computer/walter_computer/observer.py"
+        "/opt/walter-skills/walter_skills/client.py",
+        "/opt/walter-skills/walter_skills/policy.py"
       ],
       "backup_paths": [
-        "/opt/walter-computer",
-        "/root/walter-computer-use",
-        "/root/.config/walter-device-node",
-        "/etc/tmpfiles.d/walter-computer.conf"
+        "/opt/walter-skills"
       ],
       "interfaces": [
-        "OperatorSessions",
-        "MCP computer_use",
-        "Hermes plugin"
-      ],
-      "bindings": {
-        "hermes": "plugin integration verified separately",
-        "dsh": "direct MCP",
-        "codex": "direct MCP",
-        "claude-code": "direct MCP"
-      },
-      "limitations": [
-        "No live desktop input is performed by health checks.",
-        "Pixel/vision/input permissions are explicit per call.",
-        "Standalone vision sensor unavailable until configured; native Hermes vision remains.",
-        "Cross-process device lock covers each atomic call, not an entire workflow."
-      ],
-      "services": []
-    },
-    {
-      "id": "browse",
-      "root": "/opt/walter-browse",
-      "anchors": [
-        "/opt/walter-browse/walter_browse/facade.py",
-        "/opt/walter-browse/runtime/universal_router.py"
-      ],
-      "requires": [],
-      "external": [
-        "Scrapling isolated environment",
-        "Camoufox :9377",
-        "optional Webtop CDP"
-      ],
-      "data": [
-        "shared session state",
-        "learned route profiles",
-        "result cache"
-      ],
-      "core_paths": [
-        "/opt/walter-browse/walter_browse",
-        "/opt/walter-browse/runtime/universal_router.py",
-        "/opt/walter-browse/runtime/browse_session.py",
-        "/opt/walter-browse/runtime/profile_index.py",
-        "/opt/walter-browse/runtime/result_cache.py",
-        "/opt/walter-browse/runtime/search_lite.py"
-      ],
-      "backup_paths": [
-        "/opt/walter-browse"
-      ],
-      "interfaces": [
-        "shared request contract",
-        "CLI",
+        "HTTP :8891",
+        "stdlib client",
         "MCP",
         "Hermes plugin"
       ],
       "bindings": {
-        "hermes": "native walter-browse adapter to shared facade",
+        "hermes": "native walter-skills adapter and lifecycle hook",
         "dsh": "common MCP",
+        "codex": "common MCP",
+        "claude-code": "common MCP"
+      },
+      "limitations": [],
+      "services": [
+        "walter-skills",
+        "walter-skills-bus"
+      ],
+      "optional": [
+        "llm"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "skills",
+        "kind": "capability",
+        "purpose": "Gérer le contenu, la recherche, les propositions et la curation des procédures.",
+        "target_root": "/walter/skills",
+        "config_paths": [
+          "/opt/walter-skills/config/walter-skills.toml"
+        ],
+        "permissions": [
+          "propositions en brouillon",
+          "politique de publication commune"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "mcp",
+            "interface": "skills_search/skill_read",
+            "access": "read",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "propose",
+            "transport": "mcp",
+            "interface": "skill_propose/skill_patch",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "skills-git-store",
+            "role": "owner",
+            "owner": "skills",
+            "durability": "canonical"
+          },
+          {
+            "id": "postgres:skills",
+            "role": "owner",
+            "owner": "skills",
+            "durability": "configuration"
+          },
+          {
+            "id": "postgres:bus",
+            "role": "consumer",
+            "owner": "bus",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "shared-skill",
+            "assertion": "Une procédure publiée est retrouvée depuis deux harnesses et une proposition reste en brouillon.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
+    },
+    {
+      "id": "soul",
+      "root": "/opt/walter-soul",
+      "anchors": [
+        "/opt/walter-soul/bin/walter-soul",
+        "/opt/walter-soul/contracts/soul.json",
+        "/opt/walter-soul/identity.md",
+        "/opt/walter-soul/rules.md"
+      ],
+      "requires": [],
+      "external": [],
+      "data": [
+        "identity sources",
+        "curated user profile"
+      ],
+      "core_paths": [],
+      "backup_paths": [
+        "/opt/walter-soul",
+        "/opt/walter-profiles",
+        "/root/.hermes/memories"
+      ],
+      "interfaces": [
+        "renderer",
+        "walter_profile MCP"
+      ],
+      "bindings": {
+        "hermes": "rendered SOUL.md",
+        "dsh": "rendered AGENTS.md + walter_profile MCP",
         "codex": "common MCP",
         "claude-code": "common MCP"
       },
       "limitations": [
-        "Legacy hermes_adapter.py is diagnostic adapter only, not imported by shared calls.",
-        "Browser authentication API remains a separate adapter in walter-core."
+        "Profile and critical buffer retain compatibility locations under .hermes; no running Hermes required."
       ],
-      "services": []
-    },
-    {
-      "id": "raw-vault",
-      "root": "/opt/walter-raw-vault",
-      "anchors": [
-        "/opt/walter-raw-vault/rawvault.py"
-      ],
-      "requires": [
-        "memory"
-      ],
-      "external": [
-        "rclone",
-        "Google Drive",
-        "S3 :8899"
-      ],
-      "data": [
-        "core.objects registry (memory-owned)",
-        "original bytes on Drive"
-      ],
-      "core_paths": [],
-      "backup_paths": [
-        "/opt/walter-raw-vault",
-        "/root/.config/rclone/rclone.conf",
-        "/root/.hermes/raw-vault"
-      ],
-      "interfaces": [
-        "memory objects library",
-        "S3",
-        "MCP"
-      ],
-      "bindings": {
-        "hermes": "Walter library/CLI through skills; shared canonical catalog",
-        "dsh": "common MCP",
-        "codex": "common MCP",
-        "claude-code": "common MCP"
-      },
-      "limitations": [],
-      "services": [
-        "raw-vault-s3"
-      ]
-    },
-    {
-      "id": "voice-memory",
-      "root": "/opt/walter-voice-memory",
-      "anchors": [
-        "/opt/walter-voice-memory/server.py"
-      ],
-      "requires": [
-        "memory"
-      ],
-      "external": [
-        "Hindsight",
-        "local embedding model"
-      ],
-      "data": [
-        "walter_voice.*"
-      ],
-      "core_paths": [],
-      "backup_paths": [
-        "/opt/walter-voice-memory"
-      ],
-      "interfaces": [
-        "HTTP :8897"
-      ],
-      "bindings": {
-        "voice": "low-latency recall service"
-      },
-      "limitations": [],
-      "services": [
-        "walter-voice-memory"
-      ]
+      "services": [],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "soul",
+        "kind": "foundation",
+        "purpose": "Posséder l’identité commune et générer les profils des clients.",
+        "target_root": "/walter/soul",
+        "config_paths": [
+          "/opt/walter-soul/rules.md"
+        ],
+        "permissions": [
+          "écriture des profils générés"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "renderer",
+            "interface": "walter-soul sync/check",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "identity-sources",
+            "role": "owner",
+            "owner": "soul",
+            "durability": "canonical"
+          },
+          {
+            "id": "generated-profiles",
+            "role": "owner",
+            "owner": "soul",
+            "durability": "projection"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "render-consistency",
+            "assertion": "Une modification des sources produit des profils cohérents et détecte les retouches manuelles.",
+            "scope": "integration"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
     },
     {
       "id": "voice",
       "root": "/opt/openclaw",
       "anchors": [
-        "/opt/openclaw/hermes_voice_bridge.py"
+        "/opt/openclaw/contracts/voice.json",
+        "/opt/openclaw/hermes_voice_bridge.py",
+        "/opt/openclaw/voice_router_service.py",
+        "/opt/openclaw/voice_delegate.py",
+        "/opt/openclaw/config/actions.json"
       ],
       "requires": [
         "soul",
@@ -582,7 +1925,7 @@
       "external": [
         "Asterisk/SIP",
         "Gemini Live",
-        "Hermes action delegation"
+        "Selected action delegate (Hermes by default)"
       ],
       "data": [
         "SIP configuration",
@@ -596,54 +1939,254 @@
       ],
       "interfaces": [
         "SIP phone",
-        "voice_router :12110"
+        "voice_router :12110",
+        "Versioned action delegate: hermes or stdio-json"
       ],
       "bindings": {
         "voice": "phone bridge",
         "hermes": "explicit action delegate"
       },
       "limitations": [
-        "Hermes is the current selected action delegate; voice is not a Codex/Claude/DSH runtime replacement."
+        "Hermes remains the selected action adapter; alternate stdio adapter is qualified with an isolated fixture.",
+        "Phone-to-action end-to-end latency and live delivery have not been exercised."
       ],
       "services": [
         "hermes-bridge",
         "voice-router"
-      ]
+      ],
+      "optional": [
+        "logs"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "voice",
+        "kind": "composition",
+        "purpose": "Assembler téléphonie, identité, mémoire et délégation des actions vocales.",
+        "target_root": "/walter/voice",
+        "config_paths": [
+          "/etc/asterisk",
+          "/opt/openclaw/config/actions.json"
+        ],
+        "permissions": [
+          "autorisation des actions déléguées",
+          "accès téléphonique configuré"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "sip",
+            "interface": "SIP / voice_router :12110",
+            "access": "execute",
+            "timeout_seconds": 1800,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "sip-configuration",
+            "role": "owner",
+            "owner": "voice",
+            "durability": "configuration"
+          },
+          {
+            "id": "identity-sources",
+            "role": "consumer",
+            "owner": "soul",
+            "durability": "canonical"
+          },
+          {
+            "id": "postgres:core",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "voice-path",
+            "assertion": "Un appel de test traverse mémoire, délégation sélectionnée et journal sans envoi externe indu.",
+            "scope": "live"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence",
+        "compatibility_aliases": [
+          {
+            "path": "/root/.hermes/services/voice_router_service.py",
+            "target": "/opt/openclaw/voice_router_service.py",
+            "consumers": [
+              "historical service/script references"
+            ],
+            "remove_when": "all legacy consumers use the module entry point"
+          }
+        ]
+      }
     },
     {
-      "id": "colab",
-      "root": "/opt/walter-colab",
+      "id": "voice-memory",
+      "root": "/opt/walter-voice-memory",
       "anchors": [
-        "/opt/walter-colab/on_demand.py",
-        "/opt/walter-colab/RUNBOOK.md"
+        "/opt/walter-voice-memory/contracts/voice-memory.json",
+        "/opt/walter-voice-memory/server.py"
       ],
-      "requires": [],
-      "external": [
-        "official Colab MCP",
-        "browser authentication",
-        "Google Drive"
+      "requires": [
+        "memory"
       ],
+      "external": [],
       "data": [
-        "immutable prepared artifacts and result evidence"
+        "walter_voice.*"
       ],
       "core_paths": [],
       "backup_paths": [
-        "/opt/walter-colab"
+        "/opt/walter-voice-memory"
       ],
       "interfaces": [
-        "on_demand.py CLI"
+        "HTTP :8897"
       ],
       "bindings": {
-        "hermes": "local CLI via host execution permissions",
-        "dsh": "local CLI via host execution permissions",
-        "codex": "local CLI via host execution permissions",
-        "claude-code": "local CLI via host execution permissions"
+        "voice": "Thin canonical gateway port, no Hindsight fallback or external reranker"
       },
       "limitations": [
-        "GPU remains blocked until prepared artifact validation; modularity work does not remove this guard.",
-        "No remote compute is allocated by modularity checks."
+        "Warm live reads observed at 314–806 ms in four probes; no p95 service guarantee.",
+        "Legacy walter_voice projection retained for rollback; no longer served or synchronized."
       ],
-      "services": []
+      "services": [
+        "walter-voice-memory"
+      ],
+      "optional": [],
+      "contract": {
+        "schema_version": 1,
+        "version": "1.0.0",
+        "owner": "voice-memory",
+        "kind": "capability",
+        "purpose": "Adapter la mémoire canonique au protocole vocal avec délai borné.",
+        "target_root": "/walter/voice/memory",
+        "config_paths": [],
+        "permissions": [
+          "mêmes règles de confidentialité que la mémoire canonique"
+        ],
+        "invariants": [
+          "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+          "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "primary",
+            "transport": "http",
+            "interface": "recall loopback :8897",
+            "access": "read",
+            "timeout_seconds": 2,
+            "timeout_status": "implemented"
+          }
+        ],
+        "resources": [
+          {
+            "id": "postgres:walter_voice",
+            "role": "owner",
+            "owner": "voice-memory",
+            "durability": "projection"
+          },
+          {
+            "id": "postgres:core",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "canonical"
+          },
+          {
+            "id": "postgres:core",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+          "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+        ],
+        "recovery": {
+          "backup": [
+            "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+            "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+          ],
+          "restore": [
+            "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+            "Rétablir les accès externes depuis le matériel de récupération protégé."
+          ],
+          "verification": [
+            "Vérifier empreintes, modes, liens et dépendances.",
+            "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "voice-privacy",
+            "assertion": "Une source retirée ou privée ne réapparaît pas dans la projection vocale.",
+            "scope": "integration"
+          },
+          {
+            "id": "voice-latency",
+            "assertion": "La recherche respecte le budget de latence vocal mesuré sur un corpus représentatif.",
+            "scope": "live"
+          },
+          {
+            "id": "restore",
+            "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+            "scope": "recovery"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      }
     }
   ]
 }

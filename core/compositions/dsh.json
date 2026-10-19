@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "scope": "composition bindings; host runtime/environment provisioning is a prerequisite",
+  "fallback": "explicit failure; no silent replacement of a configured Walter capability",
+  "modules": [
+    "soul",
+    "memory",
+    "logs",
+    "skills",
+    "secrets",
+    "browse",
+    "computer",
+    "router",
+    "raw-vault"
+  ],
+  "id": "dsh",
+  "native": [
+    "agent_loop",
+    "permissions"
+  ],
+  "identity_source": "/opt/walter-profiles/dsh/AGENTS.md",
+  "identity_scope": "home",
+  "mcp": true,
+  "skill_source": "/opt/walter-core/skills/walter-skills/SKILL.md",
+  "context": "walter-context",
+  "model": "coding",
+  "provider": "walter",
+  "endpoint": "http://127.0.0.1:8894/v1",
+  "credential_source": "/opt/dsh/home/.credentials.yaml",
+  "hooks": {
+    "SessionStart": 10,
+    "UserPromptSubmit": 12,
+    "Stop": 30,
+    "PostToolUse": 8
+  },
+  "limitations": [
+    "No SessionEnd/PreCompact hook in installed DSH bridge; native-log watcher remains required",
+    "No model call is made by install or matrix"
+  ]
+}

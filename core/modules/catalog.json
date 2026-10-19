@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "modules": [
+    {
+      "id": "browse",
+      "manifest": "/opt/walter-browse/contracts/browse.json"
+    },
+    {
+      "id": "bus",
+      "manifest": "/opt/walter-memory/contracts/bus.json"
+    },
+    {
+      "id": "colab",
+      "manifest": "/opt/walter-colab/contracts/colab.json"
+    },
+    {
+      "id": "computer",
+      "manifest": "/opt/walter-computer/contracts/computer.json"
+    },
+    {
+      "id": "context",
+      "manifest": "/opt/walter-context/contracts/context.json"
+    },
+    {
+      "id": "core",
+      "manifest": "/opt/walter-core/contracts/core.json"
+    },
+    {
+      "id": "llm",
+      "manifest": "/opt/walter-llm/contracts/llm.json"
+    },
+    {
+      "id": "logs",
+      "manifest": "/opt/walter-memory/contracts/logs.json"
+    },
+    {
+      "id": "memory",
+      "manifest": "/opt/walter-memory/contracts/memory.json"
+    },
+    {
+      "id": "raw-vault",
+      "manifest": "/opt/walter-raw-vault/contracts/raw-vault.json"
+    },
+    {
+      "id": "router",
+      "manifest": "/opt/walter-router/contracts/router.json"
+    },
+    {
+      "id": "secrets",
+      "manifest": "/opt/walter-secrets/contracts/secrets.json"
+    },
+    {
+      "id": "skills",
+      "manifest": "/opt/walter-skills/contracts/skills.json"
+    },
+    {
+      "id": "soul",
+      "manifest": "/opt/walter-soul/contracts/soul.json"
+    },
+    {
+      "id": "voice",
+      "manifest": "/opt/openclaw/contracts/voice.json"
+    },
+    {
+      "id": "voice-memory",
+      "manifest": "/opt/walter-voice-memory/contracts/voice-memory.json"
+    }
+  ]
+}

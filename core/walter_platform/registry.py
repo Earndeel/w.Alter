@@ -22,6 +22,9 @@ def load(path=None):
     if len(set(names)) != len(names):raise ValueError('duplicate module id')
     by_id={m['id']:m for m in entries}
     for module in entries:
+        if 'contract' in module:
+            from .contracts import validate
+            validate(module)
         for dep in module.get('requires',[]):
             if dep not in by_id:raise ValueError('unknown dependency: '+dep)
         for path in module.get('backup_paths',[]):
@@ -66,7 +69,10 @@ def inspect_module(module, *, scan=False):
             'boundary_checked':scan and bool(module.get('core_paths')),
             'forbidden_imports':boundaries,'runtime_health':'not_probed',
             'requires':module.get('requires',[]),'external':module.get('external',[]),
-            'bindings':module.get('bindings',{}),'limitations':module.get('limitations',[])}
+            'bindings':module.get('bindings',{}),'limitations':module.get('limitations',[]),
+            'contract_version':module.get('contract',{}).get('version'),
+            'kind':module.get('contract',{}).get('kind'),
+            'qualification':'not_probed'}
 
 
 def report(*, scan=False, live=False, path=None):

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "scope": "composition bindings; host runtime/environment provisioning is a prerequisite",
+  "fallback": "explicit failure; no silent replacement of a configured Walter capability",
+  "modules": [
+    "soul",
+    "memory",
+    "logs",
+    "skills",
+    "secrets",
+    "browse",
+    "computer",
+    "router",
+    "raw-vault"
+  ],
+  "id": "hermes",
+  "native": [
+    "agent_loop",
+    "permissions"
+  ],
+  "identity_source": "/root/.hermes/SOUL.md",
+  "identity_scope": "home",
+  "mcp": false,
+  "skill_source": "/opt/walter-core/skills/walter-skills/SKILL.md",
+  "context": "walter-compress",
+  "model": "preserved",
+  "plugins": [
+    "hindsight",
+    "walter-browse",
+    "walter-compress",
+    "walter-computer-use",
+    "walter-router",
+    "walter-logs",
+    "walter-skills",
+    "walter-secrets"
+  ],
+  "hooks": {
+    "pre_llm_call": {
+      "command": "/opt/walter-core/hooks/walter_hook.py hermes-skills",
+      "timeout": 6
+    },
+    "on_skill_lifecycle": {
+      "command": "/opt/walter-core/hooks/walter_hook.py hermes-event",
+      "timeout": 5
+    },
+    "on_session_end": {
+      "command": "/opt/walter-core/hooks/walter_hook.py hermes-event",
+      "timeout": 5
+    },
+    "on_session_finalize": {
+      "command": "/opt/walter-core/hooks/walter_hook.py hermes-event",
+      "timeout": 5
+    }
+  }
+}
