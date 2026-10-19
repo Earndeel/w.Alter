@@ -248,15 +248,17 @@ def _rerank(query: str, results: list[dict], limit: int) -> list[dict]:
         if r["privacy_class"] == "redacted_cloud":
             text, _ = privacy.redact(text, [r.get("actor") or ""])
         docs.append(text[:2000])
+    from .llm import router_model
+    model = router_model("rerank", "cohere/rerank-4-fast")   # Walter Router poste (2026-10-16)
     try:
         resp = httpx.post("https://openrouter.ai/api/v1/rerank", headers={"Authorization": f"Bearer {_key()}"},
-                          json={"model": "cohere/rerank-4-fast", "query": query, "documents": docs, "top_n": min(limit, len(docs))},
+                          json={"model": model, "query": query, "documents": docs, "top_n": min(limit, len(docs))},
                           timeout=8)
         resp.raise_for_status()
         data = resp.json()
         order = [cloud[x["index"]] for x in data["results"]]
         from .llm import _log
-        _log(processor="search.rerank", model="cohere/rerank-4-fast", purpose="rerank", budget="recurring",
+        _log(processor="search.rerank", model=model, purpose="rerank", budget="recurring",
              privacy_class="redacted_cloud", cost_usd=(data.get("usage") or {}).get("cost"), status="ok")
     except Exception:
         return results

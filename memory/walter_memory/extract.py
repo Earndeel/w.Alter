@@ -14,7 +14,7 @@ from . import llm, privacy
 from .db import connection
 
 PROCESSOR, VERSION = "l3.conversation_summary", "1"
-MODEL = "google/gemini-3.6-flash"
+POSTE = "memory_extraction"   # Walter Router poste (2026-10-16): the router picks the model, never hardcoded here
 SEGMENT_CHARS = 30000
 PROMPT = """Tu analyses un extrait de conversation entre Monsieur (l'utilisateur) et son assistant personnel W.Alter.
 Messages numérotés :
@@ -77,9 +77,9 @@ def summarize_session(session_id: str, budget: str = "recurring") -> dict:
         lines = [f"{i + 1}. [{'Monsieur' if m['event_type'] == 'message.sent' else 'W.Alter'} · {m['occurred_at']:%Y-%m-%d %H:%M}] "
                  f"{(m['content'] or '')[:4000]}" for i, m in enumerate(seg)]
         res = llm.chat([{"role": "user", "content": PROMPT.format(transcript="\n".join(lines), tools=", ".join(tools) or "aucun")}],
-                       model=MODEL, processor=PROCESSOR, processor_version=VERSION, privacy_class=segment_class,
+                       poste=POSTE, processor=PROCESSOR, processor_version=VERSION, privacy_class=segment_class,
                        budget=budget, purpose=f"session {session_id} segment {si}", response_format={"type": "json_object"},
-                       reasoning={"effort": "low"}, max_tokens=6000)
+                       reasoning={"effort": "low"}, max_tokens=6000, timeout=300)
         out["cost_usd"] += float(res["cost_usd"] or 0)
         c = res["content"]
         data = json.loads(c[c.find("{"):c.rfind("}") + 1])
@@ -88,11 +88,12 @@ def summarize_session(session_id: str, budget: str = "recurring") -> dict:
         def cite(nums):
             return [ids[n - 1] for n in nums or [] if isinstance(n, int) and 1 <= n <= len(ids)] or ids
 
-        base = {"processor_version": VERSION, "model": MODEL, "prompt_hash": PROMPT_HASH, "status": "derived",
+        base = {"processor_version": VERSION, "model": res["model"], "prompt_hash": PROMPT_HASH, "status": "derived",
                 "derived_by": PROCESSOR}
         rows = [{"kind": "summary", "content": data.get("summary") or "", "source_event_ids": ids,
                  "attributes": {"topics": data.get("topics") or [], "people": data.get("people") or [],
-                                "projects": data.get("projects") or [], "tools": tools, "title": title["content"] if title and title['privacy_class']=='cloud_allowed' else None,
+                                "projects": data.get("projects") or [], "tools": tools,
+                                "title": title["content"] if title and title['privacy_class']=='cloud_allowed' else None,
                                 "segment": si, "from": str(seg[0]["occurred_at"]), "to": str(seg[-1]["occurred_at"])},
                  "ref": f"{session_id}:{si}:summary"}]
         for kind, key in (("decision", "decisions"), ("preference", "preferences"), ("fact", "facts"), ("open_loop", "open_loops")):
@@ -109,7 +110,7 @@ def summarize_session(session_id: str, budget: str = "recurring") -> dict:
                                 values (%s,%s,%s,%s,%s,%s,%s,%s,%s::uuid[],%s,%s,%s)
                                 on conflict (derived_by, (source_refs->>'ref')) where source_refs ? 'ref' do nothing""",
                              (r["kind"], r["content"], json.dumps(r["attributes"], ensure_ascii=False), base["status"],
-                              base["derived_by"], VERSION, MODEL, PROMPT_HASH, r["source_event_ids"],
+                              base["derived_by"], VERSION, base["model"], PROMPT_HASH, r["source_event_ids"],
                               json.dumps({"ref": r["ref"], "session": session_id}), seg[-1]["occurred_at"],segment_class))
                 out["items"] += 1
         out["segments"] += 1
