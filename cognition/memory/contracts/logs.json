@@ -1,10 +1,9 @@
 {
   "id": "logs",
-  "root": "/opt/walter-memory",
   "anchors": [
-    "/opt/walter-memory/connectors/walter_logs.py",
-    "/opt/walter-memory/contracts/logs.json",
-    "/opt/walter-memory/walter_memory/logs.py"
+    "connectors/walter_logs.py",
+    "contracts/logs.json",
+    "walter_memory/logs.py"
   ],
   "requires": [
     "memory"
@@ -14,10 +13,10 @@
     "walter_logs.*"
   ],
   "core_paths": [
-    "/opt/walter-memory/walter_memory/logs.py"
+    "walter_memory/logs.py"
   ],
   "backup_paths": [
-    "/opt/walter-memory"
+    "."
   ],
   "interfaces": [
     "Writer",
@@ -43,7 +42,7 @@
     "owner": "logs",
     "kind": "foundation",
     "purpose": "Conserver les traces accessibles de tous les harnesses dans un journal commun.",
-    "target_root": "/walter/memory",
+    "target_root": "memory",
     "config_paths": [],
     "permissions": [
       "lecture cloud-safe",

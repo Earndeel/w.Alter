@@ -1,13 +1,12 @@
 {
   "id": "memory",
-  "root": "/opt/walter-memory",
   "anchors": [
-    "/opt/walter-memory/contracts/memory.json",
-    "/opt/walter-memory/walter_memory/events.py",
-    "/opt/walter-memory/walter_memory/objects.py",
-    "/opt/walter-memory/walter_memory/client.py",
-    "/opt/walter-memory/walter_memory/read_policy.py",
-    "/opt/walter-memory/ports/hermes/__init__.py"
+    "contracts/memory.json",
+    "walter_memory/events.py",
+    "walter_memory/objects.py",
+    "walter_memory/client.py",
+    "walter_memory/read_policy.py",
+    "ports/hermes/__init__.py"
   ],
   "requires": [],
   "external": [
@@ -24,11 +23,11 @@
     "kardex.*"
   ],
   "core_paths": [
-    "/opt/walter-memory/walter_memory/events.py",
-    "/opt/walter-memory/walter_memory/objects.py"
+    "walter_memory/events.py",
+    "walter_memory/objects.py"
   ],
   "backup_paths": [
-    "/opt/walter-memory",
+    ".",
     "/root/.pgpass",
     "/root/.hermes/plugins/walter-memory"
   ],
@@ -62,9 +61,9 @@
     "owner": "memory",
     "kind": "capability",
     "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
-    "target_root": "/walter/memory",
+    "target_root": "memory",
     "config_paths": [
-      "/opt/walter-memory/.env"
+      ".env"
     ],
     "permissions": [
       "classification de confidentialité",
