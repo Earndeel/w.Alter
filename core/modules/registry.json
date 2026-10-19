@@ -1609,11 +1609,11 @@
     },
     {
       "id": "secrets",
-      "root": "/opt/walter-secrets",
+      "root": "/walter/secrets",
       "anchors": [
-        "/opt/walter-secrets/contracts/secrets.json",
-        "/opt/walter-secrets/walter_secrets/service.py",
-        "/opt/walter-secrets/walter_secrets/vault.py"
+        "/walter/secrets/contracts/secrets.json",
+        "/walter/secrets/walter_secrets/service.py",
+        "/walter/secrets/walter_secrets/vault.py"
       ],
       "requires": [],
       "external": [
@@ -1626,19 +1626,21 @@
         "sync configuration"
       ],
       "core_paths": [
-        "/opt/walter-secrets/walter_secrets/vault.py",
-        "/opt/walter-secrets/walter_secrets/service.py",
-        "/opt/walter-secrets/walter_secrets/masking.py",
-        "/opt/walter-secrets/walter_secrets/settings.py",
-        "/opt/walter-secrets/walter_secrets/unlock.py",
-        "/opt/walter-secrets/walter_secrets/otp.py",
-        "/opt/walter-secrets/walter_secrets/secrets_sync.py",
-        "/opt/walter-secrets/walter_secrets/vault_react.py"
+        "/walter/secrets/walter_secrets/vault.py",
+        "/walter/secrets/walter_secrets/service.py",
+        "/walter/secrets/walter_secrets/masking.py",
+        "/walter/secrets/walter_secrets/settings.py",
+        "/walter/secrets/walter_secrets/unlock.py",
+        "/walter/secrets/walter_secrets/otp.py",
+        "/walter/secrets/walter_secrets/secrets_sync.py",
+        "/walter/secrets/walter_secrets/vault_react.py"
       ],
       "backup_paths": [
-        "/opt/walter-secrets",
-        "/root/.hermes/vault",
+        "/walter/secrets",
         "/root/.config/Bitwarden CLI/data.json",
+        "/instances/monsieur/config/secrets",
+        "/instances/monsieur/state/secrets",
+        "/root/.hermes/vault",
         "/root/.hermes/logs/walter-secrets.jsonl",
         "/root/.hermes/logs/walter-secrets-sync.status.json",
         "/root/.hermes/logs/walter-secrets-sync.log"
@@ -1670,7 +1672,8 @@
         "purpose": "Gérer les références au coffre et injecter localement les valeurs autorisées.",
         "target_root": "/walter/secrets",
         "config_paths": [
-          "/root/.hermes/vault"
+          "/walter/secrets/config/walter-secrets.toml",
+          "/instances/monsieur/config/secrets/walter-secrets.toml"
         ],
         "permissions": [
           "approbations locales pour utilisation",

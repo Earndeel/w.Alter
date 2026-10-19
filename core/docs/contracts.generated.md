@@ -256,7 +256,7 @@ Interfaces : command walter-python.
 Gérer les références au coffre et injecter localement les valeurs autorisées.
 
 Contrat 1.0.0; propriétaire : secrets.
-Racine actuelle : `/opt/walter-secrets`. Cible : `/walter/secrets`.
+Racine actuelle : `/walter/secrets`. Cible : `/walter/secrets`.
 
 Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks.
 

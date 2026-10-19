@@ -80,7 +80,8 @@
       "id": "secrets",
       "target": "secrets",
       "legacy": "/opt/walter-secrets",
-      "manifest": "contracts/secrets.json"
+      "manifest": "contracts/secrets.json",
+      "neutral": true
     },
     {
       "id": "skills",

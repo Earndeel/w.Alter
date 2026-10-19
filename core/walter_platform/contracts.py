@@ -57,11 +57,28 @@ def _read(path):
     return data
 
 
+# In backup_paths: the locations the active instance declares for this module ([backup] <module> = [...] in
+# instance.toml), e.g. historical data kept outside the instance. Never a path written in the software.
+INSTANCE_BACKUP = '@instance:backup'
+
+
+def instance_backup_paths(module):
+    from . import instance
+    try:
+        declared = instance.manifest().get('backup', {}).get(module, [])
+    except (OSError, ValueError):
+        return []
+    _require(isinstance(declared, list), 'instance backup paths must be a list')
+    return [str(absolute_path(v)) for v in declared]
+
+
 def contract_path(value):
     """Owner manifests: relative paths live inside the module, absolute ones are external to it."""
     _require(isinstance(value, str), 'contract path must be a string')
     if value.startswith('/'):
         return absolute_path(value)
+    if value == INSTANCE_BACKUP:
+        return PurePosixPath(value)
     if layout.is_instance_path(value) or value.startswith('~/'):
         return layout.join('/', value)
     try:
@@ -148,7 +165,13 @@ def expand(manifest, root, target_root):
     raw.pop('root', None)
     for key in ('anchors', 'backup_paths', 'core_paths'):
         if isinstance(raw.get(key), list):
-            raw[key] = [str(layout.join(base, v)) for v in raw[key]]
+            expanded = []
+            for v in raw[key]:
+                if key == 'backup_paths' and v == INSTANCE_BACKUP:
+                    expanded += instance_backup_paths(out['id'])
+                else:
+                    expanded.append(str(layout.join(base, v)))
+            raw[key] = expanded
     c = raw.get('contract')
     if isinstance(c, dict):
         if isinstance(c.get('config_paths'), list):

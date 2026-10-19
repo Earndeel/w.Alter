@@ -109,10 +109,12 @@ def markers(base=None):
 
 
 def _secret_like(doc, trail=()):
+    """String values under secret-sounding keys (backup.<module> tables name modules, not secrets)."""
     for k, v in doc.items():
         if isinstance(v, dict):
             yield from _secret_like(v, trail + (k,))
-        elif SECRET_KEYS.search(k) and not k.endswith('_ref'):
+        elif (isinstance(v, str) and v and SECRET_KEYS.search(k) and not k.endswith('_ref')
+              and trail[:1] != ('backup',)):
             yield '.'.join(trail + (k,))
 
 

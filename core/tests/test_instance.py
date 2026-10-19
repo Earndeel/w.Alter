@@ -106,6 +106,16 @@ class InstanceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             paths.join('/walter/computer', '~/../etc')
 
+    def test_instance_declares_backup_paths_per_module(self):
+        from walter_platform import contracts
+        self.assertEqual(contracts.instance_backup_paths('secrets'), [])
+        (self.base / 'instance.toml').write_text(MANIFEST + '[backup]\nsecrets = ["/srv/legacy/vault"]\nbad = ["rel"]\n')
+        self.assertEqual(contracts.instance_backup_paths('secrets'), ['/srv/legacy/vault'])
+        with self.assertRaises(ValueError):
+            contracts.instance_backup_paths('bad')
+        module = contracts.expand({'id': 'secrets', 'backup_paths': ['.', '@instance:backup']}, '/walter/secrets', '/walter/secrets')
+        self.assertEqual(module['backup_paths'], ['/walter/secrets', '/srv/legacy/vault'])
+
     def test_markers_come_from_the_instance(self):
         self.assertEqual(instance.markers(), ['Alice Exemple', 'alice@example.org', 'exemple-corp', 'Madame'])
 
