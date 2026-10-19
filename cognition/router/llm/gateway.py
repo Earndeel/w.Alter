@@ -1,5 +1,6 @@
-#!/opt/walter-llm/venv/bin/python3
-"""walter-llm — W.Alter's model gateway (P8.5 + P8.7): one OpenAI-compatible endpoint for every agent runtime.
+#!/bin/sh
+"""exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run on the module venv
+walter-llm — W.Alter's model gateway (P8.5 + P8.7): one OpenAI-compatible endpoint for every agent runtime.
 
     agent (DeepSeek Harness, Codex, scripts…) ──token──▶ walter-llm (127.0.0.1:8894)
         model = a Walter Router task ("coding", "document"…) or "auto"
