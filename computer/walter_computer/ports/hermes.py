@@ -11,6 +11,7 @@ from tools.computer_use.backend import ActionResult, CaptureResult as HostCaptur
 from tools.computer_use.cua_backend import CuaDriverBackend
 from ..policy import WalterPolicyMixin
 from ..device_lock import DeviceCallLock
+from ..lease import WorkflowLease, LEASE_ACTIONS
 from ..policy import CaptureStrategy, CaptureTarget, SafeWindowStrategy, register_capture_strategy, compact_ax_state, _handle_launch_app_action, _handle_open_url_action, _handle_device_context_action, _handle_vision_target_action, _handle_click_visual_ref_action, _handle_targeted_verify_action
 from ..policy import _configured_driver_command as _driver_command
 
@@ -250,6 +251,14 @@ class _NativeSessions:
 
 
 _NATIVE_SESSIONS = _NativeSessions()
+_WORKFLOW_LEASES = {}
+
+
+def _workflow_lease(lock):
+    key = str(lock.path)
+    if key not in _WORKFLOW_LEASES:
+        _WORKFLOW_LEASES[key] = WorkflowLease(lock.path)
+    return _WORKFLOW_LEASES[key]
 
 
 def _override_handler(extra_actions):
@@ -259,7 +268,7 @@ def _override_handler(extra_actions):
     def handle(args, **kwargs):
         action = str(args.get('action') or '').strip().lower()
         session_id = str(kwargs.get('session_id') or '')
-        if not action or action not in host._ACTIONS and action not in extra_actions:
+        if not action or action not in host._ACTIONS and action not in extra_actions and action not in LEASE_ACTIONS:
             return json.dumps({'ok': False, 'error': 'missing or unknown action'})
         try:
             admitted = lease.assert_agent_may_act()
@@ -269,15 +278,22 @@ def _override_handler(extra_actions):
             # grants and fail-closed unattended behavior. New mutators also gate.
             native = host._ACTIONS.get(action)
             mutates = (native is not None and native.destructive) or action in {
-                'launch_app', 'open_url', 'click_visual_ref'}
+                'launch_app', 'open_url', 'click_visual_ref', 'lease_acquire', 'lease_renew'}
             scopes = ([action] if mutates else []) + (
                 ['bring_to_front'] if action in {'focus_app', 'launch_app', 'open_url'} or args.get('bring_to_front') or args.get('raise_window') else [])
             for scope in scopes:
                 if (error := host._request_approval(scope, {**args, 'delivery_mode': 'foreground'} if scope == 'bring_to_front' else args)) is not None:
                     return error
-            with DeviceCallLock().hold() as acquired:
+            lock = DeviceCallLock()
+            with lock.hold() as acquired:
                 if not acquired:
                     return json.dumps({'ok': False, 'action': action, 'code': 'device_busy'})
+                reservation = _workflow_lease(lock)
+                owner = host._scoped_sid(session_id)
+                if action in LEASE_ACTIONS:
+                    return json.dumps(reservation.handle(owner, action, args))
+                if not reservation.allowed(owner):
+                    return json.dumps({'ok': False, 'action': action, 'code': 'device_reserved'})
                 return admitted_call(action, args, session_id, admitted)
         except lease.HumanHasControl as exc:
             return json.dumps({'ok': False, 'action': action, 'code': 'human_has_control', 'error': str(exc)})
@@ -336,7 +352,9 @@ def register(ctx):
     if not isinstance(parameters, dict):
         raise RuntimeError('unsupported Hermes computer_use schema envelope')
     properties = parameters['properties']
-    properties['action']['enum'] += list(extension.actions)
+    properties['action']['enum'] += list(extension.actions) + sorted(LEASE_ACTIONS)
+    properties['ttl_seconds'] = {'type': 'number', 'minimum': 1, 'maximum': 300,
+                                'description': 'Task reservation TTL; default 120. Acquire before a multi-step desktop task; renew or release explicitly.'}
     for _, options in extension.actions.values():
         properties.update(options['properties'])
     # open_url was a native backend helper, not a native schema field.
@@ -350,7 +368,12 @@ def register(ctx):
         def finalize(**kwargs):
             sid = kwargs.get('session_id')
             if sid:
-                _NATIVE_SESSIONS.close(host._scoped_sid(str(sid)))
+                key = host._scoped_sid(str(sid))
+                lock = DeviceCallLock()
+                with lock.hold() as acquired:
+                    if acquired:
+                        _workflow_lease(lock).handle(key, 'lease_release', {})
+                _NATIVE_SESSIONS.close(key)
         ctx.register_hook('on_session_finalize', finalize)
     if callable(getattr(ctx, 'on_unload', None)):
         ctx.on_unload(_NATIVE_SESSIONS.close)

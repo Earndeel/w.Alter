@@ -1,0 +1,147 @@
+{
+  "id": "computer",
+  "root": "/opt/walter-computer",
+  "anchors": [
+    "/opt/walter-computer/contracts/computer.json",
+    "/opt/walter-computer/walter_computer/__init__.py"
+  ],
+  "requires": [],
+  "external": [
+    "device-node driver",
+    "Mac over SSH/Tailscale",
+    "optional walter-llm vision"
+  ],
+  "data": [
+    "isolated ephemeral operator sessions"
+  ],
+  "core_paths": [
+    "/opt/walter-computer/walter_computer/operator.py",
+    "/opt/walter-computer/walter_computer/policy.py",
+    "/opt/walter-computer/walter_computer/config.py",
+    "/opt/walter-computer/walter_computer/driver.py",
+    "/opt/walter-computer/walter_computer/transport.py",
+    "/opt/walter-computer/walter_computer/types.py",
+    "/opt/walter-computer/walter_computer/runtime.py",
+    "/opt/walter-computer/walter_computer/observer.py"
+  ],
+  "backup_paths": [
+    "/opt/walter-computer",
+    "/root/walter-computer-use",
+    "/root/.config/walter-device-node",
+    "/etc/tmpfiles.d/walter-computer.conf"
+  ],
+  "interfaces": [
+    "OperatorSessions",
+    "MCP computer_use",
+    "Hermes plugin"
+  ],
+  "bindings": {
+    "hermes": "plugin integration verified separately",
+    "dsh": "direct MCP",
+    "codex": "direct MCP",
+    "claude-code": "direct MCP"
+  },
+  "limitations": [
+    "No desktop input in health checks.",
+    "Read, pixels, vision and input require explicit grants.",
+    "Cloud vision additionally requires host-only authorization for one exact window; default denied.",
+    "Workflow reservations are cross-process leases with bounded expiry; live Mac qualification tracked separately."
+  ],
+  "services": [],
+  "optional": [
+    "llm"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "computer",
+    "kind": "capability",
+    "purpose": "Observer et manipuler un appareil avec des permissions et cibles explicites.",
+    "target_root": "/walter/computer",
+    "config_paths": [
+      "/root/.config/walter-device-node",
+      "/opt/walter-computer/config.json",
+      "/opt/walter-computer/gateway.env"
+    ],
+    "permissions": [
+      "read/input/foreground/pixels/vision accordés par le host",
+      "autorisation de la tâche sur appareil"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "mcp",
+        "interface": "computer_use",
+        "access": "execute",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "operator-sessions",
+        "role": "owner",
+        "owner": "computer",
+        "durability": "ephemeral"
+      },
+      {
+        "id": "device-policy",
+        "role": "owner",
+        "owner": "computer",
+        "durability": "configuration"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "device-task",
+        "assertion": "Une tâche synthétique sur le Mac réussit sans accéder aux applications personnelles.",
+        "scope": "live"
+      },
+      {
+        "id": "device-concurrency",
+        "assertion": "Les cibles périmées et les accès concurrents non autorisés sont refusés.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  }
+}

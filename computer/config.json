@@ -10,5 +10,13 @@
     }
   },
   "device_node_python_path": "/root/walter-computer-use/src",
-  "device_lock_path": "/run/walter-computer/main-mac.lock"
+  "device_lock_path": "/run/walter-computer/main-mac.lock",
+  "vision": {
+    "enabled": true,
+    "poste": "vision",
+    "endpoint": "http://127.0.0.1:8894/v1/chat/completions",
+    "token_file": "/opt/walter-computer/gateway.env",
+    "timeout_seconds": 45,
+    "max_image_bytes": 2097152
+  }
 }
