@@ -141,7 +141,7 @@ def build(destination, *, apply=False, root='/', catalog=None, wheelhouse=None, 
         restored.update(logical+'/'+str(_relative(p)) for p in policy.get('restored_module_anchors',{}).get(module['id'],[]))
         excluded_by_path.update(logical+'/'+str(_relative(p)) for p in policy.get('exclude_module_paths',{}).get(module['id'],[]))
     for logical in roots:
-        if not (logical.startswith(('opt/walter-','walter/')) or logical=='opt/openclaw'):raise ValueError('unsupported source root')
+        if not logical.startswith(('opt/walter-','walter/')):raise ValueError('unsupported source root')
         if destination.resolve().is_relative_to(root/logical):raise ValueError('release destination is inside a source module')
         if not selected_by_root[logical]:raise ValueError('module has no reviewed source allowlist')
     entries=[];versions={};skipped=0
@@ -214,7 +214,7 @@ def _inspect(bundle):
     if m.get('version')!=1 or not isinstance(m.get('files'),list):raise ValueError('unsupported release manifest')
     for module in m['modules']['modules']:
         contracts.validate(module)
-        if not (module['root'].startswith(('/opt/walter-','/walter/')) or module['root']=='/opt/openclaw'):raise ValueError('unsupported release module root')
+        if not module['root'].startswith(('/opt/walter-','/walter/')):raise ValueError('unsupported release module root')
     roots={v['root'].lstrip('/') for v in m['modules']['modules']}
     for env in m['runtimes']['python']:
         logical=str(_relative(env['path']))

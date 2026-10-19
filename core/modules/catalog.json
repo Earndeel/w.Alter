@@ -84,18 +84,6 @@
       "target": "soul",
       "legacy": "/opt/walter-soul",
       "manifest": "contracts/soul.json"
-    },
-    {
-      "id": "voice",
-      "target": "voice",
-      "legacy": "/opt/openclaw",
-      "manifest": "contracts/voice.json"
-    },
-    {
-      "id": "voice-memory",
-      "target": "voice/memory",
-      "legacy": "/opt/walter-voice-memory",
-      "manifest": "contracts/voice-memory.json"
     }
   ]
 }

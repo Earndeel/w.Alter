@@ -34,14 +34,19 @@ import httpx
 from mcp.server.fastmcp import FastMCP
 
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/root/.hermes"))
-HINDSIGHT_URL = os.environ.get("WALTER_HINDSIGHT_URL", "http://127.0.0.1:8888")
-BANK = os.environ.get("WALTER_BANK_ID", "walter")
 HERMES_API_URL = os.environ.get("WALTER_HERMES_API_URL", "http://127.0.0.1:8642")
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
-STACK_UNITS = [
-    "hindsight-api", "walter-voice-memory", "walter-memory-gateway", "raw-vault-s3", "hermes-bridge", "voice-router",
-    "walter-llm", "cloudflared-tunnel", "docker",   # hermes-dashboard removed 2026-10-16
-]
+# Machine services Walter relies on without owning them; module services come from the registry.
+HOST_UNITS = ["cloudflared-tunnel", "docker"]
+
+
+def _stack_units() -> list[str]:
+    try:
+        from walter_platform.registry import load
+        units = sorted({u for m in load()["modules"] for u in m.get("services", [])})
+    except Exception:  # registry unreadable: still report the host
+        units = []
+    return units + HOST_UNITS
 # Walter Memory (events, Raw Vault objects) runs in its own venv; called as a CLI so this server stays light.
 WALTER_MEMORY = ["/usr/local/bin/walter-memory"]
 BUDGETS = {"low", "mid", "high"}
@@ -58,13 +63,6 @@ def _env_value(name: str) -> str:
     except OSError:
         pass
     return ""
-
-
-def _hindsight(path: str, body: dict, timeout: float = 60.0) -> dict:
-    r = httpx.post(f"{HINDSIGHT_URL}/v1/default/banks/{BANK}{path}", json=body, timeout=timeout)
-    if r.status_code >= 400:
-        raise RuntimeError(f"Hindsight {path} → HTTP {r.status_code}: {r.text[:300]}")
-    return r.json()
 
 
 mcp = FastMCP("walter-core", instructions=(
@@ -362,8 +360,9 @@ def browser_sites() -> str:
 def walter_health() -> str:
     """Status of the W.Alter stack: core services, Hermes gateway, memory health score, model router, disk."""
     out = []
-    states = subprocess.run(["systemctl", "is-active", *STACK_UNITS], capture_output=True, text=True).stdout.split()
-    out += [f"{u}: {s}" for u, s in zip(STACK_UNITS, states)]
+    units = _stack_units()
+    states = subprocess.run(["systemctl", "is-active", *units], capture_output=True, text=True).stdout.split()
+    out += [f"{u}: {s}" for u, s in zip(units, states)]
     gw = subprocess.run(["systemctl", "--user", "is-active", "hermes-gateway"], capture_output=True, text=True)
     out.append(f"hermes-gateway (user): {gw.stdout.strip() or gw.stderr.strip()}")
     try:

@@ -18,8 +18,6 @@ Généré depuis les manifestes propriétaires. Les scénarios décrivent les cr
 | secrets | capability | Gérer les références au coffre et injecter localement les valeurs autorisées. | — |
 | skills | capability | Gérer le contenu, la recherche, les propositions et la curation des procédures. | bus |
 | soul | foundation | Posséder l’identité commune et générer les profils des clients. | — |
-| voice | composition | Assembler téléphonie, identité, mémoire et délégation des actions vocales. | soul, voice-memory |
-| voice-memory | capability | Adapter la mémoire canonique au protocole vocal avec délai borné. | memory |
 
 ## browse
 
@@ -288,42 +286,3 @@ Interfaces : renderer, walter_profile MCP.
 **Limites déclarées :**
 
 - Profile and critical buffer retain compatibility locations under .hermes; no running Hermes required.
-
-## voice
-
-Assembler téléphonie, identité, mémoire et délégation des actions vocales.
-
-Contrat 1.0.0; propriétaire : voice.
-Racine actuelle : `/opt/openclaw`. Cible : `/walter/voice`.
-
-Interfaces : SIP phone, voice_router :12110, Versioned action delegate: hermes or stdio-json.
-
-**Critères de validation :**
-
-- Un appel de test traverse mémoire, délégation sélectionnée et journal sans envoi externe indu. (live)
-- Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations. (recovery)
-
-**Limites déclarées :**
-
-- Hermes remains the selected action adapter; alternate stdio adapter is qualified with an isolated fixture.
-- Phone-to-action end-to-end latency and live delivery have not been exercised.
-
-## voice-memory
-
-Adapter la mémoire canonique au protocole vocal avec délai borné.
-
-Contrat 1.0.0; propriétaire : voice-memory.
-Racine actuelle : `/opt/walter-voice-memory`. Cible : `/walter/voice/memory`.
-
-Interfaces : HTTP :8897.
-
-**Critères de validation :**
-
-- Une source retirée ou privée ne réapparaît pas dans la projection vocale. (integration)
-- La recherche respecte le budget de latence vocal mesuré sur un corpus représentatif. (live)
-- Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations. (recovery)
-
-**Limites déclarées :**
-
-- Warm live reads observed at 314–806 ms in four probes; no p95 service guarantee.
-- Legacy walter_voice projection retained for rollback; no longer served or synchronized.

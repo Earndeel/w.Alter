@@ -95,18 +95,6 @@
     "soul": [
       "bin"
     ],
-    "voice-memory": [
-      "server.py"
-    ],
-    "voice": [
-      "hermes_voice_bridge.py",
-      "voice_router_service.py",
-      "voice_delegate.py",
-      "requirements.in",
-      "requirements.lock",
-      "tests",
-      "config/actions.json"
-    ],
     "colab": [
       "bridge.py",
       "cache_runtime.py",
