@@ -7,6 +7,8 @@
   walter-secret search [words…]                metadata only
   walter-secret file <item> [attachment]       decrypt an attachment to /dev/shm, print the path
   walter-secret otp <site> [minutes] [timeout]  wait for the code <site> sent by e-mail / message, print it
+  walter-secret grants [ID]                     Walter's authorizations: cards and health (metadata only)
+  walter-secret grant access <id> [part]        usable secret of a grant (fresh token for OAuth / subscriptions)
 """
 import json
 import sys
@@ -29,6 +31,21 @@ def main(argv: list[str]) -> int:
             print(json.dumps(vault_react.prune_local(), ensure_ascii=False))
             return 0
         print("usage: walter-secret vault-export <dest.json.age> | vault-prune", file=sys.stderr)
+        return 2
+    if argv and argv[0] in ("grants", "grant"):
+        from . import grants
+        try:
+            if argv[0] == "grants" and len(argv) <= 2:
+                out = grants.check(argv[1] if len(argv) == 2 else None)
+                print(json.dumps(out, ensure_ascii=False, indent=1))
+                return 0 if out["ok"] else 1
+            if argv[:2] == ["grant", "access"] and len(argv) in (3, 4):
+                print(grants.access(argv[2], argv[3] if len(argv) == 4 else "token"), end="")
+                return 0
+        except (grants.GrantError, SecretError, OSError, ValueError, KeyError) as exc:
+            print(f"walter-secret: {type(exc).__name__}: {exc}"[:300], file=sys.stderr)
+            return 1
+        print("usage: walter-secret grants [ID] | grant access <id> [part]", file=sys.stderr)
         return 2
     if not argv or argv[0] not in ("get", "search", "file", "otp"):
         print(__doc__, file=sys.stderr)
