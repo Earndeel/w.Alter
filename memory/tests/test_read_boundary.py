@@ -8,21 +8,52 @@ from walter_memory import read_policy, search
 
 
 class Connection:
+    """Batched canonical owners keyed by event id (the read boundary looks events up via core.event_keys)."""
     def __init__(self, rows):
         self.rows = rows
-    def execute(self, sql, args):
-        self.value = self.rows.get(args[0]); return self
-    def fetchone(self):
-        return self.value
+    def execute(self, sql, args=()):
+        self.sql, self.args = sql, args; return self
+    def fetchall(self):
+        if 'event_keys' in self.sql:
+            return [{'event_id': i, 'occurred_at': None} for i in self.args[0] if i in self.rows]
+        if 'event.retracted' in self.sql:
+            return []
+        if 'core.events' in self.sql:
+            return [{'id': i, **self.rows[i]} for i in self.args[1]]
+        return []
 
 
-def test_filter_enforces_current_owner_and_freshness():
-    conn = Connection({'public': {'privacy_class': 'cloud_allowed', 'allowed': True, 'content': 'public decision'},
-                       'private': {'privacy_class': 'local_only', 'allowed': True, 'content': 'private decision'},
-                       'stale': {'privacy_class': 'cloud_allowed', 'allowed': True, 'content': 'new decision'}})
+def test_filter_enforces_current_owner_and_freshness(monkeypatch):
+    monkeypatch.setattr(read_policy, '_retracted', (float('inf'), frozenset({'retracted'})))
+    conn = Connection({'public': {'privacy_class': 'cloud_allowed', 'content': 'public decision'},
+                       'private': {'privacy_class': 'local_only', 'content': 'private decision'},
+                       'stale': {'privacy_class': 'cloud_allowed', 'content': 'new decision'},
+                       'retracted': {'privacy_class': 'cloud_allowed', 'content': 'public decision'}})
     rows = [dict(kind='event', ref_id=key, text=text, privacy_class='cloud_allowed')
-            for key, text in [('public','public decision'),('private','private decision'),('stale','old decision')]]
+            for key, text in [('public','public decision'),('private','private decision'),('stale','old decision'),
+                              ('retracted','public decision'),('missing','public decision')]]
     assert [r['ref_id'] for r in read_policy.filter_cloud_rows(conn, rows)] == ['public']
+
+
+def test_noise_rules_hide_runtime_artefacts_not_messages():
+    noise = ['[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted',
+             '[Your active task list was preserved across context compression]',
+             'The following is the Codex agent history added since your last review',
+             '[12] user: please continue the migration',
+             '{"i":0,"result":{"result":"## Mémoire pertinente\\n- a fact"}}',
+             'Mémoire W.Alter (injectée automatiquement pour ce message) …', 'ok', 'vas y']
+    assert all(search.noise_reason(t, 'hermes') for t in noise)
+    assert search.noise_reason('{"risk_level":"low","user_authorization":"high"}', 'codex') == 'tool_output'
+    for t in ['Monsieur préfère recevoir les liens sur Telegram.', 'On se voit demain à 18h au bureau ?']:
+        assert search.noise_reason(t, 'hermes') is None and search.noise_reason(t, 'beeper') is None
+
+
+def test_dedupe_keeps_best_ranked_of_repeated_facts(monkeypatch):
+    import numpy as np
+    monkeypatch.setattr(search, 'embed', lambda texts: np.array([[1.0, 0.0] if 'Brave' in t else [0.0, 1.0] for t in texts]))
+    rows = [{'text': 'Monsieur utilise Brave.'}, {'text': 'monsieur utilise brave'}, {'text': 'Monsieur utilise Brave sur Mac.'},
+            {'text': 'Fuseau UTC+7.'}]
+    assert [r['text'] for r in search.dedupe(rows)] == ['Monsieur utilise Brave.', 'Fuseau UTC+7.']
 
 
 def test_rerank_private_query_never_calls_network(monkeypatch):
@@ -36,7 +67,7 @@ def test_rerank_stale_private_projection_never_calls_network(monkeypatch):
     monkeypatch.setattr(read_policy, 'query_privacy', lambda *args: 'cloud_allowed')
     @contextmanager
     def connect():
-        yield Connection({'private': {'privacy_class': 'local_only', 'content': 'fixture', 'allowed': True}})
+        yield Connection({'private': {'privacy_class': 'local_only', 'content': 'fixture'}})
     monkeypatch.setattr(search, 'connection', connect)
     monkeypatch.setattr(search.httpx, 'post', lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError('network')))
     rows = [{'kind': 'event', 'ref_id':'private', 'text': 'fixture', 'privacy_class': 'cloud_allowed'}]

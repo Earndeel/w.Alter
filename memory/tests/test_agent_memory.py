@@ -7,14 +7,31 @@ import pytest
 from walter_memory import agent_memory as m
 
 
+class Conn:
+    """Canonical owners for the batched read boundary: every ref is one public event unless a test changes it."""
+    owner = {'privacy_class': 'cloud_allowed', 'content': 'Public fixture decision'}
+    derived = {'status': 'derived', 'quarantined': False, 'source_event_ids': ['22222222-2222-2222-2222-222222222222'],
+               'source_object_ids': []}
+    def execute(self, sql, args=()):
+        self.sql, self.args = sql, args; return self
+    def fetchone(self): return {**self.owner, 'allowed': True}
+    def fetchall(self):
+        if 'event_keys' in self.sql: return [{'event_id': i, 'occurred_at': None} for i in self.args[0]]
+        if 'event.retracted' in self.sql: return []
+        if 'core.events' in self.sql: return [{'id': str(i), **self.owner} for i in self.args[1]]
+        if 'core.derived_items' in self.sql: return [{'id': str(i), **self.owner, **self.derived} for i in self.args[0]]
+        return []
+
+
 @pytest.fixture
 def local(monkeypatch):
-    class Conn:
-        def execute(self,sql,args=()): return self
-        def fetchone(self): return {'privacy_class':'cloud_allowed','content':'Public fixture decision','allowed':True}
     @contextmanager
     def connection(): yield Conn()
     monkeypatch.setattr(m,'connection',connection)
+    monkeypatch.setattr(m,'_kardex',lambda query: [])
+    monkeypatch.setattr(m.search,'dedupe',lambda rows: rows)
+    monkeypatch.setattr(m.search,'_rerank',lambda query,rows,limit,timeout=8: rows)
+    monkeypatch.setattr(m.read_policy,'_retracted',(float('inf'), frozenset()))
     monkeypatch.setattr(m.privacy,'classify',lambda *a,**kw:('cloud_allowed',[]))
     monkeypatch.setattr(m.privacy,'classify_event',lambda *a,**kw:'cloud_allowed')
     monkeypatch.setattr(m.llm,'chat',lambda *a,**kw:pytest.fail('external model must not be called'))
@@ -25,34 +42,73 @@ def row(cls='cloud_allowed'):
     return {'kind':'event','ref_id':'11111111-1111-1111-1111-111111111111','privacy_class':cls,'text':'Public fixture decision','occurred_at':'2026-10-18'}
 
 
+def lanes(*rows, evidence=()):
+    return lambda query, **kw: {'knowledge': list(rows), 'evidence': list(evidence)}
+
+
 def test_recall_uses_local_search_and_cloud_canonical_scope(monkeypatch,local):
     seen=[]
-    def search(query,**kw): seen.append(kw); return [row('local_only'),row()]
-    monkeypatch.setattr(m.search,'search',search)
+    def search_lanes(query,**kw): seen.append(kw); return {'knowledge': [], 'evidence': [row('local_only'),row()]}
+    monkeypatch.setattr(m.search,'search_lanes',search_lanes)
     out=m.recall('a project')
     assert out['status']=='ok' and len(out['records'])==1
-    assert seen[0]['max_privacy']=='cloud_allowed' and seen[0]['rerank'] is False
+    assert seen[0]['max_privacy']=='cloud_allowed' and 'rerank' not in seen[0]
     assert out['records'][0]['privacy_class']=='cloud_allowed'
 
 
 def test_private_query_refuses_before_embedding_or_model(monkeypatch,local):
     monkeypatch.setattr(m.privacy,'classify',lambda *a,**kw:('local_only',[]))
-    monkeypatch.setattr(m.search,'search',lambda *a,**kw:pytest.fail('query must not reach embeddings'))
+    monkeypatch.setattr(m.search,'search_lanes',lambda *a,**kw:pytest.fail('query must not reach embeddings'))
     assert m.recall('private fixture')['status']=='refused_privacy'
     assert m.reflect('private fixture')['status']=='refused_privacy'
 
 
 def test_stale_index_does_not_loosen_canonical_owner(monkeypatch,local):
-    monkeypatch.setattr(local.__class__,'fetchone',lambda _: {'privacy_class':'local_only'})
-    monkeypatch.setattr(m.search,'search',lambda *a,**kw:[row()])
+    monkeypatch.setattr(Conn,'owner',{'privacy_class':'local_only','content':'Public fixture decision'})
+    monkeypatch.setattr(m.search,'search_lanes',lanes(evidence=[row()]))
     assert m.recall('a project')['records']==[]
+
+
+def derived_row():
+    value=row(); value['kind']='derived'; value['ref_id']='33333333-3333-3333-3333-333333333333'; return value
 
 
 def test_legacy_derived_without_provenance_is_excluded(monkeypatch,local):
-    monkeypatch.setattr(local.__class__,'fetchone',lambda _: {'privacy_class':'cloud_allowed','status':'derived','source_count':0,'sources_allowed':True})
-    value=row(); value['kind']='derived'
-    monkeypatch.setattr(m.search,'search',lambda *a,**kw:[value])
+    monkeypatch.setattr(Conn,'derived',{'status':'legacy_derived','quarantined':False,'source_event_ids':[],'source_object_ids':[]})
+    monkeypatch.setattr(m.search,'search_lanes',lanes(derived_row()))
     assert m.recall('a project')['records']==[]
+
+
+def test_legacy_derived_with_readable_provenance_is_recalled_without_promotion(monkeypatch,local):
+    monkeypatch.setattr(Conn,'derived',{**Conn.derived,'status':'legacy_derived'})
+    monkeypatch.setattr(m.search,'search_lanes',lanes(derived_row()))
+    assert [r['ref'] for r in m.recall('a project')['records']]==['derived:33333333-3333-3333-3333-333333333333']
+    monkeypatch.setattr(Conn,'derived',{**Conn.derived,'status':'legacy_derived','quarantined':True})
+    assert m.recall('a project')['records']==[]
+
+
+def test_knowledge_ranks_before_evidence_and_kardex_leads(monkeypatch,local):
+    ev=[dict(row(),ref_id=f'4444444{i}-4444-4444-4444-444444444444') for i in range(8)]
+    know=[dict(derived_row(),ref_id=f'5555555{i}-5555-5555-5555-555555555555') for i in range(8)]
+    monkeypatch.setattr(m.search,'search_lanes',lanes(*know,evidence=ev))
+    monkeypatch.setattr(m,'_kardex',lambda q:[{'ref':'kardex:fixture','text':'- Fixture person (telegram)','date':''}])
+    refs=[r['ref'] for r in m.recall('a project',budget='low')['records']]
+    assert refs[0]=='kardex:fixture'
+    kinds=[r.split(':')[0] for r in refs[1:]]
+    assert kinds==['derived']*(len(kinds)-1)+['event'] and len(kinds)==6   # low budget: 5 facts + 1 evidence
+    refs=[r['ref'] for r in m.recall('quand a-t-il écrit ce message ?',budget='low')['records']]
+    assert [r.split(':')[0] for r in refs[1:]].count('event')==3            # evidence question: half evidence
+
+
+def test_rerank_orders_knowledge_with_a_bounded_timeout(monkeypatch,local):
+    know=[dict(derived_row(),ref_id=f'5555555{i}-5555-5555-5555-555555555555') for i in range(3)]
+    monkeypatch.setattr(m.search,'search_lanes',lanes(*know))
+    seen=[]
+    monkeypatch.setattr(m.search,'_rerank',lambda q,rows,limit,timeout=8: seen.append(timeout) or rows[::-1])
+    assert m.recall('a project')['records'][0]['ref']=='derived:55555552-5555-5555-5555-555555555555'
+    assert seen==[m.RERANK_TIMEOUT] and m.RERANK_TIMEOUT<=3
+    assert m.recall('a project',rerank=False)['records'][0]['ref']=='derived:55555550-5555-5555-5555-555555555555'
+    assert len(seen)==1
 
 
 def test_retain_classifies_note_and_context_and_never_copies_hindsight(monkeypatch,local):
@@ -70,7 +126,7 @@ def test_retain_classifies_note_and_context_and_never_copies_hindsight(monkeypat
 
 def test_reflect_uses_router_and_redacts_question_before_model(monkeypatch,local):
     monkeypatch.setattr(m.privacy,'classify',lambda *a,**kw:('redacted_cloud',[]))
-    monkeypatch.setattr(m.search,'search',lambda *a,**kw:[row()])
+    monkeypatch.setattr(m.search,'search_lanes',lanes(evidence=[row()]))
     calls=[]
     def chat(messages,**kw): calls.append((messages,kw)); return {'content':'A cited synthesis [event:fixture]','model':'router-selected'}
     monkeypatch.setattr(m.llm,'chat',chat)
@@ -83,7 +139,7 @@ def test_reflect_uses_router_and_redacts_question_before_model(monkeypatch,local
 
 
 def test_reflect_empty_evidence_does_not_call_model(monkeypatch,local):
-    monkeypatch.setattr(m.search,'search',lambda *a,**kw:[])
+    monkeypatch.setattr(m.search,'search_lanes',lanes())
     out=m.reflect('a project')
     assert out['model_called'] is False
 

@@ -50,7 +50,13 @@ def import_kardex_messages() -> dict:
     return {"kardex_messages": len(rows), "events_inserted": inserted}
 
 
+# Only the live bank: 'walter-shadow' was Hindsight re-extracting core.events (retired 2026-10-19), a second derivation
+# of evidence that is already canonical, not history.
+BANKS = ["walter"]
+
+
 def import_hindsight() -> dict:
+    """Idempotent (unique derived_by + ref): re-running only adds units created since the last run."""
     with connection() as conn:
         u = conn.execute(f"""
             insert into core.derived_items (kind, content, attributes, status, derived_by, source_refs, valid_from,
@@ -62,19 +68,21 @@ def import_hindsight() -> dict:
                    'legacy_derived', 'hindsight',
                    jsonb_strip_nulls(jsonb_build_object('ref', 'hindsight_unit:' || m.id, 'bank', m.bank_id,
                        'document_id', m.document_id,
-                       'session', (select substr(t, 9) from unnest(m.tags) t where t like 'session:%' limit 1))),
+                       'session', (select substr(t, 9) from unnest(m.tags) t where t like 'session:%%' limit 1))),
                    coalesce(m.occurred_start, m.mentioned_at), m.created_at, 'cloud_allowed'
             from public.memory_units m left join walter_audit.memory_labels l on l.unit_id = m.id
-            {CONFLICT}""").rowcount
+            where m.bank_id = any(%s)
+            {CONFLICT}""", (BANKS,)).rowcount
         d = conn.execute(f"""
             insert into core.derived_items (kind, content, attributes, status, derived_by, source_refs, created_at,
                                             privacy_class)
             select 'document', d.original_text, jsonb_build_object('tags', d.tags, 'metadata', d.metadata),
                    'legacy_derived', 'hindsight',
                    jsonb_strip_nulls(jsonb_build_object('ref', 'hindsight_document:' || d.id, 'bank', d.bank_id,
-                       'session', (select substr(t, 9) from unnest(d.tags) t where t like 'session:%' limit 1))),
+                       'session', (select substr(t, 9) from unnest(d.tags) t where t like 'session:%%' limit 1))),
                    d.created_at, 'cloud_allowed'
-            from public.documents d where d.original_text is not null {CONFLICT}""").rowcount
+            from public.documents d where d.original_text is not null and d.bank_id = any(%s) {CONFLICT}""",
+            (BANKS,)).rowcount
         # provenance: Hindsight rows tagged with a Hermes session → that conversation's events
         linked = conn.execute("""
             update core.derived_items di set source_event_ids = array[e.event_id]
@@ -142,9 +150,16 @@ def classify_derived() -> dict:
 
 
 def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", choices=["hindsight"], help="re-run one part (e.g. units Hindsight wrote after the first import)")
+    a = ap.parse_args()
     ingestion.register_connector("legacy_import", "hindsight_legacy", "import",
                                  "One-shot import of Kardex messages, Hindsight and user_model history")
-    res = {**import_kardex_messages(), **import_hindsight(), "user_model": import_user_model(), **classify_derived()}
+    if a.only == "hindsight":
+        res = {**import_hindsight(), **classify_derived()}
+    else:
+        res = {**import_kardex_messages(), **import_hindsight(), "user_model": import_user_model(), **classify_derived()}
     ingestion.mark_success("legacy_import")
     print(json.dumps(res, indent=1))
 

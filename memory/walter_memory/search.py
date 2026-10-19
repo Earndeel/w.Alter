@@ -5,6 +5,7 @@ derived and rebuildable: `walter-memory index --rebuild`.
 """
 from __future__ import annotations
 
+import math
 import os
 from pathlib import Path
 import re
@@ -26,6 +27,38 @@ MODEL_DIR = os.environ.get("WALTER_MEMORY_MODEL_DIR", str(Path(__file__).resolve
 TEXT_EVENT_TYPES = ("message.received", "message.sent", "message.edited", "email.received", "email.sent",
                     "calendar.event", "note.recorded", "person.met", "location.stay", "page.visited", "search.performed")
 CHUNK = 1500
+AGENT_SOURCES = ("hermes", "codex", "claude_code", "dsh")
+# Recall noise (2026-10-19): rows that stay in core.events (append-only history) but are kept out of the index's
+# readable part — hidden with a reason, recomputed by `walter-memory index --hide-noise`. Generic runtime artefacts
+# only (no personal content): harness injections, transcript replays, tool output, memory blocks already injected.
+NOISE = [
+    ("injected_memory", re.compile(r"Mémoire W\.Alter \(injectée|^## Mémoire pertinente|## Mémoire pertinente\\n|"
+                                   r"Contexte historique daté, à confronter", re.M)),
+    ("agent_replay", re.compile(r"^(The following is the Codex agent history|\[\d+\] (user|assistant|tool|system|developer)\b)")),
+    ("runtime_injection", re.compile(
+        r"^(\[(Your active task list was preserved|CONTEXT COMPACTION|PRIOR CONTEXT|System: |ASYNC DELEGATION BATCH COMPLETE|"
+        r"Continuing toward your standing goal|Escalade depuis session vocale)|## Hermes Memory Layers|"
+        r"You've reached the maximum number of tool-call|You just executed tool calls but returned an|"
+        r"Operation interrupted|\(empty\)\s*$|Historique de la conversation vocale|Tu es W\.Alter/Hermes, le cerveau profond)"
+        r"|## Historical Task Snapshot")),
+]
+TOOL_OUTPUT = re.compile(r'^\s*[\[{]\s*"')
+MIN_WORDS = 3
+
+
+def noise_reason(text: str, source: str = "") -> str | None:
+    """Why an event's text is not recall material (None = index it as readable evidence)."""
+    t = (text or "").strip()
+    for reason, rx in NOISE:
+        if rx.search(t):
+            return reason
+    if source in AGENT_SOURCES and TOOL_OUTPUT.match(t):
+        return "tool_output"
+    if len([w for w in WORD.findall(t[:200]) if len(w) > 1]) < MIN_WORDS:
+        return "too_short"
+    return None
+
+
 _embedder = None
 _lock = threading.Lock()
 
@@ -40,6 +73,13 @@ STOP = {
     "portuguese": {"não", "uma", "para", "com", "você", "eu", "mais", "como", "isso", "muito"},
 }
 WORD = re.compile(r"[\w'’]+", re.U)
+# Words that carry no subject in a question (unaccented, lowercase). Generic French/English grammar only.
+QUERY_STOP = set("""le la les l un une des du de d au aux et ou est sont ce cet cette ces c ca qu que qui quoi quel quelle
+quels quelles comment ou pourquoi quand combien je j me m mon ma mes moi tu te t ton ta tes toi il elle on nous vous ils
+elles son sa ses leur leurs y en ne n pas plus avec pour par sur dans a ai as avez avons ont etre etait fait faire
+faut doit dois veut veux peut peux s se sais the an is are was were what who whom how why when where which do does
+did i my me you your it its of to in on for with and or be can should""".split())
+RARE_DF = 5000      # a keyword in more chunks than this is too common to rank on (no IDF in ts_rank_cd)
 
 
 def detect_lang(text: str) -> str:
@@ -86,9 +126,17 @@ def chunks_of(text: str) -> list[str]:
 
 
 # ───────────────────────────── indexing ─────────────────────────────
+def _hidden_reason(r: dict, kind: str) -> str | None:
+    if r.get("hidden"):
+        return "quarantined" if kind == "derived" else "retracted"
+    reason = noise_reason(r["text"], r["source"]) if kind == "event" else None
+    return f"noise:{reason}" if reason else None
+
+
 def _index_rows(conn, rows: list[dict], kind: str) -> int:
     items = []
     for r in rows:
+        r["hidden_reason"] = _hidden_reason(r, kind)   # whole row: a replay's later chunks don't carry the marker
         for i, part in enumerate(chunks_of(r["text"])):
             if len(part) >= 2:
                 items.append((r, i, part))
@@ -101,18 +149,18 @@ def _index_rows(conn, rows: list[dict], kind: str) -> int:
             cur.execute(
                 """insert into search.chunks (kind, ref_id, chunk_no, occurred_at, source, label, thread_id,
                                               actor_identity_id, text, lang, tsv, embedding, privacy_class, hidden,
-                                              content_hash, indexer_version)
+                                              hidden_reason, content_hash, indexer_version)
                    values (%(kind)s, %(ref)s, %(no)s, %(at)s, %(source)s, %(label)s, %(thread)s, %(actor)s, %(text)s, %(lang)s,
                            setweight(to_tsvector('simple', search.f_unaccent(%(text)s)), 'A') ||
                            to_tsvector(%(lang_cfg)s::text::regconfig, %(text)s),
-                           %(vec)s::vector, %(privacy)s, %(hidden)s, md5(%(text)s), %(ver)s)
+                           %(vec)s::vector, %(privacy)s, %(hidden)s, %(reason)s, md5(%(text)s), %(ver)s)
                    on conflict (kind, ref_id, chunk_no) do nothing""",
                 {"kind": kind, "ref": r["ref_id"], "no": i, "at": r.get("occurred_at"), "source": r["source"],
                  "label": r["label"], "thread": r.get("thread_id"), "actor": r.get("actor_identity_id"),
                  "text": part, "lang": lang, "lang_cfg": lang, "vec": vec(v),
                  "privacy": privacy.strictest(r["privacy_class"], *(privacy.classify(conn, {"source": r["source"],
                             "categories": {c for c, _ in privacy.detect(part)}})[0] for _ in [0] if privacy.detect(part))),
-                 "hidden": bool(r.get("hidden")), "ver": INDEXER_VERSION})
+                 "hidden": r["hidden_reason"] is not None, "reason": r["hidden_reason"], "ver": INDEXER_VERSION})
     # cross-source duplicates (same text within 3 minutes, e.g. Telegram seen by Hermes and by Beeper)
     conn.execute("""update search.chunks c set dup_of = o.chunk_id
                     from search.chunks o
@@ -144,9 +192,10 @@ def index_pending(limit: int = 20000) -> dict:
         out["events"] = _index_rows(conn, rows, "event")
         # retractions arriving after indexing: hide the chunks (the event stays in the journal, readers skip it)
         out["retracted_hidden"] = conn.execute(
-            """update search.chunks c set hidden = true from core.events r
+            """update search.chunks c set hidden = true, hidden_reason = 'retracted' from core.events r
                where r.event_type = 'event.retracted' and r.ingested_at > %s::timestamptz - interval '3 days'
-                 and c.kind = 'event' and c.ref_id::text = r.payload->>'target_event_id' and not c.hidden""",
+                 and c.kind = 'event' and c.ref_id::text = r.payload->>'target_event_id'
+                 and c.hidden_reason is distinct from 'retracted'""",
             (since,)).rowcount
         if rows:
             ingestion.set_checkpoint("search_indexer", "events", {"ingested_at": rows[-1]["ingested_at"].isoformat()}, conn=conn)
@@ -170,10 +219,49 @@ def index_pending(limit: int = 20000) -> dict:
     return out
 
 
+def hide_noise(batch: int = 5000) -> dict:
+    """Recompute noise for every indexed event (after a NOISE rule change): hide new noise, un-hide what no longer
+    matches. Reads the canonical content; never touches core.events, retractions or derived quarantine."""
+    import collections
+    changes: dict[str, str | None] = {}
+    with connection() as conn:
+        rows = conn.execute("""select ref_id, source, string_agg(text, '' order by chunk_no) as text,
+                                      max(hidden_reason) as reason
+                               from search.chunks where kind = 'event'
+                                 and (hidden_reason is null or hidden_reason like 'noise:%%')
+                               group by ref_id, source""").fetchall()
+    for r in rows:
+        reason = noise_reason(r["text"], r["source"])
+        reason = f"noise:{reason}" if reason else None
+        if reason != r["reason"]:
+            changes[str(r["ref_id"])] = reason
+    out = collections.Counter(v or "unhidden" for v in changes.values())
+    items = list(changes.items())
+    for i in range(0, len(items), batch):
+        with connection() as conn:
+            conn.execute("""update search.chunks c set hidden = (v.reason is not null), hidden_reason = v.reason
+                            from unnest(%s::uuid[], %s::text[]) v(ref_id, reason)
+                            where c.kind = 'event' and c.ref_id = v.ref_id""",
+                         ([k for k, _ in items[i:i + batch]], [v for _, v in items[i:i + batch]]))
+    return {"scanned": len(rows), **out}
+
+
 # ───────────────────────────── search ─────────────────────────────
-def search(query: str, *, limit: int = 10, sources: list[str] | None = None, labels: list[str] | None = None,
-           since: Any = None, until: Any = None, thread_id: str | None = None, include_derived: bool = True,
-           max_privacy: str = "local_only", rerank: bool = False, candidates: int = 60) -> list[dict]:
+# Candidate generation per lane (knowledge = derived items, evidence = events/objects): raw messages vastly outnumber
+# knowledge rows and would crowd them out of a single candidate pool (bench 2026-10-01). Each predicate matches a
+# partial HNSW index (migration 013).
+LANES = {"knowledge": "c.kind = 'derived'", "evidence": "c.kind <> 'derived'"}
+# Conversation narratives and open tasks rank below atomic facts (bench 2026-10-19: +2 hits locally on 30 questions);
+# they stay findable, e.g. when nothing atomic matches.
+LABEL_WEIGHT = {"summary": 0.5, "open_loop": 0.5}
+
+
+def search_lanes(query: str, *, lanes: tuple[str, ...] = ("knowledge", "evidence"), limit: int = 10,
+                 sources: list[str] | None = None, labels: list[str] | None = None, since: Any = None,
+                 until: Any = None, thread_id: str | None = None, max_privacy: str = "local_only",
+                 candidates: int = 60) -> dict[str, list[dict]]:
+    """Hybrid search (FTS + vectors fused by RRF) per lane, each lane ranked on its own. For cloud callers every row
+    is checked against its canonical owner (read_policy) before the cut, so a filtered row doesn't shorten the list."""
     where, args = ["not c.hidden", "c.dup_of is null", "c.privacy_class = any(%s)"], [privacy.allowed_classes(max_privacy)]
     if sources:
         where.append("c.source = any(%s)"); args.append(sources)
@@ -185,51 +273,89 @@ def search(query: str, *, limit: int = 10, sources: list[str] | None = None, lab
         where.append("c.occurred_at < %s"); args.append(until)
     if thread_id:
         where.append("c.thread_id = %s"); args.append(thread_id)
-    if not include_derived:
-        where.append("c.kind <> 'derived'")
-    lang = detect_lang(query)
     qv = vec(embed([query])[0])
-    t0 = time.perf_counter()
-    # Candidate generation per lane (knowledge = derived items, evidence = events/objects): raw messages vastly
-    # outnumber knowledge rows and would crowd them out of a single candidate pool (bench 2026-10-01).
-    lanes = [["c.kind = 'derived'"], ["c.kind <> 'derived'"]] if include_derived else [[]]
-    per_lane = max(10, candidates // len(lanes))
-    scores: dict[int, float] = {}
+    out: dict[str, list[dict]] = {}
     with connection() as conn:
+        # filtered HNSW scans keep walking the graph until enough rows pass the filters (pgvector >= 0.8)
+        conn.execute("set local hnsw.ef_search = 100")
+        conn.execute("set local hnsw.iterative_scan = relaxed_order")
+        kws = keywords(conn, query)
         for lane in lanes:
-            w = " and ".join(where + lane)
-            fts = conn.execute(f"""
-                with q as (select websearch_to_tsquery('simple', search.f_unaccent(%s)) ||
-                                  websearch_to_tsquery(%s::text::regconfig, %s) as tq)
-                select c.chunk_id from search.chunks c, q where {w} and c.tsv @@ q.tq
-                order by ts_rank_cd(c.tsv, q.tq) desc limit %s""", (query, lang, query, *args, per_lane)).fetchall()
-            if len(fts) < 5:   # OR-relaxed query when the strict form finds little
-                words = [x for x in re.findall(r"\w+", search_norm(query)) if len(x) > 2]
-                if words:
-                    fts += conn.execute(f"""
-                        select c.chunk_id from search.chunks c where {w} and c.tsv @@ to_tsquery('simple', %s)
-                        order by ts_rank_cd(c.tsv, to_tsquery('simple', %s)) desc limit %s""",
-                        (*args, " | ".join(words), " | ".join(words), per_lane)).fetchall()
-            sem = conn.execute(f"""select c.chunk_id from search.chunks c where {w} and c.embedding is not null
-                                   order by c.embedding <=> %s::vector limit %s""", (*args, qv, per_lane)).fetchall()
+            w = " and ".join(where + [LANES[lane]])
+            fts = _fts(conn, w, args, kws, candidates)
+            sem = conn.execute(f"""select chunk_id, label from (
+                                       select c.chunk_id, c.label, c.embedding <=> %s::vector as d from search.chunks c
+                                       where {w} and c.embedding is not null order by d limit %s) x order by d""",
+                               (qv, *args, candidates)).fetchall()
+            scores: dict[int, float] = {}
             for ranked in (fts, sem):
                 seen = set()
                 for rank, r in enumerate(ranked):
                     if r["chunk_id"] in seen:
                         continue
                     seen.add(r["chunk_id"])
-                    scores[r["chunk_id"]] = scores.get(r["chunk_id"], 0) + 1 / (60 + rank)
-        top = sorted(scores, key=scores.get, reverse=True)[:max(limit, candidates if rerank else limit)]
-        rows = conn.execute("""select c.chunk_id, c.kind, c.ref_id::text, c.occurred_at, c.source, c.label, c.thread_id,
-                                      c.text, c.privacy_class, i.display_name as actor
-                               from search.chunks c left join core.source_identities i on i.identity_id = c.actor_identity_id
-                               where c.chunk_id = any(%s)""", (top,)).fetchall()
-    by_id = {r["chunk_id"]: {**r, "score": scores[r["chunk_id"]]} for r in rows}
-    results = [by_id[i] for i in top if i in by_id]
-    if max_privacy == 'cloud_allowed':
-        from .read_policy import filter_cloud_rows
-        with connection() as conn:
-            results = filter_cloud_rows(conn, results)
+                    scores[r["chunk_id"]] = scores.get(r["chunk_id"], 0) + 1 / (60 + rank) * LABEL_WEIGHT.get(r["label"], 1)
+            top = sorted(scores, key=scores.get, reverse=True)[:max(limit * 2, limit + 10)]
+            rows = conn.execute("""select c.chunk_id, c.kind, c.ref_id::text, c.occurred_at, c.source, c.label,
+                                          c.thread_id, c.text, c.privacy_class, i.display_name as actor
+                                   from search.chunks c left join core.source_identities i
+                                     on i.identity_id = c.actor_identity_id
+                                   where c.chunk_id = any(%s)""", (top,)).fetchall()
+            by_id = {r["chunk_id"]: {**r, "score": scores[r["chunk_id"]], "lane": lane} for r in rows}
+            ranked_rows = [by_id[i] for i in top if i in by_id]
+            if max_privacy == "cloud_allowed":
+                from .read_policy import filter_cloud_rows
+                ranked_rows = filter_cloud_rows(conn, ranked_rows)
+            out[lane] = ranked_rows[:limit]
+    return out
+
+
+def keywords(conn, query: str) -> list[tuple[str, float]]:
+    """Subject words of the query with an IDF weight, rarest first (doc frequency capped at RARE_DF, GIN-counted).
+    Question phrasing ("qu'est-ce que", "quel est mon") must not be required by the full-text match."""
+    norm = conn.execute("select search.f_unaccent(lower(%s)) as t", (query,)).fetchone()["t"]
+    words = list(dict.fromkeys(x for x in re.findall(r"\w+", norm) if len(x) > 1 and x not in QUERY_STOP))
+    out = []
+    # prefix match from 5 letters: plural / conjugation without a stemmer on the unaccented 'simple' lexemes
+    for w in (re.sub(r"(?<=\w{4})[sx]$", "", x) + ":*" if len(x) >= 5 else x for x in words[:8]):
+        df = conn.execute("""select count(*) as n from (select 1 from search.chunks
+                             where tsv @@ to_tsquery('simple', %s) limit %s) x""", (w, RARE_DF)).fetchone()["n"]
+        if df:
+            out.append((w, math.log(1 + RARE_DF / df)))
+    return sorted(out, key=lambda x: -x[1])
+
+
+def _fts(conn, where: str, args: list, kws: list[tuple[str, float]], limit: int) -> list[dict]:
+    """All subject words first; if that finds little, any rare word, ranked by the summed IDF of the words matched."""
+    if not kws:
+        return []
+    every = " & ".join(w for w, _ in kws)
+    rows = conn.execute(f"""select c.chunk_id, c.label from search.chunks c where {where} and c.tsv @@ to_tsquery('simple', %s)
+                            order by ts_rank_cd(c.tsv, to_tsquery('simple', %s)) desc limit %s""",
+                        (*args, every, every, limit)).fetchall()
+    rare = [(w, idf) for w, idf in kws if idf > math.log(2)]      # df < RARE_DF
+    if len(rows) >= 5 or len(kws) < 2 or not rare:
+        return rows
+    score = " + ".join(f"(case when c.tsv @@ to_tsquery('simple', %s) then {idf:.4f} else 0 end)" for _, idf in rare)
+    more = conn.execute(f"""select c.chunk_id, c.label from search.chunks c where {where} and c.tsv @@ to_tsquery('simple', %s)
+                            order by {score} desc, ts_rank_cd(c.tsv, to_tsquery('simple', %s)) desc limit %s""",
+                        (*args, " | ".join(w for w, _ in rare), *(w for w, _ in rare),
+                         " | ".join(w for w, _ in rare), limit)).fetchall()
+    seen = {r["chunk_id"] for r in rows}
+    return rows + [r for r in more if r["chunk_id"] not in seen]
+
+
+def search(query: str, *, limit: int = 10, sources: list[str] | None = None, labels: list[str] | None = None,
+           since: Any = None, until: Any = None, thread_id: str | None = None, include_derived: bool = True,
+           max_privacy: str = "local_only", rerank: bool = False, candidates: int = 60,
+           lanes: tuple[str, ...] | None = None) -> list[dict]:
+    """Both lanes fused by score (or the given lanes), optionally reranked."""
+    t0 = time.perf_counter()
+    lanes = lanes or (("knowledge", "evidence") if include_derived else ("evidence",))
+    per_lane = search_lanes(query, lanes=lanes, limit=max(limit, candidates if rerank else limit), sources=sources,
+                            labels=labels, since=since, until=until, thread_id=thread_id, max_privacy=max_privacy,
+                            candidates=max(10, candidates // len(lanes)))
+    results = sorted((r for rows in per_lane.values() for r in rows), key=lambda r: r["score"], reverse=True)
     if rerank and results:
         results = _rerank(query, results, limit)
     for r in results:
@@ -237,12 +363,30 @@ def search(query: str, *, limit: int = 10, sources: list[str] | None = None, lab
     return results[:limit]
 
 
+def dedupe(rows: list[dict], threshold: float = 0.88) -> list[dict]:
+    """Drop exact and near-duplicate texts, keeping the first (best-ranked): legacy memories repeat the same fact
+    with small variations, and the same message is often stored by several sessions."""
+    seen, unique = set(), []
+    for r in rows:
+        key = re.sub(r"\W+", " ", (r.get("text") or "").lower()).strip()
+        if key and key not in seen:
+            seen.add(key); unique.append(r)
+    if len(unique) < 2:
+        return unique
+    v = embed([re.sub(r"\s*\|.*$", "", r["text"])[:400] for r in unique])
+    keep: list[int] = []
+    for i in range(len(unique)):
+        if all(float(v[i] @ v[j]) < threshold for j in keep):
+            keep.append(i)
+    return [unique[i] for i in keep]
+
+
 def search_norm(text: str) -> str:
     with connection() as conn:
         return conn.execute("select search.f_unaccent(lower(%s)) as t", (text,)).fetchone()["t"]
 
 
-def _rerank(query: str, results: list[dict], limit: int) -> list[dict]:
+def _rerank(query: str, results: list[dict], limit: int, timeout: float = 8) -> list[dict]:
     """Rerank only current permitted canonical records; private queries stay local."""
     from .read_policy import filter_cloud_rows, query_privacy
     query_class = query_privacy(query)
@@ -266,7 +410,7 @@ def _rerank(query: str, results: list[dict], limit: int) -> list[dict]:
     try:
         resp = httpx.post("https://openrouter.ai/api/v1/rerank", headers={"Authorization": f"Bearer {_key()}"},
                           json={"model": model, "query": query, "documents": docs, "top_n": min(limit, len(docs))},
-                          timeout=8)
+                          timeout=timeout)
         resp.raise_for_status()
         data = resp.json()
         order = [cloud[x["index"]] for x in data["results"]]

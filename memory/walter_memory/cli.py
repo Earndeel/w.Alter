@@ -66,6 +66,7 @@ def main(argv=None) -> None:
     n.add_argument("--tag", action="append", default=[])
     ix = sub.add_parser("index", help="index new canonical rows into search.chunks")
     ix.add_argument("--loops", type=int, default=1000)
+    ix.add_argument("--hide-noise", action="store_true", help="recompute recall noise on every indexed event (after a rule change)")
     sq = sub.add_parser("search", help="unified search (FTS + vectors + filters)")
     sq.add_argument("query"); sq.add_argument("--limit", type=int, default=10); sq.add_argument("--source", action="append")
     sq.add_argument("--label", action="append"); sq.add_argument("--since"); sq.add_argument("--until")
@@ -138,6 +139,9 @@ def main(argv=None) -> None:
                                   occurred_at=now, content=a.content, payload={"context": a.context, "tags": a.tag},
                                   actor={"account": "walter-core", "external_id": a.source, "display_name": a.source})
         _print({"recorded": res["inserted"], "event_ids": res["event_ids"]})
+    elif a.cmd == "index" and a.hide_noise:
+        from . import search
+        _print(search.hide_noise())
     elif a.cmd == "index":
         from . import search
         total = {}
