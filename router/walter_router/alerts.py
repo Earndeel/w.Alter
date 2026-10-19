@@ -119,6 +119,18 @@ def top3(conn, status_for_new: str | None = None) -> list[str]:
     return created
 
 
+# boards whose score is a "higher = better" transform of a lower-is-better measure: (unit marker, raw key, label)
+RAW_MEASURES = (("latency", "latency_ms", "ms"), ("WER", "wer_pct", "% WER"))
+
+
+def _raw_measure(theirs: dict, mine: dict) -> dict:
+    """{'raw': [challenger, pinned, unit]} for a latency / WER board, read as measured."""
+    for marker, key, unit in RAW_MEASURES:
+        if marker in (theirs.get("unit") or "") and theirs.get(key) is not None:
+            return {"raw": [theirs[key], mine.get(key), unit]}
+    return {}
+
+
 def challengers(conn, status_for_new: str = "open", only_task: str | None = None,
                 only_role: str | None = None, chg: dict | None = None) -> list[str]:
     """Models that overtake one of Monsieur's pinned favourites on any leaderboard of that task
@@ -180,10 +192,10 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
                     ev["boards"][board] = {"score": r["score"], "pinned_score": ref, "delta": r["score"] - ref,
                                            "unit": r["score_unit"], "rank": podium.index(r["model_id"]) + 1,
                                            "variant": r["variant"]}
-        if not measured:
+        if not measured:   # recorded for the dossier / review, never a message (it names no model to adopt)
             _upsert(conn, "challenger", p["task"], f'{p["pinned_model_id"]}:unmeasured',
                     {"pinned": p["pinned_model_id"], "note": "favourite absent from every leaderboard of this task"},
-                    status_for_new, p["role"])
+                    "baseline", p["role"])
             continue
         # Monsieur (2026-10-14): one board is not enough (Grok Imagine 1.5 'agent' led Arena t2v while MiniMax H3
         # stays far ahead overall). A challenger must beat the favourite on the task's weighted composite of all
@@ -202,7 +214,8 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
                                             "pinned_rank": list(comp).index(p["pinned_model_id"]) + 1 if mine_c else None}
             found[model_id]["all_boards"] = {
                 name: {"challenger": b.get("score"), "pinned": (mine_c["boards"].get(name) or {}).get("score") if mine_c
-                       else None, "variant": b.get("variant"), "unit": b.get("unit")}
+                       else None, "variant": b.get("variant"), "unit": b.get("unit"),
+                       **_raw_measure(b, (mine_c["boards"].get(name) or {}) if mine_c else {})}
                 for name, b in (theirs["boards"] if theirs else {}).items() if "score" in b}
         for model_id, ev in found.items():
             why = changes.changed(chg, model_id) + [f'{p["pinned_model_id"]} dégradé'
@@ -218,10 +231,11 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
 def unranked(conn) -> list[str]:
     """Models released recently on a provider with no measurement on any leaderboard yet (one alert per model)."""
     snaps = sel.latest_snapshots(conn)
-    bench_ids = [snaps[k] for k in ("aa", "aa_decision", "mm", "da", "arena", "bridgebench") if k in snaps]
+    bench_ids = [snaps[k] for k in changes.BENCH_KINDS if k in snaps]
     created = []
     for o in conn.execute("""select o.model_id, o.interface, min(o.provider_created) as released
                              from models.offers o where o.snapshot_id = %s
+                             and o.offer_key not like '%% | audio input'   -- a chat model that also hears: one release
                              and o.provider_created > now() - make_interval(days => %s)
                              and not exists (select 1 from models.benchmarks b where b.snapshot_id = any(%s)
                                              and b.model_id = o.model_id)
@@ -548,7 +562,10 @@ def _group_key(conn, a: dict) -> tuple:
 
 BOARD_TASKS = {"text_to_video": "vidéo depuis texte", "image_to_video": "animation d'image", "text_to_image": "image",
                "image_edit": "retouche d'image", "tts": "voix", "music": "musique", "text": "texte",
-               "text_coding": "code", "webdev": "web", "3d": "3D", "frontend": "front-end", "decision": "", "intelligence": "intelligence"}
+               "text_coding": "code", "webdev": "web", "3d": "3D", "frontend": "front-end", "decision": "", "intelligence": "intelligence",
+               "wer": "fidélité (100 − WER)", "speed": "vitesse", "rerank": "rerank (ELO)", "rerank_speed": "rerank latence",
+               "embeddings": "embeddings (ELO)", "embeddings_speed": "embeddings latence",
+               "retrieval_fr": "recherche en français"}
 
 
 def _board_fr(key: str) -> str:
@@ -614,6 +631,10 @@ def _challenger_group(conn, group: list[dict]) -> list[str]:
         if pref and pref["description"]:
             lines.append(f"   {pref['description']}")
         lines.append(f"   Aujourd'hui : {pinned['name']}")
+        on_change = (conn.execute("select requirements from models.tasks where task = %s", (a["task"],)).fetchone()
+                     ["requirements"] or {}).get("on_change")
+        if on_change:   # what adopting really implies for the modules (embeddings: re-vectorise every bank)
+            lines.append(f"⚠️ {on_change}")
         if a["task"] in seen_tasks:
             continue
         seen_tasks.add(a["task"])
@@ -632,6 +653,12 @@ def _challenger_group(conn, group: list[dict]) -> list[str]:
                 continue
             mark = "✔" if b["challenger"] > b["pinned"] else "✖"
             version = f" (version {b['variant']})" if b.get("variant") and b["variant"] not in ("", "default") else ""
+            raw = b.get("raw")
+            if raw and raw[1] is not None:   # latency / WER: the measure itself, lower = better
+                d = 0 if raw[2] == "ms" else 2
+                lines.append(f"• {_board_fr(name)} : {_fr(raw[0], d)} {raw[2]} contre {_fr(raw[1], d)} {raw[2]} "
+                             f"{mark}{version}")
+                continue
             lines.append(f"• {_board_fr(name)} : {b['challenger']:.0f} contre {b['pinned']:.0f} {mark}{version}")
     return lines + [""] + _price_lines(c, current) + _route_line(conn, a0, c)
 

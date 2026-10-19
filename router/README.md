@@ -18,7 +18,8 @@ notifications, 3. analysis by the ECONOMIC text tier (L1 read from the router �
    from each model page's `displayPricing`, base unit = price ÷ `displayMultiplier`), Kie pricing, Codex account
    catalogue (read through Hermes), and the live `/models` (with prices) of OpenAI-compatible providers configured
    in Hermes (`config/providers.json`, today Arnict AI; key read at run time from `~/.hermes/.env`, sent as a
-   header only). A failing source keeps its last good snapshot.
+   header only). Service postes (2026-10-16): AA Speech-to-Text (`aa_stt`), Agentset rerankers + embeddings
+   (`agentset`), MTEB French retrieval (`mteb`, see « Internal postes »). A failing source keeps its last good snapshot.
 2. **Parse** → `models.benchmarks` (measured quality) and `models.offers` (callable, priced), linked through
    `models.canonical`/`models.aliases` (deterministic normalisation + justified manual aliases in `aliases.json`).
    Every media offer is classified (`walter_router/media.py`): `offer_kind` generation | fee | tool, `modes`
@@ -140,6 +141,42 @@ Routing and tiers are unchanged.
 (`check` / `-- <command>`): global key from Bitwarden « W.Alter · cloudflare », account e-mail from `.env`
 `CLOUDFLARE_EMAIL` (the vault item has no e-mail; an example e-mail from a skill gives 401/403).
 
+## Internal postes — every W.Alter module that uses AI (2026-10-16, Monsieur)
+Tasks the modules call, never offered to the intent classifier (`models.tasks.internal`, `requirements`, `consumers`;
+migration 020): `summarization`, `memory_extraction` (objective `level` = Monsieur's text tier L1 from
+`general`, filtered by `requirements.min_context` — they move when he adopts a new tier), `voice_assist` (BridgeBench
+speed primary and required, Arena French, BridgeBench trustworthiness; `requirements.reasoning = minimal` is applied to
+its routes), `stt`, `embeddings`, `rerank`. `pick` of a transcription / rerank / embedding poste returns `openrouter_id`. Hermes follows through `sync-hermes [--apply] [--no-restart]` (`hermes_sync.py`:
+auxiliary compression/title_generation of the main config and the wild/hephaestus profiles + `fallback_chain`, cron
+agent jobs in `CRON_POSTES`; run by the cycle and after each verdict); services through walter-llm (`model` = poste or
+`general/L2`). `generate --task tts --voice V --style S` = Hermes TTS command provider. Module table: walter-memory
+RUNBOOK § Modules IA → Walter Router.
+
+**Service boards — stt, rerank, embeddings (2026-10-16, migration 021, Monsieur: « rajouter le reranking, embedding
+et STT »).** Ranked like any task (`task_benchmarks` → `scoring.composite`, dossiers, challengers), still PINNED on the
+models in use (`watch = quality`): a better measured model is only proposed (« Changer »), never switched.
+- Sources (collected every cycle): `aa_stt` = artificialanalysis.ai/speech-to-text chart download tables (AA-WER,
+  speed factor, price per 1000 min, per model x host; English datasets — **AA publishes no French STT result**);
+  `agentset` = agentset.ai/rerankers and /embeddings (pairwise ELO on RAG retrieval, average latency, nDCG@10,
+  $/1M tokens; boards last updated 2026-02-15 by Agentset); `mteb` = MIRACL hard-negatives **French** nDCG@10 from
+  github.com/embeddings-benchmark/results, for every embedding model OpenRouter serves (GitHub API: 1 listing + 1 call
+  per model; `GITHUB_TOKEN` in `~/.hermes/.env` is used if present).
+- **Stored scores are always "higher = better"** (podium, challenger, nerf code rely on it): WER -> `100 - WER %`
+  (`extra.wer_pct` keeps the measure), latency -> `1000 / ms` (`extra.latency_ms`); proposals print the raw measure.
+- Weights: stt = `aa_stt:wer` 0.75 (primary) + `aa_stt:speed` 0.25; rerank = `agentset:rerank` 0.7 + `rerank_speed` 0.3,
+  and `requirements.max_latency_s = 0.7` excludes any model measured slower (voice recall budget); embeddings =
+  `agentset:embeddings` 0.5 + `mteb:retrieval_fr` 0.5 with `require_primary` (re-vectorising is never decided on a
+  single test).
+- Interfaces follow the offers: stt -> `transcription` (dedicated STT models + every OpenRouter chat model that hears
+  audio, as an extra offer `<id> | audio input`), embeddings -> `embedding`, rerank -> `rerank`. OpenRouter per-second /
+  per-hour / per-search prices come from the model pages (`displayPricing`) and are normalised to $/min, $/search;
+  embeddings compare in $/1M tokens. Before 021 stt sat on `audio` (the TTS interface) and embeddings on `embeddings`
+  (no offer): no callable candidate could rank.
+- `requirements.on_change` = what adopting implies, printed in the proposal and the dossier: embeddings = re-vectorise
+  every Hindsight bank (Hindsight keeps its own model config until that is done); rerank = Hindsight's reranker is the
+  static drop-in 20-reranker-fallback.conf; stt = a dedicated STT model needs the gemini-stt plugin on OpenRouter's
+  transcription API. Dossiers carry a `ranking` (every measured model, callable or not, pinned ones always listed).
+
 ## Commands
 ```
 bin/walter-router migrate
@@ -148,6 +185,7 @@ bin/walter-router pick <task> [--level L1|L2|L3]      # preferences first, then 
 bin/walter-router pick <task> --require unrestricted|open_weights   # hard constraint, best callable model
 bin/walter-router decide <task> "<request in French>"  # role by objective, route, workflow, brief
 bin/walter-router declare                               # apply config/knowledge.json
+bin/walter-router sync-hermes [--apply]                 # Hermes auxiliary jobs / crons follow the postes
 bin/walter-router dossier <task>                        # the JSON the router reads
 bin/walter-router route "<request>" [--task T]            # Jev intent -> decision -> execution routes
 bin/walter-router classify "<request>"                    # Jev intent only

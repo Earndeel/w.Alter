@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import re
 
-NORM_UNITS = {"image": "per image", "video": "per second", "audio": "per 1000 characters", "music": None}
+NORM_UNITS = {"image": "per image", "video": "per second", "audio": "per 1000 characters", "music": None,
+              "transcription": "per minute", "rerank": "per search", "embedding": "per 1m tokens"}
 MODE_LABELS = {"t2i": "texte→image", "i2i": "image→image", "t2v": "texte→vidéo", "i2v": "image→vidéo",
                "r2v": "référence→vidéo", "v2v": "vidéo→vidéo"}
 
@@ -103,6 +104,8 @@ def norm_price(interface: str, unit_price: float | None, unit: str | None, label
     got = (unit or "").strip().lower()
     if want is None or got == want:
         return unit_price, got or None
+    if want == "per minute" and got in ("per second", "per hour"):   # transcription: audio minutes
+        return unit_price * 60 if got == "per second" else unit_price / 60, want
     if want == "per 1000 characters" and got in ("per character", "per utf-8 byte"):
         return unit_price * 1000, want  # UTF-8 bytes ~ characters (accents count double: slight underestimate)
     if want == "per second" and got in ("per video", "per vedio"):

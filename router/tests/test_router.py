@@ -163,3 +163,18 @@ def test_successor_family_and_runnable_selection(conn):
     best = conn.execute("""select model_id from models.selection where run_id = (select run_id from models.latest_run)
                            and task = 'logo' and level = 'best' and rank = 1""").fetchone()
     assert best and best["model_id"] in media_exec._models()
+
+
+def test_level_poste_follows_monsieurs_text_tier(conn):
+    """Background postes (2026-10-16) take the 'general' tier Monsieur adopted, never a model of their own."""
+    tier = choose.pick(conn, "general", level="L1")
+    for poste in ("summarization", "memory_extraction"):
+        d = choose.pick(conn, poste)
+        assert d["model_id"] == tier["model_id"] and d["variant"] == tier["variant"]
+        assert d["follows"] == {"task": "general", "level": "L1"} and d["task"] == poste
+
+
+def test_internal_postes_are_not_offered_to_the_intent_classifier(conn):
+    from walter_router import intent
+    tasks, _ = intent._criteria(conn)
+    assert not {"summarization", "memory_extraction", "voice_assist", "stt", "embeddings", "rerank"} & set(tasks)

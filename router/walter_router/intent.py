@@ -78,7 +78,7 @@ VIDEO_TASKS = ("text_to_video", "image_to_video")
 
 def _criteria(conn) -> tuple[dict, dict]:
     tasks = {r["task"]: r["intent_hint"] or f'{r["label"]} — {r["description"] or ""}'.strip(" —")
-             for r in conn.execute("select task, label, description, intent_hint from models.tasks where interface <> 'decisions' order by task")}
+             for r in conn.execute("select task, label, description, intent_hint from models.tasks where interface <> 'decisions' and not internal order by task")}
     roles = {r["role"]: f'{r["label"] or r["role"]}: {r["description"] or r["note"] or ""}'
              for r in conn.execute("""select distinct on (role) role, label, description, note from models.preferences
                                       where task = any(%s) order by role, task""", (list(VIDEO_TASKS),))}

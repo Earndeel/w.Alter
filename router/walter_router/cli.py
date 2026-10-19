@@ -167,20 +167,27 @@ def subscription_fallback(conn, task: str, exclude: str | None = None) -> dict |
 
 def with_execution(conn, out: dict) -> dict:
     """Add the ordered Hermes routes to a chat decision (what the Hermes plugin runs, with fallbacks)."""
-    task = conn.execute("select interface from models.tasks where task = %s", (out.get("task"),)).fetchone()
+    task = conn.execute("select interface, requirements from models.tasks where task = %s", (out.get("task"),)).fetchone()
     if out.get("model_id") and task and task["interface"] == "chat":
         out["execution"] = execution.routes(conn, out["model_id"], out.get("variant") or "",
                                             preferred=out.get("provider"))
-        if out["task"] != "general" and not any(r["access"] == "subscription" for r in out["execution"]):
+        basis = (out.get("follows") or {}).get("task") or out["task"]   # a 'level' poste falls back like its tier
+        if basis != "general" and not any(r["access"] == "subscription" for r in out["execution"]):
             sub = subscription_fallback(conn, out["task"], exclude=out["model_id"])
             if sub:  # best model of this task reachable through the subscription, after the paid routes
                 out["execution"] += [{**r, "fallback_for": out["model_id"]}
                                      for r in execution.routes(conn, sub["model_id"], sub["variant"])]
-        fallback = knowledge.level_fallback(out["task"], out.get("level") or out.get("role"))
+        fallback = knowledge.level_fallback(basis, out.get("level") or out.get("role"))
         if fallback:  # declared tier fallback, after every route of the pinned model
             fb_model, _, fb_variant = fallback.partition("/")
             out["execution"] += [{**r, "fallback_for": out["model_id"]}
                                  for r in execution.routes(conn, fb_model, fb_variant)]
+        effort = (task["requirements"] or {}).get("reasoning")
+        if effort:   # a poste's own reasoning level (voice_assist: minimal, the latency comes first)
+            out["execution"] = [{**r, "reasoning": r.get("reasoning") or effort} for r in out["execution"]]
+    elif out.get("model_id") and task and task["interface"] in ("rerank", "transcription", "embedding"):
+        from . import media_exec   # service postes: modules call OpenRouter with this id (stt, rerank)
+        out["openrouter_id"] = media_exec.openrouter_id(conn, out["model_id"])
     elif out.get("model_id") and task and task["interface"] in ("video", "image", "audio", "music"):
         from . import media_exec   # media: provider order of the model, then the category's fallback model
         cfg = media_exec._models().get(out["model_id"]) or {}
@@ -189,6 +196,7 @@ def with_execution(conn, out: dict) -> dict:
                                                       bool((cfg.get("kie") or {}).get(mode)),
                                                       media_exec.openrouter_id(conn, out["model_id"]))
         out["fallback_models"] = media_exec.fallback_models(conn, out["task"], out.get("role"), out["model_id"], mode)
+        out["openrouter_id"] = media_exec.openrouter_id(conn, out["model_id"])   # modules calling OpenRouter (stt)
     return out
 
 
@@ -237,6 +245,9 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--role", help="with a short number covering several roles: only this one")
     lb = sub.add_parser("library", help="the model library: per task/category model, chooser, providers, fallback")
     lb.add_argument("--json", action="store_true")
+    hs = sub.add_parser("sync-hermes", help="write the router's postes into Hermes auxiliary jobs (compression…)")
+    hs.add_argument("--apply", action="store_true", help="apply (config backup + graceful gateway restart)")
+    hs.add_argument("--no-restart", action="store_true")
     pl = sub.add_parser("publish-library", help="rebuild and deploy https://library.walter-ai.cloud (Cloudflare Access)")
     pl.add_argument("--no-deploy", action="store_true")
     sb = sub.add_parser("subscriptions", help="Monsieur's subscriptions: quota meters, status, plan values")
@@ -265,6 +276,8 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--task")
     g.add_argument("--role")
     g.add_argument("--image-url", action="append", dest="image_urls")
+    g.add_argument("--voice", help="voice (tts), e.g. Algenib")
+    g.add_argument("--style", help="delivery style (tts)")
     g.add_argument("--aspect-ratio")
     g.add_argument("--duration", type=int)
     g.add_argument("--resolution")
@@ -329,7 +342,8 @@ def main(argv: list[str] | None = None) -> int:
                 out = feedback(conn, args.model, args.rating, args.task, args.note)
             elif args.cmd == "generate":
                 out = media_exec.generate(conn, args.request, args.task, args.role, args.image_urls, args.aspect_ratio,
-                                          args.duration, args.resolution, args.paid_fallback, not args.no_craft)
+                                          args.duration, args.resolution, args.paid_fallback, not args.no_craft,
+                                          voice=args.voice, style=args.style)
             elif args.cmd == "postes":
                 from . import postes as postes_mod
                 out = {"current": postes_mod.current_orchestrator(), "ranking": postes_mod.rank(conn, args.poste)}
@@ -349,6 +363,9 @@ def main(argv: list[str] | None = None) -> int:
                         p.error("calibrate needs <sub_id> <percent>")
                     subscriptions.calibrate(conn, args.sub_id, args.percent)
                 out = subscriptions.state(conn)
+            elif args.cmd == "sync-hermes":
+                from . import hermes_sync
+                out = hermes_sync.apply(conn, restart=not args.no_restart) if args.apply else hermes_sync.plan(conn)
             elif args.cmd == "publish-library":
                 from . import library
                 out = library.publish(conn, deploy=not args.no_deploy)
@@ -373,7 +390,7 @@ def main(argv: list[str] | None = None) -> int:
                 out = alerts.verdict(conn, args.alert_id, args.decision, args.note, args.role)
                 import subprocess   # the library page follows Monsieur's answer (background, non-blocking)
                 wr = Path(__file__).resolve().parent.parent / "bin" / "walter-router"   # after this command's commit
-                subprocess.Popen(["sh", "-c", f'sleep 5; "{wr}" publish-library'],
+                subprocess.Popen(["sh", "-c", f'sleep 5; "{wr}" sync-hermes --apply; "{wr}" publish-library'],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             conn.commit()
     json.dump(out, sys.stdout, indent=1, ensure_ascii=False, default=str)
