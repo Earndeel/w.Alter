@@ -12,6 +12,7 @@ def main(argv=None):
         if name=='render':q.add_argument('--format',choices=('json','markdown'),default='json')
     q=sub.add_parser('path');q.add_argument('module');q.add_argument('parts',nargs='*')
     sub.add_parser('layout')
+    q=sub.add_parser('standby');q.add_argument('standby_action',nargs='?',choices=('status','start','stop','ensure','sweep'),default='status');q.add_argument('group',nargs='?');q.add_argument('--by',default='agent')
     q=sub.add_parser('instance');q.add_argument('instance_action',nargs='?',choices=('show','check','path','render','config','harness'),default='show');q.add_argument('parts',nargs='*')
     sub.add_parser('matrix')
     sub.add_parser('doctor')
@@ -44,6 +45,13 @@ def main(argv=None):
         elif a.command=='layout':
             from . import paths
             out=paths.layout()
+        elif a.command=='standby':
+            from . import standby
+            act=a.standby_action
+            if act in ('start','stop','ensure') and not a.group:raise ValueError('usage: walter standby '+act+' <group>')
+            out=(standby.status() if act=='status' else standby.sweep() if act=='sweep' else
+                 standby.start(a.group,by=a.by) if act=='start' else standby.ensure(a.group,by=a.by) if act=='ensure' else
+                 standby.stop(a.group))
         elif a.command=='instance':
             from . import instance
             if a.instance_action=='path':

@@ -127,7 +127,7 @@ Exposer les capacités et installer les raccordements des harnesses.
 Contrat 1.0.0; propriétaire : core.
 Racine actuelle : `/opt/walter-core`. Cible : `/walter/core`.
 
-Interfaces : MCP stdio, walter CLI, CLI contracts, matrix, doctor, Declarative harness compositions, Offline source release and staged installation.
+Interfaces : MCP stdio, walter CLI, CLI contracts, matrix, doctor, Declarative harness compositions, Offline source release and staged installation, walter standby.
 
 **Critères de validation :**
 

@@ -664,7 +664,10 @@
         "/opt/walter-core/hooks/walter_hook.py",
         "/opt/walter-core/server.py",
         "/opt/walter-core/modules/catalog.json",
-        "/opt/walter-core/modules/registry.json"
+        "/opt/walter-core/modules/registry.json",
+        "/opt/walter-core/systemd/walter-standby.service",
+        "/opt/walter-core/systemd/walter-standby.timer",
+        "/opt/walter-core/config/standby.toml"
       ],
       "requires": [],
       "external": [],
@@ -690,7 +693,8 @@
         "walter CLI",
         "CLI contracts, matrix, doctor",
         "Declarative harness compositions",
-        "Offline source release and staged installation"
+        "Offline source release and staged installation",
+        "walter standby"
       ],
       "bindings": {
         "hermes": "native adapters + lifecycle hook (no duplicate MCP attachment)",
@@ -702,7 +706,9 @@
         "MCP client must reconnect to discover newly installed tools.",
         "CLI attachment installs common MCP; context/model/lifecycle bindings are checked independently."
       ],
-      "services": [],
+      "services": [
+        "walter-standby.timer"
+      ],
       "optional": [],
       "contract": {
         "schema_version": 1,
