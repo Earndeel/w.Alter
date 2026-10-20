@@ -10,7 +10,9 @@
         "/walter/browse/walter_browse/facade.py",
         "/walter/browse/ops/walter-browse-display.service",
         "/walter/browse/ops/browse-display-container.sh",
-        "/walter/browse/ops/camoufox-max-display.conf"
+        "/walter/browse/ops/camoufox-max-display.conf",
+        "/walter/browse/ops/walter-exit-mac.service",
+        "/walter/browse/ops/camoufox-max-identity.conf"
       ],
       "requires": [],
       "external": [
@@ -53,7 +55,8 @@
       ],
       "services": [
         "camoufox-max",
-        "walter-browse-display"
+        "walter-browse-display",
+        "walter-exit-mac"
       ],
       "optional": [
         "secrets",
