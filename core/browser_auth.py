@@ -218,7 +218,10 @@ def login(site_name: str, session: str = "", client: str = "cli", verify: bool =
     result = {"site": site_name, "session": session, "cookies_injected": injected, "rejected": rejected,
               "undecryptable": undecryptable, "expired_skipped": expired, "missing_required": missing,
               "hosts": dict(sorted(hosts.items(), key=lambda x: -x[1])[:12])}
-    if verify:
+    if verify and injected == 0:
+        # Nothing reached the browser (e.g. refused: the owner's network exit is down): never report a login.
+        result.update({"authenticated": False, "note": "no cookie injected; nothing to verify"})
+    elif verify:
         result.update(_verify(session, site))
     result["seconds"] = round(time.time() - started, 1)
     result["drive_with"] = f"Camoufox HTTP API {CAMOUFOX} (/tab/new, /tab/navigate, /tab/snapshot…) userId={session}"
