@@ -23,8 +23,10 @@ conteneur), `ops/walter-browse-display.service` (démarrage, lien `/tmp/.X11-uni
 ## Sortie réseau et identité par défaut du navigateur
 
 Une session sans route propre sort par la machine du propriétaire (`walter-exit-mac` : tunnel SOCKS
-`127.0.0.1:1082` par `ssh mac`) et se présente avec son système, son fuseau et ses langues (`/etc/walter/browse-identity.env`,
-valeurs de l'instance : `config/browse/network.toml [default]`) ; WebRTC est fermé (le tunnel ne le transporte pas).
+`127.0.0.1:1082` par `ssh mac`) avec le système du propriétaire (`/etc/walter/browse-identity.env`, valeurs de l'instance :
+`config/browse/network.toml [default]`) ; fuseau, langues (langue principale du pays, puis anglais), position et IP
+WebRTC sont déduits de l'IP de sortie, et le navigateur est relancé avec la bonne identité quand cette IP change
+(contrôle toutes les 5 minutes, seulement sans session ouverte).
 Si la sortie est injoignable, la session s'ouvre sans les cookies du propriétaire, depuis l'IP du serveur. Une session
 peut toujours choisir une autre sortie (`walter-browser exit`). Fichiers : `ops/walter-exit-mac.service`,
 `ops/camoufox-max-identity.conf`.
