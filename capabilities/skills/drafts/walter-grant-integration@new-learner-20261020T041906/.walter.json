@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-20T04:19:06.034478+00:00",
+ "description": "Use when migrating a Walter consumer from direct credential files or another runtime's environment to walter-secrets grants, or diagnosing grant integration health.",
+ "domain": "walter-secrets",
+ "kind": "new",
+ "reason": "The session repeatedly migrated Google connectors, the model gateway, Router alerts and OTP retrieval to a shared grant interface. It exposed reusable pitfalls involving single-writer token renewal, credential permissions, stale generated contracts and the difference between grant health and real authenticated consumer checks. None of the listed skills covers this authorization integration workflow. [session claude_code/vm/5ee0e82a-c04d-4200-b5e0-47c9f21e89e2]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/5ee0e82a-c04d-4200-b5e0-47c9f21e89e2",
+ "target": "walter-grant-integration"
+}
