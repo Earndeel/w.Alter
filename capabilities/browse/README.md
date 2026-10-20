@@ -7,3 +7,16 @@ State: WALTER_BROWSE_STATE_DIR (default: the active instance's `state/browse`, f
 Compatibility: old skill scripts and universal-scraper wrapper point here. hermes_adapter.py is a legacy diagnostic adapter and is excluded from the runtime-independent import boundary; normal calls do not import it. Existing fallback and extraction behavior is preserved.
 
 Test: python -m pytest runtime/test_*.py tests -q. Set WALTER_BROWSE_STATE_DIR to an isolated test directory. No real account needed.
+
+## Network exits
+
+`network/wg-exit/`: scoped WireGuard exits (container + loopback HTTP proxy) for browser sessions, `walter-wg-exit` on the PATH. See its README.
+
+## Écran du navigateur de Walter (Selkies)
+
+camoufox-max dessine ses fenêtres sur l'écran X :101 fourni par le conteneur `walter-browse-display` (image
+linuxserver baseimage-selkies) : le propriétaire voit et pilote le navigateur de Walter (clavier, souris) depuis un
+navigateur, sur l'adresse Tailscale port 3011 (HTTPS). Fichiers : `ops/browse-display-container.sh` (création du
+conteneur), `ops/walter-browse-display.service` (démarrage, lien `/tmp/.X11-unix/X101`),
+`ops/camoufox-max-display.conf` (complément de l'unité camoufox-max). Remplace Xvfb + x11vnc + noVNC (20/10/2026).
+
