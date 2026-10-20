@@ -31,3 +31,10 @@ Si la sortie est injoignable, la session s'ouvre sans les cookies du propriétai
 peut toujours choisir une autre sortie (`walter-browser exit`). Fichiers : `ops/walter-exit-mac.service`,
 `ops/camoufox-max-identity.conf`.
 
+Appareil et comportement : l'empreinte matérielle (processeur, écran, GPU, polices, graines canvas) est générée une
+seule fois d'après la machine du propriétaire et figée (`device-fingerprint.json` dans le dossier de données du
+navigateur) : un relancement ne ressemble jamais à un nouvel appareil. La frappe est humaine (vraies touches,
+intervalles variables, hésitations ; effacement au clavier, jamais de remplissage programmatique) ; les trajectoires
+de souris viennent de l'humanisation de Camoufox. Les cookies du propriétaire ne sont acceptés que par une session qui
+sort par sa sortie réseau (refus sinon).
+
