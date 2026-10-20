@@ -158,3 +158,13 @@ examples, not catalog truth.
 - Vérifie la syntaxe avec `/opt/walter-router/bin/walter-router alias-add --help`, puis applique `/opt/walter-router/bin/walter-router alias-add <nom_source> <model_id_canonique> --reason '<preuve et URL officielle>'` uniquement lorsque l’identité est établie.
 - Confirme la persistance avec `/opt/walter-router/bin/walter-router alias-list`, puis relis `/opt/walter-router/bin/walter-router review`. Distingue la présence de l’alias de son effet sur les données du cycle : si le résumé conserve le candidat, rapporte cette observation. Ne soustrais jamais manuellement le nombre d’alias ajoutés au nombre de candidats et ne lance pas de recalcul hors périmètre.
 - Vérifie les résultats à partir du code de sortie et du contenu retourné : une enveloppe d’outil marquée « error » peut contenir une commande réussie avec `exit_code: 0`.
+
+## Analyser un cycle de 48 h et corriger les noms
+
+- Utilise `walter-router` sur le PATH. Commence par `walter-router review`, `walter-router health` et `walter-router alias-list`. Consulte `walter-router dossier <tâche>` pour approfondir une anomalie.
+- Lorsqu’une mission limite les corrections aux alias, ne lance aucun refresh, recalcul, changement de routage ou édition de fichier/base. Utilise exclusivement la commande validée pour écrire les rapprochements.
+- Vérifie chaque rapprochement dans une source officielle : même modèle, version, taille et variante. Une ressemblance de nom constitue seulement un candidat ; conserve les cas ambigus sans correction.
+- Consulte `walter-router alias-add --help`, puis ajoute chaque correspondance avec `walter-router alias-add <id_non_noté> <id_noté> --reason '<preuve et URL>'`. Le validateur exige un identifiant source existant, une cible ayant des scores et l’absence de chaîne ou conflit.
+- Confirme les écritures avec `walter-router alias-list`, puis relis `walter-router review` et `walter-router health`. Le résumé du cycle peut conserver ses candidats et compteurs après les ajouts : distingue les alias persistés du résultat d’un recalcul, et ne lance pas ce dernier sans autorisation.
+- Si `walter-router alerts` renvoie `[]`, consulte aussi `walter-router alerts --all` et examine les champs `kind` et `status` avant de conclure à l’absence d’alertes ouvertes. Pour les modèles non classés, filtre `kind == "unranked"` et `status == "open"`.
+- Dans le compte rendu, sépare les corrections confirmées, les anomalies restantes et les limites du résumé enregistré. N’affirme jamais qu’un rapport a été écrit sans confirmation de sa création.
