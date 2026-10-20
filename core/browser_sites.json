@@ -9,8 +9,8 @@
       "domains": ["google.com", "google.fr", "accounts.google.com", "labs.google", "youtube.com", "googleusercontent.com"],
       "required_cookies": ["SID", "SIDCC", "__Secure-1PSIDCC", "__Secure-3PSIDCC"],
       "check": {
-        "url": "https://myaccount.google.com/",
-        "signed_out_url": ["accounts.google.com/v3/signin", "ServiceLogin", "/signin/"],
+        "url": "https://myaccount.google.com/personal-info",
+        "signed_out_url": ["accounts.google.com", "ServiceLogin", "/signin/", "/intro"],
         "settle_s": 4
       }
     },

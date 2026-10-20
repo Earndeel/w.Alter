@@ -61,7 +61,7 @@ class StandbyTests(unittest.TestCase):
         self.assertEqual(standby.groups(Path(self.tmp.name) / 'absent.toml'), {})
 
     def test_start_in_order_stop_in_reverse(self):
-        standby.start('app', by='monsieur', now=100, **self.kw)
+        standby.start('app', by='owner', now=100, **self.kw)
         standby.stop('app', now=200, **self.kw)
         self.assertEqual(self.host.calls, [('start', ['db.service', 'app.service', 'side']),
                                            ('stop', ['side', 'app.service', 'db.service'])])
