@@ -1,0 +1,11 @@
+{
+ "base_sha": "d22095e7f4033c927e061edc5e0e3c50180fa45762e48fb52d4c55736e6f5b9a",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-20T03:57:14.864387+00:00",
+ "domain": "mlops",
+ "kind": "patch",
+ "reason": "Le cycle récurrent a permis de confirmer sept alias via alias-add/alias-list, tandis que le résumé conservait 25 candidats sans recalcul. Autre piège observé : alerts renvoyait [] alors que alerts --all exposait des alertes unranked ouvertes. Ces vérifications complètent le skill existant sans créer de procédure concurrente. [session hermes/main/20261020_034802_8d06f1]",
+ "runtime": "learner",
+ "session_id": "hermes/main/20261020_034802_8d06f1",
+ "target": "walter-model-router"
+}
