@@ -3,12 +3,15 @@
   "anchors": [
     "contracts/browse.json",
     "runtime/universal_router.py",
-    "walter_browse/facade.py"
+    "walter_browse/facade.py",
+    "ops/walter-browse-display.service",
+    "ops/browse-display-container.sh",
+    "ops/camoufox-max-display.conf"
   ],
   "requires": [],
   "external": [
     "Scrapling isolated environment",
-    "Camoufox :9377",
+    "Camoufox :9377 (display :101, Selkies walter-browse-display, Tailscale :3011)",
     "optional Webtop CDP"
   ],
   "data": [
@@ -44,7 +47,10 @@
     "Authenticated HTTP uses managed server-side cookies and refuses cross-origin redirects or anonymous fallback.",
     "Authenticated interactive browser routes are not qualified by the HTTP fixture."
   ],
-  "services": [],
+  "services": [
+    "camoufox-max",
+    "walter-browse-display"
+  ],
   "optional": [
     "secrets",
     "llm"

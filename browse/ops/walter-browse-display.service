@@ -1,0 +1,18 @@
+[Unit]
+Description=Walter browse — Selkies display of Walter's browser (container walter-browse-display, Tailscale :3011, X display :101)
+After=docker.service tailscaled.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStartPre=/bin/mkdir -p /run/walter-browse-x11
+ExecStartPre=/bin/chmod 1777 /run/walter-browse-x11
+ExecStart=/usr/bin/docker start -a walter-browse-display
+ExecStartPost=/bin/sh -c 'for i in $(seq 1 90); do [ -S /run/walter-browse-x11/X1 ] && break; sleep 1; done; mkdir -p /tmp/.X11-unix; ln -sfn /run/walter-browse-x11/X1 /tmp/.X11-unix/X101'
+ExecStop=/usr/bin/docker stop -t 10 walter-browse-display
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
