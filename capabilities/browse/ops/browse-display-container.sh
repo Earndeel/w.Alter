@@ -7,7 +7,7 @@ IP="${WALTER_TAILSCALE_IP:-$(tailscale ip -4 | head -1)}"
 mkdir -p /run/walter-browse-x11 && chmod 1777 /run/walter-browse-x11
 docker rm -f walter-browse-display >/dev/null 2>&1 || true
 docker create --name walter-browse-display --restart no \
-  -e PUID=0 -e PGID=0 -e TZ=Etc/UTC -e TITLE="Walter — navigateur" -e MAX_RES=1920x1200 \
+  -e PUID=0 -e PGID=0 -e TZ=Etc/UTC -e TITLE="Walter — navigateur" -e MAX_RES=3840x2400 \
   -p "$IP:3011:3001" -v /run/walter-browse-x11:/tmp/.X11-unix --shm-size=512m \
   lscr.io/linuxserver/baseimage-selkies:ubuntunoble >/dev/null
 echo "walter-browse-display created (https://$IP:3011)"
