@@ -1,0 +1,12 @@
+[Unit]
+Description=Walter browse — default network exit through the owner's Mac (SOCKS 127.0.0.1:1082 over ssh mac / Tailscale)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ssh -N -D 127.0.0.1:1082 -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 mac
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
