@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from walter_router import aliases_admin, db, identity
+from walter_router.analysis import aliases_admin
+from walter_router.store import db
+from walter_router.analysis import identity
 
 
 @pytest.fixture

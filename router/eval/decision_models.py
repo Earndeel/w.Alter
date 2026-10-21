@@ -7,7 +7,8 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from walter_router import db, intent  # noqa: E402
+from walter_router.store import db  # noqa: E402
+from walter_router.serve import intent
 
 CASES = json.loads((Path(__file__).parent / "intents_fr.json").read_text())
 

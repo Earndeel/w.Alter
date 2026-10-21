@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from walter_router import alerts, choose, db, tiers
+from walter_router.analysis import alerts
+from walter_router.serve import choose
+from walter_router.store import db
+from walter_router.analysis import tiers
 
 
 def _p(m, v, s, c):

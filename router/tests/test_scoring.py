@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from walter_router import collect, db, dossier, scoring
+from walter_router.analysis import parse
+from walter_router.research.benchmarks import bridgebench
+from walter_router.store import db
+from walter_router.analysis import dossier
+from walter_router.analysis import scoring
 
 
 def _row(model, score, votes=None):
@@ -24,7 +28,7 @@ def test_reliability_follows_votes_and_provisional_rows():
 def test_bridgebench_rows_are_read_from_the_page():
     page = ('x{"id":"openai/gpt-6-luna","href":"/leaderboard/gpt-6-luna","name":"GPT-6 Luna","provisional":false,'
             '"scores":{"overall":513,"frontend":460,"oneShot":480}}y')
-    rows = collect.parse_benchmarks("bridgebench", {"rows": collect.bridgebench_rows(page)})
+    rows = parse.parse_benchmarks("bridgebench", {"rows": bridgebench.bridgebench_rows(page)})
     assert {(r["model_id"], r["task"], r["score"]) for r in rows} == {
         ("gpt-6-luna", "overall", 513), ("gpt-6-luna", "frontend", 460), ("gpt-6-luna", "one_shot", 480)}
 

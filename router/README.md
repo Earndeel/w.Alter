@@ -1,13 +1,27 @@
 # Walter Router
 
-Model catalogue + per-task model choice for W.Alter. Schema `models` in hindsight-pg (127.0.0.1:5433, creds in ~/.pgpass).
-**End-to-end design: `docs/DESIGN.md`** (two clocks, ExecutionPlan contract, roadmap V1–V5, open decisions).
-Text tiers method: `docs/TIERS.md`.
+Model catalogue + per-task model choice, a Walter module in its own right (software here, the owner's data in his
+instance: `walter instance`). Schema `models` in PostgreSQL (`docs/DATA.md`). **End-to-end design: `docs/DESIGN.md`**.
+Text tiers method: `docs/TIERS.md`. Other modules only use the `walter-router` command (and walter-llm for text calls).
+
+## Layout (2026-10-21, decided by the owner)
+| Folder | Part | Content |
+|---|---|---|
+| `research/` | **Research** — goes and fetches, periodically, by API or straight from the page | `benchmarks/` one module per site (AA, AA Decision, AA STT, Arena, Design Arena, BridgeBench, Agentset, MTEB) · `prices/` OpenRouter, Kie, Codex catalogue, Hermes providers, declared offers · `plans/` subscriptions (meters, real usage, plan values; `quota_watch` service) · `agent/` the 48 h research agent (prompt + cycle digest) · `web.py` shared web access (FlareSolverr, Next.js data) · `sources.py` registry, snapshots retention |
+| `analysis/` | **Analysis** — understands the data, organises the DB, keeps the active library, tells the owner | `parse` + `ingest` (snapshots → benchmarks / offers with identities) · `identity`, `aliases`, `media`, `catalog` · `knowledge` (owner's declarations) · `scoring`, `select`, `tiers`, `decision_pareto`, `postes`, `dossier` · `changes`, `alerts` (Telegram, buttons), `recommend` · `refresh` = the cycle |
+| `interface/` | **Interface** — the model library page | `library` (rows, publish), `page` (HTML), `translate` (English), `site/` (Cloudflare Pages functions) |
+| `serve/` | What Walter calls at run time | `choose` (pick), `intent` (decision model), `execution` (routes, probes), `media_exec` (generation), `hermes_sync` |
+| `store/` | The database | `db`, `migrations/` |
+| `llm/` | walter-llm gateway (own venv, service :8894) | |
+| `cli.py`, `bin/` | The `walter-router` command, cycle and control entry points | |
+
+The import name stays `walter_router` (`walter_router/__init__.py` points it at this folder): `walter_router.analysis.select`
+is `analysis/select.py`.
 
 ## Cycle every 48 h (timer `walter-router-refresh`, `bin/walter-router-cycle`; was daily until 2026-10-02)
 1. benchmark collection (aa-pareto skill script; its daily Hermes cron 096741a21a32 is paused), 2. router refresh +
 notifications, 3. analysis by the ECONOMIC text tier (L1 read from the router — GPT-6 Luna max via Codex today):
-`config/analysis_prompt.md` + `walter-router review` digest -> `~/.hermes/logs/walter-router/analysis-YYYYMMDD.md`
+`research/agent/prompt.md` + `walter-router review` digest -> `~/.hermes/logs/walter-router/analysis-YYYYMMDD.md`
 (read-only, proposals only; Telegram only when the report says `VERDICT: ACTION`).
 
 ## Flow
@@ -22,7 +36,7 @@ notifications, 3. analysis by the ECONOMIC text tier (L1 read from the router �
    (`agentset`), MTEB French retrieval (`mteb`, see « Internal postes »). A failing source keeps its last good snapshot.
 2. **Parse** → `models.benchmarks` (measured quality) and `models.offers` (callable, priced), linked through
    `models.canonical`/`models.aliases` (deterministic normalisation + justified manual aliases in `aliases.json`).
-   Every media offer is classified (`walter_router/media.py`): `offer_kind` generation | fee | tool, `modes`
+   Every media offer is classified (`analysis/media.py`): `offer_kind` generation | fee | tool, `modes`
    t2i/i2i/t2v/i2v/r2v/v2v, `resolution`, `audio`, and `norm_price`/`norm_unit` (video per second, image per image,
    voice per 1000 characters). View **`models.catalog`** = one row per model and interface (name, modes,
    providers, price range, resolutions, release date, every leaderboard score, open weights / licence,
@@ -122,7 +136,7 @@ BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local Fla
 ## Subscriptions (2026-10-14) — information only, no routing effect
 the owner's plans in `config/subscriptions.json` (ChatGPT Plus 20 $, Claude Pro 20 $), shown on the library page
 (tab 💳 Abonnements / Subscriptions) with two sources only (2026-10-14):
-- **Our measurement** (`walter_router/subscriptions.py`): the weekly meter — ChatGPT Plus real, from the Codex usage API
+- **Our measurement** (`research/plans/subscriptions.py`): the weekly meter — ChatGPT Plus real, from the Codex usage API
   through Hermes (read-only); Claude Pro estimated from the Claude Code transcripts (no Claude login on the VM): units =
   input + cache writes + 5 x output over a capacity, `walter-router subscriptions calibrate anthropic-pro <weekly %>`
   with the % shown on claude.ai — and the tokens W.Alter's runtimes really used (Hermes state.db sessions billed to

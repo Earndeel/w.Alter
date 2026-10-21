@@ -5,7 +5,13 @@ import json
 
 import pytest
 
-from walter_router import collect, db, identity, media, scoring
+from walter_router.analysis import parse
+from walter_router.research.benchmarks import aa_stt
+from walter_router.research.benchmarks import agentset
+from walter_router.store import db
+from walter_router.analysis import identity
+from walter_router.analysis import media
+from walter_router.analysis import scoring
 
 
 def _flight(payload: str) -> str:
@@ -20,10 +26,10 @@ def test_aa_stt_tables_join_on_model_and_host():
                            "Speed Factor": 317.6}], "fileName": "STT AA-WER vs Speed Factor"}
     other = {"data": [{"Model": "x", "AA-WER Index": 0.5}], "fileName": "STT AA-WER vs Active Parameters"}
     page = _flight("".join(f'{{"downloadData":{json.dumps(t, separators=(",", ":"))}}}' for t in (wer_price, wer_speed, other)))
-    rows = collect.aa_stt_rows(page)
+    rows = aa_stt.aa_stt_rows(page)
     assert rows == [{"model": "MAI-Transcribe-2", "provider": "Microsoft AI", "wer": 0.0204,
                      "price_per_1k_min": 1.67, "speed_factor": 317.6}]
-    bench = collect.parse_benchmarks("aa_stt", {"rows": rows})
+    bench = parse.parse_benchmarks("aa_stt", {"rows": rows})
     wer = next(b for b in bench if b["task"] == "wer")
     assert wer["score"] == pytest.approx(97.96) and wer["extra"]["wer_pct"] == pytest.approx(2.04)   # higher = better
     assert wer["cost"] == pytest.approx(0.00167) and wer["cost_unit"] == "usd_per_audio_minute"
@@ -34,9 +40,9 @@ def test_agentset_entries_and_latency_as_speed():
                 "description": "ELO: 1629 | Win Rate: 57.7%", "avgLatencyMs": 500.0, "avgNdcg10": 0.09,
                 "costPer1MTokens": 0.05}]
     page = _flight('Last updated: ","February 15, 2026"]' + json.dumps({"entries": entries}, separators=(",", ":")))
-    board = collect.agentset_board(page)
+    board = agentset.agentset_board(page)
     assert board["updated"] == "February 15, 2026" and board["entries"][0]["score"] == 1629
-    rows = collect.parse_benchmarks("agentset", {"boards": {"rerank": board}})
+    rows = parse.parse_benchmarks("agentset", {"boards": {"rerank": board}})
     by_task = {r["task"]: r for r in rows}
     assert by_task["rerank"]["model_id"] == "rerank-4-pro" and by_task["rerank"]["extra"]["win_rate"] == 57.7
     assert by_task["rerank_speed"]["score"] == pytest.approx(2.0)   # 1000 / 500 ms
@@ -74,7 +80,7 @@ def test_service_offers_land_on_their_interface_with_comparable_prices():
          "architecture": {"input_modalities": ["text"], "output_modalities": ["rerank"]},
          "pricing": {"prompt": "0", "completion": "0"}},
     ]}
-    rows = {r["offer_key"]: r for r in collect.parse_offers("openrouter", doc)}
+    rows = {r["offer_key"]: r for r in parse.parse_offers("openrouter", doc)}
     whisper = rows["openai/whisper-large-v3-turbo"]
     assert whisper["interface"] == "transcription" and whisper["price_in_1m"] is None   # per second, not a token price
     sku = rows["openai/whisper-large-v3-turbo | Audio Seconds"]
