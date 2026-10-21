@@ -105,7 +105,13 @@ BENCH_TASK = {  # bench_task -> (fr, en)
     "intelligence": ("Intelligence Index", "Intelligence Index"), "decision": ("Decision Index", "Decision Index"),
     "wer": ("taux d'erreur (WER)", "word error rate"), "speed": ("vitesse", "speed"), "rerank": ("qualité", "quality"),
     "rerank_speed": ("vitesse", "speed"), "embeddings": ("qualité", "quality"),
-    "retrieval_fr": ("recherche en français", "French retrieval"), "trustworthiness": ("fiabilité", "trustworthiness")}
+    "retrieval_fr": ("recherche en français", "French retrieval"), "trustworthiness": ("fiabilité", "trustworthiness"),
+    "healthbench": ("HealthBench", "HealthBench"), "healthbench_pro": ("HealthBench Professional", "HealthBench Professional"),
+    "harvey_lab": ("Harvey LAB (juridique)", "Harvey LAB (legal)"), "critpt": ("CritPt (physique)", "CritPt (physics)"),
+    "gpqa": ("GPQA Diamond", "GPQA Diamond"), "scicode": ("SciCode", "SciCode"), "hle": ("Humanity's Last Exam", "Humanity's Last Exam"),
+    "lcr": ("long contexte (LCR)", "long context (LCR)"), "text_creative": ("écriture créative", "creative writing"),
+    "music_vocals": ("musique chantée", "vocal music"), "music_instrumental": ("musique instrumentale", "instrumental music"),
+    "aa_3d": ("AA-3D", "AA-3D"), "mmmu_pro": ("MMMU-Pro", "MMMU-Pro")}
 
 
 def boards_of(conn, task: str) -> tuple[str, str]:

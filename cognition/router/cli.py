@@ -283,9 +283,23 @@ def main(argv: list[str] | None = None) -> int:
     cl.add_argument("request")
     o = sub.add_parser("dossier", help="the task's pre-computed dossier (what the router reads)")
     o.add_argument("task")
+    q = sub.add_parser("research", help="collect sources now (all, or --source KIND…), store and understand them; no recompute")
+    q.add_argument("--source", action="append", dest="sources", help="source kind, e.g. aa_eval, mm, arena (repeatable)")
     sub.add_parser("instance-env", help="shell assignments of the instance bindings used by the cycle and the trigger")
     args = p.parse_args(argv)
 
+    if args.cmd == "research":
+        from walter_router.analysis import ingest
+        from walter_router.research import sources
+        unknown = sorted(set(args.sources or []) - set(sources.SOURCES))
+        if unknown:
+            print(json.dumps({"error": f"unknown source(s) {unknown}", "sources": sorted(sources.SOURCES)}))
+            return 1
+        with db.connect() as conn:
+            out = sources.collect_all(conn, ingest.store, only=args.sources)
+            conn.commit()
+        print(json.dumps(out, indent=1, default=str))
+        return 0
     if args.cmd == "instance-env":
         return _instance_env()
     if args.cmd == "migrate":

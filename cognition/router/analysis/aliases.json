@@ -54,7 +54,12 @@
   "openrouter": {},
   "aa": {},
   "da": {},
-  "mm": {},
+  "mm": {
+    "Suno v6": {
+      "model_id": "suno",
+      "reason": "AA Music 'Suno v6' = the Suno W.Alter runs: Kie ai-music-api/generate is called with model V6 (config/kie_media_schemas.json, request accepted 2026-10-02); docs.kie.ai lists V6, V6_MINI, V6_WILD"
+    }
+  },
   "codex": {},
   "declared": {},
   "arena": {

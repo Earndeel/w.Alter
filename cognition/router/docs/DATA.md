@@ -16,7 +16,8 @@ failing source keeps its last good one (view `latest_snapshots`). Freshness: `wa
 | kind | What | Where from |
 |---|---|---|
 | `aa` | AA Intelligence Index + cost per AA task, per model × reasoning level | artificialanalysis.ai model page (Next.js flight data), `research/benchmarks/aa.py` |
-| `mm` | AA multimodal arenas: text-to-image, text-to-video, image-to-video, TTS, speech-to-speech | artificialanalysis.ai leaderboard tables, `research/benchmarks/aa_media.py` |
+| `aa_eval` | AA evaluations per model × level (benchmark `aa_eval`, task = evaluation): HealthBench / HealthBench Professional (medical), Harvey LAB (legal), τ³-Banking, CritPt, GPQA, SciCode, HLE (science), MMMU-Pro (vision), AA-3D (Elo), AA-LCR (long context), IFBench, τ², Terminal-Bench Hard, GDPval, APEX-Agents, Omniscience, LiveCodeBench; fractions stored ×100 | AA model page + HealthBench pages (Next.js data), `research/benchmarks/aa_evaluations.py` |
+| `mm` | AA multimodal arenas: text-to-image, text-to-video, image-to-video, TTS, speech-to-speech, music (vocals, instrumental) | artificialanalysis.ai leaderboard tables, `research/benchmarks/aa_media.py` |
 | `da` | Design Arena: models (website, UI component, 3D, game, dataviz, SVG, logo, graphic design…) and agents (full-stack, mobile, native apps) | designarena.ai JSON API, `research/benchmarks/design_arena.py` |
 | `arena` | Arena.ai (LMArena), 15 boards: text, French, coding, creative, webdev, vision, document, search, agent, text-to-image, image edit, text-to-video, image-to-video, video edit, image-to-webdev | arena.ai/leaderboard/… (embedded page data; FlareSolverr on 403/503) |
 | `bridgebench` | BridgeBench: overall, backend, frontend, reasoning, security, speed, trustworthiness, efficiency, one-shot, cost | bridgebench.ai/leaderboard (through FlareSolverr 127.0.0.1:8191) |
@@ -48,7 +49,7 @@ Unmatched names are listed by `walter-router review` (`unmatched_candidates`) fo
 ## 4. Tasks and the owner's knowledge
 | Table | Content | Written by |
 |---|---|---|
-| `tasks` | The 33 tasks: label, `interface`, `default_objective`, `intent_hint` (for the classifier), `internal` (module postes never offered to the classifier), `requirements`, `consumers` | migrations + `declare` |
+| `tasks` | The 38 tasks: label, `interface`, `default_objective`, `intent_hint` (for the classifier), `internal` (module postes never offered to the classifier), `requirements`, `consumers` | migrations + `declare` |
 | `task_benchmarks` | Which boards rank a task and their **weights** (`weight`, `is_primary`) — shown on the library page under each task | migrations |
 | `preferences` | the owner's choices per task / role: objective (`best_available`, `value`, `level`), pin (model, variant, provider), role label/description/signals (video roles), `watch` | `knowledge.json` via `declare`, `prefer`, `verdict` |
 | `profiles` | What a model is *for*: strengths, weaknesses, workflow, effort, access / cost notes | `knowledge.json` |
@@ -92,3 +93,8 @@ select at, task, provider, model, ok, seconds from models.exec_log where model_i
 ```
 CLI equivalents: `walter-router library` (the full table), `pick <task>`, `dossier <task>`, `status`, `health`,
 `alerts`, `review`. Web: https://the instance library domain (host.json library_domain) (English) and /fr/.
+
+## 9. Collecting by hand
+`walter-router research [--source KIND …]` fetches sources now (all, or the given kinds: `aa`, `aa_eval`, `mm`, `da`,
+`arena`, `bridgebench`, `aa_decision`, `aa_stt`, `agentset`, `mteb`, `openrouter`, `kie`, `codex`, `declared`,
+`hermes_providers`), stores and understands them; then `walter-router refresh --skip-collect` recomputes the choices.

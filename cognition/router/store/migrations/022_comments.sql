@@ -8,7 +8,7 @@ comment on table models.benchmarks is 'Measured quality per snapshot: benchmark 
 comment on table models.offers is 'Callable, priced offers per snapshot: provider, interface, access (paid/subscription/ui/free), $/M tokens or unit price, media modes/resolution/audio, normalised price (per second, image, 1000 chars, minute)';
 comment on table models.provider_status is 'Last live 5-token probe per provider (OpenRouter credit in detail); a failed provider goes last in routes';
 comment on table models.tasks is 'Router tasks: interface, default objective, intent_hint for the classifier, internal (module postes never offered to the classifier), requirements, consumers';
-comment on table models.task_benchmarks is 'Boards that rank each task and their weights (scoring.composite); shown under each task on the library page';
+comment on table models.task_benchmarks is 'Boards that rank each task and their weights (scoring.composite); shown under each task on the library page. Sources: AA (intelligence, evaluations aa_eval, media aa_mm, decision, STT), Arena, Design Arena, BridgeBench, Agentset, MTEB';
 comment on table models.preferences is 'the owner''s choices per task / role: objective, pinned model/variant/provider, role label, description and signals, watch. A change of favourite only through their verdict';
 comment on table models.profiles is 'What a model is for (knowledge.json): strengths, weaknesses, workflow, effort, access and cost notes';
 comment on table models.affinities is 'Close calls: the owner''s preferred model inside the tie margin (knowledge.json)';

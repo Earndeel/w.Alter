@@ -7,7 +7,7 @@ Text tiers method: `docs/TIERS.md`. Other modules only use the `walter-router` c
 ## Layout (2026-10-21, decided by the owner)
 | Folder | Part | Content |
 |---|---|---|
-| `research/` | **Research** — goes and fetches, periodically, by API or straight from the page | `benchmarks/` one module per site (AA, AA Decision, AA STT, Arena, Design Arena, BridgeBench, Agentset, MTEB) · `prices/` OpenRouter, Kie, Codex catalogue, Hermes providers, declared offers · `plans/` subscriptions (meters, real usage, plan values; `quota_watch` service) · `agent/` the 48 h research agent (prompt + cycle digest) · `web.py` shared web access (FlareSolverr, Next.js data) · `sources.py` registry, snapshots retention |
+| `research/` | **Research** — goes and fetches, periodically, by API or straight from the page | `benchmarks/` one module per site (AA intelligence, AA evaluations — medical, legal, science, vision, 3D, long context, agents —, AA media incl. music, AA Decision, AA STT, Arena, Design Arena, BridgeBench, Agentset, MTEB) · `prices/` OpenRouter, Kie, Codex catalogue, Hermes providers, declared offers · `plans/` subscriptions (meters, real usage, plan values; `quota_watch` service) · `agent/` the 48 h research agent (prompt + cycle digest) · `web.py` shared web access (FlareSolverr, Next.js data) · `sources.py` registry, snapshots retention |
 | `analysis/` | **Analysis** — understands the data, organises the DB, keeps the active library, tells the owner | `parse` + `ingest` (snapshots → benchmarks / offers with identities) · `identity`, `aliases`, `media`, `catalog` · `knowledge` (owner's declarations) · `scoring`, `select`, `tiers`, `decision_pareto`, `postes`, `dossier` · `changes`, `alerts` (Telegram, buttons), `recommend` · `refresh` = the cycle |
 | `interface/` | **Interface** — the model library page | `library` (rows, publish), `page` (HTML), `translate` (English), `site/` (Cloudflare Pages functions) |
 | `serve/` | What Walter calls at run time | `choose` (pick), `intent` (decision model), `execution` (routes, probes), `media_exec` (generation), `hermes_sync` |
@@ -212,3 +212,11 @@ bin/walter-router verdict <alert_id> adopted|dismissed [--note ...]   # adopted 
 bin/walter-router status
 ```
 Tests: `venv/bin/python -m pytest -q tests` (DB tests run inside a rolled-back transaction).
+
+## Specialised tasks (2026-10-21)
+`medical` (AA HealthBench Professional 60 % + HealthBench 40 %), `legal` (AA Harvey LAB), `science` (AA CritPt 35 %,
+GPQA 35 %, SciCode 15 %, HLE 15 %), `long_context` (AA-LCR), `writing` (Arena creative writing 60 % + French 40 %),
+`music` (AA Music vocals + instrumental; Kie's Suno is called with model V6 = AA « Suno v6 »). 3D now also weighs AA-3D
+(20 %), vision MMMU-Pro (40 %). New tasks start unpinned (best callable model); a later #1 is only proposed. Intent
+eval after adding them: 37/38 (the original 30 all pass; « photo of a mole » goes to medical instead of vision).
+`walter-router research [--source KIND]` collects by hand (docs/DATA.md § 9).
