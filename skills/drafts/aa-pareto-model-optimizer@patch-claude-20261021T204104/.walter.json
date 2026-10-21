@@ -1,0 +1,11 @@
+{
+ "base_sha": "d0b79a19135669d98449074ed6722ef55ee6043c85bba32d946bbdec2166a129",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-21T20:41:04.521760+00:00",
+ "domain": "research",
+ "kind": "patch",
+ "reason": "Absorbed into Walter Router research (owner, 2026-10-21: « absorber aa-pareto-model-optimizer pour l'intégrer dans research »). The router now collects AA Intelligence (Next.js data of an AA model page), AA media leaderboards (server-rendered tables) and Design Arena (JSON API) itself, without Playwright — verified identical rows to this skill's cache on the same data (AA 696, media 275, DA 1733) and stored in production; make_frontier/ladder_knee copied to /walter/router/analysis/pareto.py. The router cycle no longer runs ~/.hermes/scripts/aa_pareto_daily_refresh.py, so this skill's cache is no longer refreshed: the skill must say so and send routing questions to the router; it stays the procedure for ad-hoc Pareto reports.",
+ "runtime": "claude",
+ "session_id": null,
+ "target": "aa-pareto-model-optimizer"
+}
