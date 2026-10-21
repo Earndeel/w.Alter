@@ -26,7 +26,10 @@ def test_checkpoint_summary_retains_original_refs_and_reduces_tool_traffic():
     from walter_context.compress.layers import record
     messages = conversation(4)
     result = summarize(messages)
-    assert all(m['content'] in result['content'] for m in messages if m['role']=='user')
+    from walter_context.compress.wire import strip_injected
+    # the owner's own text in full; Walter's per-turn injections (<memory-context>…) are not the owner's words
+    assert all(strip_injected(m['content']).strip() in result['content'] for m in messages if m['role']=='user')
+    assert '<memory-context>' not in result['content']
     assert result['output_tokens'] < result['input_tokens']
     assert 'call_0_0' in result['content']
 

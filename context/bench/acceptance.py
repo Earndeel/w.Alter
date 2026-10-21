@@ -1,7 +1,8 @@
 """Versioned, synthetic, offline retention acceptance. Never reads user history.
 
 The predeclared gate is exact user and assistant text visibility, all tool
-references, no input mutation and safe refusal. Visual understanding is not
+references, no input mutation and safe refusal; since lot 2 (2026-10-21) also the
+owner's text in the projection record at both its levels (full and one line). Visual understanding is not
 silently counted as model-visible because logs exist.
 This does not qualify model answer quality or activate the Hermes projection.
 """
@@ -15,10 +16,10 @@ from pathlib import Path
 from walter_context import load
 from walter_context.compress.checkpoint import summarize
 from walter_context.compress.layers import record
-from walter_context.compress.wire import tokens,text_of
+from walter_context.compress.wire import tokens,text_of,turn_starts
 
 VERSION='synthetic-retention-v1'
-THRESHOLDS={'user_text_visibility':1.0,'assistant_text_visibility':1.0,'tool_reference_coverage':1.0,
+THRESHOLDS={'user_text_visibility':1.0,'projection_user_text_visibility':1.0,'assistant_text_visibility':1.0,'tool_reference_coverage':1.0,
             'expected_refusals':1.0,'input_mutation':0,'semantic_quality':'not_evaluated'}
 
 
@@ -92,9 +93,14 @@ def evaluate(case):
             row['question']=case['question'];row['gold_answer_supported']=case['gold'] in content
             row['pass'] &= row['gold_answer_supported']
         if case.get('ordered'):row['pass'] &= [content.index(x) for x in case['ordered']]==sorted(content.index(x) for x in case['ordered'])
-        # Compare the old capped record renderer to expose what the new invariant improves.
-        baseline=record(messages[1:],load().projection,lambda m:text_of(m.get('content')))['content']
-        row['legacy_record_user_text_visible']=sum(x in baseline for x in users)
+        # Projection (request-only hosts) renders the same record; its one-line level must keep the owner's text
+        # whole too (whitespace folded). Both levels are checked on every accepted case.
+        cfg=load().projection;body=messages[1:];n=len(turn_starts(body)) or 1
+        full=record(body,cfg,None)['content'];brief=record(body,cfg,None,0,n)['content']
+        fold=lambda x:' '.join(x.split())  # noqa: E731
+        row['projection_user_text_visible']=sum(x in full and fold(x) in brief for x in users)
+        row['projection_brief_tokens_estimate']=tokens([{'role':'user','content':brief}])
+        row['pass'] &= row['projection_user_text_visible']==len(users)
     row['limitations']=case.get('limits',[])
     return row
 

@@ -177,3 +177,28 @@ def test_select_is_fast_on_long_cloned_histories():
         s.select(cur)
         dt = time.perf_counter() - t
     assert dt < 0.25, dt
+
+
+def test_condensing_keeps_every_owner_request_until_the_whole_share_is_exceeded():
+    """Lot 2 ladder: one line per old turn first, the owner's request whole; omission only past the whole share,
+    and then the record says so."""
+    from walter_context.compress.policy import condense
+    from walter_context.compress.wire import strip_injected
+    m = conversation(60, calls=2, out_chars=2000)
+    for k, msg in enumerate(m):
+        if msg["role"] == "user":
+            msg["content"] = f"request {k}: keep /srv/x-{k} unchanged, never publish before approval" + \
+                             "\n\n<memory-context>recall</memory-context>"
+    cut = len(m) - 6
+    ep = Epoch(anchor(m, cut), anchor(m, cut))
+    prof = replace(CFG.profiles[-1], effective_budget=20000)
+    dense = condense(m, ep, project(m, ep, P), CFG, prof, 1.0)
+    rec = project(m, dense, P).messages[1]["content"]
+    assert dense.omit is None and "omitted" not in rec
+    owner = [strip_injected(x["content"]) for x in m[1:cut] if x["role"] == "user"]
+    assert all(" ".join(o.split()) in rec for o in owner)
+    # a budget too small even for one line per turn omits the oldest turns, explicitly
+    tiny = replace(CFG.profiles[-1], effective_budget=2000)
+    dense = condense(m, ep, project(m, ep, P), CFG, tiny, 1.0)
+    rec = project(m, dense, P).messages[1]["content"]
+    assert dense.omit is not None and "the owner's requests included" in rec

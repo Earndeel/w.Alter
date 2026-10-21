@@ -11,6 +11,11 @@ Consequences, which are the whole point:
   * between boundaries the payload grows by appending only, so every call re-reads the previous one from cache;
   * at a boundary, what was already compacted renders to the same bytes, so the prefix up to it stays cached;
   * nothing is lost: compacted tool outputs keep a ref (their call id) into the session journal.
+
+Retention ladder, the same for every host contract (projection here, checkpoint in checkpoint.py):
+    tool outputs → digest + ref · reasoning → not replayed · assistant text → verbatim, then one line ·
+    the owner's text → verbatim at every level; a turn leaves the record only past its whole budget, and the record
+    then says so (never silently).
 """
 from __future__ import annotations
 
@@ -129,7 +134,7 @@ def compact(m: Message, names: dict[str, str], cfg: Cfg, base: Base | None) -> M
     """One message as it appears in the compact zone (None = nothing left worth sending)."""
     role = m.get("role")
     if role == "user":
-        return {"role": "user", "content": clip(_user_text(m, base), cfg.text_clip_chars)}
+        return {"role": "user", "content": _user_text(m, base)}
     if role == "assistant":
         text = clip(text_of(m.get("content")).strip(), cfg.text_clip_chars)
         tcs = [{"id": cid, "type": "function", "function": {"name": name, "arguments": digest.clip_args(args, cfg.args_chars)}}
@@ -150,40 +155,50 @@ def compact(m: Message, names: dict[str, str], cfg: Cfg, base: Base | None) -> M
     return {k: m[k] for k in ("role", "content", "name") if k in m}
 
 
-def _turn_entry(turn: list[Message], names: dict[str, str], cfg: Cfg, base: Base | None) -> str:
-    users = [_user_text(m, base) for m in turn if m.get("role") == "user"]
-    results = {str(m.get("tool_call_id") or ""): text_of(m.get("content")) for m in turn if m.get("role") == "tool"}
-    actions = []
+def _results(msgs: list[Message]) -> dict[str, str]:
+    return {str(m.get("tool_call_id") or ""): text_of(m.get("content")) for m in msgs if m.get("role") == "tool"}
+
+
+def dialogue(turn: list[Message], results: dict[str, str], cfg: Cfg, base: Base | None) -> str:
+    """One turn, full level: every owner and visible assistant text verbatim, in order, and every action with its
+    status and ref. Tool payloads stay behind their refs; reasoning is not replayed. Shared by both host contracts."""
+    out: list[str] = []
+    called = set()
     for m in turn:
-        if m.get("role") != "assistant":
-            continue
-        for cid, name, args in calls(m):
-            status = digest.status_of(results.get(cid, ""))
-            line = digest.args_summary(name, args, cfg.args_chars)
-            line += f" → {status}" if status else ""
-            line += f" · ref {cid}" if cid and len(results.get(cid, "")) > cfg.tool_keep_chars else ""
-            actions.append("- " + line)
-    answer = next((text_of(m.get("content")).strip() for m in reversed(turn)
-                   if m.get("role") == "assistant" and text_of(m.get("content")).strip()), "")
-    out = []
-    if users:
-        out.append(f"## {cfg.user_label}\n" + clip("\n\n".join(users).strip(), cfg.record_user_chars))
-    if actions:
-        extra = len(actions) - cfg.record_actions
-        shown = actions[:cfg.record_actions] + ([f"- … +{extra} more actions"] if extra > 0 else [])
-        out.append("## Actions\n" + "\n".join(shown))
-    if answer:
-        out.append(f"## {cfg.assistant_label}\n" + clip(answer, cfg.record_assistant_chars))
+        role = m.get("role")
+        if role == "user":
+            text = _user_text(m, base).strip()
+            if text:
+                out.append(f"## {cfg.user_label}\n{text}")
+        elif role == "assistant":
+            text = text_of(m.get("content")).strip()
+            if text:
+                out.append(f"## {cfg.assistant_label}\n{text}")
+            actions = []
+            for cid, name, args in calls(m):
+                called.add(cid)
+                line = "- " + digest.args_summary(name, args, cfg.args_chars)
+                status = digest.status_of(results.get(cid, ""))
+                line += f" → {status}" if status else ""
+                line += f" · ref {cid}" if cid else ""
+                actions.append(line)
+            if actions:
+                out.append("## Actions\n" + "\n".join(actions))
+        elif role == "tool":
+            cid = str(m.get("tool_call_id") or "")
+            if cid not in called:     # an output whose call is outside the span keeps its own ref line
+                out.append(f"## Tool result\nref {cid} · original through context_recover")
     return "\n".join(out)
 
 
 def _brief_entry(turn: list[Message], cfg: Cfg, base: Base | None) -> str:
-    user = " ".join(_user_text(m, base) for m in turn if m.get("role") == "user")
+    """One turn, one-line level: the owner's request in full (whitespace folded), the answer in one line."""
+    user = " ".join(" ".join(_user_text(m, base).split()) for m in turn if m.get("role") == "user")
     n = sum(len(calls(m)) for m in turn if m.get("role") == "assistant")
     answer = next((text_of(m.get("content")) for m in reversed(turn)
                    if m.get("role") == "assistant" and text_of(m.get("content")).strip()), "")
-    line = "- " + (one_line(user, 200) if user else "(no request)")
-    line += f" → {one_line(answer, 160)}" if answer else ""
+    line = "- " + (user if user else "(no request)")
+    line += f" → {one_line(answer, cfg.brief_answer_chars)}" if answer else ""
     return line + (f" ({n} actions)" if n else "")
 
 
@@ -200,7 +215,7 @@ def record(body: list[Message], cfg: Cfg, base: Base | None, omit: int = 0, brie
     """Earlier turns as one inert message: `omit` oldest turns dropped, then `brief` turns as one line each, then
     full entries. Entries are appended, never rewritten, so a longer record extends the bytes of a shorter one and a
     provider prefix cache still covers what was already sent."""
-    names = _tool_names(body)
+    results = _results(body)
     out = [RECORD_HEADER]
     full: list[str] = []
     lines: list[str] = []
@@ -211,12 +226,13 @@ def record(body: list[Message], cfg: Cfg, base: Base | None, omit: int = 0, brie
         level = "brief" if k < omit + brief else "full"
         key = (level, fingerprint(turn[0]), fingerprint(turn[-1]), len(turn))
         render = (lambda t=turn: _brief_entry(t, cfg, base)) if level == "brief" else \
-                 (lambda t=turn: _turn_entry(t, names, cfg, base))
+                 (lambda t=turn: dialogue(t, results, cfg, base))
         text = cache.entry(key, render) if cache is not None else render()
         if text:
             (lines if level == "brief" else full).append(text)
     if omit:
-        out.append(f"\n\n[{omit} earlier turns omitted here: they remain in the session journal and in long-term memory.]")
+        out.append(f"\n\n[{omit} earlier turns omitted here, the owner's requests included, because the record exceeded its"
+                   f" whole budget: they remain in the session journal and in long-term memory.]")
     if lines:
         out.append("\n\n" + "\n".join(lines))
     out.extend("\n\n---\n" + e for e in full)
@@ -263,12 +279,12 @@ def describe(view: View) -> str:
 def entry_sizes(body: list[Message], cfg: Cfg, base: Base | None = None,
                 cache: Cache | None = None) -> tuple[list[int], list[int]]:
     """Estimated tokens of each turn's record entry, (full, brief): what condensing the record would save."""
-    names = _tool_names(body)
+    results = _results(body)
     full, brief = [], []
     for a, b in spans(body):
         turn = body[a:b]
         key = (fingerprint(turn[0]), fingerprint(turn[-1]), len(turn))
-        f = cache.entry(("full",) + key, lambda: _turn_entry(turn, names, cfg, base)) if cache else _turn_entry(turn, names, cfg, base)
+        f = cache.entry(("full",) + key, lambda: dialogue(turn, results, cfg, base)) if cache else dialogue(turn, results, cfg, base)
         s = cache.entry(("brief",) + key, lambda: _brief_entry(turn, cfg, base)) if cache else _brief_entry(turn, cfg, base)
         full.append(len(f) // 4 + 2)
         brief.append(len(s) // 4 + 1)

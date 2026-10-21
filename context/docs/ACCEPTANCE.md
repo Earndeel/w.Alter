@@ -1,4 +1,4 @@
-# Context acceptance — 2026-10-18
+# Context acceptance — 2026-10-18, extended 2026-10-21 (lot 2)
 
 The corpus is synthetic, versioned (`synthetic-retention-v1`), and uses no user
 history, credentials, network or model calls. Its 14 cases cover ordinary tools,
@@ -43,3 +43,22 @@ token accounting, no full multimodal understanding, clipped action arguments,
 tool payload retrieval required. The lossy Hermes projection is a different mode
 and remains inactive; this corpus does not qualify it. Codex/Claude compaction
 remains native. Run `walter-context acceptance` to reproduce the deterministic gate.
+
+## Lot 2 (2026-10-21): one record for both host contracts
+
+The checkpoint and the projection now render the same record (`layers.dialogue`). The gate gains
+`projection_user_text_visibility` = 1.0, checked on every accepted case at both projection levels:
+- *full*: the owner's text is verbatim;
+- *one line*: the owner's text is whole, with whitespace folded.
+
+Same corpus (same SHA-256), same thresholds otherwise:
+
+| Same 14-case corpus | Lot 0 | Lot 2 |
+|---|---:|---:|
+| Failed cases | 0 | 0 |
+| Safe expected refusals | 5 | 5 |
+| Checkpoint output estimate | 9,532 | 7,882 (status folded into each action line) |
+| Projection owner text visible | not gated (legacy record clipped at 1,200 chars) | 100%, both levels |
+
+Real-history replay, same 21 A8 chains (1,137 calls): 58.4k → 59.6k tokens per call (+2%), uncached 3,358 → 3,375,
+cost 0.648 → 0.657 of the uncompressed history. Hermes real: 72.2k, 4,631, 0.717.

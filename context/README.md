@@ -37,14 +37,17 @@ payload = head | record | compact | live
   the same bytes, so the prefix stays cached.
 - **Boundaries are priced** (`compress/policy.py`) against the model profile: cached/write costs, TTL and calls per
   turn. Past the effective budget, quality wins over cache.
-- **Two host contracts today:**
-  - *projection*: request-only. The host keeps its history (`Session.select/observe/turn_complete/compact_all`).
-  - *checkpoint*: the host persists a replacement record (`checkpoint.plan/summarize`, through `bridge`). It
-    retains all user and visible assistant text, or refuses.
+- **One record, one retention ladder, two host contracts.** *Projection* is request-only: the host keeps its
+  history (`Session.select/observe/turn_complete/compact_all`). *Checkpoint* means the host persists the record
+  (`checkpoint.plan/summarize`, through `bridge`). Both render the same record (`layers.dialogue`): every owner and
+  visible assistant text verbatim and in order, every action with its status and ref. The ladder is:
+  - tool outputs go to a digest plus a ref;
+  - reasoning is not replayed;
+  - old turns go to one line, but the owner's request is kept whole;
+  - a turn is omitted only when even one line per turn exceeds the record's whole share, and the record then says so.
 
-  Lot 2 merges them into one planner with one retention ladder (verbatim → digest + ref → one line → omitted,
-  recoverable). The fixed sacrifice order is tool outputs, then reasoning, then answers, then owner messages last.
-  When retention cannot fit, the engine refuses explicitly.
+  Checkpoint keeps its stricter rule: if the full dialogue does not fit, it refuses, so DSH keeps its surface.
+  Per-turn Walter injections (`<memory-context>`, `<walter-context>`) are not the owner's words and are not copied.
 - **Nothing is lost.** A compacted tool output keeps its call id as `ref`, and `walter-context recover <ref>` reads
   the original.
 
