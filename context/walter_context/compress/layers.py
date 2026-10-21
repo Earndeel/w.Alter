@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from . import digest
-from .config import Projection as Cfg
+from ..config import Projection as Cfg
 from .wire import Message, calls, clip, fingerprint, is_head, one_line, strip_injected, text_of, tokens, turn_starts
 
 Base = Callable[[Message], Optional[str]]   # host hook: the user text without per-turn injections, or None

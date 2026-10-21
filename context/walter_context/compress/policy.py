@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from .config import Config, Profile
+from ..config import Config, Profile
 from .layers import Cache, Epoch, View, anchor, body_start, entry_sizes, project, resolve, spans
 from .wire import Message, chars, step_starts, turn_starts, wire_hash
 

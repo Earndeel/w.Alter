@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import sys
 
-from . import checkpoint
+from .compress import checkpoint
 
 
 def dispatch(request: dict) -> dict:

@@ -1,6 +1,6 @@
 from dataclasses import replace
 import pytest
-from walter_context.checkpoint import summarize
+from walter_context.compress.checkpoint import summarize
 from walter_context import load
 
 @pytest.mark.parametrize('role', ['system', 'developer'])

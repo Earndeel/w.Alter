@@ -6,7 +6,7 @@ API. The checkpoint policy and rendering still belong here, not in the host.
 """
 from __future__ import annotations
 
-from .config import Config, load
+from ..config import Config, load
 from .layers import body_start, RECORD_HEADER
 from . import digest
 from .wire import Message, tokens, turn_starts, text_of, calls

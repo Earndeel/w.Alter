@@ -1,49 +1,30 @@
 # walter-context
 
-Walter owns context policy and rendering in a runtime-neutral Python 3.11+ stdlib
-core. A port connects that core to the host's supported context interface. The
-core has two modes with different retention guarantees; installing one port does
-not qualify the other.
+Decides what enters a model's window on each call: what, how much, where and in what form. The target has no
+sessions and is dynamic. Activity is cut into threads that cross sessions and runtimes. Context is recomputed for each
+owner message, then stays stable for the turn so the provider cache keeps working. History is compressed without
+silent loss. The core is runtime-neutral Python 3.11+ stdlib. Hosts plug in through `ports/`.
 
-## Public modes
+Spec, plan and measurements: `docs/walter-memory/CONTEXT-ENGINE.md` (instance documentation). Dated decisions:
+`DECISIONS.md` next to it.
 
-| Mode | Host interface | Model-visible retention | Durable source |
-| --- | --- | --- | --- |
-| Checkpoint | `checkpoint.plan` / `checkpoint.summarize`, versioned JSON/stdin bridge; DSH compaction service | Full user and visible assistant text in the selected span, including previous checkpoints, or explicit refusal. All tool-result call ids remain references. Action arguments are clipped; tool contents and reasoning are not copied in full. | DSH owns the append-only journal, replacement transaction and replay. |
-| Projection | `Session.select / observe / turn_complete / compact_all`; Hermes `ContextEngine` port | Cache-oriented `head → record → compact → live`. Older user/assistant text can be clipped, reduced to one line or omitted. | The host and Walter Logs own persistence. A recoverable source is not the same as a constraint visible to the model. |
+## Sub-modules
 
-No mode has a general proof of semantic answer quality. Preserving text does not
-prove that a model will obey every constraint in that text. Tool references make
-original evidence recoverable; they do not put the full evidence in every request.
+| Sub-module | Role | State |
+|---|---|---|
+| `compress` | The compression engine: history in, its most useful form for the budget out | built (projection + checkpoint) |
+| `recover` | Originals behind compacted refs, read from walter_logs with privacy classes applied | built |
+| `config` | The only tunables (`config/walter-context.toml`): projection, policy, model profiles | built |
+| `bridge` | Versioned JSON bridge for out-of-process hosts (DSH) | built |
+| `sense` | Local pre-selection: candidate threads and memory from local embeddings, entities, recency | plan, lot 4 |
+| `decide` | Context plan from the decision model: which thread, what context | plan, lot 4 |
+| `gather` | Thread notebook, verbatim excerpts (walter_logs), memory (reranked only when over budget) | plan, lot 4 |
+| `compose` | Layers ordered from stable to volatile, one budget, provider cache markers | plan, lot 4 |
 
-## Checkpoint mode
+Threads and their notebooks belong to Walter Memory. They are derived, revisable data with provenance.
+walter-context reads them and renders them. It never writes them.
 
-Walter selects older completed turns when measured pressure reaches the smaller
-of its model profile's effective budget and the host's input capacity. Automatic
-selection retains the live user turn plus `projection.keep_turns` completed turns.
-DSH supplies input capacity after reserving output tokens. Manual `/compact`
-selection remains DSH's policy; summary rendering still uses Walter.
-
-The extractive record preserves every user and visible assistant text, in chronological order and without content truncation, and
-all tool-result call ids, including after repeated checkpoints. Boundary whitespace
-can be normalized. The result must fit `policy.record_share` of the effective
-budget, using the core's approximate token estimator. With the current config,
-that share is 30%. If preservation cannot fit, compaction is refused instead of
-silently dropping constraints. An in-history `system` or `developer` message also
-refuses compaction: flattening its role into a user record would change authority.
-Automatic selection leaves leading head messages outside the selected range.
-The DSH port identifies the injected global system head by its durable id; every
-privileged role inside the replacement span is refused, including its first node.
-
-DSH independently validates tool pairing, locking, stable selection and that the
-framed replacement actually shrinks its source. A bridge failure, an oversized
-record or an unsupported instruction span leaves the original surface intact;
-there is no automatic native LLM summary fallback. A conversation can therefore
-reach a visible context-limit error when its preserved text or live turn is too
-large. Repeated checkpoints retain previous checkpoint text, so their size can
-grow until that explicit limit is reached.
-
-## Projection mode
+## The compression engine (`compress`)
 
 ```text
 payload = head | record | compact | live
@@ -51,81 +32,45 @@ payload = head | record | compact | live
           rows   as inert record  clipped text    with original sidecars
 ```
 
-Each zone is a pure projection; cut points move forward. Between boundaries the
-view grows by appending, and already-rendered compacted entries remain stable.
-This aims to preserve provider prefix-cache reuse; cache hits depend on the
-provider and model, not just on the local projection.
+- **Journal is truth, payload is a projection.** Every zone is a pure function of what it covers. Cut points only
+  move forward. Between boundaries the payload only grows, and at a boundary already-compacted entries render to
+  the same bytes, so the prefix stays cached.
+- **Boundaries are priced** (`compress/policy.py`) against the model profile: cached/write costs, TTL and calls per
+  turn. Past the effective budget, quality wins over cache.
+- **Two host contracts today:**
+  - *projection*: request-only. The host keeps its history (`Session.select/observe/turn_complete/compact_all`).
+  - *checkpoint*: the host persists a replacement record (`checkpoint.plan/summarize`, through `bridge`). It
+    retains all user and visible assistant text, or refuses.
 
-`policy.py` prices moves using each model profile's cached/write costs and session
-calls per turn. Past the effective budget it favors a view under budget. At high
-pressure it may compact older live-turn steps; the most recent steps remain
-verbatim. A record over its configured share can reduce old turns to short lines
-and then omit them from the view. This mode can consequently remove user
-constraints from the model's immediate context. Journal retrieval does not repair
-that omission automatically, and long-term memory is not guaranteed to contain
-every omitted turn.
+  Lot 2 merges them into one planner with one retention ladder (verbatim → digest + ref → one line → omitted,
+  recoverable). The fixed sacrifice order is tool outputs, then reasoning, then answers, then owner messages last.
+  When retention cannot fit, the engine refuses explicitly.
+- **Nothing is lost.** A compacted tool output keeps its call id as `ref`, and `walter-context recover <ref>` reads
+  the original.
 
-Hermes' `select_context` changes the outbound view. The separate emergency
-`compress` callback returns a compressed list to the host, whose lifecycle owns
-its persistence. Both paths require qualification before enabling this port.
+No mode has a general proof of semantic answer quality. Tool references make evidence recoverable; they do not put
+it in every request.
 
-## Layout and commands
+## Ports
 
-```text
-walter_context/       wire, digest, layers, policy, session, config, journal
-                     checkpoint, bridge, cli
-config/walter-context.toml  shared projection/policy/model tunables
-ports/hermes/         public ContextEngine port (currently inactive)
-ports/dsh/            public DSH compaction port
-bench/replay.py       local journal replay: sizes, simulated cache/cost, latency
-bench/quality.py      cloud-safe quality samples; estimate by default
-bench/acceptance.py   versioned synthetic exact-retention corpus, offline
-```
+| Host | Contract | State |
+|---|---|---|
+| DSH | public compaction transaction (`ports/dsh`, checkpoint) | active on new launches |
+| Hermes | public `ContextEngine` (`ports/hermes`, projection) | built, not activated. Hermes runs its native compressor (walter-compress retired 2026-10-21) until lot 6 |
+| Claude Code, Codex | native compaction; additive context only through hooks / MCP | lot 4 |
+
+## Commands
 
 ```bash
-/opt/walter-context/bin/walter-context bench --a8 --sessions 40
-/opt/walter-context/bin/walter-context quality --samples 30
-/opt/walter-context/bin/walter-context acceptance
-/opt/walter-context/bin/walter-context recover <call-id> --offset 0
-/root/.hermes/hermes-agent/venv/bin/python -m pytest -q /opt/walter-context/tests
-node /opt/walter-context/tests/test_dsh.mjs
+walter-context recover <call-id> [--offset N]     # original of a compacted output
+walter-context bench --sessions 40                # replay: tokens, simulated cache, cost
+walter-context acceptance                         # synthetic exact-retention corpus, offline
+walter-context quality --samples 30               # judged retention, estimate by default
+walter-context threads --gold FILE --mode both    # thread attachment on the real stream; --decide adds the decision model
+walter-python -m pytest -q tests                  # from the module root
+node tests/test_dsh.mjs
 ```
 
-Only `quality --run` requests judging calls through the backfill budget. Its
-cloud-safe sampling excludes entire chains containing events not classified
-`cloud_allowed`; local replay and source recovery have separate privacy rules.
-
-## Ports and verified scope
-
-- **DSH 0.2.0-rc.2:** configured to replace `compaction-basic` with the Walter port
-  on new launches. Automatic planning and record rendering belong to Walter;
-  transaction, replay, token meter and manual range selection belong to DSH.
-  See [ports/dsh/README.md](ports/dsh/README.md).
-- **Hermes:** implemented but inactive; the inspected `context.engine` remains
-  `walter-compress`, a legacy Hermes adapter. Its replacement has not passed
-  semantic retention qualification. The port honors smaller host budgets, resets
-  core session state and inherited usage/compression counters, and scopes journal
-  recovery to an exact session.
-- **Claude Code / Codex:** keep their native runtime, model and compaction. Walter
-  memory and tools are attached through their supported hooks/MCP interfaces.
-- **Future runtimes:** choose the mode matching their public host contract.
-  Request-only projection must not rewrite an event-sourced host's immutable
-  journal-derived requests.
-
-Qualification uses 27 Python tests and 9 Node tests. Node exercises real DSH
-Session, CompactionEngine, ToolRuntime, transactions and replay with synthetic
-histories, including repeated checkpoints and paged recovery of evidence in the
-middle of a large tool result. Provider metadata and metering are fixtures.
-
-The versioned 14-case synthetic acceptance corpus passes exact retention of user
-and visible assistant text, all tool references, input immutability, chronological
-superseding decisions and five expected refusals. On identical inputs the prior
-checkpoint failed the two assistant-detail cases; the current record keeps both
-answers, including an intermediate explanation attached to a tool call. Nine
-accepted cases shrink from about 335,910 to 9,532 estimated tokens (97.16%). This
-tool-heavy synthetic gain is not a prediction for real conversations. Tests make
-no model calls, measure no provider cache behavior, and do not establish semantic
-answer quality or qualify the Hermes projection. See `docs/ACCEPTANCE.md`.
-
-Design references: `/root/.hermes/docs/walter-memory/CONTEXT-ENGINE.md`,
-`HARNESS-CONTRACT.md`, `PLAN.md` and dated `DECISIONS.md` entries.
+`threads` reads walter_logs and embeds locally. Only `--decide` and `quality --run` call a model, through
+`walter_memory.llm`, and they send `cloud_allowed` data only. Reference sets that contain the owner's data live in
+the instance (`@instance/state/context/`), never in this module.

@@ -4,11 +4,11 @@
     "contracts/context.json",
     "ports/dsh/index.mjs",
     "ports/hermes/__init__.py",
-    "walter_context/session.py"
+    "walter_context/compress/session.py"
   ],
   "requires": [],
   "external": [
-    "Optional Walter Logs for Hermes journal recovery; DSH uses own raw journal"
+    "Walter Logs (recover: originals of compacted outputs); DSH keeps its own raw journal"
   ],
   "data": [
     "per-session projection epochs; recoverable originals in logs"
@@ -20,19 +20,20 @@
     "."
   ],
   "interfaces": [
-    "Python Session",
+    "Python Session (walter_context.compress)",
     "Hermes ContextEngine adapter",
-    "DSH CompactionEngine adapter"
+    "DSH CompactionEngine adapter",
+    "CLI walter-context"
   ],
   "bindings": {
-    "hermes": "see live context.engine in harness check",
+    "hermes": "native compressor until walter-context replaces it (plan lot 6)",
     "dsh": "Walter compaction adapter",
     "codex": "native compaction",
     "claude-code": "native compaction"
   },
   "limitations": [
     "DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.",
-    "Hermes remains on walter-compress; walter-context projection is not activated.",
+    "Hermes runs its native compressor (walter-compress retired 2026-10-21); the walter-context Hermes port is not activated.",
     "Structural and known-answer tests do not certify semantic model quality."
   ],
   "services": [],
@@ -42,10 +43,10 @@
   ],
   "contract": {
     "schema_version": 1,
-    "version": "1.0.0",
+    "version": "1.1.0",
     "owner": "context",
     "kind": "capability",
-    "purpose": "Construire le contexte et les checkpoints selon le contrat de chaque harness.",
+    "purpose": "Décider de ce qui entre dans la fenêtre d'un modèle à chaque appel (quoi, combien, où, sous quelle forme) ; le moteur de compression (compress) en est le premier sous-module.",
     "target_root": "context",
     "config_paths": [
       "config/walter-context.toml"

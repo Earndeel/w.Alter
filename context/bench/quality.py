@@ -25,8 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bench.replay import chains, messages  # noqa: E402
 from walter_context import load  # noqa: E402
-from walter_context.session import Session  # noqa: E402
-from walter_context.wire import MEMO, text_of  # noqa: E402
+from walter_context.compress.session import Session  # noqa: E402
+from walter_context.compress.wire import MEMO, text_of  # noqa: E402
 
 PROBE = ("You audit an assistant's memory. Below is a full conversation between a user and an AI agent (tool calls "
          "and outputs included). Write {n} short factual questions whose answers appear in the conversation BEFORE "

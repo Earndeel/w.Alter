@@ -23,10 +23,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from walter_context import load  # noqa: E402
-from walter_context.layers import Epoch, project  # noqa: E402
-from walter_context.policy import common_prefix, signature  # noqa: E402
-from walter_context.session import Session  # noqa: E402
-from walter_context.wire import MEMO  # noqa: E402
+from walter_context.compress.layers import Epoch, project  # noqa: E402
+from walter_context.compress.policy import common_prefix, signature  # noqa: E402
+from walter_context.compress.session import Session  # noqa: E402
+from walter_context.compress.wire import MEMO  # noqa: E402
 
 HEAD_CHARS = 91_000      # Hermes fixed prefix measured 2026-10-11 (system 54 KB + tool schemas 37 KB)
 
