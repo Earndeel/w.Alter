@@ -1410,7 +1410,7 @@
       "root": "/walter/router",
       "anchors": [
         "/walter/router/contracts/router.json",
-        "/walter/router/walter_router/cli.py"
+        "/walter/router/cli.py"
       ],
       "requires": [],
       "external": [
@@ -1422,7 +1422,7 @@
         "config"
       ],
       "core_paths": [
-        "/walter/router/walter_router/db.py"
+        "/walter/router/store/db.py"
       ],
       "backup_paths": [
         "/walter/router",
