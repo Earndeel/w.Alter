@@ -14,12 +14,12 @@ from walter_router.analysis import select as sel
 
 MIN_GAP_H = 24
 PRICE_DROP = 0.15
-NERF = {"aa_intelligence": 2.0, "aa_decision": 2.0, "bridgebench": 30.0,   # Elo-type boards: NERF_ELO
+NERF = {"aa_intelligence": 2.0, "aa_eval": 3.0, "aa_decision": 2.0, "bridgebench": 30.0,   # Elo-type boards: NERF_ELO
         # per board ('benchmark:task') when one source mixes scales: STT accuracy points, speed factors, req/s, nDCG
         "aa_stt:wer": 1.0, "aa_stt:speed": 50.0, "agentset:rerank_speed": 0.5, "agentset:embeddings_speed": 0.5,
         "mteb": 2.0}
 NERF_ELO = 15.0
-BENCH_KINDS = ("aa", "aa_decision", "mm", "da", "arena", "bridgebench", "aa_stt", "agentset", "mteb")
+BENCH_KINDS = ("aa", "aa_eval", "aa_decision", "mm", "da", "arena", "bridgebench", "aa_stt", "agentset", "mteb")
 OFFER_KINDS = ("openrouter", "kie", "hermes_providers")
 
 

@@ -1,5 +1,5 @@
 """Artificial Analysis media leaderboards: text-to-speech (provider voice), speech-to-speech, text-to-image,
-text-to-video, image-to-video. Read straight from the server-rendered leaderboard tables (no browser); table parsing
+text-to-video, image-to-video, music (vocals, instrumental). Read straight from the server-rendered leaderboard tables (no browser); table parsing
 taken over from the aa-pareto-model-optimizer skill (2026-10-21), so the document keeps that skill's shape
 (modules -> tasks -> rows). AA list prices are reference data, never benchmark costs."""
 from __future__ import annotations
@@ -69,6 +69,32 @@ TASK_SPECS: dict[str, dict[str, Any]] = {
         "quality_direction": "higher_is_better",
         "benchmark_cost_status": "not_published_for_benchmark_task",
     },
+    # AA Music (2026-10-21, the owner: « aller directement sur la page web si l'API ne délivre pas, comme pour Music »):
+    # arena Elo of vocal songs and of instrumentals; AA publishes no price column on these boards.
+    "music_vocals": {
+        "module": "music",
+        "task": "music_vocals",
+        "url": "https://artificialanalysis.ai/music/leaderboard/vocals",
+        "kind": "elo_leaderboard",
+        "priced": False,
+        "table_marker": "Elo",
+        "quality_metric": "AA-Music-Vocal Arena Elo",
+        "quality_unit": "Elo points",
+        "quality_direction": "higher_is_better",
+        "benchmark_cost_status": "not_published_for_benchmark_task",
+    },
+    "music_instrumental": {
+        "module": "music",
+        "task": "music_instrumental",
+        "url": "https://artificialanalysis.ai/music/leaderboard/instrumental",
+        "kind": "elo_leaderboard",
+        "priced": False,
+        "table_marker": "Elo",
+        "quality_metric": "AA-Music-Instrumental Arena Elo",
+        "quality_unit": "Elo points",
+        "quality_direction": "higher_is_better",
+        "benchmark_cost_status": "not_published_for_benchmark_task",
+    }
 }
 
 def now_iso() -> str:
@@ -99,7 +125,7 @@ def table_matches(rows: list[list[str]], spec: dict[str, Any]) -> bool:
         return (
             find_column(headers, ("model",)) is not None
             and find_column(headers, ("elo",)) is not None
-            and find_column(headers, ("api pricing",)) is not None
+            and (not spec.get("priced", True) or find_column(headers, ("api pricing",)) is not None)
         )
     return (
         find_column(headers, ("provider",)) is not None

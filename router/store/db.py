@@ -25,5 +25,8 @@ def migrate() -> list[str]:
         for path in sorted(MIGRATIONS.glob("[0-9][0-9][0-9]_*.sql")):
             if path.stem not in done:
                 conn.execute(path.read_text())
+                # recorded here too: a migration that forgets its own insert must not run again (022/023 did)
+                conn.execute("insert into models.schema_migrations (version) values (%s) on conflict do nothing",
+                             (path.stem,))
                 applied.append(path.stem)
     return applied

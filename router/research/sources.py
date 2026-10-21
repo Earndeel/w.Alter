@@ -7,6 +7,7 @@ from walter_router.research.benchmarks.aa import source_aa
 from walter_router.research.benchmarks.aa_media import source_mm
 from walter_router.research.benchmarks.design_arena import source_da
 from walter_router.research.benchmarks.aa_decision import source_aa_decision
+from walter_router.research.benchmarks.aa_evaluations import source_aa_eval
 from walter_router.research.benchmarks.aa_stt import source_aa_stt
 from walter_router.research.benchmarks.agentset import source_agentset
 from walter_router.research.benchmarks.arena import source_arena
@@ -18,17 +19,19 @@ from walter_router.research.prices.kie import source_kie
 from walter_router.research.prices.openrouter import source_openrouter
 from walter_router.research.prices.providers import source_hermes_providers
 
-SOURCES = {"aa": source_aa, "aa_decision": source_aa_decision, "mm": source_mm, "da": source_da, "arena": source_arena, "bridgebench": source_bridgebench,
+SOURCES = {"aa": source_aa, "aa_eval": source_aa_eval, "aa_decision": source_aa_decision, "mm": source_mm, "da": source_da, "arena": source_arena, "bridgebench": source_bridgebench,
            "aa_stt": source_aa_stt, "agentset": source_agentset, "mteb": source_mteb,
            "openrouter": source_openrouter, "kie": source_kie, "codex": source_codex,
            "declared": source_declared, "hermes_providers": source_hermes_providers}
 
 
-def collect_all(conn, store) -> dict[str, Any]:
+def collect_all(conn, store, only: list[str] | None = None) -> dict[str, Any]:
     """Collect every source; a failing source is reported and the last good snapshot stays in use. `store(conn, kind,
     doc, fetched_at, url)` keeps the snapshot and its parsed rows (analysis.ingest.store)."""
     report: dict[str, Any] = {}
     for kind, fn in SOURCES.items():
+        if only and kind not in only:
+            continue
         try:
             doc, fetched_at, url = fn()
             with conn.transaction():

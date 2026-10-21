@@ -38,16 +38,23 @@ def arena_board(page: str) -> dict | None:
 
 def source_arena() -> tuple[dict, datetime, str]:
     boards, errors = {}, {}
-    for path, key in ARENA_BOARDS.items():
-        try:
-            board = arena_board(fetch_text(ARENA_URL + path))
-            if board and board["rows"]:
-                boards[key] = {"path": path, **board}
-            else:
-                errors[key] = "no leaderboard rows in page"
-        except Exception as exc:  # noqa: BLE001 — one missing board leaves the others usable
-            errors[key] = f"{type(exc).__name__}: {exc}"[:200]
-        time.sleep(0.5)
+    for attempt in range(2):   # a board missing on the first pass is retried once (2026-10-21: creative writing
+        for path, key in ARENA_BOARDS.items():   # came back empty once, then fine a few minutes later)
+            if key in boards:
+                continue
+            try:
+                board = arena_board(fetch_text(ARENA_URL + path))
+                if board and board["rows"]:
+                    boards[key] = {"path": path, **board}
+                    errors.pop(key, None)
+                else:
+                    errors[key] = "no leaderboard rows in page"
+            except Exception as exc:  # noqa: BLE001 — one missing board leaves the others usable
+                errors[key] = f"{type(exc).__name__}: {exc}"[:200]
+            time.sleep(0.5)
+        if not errors:
+            break
+        time.sleep(5)
     if len(boards) < len(ARENA_BOARDS) // 2:
         raise ValueError(f"arena: only {len(boards)} boards parsed: {errors}")
     return {"boards": boards, "errors": errors}, now(), ARENA_URL

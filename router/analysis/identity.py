@@ -14,7 +14,7 @@ from walter_router import instance
 TIERS = ("non-reasoning", "minimal", "low", "medium", "high", "xhigh", "max")
 VENDOR_PREFIXES = ("google-", "openai-", "anthropic-", "meta-", "microsoft-", "alibaba-", "bytedance-",
                    "black-forest-labs-")
-BENCHMARK_NAMESPACES = ("aa", "aa_decision", "da", "mm", "arena", "bridgebench", "aa_stt", "agentset", "mteb")
+BENCHMARK_NAMESPACES = ("aa", "aa_eval", "aa_decision", "da", "mm", "arena", "bridgebench", "aa_stt", "agentset", "mteb")
 _TIER_SUFFIX = re.compile(r"-(" + "|".join(TIERS) + r")$")
 _PAREN = re.compile(r"\(([^)]*)\)")
 _GLUED = re.compile(r"(?<![a-z0-9])([a-z]{3,})(\d)")      # wan2-7 -> wan-2-7, flux1-1 -> flux-1-1 (not h3, v2, o1)

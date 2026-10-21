@@ -8,7 +8,7 @@ UNIT_SHORT = {"per second": "$/s", "per image": "$/img", "per song": "$/titre", 
               "per request": "$/requête", "per minute": "$/min", "per search": "$/recherche",
               "per 1m tokens": "$/M tokens"}
 PROVIDERS = {"openrouter": "OpenRouter", "kie": "Kie", "codex": "Codex", "google-flow": "Flow"}
-BOARDS = {"aa_intelligence": "AA", "aa_decision": "AA Decision", "aa_mm": "AA", "da_models": "Design Arena", "da_agents": "Design Arena",
+BOARDS = {"aa_intelligence": "AA", "aa_eval": "AA", "aa_decision": "AA Decision", "aa_mm": "AA", "da_models": "Design Arena", "da_agents": "Design Arena",
           "arena": "Arena", "bridgebench": "BridgeBench", "aa_stt": "AA STT", "agentset": "Agentset", "mteb": "MTEB"}
 MAX_LISTED_RESOLUTIONS = 4
 ICONS = {"image": "🖼️", "video": "🎬", "audio": "🗣️", "music": "🎵", "chat": "💬", "transcription": "🎙️",
