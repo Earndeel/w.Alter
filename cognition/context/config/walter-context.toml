@@ -7,10 +7,8 @@ live_keep_steps = 4          # emergency mid-turn cut: last assistant steps of t
 tool_keep_chars = 600        # compact zone: tool outputs up to this size stay verbatim (a digest would not pay)
 excerpt_chars = 280          # compact zone: excerpt kept from a compacted tool output
 args_chars = 240             # compact zone: tool-call arguments longer than this are clipped
-text_clip_chars = 6000       # compact zone: user / assistant text longer than this keeps head + tail
-record_user_chars = 1200     # record zone: user request per turn
-record_assistant_chars = 900 # record zone: final assistant answer per turn
-record_actions = 12          # record zone: actions listed per turn before "+n more"
+text_clip_chars = 6000       # compact zone: assistant text longer than this keeps head + tail (owner text: never)
+brief_answer_chars = 160     # record, one-line level: the answer kept beside the owner's full request
 user_label = "User"
 assistant_label = "Assistant"
 
@@ -18,7 +16,7 @@ assistant_label = "Assistant"
 horizon_calls = 12           # prior for cached reuses after a boundary; replaced by the session's own calls-per-turn
 min_gain_tokens = 6000       # a boundary must remove at least this much
 compact_share = 0.4          # fold the compact zone into the record when it exceeds this share of the effective budget
-record_share = 0.3           # condense the record (oldest turns brief, then omitted) beyond this share, down to half
+record_share = 0.3           # condense the record beyond this share (oldest turns to one line, owner text kept), down to half
 regret_tokens = 4000         # mid-turn, weigh moves again only after the payload grew this much over budget
 emergency_share = 0.92       # host-side compression only above this share of the context window (should never fire)
 

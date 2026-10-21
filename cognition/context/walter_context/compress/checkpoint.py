@@ -7,37 +7,22 @@ API. The checkpoint policy and rendering still belong here, not in the host.
 from __future__ import annotations
 
 from ..config import Config, load
-from .layers import body_start, RECORD_HEADER
-from . import digest
-from .wire import Message, tokens, turn_starts, text_of, calls
+from .layers import body_start, record
+from .wire import Message, tokens, turn_starts, text_of
 
 
 def _record(body: list[Message], cfg: Config) -> str:
-    """Keep all visible dialogue in order; tool payloads stay behind their refs.
-
-    This is the checkpoint contract, not the lossy projection record. In
-    particular, intermediate assistant explanations are part of visible dialogue
-    and must not disappear merely because a later assistant answer exists.
-    """
-    parts=[RECORD_HEADER]
+    """The record of the selected span, rendered exactly like the projection's full level (layers.dialogue): every
+    owner and visible assistant text verbatim and in order, including intermediate explanations, every action with
+    its ref. Only the checks are checkpoint-specific: a tool output needs a recoverable ref, and only dialogue and
+    tool roles can be flattened."""
     for message in body:
-        role=message.get('role')
-        text=text_of(message.get('content')).strip()
-        if role in ('user','assistant'):
-            if text:parts.append(f'## {role.title()}\n{text}')
-            if role=='assistant':
-                for cid,name,args in calls(message):
-                    parts.append('## Action\n'+digest.args_summary(name,args,cfg.projection.args_chars)+
-                                 (f' · ref {cid}' if cid else ''))
-        elif role=='tool':
-            ref=message.get('tool_call_id')
-            if not ref:raise ValueError('checkpoint tool output lacks a recoverable reference')
-            status=digest.status_of(text)
-            parts.append('## Tool result\nref '+str(ref)+(f' · {status}' if status else '')+
-                         ' — original output available through context_recover.')
-        else:
+        role = message.get('role')
+        if role == 'tool' and not message.get('tool_call_id'):
+            raise ValueError('checkpoint tool output lacks a recoverable reference')
+        if role not in ('user', 'assistant', 'tool'):
             raise ValueError('checkpoint contains an unsupported message role')
-    return '\n\n'.join(parts)
+    return record(body, cfg.projection, None)['content']
 
 
 def plan(messages: list[Message], *, model: str = "", measured_tokens: int = 0,

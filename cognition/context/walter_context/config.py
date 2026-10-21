@@ -18,9 +18,7 @@ class Projection:
     excerpt_chars: int
     args_chars: int
     text_clip_chars: int
-    record_user_chars: int
-    record_assistant_chars: int
-    record_actions: int
+    brief_answer_chars: int
     user_label: str
     assistant_label: str
 

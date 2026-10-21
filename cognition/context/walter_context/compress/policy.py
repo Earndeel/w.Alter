@@ -9,7 +9,8 @@ smaller payload, re-read from cache on the following calls, saves more than that
 A cold cache (idle past the provider TTL) makes the rewrite free: everything is re-sent anyway. Quality comes first:
 past the model's effective budget the cheapest option back under budget wins even if it costs more, including, as a
 last resort, compacting the older steps of the live turn (its last steps always stay verbatim). A record that outgrows its share is condensed
-(oldest turns to one line, then omitted) down to half its share, so that rewrite stays rare.
+(oldest turns to one line, the owner's request kept whole) down to half its share, so that rewrite stays
+rare; a turn is omitted only past the whole share, and the record says so.
 """
 from __future__ import annotations
 
@@ -85,7 +86,9 @@ def moves(msgs: list[Message], current: Epoch, view: View, cfg: Config) -> list[
 
 def condense(msgs: list[Message], ep: Epoch, view: View, cfg: Config, p: Profile, calibration: float,
              base=None, cache: Cache | None = None) -> Epoch:
-    """Bound the record: move `brief`, then `omit`, forward until the record fits half its share of the budget."""
+    """Bound the record. Oldest turns go to one line (the owner's request stays whole) until the record fits half its
+    share of the budget; a turn is omitted only when even one line per turn exceeds the whole share, and the record
+    then says so. Both cut points only move forward."""
     limit = cfg.policy.record_share * p.effective_budget
     if view.zones["record"] * calibration <= limit:
         return ep
@@ -101,7 +104,7 @@ def condense(msgs: list[Message], ep: Epoch, view: View, cfg: Config, p: Profile
     nb = max(0, sum(1 for a, _ in turns if a < (resolve(msgs, ep.brief, h) - h if ep.brief else 0)) - omit)
     while omit + nb < len(turns) and size(omit, nb) > target:
         nb += 1
-    while omit < len(turns) and size(omit, nb) > target:
+    while omit < len(turns) and size(omit, nb) > limit / calibration:
         omit, nb = omit + 1, max(0, nb - 1)
     at = lambda k: anchor(msgs, h + turns[k][0]) if k < len(turns) else ep.record   # noqa: E731
     return replace(ep, omit=at(omit) if omit else ep.omit, brief=at(omit + nb))
