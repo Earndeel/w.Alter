@@ -19,14 +19,16 @@ The import name stays `walter_router` (`walter_router/__init__.py` points it at 
 is `analysis/select.py`.
 
 ## Cycle every 48 h (timer `walter-router-refresh`, `bin/walter-router-cycle`; was daily until 2026-10-02)
-1. benchmark collection (aa-pareto skill script; its daily Hermes cron 096741a21a32 is paused), 2. router refresh +
-notifications, 3. analysis by the ECONOMIC text tier (L1 read from the router — GPT-6 Luna max via Codex today):
+1. research + analysis: every source is fetched by the router itself (since 2026-10-21 also AA Intelligence, AA media
+and Design Arena, absorbed from the aa-pareto-model-optimizer skill — no browser, no Hermes script), understood,
+ranked, active library written; 2. research agent on the ECONOMIC text tier (L1 read from the router — GPT-6 Luna max
+via Codex today):
 `research/agent/prompt.md` + `walter-router review` digest -> `~/.hermes/logs/walter-router/analysis-YYYYMMDD.md`
 (read-only, proposals only; Telegram only when the report says `VERDICT: ACTION`).
 
 ## Flow
 1. **Collect** → `models.snapshots` (deduplicated by sha256, 30-day retention, latest per kind always kept):
-   AA intelligence, AA multimodal, Design Arena (files from the aa-pareto skill cache), Arena.ai (15 boards read
+   AA intelligence (Next.js data of an AA model page), AA multimodal (server-rendered leaderboard tables), Design Arena (its JSON API), Arena.ai (15 boards read
    from the pages' embedded data: text, French, coding, webdev, vision, document, search, agent, text-to-image,
    image edit, text-to-video, image-to-video, video edit), OpenRouter (`?output_modalities=all` + media prices
    from each model page's `displayPricing`, base unit = price ÷ `displayMultiplier`), Kie pricing, Codex account

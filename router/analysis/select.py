@@ -1,38 +1,22 @@
 """Compute ranked candidates per task from the latest snapshots, on the cheapest *real* price.
 
-The Pareto mathematics is the aa-pareto-model-optimizer skill's own code (make_frontier, ladder_knee), so the
-router and the skill can never disagree on what the frontier is.
+The Pareto mathematics (make_frontier, ladder_knee) is analysis.pareto, taken over from the aa-pareto-model-optimizer
+skill on 2026-10-21.
 """
 from __future__ import annotations
 
 import re
 
-import importlib.util
 import json
-import os
-from pathlib import Path
 from typing import Any
 
-from walter_router.analysis import parse
+from walter_router.analysis import pareto, parse
 from walter_router.analysis import media
-from walter_router import instance
 
-SKILL = instance.hermes_home() / "skills/research/aa-pareto-model-optimizer/scripts"
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
 MEDIA_UNITS = media.NORM_UNITS   # image per image, video per second, voice per 1000 characters, stt per minute…
 BENCH_KIND = {"aa_intelligence": "aa", "aa_decision": "aa_decision", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena",
               "bridgebench": "bridgebench", "aa_stt": "aa_stt", "agentset": "agentset", "mteb": "mteb"}
-
-
-def _load(name: str):
-    spec = importlib.util.spec_from_file_location(f"aa_skill_{name}", SKILL / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-PARETO = _load("refresh")
-LADDER = _load("router")
 
 
 def latest_snapshots(conn) -> dict[str, int]:
@@ -182,12 +166,12 @@ def _ladder(cands: list[dict], minimum_score: float, cost_cap: float) -> dict | 
              "cost": c["real_cost"], "_c": c} for c in cands if c.get("real_cost") and c["real_cost"] > 0]
     if len(rows) < 2:
         return None
-    frontier = PARETO.make_frontier(rows, "score", "cost", minimum_score, 0.5, 0.5, 10.0, 2.0, cost_cap)
+    frontier = pareto.make_frontier(rows, "score", "cost", minimum_score, 0.5, 0.5, 10.0, 2.0, cost_cap)
     by_slug = {r["slug"]: r["_c"] for r in rows}
     ladder = frontier["upgrade_ladder"]
     if not ladder["tiers"]:
         return None
-    knee = LADDER.ladder_knee(ladder["tiers"])
+    knee = pareto.ladder_knee(ladder["tiers"])
     return {"anchor": by_slug[ladder["tiers"][0]["slug"]], "knee": by_slug[knee["slug"]],
             "ceiling": by_slug[(ladder.get("quality_ceiling") or ladder["tiers"][-1])["slug"]],
             "frontier": [by_slug[r["slug"]] for r in frontier["pragmatic_frontier"]]}

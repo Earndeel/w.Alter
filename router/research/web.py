@@ -6,6 +6,7 @@ import os
 import re
 from datetime import datetime, timezone
 from typing import Any
+from html.parser import HTMLParser
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -118,3 +119,65 @@ def _github_json(url: str) -> Any:
         headers["Authorization"] = f"Bearer {token}"
     with urlopen(Request(url, headers=headers), timeout=60) as resp:  # noqa: S310 (fixed https host)
         return json.loads(resp.read(MAX_BYTES))
+
+
+def post_json(url: str, payload: dict, attempts: int = 4) -> Any:
+    """POST a JSON body, polite backoff on rate limits / server errors (crowdsourced APIs such as Design Arena)."""
+    import time
+    last: Exception | None = None
+    for attempt in range(attempts):
+        req = Request(url, data=json.dumps(payload).encode(), headers={
+            "User-Agent": "Mozilla/5.0 (Walter-Router/1.0)", "Accept": "application/json", "Content-Type": "application/json"})
+        try:
+            with urlopen(req, timeout=60) as resp:  # noqa: S310 (fixed https URLs)
+                return json.loads(resp.read(MAX_BYTES))
+        except Exception as exc:  # noqa: BLE001 — retried, then raised
+            last = exc
+            if attempt + 1 < attempts:
+                time.sleep(1 + 2 ** attempt)
+    raise RuntimeError(f"unable to fetch {url}: {last}") from last
+
+
+class _Tables(HTMLParser):
+    BLOCK = {"div", "p", "br", "li", "span"}   # cell children rendered on their own line (≈ innerText)
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.tables: list[list[list[str]]] = []
+        self.depth = 0
+        self.row: list[str] | None = None
+        self.cell: list[str] | None = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "table":
+            self.depth += 1
+            if self.depth == 1:
+                self.tables.append([])
+        elif self.depth == 1 and tag == "tr":
+            self.row = []
+        elif self.depth == 1 and tag in ("td", "th") and self.row is not None:
+            self.cell = []
+        elif self.cell is not None and tag in self.BLOCK:
+            self.cell.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag == "table":
+            self.depth -= 1
+        elif self.depth == 1 and tag in ("td", "th") and self.cell is not None and self.row is not None:
+            self.row.append("".join(self.cell).strip())
+            self.cell = None
+        elif self.depth == 1 and tag == "tr" and self.row is not None:
+            if any(c.strip() for c in self.row):
+                self.tables[-1].append(self.row)
+            self.row = None
+
+    def handle_data(self, data):
+        if self.cell is not None:
+            self.cell.append(data)
+
+
+def html_tables(page: str) -> list[list[list[str]]]:
+    """Every top-level <table> of a server-rendered page as rows of cell texts (block children on their own line)."""
+    p = _Tables()
+    p.feed(page)
+    return [t for t in p.tables if t]
