@@ -527,3 +527,32 @@ See `references/cmux-configuration.md` for full config reference.
 - **`cmux.json` may have shell prefix**: The file can contain shell commands at the start (`mkdir -p ...`, `cat > ...`). Python `json.load()` fails on it. Use `sed` for in-place edits instead.
 - **tmux bell settings don't affect cmux notifications**: The cmux-notify script sends OSC 777 via tmux `allow-passthrough`, which bypasses tmux's bell/activity system entirely. Disabling `visual-bell`/`monitor-activity` in tmux.conf won't break notifications.
 - **Ctrl+C can't reach nested TUI**: In cmux pane → SSH → tmux → hermes --tui, Ctrl+C from cmux only reaches the outer shell. The TUI catches it or ignores it. Don't try Ctrl+C reuse — delete session file instead.
+
+## Vérifier une sortie VPN partagée via le Mac
+
+Quand le Mac utilise déjà WireGuard et qu'un client distant doit emprunter sa sortie, tester un relais SOCKS SSH avant de lancer un second tunnel avec la même identité WireGuard.
+
+1. Comparer les sorties directes sans afficher de configuration ni de clés :
+```bash
+curl --fail --silent --show-error --max-time 10 https://api.ipify.org
+timeout 20 ssh -o ConnectTimeout=8 mac 'curl --fail --silent --show-error --max-time 10 https://api.ipify.org'
+```
+2. Vérifier que le port de test est libre :
+```bash
+ss -ltn 'sport = :1082'
+```
+3. Tester un relais temporaire limité à la boucle locale, avec résolution DNS côté Mac et nettoyage automatique :
+```bash
+bash <<'SH'
+set -eu
+ssh -N -o BatchMode=yes -o ConnectTimeout=8 -o ExitOnForwardFailure=yes -D 127.0.0.1:1082 mac &
+relay_pid=$!
+trap 'kill "$relay_pid" 2>/dev/null || true; wait "$relay_pid" 2>/dev/null || true' EXIT
+sleep 2
+kill -0 "$relay_pid"
+curl --fail --silent --show-error --max-time 15 --socks5-hostname 127.0.0.1:1082 https://api.ipify.org
+SH
+```
+4. Comparer la sortie relayée à celle du Mac. Une égalité valide le chemin SOCKS testé ; elle ne prouve pas le fonctionnement du Mac comme exit node Tailscale, qui utilise un autre chemin réseau.
+5. Éviter deux clients WireGuard simultanés partageant la même clé : le serveur peut basculer son endpoint entre eux. Le relais SSH réutilise le tunnel du Mac sans créer un second pair.
+6. Pour pérenniser un relais autorisé, utiliser une unité systemd, jamais un processus de terminal laissé en arrière-plan. Si une approbation automatique rejette cette étape, signaler le refus et ne pas le contourner.
