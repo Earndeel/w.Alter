@@ -8,7 +8,7 @@ Généré depuis les manifestes propriétaires. Les scénarios décrivent les cr
 | bus | foundation | Livrer les événements entre modules et conserver les curseurs de traitement. | memory |
 | colab | capability | Préparer et exécuter des travaux de calcul distant qualifiés. | — |
 | computer | capability | Observer et manipuler un appareil avec des permissions et cibles explicites. | — |
-| context | capability | Construire le contexte et les checkpoints selon le contrat de chaque harness. | — |
+| context | capability | Décider de ce qui entre dans la fenêtre d'un modèle à chaque appel (quoi, combien, où, sous quelle forme) ; le moteur de compression (compress) en est le premier sous-module. | — |
 | core | foundation | Exposer les capacités et installer les raccordements des harnesses. | — |
 | llm | capability | Exécuter les appels modèles des consommateurs autorisés via les postes du Router. | router, secrets |
 | logs | foundation | Conserver les traces accessibles de tous les harnesses dans un journal commun. | memory |
@@ -101,12 +101,12 @@ Interfaces : OperatorSessions, MCP computer_use, Hermes plugin.
 
 ## context
 
-Construire le contexte et les checkpoints selon le contrat de chaque harness.
+Décider de ce qui entre dans la fenêtre d'un modèle à chaque appel (quoi, combien, où, sous quelle forme) ; le moteur de compression (compress) en est le premier sous-module.
 
-Contrat 1.0.0; propriétaire : context.
-Racine actuelle : `/opt/walter-context`. Cible : `/walter/context`.
+Contrat 1.1.0; propriétaire : context.
+Racine actuelle : `/walter/context`. Cible : `/walter/context`.
 
-Interfaces : Python Session, Hermes ContextEngine adapter, DSH CompactionEngine adapter.
+Interfaces : Python Session (walter_context.compress), Hermes ContextEngine adapter, DSH CompactionEngine adapter, CLI walter-context.
 
 **Critères de validation :**
 
@@ -117,7 +117,7 @@ Interfaces : Python Session, Hermes ContextEngine adapter, DSH CompactionEngine 
 **Limites déclarées :**
 
 - DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.
-- Hermes remains on walter-compress; walter-context projection is not activated.
+- Hermes runs its native compressor (walter-compress retired 2026-10-21); the walter-context Hermes port is not activated.
 - Structural and known-answer tests do not certify semantic model quality.
 
 ## core

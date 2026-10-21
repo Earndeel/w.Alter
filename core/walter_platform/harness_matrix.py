@@ -42,7 +42,7 @@ def matrix():
                 else:bound=False;provider='native';limits.append('Principal model remains selected by this harness; module-specific Walter model calls are separate.')
             elif capability=='context':
                 if host=='dsh':bound=bool(bindings.get('context_plugin'));provider='walter-context/checkpoint';limits.append('Deterministic retention/transaction qualified; semantic model-answer quality is not established.')
-                elif host=='hermes':bound=False;provider=bindings.get('context_engine');limits.append('Walter Context projection remains inactive; legacy walter-compress is selected.')
+                elif host=='hermes':bound=False;provider=bindings.get('context_engine');limits.append('Hermes native compressor until walter-context replaces it (walter-context plan, lot 6).')
                 else:bound=False;provider='native';limits.append('Native compaction is not replaceable through the supported MCP interface.')
             elif capability=='logs':
                 bound='walter-logs' in plugins if host=='hermes' else bool(bindings.get('lifecycle_hook'))

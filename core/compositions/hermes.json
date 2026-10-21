@@ -22,11 +22,10 @@
   "identity_scope": "home",
   "mcp": false,
   "skill_source": "/opt/walter-core/skills/walter-skills/SKILL.md",
-  "context": "walter-compress",
+  "context": "compressor",
   "model": "preserved",
   "plugins": [
     "walter-browse",
-    "walter-compress",
     "walter-computer-use",
     "walter-router",
     "walter-logs",

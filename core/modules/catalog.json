@@ -31,7 +31,8 @@
       "id": "context",
       "target": "context",
       "legacy": "/opt/walter-context",
-      "manifest": "contracts/context.json"
+      "manifest": "contracts/context.json",
+      "neutral": true
     },
     {
       "id": "core",
