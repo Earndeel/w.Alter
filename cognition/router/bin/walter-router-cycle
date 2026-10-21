@@ -33,7 +33,7 @@ r = next((e for e in d.get("execution", []) if e.get("probe_ok") is not False), 
 print(r["hermes_provider"], r["model"], r.get("reasoning") or "") if r else print("", "", "")')
 if [ -z "$PROVIDER" ]; then echo "[cycle] no usable L1 route: analysis skipped"; else
 args=(chat --query-file "$ANALYSIS_PROMPT" --oneshot -Q --provider "$PROVIDER" -m "$MODEL"
-      -t terminal,file,web --max-turns 30 --run-budget 900 --source walter-router-analysis)
+      -t terminal,file,web --max-turns 45 --run-budget 1200 --source walter-router-analysis)
 [ -n "$REASONING" ] && args+=(--reasoning "$REASONING")
 echo "[cycle] analysis model: $PROVIDER $MODEL ${REASONING:-}"
 WALTER_ROUTER_CHILD=1 timeout 1100 "$HERMES" "${args[@]}" > "$LOG/analysis-run-$day.log" 2>&1 \
