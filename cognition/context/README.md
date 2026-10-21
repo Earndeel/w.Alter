@@ -2,7 +2,7 @@
 
 Decides what enters a model's window on each call: what, how much, where and in what form. The target has no
 sessions and is dynamic. Activity is cut into threads that cross sessions and runtimes. Context is recomputed for each
-owner message, then stays stable for the turn so the provider cache keeps working. History is compressed without
+owner message — walter-context first understands its intent — then stays stable for the turn so the provider cache keeps working. History is compressed without
 silent loss. The core is runtime-neutral Python 3.11+ stdlib. Hosts plug in through `ports/`.
 
 Spec, plan and measurements: `docs/walter-memory/CONTEXT-ENGINE.md` (instance documentation). Dated decisions:
@@ -17,7 +17,7 @@ Spec, plan and measurements: `docs/walter-memory/CONTEXT-ENGINE.md` (instance do
 | `config` | The only tunables (`config/walter-context.toml`): projection, policy, model profiles | built |
 | `bridge` | Versioned JSON bridge for out-of-process hosts (DSH) | built |
 | `sense` | Local pre-selection: candidate threads and memory from local embeddings, entities, recency | plan, lot 4 |
-| `decide` | Context plan from the decision model: which thread, what context | plan, lot 4 |
+| `intent` | Understands the input in its conversation: thread (or new), act, context plan, level, task family (handed to the Router) | measured (lot 1), built in lot 4 |
 | `gather` | Thread notebook, verbatim excerpts (walter_logs), memory (reranked only when over budget) | plan, lot 4 |
 | `compose` | Layers ordered from stable to volatile, one budget, provider cache markers | plan, lot 4 |
 
