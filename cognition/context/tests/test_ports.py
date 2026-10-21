@@ -1,13 +1,14 @@
 """Host-independent policy and Hermes public-interface regression tests."""
 import importlib.util
+import os
 import sys
 import types
 from contextlib import contextmanager
 from pathlib import Path
 
 from walter_context import Session, load
-from walter_context.checkpoint import plan, summarize
-from walter_context.journal import recover
+from walter_context.compress.checkpoint import plan, summarize
+from walter_context.recover import recover
 from test_core import conversation
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -22,7 +23,7 @@ def test_checkpoint_preserves_live_and_previous_turn_under_pressure():
 
 
 def test_checkpoint_summary_retains_original_refs_and_reduces_tool_traffic():
-    from walter_context.layers import record
+    from walter_context.compress.layers import record
     messages = conversation(4)
     result = summarize(messages)
     assert all(m['content'] in result['content'] for m in messages if m['role']=='user')
@@ -69,12 +70,12 @@ def test_recovery_privilege_requires_exact_session_and_prefers_own_collision(mon
 
 def test_hermes_public_port_budget_reset_and_usage():
     # Run in the installed Hermes venv, importing only its public base contract.
-    sys.path.insert(0,'/root/.hermes/hermes-agent')
+    sys.path.insert(0,os.path.expanduser(os.environ.get('HERMES_AGENT_DIR','~/.hermes/hermes-agent')))
     spec = importlib.util.spec_from_file_location('walter_context_test_port',ROOT/'ports/hermes/__init__.py')
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
     engine = module.WalterContextEngine()
     engine.update_model('gpt-6.1-sol',16000)
-    engine.on_session_start('fixture',hermes_home='/root/.hermes/profiles/wild')
+    engine.on_session_start('fixture',hermes_home=os.path.expanduser('~/.hermes/profiles/wild'))
     assert engine._profile == 'wild'
     assert engine._session.profile.hard_budget == 16000
     source = conversation(4)

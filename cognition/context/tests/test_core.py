@@ -10,10 +10,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from walter_context import load  # noqa: E402
-from walter_context.layers import RECORD_HEADER, Epoch, anchor, project  # noqa: E402
-from walter_context.policy import common_prefix, signature  # noqa: E402
-from walter_context.session import Session  # noqa: E402
-from walter_context.wire import wire_hash  # noqa: E402
+from walter_context.compress.layers import RECORD_HEADER, Epoch, anchor, project  # noqa: E402
+from walter_context.compress.policy import common_prefix, signature  # noqa: E402
+from walter_context.compress.session import Session  # noqa: E402
+from walter_context.compress.wire import wire_hash  # noqa: E402
 
 CFG = load()
 P = CFG.projection
@@ -150,7 +150,7 @@ def test_compact_all_keeps_the_live_request_verbatim():
 
 
 def test_record_is_bounded_and_condensed_entries_stay_stable():
-    from walter_context.policy import condense
+    from walter_context.compress.policy import condense
     m = conversation(60, calls=2, out_chars=2000)
     cut = len(m) - 6
     ep = Epoch(anchor(m, cut), anchor(m, cut))

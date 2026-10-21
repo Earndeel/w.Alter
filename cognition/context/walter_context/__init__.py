@@ -1,11 +1,12 @@
-"""walter-context: builds the payload a model sees on each call, cache first. Runtime-agnostic (no Hermes import).
+"""walter-context: decides what enters a model's window on each call: what, how much, where, in what form.
 
-Core: wire (vocabulary) · digest (tool traffic) · layers (the projection) · policy (boundaries) · session (state).
-Ports: ports/hermes (ContextEngine plugin), journal (context_recover over walter_logs), bench (replay).
+Sub-modules: compress (the compression engine) · recover (originals behind compacted refs, from walter_logs) ·
+config (the only tunables) · bridge (versioned JSON bridge for out-of-process hosts) · cli.
+Planned (spec CONTEXT-ENGINE.md): sense · decide · gather · compose. Runtime-agnostic: no host import here;
+hosts plug in through ports/.
 """
+from .compress import Epoch, Selection, Session, View, project
 from .config import Config, load
-from .layers import Epoch, View, project
-from .session import Selection, Session
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = ["Config", "Epoch", "Selection", "Session", "View", "load", "project"]

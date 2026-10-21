@@ -13,9 +13,9 @@ import json
 import time
 from pathlib import Path
 from walter_context import load
-from walter_context.checkpoint import summarize
-from walter_context.layers import record
-from walter_context.wire import tokens,text_of
+from walter_context.compress.checkpoint import summarize
+from walter_context.compress.layers import record
+from walter_context.compress.wire import tokens,text_of
 
 VERSION='synthetic-retention-v1'
 THRESHOLDS={'user_text_visibility':1.0,'assistant_text_visibility':1.0,'tool_reference_coverage':1.0,

@@ -1,4 +1,4 @@
 #!/bin/sh
 # walter-context CLI. Runs on the shared Walter runtime, which provides walter_memory (journal recovery).
 root="$(dirname "$(readlink -f "$0")")/.."
-cd "$root" && PGPASSFILE=/root/.pgpass PYTHONPATH="$root" exec walter-python -m walter_context.cli "$@"
+cd "$root" && PYTHONPATH="$root" exec walter-python -m walter_context.cli "$@"

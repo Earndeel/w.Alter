@@ -9,7 +9,7 @@ import json
 import re
 from typing import Any
 
-from .config import Projection
+from ..config import Projection
 from .wire import clip, one_line
 
 # Arguments worth showing first, in this order (covers Hermes, Claude Code, Codex and MCP tool vocabularies).

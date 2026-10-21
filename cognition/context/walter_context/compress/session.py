@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
-from .config import Config, Profile, load
+from ..config import Config, Profile, load
 from .layers import Base, Cache, Epoch, anchor, body_start, project
 from .policy import Signals, Signature, common_prefix, condense, decide, signature
 from .wire import Message, step_starts, turn_starts
