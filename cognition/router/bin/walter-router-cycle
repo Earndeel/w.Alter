@@ -1,10 +1,14 @@
 #!/bin/bash
-# Walter Router 48 h cycle: (1) benchmark collection (aa-pareto skill), (2) router refresh + notifications,
-# (3) analysis by the ECONOMIC text tier model (L1, read from the router: today GPT-6 Luna max via Codex), which
-# links renamed models (validated `alias-add`), (4) recompute + Telegram (only new models above an active one).
-# A failing step 1 keeps the last good caches (step 2 still runs); step 3 never blocks the cycle.
-# Instance bindings (Hermes home, log folder, collection script, rendered analysis prompt, library URL) come from
-# the active Walter instance through `walter-router instance-env`.
+# Walter Router 48 h cycle:
+#   1. research + analysis: every source fetched by the router itself (research/), understood and organised in the
+#      database, models ranked, active library written (analysis/); no message yet
+#   2. research agent on the ECONOMIC text tier (L1, read from the router: today GPT-6 Luna max via Codex): checks
+#      names on the web (validated alias-add), watches the subscription plans; report only
+#   3. analysis again with the new name links, then Telegram (only news worth it: a model above an active one…)
+#   4. Hermes auxiliary jobs follow the postes; interface: the library page is republished
+# A failing source keeps its last good snapshot; step 2 never blocks the cycle.
+# Instance bindings (Hermes home, log folder, rendered agent prompt, library URL) come from the active Walter
+# instance through `walter-router instance-env`.
 set -uo pipefail
 WR=walter-router
 export HOME="${HOME:-$(getent passwd "$(id -un)" | cut -d: -f6)}"
@@ -15,34 +19,28 @@ HERMES="$HERMES_HOME/hermes-agent/venv/bin/hermes"
 mkdir -p "$LOG"
 day=$(date -u +%Y%m%d)
 
-echo "[cycle] 1/4 benchmark collection"
-if [ -z "$COLLECT_SCRIPT" ]; then echo "[cycle] no collection script for this instance: last caches kept"
-else timeout 2400 "$HPY" "$COLLECT_SCRIPT" > "$LOG/collect-$day.log" 2>&1 \
-  || echo "[cycle] collection failed (exit $?) — last good caches kept, see $LOG/collect-$day.log"
-fi
-
-echo "[cycle] 2/4 router refresh (no message yet)"
+echo "[cycle] 1/4 research + analysis (no message yet)"
 "$WR" refresh --no-notify || exit 1   # a failed refresh fails the unit (Telegram only after 2 failed cycles)
 
-echo "[cycle] 3/4 analysis on the economic tier (fixes naming gaps through validated alias-add)"
+echo "[cycle] 2/4 research agent on the economic tier (names on the web, subscription watch)"
 route=$("$WR" pick general --level L1) || route='{}' 
 read -r PROVIDER MODEL REASONING < <(printf '%s' "$route" | "$HPY" -c '
 import json, sys
 d = json.load(sys.stdin)
 r = next((e for e in d.get("execution", []) if e.get("probe_ok") is not False), None)
 print(r["hermes_provider"], r["model"], r.get("reasoning") or "") if r else print("", "", "")')
-if [ -z "$PROVIDER" ]; then echo "[cycle] no usable L1 route: analysis skipped"; else
+if [ -z "$PROVIDER" ]; then echo "[cycle] no usable L1 route: research agent skipped"; else
 args=(chat --query-file "$ANALYSIS_PROMPT" --oneshot -Q --provider "$PROVIDER" -m "$MODEL"
       -t terminal,file,web --max-turns 45 --run-budget 1200 --source walter-router-analysis)
 [ -n "$REASONING" ] && args+=(--reasoning "$REASONING")
-echo "[cycle] analysis model: $PROVIDER $MODEL ${REASONING:-}"
+echo "[cycle] research agent model: $PROVIDER $MODEL ${REASONING:-}"
 WALTER_ROUTER_CHILD=1 timeout 1100 "$HERMES" "${args[@]}" > "$LOG/analysis-run-$day.log" 2>&1 \
-  || echo "[cycle] analysis failed (exit $?) — see $LOG/analysis-run-$day.log"
+  || echo "[cycle] research agent failed (exit $?) — see $LOG/analysis-run-$day.log"
 fi
 
-echo "[cycle] 4/4 re-derive with the new name links, recompute, notify (only: a new model above an active one)"
+echo "[cycle] 3/4 analysis with the new name links, then Telegram (only: a new model above an active one)"
 "$WR" refresh --skip-collect || exit 1
-echo "[cycle] Hermes auxiliary jobs follow the router's postes (only when a pick changed)"
+echo "[cycle] 4/4 Hermes auxiliary jobs follow the postes (only when a pick changed); library page republished"
 "$WR" sync-hermes --apply > "$LOG/sync-hermes-$day.json" 2>&1 || echo "[cycle] sync-hermes failed (non-blocking)"
 echo "[cycle] library page ${LIBRARY_URL:-(not published by this instance)} (Cloudflare Access)"
 "$WR" publish-library || echo "[cycle] library page not published (non-blocking)"

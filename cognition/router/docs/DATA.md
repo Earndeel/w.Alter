@@ -15,9 +15,9 @@ failing source keeps its last good one (view `latest_snapshots`). Freshness: `wa
 
 | kind | What | Where from |
 |---|---|---|
-| `aa` | AA Intelligence Index + cost per AA task, per model × reasoning level | aa-pareto skill cache `~/.hermes/cache/aa-pareto/latest.json` (artificialanalysis.ai) |
-| `mm` | AA multimodal arenas: text-to-image, text-to-video, image-to-video, TTS, speech-to-speech | same cache, `multimodal_latest.json` (skill script `refresh_modalities.py`) |
-| `da` | Design Arena: models (website, UI component, 3D, game, dataviz, SVG, logo, graphic design…) and agents (full-stack, mobile, native apps) | same cache, `designarena.json` |
+| `aa` | AA Intelligence Index + cost per AA task, per model × reasoning level | artificialanalysis.ai model page (Next.js flight data), `research/benchmarks/aa.py` |
+| `mm` | AA multimodal arenas: text-to-image, text-to-video, image-to-video, TTS, speech-to-speech | artificialanalysis.ai leaderboard tables, `research/benchmarks/aa_media.py` |
+| `da` | Design Arena: models (website, UI component, 3D, game, dataviz, SVG, logo, graphic design…) and agents (full-stack, mobile, native apps) | designarena.ai JSON API, `research/benchmarks/design_arena.py` |
 | `arena` | Arena.ai (LMArena), 15 boards: text, French, coding, creative, webdev, vision, document, search, agent, text-to-image, image edit, text-to-video, image-to-video, video edit, image-to-webdev | arena.ai/leaderboard/… (embedded page data; FlareSolverr on 403/503) |
 | `bridgebench` | BridgeBench: overall, backend, frontend, reasoning, security, speed, trustworthiness, efficiency, one-shot, cost | bridgebench.ai/leaderboard (through FlareSolverr 127.0.0.1:8191) |
 | `aa_decision` | AA Decision Index v1 (intelligence, time and cost per 1M tasks) for decision models | artificialanalysis.ai/evaluations/artificial-analysis-decision-index |

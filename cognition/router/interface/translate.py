@@ -143,10 +143,7 @@ JS = {
     "Lancement…": "Starting…", "Échec du lancement": "Launch failed", "'fr-FR'": "'en-GB'",
     "'Indice '": "'Index '", "' $ par tâche'": "' $ per task'",
 }
-STEPS = {"1/4 collecte des classements": "1/4 collecting leaderboards", "2/4 recalcul": "2/4 recomputing",
-         "3/4 analyse par le modèle économique": "3/4 analysis by the economy model",
-         "4/4 recalcul final et notifications": "4/4 final recomputation and notifications",
-         "publication de la page": "publishing the page"}
+STEPS = {"1/4 recherche et analyse": "1/4 research and analysis", "2/4 agent de recherche (modèle économique)": "2/4 research agent (economy model)", "3/4 analyse finale et notifications": "3/4 final analysis and notifications", "4/4 Hermes et page": "4/4 Hermes and page"}
 PHRASES.update({k.replace("'", "&#x27;"): v.replace("'", "&#x27;") for k, v in list(PHRASES.items()) if "'" in k})
 PHRASES.update({k.replace("&", "&amp;"): v.replace("&", "&amp;") for k, v in list(PHRASES.items()) if "&" in k and "&#" not in k})
 _ORDER = sorted(PHRASES, key=len, reverse=True)

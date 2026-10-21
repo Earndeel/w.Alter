@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from walter_router.research.benchmarks.aa import source_aa, source_da, source_mm
+from walter_router.research.benchmarks.aa import source_aa
+from walter_router.research.benchmarks.aa_media import source_mm
+from walter_router.research.benchmarks.design_arena import source_da
 from walter_router.research.benchmarks.aa_decision import source_aa_decision
 from walter_router.research.benchmarks.aa_stt import source_aa_stt
 from walter_router.research.benchmarks.agentset import source_agentset

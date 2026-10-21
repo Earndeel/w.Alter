@@ -173,7 +173,7 @@ def route(conn, request: str, task: str | None = None, level: str | None = None)
 
 
 def _instance_env() -> int:
-    """HERMES_HOME, LOG, COLLECT_SCRIPT, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
+    """HERMES_HOME, LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
     rendered for the instance: its owner, its log folder), as shell assignments."""
     import shlex
     from walter_router import instance
@@ -186,7 +186,6 @@ def _instance_env() -> int:
     (log / "analysis-prompt.md").write_text(rendered)
     domain = instance.host().get("library_domain") or ""
     values = {"HERMES_HOME": instance.hermes_home(), "LOG": log,
-              "COLLECT_SCRIPT": instance.host_path("collect_script") or "",
               "CONTROL_ENV": instance.host_path("control_env") or "",
               "LIBRARY_URL": f"https://{domain}" if domain else "", "ANALYSIS_PROMPT": log / "analysis-prompt.md"}
     for k, v in values.items():
