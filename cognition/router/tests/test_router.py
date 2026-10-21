@@ -160,6 +160,10 @@ def test_successor_family_and_runnable_selection(conn):
     from walter_router import select as sel, media_exec
     assert sel.family("gpt-image-2-5-sunburst") == ("gpt-image", (2, 5), "sunburst")
     assert sel.family("gpt-image-2")[1] < sel.family("gpt-image-2-5-flare")[1]
+    assert sel.same_line("gpt-image-2", "gpt-image-2-5-sunburst")
+    assert not sel.same_line("gemini-3-1-flash-live-high", "gemini-3-8-flash-tts")   # 2026-10-18: TTS is not a Live
+    assert sel.same_line("gemini-3-1-flash-live-high", "gemini-3-8-flash-live")
+    assert not sel.same_line("gpt-image-2-5", "gpt-image-2")
     best = conn.execute("""select model_id from models.selection where run_id = (select run_id from models.latest_run)
                            and task = 'logo' and level = 'best' and rank = 1""").fetchone()
     assert best and best["model_id"] in media_exec._models()
@@ -194,3 +198,12 @@ def test_unranked_successor_is_saved_and_proposed(conn):
     lines = alerts._block(conn, {"kind": "new_best", "subject": model, "task": task, "ref": "t1",
                                  "evidence": {"previous_name": "Ancien", "score": None, "previous_score": 80.0, "why": []}})
     assert any("pas encore classée" in line for line in lines if line)
+
+
+def test_cli_classify_and_decision_chain_parse():
+    """2026-10-21: a local `from . import intent` in main() made `classify` raise UnboundLocalError."""
+    import ast, inspect
+    from walter_router import cli
+    tree = ast.parse(inspect.getsource(cli.main))
+    local = [n for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and any(a.name == "intent" for a in n.names)]
+    assert not local

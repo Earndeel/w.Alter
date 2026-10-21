@@ -335,7 +335,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "migrate":
         out = {"applied": db.migrate()}
     elif args.cmd == "decision-chain":
-        from . import intent
         with db.connect() as conn:
             out = {"chain": list(intent.chain(conn))}
     elif args.cmd == "refresh":

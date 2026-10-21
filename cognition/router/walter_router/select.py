@@ -256,6 +256,21 @@ def family(model_id: str) -> tuple[str, tuple, str] | None:
     return m.group(1), tuple(int(x) for x in m.group(2).split("-")), m.group(3) or ""
 
 
+LEVEL_WORDS = {"minimal", "low", "medium", "high", "xhigh", "max", "preview", "latest"}
+
+
+def same_line(model_id: str, newer_id: str) -> bool:
+    """newer_id is a later version of the SAME product line: same prefix, higher version, and it keeps every product
+    word of the old suffix (reasoning levels aside). 'gpt-image-2' -> 'gpt-image-2-5-sunburst' yes;
+    'gemini-3-1-flash-live-high' -> 'gemini-3-8-flash-tts' no (a TTS model is not a newer Live model; 2026-10-18
+    refresh failure)."""
+    a, b = family(model_id), family(newer_id)
+    if not a or not b or a[0] != b[0] or b[1] <= a[1]:
+        return False
+    words = lambda suffix: {w for w in suffix.split("-") if w and w not in LEVEL_WORDS}
+    return words(a[2]) <= words(b[2])
+
+
 def _executable_first(conn, t: dict, ranked: list[dict], offers: dict) -> list[dict]:
     """The owner (2026-10-14, logo): the best measured model must be one Walter can run; and when a newer version of
     it exists, runs and is not benchmarked on this task yet, it goes first with a warning (GPT Image 2 measured on
@@ -273,8 +288,8 @@ def _executable_first(conn, t: dict, ranked: list[dict], offers: dict) -> list[d
     out = []
     if top_measured:
         top, fam = top_measured[0], family(top_measured[0]["model_id"])
-        newer = [m for m in runnable if m not in measured and fam and (f := family(m)) and f[0] == fam[0]
-                 and f[1] > fam[1] and any(o["interface"] == t["interface"] for o in offers.get(m, []))]
+        newer = [m for m in runnable if m not in measured and fam and same_line(top["model_id"], m)
+                 and any(o["interface"] == t["interface"] for o in offers.get(m, []))]
         newer.sort(key=lambda m: (m in pinned, family(m)[1]), reverse=True)
         if newer:
             name = conn.execute("select coalesce(display_name, model_id) as n from models.canonical where model_id = %s",
