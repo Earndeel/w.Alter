@@ -336,6 +336,9 @@ class Decider:
         a = res["answers"]
         self.answers[i] = {k: (a.get(k) or {}).get("choice") for k in questions}
         self.answers[i]["thread_confidence"] = (a.get("thread") or {}).get("confidence")
+        probs = sorted(((a.get("thread") or {}).get("probabilities") or {}).items(), key=lambda x: -x[1])
+        self.answers[i]["thread_ranked"] = [(ids[k].id if k in ids else None, round(v, 3)) for k, v in probs[:3]]
+        self.answers[i]["plan_probabilities"] = (a.get("plan") or {}).get("probabilities")
         choice = self.answers[i]["thread"]
         return ids[choice].id if choice in ids else None
 
@@ -377,7 +380,7 @@ def evaluate(t: Threader, gold: list[str] | None = None) -> dict:
     # Online attachment, as the decision step faces it. A known topic must go to its home thread (the one holding
     # most of that topic so far), and that thread should at least be in the shortlist the decision model would get.
     # A new topic must open a thread.
-    home, n_opened = defaultdict(Counter), 0
+    home, n_opened, trace = defaultdict(Counter), 0, []
     stats = {k: [0, 0] for k in ("continue", "continue_short", "new_topic", "shortlist")}
     for (i, short_ids), th, topic in zip(t.ranks, t.of, ref):
         opened = th == n_opened
@@ -392,6 +395,10 @@ def evaluate(t: Threader, gold: list[str] | None = None) -> dict:
         else:
             stats["new_topic"][0] += opened
             stats["new_topic"][1] += 1
+        if t.decider is not None:
+            target = home[topic].most_common(1)[0][0] if home[topic] else None
+            trace.append({"i": i, "topic": topic, "target": target, "chosen": th, "opened": opened,
+                          "short": t.units[i].short, **t.decider.answers.get(i, {})})
         home[topic][th] += 1
     ok = sum(v[0] for k, v in stats.items() if k != "shortlist")
     tot = sum(v[1] for k, v in stats.items() if k != "shortlist")
@@ -404,7 +411,8 @@ def evaluate(t: Threader, gold: list[str] | None = None) -> dict:
             "attach_accuracy": round(ok / tot, 3) if tot else None,
             **{f"{k}_ok": f"{v[0]}/{v[1]}" for k, v in stats.items() if k != "shortlist"},
             f"shortlist@{t.k}": round(stats["shortlist"][0] / stats["shortlist"][1], 3) if stats["shortlist"][1] else None,
-            "threads_across_sessions": len(multi), "threads_across_runtimes": len(runtimes)}
+            "threads_across_sessions": len(multi), "threads_across_runtimes": len(runtimes),
+            **({"trace": trace} if trace else {})}
 
 
 def describe(t: Threader, th: Thread) -> dict:
