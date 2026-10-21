@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from walter_router import alerts, catalog, collect, db, media
+from walter_router.analysis import alerts
+from walter_router.analysis import catalog
+from walter_router.analysis import parse
+from walter_router.research.benchmarks import arena
+from walter_router.store import db
+from walter_router.analysis import media
 
 
 @pytest.mark.parametrize("interface,label,inputs,kind,modes", [
@@ -56,9 +61,9 @@ def test_arena_board_is_read_from_page_flight_data():
     page = ('<script>self.__next_f.push([1,"x\\"id\\":\\"leaderboard-sets/public/leaderboards/text_to_video-overall-raw'
             '/leaderboard-snapshots/latest\\",\\"entries\\":[{\\"rank\\":1,\\"modelDisplayName\\":\\"gemini-omni-1.1-flash'
             '\\",\\"rating\\":1516.2,\\"ratingLower\\":1500.7,\\"ratingUpper\\":1531.6,\\"votes\\":1784}]"])</script>')
-    board = collect.arena_board(page)
+    board = arena.arena_board(page)
     assert board["rows"][0]["modelDisplayName"] == "gemini-omni-1.1-flash"
-    rows = collect.parse_benchmarks("arena", {"boards": {"text_to_video": board}})
+    rows = parse.parse_benchmarks("arena", {"boards": {"text_to_video": board}})
     assert rows[0]["model_id"] == "gemini-omni-flash-1-1" and rows[0]["score"] == pytest.approx(1516.2)
 
 
@@ -101,7 +106,7 @@ def test_music_side_operations_are_not_song_prices():
 
 
 def test_unrestricted_finetune_points_to_its_base_model():
-    from walter_router import identity
+    from walter_router.analysis import identity
     assert identity.policy("glm-5-3-flash-uncensored") == ("unrestricted", "glm-5-3-flash")
     assert identity.policy("gpt-6-1-sol") == ("standard", None)
     assert identity.normalize("hermes_providers", "zai/glm-5.3-flash-uncensored/flex") == ("glm-5-3-flash-uncensored", "")
@@ -120,7 +125,7 @@ def test_unranked_releases_are_never_sent(conn):
 
 
 def test_new_best_for_a_specialised_task_is_the_only_kind_of_news(conn):
-    from walter_router import choose
+    from walter_router.serve import choose
     prev = choose.latest_run(conn)
     old = conn.execute("""select model_id from models.selection where run_id = %s and task = 'coding' and level = 'best'
                           and rank = 1""", (prev,)).fetchone()["model_id"]
@@ -150,7 +155,7 @@ def test_new_best_for_a_specialised_task_is_the_only_kind_of_news(conn):
 
 
 def test_unrestricted_pick_uses_an_unrestricted_model(conn):
-    from walter_router import choose
+    from walter_router.serve import choose
     got = choose.pick(conn, "general", require="unrestricted")
     if got["mode"] == "none":
         pytest.skip("no unrestricted provider collected")

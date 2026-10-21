@@ -2,7 +2,7 @@
   "id": "router",
   "anchors": [
     "contracts/router.json",
-    "walter_router/cli.py"
+    "cli.py"
   ],
   "requires": [],
   "external": [
@@ -14,7 +14,7 @@
     "config"
   ],
   "core_paths": [
-    "walter_router/db.py"
+    "store/db.py"
   ],
   "backup_paths": [
     ".",

@@ -1,7 +1,9 @@
 """AA Decision Index (2026-10-13): page parsing, identities, decision chain order."""
 import json
 
-from walter_router import collect, identity
+from walter_router.analysis import parse
+from walter_router.research.benchmarks import aa_decision
+from walter_router.analysis import identity
 
 ROWS = [{"slug": "typesafe_jev-1-13", "kind": "decisionModel", "name": "Jev 1.13", "hostName": "TypeSafe",
          "indexScore": 57.5, "costPerTaskUsd": 4.2e-05, "timePerTaskMs": 127, "scores": {"when2callAccuracy": 81}},
@@ -16,11 +18,11 @@ ROWS = [{"slug": "typesafe_jev-1-13", "kind": "decisionModel", "name": "Jev 1.13
 def test_rsc_page_is_decoded():
     payload = json.dumps('3a:["$","$L3e",null,{"contestants":' + json.dumps(ROWS) + '}]')[1:-1]
     page = f'<script>self.__next_f.push([1,"{payload}"])</script>'
-    assert [r["slug"] for r in collect.aa_decision_rows(page)] == [r["slug"] for r in ROWS]
+    assert [r["slug"] for r in aa_decision.aa_decision_rows(page)] == [r["slug"] for r in ROWS]
 
 
 def test_rows_identities_and_costs():
-    rows = {r["external_key"]: r for r in collect.parse_benchmarks("aa_decision", {"rows": ROWS})}
+    rows = {r["external_key"]: r for r in parse.parse_benchmarks("aa_decision", {"rows": ROWS})}
     jev = rows["typesafe_jev-1-13"]
     assert (jev["model_id"], jev["variant"], jev["task"]) == ("jev-1-13", "", "decision")
     assert round(jev["cost"]) == 42 and jev["cost_unit"] == "usd_per_1m_tasks"
@@ -36,7 +38,7 @@ def test_namespace_registered():
 
 
 def test_pareto_three_axes():
-    from walter_router import decision_pareto as dp
+    from walter_router.analysis import decision_pareto as dp
     a = {"model_id": "a", "index": 65, "ms": 93, "cost": 31.8}
     b = {"model_id": "b", "index": 57.5, "ms": 127, "cost": 41.5}
     c = {"model_id": "c", "index": 52, "ms": 500, "cost": 15}
@@ -47,7 +49,7 @@ def test_pareto_three_axes():
 
 
 def test_fallback_recommendation_without_l1():
-    from walter_router import recommend
+    from walter_router.analysis import recommend
     a = {"model_id": "a", "name": "A", "index": 65, "ms": 93, "cost": 31.8}
     b = {"model_id": "b", "name": "B", "index": 57.5, "ms": 127, "cost": 41.5}
     c = {"model_id": "c", "name": "C", "index": 53, "ms": 170, "cost": 16.5}

@@ -2,7 +2,7 @@
 
 Everything the router knows lives in schema `models` of Postgres `hindsight-pg` (127.0.0.1:5433, db `hindsight`,
 password only in `~/.pgpass`). Python access: `walter_router.db.connect()`. Each table and view also carries a
-`COMMENT` (migration 022): `\d+ models.*` explains itself.
+`COMMENT` (`store/migrations/022_comments.sql`): `\d+ models.*` explains itself.
 
 Writes go through the router code only (`walter-router refresh`, `declare`, `prefer`, `verdict`, `feedback`,
 `log-exec`, plus walter-llm, which logs into `exec_log`). Nothing else writes `models.*`.

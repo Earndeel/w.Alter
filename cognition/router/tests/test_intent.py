@@ -5,7 +5,8 @@ import json
 
 import pytest
 
-from walter_router import db, intent
+from walter_router.store import db
+from walter_router.serve import intent
 
 
 class _Resp(io.BytesIO):
@@ -35,7 +36,7 @@ def test_classify_reads_every_answer(conn, monkeypatch):
                                  "usage": {"cost": 0.00005}}).encode())
 
     monkeypatch.setattr(intent, "urlopen", fake_urlopen)
-    monkeypatch.setattr(intent.collect, "_env_value", lambda name: "k")
+    monkeypatch.setattr(intent.instance, "env_value", lambda name: "k")
     out = intent.classify(conn, "une pub vidéo", models=(intent.MODEL,))
     assert sent["model"] == "~typesafe/jev-latest" and "text_to_video" in sent["questions"]["task"]["criteria"]
     assert out["task"] == "text_to_video" and out["cost"] == 0.00005
@@ -44,7 +45,7 @@ def test_classify_reads_every_answer(conn, monkeypatch):
 def test_forwarding_router_model_is_refused(conn, monkeypatch):
     monkeypatch.setattr(intent, "urlopen", lambda req, timeout: _Resp(json.dumps(
         {"model": "typesafe/jev-router", "answers": {}}).encode()))
-    monkeypatch.setattr(intent.collect, "_env_value", lambda name: "k")
+    monkeypatch.setattr(intent.instance, "env_value", lambda name: "k")
     with pytest.raises(ValueError):
         intent.classify(conn, "x", models=(intent.MODEL,))
 
@@ -69,7 +70,7 @@ def test_chain_falls_back_to_the_next_decision_model(conn, monkeypatch):
 
     monkeypatch.setattr(intent, "_cloudflare", fake_cloudflare)
     monkeypatch.setattr(intent, "urlopen", fake_urlopen)
-    monkeypatch.setattr(intent.collect, "_env_value", lambda name: "k")
+    monkeypatch.setattr(intent.instance, "env_value", lambda name: "k")
     out = intent.classify(conn, "une pub vidéo")
     assert chain[-2:] == ("inception/mercury-decide:free", "cloudflare/clef") or chain[0] == "cloudflare/clef"
     assert "inception/mercury-decide:free" in calls and out["model"].startswith("inception/mercury-decide")

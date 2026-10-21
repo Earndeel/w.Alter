@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from walter_router import db, media_exec
+from walter_router.store import db
+from walter_router.serve import media_exec
 
 
 def test_parameters_are_coerced_to_what_the_model_accepts():
@@ -38,7 +39,7 @@ def test_ui_only_role_is_not_paid_silently(conn):
 
 def test_fallback_and_kie_health():
     """2026-10-14: one fallback model per category; a provider seen down by the probe goes last."""
-    from walter_router import db
+    from walter_router.store import db
     with db.connect() as conn:
         if not conn.execute("select 1 from models.preferences where task = 'text_to_video' limit 1").fetchone():
             return

@@ -1,7 +1,7 @@
 # Les 3 niveaux texte — la méthode de 2026-10-02
 
 The owner ne veut pas « le meilleur modèle » pour le texte courant, mais trois niveaux fonctionnels, chacun au
-meilleur rapport intelligence / prix. La méthode (code : `walter_router/tiers.py`, recalculée chaque nuit) :
+meilleur rapport intelligence / prix. La méthode (code : `analysis/tiers.py`, recalculée chaque nuit) :
 
 1. **Données** : chaque modèle appelable × chaque niveau de raisonnement (low … max), avec son score
    AA Intelligence Index et son **coût réel par tâche** (coût AA au prix catalogue × ratio du provider le moins

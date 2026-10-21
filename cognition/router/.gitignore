@@ -1,7 +1,7 @@
 venv/
 __pycache__/
 .pytest_cache/
-site/index.html
+interface/site/index.html
 .control.env
-site/fr/
-site/.wrangler/
+interface/site/fr/
+interface/site/.wrangler/

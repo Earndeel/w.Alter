@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from walter_router import alerts, choose, db, identity
-from walter_router import select as sel
+from walter_router.analysis import alerts
+from walter_router.serve import choose
+from walter_router.store import db
+from walter_router.analysis import identity
+from walter_router.analysis import select as sel
 
 
 @pytest.mark.parametrize("ns,key,name,expected", [
@@ -136,7 +139,7 @@ def test_dominance_watch_ignores_better_but_dearer_models(conn):
 
 
 def test_notification_buttons_one_row_per_news():
-    from walter_router import alerts
+    from walter_router.analysis import alerts
     rows = alerts.keyboard(None, [{"alert_id": 1, "kind": "tier", "ref": 3, "role": "L2", "subject": "gpt-6-luna/max",
                                    "evidence": {"current": "gpt-6-1-sol/medium"}},
                                   {"alert_id": 2, "kind": "nerf", "ref": 4, "role": "", "subject": "minimax-h3"}])
@@ -157,7 +160,8 @@ def test_one_board_is_not_enough(conn):
 
 def test_successor_family_and_runnable_selection(conn):
     """2026-10-14: the chosen model of a media task must be runnable (logo: GPT Image 2 measured first but not wired)."""
-    from walter_router import select as sel, media_exec
+    from walter_router.analysis import select as sel
+    from walter_router.serve import media_exec
     assert sel.family("gpt-image-2-5-sunburst") == ("gpt-image", (2, 5), "sunburst")
     assert sel.family("gpt-image-2")[1] < sel.family("gpt-image-2-5-flare")[1]
     assert sel.same_line("gpt-image-2", "gpt-image-2-5-sunburst")
@@ -179,7 +183,7 @@ def test_level_poste_follows_the_owners_text_tier(conn):
 
 
 def test_internal_postes_are_not_offered_to_the_intent_classifier(conn):
-    from walter_router import intent
+    from walter_router.serve import intent
     tasks, _ = intent._criteria(conn)
     assert not {"summarization", "memory_extraction", "voice_assist", "stt", "embeddings", "rerank"} & set(tasks)
 

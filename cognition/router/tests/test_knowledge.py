@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from walter_router import db, knowledge
+from walter_router.store import db
+from walter_router.analysis import knowledge
 
 
 def test_signals_match_whole_words_without_accents():
