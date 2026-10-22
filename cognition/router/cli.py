@@ -10,7 +10,8 @@ from walter_router import instance, paths
 from walter_router.analysis import aliases_admin
 from walter_router.analysis import alerts
 from walter_router.serve import media_exec
-from walter_router.serve import agent_view, choose
+from walter_router.serve import agent_view, choose, named
+from walter_router.serve import run as run_job
 from walter_router.analysis.refresh import refresh
 from walter_router.store import db
 from walter_router.health import health, notify_failure, status
@@ -147,6 +148,15 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--level", choices=choose.LEVELS)
     rt.add_argument("--context", help="one line on what the conversation was about before this request")
     rt.add_argument("--agent", action="store_true", help="the view an agent gets (choice, why, routes with prices)")
+    rt.add_argument("--model", help="a model named by the owner: exactly that one (or why it cannot run)")
+    rt.add_argument("--provider", help="with --model: that provider only (openrouter, kie, codex, arnict)")
+    rn = sub.add_parser("run", help="do the job on the chosen model: JSON spec on stdin (goal, request, task, level, "
+                                    "model, provider, context, toolsets…; media: role, image_urls…) -> JSON result")
+    rn.add_argument("--dry-run", action="store_true", help="the decision only")
+    ak = sub.add_parser("ask", help="the decision model for a quick choice: question + options -> choice, confidence")
+    ak.add_argument("question")
+    ak.add_argument("--option", action="append", required=True, metavar="NAME=MEANING")
+    ak.add_argument("--context")
     cl = sub.add_parser("classify", help="intent only, by the decision model (task, video role, level, unrestricted)")
     cl.add_argument("request")
     cl.add_argument("--context", help="one line on what the conversation was about before this request")
@@ -244,8 +254,15 @@ def main(argv: list[str] | None = None) -> int:
             elif args.cmd == "decide":
                 out = with_execution(conn, knowledge.decide(conn, args.task, args.intent, args.level))
             elif args.cmd == "route":
-                out = route(conn, args.request, args.task, args.level, args.context)
+                out = named.named(conn, args.model, args.provider, args.task) if args.model else \
+                    route(conn, args.request, args.task, args.level, args.context)
                 out = agent_view.view(out) if args.agent else out
+            elif args.cmd == "run":
+                spec = json.load(sys.stdin)
+                out = run_job.decide(conn, spec) if args.dry_run else run_job.run(conn, spec)
+            elif args.cmd == "ask":
+                opts = dict(o.split("=", 1) for o in args.option if "=" in o)
+                out = intent.ask(conn, args.question, opts, args.context)
             elif args.cmd == "classify":
                 out = intent.classify(conn, args.request, context=args.context)
             elif args.cmd == "log-exec":

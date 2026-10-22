@@ -287,7 +287,7 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
              aspect_ratio: str | None = None, duration: int | None = None, resolution: str | None = None,
              paid_fallback: bool = False, craft: bool = True, _depth: int = 0, model: str | None = None,
              _fallback: bool = True, voice: str | None = None,
-             style: str | None = None) -> dict:
+             style: str | None = None, provider: str | None = None) -> dict:
     from walter_router.serve.routes import route as route_request
     from walter_router.serve import choose
     from walter_router.analysis import knowledge
@@ -323,6 +323,10 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
     kie_path = (cfg.get("kie") or {}).get(mode)
     or_id = openrouter_id(conn, model_id)
     order = choose_provider(conn, model_id, t["interface"], resolution, bool(kie_path), or_id)
+    if provider:   # named by the owner: that provider only
+        order = [p for p in order if p == provider]
+        if not order:
+            return {"error": f"{model_id} ne s'exécute pas chez {provider} ici", "model_id": model_id}
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     folder = OUT_DIR / f"{stamp}-{task}"
     errors = []

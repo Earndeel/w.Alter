@@ -1,10 +1,13 @@
-"""Walter Router tools for Hermes (plugin; Hermes core is never patched).
+"""Walter Router tools for Hermes (plugin; Hermes core is never patched). Thin: every decision and every run is the
+router's own (`walter-router route | run | ask | plans`), the same as in the walter MCP for Claude Code / Codex / DSH.
 
-walter_route  which model/provider for a task, from the owner's favourites and the router's model database
-              (the `walter-router` command): role by objective, route, workflow, cost, constraints.
-walter_run    runs a text sub-task on the routed model in a separate one-shot Hermes process
-              (`hermes chat --oneshot --provider P -m M`, the public CLI — plugin tools receive no parent agent,
-              so delegate_task cannot be pinned to a model from here). Falls back to the next route on failure.
+walter_route   which model for a request (or the named model: exactly that one, or why it cannot run)
+walter_run     do the job on it: a text sub-task as a sub-agent with tools (a one-shot run of this runtime on the chosen
+               model and provider), or an image / video / music / voice generation
+walter_decide  the router's decision model for a quick choice among options
+walter_plans   the owner's AI subscriptions
+walter_verdict, walter_feedback   the owner's answers to router notifications and opinions of a result (Hermes only:
+                                  Telegram buttons arrive here)
 """
 from __future__ import annotations
 
@@ -13,32 +16,24 @@ import json
 import re
 import logging
 import os
-import tempfile
-import time
 from pathlib import Path
 from typing import Any, Mapping
 
 logger = logging.getLogger(__name__)
 
 CLI = os.environ.get("WALTER_ROUTER_CLI", "walter-router")   # Walter Router command on the PATH
-HERMES_BIN = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes") / "hermes-agent" / "venv" / "bin" / "hermes"
-CHILD_ENV = "WALTER_ROUTER_CHILD"
+CHILD_ENV = "WALTER_ROUTER_CHILD"   # set by the router in a sub-agent run: no recursive routing
 ALLOWED_TOOLSETS = ("web", "walter-web", "file", "terminal", "vision", "skills", "code_execution", "memory")
-DEFAULT_TOOLSETS = ["web", "walter-web", "file", "terminal"]
-MAX_ATTEMPTS = 3
-LAST_RESORT = {"hermes_provider": "openai-codex", "model": "gpt-6.1-sol", "reasoning": "high"}
-_ANSI = re.compile(r"\x1b\[[0-9;]*m")
-FAILURE_MARKS = ("didn't answer after", "Provider said:", "looks temporarily unavailable")
 FALLBACK_TASKS = ["general", "coding", "frontend", "ui_component", "3d", "gamedev", "dataviz", "svg", "fullstack",
                   "mobile_app", "vision", "document", "text_to_image", "image_edit", "logo", "graphic_design",
                   "text_to_video", "image_to_video", "video_edit", "tts", "speech_to_speech", "music", "weather",
                   "calculation", "research"]
 
 
-async def _cli(*args: str, timeout: int = 60) -> dict:
-    proc = await asyncio.create_subprocess_exec(CLI, *args, stdout=asyncio.subprocess.PIPE,
-                                                stderr=asyncio.subprocess.PIPE)
-    out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+async def _cli(*args: str, timeout: int = 60, stdin: str | None = None) -> dict:
+    proc = await asyncio.create_subprocess_exec(CLI, *args, stdin=asyncio.subprocess.PIPE if stdin else None,
+                                                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    out, err = await asyncio.wait_for(proc.communicate(stdin.encode() if stdin else None), timeout=timeout)
     if proc.returncode != 0:
         raise RuntimeError((err or out).decode("utf-8", "replace")[-400:])
     return json.loads(out)
@@ -65,215 +60,121 @@ def _brief() -> str:
     except Exception as exc:  # noqa: BLE001
         logger.warning("WALTER_ROUTER brief unavailable: %s", exc)
     return ("## Walter Router\nPour tout travail confié à un modèle (sous-tâche texte, image, vidéo, voix, musique), "
-            "décris le besoin à walter_route / walter_run / walter_generate : le router choisit le modèle et le "
-            "fournisseur. Ne nomme jamais un modèle toi-même.")
+            "passe par walter_route / walter_run : le router choisit le modèle et le fournisseur.")
 
 
 TASKS = _tasks()
 BRIEF = _brief()
 REQUIRE = ["unrestricted", "open_weights", "video_input"]
+DECISION = ("model", "provider", "task", "level", "require", "conversation")
 
 
-async def _decide(args: Mapping[str, Any], agent: bool = False) -> dict:
-    """With a task: that task. Without: the decision model classifies the request (task, video role, level,
-    unrestricted), reading `conversation` too when the request depends on earlier turns."""
+def _spec(args: Mapping[str, Any]) -> dict:
     task = str(args.get("task") or "").strip()
     if task and task not in TASKS:
         raise ValueError(f"unknown task {task}; use one of {TASKS}")
-    request = str(args.get("request") or "")
-    if args.get("require"):
-        cmd = ["pick", task or "general", "--require", str(args["require"])]
-    else:
-        cmd = ["route", request] + (["--task", task] if task else [])
-        if args.get("conversation"):
-            cmd += ["--context", str(args["conversation"])[:600]]
-    if args.get("level") in ("L1", "L2", "L3"):
-        cmd += ["--level", str(args["level"])]
-    return await _cli(*cmd, *(["--agent"] if agent else []))
+    keep = (*DECISION, "request", "goal", "context", "toolsets", "max_turns", "budget_seconds", "role", "image_urls",
+            "aspect_ratio", "duration", "resolution", "paid_fallback")
+    return {k: args[k] for k in keep if args.get(k) not in (None, "", [])}
 
 
 async def _handle_route(args: Mapping[str, Any], **_: Any) -> str:
     try:
-        return json.dumps(await _decide(args, agent=True), ensure_ascii=False, default=str)
+        spec = _spec(args)
+        if spec.get("model"):
+            cmd = ["route", spec.get("request") or spec["model"], "--model", spec["model"],
+                   *(["--provider", spec["provider"]] if spec.get("provider") else []),
+                   *(["--task", spec["task"]] if spec.get("task") else [])]
+        elif spec.get("require"):
+            cmd = ["pick", spec.get("task") or "general", "--require", spec["require"],
+                   *(["--level", spec["level"]] if spec.get("level") else [])]
+        else:
+            cmd = ["route", spec.get("request") or "", *(["--task", spec["task"]] if spec.get("task") else []),
+                   *(["--level", spec["level"]] if spec.get("level") else []),
+                   *(["--context", spec["conversation"][:600]] if spec.get("conversation") else [])]
+        return json.dumps(await _cli(*cmd, "--agent"), ensure_ascii=False, default=str)
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": f"walter_route: {exc}"}, ensure_ascii=False)
 
 
-async def _log(entry: dict) -> None:
-    """Every routed attempt goes to models.exec_log: the router demotes provider x model pairs that keep failing."""
-    try:
-        await _cli("log-exec", json.dumps(entry, default=str), timeout=20)
-    except Exception as exc:  # noqa: BLE001 — logging must never break a run
-        logger.warning("WALTER_ROUTER log-exec failed: %s", exc)
-
-
-async def _run_once(route: dict, prompt_file: str, toolsets: list[str], max_turns: int, budget: int) -> tuple[bool, str]:
-    cmd = [str(HERMES_BIN), "chat", "--query-file", prompt_file, "--oneshot", "-Q", "--provider",
-           route["hermes_provider"], "-m", route["model"], "-t", ",".join(toolsets), "--max-turns", str(max_turns),
-           "--run-budget", str(budget), "--source", "walter-router"]
-    if route.get("reasoning"):
-        cmd += ["--reasoning", route["reasoning"]]
-    proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-                                                env={**os.environ, CHILD_ENV: "1"})
-    try:
-        out, _ = await asyncio.wait_for(proc.communicate(), timeout=budget + 120)
-    except asyncio.TimeoutError:
-        proc.kill()
-        return False, f"timeout after {budget + 120}s"
-    text = _ANSI.sub("", out.decode("utf-8", "replace"))
-    lines = [ln for ln in text.splitlines() if not ln.startswith("session_id:")]
-    while lines and (not lines[0].strip() or lines[0].lstrip().startswith(("⚠", "Run 'hermes doctor'"))
-                     or "Config issues detected" in lines[0]):
-        lines.pop(0)  # Hermes start-up config warnings are not the sub-agent's answer
-    text = "\n".join(lines).strip()
-    failed = proc.returncode != 0 or not text or any(m in text[-600:] for m in FAILURE_MARKS)
-    return not failed, text
-
-
-# Providers whose outages are frequent and slow to detect inside Hermes (7 retries ~ 3 min): a 5-token test first.
-PREFLIGHT = {"kie": "kie", "kie-codex": "kie-codex"}
-
-
-async def _preflight(status_key: str) -> bool:
-    try:
-        out = await _cli("probe", "--provider", status_key, "--timeout", "25", timeout=40)
-        return bool(out.get(status_key, {}).get("ok"))
-    except Exception:  # noqa: BLE001
-        return False
-
-
 async def _handle_run(args: Mapping[str, Any], **_: Any) -> str:
-    started = time.monotonic()
-    goal = str(args.get("goal") or "").strip()
-    if not goal:
-        return json.dumps({"error": "walter_run: goal is required"})
     try:
-        d = await _decide(args)
-    except Exception as exc:  # noqa: BLE001
-        return json.dumps({"error": f"walter_run: routing failed: {exc}"}, ensure_ascii=False)
-    routes = d.get("execution") or []
-    if not routes:
-        return json.dumps({"error": "walter_run runs text tasks only; for image/video/voice/music use your media "
-                                    "tools with this routing decision",
-                          "decision": {k: d.get(k) for k in ("task", "model_id", "provider", "why") if d.get(k)}},
+        spec = _spec(args)
+        budget = max(60, min(int(spec.get("budget_seconds") or 900), 3600))
+        return json.dumps(await _cli("run", stdin=json.dumps(spec), timeout=3 * budget + 2700),
                           ensure_ascii=False, default=str)
-    toolsets = [t for t in (args.get("toolsets") or DEFAULT_TOOLSETS) if t in ALLOWED_TOOLSETS] or DEFAULT_TOOLSETS
-    max_turns = max(1, min(int(args.get("max_turns") or 40), 120))
-    budget = max(60, min(int(args.get("budget_seconds") or 900), 3600))
-    prompt = goal if not args.get("context") else f"{goal}\n\nContexte :\n{args['context']}"
-    attempts = []
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", prefix="walter-run-", delete=False) as fh:
-        fh.write(prompt)
-        prompt_file = fh.name
-    try:
-        runs = 0
-        for route in routes:
-            if runs >= MAX_ATTEMPTS:
-                break
-            preflightable = route["hermes_provider"] in PREFLIGHT
-            # a substitute (fallback_for set) is identified by its provider model id only
-            base = {"task": d.get("task"), "role": d.get("role"),
-                    "model_id": None if route.get("fallback_for") else d.get("model_id"),
-                    "provider": route["hermes_provider"], "model": route["model"],
-                    "fallback_for": route.get("fallback_for")}
-            if preflightable and not await _preflight(PREFLIGHT[route["hermes_provider"]]):
-                attempts.append({"provider": route["hermes_provider"], "model": route["model"], "ok": False,
-                                 "skipped": "provider test failed just before the run"})
-                await _log({**base, "ok": False, "skipped": "preflight"})
-                continue
-            if route.get("probe_ok") is False and not preflightable:
-                # known down (e.g. OpenRouter without credit): skip, it stays as the very last resort below
-                attempts.append({"provider": route["hermes_provider"], "model": route["model"], "ok": False,
-                                 "skipped": "last provider test failed"})
-                continue
-            runs += 1
-            t0 = time.monotonic()
-            ok, text = await _run_once(route, prompt_file, toolsets, max_turns, budget)
-            await _log({**base, "ok": ok, "seconds": round(time.monotonic() - t0, 1)})
-            attempts.append({"provider": route["hermes_provider"], "model": route["model"], "ok": ok})
-            logger.info("WALTER_ROUTER_RUN task=%s model=%s provider=%s ok=%s", d.get("task"), route["model"],
-                        route["hermes_provider"], ok)
-            if ok:
-                return json.dumps({"routed": {"task": d.get("task"), "role": d.get("role"), "model": route["model"],
-                                              "fallback_for": route.get("fallback_for"),
-                                              "provider": route["hermes_provider"], "reasoning": route.get("reasoning"),
-                                              "attempts": attempts,
-                                              "seconds": round(time.monotonic() - started)},
-                                   "output": text[-30000:]}, ensure_ascii=False)
-        tried = {a["provider"] for a in attempts}
-        if "openai-codex" not in tried and not (d.get("require") == "unrestricted" or d.get("unrestricted_signals")):
-            # Last resort: the owner's ChatGPT subscription (no per-call cost), flagged as a substitution.
-            ok, text = await _run_once(LAST_RESORT, prompt_file, toolsets, max_turns, budget)
-            attempts.append({"provider": "openai-codex", "model": LAST_RESORT["model"], "ok": ok,
-                             "last_resort": True})
-            if ok:
-                return json.dumps({"routed": {"task": d.get("task"), "role": d.get("role"),
-                                              "model": LAST_RESORT["model"], "provider": "openai-codex",
-                                              "substituted_for": d.get("model_id"), "attempts": attempts,
-                                              "seconds": round(time.monotonic() - started)},
-                                   "output": text[-30000:]}, ensure_ascii=False)
-        return json.dumps({"error": "every route failed", "attempts": attempts,
-                           "last_output": (locals().get("text") or "")[-1500:]},
-                          ensure_ascii=False)
-    finally:
-        os.unlink(prompt_file)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": f"walter_run: {exc}"}, ensure_ascii=False)
 
+
+async def _handle_decide(args: Mapping[str, Any], **_: Any) -> str:
+    try:
+        opts = args.get("options") or {}
+        cmd = ["ask", str(args["question"]), *[x for k, v in opts.items() for x in ("--option", f"{k}={v}")],
+               *(["--context", str(args["context"])] if args.get("context") else [])]
+        return json.dumps(await _cli(*cmd, timeout=40), ensure_ascii=False, default=str)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": f"walter_decide: {exc}"}, ensure_ascii=False)
+
+
+_DECISION_PROPS = {
+    "request": {"type": "string", "description": "The user's request, verbatim (French is fine)."},
+    "task": {"type": "string", "enum": TASKS, "description": "The speciality you chose (leave empty if unsure: the "
+             "router's decision model classifies the request)."},
+    "level": {"type": "string", "enum": ["L1", "L2", "L3"], "description": "General text: L1 everyday, L2 harder, "
+              "L3 hardest / highest stakes."},
+    "model": {"type": "string", "description": "Only when the user names a model: it runs exactly that one, or the "
+              "answer says why it cannot (never a substitute). model/variant sets the reasoning (gpt-6-1-sol/high)."},
+    "provider": {"type": "string", "description": "With model, when the user names the provider (openrouter, kie, "
+                 "codex, arnict)."},
+    "require": {"type": "string", "enum": REQUIRE, "description": "Hard constraint, only when the request needs it."},
+    "conversation": {"type": "string", "description": "One line on what the conversation was about, when the "
+                     "request depends on earlier turns (« fais la suite »)."},
+}
 
 ROUTE_SCHEMA = {
     "name": "walter_route",
-    "description": (
-        "Which model Walter Router picks for a request (tasks, levels, video objectives and constraints: section "
-        "« Walter Router » of your instructions). Call it before delegating substantial work, and follow its answer: "
-        "model, execution routes with their price per million tokens, workflow steps to plan, warnings. Pass the "
-        "user's request verbatim in `request`; leave `task` empty and the router's decision model classifies it. "
-        "When the request only makes sense with earlier turns (« fais la suite »), say what it is about in "
-        "`conversation`. Set `task` (and `level` for general) only to force them. If the chosen video objective "
-        "looks wrong, use the `brief` to pick the right one."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "task": {"type": "string", "enum": TASKS,
-                     "description": "Optional: force the task family (otherwise classified from the request)."},
-            "request": {"type": "string", "description": "The user's request, verbatim (French is fine)."},
-            "conversation": {"type": "string", "description": "Optional: one line on what the conversation was "
-                             "about, when the request depends on earlier turns."},
-            "require": {"type": "string", "enum": REQUIRE,
-                        "description": "Hard constraint, only when the request needs it."},
-            "level": {"type": "string", "enum": ["L1", "L2", "L3"],
-                      "description": "general only: L1 everyday, L2 harder, L3 hardest / highest stakes."},
-        },
-        "required": ["request"],
-    },
+    "description": ("Which model Walter Router picks for a request (section « Walter Router » of your instructions), "
+                    "with its execution routes and their price per million tokens, workflow steps, warnings. To "
+                    "check a choice before walter_run; changes nothing, runs nothing."),
+    "parameters": {"type": "object", "properties": _DECISION_PROPS, "required": ["request"]},
 }
 
 RUN_SCHEMA = {
     "name": "walter_run",
     "description": (
-        "Run a self-contained TEXT sub-task (analysis, comparison, code, writing, research synthesis...) on the "
-        "model Walter Router picks for its task, in a separate Hermes run with its own tools; returns the result and "
-        "which model ran it. Falls back to the next provider if one fails. Use it instead of doing heavy work "
-        "yourself when another model is better suited or cheaper. Write `goal` as complete instructions (the "
-        "sub-agent does not see this conversation). Not for image/video/voice/music: use walter_route + media tools."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "task": {"type": "string", "enum": TASKS, "description": "Optional: force the task family."},
-            "request": {"type": "string", "description": "The user's request verbatim (used for routing)."},
-            "conversation": {"type": "string", "description": "Optional: one line on what the conversation was "
-                             "about, when the request depends on earlier turns (used for routing)."},
-            "goal": {"type": "string", "description": "Complete, self-contained instructions for the sub-agent."},
-            "context": {"type": "string", "description": "Facts/files/excerpts the sub-agent needs."},
-            "level": {"type": "string", "enum": ["L1", "L2", "L3"]},
-            "require": {"type": "string", "enum": REQUIRE},
-            "toolsets": {"type": "array", "items": {"type": "string", "enum": list(ALLOWED_TOOLSETS)},
-                         "description": "Tools for the sub-agent (default web, walter-web, file, terminal)."},
-            "max_turns": {"type": "integer", "description": "Tool iterations (default 40, max 120)."},
-            "budget_seconds": {"type": "integer", "description": "Wall-clock budget (default 900, max 3600)."},
-        },
-        "required": ["request", "goal"],
-    },
+        "Do the job on the model Walter Router picks (or the one the user named): a TEXT sub-task runs as a "
+        "sub-agent with tools (give `goal` = complete instructions and `context` = what it needs: it does not see "
+        "this conversation); an image / video / music / voice is generated and its files returned (send them with "
+        "MEDIA:<path>) — generation COSTS MONEY: only when the user asked for it. Falls back to the next provider "
+        "of the same model; a named model is never replaced."),
+    "parameters": {"type": "object", "properties": {
+        **_DECISION_PROPS,
+        "goal": {"type": "string", "description": "Text sub-task: complete, self-contained instructions."},
+        "context": {"type": "string", "description": "Facts, files, excerpts the sub-agent needs."},
+        "toolsets": {"type": "array", "items": {"type": "string", "enum": list(ALLOWED_TOOLSETS)},
+                     "description": "Sub-agent tools (default web, walter-web, file, terminal)."},
+        "max_turns": {"type": "integer", "description": "Tool iterations (default 40, max 120)."},
+        "budget_seconds": {"type": "integer", "description": "Wall-clock budget (default 900, max 3600)."},
+        "role": {"type": "string", "description": "Media: video objective (premium, action, ugc, budget, default)."},
+        "image_urls": {"type": "array", "items": {"type": "string"}, "description": "Media: public URLs of input "
+                       "images (first frame, references)."},
+        "aspect_ratio": {"type": "string"}, "duration": {"type": "integer"}, "resolution": {"type": "string"},
+        "paid_fallback": {"type": "boolean", "description": "Media: a choice made by hand in a web UI (free credits) "
+                          "is generated in paying instead."}}, "required": ["request"]},
+}
+
+DECIDE_SCHEMA = {
+    "name": "walter_decide",
+    "description": ("The router's decision model for a quick choice of your own: sort, yes/no, pick one of several "
+                    "options, many times over (a fraction of a second, a fraction of a cent). Returns the choice, its "
+                    "confidence and the probabilities."),
+    "parameters": {"type": "object", "properties": {
+        "question": {"type": "string"},
+        "options": {"type": "object", "additionalProperties": {"type": "string"},
+                    "description": "Option name -> what it means (at least two)."},
+        "context": {"type": "string", "description": "The data to judge (a message, an excerpt…)."}},
+        "required": ["question", "options"]},
 }
 
 
@@ -320,43 +221,6 @@ async def _handle_plans(args: Mapping[str, Any], **_: Any) -> str:
         return json.dumps({"error": f"walter_plans: {exc}"}, ensure_ascii=False)
 
 
-async def _handle_generate(args: Mapping[str, Any], **_: Any) -> str:
-    try:
-        cmd = ["generate", str(args.get("request") or "")]
-        for key, flag in (("task", "--task"), ("role", "--role"), ("aspect_ratio", "--aspect-ratio"),
-                          ("duration", "--duration"), ("resolution", "--resolution")):
-            if args.get(key):
-                cmd += [flag, str(args[key])]
-        for u in args.get("image_urls") or []:
-            cmd += ["--image-url", str(u)]
-        if args.get("paid_fallback"):
-            cmd.append("--paid-fallback")
-        return json.dumps(await _cli(*cmd, timeout=2700), ensure_ascii=False, default=str)
-    except Exception as exc:  # noqa: BLE001
-        return json.dumps({"error": f"walter_generate: {exc}"}, ensure_ascii=False)
-
-
-GENERATE_SCHEMA = {
-    "name": "walter_generate",
-    "description": (
-        "Generate an image, a video, a music track or a voice-over on the model Walter Router picks (the owner's "
-        "favourite for the objective), with the prompt rewritten for that model by the economic text tier and the "
-        "model's workflow applied (e.g. Seedance premium: a reference still first). Provider order: Kie when "
-        "available and not much dearer, OpenRouter otherwise. Returns local file paths (send them to the user with "
-        "MEDIA:<path>), cost and the prompt used. A UI-only choice (Omni via Flow credits) comes back as manual "
-        "unless paid_fallback=true. Pass the user's request verbatim."),
-    "parameters": {"type": "object", "properties": {
-        "request": {"type": "string", "description": "The user's request, verbatim."},
-        "task": {"type": "string", "enum": [t for t in TASKS if t in (
-            "text_to_image", "image_edit", "logo", "graphic_design", "text_to_video", "image_to_video",
-            "video_edit", "music", "tts")]},
-        "role": {"type": "string", "description": "Force a role (premium, action, ugc, budget, default)."},
-        "image_urls": {"type": "array", "items": {"type": "string"}, "description": "Public URLs of input images."},
-        "aspect_ratio": {"type": "string"}, "duration": {"type": "integer"}, "resolution": {"type": "string"},
-        "paid_fallback": {"type": "boolean"}}, "required": ["request"]},
-}
-
-
 VERDICT_SCHEMA = {
     "name": "walter_verdict",
     "description": ("The owner's answer to a Walter Router Telegram message (« adopter 1 », « ignorer 2 », "
@@ -400,7 +264,7 @@ PLANS_SCHEMA = {
 
 
 def _available() -> bool:
-    # Hidden inside a walter_run child (no recursive routing) and when the router is not installed.
+    # Hidden inside a walter_run sub-agent (no recursive routing) and when the router is not installed.
     # CLI is a command name since 2026-10-19: look it up on the PATH (os.access on a bare name checked the current
     # directory, so every walter-router tool was hidden from Hermes until 2026-10-22)
     import shutil
@@ -408,7 +272,7 @@ def _available() -> bool:
 
 
 HERMES_RULES = (
-    "Walter Router dans Hermes : pour générer une image, une vidéo, une musique ou une voix, appelle walter_generate "
+    "Walter Router dans Hermes : pour générer une image, une vidéo, une musique ou une voix, appelle walter_run "
     "avec la demande mot pour mot (via tool_call si l'outil est différé). Ses favoris et objectifs priment sur tout "
     "skill propre à un modèle ; un skill sert ensuite à exécuter le modèle choisi. Quand l'utilisateur répond "
     "« adopter N » ou « ignorer N » à une alerte Walter Router, appelle walter_verdict ; quand il juge le résultat "
@@ -473,8 +337,8 @@ def register(ctx: Any) -> None:
         logger.error("WALTER_ROUTER_DEGRADED register_tool_missing")
         return
     for schema, handler, emoji in ((ROUTE_SCHEMA, _handle_route, "🧭"), (RUN_SCHEMA, _handle_run, "🚦"),
-                                   (VERDICT_SCHEMA, _handle_verdict, "✅"), (FEEDBACK_SCHEMA, _handle_feedback, "⭐"), (PLANS_SCHEMA, _handle_plans, "💳"),
-                                   (GENERATE_SCHEMA, _handle_generate, "🎨")):
+                                   (DECIDE_SCHEMA, _handle_decide, "🎯"), (PLANS_SCHEMA, _handle_plans, "💳"),
+                                   (VERDICT_SCHEMA, _handle_verdict, "✅"), (FEEDBACK_SCHEMA, _handle_feedback, "⭐")):
         kwargs = {"name": schema["name"], "toolset": "walter-router", "schema": schema, "handler": handler,
                   "check_fn": _available, "is_async": True, "emoji": emoji}
         try:

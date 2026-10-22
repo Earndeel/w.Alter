@@ -104,7 +104,7 @@ def test_brief_names_no_model_and_fits_a_system_prompt_section():
             "select distinct pinned_model_id as model_id from models.preferences where pinned_model_id is not null")}
         conn.rollback()
     assert len(text) <= brief.MAX_CHARS
-    for word in ("walter_route", "walter_run", "walter_generate", "walter_plans", "L1", "L2", "L3", "`vision`",
+    for word in ("walter_route", "walter_run", "walter_decide", "walter_plans", "L1", "L2", "L3", "`vision`",
                  "`text_to_video`", "`premium`", "`video_input`"):
         assert word in text
     assert not [m for m in names if m in text]
@@ -116,3 +116,33 @@ def test_brief_file_is_rewritten_only_when_it_changed():
     with db.connect() as conn:
         assert brief.write(conn) is True and brief.write(conn) is False
         conn.rollback()
+
+
+def test_a_named_model_runs_as_named_or_says_why():
+    """2026-10-22 (owner): a model (and provider) named in the request is executed as such — never a substitute."""
+    from walter_router.serve import named, run
+    with db.connect() as conn:
+        d = named.named(conn, "Claude Opus 5.5", "kie")
+        assert d["mode"] == "delegate" and {r["provider"] for r in d["execution"]} == {"kie"}
+        no = named.named(conn, "gpt-6-1-sol", "arnict")
+        assert no["mode"] == "none" and "arnict" in no["error"] and "codex" in no["available_at"]
+        assert run.run(conn, {"goal": "x", "model": "gpt-6-1-sol", "provider": "arnict"})["ok"] is False
+        assert named.named(conn, "gpt-6-1-sol/high")["variant"] == "high"
+        conn.rollback()
+
+
+def test_ask_offers_the_decision_model_for_any_choice(monkeypatch):
+    sent = {}
+
+    def fake_urlopen(req, timeout):
+        sent.update(json.loads(req.data))
+        return _Resp(json.dumps({"model": "typesafe/jev-1.13-x", "answers": {"answer": {
+            "choice": "non", "confidence": 0.9, "probabilities": {"oui": 0.1, "non": 0.9}}}}).encode())
+    monkeypatch.setattr(intent, "urlopen", fake_urlopen)
+    monkeypatch.setattr(intent.instance, "env_value", lambda name: "k")
+    with db.connect() as conn:
+        out = intent.ask(conn, "Faut-il répondre ?", {"oui": "attend une réponse", "non": "information"},
+                         context="La réunion est confirmée.", models=(intent.MODEL,))
+        conn.rollback()
+    assert out["choice"] == "non" and set(sent["questions"]["answer"]["criteria"]) == {"oui", "non"}
+    assert sent["state"]["context"] == "La réunion est confirmée."

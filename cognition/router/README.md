@@ -47,10 +47,11 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 
 | Consumer | How |
 |---|---|
-| Hermes | plugin `walter-router` (tools `walter_route`, `walter_run`, `walter_generate`, `walter_plans`, plus `walter_verdict`, `walter_feedback` for the Telegram buttons and the owner's verdicts); the brief as a system-prompt section; `sync-hermes` writes its auxiliary jobs, cron postes and `provider_routing.models.<id>.order` |
+| Hermes | plugin `walter-router` (tools `walter_route`, `walter_run`, `walter_decide`, `walter_plans`, plus `walter_verdict`, `walter_feedback` for the Telegram buttons and the owner's verdicts); the brief as a system-prompt section; `sync-hermes` writes its auxiliary jobs, cron postes and `provider_routing.models.<id>.order` |
 | Modules (walter-memory, Hindsight, voice, Kardex…) | walter-llm with `model` = a router task; `pick` for service postes (STT, rerank, embeddings) |
 | walter-memory triage | `decision-chain` (d1-ultra, then Mercury Decide, then Clef) |
-| Claude Code, Codex, DSH | the `walter` MCP: the same four tools under the same names (`walter_run` = one walter-llm call, no tools); the brief in the MCP server instructions (Claude Code) and in their W.Alter profile (Codex, DSH). Their own model stays theirs |
+| Claude Code, Codex, DSH | the `walter` MCP: the same four tools under the same names, the same runs; the brief in the MCP server instructions (Claude Code) and in their W.Alter profile (Codex, DSH). Their own model stays theirs |
+| walter-context (planned) | the decision model (`classify` / `ask`) to set the agentic level of a turn |
 | walter-core | `walter-router health` in `walter_health` |
 
 ## Operating it
@@ -65,7 +66,10 @@ walter-router health | status | review | alerts [--all]
 walter-router research [text|image|video|audio|memory|decision|prices|hosts|plans|all] [--analyse] | --list | --source KIND
 walter-router refresh [--skip-collect] [--no-notify]          # recompute (the cycle does it)
 walter-router pick TASK [--level L1|L2|L3] [--role R] [--require unrestricted|open_weights|video_input] [--agent]
-walter-router route "<request>" [--task T] [--level L] [--context "<what the conversation was about>"]
+walter-router route "<request>" [--task T] [--level L] [--context "<what the conversation was about>"] [--agent]
+walter-router route "<request>" --model M [--provider P]  # a model named by the owner: exactly that one, or why not
+walter-router run < spec.json        # do the job: text = sub-agent with tools (Hermes one-shot) | media = generation
+walter-router ask "<question>" --option a="…" --option b="…" [--context …]   # the decision model, any choice
 walter-router classify "<request>" [--context …] | decide TASK "<request>" | dossier TASK | tasks | library
 walter-router generate "<request>" [--task …] [--role …]      # costs money: on request only
 walter-router prefer TASK [--pin MODEL[/VARIANT]] … | verdict ALERT adopted|dismissed | feedback MODEL RATING

@@ -28,7 +28,7 @@ GENERATION = (("Images", ("image",)), ("Vidéo", ("video",)), ("Audio", ("audio"
 def _short(text: str | None) -> str:
     """First sentence of a role description, without where it runs (« Via Flow… »: the router's business)."""
     first = re.split(r"(?<=[.!?])\s", (text or "").strip())[0]
-    return first.rstrip(".")
+    return first.split(" : ")[0].rstrip(".")
 
 
 def _tasks(rows: list[dict], interfaces: tuple[str, ...], only: tuple[str, ...] = (), skip: tuple[str, ...] = ()) -> str:
@@ -46,20 +46,23 @@ def text(conn) -> str:
     roles.sort(key=lambda r: order.get(r["role"], 9))
     out = [
         "## Walter Router — quel modèle pour quel travail",
-        "Walter Router choisit pour chaque travail le meilleur modèle que Walter peut exécuter, et la façon la moins "
-        "chère de l'exécuter (un abonnement d'abord, à son prix de revient). Décris le besoin, jamais un modèle ni un "
-        "fournisseur : benchmarks, prix et fournisseurs sont déjà comparés. Si " + owner + " nomme un modèle, son choix "
-        "prime ; sinon un changement de modèle lui est proposé, jamais fait d'office.",
+        "Walter Router sait quel modèle fait le mieux chaque travail et comment l'exécuter au moins cher (un abonnement "
+        "d'abord, à son prix de revient) : benchmarks, prix et fournisseurs sont déjà comparés. Toi, orchestrateur, tu "
+        "découpes le travail et tu choisis pour chaque morceau la spécialité (`task`) et le niveau (`level`) ; le "
+        "router met le bon modèle derrière. Si " + owner + " nomme un modèle (et un fournisseur), passe-les "
+        "(`model`, `provider`) : il est exécuté tel quel, ou la réponse dit pourquoi c'est impossible — jamais de "
+        "substitut. Un changement de modèle par défaut lui est proposé, jamais fait d'office.",
         "",
         "Outils (mêmes noms dans chaque runtime) :",
-        "- `walter_route` : quel modèle pour une demande. `request` = la demande telle quelle ; en option `task`, "
-        "`level`, `require`, `conversation` (une ligne sur ce dont parlait la conversation, quand la demande en "
-        "dépend). Sans `task`, le modèle de décision du router classe la demande (tâche, niveau, objectif vidéo, "
-        "contrainte) en une fraction de seconde.",
-        "- `walter_run` : fait exécuter une sous-tâche texte autonome par le modèle choisi ; `goal` = des consignes "
-        "complètes (il ne voit pas la conversation). Pour un travail lourd qu'un autre modèle fait mieux ou moins cher.",
-        "- `walter_generate` : image, vidéo, musique ou voix sur le modèle choisi, prompt réécrit pour lui. Coûte de "
-        "l'argent : seulement à la demande de " + owner + ".",
+        "- `walter_run` : fait le travail. Texte : un sous-agent avec outils sur le modèle choisi ; `goal` = des "
+        "consignes complètes et `context` = ce qu'il doit savoir (il ne voit pas la conversation). Image, vidéo, "
+        "musique, voix : la génération, prompt réécrit pour le modèle (coûte de l'argent : seulement à la demande "
+        "de " + owner + ").",
+        "- `walter_route` : le même choix sans rien exécuter (modèle, routes et prix), pour vérifier ou planifier. "
+        "Sans `task`, le modèle de décision classe la demande ; `conversation` = une ligne sur ce qui précède quand "
+        "la demande en dépend.",
+        "- `walter_decide` : le modèle de décision pour tes propres choix rapides (trier, oui/non, une option parmi "
+        "plusieurs, en masse) : une fraction de seconde, une fraction de centime.",
         f"- `walter_plans` : les abonnements IA de {owner} (lire ; enregistrer un changement qu'il annonce).",
         "",
         "Niveaux de réflexion (`level`, pour le texte général : `task` = `general` ou sans `task`) :",
@@ -76,8 +79,8 @@ def text(conn) -> str:
         out.append("Objectif vidéo (`role`) : " + " · ".join(f'`{r["role"]}` {_short(r["description"]) or r["label"]}'
                                                             for r in roles))
     out.append("Contraintes (`require`) : " + " · ".join(f"`{k}` {CONSTRAINTS_FR.get(k, k)}" for k in REQUIREMENTS))
-    out.append("Le router sert aussi les modules (transcription, embeddings, rerank, modèle de décision pour trier "
-               "les messages) : rien à faire de ton côté.")
+    out.append("Le router sert aussi les modules (transcription, embeddings, rerank, tri des messages) : rien à "
+               "faire de ton côté.")
     body = "\n".join(out)
     if len(body) > MAX_CHARS:
         raise ValueError(f"brief too long for a system-prompt section ({len(body)} > {MAX_CHARS} characters)")

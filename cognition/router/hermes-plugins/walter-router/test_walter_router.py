@@ -16,13 +16,18 @@ def test_tools_hidden_inside_a_routed_child(monkeypatch):
 
 def test_route_answers_with_model_and_execution_routes():
     d = json.loads(asyncio.run(plugin._handle_route({"task": "general", "request": "analyse", "level": "L1"})))
-    assert d["model_id"] and d["execution"][0]["hermes_provider"]
+    assert d["model_id"] and d["execution"][0]["provider"]
 
 
-def test_run_refuses_media_and_returns_the_decision():
-    d = json.loads(asyncio.run(plugin._handle_run({"task": "text_to_video", "request": "pub cinématique",
-                                                    "goal": "x"})))
-    assert "media" in d["error"] and d["decision"]["model_id"] == "seedance-2-5"
+def test_run_never_substitutes_a_named_model():
+    d = json.loads(asyncio.run(plugin._handle_run({"request": "x", "goal": "x", "model": "gpt-6-1-sol",
+                                                    "provider": "arnict"})))
+    assert d["ok"] is False and "arnict" in d["error"]
+
+
+def test_named_model_route_keeps_its_provider():
+    d = json.loads(asyncio.run(plugin._handle_route({"request": "x", "model": "claude-opus-5-5", "provider": "kie"})))
+    assert d["model_id"] == "claude-opus-5-5" and {e["provider"] for e in d["execution"]} == {"kie"}
 
 
 def test_unknown_task_is_an_error_not_a_crash():
