@@ -1,0 +1,11 @@
+{
+ "base_sha": "d0b79a19135669d98449074ed6722ef55ee6043c85bba32d946bbdec2166a129",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-22T13:50:12.636995+00:00",
+ "domain": "research",
+ "kind": "patch",
+ "reason": "Absorbed into Walter Router on 2026-10-21 (research/benchmarks/aa.py, aa_media.py, design_arena.py; analysis/pareto.py); the cache ~/.hermes/cache/aa-pareto is no longer refreshed by any timer. Resubmission addressing the 2026-10-21 judge objection ('Limit the claim to the live collectors and say to refresh before recomputing or building profiles'): only refresh.py, refresh_modalities.py and collect_designarena.py fetch live data; pareto.py, build_model_profiles.py and router.py read the cache, so run the collectors first and check generated_at. router.py section marked historical (routing = walter-router). Owner name neutralised. All existing procedures kept.",
+ "runtime": "claude_code",
+ "session_id": "0c6fcbac-00d8-42b0-a541-855e301d8921",
+ "target": "aa-pareto-model-optimizer"
+}
