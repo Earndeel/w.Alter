@@ -145,3 +145,8 @@ examples, not catalog truth.
 - Si `walter-router alerts` renvoie `[]`, consulte aussi `walter-router alerts --all` et examine les champs `kind` et `status` avant de conclure à l'absence d'alertes ouvertes. Pour les modèles non classés, filtre `kind == "unranked"` et `status == "open"`.
 - Vérifie les résultats à partir du code de sortie et du contenu retourné : une enveloppe d'outil marquée « error » peut contenir une commande réussie avec `exit_code: 0`.
 - Dans le compte rendu, sépare les corrections confirmées, les anomalies restantes et les limites du résumé enregistré. N'affirme jamais qu'un rapport a été écrit sans confirmation de sa création.
+
+
+## Native text execution and provider failover (2026-10-23)
+`walter-router run` now executes text natively, through `walter-llm call` (one exact provider/model). No Hermes subprocess or hidden model fallback is used for text. Only providers of the selected model are tried; if all fail, report the failure without substituting another model. The conversation and completed tools survive provider changes. Inspect `routed.attempts` (actual provider, model, response id), `tools`, and `runtime=walter-router`. When `user_notification_required` is true, ALWAYS relay `user_notice` to the user. This also applies when execution fails. Named provider restrictions remain explicit.
+Verified on the installed version: 168 tests passed; `walter check` passed. A real coding/tool run received RateLimitError from Kie, kept Claude Opus 5.5, succeeded on OpenRouter with two recorded response ids and a terminal assertion/checksum. Backup of prior source is retained on the host; no Hermes core or global configuration was modified.
