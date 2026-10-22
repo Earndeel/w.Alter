@@ -19,7 +19,7 @@ Load `kie-image-generation-operations` via `walter_skill_read` for the general K
 ## Contract discovery
 
 - Verify the exact slug against the live catalog before generating: `GET https://api.kie.ai/api/v1/playground/model-paths` (no auth). Qwen Image 2.1 = `qwen2-1/image-to-image` (reference input) or `qwen2-1/text-to-image`. Older Qwen (`qwen/image-to-image`, `qwen/image-edit`) and Qwen 3 (`qwen3/...`) are separate models — never infer one model's fields from another and never silently substitute what the agent route picked.
-- The default agent route (walter_generate) may choose a different model than the one Monsieur named. When he names a model, call the Market API directly and state which model actually ran.
+- The default agent route (walter_run without `model`) chooses the router's favourite. When Monsieur names a model, pass it to walter_run (`model`, and `provider` = kie if he says Kie): it runs exactly that model or refuses with where it is available, never a substitute. Use the Market API directly only for a Kie model the router does not know, and state which model actually ran.
 
 ## Submit and poll
 
