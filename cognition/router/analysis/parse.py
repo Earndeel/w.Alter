@@ -63,6 +63,14 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
                                  display_name=r.get("name"), score=round(value * 100, 3) if unit == "pct" else value,
                                  score_unit={"pct": "%", "elo": "Elo", "index": "AA index"}.get(unit, unit),
                                  cost=None, cost_unit=None, released=None, extra={"source": (doc.get("evals") or {}).get(key, {}).get("page")}))
+        for key, models in (doc.get("indexes") or {}).items():
+            for r in models:
+                mid, variant = identity.normalize("aa", r["slug"], r.get("name"))
+                rows.append(dict(benchmark="aa_eval", task=key, external_key=r["slug"], model_id=mid, variant=variant,
+                                 display_name=r.get("name"), score=r["index"], score_unit="AA domain index",
+                                 cost=r.get("cost_per_task"), cost_unit="usd_per_aa_task" if r.get("cost_per_task") else None,
+                                 released=None, extra={"time_per_task_s": r.get("time_per_task_s"),
+                                                       "sub_scores": r.get("sub_scores")}))
     elif kind == "mm":
         for module in doc["modules"].values():
             for task_key, task in module["tasks"].items():

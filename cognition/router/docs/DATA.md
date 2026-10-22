@@ -16,7 +16,7 @@ failing source keeps its last good one (view `latest_snapshots`). Freshness: `wa
 | kind | What | Where from |
 |---|---|---|
 | `aa` | AA Intelligence Index + cost per AA task, per model × reasoning level | artificialanalysis.ai model page (Next.js flight data), `research/benchmarks/aa.py` |
-| `aa_eval` | AA evaluations per model × level (benchmark `aa_eval`, task = evaluation): HealthBench / HealthBench Professional (medical), Harvey LAB (legal), τ³-Banking, CritPt, GPQA, SciCode, HLE (science), MMMU-Pro (vision), AA-3D (Elo), AA-LCR (long context), IFBench, τ², Terminal-Bench Hard, GDPval, APEX-Agents, Omniscience, LiveCodeBench; fractions stored ×100 | AA model page + HealthBench pages (Next.js data), `research/benchmarks/aa_evaluations.py` |
+| `aa_eval` | AA evaluations per model × level (benchmark `aa_eval`, task = evaluation): HealthBench / HealthBench Professional (medical), Harvey LAB (legal), τ³-Banking, CritPt, GPQA, SciCode, HLE (science), MMMU-Pro (vision), AA-3D (Elo), AA-LCR (long context), IFBench, τ², Terminal-Bench Hard, GDPval, APEX-Agents, Omniscience, LiveCodeBench, Cyber Index; and the AA domain indexes `idx_engineering`, `idx_economics`, `idx_finance`, `idx_medical`, `idx_legal`, `idx_strategy_ops` (score + cost per task); fractions stored ×100 | AA model page + HealthBench, Cyber and /indexes pages (Next.js data), `research/benchmarks/aa_evaluations.py` |
 | `mm` | AA multimodal arenas: text-to-image, text-to-video, image-to-video, TTS, speech-to-speech, music (vocals, instrumental) | artificialanalysis.ai leaderboard tables, `research/benchmarks/aa_media.py` |
 | `da` | Design Arena: models (website, UI component, 3D, game, dataviz, SVG, logo, graphic design…) and agents (full-stack, mobile, native apps) | designarena.ai JSON API, `research/benchmarks/design_arena.py` |
 | `arena` | Arena.ai (LMArena), 15 boards: text, French, coding, creative, webdev, vision, document, search, agent, text-to-image, image edit, text-to-video, image-to-video, video edit, image-to-webdev | arena.ai/leaderboard/… (embedded page data; FlareSolverr on 403/503) |
@@ -49,7 +49,7 @@ Unmatched names are listed by `walter-router review` (`unmatched_candidates`) fo
 ## 4. Tasks and the owner's knowledge
 | Table | Content | Written by |
 |---|---|---|
-| `tasks` | The 38 tasks: label, `interface`, `default_objective`, `intent_hint` (for the classifier), `internal` (module postes never offered to the classifier), `requirements`, `consumers` | migrations + `declare` |
+| `tasks` | The 42 tasks: label, `interface`, `default_objective`, `intent_hint` (for the classifier), `internal` (module postes never offered to the classifier), `requirements`, `consumers` | migrations + `declare` |
 | `task_benchmarks` | Which boards rank a task and their **weights** (`weight`, `is_primary`) — shown on the library page under each task | migrations |
 | `preferences` | the owner's choices per task / role: objective (`best_available`, `value`, `level`), pin (model, variant, provider), role label/description/signals (video roles), `watch` | `knowledge.json` via `declare`, `prefer`, `verdict` |
 | `profiles` | What a model is *for*: strengths, weaknesses, workflow, effort, access / cost notes | `knowledge.json` |
