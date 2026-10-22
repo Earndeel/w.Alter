@@ -6,11 +6,11 @@ import json
 import subprocess
 import sys
 
-from walter_router import paths
+from walter_router import instance, paths
 from walter_router.analysis import aliases_admin
 from walter_router.analysis import alerts
 from walter_router.serve import media_exec
-from walter_router.serve import choose
+from walter_router.serve import agent_view, choose
 from walter_router.analysis.refresh import refresh
 from walter_router.store import db
 from walter_router.health import health, notify_failure, status
@@ -42,7 +42,6 @@ def _instance_env() -> int:
     """HERMES_HOME, LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
     rendered for the instance: its owner, its log folder), as shell assignments."""
     import shlex
-    from walter_router import instance
     log = instance.host_path("log_dir")
     log.mkdir(parents=True, exist_ok=True)
     prompt = paths.AGENT_PROMPT.read_text()
@@ -71,7 +70,8 @@ def main(argv: list[str] | None = None) -> int:
     k.add_argument("task")
     k.add_argument("--level", choices=choose.LEVELS)
     k.add_argument("--role", help="favourite role, e.g. action / value / budget")
-    k.add_argument("--require", choices=sorted(choose.REQUIREMENTS), help="hard constraint (unrestricted, open_weights)")
+    k.add_argument("--require", choices=sorted(choose.REQUIREMENTS), help="hard constraint (unrestricted, open_weights, video_input)")
+    k.add_argument("--agent", action="store_true", help="the view an agent gets (choice, why, routes with prices)")
     f = sub.add_parser("prefer", help="record the owner's preference for a task")
     f.add_argument("task")
     f.add_argument("--objective", choices=("value", "best_available"))
@@ -146,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--task")
     rt.add_argument("--level", choices=choose.LEVELS)
     rt.add_argument("--context", help="one line on what the conversation was about before this request")
+    rt.add_argument("--agent", action="store_true", help="the view an agent gets (choice, why, routes with prices)")
     cl = sub.add_parser("classify", help="intent only, by the decision model (task, video role, level, unrestricted)")
     cl.add_argument("request")
     cl.add_argument("--context", help="one line on what the conversation was about before this request")
@@ -168,6 +169,10 @@ def main(argv: list[str] | None = None) -> int:
     q.add_argument("--analyse", action="store_true", help="then recompute the choices and republish the page (no message)")
     q.add_argument("--no-web", action="store_true", help="plans: skip the web research agent (meters, mails, cost price only)")
     q.add_argument("--no-notify", action="store_true", help="plans: record news and proposals without sending them")
+    bf = sub.add_parser("brief", help="what an agent must know to use the router (tools, levels, specialities, "
+                                      "generation, constraints) — no model names")
+    bf.add_argument("--write", action="store_true", help="write it to the instance's state/router/brief.md and "
+                                                        "re-render the agent profiles (walter-soul) when it changed")
     sub.add_parser("instance-env", help="shell assignments of the instance bindings used by the cycle and the trigger")
     args = p.parse_args(argv)
 
@@ -194,6 +199,20 @@ def main(argv: list[str] | None = None) -> int:
         return research_run.main(args)
     if args.cmd == "instance-env":
         return _instance_env()
+    if args.cmd == "brief":
+        from walter_router.serve import brief
+        with db.connect() as conn:
+            if not args.write:
+                print(brief.text(conn))
+                return 0
+            changed = brief.write(conn)
+        if changed:   # the Codex / DSH profiles include it: re-render them (walter-soul, the identity module)
+            import shutil
+            import subprocess
+            if shutil.which("walter-soul"):
+                subprocess.run(["walter-soul", "sync"], capture_output=True, timeout=120)
+        print(json.dumps({"written": str(instance.state_file("brief.md")), "changed": changed}))
+        return 0
     if args.cmd == "migrate":
         out = {"applied": db.migrate()}
     elif args.cmd == "decision-chain":
@@ -218,6 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         with db.connect() as conn:
             if args.cmd == "pick":
                 out = with_execution(conn, choose.pick(conn, args.task, args.level, args.role, args.require))
+                out = agent_view.view(out) if args.agent else out
             elif args.cmd == "prefer":
                 out = choose.set_preference(conn, args.task, args.objective, args.pin, args.provider, args.note,
                                             args.role, args.watch)
@@ -225,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
                 out = with_execution(conn, knowledge.decide(conn, args.task, args.intent, args.level))
             elif args.cmd == "route":
                 out = route(conn, args.request, args.task, args.level, args.context)
+                out = agent_view.view(out) if args.agent else out
             elif args.cmd == "classify":
                 out = intent.classify(conn, args.request, context=args.context)
             elif args.cmd == "log-exec":

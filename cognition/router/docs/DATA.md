@@ -25,7 +25,6 @@ failing source keeps its last good one (view `latest_snapshots`). Freshness: `wa
 | `aa_stt` | AA Speech-to-Text: WER, speed factor, price per 1000 min, per model × host | artificialanalysis.ai/speech-to-text |
 | `agentset` | Rerankers and embeddings: ELO on RAG retrieval, latency, nDCG@10, price | agentset.ai/rerankers, /embeddings |
 | `mteb` | MIRACL French retrieval nDCG@10 for every embedding model OpenRouter serves | github.com/embeddings-benchmark/results |
-| `video_evals` | Video understanding (a model watching a video, not generating one): Video-MME-v2 grouped score with / without subtitles (measured by its authors, rarely updated) and LLM Stats video boards — LVBench, VideoMMMU, Video-MME, MLVU, LongVideoBench, MVBench (current, every score **self-reported** by the vendor: `extra.self_reported`, weighed half) | video-mme-v2.netlify.app, llm-stats.com/benchmarks/<board>, `research/benchmarks/video_evals.py` |
 | `or_endpoints` | The hosts behind OpenRouter for each model of the active library: price, quantization, service tier (flex / priority), uptime 24 h / 30 min, latency, tools | openrouter.ai/api/v1/models/<id>/endpoints, `research/prices/openrouter_endpoints.py` |
 | `openrouter` | Every OpenRouter model, all modalities, prices (media prices from each model page's `displayPricing`) | openrouter.ai/api/v1/models |
 | `kie` | Kie.ai market prices (credits → $) | api.kie.ai/client/v1/model-pricing |
@@ -44,15 +43,15 @@ Unmatched names are listed by `walter-router review` (`unmatched_candidates`) fo
 ## 3. Measurements and offers (one row per snapshot)
 | Table | Content |
 |---|---|
-| `benchmarks` | Measured quality: `benchmark` (board family: `aa_intelligence`, `aa_mm`, `arena`, `da_models`, `da_agents`, `bridgebench`, `aa_decision`, `aa_stt`, `agentset`, `mteb`, `video_mme_v2`, `llm_stats`), `task` (sub-board), `model_id`, `variant` (reasoning level), `score` (**always higher = better**: WER → 100 − WER, latency → 1000/ms), `cost` (the board's own published cost, e.g. AA $ per task), `extra` (votes, CI, raw measures) |
-| `offers` | Callable and priced: `provider`, `offer_key`, `interface` (chat, image, video, audio, music, transcription, embedding, rerank, decisions…), `access` (paid / subscription / ui / free), `price_in_1m`/`price_out_1m` ($/M tokens) or `unit_price`+`unit`, media classification (`offer_kind`, `modes` t2i/i2i/t2v/i2v/r2v/v2v, `resolution`, `audio`); for chat and decision offers `modes` = the inputs the model reads besides text (image, audio, video, file — OpenRouter only: other providers do not declare them), `norm_price`/`norm_unit` (video per second, image per image, voice per 1000 characters, STT per minute) |
+| `benchmarks` | Measured quality: `benchmark` (board family: `aa_intelligence`, `aa_mm`, `arena`, `da_models`, `da_agents`, `bridgebench`, `aa_decision`, `aa_stt`, `agentset`, `mteb`), `task` (sub-board), `model_id`, `variant` (reasoning level), `score` (**always higher = better**: WER → 100 − WER, latency → 1000/ms), `cost` (the board's own published cost, e.g. AA $ per task), `extra` (votes, CI, raw measures) |
+| `offers` | Callable and priced: `provider`, `offer_key`, `interface` (chat, image, video, audio, music, transcription, embedding, rerank, decisions…), `access` (paid / subscription / ui / free), `price_in_1m`/`price_out_1m` ($/M tokens) or `unit_price`+`unit`, media classification (`offer_kind`, `modes` t2i/i2i/t2v/i2v/r2v/v2v, `resolution`, `audio`); for chat and decision offers `modes` = the inputs the model reads besides text (image, audio, video, file — OpenRouter only: other providers do not declare them; `--require video_input` keeps the models and routes that read video), `norm_price`/`norm_unit` (video per second, image per image, voice per 1000 characters, STT per minute) |
 | `endpoints` | One row per host behind a gateway per snapshot (`or_endpoints`). Views `usable_endpoints` (>= 95 % uptime 24 h, not below the vendor's own precision) and `best_endpoints` (cheapest per model, `usage` interactive = no flex tier / background = flex allowed) |
 | `provider_status` | Last 5-token live probe per provider (`probe`), OpenRouter credit in `detail` |
 
 ## 4. Tasks and the owner's knowledge
 | Table | Content | Written by |
 |---|---|---|
-| `tasks` | The 43 tasks: label, `interface`, `default_objective`, `intent_hint` (for the classifier), `internal` (module postes never offered to the classifier), `modes` (inputs a chat task needs: `video_understanding` = {video}, so only offers that read video are callable), `requirements`, `consumers` | migrations + `declare` |
+| `tasks` | The 42 tasks: label, `interface`, `default_objective`, `intent_hint` (for the classifier), `internal` (module postes never offered to the classifier), `modes` (generation modes of a media task; for a chat task the inputs every route must read — none today), `requirements`, `consumers` | migrations + `declare` |
 | `task_benchmarks` | Which boards rank a task and their **weights** (`weight`, `is_primary`) — shown on the library page under each task | migrations |
 | `preferences` | the owner's choices per task / role: objective (`best_available`, `value`, `level`), pin (model, variant, provider), role label/description/signals (video roles), `watch` | `knowledge.json` via `declare`, `prefer`, `verdict` |
 | `profiles` | What a model is *for*: strengths, weaknesses, workflow, effort, access / cost notes | `knowledge.json` |
@@ -102,5 +101,5 @@ CLI equivalents: `walter-router library` (the full table), `pick <task>`, `dossi
 ## 9. Collecting by hand
 `walter-router research [CATEGORY …] [--analyse]` (categories: text, image, video, audio, memory, decision, prices,
 hosts, plans) or `walter-router research --source KIND …` fetches sources now (all, or the given kinds: `aa`, `aa_eval`, `mm`, `da`,
-`arena`, `bridgebench`, `aa_decision`, `aa_stt`, `agentset`, `mteb`, `video_evals`, `openrouter`, `kie`, `codex`, `declared`,
+`arena`, `bridgebench`, `aa_decision`, `aa_stt`, `agentset`, `mteb`, `openrouter`, `kie`, `codex`, `declared`,
 `hermes_providers`), stores and understands them; then `walter-router refresh --skip-collect` recomputes the choices.

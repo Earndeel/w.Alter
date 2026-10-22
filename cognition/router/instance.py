@@ -112,3 +112,11 @@ def env_value(name: str) -> str | None:
     except OSError:
         pass
     return os.environ.get(name)
+
+
+def state_file(name: str) -> Path:
+    """A file the Router generates for the instance (state/router/<name>), e.g. the agents' brief."""
+    root = _walter("path")
+    if not root:
+        raise RuntimeError("no active Walter instance")
+    return Path(root) / "state" / "router" / name

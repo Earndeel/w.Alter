@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from walter_router.analysis import knowledge
-from walter_router.serve import execution, intent
+from walter_router.serve import choose, execution, intent
 
 
 def subscription_fallback(conn, task: str, exclude: str | None = None, modes: list[str] | None = None) -> dict | None:
@@ -23,22 +23,23 @@ def subscription_fallback(conn, task: str, exclude: str | None = None, modes: li
 def with_execution(conn, out: dict) -> dict:
     """Add the ordered Hermes routes to a chat decision (what the Hermes plugin runs, with fallbacks)."""
     task = conn.execute("select interface, requirements, modes from models.tasks where task = %s", (out.get("task"),)).fetchone()
+    modes = list((task or {}).get("modes") or []) + choose.INPUTS.get(out.get("require") or "", [])
     if out.get("model_id") and task and task["interface"] == "chat":
         background = (out.get("follows") or {}).get("task") == "general" and out.get("task") != "general"
         usage = "background" if background else "interactive"   # level postes (summaries, memory) may use flex hosts
         out["execution"] = execution.routes(conn, out["model_id"], out.get("variant") or "",
-                                            preferred=out.get("provider"), usage=usage, modes=task["modes"])
+                                            preferred=out.get("provider"), usage=usage, modes=modes)
         basis = (out.get("follows") or {}).get("task") or out["task"]   # a 'level' poste falls back like its tier
         if basis != "general" and not any(r["access"] == "subscription" for r in out["execution"]):
-            sub = subscription_fallback(conn, out["task"], exclude=out["model_id"], modes=task["modes"])
+            sub = subscription_fallback(conn, out["task"], exclude=out["model_id"], modes=modes)
             if sub:  # best model of this task reachable through the subscription, after the paid routes
                 out["execution"] += [{**r, "fallback_for": out["model_id"]}
-                                     for r in execution.routes(conn, sub["model_id"], sub["variant"], modes=task["modes"])]
+                                     for r in execution.routes(conn, sub["model_id"], sub["variant"], modes=modes)]
         fallback = knowledge.level_fallback(basis, out.get("level") or out.get("role"))
         if fallback:  # declared tier fallback, after every route of the pinned model
             fb_model, _, fb_variant = fallback.partition("/")
             out["execution"] += [{**r, "fallback_for": out["model_id"]}
-                                 for r in execution.routes(conn, fb_model, fb_variant, modes=task["modes"])]
+                                 for r in execution.routes(conn, fb_model, fb_variant, modes=modes)]
         effort = (task["requirements"] or {}).get("reasoning")
         if effort:   # a poste's own reasoning level (voice_assist: minimal, the latency comes first)
             out["execution"] = [{**r, "reasoning": r.get("reasoning") or effort} for r in out["execution"]]

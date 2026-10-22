@@ -7,7 +7,7 @@ the same 0-100 scale, then boards are averaged with the task's weights:
    Linear keeps the meaning of the gaps (an Elo gap is a win probability, an index gap is an index gap) and,
    unlike a percentile, still separates the leaders, which is where the router chooses.
 2. Reliability of a measure: Elo-type boards with votes/samples count v/(v+500) (a model with 300 votes weighs
-   0.38, with 20 000 votes 0.98); a provisional BridgeBench row or a vendor's self-reported score 0.5; otherwise 1.
+   0.38, with 20 000 votes 0.98); a provisional BridgeBench row 0.5; otherwise 1.
 3. Composite = (sum weight x reliability x q + K x 50) / (sum weight x reliability + K): a model measured on a single
    light board is pulled toward the middle instead of winning on thin evidence (K = 0.25).
 4. the owner's own verdicts (models.feedback, last 180 days, this task or any): +/-3 points per net rating, capped
@@ -26,15 +26,12 @@ from walter_router import instance
 SHRINK_K = 0.25
 FEEDBACK_POINTS = 3.0  # per net rating point from the owner on that task (capped at +/-3 -> +/-9 composite points)
 VOTES_HALF = 500.0
-SELF_REPORTED = 0.5   # a vendor's claim about its own model (LLM Stats rows) weighs half a measurement
 
 
 def _reliability(row: dict) -> float:
     extra = row.get("extra") or {}
     if extra.get("provisional"):
         return 0.5
-    if extra.get("self_reported"):
-        return SELF_REPORTED
     votes = extra.get("votes") or extra.get("samples")
     if isinstance(votes, (int, float)) and votes > 0:
         return votes / (votes + VOTES_HALF)

@@ -24,13 +24,14 @@
   "interfaces": [
     "CLI",
     "walter-llm task routes",
-    "MCP route lookup"
+    "MCP walter_route / walter_run / walter_generate / walter_plans",
+    "agents' brief (`walter-router brief`, @instance/state/router/brief.md)"
   ],
   "bindings": {
-    "hermes": "router plugin + auxiliary configuration adapter",
-    "dsh": "walter-llm provider",
-    "codex": "task lookup; primary model native",
-    "claude-code": "task lookup; primary model native"
+    "hermes": "router plugin (same tools, brief as a system-prompt section) + auxiliary configuration adapter",
+    "dsh": "walter-llm provider; router tools through the walter MCP + brief in the profile",
+    "codex": "router tools through the walter MCP + brief in the profile; primary model native",
+    "claude-code": "router tools through the walter MCP, brief in the server instructions; primary model native"
   },
   "limitations": [
     "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
@@ -69,9 +70,33 @@
       {
         "id": "primary",
         "transport": "mcp",
-        "interface": "model_route",
+        "interface": "walter_route",
         "access": "read",
         "timeout_seconds": 30,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "run",
+        "transport": "mcp",
+        "interface": "walter_run",
+        "access": "write",
+        "timeout_seconds": 900,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "generate",
+        "transport": "mcp",
+        "interface": "walter_generate",
+        "access": "write",
+        "timeout_seconds": 1800,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "plans",
+        "transport": "mcp",
+        "interface": "walter_plans",
+        "access": "write",
+        "timeout_seconds": 60,
         "timeout_status": "implemented"
       }
     ],
@@ -114,5 +139,8 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
-  }
+  },
+  "public": [
+    "@instance/state/router/brief.md"
+  ]
 }

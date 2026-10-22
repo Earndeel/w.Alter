@@ -16,8 +16,7 @@ from walter_router.analysis import media
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
 MEDIA_UNITS = media.NORM_UNITS   # image per image, video per second, voice per 1000 characters, stt per minute…
 BENCH_KIND = {"aa_intelligence": "aa", "aa_eval": "aa_eval", "aa_decision": "aa_decision", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena",
-              "bridgebench": "bridgebench", "aa_stt": "aa_stt", "agentset": "agentset", "mteb": "mteb",
-              "video_mme_v2": "video_evals", "llm_stats": "video_evals"}
+              "bridgebench": "bridgebench", "aa_stt": "aa_stt", "agentset": "agentset", "mteb": "mteb"}
 
 
 def latest_snapshots(conn) -> dict[str, int]:

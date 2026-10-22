@@ -286,3 +286,20 @@ Same day, what the agent sees: `route` no longer calls the decision model when t
 level for general); it reads an optional `--context` line, so « fais la suite » is classified with what came before;
 the Hermes plugin shows each route's price per million tokens (a subscription at its cost price) and no longer a
 media route for text decisions; the tool descriptions name the decision model instead of Jev.
+
+Withdrawn the same day by the owner (« on n'a pas de benchmark satisfaisant sur la vidéo, donc pas besoin d'en faire
+une catégorie spécifique », migration 032): no video task and no video boards. What stays: chat offers record the
+inputs a model reads, and `--require video_input` (pick / route / walter_route) gives the best image-analysis model
+that reads a video, with only routes that accept it.
+
+## Every agent knows the router (2026-10-22)
+The owner: « il faut que le modèle appelé sache que ce module existe, à quoi il sert, et quels sont ses paramètres
+d'utilisation (spécialisations, niveaux de réflexion, capacités de génération ou d'analyse, modèle de décision…), sans
+qu'il ait besoin de connaître le nom du modèle, son provider ». Claude Code and Codex had called the router for a real
+task zero times in 30 days (only maintenance sessions): their profile had one line on a lookup tool, nothing on what to
+ask for, and no way to run a sub-task or a generation. Now one brief, generated from the database (`serve/brief.py`,
+`walter-router brief`), reaches every runtime: Hermes as a system-prompt section, the walter MCP server as its
+instructions (Claude Code), the Codex / DSH profiles through `@instance/state/router/brief.md` (written by the cycle,
+profiles re-rendered by walter-soul when it changes). The same four tools everywhere: `walter_route`, `walter_run`,
+`walter_generate`, `walter_plans` (MCP: `walter_run` is one walter-llm call with its own agent token `walter-mcp`).
+The agent view of a decision (`--agent`, `serve/agent_view.py`) is the router's, shared by the plugin and the MCP.
