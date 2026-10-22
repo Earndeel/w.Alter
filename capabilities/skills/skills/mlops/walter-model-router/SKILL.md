@@ -19,14 +19,17 @@ The old store (schema `walter_router`, fixed weight vectors, router_matrix.json)
 
 ## Ask the router — never hardcode a model
 - `walter-router pick <task> [--level L1|L2|L3] [--role R]` — model, provider order with prices, fallbacks.
-  `walter-router tasks` lists the task keys (42, incl. medical, legal, engineering, finance, strategy, cybersecurity,
-  science, long_context, writing, music, vision, video roles…).
-- `walter-router route "<demande>"` — the decision model (d1-ultra, then Mercury Decide free, then Clef) classifies
-  the request, then the decision with its execution routes. `classify` = intent only.
+  `walter-router tasks` lists the task keys (43, incl. medical, legal, engineering, finance, strategy, cybersecurity,
+  science, long_context, writing, music, vision, video_understanding, video roles…).
+- `walter-router route "<demande>" [--context "<what the conversation was about>"]` — the decision model (d1-ultra,
+  then Mercury Decide free, then Clef) classifies the request (with `--context` when it depends on earlier turns,
+  e.g. « fais la suite »), then the decision with its execution routes and each route's price per million tokens.
+  Not called when `--task` (and `--level` for general) are given. `classify` = intent only.
 - `walter-router dossier <task>` — the evidence behind a choice; `walter-router library` — the whole table (also the
   library page, behind Cloudflare Access).
 - Text calls from modules or agents: walter-llm (127.0.0.1:8894, OpenAI-compatible, `model` = a router task, per-agent
-  token). Hermes: plugin tools walter_route, walter_run, walter_generate, walter_feedback, walter_verdict, walter_plans.
+  token). Hermes: plugin tools walter_route, walter_run, walter_generate, walter_feedback, walter_verdict, walter_plans
+  (walter_route / walter_run take `conversation`, the same line as `--context`).
 - Media: `walter-router generate "<demande>" --task …` — costs money, only on request.
 
 ## How a choice is made (read the README for details)
