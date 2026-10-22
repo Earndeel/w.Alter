@@ -41,7 +41,7 @@ MAX_FALLBACKS = 2
 
 
 def _wanted(conn, poste: str, level: str | None = None) -> dict | None:
-    from walter_router.cli import with_execution
+    from walter_router.serve.routes import with_execution
     from walter_router.serve import choose
     d = with_execution(conn, choose.pick(conn, poste, level))
     routes = [r for r in d.get("execution") or [] if r.get("probe_ok") is not False and not r.get("unreliable")]
@@ -90,7 +90,7 @@ def _plan_home(home: Path, aux: dict, wanted: dict) -> list[dict]:
 def host_orders(conn) -> dict[str, list[str]]:
     """OpenRouter model id -> the router's host order (cheapest usable host first) for every OpenRouter route of
     every chat task: Hermes applies it through provider_routing.models.<id>.order (its own config, no core patch)."""
-    from walter_router.cli import with_execution
+    from walter_router.serve.routes import with_execution
     from walter_router.serve import choose
     out: dict[str, list[str]] = {}
     tasks = [r["task"] for r in conn.execute("select task from models.tasks where interface = 'chat'")]

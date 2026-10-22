@@ -9,38 +9,15 @@ A deterministic sentence is used when the model is unreachable.
 from __future__ import annotations
 
 import json
-import re
-import subprocess
 
 from walter_router import paths
-from walter_router.serve import execution
-from walter_router.analysis.alerts import HERMES
+from walter_router.serve.oneshot import ask_l1
 from walter_router import instance
 
 USES = {"decision": f"comprendre les demandes de {instance.owner()} et choisir le modèle (Walter Router, chaîne de décision : "
                     "modèle retenu, puis Mercury Decide gratuit, puis Clef sur Workers AI)",
         "decision_vision": "aucun usage en production pour l'instant (prévu : navigation web rapide, tri d'images en masse)"}
 EVAL = paths.EVAL / "decision_results.json"
-
-
-def ask_l1(conn, prompt: str, source: str, timeout: int = 240, tools: str = "memory", max_turns: int = 1) -> str | None:
-    """One-shot answer from the economic tier (L1) through Hermes, as craft_prompt does (tools: Hermes toolsets)."""
-    from walter_router.serve import choose
-    d = choose.pick(conn, "general", "L1")
-    route = next((r for r in execution.routes(conn, d["model_id"], d.get("variant") or "")
-                  if r.get("probe_ok") is not False), None)
-    if not route:
-        return None
-    cmd = [str(HERMES), "chat", "-q", prompt, "--oneshot", "-Q", "--provider", route["hermes_provider"], "-m",
-           route["model"], "-t", tools, "--max-turns", str(max_turns), "--source", source]
-    if route.get("reasoning"):
-        cmd += ["--reasoning", route["reasoning"]]
-    out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                         env=instance.child_env(WALTER_ROUTER_CHILD="1"))
-    lines = [ln for ln in re.sub(r"\x1b\[[0-9;]*m", "", out.stdout).splitlines()
-             if ln.strip() and not ln.startswith(("session_id:", "⚠", "Warning:")) and "hermes doctor" not in ln]
-    text = " ".join(lines).strip().strip('"')
-    return text or None
 
 
 def _per_call(point: dict) -> float | None:

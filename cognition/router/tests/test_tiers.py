@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from walter_router.analysis import alerts
+from walter_router.analysis import telegram
 from walter_router.serve import choose
 from walter_router.store import db
 from walter_router.analysis import tiers
@@ -59,7 +60,7 @@ def test_divergence_from_declared_tier_raises_one_alert_and_adopting_pins_it(con
     created = alerts.tiers(conn, run, news)
     assert created == ["L1:gpt-6-luna/max"]
     a = conn.execute("select * from models.alerts where kind = 'tier'").fetchone()
-    assert "Niveau texte L1" in alerts.render([a], conn)
+    assert "Niveau texte L1" in telegram.render([a], conn)
     alerts.verdict(conn, a["alert_id"], "adopted")
     p = conn.execute("select pinned_variant from models.preferences where task = 'general' and role = 'L1'").fetchone()
     assert p["pinned_variant"] == "max"

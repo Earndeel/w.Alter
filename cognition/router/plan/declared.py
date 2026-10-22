@@ -84,7 +84,7 @@ def retire(sub_id: str, why: str, source: str = "owner") -> dict:
 def expiring(conn, days: int = 30) -> list[str]:
     """A dated offer (`until`, e.g. Google AI Pro 15 months) ending within `days` becomes one Telegram notice."""
     from datetime import date
-    from walter_router.analysis.alerts import _upsert
+    from walter_router.analysis import alerts
     out = []
     for sub in read().get("subscriptions", []):
         until = sub.get("until")
@@ -96,6 +96,6 @@ def expiring(conn, days: int = 30) -> list[str]:
             ev = {"action": "none", "sub_id": sub["id"], "vendor": sub.get("vendor"), "plan": sub.get("plan"),
                   "mail_date": until, "text": f"l'offre {sub.get('plan')} se termine le {until} (dans {left} jours)",
                   "quote": sub.get("note") or ""}
-            if _upsert(conn, "plan_change", "", f"{sub['id']}:ends:{until}", ev, "open"):
+            if alerts.record(conn, "plan_change", "", f"{sub['id']}:ends:{until}", ev, "open"):
                 out.append(sub["id"])
     return out

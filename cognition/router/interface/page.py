@@ -306,7 +306,7 @@ EXCLUDED = {"not included in Pro (usage credits at API price)": "non inclus dans
 
 def render(conn, rs: list[dict], ctx: dict) -> str:
     from walter_router.interface.library import _name
-    from walter_router.analysis.alerts import _board_fr
+    from walter_router.analysis.telegram import _board_fr
     pts = sel.general_points(conn)
     run = conn.execute("select run_id from models.latest_run").fetchone()
     srows = list(conn.execute("""select level, model_id, variant, quality, real_cost from models.selection

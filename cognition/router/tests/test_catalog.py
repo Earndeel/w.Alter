@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from walter_router.analysis import alerts
+from walter_router.analysis import telegram
 from walter_router.analysis import catalog
 from walter_router.analysis import parse
 from walter_router.research.benchmarks import arena
@@ -146,7 +147,7 @@ def test_new_best_for_a_specialised_task_is_the_only_kind_of_news(conn):
     pend = alerts.pending(conn)
     assert {a["kind"] for a in pend} - {"board_down"} <= {"challenger", "tier", "new_best"}   # + outages (2026-10-14)
     a = next(a for a in pend if a["kind"] == "new_best")
-    assert "proposé" in alerts.render([a], conn)
+    assert "proposé" in telegram.render([a], conn)
     assert conn.execute("select pinned_model_id from models.preferences where task = 'coding'").fetchone()[
         "pinned_model_id"] == old                       # proposed, not switched
     alerts.verdict(conn, a["alert_id"], "adopted")      # « Passer au nouveau » pins the newcomer

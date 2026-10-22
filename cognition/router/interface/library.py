@@ -163,7 +163,7 @@ def boards_of(conn, task: str) -> tuple[str, str]:
 
 
 def rows(conn) -> list[dict]:
-    from walter_router.cli import with_execution   # late import (cli -> library)
+    from walter_router.serve.routes import with_execution   # late import (cli -> library)
     offers = sel.load_offers(conn, sel.latest_snapshots(conn))
     runnable = set(media_exec._models())
     hosts = best_hosts(conn)
@@ -351,7 +351,7 @@ def render_html(rs: list[dict], ctx: dict) -> str:
     when = when.astimezone(timezone.utc).strftime("%d/%m/%Y %H:%M UTC") if when else "?"
     counts = ctx.get("counts") or {}
     stats = " · ".join(f"{titles.get(k, ('', k))[1] or k} {counts[k]}" for k in order if k in counts)
-    from walter_router.analysis.alerts import _board_fr   # 'arena:image_edit' -> 'Arena retouche d'image'
+    from walter_router.analysis.telegram import _board_fr   # 'arena:image_edit' -> 'Arena retouche d'image'
     def board(subject: str) -> str:
         bench, _, task = subject.partition(":")
         return _board_fr(f"{catalog.BOARDS.get(bench, bench)} {task}")

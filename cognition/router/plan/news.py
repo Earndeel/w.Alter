@@ -84,7 +84,7 @@ def from_mail(conn, days: int = NEWS_DAYS) -> list[int]:
     ids = [m["id"] for m in mail._get(token, f"messages?maxResults=40&q={quote(q)}").get("messages", [])]
     seen = {r["source_url"] for r in conn.execute("select source_url from models.plan_evidence where origin = 'email'")}
     created = []
-    from walter_router.analysis.alerts import _upsert
+    from walter_router.analysis import alerts
     for mid in ids:
         ref = f"gmail:{mid}"
         if ref in seen:
@@ -117,7 +117,7 @@ def from_mail(conn, days: int = NEWS_DAYS) -> list[int]:
                      (sub_id, vendor, plan, f"mail {vendor}", ref, day, f"{subject} — {snippet}"[:400]))
         ev = {"action": "none", "news": True, "sub_id": sub_id, "vendor": vendor, "plan": plan, "mail_date": str(day),
               "title": subject[:160], "quote": snippet, "source": f"mail {vendor} du {day}"}
-        if _upsert(conn, "plan_change", "", f"{sub_id}:news:{ref}", ev, "open"):
+        if alerts.record(conn, "plan_change", "", f"{sub_id}:news:{ref}", ev, "open"):
             created.append(ref)
     return created
 
@@ -125,7 +125,7 @@ def from_mail(conn, days: int = NEWS_DAYS) -> list[int]:
 def from_web(conn, evidence_ids: list[int]) -> list[int]:
     """Facts the web research just added for one of the owner's plans, unless the same fact was already known."""
     created = []
-    from walter_router.analysis.alerts import _upsert
+    from walter_router.analysis import alerts
     for r in conn.execute("""select e.* from models.plan_evidence e where e.evidence_id = any(%s) and e.sub_id is not null
                              and not exists (select 1 from models.plan_evidence o where o.evidence_id < e.evidence_id
                                              and o.sub_id = e.sub_id and o.metric = e.metric
@@ -136,6 +136,6 @@ def from_web(conn, evidence_ids: list[int]) -> list[int]:
         ev = {"action": "none", "news": True, "sub_id": r["sub_id"], "vendor": r["vendor"], "plan": r["plan"],
               "mail_date": str(r["published"] or ""), "title": title[:160], "quote": (r["quote"] or "")[:240],
               "source": r["source_name"], "url": r["source_url"]}
-        if _upsert(conn, "plan_change", "", f'{r["sub_id"]}:news:web:{r["evidence_id"]}', ev, "open"):
+        if alerts.record(conn, "plan_change", "", f'{r["sub_id"]}:news:web:{r["evidence_id"]}', ev, "open"):
             created.append(r["evidence_id"])
     return created
