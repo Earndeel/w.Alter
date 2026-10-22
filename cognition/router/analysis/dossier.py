@@ -86,7 +86,9 @@ def _ranking(conn, t: dict, pinned: set[str], n: int) -> list[dict]:
     for i, c in enumerate(scoring.composite(conn, t["task"])):
         if i >= n and c["model_id"] not in pinned:
             continue
-        mine = [o for o in offers.get(c["model_id"], []) if o["interface"] == t["interface"]]
+        need = set(t["modes"] or []) if t["interface"] == "chat" else set()   # a task reading video: offers that read it
+        mine = [o for o in offers.get(c["model_id"], []) if o["interface"] == t["interface"]
+                and need <= set(o.get("modes") or [])]
         route = sel.media_route(mine, t["interface"], t["modes"]) if t["interface"] != "chat" else None
         out.append({"rank": i + 1, "model_id": c["model_id"], "composite": c["composite"],
                     "pinned": c["model_id"] in pinned, "callable": bool(mine),

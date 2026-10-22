@@ -140,7 +140,6 @@ def test_dominance_watch_ignores_better_but_dearer_models(conn):
 
 
 def test_notification_buttons_one_row_per_news():
-    from walter_router.analysis import alerts
     rows = telegram.keyboard(None, [{"alert_id": 1, "kind": "tier", "ref": 3, "role": "L2", "subject": "gpt-6-luna/max",
                                    "evidence": {"current": "gpt-6-1-sol/medium"}},
                                   {"alert_id": 2, "kind": "nerf", "ref": 4, "role": "", "subject": "minimax-h3"}])

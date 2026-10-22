@@ -23,7 +23,7 @@ def routes_for(conn, model_id: str, interface: str, modes: list[str] | None = No
     """Every current route for one model: subscription first, then paid routes cheapest first."""
     snaps = sel.latest_snapshots(conn)
     offers = sel.load_offers(conn, snaps).get(model_id, [])
-    return sel.chat_route(offers, None) if interface == "chat" else sel.media_route(offers, interface, modes)
+    return sel.chat_route(offers, None, modes) if interface == "chat" else sel.media_route(offers, interface, modes)
 
 
 def _pinned_answer(conn, task: dict, pref: dict) -> dict[str, Any]:
@@ -68,7 +68,7 @@ def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]
                               left join models.profiles pr on pr.model_id = c.model_id
                               where o.snapshot_id = any(%s) and o.interface = %s and {REQUIREMENTS[require]}""",
                           (ids, t["interface"])):
-        route = sel.chat_route(offers[c["model_id"]], None) if t["interface"] == "chat" else \
+        route = sel.chat_route(offers[c["model_id"]], None, t["modes"]) if t["interface"] == "chat" else \
             sel.media_route(offers[c["model_id"]], t["interface"], t["modes"])
         if not route["callable"]:
             continue

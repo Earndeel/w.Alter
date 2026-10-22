@@ -145,8 +145,10 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("request")
     rt.add_argument("--task")
     rt.add_argument("--level", choices=choose.LEVELS)
+    rt.add_argument("--context", help="one line on what the conversation was about before this request")
     cl = sub.add_parser("classify", help="intent only, by the decision model (task, video role, level, unrestricted)")
     cl.add_argument("request")
+    cl.add_argument("--context", help="one line on what the conversation was about before this request")
     o = sub.add_parser("dossier", help="the task's pre-computed dossier (what the router reads)")
     o.add_argument("task")
     q = sub.add_parser("plans", help="the owner's plans (subscriptions): list | set ID [--price …] | retire ID")
@@ -222,9 +224,9 @@ def main(argv: list[str] | None = None) -> int:
             elif args.cmd == "decide":
                 out = with_execution(conn, knowledge.decide(conn, args.task, args.intent, args.level))
             elif args.cmd == "route":
-                out = route(conn, args.request, args.task, args.level)
+                out = route(conn, args.request, args.task, args.level, args.context)
             elif args.cmd == "classify":
-                out = intent.classify(conn, args.request)
+                out = intent.classify(conn, args.request, context=args.context)
             elif args.cmd == "log-exec":
                 out = {"exec_id": execution.log(conn, json.loads(args.entry))}
             elif args.cmd == "feedback":

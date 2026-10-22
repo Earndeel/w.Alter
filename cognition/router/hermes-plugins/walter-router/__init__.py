@@ -1,7 +1,7 @@
 """Walter Router tools for Hermes (plugin; Hermes core is never patched).
 
-walter_route  which model/provider for a task, from the owner's favourites and the nightly model database
-              (/opt/walter-router, schema `models`): role by objective, route, workflow, cost, constraints.
+walter_route  which model/provider for a task, from the owner's favourites and the router's model database
+              (the `walter-router` command): role by objective, route, workflow, cost, constraints.
 walter_run    runs a text sub-task on the routed model in a separate one-shot Hermes process
               (`hermes chat --oneshot --provider P -m M`, the public CLI — plugin tools receive no parent agent,
               so delegate_task cannot be pinned to a model from here). Falls back to the next route on failure.
@@ -58,7 +58,8 @@ TASKS, TASK_HELP = _tasks()
 
 
 async def _decide(args: Mapping[str, Any]) -> dict:
-    """With a task: that task. Without: Jev classifies the request (task, video role, level, unrestricted)."""
+    """With a task: that task. Without: the decision model classifies the request (task, video role, level,
+    unrestricted), reading `conversation` too when the request depends on earlier turns."""
     task = str(args.get("task") or "").strip()
     if task and task not in TASKS:
         raise ValueError(f"unknown task {task}; use one of {TASKS}")
@@ -67,6 +68,8 @@ async def _decide(args: Mapping[str, Any]) -> dict:
         cmd = ["pick", task or "general", "--require", str(args["require"])]
     else:
         cmd = ["route", request] + (["--task", task] if task else [])
+        if args.get("conversation"):
+            cmd += ["--context", str(args["conversation"])[:600]]
     if args.get("level") in ("L1", "L2", "L3"):
         cmd += ["--level", str(args["level"])]
     return await _cli(*cmd)
@@ -80,10 +83,9 @@ def _compact(d: dict) -> dict:
     if d.get("profile"):
         out["profile"] = {k: v for k, v in d["profile"].items() if v}
     if d.get("execution"):
-        out["execution"] = [{k: e.get(k) for k in ("hermes_provider", "model", "reasoning", "probe_ok", "fallback_for")
-                             if e.get(k) is not None} for e in d["execution"][:6]]
+        out["execution"] = [_route_line(e) for e in d["execution"][:6]]
     route = d.get("route") or {}
-    if route.get("paid"):
+    if route.get("paid") and not d.get("execution"):   # media decisions only: a chat model's cost is per route
         out["media_route"] = {k: route["paid"].get(k) for k in ("provider", "offer_key", "cost", "unit", "by_resolution")}
     if d.get("ui"):
         out["ui"] = d["ui"]
@@ -95,6 +97,24 @@ def _compact(d: dict) -> dict:
     if d.get("alternatives"):
         out["alternatives"] = d["alternatives"][:5]
     return out
+
+
+def _route_line(e: dict) -> dict:
+    """One execution route as the agent needs it: who runs it, and what a million tokens costs there (in / out):
+    the subscription's cost price while its quota lasts, else the host's or provider's price."""
+    line = {k: e.get(k) for k in ("hermes_provider", "model", "reasoning", "probe_ok", "fallback_for") if e.get(k) is not None}
+    sub = e.get("subscription") or {}
+    price = e.get("cost_price_1m") or ({"in": e["host"]["price_in_1m"], "out": e["host"]["price_out_1m"]}
+                                       if (e.get("host") or {}).get("price_in_1m") is not None else None)
+    if price:
+        line["usd_per_1m"] = {k: round(v, 4) for k, v in price.items() if v is not None}
+    elif e.get("blended_1m") is not None:
+        line["usd_per_1m_blended"] = round(e["blended_1m"], 4)
+    if sub:
+        line["subscription"] = {"plan": sub.get("plan"), "quota_used_percent": sub.get("quota_used_percent")}
+    if (e.get("host") or {}).get("host"):
+        line["host"] = e["host"]["host"]
+    return line
 
 
 async def _handle_route(args: Mapping[str, Any], **_: Any) -> str:
@@ -231,8 +251,11 @@ ROUTE_SCHEMA = {
         "delegating any substantial work, and follow its answer: model, provider, route, workflow steps to plan "
         "(e.g. Seedance needs reference images first), cost, warnings. For video the role depends on the objective "
         "(premium, action, UGC, budget...). Pass the user's request verbatim in `request`; leave `task` empty and "
-        "the intent classifier (Jev) picks task, video objective, level and constraints. Set `task` only to "
-        "force it. If the chosen role looks wrong, use the `brief` to pick the right one. Tasks: " + TASK_HELP
+        "the router's decision model picks task, video objective, level and constraints. When the request only "
+        "makes sense with earlier turns (« fais la suite », « pareil en mieux »), say what it is about in "
+        "`conversation`. Set `task` (and `level` for general) only to force them. Each execution route shows its "
+        "price per million tokens (a subscription at its cost price). If the chosen role looks wrong, use the "
+        "`brief` to pick the right one. Tasks: " + TASK_HELP
     ),
     "parameters": {
         "type": "object",
@@ -240,6 +263,8 @@ ROUTE_SCHEMA = {
             "task": {"type": "string", "enum": TASKS,
                      "description": "Optional: force the task family (otherwise classified from the request)."},
             "request": {"type": "string", "description": "The user's request, verbatim (French is fine)."},
+            "conversation": {"type": "string", "description": "Optional: one line on what the conversation was "
+                             "about, when the request depends on earlier turns."},
             "require": {"type": "string", "enum": ["unrestricted", "open_weights"],
                         "description": "Hard constraint, only when the request needs it."},
             "level": {"type": "string", "enum": ["L1", "L2", "L3"],
@@ -263,6 +288,8 @@ RUN_SCHEMA = {
         "properties": {
             "task": {"type": "string", "enum": TASKS, "description": "Optional: force the task family."},
             "request": {"type": "string", "description": "The user's request verbatim (used for routing)."},
+            "conversation": {"type": "string", "description": "Optional: one line on what the conversation was "
+                             "about, when the request depends on earlier turns (used for routing)."},
             "goal": {"type": "string", "description": "Complete, self-contained instructions for the sub-agent."},
             "context": {"type": "string", "description": "Facts/files/excerpts the sub-agent needs."},
             "level": {"type": "string", "enum": ["L1", "L2", "L3"]},
@@ -429,8 +456,8 @@ def _home_chat() -> str | None:
 
 
 def _wire_buttons(application: Any, adapter: Any) -> None:
-    """Buttons of the Walter Router notification (callback data 'wr:<a|d>:<ref>[:<role>]', sent by
-    /opt/walter-router alerts.notify): run `walter-router verdict`, then drop that row and append the outcome."""
+    """Buttons of the Walter Router notification (callback data 'wr:<a|d>:<ref>[:<role>]', sent by the
+    router's analysis/telegram.py): run `walter-router verdict`, then drop that row and append the outcome."""
     from telegram import InlineKeyboardMarkup
     from telegram.ext import CallbackQueryHandler
 

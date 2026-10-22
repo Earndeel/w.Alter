@@ -48,6 +48,14 @@
     "rerank-3-5": {
       "model_id": "rerank-v3-5",
       "reason": "Agentset 'Cohere Rerank 3.5' = Cohere API id rerank-v3.5 (OpenRouter cohere/rerank-v3.5); Cohere names the model Rerank 3.5"
+    },
+    "gemini-3-pro-preview": {
+      "model_id": "gemini-3-pro",
+      "reason": "Gemini 3 Pro shipped under the API id gemini-3-pro-preview (Google, 2025-11-18); LLM Stats keys it by that id, Video-MME-v2, Arena and Kie name it Gemini 3 Pro"
+    },
+    "gemini-3-flash": {
+      "model_id": "gemini-3-flash-preview",
+      "reason": "Gemini 3 Flash is served as gemini-3-flash-preview (OpenRouter google/gemini-3-flash-preview, LLM Stats); Arena and Video-MME-v2 call it Gemini-3-Flash; no other Gemini 3 Flash release"
     }
   },
   "kie": {},
