@@ -231,8 +231,20 @@ compression (fp4 / fp8 / bf16) and reliability. `research/prices/openrouter_endp
 the active library uses (shortlist + pins) into `models.endpoints`; `models.best_endpoints` keeps the cheapest usable
 one per model: >= 95 % successful requests over 24 h, never below the vendor's own precision (4-bit only when the
 vendor itself serves 4-bit, e.g. Kimi K3 mxfp4), flex tier (half price, slower) only for background work. The library
-page shows that host next to the OpenRouter price. Calls do not use it yet (OpenRouter still picks the host): pending
-the owner's decision (2026-10-22).
+page shows that host next to the OpenRouter price. Since 2026-10-22 (owner's go) the route carries
+`or_provider` = usable hosts cheapest first (`allow_fallbacks`), and walter-llm passes it to OpenRouter
+(`extra_body.provider`); its log records the host that answered. Hermes' own `walter_run` (hermes chat --provider
+openrouter) cannot pass it and still lets OpenRouter choose.
+
+## Subscriptions in the price (2026-10-22)
+Owner: « en prenant en compte aussi les abonnements et le prix de revient du token avec ceux-ci ». `research plans`
+(and every cycle) records in `models.subscription_costs` the cost price of a token through each plan = plan price / API
+value it carries per month, at the current pace (7 days x 4.35) and at capacity (measured meter points, else
+SemiAnalysis). ChatGPT Plus on 2026-10-22: 2.1 % of the API price at the current pace, 4 % at measured capacity.
+A subscription route (`route_provider` in the instance's subscriptions.json) carries `cost_price_1m` and its weekly
+meter; it stays first while the meter is under 90 % (`execution.QUOTA_SWITCH`), then goes after the paid routes. The
+library shows « Codex ≈ 0,04/0,21 $/M (prix de revient, 2,1 % du prix API, quota 4 %) ». Claude Pro has no route
+(Claude Code only).
 
 ## Research by category (2026-10-22)
 `walter-router research [text|image|video|audio|memory|decision|prices|hosts|plans|all] [--analyse]` runs one or more

@@ -34,6 +34,12 @@ def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = Fal
             if not skip_collect:
                 with conn.transaction():
                     report["providers"] = execution.probe(conn)
+                try:   # research plans: cost price of a token through each subscription (never blocks the cycle)
+                    from walter_router.research.plans import subscriptions
+                    with conn.transaction():
+                        report["subscription_costs"] = subscriptions.record_costs(conn)
+                except Exception as exc:  # noqa: BLE001
+                    report["subscription_costs"] = {"error": f"{type(exc).__name__}: {exc}"[:200]}
             with conn.transaction():
                 rows = sel.compute(conn)
                 sel.save(conn, run_id, rows)

@@ -126,8 +126,10 @@ def with_execution(conn, out: dict) -> dict:
     """Add the ordered Hermes routes to a chat decision (what the Hermes plugin runs, with fallbacks)."""
     task = conn.execute("select interface, requirements from models.tasks where task = %s", (out.get("task"),)).fetchone()
     if out.get("model_id") and task and task["interface"] == "chat":
+        background = (out.get("follows") or {}).get("task") == "general" and out.get("task") != "general"
+        usage = "background" if background else "interactive"   # level postes (summaries, memory) may use flex hosts
         out["execution"] = execution.routes(conn, out["model_id"], out.get("variant") or "",
-                                            preferred=out.get("provider"))
+                                            preferred=out.get("provider"), usage=usage)
         basis = (out.get("follows") or {}).get("task") or out["task"]   # a 'level' poste falls back like its tier
         if basis != "general" and not any(r["access"] == "subscription" for r in out["execution"]):
             sub = subscription_fallback(conn, out["task"], exclude=out["model_id"])
@@ -220,7 +222,7 @@ def _research(args) -> int:
         out = {"categories": names, "sources": sources.collect_all(conn, ingest.store, only=args.sources, parts=parts)}
         conn.commit()
         if plans:
-            out["plans"] = subscriptions.refresh(conn)
+            out["plans"] = {"meters": subscriptions.refresh(conn), "cost_price": subscriptions.record_costs(conn)}
             conn.commit()
     if args.analyse:
         out["analysis"] = {k: v for k, v in refresh(notify=False, skip_collect=True).items() if k in ("run_id", "selection_rows")}

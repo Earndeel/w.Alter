@@ -184,7 +184,10 @@ def litellm_target(route: dict) -> dict | None:
         return {"model": f"anthropic/{m}", "api_base": "https://api.kie.ai/claude", "api_key": key,
                 "extra_headers": {"User-Agent": UA, "Authorization": f"Bearer {key}"}}
     if p == "openrouter":
-        return {"model": f"openrouter/{m}", "api_key": provider_key("OPENROUTER_API_KEY")}
+        target = {"model": f"openrouter/{m}", "api_key": provider_key("OPENROUTER_API_KEY")}
+        if route.get("or_provider"):   # the router's host order: cheapest usable host first, the others as fallbacks
+            target["extra_body"] = {"provider": route["or_provider"]}
+        return target
     if p == "arnict":
         return {"model": f"openai/{m}", "api_base": "https://api.arnict.com/v1", "api_key": provider_key("ARNICT_API_KEY")}
     if p == "codex":                                          # ChatGPT subscription (Codex models), own login
@@ -327,7 +330,8 @@ def build_app():
                     resp.choices[0].message.content = as_json(resp.choices[0].message.content)
                 if not stream:
                     log({**base, "ok": True, "seconds": round(time.perf_counter() - t0, 2),
-                         "usage": _usage(resp)})
+                         "usage": _usage(resp), **({"host": getattr(resp, "provider", None) or
+                                                    (resp.model_dump().get("provider"))} if route["provider"] == "openrouter" else {})})
                     return JSONResponse(resp.model_dump(), headers={"X-Walter-Route": f"{route['provider']}/{route['model']}"})
                 it = resp.__aiter__()
                 first = await it.__anext__()                  # fail over until the first token arrives
