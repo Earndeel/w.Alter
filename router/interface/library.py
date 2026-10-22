@@ -111,7 +111,11 @@ BENCH_TASK = {  # bench_task -> (fr, en)
     "gpqa": ("GPQA Diamond", "GPQA Diamond"), "scicode": ("SciCode", "SciCode"), "hle": ("Humanity's Last Exam", "Humanity's Last Exam"),
     "lcr": ("long contexte (LCR)", "long context (LCR)"), "text_creative": ("écriture créative", "creative writing"),
     "music_vocals": ("musique chantée", "vocal music"), "music_instrumental": ("musique instrumentale", "instrumental music"),
-    "aa_3d": ("AA-3D", "AA-3D"), "mmmu_pro": ("MMMU-Pro", "MMMU-Pro")}
+    "aa_3d": ("AA-3D", "AA-3D"), "mmmu_pro": ("MMMU-Pro", "MMMU-Pro"),
+    "idx_engineering": ("Engineering Index", "Engineering Index"), "idx_economics": ("Economics Index", "Economics Index"),
+    "idx_finance": ("Finance & Accounting Index", "Finance & Accounting Index"),
+    "idx_medical": ("Healthcare & Medical Index", "Healthcare & Medical Index"), "idx_legal": ("Legal Index", "Legal Index"),
+    "idx_strategy_ops": ("Strategy & Ops Index", "Strategy & Ops Index"), "cyber": ("Cyber Index", "Cyber Index")}
 
 
 def boards_of(conn, task: str) -> tuple[str, str]:

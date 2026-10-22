@@ -1,7 +1,9 @@
-"""Artificial Analysis evaluations, one score per model x reasoning level: specialised domains (medical HealthBench,
+"""Artificial Analysis evaluations and domain indexes, one score per model x reasoning level: specialised domains (medical HealthBench,
 legal Harvey LAB, finance tau3-Banking, science CritPt / GPQA / SciCode / HLE), vision (MMMU-Pro), 3D (AA-3D Elo),
-long context (AA-LCR), instruction following (IFBench), multilingual (Global-MMLU-Lite), agents (tau2, Terminal-Bench
-Hard, GDPval, APEX-Agents), knowledge reliability (AA-Omniscience), coding (LiveCodeBench).
+long context (AA-LCR), instruction following (IFBench), agents (tau2, Terminal-Bench Hard, GDPval, APEX-Agents),
+knowledge reliability (AA-Omniscience), coding (LiveCodeBench), cybersecurity (AA Cyber Index); and the domain
+indexes of artificialanalysis.ai/indexes (engineering, economics, finance & accounting, healthcare, legal, strategy &
+ops) with their cost and time per task.
 
 The model pages carry AA's whole language-model catalogue with every evaluation field; an evaluation page carries the
 same objects for the models it features (HealthBench is only there). Both are read from their Next.js data, merged by
@@ -38,9 +40,15 @@ EVALS: dict[str, tuple[str, str, str]] = {
     "apex_agents": ("apexAgents", "apex-agents-aa", "pct"),
     "omniscience": ("omniscience", "omniscience", "index"),
     "livecodebench": ("livecodebench", "livecodebench", "pct"),
+    "cyber": ("cyberIndex", "artificial-analysis-cyber-index", "index"),
 }
+# AA domain indexes (artificialanalysis.ai/indexes, 2026-10): one weighted index per profession on AA's frontier models,
+# with its own cost and time per task. Read from each index page (initialModels).
+INDEX_URL = "https://artificialanalysis.ai/indexes/{}"
+INDEXES = {"idx_engineering": "engineering", "idx_economics": "economics", "idx_finance": "finance-and-accounting",
+           "idx_medical": "healthcare-and-medical", "idx_legal": "legal", "idx_strategy_ops": "strategy-and-ops"}
 # evaluations whose scores are not (or not all) in the model-page catalogue: read from their own page as well
-PAGE_ONLY = ("healthbench", "healthbench_pro")
+PAGE_ONLY = ("healthbench", "healthbench_pro", "cyber")
 MIN_MODELS = 300
 
 
@@ -64,6 +72,29 @@ def _objects(page: str) -> list[dict[str, Any]]:
             line = re.sub(r"^[0-9a-z]+:", "", line, count=1)
             try:
                 walk(json.loads(line))
+            except ValueError:
+                continue
+    return out
+
+
+def _index_models(page: str) -> list[dict[str, Any]]:
+    """The initialModels list of an AA index page: weightedIndex, costPerTask.total, timePerTaskSeconds per model."""
+    out: list[dict[str, Any]] = []
+
+    def walk(x: Any) -> None:
+        if isinstance(x, dict):
+            if isinstance(x.get("initialModels"), list):
+                out.extend(m for m in x["initialModels"] if isinstance(m, dict) and m.get("slug"))
+            for v in x.values():
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+    for m in RSC_PUSH_PATTERN.finditer(page):
+        decoded = strip_rsc_prefix(decode_rsc_string(m.group(1)))
+        for line in decoded.split("\n"):
+            try:
+                walk(json.loads(re.sub(r"^[0-9a-z]+:", "", line, count=1)))
             except ValueError:
                 continue
     return out
@@ -107,7 +138,20 @@ def source_aa_eval() -> tuple[dict, datetime, str]:
         except Exception as exc:  # noqa: BLE001 — one page must not lose the others
             errors.append(f"{key}: {exc}"[:160])
     models = merge(objects)
+    indexes: dict[str, list[dict[str, Any]]] = {}
+    for key, slug in INDEXES.items():
+        url = INDEX_URL.format(slug)
+        try:
+            rows = _index_models(fetch_text(url))
+        except Exception as exc:  # noqa: BLE001 — one index page must not lose the others
+            errors.append(f"{key}: {exc}"[:160])
+            continue
+        indexes[key] = [{"slug": m["slug"], "name": m.get("shortName") or m.get("name"), "index": _num(m.get("weightedIndex")),
+                         "cost_per_task": _num((m.get("costPerTask") or {}).get("total")),
+                         "time_per_task_s": _num(m.get("timePerTaskSeconds")), "sub_scores": m.get("subScores")}
+                        for m in rows if _num(m.get("weightedIndex")) is not None]
+        pages[key] = url
     doc = {"generated_at": now().isoformat(), "source_url": used, "pages": pages, "errors": errors,
            "evals": {k: {"field": f, "page": EVAL_URL.format(p), "unit": u} for k, (f, p, u) in EVALS.items()},
-           "data": sorted(models.values(), key=lambda r: r["slug"])}
+           "data": sorted(models.values(), key=lambda r: r["slug"]), "indexes": indexes}
     return doc, now(), used

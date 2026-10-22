@@ -3,7 +3,7 @@
  ["Combien font 17 % de 2 340 € ?", "calculation", null],
  ["Quelles sont les dernières annonces d'OpenAI cette semaine ?", "research", null],
  ["Résume-moi ce texte en 5 points", "general", null],
- ["Compare les avantages d'un PER et d'une assurance-vie pour moi", "general", null],
+ ["Compare les avantages d'un PER et d'une assurance-vie pour moi", "finance", null],
  ["Rédige un mail de relance poli à un client qui n'a pas payé", "general", null],
  ["Corrige ce bug dans ma fonction Python qui plante sur les dates", "coding", null],
  ["Écris un script bash qui sauvegarde mon dossier tous les soirs", "coding", null],
@@ -28,5 +28,17 @@
  ["Transforme cette vidéo en style dessin animé", "video_edit", null],
  ["Lis ce texte à voix haute avec une voix chaleureuse", "tts", null],
  ["Compose une musique lo-fi pour ma vidéo YouTube", "music", null],
- ["Fais une scène de combat au sabre sous la pluie, style film", "text_to_video", "action"]
+ ["Fais une scène de combat au sabre sous la pluie, style film", "text_to_video", "action"],
+ ["J'ai mal à la gorge et 38,5 de fièvre depuis 3 jours, que faire ?", "medical", null],
+ ["Mon bailleur peut-il garder ma caution pour des traces d'usure normale ?", "legal", null],
+ ["Explique-moi la renormalisation en théorie quantique des champs avec les équations", "science", null],
+ ["Voici 12 rapports annuels de 300 pages, compare leur stratégie sur 10 ans", "long_context", null],
+ ["Écris une nouvelle de science-fiction de 2000 mots au style de Borges", "writing", null],
+ ["Compose une chanson pop en français sur l'été avec du chant", "music", null],
+ ["Écris un petit mot pour souhaiter bon anniversaire à ma sœur", "general", null],
+ ["Dimensionne une poutre en acier pour une portée de 6 m avec 5 kN/m de charge", "engineering", null],
+ ["Prépare le bilan et le compte de résultat simplifié de ma SASU", "finance", null],
+ ["Quelle stratégie pour lancer ma marque de perruques en Europe face aux concurrents ?", "strategy", null],
+ ["Audite ce serveur exposé : quelles failles et comment le durcir ?", "cybersecurity", null],
+ ["Explique-moi simplement ce qu'est l'inflation", "general", null]
 ]

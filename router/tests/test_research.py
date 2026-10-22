@@ -52,5 +52,14 @@ def test_specialised_tasks_have_their_boards():
         boards = {(r["task"], r["benchmark"], r["bench_task"]) for r in conn.execute("select * from models.task_benchmarks")}
     for need in [("medical", "aa_eval", "healthbench_pro"), ("legal", "aa_eval", "harvey_lab"), ("science", "aa_eval", "critpt"),
                  ("long_context", "aa_eval", "lcr"), ("writing", "arena", "text_creative"), ("music", "aa_mm", "music_vocals"),
-                 ("3d", "aa_eval", "aa_3d"), ("vision", "aa_eval", "mmmu_pro")]:
+                 ("3d", "aa_eval", "aa_3d"), ("vision", "aa_eval", "mmmu_pro"), ("engineering", "aa_eval", "idx_engineering"),
+                 ("finance", "aa_eval", "idx_finance"), ("strategy", "aa_eval", "idx_strategy_ops"),
+                 ("cybersecurity", "aa_eval", "cyber"), ("medical", "aa_eval", "idx_medical"), ("legal", "aa_eval", "idx_legal")]:
         assert need in boards
+
+
+def test_domain_index_rows_carry_cost_per_task():
+    doc = {"evals": {}, "data": [], "indexes": {"idx_engineering": [
+        {"slug": "m-1", "name": "M 1 (max)", "index": 60.4, "cost_per_task": 5.46, "time_per_task_s": 1208.0, "sub_scores": {}}]}}
+    (r,) = parse_benchmarks("aa_eval", doc)
+    assert r["task"] == "idx_engineering" and r["score"] == 60.4 and r["cost"] == 5.46 and r["cost_unit"] == "usd_per_aa_task"

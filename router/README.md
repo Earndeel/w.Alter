@@ -220,3 +220,7 @@ GPQA 35 %, SciCode 15 %, HLE 15 %), `long_context` (AA-LCR), `writing` (Arena cr
 (20 %), vision MMMU-Pro (40 %). New tasks start unpinned (best callable model); a later #1 is only proposed. Intent
 eval after adding them: 37/38 (the original 30 all pass; « photo of a mole » goes to medical instead of vision).
 `walter-router research [--source KIND]` collects by hand (docs/DATA.md § 9).
+2026-10-22: AA domain indexes (artificialanalysis.ai/indexes, frontier models only, with cost and time per task) —
+`engineering` (Engineering Index), `finance` (Finance & Accounting 70 % + Economics 30 %), `strategy` (Strategy & Ops),
+`cybersecurity` (AA Cyber Index); `medical` now Healthcare Index 50 % + HealthBench Pro 30 % + HealthBench 20 %, `legal`
+Legal Index 60 % + Harvey LAB 40 %. Intent eval (eval/intents_fr.json, 42 cases): 41/42 (photo of a mole -> medical).
