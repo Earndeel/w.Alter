@@ -14,7 +14,7 @@ from pathlib import Path
 from walter_router import instance
 
 EDITABLE = {"vendor": str, "plan": str, "price_usd_month": float, "execution": str, "route_provider": str,
-            "models": list, "note": str, "currency_note": str}
+            "models": list, "note": str, "currency_note": str, "since": str, "until": str, "list_price_usd_month": float}
 
 
 def _path() -> Path:
@@ -79,3 +79,23 @@ def retire(sub_id: str, why: str, source: str = "owner") -> dict:
     doc.setdefault("retired", []).append({**cur, "retired": datetime.now(timezone.utc).date().isoformat(), "why": why})
     _write(doc, f"{source}: retired {sub_id} ({why})")
     return {"retired": sub_id}
+
+
+def expiring(conn, days: int = 30) -> list[str]:
+    """A dated offer (`until`, e.g. Google AI Pro 15 months) ending within `days` becomes one Telegram notice."""
+    from datetime import date
+    from walter_router.analysis.alerts import _upsert
+    out = []
+    for sub in read().get("subscriptions", []):
+        until = sub.get("until")
+        try:
+            left = (date.fromisoformat(until) - date.today()).days if until else None
+        except ValueError:
+            continue
+        if left is not None and 0 <= left <= days:
+            ev = {"action": "none", "sub_id": sub["id"], "vendor": sub.get("vendor"), "plan": sub.get("plan"),
+                  "mail_date": until, "text": f"l'offre {sub.get('plan')} se termine le {until} (dans {left} jours)",
+                  "quote": sub.get("note") or ""}
+            if _upsert(conn, "plan_change", "", f"{sub['id']}:ends:{until}", ev, "open"):
+                out.append(sub["id"])
+    return out

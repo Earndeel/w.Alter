@@ -34,9 +34,10 @@ AMOUNT = re.compile(r"(?:(US\$|\$|€|EUR|USD)\s?(\d{1,4}(?:[.,]\d{2})?))|(?:(\d
 CANCEL = re.compile(r"will be cancel|has been cancel|cancell?ed|annulé|résili|prendr\w* fin|avantages .* fin|ended", re.I)
 TRIAL = re.compile(r"essai .*se terminera|trial (ends|will end)", re.I)
 UPGRADE = re.compile(r"upgrade|vous êtes passé|now on", re.I)
+EXPIRED = re.compile(r"a expiré|has expired|expired", re.I)
 CREDIT = re.compile(r"credit|crédit|top.?up|balance|recharge|API", re.I)
 PAY_AS_YOU_GO = {"OpenRouter", "Kie"}   # credit top-ups, not plans
-GOOGLE_BILLING = ("googleplay-noreply@google.com", "payments-noreply@google.com")
+GOOGLE_BILLING = ("googleplay-noreply@google.com", "payments-noreply@google.com", "googleone-noreply@google.com")
 REDACT = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+|\b\d{6,}\b|\*{2,}\d+|#[\d-]{6,}|\b[0-9A-F]{6}-[0-9A-F]{6}-[0-9A-F]{6}\b")
 
 
@@ -73,7 +74,8 @@ def parse(sender: str, subject: str, snippet: str) -> dict | None:
         currency = "EUR" if cur in ("€", "EUR") else "USD"
     if vendor in PAY_AS_YOU_GO or (CREDIT.search(subject or "") and not re.search(r"subscription|abonnement", subject or "", re.I)):
         return {"vendor": vendor, "plan": None, "amount": amount, "currency": currency, "event": "credit"}
-    event = "trial_end" if TRIAL.search(text) else "cancel" if CANCEL.search(text) else \
+    event = "trial_end" if TRIAL.search(text) or (EXPIRED.search(subject or "") and re.search(r"essai|trial", subject or "", re.I)) \
+        else "cancel" if CANCEL.search(text) else \
         "upgrade" if UPGRADE.search(text) else "active"
     m = re.search(r"Google AI (Pro|Ultra)", text) if vendor == "Google" else PLAN.search(text)
     if vendor == "Google" and m:
@@ -98,6 +100,9 @@ def proposal(found: dict, plans: list[dict]) -> dict | None:
     if found["event"] in ("credit", "trial_end") or not found["plan"]:
         return None
     cur = _match(found, plans)
+    since = (cur or {}).get("updated") or (cur or {}).get("declared")
+    if cur and since and found.get("date") and found["date"] < since:
+        return None   # older than the owner's own declaration of this plan: he already knows better (2026-10-22)
     if found["event"] == "cancel":
         return {"action": "retire", "sub_id": cur["id"], "text": f"{cur['vendor']} {cur['plan']} résilié"} if cur else None
     if cur is None:
@@ -148,7 +153,7 @@ def scan(conn, days: int = 120) -> dict:
         out["new"] += 1
     from walter_router.analysis.alerts import _upsert
     for (vendor, plan), (when, found, quote_txt) in latest.items():
-        p = proposal(found, plans)
+        p = proposal({**found, "date": when.date().isoformat()}, plans)
         if p:
             ev = {**p, "mail_date": str(when.date()), "vendor": vendor, "plan": plan, "amount": found["amount"],
                   "currency": found["currency"], "event": found["event"], "quote": quote_txt}

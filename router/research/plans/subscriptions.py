@@ -234,7 +234,9 @@ def refresh(conn, only: str | None = None, min_age_s: float = 0) -> dict:
     for sub in load():
         if only and sub["id"] != only:
             continue
-        source = sub["meter"]["source"]
+        source = (sub.get("meter") or {}).get("source") or "none"
+        if source == "none":   # a plan without a readable meter (Google AI Pro: Flow credits, Colab)
+            continue
         last = conn.execute("""select extract(epoch from now() - max(read_at)) as age from models.subscription_usage
                                where sub_id = %s and source = %s""", (sub["id"], source)).fetchone()["age"]
         if last is not None and float(last) < min_age_s:
@@ -340,7 +342,7 @@ def state(conn) -> list[dict]:
         if mine:
             mine["multiple"] = round(mine["month_usd"] / sub["price_usd_month"], 1)
         out.append({"id": sub["id"], "plan": f'{sub["vendor"]} {sub["plan"]}', "vendor": sub["vendor"],
-                    "name": sub["plan"], "price_usd_month": sub["price_usd_month"], "execution": sub["execution"],
+                    "name": sub["plan"], "price_usd_month": sub["price_usd_month"], "execution": sub.get("execution") or "—",
                     "excluded": sub.get("excluded") or {},
                     "meter": None if not meter else {
                         "used_percent": float(meter["used_percent"]), "resets_at": meter["resets_at"],

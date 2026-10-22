@@ -486,6 +486,8 @@ def _plan_block(a: dict) -> list[str]:
     """2026-10-22: a billing e-mail differs from the declared plans."""
     e = a["evidence"]
     amount = f' — {_fr(e["amount"], 2)} {"€" if e.get("currency") == "EUR" else "$"}' if e.get("amount") else ""
+    if e.get("action") == "none":
+        return ["💳 Abonnements — fin d'offre", f'📅 {e.get("vendor")} {e.get("plan")} : {e.get("text")}']
     return ["💳 Abonnements — changement repéré dans un mail", f'📧 {e.get("vendor")} {e.get("plan") or ""}{amount}'
             f' ({e.get("mail_date") or "date inconnue"})', f'💡 Proposition : {e.get("text")}',
             f'« {e.get("quote", "")[:160]} »']
@@ -738,7 +740,8 @@ def keyboard(conn, alerts: list[dict]) -> list[list[dict]]:
         a0 = group[0]
         n = a0.get("ref") or a0["alert_id"]
         rows.append([{"text": _button_text(conn, a0, label, code), "callback_data": f"wr:{code}:{n}"}
-                     for label, code in BUTTONS.get(a0["kind"], (("✖️ Ignorer", "d"),))])
+                     for label, code in (BUTTONS.get(a0["kind"], (("✖️ Ignorer", "d"),))
+                                         if (a0.get("evidence") or {}).get("action") != "none" else (("👁️ Vu", "d"),))])
         roles = sorted({a.get("role") or "" for a in group} - {""})
         if a0["kind"] == "challenger" and len(roles) > 1:   # one model beating several roles: adopt one role only
             rows.append([{"text": f"✅ Seulement {ROLE_LABELS.get(r, r)}"[:40], "callback_data": f"wr:a:{n}:{r}"[:64]}
@@ -891,6 +894,8 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
         from walter_router.research.plans import declared
         e = a["evidence"]
         why = f"mail {e.get('vendor')} du {e.get('mail_date')} (alerte {alert_id})"
+        if e["action"] == "none":   # a notice (offer ending): nothing to apply
+            return {"alert_id": alert_id, "status": decision}
         done = declared.retire(e["sub_id"], why, source="email") if e["action"] == "retire" else \
             declared.upsert(e["sub_id"], e.get("fields") or {}, why, source="email")
         return {"alert_id": alert_id, "status": decision, "plans": done}
