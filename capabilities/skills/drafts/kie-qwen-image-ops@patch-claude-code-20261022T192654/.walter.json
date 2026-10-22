@@ -1,0 +1,11 @@
+{
+ "base_sha": "8cd6a3ab27588004c65843aabcd32a3bb341de19e203910e5c60d75222432d6f",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-22T19:26:54.110817+00:00",
+ "domain": "productivity",
+ "kind": "patch",
+ "reason": "Walter Router change 2026-10-22 (router d44ba16): walter_generate was merged into walter_run, and walter_run now takes the model (and provider) the owner names and runs exactly that one or refuses — the skill said the agent route may pick another model and pointed to walter_generate.",
+ "runtime": "claude_code",
+ "session_id": "0c6fcbac-00d8-42b0-a541-855e301d8921",
+ "target": "kie-qwen-image-ops"
+}
