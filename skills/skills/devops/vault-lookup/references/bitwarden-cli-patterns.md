@@ -23,7 +23,7 @@ print(base64.b64encode(json.dumps(item).encode()).decode())
 ## Common Pitfalls
 
 - **JSON parsing error**: `bw create item` expects base64-encoded input when using stdin, NOT raw JSON.
-- **Session expiry**: Always re-unlock with `bw unlock «secret:vault» --raw` at the start of each session.
+- **Session**: never run `bw unlock` yourself (it invalidates the session every Walter module shares). Use `walter-secret` (search / get / ref / exec), or `export BW_SESSION=$(~/.hermes/bin/bw-unlock --print)` when a raw `bw` command is unavoidable.
 - **Template required**: Use `bw get template item` to get the correct item structure before modifying.
 - **Type 1** = Login, **Type 2** = Secure Note, **Type 3** = Card, **Type 4** = Identity.
 - **Fields type 0** = Text, **type 1** = Hidden (Boolean), **type 2** = Boolean.

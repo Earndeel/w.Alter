@@ -153,9 +153,9 @@ bw status
 bw config server https://lucas-bitwarden.duckdns.org
 bw login "$(vault get bitwarden/email)" "$(vault get bitwarden/master_password)"
 
-# Unlock (session expirée) — le --raw final appartient à bw, PAS à vault
-BW_SESSION=$(bw unlock "$(vault get bitwarden/master_password)" --raw)
-export BW_SESSION
+# Session : ne JAMAIS lancer `bw unlock` soi-même (chaque unlock invalide la session partagée par tous les modules
+# Walter — panne Cloudflare/Telegram/Beeper du 2026-10-22). Préférer `walter-secret search|get|ref|exec` ; sinon :
+export BW_SESSION=$(~/.hermes/bin/bw-unlock --print)
 
 # Chercher un item par nom
 bw list items --session "$BW_SESSION" | python3 -c "

@@ -133,7 +133,7 @@ When creating accounts on websites:
 3. Generate password: `"Svc-" + secrets.token_urlsafe(16) + "!9"`
 4. Save credentials to Bitwarden immediately:
 ```bash
-export BW_SESSION=$(bw unlock --passwordenv BW_MASTER_PW --raw)
+export BW_SESSION=$(~/.hermes/bin/bw-unlock --print)   # never `bw unlock` yourself: it kills the shared session
 bw get template item | python3 -c "
 import sys,json
 t=json.load(sys.stdin)
