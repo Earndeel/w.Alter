@@ -56,9 +56,38 @@ def reliability(conn, provider: str, model: str) -> dict:
     return {"runs": r["n"], "failed": r["failed"], "unreliable": unreliable}
 
 
-def routes(conn, model_id: str, variant: str = "", preferred: str | None = None) -> list[dict]:
-    """Every way Hermes can run this chat model, in the owner's order: subscription, Kie (if not much dearer),
-    OpenRouter last. Providers whose last probe failed, or that failed most recent real runs, go to the end."""
+QUOTA_SWITCH = 90.0   # weekly meter %: above it a subscription route goes after the paid ones (quota nearly spent)
+
+
+def subscription_costs(conn) -> dict[str, dict]:
+    """route provider (codex) -> latest cost price of its subscription + plan name (models.latest_subscription_costs)."""
+    from walter_router.research.plans import subscriptions
+    by_sub = {r["sub_id"]: dict(r) for r in conn.execute("select * from models.latest_subscription_costs")}
+    meters = {r["sub_id"]: float(r["used_percent"]) for r in conn.execute(   # fresher: read after every agent turn
+        """select sub_id, used_percent from models.latest_subscription_usage
+           where window_name = 'weekly' and source <> 'calibration'""")}
+    out = {}
+    for sub in subscriptions.load():
+        if sub.get("route_provider") and sub["id"] in by_sub:
+            used = meters.get(sub["id"], by_sub[sub["id"]].get("used_percent"))
+            out[sub["route_provider"]] = {**by_sub[sub["id"]], "used_percent": used, "plan": sub.get("plan")}
+    return out
+
+
+def host_order(conn, model_id: str, usage: str = "interactive") -> list[dict]:
+    """Usable hosts behind OpenRouter for this model, cheapest first (models.usable_endpoints); flex tier only for
+    background work."""
+    return [dict(r) for r in conn.execute(
+        """select tag, host, quantization, service_tier, price_in_1m, price_out_1m, blended_1m, uptime_1d
+           from models.usable_endpoints where model_id = %s and (%s = 'background' or coalesce(service_tier, '') <> 'flex')
+           order by uptime_1d is null, blended_1m, uptime_1d desc nulls last""", (model_id, usage))]
+
+
+def routes(conn, model_id: str, variant: str = "", preferred: str | None = None, usage: str = "interactive") -> list[dict]:
+    """Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not
+    nearly spent), Kie (if not much dearer), OpenRouter last — on its cheapest usable host (2026-10-22). Providers whose
+    last probe failed, or that failed most recent real runs, go to the end. Each route carries its price: the
+    subscription's cost price per token, Kie's price, the chosen OpenRouter host's price."""
     snaps = sel.latest_snapshots(conn)
     status = {r["provider"]: r for r in conn.execute("select * from models.provider_status")}
     out = []
@@ -73,12 +102,38 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None)
                     "reasoning": REASONING.get(variant), "access": o["access"],
                     "blended_1m": sel.blended(o), "probe_ok": None if st is None else st["ok"],
                     "unreliable": rel["unreliable"], "recent_runs": rel["runs"], "recent_failures": rel["failed"]})
+
+    costs = subscription_costs(conn)
+    list_in = next((o.get("price_in_1m") for o in sel.load_offers(conn, snaps).get(model_id, [])
+                    if o["provider"] == "openrouter" and o["interface"] == "chat" and o.get("price_in_1m") is not None), None)
+    list_out = next((o.get("price_out_1m") for o in sel.load_offers(conn, snaps).get(model_id, [])
+                     if o["provider"] == "openrouter" and o["interface"] == "chat" and o.get("price_out_1m") is not None), None)
+    hosts = None
+    for r in out:
+        if r["access"] == "subscription" and r["provider"] in costs:
+            c = costs[r["provider"]]
+            ratio = c.get("ratio_pace") or c.get("ratio_full")
+            r["subscription"] = {"plan": c.get("plan"), "quota_used_percent": c.get("used_percent"),
+                                 "cost_ratio": round(ratio, 4) if ratio else None}
+            if ratio and list_in is not None:
+                r["cost_price_1m"] = {"in": round(list_in * ratio, 4), "out": round((list_out or 0) * ratio, 4)}
+        if r["hermes_provider"] == "openrouter":
+            hosts = hosts if hosts is not None else host_order(conn, model_id, usage)
+            if hosts:   # OpenRouter is told which hosts to use, cheapest usable first, the others as fallbacks
+                r["or_provider"] = {"order": [h["tag"] for h in hosts[:8]], "allow_fallbacks": True}
+                r["host"] = {k: hosts[0][k] for k in ("host", "tag", "quantization", "service_tier", "price_in_1m", "price_out_1m")}
+                r["blended_1m"] = hosts[0]["blended_1m"]
+
     or_price = min((r["blended_1m"] for r in out if r["hermes_provider"] == "openrouter" and r["blended_1m"]),
                    default=None)
 
+    def quota_spent(r: dict) -> bool:
+        q = (r.get("subscription") or {}).get("quota_used_percent")
+        return q is not None and q >= QUOTA_SWITCH
+
     def rank(r: dict) -> float:
         if r["access"] == "subscription":
-            return 0
+            return 3.8 if quota_spent(r) else 0
         base = PROVIDER_RANK.get(r["hermes_provider"], 2)
         if base == 1 and r["provider"] == "kie" and or_price and r["blended_1m"] and \
                 r["blended_1m"] > or_price * KIE_MAX_PREMIUM:

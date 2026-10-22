@@ -350,3 +350,24 @@ def state(conn) -> list[dict]:
                     "usd_per_m_at_pace": weekly_price / used["total_tokens"] * 1e6 if used["total_tokens"] else None,
                     "measured_capacity": mine, "semianalysis": semi})
     return out
+
+
+def record_costs(conn) -> dict:
+    """Cost price of a token through each plan (owner, 2026-10-22): price / API value carried per month, at the current
+    pace (last 7 days) and at capacity (measured meter points, else SemiAnalysis' best published value)."""
+    out = {}
+    for st in state(conn):
+        price = float(st["price_usd_month"])
+        pace = (st["usage_7d"]["api_value_usd"] or 0) * MONTH_WEEKS or None
+        full = (st["measured_capacity"] or {}).get("month_usd") or max((v["usd_month"] for v in st["semianalysis"]), default=None)
+        row = {"price_usd_month": price, "api_value_month_pace": pace, "api_value_month_full": full,
+               "ratio_pace": price / pace if pace else None, "ratio_full": price / full if full else None,
+               "used_percent": (st["meter"] or {}).get("used_percent"),
+               "detail": {"capacity_source": "measured" if st["measured_capacity"] else "semianalysis",
+                          "tokens_7d": st["usage_7d"]["total_tokens"]}}
+        conn.execute("""insert into models.subscription_costs (sub_id, price_usd_month, api_value_month_pace, api_value_month_full,
+                        ratio_pace, ratio_full, used_percent, detail) values (%s,%s,%s,%s,%s,%s,%s,%s::jsonb)""",
+                     (st["id"], price, pace, full, row["ratio_pace"], row["ratio_full"], row["used_percent"],
+                      json.dumps(row["detail"])))
+        out[st["id"]] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in row.items() if k != "detail"}
+    return out

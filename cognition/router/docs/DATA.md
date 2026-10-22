@@ -70,6 +70,7 @@ Unmatched names are listed by `walter-router review` (`unmatched_candidates`) fo
 | Table / view | Content |
 |---|---|
 | `exec_log` | Every routed attempt (walter_run, generate, walter-llm): task, provider, model, ok, seconds, cost. A provider × model failing ≥ 50 % of its last ≥ 3 runs in 14 days goes last |
+| `subscription_costs` | Cost price of a token through each plan: price / API value carried per month (pace, capacity), ratios, meter — view `latest_subscription_costs` |
 | `subscription_usage` | Quota readings of the subscriptions (ChatGPT Plus real, Claude Pro estimated) — view `latest_subscription_usage` |
 
 ## 7. Views for reading

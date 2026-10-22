@@ -60,6 +60,21 @@ def _chat_price(offers: dict, mid: str, prov: str, hosts: dict | None = None) ->
     return f'{catalog.money(p[0]["price_in_1m"])}/{catalog.money(p[0]["price_out_1m"])} $/M' if p else ""
 
 
+def _route_price(route: dict, offers: dict, mid: str, hosts: dict) -> str:
+    """Price of one chat route as Walter pays it: a subscription at its cost price per token (plan price / API value it
+    carries, 2026-10-22), the quota left; Kie at its price; OpenRouter on the host the router imposes."""
+    if route.get("access") == "subscription":
+        sub, cp = route.get("subscription") or {}, route.get("cost_price_1m")
+        if cp and sub.get("cost_ratio"):
+            q = sub.get("quota_used_percent")
+            quota = f", quota {round(q)}\u202f%" if q is not None else ""
+            pct = str(round(sub["cost_ratio"] * 100, 1)).replace(".", ",")
+            return (f'≈ {catalog.money(cp["in"])}/{catalog.money(cp["out"])} $/M (prix de revient, '
+                    f'{pct}\u202f% du prix API{quota})')
+        return "inclus"
+    return _chat_price(offers, mid, route["hermes_provider"], hosts)
+
+
 def _media_price(offers: dict, mid: str, prov: str, interface: str) -> str:
     own = [o for o in offers.get(mid, []) if o["provider"] == prov and o["interface"] == interface
            and o.get("offer_kind") == "generation" and o.get("norm_price") is not None]
@@ -207,7 +222,7 @@ def rows(conn) -> list[dict]:
             ex = d.get("execution") or []
             main, fb = [r for r in ex if not r.get("fallback_for")], [r for r in ex if r.get("fallback_for")]
             row["providers"] = " → ".join(f'{PROV.get(r["hermes_provider"], r["hermes_provider"])} '
-                                          f'{_chat_price(offers, mid, r["hermes_provider"], hosts)}'.strip() for r in main)
+                                          f'{_route_price(r, offers, mid, hosts)}'.strip() for r in main)
             fb_name = _name(conn, sel_model_id(fb[0])) if fb else ""
             row["fallback"] = (f'{fb_name}{" " + fb[0]["reasoning"] if fb[0].get("reasoning") else ""} via '
                                f'{PROV.get(fb[0]["hermes_provider"], fb[0]["hermes_provider"])}') if fb else "—"
