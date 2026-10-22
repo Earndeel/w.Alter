@@ -7,9 +7,10 @@ Text tiers method: `docs/TIERS.md`. Other modules only use the `walter-router` c
 ## Layout (2026-10-21, decided by the owner)
 | Folder | Part | Content |
 |---|---|---|
-| `research/` | **Research** — goes and fetches, periodically, by API or straight from the page; **by category** (`categories/`: text, image, video, audio, memory, decision, prices, hosts, plans — `walter-router research image [--analyse]`) | `benchmarks/` one module per site (AA intelligence, AA evaluations — medical, legal, science, vision, 3D, long context, agents —, AA media incl. music, AA Decision, AA STT, Arena, Design Arena, BridgeBench, Agentset, MTEB) · `prices/` OpenRouter, Kie, Codex catalogue, Hermes providers, declared offers · `plans/` subscriptions (meters, real usage, plan values; `quota_watch` service) · `agent/` the 48 h research agent (prompt + cycle digest) · `web.py` shared web access (FlareSolverr, Next.js data) · `sources.py` registry, snapshots retention |
+| `research/` | **Research** — goes and fetches, periodically, by API or straight from the page; **by category** (`categories/`: text, image, video, audio, memory, decision, prices, hosts, plans — `walter-router research image [--analyse]`) | `benchmarks/` one module per site (AA intelligence, AA evaluations — medical, legal, science, vision, 3D, long context, agents —, AA media incl. music, AA Decision, AA STT, Arena, Design Arena, BridgeBench, Agentset, MTEB) · `prices/` OpenRouter, Kie, Codex catalogue, Hermes providers, declared offers · `agent/` the 48 h research agent (prompt + cycle digest) · `web.py` shared web access (FlareSolverr, Next.js data) · `sources.py` registry, snapshots retention |
 | `analysis/` | **Analysis** — understands the data, organises the DB, keeps the active library, tells the owner | `parse` + `ingest` (snapshots → benchmarks / offers with identities) · `identity`, `aliases`, `media`, `catalog` · `knowledge` (owner's declarations) · `scoring`, `select`, `tiers`, `decision_pareto`, `postes`, `dossier` · `changes`, `alerts` (Telegram, buttons), `recommend` · `refresh` = the cycle |
 | `interface/` | **Interface** — the model library page | `library` (rows, publish), `page` (HTML), `translate` (English), `site/` (Cloudflare Pages functions) |
+| `plan/` | **Plan** — the owner's subscriptions, a part of its own | `declared` (his plans: CLI, page form, adopted mails), `subscriptions` (meters, real usage, cost price of a token), `quota_watch` (service), `mail` (subscription mails), `watch` (web research on each plan), `news` (new benefit or change on a plan he owns -> Telegram notice) |
 | `serve/` | What Walter calls at run time | `choose` (pick), `intent` (decision model), `execution` (routes, probes), `media_exec` (generation), `hermes_sync` |
 | `store/` | The database | `db`, `migrations/` |
 | `llm/` | walter-llm gateway (own venv, service :8894) | |
@@ -138,7 +139,7 @@ BridgeBench (bridgebench.ai, behind Cloudflare) is fetched through the local Fla
 ## Subscriptions (2026-10-14) — information only, no routing effect
 the owner's plans in `config/subscriptions.json` (ChatGPT Plus 20 $, Claude Pro 20 $), shown on the library page
 (tab 💳 Abonnements / Subscriptions) with two sources only (2026-10-14):
-- **Our measurement** (`research/plans/subscriptions.py`): the weekly meter — ChatGPT Plus real, from the Codex usage API
+- **Our measurement** (`plan/subscriptions.py`): the weekly meter — ChatGPT Plus real, from the Codex usage API
   through Hermes (read-only); Claude Pro estimated from the Claude Code transcripts (no Claude login on the VM): units =
   input + cache writes + 5 x output over a capacity, `walter-router subscriptions calibrate anthropic-pro <weekly %>`
   with the % shown on claude.ai — and the tokens W.Alter's runtimes really used (Hermes state.db sessions billed to
@@ -256,15 +257,23 @@ image`: 1 min 40 s with `--analyse` = recompute + republish, no message). The 48
 Owner: providers kept = OpenRouter, Kie, Codex, Arnict (uncensored); hosts behind OpenRouter are OpenRouter's (billed
 through it), the router only orders them. `research plans` (and the 48 h cycle) = meters, then billing mails, then
 web research, then the cost price:
-- **mails** (`research/plans/mail.py`): the owner's Gmail, read-only grant `google-memory` via `walter-secret`, only
+- **mails** (`plan/mail.py`): the owner's Gmail, read-only grant `google-memory` via `walter-secret`, only
   subscription mails from AI vendors (Google Play / Payments for Google AI plans); deterministic parsing, no mail
   content sent to a model; the latest mail of each plan decides; a difference with the declared plans becomes a
   `plan_change` alert (Telegram buttons « ✅ Mettre à jour / ✖️ Ignorer »; adopting applies it). Credit top-ups
   (OpenRouter, API credits) are recorded, never proposed as plans.
-- **web** (`research/plans/watch.py`): the economic tier with web tools looks for published facts on each plan
+- **web** (`plan/watch.py`): the economic tier with web tools looks for published facts on each plan
   (SemiAnalysis / Tokenomics, vendors' limit pages, other measurements) -> `models.plan_evidence` with source and date;
   published plan values feed the capacity of the cost price when we have no measure of our own.
 - **editing**: `walter-router plans list | set ID [--vendor --plan --price --models --note] | retire ID`
-  (`research/plans/declared.py`, the instance's subscriptions.json, previous version kept in config/router/history/),
+  (`plan/declared.py`, the instance's subscriptions.json, previous version kept in config/router/history/),
   the Subscriptions tab form (page -> /api/plans -> control service POST /plans, HMAC over the body too), and adopted
   plan_change alerts.
+
+## Plan news (2026-10-22)
+Owner: « s'il y a un nouvel avantage ou une modification via un des abonnements que l'on possède, on doit être
+notifié ». `plan/news.py`, run by `research plans` (and the cycle): product / plan mails of the vendors of his plans
+(exact senders: OpenAI / ChatGPT, Anthropic, Google One / Gemini…; sign-in codes, receipts, trials, developer / API
+newsletters left out; body read without any model, tracking links removed) and facts the web research adds for one
+of his plans that were not known before. One Telegram notice each (« 💳 <plan> — nouveauté », button « 👁️ Vu »), sent
+at the end of `research plans` (`--no-notify` to only record). Window: mails of the last 21 days not seen before.

@@ -35,7 +35,7 @@ def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = Fal
                 with conn.transaction():
                     report["providers"] = execution.probe(conn)
                 try:   # research plans: cost price of a token through each subscription (never blocks the cycle)
-                    from walter_router.research.plans import subscriptions
+                    from walter_router.plan import subscriptions
                     with conn.transaction():
                         report["subscription_costs"] = subscriptions.record_costs(conn)
                 except Exception as exc:  # noqa: BLE001

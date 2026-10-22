@@ -486,6 +486,9 @@ def _plan_block(a: dict) -> list[str]:
     """2026-10-22: a billing e-mail differs from the declared plans."""
     e = a["evidence"]
     amount = f' — {_fr(e["amount"], 2)} {"€" if e.get("currency") == "EUR" else "$"}' if e.get("amount") else ""
+    if e.get("news"):   # a new benefit or change on a plan the owner has (2026-10-22)
+        return [f'💳 {e.get("plan")} — nouveauté', f'📰 {e.get("title")}', f'{e.get("quote", "")[:380]}' if e.get("quote") else None,
+                f'🔗 {e.get("source")}' + (f' — {e["url"]}' if e.get("url") else "")]
     if e.get("action") == "none":
         return ["💳 Abonnements — fin d'offre", f'📅 {e.get("vendor")} {e.get("plan")} : {e.get("text")}']
     return ["💳 Abonnements — changement repéré dans un mail", f'📧 {e.get("vendor")} {e.get("plan") or ""}{amount}'
@@ -891,7 +894,7 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
     if not a:
         raise KeyError(alert_id)
     if a["kind"] == "plan_change" and decision == "adopted":
-        from walter_router.research.plans import declared
+        from walter_router.plan import declared
         e = a["evidence"]
         why = f"mail {e.get('vendor')} du {e.get('mail_date')} (alerte {alert_id})"
         if e["action"] == "none":   # a notice (offer ending): nothing to apply

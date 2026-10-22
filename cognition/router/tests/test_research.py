@@ -133,7 +133,7 @@ def test_routes_carry_cost_price_quota_and_host_order(monkeypatch):
 def test_plan_mails_are_read_on_the_latest_event():
     """2026-10-22: subscription mails only; credit top-ups and newsletters are not plans; a cancelled plan is proposed
     for removal only when it is declared."""
-    from walter_router.research.plans import mail
+    from walter_router.plan import mail
     p = mail.parse
     assert p("Google <no-reply@accounts.google.com>", "Vous avez partagé certaines données", "…") is None
     assert p("OpenAI <noreply@tm.openai.com>", "GPT-5.6: Meet Sol, Terra and Luna", "The series is now available") is None
@@ -154,7 +154,7 @@ def test_plan_mails_are_read_on_the_latest_event():
 def test_plans_are_edited_in_the_instance_copy_with_history(tmp_path, monkeypatch):
     import json
     from walter_router import instance
-    from walter_router.research.plans import declared
+    from walter_router.plan import declared
     src = tmp_path / "instance" / "subscriptions.json"
     src.parent.mkdir(parents=True)
     src.write_text(json.dumps({"subscriptions": [{"id": "a", "vendor": "V", "plan": "P", "price_usd_month": 20}]}))
@@ -169,3 +169,31 @@ def test_plans_are_edited_in_the_instance_copy_with_history(tmp_path, monkeypatc
     import pytest
     with pytest.raises(ValueError):
         declared.upsert("c", {"plan": "no vendor"}, "test")
+
+
+def test_plan_news_filters():
+    """2026-10-22: product / plan news of the owner's vendors; codes, receipts, trials and dev newsletters are not news."""
+    from walter_router.plan import news
+    owned = {"OpenAI": "openai-plus", "Google": "google-ai-pro"}
+    assert news._sender_vendor("ChatGPT <noreply@tm.openai.com>", owned) == "OpenAI"
+    assert news._sender_vendor("Google One <googleone-noreply@google.com>", owned) == "Google"
+    assert news._sender_vendor("Google <no-reply@accounts.google.com>", owned) is None
+    assert news._sender_vendor("Anthropic <no-reply@mail.anthropic.com>", owned) is None      # no Claude plan here
+    for subject in ("Your ChatGPT code is 123456", "Votre essai Google AI Pro a expiré", "OpenAI Dev News: Build Week",
+                    "Your OpenRouter receipt"):
+        assert news.NOT_NEWS.search(subject), subject
+    assert not news.NOT_NEWS.search("Nouvelles limites d'utilisation dans Gemini Notebook")
+    assert news.clean("Bonjour͏‌  Lucas &amp; co") == "Bonjour Lucas & co"
+
+
+def test_new_web_fact_on_an_owned_plan_is_notified_once():
+    from walter_router.plan import news
+    from walter_router.store import db
+    with db.connect() as conn:
+        ids = [conn.execute("""insert into models.plan_evidence (sub_id, vendor, plan, metric, value, unit, source_name,
+                               source_url, origin) values ('openai-plus', 'OpenAI', 'ChatGPT Plus', 'messages_5h', %s,
+                               'messages/5 h', 't', %s, 'web') returning evidence_id""", (v, u)).fetchone()["evidence_id"]
+               for v, u in ((1234.0, "https://a"), (1234.0, "https://b"))]
+        made = news.from_web(conn, ids)
+        conn.rollback()
+    assert made == ids[:1]      # the same fact from a second source is not news again

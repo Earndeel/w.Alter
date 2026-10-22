@@ -61,7 +61,7 @@ QUOTA_SWITCH = 90.0   # weekly meter %: above it a subscription route goes after
 
 def subscription_costs(conn) -> dict[str, dict]:
     """route provider (codex) -> latest cost price of its subscription + plan name (models.latest_subscription_costs)."""
-    from walter_router.research.plans import subscriptions
+    from walter_router.plan import subscriptions
     by_sub = {r["sub_id"]: dict(r) for r in conn.execute("select * from models.latest_subscription_costs")}
     meters = {r["sub_id"]: float(r["used_percent"]) for r in conn.execute(   # fresher: read after every agent turn
         """select sub_id, used_percent from models.latest_subscription_usage
