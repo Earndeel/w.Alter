@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-22T04:16:20.521732+00:00",
+ "description": "Use when reviewing a Walter Router collection cycle and reconciling model names across sources through the approved alias-add command.",
+ "domain": "routing",
+ "kind": "new",
+ "reason": "The recurring 48-hour Router review exposed a distinct procedure absent from the listed skills: inspect deterministic review data, establish model identity, apply only alias-add, and verify afterward. The transcript supplies the exact alias-add syntax, follow-up alias-list/review commands, a list-of-dicts parsing failure, and misleading tool error labels with successful exit codes. Specific alias equivalences are deliberately excluded because their supporting outputs are incomplete. [session hermes/main/20261021_192302_0c4a04]",
+ "runtime": "learner",
+ "session_id": "hermes/main/20261021_192302_0c4a04",
+ "target": "walter-router-alias-review"
+}
