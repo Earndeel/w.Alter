@@ -237,7 +237,10 @@ def rows(conn) -> list[dict]:
             flow = d.get("mode") == "manual_ui" or d.get("provider") == "google-flow"
             row["providers"] = (f"Flow à la main → {provs} (si payant)" if flow else provs) or "pas de fournisseur branché"
             fb = media_exec.fallback_models(conn, task, role, mid, mode, n=1) if cfg else []
-            row["fallback"] = _name(conn, fb[0]) if fb else "—"
+            # 2026-10-22: the fallback is the same model on its next provider, another model only when declared
+            nxt = [PROV.get(p, p) for p in order[1:]] + (["Kie (payant)"] if flow and "kie" in order[:1] else [])
+            row["fallback"] = (f'{" → ".join(nxt)} (même modèle)' if nxt else "— (un seul fournisseur)") + \
+                (f' · puis {_name(conn, fb[0])}' if fb else "")
             row["subscription"] = "Gemini AI Pro (crédits Flow)" if flow else "—"
         elif iface in ("transcription", "embedding", "rerank"):   # STT, embeddings, rerank (2026-10-17): priced per minute / search / M tokens
             row["providers"] = " → ".join(

@@ -166,15 +166,19 @@ def choose_provider(conn, model_id: str, interface: str, resolution: str | None,
     return order
 
 
-def fallback_models(conn, task: str, role: str | None, model_id: str, mode: str | None = None, n: int = 2) -> list[str]:
-    """Models to try when every provider of `model_id` failed (2026-10-14: one fallback per category).
-    Declared first (knowledge.json roles.<role>.fallback), then the task's composite order among models that
-    have an executor for the mode and a callable price; for a ratio/budget role (watch = dominance) only models at
-    most FALLBACK_COST_X times the favourite's price, unless none is."""
+def fallback_models(conn, task: str, role: str | None, model_id: str, mode: str | None = None, n: int = 2,
+                    declared_only: bool = True) -> list[str]:
+    """Other models to try when every provider of `model_id` failed. Since 2026-10-22 (owner: « le secours, c'est pas
+    le modèle mais plutôt le provider ») the fallback of a media task is the SAME model on its other providers
+    (generate's provider loop); another model is used only when the owner declared it (knowledge.json
+    roles.<role>.fallback). declared_only=False gives the former computed list (composite order, same price class
+    for ratio / budget roles), kept for the dossier."""
     from walter_router.analysis import knowledge
     from walter_router.analysis.scoring import composite
     declared = ((knowledge.load().get("roles") or {}).get(role or "default") or {}).get("fallback")
     out = [m for m in ([declared] if isinstance(declared, str) else (declared or [])) if m != model_id]
+    if declared_only:
+        return out[:n]
     t = conn.execute("select interface, modes from models.tasks where task = %s", (task,)).fetchone()
     if not t:
         return out[:n]
