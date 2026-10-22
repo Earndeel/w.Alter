@@ -1,7 +1,7 @@
 ---
 name: aa-pareto-model-optimizer
-description: Use when Monsieur needs live AA Intelligence and multimodal leaderboard data.
-version: 4.9.0
+description: Use when the owner asks for an ad-hoc AA Pareto report (intelligence frontier, upgrade ladder, multimodal leaderboards) beyond what Walter Router already shows.
+version: 5.0.0
 author: W.Alter
 license: MIT
 metadata:
@@ -11,6 +11,25 @@ metadata:
 ---
 
 # Artificial Analysis Pareto Optimizer
+
+## Absorbed into Walter Router (2026-10-21)
+
+Walter Router collects these sources itself, without a browser, every 48 h and on demand: AA Intelligence + cost per
+task (`research/benchmarks/aa.py`), AA media leaderboards (`aa_media.py`), Design Arena (`design_arena.py`); the
+Pareto mathematics (`make_frontier`, `ladder_knee`) lives in `analysis/pareto.py`. For anything the router uses, read
+the router, not this cache:
+
+- `walter-router library` (or https://library.walter-ai.cloud): per-task choice, tiers L1/L2/L3, prices, leaderboards;
+- `walter-router route "<request>"`: routing from a task description (replaces `router.py` for routing), and
+  `walter-router pick <task> [--level L1|L2|L3]` for a known task;
+- `walter-router dossier <task>`: every candidate with its per-board evidence;
+- SQL on `models.benchmarks` / `models.offers` (see `/walter/router/docs/DATA.md`).
+
+`~/.hermes/cache/aa-pareto/` is no longer refreshed by any timer (the cycle stopped calling
+`aa_pareto_daily_refresh.py`; its Hermes cron 096741a21a32 stays paused). Use the scripts below only for an ad-hoc
+report (strict / pragmatic frontier, upgrade ladder). Only the collectors fetch live data (`refresh.py`,
+`refresh_modalities.py`, `collect_designarena.py`); `pareto.py`, `build_model_profiles.py` and `router.py` read the
+cache: run the collectors first, then check `generated_at`, so a report is never built on stale data.
 
 ## Purpose
 
@@ -69,7 +88,7 @@ python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/collect_desi
   Join on the normalized `slug_norm` field included in each Design Arena row
   and in `registry`. Roughly 78 frontier models match AA; unmatched tail
   models (mostly DA-only/codec variants) stay in `registry` for reference.
-- The daily cron wrapper `~/.hermes/scripts/aa_pareto_daily_refresh.py` runs
+- The former cron wrapper `~/.hermes/scripts/aa_pareto_daily_refresh.py` (no longer scheduled) runs
   every stage sequentially (`refresh.py --with-kie` → `subscription.py` →
   `refresh_modalities.py` → `collect_designarena.py` → `build_model_profiles.py`
   → `router.py`) under the system Python, and exits non-zero if any stage fails.
@@ -100,7 +119,7 @@ python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/build_model_
   reporting — it is the join table for "model X is good at Y".
 - About 136 of 582 AA rows match DA (base models; the rest are tier/date
   variants or models DA does not publish).
-- The three-stage cron wrapper runs refresh → collect → profiles sequentially.
+- The former wrapper (manual run only) chains refresh → collect → profiles.
 
 ## Live extraction contract
 
@@ -115,7 +134,7 @@ intelligenceIndexCostPerTask.cost.total
 
 AA may omit the page's own model from the global `models` array while exposing it separately as `currentModel`. Parse both, merge them by exact slug (with `currentModel` authoritative), and reject the extraction if the requested anchor slug is still absent. This guard prevents a valid frontier model such as GPT-5.6 Luna max from silently receiving a null Intelligence score.
 
-Playwright navigation to either AA page can transiently exceed 60 seconds under cron even when the site is healthy. Run the complete navigation → settle → inline-RSC extraction → parsing sequence up to three times, with 1s/2s exponential backoff and a fresh browser context per attempt. Verify cron reliability by executing the actual `/root/.hermes/scripts/aa_pareto_daily_refresh.py` wrapper under `/usr/bin/python3`, not only `refresh.py` interactively.
+Playwright navigation to either AA page can transiently exceed 60 seconds even when the site is healthy. Run the complete navigation → settle → inline-RSC extraction → parsing sequence up to three times, with 1s/2s exponential backoff and a fresh browser context per attempt. When running the full chain by hand, check it through the former wrapper `/root/.hermes/scripts/aa_pareto_daily_refresh.py` under `/usr/bin/python3` (manual run only; it is no longer scheduled).
 
 Do not scrape the visible Recharts comparison plot as the primary source. It contains a page-dependent subset and can silently omit valid frontier models.
 
@@ -280,13 +299,16 @@ $HERMES_HOME/cache/aa-pareto/history/YYYY-MM-DD.json
 
 Raw snapshots exist for debugging, not normal reasoning.
 
-## Daily refresh
+## Scheduled refresh
 
-The scheduled collector may run directly with `no_agent=True`: no model call, no reasoning-token cost, and no prompt growth. The script remains silent on success when `--quiet` is used.
+No longer scheduled: Walter Router owns the periodic collection (2026-10-21). Run the scripts by hand when an ad-hoc report needs a fresh cache.
 
-## Router engine (3 intelligence levels + conditional Design Arena escalation)
+## Router engine (historical: superseded by Walter Router)
 
-`router.py` implements Monsieur's routing philosophy exactly:
+Walter Router now owns routing (tiers L1/L2/L3 by the owner's method in `/walter/router/docs/TIERS.md`, specialised
+tasks by weighted leaderboards): do not route from `router_matrix.json`; use `walter-router route "<request>"` or
+`walter-router pick <task>`. `router.py` stays for comparison only, after a fresh collection. It implemented the
+owner's original routing philosophy:
 
 1. **Three intelligence levels derived from the AA Intelligence Pareto optimum**
    (from `upgrade_ladder` in the fresh snapshot):
@@ -318,7 +340,7 @@ python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/router.py --
   pool; they are flagged `in_llm_pool=false`.
 - Outputs `router_matrix.json` + `router_matrix.csv` (levels + domain leaders).
 - Needs `latest.json`, `designarena.json`, `model_profiles.json` in the cache
-  (the cron wrapper chains all four stages).
+  (the former wrapper, manual run only, chains all four stages).
 
 ## Interpretation order
 
@@ -329,9 +351,9 @@ Every AA intelligence Pareto report must contain these primary tables, in this o
 
 When multimodal data is requested, report separate task-specific sections for TTS, speech-to-speech, text-to-image, text-to-video, and image-to-video; show AA's quality and cost units verbatim and do not combine them into Intelligence tables.
 
-Do not use `strict_frontier` in either primary Pareto table: it is a mathematical audit view that preserves economically immaterial gains such as GLM-5.2 over Muse Spark. Show it only in an explicitly labeled appendix when Monsieur asks for the raw mathematical frontier.
+Do not use `strict_frontier` in either primary Pareto table: it is a mathematical audit view that preserves economically immaterial gains such as GLM-5.2 over Muse Spark. Show it only in an explicitly labeled appendix when the owner asks for the raw mathematical frontier.
 
-Before the tables, report `generated_at` and source row counts. After them, explain notable exclusions through `removed_by_epsilon`, `removed_by_min_gain`, `removed_by_cost_inefficiency`, or `removed_by_marginal_return` only when they affect the recommendation or Monsieur asks why a model is absent. Interpret `incremental_cost_per_score_point` as the break-even willingness to pay for one extra Index point, not as an unconditional recommendation. Use `standout_frontier` only to diagnose local knees.
+Before the tables, report `generated_at` and source row counts. After them, explain notable exclusions through `removed_by_epsilon`, `removed_by_min_gain`, `removed_by_cost_inefficiency`, or `removed_by_marginal_return` only when they affect the recommendation or the owner asks why a model is absent. Interpret `incremental_cost_per_score_point` as the break-even willingness to pay for one extra Index point, not as an unconditional recommendation. Use `standout_frontier` only to diagnose local knees.
 
 Never manufacture a shortlist from a partial chart or omit a model merely because it was absent from one comparison page.
 
