@@ -40,6 +40,59 @@ def _computer_pool():
         atexit.register(_pool.close)
     return _pool
 
+_ROUTER_WORD=re.compile(r'[A-Za-z0-9_.:/-]{1,64}')   # task, role, level, plan id: never a shell word
+_REQUIRE=('','unrestricted','open_weights','video_input')
+WALTER_LLM_URL='http://127.0.0.1:8894/v1/chat/completions'
+
+
+def _router(*args,timeout=60):
+    # Walter Router through its command on the PATH (its declared interface); arguments as a list, never a shell.
+    out=subprocess.run(['walter-router',*args],capture_output=True,text=True,timeout=timeout)
+    if out.returncode:raise RuntimeError('router command failed')
+    return json.loads(out.stdout)
+
+
+def _router_error(exc):
+    return json.dumps({'ok':False,'module':'router','error':type(exc).__name__,
+                       'hint':'walter-router health; walter check for installation diagnostics.'})
+
+
+def _router_decision(request,task,level,require,conversation,*,agent):
+    if (task and not _ROUTER_WORD.fullmatch(task)) or level not in ('','L1','L2','L3') or require not in _REQUIRE:
+        raise ValueError('invalid task, level or require')
+    if not (request or task):raise ValueError('request or task required')
+    if require:args=['pick',task or 'general','--require',require]+(['--level',level] if level else [])
+    else:args=(['route',request or task]+(['--task',task] if task else [])+(['--level',level] if level else [])
+                +(['--context',conversation[:600]] if conversation else []))
+    return _router(*args,*(['--agent'] if agent else []))
+
+
+def router_brief():
+    """Walter Router's own description for agents (tools, levels, specialities, generation, constraints)."""
+    try:
+        out=subprocess.run(['walter-router','brief'],capture_output=True,text=True,timeout=30)
+        return out.stdout.strip() if out.returncode==0 else ''
+    except Exception:return ''
+
+
+def _llm_token():
+    # This server's own walter-llm agent token, in the instance's state (0600), never in the code or the logs.
+    root=subprocess.run(['walter','instance','path'],capture_output=True,text=True,timeout=30).stdout.strip()
+    for line in (Path(root)/'state'/'core'/'llm.env').read_text().splitlines():
+        if line.startswith('WALTER_LLM_TOKEN='):return line.split('=',1)[1].strip()
+    raise PermissionError('no walter-llm token for this server')
+
+
+def _walter_llm(model,prompt,timeout=900):
+    import urllib.request
+    body=json.dumps({'model':model,'messages':[{'role':'user','content':prompt}]}).encode()
+    req=urllib.request.Request(WALTER_LLM_URL,data=body,headers={'Authorization':'Bearer '+_llm_token(),
+                                                                 'Content-Type':'application/json'})
+    with urllib.request.urlopen(req,timeout=timeout) as resp:  # noqa: S310 (loopback gateway)
+        data=json.loads(resp.read()); ran=resp.headers.get('X-Walter-Route')
+    return data['choices'][0]['message']['content'],ran
+
+
 def register(mcp,client='unknown',*,local_control=True):
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     def walter_modules(module: str='') -> str:
@@ -81,19 +134,70 @@ def register(mcp,client='unknown',*,local_control=True):
         try:return await _module('browse','walter_browse').browse(args)
         except Exception as exc:return _error('browse',exc)
 
+    # Walter Router: the same four tools as the Hermes plugin, same names. What they can do (specialities, levels,
+    # generation, constraints) is the router's own brief, in the server instructions. The harness keeps its model.
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
-    def model_route(task: str='',level: str='') -> str:
-        """Read Walter Router's selected model for a task, or list tasks with an empty task.
-        Does not change choices, buy credits or run a model. Codex/Claude keep their primary model."""
-        if not re.fullmatch(r'[a-zA-Z0-9_-]{0,64}',task) or not re.fullmatch(r'[a-zA-Z0-9_-]{0,16}',level):
-            return json.dumps({'ok':False,'error':'invalid task or level'})
-        args=['walter-router','pick',task] if task else ['walter-router','tasks']
-        if task and level:args+=['--level',level]
+    def walter_route(request: str='',task: str='',level: str='',require: str='',conversation: str='') -> str:
+        """Which model Walter Router picks for a request: choice, why, execution routes with their price per million
+        tokens (see the Walter Router section of the server instructions). Pass the request verbatim; leave task
+        empty and the router classifies it; conversation = one line on earlier turns when the request depends on them.
+        Changes nothing and runs no model."""
+        try:return json.dumps(_router_decision(request,task,level,require,conversation,agent=True),ensure_ascii=False)
+        except Exception as exc:return _router_error(exc)
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False,openWorldHint=True))
+    def walter_run(goal: str,request: str='',task: str='',level: str='',conversation: str='',context: str='') -> str:
+        """Have the model Walter Router picks answer a self-contained TEXT sub-task (analysis, comparison, code,
+        writing, synthesis), in one call through walter-llm, without tools. goal = complete instructions (it does not
+        see this conversation); context = facts it needs. Returns its answer and the route that ran it. Your own model
+        stays yours; media: walter_generate."""
         try:
-            out=subprocess.run(args,capture_output=True,text=True,timeout=30)
-            if out.returncode:return json.dumps({'ok':False,'error':'router lookup failed','exit_code':out.returncode})
-            return json.dumps(json.loads(out.stdout),ensure_ascii=False)
-        except Exception as exc:return _error('router',exc)
+            d=_router_decision(request or goal[:500],task,level,'',conversation,agent=False)
+            if not d.get('execution'):
+                return json.dumps({'ok':False,'error':'text sub-tasks only: use walter_generate for media',
+                                   'task':d.get('task')},ensure_ascii=False)
+            model=d['task']+('/'+d['level'] if d.get('task')=='general' and d.get('level') else '')
+            prompt=goal+('\n\nContexte :\n'+context if context else '')
+            text,ran=_walter_llm(model,prompt)
+            return json.dumps({'ok':True,'task':d['task'],'level':d.get('level'),'route':ran,'output':text},ensure_ascii=False)
+        except Exception as exc:return _router_error(exc)
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False,destructiveHint=True,openWorldHint=True))
+    def walter_generate(request: str,task: str='',role: str='',image_urls: list[str]|None=None,aspect_ratio: str='',
+                        duration: int=0,resolution: str='',paid_fallback: bool=False) -> str:
+        """Generate an image, video, music track or voice-over on the model Walter Router picks, prompt rewritten for
+        it. COSTS MONEY: only when the user asked for it. role = video objective (premium, action, ugc, budget,
+        default); image_urls = public URLs of input images. Returns local file paths, cost and the prompt used."""
+        args=['generate',request]
+        for flag,value in (('--task',task),('--role',role),('--aspect-ratio',aspect_ratio),('--resolution',resolution)):
+            if value:
+                if not _ROUTER_WORD.fullmatch(value):return json.dumps({'ok':False,'error':f'invalid {flag[2:]}'})
+                args+=[flag,value]
+        for url in image_urls or []:
+            if not url.startswith(('https://','http://')):return json.dumps({'ok':False,'error':'image_urls must be URLs'})
+            args+=['--image-url',url]
+        if duration:args+=['--duration',str(int(duration))]
+        if paid_fallback:args.append('--paid-fallback')
+        try:return json.dumps(_router(*args,timeout=1800),ensure_ascii=False)
+        except Exception as exc:return _router_error(exc)
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False))
+    def walter_plans(action: str='list',plan_id: str='',vendor: str='',plan: str='',price_usd_month: float|None=None,
+                     models: list[str]|None=None,since: str='',until: str='',note: str='',why: str='') -> str:
+        """The user's AI subscriptions as Walter Router knows them: list, or record a change the user tells you
+        (set: new plan, price, end of an offer, included models; retire: cancellation). Plan ids lowercase-dashed
+        (openai-plus, google-ai-pro). Only on the user's word: never invent a plan or a price."""
+        if action not in ('list','set','retire') or (action!='list' and not _ROUTER_WORD.fullmatch(plan_id or '-')):
+            return json.dumps({'ok':False,'error':'action list|set|retire; plan_id required to change a plan'})
+        args=['plans',action]+([plan_id] if action!='list' else [])
+        if action=='set':
+            for flag,value in (('--vendor',vendor),('--plan',plan),('--since',since),('--until',until),('--note',note)):
+                if value:args+=[flag,value]
+            if price_usd_month is not None:args+=['--price',str(float(price_usd_month))]
+            if models:args+=['--models',','.join(m for m in models if _ROUTER_WORD.fullmatch(m))]
+        if action!='list' and why:args+=['--why',why]
+        try:return json.dumps(_router(*args),ensure_ascii=False)
+        except Exception as exc:return _router_error(exc)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False,destructiveHint=True))
     async def computer_use(session_id: str,action: str,arguments: dict|None=None):

@@ -65,11 +65,15 @@ def _env_value(name: str) -> str:
     return ""
 
 
+from walter_capabilities import router_brief  # noqa: E402 — the router's own brief joins the server instructions
+
+ROUTER_BRIEF = router_brief()
 mcp = FastMCP("walter-core", instructions=(
     "W.Alter is the user's modular capability stack on this VM. Use its connected modules across harnesses; keep the host runtime and permissions. These tools share its long-term "
     "memory and skills. The user is addressed as 'Monsieur' and works in French. Recalled memories are dated "
     "snapshots, not live state: verify current config/services before asserting them. Retain only durable "
-    "facts about the user, their projects and decisions — never secrets, credentials or transient logs."))
+    "facts about the user, their projects and decisions — never secrets, credentials or transient logs."
+    + ("\n\n" + ROUTER_BRIEF if ROUTER_BRIEF else "")))
 
 
 def _agent_memory(method: str, args: dict, timeout: float = 180) -> str:
