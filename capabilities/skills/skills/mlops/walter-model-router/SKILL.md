@@ -18,9 +18,11 @@ Read first: `/walter/router/README.md` (current state: layout, how a choice is m
 The old store (schema `walter_router`, fixed weight vectors, router_matrix.json) is retired: never use it.
 
 ## Ask the router — never hardcode a model
-- `walter-router pick <task> [--level L1|L2|L3] [--role R]` — model, provider order with prices, fallbacks.
-  `walter-router tasks` lists the task keys (43, incl. medical, legal, engineering, finance, strategy, cybersecurity,
-  science, long_context, writing, music, vision, video_understanding, video roles…).
+- `walter-router pick <task> [--level L1|L2|L3] [--role R] [--require unrestricted|open_weights|video_input]` — model,
+  provider order with prices, fallbacks (`video_input`: e.g. `pick vision --require video_input` to analyse a video;
+  there is no video-analysis task, no satisfying benchmark).
+  `walter-router tasks` lists the task keys (42, incl. medical, legal, engineering, finance, strategy, cybersecurity,
+  science, long_context, writing, music, vision, video roles…).
 - `walter-router route "<demande>" [--context "<what the conversation was about>"]` — the decision model (d1-ultra,
   then Mercury Decide free, then Clef) classifies the request (with `--context` when it depends on earlier turns,
   e.g. « fais la suite »), then the decision with its execution routes and each route's price per million tokens.
@@ -28,8 +30,11 @@ The old store (schema `walter_router`, fixed weight vectors, router_matrix.json)
 - `walter-router dossier <task>` — the evidence behind a choice; `walter-router library` — the whole table (also the
   library page, behind Cloudflare Access).
 - Text calls from modules or agents: walter-llm (127.0.0.1:8894, OpenAI-compatible, `model` = a router task, per-agent
-  token). Hermes: plugin tools walter_route, walter_run, walter_generate, walter_feedback, walter_verdict, walter_plans
-  (walter_route / walter_run take `conversation`, the same line as `--context`).
+  token). Agents: the same tools in every runtime — walter_route, walter_run, walter_generate, walter_plans (Hermes
+  plugin; walter MCP for Claude Code / Codex / DSH), plus walter_verdict / walter_feedback in Hermes. walter_route and
+  walter_run take `conversation`, the same line as `--context`. What agents can ask for (levels, specialities,
+  generation, constraints) is `walter-router brief`, generated from the database and given to every agent (Hermes
+  prompt section, MCP instructions, Codex / DSH profiles): edit tasks/roles, never the prompt.
 - Media: `walter-router generate "<demande>" --task …` — costs money, only on request.
 
 ## How a choice is made (read the README for details)
