@@ -224,3 +224,12 @@ eval after adding them: 37/38 (the original 30 all pass; « photo of a mole » g
 `engineering` (Engineering Index), `finance` (Finance & Accounting 70 % + Economics 30 %), `strategy` (Strategy & Ops),
 `cybersecurity` (AA Cyber Index); `medical` now Healthcare Index 50 % + HealthBench Pro 30 % + HealthBench 20 %, `legal`
 Legal Index 60 % + Harvey LAB 40 %. Intent eval (eval/intents_fr.json, 42 cases): 41/42 (photo of a mole -> medical).
+
+## Hosts behind a gateway (2026-10-22)
+One model is served through OpenRouter by several hosts at different prices (DeepSeek V4 Pro: 0.45 to 1.68 $/M input),
+compression (fp4 / fp8 / bf16) and reliability. `research/prices/openrouter_endpoints.py` reads every host of the models
+the active library uses (shortlist + pins) into `models.endpoints`; `models.best_endpoints` keeps the cheapest usable
+one per model: >= 95 % successful requests over 24 h, never below the vendor's own precision (4-bit only when the
+vendor itself serves 4-bit, e.g. Kimi K3 mxfp4), flex tier (half price, slower) only for background work. The library
+page shows that host next to the OpenRouter price. Calls do not use it yet (OpenRouter still picks the host): see
+DESIGN « hosts » for the pending decision.

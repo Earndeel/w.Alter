@@ -62,8 +62,42 @@ def _ensure_identity(conn, namespace: str, key: str, model_id: str, vendor: str 
                  (namespace, key, model_id, origin))
 
 
+def _f(v) -> float | None:
+    try:
+        return float(v) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _insert_endpoints(conn, sid: int, doc: dict) -> int:
+    """Hosts behind OpenRouter (research.prices.openrouter_endpoints) -> models.endpoints, prices in $/M tokens."""
+    conn.execute("delete from models.endpoints where snapshot_id = %s", (sid,))
+    n = 0
+    for or_id, m in (doc.get("models") or {}).items():
+        for e in m.get("endpoints") or []:
+            p = e.get("pricing") or {}
+            per_m = lambda k: (_f(p.get(k)) * 1e6) if _f(p.get(k)) is not None else None
+            lat, tps = e.get("latency_last_30m"), e.get("throughput_last_30m")
+            params = set(e.get("supported_parameters") or [])
+            conn.execute("""insert into models.endpoints (snapshot_id, gateway, model_id, gateway_model, host, tag, quantization,
+                            price_in_1m, price_out_1m, cache_read_1m, context_length, uptime_1d, uptime_30m, status,
+                            latency_ms, throughput_tps, tools, structured, service_tier)
+                            values (%s,'openrouter',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) on conflict do nothing""",
+                         (sid, m["model_id"], or_id, e.get("provider_name") or "?", e.get("tag") or e.get("provider_name") or "?",
+                          e.get("quantization"), per_m("prompt"), per_m("completion"), per_m("input_cache_read"),
+                          e.get("context_length"), _f(e.get("uptime_last_1d")), _f(e.get("uptime_last_30m")), e.get("status"),
+                          _f(lat.get("p50")) if isinstance(lat, dict) else _f(lat),
+                          _f(tps.get("p50")) if isinstance(tps, dict) else _f(tps),
+                          "tools" in params, bool({"response_format", "structured_outputs"} & params), e.get("service_tier")))
+            n += 1
+    conn.execute("update models.snapshots set row_count = %s where snapshot_id = %s", (n, sid))
+    return n
+
+
 def _insert_rows(conn, sid: int, kind: str, doc: dict) -> int:
     """(Re)derive benchmarks/offers of one snapshot from its raw document with the current identity rules."""
+    if kind == "or_endpoints":
+        return _insert_endpoints(conn, sid, doc)
     conn.execute("delete from models.benchmarks where snapshot_id = %s", (sid,))
     conn.execute("delete from models.offers where snapshot_id = %s", (sid,))
     rows = parse_offers(kind, doc) if kind in OFFER_KINDS else parse_benchmarks(kind, doc)
