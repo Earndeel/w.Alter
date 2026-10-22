@@ -234,6 +234,8 @@ def _research(args) -> int:
                 except Exception as exc:  # noqa: BLE001 — one step down never blocks the others
                     conn.rollback()
                     out["plans"][step] = {"error": f"{type(exc).__name__}: {exc}"[:200]}
+            from walter_router.research.plans import declared
+            out["plans"]["offers_ending"] = declared.expiring(conn)
             out["plans"]["cost_price"] = subscriptions.record_costs(conn)
             conn.commit()
     if args.analyse:
@@ -341,6 +343,8 @@ def main(argv: list[str] | None = None) -> int:
     q.add_argument("--vendor"); q.add_argument("--plan"); q.add_argument("--price", type=float, dest="price_usd_month")
     q.add_argument("--execution"); q.add_argument("--route-provider", dest="route_provider")
     q.add_argument("--models", help="comma-separated model ids included in the plan"); q.add_argument("--note")
+    q.add_argument("--since", help="start date (YYYY-MM-DD)"); q.add_argument("--until", help="end date of an offer (YYYY-MM-DD)")
+    q.add_argument("--list-price", type=float, dest="list_price_usd_month", help="catalogue price when the plan is a free offer")
     q.add_argument("--why", default="déclaré par le propriétaire")
     q = sub.add_parser("research", help="run research now: one or more categories (text image video audio memory "
                                         "decision prices hosts plans | all), or --source KIND; --list shows them")
@@ -363,7 +367,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.action == "retire":
             out = declared.retire(args.sub_id, args.why)
         else:
-            fields = {k: getattr(args, k) for k in ("vendor", "plan", "price_usd_month", "execution", "route_provider", "note")}
+            fields = {k: getattr(args, k) for k in ("vendor", "plan", "price_usd_month", "execution", "route_provider", "note",
+                                                    "since", "until", "list_price_usd_month")}
             if args.models:
                 fields["models"] = [m.strip() for m in args.models.split(",") if m.strip()]
             out = declared.upsert(args.sub_id, fields, args.why)
