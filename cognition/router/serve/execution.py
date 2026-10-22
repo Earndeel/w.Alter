@@ -80,6 +80,7 @@ def host_order(conn, model_id: str, usage: str = "interactive") -> list[dict]:
     return [dict(r) for r in conn.execute(
         """select tag, host, quantization, service_tier, price_in_1m, price_out_1m, blended_1m, uptime_1d
            from models.usable_endpoints where model_id = %s and (%s = 'background' or coalesce(service_tier, '') <> 'flex')
+             and coalesce(service_tier, '') not in ('priority', 'fast', 'ultrafast')   -- 2x-6x the price: never imposed
            order by uptime_1d is null, blended_1m, uptime_1d desc nulls last""", (model_id, usage))]
 
 

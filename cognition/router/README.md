@@ -277,3 +277,14 @@ notifié ». `plan/news.py`, run by `research plans` (and the cycle): product / 
 newsletters left out; body read without any model, tracking links removed) and facts the web research adds for one
 of his plans that were not known before. One Telegram notice each (« 💳 <plan> — nouveauté », button « 👁️ Vu »), sent
 at the end of `research plans` (`--no-notify` to only record). Window: mails of the last 21 days not seen before.
+
+## Hermes plugged in (2026-10-22)
+- `sync-hermes` (end of every cycle, after each verdict) writes into Hermes' own config: auxiliary jobs compression,
+  title generation, curator (-> summarization = tier L1) and vision (-> vision), with their fallback chains, and the
+  router's host order for each OpenRouter model (`provider_routing.models.<id>.order`, marked `_managed_by:
+  walter-router`; priority tiers never imposed). Verified: Hermes builds {'order': ['wafer/us', …]} for Kimi K3.
+- Hermes plugin `walter-router`: tools walter_route / walter_run / walter_generate / walter_feedback / walter_verdict and
+  new `walter_plans` (list, change, cancel a plan on the owner's word). The availability check looked for the
+  command in the current directory since 2026-10-19 (tools hidden); it now uses the PATH.
+- Decision models: d1-ultra for decision and decision_vision (owner, 2026-10-22), intent eval 42/42.
+- Media fallback: the same model on its next provider; another model only when declared.

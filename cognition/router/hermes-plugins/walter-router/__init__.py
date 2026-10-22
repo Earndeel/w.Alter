@@ -301,6 +301,25 @@ async def _handle_feedback(args: Mapping[str, Any], **_: Any) -> str:
         return json.dumps({"error": f"walter_feedback: {exc}"}, ensure_ascii=False)
 
 
+async def _handle_plans(args: Mapping[str, Any], **_: Any) -> str:
+    """The owner's subscriptions (Walter Router plan/): list, change or cancel when he says so (2026-10-22)."""
+    try:
+        action = args.get("action") or "list"
+        if action == "list":
+            return json.dumps(await _cli("plans", "list"), ensure_ascii=False, default=str)
+        cmd = ["plans", "retire" if action == "retire" else "set", str(args["plan_id"]),
+               "--why", str(args.get("why") or "dit par le propriétaire dans la conversation")]
+        for key, flag in (("vendor", "--vendor"), ("plan", "--plan"), ("price_usd_month", "--price"), ("note", "--note"),
+                          ("since", "--since"), ("until", "--until")):
+            if action == "set" and args.get(key) not in (None, ""):
+                cmd += [flag, str(args[key])]
+        if action == "set" and args.get("models"):
+            cmd += ["--models", ",".join(str(m) for m in args["models"])]
+        return json.dumps(await _cli(*cmd), ensure_ascii=False, default=str)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": f"walter_plans: {exc}"}, ensure_ascii=False)
+
+
 async def _handle_generate(args: Mapping[str, Any], **_: Any) -> str:
     try:
         cmd = ["generate", str(args.get("request") or "")]
@@ -364,9 +383,28 @@ FEEDBACK_SCHEMA = {
 }
 
 
+PLANS_SCHEMA = {
+    "name": "walter_plans",
+    "description": ("The owner's AI subscriptions as Walter Router knows them (ChatGPT Plus, Claude Pro, Google AI "
+                    "Pro…): list them, or record a change he tells you about (new plan, price, end of an offer, models "
+                    "included) or a cancellation. Plan ids are lowercase with dashes (openai-plus, google-ai-pro). "
+                    "Only on his word: never invent a plan or a price."),
+    "parameters": {"type": "object", "properties": {
+        "action": {"type": "string", "enum": ["list", "set", "retire"]},
+        "plan_id": {"type": "string"}, "vendor": {"type": "string"}, "plan": {"type": "string"},
+        "price_usd_month": {"type": "number"}, "models": {"type": "array", "items": {"type": "string"}},
+        "since": {"type": "string", "description": "YYYY-MM-DD"}, "until": {"type": "string", "description": "YYYY-MM-DD"},
+        "note": {"type": "string"}, "why": {"type": "string", "description": "His words, short."}},
+        "required": ["action"]},
+}
+
+
 def _available() -> bool:
     # Hidden inside a walter_run child (no recursive routing) and when the router is not installed.
-    return os.environ.get(CHILD_ENV) != "1" and os.access(CLI, os.X_OK)
+    # CLI is a command name since 2026-10-19: look it up on the PATH (os.access on a bare name checked the current
+    # directory, so every walter-router tool was hidden from Hermes until 2026-10-22)
+    import shutil
+    return os.environ.get(CHILD_ENV) != "1" and bool(shutil.which(CLI) or os.access(CLI, os.X_OK))
 
 
 ROUTING_RULE = (
@@ -378,7 +416,8 @@ ROUTING_RULE = (
     "ensuite à exécuter le modèle choisi. Pour exécuter une sous-tâche texte sur le modèle choisi, utilise "
     "walter_run. Si l'utilisateur nomme lui-même un modèle, son choix prime. Quand il répond « adopter N » ou "
     "« ignorer N » à une alerte Walter Router, appelle walter_verdict ; quand il juge le résultat d'un modèle "
-    "(« nul », « parfait »…), enregistre-le avec walter_feedback."
+    "(« nul », « parfait »…), enregistre-le avec walter_feedback. Quand il parle d'un changement d'abonnement IA "
+    "(nouveau forfait, prix, fin d'offre, résiliation), enregistre-le avec walter_plans."
 )
 
 
@@ -437,7 +476,7 @@ def register(ctx: Any) -> None:
         logger.error("WALTER_ROUTER_DEGRADED register_tool_missing")
         return
     for schema, handler, emoji in ((ROUTE_SCHEMA, _handle_route, "🧭"), (RUN_SCHEMA, _handle_run, "🚦"),
-                                   (VERDICT_SCHEMA, _handle_verdict, "✅"), (FEEDBACK_SCHEMA, _handle_feedback, "⭐"),
+                                   (VERDICT_SCHEMA, _handle_verdict, "✅"), (FEEDBACK_SCHEMA, _handle_feedback, "⭐"), (PLANS_SCHEMA, _handle_plans, "💳"),
                                    (GENERATE_SCHEMA, _handle_generate, "🎨")):
         kwargs = {"name": schema["name"], "toolset": "walter-router", "schema": schema, "handler": handler,
                   "check_fn": _available, "is_async": True, "emoji": emoji}
