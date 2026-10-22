@@ -1,6 +1,7 @@
 {
  "hermes": {
   "path": "/root/.hermes/skills/devops/vault-lookup",
+  "pending_sha": "46ec9cbddeef6f1d500f78f49bf1c658b8bb16c7f281096590a415d4a33ea4f4",
   "sha": "f3154a96f463aaf14ee454eac933f4603abc71dd89510138d6100b369602ee13",
   "state": "active"
  },
