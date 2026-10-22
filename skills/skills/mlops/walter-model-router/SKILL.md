@@ -30,12 +30,16 @@ The old store (schema `walter_router`, fixed weight vectors, router_matrix.json)
 - `walter-router dossier <task>` — the evidence behind a choice; `walter-router library` — the whole table (also the
   library page, behind Cloudflare Access).
 - Text calls from modules or agents: walter-llm (127.0.0.1:8894, OpenAI-compatible, `model` = a router task, per-agent
-  token). Agents: the same tools in every runtime — walter_route, walter_run, walter_generate, walter_plans (Hermes
+  token). Agents: the same tools in every runtime — walter_route, walter_run (text sub-agent or media generation),
+  walter_decide (the decision model for any quick choice), walter_plans (Hermes
   plugin; walter MCP for Claude Code / Codex / DSH), plus walter_verdict / walter_feedback in Hermes. walter_route and
   walter_run take `conversation`, the same line as `--context`. What agents can ask for (levels, specialities,
   generation, constraints) is `walter-router brief`, generated from the database and given to every agent (Hermes
   prompt section, MCP instructions, Codex / DSH profiles): edit tasks/roles, never the prompt.
-- Media: `walter-router generate "<demande>" --task …` — costs money, only on request.
+- Doing the job: `walter-router run` (JSON spec on stdin: goal, context, task, level, or model + provider when the
+  owner names them — run exactly as named or refused, never substituted; media: role, image_urls…). Media costs
+  money, only on request; `walter-router generate "<demande>" --task …` remains the direct media command.
+- `walter-router ask "<question>" --option a="…" --option b="…"` — the decision model for any choice.
 
 ## How a choice is made (read the README for details)
 - research/ fetches 16 sources by category (`walter-router research image|video|text|audio|memory|decision|prices|
