@@ -1,0 +1,11 @@
+{
+ "base_sha": "d8ab57704170c17e08d496bc3bdfc182130cb03c1f91b4b32251ed5191e8c597",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-22T13:46:49.959323+00:00",
+ "domain": "mlops",
+ "kind": "patch",
+ "reason": "Restores knowledge the 2026-10-22 rewrite dropped but that is still valid (the judge's 2026-10-17 objections): AA API v2 endpoint, vault key name and the 401 trap, the Kie pricing evidence rules (family pricingDesc, verified_rates, separate official / AA-reference values, base-slug rule, no task-cost estimate without the AA token mix), the RSC stable-field match, the Design Arena two-arena contract. Only facts that became false are adjusted: the 172.17.0.3 container address (router uses 127.0.0.1:5433), the NUMERIC note (prices are double precision), the \"GPT-5.6 not on Codex\" item (Codex catalogue changes; GPT-5.5 withdrawn 2026-10-14), and cost per task now read by the router from AA page data. Nothing else of the live version is removed.",
+ "runtime": "claude",
+ "session_id": null,
+ "target": "walter-model-router"
+}
