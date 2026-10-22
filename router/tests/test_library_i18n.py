@@ -17,6 +17,7 @@ def test_english_page_has_no_french_left():
     assert '<html lang="en">' in en and 'data-lang="en" class="on"' in en and 'data-lang="fr" class="on"' not in en
     text = re.sub(r"<style.*?</style>|<script.*?</script>", "", en, flags=re.S)
     text = re.sub(r'data-search="[^"]*"', "", text)
+    text = re.sub(r'<span class="raw">[^<]*</span>', "", text)   # data quoted as published (sources, e-mails)
     words = set(re.findall(r"[A-Za-zÀ-ÿ']+", re.sub(r"<[^>]+>", " ", text)))
     leftovers = {w for w in words if (re.search(r"[éèêàùçôîâœ]", w) or w.lower() in FRENCH_WORDS) and w != "Français"}
     assert not leftovers, leftovers

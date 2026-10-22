@@ -23,8 +23,8 @@ USES = {"decision": f"comprendre les demandes de {instance.owner()} et choisir l
 EVAL = paths.EVAL / "decision_results.json"
 
 
-def ask_l1(conn, prompt: str, source: str, timeout: int = 240) -> str | None:
-    """One-shot answer from the economic tier (L1) through Hermes, as craft_prompt does."""
+def ask_l1(conn, prompt: str, source: str, timeout: int = 240, tools: str = "memory", max_turns: int = 1) -> str | None:
+    """One-shot answer from the economic tier (L1) through Hermes, as craft_prompt does (tools: Hermes toolsets)."""
     from walter_router.serve import choose
     d = choose.pick(conn, "general", "L1")
     route = next((r for r in execution.routes(conn, d["model_id"], d.get("variant") or "")
@@ -32,7 +32,7 @@ def ask_l1(conn, prompt: str, source: str, timeout: int = 240) -> str | None:
     if not route:
         return None
     cmd = [str(HERMES), "chat", "-q", prompt, "--oneshot", "-Q", "--provider", route["hermes_provider"], "-m",
-           route["model"], "-t", "memory", "--max-turns", "1", "--source", source]
+           route["model"], "-t", tools, "--max-turns", str(max_turns), "--source", source]
     if route.get("reasoning"):
         cmd += ["--reasoning", route["reasoning"]]
     out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,

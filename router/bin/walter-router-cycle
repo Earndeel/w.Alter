@@ -38,6 +38,9 @@ WALTER_ROUTER_CHILD=1 timeout 1100 "$HERMES" "${args[@]}" > "$LOG/analysis-run-$
   || echo "[cycle] research agent failed (exit $?) — see $LOG/analysis-run-$day.log"
 fi
 
+echo "[cycle] plans: meters, billing mails, web research on the plans, cost price of a token"
+timeout 1500 "$WR" research plans > "$LOG/plans-$day.json" 2>&1 || echo "[cycle] plans research failed (non-blocking)"
+
 echo "[cycle] 3/4 analysis with the new name links, then Telegram (only: a new model above an active one)"
 "$WR" refresh --skip-collect || exit 1
 echo "[cycle] 4/4 Hermes auxiliary jobs follow the postes (only when a pick changed); library page republished"

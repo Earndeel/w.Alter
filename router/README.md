@@ -251,3 +251,20 @@ library shows « Codex ≈ 0,04/0,21 $/M (prix de revient, 2,1 % du prix API, qu
 categories alone (`--list` shows what each reads). Sources shared by categories (Arena, AA media, Design Arena) are
 read in parts and merged into their last complete snapshot, so the other categories keep their data (`research
 image`: 1 min 40 s with `--analyse` = recompute + republish, no message). The 48 h cycle still runs everything.
+
+## Plans research and editing (2026-10-22)
+Owner: providers kept = OpenRouter, Kie, Codex, Arnict (uncensored); hosts behind OpenRouter are OpenRouter's (billed
+through it), the router only orders them. `research plans` (and the 48 h cycle) = meters, then billing mails, then
+web research, then the cost price:
+- **mails** (`research/plans/mail.py`): the owner's Gmail, read-only grant `google-memory` via `walter-secret`, only
+  subscription mails from AI vendors (Google Play / Payments for Google AI plans); deterministic parsing, no mail
+  content sent to a model; the latest mail of each plan decides; a difference with the declared plans becomes a
+  `plan_change` alert (Telegram buttons « ✅ Mettre à jour / ✖️ Ignorer »; adopting applies it). Credit top-ups
+  (OpenRouter, API credits) are recorded, never proposed as plans.
+- **web** (`research/plans/watch.py`): the economic tier with web tools looks for published facts on each plan
+  (SemiAnalysis / Tokenomics, vendors' limit pages, other measurements) -> `models.plan_evidence` with source and date;
+  published plan values feed the capacity of the cost price when we have no measure of our own.
+- **editing**: `walter-router plans list | set ID [--vendor --plan --price --models --note] | retire ID`
+  (`research/plans/declared.py`, the instance's subscriptions.json, previous version kept in config/router/history/),
+  the Subscriptions tab form (page -> /api/plans -> control service POST /plans, HMAC over the body too), and adopted
+  plan_change alerts.

@@ -7,6 +7,8 @@ Cloudflare Access app that admits only the Pages project's service token. Every 
 the instance's control_env file (0600).
   POST /run     start walter-router-refresh.service (the 48 h cycle) unless it runs or started < 10 min ago
   GET  /status  running?, current step, last start/end, result
+  POST /plans   edit the owner's plans from the page: {"action": "set"|"retire", "sub_id", "fields"} (HMAC also covers
+                the body: ts + method + path + sha256(body)); applied by `walter-router plans`, page republished
 """
 import hashlib
 import hmac
@@ -64,11 +66,11 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _auth(self) -> bool:
+    def _auth(self, body_digest: str = "") -> bool:
         ts, sig = self.headers.get("X-Walter-Ts", ""), self.headers.get("X-Walter-Sig", "")
         if not ts.isdigit() or abs(time.time() - int(ts)) > 300:
             return False
-        want = hmac.new(secret(), f"{ts}{self.command}{self.path}".encode(), hashlib.sha256).hexdigest()
+        want = hmac.new(secret(), f"{ts}{self.command}{self.path}{body_digest}".encode(), hashlib.sha256).hexdigest()
         return hmac.compare_digest(want, sig)
 
     def do_GET(self):  # noqa: N802
@@ -76,7 +78,36 @@ class H(BaseHTTPRequestHandler):
             return self._ok(404, {"error": "not found"})
         self._ok(200, status())
 
+    def _plans(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        if n <= 0 or n > 4000:
+            return self._ok(400, {"error": "bad body"})
+        raw = self.rfile.read(n)
+        if not self._auth(hashlib.sha256(raw).hexdigest()):
+            return self._ok(404, {"error": "not found"})
+        try:
+            req = json.loads(raw)
+            sid = str(req["sub_id"])
+            if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,40}", sid) or req.get("action") not in ("set", "retire"):
+                raise ValueError("bad request")
+        except (ValueError, KeyError, TypeError):
+            return self._ok(400, {"error": "requête invalide (identifiant : lettres minuscules, chiffres, tirets)"})
+        cmd = ["walter-router", "plans", "retire" if req["action"] == "retire" else "set", sid, "--why", "modifié depuis la page"]
+        f = req.get("fields") or {}
+        for key, flag in (("vendor", "--vendor"), ("plan", "--plan"), ("price_usd_month", "--price"), ("note", "--note")):
+            if req["action"] == "set" and str(f.get(key) or "").strip():
+                cmd += [flag, str(f[key]).strip()[:200]]
+        if req["action"] == "set" and f.get("models"):
+            cmd += ["--models", ",".join(str(m).strip()[:60] for m in f["models"][:20])]
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if out.returncode != 0:
+            return self._ok(400, {"error": (out.stdout + out.stderr).strip()[-300:]})
+        subprocess.Popen(["walter-router", "publish-library"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return self._ok(200, {"message": "Enregistré", "result": json.loads(out.stdout)})
+
     def do_POST(self):  # noqa: N802
+        if self.path == "/plans":
+            return self._plans()
         if self.path != "/run" or not self._auth():
             return self._ok(404, {"error": "not found"})
         st = status()
