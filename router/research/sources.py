@@ -14,6 +14,7 @@ from walter_router.research.benchmarks.agentset import source_agentset
 from walter_router.research.benchmarks.arena import source_arena
 from walter_router.research.benchmarks.bridgebench import source_bridgebench
 from walter_router.research.benchmarks.mteb import source_mteb
+from walter_router.research.benchmarks.video_evals import source_video_evals
 from walter_router.research.prices.codex import source_codex
 from walter_router.research.prices.declared import source_declared
 from walter_router.research.prices.kie import source_kie
@@ -22,7 +23,7 @@ from walter_router.research.prices.openrouter_endpoints import source_or_endpoin
 from walter_router.research.prices.providers import source_hermes_providers
 
 SOURCES = {"aa": source_aa, "aa_eval": source_aa_eval, "aa_decision": source_aa_decision, "mm": source_mm, "da": source_da, "arena": source_arena, "bridgebench": source_bridgebench,
-           "aa_stt": source_aa_stt, "agentset": source_agentset, "mteb": source_mteb,
+           "aa_stt": source_aa_stt, "agentset": source_agentset, "mteb": source_mteb, "video_evals": source_video_evals,
            "openrouter": source_openrouter, "or_endpoints": source_or_endpoints, "kie": source_kie, "codex": source_codex,
            "declared": source_declared, "hermes_providers": source_hermes_providers}
 

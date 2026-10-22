@@ -16,7 +16,8 @@ from walter_router.analysis import media
 DEFAULT_EFFORTS = ("medium", "high")  # assumed effort when a leaderboard lists a model without one (flagged)
 MEDIA_UNITS = media.NORM_UNITS   # image per image, video per second, voice per 1000 characters, stt per minute…
 BENCH_KIND = {"aa_intelligence": "aa", "aa_eval": "aa_eval", "aa_decision": "aa_decision", "aa_mm": "mm", "da_models": "da", "da_agents": "da", "arena": "arena",
-              "bridgebench": "bridgebench", "aa_stt": "aa_stt", "agentset": "agentset", "mteb": "mteb"}
+              "bridgebench": "bridgebench", "aa_stt": "aa_stt", "agentset": "agentset", "mteb": "mteb",
+              "video_mme_v2": "video_evals", "llm_stats": "video_evals"}
 
 
 def latest_snapshots(conn) -> dict[str, int]:
@@ -61,13 +62,15 @@ def blended(offer: dict) -> float | None:
     return (3 * offer["price_in_1m"] + offer["price_out_1m"]) / 4
 
 
-def chat_route(offers: list[dict], list_cost: float | None) -> dict[str, Any]:
+def chat_route(offers: list[dict], list_cost: float | None, modes: list[str] | None = None) -> dict[str, Any]:
     """Cheapest paid route for a chat model, scaling AA's list-price task cost by the provider/list price ratio.
 
     The OpenRouter price is the list reference (it mirrors first-party pricing). A provider without a reference
-    is kept unscaled (conservative) and flagged.
+    is kept unscaled (conservative) and flagged. `modes` = inputs the task needs besides text (video understanding:
+    ['video']): only offers declaring them count, so a model that cannot read a video is not callable for it.
     """
-    chat = [o for o in offers if o["interface"] == "chat"]
+    need = set(modes or [])
+    chat = [o for o in offers if o["interface"] == "chat" and need <= set(o.get("modes") or [])]
     subscription = next((o["provider"] for o in chat if o["access"] == "subscription"), None)
     ref = next((blended(o) for o in chat if o["provider"] == "openrouter" and blended(o)), None)
     best = None
@@ -209,7 +212,7 @@ def _best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dic
                 primary[mid]["real_cost_unit"], primary[mid]["variant"]
         else:
             mo = offers.get(mid, [])
-            route = chat_route(mo, None) if t["interface"] == "chat" else decision_route(mo, t["modes"]) \
+            route = chat_route(mo, None, t["modes"]) if t["interface"] == "chat" else decision_route(mo, t["modes"]) \
                 if t["interface"] == "decisions" else media_route(mo, t["interface"], t["modes"])
             if not route["callable"]:
                 continue
@@ -340,7 +343,7 @@ def compute(conn) -> list[dict]:
                             ref, assumed = intel[(b["model_id"], eff)], eff
                             break
                 list_cost = b["cost"] if b["benchmark"] == "aa_intelligence" else (ref["cost"] if ref else None)
-                route = chat_route(mo, list_cost)
+                route = chat_route(mo, list_cost, t["modes"])
                 cost_unit = "usd_per_aa_task" if list_cost is not None else None
                 if assumed:
                     route = {**route, "paid": {**(route["paid"] or {}), "cost_basis_effort_assumed": assumed}}

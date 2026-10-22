@@ -131,6 +131,11 @@ def normalize(namespace: str, key: str, name: str | None = None) -> tuple[str, s
         for prefix in _AGENTSET_VENDORS:
             if base.startswith(prefix):
                 base = base[len(prefix):]
+    elif namespace == "video_evals":
+        # 'Gemini-3-Pro', 'Qwen3.5-397B-A17B-Think', 'Doubao-Seed-2.0-Pro-260215', 'gpt-5.2-2025-12-11': the thinking /
+        # instruct mode and the build date are not separate models (the best row of a model counts)
+        base = _DATE_SUFFIX.sub("", slugify(key))
+        base = re.sub(r"-(?:\d{6}|think|thinking|instruct)$", "", base)
     elif namespace == "mteb":
         base = slugify(key.split("__", 1)[-1])   # results folder 'Qwen__Qwen3-Embedding-8B' (org__model)
     elif namespace == "arena":

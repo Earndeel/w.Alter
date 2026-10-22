@@ -7,7 +7,7 @@ the same 0-100 scale, then boards are averaged with the task's weights:
    Linear keeps the meaning of the gaps (an Elo gap is a win probability, an index gap is an index gap) and,
    unlike a percentile, still separates the leaders, which is where the router chooses.
 2. Reliability of a measure: Elo-type boards with votes/samples count v/(v+500) (a model with 300 votes weighs
-   0.38, with 20 000 votes 0.98); a provisional BridgeBench row 0.5; otherwise 1.
+   0.38, with 20 000 votes 0.98); a provisional BridgeBench row or a vendor's self-reported score 0.5; otherwise 1.
 3. Composite = (sum weight x reliability x q + K x 50) / (sum weight x reliability + K): a model measured on a single
    light board is pulled toward the middle instead of winning on thin evidence (K = 0.25).
 4. the owner's own verdicts (models.feedback, last 180 days, this task or any): +/-3 points per net rating, capped
@@ -20,19 +20,21 @@ from __future__ import annotations
 from statistics import median
 
 from walter_router.analysis import select as sel
+from walter_router.analysis.catalog import BOARDS
 from walter_router import instance
 
 SHRINK_K = 0.25
 FEEDBACK_POINTS = 3.0  # per net rating point from the owner on that task (capped at +/-3 -> +/-9 composite points)
 VOTES_HALF = 500.0
-BOARD_NAMES = {"aa_intelligence": "AA", "aa_eval": "AA", "aa_decision": "AA Decision", "aa_mm": "AA", "da_models": "Design Arena", "da_agents": "Design Arena",
-               "arena": "Arena", "bridgebench": "BridgeBench", "aa_stt": "AA STT", "agentset": "Agentset", "mteb": "MTEB"}
+SELF_REPORTED = 0.5   # a vendor's claim about its own model (LLM Stats rows) weighs half a measurement
 
 
 def _reliability(row: dict) -> float:
     extra = row.get("extra") or {}
     if extra.get("provisional"):
         return 0.5
+    if extra.get("self_reported"):
+        return SELF_REPORTED
     votes = extra.get("votes") or extra.get("samples")
     if isinstance(votes, (int, float)) and votes > 0:
         return votes / (votes + VOTES_HALF)
@@ -70,7 +72,7 @@ def composite(conn, task: str, snaps: dict | None = None) -> list[dict]:
                                  (sid, b["benchmark"], b["bench_task"])))
         if b["benchmark"] == "aa_decision":   # LLM reference rows would set the scale: rank decision models only
             rows = [r for r in rows if (r["extra"] or {}).get("kind") == "decisionModel"]
-        name = f'{BOARD_NAMES.get(b["benchmark"], b["benchmark"])} {b["bench_task"]}'
+        name = f'{BOARDS.get(b["benchmark"], b["benchmark"])} {b["bench_task"]}'
         for model_id, v in board_quality(rows).items():
             rel = _reliability(v["row"])
             a = acc.setdefault(model_id, {"model_id": model_id, "wq": 0.0, "w": 0.0, "boards": {}})

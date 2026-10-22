@@ -272,3 +272,17 @@ at the end of `research plans` (`--no-notify` to only record). Window: mails of 
   command in the current directory since 2026-10-19 (tools hidden); it now uses the PATH.
 - Decision models: d1-ultra for decision and decision_vision (owner, 2026-10-22), intent eval 42/42.
 - Media fallback: the same model on its next provider; another model only when declared.
+
+## Video understanding and what an agent gets from `route` (2026-10-22)
+The owner's example (analyse a client's reference video, research, plan, images, video, post-production, review)
+showed the router had no task to watch a video: `vision` picked Claude Fable 5, which reads no video at all. New task
+`video_understanding` (migration 031): `modes = {video}`, so only offers declaring video input (OpenRouter's
+`input_modalities`, now stored on chat offers) are callable, in the selection, the dossier, the Hermes routes and the
+subscription fallback. No arena measures it (AA and Arena rank video generation only; Arena vision = images;
+Video-MME saturated at ~90 %): boards = Video-MME-v2 (authors' measurement, newest rows Gemini 3 / Qwen 3.6) and the
+LLM Stats video boards (current, all vendor self-reported, reliability 0.5). Two hand-checked aliases (Gemini 3 Pro /
+gemini-3-pro-preview, Gemini 3 Flash / gemini-3-flash-preview). First choice: Gemini 3 Flash Preview.
+Same day, what the agent sees: `route` no longer calls the decision model when the caller fixed the task (and the
+level for general); it reads an optional `--context` line, so « fais la suite » is classified with what came before;
+the Hermes plugin shows each route's price per million tokens (a subscription at its cost price) and no longer a
+media route for text decisions; the tool descriptions name the decision model instead of Jev.

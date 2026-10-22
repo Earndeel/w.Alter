@@ -28,7 +28,7 @@ def record(conn, kind: str, task: str, subject: str, evidence: dict, status: str
 
 def _unit_cost(offers: list[dict], interface: str, modes: list[str] | None = None) -> float | None:
     if interface == "chat":
-        paid = sel.chat_route(offers, None)["paid"]
+        paid = sel.chat_route(offers, None, modes)["paid"]
         return paid["blended_1m"] if paid else None
     paid = sel.media_route(offers, interface, modes)["paid"]
     return paid["cost"] if paid else None

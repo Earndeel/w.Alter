@@ -84,7 +84,8 @@ def host_order(conn, model_id: str, usage: str = "interactive") -> list[dict]:
            order by uptime_1d is null, blended_1m, uptime_1d desc nulls last""", (model_id, usage))]
 
 
-def routes(conn, model_id: str, variant: str = "", preferred: str | None = None, usage: str = "interactive") -> list[dict]:
+def routes(conn, model_id: str, variant: str = "", preferred: str | None = None, usage: str = "interactive",
+           modes: list[str] | None = None) -> list[dict]:
     """Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not
     nearly spent), Kie (if not much dearer), OpenRouter last — on its cheapest usable host (2026-10-22). Providers whose
     last probe failed, or that failed most recent real runs, go to the end. Each route carries its price: the
@@ -92,7 +93,10 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
     snaps = sel.latest_snapshots(conn)
     status = {r["provider"]: r for r in conn.execute("select * from models.provider_status")}
     out = []
+    need = set(modes or [])   # inputs the task needs besides text (video): only offers that declare them
     for o in sel.load_offers(conn, snaps).get(model_id, []):
+        if need and not need <= set(o.get("modes") or []):
+            continue
         run = _runnable(o)
         if not run:
             continue

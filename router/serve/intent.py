@@ -1,13 +1,14 @@
-"""Intent classification with Jev (TypeSafe's structured decision model, through OpenRouter's Decisions API).
+"""Intent classification by the decision model (OpenRouter's Decisions API, or Cloudflare Workers AI for Clef).
 
-One call answers four questions about a free-text request (~0.4 s, ~0.00005 $): task family, video objective
-(the owner's video roles), text level (L1/L2/L3) and whether an uncensored model is needed. The criteria come from
-the database (task labels/descriptions, role descriptions), so declaring a new role in knowledge.json teaches Jev
-the new objective without code. On any failure the caller falls back to keywords.
+One call answers four questions about a free-text request (~0.4 s, a fraction of a cent): task family, video
+objective (the owner's video roles), text level (L1/L2/L3) and whether an uncensored model is needed. The models
+are tried in `chain()` order: the owner's pinned decision model (else the cycle's #1 on the AA Decision Index), then
+the free fallbacks. The criteria come from the database (task labels/descriptions, role descriptions), so a new
+role in knowledge.json teaches the objective without code. On any failure the caller falls back to keywords.
 
 Wire contract (verified 2026-10-02): POST https://openrouter.ai/api/alpha/decisions, Bearer OpenRouter key,
-{"model": "~typesafe/jev-latest", "state": {...}, "questions": {name: {"type": "choice", "instructions", "criteria"}}}
--> {"model": "typesafe/jev-1.13-...", "answers": {name: {"choice", "probabilities", "confidence"}}, "usage": {...}}.
+{"model": "...", "state": {...}, "questions": {name: {"type": "choice", "instructions", "criteria"}}}
+-> {"model": "...", "answers": {name: {"choice", "probabilities", "confidence"}}, "usage": {...}}.
 Never `typesafe/jev-router` (a different, forwarding product).
 """
 from __future__ import annotations
@@ -84,7 +85,7 @@ def _criteria(conn) -> tuple[dict, dict]:
     return tasks, roles
 
 
-def classify(conn, request: str, timeout: float = 8.0, models: tuple | None = None) -> dict:
+def classify(conn, request: str, timeout: float = 8.0, models: tuple | None = None, context: str | None = None) -> dict:
     """{'task', 'task_confidence', 'video_role', 'role_confidence', 'level', 'unrestricted', 'model', 'cost', 'ms'}.
     Raises on transport/contract errors (callers fall back to keywords)."""
     key = instance.env_value("OPENROUTER_API_KEY") or ""
@@ -104,6 +105,11 @@ def classify(conn, request: str, timeout: float = 8.0, models: tuple | None = No
         questions["video_role"] = {"type": "choice", "criteria": roles,
                                    "instructions": f"If the request is a video, which objective fits best? "
                                                    f"If it is not a video, choose default. {note}"}
+    state = {"request": request}
+    if context:   # what earlier turns were about: « fais la suite » needs it
+        state["context"] = context[:600]
+        for q in questions.values():
+            q["instructions"] += " `context` says what the conversation was about before this request."
     t0 = time.monotonic()
     errors = []
     data = None
@@ -112,7 +118,7 @@ def classify(conn, request: str, timeout: float = 8.0, models: tuple | None = No
     except Exception:  # noqa: BLE001 — no selection yet: the static order
         models = MODELS
     for model in models:
-        payload = {"model": model, "state": {"request": request}, "questions": questions}
+        payload = {"model": model, "state": state, "questions": questions}
         try:
             if model.startswith("cloudflare/"):
                 data = _cloudflare(model, payload, timeout)

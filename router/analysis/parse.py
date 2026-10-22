@@ -193,6 +193,31 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
                 if lat:   # latency as a "higher = better" speed: requests per second at the measured latency
                     rows.append(dict(benchmark="agentset", task=f"{board}_speed", score=round(1000 / lat, 3),
                                      score_unit="Agentset speed (1000 / latency ms)", **common))
+    elif kind == "video_evals":
+        # Video-MME-v2: measured by its authors (with / without subtitles). LLM Stats: vendors' own claims, flagged
+        # self_reported (the analysis weighs them half). Scores on 0-100.
+        for r in (doc.get("video_mme_v2") or {}).get("rows") or []:
+            mid, variant = identity.normalize("video_evals", r["name"])
+            extra = {"frames": r.get("frames"), "avg_acc": r.get("avg_acc"), "type": r.get("type"), "stale": r.get("stale")}
+            for task, score in zip(("with_subtitles", "without_subtitles"), r["overall"]):
+                if score is not None:
+                    rows.append(dict(benchmark="video_mme_v2", task=task, external_key=f'{r["name"]} | {r.get("frames") or ""}',
+                                     model_id=mid, variant=variant, display_name=r["name"], score=round(score, 2),
+                                     score_unit="Video-MME-v2 non-linear score /100", cost=None, cost_unit=None,
+                                     released=None, extra=extra))
+        for board, b in (doc.get("llm_stats") or {}).items():
+            for m in b.get("models") or []:
+                score = _num(m.get("score"))
+                if score is None or not m.get("model_id"):
+                    continue
+                mid, variant = identity.normalize("video_evals", m["model_id"])
+                rows.append(dict(benchmark="llm_stats", task=board, external_key=m["model_id"], model_id=mid,
+                                 variant=variant, display_name=m.get("model_name"), score=round(100 * score, 2),
+                                 score_unit=f'{b.get("name") or board} % (LLM Stats)', cost=None, cost_unit=None,
+                                 released=None,
+                                 extra={"self_reported": bool(m.get("self_reported")), "verified": bool(m.get("verified")),
+                                        "organization": m.get("organization_name"), "method": m.get("analysis_method"),
+                                        "source": m.get("self_reported_source"), "updated": b.get("updated_at")}))
     elif kind == "mteb":
         best: dict[tuple[str, str], dict] = {}
         for r in doc["rows"]:   # several revision folders of one model: its best published result
@@ -282,7 +307,7 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                              # embeddings compare on their input price per 1M tokens
                              **_media_fields(interface, "", pin * 1e6 if interface == "embedding" and pin else None,
                                              "per 1m tokens" if interface == "embedding" else None, inputs)))
-            if interface == "decisions":   # what a decision model can read besides text (image, audio, video)
+            if interface in ("decisions", "chat"):   # what the model can read besides text (image, audio, video, file)
                 rows[-1]["modes"] = sorted(x for x in inputs if x != "text")
             if interface == "chat" and "audio" in inputs:
                 # a chat model that hears audio also transcribes (Hermes stt: Gemini Flash-Lite via chat/completions
