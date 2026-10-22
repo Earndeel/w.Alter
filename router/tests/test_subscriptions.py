@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-from walter_router.research.plans import subscriptions
+from walter_router.plan import subscriptions
 
 NOW = datetime(2026, 10, 14, 18, 0, tzinfo=timezone.utc)
 ROW = dict.fromkeys(subscriptions.KINDS, 0)

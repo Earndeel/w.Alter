@@ -3,5 +3,5 @@ LABEL = ("Abonnements", "Subscriptions")
 ICON = "💳"
 # source kind -> parts to read (None = the whole source)
 SOURCES = {}
-EXTRA = "subscriptions"   # not a snapshot source: research.plans refreshes the meters and usage
+EXTRA = "subscriptions"   # not a snapshot source: the plan module (walter_router.plan) runs: meters, mails, web, news, cost price
 

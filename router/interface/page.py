@@ -150,7 +150,7 @@ def _usd(x: float | None) -> str:
 
 def _subscriptions(conn) -> tuple[str, int]:
     """Subscriptions pane (information only): our measurement on the owner's account + SemiAnalysis' plan values."""
-    from walter_router.research.plans import subscriptions
+    from walter_router.plan import subscriptions
     from walter_router.interface.library import _name
     try:
         subs = subscriptions.state(conn)
@@ -291,7 +291,7 @@ def _plan_forms(subs: list[dict]) -> str:
                 '<div class="pf-actions"><button type="submit">Enregistrer</button>'
                 + ("" if new else '<button type="button" class="pf-retire">Résilier</button>') +
                 '<span class="pf-state mute small"></span></div></form>')
-    from walter_router.research.plans import declared
+    from walter_router.plan import declared
     raw = {d["id"]: d for d in declared.read().get("subscriptions", [])}
     forms = [form(s["id"], {**raw.get(s["id"], {}), "name": s["name"], "plan_name": raw.get(s["id"], {}).get("plan")}) for s in subs]
     forms.append(form("", {}))

@@ -14,7 +14,7 @@ from email.utils import parsedate_to_datetime
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from walter_router.research.plans import declared
+from walter_router.plan import declared
 
 API = "https://gmail.googleapis.com/gmail/v1/users/me"
 GRANT = "google-memory"

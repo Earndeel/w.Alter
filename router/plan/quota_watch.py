@@ -11,7 +11,7 @@ import logging
 from walter_memory import bus
 
 from walter_router.store import db
-from walter_router.research.plans import subscriptions
+from walter_router.plan import subscriptions
 
 # Which subscription a runtime's turns spend: Hermes and Codex CLI run on ChatGPT (Codex), Claude Code on Claude Pro.
 SOURCE_SUBS = {"hermes": "openai-plus", "codex": "openai-plus", "claude_code": "anthropic-pro"}

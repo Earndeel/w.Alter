@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import re
 
-from walter_router.research.plans import declared
+from walter_router.plan import declared
 
 METRICS = ("usd_value_month", "tokens_month", "messages_5h", "messages_week", "price_usd_month", "limit_note")
 PROMPT = """Tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :
@@ -52,9 +52,9 @@ def parse(text: str) -> list[dict]:
     return out
 
 
-def store(conn, items: list[dict], origin: str = "web") -> int:
+def store(conn, items: list[dict], origin: str = "web") -> tuple[int, list[int]]:
     subs = {s["id"] for s in declared.read().get("subscriptions", [])}
-    n = 0
+    n, ids = 0, []
     for it in items:
         value = it.get("value")
         try:
@@ -64,13 +64,14 @@ def store(conn, items: list[dict], origin: str = "web") -> int:
         cur = conn.execute(
             """insert into models.plan_evidence (sub_id, vendor, plan, model_id, metric, value, unit, source_name,
                source_url, published, quote, origin) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-               on conflict do nothing""",
+               on conflict do nothing returning evidence_id""",
             (it.get("sub_id") if it.get("sub_id") in subs else None, it.get("vendor") or "?", it.get("plan") or "?",
              it.get("model_id"), it["metric"], value, it.get("unit"), it.get("source_name") or "?", it.get("source_url"),
              it.get("published") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(it.get("published") or "")) else None,
              (it.get("quote") or "")[:400], origin))
         n += cur.rowcount
-    return n
+        ids += [r["evidence_id"] for r in cur.fetchall()] if cur.rowcount and cur.description else []
+    return n, ids
 
 
 def run(conn) -> dict:
@@ -82,5 +83,6 @@ def run(conn) -> dict:
                            known=json.dumps(known(conn), ensure_ascii=False, default=str))
     text = ask_l1(conn, prompt, "walter-router-plans", timeout=900, tools="web", max_turns=25)
     items = parse(text or "")
-    added = store(conn, items)
-    return {"found": len(items), "new": added}
+    added, ids = store(conn, items)
+    from walter_router.plan import news
+    return {"found": len(items), "new": added, "notices": len(news.from_web(conn, ids))}

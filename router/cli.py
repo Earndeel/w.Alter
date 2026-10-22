@@ -18,7 +18,7 @@ from walter_router.serve import execution
 from walter_router.serve import intent
 from walter_router.analysis import knowledge
 from walter_router.research.agent import review
-from walter_router.research.plans import subscriptions
+from walter_router.plan import subscriptions
 
 
 def status() -> dict:
@@ -222,7 +222,7 @@ def _research(args) -> int:
         out = {"categories": names, "sources": sources.collect_all(conn, ingest.store, only=args.sources, parts=parts)}
         conn.commit()
         if plans:   # research plans: meters, billing mails, web research, then the cost price of a token
-            from walter_router.research.plans import mail, watch
+            from walter_router.plan import mail, watch
             out["plans"] = {"meters": subscriptions.refresh(conn)}
             conn.commit()
             for step, fn in (("mails", mail.scan), ("web", None if args.no_web else watch.run)):
@@ -234,10 +234,19 @@ def _research(args) -> int:
                 except Exception as exc:  # noqa: BLE001 — one step down never blocks the others
                     conn.rollback()
                     out["plans"][step] = {"error": f"{type(exc).__name__}: {exc}"[:200]}
-            from walter_router.research.plans import declared
+            from walter_router.plan import declared, news
             out["plans"]["offers_ending"] = declared.expiring(conn)
+            try:
+                out["plans"]["news_from_mails"] = len(news.from_mail(conn))
+            except Exception as exc:  # noqa: BLE001
+                out["plans"]["news_from_mails"] = {"error": f"{type(exc).__name__}: {exc}"[:200]}
             out["plans"]["cost_price"] = subscriptions.record_costs(conn)
             conn.commit()
+            if not args.no_notify:   # plan news, proposals and offer ends go out now, not at the next cycle
+                from walter_router.analysis import alerts
+                if conn.execute("select 1 from models.alerts where kind = 'plan_change' and status = 'open'").fetchone():
+                    out["plans"]["notify"] = alerts.notify(conn)
+                    conn.commit()
     if args.analyse:
         out["analysis"] = {k: v for k, v in refresh(notify=False, skip_collect=True).items() if k in ("run_id", "selection_rows")}
         from walter_router.interface import library
@@ -353,11 +362,12 @@ def main(argv: list[str] | None = None) -> int:
     q.add_argument("--list", action="store_true", help="categories with what each reads")
     q.add_argument("--analyse", action="store_true", help="then recompute the choices and republish the page (no message)")
     q.add_argument("--no-web", action="store_true", help="plans: skip the web research agent (meters, mails, cost price only)")
+    q.add_argument("--no-notify", action="store_true", help="plans: record news and proposals without sending them")
     sub.add_parser("instance-env", help="shell assignments of the instance bindings used by the cycle and the trigger")
     args = p.parse_args(argv)
 
     if args.cmd == "plans":
-        from walter_router.research.plans import declared
+        from walter_router.plan import declared
         if args.action == "list":
             print(json.dumps(declared.read().get("subscriptions", []), ensure_ascii=False, indent=1))
             return 0
