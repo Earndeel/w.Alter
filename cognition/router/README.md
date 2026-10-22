@@ -231,5 +231,5 @@ compression (fp4 / fp8 / bf16) and reliability. `research/prices/openrouter_endp
 the active library uses (shortlist + pins) into `models.endpoints`; `models.best_endpoints` keeps the cheapest usable
 one per model: >= 95 % successful requests over 24 h, never below the vendor's own precision (4-bit only when the
 vendor itself serves 4-bit, e.g. Kimi K3 mxfp4), flex tier (half price, slower) only for background work. The library
-page shows that host next to the OpenRouter price. Calls do not use it yet (OpenRouter still picks the host): see
-DESIGN « hosts » for the pending decision.
+page shows that host next to the OpenRouter price. Calls do not use it yet (OpenRouter still picks the host): pending
+the owner's decision (2026-10-22).
