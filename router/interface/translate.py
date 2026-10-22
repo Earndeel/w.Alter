@@ -67,7 +67,7 @@ PHRASES = {
     "Reclassement de résultats (rerank)": "Result reranking",
     "Musique": "Music", "Recherche web": "Web search", "Conversation vocale temps réel": "Real-time voice conversation",
     "SVG / vectoriel": "SVG / vector", "Vidéo depuis texte": "Text to video", "Voix (lecture)": "Voice (text to speech)",
-    "Composant d'interface": "UI component", "Édition de vidéo": "Video editing", "Analyse d'image": "Image analysis", "Analyse vidéo": "Video analysis",
+    "Composant d'interface": "UI component", "Édition de vidéo": "Video editing", "Analyse d'image": "Image analysis",
     "Météo": "Weather", "Calcul": "Calculation",
     # categories (models.preferences)
     "Budget / brouillon": "Budget / draft", "Équilibré": "Balanced", "Premium / cinématique": "Premium / cinematic",

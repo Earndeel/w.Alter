@@ -26,14 +26,14 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 
 ## How a choice is made
 
-1. **Research** — 17 sources: Artificial Analysis (Intelligence Index with cost per task, 19 evaluations, 6 domain
+1. **Research** — 16 sources: Artificial Analysis (Intelligence Index with cost per task, 19 evaluations, 6 domain
    indexes, Cyber Index, Decision Index, image / video / voice / music / speech-to-text boards), Arena (15 boards),
-   Design Arena (17 categories), BridgeBench, Agentset, MTEB, video understanding (Video-MME-v2, LLM Stats video
-   boards, self-reported scores weighed half); prices from OpenRouter, Kie, the Codex catalogue,
+   Design Arena (17 categories), BridgeBench, Agentset, MTEB; prices from OpenRouter, Kie, the Codex catalogue,
    Arnict, declared offers; the hosts behind OpenRouter for the models in use; the owner's plans.
-2. **Analysis** — names unified (`canonical`, `aliases`), every score stored "higher is better"; each task (43, of
+2. **Analysis** — names unified (`canonical`, `aliases`), every score stored "higher is better"; each task (42, of
    which 8 internal module postes) is ranked on its weighted boards (`task_benchmarks`, shown under each task on the
-   page) among the models Walter can run — for a task that reads a video, only the offers that accept one. Text tiers L1 / L2 / L3 come from the owner's Pareto method (`docs/TIERS.md`);
+   page) among the models Walter can run. A hard constraint (`--require unrestricted | open_weights | video_input`) keeps
+   only the models — and the routes — that meet it (video_input: the offers that declare video input). Text tiers L1 / L2 / L3 come from the owner's Pareto method (`docs/TIERS.md`);
    decision models are compared on three axes (Decision Index, time, cost per task).
 3. **The owner decides** — his pins and roles (`config/knowledge.json`, `prefer`) always win. A model that beats an
    active one on the task's global score, a new #1, a nerf, a board down, a plan change or a plan news becomes one
@@ -47,10 +47,10 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 
 | Consumer | How |
 |---|---|
-| Hermes | plugin `walter-router` (tools `walter_route`, `walter_run`, `walter_generate`, `walter_feedback`, `walter_verdict`, `walter_plans`); `sync-hermes` writes its auxiliary jobs, cron postes and `provider_routing.models.<id>.order` |
+| Hermes | plugin `walter-router` (tools `walter_route`, `walter_run`, `walter_generate`, `walter_plans`, plus `walter_verdict`, `walter_feedback` for the Telegram buttons and the owner's verdicts); the brief as a system-prompt section; `sync-hermes` writes its auxiliary jobs, cron postes and `provider_routing.models.<id>.order` |
 | Modules (walter-memory, Hindsight, voice, Kardex…) | walter-llm with `model` = a router task; `pick` for service postes (STT, rerank, embeddings) |
 | walter-memory triage | `decision-chain` (d1-ultra, then Mercury Decide, then Clef) |
-| Claude Code, Codex, DSH | the `walter-router` command, walter-llm |
+| Claude Code, Codex, DSH | the `walter` MCP: the same four tools under the same names (`walter_run` = one walter-llm call, no tools); the brief in the MCP server instructions (Claude Code) and in their W.Alter profile (Codex, DSH). Their own model stays theirs |
 | walter-core | `walter-router health` in `walter_health` |
 
 ## Operating it
@@ -64,13 +64,15 @@ Telegram → Hermes follows, the page is republished. Services: `walter-router-q
 walter-router health | status | review | alerts [--all]
 walter-router research [text|image|video|audio|memory|decision|prices|hosts|plans|all] [--analyse] | --list | --source KIND
 walter-router refresh [--skip-collect] [--no-notify]          # recompute (the cycle does it)
-walter-router pick TASK [--level L1|L2|L3] [--role R] [--require unrestricted|open_weights]
+walter-router pick TASK [--level L1|L2|L3] [--role R] [--require unrestricted|open_weights|video_input] [--agent]
 walter-router route "<request>" [--task T] [--level L] [--context "<what the conversation was about>"]
 walter-router classify "<request>" [--context …] | decide TASK "<request>" | dossier TASK | tasks | library
 walter-router generate "<request>" [--task …] [--role …]      # costs money: on request only
 walter-router prefer TASK [--pin MODEL[/VARIANT]] … | verdict ALERT adopted|dismissed | feedback MODEL RATING
 walter-router plans list | set ID [--vendor --plan --price --models --since --until --note] | retire ID
 walter-router subscriptions [refresh | calibrate anthropic-pro PERCENT]
+walter-router brief [--write]        # what an agent must know to use the router: tools, levels, specialities,
+                                     # generation, analysis, constraints — never a model or provider name
 walter-router sync-hermes [--apply] | publish-library | declare | migrate | probe | decision-chain
 walter-router alias-add | alias-remove | alias-list | postes | log-exec | notify-failure | instance-env
 ```

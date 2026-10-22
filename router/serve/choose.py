@@ -11,7 +11,10 @@ LEVELS = ("L1", "L2", "L3")
 # Effective content policy = the owner's profile override, else the detected one. 'permissive' models (reputedly
 # lenient, unverified) answer an unrestricted request only after every truly unrestricted one, flagged.
 POLICY = "coalesce(pr.content_policy, c.content_policy)"
-REQUIREMENTS = {"unrestricted": f"{POLICY} in ('unrestricted', 'permissive')", "open_weights": "c.open_weights"}
+REQUIREMENTS = {"unrestricted": f"{POLICY} in ('unrestricted', 'permissive')", "open_weights": "c.open_weights",
+                # the model reads a video (OpenRouter input_modalities): image analysis of a video, its review
+                "video_input": "'video' = any(o.modes)"}
+INPUTS = {"video_input": ["video"]}   # requirement -> inputs every route of the choice must read
 
 
 def latest_run(conn) -> int | None:
@@ -50,7 +53,7 @@ def _best_score(conn, snaps: dict, boards: list[dict], model_id: str) -> tuple[f
 
 
 def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]:
-    """Best callable model satisfying a hard constraint (unrestricted / open weights) for a task.
+    """Best callable model satisfying a hard constraint (unrestricted / open weights / video input) for a task.
 
     Quality = the model's own score on the task's boards (primary first); an unrestricted fine-tune that no
     leaderboard measures inherits its base model's score, flagged `score_from_base`."""
@@ -68,7 +71,8 @@ def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]
                               left join models.profiles pr on pr.model_id = c.model_id
                               where o.snapshot_id = any(%s) and o.interface = %s and {REQUIREMENTS[require]}""",
                           (ids, t["interface"])):
-        route = sel.chat_route(offers[c["model_id"]], None, t["modes"]) if t["interface"] == "chat" else \
+        need = list(t["modes"] or []) + INPUTS.get(require, [])
+        route = sel.chat_route(offers[c["model_id"]], None, need) if t["interface"] == "chat" else \
             sel.media_route(offers[c["model_id"]], t["interface"], t["modes"])
         if not route["callable"]:
             continue

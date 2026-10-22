@@ -5,7 +5,8 @@
 #   2. research agent on the ECONOMIC text tier (L1, read from the router: today GPT-6 Luna max via Codex): checks
 #      names on the web (validated alias-add), watches the subscription plans; report only
 #   3. analysis again with the new name links, then Telegram (only news worth it: a model above an active one…)
-#   4. Hermes auxiliary jobs follow the postes; interface: the library page is republished
+#   4. Hermes auxiliary jobs follow the postes; the agents' brief is rewritten (profiles re-rendered when it
+#      changed); interface: the library page is republished
 # A failing source keeps its last good snapshot; step 2 never blocks the cycle.
 # Instance bindings (Hermes home, log folder, rendered agent prompt, library URL) come from the active Walter
 # instance through `walter-router instance-env`.
@@ -45,6 +46,7 @@ echo "[cycle] 3/4 analysis with the new name links, then Telegram (only: a new m
 "$WR" refresh --skip-collect || exit 1
 echo "[cycle] 4/4 Hermes auxiliary jobs follow the postes (only when a pick changed); library page republished"
 "$WR" sync-hermes --apply > "$LOG/sync-hermes-$day.json" 2>&1 || echo "[cycle] sync-hermes failed (non-blocking)"
+"$WR" brief --write || echo "[cycle] agents' brief not written (non-blocking)"
 echo "[cycle] library page ${LIBRARY_URL:-(not published by this instance)} (Cloudflare Access)"
 "$WR" publish-library || echo "[cycle] library page not published (non-blocking)"
 exit 0

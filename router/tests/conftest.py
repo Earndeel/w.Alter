@@ -7,3 +7,4 @@ from walter_router import instance
 @pytest.fixture(autouse=True)
 def _instance_files_stay_out_of_tests(tmp_path, monkeypatch):
     monkeypatch.setattr(instance, "own_file", lambda name: tmp_path / "instance" / name)
+    monkeypatch.setattr(instance, "state_file", lambda name: tmp_path / "instance-state" / name)
