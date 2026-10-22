@@ -36,10 +36,25 @@ def _name(conn, mid: str | None) -> str:
                     (w if w[:1].isdigit() else w.capitalize()) for w in mid.replace("_", "-").split("-"))
 
 
-def _chat_price(offers: dict, mid: str, prov: str) -> str:
+def best_hosts(conn) -> dict[str, dict[str, dict]]:
+    """model_id -> usage (interactive | background) -> cheapest usable host behind OpenRouter (models.best_endpoints)."""
+    out: dict[str, dict[str, dict]] = {}
+    for r in conn.execute("select * from models.best_endpoints"):
+        out.setdefault(r["model_id"], {})[r["usage"]] = dict(r)
+    return out
+
+
+def _chat_price(offers: dict, mid: str, prov: str, hosts: dict | None = None) -> str:
     key = {"kie-codex": "kie", "openai-codex": "codex"}.get(prov, prov)
     if key == "codex":
         return "inclus"
+    best = (hosts or {}).get(mid) or {}
+    if key == "openrouter" and best.get("interactive"):
+        i, b = best["interactive"], best.get("background")
+        text = f'{catalog.money(i["price_in_1m"])}/{catalog.money(i["price_out_1m"])} $/M ({i["host"]})'
+        if b and b["blended_1m"] < i["blended_1m"] * 0.95:
+            text += f' · tâches de fond {catalog.money(b["price_in_1m"])}/{catalog.money(b["price_out_1m"])} ({b["host"]} {b["service_tier"] or ""})'.replace(" )", ")")
+        return text
     p = [o for o in offers.get(mid, []) if o["interface"] == "chat" and o["provider"] == key
          and o.get("price_in_1m") is not None]
     return f'{catalog.money(p[0]["price_in_1m"])}/{catalog.money(p[0]["price_out_1m"])} $/M' if p else ""
@@ -136,6 +151,7 @@ def rows(conn) -> list[dict]:
     from walter_router.cli import with_execution   # late import (cli -> library)
     offers = sel.load_offers(conn, sel.latest_snapshots(conn))
     runnable = set(media_exec._models())
+    hosts = best_hosts(conn)
     out = []
     for e in conn.execute(f"""select t.task, t.label, t.interface, t.modes, p.role, p.pinned_model_id, p.label as role_label
                               from models.tasks t left join models.preferences p using (task)
@@ -191,7 +207,7 @@ def rows(conn) -> list[dict]:
             ex = d.get("execution") or []
             main, fb = [r for r in ex if not r.get("fallback_for")], [r for r in ex if r.get("fallback_for")]
             row["providers"] = " → ".join(f'{PROV.get(r["hermes_provider"], r["hermes_provider"])} '
-                                          f'{_chat_price(offers, mid, r["hermes_provider"])}'.strip() for r in main)
+                                          f'{_chat_price(offers, mid, r["hermes_provider"], hosts)}'.strip() for r in main)
             fb_name = _name(conn, sel_model_id(fb[0])) if fb else ""
             row["fallback"] = (f'{fb_name}{" " + fb[0]["reasoning"] if fb[0].get("reasoning") else ""} via '
                                f'{PROV.get(fb[0]["hermes_provider"], fb[0]["hermes_provider"])}') if fb else "—"

@@ -63,3 +63,26 @@ def test_domain_index_rows_carry_cost_per_task():
         {"slug": "m-1", "name": "M 1 (max)", "index": 60.4, "cost_per_task": 5.46, "time_per_task_s": 1208.0, "sub_scores": {}}]}}
     (r,) = parse_benchmarks("aa_eval", doc)
     assert r["task"] == "idx_engineering" and r["score"] == 60.4 and r["cost"] == 5.46 and r["cost_unit"] == "usd_per_aa_task"
+
+
+def test_best_hosts_follow_reliability_precision_and_tier():
+    """2026-10-22: cheapest usable host = reliable (>= 95 % / 24 h), not below the vendor's own precision; flex only for
+    background work."""
+    from walter_router.store import db
+    with db.connect() as conn:
+        conn.execute("insert into models.snapshots (kind, fetched_at, source_url, sha256, row_count, raw) values "
+                     "('or_endpoints', now() + interval '1 day', 't', 'test-endpoints', 0, '{}')")
+        sid = conn.execute("select snapshot_id from models.snapshots where sha256 = 'test-endpoints'").fetchone()["snapshot_id"]
+        rows = [("v/m", "Vendor", "v", "fp4", None, 3.0, 15.0, 100), ("v/m", "Cheap4", "cheap/fp4", "fp4", None, 0.2, 1.0, 100),
+                ("x/m", "Vendor", "x", "bf16", None, 2.0, 10.0, 100), ("x/m", "Cheap4", "c/fp4", "fp4", None, 0.2, 1.0, 100),
+                ("x/m", "Flaky", "flaky", "bf16", None, 0.5, 2.0, 70), ("x/m", "Flex", "x/flex", "bf16", "flex", 1.0, 5.0, 100)]
+        for gm, host, tag, q, tier, pin, pout, up in rows:
+            conn.execute("""insert into models.endpoints (snapshot_id, gateway, model_id, gateway_model, host, tag, quantization,
+                            service_tier, price_in_1m, price_out_1m, uptime_1d) values (%s,'openrouter',%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                         (sid, "test-" + gm[0], gm, host, tag, q, tier, pin, pout, up))
+        best = {(r["model_id"], r["usage"]): r["tag"] for r in conn.execute(
+            "select * from models.best_endpoints where model_id like 'test-%'")}
+        conn.rollback()
+    assert best[("test-v", "interactive")] == "cheap/fp4"      # the vendor itself serves fp4: native precision
+    assert best[("test-x", "interactive")] == "x"              # fp4 below bf16 refused, flaky host refused, flex not interactive
+    assert best[("test-x", "background")] == "x/flex"

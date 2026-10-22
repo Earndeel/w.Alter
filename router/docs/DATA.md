@@ -25,6 +25,7 @@ failing source keeps its last good one (view `latest_snapshots`). Freshness: `wa
 | `aa_stt` | AA Speech-to-Text: WER, speed factor, price per 1000 min, per model × host | artificialanalysis.ai/speech-to-text |
 | `agentset` | Rerankers and embeddings: ELO on RAG retrieval, latency, nDCG@10, price | agentset.ai/rerankers, /embeddings |
 | `mteb` | MIRACL French retrieval nDCG@10 for every embedding model OpenRouter serves | github.com/embeddings-benchmark/results |
+| `or_endpoints` | The hosts behind OpenRouter for each model of the active library: price, quantization, service tier (flex / priority), uptime 24 h / 30 min, latency, tools | openrouter.ai/api/v1/models/<id>/endpoints, `research/prices/openrouter_endpoints.py` |
 | `openrouter` | Every OpenRouter model, all modalities, prices (media prices from each model page's `displayPricing`) | openrouter.ai/api/v1/models |
 | `kie` | Kie.ai market prices (credits → $) | api.kie.ai/client/v1/model-pricing |
 | `codex` | Models of W.Alter's ChatGPT/Codex subscription | read through Hermes (no price: subscription) |
@@ -44,6 +45,7 @@ Unmatched names are listed by `walter-router review` (`unmatched_candidates`) fo
 |---|---|
 | `benchmarks` | Measured quality: `benchmark` (board family: `aa_intelligence`, `aa_mm`, `arena`, `da_models`, `da_agents`, `bridgebench`, `aa_decision`, `aa_stt`, `agentset`, `mteb`), `task` (sub-board), `model_id`, `variant` (reasoning level), `score` (**always higher = better**: WER → 100 − WER, latency → 1000/ms), `cost` (the board's own published cost, e.g. AA $ per task), `extra` (votes, CI, raw measures) |
 | `offers` | Callable and priced: `provider`, `offer_key`, `interface` (chat, image, video, audio, music, transcription, embedding, rerank, decisions…), `access` (paid / subscription / ui / free), `price_in_1m`/`price_out_1m` ($/M tokens) or `unit_price`+`unit`, media classification (`offer_kind`, `modes` t2i/i2i/t2v/i2v/r2v/v2v, `resolution`, `audio`), `norm_price`/`norm_unit` (video per second, image per image, voice per 1000 characters, STT per minute) |
+| `endpoints` | One row per host behind a gateway per snapshot (`or_endpoints`). Views `usable_endpoints` (>= 95 % uptime 24 h, not below the vendor's own precision) and `best_endpoints` (cheapest per model, `usage` interactive = no flex tier / background = flex allowed) |
 | `provider_status` | Last 5-token live probe per provider (`probe`), OpenRouter credit in `detail` |
 
 ## 4. Tasks and the owner's knowledge
