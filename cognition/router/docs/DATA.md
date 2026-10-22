@@ -97,6 +97,7 @@ CLI equivalents: `walter-router library` (the full table), `pick <task>`, `dossi
 `alerts`, `review`. Web: https://the instance library domain (host.json library_domain) (English) and /fr/.
 
 ## 9. Collecting by hand
-`walter-router research [--source KIND …]` fetches sources now (all, or the given kinds: `aa`, `aa_eval`, `mm`, `da`,
+`walter-router research [CATEGORY …] [--analyse]` (categories: text, image, video, audio, memory, decision, prices,
+hosts, plans) or `walter-router research --source KIND …` fetches sources now (all, or the given kinds: `aa`, `aa_eval`, `mm`, `da`,
 `arena`, `bridgebench`, `aa_decision`, `aa_stt`, `agentset`, `mteb`, `openrouter`, `kie`, `codex`, `declared`,
 `hermes_providers`), stores and understands them; then `walter-router refresh --skip-collect` recomputes the choices.

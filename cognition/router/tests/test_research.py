@@ -86,3 +86,25 @@ def test_best_hosts_follow_reliability_precision_and_tier():
     assert best[("test-v", "interactive")] == "cheap/fp4"      # the vendor itself serves fp4: native precision
     assert best[("test-x", "interactive")] == "x"              # fp4 below bf16 refused, flaky host refused, flex not interactive
     assert best[("test-x", "background")] == "x/flex"
+
+
+def test_research_categories_cover_every_source_and_part():
+    """2026-10-22: every source and every part of a shared source belongs to a category, so `research all` = everything."""
+    from walter_router.research import categories, sources
+    from walter_router.research.benchmarks import aa_media, arena, design_arena
+    parts, plans = categories.plan(list(categories.NAMES))
+    assert set(parts) == set(sources.SOURCES) and plans
+    assert parts["arena"] is not None and parts["arena"] == set(arena.ARENA_BOARDS.values())
+    assert parts["mm"] == set(aa_media.MODULES)
+    assert parts["da"] == set(design_arena.CATEGORIES) | {"agents"}
+
+
+def test_partial_read_merges_into_the_last_snapshot():
+    from walter_router.research import sources
+    old = {"boards": {"text": {"rows": [1]}, "text_to_image": {"rows": [1]}}, "errors": {"text_to_image": "x"}}
+    new = {"boards": {"text_to_image": {"rows": [2]}}, "errors": {}}
+    merged = sources.merge("arena", old, new)
+    assert merged["boards"]["text"] == {"rows": [1]} and merged["boards"]["text_to_image"] == {"rows": [2]}
+    assert merged["errors"] == {}
+    da = sources.merge("da", {"categories": {"logo": [1], "agents/fullstack": [1]}}, {"categories": {"logo": [2]}, "registry": {"a": 1}})
+    assert da["categories"]["logo"] == [2] and da["agent_categories"] == {"fullstack": [1]} and da["registry"] == {"a": 1}

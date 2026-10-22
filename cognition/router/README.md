@@ -7,7 +7,7 @@ Text tiers method: `docs/TIERS.md`. Other modules only use the `walter-router` c
 ## Layout (2026-10-21, decided by the owner)
 | Folder | Part | Content |
 |---|---|---|
-| `research/` | **Research** — goes and fetches, periodically, by API or straight from the page | `benchmarks/` one module per site (AA intelligence, AA evaluations — medical, legal, science, vision, 3D, long context, agents —, AA media incl. music, AA Decision, AA STT, Arena, Design Arena, BridgeBench, Agentset, MTEB) · `prices/` OpenRouter, Kie, Codex catalogue, Hermes providers, declared offers · `plans/` subscriptions (meters, real usage, plan values; `quota_watch` service) · `agent/` the 48 h research agent (prompt + cycle digest) · `web.py` shared web access (FlareSolverr, Next.js data) · `sources.py` registry, snapshots retention |
+| `research/` | **Research** — goes and fetches, periodically, by API or straight from the page; **by category** (`categories/`: text, image, video, audio, memory, decision, prices, hosts, plans — `walter-router research image [--analyse]`) | `benchmarks/` one module per site (AA intelligence, AA evaluations — medical, legal, science, vision, 3D, long context, agents —, AA media incl. music, AA Decision, AA STT, Arena, Design Arena, BridgeBench, Agentset, MTEB) · `prices/` OpenRouter, Kie, Codex catalogue, Hermes providers, declared offers · `plans/` subscriptions (meters, real usage, plan values; `quota_watch` service) · `agent/` the 48 h research agent (prompt + cycle digest) · `web.py` shared web access (FlareSolverr, Next.js data) · `sources.py` registry, snapshots retention |
 | `analysis/` | **Analysis** — understands the data, organises the DB, keeps the active library, tells the owner | `parse` + `ingest` (snapshots → benchmarks / offers with identities) · `identity`, `aliases`, `media`, `catalog` · `knowledge` (owner's declarations) · `scoring`, `select`, `tiers`, `decision_pareto`, `postes`, `dossier` · `changes`, `alerts` (Telegram, buttons), `recommend` · `refresh` = the cycle |
 | `interface/` | **Interface** — the model library page | `library` (rows, publish), `page` (HTML), `translate` (English), `site/` (Cloudflare Pages functions) |
 | `serve/` | What Walter calls at run time | `choose` (pick), `intent` (decision model), `execution` (routes, probes), `media_exec` (generation), `hermes_sync` |
@@ -233,3 +233,9 @@ one per model: >= 95 % successful requests over 24 h, never below the vendor's o
 vendor itself serves 4-bit, e.g. Kimi K3 mxfp4), flex tier (half price, slower) only for background work. The library
 page shows that host next to the OpenRouter price. Calls do not use it yet (OpenRouter still picks the host): pending
 the owner's decision (2026-10-22).
+
+## Research by category (2026-10-22)
+`walter-router research [text|image|video|audio|memory|decision|prices|hosts|plans|all] [--analyse]` runs one or more
+categories alone (`--list` shows what each reads). Sources shared by categories (Arena, AA media, Design Arena) are
+read in parts and merged into their last complete snapshot, so the other categories keep their data (`research
+image`: 1 min 40 s with `--analyse` = recompute + republish, no message). The 48 h cycle still runs everything.

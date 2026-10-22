@@ -44,15 +44,16 @@ def registry() -> dict[str, dict[str, Any]]:
             for mid, m in models.items()}
 
 
-def source_da() -> tuple[dict, datetime, str]:
+def source_da(parts: set[str] | None = None) -> tuple[dict, datetime, str]:
+    """Every category, or only `parts` (category keys; 'agents' = the agents arena)."""
     reg = registry()
     categories: dict[str, Any] = {}
     meta: dict = {}
-    for cat in CATEGORIES:
+    for cat in [c for c in CATEGORIES if not parts or c in parts]:
         categories[cat], m = leaderboard(cat)
         meta = m if cat == "allcategories" else meta
         time.sleep(PAUSE_S)
-    for cat in AGENT_CATEGORIES:
+    for cat in (AGENT_CATEGORIES if not parts or "agents" in parts else []):
         try:
             rows, _ = leaderboard(cat, "agents")
         except RuntimeError:
@@ -60,7 +61,7 @@ def source_da() -> tuple[dict, datetime, str]:
         if rows:
             categories[f"agents/{cat}"] = rows
         time.sleep(PAUSE_S)
-    if len(categories.get("allcategories") or []) < 50:
+    if not parts and len(categories.get("allcategories") or []) < 50:
         raise ValueError("Design Arena: overall leaderboard nearly empty")
     doc = {"generated_at": now().isoformat(), "source": "Design Arena", "source_url": DA_BASE + "/leaderboard",
            "metadata": {"total_votes": meta.get("totalVotes"), "last_update_time": meta.get("lastUpdateTime")},
