@@ -95,13 +95,13 @@ class CapabilityTests(unittest.TestCase):
         """2026-10-22 (owner): the router's tools are the same in every runtime (walter_route / walter_run /
         walter_generate / walter_plans); the harness keeps its own model, generation is flagged as costly."""
         self.assertEqual(set(self.mcp.tools), {'walter_modules', 'secret_search', 'secret_reference', 'walter_browse',
-                                             'walter_route', 'walter_run', 'walter_generate', 'walter_plans',
+                                             'walter_route', 'walter_run', 'walter_decide', 'walter_plans',
                                              'computer_use'})
         self.assertNotIn('grants', inspect.signature(self.mcp.tools['computer_use']).parameters)
         self.assertNotIn('permissions', inspect.signature(self.mcp.tools['computer_use']).parameters)
         self.assertNotIn('command', inspect.signature(self.mcp.tools['secret_reference']).parameters)
         self.assertTrue(self.mcp.metadata['walter_route']['annotations'].readOnlyHint)
-        self.assertTrue(self.mcp.metadata['walter_generate']['annotations'].destructiveHint)
+        self.assertTrue(self.mcp.metadata['walter_run']['annotations'].destructiveHint)   # may generate (costs)
         self.assertFalse(self.mcp.metadata['computer_use']['annotations'].readOnlyHint)
 
     def test_computer_permissions_come_only_from_external_policy(self):
@@ -163,17 +163,21 @@ class CapabilityTests(unittest.TestCase):
             self.assertFalse(kwargs.get('shell', False))
             self.mcp.tools['walter_route'](request='analyse cette vidéo', task='vision', require='video_input')
             self.assertEqual(run.call_args[0][0], ['walter-router', 'pick', 'vision', '--require', 'video_input', '--agent'])
-            self.assertFalse(json.loads(self.mcp.tools['walter_generate']('x', role='a b'))['ok'])
+            self.assertFalse(json.loads(self.mcp.tools['walter_run']('x', role='a b'))['ok'])
+            self.mcp.tools['walter_route'](request='x', model='claude-opus-5-5', provider='kie')
+            self.assertEqual(run.call_args[0][0], ['walter-router', 'route', 'x', '--model', 'claude-opus-5-5',
+                                                   '--provider', 'kie', '--agent'])
 
-    def test_walter_run_refuses_media_and_reports_the_route_it_ran(self):
-        decision = {'task': 'general', 'level': 'L2', 'execution': [{'provider': 'fictional'}]}
-        with patch.object(capabilities, '_router_decision', return_value=decision), \
-             patch.object(capabilities, '_walter_llm', return_value=('réponse', 'fictional/model')) as llm:
-            out = json.loads(self.mcp.tools['walter_run']('compare A et B', request='compare A et B'))
-        self.assertEqual((out['output'], out['route']), ('réponse', 'fictional/model'))
-        self.assertEqual(llm.call_args[0][0], 'general/L2')
-        with patch.object(capabilities, '_router_decision', return_value={'task': 'text_to_video'}):
-            self.assertFalse(json.loads(self.mcp.tools['walter_run']('une vidéo'))['ok'])
+    def test_walter_run_hands_the_whole_spec_to_the_router(self):
+        with patch.object(capabilities.subprocess, 'run') as run:
+            run.return_value = subprocess.CompletedProcess([], 0, stdout='{"ok": true, "kind": "text"}', stderr='')
+            out = json.loads(self.mcp.tools['walter_run']('compare A et B', goal='compare A et B', task='general',
+                                                          level='L2'))
+            args, kwargs = run.call_args
+        self.assertTrue(out['ok'])
+        self.assertEqual(args[0], ['walter-router', 'run'])
+        self.assertEqual(json.loads(kwargs['input']), {'request': 'compare A et B', 'goal': 'compare A et B',
+                                                       'task': 'general', 'level': 'L2'})
 
     def test_browse_rejects_filesystem_session_identifiers_before_backend(self):
         from walter_browse import facade
