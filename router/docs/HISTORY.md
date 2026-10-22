@@ -303,3 +303,16 @@ instructions (Claude Code), the Codex / DSH profiles through `@instance/state/ro
 profiles re-rendered by walter-soul when it changes). The same four tools everywhere: `walter_route`, `walter_run`,
 `walter_generate`, `walter_plans` (MCP: `walter_run` is one walter-llm call with its own agent token `walter-mcp`).
 The agent view of a decision (`--agent`, `serve/agent_view.py`) is the router's, shared by the plugin and the MCP.
+
+## The orchestrator chooses, the router executes (2026-10-22)
+The owner: the orchestrating agent decides which specialised model to spawn for each piece of work (the decision
+model routes the intent, and will set the agentic level for walter-context; the orchestrator may also call it for its
+own choices); a model and provider named in the request run exactly as named; generation is not a separate kind of
+call. Now: `serve/named.py` resolves a named model (provider ids, router ids, aliases, display names, `model/variant`)
+and gives only that provider's routes — or `mode: none` with where it is available, never a substitute (the
+subscription last resort never applies to it); `serve/run.py` (`walter-router run`, moved out of the Hermes plugin)
+does the job: a text sub-agent with tools as a one-shot Hermes run on the chosen model, or the media generation
+(named provider honoured); `intent.ask` (`walter-router ask`, tool `walter_decide`) opens the decision model to any
+choice. Tools everywhere: walter_route, walter_run, walter_decide, walter_plans (walter_generate merged into walter_run;
+the walter MCP's walter-llm token, created the same day, revoked as unused). Constrained picks (`--require`) now rank
+on the task composite like any pick.

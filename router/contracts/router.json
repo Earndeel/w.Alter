@@ -24,7 +24,7 @@
   "interfaces": [
     "CLI",
     "walter-llm task routes",
-    "MCP walter_route / walter_run / walter_generate / walter_plans",
+    "MCP walter_route / walter_run / walter_decide / walter_plans",
     "agents' brief (`walter-router brief`, @instance/state/router/brief.md)"
   ],
   "bindings": {
@@ -34,8 +34,9 @@
     "claude-code": "router tools through the walter MCP, brief in the server instructions; primary model native"
   },
   "limitations": [
+    "New model choices remain subject to the owner's approval; no automatic switching introduced.",
     "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
-    "New model choices remain subject to the owner's approval; no automatic switching introduced."
+    "Text sub-agents run as one-shot runs of the Hermes runtime (the runtime here that runs every provider)."
   ],
   "services": [],
   "optional": [],
@@ -80,15 +81,15 @@
         "transport": "mcp",
         "interface": "walter_run",
         "access": "write",
-        "timeout_seconds": 900,
+        "timeout_seconds": 3600,
         "timeout_status": "implemented"
       },
       {
-        "id": "generate",
+        "id": "decide",
         "transport": "mcp",
-        "interface": "walter_generate",
-        "access": "write",
-        "timeout_seconds": 1800,
+        "interface": "walter_decide",
+        "access": "read",
+        "timeout_seconds": 40,
         "timeout_status": "implemented"
       },
       {

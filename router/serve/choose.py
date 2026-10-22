@@ -55,8 +55,9 @@ def _best_score(conn, snaps: dict, boards: list[dict], model_id: str) -> tuple[f
 def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]:
     """Best callable model satisfying a hard constraint (unrestricted / open weights / video input) for a task.
 
-    Quality = the model's own score on the task's boards (primary first); an unrestricted fine-tune that no
-    leaderboard measures inherits its base model's score, flagged `score_from_base`."""
+    Order = the task's weighted composite (as any pick), then the model's own score on the task's boards (primary
+    first); an unrestricted fine-tune that no leaderboard measures inherits its base model's score, flagged
+    `score_from_base`."""
     if require not in REQUIREMENTS:
         raise KeyError(f"unknown requirement {require}; known: {sorted(REQUIREMENTS)}")
     snaps = sel.latest_snapshots(conn)
@@ -88,7 +89,12 @@ def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]
                       "offer_key": paid.get("offer_key"), "cost": paid.get("cost"),
                       "price_1m_blended": paid.get("blended_1m")})
     order = [f'{b["benchmark"]}:{b["bench_task"]}' for b in boards]
+    from walter_router.analysis.scoring import composite   # late import (scoring -> select)
+    comp = {c["model_id"]: c["composite"] for c in composite(conn, t["task"])}
+    for x in cands:   # the task's own weighted score first, as for any pick; a model it does not measure goes after
+        x["composite"] = comp.get(x["model_id"]) or comp.get(x["score_from_base"] or "")
     cands.sort(key=lambda x: (require == "unrestricted" and x["content_policy"] == "permissive",
+                              -(x["composite"] if x["composite"] is not None else -1),
                               order.index(x["board"]) if x["board"] in order else len(order), -(x["score"] or 0),
                               x["price_1m_blended"] or x["cost"] or 0))
     for x in cands:
