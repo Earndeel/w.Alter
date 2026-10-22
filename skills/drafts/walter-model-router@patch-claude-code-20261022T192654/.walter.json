@@ -1,0 +1,11 @@
+{
+ "base_sha": "c4f0c6f9aae4fe5bc99981c114744b20df7415356f338932b127d9deabab4a69",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-22T19:26:54.015227+00:00",
+ "domain": "mlops",
+ "kind": "patch",
+ "reason": "Router commit d44ba16 (2026-10-22): walter_generate merged into walter_run (text sub-agent or media), named model/provider run exactly as named (serve/named.py), new walter_decide / `walter-router ask`. The skill still listed walter_generate and only the generate command.",
+ "runtime": "claude_code",
+ "session_id": "0c6fcbac-00d8-42b0-a541-855e301d8921",
+ "target": "walter-model-router"
+}
