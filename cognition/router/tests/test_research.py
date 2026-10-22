@@ -183,7 +183,7 @@ def test_plan_news_filters():
                     "Your OpenRouter receipt"):
         assert news.NOT_NEWS.search(subject), subject
     assert not news.NOT_NEWS.search("Nouvelles limites d'utilisation dans Gemini Notebook")
-    assert news.clean("Bonjour͏‌  Lucas &amp; co") == "Bonjour Lucas & co"
+    assert news.clean("Bonjour͏‌  Alex &amp; co") == "Bonjour Alex & co"
 
 
 def test_new_web_fact_on_an_owned_plan_is_notified_once():
