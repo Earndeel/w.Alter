@@ -71,19 +71,29 @@ def fp(v: str) -> str:
 
 
 # ── Bitwarden ──────────────────────────────────────────────────────────────────
-def session() -> str:
-    r = subprocess.run([str(settings.UNLOCK), "--print"], capture_output=True, text=True, timeout=120)
+def session(stale: str | None = None) -> str:
+    argv, env = [str(settings.UNLOCK), "--print"], None
+    if stale:
+        argv, env = [str(settings.UNLOCK), "--renew"], {**os.environ, "WALTER_BW_STALE": stale}
+    r = subprocess.run(argv, capture_output=True, text=True, timeout=120, env=env)
     if r.returncode or not r.stdout.strip():
         raise RuntimeError("bw-unlock failed")
     return r.stdout.strip().splitlines()[-1]
 
 
 def bw(*args: str) -> str:
-    r = subprocess.run(["bw", *args, "--nointeraction"], capture_output=True, text=True, timeout=180,
-                       env={**os.environ, "BW_SESSION": session(), "BW_NOINTERACTION": "true"})
-    if r.returncode:
-        raise RuntimeError(f"bw {args[0]} failed (diagnostic suppressed)")
-    return r.stdout
+    sess = session()
+    for attempt in (1, 2):
+        r = subprocess.run(["bw", *args, "--nointeraction"], capture_output=True, text=True, timeout=180,
+                           env={**os.environ, "BW_SESSION": sess, "BW_NOINTERACTION": "true"})
+        if not r.returncode:
+            return r.stdout
+        if attempt == 1 and "locked" in (r.stderr + r.stdout).lower():   # dead cached session: renew once
+            from .unlock import fingerprint
+            sess = session(stale=fingerprint(sess))
+            continue
+        break
+    raise RuntimeError(f"bw {args[0]} failed (diagnostic suppressed)")
 
 
 def folder_items() -> dict[str, dict]:

@@ -58,19 +58,30 @@ class Vault:
         self._listed = self._synced = 0.0
 
     # ── bw plumbing ────────────────────────────────────────────────────────────
-    def _session(self) -> str:
-        r = subprocess.run([str(UNLOCK), "--print"], capture_output=True, text=True, timeout=120)
+    def _session(self, stale: str | None = None) -> str:
+        argv, env = [str(UNLOCK), "--print"], None
+        if stale:   # the cached session was refused: renew it (fingerprint only, never the session itself)
+            argv, env = [str(UNLOCK), "--renew"], {**os.environ, "WALTER_BW_STALE": stale}
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=120, env=env)
         s = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
         if r.returncode or not s:
             raise SecretError("Bitwarden unlock failed (bw-unlock)")
         return s
 
     def _bw(self, *args: str, timeout: int = 120) -> str:
-        env = {**os.environ, "BW_SESSION": self._session(), "BW_NOINTERACTION": "true"}
-        r = subprocess.run(["bw", *args, "--nointeraction"], capture_output=True, text=True, timeout=timeout, env=env)
-        if r.returncode:
-            raise SecretError(f"bw {args[0]} failed (diagnostic suppressed)")
-        return r.stdout
+        session = self._session()
+        for attempt in (1, 2):
+            env = {**os.environ, "BW_SESSION": session, "BW_NOINTERACTION": "true"}
+            r = subprocess.run(["bw", *args, "--nointeraction"], capture_output=True, text=True, timeout=timeout, env=env)
+            if not r.returncode:
+                return r.stdout
+            if attempt == 1 and "locked" in (r.stderr + r.stdout).lower():
+                # a dead cached session (another `bw unlock` superseded it): renew once and retry
+                from .unlock import fingerprint
+                session = self._session(stale=fingerprint(session))
+                continue
+            break
+        raise SecretError(f"bw {args[0]} failed (diagnostic suppressed)")
 
     def items(self) -> list[dict]:
         with self._lock:
