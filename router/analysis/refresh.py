@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 
 from walter_router.analysis import alerts, changes, dossier, ingest, knowledge
+from walter_router.analysis import telegram
 from walter_router.analysis import select as sel
 from walter_router.research import sources
 from walter_router.serve import execution
@@ -59,7 +60,7 @@ def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = Fal
                              (json.dumps(report, default=str), run_id))
             if notify:
                 with conn.transaction():
-                    report["notify"] = alerts.notify(conn, dry_run=dry_run)
+                    report["notify"] = telegram.notify(conn, dry_run=dry_run)
         except Exception as exc:
             conn.rollback()
             conn.execute("update models.runs set status = 'failed', finished_at = now(), summary = %s::jsonb where run_id = %s",

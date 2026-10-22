@@ -12,7 +12,6 @@ of agentic/reliability measured (the job is about tools). Weights per poste live
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from walter_router.analysis import knowledge
 from walter_router.analysis import scoring

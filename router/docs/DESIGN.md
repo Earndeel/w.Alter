@@ -6,6 +6,9 @@
 
 Statut des briques : ✅ en production · 🟡 partiel · 🔜 à construire.
 
+> Ce document décrit la conception et la feuille de route. **L'état actuel du module (organisation, sources, règles,
+> accès extérieur) est dans le README** ; les décisions datées sont dans `docs/HISTORY.md`.
+
 ---
 
 ## 1. Deux horloges
@@ -284,8 +287,9 @@ Bouton « Lancer le cycle complet » : /api/run → the instance control host (h
 `walter-router-control` (127.0.0.1:8896, HMAC) → `walter-router-refresh.service`. Refus si un cycle tourne ou a démarré
 il y a moins de 10 minutes.
 
-## Abonnements (2026-10-14) — information seulement
-Déclarés par le propriétaire dans `config/subscriptions.json` : ChatGPT Plus (20 $, via Codex) et Claude Pro (20 $, Claude
-Code). Onglet 💳 de la bibliothèque, deux sources seulement : notre mesure (compteur hebdo réel pour ChatGPT, estimé
-pour Claude ; tokens réellement consommés valorisés au prix API ; capacité mesurée par point de compteur) et les
-valeurs publiées par SemiAnalysis. Aucun effet sur le routage ni sur les niveaux.
+## Abonnements (2026-10-14, révisé le 2026-10-22)
+Les abonnements forment la partie `plan/` du module. Depuis le 2026-10-22 ils comptent dans le choix du fournisseur :
+un chemin par abonnement passe en premier, au prix de revient d'un token (prix du forfait ÷ valeur API transportée
+par mois), tant que son quota hebdomadaire reste sous 90 %. La recherche « abonnements » lit les compteurs, les mails
+d'abonnement, le web (SemiAnalysis / Tokenomics, pages des éditeurs, autres mesures) et notifie toute nouveauté sur un
+plan du propriétaire. Détails : README, section « How a choice is made » et dossier `plan/`.

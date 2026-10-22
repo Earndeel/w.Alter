@@ -76,7 +76,7 @@ def store(conn, items: list[dict], origin: str = "web") -> tuple[int, list[int]]
 
 def run(conn) -> dict:
     from walter_router import instance
-    from walter_router.analysis.recommend import ask_l1
+    from walter_router.serve.oneshot import ask_l1
     plans = [{k: s.get(k) for k in ("id", "vendor", "plan", "price_usd_month", "models", "execution")}
              for s in declared.read().get("subscriptions", [])]
     prompt = PROMPT.format(owner=instance.owner(), plans=json.dumps(plans, ensure_ascii=False),

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
 from urllib.request import Request, urlopen
 
 from walter_router import instance

@@ -151,13 +151,13 @@ def scan(conn, days: int = 120) -> dict:
                      (sub["id"] if sub else None, found["vendor"], found["plan"] or "crédit", found["amount"],
                       found["currency"], f"mail {found['vendor']} ({found['event']})", ref, when.date(), quote_txt))
         out["new"] += 1
-    from walter_router.analysis.alerts import _upsert
+    from walter_router.analysis import alerts
     for (vendor, plan), (when, found, quote_txt) in latest.items():
         p = proposal({**found, "date": when.date().isoformat()}, plans)
         if p:
             ev = {**p, "mail_date": str(when.date()), "vendor": vendor, "plan": plan, "amount": found["amount"],
                   "currency": found["currency"], "event": found["event"], "quote": quote_txt}
-            if _upsert(conn, "plan_change", "", f"{p['sub_id']}:{p['action']}:{found['amount']}", ev, "open"):
+            if alerts.record(conn, "plan_change", "", f"{p['sub_id']}:{p['action']}:{found['amount']}", ev, "open"):
                 out["proposals"].append(p["text"])
     out["latest"] = {f"{v} {p}": f"{f['event']} {w.date()}" for (v, p), (w, f, _) in latest.items()}
     return out

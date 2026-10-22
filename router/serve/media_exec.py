@@ -288,7 +288,7 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
              paid_fallback: bool = False, craft: bool = True, _depth: int = 0, model: str | None = None,
              _fallback: bool = True, voice: str | None = None,
              style: str | None = None) -> dict:
-    from walter_router.cli import route as route_request
+    from walter_router.serve.routes import route as route_request
     from walter_router.serve import choose
     from walter_router.analysis import knowledge
     d = choose.pick(conn, task, role=role) if (task and role) else route_request(conn, request, task)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from walter_router.analysis import alerts
+from walter_router.analysis import telegram
 from walter_router.serve import choose
 from walter_router.store import db
 from walter_router.analysis import identity
@@ -88,7 +89,7 @@ def test_challenger_flow_baseline_then_new_then_adopt(conn):
     news = {"new": {"gpt-6-astra": ["nouveau sur da_models:3d"]}, "nerf": {}, "price_drop": {}}
     assert "3d:default:gpt-6-astra" in alerts.challengers(conn, "open", only_task="3d", chg=news)
     pend = [a for a in alerts.pending(conn) if a["task"] == "3d"]
-    assert pend and "Catégorie du router" in alerts.render(pend, conn)
+    assert pend and "Catégorie du router" in telegram.render(pend, conn)
     assert pend[0]["evidence"]["composite"]["challenger"] > pend[0]["evidence"]["composite"]["pinned"]
     # The owner adopts it: it becomes the pinned favourite.
     alerts.verdict(conn, pend[0]["alert_id"], "adopted")
@@ -140,7 +141,7 @@ def test_dominance_watch_ignores_better_but_dearer_models(conn):
 
 def test_notification_buttons_one_row_per_news():
     from walter_router.analysis import alerts
-    rows = alerts.keyboard(None, [{"alert_id": 1, "kind": "tier", "ref": 3, "role": "L2", "subject": "gpt-6-luna/max",
+    rows = telegram.keyboard(None, [{"alert_id": 1, "kind": "tier", "ref": 3, "role": "L2", "subject": "gpt-6-luna/max",
                                    "evidence": {"current": "gpt-6-1-sol/medium"}},
                                   {"alert_id": 2, "kind": "nerf", "ref": 4, "role": "", "subject": "minimax-h3"}])
     assert [[b["callback_data"] for b in r] for r in rows] == [["wr:a:3", "wr:d:3"], ["wr:d:4"]]
@@ -199,7 +200,7 @@ def test_unranked_successor_is_saved_and_proposed(conn):
                           "reasons": {"warning": "version supérieure", "measured_quality": 80.0}}])
     row = conn.execute("select quality, reasons from models.selection where run_id = %s", (run,)).fetchone()
     assert row["quality"] is None and row["reasons"]["measured_quality"] == 80.0
-    lines = alerts._block(conn, {"kind": "new_best", "subject": model, "task": task, "ref": "t1",
+    lines = telegram._block(conn, {"kind": "new_best", "subject": model, "task": task, "ref": "t1",
                                  "evidence": {"previous_name": "Ancien", "score": None, "previous_score": 80.0, "why": []}})
     assert any("pas encore classée" in line for line in lines if line)
 
