@@ -359,11 +359,15 @@ def record_costs(conn) -> dict:
     for st in state(conn):
         price = float(st["price_usd_month"])
         pace = (st["usage_7d"]["api_value_usd"] or 0) * MONTH_WEEKS or None
-        full = (st["measured_capacity"] or {}).get("month_usd") or max((v["usd_month"] for v in st["semianalysis"]), default=None)
+        published = [v["usd_month"] for v in st["semianalysis"]] + [float(r["value"]) for r in conn.execute(
+            """select value from models.plan_evidence where sub_id = %s and metric = 'usd_value_month' and value > 0""",
+            (st["id"],))]   # web research (SemiAnalysis / Tokenomics, other measurements), owner's config
+        full = (st["measured_capacity"] or {}).get("month_usd") or max(published, default=None)
         row = {"price_usd_month": price, "api_value_month_pace": pace, "api_value_month_full": full,
                "ratio_pace": price / pace if pace else None, "ratio_full": price / full if full else None,
                "used_percent": (st["meter"] or {}).get("used_percent"),
-               "detail": {"capacity_source": "measured" if st["measured_capacity"] else "semianalysis",
+               "detail": {"capacity_source": "measured" if st["measured_capacity"] else "published",
+                          "published_values": len(published),
                           "tokens_7d": st["usage_7d"]["total_tokens"]}}
         conn.execute("""insert into models.subscription_costs (sub_id, price_usd_month, api_value_month_pace, api_value_month_full,
                         ratio_pace, ratio_full, used_percent, detail) values (%s,%s,%s,%s,%s,%s,%s,%s::jsonb)""",

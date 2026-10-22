@@ -435,7 +435,7 @@ def pending(conn) -> list[dict]:
     # 2026-10-02: only « a new model ranks above one of our active models » — favourites ('challenger'),
     # text tiers ('tier'), auto-picked #1 of specialised tasks ('new_best'). No credit, staleness or podium news.
     return list(conn.execute("""select * from models.alerts where status = 'open'
-                                and kind in ('challenger', 'tier', 'new_best', 'nerf', 'pareto', 'board_down')
+                                and kind in ('challenger', 'tier', 'new_best', 'nerf', 'pareto', 'board_down', 'plan_change')
                                 and not (kind = 'tier' and role = 'orchestrator')
                                 order by kind, task, alert_id"""))
 
@@ -482,8 +482,19 @@ def _why(e: dict) -> str | None:
     return ("🔎 " + " ; ".join(str(w) for w in e["why"][:3])) if e.get("why") else None
 
 
+def _plan_block(a: dict) -> list[str]:
+    """2026-10-22: a billing e-mail differs from the declared plans."""
+    e = a["evidence"]
+    amount = f' — {_fr(e["amount"], 2)} {"€" if e.get("currency") == "EUR" else "$"}' if e.get("amount") else ""
+    return ["💳 Abonnements — changement repéré dans un mail", f'📧 {e.get("vendor")} {e.get("plan") or ""}{amount}'
+            f' ({e.get("mail_date") or "date inconnue"})', f'💡 Proposition : {e.get("text")}',
+            f'« {e.get("quote", "")[:160]} »']
+
+
 def _block(conn, a: dict) -> list[str]:
     e, n = a["evidence"], a.get("ref") or a["alert_id"]
+    if a["kind"] == "plan_change":
+        return _plan_block(a)
     task = conn.execute("select label, interface, modes from models.tasks where task = %s", (a["task"],)).fetchone() \
         if a["task"] else None
     if a["kind"] == "challenger" and "boards" in e:
@@ -714,7 +725,8 @@ BUTTONS = {"challenger": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d"))
            "new_best": (("✅ Passer au nouveau", "a"), ("✖️ Garder l'actuel", "d")),
            "pareto": (("👍 Noté", "a"), ("✖️ Ignorer", "d")),
            "nerf": (("👁️ Masquer", "d"),),
-           "board_down": (("👁️ Vu", "d"),)}
+           "board_down": (("👁️ Vu", "d"),),
+           "plan_change": (("✅ Mettre à jour", "a"), ("✖️ Ignorer", "d"))}
 
 
 def keyboard(conn, alerts: list[dict]) -> list[list[dict]]:
@@ -752,7 +764,7 @@ def _button_text(conn, a: dict, label: str, code: str) -> str:
         return f"✖️ Garder {_name(conn, cur)}"[:48] if cur else label
     if a["kind"] == "new_best" and code == "d" and e.get("previous_name"):
         return f"↩️ Garder {e['previous_name']}"[:48]
-    if a["kind"] == "board_down":
+    if a["kind"] in ("board_down", "plan_change"):
         return label
     return f"{label} · {_name(conn, (a.get('subject') or '').partition('/')[0])}".rstrip(" ·")[:48]
 
@@ -875,6 +887,13 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
                      (decision, note, alert_id)).fetchone()
     if not a:
         raise KeyError(alert_id)
+    if a["kind"] == "plan_change" and decision == "adopted":
+        from walter_router.research.plans import declared
+        e = a["evidence"]
+        why = f"mail {e.get('vendor')} du {e.get('mail_date')} (alerte {alert_id})"
+        done = declared.retire(e["sub_id"], why, source="email") if e["action"] == "retire" else \
+            declared.upsert(e["sub_id"], e.get("fields") or {}, why, source="email")
+        return {"alert_id": alert_id, "status": decision, "plans": done}
     if a["kind"] == "new_best" and decision == "adopted":
         from walter_router.serve.choose import set_preference
         set_preference(conn, a["task"], pin=a["subject"], watch="quality",

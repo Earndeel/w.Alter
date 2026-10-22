@@ -207,8 +207,9 @@ def _subscriptions(conn) -> tuple[str, int]:
     share = f'{semi["workload_mix"]["cache_read"] * 100:.1f}'.replace(".", ",")
     date = semi["date"]
     return (
-        '<h2>💳 Abonnements</h2><p class="dek">Ce que tes forfaits valent au prix API : notre mesure sur ton compte et '
-        'les chiffres publiés par SemiAnalysis. Information seulement, le routage ne change pas.</p>'
+        '<h2>💳 Abonnements</h2><p class="dek">Ce que tes forfaits valent au prix API, le prix de revient d’un token par '
+        'forfait (il entre dans le choix du fournisseur), ce que l’on sait de chaque plan, et la modification de tes plans.</p>'
+        + _plan_costs(conn) + _plan_facts(conn) + _plan_forms(subs) +
         '<h3>Compteur et consommation des 7 derniers jours</h3>'
         '<div class="tw"><table><thead><tr><th>Abonnement</th><th class="num">Prix</th><th>Utilisé par</th>'
         '<th class="num">Compteur hebdo</th><th>Remise à zéro</th><th class="num">Tokens</th>'
@@ -227,6 +228,77 @@ def _subscriptions(conn) -> tuple[str, int]:
         'tirée de SemiAnalysis tant qu’il n’est pas calibré. '
         f'SemiAnalysis, rapport du {date} : valeur du forfait entièrement utilisé, sur un usage agentique de {share} % '
         'de lectures en cache ; tokens par mois = valeur ÷ prix moyen du million sur ce mélange.</p>'), len(subs)
+
+
+ORIGIN_ICON = {"web": "🌐 web", "email": "📧 mail", "owner": "✍️ toi", "measure": "📏 mesure"}
+METRIC_FR = {"usd_value_month": "valeur API par mois", "tokens_month": "tokens par mois", "messages_5h": "messages par 5 h",
+             "messages_week": "messages par semaine", "price_usd_month": "prix par mois", "limit_note": "limite",
+             "plan_change": "événement"}
+
+
+def _plan_costs(conn) -> str:
+    """Cost price of a token per plan (2026-10-22): what the router uses to price a subscription route."""
+    rows = []
+    for r in conn.execute("""select c.*, extract(epoch from now() - c.at) / 3600 as age_h from models.latest_subscription_costs c
+                             order by sub_id"""):
+        pct = lambda x: "—" if x is None else f"{x * 100:.1f}".replace(".", ",") + "\u202f%"
+        quota = "—" if r["used_percent"] is None else f'{r["used_percent"]:.0f}\u202f%'
+        rows.append(f'<tr><td class="model">{esc(r["sub_id"])}</td><td class="num strong">{pct(r["ratio_pace"])}</td>'
+                    f'<td class="num">{pct(r["ratio_full"])}</td><td class="num">{_usd(r["api_value_month_pace"])}</td>'
+                    f'<td class="num">{_usd(r["api_value_month_full"])}</td><td class="num">{quota}</td>'
+                    f'<td class="num mute small">{r["age_h"]:.0f} h</td></tr>')
+    if not rows:
+        return ""
+    return ('<h3>Prix de revient d’un token</h3><div class="tw"><table><thead><tr><th>Abonnement</th>'
+            '<th class="num">À ton rythme</th><th class="num">Forfait utilisé à 100 %</th><th class="num">Valeur API par mois (rythme)</th>'
+            '<th class="num">Valeur API par mois (capacité)</th><th class="num">Quota hebdo</th><th class="num">Âge de la mesure</th></tr></thead>'
+            f'<tbody>{"".join(rows)}</tbody></table></div><p class="mute small note">Prix de revient = prix du forfait ÷ valeur '
+            'API qu’il transporte par mois, en part du prix API. Un chemin par abonnement passe en premier tant que son quota '
+            'hebdomadaire reste sous 90 %, puis après les fournisseurs payants.</p>')
+
+
+def _plan_facts(conn) -> str:
+    """Everything known about each plan, with its source (web research, billing mails, measures, the owner)."""
+    rows = []
+    for r in conn.execute("""select * from models.plan_evidence
+                             where plan <> 'crédit'   -- pay-as-you-go top-ups (OpenRouter, API credits) are not plans
+                             order by plan, origin = 'email', published desc nulls last, found_at desc limit 60"""):
+        val = "" if r["value"] is None else (f'{r["value"]:g} '.replace(".", ","))
+        src = (f'<a href="{esc(r["source_url"])}" rel="noopener" target="_blank"><span class="raw">{esc(r["source_name"])}</span></a>'
+               if (r["source_url"] or "").startswith("http") else f'<span class="raw">{esc(r["source_name"])}</span>')
+        rows.append(f'<tr><td class="model nw"><span class="raw">{esc(r["plan"])}</span></td><td>{METRIC_FR.get(r["metric"], r["metric"])}</td>'
+                    f'<td><span class="raw">{esc(val + (r["unit"] or ""))}</span><div class="mute small"><span class="raw">{esc((r["quote"] or "")[:140])}</span></div></td>'
+                    f'<td>{src}</td><td class="nw">{r["published"] or "—"}</td><td class="nw">{ORIGIN_ICON.get(r["origin"], r["origin"])}</td></tr>')
+    if not rows:
+        return ""
+    return ('<h3 class="block">Ce que l’on sait de chaque plan</h3><div class="tw"><table><thead><tr><th>Plan</th><th>Quoi</th>'
+            '<th>Valeur</th><th>Source</th><th>Date</th><th>Trouvé par</th></tr></thead>'
+            f'<tbody>{"".join(rows)}</tbody></table></div>')
+
+
+def _plan_forms(subs: list[dict]) -> str:
+    """Edit a plan, cancel it, or add one (2026-10-22). Sent to /api/plans (Access + HMAC), applied by
+    `walter-router plans`; the page is republished after the change."""
+    def form(pid: str, s: dict) -> str:
+        new = not pid
+        return (f'<form class="planform" data-id="{esc(pid)}"><div class="pf-title">{"Nouvel abonnement" if new else esc(s.get("name") or pid)}</div>'
+                + ('<label>Identifiant<input name="sub_id" placeholder="ex. google-ai-pro" required></label>' if new else "")
+                + f'<label>Éditeur<input name="vendor" value="{esc(s.get("vendor") or "")}"></label>'
+                f'<label>Plan<input name="plan" value="{esc(s.get("plan_name") or "")}"></label>'
+                f'<label>Prix par mois ($)<input name="price_usd_month" type="number" step="0.01" min="0" value="{s.get("price_usd_month") or ""}"></label>'
+                f'<label>Modèles inclus<input name="models" value="{esc(", ".join(s.get("models") or []))}" placeholder="ids séparés par des virgules"></label>'
+                f'<label>Note<input name="note" value="{esc(s.get("note") or "")}"></label>'
+                '<div class="pf-actions"><button type="submit">Enregistrer</button>'
+                + ("" if new else '<button type="button" class="pf-retire">Résilier</button>') +
+                '<span class="pf-state mute small"></span></div></form>')
+    from walter_router.research.plans import declared
+    raw = {d["id"]: d for d in declared.read().get("subscriptions", [])}
+    forms = [form(s["id"], {**raw.get(s["id"], {}), "name": s["name"], "plan_name": raw.get(s["id"], {}).get("plan")}) for s in subs]
+    forms.append(form("", {}))
+    return ('<h3 class="block">Modifier mes abonnements</h3><p class="mute small">Aussi possible dans la discussion '
+            '(« walter-router plans set … ») ; un mail de facturation qui ne correspond pas devient une proposition sur Telegram.</p>'
+            f'<div class="planforms">{"".join(forms)}</div>')
+
 
 
 EXCLUDED = {"not included in Pro (usage credits at API price)": "non inclus dans Pro (crédits payés au prix API)"}
@@ -345,6 +417,7 @@ td{{padding:10px 10px 10px 0;border-bottom:1px solid var(--rule);vertical-align:
 .num{{text-align:right;white-space:nowrap}}th.num{{text-align:right}}
 .levels td{{border-bottom:0;padding-bottom:2px}}.levels tr.sub td{{border-bottom:1px solid var(--rule);padding-top:0;padding-bottom:12px;
 font-size:12.5px;color:var(--ink2)}}.lvl{{font-weight:700;font-size:15px;width:34px}}.lname{{font-weight:600;white-space:nowrap}}
+.planforms{{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin:8px 0 28px}}.planform{{border:1px solid var(--rule);padding:14px 16px;display:flex;flex-direction:column;gap:8px}}.planform .pf-title{{font-weight:600;margin-bottom:2px}}.planform label{{display:flex;flex-direction:column;font-size:12px;color:var(--mute);gap:3px}}.planform input{{font:inherit;font-size:14px;color:inherit;padding:6px 8px;border:1px solid var(--rule);background:transparent}}.pf-actions{{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px}}.pf-actions button{{font:inherit;font-size:13px;padding:6px 12px;border:1px solid currentColor;background:transparent;cursor:pointer}}.pf-actions button[type=submit]{{background:var(--ink,#111);color:var(--bg,#fff);border-color:var(--ink,#111)}}
 .model{{font-weight:600}}.levels .model{{white-space:nowrap}}.small{{font-size:12px;font-weight:400}}.mute{{color:var(--mute)}}.sep2{{margin-left:14px}}
 .arr{{color:var(--mute)}}.nw{{white-space:nowrap}}.amber{{color:var(--amber);font-size:12.5px}}
 .lib td.task{{width:21%;font-weight:600}}.lib .cat{{font-weight:400;color:var(--ink2)}}.lib td.route{{font-size:12.5px}}
@@ -436,4 +509,10 @@ if(o.running&&!poll)poll=setInterval(state,15000)}}catch(e){{rs.textContent='Sta
 rb.onclick=async()=>{{if(!confirm('Lancer maintenant le cycle complet ? Collecte des classements, recalcul, analyse par le modèle économique, notifications et republication de cette page (20 à 60 minutes).'))return;
 rb.disabled=true;rs.textContent='Lancement…';try{{const r=await fetch('/api/run',{{method:'POST'}});const o=await r.json();rs.textContent=o.message||'';}}catch(e){{rs.textContent='Échec du lancement'}}setTimeout(state,1500)}};
 state();
+document.querySelectorAll('form.planform').forEach(f=>{{const st=f.querySelector('.pf-state');
+async function send(body){{st.textContent='Envoi…';try{{const r=await fetch('/api/plans',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}});
+const o=await r.json();st.textContent=r.ok?'Enregistré, la page se met à jour…':(o.error||'Refusé');if(r.ok)setTimeout(()=>location.reload(),45000)}}catch(e){{st.textContent='Échec de l’envoi'}}}}
+f.onsubmit=e=>{{e.preventDefault();const d=Object.fromEntries(new FormData(f));const id=f.dataset.id||d.sub_id;delete d.sub_id;
+d.models=(d.models||'').split(',').map(x=>x.trim()).filter(Boolean);send({{action:'set',sub_id:id,fields:d}})}};
+const r=f.querySelector('.pf-retire');if(r)r.onclick=()=>{{if(confirm('Résilier ce plan ? Il sortira de tes abonnements (gardé dans l’historique).'))send({{action:'retire',sub_id:f.dataset.id}})}}}});
 </script></body></html>"""

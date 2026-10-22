@@ -128,3 +128,44 @@ def test_routes_carry_cost_price_quota_and_host_order(monkeypatch):
                                                                                     "used_percent": 95.0}})
         rs = execution.routes(conn, "gpt-6-1-sol", "medium")
         assert rs[0]["access"] != "subscription"
+
+
+def test_plan_mails_are_read_on_the_latest_event():
+    """2026-10-22: subscription mails only; credit top-ups and newsletters are not plans; a cancelled plan is proposed
+    for removal only when it is declared."""
+    from walter_router.research.plans import mail
+    p = mail.parse
+    assert p("Google <no-reply@accounts.google.com>", "Vous avez partagé certaines données", "…") is None
+    assert p("OpenAI <noreply@tm.openai.com>", "GPT-5.6: Meet Sol, Terra and Luna", "The series is now available") is None
+    assert p("OpenRouter <receipts@openrouter.ai>", "Your OpenRouter, Inc receipt", "Amount paid $10.80")["event"] == "credit"
+    g = p("Google Play <googleplay-noreply@google.com>", "Les avantages de votre abonnement Google One prendront bientôt fin",
+          "Votre abonnement Google One (Google AI Pro (5 TB)) prendra fin le 13 sept.")
+    assert g["plan"] == "Google AI Pro" and g["event"] == "cancel"
+    c = p("Anthropic <no-reply@mail.anthropic.com>", "Your Pro subscription is confirmed", "Thanks for starting your Pro subscription")
+    assert c["plan"] == "Claude Pro" and c["event"] == "active"
+    plans = [{"id": "anthropic-pro", "vendor": "Anthropic", "plan": "Claude Pro", "price_usd_month": 20}]
+    assert mail.proposal(c, plans) is None                                    # matches what is declared
+    assert mail.proposal(g, plans) is None                                    # cancelled and not declared: nothing to do
+    assert mail.proposal({**c, "event": "cancel"}, plans)["action"] == "retire"
+    new = mail.proposal({"vendor": "xAI", "plan": "SuperGrok", "amount": 30.0, "currency": "USD", "event": "active"}, plans)
+    assert new["action"] == "upsert" and new["fields"]["price_usd_month"] == 30.0
+
+
+def test_plans_are_edited_in_the_instance_copy_with_history(tmp_path, monkeypatch):
+    import json
+    from walter_router import instance
+    from walter_router.research.plans import declared
+    src = tmp_path / "instance" / "subscriptions.json"
+    src.parent.mkdir(parents=True)
+    src.write_text(json.dumps({"subscriptions": [{"id": "a", "vendor": "V", "plan": "P", "price_usd_month": 20}]}))
+    monkeypatch.setattr(instance, "config_path", type("F", (), {"__call__": staticmethod(lambda n: src),
+                                                                "cache_clear": staticmethod(lambda: None)})())
+    declared.upsert("a", {"price_usd_month": 25}, "test")
+    declared.upsert("b", {"vendor": "X", "plan": "Y", "price_usd_month": 10}, "test")
+    declared.retire("a", "test")
+    doc = json.loads(src.read_text())
+    assert [s["id"] for s in doc["subscriptions"]] == ["b"] and doc["retired"][0]["price_usd_month"] == 25.0
+    assert len(list((src.parent / "history").glob("subscriptions-*.json"))) == 3
+    import pytest
+    with pytest.raises(ValueError):
+        declared.upsert("c", {"plan": "no vendor"}, "test")

@@ -135,6 +135,9 @@ PHRASES = {
 FRENCH_MARKERS = ("Fournisseur", "Secours", "Abonnement", "Modèle", "Tâche", "réflexion", "Calculé", "mesuré",
                   "Économique", "Vidéo", "Coût", "Rechercher", "Lancer", "généré", "estimé", "Équilibré")
 JS = {
+    "'Envoi…'": "'Sending…'", "'Enregistré, la page se met à jour…'": "'Saved, the page is updating…'", "'Refusé'": "'Refused'",
+    "'Échec de l’envoi'": "'Sending failed'",
+    "'Résilier ce plan ? Il sortira de tes abonnements (gardé dans l’historique).'": "'Cancel this plan? It leaves your plans (kept in the history).'",
     "Cycle en cours — ": "Cycle running — ", "'démarrage'": "'starting'", "Dernier cycle complet : ": "Last full cycle: ",
     "' (échec)'": "' (failed)'", "Statut indisponible": "Status unavailable",
     "Lancer maintenant le cycle complet ? Collecte des classements, recalcul, analyse par le modèle économique, notifications et republication de cette page (20 à 60 minutes).":
@@ -146,6 +149,41 @@ JS = {
 STEPS = {"1/4 recherche et analyse": "1/4 research and analysis", "2/4 agent de recherche (modèle économique)": "2/4 research agent (economy model)", "3/4 analyse finale et notifications": "3/4 final analysis and notifications", "4/4 Hermes et page": "4/4 Hermes and page"}
 PHRASES.update({k.replace("'", "&#x27;"): v.replace("'", "&#x27;") for k, v in list(PHRASES.items()) if "'" in k})
 PHRASES.update({k.replace("&", "&amp;"): v.replace("&", "&amp;") for k, v in list(PHRASES.items()) if "&" in k and "&#" not in k})
+PHRASES.update({
+ "Ce que tes forfaits valent au prix API, le prix de revient d’un token par forfait (il entre dans le choix du fournisseur), ce que l’on sait de chaque plan, et la modification de tes plans.": "What your plans are worth at API prices, the cost price of a token per plan (it counts in the choice of provider), what is known about each plan, and editing your plans.",
+ "Prix de revient d’un token": "Cost price of a token",
+ "À ton rythme": "At your pace",
+ "Forfait utilisé à 100 %": "Plan used at 100 %",
+ "Valeur API par mois (rythme)": "API value per month (pace)",
+ "Valeur API par mois (capacité)": "API value per month (capacity)",
+ "Quota hebdo": "Weekly quota",
+ "Âge de la mesure": "Age of the measure",
+ "Prix de revient = prix du forfait ÷ valeur API qu’il transporte par mois, en part du prix API. Un chemin par abonnement passe en premier tant que son quota hebdomadaire reste sous 90 %, puis après les fournisseurs payants.": "Cost price = plan price ÷ API value it carries per month, as a share of the API price. A route through a plan goes first while its weekly quota stays under 90 %, then after the paid providers.",
+ "Ce que l’on sait de chaque plan": "What is known about each plan",
+ "Trouvé par": "Found by",
+ "Quoi": "What",
+ "Valeur": "Value",
+ "valeur API par mois": "API value per month",
+ "tokens par mois": "tokens per month",
+ "messages par 5 h": "messages per 5 h",
+ "messages par semaine": "messages per week",
+ "prix par mois": "price per month",
+ "limite": "limit",
+ "événement": "event",
+ "✍️ toi": "✍️ you",
+ "📏 mesure": "📏 measure",
+ "Modifier mes abonnements": "Edit my plans",
+ "Aussi possible dans la discussion (« walter-router plans set … ») ; un mail de facturation qui ne correspond pas devient une proposition sur Telegram.": "Also possible in the conversation (« walter-router plans set … »); a billing e-mail that does not match becomes a proposal on Telegram.",
+ "Nouvel abonnement": "New plan",
+ "Identifiant": "Identifier",
+ "Éditeur": "Vendor",
+ "Prix par mois ($)": "Price per month ($)",
+ "Modèles inclus": "Included models",
+ "Enregistrer": "Save",
+ "Résilier": "Cancel plan",
+ "ex. google-ai-pro": "e.g. google-ai-pro",
+ "ids séparés par des virgules": "comma-separated ids"
+})
 _ORDER = sorted(PHRASES, key=len, reverse=True)
 _DECIMAL = re.compile(r"(?<=\d),(?=\d)")
 _DATE = re.compile(r"\b(\d{2})/(\d{2})/(\d{4}), (\d{2}:\d{2}) UTC")
@@ -174,12 +212,14 @@ def to_english(html: str) -> str:
     head, sep, rest = html.partition("<script>")
     script, sep2, tail = rest.partition("</script>")
     out, in_style = [], False
+    in_raw = False   # <span class="raw">: data quoted as published (sources, e-mails), never translated
     for part in re.split(r"(<[^>]+>)", head):
         if part.startswith("<"):
             in_style = part.startswith("<style") or (in_style and not part.startswith("</style"))
+            in_raw = part.startswith('<span class="raw"') or (in_raw and part != "</span>")
             out.append(_tag(part))
         else:
-            out.append(part if in_style else _text(part))
+            out.append(part if in_style or in_raw else _text(part))
     for fr, en in sorted(JS.items(), key=lambda kv: -len(kv[0])):
         script = script.replace(fr, en)
     for fr, en in STEPS.items():

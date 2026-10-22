@@ -14,7 +14,7 @@ fichiers du projet. Pas de délégation, pas de génération de média, pas d'ap
 - Méthode des 3 niveaux : `/opt/walter-router/docs/TIERS.md` ; préférences : `/opt/walter-router/config/knowledge.json`
 - Alias de noms existants : `/opt/walter-router/walter_router/aliases.json`
 Tu peux faire des recherches web ciblées pour vérifier qu'un nom de modèle désigne bien le même modèle qu'un
-autre (page officielle, page provider), et pour la veille des abonnements (point 6). Maximum 12 recherches.
+autre (page officielle, page provider). Maximum 8 recherches.
 
 ## À faire
 1. Sources : une source en erreur ou trop vieille ? Cause probable (site modifié, panne, crédit) et correction
@@ -29,17 +29,11 @@ autre (page officielle, page provider), et pour la veille des abonnements (point
 3. Niveaux texte : si le calcul diffère du déclaré, explique en une phrase pourquoi (nouveau modèle, prix…).
 4. Prix : signale les variations des modèles de la short list qui changent un choix ou un coût de plus de 20 %.
 5. Providers : panne, lenteur, crédit épuisé — impact concret pour {{owner.address}}.
-6. Abonnements (veille, 2026-10-21) : lis `walter-router subscriptions` (compteurs, consommation réelle, valeurs
-   déclarées). Cherche sur le web ce qui a changé pour CHAQUE abonnement déclaré : prix, limites d'usage publiées
-   (fenêtres 5 h / hebdo, modèles inclus), modèles ajoutés ou retirés de l'offre, et toute nouvelle mesure publiée de
-   la valeur API d'un plan (SemiAnalysis ou équivalent sérieux, avec date). Pages officielles de l'éditeur (aide,
-   tarifs, notes de version) d'abord. Compare avec les valeurs déclarées et leur date ; signale chaque écart avec
-   l'URL et la date de la source. Tu ne modifies RIEN (ni configuration ni base) : c'est {{owner.address}} qui décide.
+6. Abonnements : la veille des plans a sa propre recherche (`walter-router research plans`) ; n'en fais pas ici.
 
 ## Sortie
 Écris le rapport en français, court (≤ 55 lignes), dans
 `{{log_dir}}/analysis-<AAAAMMJJ>.md` (date du jour UTC) : liens ajoutés (avec preuve),
-candidats rejetés ou incertains, problèmes de sources/providers et leur cause, veille des abonnements
-(écarts trouvés avec leurs sources, ou « rien de nouveau » avec les pages vérifiées). Ce rapport n'est pas envoyé à
+candidats rejetés ou incertains, problèmes de sources/providers et leur cause. Ce rapport n'est pas envoyé à
 {{owner.address}} (qui ne veut être prévenu que d'un nouveau modèle au-dessus de ses modèles actifs — le script s'en charge
 après ton passage). Termine ta réponse par le chemin du rapport.

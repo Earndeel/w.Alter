@@ -221,8 +221,20 @@ def _research(args) -> int:
     with db.connect() as conn:
         out = {"categories": names, "sources": sources.collect_all(conn, ingest.store, only=args.sources, parts=parts)}
         conn.commit()
-        if plans:
-            out["plans"] = {"meters": subscriptions.refresh(conn), "cost_price": subscriptions.record_costs(conn)}
+        if plans:   # research plans: meters, billing mails, web research, then the cost price of a token
+            from walter_router.research.plans import mail, watch
+            out["plans"] = {"meters": subscriptions.refresh(conn)}
+            conn.commit()
+            for step, fn in (("mails", mail.scan), ("web", None if args.no_web else watch.run)):
+                if fn is None:
+                    continue
+                try:
+                    out["plans"][step] = fn(conn)
+                    conn.commit()
+                except Exception as exc:  # noqa: BLE001 — one step down never blocks the others
+                    conn.rollback()
+                    out["plans"][step] = {"error": f"{type(exc).__name__}: {exc}"[:200]}
+            out["plans"]["cost_price"] = subscriptions.record_costs(conn)
             conn.commit()
     if args.analyse:
         out["analysis"] = {k: v for k, v in refresh(notify=False, skip_collect=True).items() if k in ("run_id", "selection_rows")}
@@ -323,15 +335,40 @@ def main(argv: list[str] | None = None) -> int:
     cl.add_argument("request")
     o = sub.add_parser("dossier", help="the task's pre-computed dossier (what the router reads)")
     o.add_argument("task")
+    q = sub.add_parser("plans", help="the owner's plans (subscriptions): list | set ID [--price …] | retire ID")
+    q.add_argument("action", choices=["list", "set", "retire"])
+    q.add_argument("sub_id", nargs="?")
+    q.add_argument("--vendor"); q.add_argument("--plan"); q.add_argument("--price", type=float, dest="price_usd_month")
+    q.add_argument("--execution"); q.add_argument("--route-provider", dest="route_provider")
+    q.add_argument("--models", help="comma-separated model ids included in the plan"); q.add_argument("--note")
+    q.add_argument("--why", default="déclaré par le propriétaire")
     q = sub.add_parser("research", help="run research now: one or more categories (text image video audio memory "
                                         "decision prices hosts plans | all), or --source KIND; --list shows them")
     q.add_argument("categories", nargs="*", help="research categories (default: all)")
     q.add_argument("--source", action="append", dest="sources", help="source kind instead, e.g. aa_eval, arena (repeatable)")
     q.add_argument("--list", action="store_true", help="categories with what each reads")
     q.add_argument("--analyse", action="store_true", help="then recompute the choices and republish the page (no message)")
+    q.add_argument("--no-web", action="store_true", help="plans: skip the web research agent (meters, mails, cost price only)")
     sub.add_parser("instance-env", help="shell assignments of the instance bindings used by the cycle and the trigger")
     args = p.parse_args(argv)
 
+    if args.cmd == "plans":
+        from walter_router.research.plans import declared
+        if args.action == "list":
+            print(json.dumps(declared.read().get("subscriptions", []), ensure_ascii=False, indent=1))
+            return 0
+        if not args.sub_id:
+            print(json.dumps({"error": "plan id required"}))
+            return 1
+        if args.action == "retire":
+            out = declared.retire(args.sub_id, args.why)
+        else:
+            fields = {k: getattr(args, k) for k in ("vendor", "plan", "price_usd_month", "execution", "route_provider", "note")}
+            if args.models:
+                fields["models"] = [m.strip() for m in args.models.split(",") if m.strip()]
+            out = declared.upsert(args.sub_id, fields, args.why)
+        print(json.dumps(out, ensure_ascii=False, indent=1))
+        return 0
     if args.cmd == "research":
         return _research(args)
     if args.cmd == "instance-env":
