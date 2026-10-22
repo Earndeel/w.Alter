@@ -193,6 +193,44 @@ def _instance_env() -> int:
     return 0
 
 
+def _research(args) -> int:
+    """walter-router research [CATEGORY…] [--source KIND] [--list] [--analyse]"""
+    from walter_router.analysis import ingest
+    from walter_router.research import categories, sources
+    if args.list:
+        out = {n: {"label": categories.get(n).LABEL[0], "sources": {k: sorted(v) if v else "tout"
+                                                                    for k, v in categories.get(n).SOURCES.items()}}
+               for n in categories.NAMES}
+        print(json.dumps(out, ensure_ascii=False, indent=1))
+        return 0
+    if args.sources:
+        unknown = sorted(set(args.sources) - set(sources.SOURCES))
+        if unknown:
+            print(json.dumps({"error": f"unknown source(s) {unknown}", "sources": sorted(sources.SOURCES)}))
+            return 1
+        parts, plans, names = None, False, []
+    else:
+        names = list(categories.NAMES) if not args.categories or "all" in args.categories else args.categories
+        try:
+            parts, plans = categories.plan(names)
+        except KeyError as exc:
+            print(json.dumps({"error": str(exc)}, ensure_ascii=False))
+            return 1
+    with db.connect() as conn:
+        out = {"categories": names, "sources": sources.collect_all(conn, ingest.store, only=args.sources, parts=parts)}
+        conn.commit()
+        if plans:
+            out["plans"] = subscriptions.refresh(conn)
+            conn.commit()
+    if args.analyse:
+        out["analysis"] = {k: v for k, v in refresh(notify=False, skip_collect=True).items() if k in ("run_id", "selection_rows")}
+        from walter_router.interface import library
+        with db.connect() as conn:
+            out["page"] = library.publish(conn).get("deployed")
+    print(json.dumps(out, indent=1, default=str, ensure_ascii=False))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="walter-router")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -283,23 +321,17 @@ def main(argv: list[str] | None = None) -> int:
     cl.add_argument("request")
     o = sub.add_parser("dossier", help="the task's pre-computed dossier (what the router reads)")
     o.add_argument("task")
-    q = sub.add_parser("research", help="collect sources now (all, or --source KIND…), store and understand them; no recompute")
-    q.add_argument("--source", action="append", dest="sources", help="source kind, e.g. aa_eval, mm, arena (repeatable)")
+    q = sub.add_parser("research", help="run research now: one or more categories (text image video audio memory "
+                                        "decision prices hosts plans | all), or --source KIND; --list shows them")
+    q.add_argument("categories", nargs="*", help="research categories (default: all)")
+    q.add_argument("--source", action="append", dest="sources", help="source kind instead, e.g. aa_eval, arena (repeatable)")
+    q.add_argument("--list", action="store_true", help="categories with what each reads")
+    q.add_argument("--analyse", action="store_true", help="then recompute the choices and republish the page (no message)")
     sub.add_parser("instance-env", help="shell assignments of the instance bindings used by the cycle and the trigger")
     args = p.parse_args(argv)
 
     if args.cmd == "research":
-        from walter_router.analysis import ingest
-        from walter_router.research import sources
-        unknown = sorted(set(args.sources or []) - set(sources.SOURCES))
-        if unknown:
-            print(json.dumps({"error": f"unknown source(s) {unknown}", "sources": sorted(sources.SOURCES)}))
-            return 1
-        with db.connect() as conn:
-            out = sources.collect_all(conn, ingest.store, only=args.sources)
-            conn.commit()
-        print(json.dumps(out, indent=1, default=str))
-        return 0
+        return _research(args)
     if args.cmd == "instance-env":
         return _instance_env()
     if args.cmd == "migrate":

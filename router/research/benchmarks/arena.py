@@ -36,10 +36,12 @@ def arena_board(page: str) -> dict | None:
     return None
 
 
-def source_arena() -> tuple[dict, datetime, str]:
+def source_arena(parts: set[str] | None = None) -> tuple[dict, datetime, str]:
+    """Every board, or only `parts` (board keys, for a research category run; merged later into the last snapshot)."""
+    wanted = {p: k for p, k in ARENA_BOARDS.items() if not parts or k in parts}
     boards, errors = {}, {}
     for attempt in range(2):   # a board missing on the first pass is retried once (2026-10-21: creative writing
-        for path, key in ARENA_BOARDS.items():   # came back empty once, then fine a few minutes later)
+        for path, key in wanted.items():   # came back empty once, then fine a few minutes later)
             if key in boards:
                 continue
             try:
@@ -55,6 +57,6 @@ def source_arena() -> tuple[dict, datetime, str]:
         if not errors:
             break
         time.sleep(5)
-    if len(boards) < len(ARENA_BOARDS) // 2:
+    if len(boards) < max(1, len(wanted) // 2):
         raise ValueError(f"arena: only {len(boards)} boards parsed: {errors}")
     return {"boards": boards, "errors": errors}, now(), ARENA_URL

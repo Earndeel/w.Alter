@@ -349,7 +349,7 @@ def build_multimodal_snapshot(
     modules: dict[str, dict[str, Any]] = {}
     for task_name, spec in TASK_SPECS.items():
         if task_name not in raw_tables:
-            raise RuntimeError(f"No refreshed AA table supplied for task {task_name}")
+            continue   # a research category run reads only its modules (merged later into the last snapshot)
         payload = build_task_payload(spec, raw_tables[task_name], retrieved_at)
         modules.setdefault(spec["module"], {"tasks": {}})["tasks"][task_name] = payload
     return {
@@ -366,7 +366,12 @@ def build_multimodal_snapshot(
     }
 
 
-def source_mm() -> tuple[dict, datetime, str]:
-    tables = {name: select_task_table(html_tables(fetch_text(spec["url"])), spec) for name, spec in TASK_SPECS.items()}
+MODULES = sorted({s["module"] for s in TASK_SPECS.values()})   # tts, speech_to_speech, image, video, music
+
+
+def source_mm(parts: set[str] | None = None) -> tuple[dict, datetime, str]:
+    """Every module, or only `parts` (module names)."""
+    tables = {name: select_task_table(html_tables(fetch_text(spec["url"])), spec) for name, spec in TASK_SPECS.items()
+              if not parts or spec["module"] in parts}
     doc = build_multimodal_snapshot(tables)
     return doc, _parse_time(doc.get("generated_at")), "https://artificialanalysis.ai/"
