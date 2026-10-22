@@ -1,7 +1,7 @@
 ---
 name: walter-model-router
 description: "Use when choosing which AI model or provider W.Alter should use for a task, checking live leaderboards, prices or the owner's AI subscriptions, explaining or tuning Walter Router (tasks, weights, preferences, alerts, library page), or analysing its 48 h cycle."
-version: 4.1.0
+version: 4.2.0
 author: W.Alter
 metadata:
   hermes:
@@ -14,7 +14,7 @@ metadata:
 Module `/walter/router` (also reachable as `/opt/walter-router`), command `walter-router` on the PATH. Data: schema
 `models` in PostgreSQL 127.0.0.1:5433 db `hindsight` (password only in ~/.pgpass; every table and view is commented).
 Read first: `/walter/router/README.md` (current state: layout, how a choice is made, consumers, access, rules), then
-`docs/DATA.md` (every source and table), `docs/TIERS.md` (text tiers), `docs/HISTORY.md` (dated decisions).
+`docs/README.md` (documentation index), `docs/reference/DATABASE.md` (all SQL fields), `docs/DATA.md` (provenance), `docs/TIERS.md` (text tiers), `docs/HISTORY.md` (dated decisions).
 The old store (schema `walter_router`, fixed weight vectors, router_matrix.json) is retired: never use it.
 
 ## Ask the router — never hardcode a model
@@ -150,3 +150,14 @@ examples, not catalog truth.
 ## Native text execution and provider failover (2026-10-23)
 `walter-router run` now executes text natively, through `walter-llm call` (one exact provider/model). No Hermes subprocess or hidden model fallback is used for text. Only providers of the selected model are tried; if all fail, report the failure without substituting another model. The conversation and completed tools survive provider changes. Inspect `routed.attempts` (actual provider, model, response id), `tools`, and `runtime=walter-router`. When `user_notification_required` is true, ALWAYS relay `user_notice` to the user. This also applies when execution fails. Named provider restrictions remain explicit.
 Verified on the installed version: 168 tests passed; `walter check` passed. A real coding/tool run received RateLimitError from Kie, kept Claude Opus 5.5, succeeded on OpenRouter with two recorded response ids and a terminal assertion/checksum. Backup of prior source is retained on the host; no Hermes core or global configuration was modified.
+
+## Maintained documentation and orchestrator note (2026-10-23)
+- Resolve module roots through `walter path router` and `walter path context`; do not introduce hardcoded paths in new integrations.
+- Guides: `docs/USAGE.md`, `INTEGRATION.md`, `EXECUTION.md`, `OPERATIONS.md`, `MAINTENANCE.md`, `ORCHESTRATOR.md`. Public generated references cover API/CLI, all database fields, tasks/weights, configuration and code signatures. `docs/DESIGN.md` is historical.
+- `walter-router schema` returns the public tool schema. `walter-router docs --write` regenerates references from code and SQL metadata; `docs --check` fails if stale. `--offline` uses the stored schema snapshot, not a live SQL-schema verification. Export no private instance rows or secrets.
+- After a source/schema change: back up, update behavior guides and API descriptions, regenerate references, run `docs --check` and appropriate tests, and update history. Module `AGENTS.md` records this maintenance rule.
+- One brief producer: `walter-router brief --json` returns versioned Markdown, hash, length, source and required tools. `brief --write` publishes the Markdown and JSON to instance state and syncs supported profiles. Do not maintain another prompt copy.
+- Walter Context can prepare this trusted source via `walter-context capability router --tool walter_route --tool walter_run --tool walter_decide --tool walter_plans`. Its `TurnNotes` API freezes the note for a turn and reloads on the next owner message. An actual tool inventory is required before injection is allowed.
+- This source does not activate the future lot-4 general context composer, nor guarantee automatic injection in every harness. The host owns instruction placement, tool permissions, deduplication and snapshot lifetime.
+- Current execution limits are explicit in EXECUTION.md: native text tool groups are limited; vision selection does not attach input; media uses a separate execution path; subprocesses run with the server's actual rights, not automatically a caller sandbox.
+Validated: router suite 175 tests, context suite 43 tests, DSH port 9 tests; installed live reference check and actual Context-to-Router note loading pass. These are functional checks, not provider availability or billing evidence.
