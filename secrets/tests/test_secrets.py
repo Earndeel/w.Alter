@@ -216,3 +216,41 @@ def test_unlock_preserves_noninteractive_relogin_without_password_argv(tmp_path,
     assert '--passwordenv' in login[0]
     assert login[1]['WALTER_BW_MASTER'] == FAKE
     assert FAKE not in repr([argv for argv,env in calls])
+
+
+def test_refused_session_is_renewed_once_under_lock(tmp_path, monkeypatch):
+    """2026-10-22: two processes unlocking at once left a dead session in the cache, trusted for 8 h. A refused
+    session (its fingerprint) is replaced; a session another process already renewed is reused, not re-unlocked."""
+    cache = tmp_path/'session'
+    monkeypatch.setattr(unlock.settings, 'SESSION', cache)
+    cache.write_text('dead-session-not-live')
+    unlocks = []
+    def run(argv, *, env=None):
+        if argv[0] == 'age':
+            return json.dumps({'services': {'bitwarden': {'master_password': FAKE}}})
+        if argv[:2] == ['bw', 'status']:
+            return json.dumps({'status': 'locked'})
+        if argv[:2] == ['bw', 'unlock']:
+            unlocks.append(1)
+            return f'fresh-session-{len(unlocks)}-not-live'
+        return ''
+    monkeypatch.setattr(unlock, '_run', run)
+    assert unlock.session() == 'dead-session-not-live'                        # recent cache: trusted (fast path)
+    assert unlock.session(unlock.fingerprint('dead-session-not-live')) == 'fresh-session-1-not-live'
+    # a second process that also saw the dead session gets the renewed one, without a new `bw unlock`
+    assert unlock.session(unlock.fingerprint('dead-session-not-live')) == 'fresh-session-1-not-live'
+    assert len(unlocks) == 1
+
+
+def test_vault_retries_a_locked_vault_once(monkeypatch):
+    from walter_secrets import vault as vmod
+    v = vmod.Vault()
+    sessions = iter(['dead-not-live', 'fresh-not-live'])
+    monkeypatch.setattr(v, '_session', lambda stale=None: next(sessions))
+    seen = []
+    def run(argv, **kw):
+        seen.append(kw['env']['BW_SESSION'])
+        ok = kw['env']['BW_SESSION'] == 'fresh-not-live'
+        return subprocess.CompletedProcess(argv, 0 if ok else 1, stdout='[]' if ok else '', stderr='' if ok else 'Vault is locked.')
+    monkeypatch.setattr(vmod.subprocess, 'run', run)
+    assert v._bw('list', 'items') == '[]' and seen == ['dead-not-live', 'fresh-not-live']
