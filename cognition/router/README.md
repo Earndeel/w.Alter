@@ -79,9 +79,9 @@ written by tests).
 
 | Door | Protection |
 |---|---|
-| https://library.walter-ai.cloud (page, English; /fr/ French) | Cloudflare Access: the owner's e-mail only (one-time code); `*.pages.dev` answers 404 (Pages middleware checks the host and the Access token) |
-| `/api/status`, `/api/run` (« Lancer le cycle complet »), `/api/plans` (edit a plan) | behind the same Access, relayed by Pages functions to `router-control.walter-ai.cloud` |
-| router-control.walter-ai.cloud → `walter-router-control` (127.0.0.1:8896) | Cloudflare Access with a service token only (the Pages project's), then HMAC-SHA256 over timestamp + method + path (+ body hash for `/plans`), 5-minute window; a cycle cannot start twice nor within 10 minutes; plan ids and fields validated |
+| the library page at the instance's `library_domain` (host.json; English, /fr/ French) | Cloudflare Access: the owner's e-mail only (one-time code); `*.pages.dev` answers 404 (Pages middleware checks the host and the Access token) |
+| `/api/status`, `/api/run` (« Lancer le cycle complet »), `/api/plans` (edit a plan) | behind the same Access, relayed by Pages functions to the instance's `control_origin` (host.json) |
+| `control_origin` (Cloudflare tunnel host) → `walter-router-control` (127.0.0.1:8896) | Cloudflare Access with a service token only (the Pages project's), then HMAC-SHA256 over timestamp + method + path (+ body hash for `/plans`), 5-minute window; a cycle cannot start twice nor within 10 minutes; plan ids and fields validated |
 | walter-llm (127.0.0.1:8894) | local only; one token per agent (sha256 in the instance's `state/llm/agents.json`, 0600); provider keys stay in the gateway |
 | Outbound | provider keys and grants from walter-secrets (never printed, headers only); the owner's Gmail read-only grant for subscription mails (no mail content goes to a model) |
 
