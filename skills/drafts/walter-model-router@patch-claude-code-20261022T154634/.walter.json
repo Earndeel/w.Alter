@@ -1,0 +1,11 @@
+{
+ "base_sha": "fa74b9c7f96e4f4b64d70cacf65857f678a5d5d83e1d581d9318d9942483afce",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-22T15:46:34.243864+00:00",
+ "domain": "mlops",
+ "kind": "patch",
+ "reason": "Router changed on 2026-10-22 (commit c3ba898 in /walter/router): new task video_understanding (43 tasks; only offers that read video are callable), `route --context` / plugin `conversation` for follow-up requests, no decision-model call when task+level are forced, route prices shown per million tokens. The skill still said 42 tasks and documented route without these. Nothing else removed.",
+ "runtime": "claude_code",
+ "session_id": "0c6fcbac-00d8-42b0-a541-855e301d8921",
+ "target": "walter-model-router"
+}
