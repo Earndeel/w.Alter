@@ -1,0 +1,11 @@
+{
+ "base_sha": "4caf54f3925a1a24ef11a7f0f839e6f056ea5d99bc911763d333b7acabe1f9f3",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-22T21:29:13.735141+00:00",
+ "domain": "mlops",
+ "kind": "patch",
+ "reason": "Le module dispose maintenant d'une référence complète contrôlée contre le code et PG et d'une note versionnée consommable par Walter Context. Documenter les commandes de maintenance, le producteur unique et les limites du branchement; vérification installée docs --check et chargement réel réussis.",
+ "runtime": "codex",
+ "session_id": null,
+ "target": "walter-model-router"
+}
