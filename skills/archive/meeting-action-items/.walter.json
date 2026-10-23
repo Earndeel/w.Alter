@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:11+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "productivity",
  "hermes": {
   "path": "/root/.hermes/skills/productivity/meeting-action-items",
   "sha": "723f403a58d7d86c074b5480a9496dcacd1cac7b0a72c72af4ae553cd8fca2da",
