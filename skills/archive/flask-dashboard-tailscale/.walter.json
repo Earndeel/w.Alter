@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:07+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/devops/flask-dashboard-tailscale",
   "sha": "668322cc6e615a32cb2d3ca285b8df8d93567d31649299cd93de4d1921356f26",
