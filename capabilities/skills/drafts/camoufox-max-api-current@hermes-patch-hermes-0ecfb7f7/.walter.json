@@ -1,0 +1,19 @@
+{
+ "created_at": "2026-10-23T12:39:04+00:00",
+ "domain": "web-browsing-auth",
+ "evidence": {
+  "requests": [
+   "Ne déconnecte ni force le VPN Mac. Alternative évidente : le Mac a déjà tunnel Lucas actif, peut-être sortie FR. Vérifie pays IP réel du proxy scoped existant walter-exit-mac (127.0.0.1:1082) et du Mac; si FR confirmé, utilise cette sortie déjà en place (session browser par défaut via Mac, sans routage global changé), configure identité FR et authentifie trainai dans trainai-fr-20261023 avec browser_session. Si pas FR, rapporte pays réel et bloque. Priorité ouvrir le compte dans Camoufox visible sur Selkies puis lire tableau de bord pour avancer leçons ordinaires. Pas de quiz soumis. Retourne état rapide et session/tab pour que je poursuive."
+  ],
+  "session_id": "hermes/main/20261023_123713_8ff3ec"
+ },
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/camoufox-max-api-current",
+  "sha": "0ecfb7f70efd22c50c27f0a7653fbf4446b4eb42fe05dc1411541a163d968059",
+  "state": "active"
+ },
+ "kind": "hermes_patch",
+ "reason": "patched by the Hermes agent",
+ "runtime": "hermes",
+ "target": "camoufox-max-api-current"
+}
