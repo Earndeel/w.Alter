@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:06+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "creative",
  "hermes": {
   "path": "/root/.hermes/skills/creative/baoyu-article-illustrator",
   "sha": "32f12d4389447100abbb5991a42fcff2f43db767540caea1737354f8a489085f",
