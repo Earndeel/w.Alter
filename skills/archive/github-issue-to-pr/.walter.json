@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:08+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "github",
  "hermes": {
   "path": "/root/.hermes/skills/github/github-issue-to-pr",
   "sha": "f9cf8d1757eedce42fc7050d13e5bf250e3615536c2865f40e7e86fc3f358615",
