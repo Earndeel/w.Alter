@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:05+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "autonomous-ai-agents",
  "hermes": {
   "path": "/root/.hermes/skills/autonomous-ai-agents/merge-reconciler",
   "sha": "7bc02a547ade875610355627ff9586a022d71f96ab559fbe964ee1320d27a648",
