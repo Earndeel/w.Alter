@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:12+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "software-development",
  "hermes": {
   "path": "/root/.hermes/skills/software-development/hermes-s6-container-supervision",
   "sha": "d69b3c0c99d88e7e95f55caa0df467bd958e90678d73420f7d902070b9120534",
