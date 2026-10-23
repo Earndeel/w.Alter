@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:06+00:00",
+ "archived_reason": "not read for 79 days",
+ "domain": "creative",
  "hermes": {
   "path": "/root/.hermes/skills/creative/creative-ideation",
   "sha": "ac853cd491c8624f5a7db234822240707785e2f1f8b4d1c03070bd45681edd79",
