@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:06+00:00",
+ "archived_reason": "not read for 70 days",
+ "domain": "creative",
  "hermes": {
   "path": "/root/.hermes/skills/creative/tldraw-offline",
   "sha": "ef54716b4b71937c157e2a5e0692901ba4ffde5715f8d86465e5c7bb03561b1a",
