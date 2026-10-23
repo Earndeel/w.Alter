@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:11+00:00",
+ "archived_reason": "not read for 173 days",
+ "domain": "red-teaming",
  "hermes": {
   "path": "/root/.hermes/skills/red-teaming/github-credential-scanner",
   "sha": "13e9187346804aef3e7ef7aebbd8f8c7ab839b6ebc97b273024f9723bc7d15e9",
