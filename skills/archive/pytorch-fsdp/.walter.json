@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:10+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "mlops/training",
  "hermes": {
   "path": "/root/.hermes/skills/mlops/training/pytorch-fsdp",
   "sha": "41d0b2e56fcf40b90f1e485efd8f1ba4d8d1921202a3793dd7a278fe0e9c5b3f",
