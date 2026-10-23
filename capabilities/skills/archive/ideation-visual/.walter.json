@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:06+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "creative",
  "hermes": {
   "path": "/root/.hermes/skills/creative/ideation-visual",
   "sha": "2ed6e2a79c5a3c88cea4368b828f6e4ab52bf72d4a42415bbbda4d75315ef9cf",
