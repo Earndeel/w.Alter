@@ -45,6 +45,12 @@ All action endpoints are JSON `POST` requests:
 A successful lifecycle must also verify a usable `snapshot` and non-empty
 `refs` when the target page contains semantic or interactive elements.
 
+## Scoped network and authenticated-state checks
+
+- If a dedicated VPN exit refuses to start because the Mac already owns its key, do not disconnect or force the Mac tunnel. Check the existing session-scoped Mac proxy and the Mac's public country first; an already-working French exit can satisfy the task without any global routing change. Verify the country again from inside the exact browser session before account navigation.
+- Use the official `browser_session`/`walter-browser login` broker for cookie transfer, with server-side site scoping and metadata-only results. When a tenant subdomain has no cookies, inspect cookie host/name metadata for the necessary parent-domain session cookie before declaring authentication impossible; never export cookie values into the agent context or include unrelated tenants.
+- A broker's `authenticated: false` based on a UI selector is not definitive. Read the live account menu and enrollment UI; a placeholder display name can coexist with a valid authenticated account. Distinguish actual enrollment data from an anonymous SPA shell, and do not launch assessments while verifying access.
+
 ## Snapshot compatibility
 
 Camoufox/Playwright Firefox in this runtime does not expose
