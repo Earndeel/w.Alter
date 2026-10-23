@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:10+00:00",
+ "archived_reason": "not read for 88 days",
+ "domain": "mlops/inference",
  "hermes": {
   "path": "/root/.hermes/skills/mlops/inference/obliteratus",
   "sha": "499c64f75c35522fa0f13359a6a4e357286379715b4dee25bd317ce0166270e1",
