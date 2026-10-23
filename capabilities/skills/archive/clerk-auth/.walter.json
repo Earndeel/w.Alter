@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:07+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/devops/clerk-auth",
   "sha": "099548cf4c33e6a287a1905881dc363244a04080c7e41291065c65bc0eadd041",
