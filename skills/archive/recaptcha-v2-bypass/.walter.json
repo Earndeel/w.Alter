@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:07+00:00",
+ "archived_reason": "not read for 153 days",
+ "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/devops/recaptcha-v2-bypass",
   "sha": "1b24ec40011856f92808fe3edf09e053d03449c81334dc5ac712ec6897c8bf06",
