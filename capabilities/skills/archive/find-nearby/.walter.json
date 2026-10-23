@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:09+00:00",
+ "archived_reason": "not read for 141 days",
+ "domain": "leisure",
  "hermes": {
   "path": "/root/.hermes/skills/leisure/find-nearby",
   "sha": "ce607e60f34e1f3d322755090b82f7b11a3ffb8c782df427a5f94749ac027a84",
