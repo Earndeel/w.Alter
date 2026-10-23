@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:11+00:00",
+ "archived_reason": "not read for 146 days",
+ "domain": "productivity",
  "hermes": {
   "path": "/root/.hermes/skills/productivity/linear",
   "sha": "bc2c40cb03304a797e254ed9a28d7ca5ee8f3ba076391930547d8d1d055c0a8a",
