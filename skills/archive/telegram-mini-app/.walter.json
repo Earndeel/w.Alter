@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:08+00:00",
+ "archived_reason": "not read for 173 days",
+ "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/devops/telegram-mini-app",
   "sha": "158044023a79ea992ccead77b2111d6f99650d72b5e6a959cc35e5f2b885a067",
