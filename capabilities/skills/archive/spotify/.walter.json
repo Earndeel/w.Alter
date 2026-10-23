@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:09+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "media",
  "hermes": {
   "path": "/root/.hermes/skills/media/spotify",
   "sha": "c72fc64f946601d40cb10295cd9a95fa823075155c968f104aa2e837db4c80bb",
