@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-23T04:15:09+00:00",
+ "archived_reason": "not read for 167 days",
+ "domain": "misc",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/video-agent-factory",
   "sha": "cfd24724aa56f933061cf87819814f593068d973b3838963c1c04b7c234af25e",
