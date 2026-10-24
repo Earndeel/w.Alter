@@ -1,0 +1,21 @@
+{
+ "created_at": "2026-10-24T07:50:32+00:00",
+ "domain": "devops",
+ "evidence": {
+  "requests": [
+   "[Your active task list was preserved across context compression]\n- [>] account. Vérifier et ouvrir le compte Upwork existant dans la session navigateur autorisée, sans doublon. (in_progress)\n- [ ] evidence. Recouper CV, réalisations vidéo IA et portfolio ; exclure titres, clients et résultats non prouvés. (pending)\n- [ ] profile. Préparer puis enregistrer le profil vidéo IA anglais dans les seuls champs vérifiés, si accès possible. (pending)\n- [ ] verify. Vérifier le résultat ou restituer le blocage exact et les identifiants de suivi. (pending)\n\n[Skills pruned during compression — reload before acting on these tasks]\nThe task list above crossed the compression boundary verbatim, but the skill instructions that governed it were pruned. Before executing any preserved task that depends on the",
+   "Continue from the compressed conversation context above. This marker exists because no human user turn was available.",
+   "[Your active task list was preserved across context compression]\n- [>] account. Vérifier et ouvrir le compte Upwork existant dans la session navigateur autorisée, sans doublon. (in_progress)\n- [ ] evidence. Recouper CV, réalisations vidéo IA et portfolio ; exclure titres, clients et résultats non prouvés. (pending)\n- [ ] profile. Préparer puis enregistrer le profil vidéo IA anglais dans les seuls champs vérifiés, si accès possible. (pending)\n- [ ] verify. Vérifier le résultat ou restituer le blocage exact et les identifiants de suivi. (pending)\n\n[Skills pruned during compression — reload before acting on these tasks]\nThe task list above crossed the compression boundary verbatim, but the skill instructions that governed it were pruned. Before executing any preserved task that depends on the"
+  ],
+  "session_id": "hermes/main/20261024_074409_9dc95c"
+ },
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/authenticated-profile-evidence-gates",
+  "sha": "d0886aa9504c7b9c265d981872dcd1c437cae8f1ff941eb455f47274840ecc4d",
+  "state": "active"
+ },
+ "kind": "new",
+ "reason": "created by the Hermes agent (skill_manage)",
+ "runtime": "hermes",
+ "target": "authenticated-profile-evidence-gates"
+}
