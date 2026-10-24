@@ -1,0 +1,11 @@
+{
+ "created_at": "2026-10-24T04:31:18.254686+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "reference-video-fidelity",
+  "ad-video-pipeline",
+  "video-analysis-pipeline"
+ ]
+}
