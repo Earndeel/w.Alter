@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-10-24T04:13:51+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "productivity",
  "hermes": {
   "path": "/root/.hermes/skills/productivity/box",
   "sha": "d82ccf0a12946d6a931641206809c5aa95798c46a0ea539a9d4f4eba259e4233",
