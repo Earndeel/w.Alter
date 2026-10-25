@@ -50,7 +50,8 @@ def test_rules_settle_the_obvious_without_a_call(fake_llm):
 
 def _full(answers, **over):
     answers.update({"thread": {"choice": "th-2", "confidence": 0.9, "probabilities": {"th-2": 0.7, "th-1": 0.25}},
-                    "act": {"choice": "continue", "confidence": 0.9}, "level": {"choice": "L2", "confidence": 0.95},
+                    "act": {"choice": "continue", "confidence": 0.9}, "plan": {"choice": "thread", "confidence": 0.95},
+                    "extensive": {"noul": 0.1},
                     "domain": {"choice": "projects", "confidence": 0.8}, "horizon": {"choice": "medium"},
                     "model_level": {"choice": "L2"}, "task": {"choice": "coding"},
                     "cap_skills": {"noul": 0.8}, "cap_search": {"noul": 0.2}, "cap_delegation": {"noul": 0.1},
@@ -72,10 +73,10 @@ def test_decision_maps_onto_a_valid_plan(fake_llm):
 
 def test_unsure_level_escalates_and_floor_keeps_the_last_exchange(fake_llm):
     calls, answers = fake_llm
-    _full(answers, level={"choice": "L1", "confidence": 0.3})
+    _full(answers, plan={"choice": "last_exchange", "confidence": 0.3})
     p = run(Request("t", "et pour le reste de la semaine on fait comment exactement", previous=prev()))
     assert p.escalated and p.level == "L3" and calls["chat"][0]["poste"] == "general"
-    _full(answers, level={"choice": "L0", "confidence": 0.99})
+    _full(answers, plan={"choice": "none", "confidence": 0.99})
     assert run(Request("t", "et pour le reste de la semaine on fait comment", previous=prev(age=600))).level == "L1"
 
 
@@ -90,3 +91,9 @@ def test_local_only_never_calls_a_cloud_model_and_failures_stay_open(fake_llm, m
     monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", boom)
     p = run(Request("t", "une vraie question qui demande une décision du modèle"))
     assert p.level == "L1" and "TimeoutError" in p.decision["error"] and p.thread.new
+
+
+def test_extensive_search_lifts_a_thread_plan_to_l4(fake_llm):
+    calls, answers = fake_llm
+    _full(answers, extensive={"noul": 0.8})
+    assert run(Request("t", "retrouve tout ce qu'on a décidé sur la mémoire depuis septembre", previous=prev())).level == "L4"

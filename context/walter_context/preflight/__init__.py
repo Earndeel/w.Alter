@@ -4,7 +4,7 @@ One typed call to Walter Router's decision model (walter_memory.llm.decide, the 
 d1-ultra first since 25/10) answers, together: which thread (or a new one), the act, the context level L0-L4,
 the main knowledge domain and horizon, the capabilities the answer needs, the task family and text tier asked
 of the Router. Rules settle the obvious cases without a call (short reply right after an exchange, a bare
-calculation or the time); an unsure context level is settled by a stronger model (Router poste `general`) —
+calculation or the time); an unsure context plan is settled by a stronger model (Router poste `general`) —
 measured 21/10: it halves the plans with too little context, it does not choose threads better, so it only
 settles the level. A plan floor keeps at least the last exchange when the message follows it closely.
 
@@ -24,7 +24,15 @@ from ..plan import (ACTS, CAPABILITIES, DOMAINS, HORIZONS, LEVELS, MODEL_LEVELS,
 
 REPLY_WINDOW_S = 2 * 3600       # past that, « ok, regarde X » opens a subject rather than answering one
 FLOOR_WINDOW_S = 30 * 60        # a message this close to the previous exchange needs at least that exchange
-ESCALATE_BELOW = 0.7            # level confidence under which the Router's `general` poste settles the level
+ESCALATE_BELOW = 0.5            # plan confidence under which the Router's `general` poste settles the level
+# The level is asked as the four plans measured in lot 1 (d1-ultra 61-67 % right on its own) plus a yes/no for the
+# extensive level: one five-way question left the decision model unsure on almost every message (25/10: 134
+# escalations out of 136, 4 s median).
+PLANS = {"none": "nothing beyond the new message: the assistant's tools suffice",
+         "last_exchange": "the last exchange of its subject",
+         "thread": "more of its subject's history: earlier decisions, other sessions or tools",
+         "thread_and_memory": "its subject plus long-term memory: people, past events, other sources"}
+PLAN_LEVEL = {"none": "L0", "last_exchange": "L1", "thread": "L2", "thread_and_memory": "L3"}
 
 WORD = re.compile(r"[a-zà-ÿ0-9][a-zà-ÿ0-9'’\-]+", re.I)
 SHORT = re.compile(r"^\s*(oui|ok|okay|non|vas[- ]?y|go|parfait|merci|d'?accord|valid|fais[- ]le|c'?est bon|top|"
@@ -128,8 +136,11 @@ def questions(req: Request) -> tuple[dict, dict]:
                                                     "keywords", "hours_since_last") if c.get(x)} for k, c in ids.items()}}
     q = {"act": {"type": "choice", "criteria": ACT_CRITERIA,
                  "instructions": "What does the new message do, given the previous exchange?" + NOTE},
-         "level": {"type": "choice", "criteria": LEVELS,
-                   "instructions": "What must the assistant see, beyond the new message, to answer it well?" + NOTE},
+         "plan": {"type": "choice", "criteria": PLANS,
+                  "instructions": "What must the assistant see, beyond the new message, to answer it well?" + NOTE},
+         "extensive": {"type": "noul", "instructions": (
+             "Does answering need an extensive search: several sources, a long history, several rounds of looking "
+             "things up?" + NOTE)},
          "domain": {"type": "choice", "criteria": DOMAIN_CRITERIA,
                     "instructions": "Which kind of stored knowledge about the owner matters most here?" + NOTE},
          "horizon": {"type": "choice", "criteria": HORIZON_CRITERIA,
@@ -198,8 +209,10 @@ def run(req: Request, *, escalate: bool = True, purpose: str = "walter-context p
         thread = ThreadChoice(id=None, new=True, confidence=conf("thread"))
     else:
         thread = _default_thread(req)
-    level, escalated = pick("level") if pick("level") in LEVELS else "L1", False
-    if escalate and (conf("level") or 0) < ESCALATE_BELOW:
+    level, escalated = PLAN_LEVEL.get(pick("plan"), "L1"), False
+    if ((a.get("extensive") or {}).get("noul") or 0) >= 0.5 and level in ("L2", "L3"):
+        level = "L4"
+    if escalate and (conf("plan") or 0) < ESCALATE_BELOW:
         try:
             better = _escalate_level(state, purpose)
             if better:
@@ -218,7 +231,7 @@ def run(req: Request, *, escalate: bool = True, purpose: str = "walter-context p
         model_profile=ModelProfile(task=task, level=pick("model_level") if pick("model_level") in MODEL_LEVELS else "L1"),
         escalated=escalated,
         decision={"model": res.get("model"), "ms": round((time.perf_counter() - t0) * 1000),
-                  "confidence": {k: conf(k) for k in ("thread", "act", "level", "domain", "horizon", "task")
+                  "confidence": {k: conf(k) for k in ("thread", "act", "plan", "domain", "horizon", "task")
                                  if conf(k) is not None}})
     return plan.validate()
 
