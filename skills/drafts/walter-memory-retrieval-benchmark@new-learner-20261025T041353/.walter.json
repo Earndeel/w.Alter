@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-25T04:13:53.683962+00:00",
+ "description": "Use when comparing Walter Memory embeddings or rerankers and diagnosing why retrieved sources disappear before reaching the agent's final context.",
+ "domain": "memory",
+ "kind": "new",
+ "reason": "The session established a repeatable end-to-end memory benchmark across three embedding/reranker combinations on a frozen 185-excerpt, 24-question pilot. Both embedding systems retrieved all expected sources, but final selection retained 23/24 versus 22/24. Traces exposed an original-evidence quota and a reranker boundary that explained the losses; prepared document vectors also limited latency interpretation. These memory-specific evaluation procedures are distinct from the listed Hermes payload-validation skills. [session codex/Codex Desktop/01a16cd2-9e70-7130-9c21-16bb40e0844b]",
+ "runtime": "learner",
+ "session_id": "codex/Codex Desktop/01a16cd2-9e70-7130-9c21-16bb40e0844b",
+ "target": "walter-memory-retrieval-benchmark"
+}
