@@ -88,7 +88,7 @@ def fast_path(req: Request) -> ContextPlan | None:
     waiting = prev.thread_id if prev else None
     words = _words(text)
     if prev and waiting and prev.age_s is not None and prev.age_s <= REPLY_WINDOW_S and (
-            len(words) <= 3 or (SHORT.match(text) and len(words) <= 12)):
+            len(words) <= 3 or (SHORT.match(text) and len(words) <= 5)):
         return ContextPlan(turn_id=req.turn_id, thread=ThreadChoice(id=waiting), level="L1",
                            act="approve" if APPROVE.match(text) else "continue", fast_path="short_reply")
     if TRIVIAL.match(text):
