@@ -1,0 +1,5 @@
+#!/bin/sh
+# walter-context preflight: JSON request on stdin -> ContextPlan (--shadow: recorded in the instance, nothing printed).
+# Separate entry point until the shared CLI (bin/walter-context) gains a `preflight` subcommand.
+root="$(dirname "$(readlink -f "$0")")/.."
+cd "$root" && PYTHONPATH="$root" exec walter-python -m walter_context.preflight "$@"

@@ -249,6 +249,57 @@ class Threader:
         return self
 
 
+class PreflightDecider:
+    """The production preflight (walter_context.preflight) behind the bench's decider interface: same thread cards,
+    same channel, so its thread, act and level are scored against the reference like the lot 1 decider."""
+
+    LEVEL_TO_PLAN = {"L0": "none", "L1": "last_exchange", "L2": "thread", "L3": "thread_and_memory",
+                     "L4": "thread_and_memory"}
+
+    def __init__(self, purpose: str):
+        from walter_context import preflight
+        self.pf, self.purpose = preflight, purpose
+        self.calls, self.models, self.errors, self.fast = 0, Counter(), 0, Counter()
+        self.latency: list[float] = []
+        self.answers: dict[int, dict] = {}
+        self.escalate = None
+        self.levels, self.escalated = Counter(), 0
+
+    def __call__(self, t: "Threader", i: int, cands: list[Thread], waiting: int | None) -> int | None:
+        u = t.units[i]
+        prev = t.units[i - 1] if i else None
+        req = self.pf.Request(
+            turn_id=f"u{i}", message=u.user,
+            previous=self.pf.Exchange(message=prev.user, answer=prev.reply, age_s=(u.ts - prev.ts).total_seconds(),
+                                      thread_id=f"t{waiting}" if waiting is not None else None) if prev else None,
+            candidates=[{"id": f"t{th.id}", **Decider.card(None, t, th)} for th in cands])
+        plan = self.pf.run(req, purpose=self.purpose)
+        d = plan.decision
+        if plan.fast_path:
+            self.fast[plan.fast_path] += 1
+        elif "error" in d:
+            self.errors += 1
+        else:
+            self.calls += 1
+            self.models[d.get("model")] += 1
+            self.latency.append((d.get("ms") or 0) / 1000)
+        self.levels[plan.level] += 1
+        self.escalated += plan.escalated
+        self.answers[i] = {"thread": plan.thread.id or "new", "thread_confidence": plan.thread.confidence,
+                           "act": plan.act, "plan": self.LEVEL_TO_PLAN[plan.level], "plan_raw": self.LEVEL_TO_PLAN[plan.level],
+                           "level": plan.level, "domains": plan.domains, "horizons": plan.horizons,
+                           "capabilities": plan.capabilities, "task": plan.model_profile.task}
+        tid = plan.thread.id
+        return int(tid[1:]) if tid and tid[1:].isdigit() and any(th.id == int(tid[1:]) for th in cands) else None
+
+    def score(self, items):
+        out = Decider.score(self, items)
+        out.update({"context_levels": dict(self.levels), "escalated": self.escalated, "fast_paths": dict(self.fast),
+                    "domains": dict(Counter(d for a in self.answers.values() for d in a["domains"])),
+                    "capabilities": dict(Counter(c for a in self.answers.values() for c in a["capabilities"]))})
+        return out
+
+
 def _json(text: str) -> dict:
     m = re.search(r"\{.*\}", text or "", re.S)
     try:
@@ -632,6 +683,7 @@ def main(argv=None) -> int:
     ap.add_argument("--decide", action="store_true",
                     help="intent understanding by the decision model (cloud call per exchange, cloud_allowed only)")
     ap.add_argument("--model", help="decision model offer key (default: Walter Router's decision chain)")
+    ap.add_argument("--preflight", action="store_true", help="score the production preflight (walter_context.preflight)")
     ap.add_argument("--cards", action="store_true", help="solution 3: real thread cards (Router poste memory_extraction)")
     ap.add_argument("--escalate", type=float, help="solution 4: below this thread confidence, Router poste general decides")
     ap.add_argument("--escalate-plan-only", action="store_true", help="the escalation settles the plan only")
@@ -673,7 +725,9 @@ def main(argv=None) -> int:
             t = Threader(corpus, mode, theta=th, tau_h=a.tau_hours, shortlist=a.shortlist, w_sim=w[0], w_ent=w[1],
                          w_rec=w[2], w_sess=w[3], sleep_days=a.sleep_days)
             purpose = f"walter-context intent bench ({mode})"
-            if a.decide:
+            if a.preflight:
+                t.decider = PreflightDecider(purpose)
+            elif a.decide:
                 t.decider = Decider(purpose, a.model)
                 if a.escalate:
                     t.decider.escalate = Escalator(purpose, a.escalate)
@@ -681,7 +735,8 @@ def main(argv=None) -> int:
             if a.cards:
                 t.cards = CardWriter(purpose)
             t.run()
-            row = {"theta": th, **evaluate(t, gold), **({"intent": t.decider.score(items)} if a.decide else {})}
+            row = {"theta": th, **evaluate(t, gold),
+                   **({"intent": t.decider.score(items)} if (a.decide or a.preflight) else {})}
             if a.cards:
                 row["cards"] = {"calls": t.cards.calls, "errors": t.cards.errors}
             if a.nightly:

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/context/thread-hint.v1.json",
+  "title": "ThreadHint v1",
+  "description": "walter-context -> Walter Memory (bus turn.ended); Memory decides.",
+  "type": "object",
+  "required": [
+    "version",
+    "session_id",
+    "turn_id",
+    "thread_id",
+    "new"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "turn_id": {
+      "type": "string"
+    },
+    "thread_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "new": {
+      "type": "boolean"
+    },
+    "confidence": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}
