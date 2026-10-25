@@ -129,3 +129,12 @@ def test_stored_rows_give_back_the_same_key(conn, tmp_path, monkeypatch):
     todo, dups = L.session_keys(conn, SESSION)
     assert dict((seq, k) for k, seq in todo) == stored
     assert dups == [(100, 1)]
+    for k, seq in todo:          # what `walter_logs.py keys` does
+        conn.execute("update walter_logs.events set event_key = %s where session_id = %s and seq = %s", (k, SESSION, seq))
+    # cleanup (quarantine, Monsieur 2026-10-25): the copy leaves the journal, reversible from walter_logs.duplicates
+    assert L.quarantine_copies(conn, SESSION) == (1, 1)
+    assert 100 not in {e["seq"] for e in events(conn)}
+    q = conn.execute("select seq, duplicate_of, event_key from walter_logs.duplicates where session_id = %s",
+                     (SESSION,)).fetchall()
+    assert [(r["seq"], r["duplicate_of"], r["event_key"]) for r in q] == [(100, 1, stored[1])]
+    assert L.quarantine_copies(conn, SESSION) == (0, 0)
