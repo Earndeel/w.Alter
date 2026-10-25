@@ -53,3 +53,18 @@ def test_secrets_stay_local_and_switches_hold(hook, monkeypatch):
     monkeypatch.setenv("WALTER_HOOK_PREFLIGHT", "off")
     mod.preflight_shadow("une question normale pour la suite", "claude_code", "abc", None)
     assert len(sent) == n
+
+
+def test_turn_end_updates_subject_views_detached(hook, monkeypatch):
+    mod, sent = hook
+    started = []
+    monkeypatch.setattr(mod.subprocess, "Popen", lambda cmd, **kw: started.append((cmd, kw)))
+    import walter_memory.bus as real_bus
+    monkeypatch.setattr(real_bus, "emit", lambda *a, **k: None)          # nothing reaches the real bus
+    mod.emit("turn.ended", "claude_code", "claude_code/vm/x")
+    assert "walter-memory views run" in started[0][0][2] and started[0][1]["start_new_session"]
+    mod.emit("session.ended", "claude_code", "claude_code/vm/x")
+    mod.emit("turn.ended", "dsh", "dsh/vm/x")
+    monkeypatch.setenv("WALTER_HOOK_VIEWS", "off")
+    mod.emit("turn.ended", "codex", "codex/x")
+    assert len(started) == 1

@@ -13,7 +13,8 @@ One script, several hosts (the wire format is Claude Code's, which Hermes' shell
                                    card lists that symptom, only on a real match); SessionStart also gets the domain map
                PreCompact        → journal the transcript synchronously, so the recovery pointer is true
                Stop / SessionEnd → journal the transcript in the background (connector agent_sessions)
-                                   + bus turn.ended / session.ended
+                                   + bus turn.ended / session.ended (+ Walter Memory subject views, detached;
+                                   WALTER_HOOK_VIEWS=off disables it)
   Hermes       pre_llm_call      → same memory context, answered as {"context": …}
                `walter_hook.py hermes-skills` (config.yaml hooks.pre_llm_call): ONLY the walter-skills shortlist —
                Hermes keeps its own memory and its own skill index (parallel mode, P10)
@@ -209,13 +210,24 @@ def journal(transcript: str | None, *, wait: bool, runtime_flag: str | None = No
             subprocess.Popen(args, stdin=null, stdout=null, stderr=null, start_new_session=True)
 
 
+VIEWS_DELAY_S = 30   # walter-logs-watch ingests the turn within seconds; the subject views read it from there
+
+
 def emit(type: str, source: str, subject: str | None, payload: dict | None = None) -> None:
-    """One event on the Walter bus (fail-open, ~10 ms)."""
+    """One event on the Walter bus (fail-open, ~10 ms). After a turn, Walter Memory's subject views are brought up
+    to date in a detached process (one runner at a time: an overlapping run steps aside)."""
     try:
         from walter_memory import bus
         bus.emit(type, source, subject, payload)
     except Exception as e:
         log(f"bus {type} failed {type(e).__name__}: {str(e)[:160]}")
+    if type == "turn.ended" and os.environ.get("WALTER_HOOK_VIEWS", "on") != "off" and source != "dsh":
+        try:
+            subprocess.Popen(["sh", "-c", f"sleep {VIEWS_DELAY_S}; exec walter-memory views run --limit 40"],
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True)
+        except OSError as e:
+            log(f"views run failed {type(e).__name__}: {str(e)[:160]}")
 
 
 SKILL_CONTENT_ACTIONS = {"created", "patched", "edited", "installed", "archived", "restored"}
