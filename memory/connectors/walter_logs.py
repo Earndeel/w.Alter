@@ -3,6 +3,8 @@
 
   sync   one incremental pass over every source (or --hermes/--claude/--codex/--dsh, or --file PATH)
   keys   backfill walter_logs.events.event_key (migration 015) for rows that have none; reports later copies
+  dedup  move later copies of an event (same event_key in the session) to walter_logs.duplicates (dry run
+         unless --apply; migration 016, decided by Monsieur 2026-10-25)
   watch  daemon (walter-logs-watch.service): inotify on the sources, sync the changed one within ~2 s, and a full
          catch-up sweep every SWEEP_S (a missed notification is caught there; ids make re-reads free). No timer.
          Hermes changes also start walter-memory-hermes.service (core.events), at most every CORE_EVENTS_S.
@@ -156,19 +158,37 @@ def backfill_keys(only: str | None = None) -> dict:
     return out
 
 
+def dedup(apply: bool = False, only: str | None = None) -> dict:
+    """Quarantine: every later copy of an event leaves walter_logs.events for walter_logs.duplicates (reversible)."""
+    from walter_memory.db import connect
+    out = {"sessions": 0, "copies": 0, "moved": 0, "apply": apply}
+    with connect() as conn:
+        sids = [r["session_id"] for r in conn.execute(
+            """select distinct session_id from walter_logs.events where event_key is null
+               and (%s::text is null or session_id = %s) order by 1""", (only, only)).fetchall()]
+    for sid in sids:
+        with connection() as conn:
+            copies, moved = logs.quarantine_copies(conn, sid, apply=apply)
+        out["sessions"] += bool(copies); out["copies"] += copies; out["moved"] += moved
+        if moved >= 100:
+            print(f"  {sid}: {moved} copies quarantined", flush=True)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("action", choices=["sync", "watch", "keys"])
+    ap.add_argument("action", choices=["sync", "watch", "keys", "dedup"])
     for rt in ("hermes", "claude", "codex", "dsh"):
         ap.add_argument(f"--{rt}", action="store_true")
     ap.add_argument("--file")
-    ap.add_argument("--session", help="keys: only this session")
+    ap.add_argument("--session", help="keys/dedup: only this session")
+    ap.add_argument("--apply", action="store_true", help="dedup: move the copies (default: count them)")
     a = ap.parse_args()
     if a.action == "watch":
         return watch_main()
-    if a.action == "keys":
+    if a.action in ("keys", "dedup"):
         with _locked():
-            print(backfill_keys(a.session))
+            print(backfill_keys(a.session) if a.action == "keys" else dedup(a.apply, a.session))
         return 0
     with _locked():
         if a.file:
