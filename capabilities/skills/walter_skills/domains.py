@@ -1,39 +1,95 @@
-"""Tier 0 — the domain map: one stable line per domain of the library, so the agent always knows what exists even when
-the per-message cards do not show it. Deterministic (no LLM), rebuilt nightly, shown once per session (cache-friendly).
+"""Curator-published discovery index. Overview → domain entries → explicit skill read.
+
+Only metadata is exposed here; procedure bodies and supporting files stay behind skill_read.
+The local snapshot is derived, atomically replaced, and usable without Postgres.
 """
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+import json
+import os
+import tempfile
+from collections import defaultdict
+from pathlib import Path
 
 from . import registry, store
 
-HEADER = ("Bibliothèque de skills W.Alter (procédures testées sur cette VM) — domaines et skills les plus utilisés. "
-          "Cherche avec {search} si la tâche relève d'un domaine sans fiche proposée :")
+
+def _snapshot(root: Path | None = None) -> Path:
+    return (root or store.ROOT) / '.cache' / 'library-index.json'
 
 
 def build(top: int = 5) -> list[dict]:
-    usage = Counter()
-    with registry.db() as c:
-        for r in c.execute("""select name, count(*) n from skills.reads where at > now() - interval '90 days'
-                              group by 1"""):
-            usage[r["name"]] += r["n"]
-    prior = {}
-    row = registry.ranker()
-    if row:
-        from .ranker import Ranker
-        prior = Ranker.loads(bytes(row["blob"])).prior
-    groups: dict[str, list[str]] = defaultdict(list)
+    """Publish active entries after curation; `top` is retained for old callers."""
+    cards = registry.cards()
+    groups = defaultdict(list)
     for s in store.iter_skills():
-        groups[(s.domain or "misc").split("/")[0]].append(s.name)
+        fm = store.frontmatter(s.body[:8000])
+        card = cards.get(s.name, {})
+        kind = s.meta.get('kind') or fm.get('type') or card.get('kind') or 'procedure'
+        requires = s.meta.get('requires') or []
+        groups[s.domain or 'uncategorized'].append({
+            'name': s.name, 'kind': kind,
+            'purpose': ' '.join((s.description or card.get('summary') or s.name).split())[:240],
+            'requires': list(requires) if isinstance(requires, list) else [],
+        })
     out = []
-    for d, names in sorted(groups.items(), key=lambda x: -len(x[1])):
-        names.sort(key=lambda n: -(usage[n] * 10 + prior.get(n, 0)))
-        out.append({"domain": d, "count": len(names), "top": names[:top]})
-    registry.set_state("domain_map", out)
+    for domain, entries in sorted(groups.items()):
+        entries.sort(key=lambda e: (e['kind'] != 'workflow', e['name']))
+        out.append({'domain': domain, 'count': len(entries),
+                    'workflows': sum(e['kind'] == 'workflow' for e in entries), 'entries': entries})
+    # Build the whole document before publishing. Readers never observe half an index.
+    path = _snapshot()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix='library-index-', suffix='.tmp', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump(out, f, ensure_ascii=False, sort_keys=True)
+            f.write('\n')
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    registry.set_state('domain_map', out)
     return out
 
 
+def _load(root: Path | None = None) -> list[dict]:
+    # Use the published local snapshot on the runtime path: no DB/LLM/embedding work per message.
+    try:
+        return json.loads(_snapshot(root).read_text())
+    except (OSError, ValueError):
+        if root is not None:
+            raise RuntimeError('Discovery index unavailable; use search/read.')
+        m = registry.get_state('domain_map')
+        return m if m and all('entries' in d for d in m) else build()
+
+
+def index(domain: str = '', offset: int = 0, limit: int = 20, *, root: Path | None = None) -> dict:
+    """Empty domain lists domains; a selected domain returns a bounded page, workflows first."""
+    m = _load(root)
+    if not domain:
+        return {'domains': [{k: d[k] for k in ('domain', 'count', 'workflows')} for d in m],
+                'total': sum(d['count'] for d in m)}
+    entries = [e | {'domain': d['domain']} for d in m
+               if d['domain'] == domain or d['domain'].startswith(domain + '/') for e in d['entries']]
+    entries.sort(key=lambda e: (e['kind'] != 'workflow', e['name']))
+    offset, limit = max(0, offset), max(1, min(limit, 20))
+    end = offset + limit
+    return {'domain': domain, 'entries': entries[offset:end], 'total': len(entries),
+            'offset': offset, 'next_offset': end if end < len(entries) else None}
+
+
+def manifest(root: Path | None = None) -> str:
+    return ((root or Path(__file__).resolve().parent.parent) / 'MANIFEST.md').read_text()
+
+
 def render(search_tool: str) -> str:
-    m = registry.get_state("domain_map") or build()
-    lines = [f"- {x['domain']} ({x['count']}) : {', '.join(x['top'])}" for x in m]
-    return HEADER.format(search=search_tool) + "\n" + "\n".join(lines)
+    hermes = search_tool.startswith('walter_')
+    index_tool = 'walter_skills_index' if hermes else 'skills_index'
+    manifest_tool = 'walter_skills_manifest' if hermes else 'skills_manifest'
+    data = index()
+    header = ("W.Alter Skills — bibliothèque de procédures et workflows, partagée entre les agents.\n"
+              f"{manifest_tool} explique le module ; {index_tool}(domain=…) indique à quoi sert chaque entrée. "
+              f"{search_tool}(query=…) cherche par intention. Lis ensuite le skill choisi et seulement ses références utiles.\n"
+              "Index compact des domaines (total / workflows) :\n")
+    return header + '\n'.join(f"- {d['domain']} : {d['count']} / {d['workflows']}" for d in data['domains'])

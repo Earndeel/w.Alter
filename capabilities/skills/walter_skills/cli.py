@@ -31,6 +31,11 @@ def main() -> int:
     n.add_argument("--only", default="")
     for c in ("sync", "cards", "catalog", "implicit", "judge", "sessions", "map", "digest", "health", "quick"):
         sub.add_parser(c)
+    sub.add_parser("manifest")
+    ix = sub.add_parser("index")
+    ix.add_argument("--domain", default="")
+    ix.add_argument("--offset", type=int, default=0)
+    ix.add_argument("--limit", type=int, default=20)
     t = sub.add_parser("train")
     t.add_argument("--force", action="store_true")
     cu = sub.add_parser("curate")
@@ -83,6 +88,12 @@ def main() -> int:
         from . import domains
         domains.build()
         print(domains.render("skills_search"))
+    elif a.cmd == "manifest":
+        from . import domains
+        print(domains.manifest())
+    elif a.cmd == "index":
+        from . import domains
+        p(domains.index(a.domain, a.offset, a.limit))
     elif a.cmd == "digest":
         from . import curation
         text = curation.digest()

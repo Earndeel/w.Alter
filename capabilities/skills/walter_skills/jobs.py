@@ -21,7 +21,9 @@ def catalog() -> int:
                      "summary": (have.get(s.name) or {}).get("summary"), "path": str(s.path),
                      "content_sha": store.tree_hash(s.path), "card_sha": (have.get(s.name) or {}).get("sha"),
                      "meta": json.dumps(s.meta, default=str)})
-    return registry.refresh_catalog(rows)
+    n = registry.refresh_catalog(rows)
+    domains.build()  # events/quick reconciliation also publish new and patched descriptions
+    return n
 
 
 def curation_always_active() -> dict:

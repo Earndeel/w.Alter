@@ -29,6 +29,9 @@ class FakeEngine:
 
 @pytest.fixture
 def env(monkeypatch):
+    real_get = policy.config.get
+    monkeypatch.setattr(policy.config, 'get', lambda section: real_get(section) |
+                        ({'discovery': 'shortlist'} if section == 'policy' else {}))
     state = {"shown": set(), "n_prev": 0, "session": {}, "journal": []}
     monkeypatch.setattr(policy.registry, "recently_shown", lambda sid, n: (state["shown"], state["n_prev"]))
     monkeypatch.setattr(policy.registry, "journal_retrieval", lambda *a, **k: state["journal"].append(a))
@@ -87,3 +90,18 @@ def test_errors_need_a_marker_and_a_specific_symptom_match(env, monkeypatch):
     assert policy.expose("error", "all good, 3 files copied").shown == []
     e = policy.expose("error", "Error: Beeper API returns 404 when using /v0/messages")
     assert e.shown == ["beeper-messages"]
+
+
+def test_on_demand_mode_has_no_per_message_shortlist_or_ranker(env, monkeypatch):
+    original = policy.config.get
+    monkeypatch.setattr(policy.config, 'get', lambda section: original(section) |
+                        ({'discovery': 'on_demand'} if section == 'policy' else {}))
+    def no_engine():
+        raise AssertionError('Index navigation must not warm the ranker')
+    monkeypatch.setattr(policy, 'engine', no_engine)
+    first = policy.expose('message', 'génère une vidéo publicitaire avec référence', first_turn=True)
+    assert first.text == 'MAP(skills_search)' and first.shown == []
+    later = policy.expose('message', 'lis mes derniers messages beeper', session_id='new-topic')
+    assert later.text == '' and later.shown == []
+    start = policy.expose('session_start', '')
+    assert start.text == 'MAP(skills_search)'

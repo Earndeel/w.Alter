@@ -4,6 +4,21 @@ W.Alter's procedural memory: skills and workflows, owned by Walter, independent 
 Code, Codex and DSH are adapters. Plan: `/root/.hermes/docs/walter-memory/PLAN.md` (P10). Decisions and measurements:
 `DECISIONS.md` (2026-10-09/10). Operations: `RUNBOOK.md` § walter-skills.
 
+## Manifest and discovery index
+
+`MANIFEST.md` explains purpose, components and progressive loading. `contracts/skills.json` is the machine-readable
+technical contract. The Curator maintains descriptions/domains/workflows and publishes the active discovery index;
+event reconciliation and the nightly graph refresh it too. The projection contains names, kinds, purposes and workflow
+components, never procedure bodies. It is atomically published in `.cache/library-index.json` and registry state.
+
+Default `policy.discovery = "on_demand"`: show the compact domain overview at session start, browse a selected domain
+with `skills_index`, or search by intent; then read only the selected procedure and supporting files. `skills_manifest`
+explains the module. Hermes uses `walter_skills_index` / `walter_skills_manifest`. CLI: `walter-skills manifest` and
+`walter-skills index --domain <domain> [--offset N --limit N]`. HTTP: `/v1/manifest`, `/v1/index`.
+
+`shortlist` keeps the former per-message ranking policy for comparisons/rollback. Search ranking and error assistance
+remain available. Existing MCP sessions need their tool schemas refreshed to see the two new operations.
+
 ## Shape: one core, thin ports, one loop
 
 ```
@@ -45,8 +60,8 @@ by the hourly reconciliation (`jobs.quick`, run by the consumer when idle). Fail
 
 | Tier | When | What |
 |---|---|---|
-| 0 | session start (Claude Code / DSH `SessionStart`, Hermes first turn) | the domain map, stable → provider-cached |
-| 1 | each user message | cards new for this session: 15, or 8 when the ranker is calibrated-confident; a workflow first, replacing its sub-skills; nothing on follow-ups and machine prompts |
+| 0 | session start (Claude Code / DSH `SessionStart`, Hermes first turn) | compact purpose + domain index + navigation tools |
+| 1 | on demand | selected domain: workflow/skill purposes and dependencies, up to 20 entries per page; no per-message shortlist in `on_demand` mode |
 | 1e | after a FAILED command (Claude Code `PostToolUseFailure` or stderr, DSH `[exit code: N]`) | at most 2 skills whose card *symptoms* match the specific words of the error |
 | 2 | the agent's initiative | `skills_search` / `skill_read` (Hermes: `walter_skill_search` / `walter_skill_read`) |
 

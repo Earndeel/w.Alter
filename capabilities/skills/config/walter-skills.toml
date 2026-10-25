@@ -12,6 +12,7 @@ learner = "hgb"                                         # fusion trained on judg
 cache_dir = "/opt/walter-skills/.cache/embeddings"
 
 [policy]
+discovery = "on_demand"   # session overview → index/search on demand → selected procedure; shortlist = legacy
 # What the agent sees. The agent's own model always decides what to open; the policy only chooses what to show.
 k_max = 15                 # bench: 15 cards = best first pick by the agent (Claude 86 %, luna 78 %)
 k_confident = 8            # when the ranker is confident, fewer cards: same recall (held-out 2026-10-10: 95.6 % @8 = @15)
