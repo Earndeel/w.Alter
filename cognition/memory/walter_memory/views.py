@@ -81,7 +81,7 @@ def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict
           and s.runtime in ('claude_code', 'codex', 'hermes', 'dsh')
           and e.type in ('user/message', 'assistant/message')
         order by e.session_id, e.seq""", (since, until or _now() + timedelta(days=1))).fetchall()
-    out, cur = [], {}
+    out, cur, seen, replayed = [], {}, set(), set()
     for r in rows:
         sid = r["session_id"]
         if (r["model"] == "codex-auto-review" or r["session_privacy"] == "local_only"
@@ -92,6 +92,14 @@ def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict
             continue
         text = r["text"] or ""
         if r["type"] == "user/message":
+            # walter_logs can hold a transcript ingested twice (offsets changed when it was rewritten, 22/10): the
+            # same message at the same instant is one exchange; its replayed answer must not overwrite a newer one
+            mark = (sid, r["occurred_at"], text)
+            if mark in seen:
+                replayed.add(sid)
+                continue
+            seen.add(mark)
+            replayed.discard(sid)
             if NOISE.match(text):
                 continue
             text = INJECTED.sub(" ", text).strip()
@@ -107,7 +115,7 @@ def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict
                   "message": text, "answer": ""}
             cur[sid] = ex
             out.append(ex)
-        elif sid in cur:
+        elif sid in cur and sid not in replayed:
             cur[sid]["answer"] = text
     out.sort(key=lambda x: x["at"])
     return out
