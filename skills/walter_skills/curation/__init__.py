@@ -46,6 +46,9 @@ def run(apply: bool | None = None, use_models: bool = True, only: set[str] | Non
             done[f"{op.name}:{r.get('status')}"].append(p | r)
     summary = {"mode": mode, "editor": "ok" if editor_ok else "unavailable",
                "proposed": {k: len(v) for k, v in proposed.items()}, "done": {k: len(v) for k, v in done.items()}}
+    if mode == "active":
+        from .. import domains
+        domains.build()  # publish final active metadata; shadow work never changes the live index
     _report(day, mode, root, proposed, done, summary)
     registry.ledger("curator" if mode == "active" else "curator.shadow", "run", None, None, summary)
     return {"summary": summary, "branch": None if mode == "active" else f"curator/{day}"}

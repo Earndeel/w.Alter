@@ -4,6 +4,8 @@ POST /v1/expose            {kind: message|error|session_start, message, context,
 POST /v1/search            {query|message, context, k, include_archived, runtime, session_id}    (tier 2)
 GET  /v1/skill/{name}      ?file_path=&runtime=&session_id=                                      (tier 2)
 GET  /v1/map               ?runtime=                                                             (tier 0)
+GET  /v1/manifest          module purpose and structure
+GET  /v1/index             ?domain=&offset=&limit= (metadata only, bounded pages)
 POST /v1/skills/propose    POST /v1/skills/patch                                                 (write door)
 GET  /health
 A background thread hot-swaps the engine when the active ranker or the store (git HEAD) changes.
@@ -91,6 +93,16 @@ def skill(name: str, file_path: str | None = None, runtime: str | None = None, s
 @app.get("/v1/map", response_class=PlainTextResponse)
 def domain_map(runtime: str = "agent") -> str:
     return domains.render(policy._tools(runtime)[1])
+
+
+@app.get("/v1/manifest", response_class=PlainTextResponse)
+def module_manifest() -> str:
+    return domains.manifest()
+
+
+@app.get("/v1/index")
+def library_index(domain: str = "", offset: int = 0, limit: int = 20) -> dict:
+    return domains.index(domain, offset, limit)
 
 
 def _door(fn, **kw) -> dict:

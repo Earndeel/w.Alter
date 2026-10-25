@@ -1,10 +1,10 @@
 """The exposure policy — the ONLY place that decides what an agent sees. Adapters (hooks, plugins) hold no rules.
 
 The agent's own model always decides what to open; the policy only chooses what to show, in three tiers:
-  tier 0  session start: the domain map (stable → provider-cached)
-  tier 1  each message: the cards that are new for this session, 8 when the ranker is confident, up to 15 otherwise;
-          a matching workflow is shown first and replaces the sub-skills it orchestrates
-  tier 2  on demand: search / read tools (the agent's initiative)
+  tier 0  session start: compact purpose + domain overview + navigation tools
+  tier 1  on demand: domain index entries (purposes and workflow components), no per-message shortlist by default
+  tier 2  on demand: intent search / selected procedure and references (the agent's initiative)
+Legacy discovery=shortlist retains adaptive cards for comparison/rollback.
 After a failed command: only skills whose card lists that symptom (lexical evidence, not a guess).
 Every exposure is journaled (skills.retrievals) — the learning loop reads it back as implicit feedback.
 """
@@ -80,10 +80,16 @@ def expose(kind: str, message: str, *, context: str = "", session_id: str | None
         if p["domain_map"]:
             out.text, out.mode = _safe(lambda: domains.render(search_tool), ""), "map"
             out.shown = []
-        return _done(out, t0, runtime, session_id, msg)
+        return _done(out, t0, runtime, session_id, msg, journal=False)
 
     if not msg or any(m in msg[:400] for m in MACHINE):
         out.reason = "machine prompt"
+        return _done(out, t0, runtime, session_id, msg, journal=False)
+
+    if kind == "message" and p.get("discovery", "shortlist") == "on_demand":
+        out.reason = "on-demand discovery"
+        if first_turn and p["domain_map"]:
+            out.text, out.mode = _safe(lambda: domains.render(search_tool), ""), "map"
         return _done(out, t0, runtime, session_id, msg, journal=False)
 
     e = engine()

@@ -57,6 +57,24 @@ def read(name: str, file_path: str = "", runtime: str = "agent", session_id: str
         return _local_read(name, file_path)
 
 
+def manifest() -> str:
+    try:
+        return _call("GET", "/v1/manifest", timeout=10)
+    except Exception:
+        try:
+            return (STORE / "MANIFEST.md").read_text()
+        except OSError:
+            return "Module manifest unavailable; search/read remain available."
+
+
+def index(domain: str = "", offset: int = 0, limit: int = 20) -> dict:
+    q = urllib.parse.urlencode({"domain": domain, "offset": offset, "limit": limit})
+    try:
+        return _call("GET", f"/v1/index?{q}", timeout=10)
+    except Exception:
+        return {"unavailable": True, "hint": "Use skills_search(query=…) and skill_read(name)."}
+
+
 def write(kind: str, body: dict) -> dict:
     try:
         return _call("POST", f"/v1/skills/{kind}", body, timeout=30)

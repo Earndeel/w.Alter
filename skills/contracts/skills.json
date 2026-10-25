@@ -3,7 +3,8 @@
   "anchors": [
     "config/walter-skills.toml",
     "contracts/skills.json",
-    "walter_skills/api.py"
+    "walter_skills/api.py",
+    "MANIFEST.md"
   ],
   "requires": [
     "bus"
@@ -18,7 +19,8 @@
   ],
   "core_paths": [
     "walter_skills/client.py",
-    "walter_skills/policy.py"
+    "walter_skills/policy.py",
+    "walter_skills/domains.py"
   ],
   "backup_paths": [
     "."
@@ -45,7 +47,7 @@
   ],
   "contract": {
     "schema_version": 1,
-    "version": "1.0.0",
+    "version": "1.1.0",
     "owner": "skills",
     "kind": "capability",
     "purpose": "Gérer le contenu, la recherche, les propositions et la curation des procédures.",
@@ -60,7 +62,8 @@
     "invariants": [
       "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
       "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
-      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+      "Les données privées et secrets ne sont pas exposés par les diagnostics.",
+      "La découverte charge le manifeste et l'index par niveau ; les procédures complètes sont lues à la demande."
     ],
     "errors": [
       "invalid_request",
@@ -88,6 +91,14 @@
         "interface": "skill_propose/skill_patch",
         "access": "write",
         "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "discovery",
+        "transport": "mcp",
+        "interface": "skills_manifest/skills_index",
+        "access": "read",
+        "timeout_seconds": 10,
         "timeout_status": "target"
       }
     ],
@@ -145,6 +156,11 @@
         "id": "restore",
         "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
         "scope": "recovery"
+      },
+      {
+        "id": "progressive-discovery",
+        "assertion": "Le repère de session ne contient aucun corps de procédure ; un domaine expose les usages et workflows ; une publication active du Curator met à jour l'index sans injecter de candidats à chaque message.",
+        "scope": "integration"
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
