@@ -100,3 +100,21 @@ def test_replies_versus_requests():
     for request in ("Ok Analyse completement l'etat de la VM et de walter",
                     "Est ce que l'architecture de walter peut etre considerer comme elegante ?"):
         assert not views._short(request), request
+
+
+def test_a_transcript_ingested_twice_counts_once():
+    class Conn:
+        def execute(self, *a):
+            return self
+
+        def fetchall(self):
+            base = dict(session_id="s", privacy_class="cloud_allowed", runtime="claude_code", platform="",
+                        model="", session_privacy="cloud_allowed")
+            return [{**base, "seq": 1, "type": "user/message", "occurred_at": T0, "text": "Première vraie demande sur le banc"},
+                    {**base, "seq": 2, "type": "assistant/message", "occurred_at": T0, "text": "réponse 1"},
+                    {**base, "seq": 3, "type": "user/message", "occurred_at": T0 + timedelta(minutes=9), "text": "Deuxième demande, plus récente"},
+                    {**base, "seq": 4, "type": "assistant/message", "occurred_at": T0 + timedelta(minutes=9), "text": "réponse 2"},
+                    {**base, "seq": 9, "type": "user/message", "occurred_at": T0, "text": "Première vraie demande sur le banc"},
+                    {**base, "seq": 10, "type": "assistant/message", "occurred_at": T0, "text": "réponse 1"}]
+    out = views.exchanges(Conn(), T0 - timedelta(days=1), T0 + timedelta(days=1))
+    assert [(e["seq"], e["answer"]) for e in out] == [(1, "réponse 1"), (3, "réponse 2")]
