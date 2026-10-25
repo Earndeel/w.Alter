@@ -145,6 +145,19 @@ from walter_skills import client as skills_client  # walter-skills adapter: tran
 
 
 @mcp.tool()
+def skills_manifest() -> str:
+    """Explain walter-skills: purpose, components, ownership, and progressive discovery. Read once when needed."""
+    return skills_client.manifest()
+
+
+@mcp.tool()
+def skills_index(domain: str = "", offset: int = 0, limit: int = 20) -> str:
+    """Browse the Curator-maintained index. Empty domain lists domains only; select a domain for workflow/skill
+    purposes and workflow dependencies, then skill_read the chosen entry. next_offset paginates; no procedure bodies."""
+    return json.dumps(skills_client.index(domain, offset, limit), ensure_ascii=False)
+
+
+@mcp.tool()
 def skills_search(query: str = "", limit: int = 8, context: str = "", include_archived: bool = False) -> str:
     """Find the W.Alter skills (tested procedures for Monsieur's tools, infra, projects and workflows) that match an
     intent. Pass the user's request as `query` (any language, plain words) and optionally the previous turn as
