@@ -40,6 +40,9 @@ def test_rules_settle_the_obvious_without_a_call(fake_llm):
     p = run(Request("t", "oui vas y", previous=prev()))
     assert p.fast_path == "short_reply" and p.thread.id == "th-1" and p.act == "approve" and p.level == "L1"
     assert fast_path(Request("t", "oui vas y", previous=prev(age=3 * 3600))) is None   # too old to be a reply
+    # an acknowledgement followed by a real request is not a reply
+    assert fast_path(Request("t", "Ok analyse complètement l'état de la VM et de walter", previous=prev())) is None
+    assert fast_path(Request("t", "Oui, lance le lot 0.", previous=prev())).fast_path == "short_reply"
     for q in ("combien font 17 % de 2 340 ?", "54% de 89", "quelle heure est-il ?", "12*7"):
         assert run(Request("t", q)).fast_path == "trivial", q
     assert not calls["decide"]
