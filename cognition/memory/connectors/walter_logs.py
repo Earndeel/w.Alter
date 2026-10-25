@@ -2,6 +2,7 @@
 """walter-logs connector: every agent runtime's session log → walter_logs.* (see walter_memory/logs.py).
 
   sync   one incremental pass over every source (or --hermes/--claude/--codex/--dsh, or --file PATH)
+  keys   backfill walter_logs.events.event_key (migration 015) for rows that have none; reports later copies
   watch  daemon (walter-logs-watch.service): inotify on the sources, sync the changed one within ~2 s, and a full
          catch-up sweep every SWEEP_S (a missed notification is caught there; ids make re-reads free). No timer.
          Hermes changes also start walter-memory-hermes.service (core.events), at most every CORE_EVENTS_S.
@@ -133,15 +134,42 @@ def watch_main() -> int:
                 return 0
 
 
+def backfill_keys(only: str | None = None) -> dict:
+    """event_key on every stored row that has none (the first copy of each event); later copies stay NULL."""
+    from walter_memory.db import connect
+    out = {"sessions": 0, "keyed": 0, "duplicates": 0}
+    with connect() as conn:
+        sids = [r["session_id"] for r in conn.execute(
+            """select distinct session_id from walter_logs.events where event_key is null
+               and (%s::text is null or session_id = %s) order by 1""", (only, only)).fetchall()]
+    for sid in sids:
+        with connection() as conn:
+            todo, dups = logs.session_keys(conn, sid)
+            with conn.cursor() as cur:
+                cur.executemany("""update walter_logs.events e set event_key = %s where session_id = %s and seq = %s
+                                   and not exists (select 1 from walter_logs.events k
+                                                   where k.session_id = e.session_id and k.event_key = %s)""",
+                                [(k, sid, seq, k) for k, seq in todo])
+        out["sessions"] += 1; out["keyed"] += len(todo); out["duplicates"] += len(dups)
+        if len(dups) >= 100:
+            print(f"  {sid}: {len(todo)} keyed, {len(dups)} later copies", flush=True)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("action", choices=["sync", "watch"])
+    ap.add_argument("action", choices=["sync", "watch", "keys"])
     for rt in ("hermes", "claude", "codex", "dsh"):
         ap.add_argument(f"--{rt}", action="store_true")
     ap.add_argument("--file")
+    ap.add_argument("--session", help="keys: only this session")
     a = ap.parse_args()
     if a.action == "watch":
         return watch_main()
+    if a.action == "keys":
+        with _locked():
+            print(backfill_keys(a.session))
+        return 0
     with _locked():
         if a.file:
             p = Path(a.file).resolve()

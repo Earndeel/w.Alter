@@ -4,7 +4,7 @@ What the agents DID, in order, whatever the runtime: user/message, assistant/rea
 tool/call (full arguments), tool/result (full output), model/selection, compaction/summary, system/message...
 (DeepSeek Harness session-log vocabulary). Readers (pure: one source row/line → events) for Hermes (every profile's
 state.db, read-only), Claude Code and Codex (JSONL transcripts) and DSH (zstd session logs); incremental per source,
-idempotent (session_id, source_ref). Triggered by file changes (connectors/walter_logs.py watch), not by a timer.
+idempotent on the event's identity (session_id, event_key: see event_key()), not on its position in the source. Triggered by file changes (connectors/walter_logs.py watch), not by a timer.
 
 Storage rules: secrets are masked BEFORE storage (mask()); each event gets a privacy class from the same policies as
 core.events (privacy.classify on detected categories; Hermes profile `wild` = local_only). Agents read through
@@ -13,6 +13,7 @@ never local_only.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -110,13 +111,43 @@ def _json(v) -> str:
 
 
 # ───────────────────────── writer ─────────────────────────
+def _plain(v):
+    """JSON as Postgres jsonb gives it back (integral floats come back as integers)."""
+    if isinstance(v, float) and v.is_integer():
+        return int(v)
+    if isinstance(v, dict):
+        return {k: _plain(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_plain(x) for x in v]
+    return v
+
+
+def event_key(type_: str, occurred_at: datetime, source_ref: str, call_id: str | None, tool: str | None,
+              text: str | None, data) -> str:
+    """Identity of an event inside its session, whatever its position in the source (2026-10-25).
+
+    Runtimes write the same event more than once: Claude Code re-appends transcript lines (same uuid) on resume,
+    Hermes re-persists history rows under new ids in state.db, a rewritten file shifts every byte offset. The
+    position (source_ref's head: row id m…, offset o…) is dropped; what stays is what the event is: type, instant,
+    the part inside the source item (content block, reasoning, call id: source_ref after the first ':'), call, tool,
+    stored (masked) text and data. Computable again from a stored row (backfill, cleanup)."""
+    sub = source_ref.split(":", 1)[1] if ":" in source_ref else ""
+    if isinstance(data, str):
+        data = json.loads(data)
+    ts = occurred_at.astimezone(timezone.utc).isoformat(timespec="microseconds")
+    payload = "\x1f".join([type_, ts, sub, call_id or "", tool or "", text or "",
+                           json.dumps(_plain(data or {}), sort_keys=True, ensure_ascii=False, separators=(",", ":"))])
+    return hashlib.sha256(payload.encode("utf-8", "surrogatepass")).hexdigest()[:32]
+
+
 class Writer:
-    """Buffers sessions and events for one transaction; assigns per-session seq; idempotent on source_ref."""
+    """Buffers sessions and events for one transaction; idempotent on event_key (an event the session already holds,
+    or that the batch already carries, is dropped before it gets a seq or counts as a turn)."""
 
     def __init__(self, conn):
         self.conn = conn
         self.sess: dict[str, dict] = {}
-        self.rows: list[tuple] = []
+        self.rows: list[dict] = []
         self.calls: dict[str, str] = {}
         self.dirty: set[str] = set()
         self.inserted = 0
@@ -144,30 +175,51 @@ class Writer:
             call_id: str | None = None, tool: str | None = None, model: str | None = None, status: str | None = None,
             data: dict | None = None, human: bool = False) -> None:
         s = self.sess[session_id]
-        if human:
-            s["turns"] += 1
-        s["seq"] += 1
         text = mask(text.replace("\x00", "")) if text else None
-        cls = classify(self.conn, s["runtime"], s["privacy"], text)
         occurred_at = occurred_at or s["last"] or datetime.now(timezone.utc)
         s["last"] = occurred_at
-        self.dirty.add(session_id)
         if type_ == "tool/call" and call_id and tool:
             self.calls[call_id] = tool
-        self.rows.append((session_id, s["seq"], type_, occurred_at, s["turns"] or None, call_id, tool, model, status,
-                          text, json.dumps(data or {}, default=str, ensure_ascii=False).replace("\\u0000", ""), len(text or ""), cls, source_ref))
+        data_json = json.dumps(data or {}, default=str, ensure_ascii=False).replace("\\u0000", "")
+        self.rows.append({"sid": session_id, "type": type_, "at": occurred_at, "call_id": call_id, "tool": tool,
+                          "model": model, "status": status, "text": text, "data": data_json, "ref": source_ref,
+                          "human": human,
+                          "key": event_key(type_, occurred_at, source_ref, call_id, tool, text, data_json)})
         if len(self.rows) >= 2000:
             self.flush()
 
+    def _known(self, rows: list[dict]) -> set[tuple[str, str]]:
+        if not rows:
+            return set()
+        found = self.conn.execute(
+            """select e.session_id, e.event_key from walter_logs.events e
+               join unnest(%s::text[], %s::text[]) k(session_id, event_key) using (session_id, event_key)""",
+            ([r["sid"] for r in rows], [r["key"] for r in rows])).fetchall()
+        return {(f["session_id"], f["event_key"]) for f in found}
+
     def flush(self) -> int:
-        if self.rows:
+        rows, self.rows = self.rows, []
+        known, out = self._known(rows), []
+        for r in rows:
+            k = (r["sid"], r["key"])
+            if k in known:           # already in the session (re-read, re-appended or re-persisted by the runtime)
+                continue
+            known.add(k)
+            s = self.sess[r["sid"]]
+            if r["human"]:
+                s["turns"] += 1
+            s["seq"] += 1
+            self.dirty.add(r["sid"])
+            out.append((r["sid"], s["seq"], r["type"], r["at"], s["turns"] or None, r["call_id"], r["tool"], r["model"],
+                        r["status"], r["text"], r["data"], len(r["text"] or ""),
+                        classify(self.conn, s["runtime"], s["privacy"], r["text"]), r["ref"], r["key"]))
+        if out:
             with self.conn.cursor() as cur:
                 cur.executemany("""insert into walter_logs.events (session_id, seq, type, occurred_at, turn, call_id, tool,
-                                       model, status, text, data, chars, privacy_class, source_ref)
-                                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s) on conflict do nothing""",
-                                self.rows)
+                                       model, status, text, data, chars, privacy_class, source_ref, event_key)
+                                   values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s) on conflict do nothing""",
+                                out)
                 self.inserted += max(cur.rowcount, 0)
-            self.rows = []
         for sid in self.dirty:
             s = self.sess[sid]
             self.conn.execute("""update walter_logs.sessions set last_seq = greatest(last_seq, %s), turns = greatest(turns, %s),
@@ -184,6 +236,26 @@ class Writer:
         row = self.conn.execute("""select tool from walter_logs.events where call_id = %s and type = 'tool/call'
                                    order by occurred_at desc limit 1""", (call_id,)).fetchone()
         return row["tool"] if row else None
+
+
+def session_keys(conn, session_id: str) -> tuple[list[tuple[str, int]], list[tuple[int, int]]]:
+    """Recompute event_key over a stored session (oldest copy first): (key, seq) to set on rows that have none, and
+    (seq, seq of the first copy) for every later copy of an event."""
+    first, todo, dups = {}, [], []
+    with conn.cursor(name=f"keys_{abs(hash(session_id))}") as cur:
+        cur.itersize = 500
+        cur.execute("""select seq, type, occurred_at, source_ref, call_id, tool, text, data, event_key
+                       from walter_logs.events where session_id = %s order by seq""", (session_id,))
+        for r in cur:
+            k = r["event_key"] or event_key(r["type"], r["occurred_at"], r["source_ref"], r["call_id"], r["tool"],
+                                            r["text"], r["data"])
+            if k in first:
+                dups.append((r["seq"], first[k]))
+                continue
+            first[k] = r["seq"]
+            if not r["event_key"]:
+                todo.append((k, r["seq"]))
+    return todo, dups
 
 
 # ───────────────────────── Hermes (state.db of every profile, read-only) ─────────────────────────
