@@ -6,6 +6,8 @@ One script, several hosts (the wire format is Claude Code's, which Hermes' shell
   Claude Code  SessionStart      → one line telling the agent its session is journaled (+ how to recover exact
                                    messages after a compaction: memory_events(thread_id=…))
                UserPromptSubmit  → budgeted W.Alter memory context for the prompt (cloud-safe, secrets dropped)
+                                   + walter-context preflight in SHADOW (detached, records a ContextPlan in the
+                                   instance, injects nothing; WALTER_HOOK_PREFLIGHT=off disables it)
                                    + the W.Alter skills that fit the message (walter-skills :8891, P10), in parallel
                PostToolUse(Failure)(Bash) → a FAILED command's output goes to the walter-skills policy (skills whose
                                    card lists that symptom, only on a real match); SessionStart also gets the domain map
@@ -130,6 +132,63 @@ def previous_turn(transcript: str | None) -> str:
     return f"{found.get('user', '')[-400:]}\n{found.get('assistant', '')[-400:]}".strip()
 
 
+def previous_exchange(transcript: str | None) -> dict | None:
+    """Last user and assistant texts of a Claude Code / dsh transcript with the age of that user message (seconds)."""
+    if not transcript:
+        return None
+    try:
+        with open(transcript, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 300_000))
+            lines = f.read().decode("utf-8", "replace").splitlines()[1:]
+    except OSError:
+        return None
+    found: dict[str, tuple[str, str]] = {}
+    for line in reversed(lines):
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        role = ev.get("type")
+        if role not in ("user", "assistant") or role in found:
+            continue
+        content = (ev.get("message") or {}).get("content")
+        text = content if isinstance(content, str) else " ".join(
+            b.get("text", "") for b in content or [] if isinstance(b, dict) and b.get("type") == "text")
+        if text.strip() and not text.lstrip().startswith("<"):
+            found[role] = (text.strip(), ev.get("timestamp") or "")
+        if len(found) == 2:
+            break
+    if "user" not in found:
+        return None
+    age = None
+    try:
+        age = (datetime.now(timezone.utc) - datetime.fromisoformat(found["user"][1].replace("Z", "+00:00"))).total_seconds()
+    except ValueError:
+        pass
+    return {"message": found["user"][0][-1500:], "answer": found.get("assistant", ("", ""))[0][-1500:], "age_s": age}
+
+
+def preflight_shadow(prompt: str, runtime: str, session_id: str, transcript: str | None) -> None:
+    """walter-context lot 4 in shadow: the preflight runs detached and records its ContextPlan in the instance;
+    nothing is injected and the prompt is not delayed. A message that looks like it holds a secret stays local."""
+    if os.environ.get("WALTER_HOOK_PREFLIGHT", "shadow") == "off" or machine_prompt(prompt) or runtime == "dsh":
+        return
+    secret = any(cat == "secret" for cat, _ in _privacy().detect(prompt))
+    prev = previous_exchange(transcript)
+    thread = f"session:{session_id}" if session_id else None
+    if prev:
+        prev["thread_id"] = thread
+    req = {"turn_id": f"{session_id}:{int(time.time() * 1000)}", "message": prompt[:6000], "previous": prev,
+           "runtime": runtime, "session_id": session_id, "default_thread": thread,
+           "candidates": [{"id": thread, "title": "this session"}] if thread else [],
+           "privacy_class": "local_only" if secret else "cloud_allowed"}
+    p = subprocess.Popen(["walter-context-preflight", "--shadow"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    p.stdin.write(json.dumps(req, ensure_ascii=False).encode())
+    p.stdin.close()
+
+
 def skills(kind: str, message: str, runtime: str, session_id: str, context: str = "", first_turn: bool = False) -> str:
     """walter-skills exposure (P10). The policy lives in the service; this adapter only transports (fail-open)."""
     if os.environ.get("WALTER_HOOK_SKILLS", "on") == "off":
@@ -207,6 +266,10 @@ def claude_code(ev: dict) -> dict | None:
         caller, prompt = f"{runtime.replace('_', '-')}-hook", OWN.sub(" ", ev.get("prompt") or "").strip()
         if not prompt:  # a dsh step whose only new messages are our own contexts or tool results
             return None
+        try:
+            preflight_shadow(prompt, runtime, sid, ev.get("transcript_path"))
+        except Exception as e:  # noqa: BLE001 — shadow mode never affects the prompt
+            log(f"preflight shadow error {type(e).__name__}: {str(e)[:160]}")
         with ThreadPoolExecutor(2) as ex:  # memory and skills in parallel; each fails open on its own
             fm = ex.submit(memory_context, prompt, caller, sid)
             fs = ex.submit(skills, "message", prompt, runtime, f"{runtime}/vm/{sid}" if sid else "",
