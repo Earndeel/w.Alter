@@ -115,7 +115,7 @@ def load(conn, since: datetime, until: datetime, runtimes: list[str], platforms:
         where e.occurred_at >= %s and e.occurred_at < %s and s.runtime = any(%s)
           and e.type in ('user/message', 'assistant/message', 'tool/call')
         order by e.session_id, e.seq""", (since, until, runtimes)).fetchall()
-    units, cur, skip = [], {}, set()
+    units, cur, skip, seen, replayed = [], {}, set(), set(), set()
     for r in rows:
         sid = r["session_id"]
         if sid in skip:
@@ -130,6 +130,12 @@ def load(conn, since: datetime, until: datetime, runtimes: list[str], platforms:
             continue
         text = r["text"] or ""
         if r["type"] == "user/message":
+            mark = (sid, r["occurred_at"], text)      # a transcript ingested twice into walter_logs (22/10)
+            if mark in seen:
+                replayed.add(sid)
+                continue
+            seen.add(mark)
+            replayed.discard(sid)
             if NOISE.match(text):
                 continue
             text = clean(text)
@@ -144,7 +150,7 @@ def load(conn, since: datetime, until: datetime, runtimes: list[str], platforms:
             u = Unit(r["occurred_at"], sid, r["runtime"], r["platform"], r["title"], text)
             cur[sid] = u
             units.append(u)
-        elif sid in cur:
+        elif sid in cur and sid not in replayed:
             u = cur[sid]
             if r["type"] == "assistant/message":
                 u.reply = text                              # the last visible answer of the turn
