@@ -108,6 +108,17 @@ def post_agent_memory(body: AgentMemoryIn):
         raise HTTPException(503, 'agent memory temporarily unavailable') from None
 
 
+@app.post("/v1/views/read", dependencies=[Depends(auth)])
+def post_views_read(body: dict):
+    """Memory Views (lot 3): the MemoryViewQuery v1 contract of walter-context (depth, key | domain, horizon,
+    max_tokens, max_age_s, privacy)."""
+    from . import views
+    res = views.read(body)
+    if "error" in res:
+        raise HTTPException(404 if res["error"].startswith("no view") else 422, res["error"])
+    return res
+
+
 @app.post("/v1/context", dependencies=[Depends(auth)])
 def post_context(body: ContextIn):
     import hashlib

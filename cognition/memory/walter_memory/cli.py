@@ -98,6 +98,13 @@ def main(argv=None) -> None:
     lg.add_argument("--max-chars", type=int, default=600); lg.add_argument("--limit", type=int, default=20)
     lg.add_argument("--cloud-safe", action="store_true", help="hide local_only, pseudonymise redacted_cloud")
     lg.add_argument("--json", action="store_true")
+    vw = sub.add_parser("views", help="Memory Views (lot 3): attach exchanges to subjects, read a view at a depth")
+    vw.add_argument("action", choices=["run", "read", "board", "stats"])
+    vw.add_argument("key", nargs="?", default="", help="read: a view key (subject:…)")
+    vw.add_argument("--since", help="run: ISO time to start from (else the cursor)"); vw.add_argument("--until")
+    vw.add_argument("--limit", type=int, default=500); vw.add_argument("--dry", action="store_true")
+    vw.add_argument("--depth", default="overview"); vw.add_argument("--domain"); vw.add_argument("--horizon")
+    vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
     a = p.parse_args(argv)
 
     if a.cmd == "agent-memory":
@@ -212,6 +219,27 @@ def main(argv=None) -> None:
             else:
                 res = logs.stats(conn)
         print(json.dumps(res, default=str, ensure_ascii=False, indent=1) if a.json else logs.render(a.action, res))
+    elif a.cmd == "views":
+        from . import views
+        from datetime import datetime as _dt
+        if a.action == "run":
+            res = views.run(since=_dt.fromisoformat(a.since) if a.since else None,
+                            until=_dt.fromisoformat(a.until) if a.until else None, limit=a.limit, dry=a.dry)
+        elif a.action == "read":
+            res = views.read({"depth": a.depth, "key": a.key or None, "domain": a.domain, "horizon": a.horizon,
+                              "max_tokens": a.max_tokens})
+        elif a.action == "board":
+            res = views.read({"depth": "index", "domain": a.domain or "projects", "horizon": a.horizon,
+                              "max_tokens": a.max_tokens})
+        else:
+            with connection() as conn:
+                res = {r["k"]: r["n"] for r in conn.execute(
+                    """select 'views' k, count(*) n from views.view union all select 'members', count(*) from views.member
+                       union all select 'versions', count(*) from views.version""").fetchall()}
+        if a.json or a.action in ("run", "stats") or "error" in res:
+            print(json.dumps(res, default=str, ensure_ascii=False, indent=1))
+        else:
+            print(res.get("content") or json.dumps(res, default=str, ensure_ascii=False, indent=1))
     elif a.cmd == "purge":
         _print(purge.purge(reason=a.reason, requested_by=a.by, event_ids=a.event, object_refs=a.object,
                            pattern=a.pattern, include_hindsight=a.hindsight, execute=a.execute,
