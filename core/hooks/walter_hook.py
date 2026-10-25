@@ -74,6 +74,7 @@ def _token() -> str:
 
 
 MACHINE_PROMPTS = ("<task-notification", "[SYSTEM NOTIFICATION", "Another Claude session sent a message",
+                   "<cross-session-message", "<side-sessions-event>", "<ci-monitor-event>",
                    "[Subagent hand-back]", "<system-reminder", "[ASYNC DELEGATION", "[CONTEXT COMPACTION",
                    "[System:", "[SYSTEM:")
 
@@ -137,13 +138,31 @@ def previous_exchange(transcript: str | None) -> dict | None:
     """Last user and assistant texts of a Claude Code / dsh transcript with the age of that user message (seconds)."""
     if not transcript:
         return None
-    try:
-        with open(transcript, "rb") as f:
-            f.seek(0, 2)
-            f.seek(max(0, f.tell() - 300_000))
-            lines = f.read().decode("utf-8", "replace").splitlines()[1:]
-    except OSError:
+    found: dict[str, tuple[str, str]] = {}
+    for tail in (300_000, 2_000_000, 8_000_000):   # tool outputs can fill the last few hundred kB of a session
+        try:
+            with open(transcript, "rb") as f:
+                f.seek(0, 2)
+                size = f.tell()
+                f.seek(max(0, size - tail))
+                lines = f.read().decode("utf-8", "replace").splitlines()[1:]
+        except OSError:
+            return None
+        found = _last_texts(lines)
+        if "user" in found or size <= tail:
+            break
+    if "user" not in found:
         return None
+    age = None
+    try:
+        age = (datetime.now(timezone.utc) - datetime.fromisoformat(found["user"][1].replace("Z", "+00:00"))).total_seconds()
+    except ValueError:
+        pass
+    return {"message": found["user"][0][-1500:], "answer": found.get("assistant", ("", ""))[0][-1500:], "age_s": age}
+
+
+def _last_texts(lines: list[str]) -> dict[str, tuple[str, str]]:
+    """The last owner text and the last assistant text of transcript lines (machine notices skipped)."""
     found: dict[str, tuple[str, str]] = {}
     for line in reversed(lines):
         try:
@@ -156,18 +175,11 @@ def previous_exchange(transcript: str | None) -> dict | None:
         content = (ev.get("message") or {}).get("content")
         text = content if isinstance(content, str) else " ".join(
             b.get("text", "") for b in content or [] if isinstance(b, dict) and b.get("type") == "text")
-        if text.strip() and not text.lstrip().startswith("<"):
+        if text.strip() and not text.lstrip().startswith("<") and not (role == "user" and machine_prompt(text)):
             found[role] = (text.strip(), ev.get("timestamp") or "")
         if len(found) == 2:
             break
-    if "user" not in found:
-        return None
-    age = None
-    try:
-        age = (datetime.now(timezone.utc) - datetime.fromisoformat(found["user"][1].replace("Z", "+00:00"))).total_seconds()
-    except ValueError:
-        pass
-    return {"message": found["user"][0][-1500:], "answer": found.get("assistant", ("", ""))[0][-1500:], "age_s": age}
+    return found
 
 
 def preflight_shadow(prompt: str, runtime: str, session_id: str, transcript: str | None) -> None:
