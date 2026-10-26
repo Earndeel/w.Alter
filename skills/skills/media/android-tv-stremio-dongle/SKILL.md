@@ -102,7 +102,7 @@ All options of `stremio.py`:
 | `--probe` | With `--pick N`: ffprobe the Nth source on the executing host (Mac), print its video/audio tracks (language, title, default) and a verdict for the requested language, taking into account the track Stremio already kept for this title and the profile's preferred audio language. Launches nothing; never prints URLs (errors are masked) |
 | `--state` | Player state from `dumpsys media_session` (playing/paused, position, title) and the audio/subtitle tracks Stremio kept for this title (`core.xml` → `streams`, episode first, else the series; else the profile defaults). Read-only. Does not prove English subtitles are on screen |
 | `--open` | Open the title/episode page in Stremio, no source launched |
-| `--on` / `--off` | TV power only (two separate commands) |
+| `--on` / `--off` | TV power only, no film (two separate commands). `--off` also puts the dongle's screen to sleep (`KEYCODE_SLEEP`); it stays reachable over ADB (KeepAlive service) |
 | `--host IP` | Dongle address (default `192.168.1.37`) |
 
 From TV off to film on screen with subtitles: ~18 s (verified). Search + 4 addons + ranking: ~3 s.
