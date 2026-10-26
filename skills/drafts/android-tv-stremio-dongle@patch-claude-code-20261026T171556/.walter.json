@@ -1,0 +1,11 @@
+{
+ "base_sha": "8e94153c41c727002612f9d8efcb5621486733427bbcddc1646ad36c1f7fbaa3",
+ "changed": "scripts/stremio.py",
+ "created_at": "2026-10-26T17:15:56.130049+00:00",
+ "domain": "media",
+ "kind": "patch",
+ "reason": "Resubmission after curator reject 96916a5 (fixed: launch message again asks to verify English subtitles on screen; --state now also prints the kept subtitle track or the profile subtitle defaults and states it does not prove English subtitles are displayed). Owner request 2026-10-26: agents (MiMo run hermes/main/20261026_164218_2ba6fa, 10 min) wrote their own ffprobe/state scripts and fought the Mac PATH. Adds --probe (ffprobe of the --pick N source on the executing host, track list + verdict using profile audioLanguage and the per-title kept track; URLs masked; nothing launched) and --state (read-only). Adds /usr/local/bin and /opt/homebrew/bin to PATH. --lang fr: rejects VOSTFR/SUBFRENCH unless a VF/MULTi tag is present; +4 for French-only releases. --list/--probe/--state never wake the TV. Evidence: 16 local tests pass; read-only runs on the real dongle from the Mac: --list 3.5 s, --probe 2 s, --state OK.",
+ "runtime": "claude_code",
+ "session_id": "996254cc-9f30-4f49-a4af-10df65cf2b76",
+ "target": "android-tv-stremio-dongle"
+}
