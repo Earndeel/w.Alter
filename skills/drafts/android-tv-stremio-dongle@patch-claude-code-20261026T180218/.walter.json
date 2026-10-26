@@ -1,0 +1,11 @@
+{
+ "base_sha": "722fab629e852a684c6692c18adf3cf2267360702cf04895fe2edc270d0e654b",
+ "changed": "scripts/stremio.py",
+ "created_at": "2026-10-26T18:02:18.984653+00:00",
+ "domain": "media",
+ "kind": "patch",
+ "reason": "--state: media_session position is a snapshot at 'updated' (raw 8:37 while the screen showed 17:59 in the MiMo run 2026-10-26); now adds (nowELAPSED - updated) * speed from dumpsys alarm and prints m:ss. Verified read-only on the dongle: raw 12:12 -> computed 38:43.",
+ "runtime": "claude_code",
+ "session_id": "996254cc-9f30-4f49-a4af-10df65cf2b76",
+ "target": "android-tv-stremio-dongle"
+}
