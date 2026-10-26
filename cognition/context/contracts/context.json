@@ -23,7 +23,8 @@
     "Python Session (walter_context.compress)",
     "Hermes ContextEngine adapter",
     "DSH CompactionEngine adapter",
-    "CLI walter-context"
+    "CLI walter-context",
+    "HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it)"
   ],
   "bindings": {
     "hermes": "native compressor until walter-context replaces it (plan lot 6)",
@@ -36,7 +37,9 @@
     "Hermes runs its native compressor (walter-compress retired 2026-10-21); the walter-context Hermes port is not activated.",
     "Structural and known-answer tests do not certify semantic model quality."
   ],
-  "services": [],
+  "services": [
+    "walter-context-preflight"
+  ],
   "optional": [
     "logs",
     "llm"

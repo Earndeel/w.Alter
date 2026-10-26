@@ -7,6 +7,7 @@
 --shadow: the plan is only recorded (instance state, context/shadow/preflight-<day>.jsonl, private), nothing is
 printed for injection. Used by the hook while lot 4 is in shadow mode. Fail-open: exit 0, a line in the record.
 --refresh-router: refresh the cached Walter Router answers (task families, decision chain) and exit.
+--serve: the warm service (walter_context.preflight.service, 127.0.0.1:8897) the bin script tries first.
 """
 from __future__ import annotations
 
@@ -22,12 +23,18 @@ from pathlib import Path
 from . import Exchange, Request, refresh_router, run
 
 
+_STATE: list[Path | None] = []
+
+
 def _instance_state() -> Path | None:
-    try:
-        root = subprocess.run(["walter", "instance", "path"], capture_output=True, text=True, timeout=10).stdout.strip()
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return Path(root) / "state" / "context" / "shadow" if root else None
+    if not _STATE:                                        # once per process: the service records many plans
+        try:
+            root = subprocess.run(["walter", "instance", "path"], capture_output=True, text=True,
+                                  timeout=10).stdout.strip()
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        _STATE.append(Path(root) / "state" / "context" / "shadow" if root else None)
+    return _STATE[0]
 
 
 def _record(row: dict) -> None:
@@ -42,13 +49,10 @@ def _record(row: dict) -> None:
         f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
 
-def main(argv: list[str]) -> int:
-    if "--refresh-router" in argv:
-        return 0 if refresh_router()["tasks"] else 1
-    shadow = "--shadow" in argv
+def handle(d: dict, shadow: bool) -> tuple[dict | None, dict]:
+    """One request → (plan or None, record row). Shared by the CLI and the service; never raises."""
     t0 = time.time()
     try:
-        d = json.loads(sys.stdin.read() or "{}")
         prev = d.get("previous") or None
         req = Request(turn_id=str(d.get("turn_id") or f"t{int(t0 * 1000)}"), message=str(d.get("message") or ""),
                       previous=Exchange(**{k: prev.get(k) for k in ("message", "answer", "age_s", "thread_id")})
@@ -68,6 +72,24 @@ def main(argv: list[str]) -> int:
             _record(row)
         except OSError:
             pass
+    return plan, row
+
+
+def main(argv: list[str]) -> int:
+    if "--refresh-router" in argv:
+        return 0 if refresh_router()["tasks"] else 1
+    if "--serve" in argv:
+        from .service import serve
+        return serve()
+    shadow = "--shadow" in argv
+    try:
+        d = json.loads(sys.stdin.read() or "{}")
+    except ValueError as exc:
+        if not shadow:
+            print(json.dumps({"error": f"invalid request: {exc}"[:200]}))
+        return 0 if shadow else 1
+    plan, row = handle(d, shadow)
+    if shadow:
         return 0
     print(json.dumps(plan if plan is not None else row, ensure_ascii=False))
     return 0 if plan is not None else 1

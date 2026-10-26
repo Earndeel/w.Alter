@@ -106,6 +106,7 @@ def test_router_answers_are_cached_and_refreshed_off_the_message_path(tmp_path, 
     import time
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
     monkeypatch.setattr(preflight, "_ROUTER", None)
+    monkeypatch.setattr(preflight, "_ROUTER_SEEN", [0.0, 0.0])
     spawned = []
 
     class Proc:
@@ -125,6 +126,42 @@ def test_router_answers_are_cached_and_refreshed_off_the_message_path(tmp_path, 
     assert preflight.decision_chain() == ("a/decider", "b/decider") and not spawned        # fresh: disk only
     cache = tmp_path / "walter-context" / "router.json"
     cache.write_text(json.dumps({**json.loads(cache.read_text()), "at": time.time() - 3600}))
-    monkeypatch.setattr(preflight, "_ROUTER", None)
+    monkeypatch.setattr(preflight, "_ROUTER_SEEN", [0.0, 0.0])
     assert preflight.decision_chain() == ("a/decider", "b/decider")                       # stale copy used now
     assert len(spawned) == 1 and "--refresh-router" in spawned[0]                           # refreshed detached
+    preflight.decision_chain()
+    assert len(spawned) == 1                                   # a long-lived process refreshes once per period
+    cache.write_text(json.dumps({"at": time.time(), "tasks": {}, "chain": ["c/decider"]}))
+    assert preflight.decision_chain() == ("c/decider",)                                    # new file read back
+
+
+def test_service_answers_like_the_cli_and_records_shadow_plans(fake_llm, monkeypatch, tmp_path):
+    import json
+    import threading
+    import urllib.request
+    from http.server import ThreadingHTTPServer
+    from walter_context.preflight import __main__ as cli
+    from walter_context.preflight import service
+    calls, answers = fake_llm
+    _full(answers)
+    monkeypatch.setattr(service, "_router", lambda: {"chain": ["fake/decider"]})
+    monkeypatch.setattr(cli, "_STATE", [tmp_path])
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), service.Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+
+    def post(path, body):
+        req = urllib.request.Request(base + path, data=json.dumps(body).encode(), method="POST")
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status, r.read()
+    try:
+        status, body = post("/preflight", {"message": "On reprend le banc des fils sur les vrais messages"})
+        assert status == 200 and json.loads(body)["level"] == "L2"
+        status, body = post("/preflight?shadow=1", {"message": "oui vas y", "runtime": "claude_code"})
+        assert status == 204 and not body
+        rows = [json.loads(x) for f in tmp_path.glob("preflight-*.jsonl") for x in f.read_text().splitlines()]
+        assert len(rows) == 1 and rows[0]["runtime"] == "claude_code" and "plan" in rows[0]
+        with urllib.request.urlopen(base + "/health", timeout=5) as r:
+            assert json.loads(r.read()) == {"ok": True, "router_cached": True}
+    finally:
+        srv.shutdown()

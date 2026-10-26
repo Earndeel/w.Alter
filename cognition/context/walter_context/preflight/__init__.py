@@ -140,26 +140,36 @@ def refresh_router() -> dict:
 
 
 _ROUTER: dict | None = None
+_ROUTER_SEEN = [0.0, 0.0]          # mtime of the cache file read, last detached refresh started
 
 
 def _router() -> dict:
-    """The cached Router answers (process, then disk). Past ROUTER_TTL_S the stale copy is used and refreshed by a
-    detached process, so the Router is never on the message's path once the cache exists."""
+    """The cached Router answers (process, then disk). Past ROUTER_TTL_S the copy in hand is used and a detached
+    process refreshes the disk, read back once it changes: the Router is never on a message's path once the cache
+    exists, for a one-shot CLI as for the long-lived service."""
     global _ROUTER
-    if _ROUTER is None:
+    path = _router_cache()
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    if _ROUTER is None or mtime > _ROUTER_SEEN[0]:
         try:
-            _ROUTER = json.loads(_router_cache().read_text())
+            _ROUTER, _ROUTER_SEEN[0] = json.loads(path.read_text()), mtime
         except (OSError, ValueError):
-            _ROUTER = refresh_router()
-        else:
-            if time.time() - float(_ROUTER.get("at") or 0) > ROUTER_TTL_S:
-                root = Path(__file__).resolve().parents[2]
-                try:
-                    subprocess.Popen([sys.executable, "-m", "walter_context.preflight", "--refresh-router"], cwd=root,
-                                     env={**os.environ, "PYTHONPATH": str(root)}, stdin=subprocess.DEVNULL,
-                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                except OSError:
-                    pass
+            if _ROUTER is None:
+                _ROUTER = refresh_router()
+                _ROUTER_SEEN[1] = time.time()
+    now = time.time()
+    if now - float(_ROUTER.get("at") or 0) > ROUTER_TTL_S and now - _ROUTER_SEEN[1] > ROUTER_TTL_S:
+        _ROUTER_SEEN[1] = now
+        root = Path(__file__).resolve().parents[2]
+        try:
+            subprocess.Popen([sys.executable, "-m", "walter_context.preflight", "--refresh-router"], cwd=root,
+                             env={**os.environ, "PYTHONPATH": str(root)}, stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        except OSError:
+            pass
     return _ROUTER
 
 
