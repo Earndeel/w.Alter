@@ -32,7 +32,7 @@ remain available. Existing MCP sessions need their tool schemas refreshed to see
                  │ evaluate    the single evaluator (nightly promotion, curation checks, bench)   │
                  │ curation    operators: drafts, archive, links, merge, split, workflow, organize │
                  │ postes      editor / indexer / judge: ordered routes with fallback             │
-                 │ door        the single way content enters (judged before it goes live)         │
+                 │ door        the single way content enters (checked at the door, then live)     │
                  └───────────────────────────────────────────────────────────────────────────────┘
   ports (no rules): api.py (HTTP :8891) · client.py (stdlib, fallback to the store) · MCP walter · hooks · Hermes plugin
   events: consumer.py on the Walter bus (walter_memory.bus) — instant reactions, no timers
@@ -47,12 +47,12 @@ write door emits too. `walter-skills-bus` runs two consumers, each with its own 
 
 | Event | Emitted by | walter-skills reacts |
 |---|---|---|
-| `skill.proposed` | the write door (MCP `skill_propose`/`skill_patch`, the learner) | consumer `walter-skills`: judge the draft → live + card (< 1 min) |
+| `skill.proposed` | the write door (MCP `skill_propose`/`skill_patch`, the learner) | consumer `walter-skills`: draft → live + card (< 1 min; no model judge since 2026-10-26, only the target is checked) |
 | `skill.changed` | Hermes `on_skill_lifecycle` (created/patched/edited/…) | same, after syncing that skill from `~/.hermes/skills` |
 | `turn.ended` | Claude Code / DSH `Stop`, Hermes `on_session_end` (every turn), Codex `notify` | consumer `walter-skills-learning`: implicit labels for that session |
 | `session.ended` | Claude Code `SessionEnd`, Hermes `on_session_finalize` | same + the learner reads the session (may propose a skill) |
 
-Bursts are absorbed (a 10 s calm before a judgement). What bypasses the bus (a hand edit, a Hermes update) is caught
+Bursts are absorbed (a 10 s calm before applying). What bypasses the bus (a hand edit, a Hermes update) is caught
 by the hourly reconciliation (`jobs.quick`, run by the consumer when idle). Failed events stay in `bus.dead`;
 `walter-skills health` reports a consumer more than 15 min behind.
 
