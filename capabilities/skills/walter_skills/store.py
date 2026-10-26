@@ -13,7 +13,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-ROOT = Path("/opt/walter-skills")
+ROOT = Path("/walter/skills")
 SKILLS = ROOT / "skills"
 ARCHIVE = ROOT / "archive"
 DRAFTS = ROOT / "drafts"
