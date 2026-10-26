@@ -24,7 +24,7 @@ def run(apply: bool | None = None, use_models: bool = True, only: set[str] | Non
     mode = base.mode_today(cfg, day, apply)
     root = store.ROOT if mode == "active" else base.worktree(day)
     ctx = base.Context(root=root, mode=mode, day=day, cfg=cfg, cards=registry.cards(), aliases=aliases(),
-                       use_models=use_models and postes.available("judge"))
+                       use_models=use_models)
     active = list(store.iter_skills(root=root))
     ctx.sig = {"active": active, "usage": signals.usage(ctx.aliases), "needed": signals.judged_needed(),
                "pins": signals.pinned(), "cool": signals.recently_curated(cfg["cooldown_days"]),

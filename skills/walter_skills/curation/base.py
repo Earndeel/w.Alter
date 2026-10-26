@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from .. import cards as cards_mod
-from .. import config, evaluate, postes, registry, store
+from .. import config, evaluate, registry, store
 from ..ranker import Corpus, Encoder, Ranker, features, score
 from . import signals
 
@@ -46,7 +46,7 @@ class Context:
 # ── content helpers ───────────────────────────────────────────────────────────────────────────────────
 
 def bundle(s: store.Skill, limit: int = 150000, per_file: int = 40000) -> str:
-    """The skill as the editor/judge reads it. Never truncated silently: any cut is marked as display-only."""
+    """The skill as the editor reads it. Never truncated silently: any cut is marked as display-only."""
     def cut(text: str, n: int) -> str:
         return text if len(text) <= n else text[:n] + f"\n[… display truncated here: {len(text) - n} more chars; the file is complete on disk …]"
     parts = [f"=== {s.name}/SKILL.md ===\n{cut(s.body, per_file)}"]
@@ -117,18 +117,6 @@ def lossless(before: str, after: str, dropped: list[dict]) -> dict:
     return {"ok": not missing, "missing": missing[:40]}
 
 
-def review(kind: str, before: str, after: str) -> dict | None:
-    """The judge poste (another model family than the editor)."""
-    obj, _ = postes.ask_json(
-        "judge", f"You are the reviewer of an automated {kind} in W.Alter's skill library (procedures an AI agent loads "
-                 "before acting). Reject if any still-valid procedure, command, path, credential *location*, model id or "
-                 "warning was lost or altered, if facts were invented, or if the result is less usable by an agent. "
-                 'Return JSON only: {"ok": true|false, "issues": ["..."]}\n\n'
-                 "Texts marked 'display truncated' are complete on disk: never treat a display cut as content loss.\n\n"
-                 f"BEFORE:\n{before}\n\nAFTER:\n{after}", require="ok", timeout=300)
-    return obj
-
-
 def card_for(target: store.Skill, res: dict) -> tuple[dict | None, str]:
     """Trigger card of an edited skill, generated from the edited files in a scratch copy."""
     with tempfile.TemporaryDirectory(prefix="walter-card-") as d:
@@ -183,17 +171,10 @@ def validate(ctx: Context, kind: str, originals: list[store.Skill], target: stor
             kept[rel] = p.read_text(errors="replace") if p.suffix in TEXT_SUFFIXES else f"(binary, {p.stat().st_size} bytes)"
     after = res["skill_md"] + "\n\n" + "\n\n".join(f"=== {k} ===\n{v}" for k, v in {**kept, **new_files}.items())
     ll = lossless(before, after, res.get("dropped") or [])
-    files = "\n".join(f"- {k} ({len(v)} chars{', new' if k in new_files else ''})" for k, v in {**kept, **new_files}.items())
-    rv = review(kind, f"ORIGINAL SKILL(S):\n{before[:50000]}",
-                "A script moved/copied the original content VERBATIM and verified that every command, path, URL, port, "
-                f"code line and variable of the original is present after the {kind} (lossless check: "
-                f"{'passed' if ll['ok'] else 'FAILED'}). Judge the result as an agent would use it: frontmatter kept, "
-                "always-on rules first, every moved part reachable through an explicit references/ link; does the NEW "
-                f"text written by the editor invent or alter any fact?\n\nNEW SKILL.md:\n{res['skill_md'][:30000]}\n\n"
-                f"FILES AFTER:\n{files}\n\nTEXT WRITTEN BY THE EDITOR:\n{res.get('added_text') or '(see SKILL.md)'}")
-    out = {"lossless": ll, "judge": rv}
-    if not ll["ok"] or not (rv and rv.get("ok")):
-        return out | {"accepted": False, "reason": "lossless" if not ll["ok"] else "judge"}
+    # No model judge (2026-10-26, Monsieur): the scripted checks decide — lossless here, card + retrieval for a merge.
+    out = {"lossless": ll}
+    if not ll["ok"]:
+        return out | {"accepted": False, "reason": "lossless"}
     if kind == "merge":
         card, desc = card_for(target, res)
         if card is None:
