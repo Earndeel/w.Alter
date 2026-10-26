@@ -9,6 +9,7 @@ dongle D6 et la lance directement dans le lecteur de Stremio. Aucune navigation 
   python3 stremio.py "south park" --s 12 --e 6 --open  ouvre la fiche, l'utilisateur choisit la source
   python3 stremio.py --on / --off                     allume ou éteint la télé
   python3 stremio.py "alien" --pick 2 --probe          pistes audio réelles de la 2e source, sans lancer
+  python3 stremio.py "alien" --match "GRP" --probe     même chose en désignant la release par son nom
   python3 stremio.py "alien" --state                   lecture en cours + piste audio retenue par Stremio
   options : --lang fr (VF explicite), --lang vo (défaut), --original-lang CODE, --host IP
   Qualité automatique : meilleure résolution admissible; --4k est conservé par compatibilité.
@@ -445,6 +446,25 @@ def print_state(host, meta_id, video_id):
     print("   sous-titres anglais : à confirmer à l'écran (capture), --state ne le prouve pas")
 
 
+def release_label(stream, addon=""):
+    lines = (stream.get("title") or stream.get("description") or "").splitlines()
+    return mask(lines[0] if lines else addon)
+
+
+def choose(ranked, pick, match):
+    """La source à sonder ou lancer : par son nom (--match, stable d'un appel à l'autre) sinon par rang."""
+    if match:
+        want = norm(match)
+        hits = [i for i, r in enumerate(ranked) if want in norm(
+            "\n".join(str(r[4].get(k, "")) for k in ("name", "title", "description")))]
+        if not hits:
+            sys.exit(f"Aucune source admissible ne contient « {match} ». Aucun lancement.")
+        return hits[0] + 1
+    if not 1 <= pick <= len(ranked):
+        sys.exit("Numéro de source hors classement.")
+    return pick
+
+
 def player_link(stream, stream_transport, meta_transport, kind, meta_id, video_id):
     # stremio-core Stream::encode : JSON -> zlib -> base64 standard, puis encodage URI composant.
     enc = base64.b64encode(zlib.compress(json.dumps(stream, separators=(",", ":")).encode())).decode()
@@ -467,6 +487,8 @@ def main():
     ap.add_argument("--list", action="store_true", help="classer sans lancer")
     ap.add_argument("--open", action="store_true", help="ouvrir la fiche dans Stremio sans lancer de source")
     ap.add_argument("--pick", type=int, default=1)
+    ap.add_argument("--match", help="choisir la première source admissible dont le libellé contient ce texte "
+                                    "(nom de release), au lieu d'un rang qui peut changer entre deux appels")
     ap.add_argument("--probe", action="store_true",
                     help="sonder les pistes audio réelles de la source --pick, sans rien lancer")
     ap.add_argument("--state", action="store_true",
@@ -529,19 +551,18 @@ def main():
     if a.list:
         return
 
-    if not 1 <= a.pick <= len(ranked):
-        sys.exit("Numéro de source hors classement.")
+    a.pick = choose(ranked, a.pick, a.match)
     pts, info, name, transport, stream = ranked[a.pick - 1]
     if a.probe:
-        lines = (stream.get("title") or stream.get("description") or "").splitlines()
-        print(f"? sonde n°{a.pick} : {mask(lines[0] if lines else name)[:90]}")
+        print(f"? sonde n°{a.pick} : {release_label(stream, name)[:90]}")
         return print_probe(stream, a.lang, profile.get("settings", {}).get("audioLanguage"),
                            saved_track(core, meta["id"], video_id))
     link = player_link(stream, transport, f"{CINEMETA}/manifest.json", kind, meta["id"], video_id)
     if not ensure_server(a.host):
         sys.exit("Serveur de sous-titres indisponible : lecture interrompue, à réparer.")
     out = adb(a.host, "shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", f"'{link}'", STREMIO_PKG)
-    print(f"▶ lancement demandé : n°{a.pick} ({name}, {info['res']}, {info['audio']}). "
+    print(f"▶ lancement demandé : n°{a.pick} {release_label(stream, name)[:90]} "
+          f"({name}, {info['res']}, {info['audio']}). "
           "Contrôler la lecture et la piste audio avec --state (mêmes arguments), "
           "puis vérifier les sous-titres anglais à l'écran."
           if "Error" not in out else "Stremio a refusé le lancement.")
