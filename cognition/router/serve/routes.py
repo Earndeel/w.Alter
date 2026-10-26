@@ -1,27 +1,14 @@
-"""What Walter runs for a decision: the ordered execution routes of a chat model (subscription at its cost price\nwhile its quota lasts, Kie, OpenRouter on its imposed hosts, then the subscription model of the task and the\ndeclared tier fallback), the provider order of a media model, the OpenRouter id of a service poste — and the\nfree-text entry point (decision model intent -> decision -> routes)."""
+"""Ordered providers of the selected model, media provider routes, service poste ids and the free-text entry.
+Availability never authorises substituting a different text model.
+"""
 from __future__ import annotations
 
 from walter_router.analysis import knowledge
 from walter_router.serve import choose, execution, intent
 
 
-def subscription_fallback(conn, task: str, exclude: str | None = None, modes: list[str] | None = None) -> dict | None:
-    """Best model of the task (weighted composite) that the subscription (Codex) can run, with the reasoning level
-    measured on the task's primary board; with `modes`, only a subscription offer that reads those inputs."""
-    from walter_router.analysis import scoring
-    subs = {r["model_id"] for r in conn.execute("""select distinct o.model_id from models.offers o
-                                                  join models.latest_snapshots s using (snapshot_id)
-                                                  where o.access = 'subscription' and o.interface = 'chat'
-                                                    and o.modes @> %s::text[]""", (list(modes or []),))}
-    for c in scoring.composite(conn, task):
-        if c["model_id"] in subs and c["model_id"] != exclude:
-            variants = [b["variant"] for b in c["boards"].values() if b.get("variant")]
-            return {"model_id": c["model_id"], "variant": variants[0] if variants else "high",
-                    "composite": c["composite"]}
-    return None
-
 def with_execution(conn, out: dict) -> dict:
-    """Add the ordered Hermes routes to a chat decision (what the Hermes plugin runs, with fallbacks)."""
+    """Add the selected model's ordered providers; availability never authorises another model."""
     task = conn.execute("select interface, requirements, modes from models.tasks where task = %s", (out.get("task"),)).fetchone()
     modes = list((task or {}).get("modes") or []) + choose.INPUTS.get(out.get("require") or "", [])
     if out.get("model_id") and task and task["interface"] == "chat":
@@ -29,17 +16,9 @@ def with_execution(conn, out: dict) -> dict:
         usage = "background" if background else "interactive"   # level postes (summaries, memory) may use flex hosts
         out["execution"] = execution.routes(conn, out["model_id"], out.get("variant") or "",
                                             preferred=out.get("provider"), usage=usage, modes=modes)
-        basis = (out.get("follows") or {}).get("task") or out["task"]   # a 'level' poste falls back like its tier
-        if basis != "general" and not any(r["access"] == "subscription" for r in out["execution"]):
-            sub = subscription_fallback(conn, out["task"], exclude=out["model_id"], modes=modes)
-            if sub:  # best model of this task reachable through the subscription, after the paid routes
-                out["execution"] += [{**r, "fallback_for": out["model_id"]}
-                                     for r in execution.routes(conn, sub["model_id"], sub["variant"], modes=modes)]
-        fallback = knowledge.level_fallback(basis, out.get("level") or out.get("role"))
-        if fallback:  # declared tier fallback, after every route of the pinned model
-            fb_model, _, fb_variant = fallback.partition("/")
-            out["execution"] += [{**r, "fallback_for": out["model_id"]}
-                                 for r in execution.routes(conn, fb_model, fb_variant, modes=modes)]
+        # Report the effective first route, never the provider from an older ranking.
+        out["provider"] = out["execution"][0]["provider"] if out["execution"] else None
+        # Availability never authorises another model: try only this model's providers.
         effort = (task["requirements"] or {}).get("reasoning")
         if effort:   # a poste's own reasoning level (voice_assist: minimal, the latency comes first)
             out["execution"] = [{**r, "reasoning": r.get("reasoning") or effort} for r in out["execution"]]

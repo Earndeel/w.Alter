@@ -44,7 +44,8 @@ def _wanted(conn, poste: str, level: str | None = None) -> dict | None:
     from walter_router.serve.routes import with_execution
     from walter_router.serve import choose
     d = with_execution(conn, choose.pick(conn, poste, level))
-    routes = [r for r in d.get("execution") or [] if r.get("probe_ok") is not False and not r.get("unreliable")]
+    routes = [r for r in d.get("execution") or [] if r.get("hermes_provider")
+              and r.get("probe_ok") is not False and not r.get("unreliable")]
     if not routes:
         return None
     first, rest = routes[0], routes[1:1 + MAX_FALLBACKS]

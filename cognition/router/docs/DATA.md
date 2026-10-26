@@ -1,7 +1,10 @@
 # Walter Router — data reference (2026-10-17)
 
-Everything the router knows lives in schema `models` of Postgres `hindsight-pg` (127.0.0.1:5433, db `hindsight`,
-password only in `~/.pgpass`). Python access: `walter_router.db.connect()`. Each table and view also carries a
+
+> Référence SQL exhaustive actuelle : [reference/DATABASE.md](reference/DATABASE.md) (toutes les colonnes, types, défauts, contraintes, index et vues). Ce guide explique la provenance. Les déclarations/configurations d’instance et les secrets ne sont pas tous dans PG ; voir OPERATIONS.md.
+
+The structured catalogue, measurements and derived decisions live in schema `models` of Postgres `hindsight-pg` (127.0.0.1:5433, db `hindsight`,
+password only in `~/.pgpass`). Python access: `walter_router.store.db.connect()`. Each table and view also carries a
 `COMMENT` (`store/migrations/022_comments.sql`): `\d+ models.*` explains itself.
 
 Writes go through the router code only (`walter-router refresh`, `declare`, `prefer`, `verdict`, `feedback`,

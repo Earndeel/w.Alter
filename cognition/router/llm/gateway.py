@@ -175,6 +175,9 @@ def chat_tasks() -> list[str]:
 def litellm_target(route: dict) -> dict | None:
     """LiteLLM arguments for one router route, or None when this gateway cannot run it (yet)."""
     p, m = route["provider"], route["model"]
+    if p == "claude-pro":
+        config = _CONF.get("claude_subscription") or {}
+        return {"model": m} if config.get("enabled") and m in config.get("verified_models", []) else None
     if p == "kie" and m.startswith(KIE_GPT):                 # Kie /codex = OpenAI Responses protocol
         key = provider_key("KIE_API_KEY")
         return {"model": f"openai/responses/{m}", "api_base": "https://api.kie.ai/codex/v1", "api_key": key,
@@ -195,6 +198,22 @@ def litellm_target(route: dict) -> dict | None:
             return None
         return {"model": f"chatgpt/{m}"}
     return None
+
+
+async def provider_completion(route: dict, **kwargs):
+    """One provider transport; Claude's native client contributes no agent context or tools."""
+    if route["provider"] != "claude-pro":
+        import litellm
+        return await litellm.acompletion(**kwargs)
+    import asyncio
+    from walter_secrets import grants
+    from claude_subscription import completion
+    config = dict(_CONF["claude_subscription"])
+    for key in ("cli", "state_dir", "usage_log"):
+        if config.get(key):
+            config[key] = str(_instance_path(config[key]))
+    token = await asyncio.to_thread(grants.access, config.get("grant", "claude-subscription"))
+    return await completion(config, token, **kwargs)
 
 
 def codex_access_token() -> str:
@@ -235,6 +254,54 @@ def as_json(text: str | None) -> str:
     t = t[t.find("{"):t.rfind("}") + 1] if "{" in t else t
     json.loads(t)
     return t
+
+
+async def exact_call(spec: dict) -> dict:
+    """Local router transport: one provider, one model, no retries or model fallbacks.
+
+    Keys remain in the gateway. The caller owns provider order, conversation and notices.
+    This CLI operation opens no unauthenticated HTTP endpoint.
+    """
+    import litellm
+    import re
+
+    route = spec.get("route") or {}
+    provider, model = route.get("provider"), route.get("model")
+    if provider not in {"kie", "openrouter", "codex", "arnict", "claude-pro"} or not isinstance(model, str) or not model.strip():
+        return {"ok": False, "error": "invalid_route"}
+    try:
+        if provider == "codex":
+            _install_codex_auth()
+        target = litellm_target(route)
+        if target is None:
+            return {"ok": False, "error": "provider_unavailable"}
+        litellm.suppress_debug_info = True
+        litellm.drop_params = True
+        kwargs = {**target, "messages": spec["messages"], "stream": False, "num_retries": 0,
+                  "fallbacks": [], "timeout": max(0.1, float(spec.get("timeout") or 60))}
+        if spec.get("tools"):
+            kwargs["tools"] = spec["tools"]
+        if route.get("reasoning") and route["reasoning"] not in {"none", "non-reasoning"}:
+            kwargs["reasoning_effort"] = route["reasoning"]
+        response = await provider_completion(route, **kwargs)
+        message = response.choices[0].message.model_dump(exclude_none=True)
+        returned_model = response.model
+        # Provider prefixes and punctuation differ; a different model is never accepted as success.
+        def identity(value):
+            return re.sub(r"[^a-z0-9]", "", value.rsplit("/", 1)[-1].lower())
+        if not returned_model or identity(returned_model) != identity(model):
+            return {"ok": False, "error": "provider_model_mismatch"}
+        if response.choices[0].finish_reason not in {"stop", "tool_calls", "function_call", "end_turn"}:
+            return {"ok": False, "error": "provider_incomplete_response"}
+        if not message.get("content") and not message.get("tool_calls"):
+            return {"ok": False, "error": "empty_provider_response"}
+        return {"ok": True, "message": message, "provider": provider, "model": model,
+                "response_model": returned_model, "response_id": response.id, "usage": _usage(response)}
+    except Exception as exc:
+        # Provider exception text can contain credentials, payloads and URLs: return only its type.
+        status = getattr(exc, "status_code", None)
+        return {"ok": False, "error": type(exc).__name__,
+                **({"status_code": status} if isinstance(status, int) else {})}
 
 
 # ───────────────────────── logging ─────────────────────────
@@ -325,7 +392,7 @@ def build_app():
                 kwargs["messages"] = [{"role": "system", "content": json_instruction(body["response_format"])},
                                       *body.get("messages", [])]
             try:
-                resp = await litellm.acompletion(**kwargs)
+                resp = await provider_completion(route, **kwargs)
                 if want_json and not stream:
                     resp.choices[0].message.content = as_json(resp.choices[0].message.content)
                 if not stream:
@@ -352,6 +419,9 @@ def build_app():
                     ok = False
                     yield f"data: {json.dumps({'error': {'message': f'{type(e).__name__}: {e}'[:300]}})}\n\n"
                 finally:
+                    close = getattr(it, "aclose", None)
+                    if close:
+                        await close()
                     log({**base, "ok": ok, "seconds": round(time.perf_counter() - t0, 2), "stream": True})
 
             return StreamingResponse(sse(), media_type="text/event-stream",
@@ -391,8 +461,21 @@ def add_agent(name: str, cred_file: str, ref: str = "WALTER_LLM_TOKEN") -> None:
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "serve"
-    if cmd == "add-agent":
+    if cmd == "call":
+        import asyncio
+        from contextlib import redirect_stdout
+        with redirect_stdout(sys.stderr):
+            try:
+                answer = asyncio.run(exact_call(json.load(sys.stdin)))
+            except Exception as exc:
+                answer = {"ok": False, "error": type(exc).__name__}
+        print(json.dumps(answer))
+        sys.exit(0 if answer.get("ok") else 1)
+    elif cmd == "add-agent":
         add_agent(sys.argv[2], sys.argv[3])
-    else:
+    elif cmd == "serve":
         import uvicorn
         uvicorn.run(build_app(), host="127.0.0.1", port=int(os.environ.get("WALTER_LLM_PORT", "8894")), log_level="warning")
+    else:
+        print("Usage: walter-llm serve | call | add-agent NAME FILE", file=sys.stderr)
+        sys.exit(2)

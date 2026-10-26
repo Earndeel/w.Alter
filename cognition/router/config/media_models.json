@@ -3,59 +3,103 @@
   "models": {
     "wan-3": {
       "kind": "video",
-      "kie": {"t2v": "wan/3-0-video", "i2v": "wan/3-0-video", "r2v": "wan/3-0-video",
-              "first_frame": "first_frame_url", "references": "reference_image_urls"},
+      "kie": {
+        "t2v": "wan/3-0-video",
+        "i2v": "wan/3-0-video",
+        "r2v": "wan/3-0-video",
+        "first_frame": "first_frame_url",
+        "references": "reference_image_urls"
+      },
       "openrouter": "alibaba/wan-3.0",
-      "defaults": {"resolution": "720p"},
+      "defaults": {
+        "resolution": "720p"
+      },
       "prompt_style": "A vivid English video prompt: subject, action and motion, camera movement, setting, lighting, sound if relevant. Keep every requested element.",
       "_note": "Kie wan/3-0-video (docs.kie.ai/market/wan/3-0-video.md, 2026-10-14): 2-30 s, 480P/720P/1080P (default 1080P = 0.16 $/s, hence 720p), audio on by default, nsfw_checker off by default."
     },
     "gpt-image-2-5-sunburst": {
       "kind": "image",
-      "kie": {"t2i": "gpt-image-2-5-sunburst-text-to-image", "i2i": "gpt-image-2-5-sunburst-image-to-image", "images": "input_urls"},
+      "kie": {
+        "t2i": "gpt-image-2-5-sunburst-text-to-image",
+        "i2i": "gpt-image-2-5-sunburst-image-to-image",
+        "images": "input_urls"
+      },
       "openrouter": "openai/gpt-image-2.5-sunburst",
       "prompt_style": "A detailed English image prompt: main subject, setting/background, lighting, composition and camera framing, style and mood. Keep EVERY element the user asked for (the setting especially) and add nothing he would not want."
     },
     "gpt-image-2-5-flare": {
       "kind": "image",
-      "kie": {"t2i": "gpt-image-2-5-flare-text-to-image", "i2i": "gpt-image-2-5-flare-image-to-image", "images": "input_urls"},
+      "kie": {
+        "t2i": "gpt-image-2-5-flare-text-to-image",
+        "i2i": "gpt-image-2-5-flare-image-to-image",
+        "images": "input_urls"
+      },
       "openrouter": "openai/gpt-image-2.5-flare",
       "prompt_style": "A detailed English image prompt: subject, setting, lighting, composition, style. Keep every requested element."
     },
     "seedance-2-5": {
       "kind": "video",
-      "kie": {"t2v": "bytedance/seedance-2-5", "i2v": "bytedance/seedance-2-5", "r2v": "bytedance/seedance-2-5",
-              "first_frame": "first_frame_url", "references": "reference_image_urls"},
+      "kie": {
+        "t2v": "bytedance/seedance-2-5",
+        "i2v": "bytedance/seedance-2-5",
+        "r2v": "bytedance/seedance-2-5",
+        "first_frame": "first_frame_url",
+        "references": "reference_image_urls"
+      },
       "openrouter": "bytedance/seedance-2.5",
       "prompt_style": "An English shot-by-shot video prompt for Seedance: for each shot, framing, camera movement, action and timing; consistent characters; reference the attached reference image as the visual anchor. Keep every requested element.",
       "workflow": "reference_first"
     },
     "minimax-h3": {
       "kind": "video",
-      "kie": {"t2v": "minimax-h3/text-to-video", "i2v": "minimax-h3/image-to-video", "r2v": "minimax-h3/reference-to-video",
-              "first_frame": "first_frame_url", "references": "reference_image_urls"},
+      "kie": {
+        "t2v": "minimax-h3/text-to-video",
+        "i2v": "minimax-h3/image-to-video",
+        "r2v": "minimax-h3/reference-to-video",
+        "first_frame": "first_frame_url",
+        "references": "reference_image_urls"
+      },
       "openrouter": "minimax/hailuo-3",
       "prompt_style": "A vivid English video prompt: subject, action and motion, camera, setting, lighting, sound if relevant. Keep every requested element."
     },
     "gemini-omni-flash-1-1": {
       "kind": "video",
-      "kie": {"t2v": "google/gemini-omni-flash-1-1", "i2v": "google/gemini-omni-flash-1-1", "first_frame": "first_frame_url", "references": "image_urls"},
+      "kie": {
+        "t2v": "google/gemini-omni-flash-1-1",
+        "i2v": "google/gemini-omni-flash-1-1",
+        "first_frame": "first_frame_url",
+        "references": "image_urls"
+      },
       "prompt_style": "A natural English prompt for an authentic creator-style (UGC) video: who speaks, framing (selfie / face camera), setting, what is said, tone. Keep every requested element."
     },
     "grok-imagine-video-1-5": {
       "kind": "video",
-      "kie": {"t2v": "grok-imagine-video-1-5-preview", "i2v": "grok-imagine-video-1-5-preview", "first_frame": "image_urls", "references": "image_urls"},
+      "kie": {
+        "t2v": "grok-imagine-video-1-5-preview",
+        "i2v": "grok-imagine-video-1-5-preview",
+        "first_frame": "image_urls",
+        "references": "image_urls"
+      },
       "openrouter": "x-ai/grok-imagine-video-1.5",
       "prompt_style": "A short English video prompt: subject, action, camera, setting."
     },
     "suno": {
       "kind": "music",
-      "kie": {"music": "ai-music-api/generate"},
+      "kie": {
+        "music": "ai-music-api/generate"
+      },
       "prompt_style": "Suno style tags in English (genre, mood, instruments, tempo) — max 200 characters."
     },
     "gemini-3-8-flash-tts": {
       "kind": "audio",
-      "kie": {"tts": "google/gemini-3-8-flash-tts"}
+      "kie": {
+        "tts": "google/gemini-3-8-flash-tts"
+      }
+    },
+    "heygen-video-1": {
+      "kind": "video",
+      "openrouter": "heygen/heygen-video-1",
+      "prompt_style": "A vivid English video prompt: subject, action and motion, camera, setting, lighting, sound if relevant. Keep every requested element."
     }
   }
 }

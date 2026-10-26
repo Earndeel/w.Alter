@@ -12,6 +12,7 @@ from walter_router.serve import execution
 PROVIDERS = {"openrouter": "openrouter", "kie": "kie", "kie.ai": "kie", "kie-codex": "kie", "codex": "codex",
              "openai-codex": "codex", "chatgpt": "codex", "arnict": "arnict", "flow": "google-flow",
              "google-flow": "google-flow"}
+PROVIDERS.update({"claude-pro": "claude-pro", "claude-subscription": "claude-pro"})
 DEFAULT_TASK = {"chat": "general", "image": "text_to_image", "video": "text_to_video", "audio": "tts", "music": "music"}
 
 
@@ -70,4 +71,5 @@ def named(conn, model: str, provider: str | None = None, task: str | None = None
             return {**out, "mode": "none",
                     "error": f"{model_id} : aucune route exécutable" + (f" chez {prov}" if prov else "")}
         out["execution"] = routes
+        out["provider"] = routes[0]["provider"]
     return out

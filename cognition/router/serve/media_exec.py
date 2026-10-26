@@ -51,7 +51,7 @@ def _http(method: str, url: str, headers: dict, body: dict | None = None, timeou
                                                           **headers})
     with urlopen(req, timeout=timeout) as resp:  # noqa: S310 (fixed provider hosts)
         raw = resp.read(200 * 1024 * 1024)
-    return json.loads(raw) if raw[:1] in (b"{", b"[") else raw
+    return json.loads(raw) if raw.lstrip()[:1] in (b"{", b"[") else raw
 
 
 # --- parameters -----------------------------------------------------------------------------------------

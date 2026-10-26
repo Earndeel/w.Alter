@@ -242,7 +242,7 @@ def _kie_interface(rec: dict) -> str:
     return kind
 
 
-OFFER_KINDS = ("openrouter", "kie", "codex", "declared", "hermes_providers")
+OFFER_KINDS = ("openrouter", "kie", "codex", "claude_pro", "declared", "hermes_providers")
 
 
 def _media_fields(interface: str, label: str, unit_price: float | None, unit: str | None,
@@ -366,6 +366,13 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                                  else m["name"].split(": ", 1)[-1],
                                  meta={"open_weights": True if m.get("hugging_face_id") else None,
                                        "license": None, "hf": m.get("hugging_face_id")}))
+    elif kind == "claude_pro":
+        for oid in doc["models"]:
+            mid, _ = identity.normalize("claude_pro", oid)
+            rows.append(dict(provider="claude-pro", offer_key=oid, model_id=mid, interface="chat", access="subscription",
+                             price_in_1m=None, price_out_1m=None, unit_price=None, unit=None, provider_created=None,
+                             pricing={"subscription": "Claude", "transport": "native-cli", "verified": True},
+                             modes=["text"], offer_kind="generation"))
     elif kind == "codex":
         for oid in doc["models"]:
             mid, _ = identity.normalize("codex", oid)

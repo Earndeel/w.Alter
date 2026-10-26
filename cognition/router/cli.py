@@ -59,7 +59,7 @@ def _instance_env() -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="walter-router")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("migrate")
@@ -181,11 +181,32 @@ def main(argv: list[str] | None = None) -> int:
     q.add_argument("--no-notify", action="store_true", help="plans: record news and proposals without sending them")
     bf = sub.add_parser("brief", help="what an agent must know to use the router (tools, levels, specialities, "
                                       "generation, constraints) — no model names")
+    bf.add_argument("--json", action="store_true", help="versioned stable note for walter-context and harnesses")
     bf.add_argument("--write", action="store_true", help="write it to the instance's state/router/brief.md and "
                                                         "re-render the agent profiles (walter-soul) when it changed")
     sub.add_parser("instance-env", help="shell assignments of the instance bindings used by the cycle and the trigger")
+    sub.add_parser("schema", help="versioned public tool parameter reference (JSON, no model call)")
+    doc = sub.add_parser("docs", help="generate or check reference documentation against source and the models schema")
+    mode = doc.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--write", action="store_true", help="regenerate reference files; reads DB metadata only")
+    mode.add_argument("--check", action="store_true", help="exit nonzero on stale or incomplete reference docs")
+    doc.add_argument("--offline", action="store_true", help="check against the committed database metadata snapshot")
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = build_parser()
     args = p.parse_args(argv)
 
+    if args.cmd == "schema":
+        from walter_router.serve.api import schema
+        print(json.dumps(schema(), ensure_ascii=False, indent=2))
+        return 0
+    if args.cmd == "docs":
+        from walter_router.documentation import maintain
+        out = maintain(write=args.write, offline=args.offline)
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out["ok"] else 1
     if args.cmd == "plans":
         from walter_router.plan import declared
         if args.action == "list":
@@ -213,13 +234,15 @@ def main(argv: list[str] | None = None) -> int:
         from walter_router.serve import brief
         with db.connect() as conn:
             if not args.write:
-                print(brief.text(conn))
+                print(json.dumps(brief.document(conn), ensure_ascii=False) if args.json else brief.text(conn))
                 return 0
             changed = brief.write(conn)
-        if changed:   # the Codex / DSH profiles include it: re-render them (walter-soul, the identity module)
-            import shutil
+        if changed:   # the Codex / DSH profiles include the module layer that carries it: walter-context
+            import shutil  # republishes it and re-renders the profiles (walter-soul) when the layer changed
             import subprocess
-            if shutil.which("walter-soul"):
+            if shutil.which("walter-context"):
+                subprocess.run(["walter-context", "capability", "all", "--write"], capture_output=True, timeout=180)
+            elif shutil.which("walter-soul"):
                 subprocess.run(["walter-soul", "sync"], capture_output=True, timeout=120)
         print(json.dumps({"written": str(instance.state_file("brief.md")), "changed": changed}))
         return 0

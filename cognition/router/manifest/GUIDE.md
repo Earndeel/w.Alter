@@ -1,0 +1,49 @@
+# Walter Router — guide détaillé
+
+## Objectif
+
+Choisir, pour chaque tâche, le modèle et le fournisseur qui conviennent (benchmarks, prix, abonnements de
+{{owner.address}}, ses préférences), et l'exécuter quand on le lui demande. L'agent reste l'orchestrateur : il définit le
+travail, les données autorisées, vérifie le résultat. Son propre modèle ne change pas quand il appelle le routeur.
+Aucun module de W.Alter n'écrit un nom de modèle en dur : il demande un poste au routeur.
+
+## Comment l'utiliser
+
+La note d'usage du routeur est dans la couche stable du prompt (`walter-router brief`). En résumé :
+
+| Outil | Usage |
+|---|---|
+| `walter_run` | Faire une sous-tâche texte (sous-agent avec outils) ou une génération média demandée par {{owner.address}} |
+| `walter_route` | Examiner un choix, ses routes et ses prix sans rien exécuter |
+| `walter_decide` | Choix court ou répété parmi des options nommées |
+| `walter_plans` | Lire les abonnements ; enregistrer un changement que {{owner.address}} annonce |
+
+L'index (`module_index('router')`) liste les tâches disponibles (clé, libellé, interface). Guide complet :
+`docs/USAGE.md` ; parcours de la documentation : `docs/README.md`.
+
+## Organisation
+
+| Partie | Rôle |
+|---|---|
+| `research/`, `analysis/` | Classements (AA, Arena, Design Arena, BridgeBench, MTEB…) et prix (OpenRouter, Kie, Codex…) → PG schéma `models` |
+| `plan/` | Abonnements de {{owner.address}} au coût réel du token |
+| `serve/` | Choix par tâche, exécution (`run`, médias), décision, note d'usage |
+| `interface/` | Page publique de la bibliothèque de modèles (domaine de l’instance), propositions Telegram |
+| `llm/` (walter-llm, :8894) | Passerelle OpenAI-compatible pour les modules : `model` = un poste du routeur |
+| `walter-router-refresh.timer` | Cycle de 48 h ; propositions avec boutons, jamais de bascule automatique |
+
+## Interfaces
+
+| Besoin | MCP / Hermes | CLI |
+|---|---|---|
+| Exécuter / examiner / décider | `walter_run`, `walter_route`, `walter_decide` | `walter-router run|route|decide` |
+| Abonnements | `walter_plans` | `walter-router plans` |
+| Tâches | `module_index('router')` | `walter-router tasks` |
+| Santé | `walter_health` | `walter-router health` |
+
+## Règles et limites
+
+- Si {{owner.address}} nomme un modèle, le transmettre (`model`, `provider`) ; aucun substitut.
+- Génération média payante : uniquement à sa demande.
+- Jamais de secret ni de donnée `local_only` vers un modèle cloud.
+- Les favoris ne changent que sur décision de {{owner.address}}.
