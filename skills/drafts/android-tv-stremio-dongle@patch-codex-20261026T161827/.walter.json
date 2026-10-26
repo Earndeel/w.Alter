@@ -1,0 +1,11 @@
+{
+ "base_sha": "1a3da8d2d707426570cc154b5a1eb86e1182e99a7f25d4ad4d0d6cd1bb6fe59c",
+ "changed": "references/keepalive.md",
+ "created_at": "2026-10-26T16:18:27.871608+00:00",
+ "domain": "media",
+ "kind": "patch",
+ "reason": "ADD ONE NEW LINKED FILE ONLY: file_path=references/keepalive.md. This does NOT replace SKILL.md or delete any TV/Stremio procedure. Live SKILL.md already accepted in commit head documents the service and references this file. Previous rejection incorrectly compared this new reference against the WHOLE skill because Drafts.apply falls back to base.bundle when the target file does not yet exist. All playback/CEC/credentials/debloat content remains in the unchanged SKILL.md. This additive maintenance reference contains APK/source vault ID, tested service setup and rollback. Judge as an added linked file, not replacement of the skill.",
+ "runtime": "codex",
+ "session_id": null,
+ "target": "android-tv-stremio-dongle"
+}
