@@ -49,21 +49,59 @@ def _record(row: dict) -> None:
         f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
 
+def session_key(d: dict) -> str | None:
+    """The walter_logs / Walter Memory key of the caller's session (Claude Code: claude_code/vm/<id>)."""
+    sid, runtime = d.get("session_id"), d.get("runtime")
+    if not sid or not runtime:
+        return None
+    return sid if "/" in sid else f"{runtime}/vm/{sid}"
+
+
+def subjects(d: dict) -> tuple[list[dict], str | None, float | None]:
+    """Candidate subjects from Walter Memory's views (local embeddings, warm in the service): (cards, waiting, age)."""
+    try:
+        from walter_memory import views
+        r = views.subject_candidates(str(d.get("message") or "")[:4000], session_key(d))
+        return r["candidates"], r["waiting"], r["waiting_age_s"]
+    except Exception:  # noqa: BLE001 — no views: the preflight still runs, on the session alone
+        return [], None, None
+
+
 def handle(d: dict, shadow: bool) -> tuple[dict | None, dict]:
-    """One request → (plan or None, record row). Shared by the CLI and the service; never raises."""
+    """One request → (plan or None, record row). Shared by the CLI and the service; never raises.
+    Without candidates in the request, the subjects come from Walter Memory (step D). In shadow mode the context
+    pack the plan asks for is assembled and recorded next to the host's current injection, nothing is injected."""
     t0 = time.time()
     try:
-        prev = d.get("previous") or None
+        prev = dict(d.get("previous") or {}) or None
+        cands, waiting, waiting_age = (list(d.get("candidates") or []), None, None)
+        if not cands:
+            cands, waiting, waiting_age = subjects(d)
+            if waiting and prev:
+                prev["thread_id"] = waiting
         req = Request(turn_id=str(d.get("turn_id") or f"t{int(t0 * 1000)}"), message=str(d.get("message") or ""),
                       previous=Exchange(**{k: prev.get(k) for k in ("message", "answer", "age_s", "thread_id")})
                       if prev else None,
-                      candidates=list(d.get("candidates") or []),
-                      privacy_class=d.get("privacy_class") or "cloud_allowed",
-                      default_thread=d.get("default_thread"))
-        plan = run(req, purpose="walter-context preflight" + (" (shadow)" if shadow else "")).to_dict()
+                      candidates=cands, privacy_class=d.get("privacy_class") or "cloud_allowed",
+                      default_thread=waiting or d.get("default_thread"))
+        plan_obj = run(req, purpose="walter-context preflight" + (" (shadow)" if shadow else ""))
+        plan = plan_obj.to_dict()
         row = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "runtime": d.get("runtime"),
                "session_id": d.get("session_id"), "message_sha": hashlib.sha256(req.message.encode()).hexdigest()[:16],
-               "message_head": req.message[:160], "plan": plan}
+               "message_head": req.message[:160], "plan": plan,
+               "subjects": {"candidates": [c.get("id") for c in cands], "waiting": waiting,
+                            "waiting_age_s": waiting_age}, "plan_ms": round((time.time() - t0) * 1000)}
+        if shadow and req.privacy_class != "local_only":
+            from ..assembly import pack
+            from ..retrieval import gather
+            blocks, notes = gather(plan_obj, req.message, session_key=session_key(d),
+                                   native_history=d.get("runtime") in ("claude_code", "codex", "dsh"))
+            p = pack(plan_obj, blocks, notes)
+            cur = d.get("current_injection") or {}
+            row["pack"] = p.summary()
+            row["pack_text"] = p.text()
+            row["current"] = {"tokens": len(cur.get("text") or "") // 4 + (1 if cur.get("text") else 0),
+                              "parts": cur.get("parts"), "text": cur.get("text")}
     except Exception as exc:  # noqa: BLE001 — fail-open
         row, plan = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                      "error": f"{type(exc).__name__}: {str(exc)[:200]}"}, None
