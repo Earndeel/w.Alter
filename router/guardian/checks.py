@@ -71,7 +71,7 @@ def dirty_paths(root=None) -> set[str]:
     return {line[3:].split(" -> ")[-1].strip() for line in out.stdout.splitlines() if line.strip()}
 
 
-_FAILED = re.compile(r"^(FAILED|ERROR) (\S+?)(?: - (.*))?$")
+_FAILED = re.compile(r"^(FAILED|ERROR) (.+?)(?: - (.*))?$")   # parametrised ids may hold spaces
 
 
 def run_tests(root, timeout: int = TEST_TIMEOUT) -> dict:

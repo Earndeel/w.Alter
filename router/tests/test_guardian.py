@@ -140,3 +140,12 @@ def test_reference_regeneration_is_quiet():
 def test_no_reference_in_this_version_is_no_incident(monkeypatch):
     monkeypatch.setattr(checks, "docs_check", lambda: {})
     assert checks.docs() == []
+
+
+def test_parametrised_test_ids_with_spaces_are_kept_whole(monkeypatch, tmp_path):
+    out = ("FAILED tests/test_k.py::test_v[20 variantes en brouillon-budget-grok] - AssertionError: x\n"
+           "ERROR tests/test_c.py\n")
+    monkeypatch.setattr(checks.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 1, out, ""))
+    assert checks.run_tests(tmp_path)["failures"] == {
+        "tests/test_k.py::test_v[20 variantes en brouillon-budget-grok]": "AssertionError: x",
+        "tests/test_c.py": "ERROR"}
