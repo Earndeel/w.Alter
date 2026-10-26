@@ -1,0 +1,18 @@
+# Default exit of Walter's browsers (2026-10-26): SOCKS selector on the instance's [default] proxy (network.toml);
+# the owner's Mac while its France WireGuard tunnel is connected, else the freebox-fr WireGuard exit, started and
+# stopped automatically. Fail closed when neither is available. Install: copy to /etc/systemd/system/.
+[Unit]
+Description=Walter browse — default exit selector (Mac on its France VPN, else WireGuard France), SOCKS 127.0.0.1:1083
+After=network-online.target tailscaled.service docker.service walter-exit-mac.service
+Wants=network-online.target walter-exit-mac.service docker.service
+
+[Service]
+User=root
+ExecStart=/usr/local/bin/walter-exit-default serve
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/walter-exit-default.log
+StandardError=append:/var/log/walter-exit-default.log
+
+[Install]
+WantedBy=multi-user.target

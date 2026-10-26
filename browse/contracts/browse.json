@@ -9,13 +9,16 @@
     "ops/camoufox-max-display.conf",
     "ops/walter-exit-mac.service",
     "ops/camoufox-max-identity.conf",
-    "ops/cloakbrowser-max.service"
+    "ops/cloakbrowser-max.service",
+    "ops/walter-exit-default.service",
+    "network/exit-default/bin/walter-exit-default"
   ],
   "requires": [],
   "external": [
     "Scrapling isolated environment",
     "Camoufox :9377 (display :101, Selkies walter-browse-display, Tailscale :3011)",
     "CloakBrowser Chromium :9378 (free v146 linux-arm64 build, ~/.cloakbrowser; same display :101)",
+    "WireGuard France exit (walter-wg-exit freebox-fr, docker), fallback of the default exit",
     "optional Webtop CDP"
   ],
   "data": [
@@ -55,7 +58,8 @@
     "camoufox-max",
     "cloakbrowser-max",
     "walter-browse-display",
-    "walter-exit-mac"
+    "walter-exit-mac",
+    "walter-exit-default"
   ],
   "optional": [
     "secrets",

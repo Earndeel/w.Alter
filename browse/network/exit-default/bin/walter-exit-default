@@ -1,0 +1,219 @@
+#!/usr/bin/env walter-python
+"""walter-exit-default — the default network exit of Walter's browsers, chosen automatically.
+
+Serves SOCKS5 (CONNECT, no auth) on the instance's default proxy (network.toml [default] `proxy`, e.g.
+127.0.0.1:1083); every browser engine uses it as its default exit. Each new connection goes out through:
+
+  primary   the owner's machine (`primary_proxy`, SOCKS, e.g. walter-exit-mac), only while its VPN tunnel
+            `primary_requires_vpn` is connected there (checked over `ssh primary_ssh`, scutil);
+  fallback  otherwise, the scoped WireGuard exit `fallback_exit` (walter-wg-exit), started automatically and
+            stopped again as soon as the owner's machine is back on its tunnel (same key: never both at once);
+  none      neither available: the connection is refused (fail closed; never the bare server IP).
+
+  walter-exit-default serve        run the selector (systemd unit walter-exit-default)
+  walter-exit-default status       current route (state file)
+
+Switching only affects new connections. Both routes are meant to leave from the same public IP.
+"""
+from __future__ import annotations
+
+import asyncio
+import ipaddress
+import json
+import os
+import socket
+import struct
+import subprocess
+import sys
+import time
+import tomllib
+from pathlib import Path
+from urllib.parse import urlparse
+
+CHECK_EVERY_S = 20
+RETRY_UP_S = 120          # after a failed start of the fallback, wait before trying again
+STATE = Path(os.environ.get("WALTER_EXIT_DEFAULT_STATE", "/run/walter-exit-default.json"))
+route = "none"            # primary | fallback | none
+cfg: dict = {}
+next_up = 0.0
+
+
+def log(msg: str) -> None:
+    print(time.strftime("%Y-%m-%dT%H:%M:%S"), msg, flush=True)
+
+
+def sh(*cmd: str, timeout: float = 60) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, 124, "", "timeout")
+
+
+def load_config() -> dict:
+    path = sh("walter", "instance", "config", "browse", "network.toml").stdout.strip()
+    data = tomllib.loads(Path(path).read_text())
+    d, exits = data.get("default", {}), data.get("exit", {})
+    for k in ("proxy", "primary_proxy", "primary_ssh", "primary_requires_vpn", "fallback_exit"):
+        if not d.get(k):
+            sys.exit(f"network.toml [default] lacks {k}")
+    fb = exits[d["fallback_exit"]]
+    return {"listen": urlparse(d["proxy"]), "primary": urlparse(d["primary_proxy"]), "ssh": d["primary_ssh"],
+            "vpn": d["primary_requires_vpn"], "fallback": d["fallback_exit"], "fallback_port": int(fb["port"])}
+
+
+def port_open(host: str, port: int, timeout: float = 2) -> bool:
+    try:
+        socket.create_connection((host, port), timeout=timeout).close()
+        return True
+    except OSError:
+        return False
+
+
+def primary_on_vpn() -> bool | None:
+    """True/False = the owner's machine has / has not its tunnel connected; None = cannot be checked."""
+    r = sh("ssh", "-o", "ConnectTimeout=6", "-o", "BatchMode=yes", cfg["ssh"],
+           f"scutil --nc status {json.dumps(cfg['vpn'])}", timeout=20)
+    if r.returncode:
+        return None
+    return r.stdout.splitlines()[:1] == ["Connected"]
+
+
+def fallback_running() -> bool:
+    r = sh("docker", "inspect", "-f", "{{.State.Running}}", f"walter-wg-{cfg['fallback']}")
+    return r.stdout.strip() == "true"
+
+
+def decide() -> str:
+    on_vpn = primary_on_vpn()
+    if on_vpn and port_open(cfg["primary"].hostname, cfg["primary"].port):
+        if fallback_running():   # the owner's machine holds the shared key again: release it
+            sh("walter-wg-exit", "down", cfg["fallback"])
+            log(f"{cfg['ssh']} is back on {cfg['vpn']}: {cfg['fallback']} stopped")
+        return "primary"
+    global next_up
+    if not fallback_running() and time.time() >= next_up:
+        # Machine unreachable (asleep, offline): it cannot be holding the tunnel in use; start anyway, and the
+        # next check stops the fallback as soon as the machine is back on its tunnel.
+        args = ["walter-wg-exit", "up", cfg["fallback"]] + (["--force"] if on_vpn is None else [])
+        r = sh(*args, timeout=400)
+        next_up = 0.0 if fallback_running() else time.time() + RETRY_UP_S
+        log(f"{cfg['ssh']} {'unreachable' if on_vpn is None else 'not on ' + cfg['vpn']}: "
+            f"{(r.stdout or r.stderr).strip()[:200]}")
+    if fallback_running() and port_open("127.0.0.1", cfg["fallback_port"]):
+        return "fallback"
+    return "none"
+
+
+def save_state() -> None:
+    STATE.write_text(json.dumps({"route": route, "since": time.time(),
+                                 "via": {"primary": cfg["ssh"], "fallback": cfg["fallback"]}.get(route)}))
+
+
+async def supervise() -> None:
+    global route
+    save_state()
+    while True:
+        try:
+            new = await asyncio.to_thread(decide)
+        except Exception as e:  # never die on a check; keep the last route
+            log(f"check failed: {e}")
+            new = route
+        if new != route:
+            log(f"route {route} -> {new}")
+            route = new
+            save_state()
+        await asyncio.sleep(CHECK_EVERY_S)
+
+
+async def read_target(reader: asyncio.StreamReader) -> tuple[bytes, str, int]:
+    """SOCKS5 request after the greeting; returns the raw address part, host and port."""
+    ver, cmd, _, atyp = await reader.readexactly(4)
+    if ver != 5 or cmd != 1:
+        raise ValueError("only SOCKS5 CONNECT")
+    if atyp == 1:
+        raw = await reader.readexactly(4); host = str(ipaddress.IPv4Address(raw))
+    elif atyp == 3:
+        n = await reader.readexactly(1); raw = n + await reader.readexactly(n[0]); host = raw[1:].decode()
+    elif atyp == 4:
+        raw = await reader.readexactly(16); host = str(ipaddress.IPv6Address(raw))
+    else:
+        raise ValueError("bad address type")
+    pb = await reader.readexactly(2)
+    return bytes([atyp]) + raw + pb, host, struct.unpack(">H", pb)[0]
+
+
+async def open_upstream(addr: bytes, host: str, port: int):
+    if route == "primary":
+        r, w = await asyncio.open_connection(cfg["primary"].hostname, cfg["primary"].port)
+        w.write(b"\x05\x01\x00"); await w.drain()
+        if await r.readexactly(2) != b"\x05\x00":
+            raise ConnectionError("primary refused the greeting")
+        w.write(b"\x05\x01\x00" + addr); await w.drain()
+        head = await r.readexactly(4)
+        if head[1] != 0:
+            raise ConnectionError(f"primary CONNECT failed ({head[1]})")
+        skip = {1: 4, 4: 16}.get(head[3]) or (await r.readexactly(1))[0]
+        await r.readexactly(skip + 2)
+        return r, w
+    if route == "fallback":
+        r, w = await asyncio.open_connection("127.0.0.1", cfg["fallback_port"])
+        hp = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+        w.write(f"CONNECT {hp} HTTP/1.1\r\nHost: {hp}\r\n\r\n".encode()); await w.drain()
+        status = await r.readuntil(b"\r\n\r\n")
+        if b" 200" not in status.split(b"\r\n", 1)[0]:
+            raise ConnectionError("fallback CONNECT failed")
+        return r, w
+    raise ConnectionError("no exit available")
+
+
+async def pipe(src: asyncio.StreamReader, dst: asyncio.StreamWriter) -> None:
+    try:
+        while data := await src.read(65536):
+            dst.write(data); await dst.drain()
+    except (ConnectionError, asyncio.IncompleteReadError):
+        pass
+    finally:
+        dst.close()
+
+
+async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    try:
+        ver, n = await reader.readexactly(2)
+        methods = await reader.readexactly(n)
+        if ver != 5 or 0 not in methods:
+            writer.write(b"\x05\xff"); return
+        writer.write(b"\x05\x00"); await writer.drain()
+        addr, host, port = await read_target(reader)
+        try:
+            ur, uw = await asyncio.wait_for(open_upstream(addr, host, port), 30)
+        except Exception:
+            writer.write(b"\x05\x01\x00\x01" + b"\0" * 6); await writer.drain(); return
+        writer.write(b"\x05\x00\x00\x01" + b"\0" * 6); await writer.drain()
+        await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
+    except (ConnectionError, asyncio.IncompleteReadError, ValueError):
+        pass
+    finally:
+        writer.close()
+
+
+async def serve() -> None:
+    global cfg
+    cfg = load_config()
+    srv = await asyncio.start_server(handle, cfg["listen"].hostname, cfg["listen"].port)
+    log(f"listening on {cfg['listen'].hostname}:{cfg['listen'].port} (primary {cfg['ssh']} on {cfg['vpn']}, "
+        f"else {cfg['fallback']})")
+    async with srv:
+        await asyncio.gather(srv.serve_forever(), supervise())
+
+
+def main(argv: list[str]) -> None:
+    if argv[:1] == ["serve"]:
+        asyncio.run(serve())
+    elif argv[:1] == ["status"]:
+        print(STATE.read_text() if STATE.exists() else '{"route": "unknown (service not running)"}')
+    else:
+        print(__doc__.strip())
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

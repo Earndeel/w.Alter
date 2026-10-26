@@ -1,11 +1,11 @@
 # Walter's Chromium browser (2026-10-26): same server and HTTP API as camoufox-max, engine = CloakBrowser (Chromium
 # patched at the C++ level, free v146 build on linux-arm64, no key). For sites that need Chromium; Camoufox stays the
-# default. Same default exit through the owner's Mac, identity from the exit IP, owner-cookie rule, display :101.
+# default. Same default exit (walter-exit-default: owner's Mac on its France VPN, else WireGuard France), identity from the exit IP, owner-cookie rule, display :101.
 # Install: copy to /etc/systemd/system/. Persona fonts: %h/.cloakbrowser/fonts.conf (owner's Mac fonts, this unit only).
 [Unit]
 Description=CloakBrowser MAX stealth Chromium server (W.Alter, :9378)
-After=network-online.target tailscaled.service walter-browse-display.service walter-exit-mac.service
-Wants=network-online.target walter-exit-mac.service
+After=network-online.target tailscaled.service walter-browse-display.service walter-exit-default.service
+Wants=network-online.target walter-exit-default.service
 Requires=walter-browse-display.service
 StartLimitIntervalSec=300
 StartLimitBurst=5
