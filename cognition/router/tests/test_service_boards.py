@@ -35,6 +35,18 @@ def test_aa_stt_tables_join_on_model_and_host():
     assert wer["cost"] == pytest.approx(0.00167) and wer["cost_unit"] == "usd_per_audio_minute"
 
 
+def test_aa_stt_host_model_objects_when_no_table():
+    """Page redesign (2026-10-24): no download table, the host model objects carry the same figures."""
+    obj = {"id": "8bd5d2f8-db32-431c-a366-5169ae11ab73", "name": "MAI-Transcribe-2", "displayName": "MAI-Transcribe-2",
+           "pricePer1kMinutes": 1.67, "host": {"id": "h", "name": "Microsoft AI"},
+           "performance": {"medianSpeedFactor": 304.0}, "aaWerIndex": 0.0204}
+    no_wer = {**obj, "id": "3dcc12ca-c8c4-4287-946d-77fed7e21407", "displayName": "Other"}
+    del no_wer["aaWerIndex"]
+    page = _flight(json.dumps({"defaultSelected": [obj, no_wer], "all": [obj]}, separators=(",", ":")))
+    assert aa_stt.aa_stt_rows(page) == [{"model": "MAI-Transcribe-2", "provider": "Microsoft AI", "wer": 0.0204,
+                                         "speed_factor": 304.0, "price_per_1k_min": 1.67}]
+
+
 def test_agentset_entries_and_latency_as_speed():
     entries = [{"rank": 1, "name": "Cohere Rerank 4 Pro", "score": 1629, "provider": "Cohere", "license": "Proprietary",
                 "description": "ELO: 1629 | Win Rate: 57.7%", "avgLatencyMs": 500.0, "avgNdcg10": 0.09,
