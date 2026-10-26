@@ -22,6 +22,9 @@ def conn():
 
 
 def test_kie_first_unless_clearly_dearer_and_openrouter_down_goes_last(conn):
+    # This scenario assumes Kie is healthy, independently of the latest live probe.
+    conn.execute("""insert into models.provider_status (provider, ok, detail) values ('kie', true, 't')
+                    on conflict (provider) do update set ok = true""")
     conn.execute("""insert into models.provider_status (provider, ok, detail) values ('openrouter', true, 't')
                     on conflict (provider) do update set ok = true""")
     # Seedance 2.5: OpenRouter is ~30 % cheaper than Kie at 720p -> OpenRouter first
