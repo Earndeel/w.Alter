@@ -267,7 +267,7 @@ def issues_body(verdict: dict | None) -> str:
 
 
 class Drafts:
-    """Agents' proposals (write door) and Hermes' own changes → judged → live or removed (git keeps the trace)."""
+    """Agents' proposals (write door) and Hermes' own changes → live at once, no model judge (git keeps the trace)."""
     name, limit, editor = "drafts", None, False
 
     def propose(self, ctx: base.Context) -> list[dict]:
@@ -279,33 +279,16 @@ class Drafts:
         d, kind, target = ctx.root / "drafts" / p["draft"], p.get("kind"), p.get("target")
         if kind == "hermes_update":
             return {"status": "skipped", "reason": "Hermes changed a skill Walter also changed: manual merge"}
-        if not ctx.use_models:
-            return {"status": "skipped", "reason": "judge unavailable"}
+        # No model judge on drafts (2026-10-26, Monsieur: "beaucoup trop strict inutilement"). The write door already
+        # refuses secrets, malformed frontmatter, oversize text and paths outside the skill; here only the target is
+        # checked. A wrong change is undone with git (every acceptance is its own commit).
         sk = ctx.skills()
-        draft = store._load(d, "draft", "")
         if kind == "new":
-            if target in sk or (ctx.root / "archive" / target).exists():
-                verdict = {"ok": False, "issues": [f"{target} already exists"]}
-            else:
-                verdict = triage(base.review("new skill proposed by an agent", f"REASON: {p.get('reason')}",
-                                             NEW_SKILL_RUBRIC + "\n\n" + base.bundle(draft)))
+            verdict = {"ok": target not in sk and not (ctx.root / "archive" / target).exists(),
+                       "issues": [f"{target} already exists"] if target in sk or (ctx.root / "archive" / target).exists()
+                       else []}
         elif kind in ("patch", "hermes_patch") and target in sk:
-            changed = p.get("changed", "SKILL.md") if kind == "patch" else None
-            old = (sk[target].path / changed).read_text(errors="replace") if changed and (sk[target].path / changed).exists() \
-                else base.bundle(sk[target])
-            new = (d / changed).read_text(errors="replace") if changed else base.bundle(draft)
-            lost = sorted(base.atoms(old) - base.atoms(new))[:40]
-            ev = p.get("evidence") or {}
-            asked = ("This change was made by Monsieur's own agent (Hermes) in his session. His requests there:\n- "
-                     + "\n- ".join(ev.get("requests") or ["(not found)"])) if kind == "hermes_patch" else \
-                f"REASON + EVIDENCE GIVEN BY THE AGENT: {p.get('reason')}"
-            verdict = base.review(
-                f"{kind} of {target}", f"{asked}\n\nCURRENT VERSION:\n{old}",
-                "Accept unless the new version: contains a secret value or personal data, is a session log instead of "
-                "a procedure, or loses a still-valid procedure that it does not replace "
-                f"(items that disappear: {lost or 'none'}). Do NOT require external proof of new facts: the author is "
-                "Monsieur's agent working on his live system; you cannot verify facts, only integrity and usability."
-                f"\n\nPROPOSED VERSION:\n{new}")
+            verdict = {"ok": True, "issues": []}
         else:
             verdict = {"ok": False, "issues": [f"{target} is not an active skill"]}
         if verdict and verdict.get("ok"):
