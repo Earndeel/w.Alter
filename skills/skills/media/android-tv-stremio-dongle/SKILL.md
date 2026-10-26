@@ -6,8 +6,9 @@ description: "Use when Monsieur asks to play a film or episode on the living-roo
 # Living-room TV: Android dongle + Stremio + Hisense over HDMI-CEC
 
 Everything here was established and verified with Monsieur watching the screen on 2026-10-26. The TV only does what
-he sees: a CEC message that was *sent* proves nothing. When the outcome is visual (power, input, subtitles), ask him
-what the screen shows or read the TV's CEC power reply; never report success from the sent log alone.
+he sees: a CEC message that was *sent* proves nothing. Check device/player feedback first (CEC power reply for the TV; player progress and selected tracks for playback).
+Ask Monsieur about the screen only when remote evidence cannot establish the outcome. Verification follows the
+requested action; it is not a reason to stop at the source list. Never report success from a sent command alone.
 
 ## The setup
 
@@ -28,7 +29,8 @@ From the skill folder (the folder holding `SKILL.md`):
 
 ```
 python3 scripts/stremio.py "title" [--year Y]            # TV on (if off) + best source + English subtitles
-python3 scripts/stremio.py "show" --s 12 --e 6 --open    # open the episode page, Monsieur picks the source
+python3 scripts/stremio.py "show" --s 12 --e 6           # analyse sources and play the best eligible one
+python3 scripts/stremio.py "title" --lang fr              # explicit VF request
 python3 scripts/stremio.py "title" --list                # ranking only, nothing launched
 python3 scripts/stremio.py "title" --pick 3              # play the 3rd source of the ranking
 python3 scripts/stremio.py --on                          # TV on (lands on HDMI2)
@@ -42,8 +44,9 @@ All options of `stremio.py`:
 | `"query"` | Title searched on Cinemeta (exact title first, else the most popular match; the alternatives are printed) |
 | `--year Y` | Prefer Cinemeta matches released in Y (remakes, homonyms); if none matches, all results are kept |
 | `--s N --e N` | Series: season and episode (episode defaults to 1) |
-| `--lang fr` (default) / `--lang en` | Bonus for French/MULTI audio (VFF, VF2, TRUEFRENCH, MULTI, 🇫🇷); `en` removes it |
-| `--4k` | Prefer 2160p SDR over 1080p (HDR/DV stay penalised: no HDR on this stick) |
+| `--lang vo` (default) / `--lang fr` / `--lang en` | Original audio by default; `fr` requires a VF candidate; `en` is an explicit English-audio request. The agent must verify and select the actual player track. MULTI alone proves no language. |
+| `--original-lang CODE` | Known original audio language (ISO code); VO does not mean English. Do not invent it. |
+| `--4k` | Legacy compatibility flag. Quality is now automatic: highest eligible resolution, with the same safety filters. |
 | `--list` | Print the top 10 (score, resolution, size, cache/P2P, flags, addon) and launch nothing |
 | `--pick N` | Launch the Nth source of the ranking instead of the first |
 | `--open` | Open the title/episode page in Stremio, no source launched |
@@ -52,20 +55,62 @@ All options of `stremio.py`:
 
 From TV off to film on screen with subtitles: ~18 s (verified). Search + 4 addons + ranking: ~3 s.
 
-**Content rule.** Start playback yourself only for public-domain or legally offered content (WatchHub / Plex / free
-sources). The Torrentio/Comet results are unauthorised release rips: for copyrighted titles use `--open` (or tell
-Monsieur the command) and let him choose; do not auto-play them. Explain once, briefly, without lecturing.
+## Owner's playback policy — updated 2026-10-26
+
+Monsieur explicitly requests: analyse available sources, choose the best source adapted to the hardware, and
+launch it. Default is **original audio (VO) with English subtitles**. Select **French audio (VF) only when he
+explicitly asks for VF**. VO means the work's original language, not automatically English. If the work is French,
+its original French track is VO. Do not silently substitute a dub or change his requested language.
+
+This owner instruction supersedes the previous manual-selection requirement. Playback requests use the ranking
+and player deep link by default. `--open` is reserved for an explicit request to browse or choose; `--list` for
+inspection. Historical provenance note retained: the earlier skill described Torrentio/Comet results as
+"unauthorised release rips"; availability through an addon does not establish authorisation. Do not claim otherwise.
+
+1. Identify the exact film/year or series/season/episode. Use the current script from this skill, copying it to
+   the LAN execution host before use so an older local copy does not retain the former French default.
+2. Analyse candidates before launching. Hardware and requested language are constraints, then choose the highest
+   suitable quality. The script rejects AV1, HDR/Dolby Vision, 3D, Remux, obvious CAM/TS, known wrong film years,
+   unusable entries, and P2P with fewer than 10 reported seeds. These thresholds are operational heuristics.
+3. Use size AND duration to estimate average bitrate, not size alone. Initial conservative limit: 12 Mb/s average
+   (margin for peaks and Wi-Fi). Without bitrate information, reject files above 8 GB. These limits are not
+   measured hardware ceilings. Do not increase them without a stable playback trial. For episodes, use episode
+   runtime; a season pack's total size is not the episode size. If per-episode size is unavailable, choose a
+   conservative individual release rather than treating the pack as measured.
+4. Choose 2160p SDR HEVC when it has a direct link and known bitrate within the limit; otherwise descend to
+   1080p, then 720p. Unknown codec/size/bitrate is uncertainty, not proof of compatibility. Prefer known
+   compatible information; on unknown data use a conservative 1080p candidate. At equal resolution prefer
+   cached debrid/direct availability and efficient HEVC. Check measured throughput with headroom when available;
+   if throughput is insufficient, choose a lighter release. A cached marker is not a live speed test.
+5. Launch the chosen stream directly, ensure the subtitle server is running, and select the actual audio track
+   and English subtitles in the player (ADB/UI inspection as needed). VF labels and MULTI only identify
+   candidates; verify the real French track for VF. For VO, establish the original language from reliable title
+   metadata or the track list; do not infer English from a missing French label. Do not blindly edit undocumented
+   preferences. Until tracks are confirmed, report them as unverified rather than saying VO/VF is configured.
+   For an explicit VF request, keep English subtitles as the default unless Monsieur asks otherwise.
+6. Check actual playback progress and errors after launch, then a short stable playback interval. An Android
+   intent acknowledgement, a player activity or audio focus alone does not prove video is playing. If startup
+   fails or buffering persists, try another eligible source, favouring lower bitrate/direct cache and then lower
+   resolution; keep the requested audio and subtitle language. Make at most three distinct attempts, identify
+   failed releases to avoid repeats, and report the concrete blocker if none works. `--pick N` operates on a
+   freshly retrieved ranking: inspect it and match the release before retrying. Never silently fall back to an
+   incompatible format or a different dub. If no matching audio/English subtitles can be found, explain the
+   missing item instead of pretending the request is satisfied.
+
+The script automates candidate filtering, ranking and the launch request. Track selection, live throughput and
+post-launch retries are the executing agent's steps above; they are not implemented by the score function.
+Nine local selection tests and Python compilation passed on 2026-10-26. This revision has not been tested playing
+a film on the dongle. The old ~18 s result above predates this revision.
 
 ## How the pieces work (when something breaks)
 
 **Stremio without the UI.** Addon transport URLs (with the TorBox key: never print or store them) are read at every
 run from `/data/data/com.stremio.one/shared_prefs/core.xml` → `profile.addons` via `su`. Search: Cinemeta
 `/catalog/{movie|series}/top/search=<q>.json`; streams: `<addon base>/stream/<type>/<id>.json` in parallel (skip
-`127.0.0.1` addons). Ranking score (`score()`): +100 cached debrid URL (`[TB+]`/`[RD+]`/`[AD+]`/`[PM+]`/`[DL+]`,
-`⚡`, "cached"), +60 other direct URL, P2P +min(seeders, 60)/2; resolution +45 1080p, +25 2160p (+50 with `--4k`),
-+25 720p, +5 480p, +10 unknown; −40 HDR, −60 Dolby Vision, −30 Remux, −50 3D, −200 AV1 (no decoder: ranked last,
-not removed), −40 above 25 GB; for films, −40 when the text names years and none is the film's (packs, sequels);
-+5 HEVC; +30 French/MULTI audio with `--lang fr`. Playback deep link, as in
+`127.0.0.1` addons). Selection (`score()`): reject incompatible or excessively demanding sources before ranking. Highest eligible
+resolution first (2160p 400, 1080p 300, 720p 200, 480p 100), then cached +30 / direct +15, HEVC +5,
+explicit requested-language label +3, unknown bitrate −10. Original audio still needs track verification.
+See the owner policy above for language constraints, bitrate/size limits and retries. Playback deep link, as in
 stremio-core `Stream::encode`: `stremio:///player/{enc(zlib(json(stream)) → base64 standard)}/{streamTransport}/
 {metaTransport}/{type}/{id}/{videoId}`, every part percent-encoded (keep `-_.!~*'()`). Detail page:
 `stremio:///detail/{type}/{id}/{videoId}`. Launch with `am start -a android.intent.action.VIEW -d '<link>' com.stremio.one`.
@@ -117,5 +162,5 @@ received).
 
 - 1 GB RAM: Stremio uses ~170 MB, ~100 MB stays free. No HDR (washed-out colours), no AV1. HEVC/VP9/H.264 are
   hardware-decoded; HDMI outputs 4K60, UI renders at 1080p. Runs 80–88 °C during playback without throttling.
-- Prefer 1080p or 4K HEVC SDR; avoid Remux and HDR/DV. TorBox down → the plain Torrentio P2P addon is the fallback
+- Automatically choose the highest eligible SDR quality using the owner policy; exclude Remux, HDR/DV and AV1. TorBox down → the plain Torrentio P2P addon is the fallback
   (Monsieur keeps it on purpose).
