@@ -420,15 +420,21 @@ def print_state(host, meta_id, video_id):
     """Lecture en cours (media session) et piste audio retenue par Stremio pour ce titre."""
     out = adb(host, "shell", "dumpsys", "media_session", check=False)
     block = out.split(f"package={STREMIO_PKG}", 1)[1][:1500] if f"package={STREMIO_PKG}" in out else ""
-    m = re.search(r"state=PlaybackState \{state=(\d+), position=(\d+)", block)
+    m = re.search(r"state=PlaybackState \{state=(\d+), position=(\d+).*?speed=([\d.]+), updated=(\d+)", block)
     d = re.search(r"description=([^\n]*)", block)
     names = {"0": "aucun", "1": "arrêté", "2": "en pause", "3": "en lecture", "6": "chargement", "7": "erreur"}
     if m:
-        print(f"   lecteur : {names.get(m.group(1), m.group(1))}, position {int(m.group(2)) // 1000} s"
+        state, pos, speed, updated = m.group(1), int(m.group(2)), float(m.group(3)), int(m.group(4))
+        # `position` is a snapshot taken at `updated` (elapsedRealtime ms), not republished while playing:
+        # the real position is position + (now - updated) * speed (verified 2026-10-26: raw 8:37, screen 17:59).
+        now = re.search(r"nowELAPSED=(\d+)", adb(host, "shell", "dumpsys", "alarm", check=False))
+        if state == "3" and now:
+            pos += int((int(now.group(1)) - updated) * speed)
+        mm, ss = divmod(pos // 1000, 60)
+        print(f"   lecteur : {names.get(state, state)}, position ≈ {mm}:{ss:02d}"
               + (f", « {d.group(1).strip()} »" if d else ""))
     else:
         print("   lecteur : aucune session Stremio active")
-    print("   (relancer --state après quelques secondes : la position doit avancer)")
     core = read_core(host)
     state = saved_state(core, meta_id, video_id)
     track, sub = state.get("audioTrack"), state.get("subtitleTrack")
