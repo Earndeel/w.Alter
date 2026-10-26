@@ -4,6 +4,7 @@ Each problem is a dict {key, kind, subject, detail}; `key` is stable across chec
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -95,6 +96,26 @@ def tests(root=None) -> list[dict]:
             for node, why in res["failures"].items() if node.split("::")[0] not in busy]
 
 
+def docs_check() -> dict:
+    """`walter-router docs --check`: the generated reference against code and schema. {} when the installed version
+    has no generated reference."""
+    proc = subprocess.run(["walter-router", "docs", "--check"], capture_output=True, text=True, timeout=600)
+    if "invalid choice" in proc.stderr:
+        return {}
+    try:
+        return json.loads(proc.stdout)
+    except ValueError:
+        return {"ok": False, "error": (proc.stderr or proc.stdout)[-500:]}
+
+
+def docs() -> list[dict]:
+    out = docs_check()
+    if not out or out.get("ok"):
+        return []
+    return [{"key": "docs", "kind": "docs_stale", "subject": "docs/reference",
+             "detail": {"stale": out.get("stale") or [], "error": out.get("error")}}]
+
+
 def detect(conn, with_tests: bool = True) -> list[dict]:
-    found = sources(conn) + cycle(conn) + providers(conn)
+    found = sources(conn) + cycle(conn) + providers(conn) + docs()
     return found + (tests() if with_tests else [])
