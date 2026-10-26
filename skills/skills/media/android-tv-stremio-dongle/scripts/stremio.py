@@ -8,6 +8,8 @@ dongle D6 et la lance directement dans le lecteur de Stremio. Aucune navigation 
   python3 stremio.py "alien" --pick 3                  lance la 3e source du classement
   python3 stremio.py "south park" --s 12 --e 6 --open  ouvre la fiche, l'utilisateur choisit la source
   python3 stremio.py --on / --off                     allume ou éteint la télé
+  python3 stremio.py "alien" --pick 2 --probe          pistes audio réelles de la 2e source, sans lancer
+  python3 stremio.py "alien" --state                   lecture en cours + piste audio retenue par Stremio
   options : --lang fr (VF explicite), --lang vo (défaut), --original-lang CODE, --host IP
   Qualité automatique : meilleure résolution admissible; --4k est conservé par compatibilité.
 
@@ -18,7 +20,7 @@ puis s'assure que le serveur de Stremio tourne (sinon pas de sous-titres) avant 
 Les adresses des addons (avec ta clé TorBox) sont lues sur le dongle à chaque lancement et ne sont
 jamais affichées ni écrites sur le disque.
 """
-import argparse, base64, json, re, subprocess, sys, time, unicodedata, zlib
+import argparse, base64, json, os, re, shutil, subprocess, sys, time, unicodedata, zlib
 import urllib.parse, urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -27,6 +29,9 @@ CINEMETA = "https://v3-cinemeta.strem.io"
 STREMIO_PKG = "com.stremio.one"
 # Comme URI_COMPONENT_ENCODE_SET dans stremio-core : tout sauf A-Z a-z 0-9 - _ . ! ~ * ' ( )
 SAFE = "-_.!~*'()"
+# Par ssh non interactif, le PATH du Mac n'inclut pas Homebrew : adb et ffprobe y sont pourtant.
+os.environ["PATH"] = os.pathsep.join([os.environ.get("PATH", ""), "/usr/local/bin", "/opt/homebrew/bin"])
+FRENCH_CODES = {"fr", "fre", "fra", "french", "francais"}
 
 
 def adb(host, *args, check=True):
@@ -47,12 +52,19 @@ def norm(s):
     return re.sub(r"[^a-z0-9]+", " ", s).strip()
 
 
-def read_addons(host):
-    """Les addons installés, lus dans le profil de Stremio sur le dongle (root nécessaire)."""
+def read_core(host):
+    """L'état de Stremio sur le dongle (root nécessaire) : profil (addons, réglages) et `streams`."""
     xml = adb(host, "shell", "su", "-c", f"'cat /data/data/{STREMIO_PKG}/shared_prefs/core.xml'")
-    root = ET.fromstring(xml)
-    profile = json.loads(next(e.text for e in root if e.get("name") == "profile"))
-    return profile["addons"]
+    return {e.get("name"): e.text for e in ET.fromstring(xml)}
+
+
+def read_profile(host):
+    return json.loads(read_core(host)["profile"])
+
+
+def read_addons(host):
+    """Les addons installés, lus dans le profil de Stremio sur le dongle."""
+    return read_profile(host)["addons"]
 
 
 def stream_addons(addons, kind, imdb_id):
@@ -155,12 +167,17 @@ def score(s, want_4k=False, lang="vo", year=None, runtime_minutes=None, original
         rejected.append("qualité ou format inadapté")
 
     # MULTI ne garantit aucune langue : c'est une piste à vérifier dans le lecteur.
-    french = bool(re.search(r"\b(?:vff|vf2?|truefrench|french|francais|vfq)\b|🇫🇷", t))
+    french_tag = bool(re.search(r"\b(?:vff|vfi|vf2?|truefrench|french|francais|vfq)\b", t))
+    french = french_tag or "🇫🇷" in t
     multi = bool(re.search(r"\bmulti\b|dual[ ._-]*audio", t))
     vo = bool(re.search(r"\b(?:vo|vost|vostfr|vosten|original)\b", t))
+    vostfr = bool(re.search(r"\b(?:vostfr|subfrench|stfr)\b", t))
     if lang == "fr":
         if not (french or multi or original_lang == "fr"):
             rejected.append("VF non indiquée")
+        # VOSTFR = audio original + sous-titres français ; le drapeau 🇫🇷 de l'addon ne fait pas une VF.
+        if vostfr and not multi and not re.search(r"\b(?:vff|vfi|vf2?|truefrench|vfq)\b", t):
+            rejected.append("VOSTFR : audio original")
         info["audio"] = "VF indiquée" if french else "VF à vérifier"
     else:
         if french and not (multi or vo or original_lang == "fr"):
@@ -205,6 +222,8 @@ def score(s, want_4k=False, lang="vo", year=None, runtime_minutes=None, original
     pts += 30 if info["cached"] else (15 if s.get("url") else 0)
     pts += 5 if "HEVC" in info["flags"] else 0
     pts += 3 if (lang == "fr" and french) or (lang == "vo" and vo) else 0
+    # VF seule : joue en français sans bascule (le profil Stremio préfère l'anglais sur une MULTi).
+    pts += 4 if lang == "fr" and french_tag and not multi else 0
     if bitrate is None:
         pts -= 10
         info["flags"].append("DÉBIT?")
@@ -299,6 +318,133 @@ def ensure_server(host, timeout=45):
     return False
 
 
+def mask(text):
+    """Les liens debrid et les adresses d'addons contiennent les clés : jamais affichés."""
+    return re.sub(r"\b[a-z][a-z0-9+.-]*://\S+", "<url>", str(text), flags=re.I)
+
+
+def is_french(code_or_title):
+    words = set(norm(code_or_title or "").split())
+    return bool(words & (FRENCH_CODES | {"vf", "vff", "vfi", "vfq", "vf2", "truefrench"}))
+
+
+def probe_tracks(url, timeout=90):
+    """Pistes réelles du fichier par ffprobe (sur l'hôte qui exécute le script, pas le dongle)."""
+    exe = shutil.which("ffprobe")
+    if not exe:
+        return None, "ffprobe introuvable sur cet hôte (Mac : /usr/local/bin/ffprobe)"
+    try:
+        r = subprocess.run([exe, "-v", "error", "-show_entries",
+                            "stream=index,codec_type,codec_name,channels,width,height:stream_tags=language,title"
+                            ":stream_disposition=default", "-of", "json", url],
+                           capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return None, f"ffprobe sans réponse après {timeout} s (source lente ou non mise en cache)"
+    if r.returncode != 0:
+        return None, "ffprobe a échoué : " + mask(r.stderr.strip())[:300]
+    return json.loads(r.stdout or "{}").get("streams", []), None
+
+
+def saved_state(core, meta_id, video_id):
+    """État de lecture que Stremio a retenu pour ce titre (épisode, sinon série) : pistes, décalages."""
+    items = json.loads(core.get("streams") or "{}").get("items", [])
+    hit = next((v for k, v in items if k.get("videoId") == video_id), None) or \
+        next((v for k, v in items if k.get("metaId") == meta_id), None)
+    return (hit or {}).get("state") or {}
+
+
+def saved_track(core, meta_id, video_id):
+    """Piste audio que Stremio a retenue pour ce titre, ou None."""
+    return saved_state(core, meta_id, video_id).get("audioTrack")
+
+
+def audio_verdict(tracks, lang, preferred, release_text, saved=None):
+    """Ce que le lecteur jouera, d'après les pistes, la piste retenue pour ce titre et le profil."""
+    audio = [t for t in tracks if t.get("codec_type") == "audio"]
+    if not audio:
+        return "aucune piste audio détectée"
+    tag = lambda t: (t.get("tags") or {})
+    fr = [t for t in audio if is_french(tag(t).get("language")) or is_french(tag(t).get("title"))]
+    pref = [t for t in audio if (tag(t).get("language") or "").lower() == (preferred or "").lower()]
+    if lang != "fr":
+        return (f"{len(audio)} piste(s) audio ; le lecteur prendra « {preferred} » si elle existe"
+                + ("" if pref else ", sinon la piste par défaut du fichier") + ". Vérifier la VO.")
+    if len(audio) == 1:
+        if fr or re.search(r"\b(?:vff|vfi|vf2?|truefrench|french|vfq)\b", release_text.lower()):
+            return "VF OK : une seule piste audio, release française. Rien à basculer."
+        return "VF NON PROUVÉE : une seule piste, sans étiquette française. Choisir une autre source."
+    if not fr:
+        return "VF ABSENTE : aucune piste étiquetée français. Choisir une autre source."
+    if saved and is_french(saved.get("language")):
+        return (f"VF présente (piste #{fr[0]['index']}) ; Stremio a déjà retenu le français pour ce titre "
+                "et devrait le reprendre. Contrôler avec --state après le lancement.")
+    if pref:
+        if pref[0] in fr:
+            return (f"VF présente (piste #{pref[0]['index']}) et conforme à la langue du profil : "
+                    "le lecteur devrait la prendre. Contrôler avec --state.")
+        return (f"VF présente (piste #{fr[0]['index']}), mais le profil Stremio préfère « {preferred} » : "
+                "le lecteur devrait démarrer sur cette langue. Basculer l'audio en français dans le lecteur "
+                "(skill, « Getting French audio »), puis contrôler avec --state.")
+    default = [t for t in audio if (t.get("disposition") or {}).get("default")]
+    if len(default) == 1 and default[0] in fr:
+        return (f"VF présente (piste #{fr[0]['index']}, piste par défaut du fichier) ; aucune piste dans la "
+                f"langue du profil (« {preferred} ») : le lecteur devrait prendre la VF, NON GARANTI. "
+                "Contrôler après lancement (menu audio ou --state).")
+    return (f"VF présente (piste #{fr[0]['index']}), mais rien n'établit la piste que le lecteur prendra "
+            "(pas de piste dans la langue du profil, défaut du fichier absent ou non français) : INCERTAIN. "
+            "Basculer en français dans le lecteur si besoin, puis contrôler.")
+
+
+def print_probe(stream, lang, preferred, saved=None):
+    text = "\n".join(str(stream.get(k, "")) for k in ("name", "title", "description"))
+    if not stream.get("url"):
+        print("   source pair-à-pair (sans lien direct) : pistes non sondables avant lancement")
+        return
+    tracks, err = probe_tracks(stream["url"])
+    if err:
+        print("   " + err)
+        return
+    for t in tracks:
+        tags, kind = t.get("tags") or {}, t.get("codec_type")
+        if kind == "video":
+            print(f"   vidéo #{t['index']}  {t.get('codec_name')}  {t.get('width')}x{t.get('height')}")
+        elif kind == "audio":
+            default = " défaut" if (t.get("disposition") or {}).get("default") else ""
+            print(f"   audio #{t['index']}  {t.get('codec_name')}  {t.get('channels')}ch  "
+                  f"langue={tags.get('language', '?')}  titre={mask(tags.get('title', '-'))}{default}")
+    print("   → " + audio_verdict(tracks, lang, preferred, text, saved))
+
+
+def print_state(host, meta_id, video_id):
+    """Lecture en cours (media session) et piste audio retenue par Stremio pour ce titre."""
+    out = adb(host, "shell", "dumpsys", "media_session", check=False)
+    block = out.split(f"package={STREMIO_PKG}", 1)[1][:1500] if f"package={STREMIO_PKG}" in out else ""
+    m = re.search(r"state=PlaybackState \{state=(\d+), position=(\d+)", block)
+    d = re.search(r"description=([^\n]*)", block)
+    names = {"0": "aucun", "1": "arrêté", "2": "en pause", "3": "en lecture", "6": "chargement", "7": "erreur"}
+    if m:
+        print(f"   lecteur : {names.get(m.group(1), m.group(1))}, position {int(m.group(2)) // 1000} s"
+              + (f", « {d.group(1).strip()} »" if d else ""))
+    else:
+        print("   lecteur : aucune session Stremio active")
+    print("   (relancer --state après quelques secondes : la position doit avancer)")
+    core = read_core(host)
+    state = saved_state(core, meta_id, video_id)
+    track, sub = state.get("audioTrack"), state.get("subtitleTrack")
+    settings = json.loads(core["profile"]).get("settings", {})
+    if track:
+        print(f"   piste audio retenue pour ce titre : {track.get('language')} (id {track.get('id')})")
+    else:
+        print(f"   aucune piste audio retenue pour ce titre : le lecteur suit le profil "
+              f"(« {settings.get('audioLanguage')} »)")
+    if sub:
+        print(f"   sous-titres retenus pour ce titre : {sub.get('language') or '?'} (id {mask(sub.get('id'))})")
+    else:
+        print(f"   aucun sous-titre retenu pour ce titre : profil « {settings.get('subtitlesLanguage')} », "
+              f"sélection auto {'oui' if settings.get('subtitlesAutoSelect') else 'non'}")
+    print("   sous-titres anglais : à confirmer à l'écran (capture), --state ne le prouve pas")
+
+
 def player_link(stream, stream_transport, meta_transport, kind, meta_id, video_id):
     # stremio-core Stream::encode : JSON -> zlib -> base64 standard, puis encodage URI composant.
     enc = base64.b64encode(zlib.compress(json.dumps(stream, separators=(",", ":")).encode())).decode()
@@ -321,6 +467,10 @@ def main():
     ap.add_argument("--list", action="store_true", help="classer sans lancer")
     ap.add_argument("--open", action="store_true", help="ouvrir la fiche dans Stremio sans lancer de source")
     ap.add_argument("--pick", type=int, default=1)
+    ap.add_argument("--probe", action="store_true",
+                    help="sonder les pistes audio réelles de la source --pick, sans rien lancer")
+    ap.add_argument("--state", action="store_true",
+                    help="lecture en cours et piste audio retenue par Stremio pour ce titre")
     ap.add_argument("--host", default="192.168.1.37")
     a = ap.parse_args()
 
@@ -329,7 +479,8 @@ def main():
     if a.on or not a.query:
         return tv_on(a.host)
     kind = "series" if a.s else "movie"
-    if not a.list:
+    inspect = a.list or a.probe or a.state
+    if not inspect:
         tv_on(a.host)
     elif not reachable(a.host):
         sys.exit("Dongle injoignable.")
@@ -338,6 +489,8 @@ def main():
     print(f"→ {meta['name']} ({meta.get('releaseInfo', '?')})  [{meta['id']}]")
     if len(others) > 1:
         print("   autres : " + " · ".join(f"{m['name']} ({m.get('releaseInfo', '?')})" for m in others[1:4]))
+    if a.state:
+        return print_state(a.host, meta["id"], video_id)
     if a.open:
         q = lambda s: urllib.parse.quote(s, safe=SAFE)
         link = f"stremio:///detail/{kind}/{q(meta['id'])}/{q(video_id)}"
@@ -350,7 +503,9 @@ def main():
     except Exception:
         details = {}
     runtime = get_runtime(details, kind, a.s, a.e or 1)
-    addons = stream_addons(read_addons(a.host), kind, meta["id"])
+    core = read_core(a.host)
+    profile = json.loads(core["profile"])
+    addons = stream_addons(profile["addons"], kind, meta["id"])
     results = fetch_streams(addons, kind, video_id)
     year = re.match(r"\d{4}", str(meta.get("releaseInfo", ""))) if kind == "movie" else None
     ranked = []
@@ -377,12 +532,18 @@ def main():
     if not 1 <= a.pick <= len(ranked):
         sys.exit("Numéro de source hors classement.")
     pts, info, name, transport, stream = ranked[a.pick - 1]
+    if a.probe:
+        lines = (stream.get("title") or stream.get("description") or "").splitlines()
+        print(f"? sonde n°{a.pick} : {mask(lines[0] if lines else name)[:90]}")
+        return print_probe(stream, a.lang, profile.get("settings", {}).get("audioLanguage"),
+                           saved_track(core, meta["id"], video_id))
     link = player_link(stream, transport, f"{CINEMETA}/manifest.json", kind, meta["id"], video_id)
     if not ensure_server(a.host):
         sys.exit("Serveur de sous-titres indisponible : lecture interrompue, à réparer.")
     out = adb(a.host, "shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", f"'{link}'", STREMIO_PKG)
     print(f"▶ lancement demandé : n°{a.pick} ({name}, {info['res']}, {info['audio']}). "
-          "Vérifier les pistes audio et sous-titres anglais ainsi que la progression du lecteur."
+          "Contrôler la lecture et la piste audio avec --state (mêmes arguments), "
+          "puis vérifier les sous-titres anglais à l'écran."
           if "Error" not in out else "Stremio a refusé le lancement.")
 
 
