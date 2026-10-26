@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-26T11:12:51.764859+00:00",
+ "description": "Use when playing a title in Stremio on an Android TV box from a computer on the same network without using its UI, fixing missing Stremio subtitles, turning the TV on/off over HDMI-CEC, or auditing/debloating a cheap Android TV stick.",
+ "domain": "media",
+ "kind": "new",
+ "reason": "Reusable procedure, learned and verified with the user in a Claude Code session on 2026-10-26: drive Stremio on an Android TV box without its UI (addon API + player deep links), fix subtitles via the local server, control the TV over HDMI-CEC including raw CEC on Allwinner, keep cheap sticks reachable, audit/debloat safely. Generic: no addresses, models or household setup.",
+ "runtime": "claude-code",
+ "session_id": null,
+ "target": "android-tv-stremio-remote-control"
+}
