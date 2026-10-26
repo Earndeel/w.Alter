@@ -8,12 +8,14 @@
     "ops/browse-display-container.sh",
     "ops/camoufox-max-display.conf",
     "ops/walter-exit-mac.service",
-    "ops/camoufox-max-identity.conf"
+    "ops/camoufox-max-identity.conf",
+    "ops/cloakbrowser-max.service"
   ],
   "requires": [],
   "external": [
     "Scrapling isolated environment",
     "Camoufox :9377 (display :101, Selkies walter-browse-display, Tailscale :3011)",
+    "CloakBrowser Chromium :9378 (free v146 linux-arm64 build, ~/.cloakbrowser; same display :101)",
     "optional Webtop CDP"
   ],
   "data": [
@@ -51,6 +53,7 @@
   ],
   "services": [
     "camoufox-max",
+    "cloakbrowser-max",
     "walter-browse-display",
     "walter-exit-mac"
   ],

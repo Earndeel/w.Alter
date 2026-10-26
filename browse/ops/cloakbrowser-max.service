@@ -1,0 +1,41 @@
+# Walter's Chromium browser (2026-10-26): same server and HTTP API as camoufox-max, engine = CloakBrowser (Chromium
+# patched at the C++ level, free v146 build on linux-arm64, no key). For sites that need Chromium; Camoufox stays the
+# default. Same default exit through the owner's Mac, identity from the exit IP, owner-cookie rule, display :101.
+# Install: copy to /etc/systemd/system/. Persona fonts: %h/.cloakbrowser/fonts.conf (owner's Mac fonts, this unit only).
+[Unit]
+Description=CloakBrowser MAX stealth Chromium server (W.Alter, :9378)
+After=network-online.target tailscaled.service walter-browse-display.service walter-exit-mac.service
+Wants=network-online.target walter-exit-mac.service
+Requires=walter-browse-display.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=%h/.hermes/camoufox-max
+EnvironmentFile=-/etc/walter/browse-identity.env
+Environment=CAMOFOX_ENGINE=chromium
+Environment=CAMOFOX_MAX_PORT=9378
+Environment=CAMOFOX_MAX_HOST=127.0.0.1
+Environment=CAMOFOX_DATA_DIR=%h/.cloakbrowser-max-data
+Environment=CLOAKBROWSER_CACHE_DIR=%h/.cloakbrowser
+Environment=FONTCONFIG_FILE=%h/.cloakbrowser/fonts.conf
+Environment=DISPLAY=:101
+Environment=CAMOUFOX_HEADLESS=false
+Environment=NODE_ENV=production
+ExecStartPre=/usr/bin/test -x %h/.cloakbrowser/chromium-146.0.7680.177.3/chrome
+ExecStart=/usr/bin/node %h/.hermes/camoufox-max/server-max.js
+Restart=always
+RestartSec=10
+TimeoutStartSec=120
+TimeoutStopSec=30
+KillMode=mixed
+MemoryHigh=1G
+MemoryMax=2G
+OOMPolicy=continue
+StandardOutput=append:/var/log/cloakbrowser-max.log
+StandardError=append:/var/log/cloakbrowser-max.log
+
+[Install]
+WantedBy=multi-user.target
