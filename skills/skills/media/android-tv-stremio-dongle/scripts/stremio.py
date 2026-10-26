@@ -8,7 +8,8 @@ dongle D6 et la lance directement dans le lecteur de Stremio. Aucune navigation 
   python3 stremio.py "alien" --pick 3                  lance la 3e source du classement
   python3 stremio.py "south park" --s 12 --e 6 --open  ouvre la fiche, l'utilisateur choisit la source
   python3 stremio.py --on / --off                     allume ou éteint la télé
-  options : --4k (préférer la 4K SDR), --lang en (au lieu du français), --host IP
+  options : --lang fr (VF explicite), --lang vo (défaut), --original-lang CODE, --host IP
+  Qualité automatique : meilleure résolution admissible; --4k est conservé par compatibilité.
 
 Le dongle ne se met jamais en veille profonde (verrou noyau) : quand la télé est éteinte, il reste
 joignable écran éteint. Le lancer d'un film réveille son écran, ce qui allume la télé par HDMI-CEC,
@@ -95,7 +96,7 @@ def fetch_streams(addons, kind, video_id):
         return list(ex.map(one, addons))
 
 
-def score(s, want_4k, lang, year=None):
+def legacy_score(s, want_4k, lang, year=None):
     text = f"{s.get('name', '')}\n{s.get('title', '')}\n{s.get('description', '')}"
     t = text.lower()
     info = {"cached": False, "res": "?", "size_gb": None, "seeds": None, "flags": []}
@@ -132,6 +133,95 @@ def score(s, want_4k, lang, year=None):
         info["flags"].append("FR")
         pts += 30
     return pts, info
+
+
+def score(s, want_4k=False, lang="vo", year=None, runtime_minutes=None, original_lang=None):
+    """Filtrer avant de classer. Les limites de débit sont prudentes, pas un benchmark du Wi-Fi."""
+    text = "\n".join(str(s.get(k, "")) for k in ("name", "title", "description"))
+    t = text.lower()
+    _, info = legacy_score(s, want_4k, lang, None)
+    rejected = []
+    info["rejected"] = rejected
+    original_lang = (original_lang or "").lower()
+    years = set(re.findall(r"\b(?:19[2-9]\d|20[0-4]\d)\b", t))
+    if year and years and str(year) not in years:
+        rejected.append("mauvaise année")
+    if not (s.get("url") or s.get("infoHash")):
+        rejected.append("pas de flux lisible")
+    for flag in ("HDR", "DV", "AV1", "3D", "REMUX"):
+        if flag in info["flags"]:
+            rejected.append(flag)
+    if re.search(r"\b(?:cam|hdcam|hdts|telesync|telecine|screener|8k|4320p)\b", t):
+        rejected.append("qualité ou format inadapté")
+
+    # MULTI ne garantit aucune langue : c'est une piste à vérifier dans le lecteur.
+    french = bool(re.search(r"\b(?:vff|vf2?|truefrench|french|francais|vfq)\b|🇫🇷", t))
+    multi = bool(re.search(r"\bmulti\b|dual[ ._-]*audio", t))
+    vo = bool(re.search(r"\b(?:vo|vost|vostfr|vosten|original)\b", t))
+    if lang == "fr":
+        if not (french or multi or original_lang == "fr"):
+            rejected.append("VF non indiquée")
+        info["audio"] = "VF indiquée" if french else "VF à vérifier"
+    else:
+        if french and not (multi or vo or original_lang == "fr"):
+            rejected.append("doublage français seul")
+        info["audio"] = "VO à vérifier"
+        # Une VO n'est pas forcément anglaise. --lang en reste une demande explicite.
+        if lang == "en" and not (re.search(r"\b(?:english|eng)\b|🇬🇧|🇺🇸", t) or multi or original_lang == "en"):
+            rejected.append("audio anglais non indiqué")
+
+    size = (s.get("behaviorHints") or {}).get("videoSize")
+    if isinstance(size, (int, float)) and size > 0:
+        info["size_gb"] = size / 1_000_000_000
+    else:
+        m = re.search(r"([\d]+(?:[.,]\d+)?)\s*(gib|gb|go|mib|mb|mo)\b", t)
+        if m:
+            amount = float(m.group(1).replace(",", "."))
+            unit = m.group(2)
+            info["size_gb"] = amount * {"gib": 1.073741824, "gb": 1, "go": 1,
+                                           "mib": .001048576, "mb": .001, "mo": .001}[unit]
+    bitrate = None
+    if runtime_minutes and info["size_gb"]:
+        bitrate = info["size_gb"] * 8000 / (runtime_minutes * 60)
+    else:
+        m = re.search(r"(\d+(?:[.,]\d+)?)\s*(mbps|mb/s|kbps)\b", t)
+        if m:
+            bitrate = float(m.group(1).replace(",", ".")) / (1000 if m.group(2) == "kbps" else 1)
+    info["bitrate_mbps"] = bitrate
+    # 12 Mb/s moyens : marge pour pointes, Wi-Fi et seulement 1 Go de RAM.
+    # À relever seulement après un essai de lecture stable sur le dongle.
+    if bitrate is not None and bitrate > 12:
+        rejected.append("débit moyen > 12 Mb/s")
+    if bitrate is None and info["size_gb"] and info["size_gb"] > 8:
+        rejected.append("fichier > 8 Go sans débit connu")
+    if info["res"] == "2160p":
+        if "HEVC" not in info["flags"] or bitrate is None or not s.get("url"):
+            rejected.append("4K sans HEVC, débit connu ou lien direct")
+    if s.get("infoHash") and not s.get("url") and (info["seeds"] or 0) < 10:
+        rejected.append("P2P insuffisamment disponible")
+
+    # La meilleure résolution admissible prime; à qualité égale, cache et HEVC.
+    pts = {"2160p": 400, "1080p": 300, "720p": 200, "480p": 100}.get(info["res"], 50)
+    pts += 30 if info["cached"] else (15 if s.get("url") else 0)
+    pts += 5 if "HEVC" in info["flags"] else 0
+    pts += 3 if (lang == "fr" and french) or (lang == "vo" and vo) else 0
+    if bitrate is None:
+        pts -= 10
+        info["flags"].append("DÉBIT?")
+    return pts, info
+
+
+def get_runtime(meta, kind, season=None, episode=None):
+    """Ne pas appliquer la durée d'un film ou d'un pack à un épisode."""
+    value = meta.get("runtime")
+    if kind == "series":
+        videos = meta.get("videos") or []
+        video = next((v for v in videos if v.get("season") == season and v.get("episode") == episode), {})
+        value = video.get("runtime") or value
+    if isinstance(value, (int, float)):
+        return float(value) if value > 0 else None
+    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*(?:min(?:utes?)?)?\s*", str(value or ""), re.I)
+    return float(m.group(1)) if m and float(m.group(1)) > 0 else None
 
 
 def reachable(host):
@@ -205,7 +295,7 @@ def ensure_server(host, timeout=45):
         time.sleep(1)
         if server_up(host):
             return True
-    print("   le serveur n'a pas démarré : lecture sans sous-titres")
+    print("   le serveur de sous-titres n'a pas démarré")
     return False
 
 
@@ -225,7 +315,9 @@ def main():
     ap.add_argument("--s", type=int, help="saison (série)")
     ap.add_argument("--e", type=int, help="épisode (série)")
     ap.add_argument("--4k", dest="want_4k", action="store_true")
-    ap.add_argument("--lang", default="fr")
+    ap.add_argument("--lang", choices=("vo", "fr", "en"), default="vo",
+                    help="VO par défaut; fr pour une demande VF explicite")
+    ap.add_argument("--original-lang", help="langue originale ISO connue (VO ne signifie pas anglais)")
     ap.add_argument("--list", action="store_true", help="classer sans lancer")
     ap.add_argument("--open", action="store_true", help="ouvrir la fiche dans Stremio sans lancer de source")
     ap.add_argument("--pick", type=int, default=1)
@@ -253,6 +345,11 @@ def main():
         print("▶ fiche ouverte dans Stremio")
         return
 
+    try:
+        details = get_json(f"{CINEMETA}/meta/{kind}/{meta['id']}.json").get("meta", {})
+    except Exception:
+        details = {}
+    runtime = get_runtime(details, kind, a.s, a.e or 1)
     addons = stream_addons(read_addons(a.host), kind, meta["id"])
     results = fetch_streams(addons, kind, video_id)
     year = re.match(r"\d{4}", str(meta.get("releaseInfo", ""))) if kind == "movie" else None
@@ -260,26 +357,35 @@ def main():
     for name, transport, streams, err in results:
         print(f"   {name:28} {'erreur ' + err if err else str(len(streams)) + ' sources'}")
         for s in streams:
-            pts, info = score(s, a.want_4k, a.lang, year.group(0) if year else None)
-            ranked.append((pts, info, name, transport, s))
+            pts, info = score(s, a.want_4k, a.lang, year.group(0) if year else None,
+                              runtime, a.original_lang)
+            if not info["rejected"]:
+                ranked.append((pts, info, name, transport, s))
     ranked.sort(key=lambda r: -r[0])
     if not ranked:
-        sys.exit("Aucune source trouvée.")
+        sys.exit("Aucune source adaptée au matériel et à la langue demandée. Aucun lancement.")
 
     for i, (pts, info, name, _, s) in enumerate(ranked[:10], 1):
         size = f"{info['size_gb']:.1f} Go" if info["size_gb"] else "? Go"
         how = "cache" if info["cached"] else (f"P2P {info['seeds']}👤" if info["seeds"] is not None else "direct")
-        first = (s.get("title") or s.get("description") or "").splitlines()[0][:60]
+        lines = (s.get("title") or s.get("description") or "").splitlines()
+        first = lines[0][:60] if lines else ""
         print(f"{i:>3}. {pts:>5.0f}  {info['res']:>6} {size:>8}  {how:10} {','.join(info['flags']):14} {name[:16]:16} {first}")
     if a.list:
         return
 
+    if not 1 <= a.pick <= len(ranked):
+        sys.exit("Numéro de source hors classement.")
     pts, info, name, transport, stream = ranked[a.pick - 1]
     link = player_link(stream, transport, f"{CINEMETA}/manifest.json", kind, meta["id"], video_id)
-    ensure_server(a.host)
+    if not ensure_server(a.host):
+        sys.exit("Serveur de sous-titres indisponible : lecture interrompue, à réparer.")
     out = adb(a.host, "shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", f"'{link}'", STREMIO_PKG)
-    print(f"▶ lancé : n°{a.pick} ({name}, {info['res']})" if "Error" not in out else out)
+    print(f"▶ lancement demandé : n°{a.pick} ({name}, {info['res']}, {info['audio']}). "
+          "Vérifier les pistes audio et sous-titres anglais ainsi que la progression du lecteur."
+          if "Error" not in out else "Stremio a refusé le lancement.")
 
 
 if __name__ == "__main__":
     main()
+
