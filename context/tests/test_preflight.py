@@ -28,6 +28,7 @@ def fake_llm(monkeypatch):
     monkeypatch.setitem(sys.modules, "walter_memory", pkg)
     monkeypatch.setitem(sys.modules, "walter_memory.llm", mod)
     monkeypatch.setattr(preflight, "router_tasks", lambda: {"general": "Général", "coding": "Code"})
+    monkeypatch.setattr(preflight, "decision_chain", lambda: ("fake/decider",))
     return calls, answers
 
 
@@ -71,11 +72,12 @@ def test_decision_maps_onto_a_valid_plan(fake_llm):
     assert set(q["thread"]["criteria"]) == {"th-1", "th-2", "new"} and q["cap_secrets"]["type"] == "noul"
 
 
-def test_unsure_level_escalates_and_floor_keeps_the_last_exchange(fake_llm):
+def test_unsure_plan_stays_one_decision_call_and_floor_keeps_the_last_exchange(fake_llm):
     calls, answers = fake_llm
     _full(answers, plan={"choice": "last_exchange", "confidence": 0.3})
     p = run(Request("t", "et pour le reste de la semaine on fait comment exactement", previous=prev()))
-    assert p.escalated and p.level == "L3" and calls["chat"][0]["poste"] == "general"
+    assert not p.escalated and p.level == "L1" and not calls["chat"] and len(calls["decide"]) == 1
+    assert calls["decide"][0][2]["models"] == ("fake/decider",)
     _full(answers, plan={"choice": "none", "confidence": 0.99})
     assert run(Request("t", "et pour le reste de la semaine on fait comment", previous=prev(age=600))).level == "L1"
 
@@ -97,3 +99,32 @@ def test_extensive_search_lifts_a_thread_plan_to_l4(fake_llm):
     calls, answers = fake_llm
     _full(answers, extensive={"noul": 0.8})
     assert run(Request("t", "retrouve tout ce qu'on a décidé sur la mémoire depuis septembre", previous=prev())).level == "L4"
+
+
+def test_router_answers_are_cached_and_refreshed_off_the_message_path(tmp_path, monkeypatch):
+    import json
+    import time
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.setattr(preflight, "_ROUTER", None)
+    spawned = []
+
+    class Proc:
+        def __init__(self, args, **kw):
+            spawned.append(args)
+            self.out = json.dumps([{"task": "general", "label": "Général", "interface": "chat"}]
+                                  if args[1:] == ["tasks"] else {"chain": ["a/decider", "b/decider"]})
+
+        def communicate(self, timeout=None):
+            return self.out, ""
+
+    monkeypatch.setattr(preflight.subprocess, "Popen", Proc)
+    assert preflight.router_tasks() == {"general": "Général"} and preflight.decision_chain() == ("a/decider", "b/decider")
+    assert len(spawned) == 2 and (tmp_path / "walter-context" / "router.json").exists()
+    monkeypatch.setattr(preflight, "_ROUTER", None)
+    spawned.clear()
+    assert preflight.decision_chain() == ("a/decider", "b/decider") and not spawned        # fresh: disk only
+    cache = tmp_path / "walter-context" / "router.json"
+    cache.write_text(json.dumps({**json.loads(cache.read_text()), "at": time.time() - 3600}))
+    monkeypatch.setattr(preflight, "_ROUTER", None)
+    assert preflight.decision_chain() == ("a/decider", "b/decider")                       # stale copy used now
+    assert len(spawned) == 1 and "--refresh-router" in spawned[0]                           # refreshed detached
