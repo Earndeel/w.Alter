@@ -356,7 +356,7 @@ Ajout de la configuration média `heygen-video-1` via OpenRouter pour exécuter 
 
 2026-10-24 : le décodage HTTP média accepte les espaces et sauts de ligne avant un objet/tableau JSON ; les réponses binaires restent des octets.
 
-## 2026-10-27 — Route Claude Pro et contexte possédé par Walter
+## 2026-10-26 — Route Claude Pro et contexte possédé par Walter
 
 À la demande du propriétaire, ajout de `claude-pro` dans le Router et sa passerelle. Le client officiel ne fournit que le transport authentifié et l’attribution technique ; les messages, outils, paramètres et la boucle d’exécution appartiennent au consommateur Walter. La CLI reçoit un accusé synthétique sans outil plutôt que la vraie réponse du modèle. Le contenu natif n’est jamais repris par simple filtrage de chaînes : le pont reconstruit la requête à partir du payload du consommateur et d’un bloc d’attribution validé.
 
@@ -369,3 +369,23 @@ Les décisions ordinaires et les modèles nommés exposent désormais comme `pro
 exécutable ordonnée, au lieu du fournisseur historique du classement. Sans route, la valeur est nulle.
 L’ordre peut évoluer avec les abonnements et quotas sans laisser un résumé contradictoire.
 Les restrictions explicites et le fournisseur réellement observé après exécution restent inchangés.
+
+
+## 2026-10-26 — Guardian : le module se maintient lui-même
+
+Le propriétaire : « cela doit être fait automatiquement à partir de maintenant, fais un guardian dans le module qui
+s'occupe de la maintenance de celui-ci, peut-être propulsé par L2 ». Déclencheur : la source AA Speech-to-Text était
+muette depuis 118 h (page refaite le 24/10, plus de tableaux téléchargeables ; le lecteur lit désormais les objets
+modèle × hébergeur de la page) et une panne de l'API Claude de Kie déclassait toutes les vidéos et images Kie.
+
+`guardian/` : détection sans modèle (sources, cycle, fournisseurs, tests, référence générée), incidents dans
+`models.guardian_incidents`, actions simples d'abord (nouveau test du fournisseur, relecture de la source), pannes
+extérieures attendues, réparation par le niveau L2 sur une copie du module (module, configuration de l'instance et
+services en lecture seule pour l'agent), mise en place seulement après des contrôles déterministes et sur des
+fichiers que personne n'est en train de modifier, puis commit de ces seuls fichiers. Référence générée régénérée
+sans modèle. Telegram seulement pour une réparation faite, une décision du propriétaire, une panne extérieure de
+48 h. Toutes les 6 h et après chaque cycle. Premier essai réel : test média réparé en 2 min 30 (commit 4123ac9).
+
+Kie est testé en trois services distincts : `kie` (API Claude), `kie-codex`, `kie-media` (compte et crédit, aucune
+génération). Les médias suivent `kie-media` ; le détail d'un test garde la raison donnée par le fournisseur
+(« no_available_account »). Le transport d'abonnement Claude refuse un modèle non qualifié avant de charger litellm.

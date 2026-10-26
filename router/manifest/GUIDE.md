@@ -31,6 +31,7 @@ L'index (`module_index('router')`) liste les tâches disponibles (clé, libellé
 | `interface/` | Page publique de la bibliothèque de modèles (domaine de l’instance), propositions Telegram |
 | `llm/` (walter-llm, :8894) | Passerelle OpenAI-compatible pour les modules : `model` = un poste du routeur |
 | `walter-router-refresh.timer` | Cycle de 48 h ; propositions avec boutons, jamais de bascule automatique |
+| `guardian/` (`walter-router-guardian.timer`) | Maintenance autonome du module toutes les 6 h et après chaque cycle : détecte, répare ce qui est interne par le niveau L2 sur une copie, contrôles déterministes avant mise en place ; Telegram seulement si utile |
 
 ## Interfaces
 
@@ -40,6 +41,7 @@ L'index (`module_index('router')`) liste les tâches disponibles (clé, libellé
 | Abonnements | `walter_plans` | `walter-router plans` |
 | Tâches | `module_index('router')` | `walter-router tasks` |
 | Santé | `walter_health` | `walter-router health` |
+| Maintenance | — | `walter-router-guardian status` |
 
 ## Règles et limites
 

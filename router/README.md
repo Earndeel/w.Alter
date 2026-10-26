@@ -36,6 +36,7 @@ et les limites actuelles des outils natifs sont explicités dans [docs/EXECUTION
 | `plan/` | **Plan** — the owner's subscriptions | `declared` (his plans: one writer) · `subscriptions` (meters, real usage, cost price of a token) · `quota_watch` (service) · `mail` (subscription mails) · `watch` (web research per plan) · `news` (new benefits or changes → notices) |
 | `interface/` | **Interface** — the library page | `library` (rows, publishing) · `page` (HTML) · `translate` (English) · `site/` (Cloudflare Pages functions) |
 | `serve/` | What Walter calls at run time | `api` (schémas) · `brief` (note) · `run` / `text_agent` (exécution native) · `choose` (pick) · `routes` (execution routes, free-text entry) · `intent` (decision model) · `execution` (provider order, hosts, probes, reliability) · `media_exec` (image / video / music / voice) · `oneshot` (economic-tier answers) · `hermes_sync` |
+| `guardian/` | **Guardian** — the module's own maintenance (2026-10-26) | `checks` (detection, no model) · `run` (incidents, decisions, Telegram) · `repair` (the L2 agent on a copy of the module, deterministic gates, landing) · `prompt.md` · README |
 | `store/` | The database | `db`, `migrations/` (each table and view commented) |
 | `llm/` | walter-llm, the model gateway (own venv, 127.0.0.1:8894) | |
 | `cli.py`, `health.py`, `bin/` | The command, the module's health, the cycle and the page trigger | |
@@ -77,8 +78,15 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 
 The 48 h cycle (`walter-router-refresh.timer`, `bin/walter-router-cycle`): research + analysis → research agent on the
 economic tier (names checked on the web) → plan research (meters, mails, web, news, cost price) → final analysis and
-Telegram → Hermes follows, the page is republished. Services: `walter-router-quota` (meters after each agent turn),
-`walter-router-control` (page trigger), `walter-llm`.
+Telegram → Hermes follows, the page is republished → the guardian follows up what is still broken. Services:
+`walter-router-quota` (meters after each agent turn), `walter-router-control` (page trigger), `walter-llm`,
+`walter-router-guardian.timer` (every 6 h, and after each cycle).
+
+The guardian ([guardian/README.md](guardian/README.md)) keeps the module working without the owner: it detects stale
+or failing sources, a failed cycle, providers down, failing tests and an out-of-date generated reference; probes and
+re-reads first; waits out outside outages; has the L2 text tier repair what is ours on a copy of the module; lands a
+patch only through deterministic gates and only on files nobody is editing; regenerates the reference itself.
+Telegram only for a repair that landed, a decision only the owner can take, or an outage lasting 48 h.
 
 ```
 walter-router health | status | review | alerts [--all]
@@ -98,6 +106,7 @@ walter-router brief [--write]        # what an agent must know to use the router
                                      # generation, analysis, constraints — never a model or provider name
 walter-router sync-hermes [--apply] | publish-library | declare | migrate | probe | decision-chain
 walter-router alias-add | alias-remove | alias-list | postes | log-exec | notify-failure | instance-env
+walter-router-guardian check [--no-tests] | run [--no-agent] [--no-tests] [--no-notify] [--dry-run] | status
 ```
 Tests: `venv/bin/python -m pytest -q` (database tests run in a rolled-back transaction; instance files are never
 written by tests).

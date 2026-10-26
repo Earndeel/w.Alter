@@ -14,7 +14,8 @@
   ],
   "data": [
     "models.*",
-    "config"
+    "config",
+    "models.guardian_incidents"
   ],
   "core_paths": [
     "store/db.py"
@@ -31,7 +32,8 @@
     "agents' brief (`walter-router brief`, @instance/state/router/brief.md)",
     "CLI walter-router schema (public tool contract v1)",
     "CLI walter-router docs --write/--check [--offline]",
-    "CLI walter-router brief --json (versioned orchestrator note v1)"
+    "CLI walter-router brief --json (versioned orchestrator note v1)",
+    "CLI walter-router-guardian check | run | status (the module's own maintenance)"
   ],
   "bindings": {
     "hermes": "router plugin (same tools, brief as a system-prompt section) + auxiliary configuration adapter",
@@ -42,9 +44,12 @@
   "limitations": [
     "New model choices remain subject to the owner's approval; no automatic switching introduced.",
     "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
-    "Text runs execute natively with bounded terminal/file tools; only providers of the selected model are tried, and callers must forward user_notice on failover."
+    "Text runs execute natively with bounded terminal/file tools; only providers of the selected model are tried, and callers must forward user_notice on failover.",
+    "The guardian lands repairs only in research/, analysis/parse.py, analysis/identity.py, analysis/aliases.json, interface/ and tests/, through deterministic gates; owner choices, execution policy, schema and units are never changed by it."
   ],
-  "services": [],
+  "services": [
+    "walter-router-guardian.timer"
+  ],
   "optional": [],
   "contract": {
     "schema_version": 1,
