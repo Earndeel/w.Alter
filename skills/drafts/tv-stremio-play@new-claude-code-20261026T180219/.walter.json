@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-26T18:02:19.425183+00:00",
+ "description": "Use when Monsieur asks to put on a film or a series episode on the living-room TV (Stremio on the Android dongle), in VO or VF. Search, pick the right release, check audio tracks, launch, verify; ~2 min.",
+ "domain": "media",
+ "kind": "new",
+ "reason": "Monsieur 2026-10-26: split the living-room TV skill into isolated procedures (fast TV access, playback, maintenance), each with what worked and what did not, so the next agent does not lose time. Built from the hub skill android-tv-stremio-dongle and today's Hermes/Codex/Claude Code TV sessions; commands checked read-only on the real dongle.",
+ "runtime": "claude_code",
+ "session_id": "996254cc-9f30-4f49-a4af-10df65cf2b76",
+ "target": "tv-stremio-play"
+}
