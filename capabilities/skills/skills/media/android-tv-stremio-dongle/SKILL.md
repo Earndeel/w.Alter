@@ -17,7 +17,7 @@ requested action; it is not a reason to stop at the source list. Never report su
 | Dongle | Chinese stick "D6" (`eros_p1`), Allwinner H313/H616 (`sun50iw9p1`), **1 GB real RAM** (reports 4 GB), 8 GB eMMC, **Android 10 disguised as 12**, patch 2019-12, `userdebug`/test-keys. LAN `192.168.1.37`, ADB over Wi-Fi on 5555 (already authorised for the MacBook's `~/.android` key). Root: `su` works from the ADB shell without prompt. |
 | TV | Hisense 50A5FX, VIDAA `V0000.09.09O.P1015`, LAN `192.168.1.36`. Dongle on **HDMI2** (CEC name "Living Room T"). TV setting **Default startup page = Last accessed source** (Monsieur set it; required). |
 | Stremio | `com.stremio.one` 1.11.x, ExoPlayer, hardware decoding on. Addons: Torrentio, Torrentio TB, Comet/ElfHosted TB (TorBox debrid), WatchHub (legal offers), OpenSubtitles. Subtitles: English, black opaque outline. |
-| Tools | `scripts/stremio.py` (search → rank → play, TV on/off), `scripts/cecsend.c` (raw CEC), `scripts/restore.sh` (re-enables every app, Google TV Home, animations, CEC setting, wake lock and cecsend; the light launcher stays installed and trimmed caches cannot come back), `references/debloat.txt`. |
+| Tools | `scripts/stremio.py` (search → rank → play, TV on/off), `scripts/cecsend.c` (raw CEC), `scripts/restore.sh` (re-enables every app, Google TV Home, animations, CEC setting, wake lock, KeepAlive service and cecsend; the light launcher stays installed and trimmed caches cannot come back), `references/debloat.txt`, `references/keepalive.md` (persistent Android service, APK/source backup and targeted rollback). |
 
 The dongle and TV are on the home LAN. Run the tools from Monsieur's MacBook (needs `adb` and `python3`) or any host
 on that LAN; from the Walter VM, only through a link to that LAN. Copy the scripts next to each other
@@ -133,11 +133,33 @@ outline colour/opacity (Settings → Subtitles; opacity moves 1 % per press).
 | Switching input from VIDAA: `<Active Source>`, `<Set Stream Path>`, UI keys Input/Select/`69 02`, Home key (One Touch Play), repeated AS during boot | **No.** VIDAA ignores remote keys and source claims coming over CEC |
 | Wake-on-LAN (dongle or TV), Hisense MQTT :36669 (needs the official app's client cert, not available on Android TV; Monsieur has no Android phone), AirPlay pair-pin-start (only shows a PIN on VIDAA) | **No / abandoned** |
 
-**The dongle must never deep-sleep**: asleep, its Wi-Fi (ssv6xxx) goes dark and nothing wakes it remotely. The TV
-keeps powering it by USB. The script writes a kernel wake lock (`echo stremio_remote > /sys/power/wake_lock` via
-`su`) every time it turns the TV on or off, opens a page or plays something (not with `--list`), so the screen can sleep
-while ADB stays reachable. The lock is lost on reboot: after a power cut,
-Monsieur wakes the dongle once with its own remote, then the next script run re-arms it.
+**Persistent availability — installed and tested 2026-10-26.** The dongle must stay reachable even with the TV
+or its display off. The initial live diagnosis showed `mLastSleepReason=hdmi`, with USB power still present;
+this observation does not prove the cause of every reported outage.
+
+The local Android app `cloud.walter.tvkeepalive` now runs a foreground `START_STICKY` service, holds a partial CPU
+wake lock and high-performance Wi-Fi lock (both tagged `walter:tvkeepalive`), starts on `BOOT_COMPLETED` and
+`MY_PACKAGE_REPLACED`, and is exempted from device idle. It does not wake the display or TV, has no Internet
+permission, and requires no firmware modification or root for operation. See **references/keepalive.md** for the
+signed APK/source archive in Raw Vault, install/verification commands, backup and targeted rollback.
+
+Verified on the real D6: service and locks active; actual Android reboot (boot_id changed) with automatic service
+startup and no manual relaunch; deliberate process kill followed by a new PID and reacquired locks after 12 s;
+ADB plus both locks still active 20 s after `KEYCODE_SLEEP`. Display restored awake after tests. This is short
+functional verification, not an overnight stability result.
+
+`stremio.py` still writes the legacy kernel wake lock (`echo stremio_remote > /sys/power/wake_lock` via `su`)
+when turning the TV on/off, opening a page or playing (not with `--list`). That lock alone is lost on reboot;
+the Android service is the persistent replacement for depending on the next script run. Keep the legacy lock as
+a secondary fallback. Do not require Monsieur to wake the dongle after every ordinary reboot: inspect the
+service, locks, boot state and network first. A force-stop, disabling or uninstalling the app deliberately
+disables its auto-start until it is explicitly launched again.
+
+**Physical power remains a separate limit.** A software service cannot run or restart an electrically unpowered
+dongle, recover a complete PMIC shutdown by itself, or guarantee recovery from a hardware hang. A real Android
+reboot was tested; USB power loss/restoration was not. If the TV cuts USB power or its supply is unstable, power
+the dongle from a suitable independent USB mains adapter and cable. Never disable thermal protection to keep it
+running. Distinguish display asleep, system suspended, rebooting and actually unpowered before reporting a cause.
 
 **Raw CEC** (`cecsend <dest hex> <bytes hex>…`, root): the sunxi driver `/dev/cec` takes ioctl `0xC0346305` on a
 52-byte struct (word0 = address of offset 0x0c, word3 = length incl. header, word4 = timeout ms, header byte at 0x20 =
