@@ -153,7 +153,8 @@ def choose_provider(conn, model_id: str, interface: str, resolution: str | None,
         return min(p) if p else None
 
     status = {r["provider"]: r["ok"] for r in conn.execute("select provider, ok from models.provider_status")}
-    or_down, kie_down = status.get("openrouter") is False, status.get("kie") is False
+    # Kie's media tasks have their own probe (kie-media); `kie` alone is its Claude chat API (2026-10-26)
+    or_down, kie_down = status.get("openrouter") is False, status.get("kie-media", status.get("kie")) is False
     kie_p, or_p = price("kie"), price("openrouter")
     order = []
     if has_kie_path and not (kie_down and or_id) and \

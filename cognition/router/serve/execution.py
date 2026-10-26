@@ -6,6 +6,7 @@ runs the first route with `hermes chat --oneshot --provider P -m M` and falls ba
 from __future__ import annotations
 
 import json
+import re
 import time
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -171,6 +172,32 @@ def log(conn, entry: dict) -> int:
 _TIMEOUT = 90
 
 
+def _stream_error(data: bytes) -> str:
+    """The provider's own reason when an HTTP 200 stream ends on an error event (Kie: « no_available_account »)."""
+    m = re.search(rb'"error"\s*:\s*\{[^{}]*?"message"\s*:\s*"([^"]{1,160})"', data)
+    return f" : {m.group(1).decode('utf-8', 'replace')}" if m else ""
+
+
+def _kie_media(kie: str) -> tuple[bool, str]:
+    """Kie's media API (video, image, music tasks) is another service than its Claude chat API: usable when the
+    account answers and has credit. No generation is started (2026-10-26: a Claude-only outage at Kie had sent
+    every Kie video and image to OpenRouter)."""
+    try:
+        req = Request("https://api.kie.ai/api/v1/chat/credit", headers={"Authorization": f"Bearer {kie}", "User-Agent": UA})
+        with urlopen(req, timeout=_TIMEOUT) as resp:  # noqa: S310 (fixed provider endpoint)
+            body = json.loads(resp.read())
+    except HTTPError as exc:
+        return False, f"HTTP {exc.code}: {exc.read(200).decode('utf-8', 'replace')}"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"{type(exc).__name__}: {exc}"[:200]
+    credit = body.get("data")
+    if body.get("code") != 200 or not isinstance(credit, (int, float)):
+        return False, f'HTTP 200 (réponse inattendue : {str(body.get("msg"))[:120]})'
+    if credit <= 0:
+        return False, f"crédit épuisé : {credit} crédits"
+    return True, f"HTTP 200, crédit {credit} crédits"
+
+
 def _post(url: str, body: dict, headers: dict, timeout: int | None = None, must: str | None = None) -> tuple[bool, str]:
     """POST and read the whole answer (SSE included); ok = HTTP 200, non-empty, containing `must` when given
     (a Kie stream can be HTTP 200 and still end without a message)."""
@@ -180,7 +207,7 @@ def _post(url: str, body: dict, headers: dict, timeout: int | None = None, must:
         with urlopen(req, timeout=timeout or _TIMEOUT) as resp:  # noqa: S310 (fixed provider endpoints)
             data = resp.read(200000)
             ok = resp.status == 200 and bool(data.strip()) and (must is None or must.encode() in data)
-            return ok, f"HTTP {resp.status}" + ("" if ok else " (réponse incomplète)")
+            return ok, f"HTTP {resp.status}" + ("" if ok else f" (réponse incomplète{_stream_error(data)})")
     except HTTPError as exc:
         return False, f"HTTP {exc.code}: {exc.read(200).decode('utf-8', 'replace')}"
     except Exception as exc:  # noqa: BLE001
@@ -190,7 +217,9 @@ def _post(url: str, body: dict, headers: dict, timeout: int | None = None, must:
 def probe(conn, only: str | None = None, timeout: int = 90) -> dict:
     """Tiny live call per API provider (max 5 output tokens, streamed when the provider streams for Hermes).
     A provider that answers but slower than SLOW_MS is recorded not ok ('dégradé'). Codex is the subscription
-    Hermes itself uses all day: not probed here (the Hermes run falls back if it fails)."""
+    Hermes itself uses all day: not probed here (the Hermes run falls back if it fails). Kie has three services
+    probed apart: `kie` = its Claude chat API, `kie-codex` = its Codex responses API, `kie-media` = its media
+    tasks (account and credit, no generation)."""
     key = instance.env_value
     kie = key("KIE_API_KEY") or ""
     checks = {
@@ -199,6 +228,7 @@ def probe(conn, only: str | None = None, timeout: int = 90) -> dict:
                               "messages": [{"role": "user", "content": "OK"}]},
                              {"x-api-key": kie, "Authorization": f"Bearer {kie}", "anthropic-version": "2023-06-01"},
                              must="message_stop"),
+        "kie-media": lambda: _kie_media(kie),
         "kie-codex": lambda: _post("https://api.kie.ai/codex/v1/responses",
                                    {"model": "gpt-6-luna", "input": "OK", "stream": False, "max_output_tokens": 16},
                                    {"Authorization": f"Bearer {kie}"}),

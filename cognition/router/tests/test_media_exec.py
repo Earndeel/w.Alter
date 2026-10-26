@@ -23,7 +23,7 @@ def conn():
 
 def test_kie_first_unless_clearly_dearer_and_openrouter_down_goes_last(conn):
     # This scenario assumes Kie is healthy, independently of the latest live probe.
-    conn.execute("""insert into models.provider_status (provider, ok, detail) values ('kie', true, 't')
+    conn.execute("""insert into models.provider_status (provider, ok, detail) values ('kie', true, 't'), ('kie-media', true, 't')
                     on conflict (provider) do update set ok = true""")
     conn.execute("""insert into models.provider_status (provider, ok, detail) values ('openrouter', true, 't')
                     on conflict (provider) do update set ok = true""")
@@ -51,6 +51,18 @@ def test_fallback_and_kie_health():
         fb = media_exec.fallback_models(conn, "text_to_video", "action", "minimax-h3", "t2v", declared_only=False)
         assert fb and "minimax-h3" not in fb and all(m in media_exec._models() for m in fb)
         or_id = media_exec.openrouter_id(conn, "minimax-h3")
-        conn.execute("update models.provider_status set ok = false where provider = 'kie'")
+        conn.execute("""insert into models.provider_status (provider, ok, detail) values ('kie-media', true, 't')
+                        on conflict (provider) do update set ok = true""")
+        conn.execute("update models.provider_status set ok = false where provider = 'kie'")   # Claude API only
+        assert media_exec.choose_provider(conn, "minimax-h3", "video", None, True, or_id)[0] == "kie"
+        conn.execute("update models.provider_status set ok = false where provider = 'kie-media'")
         assert media_exec.choose_provider(conn, "minimax-h3", "video", None, True, or_id)[0] == "openrouter"
         conn.rollback()
+
+
+def test_stream_error_reason_is_kept_in_the_probe_detail():
+    from walter_router.serve import execution
+    data = (b'event: message_start\ndata: {"type": "message_start"}\n\nevent: error\n'
+            b'data: {"type": "error", "error": {"type": "api_error", "message": "no_available_account"}}\n')
+    assert execution._stream_error(data) == " : no_available_account"
+    assert execution._stream_error(b"data: {}") == ""
