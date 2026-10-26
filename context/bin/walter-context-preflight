@@ -5,7 +5,7 @@
 # Separate entry point until the shared CLI (bin/walter-context) gains a `preflight` subcommand.
 root="$(dirname "$(readlink -f "$0")")/.."
 case "$1" in
-  --serve|--refresh-router) cd "$root" && PYTHONPATH="$root" exec walter-python -m walter_context.preflight "$@" ;;
+  --serve|--refresh-router|--report) cd "$root" && PYTHONPATH="$root" exec walter-python -m walter_context.preflight "$@" ;;
 esac
 req="$(cat)"
 query=""; [ "$1" = "--shadow" ] && query="?shadow=1"
