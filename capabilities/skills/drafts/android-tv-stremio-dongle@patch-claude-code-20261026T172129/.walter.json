@@ -1,0 +1,11 @@
+{
+ "base_sha": "9176793eb281c8229ef869bc7e098414215b674a4993ae1428e106bec4062023",
+ "changed": "scripts/test_stremio.py",
+ "created_at": "2026-10-26T17:21:29.265950+00:00",
+ "domain": "media",
+ "kind": "patch",
+ "reason": "ADD ONE NEW LINKED FILE ONLY: file_path=scripts/test_stremio.py. This does NOT replace SKILL.md or any other file: SKILL.md, scripts/stremio.py, scripts/cecsend.c, scripts/restore.sh and references/* stay exactly as they are (the door copies the current SKILL.md into the draft). Resubmission after d35fdc0, which read the new file as the whole skill. Content: local tests for the accepted stremio.py revision 77116aa, 18 checks, no device needed (VOSTFR rejection, French-only preference, probe verdicts incl. INCERTAIN/NON GARANTI, saved track, URL masking). Run: python3 -I scripts/test_stremio.py. Passed locally 2026-10-26: 18 tests OK.",
+ "runtime": "claude_code",
+ "session_id": "996254cc-9f30-4f49-a4af-10df65cf2b76",
+ "target": "android-tv-stremio-dongle"
+}
