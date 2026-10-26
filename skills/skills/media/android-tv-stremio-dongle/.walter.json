@@ -1,0 +1,11 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "claude-code",
+ "reason": "Captures the verified procedures for playing films on Monsieur's living-room TV (Stremio deep links, subtitles server, HDMI-CEC power of the Hisense, dongle debloat/restore), learned in a Claude Code session on 2026-10-26.",
+ "review_notes": [
+  "MINOR: The AV1 note says it is “ranked last,” but the code only subtracts 200 points; a high-scoring AV1 result can still rank above other sources.",
+  "MINOR: The `--on` / `--off` table says “TV power only,” but `tv_off()` also puts the dongle screen to sleep. The later wake-lock note explains that it stays reachable; clarify this side effect in the table."
+ ],
+ "store_sha": "212700baaf3458a8c08cd0d4d04646da120c15bc5f81d2b74c84d75101981d06"
+}
