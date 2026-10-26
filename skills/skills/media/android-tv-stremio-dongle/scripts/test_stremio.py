@@ -54,4 +54,12 @@ core = {"streams": '{"uid":"u","items":[[{"metaId":"tt1","videoId":"tt1:1:2"},{"
 check(S.saved_track(core, "tt1", "tt1:1:2")["language"] == "fr", "saved ep")
 check(S.saved_track(core, "tt1", "tt1:1:3")["language"] == "fr", "saved series fallback")
 check(S.saved_track(core, "tt9", "tt9") is None, "none")
+R = [(300, {}, "A", "t", st("Show.S01E01.MULTi.VFi.1080p-TARDiS")), (290, {}, "B", "t", st("Show S01E01 FRENCH DVDRiP PLANET3"))]
+check(S.choose(R, 1, "planet3") == 2, "match by release name")
+check(S.choose(R, 2, None) == 2, "pick by rank")
+try:
+    S.choose(R, 1, "absent"); check(False, "match absent must exit")
+except SystemExit:
+    check(True, "")
+check(S.release_label(st("Rel.Name-GRP")) == "Rel.Name-GRP", S.release_label(st("Rel.Name-GRP")))
 print(f"{ok} tests OK")
