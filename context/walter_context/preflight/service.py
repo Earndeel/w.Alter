@@ -6,7 +6,9 @@ walter-context-preflight). A one-shot process pays ~0.4 s per message before the
     POST /preflight?shadow=1   plan recorded in the instance (lot 4 shadow), 204
     GET  /health               {"ok": true, "router_cached": bool}
 
-Loopback only, no token: it reads what the caller sends and answers with a plan; it never reads memory or secrets.
+Loopback only, no token. Since step D (26/10) it reads Walter Memory's subject views (candidates, cards) and, in
+shadow mode, assembles the context pack the plan asks for (views, cloud-safe memory context, recent exchanges) and
+records it in the instance; it never reads secrets and returns only a plan.
 """
 from __future__ import annotations
 
