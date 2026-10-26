@@ -118,3 +118,17 @@ def test_a_transcript_ingested_twice_counts_once():
                     {**base, "seq": 10, "type": "assistant/message", "occurred_at": T0, "text": "réponse 1"}]
     out = views.exchanges(Conn(), T0 - timedelta(days=1), T0 + timedelta(days=1))
     assert [(e["seq"], e["answer"]) for e in out] == [(1, "réponse 1"), (3, "réponse 2")]
+
+
+def test_subject_candidates_for_a_new_message():
+    llm = FakeLLM()
+    sid = f"{SID}-cand"
+    with connection() as c:
+        a = views.attach(c, {**ex(10, 0, "Nouveau sujet de test pour les candidats"), "session_id": sid},
+                         embed=embed, llm=llm)
+    got = views.subject_candidates("Nouveau sujet de test pour les candidats", sid, at=T0 + timedelta(minutes=5),
+                                   embed=embed)
+    assert got["waiting"] == a["view_key"] and got["waiting_age_s"] == 300
+    assert got["candidates"][0]["id"] == a["view_key"] and got["candidates"][0]["title"] == "Banc des fils"
+    none = views.subject_candidates("", None, at=T0, embed=embed)
+    assert none == {"candidates": [], "waiting": None, "waiting_age_s": None}
