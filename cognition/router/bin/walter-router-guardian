@@ -1,0 +1,4 @@
+#!/bin/sh
+# Walter Router guardian: the module's own maintenance (guardian/README.md).
+root="$(dirname "$(readlink -f "$0")")/.."
+cd "$root" && exec "$root/venv/bin/python" -m walter_router.guardian "$@"
