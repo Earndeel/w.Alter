@@ -88,6 +88,8 @@ inspection. Historical provenance note retained: the earlier skill described Tor
    metadata or the track list; do not infer English from a missing French label. Do not blindly edit undocumented
    preferences. Until tracks are confirmed, report them as unverified rather than saying VO/VF is configured.
    For an explicit VF request, keep English subtitles as the default unless Monsieur asks otherwise.
+   **For VF, follow "Getting French audio (VF)" below**: the VF is chosen on the release title before launch,
+   not fished for in the player afterwards.
 6. Check actual playback progress and errors after launch, then a short stable playback interval. An Android
    intent acknowledgement, a player activity or audio focus alone does not prove video is playing. If startup
    fails or buffering persists, try another eligible source, favouring lower bitrate/direct cache and then lower
@@ -101,6 +103,65 @@ The script automates candidate filtering, ranking and the launch request. Track 
 post-launch retries are the executing agent's steps above; they are not implemented by the score function.
 Nine local selection tests and Python compilation passed on 2026-10-26. This revision has not been tested playing
 a film on the dongle. The old ~18 s result above predates this revision.
+
+## Getting French audio (VF)
+
+Monsieur's rule (2026-10-26): **the VF is chosen when picking the source, from the release title, before
+launching.** The player is never where the language gets decided. Picking a French-only release is the goal;
+a MULTi release is a VF release too, but with the current Stremio setting it needs one extra confirmation step
+after launch (below). That step applies the choice already made; it never replaces it.
+
+**Why a MULTi release starts in English.** The Stremio profile on the dongle has `settings.audioLanguage =
+"eng"` (read 2026-10-26 from `core.xml` → `profile`). When a file carries several audio tracks, the player picks
+the track matching that language, even if the French track is first. So "the title says MULTi" ≠ "VF is playing".
+
+**1. Choose the release on its title** (`--list --lang fr`; the full label is in the stream `title`/`description`):
+
+| Title tag | Audio | Use for a VF request |
+|---|---|---|
+| `TRUEFRENCH`, `VFF` (France), `VFQ` (Québec), `VF2` (VFF + VFQ), `FRENCH` **without** MULTi | French only (normally one track) | **First choice**: plays in French as is. Check it is not VOSTFR |
+| `MULTi`, `MULTi.VFF`, `MULTi.VFi`, `MULTi.VF2`, `DUAL` | French **and** original | Second choice, when no playable French-only release of suitable quality exists. Requires step 3 |
+| `VOSTFR`, `SUBFRENCH`, `vostfr` in the file name | **Original audio**, French subtitles | **Not VF**: reject. The addon's 🇫🇷 flag can still make the script show `FR`/"VF indiquée" |
+| Only a 🇫🇷 flag / `FR` from the addon, no tag | Unknown | Probe (step 2) before choosing it |
+
+A lower-ranked French-only release must still be playable on the dongle: on 2026-10-26 an uncached (`TB⬇️`)
+XviD DVDRip with unknown resolution never opened the player while a cached HEVC MULTi release did. A failed
+player link can leave Stremio on the **next** episode's detail page: check which episode is shown before
+concluding anything.
+
+**2. Probe the tracks before launch when the title leaves doubt** (MULTi, flag only, no tag). On the Mac
+(`ffprobe` in `/usr/local/bin`), fetch the stream list the same way `stremio.py` does (addons read from
+`core.xml`), take the chosen stream's `url` and run, from a script,
+`ffprobe -v error -show_entries stream=index,codec_type,codec_name,channels:stream_tags=language,title:stream_disposition=default -of json "$URL"`.
+**Never print, log or echo the URL or the addon transport URLs**: they embed the TorBox/Real-Debrid keys. Print
+only the track list. Verified 2026-10-26: a `MULTi.VFi` release gave audio #1 `fre` "FR VFi : AC3 2.0" and
+audio #2 `eng` "ENG VO : AC3 5.1"; a `FRENCH DVDRiP` release gave a single untagged audio track (one track +
+French release title is enough).
+
+**3. MULTi only: make the player use the French track that was chosen.** Stremio stores the track per title in
+`core.xml` → `streams.items[*][1].state.audioTrack` (e.g. `{"id": "0:2", "language": "fr"}`) and reuses it for
+that title afterwards, so this is normally needed once per film/series. Player navigation (Android TV player,
+observed 2026-10-26 on screenshots; **not yet verified end to end**):
+- `KEYCODE_DPAD_DOWN` shows the control bar without pausing; focus starts on **Play/Pause**. Observed button
+  order: Play/Pause, Next episode, Rewind, Subtitles (CC), **Audio**, Speed, Fullscreen, PiP, Episodes.
+- **Screenshot (`adb exec-out screencap -p`) after every key** and check which button has the focus halo before
+  pressing `KEYCODE_DPAD_CENTER`. CENTER on Play/Pause pauses the film (it happened); if `dumpsys media_session`
+  shows `state=2`, put focus back on Play/Pause and press CENTER to resume.
+- `uiautomator dump` returns nothing in the player (no accessibility nodes): use screenshots + vision.
+- In the audio menu select the French entry (label like "FR VFi"/"French"/`fre`), then BACK.
+- On the Mac (zsh) never put the adb command in a variable (`$A KEYCODE…` fails, zsh does not split words):
+  write each `adb … shell input keyevent …` in full or loop over the keycodes.
+Once verified on a real MULTi playback, remove "not yet verified" and record the exact number of `DPAD_RIGHT`
+presses from Play/Pause to Audio.
+
+**4. Verify, don't assume.** VF is confirmed when one of these holds: single audio track on a French-only
+release (steps 1–2); `streams` state for that title shows `audioTrack.language = "fr"`, re-read after step 3;
+or a screenshot of the audio menu shows French selected. Playback progress says nothing about the language.
+Otherwise report the audio as **unverified**.
+
+**Do not** edit `core.xml` by hand (the app rewrites it and the profile syncs to Monsieur's Stremio account).
+Changing Settings → Player → default audio language to French would start every MULTi film in VF, against his
+default (VO): only on his request, and say it is global.
 
 ## How the pieces work (when something breaks)
 
