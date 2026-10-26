@@ -6,7 +6,8 @@
 #      names on the web (validated alias-add), watches the subscription plans; report only
 #   3. analysis again with the new name links, then Telegram (only news worth it: a model above an active one…)
 #   4. Hermes auxiliary jobs follow the postes; the agents' brief is rewritten (profiles re-rendered when it
-#      changed); interface: the library page is republished
+#      changed); interface: the library page is republished; then the guardian (own unit) follows up what is
+#      still broken: stale source, provider down, failing test
 # A failing source keeps its last good snapshot; step 2 never blocks the cycle.
 # Instance bindings (Hermes home, log folder, rendered agent prompt, library URL) come from the active Walter
 # instance through `walter-router instance-env`.
@@ -49,4 +50,6 @@ echo "[cycle] 4/4 Hermes auxiliary jobs follow the postes (only when a pick chan
 "$WR" brief --write || echo "[cycle] agents' brief not written (non-blocking)"
 echo "[cycle] library page ${LIBRARY_URL:-(not published by this instance)} (Cloudflare Access)"
 "$WR" publish-library || echo "[cycle] library page not published (non-blocking)"
+echo "[cycle] guardian started on its own unit: what this cycle left broken is followed up (guardian/README.md)"
+systemctl start --no-block walter-router-guardian.service || echo "[cycle] guardian not started (non-blocking)"
 exit 0
