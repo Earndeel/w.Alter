@@ -197,7 +197,7 @@ def database(conn):
 
 
 def source_files():
-    roots = ('analysis','serve','research','plan','interface','store','llm','config','hermes-plugins','contracts')
+    roots = ('analysis','serve','research','plan','interface','store','llm','config','hermes-plugins','contracts','guardian')
     files = [paths.ROOT / n for n in ('cli.py','instance.py','paths.py','health.py','documentation.py')]
     for root in roots:
         files += [p for p in (paths.ROOT/root).rglob('*') if p.is_file() and p.suffix in ('.py','.json','.sql','.js','.mjs','.html')

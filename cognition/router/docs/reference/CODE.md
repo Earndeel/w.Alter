@@ -287,6 +287,72 @@ Reproducible reference documentation. Metadata only; never read provider/account
 - `render(c)` — 
 - `maintain(write=False, offline=False)` — 
 
+## guardian/__init__.py
+
+Guardian of the Walter Router: keeps the module working without the owner (2026-10-26).
+
+
+## guardian/__main__.py
+
+walter-router-guardian check | run [--no-agent] [--no-tests] [--no-notify] [--dry-run] | status
+
+- `main(argv: list[str] | None=None)` — 
+
+## guardian/checks.py
+
+Deterministic detection: what is wrong with the module right now. No model is called here.
+
+- `sources(conn)` — 
+- `cycle(conn)` — 
+- `provider_side(detail: str)` — 'ours' (the request looks wrong: repairable here), 'account' (key, credit: the owner's), 'external'.
+- `providers(conn)` — 
+- `dirty_paths(root=None)` — Files with uncommitted changes in the live module (someone's work in progress), relative to its root.
+- `run_tests(root, timeout: int=TEST_TIMEOUT)` — The module's test suite in `root`: {ok, failures: {node id: one-line reason}, tail}.
+- `tests(root=None)` — Failing tests, except those whose test file is itself someone's uncommitted work (still being written).
+- `docs_check()` — `walter-router docs --check`: the generated reference against code and schema. {} when the installed version
+- `docs()` — 
+- `detect(conn, with_tests: bool=True)` — 
+
+## guardian/repair.py
+
+Repair of one incident by the L2 agent, on a copy of the module; deterministic gates decide whether it lands.
+
+- `_git(cwd: Path, *args: str, check: bool=True)` — 
+- `workspace(incident_id: int)` — A fresh copy of the live module with a git baseline: what the agent works on.
+- `_render(incident: dict, module: Path)` — 
+- `_readonly_script()` — The live module, the instance configuration and the system units are read-only for the agent.
+- `verdict_of(output: str)` — The agent's closing JSON (outcome, cause, changes, summary): the last object carrying an `outcome`.
+- `agent(incident: dict, module: Path)` — 
+- `changed_files(module: Path)` — (status, path) of the agent's changes against the baseline; status D = deleted.
+- `_asserts(text: str)` — 
+- `verify_source(module: Path, kind: str)` — Read the source with the repaired code (no database write): rows parsed, or the error.
+- `gates(module: Path, incident: dict, baseline: dict)` — Deterministic checks on the agent's patch. ok=False lists why it must not land.
+- `_digest(path: Path)` — 
+- `apply(module: Path, files: list[str], deleted: list[str], message: str)` — Copy the verified files into the live module, only where the live file is exactly what the agent started
+- `regenerate_docs(message: str)` — Generated reference out of date: regenerate it (no model), and commit the regenerated files alone, unless one
+- `_new(module: Path)` — 
+- `prune(days: int=7, keep: set[str]=frozenset())` — Old workspaces go; those holding a deferred patch stay.
+
+## guardian/run.py
+
+One guardian pass: detect, follow incidents, act, tell the owner only what is worth it.
+
+- `_now()` — 
+- `_age_h(ts)` — 
+- `sync(conn, problems: list[dict], tests_checked: bool)` — Open or refresh one incident per problem; close those no longer seen (a test incident only when the
+- `_set(conn, inc: dict, status: str, verdict: dict | None=None, attempt: bool=False)` — 
+- `reread_source(kind: str)` — The router's own read of one source (writes its snapshot when it works).
+- `_needs_agent(inc: dict)` — 
+- `commit_message(inc: dict, v: dict)` — Subject: which incident; body: the agent's cause and evidence, then who did the work.
+- `_repair(conn, inc: dict, dry_run: bool)` — 
+- `_retry_deferred(conn, inc: dict)` — A verified patch waiting for files someone else was editing: land it once they are free.
+- `_docs(conn, inc: dict, dry_run: bool)` — Generated reference: regenerated mechanically, never by the agent; quiet when it works.
+- `handle(conn, inc: dict, budget: list[int], dry_run: bool=False)` — 
+- `_message(inc: dict)` — What the owner reads, once per outcome; None = nothing worth a message.
+- `notify(conn, incidents: list[dict], send: bool=True)` — 
+- `run(agent: bool=True, tests: bool=True, send: bool=True, dry_run: bool=False)` — 
+- `status()` — 
+
 ## health.py
 
 Health of the Walter Router module: last refresh, source ages, providers, subscriptions, dossiers (`walter-router
@@ -820,6 +886,8 @@ From a chosen model to something Hermes can run: ordered execution routes and li
 - `host_order(conn, model_id: str, usage: str='interactive')` — Usable hosts behind OpenRouter for this model, cheapest first (models.usable_endpoints); flex tier only for
 - `routes(conn, model_id: str, variant: str='', preferred: str | None=None, usage: str='interactive', modes: list[str] | None=None)` — Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not
 - `log(conn, entry: dict)` — One routed execution attempt (from the Hermes plugin or the media executor).
+- `_stream_error(data: bytes)` — The provider's own reason when an HTTP 200 stream ends on an error event (Kie: « no_available_account »).
+- `_kie_media(kie: str)` — Kie's media API (video, image, music tasks) is another service than its Claude chat API: usable when the
 - `_post(url: str, body: dict, headers: dict, timeout: int | None=None, must: str | None=None)` — POST and read the whole answer (SSE included); ok = HTTP 200, non-empty, containing `must` when given
 - `probe(conn, only: str | None=None, timeout: int=90)` — Tiny live call per API provider (max 5 output tokens, streamed when the provider streams for Hermes).
 

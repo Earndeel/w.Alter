@@ -3670,7 +3670,7 @@
           },
           {
             "default": null,
-            "description": "source_stale | source_error | provider_down | test_failure | cycle_failed.",
+            "description": "source_stale | source_error | provider_down | test_failure | cycle_failed | docs_stale (generated reference out of date: regenerated without a model).",
             "name": "kind",
             "nullable": false,
             "type": "text"
@@ -6428,6 +6428,240 @@
         ]
       },
       {
+        "description": "Guardian of the Walter Router: keeps the module working without the owner (2026-10-26).",
+        "file": "guardian/__init__.py",
+        "functions": []
+      },
+      {
+        "description": "walter-router-guardian check | run [--no-agent] [--no-tests] [--no-notify] [--dry-run] | status",
+        "file": "guardian/__main__.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "main",
+            "signature": "argv: list[str] | None=None"
+          }
+        ]
+      },
+      {
+        "description": "Deterministic detection: what is wrong with the module right now. No model is called here.",
+        "file": "guardian/checks.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "sources",
+            "signature": "conn"
+          },
+          {
+            "description": "",
+            "name": "cycle",
+            "signature": "conn"
+          },
+          {
+            "description": "'ours' (the request looks wrong: repairable here), 'account' (key, credit: the owner's), 'external'.",
+            "name": "provider_side",
+            "signature": "detail: str"
+          },
+          {
+            "description": "",
+            "name": "providers",
+            "signature": "conn"
+          },
+          {
+            "description": "Files with uncommitted changes in the live module (someone's work in progress), relative to its root.",
+            "name": "dirty_paths",
+            "signature": "root=None"
+          },
+          {
+            "description": "The module's test suite in `root`: {ok, failures: {node id: one-line reason}, tail}.",
+            "name": "run_tests",
+            "signature": "root, timeout: int=TEST_TIMEOUT"
+          },
+          {
+            "description": "Failing tests, except those whose test file is itself someone's uncommitted work (still being written).",
+            "name": "tests",
+            "signature": "root=None"
+          },
+          {
+            "description": "`walter-router docs --check`: the generated reference against code and schema. {} when the installed version",
+            "name": "docs_check",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "docs",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "detect",
+            "signature": "conn, with_tests: bool=True"
+          }
+        ]
+      },
+      {
+        "description": "Repair of one incident by the L2 agent, on a copy of the module; deterministic gates decide whether it lands.",
+        "file": "guardian/repair.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_git",
+            "signature": "cwd: Path, *args: str, check: bool=True"
+          },
+          {
+            "description": "A fresh copy of the live module with a git baseline: what the agent works on.",
+            "name": "workspace",
+            "signature": "incident_id: int"
+          },
+          {
+            "description": "",
+            "name": "_render",
+            "signature": "incident: dict, module: Path"
+          },
+          {
+            "description": "The live module, the instance configuration and the system units are read-only for the agent.",
+            "name": "_readonly_script",
+            "signature": ""
+          },
+          {
+            "description": "The agent's closing JSON (outcome, cause, changes, summary): the last object carrying an `outcome`.",
+            "name": "verdict_of",
+            "signature": "output: str"
+          },
+          {
+            "description": "",
+            "name": "agent",
+            "signature": "incident: dict, module: Path"
+          },
+          {
+            "description": "(status, path) of the agent's changes against the baseline; status D = deleted.",
+            "name": "changed_files",
+            "signature": "module: Path"
+          },
+          {
+            "description": "",
+            "name": "_asserts",
+            "signature": "text: str"
+          },
+          {
+            "description": "Read the source with the repaired code (no database write): rows parsed, or the error.",
+            "name": "verify_source",
+            "signature": "module: Path, kind: str"
+          },
+          {
+            "description": "Deterministic checks on the agent's patch. ok=False lists why it must not land.",
+            "name": "gates",
+            "signature": "module: Path, incident: dict, baseline: dict"
+          },
+          {
+            "description": "",
+            "name": "_digest",
+            "signature": "path: Path"
+          },
+          {
+            "description": "Copy the verified files into the live module, only where the live file is exactly what the agent started",
+            "name": "apply",
+            "signature": "module: Path, files: list[str], deleted: list[str], message: str"
+          },
+          {
+            "description": "Generated reference out of date: regenerate it (no model), and commit the regenerated files alone, unless one",
+            "name": "regenerate_docs",
+            "signature": "message: str"
+          },
+          {
+            "description": "",
+            "name": "_new",
+            "signature": "module: Path"
+          },
+          {
+            "description": "Old workspaces go; those holding a deferred patch stay.",
+            "name": "prune",
+            "signature": "days: int=7, keep: set[str]=frozenset()"
+          }
+        ]
+      },
+      {
+        "description": "One guardian pass: detect, follow incidents, act, tell the owner only what is worth it.",
+        "file": "guardian/run.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_now",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "_age_h",
+            "signature": "ts"
+          },
+          {
+            "description": "Open or refresh one incident per problem; close those no longer seen (a test incident only when the",
+            "name": "sync",
+            "signature": "conn, problems: list[dict], tests_checked: bool"
+          },
+          {
+            "description": "",
+            "name": "_set",
+            "signature": "conn, inc: dict, status: str, verdict: dict | None=None, attempt: bool=False"
+          },
+          {
+            "description": "The router's own read of one source (writes its snapshot when it works).",
+            "name": "reread_source",
+            "signature": "kind: str"
+          },
+          {
+            "description": "",
+            "name": "_needs_agent",
+            "signature": "inc: dict"
+          },
+          {
+            "description": "Subject: which incident; body: the agent's cause and evidence, then who did the work.",
+            "name": "commit_message",
+            "signature": "inc: dict, v: dict"
+          },
+          {
+            "description": "",
+            "name": "_repair",
+            "signature": "conn, inc: dict, dry_run: bool"
+          },
+          {
+            "description": "A verified patch waiting for files someone else was editing: land it once they are free.",
+            "name": "_retry_deferred",
+            "signature": "conn, inc: dict"
+          },
+          {
+            "description": "Generated reference: regenerated mechanically, never by the agent; quiet when it works.",
+            "name": "_docs",
+            "signature": "conn, inc: dict, dry_run: bool"
+          },
+          {
+            "description": "",
+            "name": "handle",
+            "signature": "conn, inc: dict, budget: list[int], dry_run: bool=False"
+          },
+          {
+            "description": "What the owner reads, once per outcome; None = nothing worth a message.",
+            "name": "_message",
+            "signature": "inc: dict"
+          },
+          {
+            "description": "",
+            "name": "notify",
+            "signature": "conn, incidents: list[dict], send: bool=True"
+          },
+          {
+            "description": "",
+            "name": "run",
+            "signature": "agent: bool=True, tests: bool=True, send: bool=True, dry_run: bool=False"
+          },
+          {
+            "description": "",
+            "name": "status",
+            "signature": ""
+          }
+        ]
+      },
+      {
         "description": "Health of the Walter Router module: last refresh, source ages, providers, subscriptions, dossiers (`walter-router",
         "file": "health.py",
         "functions": [
@@ -7956,6 +8190,16 @@
             "description": "One routed execution attempt (from the Hermes plugin or the media executor).",
             "name": "log",
             "signature": "conn, entry: dict"
+          },
+          {
+            "description": "The provider's own reason when an HTTP 200 stream ends on an error event (Kie: « no_available_account »).",
+            "name": "_stream_error",
+            "signature": "data: bytes"
+          },
+          {
+            "description": "Kie's media API (video, image, music tasks) is another service than its Claude chat API: usable when the",
+            "name": "_kie_media",
+            "signature": "kie: str"
           },
           {
             "description": "POST and read the whole answer (SSE included); ok = HTTP 200, non-empty, containing `must` when given",
@@ -13494,6 +13738,94 @@
       },
       {
         "comment": "the cycle runs every 48 h",
+        "file": "guardian/checks.py",
+        "name": "RUN_MAX_AGE_H",
+        "value": 54
+      },
+      {
+        "comment": "",
+        "file": "guardian/checks.py",
+        "name": "TEST_TIMEOUT",
+        "value": 600
+      },
+      {
+        "comment": "",
+        "file": "guardian/repair.py",
+        "name": "LEVEL",
+        "value": "L2"
+      },
+      {
+        "comment": "",
+        "file": "guardian/repair.py",
+        "name": "MAX_TURNS",
+        "value": 80
+      },
+      {
+        "comment": "",
+        "file": "guardian/repair.py",
+        "name": "BUDGET_S",
+        "value": 2400
+      },
+      {
+        "comment": "",
+        "file": "guardian/repair.py",
+        "name": "ALLOWED",
+        "value": [
+          "research/",
+          "analysis/parse.py",
+          "analysis/identity.py",
+          "analysis/aliases.json",
+          "interface/",
+          "tests/"
+        ]
+      },
+      {
+        "comment": "agent runs per incident before it is handed to the owner",
+        "file": "guardian/run.py",
+        "name": "MAX_ATTEMPTS",
+        "value": 3
+      },
+      {
+        "comment": "between two agent runs on the same incident",
+        "file": "guardian/run.py",
+        "name": "RETRY_AFTER_H",
+        "value": 12
+      },
+      {
+        "comment": "a failing test is often someone's work in progress: act only if it lasts",
+        "file": "guardian/run.py",
+        "name": "TEST_GRACE_H",
+        "value": 6
+      },
+      {
+        "comment": "",
+        "file": "guardian/run.py",
+        "name": "MAX_REPAIRS_PER_PASS",
+        "value": 3
+      },
+      {
+        "comment": "an outside outage is worth a message only when it lasts this long",
+        "file": "guardian/run.py",
+        "name": "EXTERNAL_NOTICE_H",
+        "value": 48
+      },
+      {
+        "comment": "",
+        "file": "guardian/run.py",
+        "name": "_CLOSED_OK",
+        "value": [
+          "fixed",
+          "resolved"
+        ]
+      },
+      {
+        "comment": "a reference that cannot be regenerated for a day goes to the owner",
+        "file": "guardian/run.py",
+        "name": "DOCS_OWNER_AFTER_H",
+        "value": 24
+      },
+      {
+        "comment": "the cycle runs every 48 h",
         "file": "health.py",
         "name": "RUN_MAX_AGE_H",
         "value": 54
@@ -15813,8 +16145,13 @@
     "config/media_models.json": "1a00950c74b50b046e5a6d9ab534def777ea8c349f3058e2a842800168b1ea7a",
     "config/providers.json": "ea7f381395589799ef723a1a4e93540d4a3b4bc08549a42207a22857940be430",
     "config/subscriptions.json": "d2e56aa07e15344a1986746b1f8608842873639f5d37788e37e9896d6ba67017",
-    "contracts/router.json": "ff55a42570d5b42e612172c4a7e74ca420c7eea31069885e501907d9c6492f9d",
-    "documentation.py": "ab295bbbcaf269c6400f59b1ba16bd0c90fcbd8c82890ea345abcdc8a89eb002",
+    "contracts/router.json": "d52d10e173e0b31bdeca9716e1a88dc203bb7cf614b523b985bcf7648fb178f8",
+    "documentation.py": "93f6e50c6e031e7e7b824d040533250527e59283d5a263ad438257a199656642",
+    "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
+    "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
+    "guardian/checks.py": "95e2b17fc987f7bbe2d4d6dea98b25dc1af2aee919f98539ddb6781494eeb17e",
+    "guardian/repair.py": "9b81285d70fe2a6052b1eab9d72166d28ee225e46752afc477432f6ad3d90bf7",
+    "guardian/run.py": "3093f8e6b65fca4b8906a57617c02d07fd5db1e67d44339d7575ebee3e343932",
     "health.py": "d73bf52fce1a01b184fc9bb05639aebab5f89f104bda043e0b2189b381b602f8",
     "hermes-plugins/kie-compat/__init__.py": "aba770c340305899abfca6172a3774b0e56b400328e6f0f3350ab79a688daace",
     "hermes-plugins/walter-router/__init__.py": "0304d91d38ac0059f7665587f447fa8098bb4e7cb562a24cac4b4e92e3458f4d",
@@ -15827,7 +16164,7 @@
     "interface/site/functions/api/run.js": "f0c5e0aaae262eae630e2b685f2f3c28e4c1430bca9451e3015f5c4d9f7506f3",
     "interface/site/functions/api/status.js": "37fbd922a3eae2e33236fe4cda7d4546dafd6b69f7d76b50aea92d2deafd92cb",
     "interface/translate.py": "0f2af8b1272f4a61f561e7f5bb6ae2ab258ceb7916cbdfee5d5ffad09cf5205f",
-    "llm/claude_subscription.py": "2c589db266d1cd8f1636a8b3835cf36edfedfcf9d3209be67b99a8fa1f814ed9",
+    "llm/claude_subscription.py": "96b53a70d801791fdb8a1cead6695a60469e1295dd86c019a76f141d4397cc89",
     "llm/config/gateway.json": "8220ddfa6a365a83e43a772fbcf0e07aa142209f7f985a9d19f34d127f41c19b",
     "llm/contracts/llm.json": "5a8339b24a1773650873249914afe7fe4e6af03eaf3e36eab6c8b9451b06c685",
     "llm/gateway.py": "ca024a028ebe0c5a310ae6f3acd8cf620337b3d0145d917c72e9f62a2ed12763",
@@ -15879,10 +16216,10 @@
     "serve/api.py": "a457147d23cf995c1144150f98d74cbb30b2cdb1b535974e3221903ae8252157",
     "serve/brief.py": "33ca79121e190834adabe6fbc573b408ef84d4cf29a93736cf4f8de48275c3ab",
     "serve/choose.py": "e8894e22b18bc0d87f30878bd1a6a75f216090cd64bd5a9f91ab27bb76dfa6ea",
-    "serve/execution.py": "710d5a3bb54fbbed918565fc04e1ae176c6106e93db55150195cc8c134977073",
+    "serve/execution.py": "2dc7ea2cdd31c8dae743c7bf550a73e57dc871ed0a7a4c320eeb9ef3c5bde21f",
     "serve/hermes_sync.py": "1dc99d9f119e45cc958e5954fac64ba29802505d04ccd2ef096c3aba3db633cc",
     "serve/intent.py": "8f8c1adcbc776fce3e38d1aa751bcea89b1a71b00c1918c0b6ab9dd71b2c75cf",
-    "serve/media_exec.py": "2594cc980aff730e87a42f23e23e3a7db43e3579f8d364af3dad1827228aa990",
+    "serve/media_exec.py": "442b830d7a13cb3c0502b4b6767af964dd0adcf38fefc3d851bb28a455e7b016",
     "serve/named.py": "9faaa5031f319ffef3f708b2de78a3b96fd2c2d8c1c010ff7bc2e44afb38d264",
     "serve/oneshot.py": "12239c7c99038605afeb49f40264dc08b84975ffef4f9f0f54e1f842f45b85ae",
     "serve/routes.py": "492e8e75f102e42856bcd66f612dfe7b30cc21c14c8776aeb352d9d2e7e420fb",
@@ -15922,7 +16259,8 @@
     "store/migrations/030_plan_change_alerts.sql": "be4b1805ecdc4a5c427ad326ee31479e225d062f163c225700c1ec214241bb9c",
     "store/migrations/031_video_understanding.sql": "f7597362e2a3a69d47adca5f7140003cc2b1ec87da62c5dfd0097c4b1e392e3c",
     "store/migrations/032_no_video_understanding_task.sql": "4f8e7527db1979c92b5df0b386c329080e7c19d84fa054e6d47cec70df82929a",
-    "store/migrations/033_guardian.sql": "8013f62d521b5e243ee6651b6b40c8d19b4097f44bf1434ce9783dcde086a244"
+    "store/migrations/033_guardian.sql": "8013f62d521b5e243ee6651b6b40c8d19b4097f44bf1434ce9783dcde086a244",
+    "store/migrations/034_guardian_docs.sql": "bb25f74a84385740452d3890e06759a9ccb4c4845719176d4eba14396260069e"
   },
   "tasks": [
     {

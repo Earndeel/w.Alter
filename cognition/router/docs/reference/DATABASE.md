@@ -527,7 +527,7 @@ Maintenance incidents of the Walter Router seen by its guardian (guardian/): det
 |---|---|---|---|---|
 | `incident_id` | bigint | False | nextval('models.guardian_incidents_incident_id_seq'::regclass) | Incident number. |
 | `key` | text | False | — | Stable identity of the problem (source:aa_stt, provider:kie, test:<pytest node id>, cycle): one open row per key. |
-| `kind` | text | False | — | source_stale \| source_error \| provider_down \| test_failure \| cycle_failed. |
+| `kind` | text | False | — | source_stale \| source_error \| provider_down \| test_failure \| cycle_failed \| docs_stale (generated reference out of date: regenerated without a model). |
 | `subject` | text | False | — | What is affected: source kind, provider, test node id or run. |
 | `status` | text | False | 'open'::text | open (seen, not handled yet) \| repairing \| fixed (patch applied and verified) \| external (cause outside the module: provider or site outage, waiting) \| needs_owner (a decision only the owner can take) \| deferred (verified patch waiting for files another session is editing) \| resolved (gone by itself). |
 | `opened_at` | timestamp with time zone | False | now() | First detection. |
