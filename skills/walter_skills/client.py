@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 
 URL = os.environ.get("WALTER_SKILLS_URL", "http://127.0.0.1:8891")
-STORE = Path(os.environ.get("WALTER_SKILLS_STORE", "/opt/walter-skills"))
+STORE = Path(os.environ.get("WALTER_SKILLS_STORE", "/walter/skills"))
 
 
 def _call(method: str, path: str, body: dict | None = None, timeout: float = 4.0):
