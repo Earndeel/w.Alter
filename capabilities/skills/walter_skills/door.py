@@ -1,9 +1,10 @@
 """The write door — the single way content enters walter-skills: any agent proposes a new skill or a fix; nothing goes
-live directly (the curation Drafts operator judges every draft).
+live directly: the curation Drafts operator applies every draft (no model judge since 2026-10-26).
 
 propose(...) → drafts/<name>@new-<runtime>-<ts>/      (kind: new)
 patch(...)   → drafts/<name>@patch-<runtime>-<ts>/    (kind: patch, full new SKILL.md or one linked file)
-The curator reviews drafts every night (judge + checks) and promotes or rejects them (curator.process_drafts).
+The Drafts operator promotes them within a minute; it only rejects a new skill whose name exists or a patch whose
+target is not active. Every acceptance is its own git commit: revert to undo.
 Refused at the door: bad names, missing frontmatter, oversized content, path tricks, and anything that looks like a
 secret (an agent must reference where a secret lives, never paste it).
 """
@@ -65,13 +66,13 @@ _PROD_ROOT = store.ROOT  # tests swap store.ROOT for a tmp repo: only the real s
 
 
 def _announce(d: Path, kind: str, name: str, runtime: str | None, session_id: str | None) -> dict:
-    """skill.proposed on the Walter bus → the walter-skills consumer judges it within a minute (fail-open: the
+    """skill.proposed on the Walter bus → the walter-skills consumer applies it within a minute (fail-open: the
     hourly reconciliation picks up a draft whose announcement was lost)."""
     rel = str(d.relative_to(store.ROOT))
     if store.ROOT == _PROD_ROOT:
         from walter_memory import bus
         bus.emit("skill.proposed", runtime or "agent", name, {"draft": rel, "kind": kind, "session_id": session_id})
-    return {"draft": rel, "status": "pending: judged by the curator within a minute, then live if accepted"}
+    return {"draft": rel, "status": "pending: live within a minute (no model judge; only the target is checked)"}
 
 
 def _draft_dir(name: str, kind: str, runtime: str | None) -> Path:
