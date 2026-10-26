@@ -1,0 +1,23 @@
+# Dongle D6 (Allwinner H313, eros_p1), Android 10 maquillé en 12. Usage : Stremio uniquement.
+# Désactivé avec pm disable-user --user 0 le 2026-10-26. Réactivation : sh restore.sh
+
+# + les applis tierces que l'utilisateur n'utilise plus (à choisir avec lui, ajoutées ici une par ligne)
+
+# Google : YouTube, assistant vocal (~71 Mo de RAM), lignes de recommandations, services inutiles
+com.google.android.youtube.tv
+com.google.android.katniss
+com.google.android.tvrecommendations
+com.google.android.feedback
+com.google.android.backuptransport
+com.google.android.apps.restore
+com.google.android.partnersetup
+com.google.android.onetimeinitializer
+
+# Allwinner / fabricant : tests d'usine, Miracast, lecteur vidéo, logs, liste d'applis
+com.DeviceTest
+com.softwinner.agingdragonbox
+com.softwinner.dragonbox
+com.softwinner.miracastReceiver
+com.softwinner.TvdVideo
+com.softwinner.awlogsettings
+com.ald.atvapplist

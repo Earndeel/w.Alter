@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-26T11:10:41.426451+00:00",
+ "description": "Use when Monsieur asks to play a film or episode on the living-room TV, turn the Hisense TV on or off, or fix/maintain the Chinese Android TV dongle (Stremio, subtitles, ADB, HDMI-CEC, debloat).",
+ "domain": "media",
+ "kind": "new",
+ "reason": "Captures the verified procedures for playing films on the living-room Android TV dongle (Stremio deep links, subtitles server, HDMI-CEC power of a Hisense VIDAA TV, debloat/restore), learned in a Claude Code session on 2026-10-26. Resubmitted without LAN addresses or device-specific private details.",
+ "runtime": "claude-code",
+ "session_id": null,
+ "target": "android-tv-stremio-dongle"
+}
