@@ -35,12 +35,14 @@ def test_shadow_request_is_detached_and_carries_the_previous_exchange(hook, tmp_
     t.write_text("{}\n" + json.dumps({"type": "user", "timestamp": "2026-10-25T10:00:00Z",
                                        "message": {"content": "Je lance le lot B ?"}}) + "\n" +
                  json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": "Oui, en fantôme."}]}}))
-    mod.preflight_shadow("On mesure le preflight sur les vrais messages", "claude_code", "abc", str(t))
+    mod.preflight_shadow("On mesure le preflight sur les vrais messages", "claude_code", "abc", str(t),
+                         {"text": "Mémoire W.Alter …", "parts": ["memory"]})
     cmd, kw, req = sent[0]
     assert cmd == ["walter-context-preflight", "--shadow"] and kw["start_new_session"]
-    assert req["default_thread"] == "session:abc" and req["previous"]["thread_id"] == "session:abc"
+    assert req["session_id"] == "abc" and "candidates" not in req   # the subjects come from Walter Memory
     assert req["previous"]["message"] == "Je lance le lot B ?" and req["previous"]["answer"] == "Oui, en fantôme."
     assert req["privacy_class"] == "cloud_allowed" and req["previous"]["age_s"] > 0
+    assert req["current_injection"]["parts"] == ["memory"]
 
 
 def test_secrets_stay_local_and_switches_hold(hook, monkeypatch):

@@ -182,20 +182,18 @@ def _last_texts(lines: list[str]) -> dict[str, tuple[str, str]]:
     return found
 
 
-def preflight_shadow(prompt: str, runtime: str, session_id: str, transcript: str | None) -> None:
-    """walter-context lot 4 in shadow: the preflight runs detached and records its ContextPlan in the instance;
-    nothing is injected and the prompt is not delayed. A message that looks like it holds a secret stays local."""
+def preflight_shadow(prompt: str, runtime: str, session_id: str, transcript: str | None,
+                     current: dict | None = None) -> None:
+    """walter-context lot 4 in shadow: the preflight runs detached; with Walter Memory's subjects it records its
+    ContextPlan and the context pack it would have injected, next to `current` (what this hook injects today) for
+    the comparison. Nothing is injected and the prompt is not delayed. A message that looks like it holds a secret
+    stays local."""
     if os.environ.get("WALTER_HOOK_PREFLIGHT", "shadow") == "off" or machine_prompt(prompt) or runtime == "dsh":
         return
     secret = any(cat == "secret" for cat, _ in _privacy().detect(prompt))
-    prev = previous_exchange(transcript)
-    thread = f"session:{session_id}" if session_id else None
-    if prev:
-        prev["thread_id"] = thread
-    req = {"turn_id": f"{session_id}:{int(time.time() * 1000)}", "message": prompt[:6000], "previous": prev,
-           "runtime": runtime, "session_id": session_id, "default_thread": thread,
-           "candidates": [{"id": thread, "title": "this session"}] if thread else [],
-           "privacy_class": "local_only" if secret else "cloud_allowed"}
+    req = {"turn_id": f"{session_id}:{int(time.time() * 1000)}", "message": prompt[:6000],
+           "previous": previous_exchange(transcript), "runtime": runtime, "session_id": session_id,
+           "current_injection": current or {}, "privacy_class": "local_only" if secret else "cloud_allowed"}
     p = subprocess.Popen(["walter-context-preflight", "--shadow"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True)
     p.stdin.write(json.dumps(req, ensure_ascii=False).encode())
@@ -290,10 +288,6 @@ def claude_code(ev: dict) -> dict | None:
         caller, prompt = f"{runtime.replace('_', '-')}-hook", OWN.sub(" ", ev.get("prompt") or "").strip()
         if not prompt:  # a dsh step whose only new messages are our own contexts or tool results
             return None
-        try:
-            preflight_shadow(prompt, runtime, sid, ev.get("transcript_path"))
-        except Exception as e:  # noqa: BLE001 — shadow mode never affects the prompt
-            log(f"preflight shadow error {type(e).__name__}: {str(e)[:160]}")
         with ThreadPoolExecutor(2) as ex:  # memory and skills in parallel; each fails open on its own
             fm = ex.submit(memory_context, prompt, caller, sid)
             fs = ex.submit(skills, "message", prompt, runtime, f"{runtime}/vm/{sid}" if sid else "",
@@ -306,6 +300,11 @@ def claude_code(ev: dict) -> dict | None:
                 except Exception as e:
                     log(f"{label} error {type(e).__name__}: {str(e)[:160]}")
         ctx = ours(runtime, "\n\n".join(parts))
+        try:   # after the current injection is known, so the shadow can compare; detached, adds no delay
+            preflight_shadow(prompt, runtime, sid, ev.get("transcript_path"),
+                             {"text": ctx[:20000], "parts": [p.split("\n", 1)[0][:80] for p in parts]})
+        except Exception as e:  # noqa: BLE001 — shadow mode never affects the prompt
+            log(f"preflight shadow error {type(e).__name__}: {str(e)[:160]}")
         return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": ctx}} if ctx else None
     if name in ("PostToolUse", "PostToolUseFailure"):
         ctx = ours(runtime, error_skills(ev, runtime, sid))
