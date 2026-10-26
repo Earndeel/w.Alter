@@ -119,6 +119,14 @@ def post_views_read(body: dict):
     return res
 
 
+@app.post("/v1/views/candidates", dependencies=[Depends(auth)])
+def post_views_candidates(body: dict):
+    """The subjects a new owner message may belong to (walter-context preflight): {message, session_id, limit}."""
+    from . import views
+    return views.subject_candidates(str(body.get("message") or "")[:4000], body.get("session_id"),
+                                    limit=max(1, min(int(body.get("limit") or 5), 10)))
+
+
 @app.post("/v1/context", dependencies=[Depends(auth)])
 def post_context(body: ContextIn):
     import hashlib

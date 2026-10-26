@@ -383,3 +383,28 @@ def read(q: dict) -> dict:
         return {"domain": q["domain"], "horizon": q.get("horizon"), "depth": "index", "content": "\n".join(lines),
                 "views": [r["view_key"] for r in rows[:len(lines)]], "stale": False,
                 "deeper": ["overview", "synthesis", "details", "sources"]}
+
+
+# ── candidates for a new message (walter-context preflight, step D) ─────────────────────────────────────────────────
+def subject_candidates(message: str, session_id: str | None = None, at: datetime | None = None,
+                       limit: int = SHORTLIST, embed=None) -> dict:
+    """The subjects a new owner message may belong to, as cards, closest first, plus the subject the session's last
+    attached exchange went to ('waiting'). Local embeddings only: nothing leaves the VM here."""
+    from .db import connection
+    if embed is None:
+        from .search import embed
+    at = at or _now()
+    ex = {"message": message or "", "at": at, "session_id": session_id or ""}
+    with connection() as conn:
+        rows = candidates(conn, ex, embed)[:limit] if message else []
+        waiting = _previous(conn, ex) if session_id else None
+        if waiting and all(r["view_key"] != waiting["view_key"] for r in rows):
+            row = conn.execute("select view_key, title, last_at from views.view where view_key = %s",
+                               (waiting["view_key"],)).fetchone()
+            if row:
+                rows = [*rows[:max(0, limit - 1)], {**row, "sim": None}]
+        cards = [{"id": r["view_key"], **_card(conn, r["view_key"]),
+                  "hours_since_last": round((at - r["last_at"]).total_seconds() / 3600, 1),
+                  "similarity": round(float(r["sim"]), 3) if r.get("sim") is not None else None} for r in rows]
+    return {"candidates": cards, "waiting": waiting["view_key"] if waiting else None,
+            "waiting_age_s": (at - waiting["occurred_at"]).total_seconds() if waiting else None}
