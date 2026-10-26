@@ -7,6 +7,7 @@
 --shadow: the plan is only recorded (instance state, context/shadow/preflight-<day>.jsonl, private), nothing is
 printed for injection. Used by the hook while lot 4 is in shadow mode. Fail-open: exit 0, a line in the record.
 --refresh-router: refresh the cached Walter Router answers (task families, decision chain) and exit.
+--report [--days N]: what the recorded shadow plans say (walter_context.shadow), read-only.
 --serve: the warm service (walter_context.preflight.service, 127.0.0.1:8897) the bin script tries first.
 """
 from __future__ import annotations
@@ -116,6 +117,12 @@ def handle(d: dict, shadow: bool) -> tuple[dict | None, dict]:
 def main(argv: list[str]) -> int:
     if "--refresh-router" in argv:
         return 0 if refresh_router()["tasks"] else 1
+    if "--report" in argv:
+        from ..shadow import report
+        days = int(argv[argv.index("--days") + 1]) if "--days" in argv else 1
+        folder = _instance_state()
+        print(json.dumps(report(folder, days) if folder else {"error": "no instance"}, ensure_ascii=False, indent=1))
+        return 0
     if "--serve" in argv:
         from .service import serve
         return serve()

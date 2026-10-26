@@ -58,3 +58,22 @@ def test_a_failing_source_drops_only_its_block(sources, monkeypatch):
     blocks, notes = retrieval.gather(plan("L2"), "et la suite ?")
     assert "subjects_board" not in [b.id for b in blocks] and notes and notes[0].startswith("board: TimeoutError")
     assert pack(plan("L2", thread=None), [], []).text() == ""
+
+
+def test_shadow_report_compares_pack_and_current(tmp_path):
+    import json
+    from datetime import datetime, timezone
+    from walter_context.shadow import report
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    lines = [{"plan": {"level": "L2", "thread": {"id": "subject:a"}, "fast_path": None}, "plan_ms": 700,
+              "pack": {"tokens_per_message": 900, "tokens_session_layer": 680, "retrieval_ms": 40, "notes": []},
+              "current": {"tokens": 500}},
+             {"plan": {"level": "L1", "thread": {"id": "subject:a"}, "fast_path": "short_reply"}, "plan_ms": 1,
+              "pack": {"tokens_per_message": 0, "tokens_session_layer": 680, "retrieval_ms": 2, "notes": ["board: X"]},
+              "current": {"tokens": 0}},
+             {"error": "boom"}]
+    (tmp_path / f"preflight-{day}.jsonl").write_text("\n".join(json.dumps(x) for x in lines))
+    r = report(tmp_path)
+    assert r["messages"] == 2 and r["errors"] == 1 and r["levels"] == {"L2": 1, "L1": 1}
+    assert r["tokens_per_message"]["walter_context_total"] == 900 and r["tokens_per_message"]["current_hook_total"] == 500
+    assert r["nothing_injected"] == {"walter_context": 1, "current_hook": 1} and r["source_failures"] == {"board": 1}
