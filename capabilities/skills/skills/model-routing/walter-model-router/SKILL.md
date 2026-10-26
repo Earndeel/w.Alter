@@ -1,7 +1,7 @@
 ---
 name: walter-model-router
 description: "Use when choosing which AI model or provider W.Alter should use for a task, checking live leaderboards, prices or the owner's AI subscriptions, explaining or tuning Walter Router (tasks, weights, preferences, alerts, library page), or analysing its 48 h cycle."
-version: 4.2.0
+version: 4.3.0
 author: W.Alter
 metadata:
   hermes:
@@ -161,3 +161,14 @@ Verified on the installed version: 168 tests passed; `walter check` passed. A re
 - This source does not activate the future lot-4 general context composer, nor guarantee automatic injection in every harness. The host owns instruction placement, tool permissions, deduplication and snapshot lifetime.
 - Current execution limits are explicit in EXECUTION.md: native text tool groups are limited; vision selection does not attach input; media uses a separate execution path; subprocesses run with the server's actual rights, not automatically a caller sandbox.
 Validated: router suite 175 tests, context suite 43 tests, DSH port 9 tests; installed live reference check and actual Context-to-Router note loading pass. These are functional checks, not provider availability or billing evidence.
+
+
+
+## Claude subscription transport (2026-10-27)
+The optional provider `claude-pro` is now a Walter Router route, not a direct Hermes provider. Read `docs/CLAUDE-SUBSCRIPTION.md` under `walter path router` for configuration and operational limits. The verified model allowlist belongs to the instance, not the shared code; catalogue presence alone never proves generation or tool capability.
+
+The official native client contributes authenticated transport and a validated technical billing attribution only. The bridge forwards caller-owned messages, tools and parameters; no native Agent SDK identity, machine context, CLAUDE.md or native tools. Real responses/tool calls return only to Walter's own tool loop. The CLI gets a synthetic tool-free acknowledgement. Streaming, exact model identity and cancellation are covered by the transport. A caller requiring this subscription may use `provider=claude-pro`; no provider/model fallback is added by the adapter.
+
+The `claude-subscription` grant is renewed only by Walter Secrets (opaque token expiry, interprocess lock, atomic rotation). Never extract or print credentials. `walter-secret grants claude-subscription` exposes metadata only. `research --source claude_pro` refreshes the qualified catalogue; the existing quota worker reads real five-hour/weekly vendor meters (`claude_usage_api`) instead of transcript estimates. Actual bridge token metadata are distinct from the CLI's synthetic acknowledgement and local list-price estimates.
+
+After changing the instance's gateway configuration, restart `walter-llm`; do not change a global CLI or model favourite merely to provision this optional transport. Do not force expiry or rotate persistent credentials just to test renewal without specific authorization. Publishing library metadata is a separate external write: prepare a local preview and obtain authorization if the approval reviewer rejects publication. Neither a blocked forced-renewal test nor a blocked publication prevents the installed Router route from being validated independently.
