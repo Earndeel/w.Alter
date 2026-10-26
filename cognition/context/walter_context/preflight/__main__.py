@@ -6,6 +6,7 @@
 
 --shadow: the plan is only recorded (instance state, context/shadow/preflight-<day>.jsonl, private), nothing is
 printed for injection. Used by the hook while lot 4 is in shadow mode. Fail-open: exit 0, a line in the record.
+--refresh-router: refresh the cached Walter Router answers (task families, decision chain) and exit.
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import Exchange, Request, run
+from . import Exchange, Request, refresh_router, run
 
 
 def _instance_state() -> Path | None:
@@ -42,6 +43,8 @@ def _record(row: dict) -> None:
 
 
 def main(argv: list[str]) -> int:
+    if "--refresh-router" in argv:
+        return 0 if refresh_router()["tasks"] else 1
     shadow = "--shadow" in argv
     t0 = time.time()
     try:
