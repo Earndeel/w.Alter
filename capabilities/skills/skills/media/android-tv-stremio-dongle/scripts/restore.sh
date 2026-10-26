@@ -33,6 +33,13 @@ adb -s "$DEV" shell settings delete global animator_duration_scale
 # HDMI-CEC : la télé ne s'éteint plus quand le dongle se met en veille (valeur d'origine 0).
 adb -s "$DEV" shell settings put global hdmi_control_auto_device_off_enabled 0
 
+# Retire le service anti-veille persistant ajouté le 2026-10-26.
+# L'APK signé et ses sources sont sauvegardés (references/keepalive.md).
+adb -s "$DEV" shell dumpsys deviceidle whitelist -cloud.walter.tvkeepalive 2>/dev/null
+if adb -s "$DEV" shell pm path cloud.walter.tvkeepalive 2>/dev/null | grep -q '^package:'; then
+  adb -s "$DEV" uninstall cloud.walter.tvkeepalive
+fi
+
 # Le dongle peut de nouveau passer en veille profonde (verrou posé par stremio-remote/stremio.py).
 adb -s "$DEV" shell su -c "'echo stremio_remote > /sys/power/wake_unlock'" 2>/dev/null
 adb -s "$DEV" shell rm -f /data/local/tmp/cecsend
