@@ -1,0 +1,11 @@
+{
+ "base_sha": "9176793eb281c8229ef869bc7e098414215b674a4993ae1428e106bec4062023",
+ "changed": "scripts/test_stremio.py",
+ "created_at": "2026-10-26T17:19:54.794893+00:00",
+ "domain": "media",
+ "kind": "patch",
+ "reason": "Add local tests for the accepted stremio.py revision (77116aa): the SKILL.md claims tested behaviour but no test file existed in the skill. 18 checks, no device needed: VOSTFR rejected for VF even with the addon flag, MULTi.VFi accepted, French-only ahead of MULTi, dub-only still rejected for VO, MULTi VFF VOSTFR admitted, probe verdicts (switch needed, single French track OK, untagged single track not proven, no French track, no profile match INCERTAIN, French default NON GARANTI, profile match), saved track per episode/series fallback, URL masking, is_french. Run: python3 -I scripts/test_stremio.py (imports stremio.py from its own folder). Passed locally 2026-10-26: 18 tests OK.",
+ "runtime": "claude_code",
+ "session_id": "996254cc-9f30-4f49-a4af-10df65cf2b76",
+ "target": "android-tv-stremio-dongle"
+}
