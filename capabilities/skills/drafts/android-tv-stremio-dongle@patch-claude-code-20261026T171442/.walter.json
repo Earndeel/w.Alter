@@ -1,0 +1,11 @@
+{
+ "base_sha": "8e94153c41c727002612f9d8efcb5621486733427bbcddc1646ad36c1f7fbaa3",
+ "changed": "scripts/stremio.py",
+ "created_at": "2026-10-26T17:14:42.416452+00:00",
+ "domain": "media",
+ "kind": "patch",
+ "reason": "Owner request 2026-10-26: agents (MiMo run hermes/main/20261026_164218_2ba6fa, 10 min) wrote their own ffprobe/state scripts and fought the Mac PATH. Adds --probe (ffprobe of the --pick N source on the executing host, track list + verdict for the requested language using the profile audioLanguage and the per-title kept track; URLs masked, nothing launched) and --state (dumpsys media_session state/position + kept audioTrack from core.xml streams, read-only). Appends /usr/local/bin and /opt/homebrew/bin to PATH. For --lang fr: rejects VOSTFR/SUBFRENCH unless a VF/MULTi tag is present (addon flag made a vostfr.avi look French) and +4 for French-only releases (plays French without a switch, profile prefers eng). --list/--probe/--state do not wake the TV. Evidence: 16 local tests pass; run read-only on the real dongle from the Mac: --list 3.5 s, --probe 2 s (MULTi.VFi: fre #1/eng #2 verdict; FRENCH single untagged track: VF OK), --state shows kept track fr.",
+ "runtime": "claude_code",
+ "session_id": "996254cc-9f30-4f49-a4af-10df65cf2b76",
+ "target": "android-tv-stremio-dongle"
+}
