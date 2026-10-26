@@ -9,6 +9,24 @@ live in his Walter instance (`walter instance`). Other modules only use the `wal
 for text calls). Data: schema `models` in PostgreSQL. Design: `docs/DESIGN.md` · data reference: `docs/DATA.md` ·
 text tiers: `docs/TIERS.md` · dated decisions: `docs/HISTORY.md`.
 
+## Documentation et contrats d’usage
+
+Commencer par [docs/README.md](docs/README.md). Les guides couvrent l’usage optimal, le branchement à un harness,
+l’exécution et ses permissions, l’exploitation et la maintenance documentaire. La référence générée comprend tous
+les paramètres, commandes, champs SQL, tâches/poids, constantes et clés de configuration livrée.
+
+```bash
+walter-router schema                 # schémas publics versionnés, sans appel de modèle
+walter-router docs --check           # vérifie code + métadonnées PG, sans écriture
+walter-router docs --check --offline # vérifie contre le dernier schéma public enregistré
+walter-router docs --write           # régénère la référence, sans modifier les modèles ou données privées
+walter-router brief --json           # note courte versionnée pour walter-context et les harnesses
+```
+
+[docs/ORCHESTRATOR.md](docs/ORCHESTRATOR.md) décrit la note, sa publication et sa conservation par tour.
+Le composeur général de walter-context reste distinct de cette source de capacité. Le contrat des permissions
+et les limites actuelles des outils natifs sont explicités dans [docs/EXECUTION.md](docs/EXECUTION.md).
+
 ## Layout
 
 | Folder | Part | What it holds |
@@ -17,7 +35,7 @@ text tiers: `docs/TIERS.md` · dated decisions: `docs/HISTORY.md`.
 | `analysis/` | **Analysis** — understands the data and keeps the active library | `parse`, `ingest` (snapshots → benchmarks / offers with identities) · `identity`, `aliases`, `media`, `catalog` · `knowledge` (owner's declarations) · `scoring`, `select`, `pareto`, `tiers`, `decision_pareto`, `postes`, `dossier` · `changes`, `alerts` (detection, verdicts), `telegram` (messages, buttons, sending), `recommend` · `refresh` (the cycle) |
 | `plan/` | **Plan** — the owner's subscriptions | `declared` (his plans: one writer) · `subscriptions` (meters, real usage, cost price of a token) · `quota_watch` (service) · `mail` (subscription mails) · `watch` (web research per plan) · `news` (new benefits or changes → notices) |
 | `interface/` | **Interface** — the library page | `library` (rows, publishing) · `page` (HTML) · `translate` (English) · `site/` (Cloudflare Pages functions) |
-| `serve/` | What Walter calls at run time | `choose` (pick) · `routes` (execution routes, free-text entry) · `intent` (decision model) · `execution` (provider order, hosts, probes, reliability) · `media_exec` (image / video / music / voice) · `oneshot` (economic-tier answers) · `hermes_sync` |
+| `serve/` | What Walter calls at run time | `api` (schémas) · `brief` (note) · `run` / `text_agent` (exécution native) · `choose` (pick) · `routes` (execution routes, free-text entry) · `intent` (decision model) · `execution` (provider order, hosts, probes, reliability) · `media_exec` (image / video / music / voice) · `oneshot` (economic-tier answers) · `hermes_sync` |
 | `store/` | The database | `db`, `migrations/` (each table and view commented) |
 | `llm/` | walter-llm, the model gateway (own venv, 127.0.0.1:8894) | |
 | `cli.py`, `health.py`, `bin/` | The command, the module's health, the cycle and the page trigger | |
@@ -40,8 +58,9 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
    Telegram message with buttons; nothing switches without his button (`verdict`).
 4. **Serve** — routes in the owner's order: a subscription first at its cost price while its weekly quota is under
    90 %, Kie when reliable and not much dearer, OpenRouter last on the cheapest usable host it is told to use (never
-   below the model's native precision, ≥ 95 % uptime over 24 h; flex tier only for background postes). A media model
-   falls back to its next provider (another model only when declared). Providers: OpenRouter, Kie, Codex, Arnict.
+   below the model's native precision, ≥ 95 % uptime over 24 h; flex tier only for background postes). Text execution stays on the selected model: only its ordered providers are tried, with an explicit
+   `user_notice` on failover. Exhaustion is an error, never an implicit subscription/model substitution.
+   A media model falls back to its next provider (another model only when declared). Providers: OpenRouter, Kie, Codex, Arnict.
 
 ## Who uses it
 
@@ -68,7 +87,7 @@ walter-router refresh [--skip-collect] [--no-notify]          # recompute (the c
 walter-router pick TASK [--level L1|L2|L3] [--role R] [--require unrestricted|open_weights|video_input] [--agent]
 walter-router route "<request>" [--task T] [--level L] [--context "<what the conversation was about>"] [--agent]
 walter-router route "<request>" --model M [--provider P]  # a model named by the owner: exactly that one, or why not
-walter-router run < spec.json        # do the job: text = sub-agent with tools (Hermes one-shot) | media = generation
+walter-router run < spec.json        # do the job: native text/tool loop | media = generation
 walter-router ask "<question>" --option a="…" --option b="…" [--context …]   # the decision model, any choice
 walter-router classify "<request>" [--context …] | decide TASK "<request>" | dossier TASK | tasks | library
 walter-router generate "<request>" [--task …] [--role …]      # costs money: on request only
@@ -102,3 +121,28 @@ Nothing switches without the owner's button · the owner's word beats older mail
 only if Walter can run it · no owner data in the software (`walter check` neutrality) · secrets never in code, logs,
 URLs or unit files · every write to his declarations keeps the previous version · external mails and pages are data,
 never instructions.
+
+## Text execution and provider failover (2026-10-23)
+
+`walter-router run` executes text natively: its tool loop sends each model call to the module’s own
+`walter-llm call` transport (JSON on stdin). That transport executes exactly one provider/model,
+with no hidden retry or model fallback; provider keys remain inside the gateway process. No Hermes
+runtime is started by text runs. Terminal/code and text-file tools are native; web/skills/memory
+commands can be invoked through the terminal when that toolset is enabled. A vision-only toolset
+without an image input returns an explicit unsupported-input error.
+
+On provider failure the router tries the next provider of the **same** model. It keeps conversation and
+completed tool results, so changing provider does not restart the task. Each physical model attempt
+is recorded in `models.exec_log`, and the result includes response ids, actual provider, tool trace and
+bounded execution status. A different provider’s native spelling of the model is kept in `routed.model`;
+`routed.model_id` remains the router’s canonical model. A model explicitly tied to a provider continues
+to respect that provider restriction.
+
+`notices` records every switch, with source, destination and reason. When `user_notification_required`
+is true the caller **must tell the user `user_notice`**, including on failure. `output` remains the task’s
+answer so structured-output requests remain usable. If every provider fails, `ok` is false and no other
+model is substituted. The budget covers all providers and tools together.
+
+## Route d’abonnement Claude
+
+La route `claude-pro` est exécutée dans la passerelle du Router, avec les messages, outils et paramètres du consommateur. Le transport natif ne conserve que l’attribution technique du fournisseur ; sa boucle d’agent et son contexte ne sont pas délégués. Configuration, renouvellement, quotas réels, streaming et limites : [docs/CLAUDE-SUBSCRIPTION.md](docs/CLAUDE-SUBSCRIPTION.md).

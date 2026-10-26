@@ -1,3 +1,5 @@
+> **Document historique de conception (2026-10-04), conservé pour la provenance.** Les noms de modèles, services et mécanismes de repli ci-dessous peuvent avoir été retirés. Pour l’état actuel, lire [README.md](../README.md), [EXECUTION.md](EXECUTION.md) et la [référence](README.md). Ce document n’est pas un contrat d’exécution actuel.
+
 # Walter Router — conception de bout en bout (v1, 2026-10-04)
 
 > **Le Router ne décide pas quoi penser. Il décide comment Walter doit penser pour cette tâche.**

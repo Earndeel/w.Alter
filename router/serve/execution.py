@@ -29,6 +29,9 @@ def _runnable(offer: dict) -> tuple[str, str, str] | None:
     """(Hermes provider, model id at that provider, status key) or None when Hermes cannot run this offer."""
     if offer["interface"] != "chat":
         return None
+    if offer["provider"] == "claude-pro":
+        # Native Walter transport only; never write this provider into Hermes' direct-provider config.
+        return None, offer["offer_key"], "claude-pro"
     if offer["provider"] == "kie":  # Kie ids are the canonical ids (claude-opus-5-5, gpt-6-1-sol)
         if offer["model_id"].startswith("claude-"):
             return "kie", offer["model_id"], "kie"
@@ -66,11 +69,14 @@ def subscription_costs(conn) -> dict[str, dict]:
     meters = {r["sub_id"]: float(r["used_percent"]) for r in conn.execute(   # fresher: read after every agent turn
         """select sub_id, used_percent from models.latest_subscription_usage
            where window_name = 'weekly' and source <> 'calibration'""")}
+    sessions = {r["sub_id"]: float(r["used_percent"]) for r in conn.execute(
+        "select sub_id, used_percent from models.latest_subscription_usage where window_name = 'session'")}
     out = {}
     for sub in subscriptions.load():
         if sub.get("route_provider") and sub["id"] in by_sub:
             used = meters.get(sub["id"], by_sub[sub["id"]].get("used_percent"))
-            out[sub["route_provider"]] = {**by_sub[sub["id"]], "used_percent": used, "plan": sub.get("plan")}
+            out[sub["route_provider"]] = {**by_sub[sub["id"]], "used_percent": used, "plan": sub.get("plan"),
+                                          "session_used_percent": sessions.get(sub["id"])}
     return out
 
 
@@ -102,7 +108,7 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
             continue
         hp, model, key = run
         st = status.get(key)
-        rel = reliability(conn, hp, model)
+        rel = reliability(conn, hp or key, model)
         out.append({"provider": o["provider"], "hermes_provider": hp, "model": model,
                     "reasoning": REASONING.get(variant), "access": o["access"],
                     "blended_1m": sel.blended(o), "probe_ok": None if st is None else st["ok"],
@@ -119,6 +125,7 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
             c = costs[r["provider"]]
             ratio = c.get("ratio_pace") or c.get("ratio_full")
             r["subscription"] = {"plan": c.get("plan"), "quota_used_percent": c.get("used_percent"),
+                                 "session_used_percent": c.get("session_used_percent"),
                                  "cost_ratio": round(ratio, 4) if ratio else None}
             if ratio and list_in is not None:
                 r["cost_price_1m"] = {"in": round(list_in * ratio, 4), "out": round((list_out or 0) * ratio, 4)}
@@ -134,7 +141,8 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
 
     def quota_spent(r: dict) -> bool:
         q = (r.get("subscription") or {}).get("quota_used_percent")
-        return q is not None and q >= QUOTA_SWITCH
+        session = (r.get("subscription") or {}).get("session_used_percent")
+        return (q is not None and q >= QUOTA_SWITCH) or (session is not None and session >= 100)
 
     def rank(r: dict) -> float:
         if r["access"] == "subscription":

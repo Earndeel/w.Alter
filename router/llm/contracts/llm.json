@@ -8,7 +8,9 @@
     "router",
     "secrets"
   ],
-  "external": [],
+  "external": [
+    "Optional native Claude Code client, path provisioned by instance"
+  ],
   "data": [
     "local consumer tokens",
     "provider routing configuration"
@@ -21,7 +23,8 @@
     "@instance:backup"
   ],
   "interfaces": [
-    "OpenAI-compatible :8894"
+    "OpenAI-compatible :8894",
+    "CLI walter-llm call: one exact model/provider, JSON stdin/stdout, no implicit retry or fallback"
   ],
   "bindings": {
     "dsh": "configured provider",
@@ -36,7 +39,7 @@
   "optional": [],
   "contract": {
     "schema_version": 1,
-    "version": "1.0.0",
+    "version": "1.1.0",
     "owner": "llm",
     "kind": "capability",
     "purpose": "Exécuter les appels modèles des consommateurs autorisés via les postes du Router.",
@@ -52,7 +55,8 @@
     "invariants": [
       "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
       "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
-      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+      "Les données privées et secrets ne sont pas exposés par les diagnostics.",
+      "Claude subscription forwards caller-owned messages and tools plus validated technical attribution; native agent output never executes tools."
     ],
     "errors": [
       "invalid_request",

@@ -2,7 +2,10 @@
   "id": "router",
   "anchors": [
     "contracts/router.json",
-    "cli.py"
+    "cli.py",
+    "docs/README.md",
+    "serve/api.py",
+    "documentation.py"
   ],
   "requires": [],
   "external": [
@@ -25,7 +28,10 @@
     "CLI",
     "walter-llm task routes",
     "MCP walter_route / walter_run / walter_decide / walter_plans",
-    "agents' brief (`walter-router brief`, @instance/state/router/brief.md)"
+    "agents' brief (`walter-router brief`, @instance/state/router/brief.md)",
+    "CLI walter-router schema (public tool contract v1)",
+    "CLI walter-router docs --write/--check [--offline]",
+    "CLI walter-router brief --json (versioned orchestrator note v1)"
   ],
   "bindings": {
     "hermes": "router plugin (same tools, brief as a system-prompt section) + auxiliary configuration adapter",
@@ -36,13 +42,13 @@
   "limitations": [
     "New model choices remain subject to the owner's approval; no automatic switching introduced.",
     "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
-    "Text sub-agents run as one-shot runs of the Hermes runtime (the runtime here that runs every provider)."
+    "Text runs execute natively with bounded terminal/file tools; only providers of the selected model are tried, and callers must forward user_notice on failover."
   ],
   "services": [],
   "optional": [],
   "contract": {
     "schema_version": 1,
-    "version": "1.0.0",
+    "version": "1.1.0",
     "owner": "router",
     "kind": "capability",
     "purpose": "Choisir les modèles par poste avec décisions et coûts traçables.",
@@ -142,6 +148,33 @@
     "conventions_status": "required; enforced per port only after qualification evidence"
   },
   "public": [
-    "@instance/state/router/brief.md"
-  ]
+    "@instance/state/router/brief.md",
+    "@instance/state/router/brief.json"
+  ],
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Router",
+    "order": 70,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "manifest_command": [
+      "walter-router",
+      "brief",
+      "--json"
+    ],
+    "tools": [
+      "walter_route",
+      "walter_run",
+      "walter_decide",
+      "walter_plans"
+    ],
+    "index": {
+      "command": [
+        "walter-router",
+        "tasks"
+      ],
+      "sections": "tâches (clé, libellé, interface)"
+    }
+  }
 }

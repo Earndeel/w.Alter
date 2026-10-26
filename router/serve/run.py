@@ -2,34 +2,22 @@
 
     spec ──▶ decision: the model named by the owner (named.py: exactly that, or why not) / a hard constraint / the
              request classified by the decision model (routes.route)
-         ├─ text  ──▶ a sub-agent with tools on the chosen model: a one-shot run in the Hermes runtime (the runtime
-         │           here that runs every provider: Codex subscription, Kie, OpenRouter, Arnict), routes in order,
-         │           a provider test before the flaky ones, every attempt in models.exec_log
+         ├─ text  ──▶ a native tool loop on the chosen model, through the model gateway's exact-route transport,
+         │           providers in order, every attempt in models.exec_log
          └─ media ──▶ media_exec.generate (image, video, music, voice): costs money, on request only
 
-A routed run may end on the subscription's model as a flagged substitute; a named model never does.
+Text execution is native to the router. Only providers of the selected model are tried; every switch is reported.
 """
 from __future__ import annotations
 
-import os
-import re
-import shutil
-import subprocess
-import tempfile
 import time
 from typing import Any
 
 from walter_router.serve import choose, execution, media_exec, named, routes
 
-CHILD_ENV = "WALTER_ROUTER_CHILD"   # set in the sub-agent: its router tools hide (no recursive routing)
 ALLOWED_TOOLSETS = ("web", "walter-web", "file", "terminal", "vision", "skills", "code_execution", "memory")
 DEFAULT_TOOLSETS = ["web", "walter-web", "file", "terminal"]
-MAX_ATTEMPTS = 3
-LAST_RESORT = {"hermes_provider": "openai-codex", "provider": "codex", "model": "gpt-6.1-sol", "reasoning": "high"}
-PREFLIGHT = {"kie": "kie", "kie-codex": "kie-codex"}   # outages frequent and slow to detect inside a run
-FAILURE_MARKS = ("didn't answer after", "Provider said:", "looks temporarily unavailable")
 MEDIA = ("image", "video", "music", "audio")
-_ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def decide(conn, spec: dict) -> dict:
@@ -42,84 +30,84 @@ def decide(conn, spec: dict) -> dict:
                         spec.get("conversation"))
 
 
-def _once(route: dict, prompt_file: str, toolsets: list[str], max_turns: int, budget: int) -> tuple[bool, str]:
-    hermes = shutil.which("hermes")
-    if not hermes:
-        return False, "Hermes runtime not installed (command `hermes`)"
-    cmd = [hermes, "chat", "--query-file", prompt_file, "--oneshot", "-Q", "--provider", route["hermes_provider"],
-           "-m", route["model"], "-t", ",".join(toolsets), "--max-turns", str(max_turns), "--run-budget", str(budget),
-           "--source", "walter-router"]
-    if route.get("reasoning"):
-        cmd += ["--reasoning", route["reasoning"]]
-    try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=budget + 120, env={**os.environ, CHILD_ENV: "1"})
-    except subprocess.TimeoutExpired:
-        return False, f"timeout after {budget + 120}s"
-    lines = [ln for ln in _ANSI.sub("", out.stdout + out.stderr).splitlines() if not ln.startswith("session_id:")]
-    while lines and (not lines[0].strip() or lines[0].lstrip().startswith(("⚠", "Run 'hermes doctor'"))
-                     or "Config issues detected" in lines[0]):
-        lines.pop(0)   # start-up config warnings are not the sub-agent's answer
-    text = "\n".join(lines).strip()
-    return not (out.returncode != 0 or not text or any(m in text[-600:] for m in FAILURE_MARKS)), text
-
-
 def _text(conn, d: dict, spec: dict) -> dict:
+    """The router alone owns failover. Preserve the conversation across providers of this model."""
+    from walter_router.serve import text_agent
+
     started = time.monotonic()
-    toolsets = [t for t in (spec.get("toolsets") or DEFAULT_TOOLSETS) if t in ALLOWED_TOOLSETS] or DEFAULT_TOOLSETS
-    max_turns = max(1, min(int(spec.get("max_turns") or 40), 120))
     budget = max(60, min(int(spec.get("budget_seconds") or 900), 3600))
-    prompt = spec["goal"] + (f"\n\nContexte :\n{spec['context']}" if spec.get("context") else "")
-    is_named = d.get("source") == "named"
-    attempts: list[dict] = []
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", prefix="walter-run-", delete=False) as fh:
-        fh.write(prompt)
-        prompt_file = fh.name
+    deadline = started + budget
+    toolsets = spec.get("toolsets") if spec.get("toolsets") is not None else DEFAULT_TOOLSETS
+    unknown = set(toolsets) - set(ALLOWED_TOOLSETS)
+    if unknown:
+        return {"ok": False, "error": "unsupported_toolsets", "toolsets": sorted(unknown)}
+    if "vision" in toolsets:
+        return {"ok": False, "error": "vision_toolset_requires_an_explicit_image_input"}
+    max_turns = max(1, min(int(spec.get("max_turns") or 40), 120))
+    # Defend against stale/cached decisions containing the former subscription/model fallback.
+    candidates = [r for r in d.get("execution") or [] if not r.get("fallback_for")]
+    attempts, notices = [], []
+    state = {"index": 0, "route": None}
 
-    def result(route: dict, text: str, **extra) -> dict:
-        return {"ok": True, "kind": "text", "output": text[-30000:],
-                "routed": {"task": d.get("task"), "role": d.get("role"), "model": route["model"],
-                           "provider": route.get("provider") or route["hermes_provider"],
-                           "reasoning": route.get("reasoning"), "fallback_for": route.get("fallback_for"),
-                           "named": d.get("named"), "attempts": attempts,
-                           "seconds": round(time.monotonic() - started), **extra}}
-    try:
-        runs = 0
-        for route in d.get("execution") or []:
-            if runs >= MAX_ATTEMPTS:
-                break
-            hp = route["hermes_provider"]
-            base = {"task": d.get("task"), "role": d.get("role"),
-                    "model_id": None if route.get("fallback_for") else d.get("model_id"),
-                    "provider": hp, "model": route["model"], "fallback_for": route.get("fallback_for")}
-            if hp in PREFLIGHT and not (execution.probe(conn, only=PREFLIGHT[hp], timeout=25).get(PREFLIGHT[hp]) or {}).get("ok"):
-                attempts.append({"provider": hp, "model": route["model"], "ok": False, "skipped": "provider test failed"})
-                execution.log(conn, {**base, "ok": False, "skipped": "preflight"})
-                conn.commit()
-                continue
-            if route.get("probe_ok") is False and hp not in PREFLIGHT and not is_named:
-                attempts.append({"provider": hp, "model": route["model"], "ok": False, "skipped": "last provider test failed"})
-                continue
-            runs += 1
+    def call(messages, tools, remaining):
+        while state["index"] < len(candidates):
+            route = candidates[state["index"]]
+            available = deadline - time.monotonic()
+            if available <= 0:
+                raise RuntimeError("budget_exhausted")
             t0 = time.monotonic()
-            ok, text = _once(route, prompt_file, toolsets, max_turns, budget)
-            execution.log(conn, {**base, "ok": ok, "seconds": round(time.monotonic() - t0, 1)})
+            entry = {"provider": route["provider"], "model": route["model"]}
+            try:
+                # Keep time for this model's remaining providers when one endpoint hangs.
+                attempt_timeout = available / (len(candidates) - state["index"])
+                response = text_agent.complete(route, messages, tools, attempt_timeout)
+                entry.update(ok=True, response_id=response.get("response_id"),
+                             response_model=response.get("response_model"))
+            except (RuntimeError, OSError, ValueError, KeyError) as exc:
+                entry.update(ok=False, error=str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__)
+                response = None
+            entry["seconds"] = round(time.monotonic() - t0, 2)
+            attempts.append(entry)
+            execution.log(conn, {"task": d.get("task"), "role": d.get("role"), "model_id": d.get("model_id"),
+                                 "provider": route["provider"], "model": route["model"],
+                                 "ok": entry["ok"], "seconds": entry["seconds"]})
             conn.commit()
-            attempts.append({"provider": hp, "model": route["model"], "ok": ok})
-            if ok:
-                return result(route, text)
-        if not is_named and not (d.get("require") == "unrestricted" or d.get("unrestricted_signals")) \
-                and "openai-codex" not in {a["provider"] for a in attempts}:
-            ok, text = _once(LAST_RESORT, prompt_file, toolsets, max_turns, budget)   # the subscription, flagged
-            attempts.append({"provider": "openai-codex", "model": LAST_RESORT["model"], "ok": ok, "last_resort": True})
-            if ok:
-                return result(LAST_RESORT, text, substituted_for=d.get("model_id"))
-        return {"ok": False, "kind": "text", "error": "every route failed" + (" (modèle nommé : aucun substitut)" if is_named else ""),
-                "attempts": attempts, "last_output": (locals().get("text") or "")[-1500:]}
-    finally:
-        os.unlink(prompt_file)
+            if response is not None:
+                state["route"] = route
+                return response
+            state["index"] += 1
+            if state["index"] < len(candidates):
+                nxt = candidates[state["index"]]
+                notice = {"type": "provider_fallback", "model": d["model_id"],
+                          "from_provider": route["provider"], "to_provider": nxt["provider"],
+                          "reason": entry["error"],
+                          "message": f"{route['provider']} n'a pas répondu correctement pour {d['model_id']}. "
+                                     f"Basculement vers {nxt['provider']}, avec le même modèle."}
+                notices.append(notice)
+        raise RuntimeError("all_providers_failed")
+
+    try:
+        result = text_agent.run(spec["goal"], spec.get("context") or "", list(toolsets), max_turns, deadline, call)
+    except (RuntimeError, OSError, ValueError, KeyError) as exc:
+        result = {"ok": False, "error": str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__}
+    route = state["route"]
+    user_notice = "\n".join(n["message"] for n in notices)
+    if not result["ok"]:
+        failure = (f"Aucun fournisseur n'a pu exécuter {d['model_id']}. Aucun autre modèle n'a été utilisé."
+                   if result.get("error") == "all_providers_failed" else
+                   f"L'exécution de {d['model_id']} a échoué : {result.get('error')}.")
+        user_notice = "\n".join(filter(None, (user_notice, failure)))
+    return {**result, "kind": "text", "runtime": "walter-router", "notices": notices,
+            "user_notification_required": bool(user_notice), "user_notice": user_notice,
+            "routed": {"task": d.get("task"), "model_id": d.get("model_id"),
+                       "model": route["model"] if route else None,
+                       "provider": route["provider"] if route else None,
+                       "reasoning": route.get("reasoning") if route else None,
+                       "named": d.get("named"), "attempts": attempts,
+                       "seconds": round(time.monotonic() - started, 2)}}
 
 
-def run(conn, spec: dict) -> dict[str, Any]:
+def _run(conn, spec: dict) -> dict[str, Any]:
     if not (spec.get("goal") or spec.get("request")):
         return {"ok": False, "error": "goal (text) or request (media) required"}
     d = decide(conn, spec)
@@ -142,3 +130,8 @@ def run(conn, spec: dict) -> dict[str, Any]:
     if not spec.get("goal"):
         return {"ok": False, "error": "goal required: complete instructions for the sub-agent (it does not see the conversation)"}
     return _text(conn, d, spec)
+
+
+def run(conn, spec: dict) -> dict[str, Any]:
+    """Versioned result; existing fields remain compatible with every current adapter."""
+    return {"schema_version": 1, **_run(conn, spec)}

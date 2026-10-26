@@ -140,7 +140,31 @@ def codex_cli_usage(since: datetime | None, root: Path = CODEX_SESSIONS) -> dict
     return acc
 
 
-USAGE = {"claude_code": claude_code_usage, "hermes_codex": hermes_codex_usage, "codex_cli": codex_cli_usage}
+def walter_claude_usage(since: datetime | None) -> dict:
+    """Actual model usage of the subscription bridge (not the CLI's synthetic acknowledgement)."""
+    from walter_router.research.prices.claude_pro import settings
+    value = settings().get("usage_log")
+    acc, seen = {}, set()
+    if not value:
+        return acc
+    path = instance._expand(value)
+    if not path.exists():
+        return acc
+    with path.open() as source:
+        for line in source:
+            try:
+                row = json.loads(line)
+                if row.get("id") in seen or (since and datetime.fromisoformat(row["at"]) < since):
+                    continue
+                seen.add(row["id"])
+                _add(acc, row["model"], **row["tokens"])
+            except (ValueError, KeyError, TypeError):
+                continue
+    return acc
+
+
+USAGE = {"claude_code": claude_code_usage, "hermes_codex": hermes_codex_usage, "codex_cli": codex_cli_usage,
+         "walter_claude": walter_claude_usage}
 
 
 def usage(sub: dict, since: datetime | None) -> dict:
@@ -250,6 +274,9 @@ def refresh(conn, only: str | None = None, min_age_s: float = 0) -> dict:
                 for w in windows:
                     w["detail"]["cumulative_api_value_usd"] = cumul["api_value_usd"]
                     w["detail"]["cumulative_tokens"] = cumul["total_tokens"]
+            elif source == "claude_usage_api":
+                from walter_router.research.prices.claude_pro import read_usage
+                windows = read_usage()
             else:
                 windows = estimate_claude(sub)
         except Exception as exc:  # noqa: BLE001 — one meter down never blocks the others

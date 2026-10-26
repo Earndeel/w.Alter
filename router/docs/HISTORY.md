@@ -316,3 +316,56 @@ does the job: a text sub-agent with tools as a one-shot Hermes run on the chosen
 choice. Tools everywhere: walter_route, walter_run, walter_decide, walter_plans (walter_generate merged into walter_run;
 the walter MCP's walter-llm token, created the same day, revoked as unused). Constrained picks (`--require`) now rank
 on the task composite like any pick.
+
+
+## Native text execution; failover belongs to the router (2026-10-23)
+
+Owner: if a model’s provider does not answer, use that model’s fallback provider and notify the user;
+Hermes is not part of this execution path. The earlier one-shot wrapper could receive a successful
+answer from an internal runtime fallback while reporting the initial provider/model as successful.
+
+Text `run` now owns a native tool loop and an exact-route gateway transport. It tries only providers
+of the selected model, carries the conversation/tool results across failures, records actual attempts
+and response ids, and requires callers to forward `user_notice`. The automatic subscription/model
+substitution and hardcoded last-resort model are removed. Named provider restrictions stay explicit.
+No runtime source, global configuration or provider key is changed. Regression coverage includes
+provider exhaustion, empty/wrong-model responses, no hidden retry, preserving tool side effects,
+tool permissions, execution budgets and notification delivery in the result.
+
+
+## Documentation vérifiable et note orchestrateur unique (2026-10-23)
+
+Le propriétaire demande une documentation complète maintenue avec le module, et une note courte destinée à
+walter-context pour expliquer au modèle orchestrateur à quoi sert le routeur et comment l’utiliser efficacement.
+La référence est désormais générée depuis les schémas d’outils, le parseur CLI, le catalogue PG, les tâches/poids,
+les constantes, l’environnement et la configuration livrée. Un contrôle hors ligne est intégré aux tests ; la
+vérification live contrôle aussi PG. Une colonne SQL non décrite ou une référence périmée doit produire un échec.
+
+`brief` reste l’unique producteur de la note ; `brief --json` lui ajoute versions, empreinte, taille, outils requis
+et politique de chargement. La note ne contient pas de choix de modèle ou de prix volatils. Un consommateur
+walter-context prépare cette source par l’interface CLI, vérifie les outils réels et la garde stable pendant un
+tour. Cela prépare le composeur futur sans modifier les ports de compression actifs. Les limites d’exécution,
+de confidentialité et de permissions du texte natif sont explicites ; elles ne sont pas remplacées par une
+promesse de portabilité universelle. Les documents de conception anciens sont identifiés comme historiques.
+
+
+## 2026-10-24 — Exécuteur HeyGen Video 1
+
+Ajout de la configuration média `heygen-video-1` via OpenRouter pour exécuter ce modèle déjà présent au catalogue. Aucun favori modifié. Le catalogue vidéo public annonce 480p, 768p et 2K, sans 720p exact ; utiliser une résolution native prise en charge et distinguer toute conversion de livraison.
+
+
+2026-10-24 : le décodage HTTP média accepte les espaces et sauts de ligne avant un objet/tableau JSON ; les réponses binaires restent des octets.
+
+## 2026-10-27 — Route Claude Pro et contexte possédé par Walter
+
+À la demande du propriétaire, ajout de `claude-pro` dans le Router et sa passerelle. Le client officiel ne fournit que le transport authentifié et l’attribution technique ; les messages, outils, paramètres et la boucle d’exécution appartiennent au consommateur Walter. La CLI reçoit un accusé synthétique sans outil plutôt que la vraie réponse du modèle. Le contenu natif n’est jamais repris par simple filtrage de chaînes : le pont reconstruit la requête à partir du payload du consommateur et d’un bloc d’attribution validé.
+
+Autorisation dédiée dans Walter Secrets, renouvellement atomique avec verrou interprocessus, catalogue limité aux modèles qualifiés de l’instance, vrais compteurs d’abonnement et journal d’usage sans contenu. Les configurations directes Hermes ne reçoivent pas ce nouveau fournisseur. Les restrictions fournisseur explicites et l’absence de fallback de modèle restent inchangées. Guide : CLAUDE-SUBSCRIPTION.md.
+
+
+## 2026-10-26 — Fournisseur effectif des décisions texte
+
+Les décisions ordinaires et les modèles nommés exposent désormais comme `provider` la première route
+exécutable ordonnée, au lieu du fournisseur historique du classement. Sans route, la valeur est nulle.
+L’ordre peut évoluer avec les abonnements et quotas sans laisser un résumé contradictoire.
+Les restrictions explicites et le fournisseur réellement observé après exécution restent inchangés.

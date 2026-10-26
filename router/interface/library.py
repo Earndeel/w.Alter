@@ -16,11 +16,25 @@ from walter_router.analysis import select as sel
 from walter_router import instance
 
 PROV = {"openai-codex": "Codex (abonnement)", "codex": "Codex (abonnement)", "kie-codex": "Kie", "kie": "Kie",
-        "openrouter": "OpenRouter", "arnict": "Arnict", "google-flow": "Flow"}
+        "openrouter": "OpenRouter", "arnict": "Arnict", "google-flow": "Flow", "claude-pro": "Claude Pro"}
 MODES = {"text_to_video": "t2v", "image_to_video": "i2v", "text_to_image": "t2i", "image_edit": "i2i", "logo": "t2i",
          "graphic_design": "t2i", "music": "music", "tts": "tts", "video_edit": "v2v"}
 IMAGE_TOKENS = (1056, 4160)   # medium / high 1024x1024 output tokens (OpenAI gpt-image token tables)
 ROLE_ORDER = "case p.role when 'default' then 0 when 'L1' then 0 when 'L2' then 1 when 'L3' then 2 else 5 end"
+
+
+
+def provider_label(route: dict) -> str:
+    """Gateway-only routes have no direct Hermes provider; show their actual provider name."""
+    key = route.get("hermes_provider") or route["provider"]
+    return PROV.get(key, key)
+
+
+def subscription_label(routes: list[dict]) -> str:
+    """Name the actual subscription instead of labelling every subscription as Codex."""
+    labels = {"codex": "Codex", "claude-pro": "Claude Pro"}
+    return " + ".join(dict.fromkeys(labels.get(r["provider"], r["provider"])
+                                   for r in routes if r.get("access") == "subscription"))
 
 
 def _name(conn, mid: str | None) -> str:
@@ -221,13 +235,13 @@ def rows(conn) -> list[dict]:
             d = with_execution(conn, d)
             ex = d.get("execution") or []
             main, fb = [r for r in ex if not r.get("fallback_for")], [r for r in ex if r.get("fallback_for")]
-            row["providers"] = " → ".join(f'{PROV.get(r["hermes_provider"], r["hermes_provider"])} '
+            row["providers"] = " → ".join(f'{provider_label(r)} '
                                           f'{_route_price(r, offers, mid, hosts)}'.strip() for r in main)
             fb_name = _name(conn, sel_model_id(fb[0])) if fb else ""
             row["fallback"] = (f'{fb_name}{" " + fb[0]["reasoning"] if fb[0].get("reasoning") else ""} via '
-                               f'{PROV.get(fb[0]["hermes_provider"], fb[0]["hermes_provider"])}') if fb else "—"
-            row["subscription"] = "Codex" if any(r["access"] == "subscription" for r in main) else \
-                ("Codex (secours)" if any(r["access"] == "subscription" for r in fb) else "—")
+                               f'{provider_label(fb[0])}') if fb else "—"
+            row["subscription"] = subscription_label(main) or (subscription_label(fb) + " (secours)"
+                                                                 if subscription_label(fb) else "—")
         elif iface in sel.MEDIA_EXEC_INTERFACES:
             cfg = media_exec._models().get(mid) or {}
             mode = MODES.get(task)

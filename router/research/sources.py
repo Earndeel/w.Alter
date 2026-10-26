@@ -15,6 +15,7 @@ from walter_router.research.benchmarks.arena import source_arena
 from walter_router.research.benchmarks.bridgebench import source_bridgebench
 from walter_router.research.benchmarks.mteb import source_mteb
 from walter_router.research.prices.codex import source_codex
+from walter_router.research.prices.claude_pro import source_claude_pro
 from walter_router.research.prices.declared import source_declared
 from walter_router.research.prices.kie import source_kie
 from walter_router.research.prices.openrouter import source_openrouter
@@ -25,6 +26,7 @@ SOURCES = {"aa": source_aa, "aa_eval": source_aa_eval, "aa_decision": source_aa_
            "aa_stt": source_aa_stt, "agentset": source_agentset, "mteb": source_mteb,
            "openrouter": source_openrouter, "or_endpoints": source_or_endpoints, "kie": source_kie, "codex": source_codex,
            "declared": source_declared, "hermes_providers": source_hermes_providers}
+SOURCES["claude_pro"] = source_claude_pro
 
 
 # Sources shared by several categories can be read in parts; the parts are merged into the last snapshot.

@@ -81,6 +81,20 @@ def retire(sub_id: str, why: str, source: str = "owner") -> dict:
     return {"retired": sub_id}
 
 
+def bind_claude_meter(sub_id: str, why: str) -> dict:
+    """One-writer activation of the real Claude quota and bridge usage, preserving plan/price/history."""
+    document = read()
+    sub = next((s for s in document["subscriptions"] if s["id"] == sub_id), None)
+    if sub is None:
+        raise KeyError("subscription must already be declared by its owner")
+    sub["meter"] = {"source": "claude_usage_api", "note": "Live five-hour and weekly subscription windows via Walter Secrets grant."}
+    sources = sub.setdefault("usage_sources", [])
+    if "walter_claude" not in sources:
+        sources.append("walter_claude")
+    _write(document, why)
+    return {"id": sub_id, "meter_source": "claude_usage_api", "usage_sources": sources}
+
+
 def expiring(conn, days: int = 30) -> list[str]:
     """A dated offer (`until`, e.g. Google AI Pro 15 months) ending within `days` becomes one Telegram notice."""
     from datetime import date
