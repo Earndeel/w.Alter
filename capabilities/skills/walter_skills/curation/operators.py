@@ -234,6 +234,38 @@ class Workflow:
         return {"status": "done", "name": name, "commit": c}
 
 
+NEW_SKILL_RUBRIC = (
+    "A reusable procedure (not a log or diary), specific and actionable (commands, paths, checks), with a frontmatter "
+    "name + 'Use when' description. The author is Monsieur's agent and this library is the procedural memory of HIS "
+    "installations: facts about his own setup (device models and firmware, LAN addresses and hostnames, his settings, "
+    "the apps and add-ons he uses) are expected and make the procedure precise; never flag them or ask to generalise. "
+    "Do NOT require external proof of new facts: you cannot verify facts, only integrity and usability.\n"
+    "List EVERY problem you find in issues, each starting with 'BLOCKING: ' or 'MINOR: '. BLOCKING is only for: a "
+    "secret value (password, token, API key, private key, session cookie), data about third parties, a session log or "
+    "diary instead of a procedure, a missing or malformed frontmatter, or a command/path wrong or dangerous enough to "
+    "fail or damage a system when followed. Everything else is MINOR (imprecise or incomplete wording, documentation "
+    "slightly off from the code, style). Set ok=false only when at least one issue is BLOCKING.")
+
+
+def triage(verdict: dict | None) -> dict | None:
+    """New skills: only a blocking issue rejects, minor ones become notes. An unprefixed issue, or a refusal that
+    names no issue, counts as blocking (fail closed)."""
+    if not verdict:
+        return verdict
+    issues = [str(i).strip() for i in verdict.get("issues") or []]
+    minor = [i for i in issues if i.upper().startswith("MINOR")]
+    blocking = [i for i in issues if i not in minor]
+    if not blocking and verdict.get("ok") is False and not issues:
+        blocking = ["BLOCKING: the judge refused without naming a problem"]
+    return verdict | {"ok": not blocking, "blocking": blocking, "minor": minor}
+
+
+def issues_body(verdict: dict | None) -> str:
+    """Every remark of the judge, in full, for the commit body (the subject line is cut at 150 characters)."""
+    issues = (verdict or {}).get("issues") or []
+    return ("\n\nJudge:\n" + "\n".join(f"- {i}" for i in issues)) if issues else ""
+
+
 class Drafts:
     """Agents' proposals (write door) and Hermes' own changes → judged → live or removed (git keeps the trace)."""
     name, limit, editor = "drafts", None, False
@@ -255,10 +287,8 @@ class Drafts:
             if target in sk or (ctx.root / "archive" / target).exists():
                 verdict = {"ok": False, "issues": [f"{target} already exists"]}
             else:
-                verdict = base.review("new skill proposed by an agent", f"REASON: {p.get('reason')}",
-                                      "Accept only a reusable procedure (not a log or diary), specific and actionable "
-                                      "(commands, paths, checks), well formed (frontmatter name + 'Use when' description), "
-                                      "with no secret value and no personal data.\n\n" + base.bundle(draft))
+                verdict = triage(base.review("new skill proposed by an agent", f"REASON: {p.get('reason')}",
+                                             NEW_SKILL_RUBRIC + "\n\n" + base.bundle(draft)))
         elif kind in ("patch", "hermes_patch") and target in sk:
             changed = p.get("changed", "SKILL.md") if kind == "patch" else None
             old = (sk[target].path / changed).read_text(errors="replace") if changed and (sk[target].path / changed).exists() \
@@ -284,7 +314,8 @@ class Drafts:
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(d), str(dst))
                 side = {"origin": "hermes-agent" if p.get("runtime") == "hermes" else "agent-proposal", "owner": "walter",
-                        "proposed_by": p.get("runtime"), "reason": p.get("reason"), "hermes": p.get("hermes")}
+                        "proposed_by": p.get("runtime"), "reason": p.get("reason"), "hermes": p.get("hermes"),
+                        "review_notes": verdict.get("minor")}
                 store.write_sidecar(dst, {k: v for k, v in side.items() if v} | {"store_sha": store.tree_hash(dst)})
             elif kind == "patch":
                 shutil.copyfile(d / p.get("changed", "SKILL.md"), sk[target].path / p.get("changed", "SKILL.md"))
@@ -297,11 +328,13 @@ class Drafts:
                 hermes.pop("pending_sha", None)
                 store.write_sidecar(sk[target].path, meta | {"hermes": hermes})
                 store.write_sidecar(sk[target].path, meta | {"hermes": hermes, "store_sha": store.tree_hash(sk[target].path)})
-            c = ctx.commit(f"curator: accept {kind} {target} ({str(p.get('reason'))[:100]})", f"draft_{kind}", target,
+            c = ctx.commit(f"curator: accept {kind} {target} ({str(p.get('reason'))[:100]})" + issues_body(verdict),
+                           f"draft_{kind}", target,
                            {"draft": p["draft"], "judge": verdict}, paths=["skills", "drafts"])
             return {"status": "done", "commit": c, "judge": verdict}
         shutil.rmtree(d)
-        c = ctx.commit(f"curator: reject {kind} {target} ({'; '.join((verdict or {}).get('issues', ['no verdict']))[:150]})",
+        shown = (verdict or {}).get("blocking") or (verdict or {}).get("issues") or ["no verdict"]
+        c = ctx.commit(f"curator: reject {kind} {target} ({'; '.join(shown)[:150]})" + issues_body(verdict),
                        f"draft_{kind}_rejected", target, {"draft": p["draft"], "judge": verdict}, paths=["drafts"])
         return {"status": "rejected", "commit": c, "judge": verdict}
 

@@ -205,7 +205,9 @@ def drafts_from_sessions(max_sessions: int | None = None, hours: int = 48, sessi
             'exact commands>", "reason": "<what it adds + evidence>"}\n'
             '{"action": "new", "name": "<kebab-case>", "domain": "<domain>", "skill_md": "<full SKILL.md, frontmatter '
             'name + description starting with Use when>", "reason": "<recurring task + evidence>"}\n'
-            "Prefer skip over a weak skill and patch over a near-duplicate. No secret values, no personal data, no "
+            "Prefer skip over a weak skill and patch over a near-duplicate. No secret values (passwords, tokens, keys) "
+            "and no data about third parties; facts about Monsieur's own setup (devices, models, LAN addresses, "
+            "settings, apps he uses) are wanted: they make the procedure precise. No "
             f"narration.\n\nSESSION ({x['runtime']}/{x['platform']}, {x['calls']} tool calls):\n{dig}"), require="action")
         seen.add(x["session_id"])
         try:
