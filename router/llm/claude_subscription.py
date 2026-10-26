@@ -293,13 +293,12 @@ class NativeBridge:
 
 async def completion(config: dict, access_token: str, **kwargs):
     """OpenAI completion, including real streaming/tool calls, over native subscription transport."""
-    import litellm
-
     model = kwargs.pop("model")
     if not re.fullmatch(r"claude-[a-z0-9-]+", model):
         raise TransportError("invalid_claude_model")
     if model not in config.get("verified_models", []):
         raise TransportError("unverified_claude_model")
+    import litellm   # only once the model is allowed: a refusal needs no transport library
     timeout = kwargs.pop("timeout", 60)
     timeout = float(timeout) if isinstance(timeout, (int, float)) else 60
     if kwargs.get("stream"):
