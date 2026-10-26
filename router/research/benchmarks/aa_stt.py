@@ -18,8 +18,37 @@ AA_STT_TABLES = ("STT AA-WER vs Price", "STT AA-WER vs Speed Factor", "STT Speed
 
 def aa_stt_rows(page: str) -> list[dict]:
     """One row per model x host of AA's Speech-to-Text page: the chart download tables (WER vs price, WER vs speed,
-    speed vs price) joined on (Model, Provider)."""
+    speed vs price) joined on (Model, Provider); when the page carries no such table (since 2026-10-24), the host
+    model objects of its flight data."""
     text = rsc_text(page)
+    return _table_rows(text) or _host_model_rows(text)
+
+
+# Host model object of the page data: {"id", "name", "displayName", ..., "pricePer1kMinutes", "host": {"name"},
+# "performance": {"medianSpeedFactor"}, "aaWerIndex", ...}; displayName and host name = the old tables' Model, Provider.
+_HOST_MODEL = re.compile(r'\{"id":"[0-9a-f-]{36}","name":"[^"]*","displayName":')
+
+
+def _host_model_rows(text: str) -> list[dict]:
+    merged: dict[tuple[str, str], dict] = {}
+    for m in _HOST_MODEL.finditer(text):
+        try:
+            o = json.loads(_json_object(text, m.start()))
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if "aaWerIndex" not in o or not isinstance(o.get("host"), dict):
+            continue
+        host = o["host"].get("name") or ""
+        row = merged.setdefault((o["displayName"], host), {"model": o["displayName"], "provider": host or None})
+        for dst, value in (("wer", o.get("aaWerIndex")),
+                           ("speed_factor", (o.get("performance") or {}).get("medianSpeedFactor")),
+                           ("price_per_1k_min", o.get("pricePer1kMinutes"))):
+            if value is not None:
+                row[dst] = value
+    return list(merged.values())
+
+
+def _table_rows(text: str) -> list[dict]:
     merged: dict[tuple[str, str], dict] = {}
     for m in re.finditer(r'"downloadData":\{"data":\[', text):
         try:
