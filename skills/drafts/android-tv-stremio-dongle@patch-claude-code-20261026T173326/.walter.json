@@ -1,0 +1,11 @@
+{
+ "base_sha": "4046a7cc53de4d9fbbaadc8fa480d298a0c084a9b96710561930d287203c789d",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-26T17:33:26.346404+00:00",
+ "domain": "media",
+ "kind": "patch",
+ "reason": "Options table: --off also sends KEYCODE_SLEEP to the dongle (tv_off() in scripts/stremio.py), as the old review note in .walter.json pointed out; the KeepAlive section shows ADB stays reachable after KEYCODE_SLEEP.",
+ "runtime": "claude_code",
+ "session_id": "996254cc-9f30-4f49-a4af-10df65cf2b76",
+ "target": "android-tv-stremio-dongle"
+}
