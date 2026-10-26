@@ -222,42 +222,16 @@ class Workflow:
             return {"status": "rejected", "reason": "editor returned nothing"}
         name = re.sub(r"[^a-z0-9-]", "-", str(obj.get("name", "")).lower()).strip("-")
         missing = [s.name for s in steps if s.name not in obj["skill_md"]]
-        rv = base.review("workflow creation", "\n\n".join(base.bundle(s, 8000) for s in steps), obj["skill_md"])
-        if missing or "type: workflow" not in obj["skill_md"] or not (rv and rv.get("ok")) or not name or name in sk:
-            return {"status": "rejected", "name": name, "missing_steps": missing, "judge": rv}
+        # No model judge (2026-10-26, Monsieur): every step named, workflow type, free name.
+        if missing or "type: workflow" not in obj["skill_md"] or not name or name in sk:
+            return {"status": "rejected", "name": name, "missing_steps": missing}
         dst = ctx.root / "skills" / "workflows" / name
         dst.mkdir(parents=True, exist_ok=True)
         (dst / "SKILL.md").write_text(obj["skill_md"].rstrip() + "\n")
         store.write_sidecar(dst, {"origin": "walter-curator", "owner": "walter", "kind": "workflow",
                                   "requires": [s.name for s in steps], "created_at": signals.now().isoformat()})
-        c = ctx.commit(f"curator: workflow {name} = {' → '.join(p['steps'])}", "workflow", name, p | {"judge": rv})
+        c = ctx.commit(f"curator: workflow {name} = {' → '.join(p['steps'])}", "workflow", name, p)
         return {"status": "done", "name": name, "commit": c}
-
-
-NEW_SKILL_RUBRIC = (
-    "A reusable procedure (not a log or diary), specific and actionable (commands, paths, checks), with a frontmatter "
-    "name + 'Use when' description. The author is Monsieur's agent and this library is the procedural memory of HIS "
-    "installations: facts about his own setup (device models and firmware, LAN addresses and hostnames, his settings, "
-    "the apps and add-ons he uses) are expected and make the procedure precise; never flag them or ask to generalise. "
-    "Do NOT require external proof of new facts: you cannot verify facts, only integrity and usability.\n"
-    "List EVERY problem you find in issues, each starting with 'BLOCKING: ' or 'MINOR: '. BLOCKING is only for: a "
-    "secret value (password, token, API key, private key, session cookie), data about third parties, a session log or "
-    "diary instead of a procedure, a missing or malformed frontmatter, or a command/path wrong or dangerous enough to "
-    "fail or damage a system when followed. Everything else is MINOR (imprecise or incomplete wording, documentation "
-    "slightly off from the code, style). Set ok=false only when at least one issue is BLOCKING.")
-
-
-def triage(verdict: dict | None) -> dict | None:
-    """New skills: only a blocking issue rejects, minor ones become notes. An unprefixed issue, or a refusal that
-    names no issue, counts as blocking (fail closed)."""
-    if not verdict:
-        return verdict
-    issues = [str(i).strip() for i in verdict.get("issues") or []]
-    minor = [i for i in issues if i.upper().startswith("MINOR")]
-    blocking = [i for i in issues if i not in minor]
-    if not blocking and verdict.get("ok") is False and not issues:
-        blocking = ["BLOCKING: the judge refused without naming a problem"]
-    return verdict | {"ok": not blocking, "blocking": blocking, "minor": minor}
 
 
 def issues_body(verdict: dict | None) -> str:

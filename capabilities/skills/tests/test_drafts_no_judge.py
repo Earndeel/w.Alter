@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-from walter_skills import door, store
+from walter_skills import door, postes, store
 from walter_skills.curation import base, operators
 
 SKILL = """---
@@ -25,7 +25,7 @@ def tmp_store(tmp_path, monkeypatch):
     for k, v in {"ROOT": tmp_path, "SKILLS": tmp_path / "skills", "ARCHIVE": tmp_path / "archive",
                  "DRAFTS": tmp_path / "drafts"}.items():
         monkeypatch.setattr(store, k, v)
-    monkeypatch.setattr(base, "review", lambda *a, **k: pytest.fail("the model judge must not be called"))
+    monkeypatch.setattr(postes, "ask_json", lambda *a, **k: pytest.fail("the model judge must not be called"))
     return tmp_path
 
 
