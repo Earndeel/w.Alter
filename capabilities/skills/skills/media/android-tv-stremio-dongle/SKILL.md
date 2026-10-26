@@ -10,6 +10,55 @@ he sees: a CEC message that was *sent* proves nothing. Check device/player feedb
 Ask Monsieur about the screen only when remote evidence cannot establish the outcome. Verification follows the
 requested action; it is not a reason to stop at the source list. Never report success from a sent command alone.
 
+## Fast path: play something (read this, then run; ~2 min end to end)
+
+Run from the Walter VM. The script does the title search, the addons, the ranking, the track probe and the state
+check itself: **do not query Cinemeta or the addons yourself, do not read `stremio.py`, do not write helper
+scripts.** Read the sections below only if a step fails.
+
+```
+D=$(walter path skills skills/media/android-tv-stremio-dongle)
+ssh mac "mkdir -p ~/walter-tv" && scp -q "$D/scripts/stremio.py" mac:~/walter-tv/   # always: refresh the Mac copy
+ssh mac 'cd ~/walter-tv && python3 stremio.py "TITLE" [--year Y] [--s N --e N] [--lang fr] --list'
+ssh mac 'cd ~/walter-tv && python3 stremio.py "TITLE" … --match "RELEASE-NAME" --probe'   # real tracks, nothing launched
+ssh mac 'cd ~/walter-tv && python3 stremio.py "TITLE" … --match "RELEASE-NAME"'           # launch (wakes the TV)
+ssh mac 'cd ~/walter-tv && python3 stremio.py "TITLE" … --state'                          # twice, ~10 s apart
+```
+
+1. **Identify the work** from Monsieur's words (episode described by its plot → find season/episode from your
+   knowledge or one web search, then pass `--s/--e`). Same arguments on every call. VO is the default; add
+   `--lang fr` only when he asks for VF.
+2. **`--list`**, then choose a line per the policy below. For VF, read the release tags ("Getting French audio
+   (VF)": French-only first, MULTi second, never VOSTFR; the script already rejects VOSTFR and ranks
+   French-only releases ahead at equal quality).
+3. **Designate that release by name with `--match`** (a distinctive part of its label, e.g. the group tag plus
+   episode), for both the probe and the launch. Each call fetches a fresh ranking, so a rank (`--pick N`) can
+   point to another release next time. Both commands print the release label they used: check it is the one
+   you chose before trusting the result.
+4. **`--probe` before launching.** It prints the real tracks and a verdict line.
+   - **VF**: `VF OK` / `… déjà retenu le français` / `… conforme à la langue du profil` → launch. `… Basculer` /
+     `… NON GARANTI` / `… INCERTAIN` → launch, then check and if needed switch the track in the player (VF
+     section, step 3). `VF ABSENTE` / `VF NON PROUVÉE` → probe the next candidate.
+   - **VO (default)**: the profile prefers English (`eng`), and VO is not always English. Establish the work's
+     original language from reliable metadata (pass it with `--original-lang` when known), and compare it with
+     the probed track list. If the original language is not English and an English track exists, the player is
+     expected to start in English: switch the audio to the original-language track in the player (same player
+     navigation as the VF section, step 3). If no original-language track exists, say so: never report a dub as
+     VO.
+   - P2P lines without a direct link cannot be probed: prefer a probed line, or report the audio as unverified.
+5. **Launch with the same `--match`**, then **`--state`** twice: `en lecture` with a moving position = playing;
+   it also prints the audio/subtitle tracks Stremio kept for this title. Report audio as verified only per the VF
+   section's step 4 (for VO, the same evidence with the original language). English subtitles still need a
+   screenshot (`adb exec-out screencap -p`) showing English text.
+6. If it does not play: next eligible release (max three attempts, policy step 6).
+
+Only `stremio.py` needs to be on the Mac for this path. Waking the TV uses `KEYCODE_WAKEUP` (no companion file).
+`--off` uses `/data/local/tmp/cecsend` already installed on the dongle; the script would push a `cecsend` binary
+from its own folder only if that file were missing, and the skill ships the source (`scripts/cecsend.c`, build in
+"Raw CEC"), not a binary. No `export PATH` needed (the script adds `/usr/local/bin` for `adb`/`ffprobe`).
+`--list`, `--probe` and `--state` never wake the TV. On zsh (the Mac) never store a command in a variable
+(`$A KEYCODE…` fails).
+
 ## The setup
 
 | Thing | Facts |
@@ -48,7 +97,10 @@ All options of `stremio.py`:
 | `--original-lang CODE` | Known original audio language (ISO code); VO does not mean English. Do not invent it. |
 | `--4k` | Legacy compatibility flag. Quality is now automatic: highest eligible resolution, with the same safety filters. |
 | `--list` | Print the top 10 (score, resolution, size, cache/P2P, flags, addon) and launch nothing |
-| `--pick N` | Launch the Nth source of the ranking instead of the first |
+| `--pick N` | Launch the Nth source of the ranking instead of the first (the ranking is recomputed at every call) |
+| `--match TEXT` | Use the first eligible source whose label contains TEXT (release name) instead of a rank; works with `--probe` and the launch; exits without launching if nothing matches |
+| `--probe` | With `--pick N`: ffprobe the Nth source on the executing host (Mac), print its video/audio tracks (language, title, default) and a verdict for the requested language, taking into account the track Stremio already kept for this title and the profile's preferred audio language. Launches nothing; never prints URLs (errors are masked) |
+| `--state` | Player state from `dumpsys media_session` (playing/paused, position, title) and the audio/subtitle tracks Stremio kept for this title (`core.xml` → `streams`, episode first, else the series; else the profile defaults). Read-only. Does not prove English subtitles are on screen |
 | `--open` | Open the title/episode page in Stremio, no source launched |
 | `--on` / `--off` | TV power only (two separate commands) |
 | `--host IP` | Dongle address (default `192.168.1.37`) |
@@ -95,14 +147,16 @@ inspection. Historical provenance note retained: the earlier skill described Tor
    fails or buffering persists, try another eligible source, favouring lower bitrate/direct cache and then lower
    resolution; keep the requested audio and subtitle language. Make at most three distinct attempts, identify
    failed releases to avoid repeats, and report the concrete blocker if none works. `--pick N` operates on a
-   freshly retrieved ranking: inspect it and match the release before retrying. Never silently fall back to an
+   freshly retrieved ranking: prefer `--match "RELEASE"` and check the printed label before retrying. Never silently fall back to an
    incompatible format or a different dub. If no matching audio/English subtitles can be found, explain the
    missing item instead of pretending the request is satisfied.
 
-The script automates candidate filtering, ranking and the launch request. Track selection, live throughput and
-post-launch retries are the executing agent's steps above; they are not implemented by the score function.
-Nine local selection tests and Python compilation passed on 2026-10-26. This revision has not been tested playing
-a film on the dongle. The old ~18 s result above predates this revision.
+The script automates candidate filtering, ranking, the launch request, the audio-track probe (`--probe`) and
+the playback/track state (`--state`). Switching a track inside the player, live throughput and post-launch
+retries remain the executing agent's steps above. `python3 -I scripts/test_stremio.py` runs 22 local
+tests (selection, VOSTFR rejection, French-only preference, probe verdicts incl. uncertain track choice, saved track, `--match`, URL masking); they
+passed on 2026-10-26, and `--list`, `--probe` and `--state` were run read-only against the real dongle the same
+day (probe ~2 s on a cached source). The old ~18 s result above predates these revisions.
 
 ## Getting French audio (VF)
 
@@ -111,9 +165,10 @@ launching.** The player is never where the language gets decided. Picking a Fren
 a MULTi release is a VF release too, but with the current Stremio setting it needs one extra confirmation step
 after launch (below). That step applies the choice already made; it never replaces it.
 
-**Why a MULTi release starts in English.** The Stremio profile on the dongle has `settings.audioLanguage =
-"eng"` (read 2026-10-26 from `core.xml` → `profile`). When a file carries several audio tracks, the player picks
-the track matching that language, even if the French track is first. So "the title says MULTi" ≠ "VF is playing".
+**Why a MULTi release should start in English.** The Stremio profile on the dongle has `settings.audioLanguage
+= "eng"` (read 2026-10-26 from `core.xml` → `profile`). When a file carries several audio tracks, the player is
+expected to pick the track matching that language, even if the French track is first (Stremio's preferred-audio
+setting; not yet confirmed by ear on the dongle). So "the title says MULTi" ≠ "VF is playing".
 
 **1. Choose the release on its title** (`--list --lang fr`; the full label is in the stream `title`/`description`):
 
@@ -129,18 +184,17 @@ XviD DVDRip with unknown resolution never opened the player while a cached HEVC 
 player link can leave Stremio on the **next** episode's detail page: check which episode is shown before
 concluding anything.
 
-**2. Probe the tracks before launch when the title leaves doubt** (MULTi, flag only, no tag). On the Mac
-(`ffprobe` in `/usr/local/bin`), fetch the stream list the same way `stremio.py` does (addons read from
-`core.xml`), take the chosen stream's `url` and run, from a script,
-`ffprobe -v error -show_entries stream=index,codec_type,codec_name,channels:stream_tags=language,title:stream_disposition=default -of json "$URL"`.
-**Never print, log or echo the URL or the addon transport URLs**: they embed the TorBox/Real-Debrid keys. Print
-only the track list. Verified 2026-10-26: a `MULTi.VFi` release gave audio #1 `fre` "FR VFi : AC3 2.0" and
+**2. Probe the tracks before launch: `stremio.py … --lang fr --pick N --probe`** (same arguments as `--list`).
+It runs ffprobe on the Mac against the Nth source and prints the tracks and a verdict line; no script to
+write. Do not run ffprobe by hand on a stream URL: debrid URLs and addon transport URLs embed the
+TorBox/Real-Debrid keys, and the script is what keeps them out of output. Verified 2026-10-26: a `MULTi.VFi` release gave audio #1 `fre` "FR VFi : AC3 2.0" and
 audio #2 `eng` "ENG VO : AC3 5.1"; a `FRENCH DVDRiP` release gave a single untagged audio track (one track +
 French release title is enough).
 
 **3. MULTi only: make the player use the French track that was chosen.** Stremio stores the track per title in
 `core.xml` → `streams.items[*][1].state.audioTrack` (e.g. `{"id": "0:2", "language": "fr"}`) and reuses it for
-that title afterwards, so this is normally needed once per film/series. Player navigation (Android TV player,
+that title afterwards, so this is normally needed once per film/series (`--probe` then says "déjà retenu le
+français"; that a kept track is reapplied on a deep-link launch is expected but not yet checked by ear). Player navigation (Android TV player,
 observed 2026-10-26 on screenshots; **not yet verified end to end**):
 - `KEYCODE_DPAD_DOWN` shows the control bar without pausing; focus starts on **Play/Pause**. Observed button
   order: Play/Pause, Next episode, Rewind, Subtitles (CC), **Audio**, Speed, Fullscreen, PiP, Episodes.
@@ -155,7 +209,7 @@ Once verified on a real MULTi playback, remove "not yet verified" and record the
 presses from Play/Pause to Audio.
 
 **4. Verify, don't assume.** VF is confirmed when one of these holds: single audio track on a French-only
-release (steps 1–2); `streams` state for that title shows `audioTrack.language = "fr"`, re-read after step 3;
+release (`--probe` says `VF OK`); `--state` shows the kept track `fr` for that title, re-read after step 3;
 or a screenshot of the audio menu shows French selected. Playback progress says nothing about the language.
 Otherwise report the audio as **unverified**.
 
