@@ -121,3 +121,22 @@ def test_failing_test_waits_for_work_in_progress():
     assert not run._needs_agent({**fresh, "opened_at": now - timedelta(hours=7), "attempts": 3})
     assert not run._needs_agent({**fresh, "opened_at": now - timedelta(hours=30), "attempts": 1,
                                  "last_attempt_at": now - timedelta(hours=2)})
+
+
+def test_stale_reference_waits_for_files_being_written(monkeypatch):
+    monkeypatch.setattr(checks, "dirty_paths", lambda root=None: {"docs/reference/CODE.md"})
+    monkeypatch.setattr(checks, "docs_check", lambda: {"ok": False, "stale": ["docs/reference/CODE.md"]})
+    called = []
+    monkeypatch.setattr(repair.subprocess, "run", lambda *a, **k: called.append(a))
+    assert repair.regenerate_docs("m") == {"applied": False, "deferred": True, "blocked": ["docs/reference/CODE.md"]}
+    assert not called                                   # nothing regenerated over someone's work
+
+
+def test_reference_regeneration_is_quiet():
+    inc = _inc("fixed", outcome="fixed", quiet=True, apply={"applied": True})
+    assert run._message(inc) is None
+
+
+def test_no_reference_in_this_version_is_no_incident(monkeypatch):
+    monkeypatch.setattr(checks, "docs_check", lambda: {})
+    assert checks.docs() == []

@@ -138,8 +138,30 @@ def _retry_deferred(conn, inc: dict) -> None:
         _set(conn, inc, "deferred", v)
 
 
+DOCS_OWNER_AFTER_H = 24   # a reference that cannot be regenerated for a day goes to the owner
+
+
+def _docs(conn, inc: dict, dry_run: bool) -> None:
+    """Generated reference: regenerated mechanically, never by the agent; quiet when it works."""
+    if dry_run:
+        return None
+    res = repair.regenerate_docs(f'Guardian: generated reference regenerated (incident {inc["incident_id"]})\n\n'
+                                 + "\n".join((inc["detail"] or {}).get("stale") or []))
+    if res.get("applied"):
+        return _set(conn, inc, "fixed", {"outcome": "fixed", "quiet": True, "apply": res})
+    if res.get("deferred"):
+        return _set(conn, inc, "deferred", {"outcome": "deferred", "quiet": True, "apply": res})
+    owner = _age_h(inc["opened_at"]) >= DOCS_OWNER_AFTER_H
+    _set(conn, inc, "needs_owner" if owner else "open", {
+        "outcome": "needs_owner" if owner else "open", "apply": res,
+        "summary_fr": "La documentation de référence du Router ne se régénère plus depuis un jour : "
+                      f'{str(res.get("error"))[:200]}. Il faut une correction dans le module.'})
+
+
 def handle(conn, inc: dict, budget: list[int], dry_run: bool = False) -> None:
     kind = inc["kind"]
+    if kind == "docs_stale":
+        return None if inc["status"] == "needs_owner" else _docs(conn, inc, dry_run)
     if inc["status"] == "deferred":
         return _retry_deferred(conn, inc)
     if kind == "provider_down":
@@ -165,7 +187,7 @@ def _message(inc: dict) -> str | None:
     """What the owner reads, once per outcome; None = nothing worth a message."""
     v = inc.get("verdict") or {}
     head = "🛠 Walter Router"
-    if inc["status"] == "fixed" and (v.get("apply") or {}).get("applied"):
+    if inc["status"] == "fixed" and (v.get("apply") or {}).get("applied") and not v.get("quiet"):
         return f'{head} — réparé tout seul\n\n{v.get("summary_fr") or v.get("cause")}\n\nVérifié avant mise en place.'
     if inc["status"] == "needs_owner":
         q = v.get("question_fr")

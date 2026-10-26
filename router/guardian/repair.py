@@ -185,6 +185,30 @@ def apply(module: Path, files: list[str], deleted: list[str], message: str) -> d
     return {"applied": True, "commit": _git(root, "rev-parse", "--short", "HEAD").strip(), "files": files}
 
 
+def regenerate_docs(message: str) -> dict:
+    """Generated reference out of date: regenerate it (no model), and commit the regenerated files alone, unless one
+    of them is someone's uncommitted work."""
+    busy = checks.dirty_paths()
+    stale = checks.docs_check().get("stale") or []
+    blocked = [p for p in stale if p in busy]
+    if blocked:
+        return {"applied": False, "deferred": True, "blocked": blocked}
+    proc = subprocess.run(["walter-router", "docs", "--write"], capture_output=True, text=True, timeout=600)
+    after = checks.docs_check()
+    if proc.returncode or not after.get("ok"):
+        return {"applied": False, "error": (proc.stderr or proc.stdout)[-500:] or after.get("error"), "check": after}
+    changed = sorted(checks.dirty_paths() - busy)
+    if not changed:
+        return {"applied": True, "files": [], "commit": None}
+    if any(not p.startswith("docs/reference/") for p in changed):
+        return {"applied": True, "files": changed, "commit": None, "note": "files outside docs/reference left uncommitted"}
+    root = paths.ROOT
+    _git(root, "add", "--", *changed)
+    email = _git(root, "config", "user.email", check=False).strip() or "guardian@localhost"
+    _git(root, "-c", f"user.email={email}", "commit", "-q", "-m", message, "--", *changed)
+    return {"applied": True, "files": changed, "commit": _git(root, "rev-parse", "--short", "HEAD").strip()}
+
+
 def _new(module: Path) -> set[str]:
     out = _git(module, "diff", "--cached", "--name-status", "--no-renames", "HEAD")
     return {line.split("\t", 1)[1] for line in out.splitlines() if line.startswith("A\t")}
