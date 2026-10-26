@@ -22,14 +22,19 @@ conteneur), `ops/walter-browse-display.service` (démarrage, lien `/tmp/.X11-uni
 
 ## Sortie réseau et identité par défaut du navigateur
 
-Une session sans route propre sort par la machine du propriétaire (`walter-exit-mac` : tunnel SOCKS
-`127.0.0.1:1082` par `ssh mac`) avec le système du propriétaire (`/etc/walter/browse-identity.env`, valeurs de l'instance :
-`config/browse/network.toml [default]`) ; fuseau, langues (langue principale du pays, puis anglais), position et IP
-WebRTC sont déduits de l'IP de sortie, et le navigateur est relancé avec la bonne identité quand cette IP change
-(contrôle toutes les 5 minutes, seulement sans session ouverte).
-Si la sortie est injoignable, la session s'ouvre sans les cookies du propriétaire, depuis l'IP du serveur. Une session
-peut toujours choisir une autre sortie (`walter-browser exit`). Fichiers : `ops/walter-exit-mac.service`,
-`ops/camoufox-max-identity.conf`.
+Une session sans route propre sort par le sélecteur `walter-exit-default` (SOCKS `127.0.0.1:1083`, valeurs de
+l'instance : `config/browse/network.toml [default]`), commun à tous les moteurs (26/10). Il choisit toutes les 20 s :
+la machine du propriétaire (`walter-exit-mac` : tunnel SOCKS `127.0.0.1:1082` par `ssh mac`) tant que son VPN
+WireGuard désigné (`primary_requires_vpn`, sortie France) y est connecté ; sinon la sortie WireGuard `fallback_exit`
+(`network/wg-exit`), démarrée automatiquement et arrêtée dès que la machine revient sur son tunnel (même clé : jamais
+les deux à la fois ; le VPN de la machine n'est jamais touché). Les deux sortent par la même IP, le changement est donc
+invisible des sites ; il ne touche que les nouvelles connexions. Aucune des deux disponible : connexion refusée (jamais
+l'IP du serveur). État : `walter-exit-default status`, journal `/var/log/walter-exit-default.log`.
+Le navigateur garde le système du propriétaire (`/etc/walter/browse-identity.env`) ; fuseau, langues (langue
+principale du pays, puis anglais), position et IP WebRTC sont déduits de l'IP de sortie, et le navigateur est relancé
+avec la bonne identité quand cette IP change (contrôle toutes les 5 minutes, seulement sans session ouverte). Une
+session peut toujours choisir une autre sortie (`walter-browser exit`). Fichiers : `network/exit-default/`,
+`ops/walter-exit-default.service`, `ops/walter-exit-mac.service`, `ops/camoufox-max-identity.conf`.
 
 Appareil et comportement : l'empreinte matérielle (processeur, écran, GPU, polices, graines canvas) est générée une
 seule fois d'après la machine du propriétaire et figée (`device-fingerprint.json` dans le dossier de données du
@@ -46,7 +51,7 @@ Camoufox (Firefox, `camoufox-max`, :9377) reste le navigateur par défaut. Quand
 offre la même API HTTP avec CloakBrowser : un Chromium dont l'empreinte est modifiée dans le code C++ (MIT pour
 l'enveloppe ; binaire gratuit v146, 58 patchs, sans clé ni compte, sur linux-arm64). Un seul serveur pour les deux
 (`~/.hermes/camoufox-max/server-max.js`, choix par `CAMOFOX_ENGINE=chromium`) : mêmes règles de sortie (par défaut
-par le Mac du propriétaire), identité réseau tirée de l'IP de sortie (fuseau, langues de la région puis anglais, IP
+`walter-exit-default`), identité réseau tirée de l'IP de sortie (fuseau, langues de la région puis anglais, IP
 WebRTC, passés en options du binaire, sans émulation CDP), cookies du propriétaire refusés hors de sa sortie, même
 écran :101.
 
