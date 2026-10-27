@@ -105,6 +105,9 @@ def main(argv=None) -> None:
     vw.add_argument("--limit", type=int, default=500); vw.add_argument("--dry", action="store_true")
     vw.add_argument("--depth", default="overview"); vw.add_argument("--domain"); vw.add_argument("--horizon")
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
+    rn = sub.add_parser("runs", help="Walter Run Plane: runs, their tasks, model calls and links (P0, 2026-10-27)")
+    rn.add_argument("action", choices=["list", "show", "sweep"]); rn.add_argument("run_id", nargs="?", default="")
+    rn.add_argument("--limit", type=int, default=20)
     a = p.parse_args(argv)
 
     if a.cmd == "agent-memory":
@@ -219,6 +222,15 @@ def main(argv=None) -> None:
             else:
                 res = logs.stats(conn)
         print(json.dumps(res, default=str, ensure_ascii=False, indent=1) if a.json else logs.render(a.action, res))
+    elif a.cmd == "runs":
+        from . import runs
+        if a.action == "list":
+            res = runs.recent(a.limit)
+        elif a.action == "show":
+            res = runs.show(a.run_id) or {"error": "unknown run"}
+        else:
+            res = {"abandoned": runs.sweep()}
+        print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
     elif a.cmd == "views":
         from . import views
         from datetime import datetime as _dt
