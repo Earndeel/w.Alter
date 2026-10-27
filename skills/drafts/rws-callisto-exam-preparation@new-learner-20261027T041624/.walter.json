@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-27T04:16:24.264207+00:00",
+ "description": "Use when preparing Monsieur for the RWS Callisto exam by reviewing historical screenshots against the guidelines supplied for the upcoming exam.",
+ "domain": "learning",
+ "kind": "new",
+ "reason": "The session established a recurring workflow: reviewing 48 historical exam photos, checking 108 theory statements and 11 practical tasks against dated guidelines, then generating preparation exercises. It uncovered a missed flag exception, a grid/comment contradiction, unreadable selections and limits caused by missing landing pages. None of the listed skills covers this evidence-based exam preparation procedure. [session codex/Codex Desktop/01a17802-e3ce-70d3-baff-6d893a4dcfea]",
+ "runtime": "learner",
+ "session_id": "codex/Codex Desktop/01a17802-e3ce-70d3-baff-6d893a4dcfea",
+ "target": "rws-callisto-exam-preparation"
+}
