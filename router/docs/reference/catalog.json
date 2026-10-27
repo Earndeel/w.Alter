@@ -3575,6 +3575,20 @@
             "name": "kind",
             "nullable": false,
             "type": "text"
+          },
+          {
+            "default": null,
+            "description": "Walter run (runs.runs.run_id) this execution served, from WALTER_RUN_ID; null outside a run.",
+            "name": "run_id",
+            "nullable": true,
+            "type": "uuid"
+          },
+          {
+            "default": null,
+            "description": "Sub-agent task (runs.tasks.task_id) this execution served (walter_run); null otherwise.",
+            "name": "task_id",
+            "nullable": true,
+            "type": "uuid"
           }
         ],
         "constraints": [
@@ -3583,7 +3597,8 @@
         "description": "Every routed execution attempt (walter_run, generate, walter-llm): provider, model, ok, seconds, cost. >= 50 % failures over >= 3 runs in 14 days demotes the route",
         "indexes": [
           "CREATE UNIQUE INDEX exec_log_pkey ON models.exec_log USING btree (exec_id)",
-          "CREATE INDEX exec_log_recent ON models.exec_log USING btree (provider, model_id, at DESC)"
+          "CREATE INDEX exec_log_recent ON models.exec_log USING btree (provider, model_id, at DESC)",
+          "CREATE INDEX exec_log_run ON models.exec_log USING btree (run_id) WHERE (run_id IS NOT NULL)"
         ],
         "kind": "r",
         "name": "exec_log"
@@ -8185,6 +8200,11 @@
             "description": "Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not",
             "name": "routes",
             "signature": "conn, model_id: str, variant: str='', preferred: str | None=None, usage: str='interactive', modes: list[str] | None=None"
+          },
+          {
+            "description": "",
+            "name": "_uuid",
+            "signature": "value"
           },
           {
             "description": "One routed execution attempt (from the Hermes plugin or the media executor).",
@@ -15972,6 +15992,20 @@
       },
       {
         "default_expression": "aucun",
+        "description": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
+        "file": "serve/execution.py",
+        "name": "WALTER_RUN_ID",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "Tâche de sous-agent (runs.tasks) servie par l'exécution walter_run ; inscrite dans models.exec_log.",
+        "file": "serve/execution.py",
+        "name": "WALTER_TASK_ID",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
         "description": "Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation.",
         "file": "serve/intent.py",
         "name": "CLOUDFLARE_ACCOUNT_ID",
@@ -16064,7 +16098,9 @@
       "WALTER_FLARESOLVERR",
       "WALTER_LLM_PORT",
       "WALTER_ROUTER_CLI",
-      "WALTER_ROUTER_DATABASE_URL"
+      "WALTER_ROUTER_DATABASE_URL",
+      "WALTER_RUN_ID",
+      "WALTER_TASK_ID"
     ]
   },
   "note": {
@@ -16146,7 +16182,7 @@
     "config/providers.json": "ea7f381395589799ef723a1a4e93540d4a3b4bc08549a42207a22857940be430",
     "config/subscriptions.json": "d2e56aa07e15344a1986746b1f8608842873639f5d37788e37e9896d6ba67017",
     "contracts/router.json": "d52d10e173e0b31bdeca9716e1a88dc203bb7cf614b523b985bcf7648fb178f8",
-    "documentation.py": "93f6e50c6e031e7e7b824d040533250527e59283d5a263ad438257a199656642",
+    "documentation.py": "73220d30d363aef887069deb3d3efb00fb40098af9eb5659cde86ce62cee8267",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "95e2b17fc987f7bbe2d4d6dea98b25dc1af2aee919f98539ddb6781494eeb17e",
@@ -16216,7 +16252,7 @@
     "serve/api.py": "a457147d23cf995c1144150f98d74cbb30b2cdb1b535974e3221903ae8252157",
     "serve/brief.py": "33ca79121e190834adabe6fbc573b408ef84d4cf29a93736cf4f8de48275c3ab",
     "serve/choose.py": "e8894e22b18bc0d87f30878bd1a6a75f216090cd64bd5a9f91ab27bb76dfa6ea",
-    "serve/execution.py": "2dc7ea2cdd31c8dae743c7bf550a73e57dc871ed0a7a4c320eeb9ef3c5bde21f",
+    "serve/execution.py": "2d3ee5396c416d4ee08aad13bedb5a1bb3ea0c36af5a0f432f0786eeec5988c3",
     "serve/hermes_sync.py": "1dc99d9f119e45cc958e5954fac64ba29802505d04ccd2ef096c3aba3db633cc",
     "serve/intent.py": "8f8c1adcbc776fce3e38d1aa751bcea89b1a71b00c1918c0b6ab9dd71b2c75cf",
     "serve/media_exec.py": "442b830d7a13cb3c0502b4b6767af964dd0adcf38fefc3d851bb28a455e7b016",
@@ -16260,7 +16296,8 @@
     "store/migrations/031_video_understanding.sql": "f7597362e2a3a69d47adca5f7140003cc2b1ec87da62c5dfd0097c4b1e392e3c",
     "store/migrations/032_no_video_understanding_task.sql": "4f8e7527db1979c92b5df0b386c329080e7c19d84fa054e6d47cec70df82929a",
     "store/migrations/033_guardian.sql": "8013f62d521b5e243ee6651b6b40c8d19b4097f44bf1434ce9783dcde086a244",
-    "store/migrations/034_guardian_docs.sql": "bb25f74a84385740452d3890e06759a9ccb4c4845719176d4eba14396260069e"
+    "store/migrations/034_guardian_docs.sql": "bb25f74a84385740452d3890e06759a9ccb4c4845719176d4eba14396260069e",
+    "store/migrations/035_exec_log_run.sql": "3bdbdf329f83c83a305285a692850a7052bc033caf9115f47a6eaf04fa2262cd"
   },
   "tasks": [
     {

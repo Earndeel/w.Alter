@@ -242,6 +242,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `CLAUDE_PROJECTS` | plan/subscriptions.py | get | aucun | Source locale de métriques des sessions Claude pour estimer un abonnement. |
 | `CODEX_SESSIONS` | plan/subscriptions.py | get | aucun | Source locale de métriques des sessions Codex pour estimer un abonnement. |
 | `WALTER_FLARESOLVERR` | research/web.py | get | 'http://127.0.0.1:8191/v1' | Adresse du service de lecture des sources qui le nécessitent. |
+| `WALTER_RUN_ID` | serve/execution.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
+| `WALTER_TASK_ID` | serve/execution.py | get | aucun | Tâche de sous-agent (runs.tasks) servie par l'exécution walter_run ; inscrite dans models.exec_log. |
 | `CLOUDFLARE_ACCOUNT_ID` | serve/intent.py | env_value | aucun | Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation. |
 | `CLOUDFLARE_AI_TOKEN` | serve/intent.py | env_value | aucun | Nom d'un accès secret pour la voie de décision ; ne pas afficher sa valeur. |
 | `OPENROUTER_API_KEY` | serve/intent.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |

@@ -885,6 +885,7 @@ From a chosen model to something Hermes can run: ordered execution routes and li
 - `subscription_costs(conn)` — route provider (codex) -> latest cost price of its subscription + plan name (models.latest_subscription_costs).
 - `host_order(conn, model_id: str, usage: str='interactive')` — Usable hosts behind OpenRouter for this model, cheapest first (models.usable_endpoints); flex tier only for
 - `routes(conn, model_id: str, variant: str='', preferred: str | None=None, usage: str='interactive', modes: list[str] | None=None)` — Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not
+- `_uuid(value)` — 
 - `log(conn, entry: dict)` — One routed execution attempt (from the Hermes plugin or the media executor).
 - `_stream_error(data: bytes)` — The provider's own reason when an HTTP 200 stream ends on an error event (Kie: « no_available_account »).
 - `_kie_media(kie: str)` — Kie's media API (video, image, music tasks) is another service than its Claude chat API: usable when the
