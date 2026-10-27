@@ -24,15 +24,33 @@ def contracts(root):
     return catalog
 
 
-def test_changed_owner_contract_blocks_backup_before_any_archive(tmp_path):
+def _drift(root, catalog, value):
+    path=root/str(manifest(catalog['modules'][0])).lstrip('/')
+    module=json.loads(path.read_text());module['backup_paths'].append(value);path.write_text(json.dumps(module))
+
+
+def test_changed_owner_contract_gives_a_degraded_backup_covering_both(tmp_path):
+    # Owner decision 2026-10-27: a registry drift must not leave Walter without a backup.
     root=tmp_path/'root'; catalog=contracts(root)
     assert B.contracts_check(root)['ok']
-    path=root/str(manifest(catalog['modules'][0])).lstrip('/')
-    module=json.loads(path.read_text());module['backup_paths'].append('/new-required-state');path.write_text(json.dumps(module))
+    _drift(root, catalog, '/new-required-state')
+    state=B.contracts_check(root)
+    assert state['degraded'] and 'new-required-state' in state['rendered_paths']
+    assert 'new-required-state' in B.module_backup_paths(root)          # registry in place ∪ contracts
     archive=tmp_path/'bundle.tar'
-    with pytest.raises(RuntimeError,match='differs from owner'):
-        B.create(archive,root,[],[],False)
-    assert not archive.exists()
+    B.create(archive,root,[],[],False)
+    assert archive.exists()
+    import tarfile
+    with tarfile.open(archive) as t:
+        recorded=json.loads(t.extractfile(B.MANIFEST).read())['contract_check']
+    assert recorded['degraded'] and recorded['registry_matches_contracts'] is False
+
+
+def test_unsafe_contract_path_still_blocks_the_backup(tmp_path):
+    root=tmp_path/'root'; catalog=contracts(root)
+    _drift(root, catalog, 'relative/../escape')
+    with pytest.raises(RuntimeError):
+        B.module_backup_paths(root)
 
 
 def test_legacy_registry_is_supported_without_catalog(tmp_path):

@@ -39,10 +39,12 @@ def _core(root):
     return None
 
 def contracts_check(root):
-    """Reject stale generated registries before writing a backup payload.
+    """Compare the generated registry with the owner contracts before writing a backup payload.
 
     Old archives without a contract catalogue retain the v1 registry interface. The check is walter-core's
-    own command (`walter contracts check`); no core code is loaded here.
+    own command (`walter contracts check`); no core code is loaded here. A divergence no longer prevents the
+    backup (degraded mode, owner decision 2026-10-27): the payload covers the paths of the registry in place
+    AND of the registry rendered from the contracts, and records the drift; only an unavailable check stops it.
     """
     core=_core(root)
     catalog=core/'modules/catalog.json' if core else None
@@ -53,16 +55,17 @@ def contracts_check(root):
         result=json.loads(r.stdout)
     except (OSError,subprocess.TimeoutExpired,ValueError):
         raise RuntimeError('contract check unavailable (walter contracts check)') from None
-    if not result.get('ok'):raise RuntimeError('module registry differs from owner contracts; regenerate before backup')
+    if not result.get('ok'):
+        try:
+            r=subprocess.run(['walter','contracts','render','--catalog',str(catalog),'--root',str(root)],
+                             capture_output=True,text=True,timeout=120)
+            rendered=json.loads(r.stdout)
+        except (OSError,subprocess.TimeoutExpired,ValueError):
+            raise RuntimeError('module registry differs from owner contracts and cannot be rendered') from None
+        result={**result,'degraded':True,'rendered_paths':_registry_paths(rendered)}
     return result
 
-def module_backup_paths(root):
-    """Read the composition contract without importing the capability server."""
-    contracts_check(root)
-    core=_core(root)
-    registry=core/'modules/registry.json' if core else None
-    if registry is None or not registry.exists():return []
-    data=json.loads(registry.read_text())
+def _registry_paths(data):
     if data.get('version')!=1:raise RuntimeError('unsupported module registry version')
     paths=set()
     for module in data.get('modules',[]):
@@ -70,6 +73,15 @@ def module_backup_paths(root):
             p=pathlib.PurePosixPath(value)
             if not p.is_absolute() or '..' in p.parts:raise RuntimeError('unsafe module backup path')
             paths.add(str(p).lstrip('/'))
+    return sorted(paths)
+
+def module_backup_paths(root):
+    """Read the composition contract without importing the capability server (degraded: registry ∪ contracts)."""
+    state=contracts_check(root)
+    core=_core(root)
+    registry=core/'modules/registry.json' if core else None
+    paths=set(state.get('rendered_paths') or [])
+    if registry is not None and registry.exists():paths.update(_registry_paths(json.loads(registry.read_text())))
     return sorted(paths)
 
 def inventory(root):
@@ -218,6 +230,10 @@ def create(output,root=pathlib.Path('/'),sources=None,required=None,include_depe
         missing=[n for n in required if n not in entries]
         if missing:raise RuntimeError('required paths not archived: '+', '.join(missing))
         if contracts_check(root)!=contract_state:raise RuntimeError('module contracts changed during backup')
+        if contract_state.get('degraded'):
+            import sys
+            print('WARNING: degraded backup — module registry differs from owner contracts; '
+                  'payload covers both, drift recorded in the manifest (contract_check)',file=sys.stderr)
         manifest={'contract_check':contract_state,'version':2,'created_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   'sources':sources,'required':required,'optional_absent':absent,'entries':entries,
                   'sqlite_snapshots':snapshots,'python_packages':dependencies(root) if include_dependencies else {},
