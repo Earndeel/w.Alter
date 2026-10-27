@@ -62,3 +62,22 @@ def test_safe_never_raises_and_respects_switch(monkeypatch):
     assert runs.safe(lambda: 1 / 0) is None
     monkeypatch.setenv("WALTER_RUNS", "off")
     assert runs.safe(lambda: 42) is None
+
+
+def test_trace_writes_a_masked_walter_logs_session_from_iso_times():
+    r = runs.start(origin=origin(), goal="parent")
+    t = runs.task_start(r, kind="walter_run", session_id="pytest-trace/1")
+    evs = [{"type": "user/message", "text": "goal", "at": "2026-10-27T18:40:45+00:00"},
+           {"type": "tool/call", "tool": "walter_browse", "call_id": "c0", "text": "{\"query\": \"q\"}", "at": "2026-10-27T18:40:46+00:00"},
+           {"type": "tool/result", "tool": "walter_browse", "call_id": "c0", "text": "{}", "at": "2026-10-27T18:40:47+00:00"},
+           {"type": "assistant/message", "text": "done", "at": "2026-10-27T18:40:48+00:00"}]
+    try:
+        assert runs.trace("pytest-trace/1", evs, runtime="walter-router", native_id=t) == 4
+        assert runs.trace("pytest-trace/1", evs, runtime="walter-router", native_id=t) == 0   # idempotent
+        with connect() as c:
+            tools = [x["tool"] for x in c.execute("select tool from walter_logs.events where session_id = 'pytest-trace/1' and type = 'tool/call'")]
+        assert tools == ["walter_browse"]
+    finally:
+        with connect() as c:
+            c.execute("delete from walter_logs.events where session_id = 'pytest-trace/1'")
+            c.execute("delete from walter_logs.sessions where session_id = 'pytest-trace/1'")
