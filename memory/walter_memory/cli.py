@@ -106,7 +106,7 @@ def main(argv=None) -> None:
     vw.add_argument("--depth", default="overview"); vw.add_argument("--domain"); vw.add_argument("--horizon")
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
     rn = sub.add_parser("runs", help="Walter Run Plane: runs, their tasks, model calls and links (P0, 2026-10-27)")
-    rn.add_argument("action", choices=["list", "show", "sweep"]); rn.add_argument("run_id", nargs="?", default="")
+    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end"]); rn.add_argument("run_id", nargs="?", default="")
     rn.add_argument("--limit", type=int, default=20)
     a = p.parse_args(argv)
 
@@ -228,6 +228,21 @@ def main(argv=None) -> None:
             res = runs.recent(a.limit)
         elif a.action == "show":
             res = runs.show(a.run_id) or {"error": "unknown run"}
+        elif a.action == "task-start":      # a sub-agent runner (walter-router run): JSON on stdin
+            spec = json.load(sys.stdin)
+            res = {"task_id": runs.task_start(spec["run_id"], kind=spec.get("kind", "walter_run"), goal=spec.get("goal"),
+                                              spec=spec.get("spec"), session_id=spec.get("session_id"),
+                                              task_id=spec.get("task_id"))}
+        elif a.action == "task-end":        # its trace (walter_logs session), routing and outcome
+            spec = json.load(sys.stdin)
+            n = runs.trace(spec["session_id"], spec.get("events") or [], runtime=spec.get("runtime", "walter-router"),
+                           native_id=spec.get("task_id"), model=spec.get("model"), title=(spec.get("goal") or "")[:80],
+                           parent_session_id=spec.get("parent_session_id"),
+                           meta={"run_id": spec.get("run_id"), "task_id": spec.get("task_id")})
+            if spec.get("routing"):
+                runs.routing(spec["run_id"], spec["routing"], task_id=spec["task_id"])
+            runs.task_end(spec["task_id"], status=spec.get("status", "ended"), result=spec.get("result"))
+            res = {"events": n}
         else:
             res = {"abandoned": runs.sweep()}
         print(json.dumps(res, ensure_ascii=False, indent=2, default=str))

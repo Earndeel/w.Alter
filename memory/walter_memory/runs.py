@@ -131,6 +131,29 @@ def task_end(task_id: str, *, status: str = "ended", result: dict | None = None)
                                                           "status": status}, f"task.ended/{task_id}")
 
 
+def trace(session_id: str, events: list[dict], *, runtime: str, native_id: str, model: str | None = None,
+          parent_session_id: str | None = None, title: str | None = None, meta: dict | None = None) -> int:
+    """Write a sub-agent's own trace as a walter_logs session (masked at write, idempotent on event identity).
+    events: [{type, at, text, tool, call_id, model, status}] in order; types are walter_logs' vocabulary."""
+    from .logs import Writer
+
+    def at(v):
+        if isinstance(v, str):
+            v = datetime.fromisoformat(v)
+        return v if v is None or v.tzinfo else v.replace(tzinfo=timezone.utc)
+    events = [{**ev, "at": at(ev.get("at"))} for ev in events]
+    with connect() as conn:
+        w = Writer(conn)
+        w.session(session_id, runtime=runtime, native_id=native_id, model=model, title=title,
+                  parent_session_id=parent_session_id, meta=meta or {},
+                  started_at=events[0].get("at") if events else None, ended_at=events[-1].get("at") if events else None)
+        for i, ev in enumerate(events):
+            w.add(session_id, ev["type"], ev.get("at"), f"{native_id}:{i}", text=ev.get("text"), call_id=ev.get("call_id"),
+                  tool=ev.get("tool"), model=ev.get("model"), status=ev.get("status"),
+                  human=ev["type"] == "user/message")
+        return w.flush()
+
+
 def link(run_id: str, kind: str, ref: str) -> None:
     with connect() as conn:
         conn.execute("insert into runs.links (run_id, kind, ref) values (%s, %s, %s) on conflict do nothing",
