@@ -1,0 +1,14 @@
+# Walter end-to-end minimal scenario (P0, 2026-10-27) — enriched at each milestone (P1: sub-agent + walter_browse).
+# Plays a request through the real hook adapter, a routed model call carrying the run, then the end of the turn;
+# asserts on what the tables recorded.
+name: e2e-minimal
+milestone: P0
+steps:
+  - hook: {event: UserPromptSubmit, prompt: "Scénario e2e-minimal : réponds OK."}
+  - router: {goal: "Réponds uniquement par le mot OK.", task: general, level: L1, toolsets: [], max_turns: 1, budget_seconds: 60}
+  - hook: {event: Stop}
+assertions:
+  - {path: run.status, equals: ended}
+  - {path: "links[*].kind", contains: session}
+  - {path: model_calls, min_len: 1}
+  - {path: "model_calls[*].ok", all: true}

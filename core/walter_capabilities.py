@@ -44,9 +44,21 @@ _ROUTER_WORD=re.compile(r'[A-Za-z0-9_.:/-]{1,64}')   # task, role, level, plan i
 _REQUIRE=('','unrestricted','open_weights','video_input')
 
 
+def _run_env():
+    # Walter Run Plane: the current run travels to the module as WALTER_RUN_ID (how it is found is the adapter's
+    # detail, hooks/runctx.py: explicit environment, else the record of this harness process).
+    try:
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('walter_runctx',os.path.join(os.path.dirname(os.path.abspath(__file__)),'hooks','runctx.py'))
+        mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+        return {**os.environ,**mod.env()}
+    except Exception:
+        return None
+
+
 def _router(*args,timeout=60,stdin=None):
     # Walter Router through its command on the PATH (its declared interface); arguments as a list, never a shell.
-    out=subprocess.run(['walter-router',*args],input=stdin,capture_output=True,text=True,timeout=timeout)
+    out=subprocess.run(['walter-router',*args],input=stdin,capture_output=True,text=True,timeout=timeout,env=_run_env())
     if out.returncode:raise RuntimeError('router command failed')
     return json.loads(out.stdout)
 

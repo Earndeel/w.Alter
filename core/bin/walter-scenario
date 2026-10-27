@@ -1,0 +1,202 @@
+#!/opt/walter-core/venv/bin/python
+"""walter-scenario — end-to-end scenarios checked on real traces (P0, 2026-10-27; reused by walter-lab later).
+
+A scenario (scenarios/*.yaml) plays a request through the real adapters and modules, then asserts on what the
+tables recorded (`walter-memory runs show`, walter_logs), not on return values alone.
+
+  walter-scenario run <file.yaml> [--json]      play it; exit 0 when every assertion holds
+  walter-scenario list                           scenarios shipped with walter-core
+
+Steps:
+  hook:   {event: UserPromptSubmit|Stop, prompt: "..."}  → hooks/walter_hook.py, this process standing in for the
+          harness (WALTER_HARNESS_PID), so the run is found exactly as an MCP server would find it
+  router: {goal, task, level, toolsets, max_turns, budget_seconds} → `walter-router run` with the run's environment
+  mcp:    {tool: name, arguments: {...}} → the walter-core MCP server started as this process' child (the real
+          Claude Code path: the server finds the run through its parent's record)
+Assertions (on `walter-memory runs show <run_id>`; `$` = that JSON):
+  - {path: run.status, equals: ended}
+  - {path: model_calls, min_len: 1}       - {path: tasks, min_len: 1}
+  - {path: model_calls[*].ok, all: true}  - {path: links[*].kind, contains: session}
+  - {tool_called: walter_browse, in: tasks}   the sub-agent's walter_logs session holds that tool call
+Per-message modules (memory context, skills, preflight, views) are off unless the scenario sets `modules: on`.
+Reports: <instance>/state/scenarios/<name>/<time>.json.
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import yaml
+
+CORE = Path(__file__).resolve().parent.parent
+HOOK = CORE / "hooks" / "walter_hook.py"
+sys.path.insert(0, str(CORE / "hooks"))
+import runctx  # noqa: E402
+
+
+def _instance() -> Path:
+    try:
+        return Path(os.environ.get("WALTER_INSTANCE") or Path("/etc/walter/instance").read_text().strip())
+    except OSError:
+        return Path("/instances/monsieur")
+
+
+def _env(modules_on: bool) -> dict:
+    env = {**os.environ, "WALTER_HARNESS_PID": str(os.getpid())}
+    if not modules_on:
+        env.update(WALTER_HOOK_CONTEXT="off", WALTER_HOOK_SKILLS="off", WALTER_HOOK_PREFLIGHT="off", WALTER_HOOK_VIEWS="off")
+    return env
+
+
+def step_hook(step: dict, session: str, env: dict) -> dict:
+    ev = {"hook_event_name": step["event"], "session_id": session, "transcript_path": ""}
+    if step.get("prompt"):
+        ev["prompt"] = step["prompt"]
+    t0 = time.perf_counter()
+    subprocess.run([str(HOOK)], input=json.dumps(ev), text=True, capture_output=True, env=env, timeout=60)
+    return {"ms": round((time.perf_counter() - t0) * 1000)}
+
+
+def step_router(step: dict, env: dict) -> dict:
+    run_env = {**env, **runctx.env(os.getpid())}
+    out = subprocess.run(["walter-router", "run"], input=json.dumps(step), text=True, capture_output=True,
+                         env=run_env, timeout=int(step.get("budget_seconds") or 300) * 3 + 120)
+    try:
+        res = json.loads(out.stdout)
+    except ValueError:
+        return {"ok": False, "error": (out.stderr or out.stdout)[-300:]}
+    return {"ok": res.get("ok"), "error": res.get("error"), "task_id": res.get("task_id"),
+            "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("answer") or res.get("text") or "")[:400]}
+
+
+async def _mcp(tool: str, arguments: dict, env: dict) -> dict:
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    params = StdioServerParameters(command=str(CORE / "venv/bin/python"), args=[str(CORE / "server.py")],
+                                   env={**env, "WALTER_CLIENT_TAG": "walter-scenario"})
+    async with stdio_client(params) as (r, w):
+        async with ClientSession(r, w) as s:
+            await s.initialize()
+            res = await s.call_tool(tool, arguments)
+            text = "".join(getattr(c, "text", "") for c in res.content)
+    try:
+        return json.loads(json.loads(text).get("result", text)) if text.startswith("{\"result\"") else json.loads(text)
+    except (ValueError, AttributeError, TypeError):
+        return {"raw": text[:2000]}
+
+
+def step_mcp(step: dict, env: dict) -> dict:
+    res = asyncio.run(_mcp(step["tool"], step.get("arguments") or {}, env))
+    return {"ok": res.get("ok"), "error": res.get("error"), "task_id": res.get("task_id"),
+            "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("answer") or res.get("raw") or "")[:600]}
+
+
+def _get(data, path: str):
+    """run.status, model_calls, model_calls[*].ok, links[*].kind"""
+    cur = [data]
+    for part in path.split("."):
+        star = part.endswith("[*]")
+        key = part[:-3] if star else part
+        nxt = []
+        for c in cur:
+            v = c.get(key) if isinstance(c, dict) else None
+            if star:
+                nxt.extend(v or [])
+            else:
+                nxt.append(v)
+        cur = nxt
+    return cur if "[*]" in path else (cur[0] if cur else None)
+
+
+def _tool_calls(session_id: str) -> list[str]:
+    out = subprocess.run(["walter-memory", "logs", "timeline", session_id, "--type", "tool/call", "--limit", "200",
+                          "--json"], capture_output=True, text=True, timeout=60)
+    try:
+        rows = json.loads(out.stdout)
+    except ValueError:
+        return []
+    rows = rows.get("events", rows) if isinstance(rows, dict) else rows
+    return [r.get("tool") for r in rows if isinstance(r, dict)]
+
+
+def check(assertion: dict, shown: dict) -> tuple[bool, str]:
+    if "tool_called" in assertion:
+        sessions = [t.get("session_id") for t in shown.get("tasks") or [] if t.get("session_id")]
+        tools = [x for s in sessions for x in _tool_calls(s)]
+        return assertion["tool_called"] in tools, f"tools in task sessions: {sorted(set(filter(None, tools)))}"
+    value = _get(shown, assertion["path"])
+    if "equals" in assertion:
+        return value == assertion["equals"], f"{assertion['path']} = {value!r}"
+    if "min_len" in assertion:
+        n = len(value or [])
+        return n >= assertion["min_len"], f"len({assertion['path']}) = {n}"
+    if "all" in assertion:
+        return bool(value) and all(v == assertion["all"] for v in value), f"{assertion['path']} = {value}"
+    if "contains" in assertion:
+        return assertion["contains"] in (value or []), f"{assertion['path']} = {value}"
+    return False, f"unknown assertion {assertion}"
+
+
+def run(path: Path) -> dict:
+    sc = yaml.safe_load(path.read_text())
+    name = sc.get("name") or path.stem
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    session = f"scenario-{name}-{stamp}"
+    env = _env(sc.get("modules") == "on")
+    report = {"scenario": name, "at": stamp, "session": f"claude_code/vm/{session}", "steps": [], "assertions": []}
+    for step in sc.get("steps") or []:
+        kind = next(iter(step))
+        if kind == "hook":
+            r = step_hook(step["hook"], session, env)
+        elif kind == "router":
+            r = step_router(step["router"], env)
+        elif kind == "mcp":
+            r = step_mcp(step["mcp"], env)
+        else:
+            r = {"error": f"unknown step {kind}"}
+        report["steps"].append({kind: r})
+        if kind == "hook" and step["hook"]["event"] == "UserPromptSubmit":
+            report["run_id"] = (runctx.current(os.getpid()) or {}).get("run_id")
+    shown = {}
+    if report.get("run_id"):
+        out = subprocess.run(["walter-memory", "runs", "show", report["run_id"]], capture_output=True, text=True, timeout=60)
+        shown = json.loads(out.stdout or "{}")
+    for a in sc.get("assertions") or []:
+        ok, detail = check(a, shown) if shown else (False, "no run recorded")
+        report["assertions"].append({"ok": ok, "assert": a, "detail": detail})
+    report["ok"] = bool(report["assertions"]) and all(a["ok"] for a in report["assertions"])
+    out_dir = _instance() / "state" / "scenarios" / name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / f"{stamp}.json").write_text(json.dumps({**report, "run": shown}, ensure_ascii=False, indent=2, default=str))
+    return report
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("action", choices=["run", "list"]); p.add_argument("file", nargs="?")
+    p.add_argument("--json", action="store_true")
+    a = p.parse_args()
+    if a.action == "list":
+        for f in sorted((CORE / "scenarios").glob("*.yaml")):
+            print(f.name)
+        return 0
+    path = Path(a.file) if a.file and Path(a.file).exists() else CORE / "scenarios" / f"{a.file}.yaml"
+    rep = run(path)
+    if a.json:
+        print(json.dumps(rep, ensure_ascii=False, indent=2, default=str))
+    else:
+        print(f"{rep['scenario']}: {'OK' if rep['ok'] else 'FAILED'}  run {rep.get('run_id')}")
+        for s in rep["assertions"]:
+            print(f"  {'✓' if s['ok'] else '✗'} {s['detail']}")
+    return 0 if rep["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

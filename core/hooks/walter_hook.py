@@ -240,6 +240,45 @@ def emit(type: str, source: str, subject: str | None, payload: dict | None = Non
             log(f"views run failed {type(e).__name__}: {str(e)[:160]}")
 
 
+def run_start(runtime: str, session_key: str, prompt: str, *, channel: str = "owner", dedupe: str | None = None,
+              record_pid: int | None = None) -> str | None:
+    """Walter Run Plane (P0): one run per request; run_id is Walter's canonical id (WALTER_RUNS=off disables it).
+    For Claude Code / DSH the run is also recorded under the harness process, so its MCP server finds it (runctx)."""
+    if os.environ.get("WALTER_RUNS", "on") == "off":
+        return None
+    try:
+        from walter_memory import runs
+        import runctx
+        if record_pid:                      # a new message while the previous run never got its Stop: interrupted
+            prev = runctx.current(record_pid)
+            if prev and prev.get("run_id"):
+                runs.safe(runs.end, prev["run_id"], "cancelled")
+        secret = any(cat == "secret" for cat, _ in _privacy().detect(prompt))
+        run_id = runs.start(origin={"channel": channel, "runtime": runtime, "session_id": session_key},
+                            goal=prompt, privacy_class="local_only" if secret else "cloud_allowed", dedupe_key=dedupe)
+        if record_pid:
+            runctx.record(record_pid, run_id, session_key, runtime)
+        return run_id
+    except Exception as e:  # noqa: BLE001 — fail-open
+        log(f"run start failed {type(e).__name__}: {str(e)[:160]}")
+        return None
+
+
+def run_end(runtime: str, session_key: str, *, record_pid: int | None = None, status: str = "ended") -> None:
+    if os.environ.get("WALTER_RUNS", "on") == "off":
+        return
+    try:
+        from walter_memory import runs
+        import runctx
+        cur = runctx.current(record_pid) if record_pid else None
+        if cur and cur.get("run_id"):
+            runs.end(cur["run_id"], status)
+        else:
+            runs.end_open(session_key, status)
+    except Exception as e:  # noqa: BLE001 — fail-open
+        log(f"run end failed {type(e).__name__}: {str(e)[:160]}")
+
+
 SKILL_CONTENT_ACTIONS = {"created", "patched", "edited", "installed", "archived", "restored"}
 
 
@@ -251,6 +290,7 @@ def hermes_event(ev: dict) -> None:
              {"action": extra["action"], "provenance": extra.get("provenance"),
               "session_id": f"hermes/main/{sid}" if sid else None})
     elif name == "on_session_end" and sid:
+        run_end("hermes", f"hermes/main/{sid}", status="failed" if extra.get("failed") else "ended")
         emit("turn.ended", "hermes", f"hermes/main/{sid}",
              {k: extra.get(k) for k in ("completed", "failed", "interrupted", "turn_exit_reason", "model", "platform")})
     elif name == "on_session_finalize" and sid:
@@ -288,7 +328,11 @@ def claude_code(ev: dict) -> dict | None:
         caller, prompt = f"{runtime.replace('_', '-')}-hook", OWN.sub(" ", ev.get("prompt") or "").strip()
         if not prompt:  # a dsh step whose only new messages are our own contexts or tool results
             return None
-        with ThreadPoolExecutor(2) as ex:  # memory and skills in parallel; each fails open on its own
+        import runctx
+        hpid = runctx.harness_pid()
+        with ThreadPoolExecutor(3) as ex:  # run, memory and skills in parallel; each fails open on its own
+            ex.submit(run_start, runtime, f"{runtime}/vm/{sid}" if sid else runtime, prompt,
+                      channel="machine" if machine_prompt(prompt) else "owner", record_pid=hpid)
             fm = ex.submit(memory_context, prompt, caller, sid)
             fs = ex.submit(skills, "message", prompt, runtime, f"{runtime}/vm/{sid}" if sid else "",
                            previous_turn(ev.get("transcript_path")))
@@ -315,6 +359,8 @@ def claude_code(ev: dict) -> dict | None:
         # dsh runs hooks in a sandbox that reaps detached children: journal synchronously there (~1 s, incremental)
         journal(ev.get("transcript_path"), wait=runtime == "dsh", runtime_flag="--dsh" if runtime == "dsh" else None)
         if sid and name != "SubagentStop":
+            import runctx
+            run_end(runtime, f"{runtime}/vm/{sid}", record_pid=runctx.harness_pid())
             emit("session.ended" if name == "SessionEnd" else "turn.ended", runtime, f"{runtime}/vm/{sid}",
                  {"reason": ev.get("reason")} if name == "SessionEnd" else None)
     return None
@@ -378,6 +424,9 @@ def hermes_skills(ev: dict) -> dict | None:
         if prev_user and prev_asst:
             break
     sid = ev.get("session_id") or ""
+    if sid and msg:
+        turn = sum(1 for m in hist if m.get("role") == "user") or 1
+        run_start("hermes", f"hermes/main/{sid}", msg, dedupe=f"hermes/main/{sid}/{turn}")
     ctx = skills("message", msg, "hermes", f"hermes/main/{sid}" if sid else "",
                  context=f"{prev_user[-400:]}\n{prev_asst[-400:]}".strip(), first_turn=bool(extra.get("is_first_turn")))
     return {"context": ctx} if ctx else None
@@ -391,6 +440,11 @@ def main() -> int:
             if note.get("type") == "agent-turn-complete":
                 journal(None, wait=False, runtime_flag="--codex")
                 # the notify payload has no originator: the session key is completed by walter_logs ("codex/<originator>/<id>")
+                key = f"codex/{note.get('thread-id')}"
+                msgs = note.get("input-messages") or []
+                if run_start("codex", key, msgs[-1] if msgs and isinstance(msgs[-1], str) else "",
+                             dedupe=f"{key}/{note.get('turn-id')}"):
+                    run_end("codex", key)
                 emit("turn.ended", "codex", note.get("thread-id"), {"turn_id": note.get("turn-id"), "cwd": note.get("cwd")})
             return 0
         ev = json.loads(sys.stdin.read() or "{}")
