@@ -960,6 +960,9 @@ Ordered providers of the selected model, media provider routes, service poste id
 
 Do the job on the chosen model — one entry for every runtime (Hermes plugin, walter MCP, the command).
 
+- `default_toolsets()` — 
+- `_memory(action: str, payload: dict)` — Walter Memory's Run Plane through its command (declared interface); never blocks the sub-agent.
+- `_events(goal: str, context: str, result: dict, model: str | None)` — The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write).
 - `decide(conn, spec: dict)` — 
 - `_text(conn, d: dict, spec: dict)` — The router alone owns failover. Preserve the conversation across providers of this model.
 - `_run(conn, spec: dict)` — 
@@ -973,7 +976,7 @@ Bounded native text execution. Provider choice belongs to run.py, transport to l
 - `_schema(name: str, description: str, properties: dict, required: list[str])` — 
 - `tools_for(toolsets: list[str])` — 
 - `execute_tool(name: str, args: dict, remaining: float, workdir: Path | None=None)` — 
-- `run(goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call)` — call(messages, tools, seconds_remaining) handles provider attempts, never tool execution.
+- `run(goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call, gateway: 'Gateway | None'=None)` — call(messages, tools, seconds_remaining) handles provider attempts, never tool execution.
 
 ## store/__init__.py
 
