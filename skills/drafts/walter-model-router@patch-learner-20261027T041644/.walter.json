@@ -1,0 +1,11 @@
+{
+ "base_sha": "ed6ce6392f5b0d5fb9fce5b7377dcc34bdf0f19b409c15946bc6b3f006a3645b",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-27T04:16:44.712269+00:00",
+ "domain": "model-routing",
+ "kind": "patch",
+ "reason": "La session a établi une procédure réutilisable pour une panne partielle de fournisseur : l’API Claude de Kie retournait HTTP 200 sans réponse utile avec l’erreur no_available_account, ce qui déclassait aussi ses médias pourtant disponibles. La séparation des sondes a rétabli Kie pour MiniMax H3, tandis que Seedance restait sur OpenRouter pour son prix. Elle a également révélé deux pièges du guardian : les changements non commités bloquent son intervention et les identifiants pytest paramétrés peuvent contenir des espaces. [session claude_code/vm/9c8cb765-a75b-4d36-abc6-9542c7306c23]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/9c8cb765-a75b-4d36-abc6-9542c7306c23",
+ "target": "walter-model-router"
+}
