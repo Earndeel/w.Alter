@@ -224,7 +224,10 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/named.py | `PROVIDERS` | {"arnict": "arnict", "chatgpt": "codex", "codex": "codex", "flow": "google-flow", "google-flow": "google-flow", "kie": "kie", "kie-codex": "kie", "kie.ai": "kie", "openai-codex": "codex", "openrouter": "openrouter"} |  |
 | serve/named.py | `DEFAULT_TASK` | {"audio": "tts", "chat": "general", "image": "text_to_image", "music": "music", "video": "text_to_video"} |  |
 | serve/run.py | `ALLOWED_TOOLSETS` | ["web", "walter-web", "file", "terminal", "vision", "skills", "code_execution", "memory"] |  |
-| serve/run.py | `DEFAULT_TOOLSETS` | ["web", "walter-web", "file", "terminal"] |  |
+| serve/run.py | `DEFAULT_TOOLSETS` | ["walter-web", "skills", "memory"] |  |
+| serve/run.py | `LEGACY_TOOLSETS` | ["web", "walter-web", "file", "terminal"] |  |
+| serve/run.py | `TOOLSET_TOOLS` | {"memory": ["memory_context", "memory_search", "memory_events"], "skills": ["skills_search", "skill_read"], "walter-web": ["walter_browse"], "web": ["walter_browse"]} |  |
+| serve/run.py | `TOOL_FAMILY_TOOLSETS` | {"research": ["walter-web", "skills"], "weather": ["walter-web"]} | mode "tool" tasks |
 | serve/run.py | `MEDIA` | ["image", "video", "music", "audio"] |  |
 
 ## Variables d’environnement lues ou initialisées
@@ -254,6 +257,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `KIE_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets, pas une clé transmise au modèle. |
 | `OPENROUTER_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
 | `OPENROUTER_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
+| `WALTER_RUN_ID` | serve/run.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
+| `WALTER_RUN_TOOLS` | serve/run.py | get | aucun | legacy = anciens toolsets par défaut de walter_run (web, walter-web, file, terminal) ; sinon capacités Walter via le Tool Gateway. |
+| `WALTER_SESSION_ID` | serve/run.py | get | aucun | Session walter_logs de l'appelant ; parent de la session du sous-agent walter_run. |
 | `WALTER_ROUTER_DATABASE_URL` | store/db.py | get | 'postgresql://hindsight@127.0.0.1:5433/hindsight' | DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée. |
 
 ## Clés des fichiers de configuration livrés

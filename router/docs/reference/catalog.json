@@ -190,7 +190,7 @@
             },
             "toolsets": {
               "default": null,
-              "description": "Groupes d'outils du texte. Terminal/code et fichiers sont natifs ; voir les limites d'exécution.",
+              "description": "Groupes d'outils du texte. Par défaut les capacités Walter (walter-web = walter_browse, skills, memory) via le Tool Gateway ; terminal et fichiers seulement sur demande explicite.",
               "items": {
                 "enum": [
                   "web",
@@ -209,10 +209,9 @@
                 "null"
               ],
               "x-effective-default": [
-                "web",
                 "walter-web",
-                "file",
-                "terminal"
+                "skills",
+                "memory"
               ],
               "x-note": "MCP omet la liste vide ; elle ne désactive donc pas les outils via ce transport."
             }
@@ -8445,6 +8444,21 @@
         "functions": [
           {
             "description": "",
+            "name": "default_toolsets",
+            "signature": ""
+          },
+          {
+            "description": "Walter Memory's Run Plane through its command (declared interface); never blocks the sub-agent.",
+            "name": "_memory",
+            "signature": "action: str, payload: dict"
+          },
+          {
+            "description": "The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write).",
+            "name": "_events",
+            "signature": "goal: str, context: str, result: dict, model: str | None"
+          },
+          {
+            "description": "",
             "name": "decide",
             "signature": "conn, spec: dict"
           },
@@ -8492,7 +8506,7 @@
           {
             "description": "call(messages, tools, seconds_remaining) handles provider attempts, never tool execution.",
             "name": "run",
-            "signature": "goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call"
+            "signature": "goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call, gateway: 'Gateway | None'=None"
           }
         ]
       },
@@ -15894,11 +15908,57 @@
         "file": "serve/run.py",
         "name": "DEFAULT_TOOLSETS",
         "value": [
+          "walter-web",
+          "skills",
+          "memory"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "serve/run.py",
+        "name": "LEGACY_TOOLSETS",
+        "value": [
           "web",
           "walter-web",
           "file",
           "terminal"
         ]
+      },
+      {
+        "comment": "",
+        "file": "serve/run.py",
+        "name": "TOOLSET_TOOLS",
+        "value": {
+          "memory": [
+            "memory_context",
+            "memory_search",
+            "memory_events"
+          ],
+          "skills": [
+            "skills_search",
+            "skill_read"
+          ],
+          "walter-web": [
+            "walter_browse"
+          ],
+          "web": [
+            "walter_browse"
+          ]
+        }
+      },
+      {
+        "comment": "mode \"tool\" tasks",
+        "file": "serve/run.py",
+        "name": "TOOL_FAMILY_TOOLSETS",
+        "value": {
+          "research": [
+            "walter-web",
+            "skills"
+          ],
+          "weather": [
+            "walter-web"
+          ]
+        }
       },
       {
         "comment": "",
@@ -16075,6 +16135,27 @@
         "operation": "env_value"
       },
       {
+        "default_expression": "aucun",
+        "description": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
+        "file": "serve/run.py",
+        "name": "WALTER_RUN_ID",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "legacy = anciens toolsets par défaut de walter_run (web, walter-web, file, terminal) ; sinon capacités Walter via le Tool Gateway.",
+        "file": "serve/run.py",
+        "name": "WALTER_RUN_TOOLS",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "Session walter_logs de l'appelant ; parent de la session du sous-agent walter_run.",
+        "file": "serve/run.py",
+        "name": "WALTER_SESSION_ID",
+        "operation": "get"
+      },
+      {
         "default_expression": "'postgresql://hindsight@127.0.0.1:5433/hindsight'",
         "description": "DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée.",
         "file": "store/db.py",
@@ -16100,6 +16181,8 @@
       "WALTER_ROUTER_CLI",
       "WALTER_ROUTER_DATABASE_URL",
       "WALTER_RUN_ID",
+      "WALTER_RUN_TOOLS",
+      "WALTER_SESSION_ID",
       "WALTER_TASK_ID"
     ]
   },
@@ -16182,7 +16265,7 @@
     "config/providers.json": "ea7f381395589799ef723a1a4e93540d4a3b4bc08549a42207a22857940be430",
     "config/subscriptions.json": "d2e56aa07e15344a1986746b1f8608842873639f5d37788e37e9896d6ba67017",
     "contracts/router.json": "d52d10e173e0b31bdeca9716e1a88dc203bb7cf614b523b985bcf7648fb178f8",
-    "documentation.py": "73220d30d363aef887069deb3d3efb00fb40098af9eb5659cde86ce62cee8267",
+    "documentation.py": "ac9e282ab66a242c1f3c167652192e310d83b1e86a2a2e98c7970bd69b0ddb5f",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "95e2b17fc987f7bbe2d4d6dea98b25dc1af2aee919f98539ddb6781494eeb17e",
@@ -16249,7 +16332,7 @@
     "research/web.py": "71e3bf9073480552ab10f369cc69ca3f0e462027b2bf0829a7c02e13353276ca",
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
     "serve/agent_view.py": "144454b28cfc6ba0cf8678aa072a38f9c0fe857eab59cd66fbd676414a461367",
-    "serve/api.py": "a457147d23cf995c1144150f98d74cbb30b2cdb1b535974e3221903ae8252157",
+    "serve/api.py": "2f0d6e3b79cf8e4b91bd661408211fe31bc2058b8a2fe1901d920c854994d1a1",
     "serve/brief.py": "33ca79121e190834adabe6fbc573b408ef84d4cf29a93736cf4f8de48275c3ab",
     "serve/choose.py": "e8894e22b18bc0d87f30878bd1a6a75f216090cd64bd5a9f91ab27bb76dfa6ea",
     "serve/execution.py": "2d3ee5396c416d4ee08aad13bedb5a1bb3ea0c36af5a0f432f0786eeec5988c3",
@@ -16259,8 +16342,8 @@
     "serve/named.py": "9faaa5031f319ffef3f708b2de78a3b96fd2c2d8c1c010ff7bc2e44afb38d264",
     "serve/oneshot.py": "12239c7c99038605afeb49f40264dc08b84975ffef4f9f0f54e1f842f45b85ae",
     "serve/routes.py": "492e8e75f102e42856bcd66f612dfe7b30cc21c14c8776aeb352d9d2e7e420fb",
-    "serve/run.py": "6af6419a147018f3e7f6351355c71f96ebfb583f57eb941444fb183b071aea71",
-    "serve/text_agent.py": "c6b8ecdc4b375c3f07f2b681276ede9ac6f094ea2d2c9b30d4835ecb92747860",
+    "serve/run.py": "0ad1513a4ef075fec31760740aea67b56d250ef0f6ec9c1f10f3febd50c8c42b",
+    "serve/text_agent.py": "4e910f3619c717895c9970d78178766d8b7c6f3c56a1c8313374a50d93e9a705",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
     "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",
     "store/migrations/001_models.sql": "dfdcb4be9930086cbdc935eb7cffe07f6705cb1562169c162f74f7b2205dcc37",

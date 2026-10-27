@@ -10,14 +10,61 @@ Text execution is native to the router. Only providers of the selected model are
 """
 from __future__ import annotations
 
+import json
+import os
+import subprocess
 import time
+import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from walter_router.serve import choose, execution, media_exec, named, routes
 
 ALLOWED_TOOLSETS = ("web", "walter-web", "file", "terminal", "vision", "skills", "code_execution", "memory")
-DEFAULT_TOOLSETS = ["web", "walter-web", "file", "terminal"]
+# P1 (2026-10-27): a sub-agent works with Walter's capabilities by default, through the Tool Gateway; the root
+# terminal and file writes are opt-in. WALTER_RUN_TOOLS=legacy restores the former default.
+DEFAULT_TOOLSETS = ["walter-web", "skills", "memory"]
+LEGACY_TOOLSETS = ["web", "walter-web", "file", "terminal"]
+TOOLSET_TOOLS = {"web": ["walter_browse"], "walter-web": ["walter_browse"],
+                 "memory": ["memory_context", "memory_search", "memory_events"],
+                 "skills": ["skills_search", "skill_read"]}
+TOOL_FAMILY_TOOLSETS = {"research": ["walter-web", "skills"], "weather": ["walter-web"]}  # mode "tool" tasks
 MEDIA = ("image", "video", "music", "audio")
+
+
+def default_toolsets() -> list[str]:
+    return list(LEGACY_TOOLSETS if os.environ.get("WALTER_RUN_TOOLS") == "legacy" else DEFAULT_TOOLSETS)
+
+
+def _memory(action: str, payload: dict) -> dict:
+    """Walter Memory's Run Plane through its command (declared interface); never blocks the sub-agent."""
+    try:
+        out = subprocess.run(["walter-memory", "runs", action], input=json.dumps(payload, default=str),
+                             capture_output=True, text=True, timeout=60)
+        return json.loads(out.stdout) if out.returncode == 0 else {}
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return {}
+
+
+def _events(goal: str, context: str, result: dict, model: str | None) -> list[dict]:
+    """The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write)."""
+    now = lambda t=None: datetime.fromtimestamp(t or time.time(), timezone.utc).isoformat()
+    evs = [{"type": "user/message", "text": goal + ("\n\nContext:\n" + context if context else "")}]
+    for i, t in enumerate(result.get("tools") or []):
+        cid = f"call-{i}"
+        evs.append({"type": "tool/call", "tool": t.get("name"), "call_id": cid, "at": now(t.get("at")),
+                    "text": json.dumps(t.get("arguments"), ensure_ascii=False, default=str)[:20000]})
+        evs.append({"type": "tool/result", "tool": t.get("name"), "call_id": cid, "at": now(t.get("at")),
+                    "status": "ok" if t.get("ok") else "error",
+                    "text": json.dumps(t.get("result"), ensure_ascii=False, default=str)[:20000]})
+    if result.get("output"):
+        evs.append({"type": "assistant/message", "text": result["output"], "model": model})
+    else:
+        evs.append({"type": "system/message", "text": f"run ended: {result.get('error')}"})
+    stamp = now()
+    for e in evs:
+        e.setdefault("at", stamp)
+    return evs
 
 
 def decide(conn, spec: dict) -> dict:
@@ -37,7 +84,7 @@ def _text(conn, d: dict, spec: dict) -> dict:
     started = time.monotonic()
     budget = max(60, min(int(spec.get("budget_seconds") or 900), 3600))
     deadline = started + budget
-    toolsets = spec.get("toolsets") if spec.get("toolsets") is not None else DEFAULT_TOOLSETS
+    toolsets = spec.get("toolsets") if spec.get("toolsets") is not None else default_toolsets()
     unknown = set(toolsets) - set(ALLOWED_TOOLSETS)
     if unknown:
         return {"ok": False, "error": "unsupported_toolsets", "toolsets": sorted(unknown)}
@@ -86,18 +133,51 @@ def _text(conn, d: dict, spec: dict) -> dict:
                 notices.append(notice)
         raise RuntimeError("all_providers_failed")
 
+    # Walter Run Plane: inside a run, this execution is a task with its own walter_logs session.
+    run_id = os.environ.get("WALTER_RUN_ID")
+    task_id = session_id = None
+    if run_id:
+        task_id = str(uuid.uuid4())
+        session_id = f"walter-router/{task_id}"
+        os.environ["WALTER_TASK_ID"] = task_id          # read by execution.log and passed to the Tool Gateway
+        _memory("task-start", {"run_id": run_id, "task_id": task_id, "kind": "walter_run", "goal": spec["goal"],
+                               "session_id": session_id,
+                               "spec": {k: spec.get(k) for k in ("task", "level", "max_turns", "budget_seconds")} |
+                                       {"toolsets": list(toolsets), "requested_task": d.get("requested_task")}})
+    walter_tools = sorted({t for ts in toolsets for t in TOOLSET_TOOLS.get(ts, [])})
+    gateway = None
     try:
-        result = text_agent.run(spec["goal"], spec.get("context") or "", list(toolsets), max_turns, deadline, call)
+        if walter_tools:
+            gateway = text_agent.Gateway(walter_tools)
+        result = text_agent.run(spec["goal"], spec.get("context") or "", list(toolsets), max_turns, deadline, call,
+                                gateway=gateway)
     except (RuntimeError, OSError, ValueError, KeyError) as exc:
         result = {"ok": False, "error": str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__}
+    finally:
+        if gateway:
+            gateway.close()
     route = state["route"]
+    if run_id:
+        _memory("task-end", {"run_id": run_id, "task_id": task_id, "session_id": session_id, "goal": spec["goal"],
+                             "parent_session_id": os.environ.get("WALTER_SESSION_ID"),
+                             "model": route["model"] if route else None,
+                             "events": _events(spec["goal"], spec.get("context") or "", result,
+                                               route["model"] if route else None),
+                             "status": "ended" if result.get("ok") else "failed",
+                             "routing": {"task": d.get("requested_task") or d.get("task"), "executed_as": d.get("task"),
+                                         "model_id": d.get("model_id"), "provider": route["provider"] if route else None,
+                                         "applied": True},
+                             "result": {"ok": result.get("ok"), "error": result.get("error"),
+                                        "tools": len(result.get("tools") or []),
+                                        "seconds": round(time.monotonic() - started, 1)}})
     user_notice = "\n".join(n["message"] for n in notices)
     if not result["ok"]:
         failure = (f"Aucun fournisseur n'a pu exécuter {d['model_id']}. Aucun autre modèle n'a été utilisé."
                    if result.get("error") == "all_providers_failed" else
                    f"L'exécution de {d['model_id']} a échoué : {result.get('error')}.")
         user_notice = "\n".join(filter(None, (user_notice, failure)))
-    return {**result, "kind": "text", "runtime": "walter-router", "notices": notices,
+    return {**result, "kind": "text", "runtime": "walter-router", "notices": notices, "run_id": run_id,
+            "task_id": task_id, "trace_session": session_id,
             "user_notification_required": bool(user_notice), "user_notice": user_notice,
             "routed": {"task": d.get("task"), "model_id": d.get("model_id"),
                        "model": route["model"] if route else None,
@@ -113,6 +193,14 @@ def _run(conn, spec: dict) -> dict[str, Any]:
     d = decide(conn, spec)
     if d.get("mode") == "none" or d.get("error"):
         return {"ok": False, "error": d.get("error") or d.get("why") or "no model", "decision": d}
+    if d.get("mode") == "tool" and spec.get("goal"):
+        # A task answered by a tool (research, weather…): a sub-agent on the general tier holding that tool.
+        family = d.get("tool") or d.get("task")
+        spec = {**spec, "toolsets": spec["toolsets"] if spec.get("toolsets") is not None
+                else TOOL_FAMILY_TOOLSETS.get(family, default_toolsets())}
+        d = {**decide(conn, {**spec, "task": "general", "level": spec.get("level") or "L2"}), "requested_task": family}
+        if d.get("mode") == "none" or d.get("error"):
+            return {"ok": False, "error": d.get("error") or "no model", "decision": d}
     t = conn.execute("select interface from models.tasks where task = %s", (d.get("task"),)).fetchone()
     if t and t["interface"] in MEDIA:
         is_named = d.get("source") == "named"

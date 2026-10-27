@@ -41,6 +41,46 @@ def _schema(name: str, description: str, properties: dict, required: list[str]) 
                            "additionalProperties": False}}}
 
 
+class Gateway:
+    """Walter's capabilities through the Tool Gateway (`walter-tools serve`, walter-core's declared command): one
+    process per run, line-delimited JSON, an allow-list fixed at start. The run's environment (WALTER_RUN_ID,
+    WALTER_TASK_ID) reaches the modules through it."""
+
+    def __init__(self, allow: list[str]):
+        self.proc = subprocess.Popen(["walter-tools", "serve", "--allow", ",".join(allow)], stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1,
+                                     env={**os.environ, "WALTER_CLIENT_TAG": "walter-run"}, start_new_session=True)
+        self.tools = self._ask({"op": "list"}, 60).get("tools") or []
+
+    def _ask(self, req: dict, timeout: float) -> dict:
+        import select
+        self.proc.stdin.write(json.dumps(req) + "\n"); self.proc.stdin.flush()
+        ready, _, _ = select.select([self.proc.stdout], [], [], max(1.0, timeout))
+        if not ready:
+            raise RuntimeError("tool_gateway_timeout")
+        line = self.proc.stdout.readline()
+        if not line:
+            raise RuntimeError("tool_gateway_closed")
+        return json.loads(line)
+
+    def schemas(self) -> list[dict]:
+        return [{"type": "function", "function": {"name": t["name"], "description": t["description"][:1200],
+                 "parameters": t.get("input_schema") or {"type": "object", "properties": {}}}} for t in self.tools]
+
+    def call(self, name: str, args: dict, remaining: float) -> dict:
+        out = self._ask({"op": "call", "name": name, "arguments": args}, remaining)
+        result = out.get("result")
+        if not out.get("ok"):
+            return {"error": out.get("error") or "tool_failed", "result": result}
+        return result if isinstance(result, dict) else {"result": result}
+
+    def close(self) -> None:
+        try:
+            self.proc.stdin.close(); self.proc.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            os.killpg(self.proc.pid, signal.SIGKILL)
+
+
 def tools_for(toolsets: list[str]) -> list[dict]:
     tools = []
     # Walter's web, skills and memory commands are available through the terminal.
@@ -83,10 +123,12 @@ def execute_tool(name: str, args: dict, remaining: float, workdir: Path | None =
     raise ValueError("unknown_tool")
 
 
-def run(goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call) -> dict:
+def run(goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call,
+        gateway: "Gateway | None" = None) -> dict:
     """call(messages, tools, seconds_remaining) handles provider attempts, never tool execution."""
-    tools = tools_for(toolsets)
+    tools = tools_for(toolsets) + (gateway.schemas() if gateway else [])
     allowed = {t["function"]["name"] for t in tools}
+    walter_tools = {t["name"] for t in gateway.tools} if gateway else set()
     workdir = instance.state_file("runs") / uuid.uuid4().hex
     workdir.mkdir(parents=True, mode=0o700)
     messages = [{"role": "system", "content": "Follow the user's task and constraints. Use tools when needed and "
@@ -118,10 +160,11 @@ def run(goal: str, context: str, toolsets: list[str], max_turns: int, deadline: 
                 args = json.loads(tool["function"].get("arguments") or "{}")
                 if not isinstance(args, dict):
                     raise ValueError("invalid_tool_arguments")
-                result = execute_tool(name, args, deadline - time.monotonic(), workdir)
-            except (OSError, ValueError, TypeError, KeyError) as exc:
-                result = {"error": type(exc).__name__}
-            trace.append({"name": name, "arguments": args, "result": result,
+                result = (gateway.call(name, args, deadline - time.monotonic()) if name in walter_tools
+                          else execute_tool(name, args, deadline - time.monotonic(), workdir))
+            except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+                result = {"error": str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__}
+            trace.append({"name": name, "arguments": args, "result": result, "at": time.time(),
                           "ok": not result.get("error") and result.get("exit_code", 0) == 0})
             messages.append({"role": "tool", "tool_call_id": tool["id"], "content": json.dumps(result)})
     return {"ok": False, "error": "max_turns_exhausted", "tools": trace}
