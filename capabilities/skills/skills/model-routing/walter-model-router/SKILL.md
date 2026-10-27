@@ -182,3 +182,13 @@ After changing the instance's gateway configuration, restart `walter-llm`; do no
 - Vérifier le comportement avec `cd /walter/router` puis `venv/bin/python -m pytest -q -p no:cacheprovider tests/test_media_exec.py`. Contrôler aussi le fournisseur réellement choisi : une sonde médias saine rend Kie éligible, mais le prix peut toujours favoriser OpenRouter.
 - Après les corrections et leurs commits, lancer `walter-router-guardian run --no-agent --no-notify`, puis `walter-router-guardian status` pour vérifier les incidents sans déclencher de réparation par agent ni de notification.
 - Si le guardian analyse les sorties pytest, préserver les identifiants paramétrés contenant des espaces : utiliser une capture de l’identifiant complet, pas `\S+`.
+
+## Vérifier un cycle de 48 h sans élargir les corrections
+
+1. Lire `walter-router review`, `walter-router health`, `walter-router alias-list` et, pour les tâches concernées, `walter-router dossier <tâche>`. Consulter `docs/TIERS.md` et `config/knowledge.json` sous la racine obtenue par `walter path router` pour interpréter les niveaux calculés et déclarés.
+2. Séparer les alertes créées pendant le cycle du stock historique obtenu par `walter-router alerts --all`. Ne pas présenter le nombre total d’alertes `unranked` ouvertes comme le nombre de nouveaux modèles du cycle.
+3. Lire les détails de santé : un HTTP 200 accompagné de `no_available_account` indique une indisponibilité fonctionnelle. Distinguer les providers exposés séparément dans le résultat. Une source renvoyant HTTP 500 avec zéro tableau parsé ne prouve pas un changement de structure de page ; signaler l’erreur et la fraîcheur des données.
+4. Vérifier chaque rapprochement avec une source officielle et les alias déjà enregistrés. Conserver les différences de version, date, modalité et variante : une ressemblance de nom ne suffit pas à établir l’identité. Si la preuve manque, laisser le candidat sans alias.
+5. Pour une identité certaine absente de la liste, utiliser exclusivement `walter-router alias-add <key> <model_id> --reason '<preuve et référence officielle>'`. Vérifier ensuite avec `walter-router alias-list` et `walter-router review`. Ne modifier ni SQL, ni configuration, ni fichier d’alias directement. Un cycle sans nouvel alias est un résultat valide.
+6. Si `web_extract` signale que Brave Free ne permet que la recherche, ne pas répéter la même extraction ni changer la configuration pendant cette analyse. Employer une capacité d’extraction autorisée déjà disponible ou conserver explicitement l’incertitude.
+7. Pour une variation de prix, calculer `(nouveau - ancien) / ancien * 100` et préciser le sens de la variation. Exemple : 0,239 → 0,200 correspond à une baisse de 16,32 %.
