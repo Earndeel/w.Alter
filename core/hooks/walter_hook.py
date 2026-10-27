@@ -258,6 +258,9 @@ def run_start(runtime: str, session_key: str, prompt: str, *, channel: str = "ow
                             goal=prompt, privacy_class="local_only" if secret else "cloud_allowed", dedupe_key=dedupe)
         if record_pid:
             runctx.record(record_pid, run_id, session_key, runtime)
+        if int(time.time() * 1000) % 50 == 0:          # now and then: close runs that never got an end
+            runs.safe(runs.sweep)
+            runctx.sweep()
         return run_id
     except Exception as e:  # noqa: BLE001 — fail-open
         log(f"run start failed {type(e).__name__}: {str(e)[:160]}")

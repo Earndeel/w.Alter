@@ -73,7 +73,7 @@ def step_router(step: dict, env: dict) -> dict:
     except ValueError:
         return {"ok": False, "error": (out.stderr or out.stdout)[-300:]}
     return {"ok": res.get("ok"), "error": res.get("error"), "task_id": res.get("task_id"),
-            "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("answer") or res.get("text") or "")[:400]}
+            "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("output") or res.get("answer") or "")[:400]}
 
 
 async def _mcp(tool: str, arguments: dict, env: dict) -> dict:
@@ -95,7 +95,7 @@ async def _mcp(tool: str, arguments: dict, env: dict) -> dict:
 def step_mcp(step: dict, env: dict) -> dict:
     res = asyncio.run(_mcp(step["tool"], step.get("arguments") or {}, env))
     return {"ok": res.get("ok"), "error": res.get("error"), "task_id": res.get("task_id"),
-            "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("answer") or res.get("raw") or "")[:600]}
+            "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("output") or res.get("answer") or res.get("raw") or "")[:600]}
 
 
 def _get(data, path: str):

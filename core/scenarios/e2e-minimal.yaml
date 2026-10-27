@@ -1,14 +1,27 @@
-# Walter end-to-end minimal scenario (P0, 2026-10-27) — enriched at each milestone (P1: sub-agent + walter_browse).
-# Plays a request through the real hook adapter, a routed model call carrying the run, then the end of the turn;
-# asserts on what the tables recorded.
+# Walter end-to-end minimal scenario — enriched at each milestone (P0 2026-10-27: run; P1: routed sub-agent + Browse).
+# Plays a request through the real hook adapter and the real walter-core MCP server (the Claude Code path: the server
+# finds the run through its parent's record), then asserts on what the tables recorded.
 name: e2e-minimal
-milestone: P0
+milestone: P1
 steps:
-  - hook: {event: UserPromptSubmit, prompt: "Scénario e2e-minimal : réponds OK."}
-  - router: {goal: "Réponds uniquement par le mot OK.", task: general, level: L1, toolsets: [], max_turns: 1, budget_seconds: 60}
+  - hook: {event: UserPromptSubmit, prompt: "Scénario e2e-minimal : offres de café glacé 7-Eleven en Thaïlande."}
+  - mcp:
+      tool: walter_run
+      arguments:
+        request: "Recherche web : prix de cafés glacés All Café (7-Eleven Thaïlande)."
+        goal: >-
+          Trouve 2 offres réelles de café glacé All Café vendues par 7-Eleven en Thaïlande. Utilise walter_browse
+          (recherche puis lecture des pages). Pour chaque offre : produit, prix en THB, volume si visible, URL source.
+          N'invente rien : écris "inconnu" si une valeur manque. Réponds en JSON {"offers": [...]} uniquement.
+        task: research
+        level: L2
+        max_turns: 12
+        budget_seconds: 300
   - hook: {event: Stop}
 assertions:
   - {path: run.status, equals: ended}
   - {path: "links[*].kind", contains: session}
+  - {path: tasks, min_len: 1}
+  - {path: "tasks[*].kind", contains: walter_run}
   - {path: model_calls, min_len: 1}
-  - {path: "model_calls[*].ok", all: true}
+  - {tool_called: walter_browse}
