@@ -477,6 +477,8 @@ Every routed execution attempt (walter_run, generate, walter-llm): provider, mod
 | `cost_usd` | real | True | — | Coût USD connu ; NULL signifie inconnu, pas gratuit. |
 | `fallback_for` | text | True | — | Référence historique du modèle remplacé ; aucune substitution automatique dans le texte actuel. |
 | `kind` | text | False | 'text'::text | Catégorie du fait, de l'alerte ou de l'exécution. |
+| `run_id` | uuid | True | — | Walter run (runs.runs.run_id) this execution served, from WALTER_RUN_ID; null outside a run. |
+| `task_id` | uuid | True | — | Sub-agent task (runs.tasks.task_id) this execution served (walter_run); null otherwise. |
 
 constraints :
 
@@ -489,6 +491,7 @@ indexes :
 ```sql
 CREATE UNIQUE INDEX exec_log_pkey ON models.exec_log USING btree (exec_id)
 CREATE INDEX exec_log_recent ON models.exec_log USING btree (provider, model_id, at DESC)
+CREATE INDEX exec_log_run ON models.exec_log USING btree (run_id) WHERE (run_id IS NOT NULL)
 ```
 
 ## models.feedback (table)

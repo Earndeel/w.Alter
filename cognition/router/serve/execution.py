@@ -6,8 +6,10 @@ runs the first route with `hermes chat --oneshot --provider P -m M` and falls ba
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
+import uuid
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -159,12 +161,23 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
     return out
 
 
+def _uuid(value) -> str | None:
+    try:
+        return str(uuid.UUID(str(value))) if value else None
+    except ValueError:
+        return None
+
+
 def log(conn, entry: dict) -> int:
     """One routed execution attempt (from the Hermes plugin or the media executor)."""
-    keys = ("task", "role", "model_id", "provider", "model", "ok", "skipped", "seconds", "cost_usd", "fallback_for", "kind")
+    keys = ("task", "role", "model_id", "provider", "model", "ok", "skipped", "seconds", "cost_usd", "fallback_for", "kind",
+            "run_id", "task_id")
     row = {k: entry.get(k) for k in keys}
     row["ok"] = bool(row["ok"])
     row["kind"] = row["kind"] or "text"
+    # Walter Run Plane: the caller's run and sub-agent task travel as WALTER_RUN_ID / WALTER_TASK_ID.
+    row["run_id"] = _uuid(row["run_id"] or os.environ.get("WALTER_RUN_ID"))
+    row["task_id"] = _uuid(row["task_id"] or os.environ.get("WALTER_TASK_ID"))
     return conn.execute(f"""insert into models.exec_log ({", ".join(keys)}) values ({", ".join(["%s"] * len(keys))})
                             returning exec_id""", [row[k] for k in keys]).fetchone()["exec_id"]
 
