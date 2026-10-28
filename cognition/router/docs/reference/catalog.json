@@ -7233,6 +7233,11 @@
             "signature": "value"
           },
           {
+            "description": "Accept DSH's native session-UUID and bare UUID forms, preserving exact local identity.",
+            "name": "_dsh_session",
+            "signature": "value"
+          },
+          {
             "description": "The public metadata-only lookup; no database import or global most-recent-run guess.",
             "name": "_session_run",
             "signature": "session: str"
@@ -16478,7 +16483,7 @@
     "llm/claude_subscription.py": "96b53a70d801791fdb8a1cead6695a60469e1295dd86c019a76f141d4397cc89",
     "llm/config/gateway.json": "8220ddfa6a365a83e43a772fbcf0e07aa142209f7f985a9d19f34d127f41c19b",
     "llm/contracts/llm.json": "17a51a635cfd54e506593c5be38b0aaa2a847f9646ee56f77e075df79dcd589d",
-    "llm/gateway.py": "5d7abd02382aab861a7fdd51edbc999f3b2fb403c785b28f34c9a60092d954f1",
+    "llm/gateway.py": "0148ca7977a6a0d739a5341bde6f554022960ef57587e5d09a1d8ec1822a85d4",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",

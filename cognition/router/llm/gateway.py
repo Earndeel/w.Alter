@@ -355,6 +355,18 @@ def _uuid(value) -> str | None:
         raise ValueError("invalid correlation identifier") from None
 
 
+def _dsh_session(value) -> str | None:
+    """Accept DSH's native session-UUID and bare UUID forms, preserving exact local identity."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("invalid session identifier")
+    _uuid(value.removeprefix("session-"))
+    if not value:
+        raise ValueError("invalid session identifier")
+    return value
+
+
 def _session_run(session: str) -> dict:
     """The public metadata-only lookup; no database import or global most-recent-run guess."""
     try:
@@ -401,7 +413,7 @@ async def _correlation(request, body: dict, agent: str) -> dict:
             out["run_id"] = checked(row, out["run_id"])
             out["correlation_status"] = "resolved"
         if agent == "dsh":
-            session_id = _uuid(body.pop("prompt_cache_key", None))
+            session_id = _dsh_session(body.pop("prompt_cache_key", None))
             body.pop("prompt_cache_retention", None)
             if session_id:
                 session = "dsh/vm/" + session_id

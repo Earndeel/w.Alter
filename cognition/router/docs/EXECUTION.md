@@ -144,7 +144,7 @@ La route `claude-pro` est exécutée dans la passerelle du Router, avec les mess
 
 La passerelle corrèle chaque requête avec son run ouvert dans Memory, sans variable de session globale.
 `X-Walter-Run-Id` et `X-Walter-Task-Id` sont des UUID locaux ; le run est vérifié par la CLI publique.
-DSH transmet son UUID de session par les options publiques pi-ai de cache ; la passerelle l’enlève avant
+DSH transmet son identifiant natif de session (`session-UUID`, ou UUID) par les options publiques pi-ai de cache ; la passerelle l’enlève avant
 le transport fournisseur et cherche un run ouvert unique. Une session ambiguë ou indisponible est refusée.
 Les classes `local_only` et `redacted_cloud` sont refusées pour ces contextes identifiés : cette passerelle
 ne possède pas d’étape de pseudonymisation. Cette vérification ne certifie pas la confidentialité des anciens

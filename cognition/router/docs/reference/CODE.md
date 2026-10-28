@@ -494,6 +494,7 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_number(value)` — A finite nonnegative measurement, or unknown when missing or malformed.
 - `_telemetry(resp)` — Vendor-reported cost and transport estimate stay distinguishable; absence is never zero.
 - `_uuid(value)` — Validate a local correlation identifier without echoing its supplied value.
+- `_dsh_session(value)` — Accept DSH's native session-UUID and bare UUID forms, preserving exact local identity.
 - `_session_run(session: str)` — The public metadata-only lookup; no database import or global most-recent-run guess.
 - `_run_metadata(run_id: str)` — Validate explicit request correlation through Memory's metadata-only public CLI.
 - `_correlation(request, body: dict, agent: str)` — Request-local transport metadata. DSH's public pi-ai cache key carries its native session identity only
