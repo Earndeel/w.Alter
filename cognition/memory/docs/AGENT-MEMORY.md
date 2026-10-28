@@ -17,3 +17,11 @@ Example request, sent on stdin (never put personal content in command arguments)
 Tests `tests/test_agent_memory.py` simulate model calls. A live CLI read validated the real Router task and canonical search path without sending model requests or printing retrieved contents. Retention and reflection writes/model calls were not exercised against live user data.
 
 Known scope: long-running MCP processes must be reconnected/restarted to load updated adapters. Hermes' existing Hindsight provider and voice layer are separate integrations; this facade does not claim they have been migrated. Detection/policy classification remains the source of privacy truth; it cannot retrospectively prove that all historical rows were classified perfectly.
+
+
+## Curated document provenance
+
+Curated instance documents enter the knowledge lane through canonical `document.section` occurrences. Their
+availability, explicit removal, revision/idempotence rules and privacy checks are documented in
+[DOCUMENTS.md](DOCUMENTS.md). An unavailable source retains its previous knowledge; returning to an older text
+creates a fresh canonical occurrence when its former evidence was retracted. Historical retractions remain intact.

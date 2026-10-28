@@ -198,7 +198,7 @@ def show(run_id: str) -> dict[str, Any] | None:
             return None
         tasks = conn.execute("select * from runs.tasks where run_id = %s order by started_at", (run_id,)).fetchall()
         links = conn.execute("select kind, ref, at from runs.links where run_id = %s order by at", (run_id,)).fetchall()
-        calls = conn.execute("""select task, model_id, provider, ok, seconds, cost_usd, task_id from models.exec_log
+        calls = conn.execute("""select task, model_id, provider, ok, seconds, cost_usd, task_id, usage, cost_status from models.exec_log
                                 where run_id = %s order by at""", (run_id,)).fetchall() if _has_exec_run(conn) else []
         children = conn.execute("select run_id, status, goal from runs.runs where parent_run_id = %s", (run_id,)).fetchall()
     return {"run": run, "tasks": tasks, "links": links, "model_calls": calls, "children": children}

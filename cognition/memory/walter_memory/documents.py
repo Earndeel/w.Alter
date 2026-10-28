@@ -17,6 +17,7 @@ retracted and their chunks hidden, so the knowledge lane holds only the current 
 from __future__ import annotations
 
 import glob
+import fnmatch
 import hashlib
 import json
 import os
@@ -32,19 +33,41 @@ from .events import record_events
 
 KIND = "doc_section"
 PROCESSOR = "documents"
-VERSION = 1
+VERSION = 2
 DATED = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 FRONT = re.compile(r"\A---\n.*?\n---\n", re.S)
 MAX_CHARS = 12000
 
 
+class DocumentsUnavailable(RuntimeError):
+    """A source could not be inspected; this is never evidence of an intentional removal."""
+
+
 def config() -> list[dict]:
     try:
         path = subprocess.run(["walter", "instance", "config", "memory", "documents.toml"], capture_output=True,
-                              text=True, timeout=20).stdout.strip()
-        return tomllib.loads(Path(path).read_text()).get("source", []) if path else []
-    except (OSError, ValueError, subprocess.SubprocessError):
-        return []
+                              text=True, timeout=20, check=True).stdout.strip()
+        if not path:
+            raise ValueError("instance returned no document configuration path")
+        sources = tomllib.loads(Path(path).read_text())["source"]
+        if not isinstance(sources, list):
+            raise ValueError("source must be a list (source = [] intentionally removes all sources)")
+        names = set()
+        for src in sources:
+            if (not isinstance(src, dict) or any(not isinstance(src.get(k), str) or not src[k].strip()
+                                                 for k in ("name", "path"))):
+                raise ValueError("each source needs a non-empty name and path")
+            if src["name"] in names:
+                raise ValueError("source names must be unique")
+            names.add(src["name"])
+            if src.get("split", "h2") not in ("file", "h2") or src.get("privacy", "cloud_allowed") not in privacy.ORDER:
+                raise ValueError("invalid source split or privacy class")
+            excluded = src.get("exclude", [])
+            if not isinstance(excluded, list) or any(not isinstance(name, str) for name in excluded):
+                raise ValueError("exclude must be a list of file names")
+        return sources
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+        raise DocumentsUnavailable("document configuration unavailable or invalid; existing knowledge retained") from exc
 
 
 def sections(path: str, split: str) -> list[dict]:
@@ -80,35 +103,80 @@ def sections(path: str, split: str) -> list[dict]:
 
 
 def sync(dry_run: bool = False) -> dict:
+    return _sync(config(), dry_run=dry_run)
+
+
+def _sync(sources: list[dict], *, dry_run: bool = False) -> dict:
     stats = {"sources": 0, "sections": 0, "new": 0, "changed": 0, "unchanged": 0, "removed": 0, "skipped_secret": 0}
     with connect() as conn:
-        current = {r["k"]: r for r in conn.execute(
-            """select item_id, attributes->>'doc_key' k, attributes->>'sha' sha, source_event_ids from core.derived_items
-               where kind = %s and status = 'derived'""", (KIND,)).fetchall()}
+        # Revisions and their projections commit together. Serialize syncs so parallel index passes cannot
+        # allocate the same next revision or create two current rows for one section.
+        conn.execute("select pg_advisory_xact_lock(hashtext(%s))", ("walter-memory.documents",))
+        history = conn.execute(
+            """select item_id, attributes->>'doc_key' k, attributes->>'sha' sha, source_event_ids,
+                      attributes->>'source' source, attributes->>'path' path,
+                      attributes->>'revision' revision, status, privacy_class from core.derived_items
+               where kind = %s""", (KIND,)).fetchall()
+        current = {r["k"]: r for r in history if r["status"] == "derived"}
+        revisions = {}
+        by_key = {}
+        for row in history:
+            revisions[row["k"]] = max(revisions.get(row["k"], 0), int(row["revision"] or 1))
+            by_key.setdefault(row["k"], []).append(row)
+        evidence = _evidence(conn, history)
         live = set()
-        for src in config():
+        policy_classes = {}
+        for src in sources:
             stats["sources"] += 1
             files = sorted(glob.glob(src["path"])) if any(c in src["path"] for c in "*?[") else [src["path"]]
+            for old in current.values():
+                if (old["source"] == src["name"] and fnmatch.fnmatchcase(old["path"], src["path"])
+                        and os.path.basename(old["path"]) not in src.get("exclude", []) and old["path"] not in files):
+                    raise DocumentsUnavailable("a previously indexed document is unavailable; use exclude for removal")
             for f in files:
-                if not os.path.isfile(f) or os.path.basename(f) in src.get("exclude", []):
+                if os.path.basename(f) in src.get("exclude", []):
                     continue
+                if not os.path.isfile(f):
+                    raise DocumentsUnavailable("a declared document is unavailable; existing knowledge retained")
                 for s in sections(f, src.get("split", "h2")):
                     stats["sections"] += 1
                     key = f"{src['name']}:{f}:{s['key']}"
                     body = s["text"][:MAX_CHARS]
                     sha = hashlib.sha256(body.encode()).hexdigest()
-                    found = privacy.detect(body)
+                    # Classify the complete section and every metadata string before truncation/storage.
+                    found = privacy.detect("\n".join((s["text"], s["title"], src["name"], f)))
                     if any(cat == "secret" for cat, _ in found):
                         stats["skipped_secret"] += 1
                         continue
                     live.add(key)
                     old = current.get(key)
-                    if old and old["sha"] == sha and old["source_event_ids"]:
+                    same_content = [r for r in by_key.get(key, []) if r["sha"] == sha]
+                    categories = frozenset(cat for cat, _ in found)
+                    if categories not in policy_classes:
+                        policy_classes[categories], _ = privacy.classify(conn, {
+                            "source": PROCESSOR, "source_account": "", "event_type": "document.section",
+                            "categories": categories})
+                    pclass = privacy.strictest(policy_classes[categories],
+                                              "local_only" if found else src.get("privacy", "cloud_allowed"),
+                                              *(r["privacy_class"] for r in same_content),
+                                              *(evidence[str(e)]["privacy_class"] for r in same_content
+                                                for e in r["source_event_ids"] or [] if str(e) in evidence))
+                    if not dry_run:
+                        for row in same_content:
+                            if row["privacy_class"] != pclass or any(
+                                    evidence.get(str(e), {}).get("privacy_class", pclass) != pclass
+                                    for e in row["source_event_ids"] or []):
+                                _tighten(conn, row, pclass)
+                    valid = old and old["source_event_ids"] and all(
+                        evidence.get(str(e), {}).get("active") for e in old["source_event_ids"])
+                    if old and old["sha"] == sha and valid and old["privacy_class"] == pclass:
                         stats["unchanged"] += 1
                         continue
                     stats["changed" if old else "new"] += 1
                     if not dry_run:
-                        _record(conn, src, f, s, key, body, sha, "local_only" if found else src.get("privacy", "cloud_allowed"))
+                        revision = revisions.get(key, 0) + 1
+                        _record(conn, src, f, s, key, body, sha, pclass, revision)
+                        revisions[key] = revision
                         if old:
                             _retire(conn, old, "superseded")
         for key, old in current.items():
@@ -119,11 +187,42 @@ def sync(dry_run: bool = False) -> dict:
     return stats
 
 
-def _record(conn, src: dict, path: str, s: dict, key: str, body: str, sha: str, pclass: str) -> None:
+def _evidence(conn, history: list[dict]) -> dict[str, dict]:
+    """Read provenance without the recall cache so legacy broken rows can be repaired on this pass."""
+    ids = list({str(e) for row in history for e in row["source_event_ids"] or []})
+    if not ids:
+        return {}
+    keys = conn.execute("select event_id, occurred_at from core.event_keys where event_id = any(%s::uuid[])",
+                        (ids,)).fetchall()
+    if not keys:
+        return {}
+    rows = conn.execute("""select event_id::text as id, privacy_class from core.events
+                           where occurred_at = any(%s) and event_id = any(%s)""",
+                        ([k["occurred_at"] for k in keys], [k["event_id"] for k in keys])).fetchall()
+    gone = {r["t"] for r in conn.execute("""select payload->>'target_event_id' as t from core.events
+                                          where event_type = 'event.retracted'
+                                          and payload->>'target_event_id' = any(%s)""", (ids,)).fetchall()}
+    return {r["id"]: {**r, "active": r["id"] not in gone} for r in rows}
+
+
+def _tighten(conn, row: dict, pclass: str) -> None:
+    """The append-only store explicitly permits privacy tightening, never declassification."""
+    looser = privacy.ORDER[:privacy.ORDER.index(pclass)]
+    conn.execute("""update core.events set privacy_class = %s
+                    where event_id = any(%s::uuid[]) and privacy_class = any(%s)""",
+                 (pclass, row["source_event_ids"] or [], looser))
+    conn.execute("""update core.derived_items set privacy_class = %s
+                    where item_id = %s and privacy_class = any(%s)""", (pclass, row["item_id"], looser))
+    conn.execute("""update search.chunks set privacy_class = %s
+                    where kind = 'derived' and ref_id = %s and privacy_class = any(%s)""",
+                 (pclass, row["item_id"], looser))
+
+
+def _record(conn, src: dict, path: str, s: dict, key: str, body: str, sha: str, pclass: str, revision: int) -> None:
     """The section version as canonical evidence (document.section), then the knowledge row that points to it: derived
     knowledge is only readable through readable provenance (read_policy)."""
-    meta = {"doc_key": key, "source": src["name"], "path": path, "title": s["title"], "sha": sha}
-    source_id = f"{key}|{sha[:16]}"
+    meta = {"doc_key": key, "source": src["name"], "path": path, "title": s["title"], "sha": sha, "revision": revision}
+    source_id = f"{key}|{sha}|v{revision}"
     record_events([{"event_type": "document.section", "source": PROCESSOR, "source_id": source_id,
                     "occurred_at": s["date"], "content": body, "payload": meta, "privacy_class": pclass}], conn=conn)
     event_id = conn.execute("""select event_id from core.event_keys where source = %s and source_id = %s
@@ -151,16 +250,18 @@ def _retire(conn, old: dict, reason: str) -> None:
 def sync_if_changed() -> dict:
     """The index pass calls this every time: a stat of the declared files, a sync only when one changed."""
     from . import ingestion
+    sources = config()
     stamp = {}
-    for src in config():
+    for src in sources:
         files = sorted(glob.glob(src["path"])) if any(c in src["path"] for c in "*?[") else [src["path"]]
         for f in files:
             if os.path.isfile(f):
                 stamp[f] = os.path.getmtime(f)
-    digest = hashlib.sha256(json.dumps(stamp, sort_keys=True).encode()).hexdigest()
+    digest = hashlib.sha256(json.dumps({"version": VERSION, "sources": sources, "files": stamp},
+                                      sort_keys=True).encode()).hexdigest()
     if ingestion.get_checkpoint(PROCESSOR, "files").get("digest") == digest:
         return {}
-    out = sync()
+    out = _sync(sources)
     ingestion.set_checkpoint(PROCESSOR, "files", {"digest": digest, "files": len(stamp)})
     ingestion.mark_success(PROCESSOR)
     return out
