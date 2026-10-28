@@ -324,6 +324,26 @@ def _build_router_command(request: Mapping[str, Any]) -> list[str]:
     return command
 
 
+# Network exits (Monsieur, 2026-10-28): page reads (HTTP probes, static HTML, Scrapling) leave through the owner's
+# real local IP (walter-exit-local, fail closed, per-host budget), never the server's bare IP; search APIs
+# authenticated by a key (Brave) leave from the server, which keeps the owner's IP out of search-engine volume.
+# Browser engines use their own exits (Camoufox: walter-exit-local; Chromium: the parents' Freebox).
+_LOCAL_EXIT = "http://127.0.0.1:1084"
+
+
+def _router_env(request: Mapping[str, Any]) -> dict[str, str]:
+    import os
+    env = dict(os.environ)
+    for k in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        env.pop(k, None)
+    if request.get("query"):
+        return env
+    proxy = os.environ.get("WALTER_BROWSE_EXIT_LOCAL", _LOCAL_EXIT)
+    env.update(HTTP_PROXY=proxy, HTTPS_PROXY=proxy, http_proxy=proxy, https_proxy=proxy, WALTER_BROWSE_PROXY=proxy,
+               NO_PROXY="127.0.0.1,localhost,::1", no_proxy="127.0.0.1,localhost,::1")
+    return env
+
+
 def _run_router(request: Mapping[str, Any]) -> dict[str, Any]:
     command = _build_router_command(request)
     try:
@@ -333,6 +353,7 @@ def _run_router(request: Mapping[str, Any]) -> dict[str, Any]:
             text=True,
             timeout=_ROUTER_TIMEOUT_SECONDS,
             check=False,
+            env=_router_env(request),
         )
     except subprocess.TimeoutExpired:
         return {

@@ -1,0 +1,323 @@
+#!/usr/bin/env walter-python
+"""walter-exit-local — Walter's exit through the owner's real local IP (the Mac without its France tunnel).
+
+Monsieur, 2026-10-28: Camoufox and Walter's non-browser reads (HTTP, static HTML, Scrapling) go out through his
+own residential IP — his usual fingerprint, far fewer captchas than the server's datacenter IP — but never through
+the parents' Freebox (that IP is kept for the Chromium profile, [default] / walter-exit-default) and never through
+the server's bare IP. Serves on the instance's [local] proxy (network.toml), e.g. 127.0.0.1:1084:
+
+  SOCKS5 (CONNECT)  and  HTTP proxy (CONNECT for https, absolute-URI requests for http)  on the same port.
+
+  open    the Mac answers over ssh, its tunnel `forbidden_vpn` is NOT connected, its SOCKS (`upstream_proxy`) is up
+          and its exit IP differs from every France exit of network.toml;
+  closed  otherwise (Mac on its France tunnel, asleep, offline): every connection is refused (fail closed).
+
+A per-host budget (`per_host_per_minute`, `per_host_per_day` new connections) keeps an automated loop from burning
+the owner's IP; over budget the connection is refused and logged.
+
+  walter-exit-local serve       run it (systemd unit walter-exit-local)
+  walter-exit-local status      state: open/closed, why, exit IP and country, hosts over budget today
+  walter-exit-local probe       egress check of every Browse exit (JSON; exit 1 on a violation): Chromium's exit
+                                must be the parents' Freebox, this exit must refuse or be a non-France owner IP,
+                                and each engine must be configured on its exit (guardian building block)
+"""
+from __future__ import annotations
+
+import asyncio
+import ipaddress
+import json
+import os
+import socket
+import struct
+import subprocess
+import sys
+import time
+import tomllib
+from collections import defaultdict
+from pathlib import Path
+from urllib.parse import urlparse
+
+CHECK_EVERY_S = 20
+IP_EVERY_S = 300
+STATE = Path(os.environ.get("WALTER_EXIT_LOCAL_STATE", "/run/walter-exit-local.json"))
+cfg: dict = {}
+state = {"route": "closed", "why": "starting", "ip": None, "country": None, "checked_ip_at": 0.0}
+minute: dict[str, list] = defaultdict(lambda: [0.0, 0])      # host -> [window start, count]
+day: dict[str, list] = defaultdict(lambda: ["", 0])          # host -> [date, count]
+refused: dict[str, int] = defaultdict(int)
+
+
+def log(msg: str) -> None:
+    print(time.strftime("%Y-%m-%dT%H:%M:%S"), msg, flush=True)
+
+
+def sh(*cmd: str, timeout: float = 60) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, 124, "", "timeout")
+
+
+def load_config() -> dict:
+    path = sh("walter", "instance", "config", "browse", "network.toml").stdout.strip()
+    data = tomllib.loads(Path(path).read_text())
+    loc = data.get("local", {})
+    for k in ("proxy", "upstream_proxy", "upstream_ssh", "forbidden_vpn"):
+        if not loc.get(k):
+            sys.exit(f"network.toml [local] lacks {k}")
+    france_ports = [int(e["port"]) for e in data.get("exit", {}).values() if e.get("country") == "FR" and e.get("port")]
+    france_known = {e["public_ip"] for e in data.get("exit", {}).values() if e.get("country") == "FR" and e.get("public_ip")}
+    return {"listen": urlparse(loc["proxy"]), "up": urlparse(loc["upstream_proxy"]), "ssh": loc["upstream_ssh"],
+            "vpn": loc["forbidden_vpn"], "per_min": int(loc.get("per_host_per_minute", 120)),
+            "per_day": int(loc.get("per_host_per_day", 3000)), "france_ports": france_ports,
+            "france_known": france_known}
+
+
+def port_open(host: str, port: int, timeout: float = 2) -> bool:
+    try:
+        socket.create_connection((host, port), timeout=timeout).close()
+        return True
+    except OSError:
+        return False
+
+
+def mac_on_vpn() -> bool | None:
+    r = sh("ssh", "-o", "ConnectTimeout=6", "-o", "BatchMode=yes", cfg["ssh"],
+           f"scutil --nc status {json.dumps(cfg['vpn'])}", timeout=20)
+    if r.returncode:
+        return None
+    return r.stdout.splitlines()[:1] == ["Connected"]
+
+
+def exit_ip(proxy: str) -> tuple[str | None, str | None]:
+    r = sh("curl", "-s", "--max-time", "12", "-x", proxy, "https://ipinfo.io/json", timeout=20)
+    try:
+        d = json.loads(r.stdout)
+        return d.get("ip"), d.get("country")
+    except ValueError:
+        return None, None
+
+
+def france_ips() -> set[str]:
+    ips = set(cfg.get("france_known") or ())
+    for port in cfg["france_ports"]:
+        if port_open("127.0.0.1", port):
+            ip, _ = exit_ip(f"http://127.0.0.1:{port}")
+            if ip:
+                ips.add(ip)
+    return ips
+
+
+def decide() -> tuple[str, str]:
+    on_vpn = mac_on_vpn()
+    if on_vpn is None:
+        return "closed", f"{cfg['ssh']} unreachable"
+    if on_vpn:
+        return "closed", f"{cfg['ssh']} is on {cfg['vpn']} (France): its IP would be the parents'"
+    if not port_open(cfg["up"].hostname, cfg["up"].port):
+        return "closed", f"{cfg['up'].netloc} (Mac SOCKS) down"
+    if time.time() - state["checked_ip_at"] > IP_EVERY_S or not state["ip"]:
+        ip, country = exit_ip(f"socks5h://{cfg['up'].netloc}")
+        state.update(ip=ip, country=country, checked_ip_at=time.time(), is_france_exit=bool(ip and ip in france_ips()))
+    if state.get("is_france_exit"):
+        return "closed", f"Mac exit {state['ip']} is a France exit"
+    if not state["ip"]:
+        return "closed", "Mac exit IP unknown"
+    return "open", f"Mac real IP {state['ip']} ({state['country']})"
+
+
+def save_state() -> None:
+    today = time.strftime("%Y-%m-%d")
+    STATE.write_text(json.dumps({**state, "since": time.time(),
+                                 "over_budget_today": {h: n for h, n in refused.items()},
+                                 "busiest_today": sorted(((h, c) for h, (d, c) in day.items() if d == today),
+                                                         key=lambda x: -x[1])[:10]}))
+
+
+async def supervise() -> None:
+    while True:
+        try:
+            route, why = await asyncio.to_thread(decide)
+        except Exception as e:  # never die on a check; fail closed
+            route, why = "closed", f"check failed: {e}"
+        if (route, why) != (state["route"], state["why"]):
+            log(f"{state['route']} -> {route}: {why}")
+        state.update(route=route, why=why)
+        save_state()
+        await asyncio.sleep(CHECK_EVERY_S)
+
+
+def allow(host: str) -> bool:
+    now, today = time.time(), time.strftime("%Y-%m-%d")
+    m = minute[host]
+    if now - m[0] >= 60:
+        m[0], m[1] = now, 0
+    d = day[host]
+    if d[0] != today:
+        d[0], d[1] = today, 0
+        refused.pop(host, None)
+    if m[1] >= cfg["per_min"] or d[1] >= cfg["per_day"]:
+        if refused[host] == 0:
+            log(f"budget reached for {host} ({m[1]}/min, {d[1]}/day): refusing")
+        refused[host] += 1
+        return False
+    m[1] += 1; d[1] += 1
+    return True
+
+
+async def upstream(host: str, port: int):
+    """A tunnel to host:port through the Mac's SOCKS, only while open and within the host's budget."""
+    if state["route"] != "open":
+        raise ConnectionError(state["why"])
+    if not allow(host.lower()):
+        raise ConnectionError("over budget")
+    r, w = await asyncio.open_connection(cfg["up"].hostname, cfg["up"].port)
+    w.write(b"\x05\x01\x00"); await w.drain()
+    if await r.readexactly(2) != b"\x05\x00":
+        raise ConnectionError("upstream refused the greeting")
+    try:
+        addr = b"\x01" + ipaddress.IPv4Address(host).packed
+    except ValueError:
+        try:
+            addr = b"\x04" + ipaddress.IPv6Address(host).packed
+        except ValueError:
+            h = host.encode(); addr = b"\x03" + bytes([len(h)]) + h
+    w.write(b"\x05\x01\x00" + addr + struct.pack(">H", port)); await w.drain()
+    head = await r.readexactly(4)
+    if head[1] != 0:
+        raise ConnectionError(f"upstream CONNECT failed ({head[1]})")
+    skip = {1: 4, 4: 16}.get(head[3]) or (await r.readexactly(1))[0]
+    await r.readexactly(skip + 2)
+    return r, w
+
+
+async def pipe(src: asyncio.StreamReader, dst: asyncio.StreamWriter) -> None:
+    try:
+        while data := await src.read(65536):
+            dst.write(data); await dst.drain()
+    except (ConnectionError, asyncio.IncompleteReadError):
+        pass
+    finally:
+        dst.close()
+
+
+async def socks(reader, writer, first: bytes) -> None:
+    n = (await reader.readexactly(1))[0]
+    methods = await reader.readexactly(n)
+    if 0 not in methods:
+        writer.write(b"\x05\xff"); return
+    writer.write(b"\x05\x00"); await writer.drain()
+    ver, cmd, _, atyp = await reader.readexactly(4)
+    if ver != 5 or cmd != 1:
+        raise ValueError("only SOCKS5 CONNECT")
+    if atyp == 1:
+        host = str(ipaddress.IPv4Address(await reader.readexactly(4)))
+    elif atyp == 3:
+        n = (await reader.readexactly(1))[0]; host = (await reader.readexactly(n)).decode()
+    elif atyp == 4:
+        host = str(ipaddress.IPv6Address(await reader.readexactly(16)))
+    else:
+        raise ValueError("bad address type")
+    port = struct.unpack(">H", await reader.readexactly(2))[0]
+    try:
+        ur, uw = await asyncio.wait_for(upstream(host, port), 30)
+    except Exception:
+        writer.write(b"\x05\x02\x00\x01" + b"\0" * 6); await writer.drain(); return   # 0x02: not allowed
+    writer.write(b"\x05\x00\x00\x01" + b"\0" * 6); await writer.drain()
+    await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
+
+
+async def http_proxy(reader, writer, first: bytes) -> None:
+    head = first + await reader.readuntil(b"\r\n\r\n")
+    line, _, rest = head.partition(b"\r\n")
+    method, target, version = line.decode("latin-1").split(" ", 2)
+    if method.upper() == "CONNECT":
+        host, _, port = target.rpartition(":")
+        host = host.strip("[]")
+        try:
+            ur, uw = await asyncio.wait_for(upstream(host, int(port)), 30)
+        except Exception as e:
+            writer.write(f"HTTP/1.1 403 Forbidden\r\nX-Walter-Exit: {e}\r\nContent-Length: 0\r\n\r\n".encode())
+            await writer.drain(); return
+        writer.write(b"HTTP/1.1 200 Connection established\r\n\r\n"); await writer.drain()
+        await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
+        return
+    u = urlparse(target)
+    if u.scheme != "http" or not u.hostname:
+        writer.write(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n"); await writer.drain(); return
+    try:
+        ur, uw = await asyncio.wait_for(upstream(u.hostname, u.port or 80), 30)
+    except Exception as e:
+        writer.write(f"HTTP/1.1 403 Forbidden\r\nX-Walter-Exit: {e}\r\nContent-Length: 0\r\n\r\n".encode())
+        await writer.drain(); return
+    path = (u.path or "/") + (f"?{u.query}" if u.query else "")
+    headers = [h for h in rest.split(b"\r\n") if h and not h.lower().startswith(b"proxy-")]
+    uw.write(f"{method} {path} {version}\r\n".encode("latin-1") + b"\r\n".join(headers) + b"\r\n\r\n")
+    await uw.drain()
+    await asyncio.gather(pipe(reader, uw), pipe(ur, writer))
+
+
+async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    try:
+        first = await reader.readexactly(1)
+        await (socks if first == b"\x05" else http_proxy)(reader, writer, first)
+    except (ConnectionError, asyncio.IncompleteReadError, asyncio.LimitOverrunError, ValueError):
+        pass
+    finally:
+        writer.close()
+
+
+async def serve() -> None:
+    global cfg
+    cfg = load_config()
+    srv = await asyncio.start_server(handle, cfg["listen"].hostname, cfg["listen"].port)
+    log(f"listening on {cfg['listen'].netloc} (SOCKS5 + HTTP): the owner's real IP via {cfg['ssh']}, "
+        f"never while on {cfg['vpn']}; budget {cfg['per_min']}/min, {cfg['per_day']}/day per host")
+    async with srv:
+        await asyncio.gather(srv.serve_forever(), supervise())
+
+
+def probe() -> int:
+    global cfg
+    cfg = load_config()
+    out, bad = {}, []
+    fr = france_ips()
+    ip, country = exit_ip("socks5h://127.0.0.1:1083")
+    out["chromium_exit"] = {"ip": ip, "country": country}
+    if not ip or ip not in fr:
+        bad.append("Chromium's exit (:1083) is not the parents' Freebox")
+    ip, country = exit_ip(f"socks5h://{cfg['listen'].netloc}")
+    st = json.loads(STATE.read_text()) if STATE.exists() else {}
+    out["local_exit"] = {"ip": ip, "country": country, "route": st.get("route"), "why": st.get("why")}
+    if ip and (ip in fr or country == "FR"):
+        bad.append("local exit (:1084) leaves from a France IP")
+    if ip and st.get("route") != "open":
+        bad.append("local exit answered while closed")
+    for unit, want in (("camoufox-max", cfg["listen"].netloc), ("cloakbrowser-max", "127.0.0.1:1083")):
+        pid = sh("systemctl", "show", unit, "-p", "MainPID", "--value").stdout.strip()
+        try:
+            env = dict(l.split("=", 1) for l in Path(f"/proc/{pid}/environ").read_text().split("\0") if "=" in l)
+        except OSError:
+            env = {}
+        got = env.get("CAMOFOX_DEFAULT_PROXY", "")
+        out[unit] = got
+        if want not in got:
+            bad.append(f"{unit} is not on {want}")
+    out["violations"] = bad
+    print(json.dumps(out, indent=2))
+    return 1 if bad else 0
+
+
+def main(argv: list[str]) -> None:
+    if argv[:1] == ["serve"]:
+        asyncio.run(serve())
+    elif argv[:1] == ["probe"]:
+        sys.exit(probe())
+    elif argv[:1] == ["status"]:
+        print(STATE.read_text() if STATE.exists() else '{"route": "unknown (service not running)"}')
+    else:
+        print(__doc__.strip())
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

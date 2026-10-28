@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import hashlib
 import json
 import re
@@ -1095,7 +1096,7 @@ class UniversalRouter:
             order = {
                 "scrapling": ["scrapling"],
                 "camoufox": ["camoufox-max"],
-                "webtop": ["webtop-cdp"],
+                "webtop": ["webtop-cdp"] if self.fallback_to_webtop else [],   # off: leaves from the server's IP
             }[mode]
 
         for backend in order:
@@ -1450,6 +1451,7 @@ async def _run_cli(args: argparse.Namespace) -> int:
             sctx.log_event(session, "NETWORK_ROUTE", mode=session.network, country=session.country)
 
     router = UniversalRouter(
+        fallback_to_webtop=os.environ.get("WALTER_BROWSE_WEBTOP", "off") == "on",   # Webtop leaves from the server's IP (2026-10-28)
         scrapling_extractor=scrapling,
         camoufox_client=CamoufoxMaxClient(
             base_url=args.camoufox_url,

@@ -66,3 +66,19 @@ Usage : `walter-browser -e chromium -s <session> login SITE|new` (la session ret
 `/etc/systemd/system/`), binaire `~/.cloakbrowser/chromium-146.0.7680.177.3/`, journal `/var/log/cloakbrowser-max.log`.
 Version la plus récente (Chromium 155, 87 patchs) : gratuite avec une connexion GitHub, une session simultanée
 (`cloakbrowser login`) ; non activée.
+
+## Sorties réseau par type de trafic (Monsieur, 28/10/2026)
+
+Aucune sortie Browse par l'IP nue du serveur. Trois sorties, chacune fermée par défaut :
+
+| Trafic | Sortie | Port |
+|---|---|---|
+| Chromium (CloakBrowser) : profil des démarches lancées en France | IP de la Freebox des parents (`walter-exit-default` : Mac sur « Lucas » ou `freebox-fr`, même IP) | `:1083` |
+| Camoufox + lectures sans navigateur de `walter_browse` (sonde HTTP, HTML statique, Scrapling) | IP réelle locale du propriétaire (Mac **hors** « Lucas ») ; refus si le Mac est sur « Lucas », endormi ou hors ligne ; budget par site (`[local]` de `network.toml`) | `:1084` (`walter-exit-local`, SOCKS5 + proxy HTTP) |
+| Recherche par API authentifiée par clé (Brave) | serveur (pas d'antibot, l'IP du propriétaire reste hors du volume de recherche) | — |
+
+Le facade pose le proxy dans l'environnement du sous-processus de lecture (`_router_env`) et Scrapling le reçoit
+explicitement (`WALTER_BROWSE_PROXY`, fixé à la création de sa session). Le repli Webtop (qui sort par le serveur)
+est désactivé sauf `WALTER_BROWSE_WEBTOP=on`. Contrôle : `walter-exit-local probe` (JSON, code 1 en cas d'écart) ;
+état : `walter-exit-local status`, journal `/var/log/walter-exit-local.log`. Fichiers : `network/exit-local/`,
+`ops/walter-exit-local.service`, `ops/camoufox-max-local-exit.conf`, `/etc/walter/browse-identity-camoufox.env`.
