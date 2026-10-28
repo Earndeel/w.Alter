@@ -142,10 +142,44 @@ def restorability(cfg: dict) -> dict:
     return out
 
 
+def offsite(cfg: dict) -> dict:
+    """What is really off the VM: the newest file of each kind on the remote, and a copy of the private recovery key
+    outside the VM (looked up by name in the owner's vault, metadata only). Needs rclone and walter-secret only."""
+    o = cfg.get("offsite") or {}
+    if not o.get("remote"):
+        return {"configured": False}
+    out = {"remote": o["remote"], "kinds": {}}
+    for kind in o.get("kinds") or []:
+        r = sh("rclone", "lsjson", f"{o['remote']}/{kind}/", timeout=120)
+        try:
+            files = sorted(json.loads(r.stdout), key=lambda f: f["ModTime"])
+        except ValueError:
+            out["kinds"][kind] = {"ok": False, "error": "remote unreadable"}
+            continue
+        if not files:
+            out["kinds"][kind] = {"ok": False, "files": 0}
+            continue
+        last = files[-1]
+        ts = datetime.fromisoformat(last["ModTime"].replace("Z", "+00:00")).timestamp()
+        age = _age_h(ts)
+        out["kinds"][kind] = {"ok": age <= float(o.get("max_age_hours", 26)), "files": len(files), "newest": last["Name"],
+                              "age_h": age, "gib": round(sum(f["Size"] for f in files) / 2**30, 2)}
+    item = o.get("recovery_key_item")
+    if item:
+        r = sh("walter-secret", "search", item, timeout=120)
+        try:
+            d = json.loads(r.stdout)
+            items = d if isinstance(d, list) else d.get("items") or d.get("results") or []
+            out["recovery_key_off_vm"] = any((i.get("name") or "").strip() == item for i in items)
+        except ValueError:
+            out["recovery_key_off_vm"] = None
+    return out
+
+
 def status() -> dict:
     cfg = config()
     return {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "conformity": conformity(),
-            "backup_health": backup_health(cfg), "restorability": restorability(cfg)}
+            "backup_health": backup_health(cfg), "offsite": offsite(cfg), "restorability": restorability(cfg)}
 
 
 # ---- versioning (Git Manager) ----------------------------------------------------------------------------------
@@ -246,9 +280,27 @@ def checkpoint(level: str, scope: str, *, schemas: list[str] | None = None, note
                    restore=f"pg_restore --clean --if-exists -n <schema> {out}   # only with the owner's go-ahead")
     else:
         raise ValueError("level must be git, files or db")
+    if rec.get("file"):
+        rec["offsite"] = push_offsite(Path(rec["file"]), cfg)
     with open(state_dir() / "checkpoints.jsonl", "a") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     return rec
+
+
+def push_offsite(path: Path, cfg: dict | None = None) -> dict:
+    """age-encrypt a checkpoint with the recovery PUBLIC key and copy it to the remote (as walter-offsite-backup does).
+    The plain local copy stays; the remote copy is what survives the loss of the VM."""
+    o = (cfg or config()).get("offsite") or {}
+    if not o.get("remote") or not o.get("recipient"):
+        return {"ok": False, "error": "offsite not configured"}
+    enc = path.with_name(path.name + ".age")
+    r = sh("age", "-R", o["recipient"], "-o", str(enc), str(path), timeout=1800)
+    if r.returncode:
+        return {"ok": False, "error": "age failed"}
+    dest = f"{o['remote']}/{o.get('checkpoints_dir', 'checkpoints')}/{enc.name}"
+    c = sh("rclone", "copyto", str(enc), dest, timeout=3600)
+    enc.unlink(missing_ok=True)
+    return {"ok": c.returncode == 0, "remote": dest} if c.returncode == 0 else {"ok": False, "error": "rclone failed"}
 
 
 def _pg_user() -> str:
@@ -334,6 +386,17 @@ def check() -> list[dict]:
             out.append(incident(f"backup:{kind}", "backup_stale", sev,
                                 f"Sauvegarde {kind} absente ou trop ancienne ({item.get('age_h')} h, limite "
                                 f"{item.get('max_age_hours')} h).", item, "G1"))
+    off = st.get("offsite") or {}
+    for kind, item in (off.get("kinds") or {}).items():
+        if not item.get("ok"):
+            out.append(incident(f"offsite:{kind}", "offsite_stale", "critical",
+                                f"Sauvegarde {kind} absente ou trop ancienne sur le Drive ({item.get('age_h')} h) : "
+                                "une perte de la VM la perdrait.", item, "G1"))
+    if off.get("recovery_key_off_vm") is False:
+        out.append(incident("offsite:recovery-key", "recovery_key_on_vm_only", "critical",
+                            "La clé privée de récupération n'existe que sur la VM : si la VM meurt, toutes les "
+                            "sauvegardes du Drive sont illisibles. Une copie doit être rangée dans le coffre du propriétaire.",
+                            {"expected_item": (cfg.get("offsite") or {}).get("recovery_key_item")}, "G3"))
     r = st["restorability"]
     for name in ("offsite_restore_test", "isolated_drill"):
         if name in r and not r[name].get("ok"):

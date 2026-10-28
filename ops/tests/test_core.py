@@ -49,3 +49,42 @@ def test_check_turns_status_into_incident_v1(monkeypatch):
     assert set(inc) == {"conformity", "backup:offsite", "restore:disk"}
     assert inc["backup:offsite"]["severity"] == "critical" and inc["backup:offsite"]["version"] == 1
     assert all({"module", "kind", "summary", "evidence", "suggested_level"} <= set(i) for i in inc.values())
+
+
+def test_offsite_reads_the_remote_and_flags_a_missing_off_vm_key(monkeypatch):
+    import subprocess as sp
+    def fake_sh(*cmd, timeout=60, input=None):
+        if cmd[0] == "rclone":
+            kind = cmd[2].rstrip("/").split("/")[-1]
+            files = [] if kind == "statedb" else [{"Name": f"{kind}-1.age", "ModTime": "2000-01-01T00:00:00Z", "Size": 10},
+                                                   {"Name": f"{kind}-2.age", "ModTime": datetime_now(), "Size": 10}]
+            return sp.CompletedProcess(cmd, 0, json.dumps(files), "")
+        if cmd[0] == "walter-secret":
+            return sp.CompletedProcess(cmd, 0, json.dumps([{"name": "something else"}]), "")
+        return sp.CompletedProcess(cmd, 1, "", "")
+    monkeypatch.setattr(core, "sh", fake_sh)
+    out = core.offsite({"offsite": {"remote": "r:", "kinds": ["pg", "statedb"], "max_age_hours": 26,
+                                    "recovery_key_item": "W.Alter recovery key (age)"}})
+    assert out["kinds"]["pg"]["ok"] and out["kinds"]["pg"]["files"] == 2 and out["kinds"]["pg"]["newest"] == "pg-2.age"
+    assert out["kinds"]["statedb"] == {"ok": False, "files": 0} and out["recovery_key_off_vm"] is False
+
+
+def test_push_offsite_encrypts_then_copies_and_removes_the_encrypted_copy(tmp_path, monkeypatch):
+    import subprocess as sp
+    calls = []
+    def fake_sh(*cmd, timeout=60, input=None):
+        calls.append(cmd)
+        if cmd[0] == "age":
+            Path(cmd[cmd.index("-o") + 1]).write_text("enc")
+        return sp.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(core, "sh", fake_sh)
+    f = tmp_path / "pg-x.dump"; f.write_text("data")
+    res = core.push_offsite(f, {"offsite": {"remote": "r:", "recipient": "/k.pub"}})
+    assert res == {"ok": True, "remote": "r:/checkpoints/pg-x.dump.age"}
+    assert calls[0][:3] == ("age", "-R", "/k.pub") and calls[1][0] == "rclone"
+    assert f.exists() and not (tmp_path / "pg-x.dump.age").exists()
+
+
+def datetime_now():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
