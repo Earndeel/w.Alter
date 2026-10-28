@@ -51,15 +51,33 @@ def _instance() -> Path:
         return Path("/instances/monsieur")
 
 
-def _env(modules_on: bool) -> dict:
+def _env(modules) -> dict:
+    """modules: "on" (all per-message modules), absent/"off" (none), or a list among preflight, memory, skills, views."""
     env = {**os.environ, "WALTER_HARNESS_PID": str(os.getpid())}
-    if not modules_on:
-        env.update(WALTER_HOOK_CONTEXT="off", WALTER_HOOK_SKILLS="off", WALTER_HOOK_PREFLIGHT="off", WALTER_HOOK_VIEWS="off")
+    on = {"preflight", "memory", "skills", "views"} if modules == "on" else set(modules or []) if isinstance(modules, list) else set()
+    for name, var in (("memory", "WALTER_HOOK_CONTEXT"), ("skills", "WALTER_HOOK_SKILLS"),
+                      ("preflight", "WALTER_HOOK_PREFLIGHT"), ("views", "WALTER_HOOK_VIEWS")):
+        if name not in on:
+            env[var] = "off"
+        elif var == "WALTER_HOOK_PREFLIGHT":
+            env[var] = "shadow"
     return env
 
 
 def step_hook(step: dict, session: str, env: dict) -> dict:
-    ev = {"hook_event_name": step["event"], "session_id": session, "transcript_path": ""}
+    """transcript: [[user, assistant], …] — the previous exchanges the harness would show the preflight."""
+    path = ""
+    if step.get("transcript"):
+        import tempfile
+        fd, path = tempfile.mkstemp(prefix="walter-scenario-", suffix=".jsonl")
+        now = datetime.now(timezone.utc).isoformat()
+        with os.fdopen(fd, "w") as f:
+            f.write("{}\n")                                   # the reader skips the first (possibly partial) line
+            for u, a in step["transcript"]:
+                f.write(json.dumps({"type": "user", "timestamp": now, "message": {"role": "user", "content": u}}) + "\n")
+                f.write(json.dumps({"type": "assistant", "timestamp": now,
+                                    "message": {"role": "assistant", "content": [{"type": "text", "text": a}]}}) + "\n")
+    ev = {"hook_event_name": step["event"], "session_id": session, "transcript_path": path}
     if step.get("prompt"):
         ev["prompt"] = step["prompt"]
     t0 = time.perf_counter()
@@ -166,7 +184,7 @@ def run(path: Path) -> dict:
     name = sc.get("name") or path.stem
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     session = f"scenario-{name}-{stamp}"
-    env = _env(sc.get("modules") == "on")
+    env = _env(sc.get("modules"))
     outputs: dict = {}
     report = {"scenario": name, "at": stamp, "session": f"claude_code/vm/{session}", "steps": [], "assertions": []}
     for step in sc.get("steps") or []:
@@ -182,6 +200,8 @@ def run(path: Path) -> dict:
             with ThreadPoolExecutor(len(step["parallel"])) as ex:
                 futs = [ex.submit(step_mcp, s["mcp"], env) for s in step["parallel"]]
                 r = {"results": [f.result() for f in futs]}
+        elif kind == "wait":
+            time.sleep(float(step["wait"])); r = {"waited": step["wait"]}
         elif kind == "cmd":                 # a deterministic tool on the run's data; {run_id} is substituted
             r = step_cmd(step["cmd"], report.get("run_id"))
             outputs[step["cmd"].get("name", f"cmd{len(outputs)}")] = r.get("json")
@@ -190,12 +210,25 @@ def run(path: Path) -> dict:
         report["steps"].append({kind: r})
         if kind == "hook" and step["hook"]["event"] == "UserPromptSubmit":
             report["run_id"] = (runctx.current(os.getpid()) or {}).get("run_id")
+            report.setdefault("runs", []).append(report["run_id"])
     shown = {}
     if report.get("run_id"):
         out = subprocess.run(["walter-memory", "runs", "show", report["run_id"]], capture_output=True, text=True, timeout=60)
         shown = json.loads(out.stdout or "{}")
     for a in sc.get("assertions") or []:
-        if "step" in a:
+        if "run" in a or "episode_of" in a:          # another run of the scenario (0 = first request) or its episode
+            idx = a.get("run", a.get("episode_of"))
+            rid = (report.get("runs") or [None])[idx] if idx < len(report.get("runs") or []) else None
+            sub = ["walter-memory", "episodes", "show", rid or ""] if "episode_of" in a else ["walter-memory", "runs", "show", rid or ""]
+            data = json.loads(subprocess.run(sub, capture_output=True, text=True, timeout=60).stdout or "{}")
+            want = a.get("equals_run")
+            cond = {k: v for k, v in a.items() if k not in ("run", "episode_of", "equals_run")}
+            if want is not None:
+                cond["equals"] = (report.get("runs") or [None])[want]
+                data = json.loads(json.dumps(data, default=str))
+            ok, detail = check(cond, data)
+            detail = f"{'episode of ' if 'episode_of' in a else ''}run {idx}: {detail}"
+        elif "step" in a:
             ok, detail = check({k: v for k, v in a.items() if k != "step"}, outputs.get(a["step"]) or {})
             detail = f"{a['step']}: {detail}"
         else:

@@ -261,9 +261,11 @@ def run_start(runtime: str, session_key: str, prompt: str, *, channel: str = "ow
             runctx.record(record_pid, run_id, session_key, runtime)
         runs.safe(runs.routing, run_id, {"applied": True, "via": "walter-llm poste (DSH provider walter)"} if runtime == "dsh"
                   else {"applied": False, "constraint": "harness_imposed", "runtime": runtime})
-        if int(time.time() * 1000) % 50 == 0:          # now and then: close runs that never got an end
-            runs.safe(runs.sweep)
+        if int(time.time() * 1000) % 50 == 0:          # now and then: close runs that never got an end,
+            runs.safe(runs.sweep)                         # and write the episodes a lost detached build missed
             runctx.sweep()
+            subprocess.Popen(["walter-memory", "episodes", "pending"], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         return run_id
     except Exception as e:  # noqa: BLE001 — fail-open
         log(f"run start failed {type(e).__name__}: {str(e)[:160]}")
@@ -279,8 +281,14 @@ def run_end(runtime: str, session_key: str, *, record_pid: int | None = None, st
         cur = runctx.current(record_pid) if record_pid else None
         if cur and cur.get("run_id"):
             runs.end(cur["run_id"], status)
+            run_id = cur["run_id"]
         else:
-            runs.end_open(session_key, status)
+            run_id = runs.end_open(session_key, status)
+        if run_id and os.environ.get("WALTER_EPISODES", "on") != "off":
+            # P4: the run's episode, once the transcript is journaled (detached; a trivial run gets none)
+            subprocess.Popen(["sh", "-c", f"sleep {VIEWS_DELAY_S}; exec walter-memory episodes build {run_id}"],
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True)
     except Exception as e:  # noqa: BLE001 — fail-open
         log(f"run end failed {type(e).__name__}: {str(e)[:160]}")
 

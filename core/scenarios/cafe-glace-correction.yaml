@@ -1,0 +1,41 @@
+# P4 (2026-10-28) — a correction of the owner is linked to the run it corrects, reuses what that run observed (no new
+# browsing), and re-versions its episode; satisfaction becomes "corrected", never inferred from silence.
+name: cafe-glace-correction
+milestone: P4
+modules: [preflight]
+steps:
+  - hook: {event: UserPromptSubmit, prompt: "Je suis à Asok, Bangkok. Trouve le meilleur café glacé americano chez 7-Eleven : prix et volumes."}
+  - mcp:
+      tool: walter_run
+      arguments:
+        request: "Recherche web : americano glacé All Café chez 7-Eleven Thaïlande, prix et tailles."
+        goal: >-
+          Relève l'americano glacé All Café de 7-Eleven en Thaïlande : une observation par taille, prix en THB et volume.
+          Les observations déjà relevées te sont données : complète seulement ce qui manque. Réponds uniquement en JSON.
+        task: research
+        level: L2
+        max_turns: 8
+        budget_seconds: 240
+        constraints: {geo: {zone: "Asok, Bangkok", pays: TH, devise: THB, langue: th}, reuse: "americano 7-eleven", reuse_max_age_hours: 48}
+        output_schema: {observations: [{subject: str, seller: str, source_url: str, values: {price: "number|null", currency: str, volume: "str|null"}, method: str, confidence: str}]}
+        persist: observations
+  - hook: {event: Stop}
+  - hook:
+      event: UserPromptSubmit
+      prompt: "Non, en fait je préfère une meilleure qualité d'ingrédients, même si c'est un peu plus cher."
+      transcript:
+        - ["Je suis à Asok, Bangkok. Trouve le meilleur café glacé americano chez 7-Eleven : prix et volumes.",
+           "Chez 7-Eleven (All Café), l'americano glacé coûte 35 THB en 16 oz et 45 THB en 22 oz ; le 22 oz est le moins cher aux 100 ml."]
+  - wait: 12
+  - cmd: {name: recompute, shell: "walter-skills read recherche-produit-locale --file scripts/pareto.py > /tmp/walter-pareto-{run_id}.py && walter-memory observations recent 'americano 7-eleven' --max-age-hours 48 | python3 -I /tmp/walter-pareto-{run_id}.py --min price --max volume_ml; rm -f /tmp/walter-pareto-{run_id}.py"}
+  - hook: {event: Stop}
+  - wait: 75
+assertions:
+  - {run: 0, path: run.status, equals: ended}
+  - {run: 0, link_kind: observation_reused, min: 1}
+  - {run: 1, path: run.act, equals: correct}
+  - {run: 1, path: run.parent_run_id, equals_run: 0}
+  - {run: 1, path: tasks, min_len: 0}
+  - {step: recompute, path: front, min_len: 1}
+  - {episode_of: 0, path: evaluation.satisfaction, equals: corrected}
+  - {episode_of: 0, path: reason, equals: child_run}
