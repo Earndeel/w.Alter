@@ -52,3 +52,13 @@ def test_child_context_is_optional_and_the_pack_is_traced(monkeypatch):
     assert run._child_context({"goal": "g"}) == {}                       # walter-context missing: caller's context
     evs = run._events("g", "pack", {"ok": True, "output": "x"}, "m", {"tokens": 10, "blocks": []})
     assert evs[0]["type"] == "system/context" and evs[1]["type"] == "user/message"
+
+
+def test_persist_observations_reads_fenced_json_and_passes_run_task_geo(monkeypatch):
+    sent = {}
+    monkeypatch.setattr(run, "_memory", lambda action, payload: sent.update(action=action, **payload) or {"stored": 1})
+    out = '```json\n{"observations": [{"subject": "x", "source_url": "https://a"}]}\n```'
+    assert run._persist_observations(out, "r1", "t1", {"pays": "TH"}) == {"stored": 1}
+    assert sent["action"] == "observations-add" and sent["run_id"] == "r1" and sent["geo"] == {"pays": "TH"}
+    assert run._persist_observations("pas du JSON", "r1", "t1", None)["stored"] == 0
+    assert "observations" in run._persist_observations('{"offers": []}', "r1", "t1", None)["errors"][0]["error"]

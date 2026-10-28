@@ -88,6 +88,14 @@
                 3600
               ]
             },
+            "constraints": {
+              "default": null,
+              "description": "Contraintes du sous-agent texte ; geo = {zone, pays, devise, langue} pour une recherche locale (la zone est choisie explicitement sur les sites).",
+              "type": [
+                "object",
+                "null"
+              ]
+            },
             "context": {
               "default": "",
               "description": "Faits, contraintes, extraits et chemins nécessaires à l'exécuteur ; il ne voit pas le chat.",
@@ -147,10 +155,27 @@
               "description": "Seulement si l'utilisateur nomme le modèle ; identifiant, alias, nom ou modèle/variante.",
               "type": "string"
             },
+            "output_schema": {
+              "default": null,
+              "description": "Forme JSON exigée de la réponse du sous-agent texte.",
+              "type": [
+                "object",
+                "null"
+              ]
+            },
             "paid_fallback": {
               "default": false,
               "description": "Autorise le passage d'un rôle prévu en interface manuelle à une génération payante ; exige la demande de l'utilisateur.",
               "type": "boolean"
+            },
+            "persist": {
+              "default": "",
+              "description": "observations = chaque élément de la liste \"observations\" de la réponse est enregistré comme observation sourcée du run.",
+              "enum": [
+                "",
+                "observations"
+              ],
+              "type": "string"
             },
             "provider": {
               "default": "",
@@ -8503,6 +8528,11 @@
             "signature": "action: str, payload: dict"
           },
           {
+            "description": "persist=\"observations\": the answer's \"observations\" list becomes sourced observations of the run (Walter",
+            "name": "_persist_observations",
+            "signature": "output: str, run_id: str | None, task_id: str | None, geo: dict | None"
+          },
+          {
             "description": "walter-context's pack for a sub-agent, through its command (declared interface); {} when unavailable.",
             "name": "_child_context",
             "signature": "spec: dict"
@@ -16443,7 +16473,7 @@
     "research/web.py": "71e3bf9073480552ab10f369cc69ca3f0e462027b2bf0829a7c02e13353276ca",
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
     "serve/agent_view.py": "144454b28cfc6ba0cf8678aa072a38f9c0fe857eab59cd66fbd676414a461367",
-    "serve/api.py": "2f0d6e3b79cf8e4b91bd661408211fe31bc2058b8a2fe1901d920c854994d1a1",
+    "serve/api.py": "9b04510dd95c3ffa62de95158326f921ca07ac2785cc4a04a8870324938ed1af",
     "serve/brief.py": "33ca79121e190834adabe6fbc573b408ef84d4cf29a93736cf4f8de48275c3ab",
     "serve/choose.py": "e8894e22b18bc0d87f30878bd1a6a75f216090cd64bd5a9f91ab27bb76dfa6ea",
     "serve/execution.py": "2d3ee5396c416d4ee08aad13bedb5a1bb3ea0c36af5a0f432f0786eeec5988c3",
@@ -16453,7 +16483,7 @@
     "serve/named.py": "9faaa5031f319ffef3f708b2de78a3b96fd2c2d8c1c010ff7bc2e44afb38d264",
     "serve/oneshot.py": "12239c7c99038605afeb49f40264dc08b84975ffef4f9f0f54e1f842f45b85ae",
     "serve/routes.py": "492e8e75f102e42856bcd66f612dfe7b30cc21c14c8776aeb352d9d2e7e420fb",
-    "serve/run.py": "3eb97d8ef66dbe518800b27fb35cc74ca082152b6afa23347faedf6e9d73f173",
+    "serve/run.py": "f0ea840031db2d4970c231fe4f5044383c490ceddee1d8b0b2f42a1b9634ec29",
     "serve/text_agent.py": "4e910f3619c717895c9970d78178766d8b7c6f3c56a1c8313374a50d93e9a705",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
     "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",

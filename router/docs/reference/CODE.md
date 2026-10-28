@@ -972,6 +972,7 @@ Do the job on the chosen model — one entry for every runtime (Hermes plugin, w
 
 - `default_toolsets()` — 
 - `_memory(action: str, payload: dict)` — Walter Memory's Run Plane through its command (declared interface); never blocks the sub-agent.
+- `_persist_observations(output: str, run_id: str | None, task_id: str | None, geo: dict | None)` — persist="observations": the answer's "observations" list becomes sourced observations of the run (Walter
 - `_child_context(spec: dict)` — walter-context's pack for a sub-agent, through its command (declared interface); {} when unavailable.
 - `_events(goal: str, context: str, result: dict, model: str | None, pack: dict | None=None)` — The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write).
 - `decide(conn, spec: dict)` — 

@@ -41,6 +41,9 @@ RUN = {
     "duration": p("integer", "Durée média demandée, en secondes ; dépend des capacités du modèle.", 0),
     "resolution": p("string", "Résolution média ; la valeur peut être normalisée selon les formats du modèle.", ""),
     "paid_fallback": p("boolean", "Autorise le passage d'un rôle prévu en interface manuelle à une génération payante ; exige la demande de l'utilisateur.", False),
+    "constraints": p(["object", "null"], "Contraintes du sous-agent texte ; geo = {zone, pays, devise, langue} pour une recherche locale (la zone est choisie explicitement sur les sites).", None),
+    "output_schema": p(["object", "null"], "Forme JSON exigée de la réponse du sous-agent texte.", None),
+    "persist": p("string", "observations = chaque élément de la liste \"observations\" de la réponse est enregistré comme observation sourcée du run.", "", enum=["", "observations"]),
 }
 
 ROUTE_KEYS = ("request", "task", "level", "model", "provider", "require", "conversation")
