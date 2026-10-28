@@ -7,6 +7,11 @@ min_free_gib_drill = 16          # the isolated restore drill needs about 2x the
 
 [git]
 dirty_warn_hours = 48            # uncommitted work older than this is reported (it is in no backup ref)
+untracked_warn_hours = 48        # age of non-ignored, untracked work; based on file mtime, not Git history
+# Preserved evidence stays visible in counts but is not treated as repository dirt. This does not delete/ignore it.
+preserved_paths = ["archive/**", "archives/**", "reports/**", "outputs/**", "docs/reports/**"]
+# Narrow, recognisable caches only: generated source/assets intentionally committed are not inferred from content.
+generated_patterns = ["*.pyc", "*.pyo", "__pycache__/*", "*/__pycache__/*", ".pytest_cache/*", "*/.pytest_cache/*", ".mypy_cache/*", "*/.mypy_cache/*", ".ruff_cache/*", "*/.ruff_cache/*", ".DS_Store", "*/.DS_Store"]
 
 [raw_vault]
 sample = 3                       # objects re-downloaded and checked against their sha256 by `verify`

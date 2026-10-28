@@ -201,28 +201,72 @@ def repos(cfg: dict | None = None) -> list[Path]:
     return tops
 
 
-def repo_state(repo: Path) -> dict:
-    g = lambda *a: sh("git", "-C", str(repo), *a, timeout=60).stdout
-    porcelain = [l for l in g("status", "--porcelain").splitlines() if l]
-    oldest = None
-    for line in porcelain:
-        p = repo / line[3:].split(" -> ")[-1].strip('"')
-        try:
-            m = p.stat().st_mtime
-            oldest = m if oldest is None else min(oldest, m)
-        except OSError:
-            pass
+def repo_state(repo: Path, cfg: dict | None = None) -> dict:
+    """Read names/status/mtimes only. NUL records preserve spaces, newlines and rename destinations.
+
+    mtime estimates age of visible working files; Git does not record when an uncommitted change began.
+    Preserved evidence is counted separately, never removed or automatically ignored.
+    """
+    git_cfg = ((cfg if cfg is not None else config()).get("git") or {})
+    preserved = git_cfg.get("preserved_paths", ["archive/**", "archives/**", "reports/**", "outputs/**", "docs/reports/**"])
+    generated = git_cfg.get("generated_patterns", ["*.pyc", "*.pyo", "__pycache__/*", "*/__pycache__/*"])
+    errors = []
+
+    def g(*args):
+        result = sh("git", "-C", str(repo), *args, timeout=60)
+        if result.returncode and args[0] in {"status", "ls-files"}:
+            errors.append(args[0])
+        return result.stdout if result.returncode == 0 else ""
+
+    def matches(name, patterns):
+        return any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns)
+
+    porcelain = []
+    records = iter(g("status", "--porcelain=v1", "-z", "--untracked-files=all").split("\0"))
+    for line in records:
+        if not line:
+            continue
+        if len(line) < 4 or line[2] != " ":
+            errors.append("status-record")
+            continue
+        code, name = line[:2], line[3:]
+        porcelain.append((code, name))
+        if "R" in code or "C" in code:
+            next(records, None)  # -z writes destination first, original name in the next NUL record
+
+    tracked = [name for code, name in porcelain if code != "??"]
+    untracked = [name for code, name in porcelain if code == "??"]
+    untracked_work = [name for name in untracked if not matches(name, preserved)]
+    tracked_generated = [name for name in g("ls-files", "-z").split("\0")
+                         if name and matches(name, generated) and not matches(name, preserved)]
+
+    def oldest_age(names):
+        oldest = None
+        for name in names:
+            try:
+                modified = (repo / name).lstat().st_mtime  # do not follow an untracked symlink
+                oldest = modified if oldest is None else min(oldest, modified)
+            except OSError:
+                pass
+        return _age_h(oldest)
+
     head = g("log", "-1", "--format=%H %ct").split()
     return {"repo": str(repo), "branch": g("rev-parse", "--abbrev-ref", "HEAD").strip(),
             "head": head[0][:12] if head else None, "head_age_h": _age_h(float(head[1])) if len(head) > 1 else None,
-            "dirty": len([l for l in porcelain if not l.startswith("??")]),
-            "untracked": len([l for l in porcelain if l.startswith("??")]),
-            "oldest_change_age_h": _age_h(oldest), "remotes": [r for r in g("remote").split() if r],
+            "dirty": len(tracked), "untracked": len(untracked),
+            "oldest_change_age_h": oldest_age(tracked + untracked),
+            "oldest_tracked_change_age_h": oldest_age(tracked),
+            "untracked_work": len(untracked_work), "untracked_preserved": len(untracked) - len(untracked_work),
+            "oldest_untracked_work_age_h": oldest_age(untracked_work),
+            "untracked_work_files": untracked_work[:50],
+            "tracked_generated": len(tracked_generated), "tracked_generated_files": tracked_generated[:50],
+            "inspection_errors": sorted(set(errors)), "remotes": [r for r in g("remote").split() if r],
             "checkpoints": len([l for l in g("for-each-ref", "refs/walter-backup/").splitlines() if l])}
 
 
 def git_inventory() -> list[dict]:
-    return [repo_state(r) for r in repos()]
+    cfg = config()
+    return [repo_state(r, cfg) for r in repos(cfg)]
 
 
 # ---- checkpoints (adapted to the risk) --------------------------------------------------------------------------
@@ -407,9 +451,23 @@ def check() -> list[dict]:
                             f"Pas assez de disque pour l'exercice de restauration ({r['disk']['free_gib']} Gio libres, "
                             f"{r['disk']['needed_for_drill_gib']} nécessaires).", r["disk"], "G3"))
     warn = float((cfg.get("git") or {}).get("dirty_warn_hours", 48))
+    untracked_warn = float((cfg.get("git") or {}).get("untracked_warn_hours", warn))
     for repo in git_inventory():
-        if repo["dirty"] and (repo["oldest_change_age_h"] or 0) > warn:
+        age = repo.get("oldest_tracked_change_age_h", repo.get("oldest_change_age_h"))
+        if repo["dirty"] and (age or 0) > warn:
             out.append(incident(f"git:{repo['repo']}", "uncommitted_work", "info",
-                                f"Travail non commité depuis {repo['oldest_change_age_h']} h dans {repo['repo']} "
+                                f"Travail non commité, ancienneté estimée {age} h dans {repo['repo']} "
                                 f"({repo['dirty']} fichiers) : il n'est dans aucune référence git.", repo, "G0"))
+        if repo.get("tracked_generated"):
+            out.append(incident(f"git-generated:{repo['repo']}", "tracked_generated_files", "warning",
+                                f"{repo['tracked_generated']} fichiers de cache générés sont suivis par Git dans "
+                                f"{repo['repo']} ; les retirer du suivi après vérification, pas les archives conservées.", repo))
+        if repo.get("untracked_work") and (repo.get("oldest_untracked_work_age_h") or 0) > untracked_warn:
+            out.append(incident(f"git-untracked:{repo['repo']}", "untracked_work", "warning",
+                                f"Travail non suivi dans {repo['repo']} ({repo['untracked_work']} fichiers, ancienneté "
+                                f"estimée {repo['oldest_untracked_work_age_h']} h) : absent des checkpoints Git.", repo))
+        if repo.get("inspection_errors"):
+            out.append(incident(f"git-inspection:{repo['repo']}", "git_inspection_failed", "warning",
+                                f"Inspection Git incomplète dans {repo['repo']} : la propreté n'est pas établie.",
+                                {"repo": repo["repo"], "operations": repo["inspection_errors"]}))
     return out

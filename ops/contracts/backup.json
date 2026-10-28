@@ -41,7 +41,10 @@
     "Façade: the backup units and scripts stay where they are until qualified (owner decision 2026-10-28).",
     "Restores are described, never executed by the tool.",
     "A git checkpoint holds tracked files only; untracked files are listed, not captured.",
-    "Optional modules: memory (Raw Vault sample of verify), core (walter contracts for conformity)."
+    "Optional modules: memory (Raw Vault sample of verify), core (walter contracts for conformity).",
+    "Repository hygiene reports G0 warnings only; it never removes, stages or commits files.",
+    "Uncommitted age is estimated from visible file mtimes; touching/deleting a file limits that estimate.",
+    "Configured preserved evidence paths remain visible but are excluded from hygiene warnings; intentional compatibility is not inferred to be obsolete."
   ],
   "services": [],
   "optional": [
@@ -50,7 +53,7 @@
   ],
   "contract": {
     "schema_version": 1,
-    "version": "0.1.0",
+    "version": "0.1.1",
     "owner": "backup",
     "kind": "foundation",
     "purpose": "Conserver, versionner, sauvegarder, vérifier et restaurer l'état de Walter, indépendamment des autres modules.",
@@ -130,6 +133,11 @@
         "id": "three-answers",
         "assertion": "Une dérive de registre n'empêche ni la sauvegarde ni le rapport de santé.",
         "scope": "integration"
+      },
+      {
+        "id": "repository-hygiene",
+        "assertion": "Les caches déjà suivis et le travail non suivi ancien déclenchent un warning G0 ; archives et rapports conservés sont distingués, sans suppression automatique.",
+        "scope": "unit"
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"

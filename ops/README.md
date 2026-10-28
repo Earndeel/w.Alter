@@ -21,3 +21,44 @@ It must keep working when Router, Context, Memory (partly), Hermes, DSH or every
 Configuration: `config/backup.toml` (neutral defaults), instance overrides in `@instance/config/backup/backup.toml`
 (which units, where their outputs land, freshness limits). State: `@instance/state/backup/` (checkpoints.jsonl).
 Maintenance: `contracts/maintenance.json` (guardian convention, read by `walter-guardians`).
+
+## Repository hygiene
+
+`walter-backup git` inventories tracked changes and non-ignored untracked files separately. Git NUL records preserve
+filenames containing spaces, newlines and rename destinations. The inventory reads status, names and filesystem
+timestamps; it exposes no file contents, diffs, environment values or remote URLs.
+
+The existing `check` watchdog now raises G0 `warning` incidents for:
+
+* recognisable generated caches already tracked by Git, even in a clean working tree;
+* untracked working files whose oldest visible modification exceeds `git.untracked_warn_hours` (48 hours by default);
+* a failed Git status/file inventory, which cannot establish cleanliness.
+
+The existing information incident for tracked edits uses their own age. An old untracked file no longer makes a
+fresh tracked edit look old. Ages are **estimates from file mtime**, not proof of when work began: touching a file
+resets this indicator, and a deleted file has no mtime to inspect. Git has no history of uncommitted edits.
+The watchdog only reports; it never deletes, stages, commits, stashes or moves a working file.
+
+`git.generated_patterns` lists narrow cache patterns (`.pyc`/`.pyo`, `__pycache__`, common Python test/type/lint
+caches and `.DS_Store`). It does not guess whether a generated asset or source file should be committed. The module
+`.gitignore` prevents its own interpreter/test caches from being added accidentally; **ignore rules do not untrack
+an existing indexed file**, which needs a reviewed versioned removal.
+
+`git.preserved_paths` keeps intentional evidence out of hygiene warnings. Defaults cover `archive/**`,
+`archives/**`, `reports/**`, `outputs/**` and `docs/reports/**`, relative to each repository. Those files remain
+visible in untracked totals and a separate preserved count; they are neither deleted nor automatically ignored.
+Override the list for other intentional evidence roots. The full counts are retained while filename evidence is
+limited to 50 entries per category. Checkpoints based on Git still omit untracked files, including preserved
+reports: use the appropriate file backup or version the intended deliverable to protect it.
+
+Declared compatibility links, historical reports and deliberate migration bridges are not generated residue.
+Their retirement needs evidence that no consumer depends on them and the recorded migration decision; a path
+looking old is not permission to remove it. This watchdog neither infers nor removes obsolete compatibility.
+
+Behavioural regressions use temporary Git repositories and synthetic files:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. walter-python -m pytest -q -p no:cacheprovider tests
+```
+
+See `docs/CORRECTIONS-2026-10-29.md` for the tracked-bytecode cleanup and RED/GREEN evidence.
