@@ -105,6 +105,8 @@ def main(argv=None) -> None:
     vw.add_argument("--limit", type=int, default=500); vw.add_argument("--dry", action="store_true")
     vw.add_argument("--depth", default="overview"); vw.add_argument("--domain"); vw.add_argument("--horizon")
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
+    dc = sub.add_parser("documents", help="the instance's curated records as knowledge (doc_section): sync, list")
+    dc.add_argument("action", choices=["sync", "list", "register"]); dc.add_argument("--dry", action="store_true")
     ep = sub.add_parser("episodes", help="Episodes of runs (P4): build <run_id>, pending (catch-up), show <run_id>")
     ep.add_argument("action", choices=["build", "pending", "show"]); ep.add_argument("run_id", nargs="?", default="")
     ep.add_argument("--no-summary", action="store_true")
@@ -160,8 +162,12 @@ def main(argv=None) -> None:
         from . import search
         _print(search.hide_noise())
     elif a.cmd == "index":
-        from . import search
+        from . import documents, search
         total = {}
+        try:
+            total.update({f"documents_{k}": v for k, v in documents.sync_if_changed().items() if k in ("new", "changed", "removed")})
+        except Exception as exc:  # noqa: BLE001 — documents never block the event index
+            print(f"documents: {type(exc).__name__}: {exc}", file=sys.stderr)
         for _ in range(a.loops):
             out = search.index_pending()
             for k, v in out.items():
@@ -237,6 +243,11 @@ def main(argv=None) -> None:
             res = episodes.pending()
         else:
             res = episodes.latest(a.run_id) or {"error": "no episode"}
+        print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
+    elif a.cmd == "documents":
+        from . import documents
+        res = (documents.sync(dry_run=a.dry) if a.action == "sync" else documents.register() or {"registered": True}
+               if a.action == "register" else documents.listing())
         print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
     elif a.cmd == "observations":
         from . import observations

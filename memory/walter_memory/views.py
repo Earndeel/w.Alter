@@ -94,7 +94,7 @@ def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict
     out, cur, seen, replayed = [], {}, set(), set()
     for r in rows:
         sid = r["session_id"]
-        if (r["model"] == "codex-auto-review" or r["session_privacy"] == "local_only" or is_test_session(sid, r["cwd"])
+        if (r["model"] == "codex-auto-review" or r["session_privacy"] == "local_only" or is_test_session(sid, r.get("cwd") or "")
                 or (r["runtime"] == "claude_code" and ":" in sid)                       # subagent prompts
                 or (r["runtime"] == "hermes" and r["platform"] not in ("telegram", "desktop", "tui", "cli"))):
             continue
