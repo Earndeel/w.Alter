@@ -154,7 +154,8 @@ appels dépourvus d’identité Memory.
 `cost_status` distingue `reported` (usage fournisseur), `estimated` (estimation positive du transport),
 `legacy` (ancienne valeur sans provenance précise) et `unknown` (coût null). Un zéro synthétique du transport
 reste inconnu ; un zéro explicitement retourné dans usage.cost est conservé. Les flux accumulent la dernière
-mesure disponible ; une annulation ou un échec de fermeture est journalisé en échec. Les appels sans coût
+mesure disponible ; une interruption avant épuisement ou un échec du nettoyage est journalisé en échec.
+Une fermeture du client après épuisement peut conserver le succès fournisseur et sa raison de fermeture. Les appels sans coût
 ne permettent pas de calculer un coût total complet. Installer la migration 036 avant les lecteurs et le gateway.
 
 Le transport CLI exact retourne les mêmes mesures que le port HTTP. La boucle texte native conserve
