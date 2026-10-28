@@ -90,12 +90,22 @@ def test_daily_and_voluntary_trip_profiles():
     batch = m.normalize({'locations': [point(motion=['stationary'])]})
     settings = m.settings_for(batch)
     assert settings['send_interval'] == '5m'
-    assert settings['main']['desired_accuracy'] == '100m'
+    assert settings['main']['desired_accuracy'] == '10m'
     assert settings['main']['visit_tracking'] is True
     assert settings['main']['pause_automatically'] is True
-    assert settings['main']['resume_with_geofence'] == '200m'
+    assert settings['main']['resume_with_geofence'] == '100m'
     batch.append({'payload': {'trip': {'start': 'active'}}, 'event_type': 'location.telemetry'})
     settings = m.settings_for(batch)
     assert settings['send_interval'] == '1m'
     assert settings['trip']['desired_accuracy'] == '10m'
     assert settings['trip']['prevent_screen_lock'] is False
+
+
+def test_precision_and_stationary_suppression_even_on_low_battery():
+    batch = m.normalize({'locations': [point(motion=['stationary'], battery_level=0.1)]})
+    settings = m.settings_for(batch)
+    assert settings['main']['desired_accuracy'] == '10m'
+    assert settings['trip']['desired_accuracy'] == '10m'
+    assert settings['main']['discard_stationary'] is True
+    assert settings['main']['min_distance'] == 'off'
+    assert settings['main']['min_time'] == '30s'

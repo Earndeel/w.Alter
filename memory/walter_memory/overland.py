@@ -109,14 +109,14 @@ def settings_for(batch, now=None):
     low = number(battery) and 0 <= battery < 0.2 and props.get("battery_state") not in ("charging", "full")
     active_trip = any(e["payload"].get("trip") for e in batch)
     return {"send_interval": "10m" if low else "1m" if active_trip else "2m" if moving else "5m",
-            "main": {"tracking_mode": "both", "desired_accuracy": "100m",
+            "main": {"tracking_mode": "both", "desired_accuracy": "10m",
                      "visit_tracking": True,
                      "activity_type": "other", "pause_automatically": True,
-                     "resume_with_geofence": "200m", "background_indicator": True,
+                     "resume_with_geofence": "100m", "background_indicator": True,
                      "logging_mode": "all", "batch_size": 200,
-                     "min_distance": "100m", "min_time": "1m",
-                     "discard_stationary": False, "discard_without_gps": False},
-            "trip": {"desired_accuracy": "100m" if low else "10m",
+                     "min_distance": "off", "min_time": "30s",
+                     "discard_stationary": True, "discard_without_gps": False},
+            "trip": {"desired_accuracy": "10m",
                      "background_indicator": True, "prevent_screen_lock": False,
                      "logging_mode": "all", "batch_size": 200,
                      "min_distance": "50m", "min_time": "30s"}}
