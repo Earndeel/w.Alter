@@ -3613,9 +3613,24 @@
             "name": "task_id",
             "nullable": true,
             "type": "uuid"
+          },
+          {
+            "default": null,
+            "description": "Measured token counts for this execution attempt (in/out/cached); NULL means unavailable, never zero by inference.",
+            "name": "usage",
+            "nullable": true,
+            "type": "jsonb"
+          },
+          {
+            "default": "'unknown'::text",
+            "description": "Cost provenance: unknown when unavailable; reported from provider usage; estimated by transport; legacy for historical values with no provenance.",
+            "name": "cost_status",
+            "nullable": false,
+            "type": "text"
           }
         ],
         "constraints": [
+          "CHECK ((cost_status = ANY (ARRAY['unknown'::text, 'reported'::text, 'estimated'::text, 'legacy'::text])))",
           "PRIMARY KEY (exec_id)"
         ],
         "description": "Every routed execution attempt (walter_run, generate, walter-llm): provider, model, ok, seconds, cost. >= 50 % failures over >= 3 runs in 14 days demotes the route",
@@ -7203,6 +7218,41 @@
             "signature": "resp"
           },
           {
+            "description": "A finite nonnegative measurement, or unknown when missing or malformed.",
+            "name": "_number",
+            "signature": "value"
+          },
+          {
+            "description": "Vendor-reported cost and transport estimate stay distinguishable; absence is never zero.",
+            "name": "_telemetry",
+            "signature": "resp"
+          },
+          {
+            "description": "Validate a local correlation identifier without echoing its supplied value.",
+            "name": "_uuid",
+            "signature": "value"
+          },
+          {
+            "description": "The public metadata-only lookup; no database import or global most-recent-run guess.",
+            "name": "_session_run",
+            "signature": "session: str"
+          },
+          {
+            "description": "Validate explicit request correlation through Memory's metadata-only public CLI.",
+            "name": "_run_metadata",
+            "signature": "run_id: str"
+          },
+          {
+            "description": "Request-local transport metadata. DSH's public pi-ai cache key carries its native session identity only",
+            "name": "_correlation",
+            "signature": "request, body: dict, agent: str"
+          },
+          {
+            "description": "Persist through public ports. DSH routing becomes applied only after an observed response.",
+            "name": "_record_attempt",
+            "signature": "row: dict, entry: dict"
+          },
+          {
             "description": "",
             "name": "log",
             "signature": "entry: dict"
@@ -8247,7 +8297,7 @@
         ]
       },
       {
-        "description": "From a chosen model to something Hermes can run: ordered execution routes and live provider probes.",
+        "description": "Ordered provider routes and execution metadata for Walter consumers.",
         "file": "serve/execution.py",
         "functions": [
           {
@@ -16427,8 +16477,8 @@
     "interface/translate.py": "0f2af8b1272f4a61f561e7f5bb6ae2ab258ceb7916cbdfee5d5ffad09cf5205f",
     "llm/claude_subscription.py": "96b53a70d801791fdb8a1cead6695a60469e1295dd86c019a76f141d4397cc89",
     "llm/config/gateway.json": "8220ddfa6a365a83e43a772fbcf0e07aa142209f7f985a9d19f34d127f41c19b",
-    "llm/contracts/llm.json": "5a8339b24a1773650873249914afe7fe4e6af03eaf3e36eab6c8b9451b06c685",
-    "llm/gateway.py": "ca024a028ebe0c5a310ae6f3acd8cf620337b3d0145d917c72e9f62a2ed12763",
+    "llm/contracts/llm.json": "17a51a635cfd54e506593c5be38b0aaa2a847f9646ee56f77e075df79dcd589d",
+    "llm/gateway.py": "5d7abd02382aab861a7fdd51edbc999f3b2fb403c785b28f34c9a60092d954f1",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",
@@ -16477,7 +16527,7 @@
     "serve/api.py": "9b04510dd95c3ffa62de95158326f921ca07ac2785cc4a04a8870324938ed1af",
     "serve/brief.py": "33ca79121e190834adabe6fbc573b408ef84d4cf29a93736cf4f8de48275c3ab",
     "serve/choose.py": "e8894e22b18bc0d87f30878bd1a6a75f216090cd64bd5a9f91ab27bb76dfa6ea",
-    "serve/execution.py": "2d3ee5396c416d4ee08aad13bedb5a1bb3ea0c36af5a0f432f0786eeec5988c3",
+    "serve/execution.py": "712071ac7bb3911a7eb11e3793b87caf9b791aadd54fbeafb1f6523060404063",
     "serve/hermes_sync.py": "1dc99d9f119e45cc958e5954fac64ba29802505d04ccd2ef096c3aba3db633cc",
     "serve/intent.py": "8f8c1adcbc776fce3e38d1aa751bcea89b1a71b00c1918c0b6ab9dd71b2c75cf",
     "serve/media_exec.py": "442b830d7a13cb3c0502b4b6767af964dd0adcf38fefc3d851bb28a455e7b016",
@@ -16522,7 +16572,8 @@
     "store/migrations/032_no_video_understanding_task.sql": "4f8e7527db1979c92b5df0b386c329080e7c19d84fa054e6d47cec70df82929a",
     "store/migrations/033_guardian.sql": "8013f62d521b5e243ee6651b6b40c8d19b4097f44bf1434ce9783dcde086a244",
     "store/migrations/034_guardian_docs.sql": "bb25f74a84385740452d3890e06759a9ccb4c4845719176d4eba14396260069e",
-    "store/migrations/035_exec_log_run.sql": "3bdbdf329f83c83a305285a692850a7052bc033caf9115f47a6eaf04fa2262cd"
+    "store/migrations/035_exec_log_run.sql": "3bdbdf329f83c83a305285a692850a7052bc033caf9115f47a6eaf04fa2262cd",
+    "store/migrations/036_exec_telemetry.sql": "22728fe19ef56564fa75c99995101232578c331942aaaeec0e4887670415eb52"
   },
   "tasks": [
     {

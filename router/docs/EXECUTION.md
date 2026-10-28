@@ -139,3 +139,20 @@ Le modèle de catalogue `heygen-video-1` dispose d’un exécuteur OpenRouter. S
 ## Route d’abonnement Claude
 
 La route `claude-pro` est exécutée dans la passerelle du Router, avec les messages, outils et paramètres du consommateur. Le transport natif ne conserve que l’attribution technique du fournisseur ; sa boucle d’agent et son contexte ne sont pas délégués. Configuration, renouvellement, quotas réels, streaming et limites : [CLAUDE-SUBSCRIPTION.md](CLAUDE-SUBSCRIPTION.md).
+
+## Appels HTTP des harnesses (correction du 29 octobre 2026)
+
+La passerelle corrèle chaque requête avec son run ouvert dans Memory, sans variable de session globale.
+`X-Walter-Run-Id` et `X-Walter-Task-Id` sont des UUID locaux ; le run est vérifié par la CLI publique.
+DSH transmet son UUID de session par les options publiques pi-ai de cache ; la passerelle l’enlève avant
+le transport fournisseur et cherche un run ouvert unique. Une session ambiguë ou indisponible est refusée.
+Les classes `local_only` et `redacted_cloud` sont refusées pour ces contextes identifiés : cette passerelle
+ne possède pas d’étape de pseudonymisation. Cette vérification ne certifie pas la confidentialité des anciens
+appels dépourvus d’identité Memory.
+
+`models.exec_log.usage` conserve les tokens d’entrée, de sortie et de cache quand ils sont retournés.
+`cost_status` distingue `reported` (usage fournisseur), `estimated` (estimation positive du transport),
+`legacy` (ancienne valeur sans provenance précise) et `unknown` (coût null). Un zéro synthétique du transport
+reste inconnu ; un zéro explicitement retourné dans usage.cost est conservé. Les flux accumulent la dernière
+mesure disponible ; une annulation ou un échec de fermeture est journalisé en échec. Les appels sans coût
+ne permettent pas de calculer un coût total complet. Installer la migration 036 avant les lecteurs et le gateway.

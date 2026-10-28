@@ -21,12 +21,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import secrets
 import subprocess
 import sys
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -309,8 +311,127 @@ def _usage(resp) -> dict | None:
     u = getattr(resp, "usage", None)
     if not u:
         return None
-    cached = getattr(getattr(u, "prompt_tokens_details", None), "cached_tokens", None)
-    return {"in": u.prompt_tokens, "out": u.completion_tokens, "cached": cached}
+    def get(obj, key):
+        return obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None)
+    return {"in": get(u, "prompt_tokens"), "out": get(u, "completion_tokens"),
+            "cached": get(get(u, "prompt_tokens_details"), "cached_tokens")}
+
+
+def _number(value) -> float | None:
+    """A finite nonnegative measurement, or unknown when missing or malformed."""
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return result if math.isfinite(result) and result >= 0 else None
+
+
+def _telemetry(resp) -> dict:
+    """Vendor-reported cost and transport estimate stay distinguishable; absence is never zero."""
+    usage = getattr(resp, "usage", None)
+    cost = _number(usage.get("cost") if isinstance(usage, dict) else getattr(usage, "cost", None))
+    status = "reported" if cost is not None else "unknown"
+    if cost is None:
+        hidden = getattr(resp, "_hidden_params", None) or {}
+        cost = _number(hidden.get("response_cost")) if isinstance(hidden, dict) else None
+        # LiteLLM may synthesize zero when pricing/usage is unavailable. Only an explicit
+        # provider usage.cost is evidence for zero; a hidden zero has no such provenance.
+        if cost is not None and cost > 0:
+            status = "estimated"
+        else:
+            cost = None
+    return {"usage": _usage(resp), "cost_usd": cost, "cost_status": status}
+
+
+def _uuid(value) -> str | None:
+    """Validate a local correlation identifier without echoing its supplied value."""
+    if value is None or value == "":
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, TypeError, AttributeError):
+        raise ValueError("invalid correlation identifier") from None
+
+
+def _session_run(session: str) -> dict:
+    """The public metadata-only lookup; no database import or global most-recent-run guess."""
+    try:
+        p = subprocess.run(["walter-memory", "runs", "find", "--session", session, "--open-only"],
+                           capture_output=True, text=True, timeout=10)
+        row = json.loads(p.stdout) if p.returncode == 0 else {}
+        return row if isinstance(row, dict) else {}
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return {}
+
+
+def _run_metadata(run_id: str) -> dict:
+    """Validate explicit request correlation through Memory's metadata-only public CLI."""
+    try:
+        p = subprocess.run(["walter-memory", "runs", "find", run_id, "--open-only"],
+                           capture_output=True, text=True, timeout=10)
+        row = json.loads(p.stdout) if p.returncode == 0 else {}
+        return row if isinstance(row, dict) else {}
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return {}
+
+
+async def _correlation(request, body: dict, agent: str) -> dict:
+    """Request-local transport metadata. DSH's public pi-ai cache key carries its native session identity only
+    to this local gateway; it is consumed here and never forwarded to a provider as an internal identifier."""
+    import asyncio
+    from fastapi import HTTPException
+    def checked(row, expected=None):
+        if not isinstance(row, dict) or row.get("status") != "open" or not row.get("run_id"):
+            raise HTTPException(409, "identified run context unavailable or not open")
+        resolved = _uuid(row["run_id"])
+        if expected and resolved != expected:
+            raise HTTPException(409, "identified run context mismatch")
+        # This gateway has no pseudonymization stage. Private and unclassified identified
+        # contexts cannot use a cloud route. Untracked legacy calls are a separate scope.
+        if row.get("privacy_class") != "cloud_allowed":
+            raise HTTPException(403, "identified context is not authorized for raw cloud transport")
+        return resolved
+    try:
+        out = {"run_id": _uuid(request.headers.get("X-Walter-Run-Id")),
+               "task_id": _uuid(request.headers.get("X-Walter-Task-Id"))}
+        if out["run_id"]:
+            row = await asyncio.to_thread(_run_metadata, out["run_id"])
+            out["run_id"] = checked(row, out["run_id"])
+            out["correlation_status"] = "resolved"
+        if agent == "dsh":
+            session_id = _uuid(body.pop("prompt_cache_key", None))
+            body.pop("prompt_cache_retention", None)
+            if session_id:
+                session = "dsh/vm/" + session_id
+                row = await asyncio.to_thread(_session_run, session)
+                found = checked(row)
+                if out["run_id"] and out["run_id"] != found:
+                    raise HTTPException(400, "conflicting correlation identifiers")
+                out.update(run_id=found, session_id=session, correlation_status="resolved")
+        if out["task_id"] and not out["run_id"]:
+            raise HTTPException(409, "task correlation requires a resolved run")
+        return {k: v for k, v in out.items() if v is not None}
+    except ValueError:
+        raise HTTPException(400, "invalid correlation identifier") from None
+
+
+def _record_attempt(row: dict, entry: dict) -> None:
+    """Persist through public ports. DSH routing becomes applied only after an observed response."""
+    try:
+        subprocess.run([ROUTER, "log-exec", json.dumps(row)], capture_output=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    if (entry.get("agent") == "dsh" and entry.get("correlation_status") == "resolved"
+            and entry.get("run_id") and entry.get("observed_model")):
+        routing = {"applied": True, "via": "walter-llm observed response",
+                   **{key: entry.get(key) for key in ("model_id", "model", "provider", "observed_model")}}
+        try:
+            subprocess.run(["walter-memory", "runs", "routing", entry["run_id"]],
+                           input=json.dumps(routing), text=True, capture_output=True, timeout=20)
+        except (OSError, subprocess.SubprocessError):
+            pass  # Routing is an observation, never a reason to repeat the provider call.
 
 
 def log(entry: dict) -> None:
@@ -323,13 +444,14 @@ def log(entry: dict) -> None:
     if entry.get("provider"):                                 # teach the router (background, best effort)
         row = {"task": entry.get("task"), "model_id": entry.get("model_id"), "provider": entry["provider"],
                "model": entry.get("model"), "ok": entry.get("ok"), "seconds": entry.get("seconds"), "kind": "text",
-               "role": f"agent:{entry.get('agent')}"}
-        threading.Thread(target=subprocess.run, args=([ROUTER, "log-exec", json.dumps(row)],),
-                         kwargs={"capture_output": True, "timeout": 60}, daemon=True).start()
+               "role": f"agent:{entry.get('agent')}",
+               **{k: entry.get(k) for k in ("run_id", "task_id", "usage", "cost_usd", "cost_status")}}
+        threading.Thread(target=_record_attempt, args=(row, entry), daemon=True).start()
 
 
 # ───────────────────────── HTTP ─────────────────────────
 def build_app():
+    import asyncio
     import litellm
     from fastapi import FastAPI, Header, HTTPException
     from fastapi.responses import JSONResponse, StreamingResponse
@@ -362,18 +484,21 @@ def build_app():
     async def completions(request: Request, authorization: str = Header(default="")):
         agent = agent_of(authorization)
         body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(400, "request must be a JSON object")
+        correlation = await _correlation(request, body, agent)
         task = body.pop("model", None) or DEFAULT_TASK
         task = DEFAULT_TASK if task in ("auto", "walter") else task.removeprefix("walter/")
         stream = bool(body.pop("stream", False))
         try:
             d = decision(task)
-        except Exception as e:
-            raise HTTPException(400, f"no route for task {task!r}: {e}")
+        except Exception:
+            raise HTTPException(400, "no route for requested task") from None
         errors = []
         for route in d.get("execution") or []:
             t0 = time.perf_counter()
             base = {"agent": agent, "task": task, "model_id": d.get("model_id"), "provider": route["provider"],
-                    "model": route["model"]}
+                    "model": route["model"], **correlation}
             try:
                 target = litellm_target(route)
             except Exception as e:                            # key missing in Bitwarden, vault locked…
@@ -397,36 +522,59 @@ def build_app():
                     resp.choices[0].message.content = as_json(resp.choices[0].message.content)
                 if not stream:
                     log({**base, "ok": True, "seconds": round(time.perf_counter() - t0, 2),
-                         "usage": _usage(resp), **({"host": getattr(resp, "provider", None) or
+                         "observed_model": getattr(resp, "model", None),
+                         **_telemetry(resp), **({"host": getattr(resp, "provider", None) or
                                                     (resp.model_dump().get("provider"))} if route["provider"] == "openrouter" else {})})
                     return JSONResponse(resp.model_dump(), headers={"X-Walter-Route": f"{route['provider']}/{route['model']}"})
                 it = resp.__aiter__()
                 first = await it.__anext__()                  # fail over until the first token arrives
+            except asyncio.CancelledError:
+                log({**base, "ok": False, "seconds": round(time.perf_counter() - t0, 2),
+                     "stream": stream, "error": "CancelledError"})
+                raise
             except Exception as e:
-                errors.append(f"{route['provider']}/{route['model']}: {type(e).__name__}: {str(e)[:160]}")
+                errors.append(f"{route['provider']}/{route['model']}: {type(e).__name__}")
                 log({**base, "ok": False, "seconds": round(time.perf_counter() - t0, 2), "error": type(e).__name__,
-                     "detail": str(e)[:300], "params": sorted(k for k in body if k != "messages")})
+                     "params": sorted(k for k in body if k != "messages")})
                 continue
 
             async def sse(first=first, it=it, base=base, t0=t0):
-                ok = True
+                ok, failure = False, None
+                telemetry = _telemetry(first)
+                observed_model = getattr(first, "model", None)
                 try:
                     yield f"data: {first.model_dump_json()}\n\n"
                     async for chunk in it:
+                        update = _telemetry(chunk)
+                        observed_model = getattr(chunk, "model", None) or observed_model
+                        if update["usage"] is not None:
+                            telemetry["usage"] = update["usage"]
+                        if update["cost_usd"] is not None:
+                            telemetry.update(cost_usd=update["cost_usd"], cost_status=update["cost_status"])
                         yield f"data: {chunk.model_dump_json()}\n\n"
+                    ok = True  # Only the provider iterator's normal exhaustion establishes success.
                     yield "data: [DONE]\n\n"
-                except Exception as e:                        # mid-stream failure: surface it, do not hang
-                    ok = False
-                    yield f"data: {json.dumps({'error': {'message': f'{type(e).__name__}: {e}'[:300]}})}\n\n"
+                except (asyncio.CancelledError, GeneratorExit) as exc:
+                    failure = type(exc).__name__
+                    raise
+                except Exception as exc:                      # no fallback after a chunk was delivered
+                    failure = type(exc).__name__
+                    yield f"data: {json.dumps({'error': {'message': failure}})}\n\n"
                 finally:
-                    close = getattr(it, "aclose", None)
-                    if close:
-                        await close()
-                    log({**base, "ok": ok, "seconds": round(time.perf_counter() - t0, 2), "stream": True})
+                    try:
+                        close = getattr(it, "aclose", None)
+                        if close:
+                            await asyncio.wait_for(close(), timeout=5)
+                    except BaseException as exc:               # cleanup must never suppress the attempt trace
+                        ok, failure = False, type(exc).__name__
+                        raise
+                    finally:
+                        log({**base, "ok": ok, "seconds": round(time.perf_counter() - t0, 2), "stream": True,
+                             "observed_model": observed_model, **telemetry, **({"error": failure} if failure else {})})
 
             return StreamingResponse(sse(), media_type="text/event-stream",
                                      headers={"X-Walter-Route": f"{route['provider']}/{route['model']}"})
-        log({"agent": agent, "task": task, "ok": False, "error": "all routes failed"})
+        log({"agent": agent, "task": task, "ok": False, "error": "all routes failed", **correlation})
         raise HTTPException(502, {"message": "every route failed", "attempts": errors})
 
     return app

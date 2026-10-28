@@ -1,0 +1,68 @@
+# Walter LLM
+
+Gateway de modèles des consommateurs autorisés, compatible OpenAI sur loopback. Le Router possède les choix et
+leurs routes ; Secrets fournit les accès fournisseur ; chaque consommateur détient un jeton local révocable.
+Le gateway transporte les messages et outils de l'appelant. Il ne crée pas une autre boucle d'agent.
+
+## Interfaces et dépendances
+
+- HTTP `/v1/chat/completions`, `/v1/models` ; `/health` ne certifie aucun fournisseur.
+- `walter-llm call` : une route exacte, JSON sur stdin/stdout, sans repli de modèle implicite.
+- Router et Secrets requis ; Memory optionnel pour retrouver le run ouvert d'une session DSH via sa CLI publique.
+- Configuration et état personnels dans l'instance ; aucune clé fournisseur dans une requête du modèle.
+
+## Corrélation et coût
+
+Les headers locaux `X-Walter-Run-Id` et `X-Walter-Task-Id` sont des UUID de corrélation par requête. Ils ne donnent
+aucune permission et ne sont jamais transmis aux fournisseurs. Une valeur invalide est refusée sans être affichée.
+
+DSH transmet déjà sa session native à pi-ai. Sur sa seule route locale Walter, les options publiques
+`cacheRetention: long` et `compat.supportsLongCacheRetention: true` transportent cette identité dans
+`prompt_cache_key`. Le gateway la consomme comme `dsh/vm/<session>` et appelle
+`walter-memory runs find --session <session> --open-only`. L'identifiant de session n'est jamais traité comme un
+identifiant de run. La résolution est locale à la requête ; pas de dernière session globale ni de modification
+des requêtes immuables du harness. `prompt_cache_key` et `prompt_cache_retention` sont retirés avant le fournisseur :
+cette convention locale ne promet aucune rétention de cache de 24 heures en amont.
+
+Dès qu'un identifiant de run ou une session DSH est fourni, le gateway exige un run ouvert résolu par la CLI
+Memory. Pour un run explicite : `walter-memory runs find <run_id> --open-only`. Une résolution absente, ambiguë,
+fermée ou indisponible bloque cet appel ; les identifiants explicite/session contradictoires sont refusés. Seule
+la classe `cloud_allowed` est acceptée : `local_only`, `redacted_cloud` et une classe inconnue sont refusées, car ce
+gateway n'a pas d'étape de pseudonymisation. Un identifiant de tâche seul exige aussi un run résolu.
+
+Les appels historiques sans aucun identifiant restent possibles et non attribués ; cette compatibilité ne prouve
+pas leur conformité aux politiques Memory. Les headers sont de la corrélation, pas une permission. Un contrôle
+du contexte identifiable ne transforme pas le gateway en moteur complet de politique des données. Le hook DSH
+annonce seulement `configured:true, applied:false` ; seule une observation de transport doit établir la route
+réellement appliquée.
+
+Chaque requête possède sa corrélation propre, même quand les réponses se terminent dans un autre ordre. Le writer
+Router n'utilise `WALTER_RUN_ID`/`WALTER_TASK_ID` que si la clé correspondante est absente de l'entrée. Un `null`
+explicite reste inconnu et ne peut hériter du run d'un autre appel.
+
+Le JSON de télémétrie et `models.exec_log` conservent les UUID, les tokens mesurés, le coût quand disponible et
+`cost_status` : `reported` (usage fournisseur), `estimated` (calcul du transport), `legacy` (ancienne valeur sans
+provenance), `unknown` (absent). Un zéro explicitement fourni dans l'usage fournisseur est conservé. Un zéro
+caché dans les métadonnées LiteLLM reste inconnu : la bibliothèque peut le synthétiser sans prix disponible.
+Un coût caché strictement positif est une estimation, pas une facture. En streaming, le dernier usage reçu est
+conservé ; une interruption sans usage reste inconnue. Ces valeurs portent sur les tentatives enregistrées et ne
+prouvent pas l'exhaustivité de la facturation. Aucun prompt ni réponse n'entre dans cette télémétrie.
+
+Un stream ne devient réussi qu'à l'épuisement normal de son itérateur fournisseur. Annulation, fermeture anticipée
+et erreur pendant le flux restent des échecs ; aucun repli fournisseur ne rejoue une réponse déjà commencée.
+La fermeture est bornée à cinq secondes et la journalisation se fait aussi quand elle échoue. Les diagnostics de
+la télémétrie conservent des types d'erreur, jamais les messages bruts des exceptions fournisseur.
+
+## Maintenance et validation
+
+Migration Router `036_exec_telemetry` avant activation des producteurs et lecteurs de ces colonnes. En cas de
+retour arrière, rétablir les lecteurs/producteurs avant toute intervention sur le schéma ; conserver les colonnes
+additives est compatible avec les versions précédentes. Aucun coût historique n'est recalculé silencieusement.
+
+Tests : `tests/test_gateway_telemetry.py` du Router (HTTP/streaming factices, confidentialité, corrélation et
+écriture de télémétrie, annulations, fermeture en erreur, isolation de trois requêtes simultanées et null explicite).
+Les lookups des fixtures sont exécutés inline pour éviter le blocage du pool dans le sandbox ; les requêtes ASGI
+et attentes des fournisseurs restent asynchrones et se chevauchent. Ces tests n'utilisent ni DB, socket réseau,
+secret ou fournisseur réel. Une sonde réelle est nécessaire pour attester qu'un harness donné fournit sa session.
+Redémarrer uniquement `walter-llm` après installation, puis vérifier `/health` et une requête corrélée via le banc.
+Les processus DSH déjà lancés conservent leur configuration chargée ; les nouveaux lancements prennent le port.

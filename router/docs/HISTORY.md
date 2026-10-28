@@ -389,3 +389,10 @@ sans modèle. Telegram seulement pour une réparation faite, une décision du pr
 Kie est testé en trois services distincts : `kie` (API Claude), `kie-codex`, `kie-media` (compte et crédit, aucune
 génération). Les médias suivent `kie-media` ; le détail d'un test garde la raison donnée par le fournisseur
 (« no_available_account »). Le transport d'abonnement Claude refuse un modèle non qualifié avant de charger litellm.
+
+## 2026-10-29 — Corrélation et mesure du gateway
+
+Les requêtes HTTP sont corrélées individuellement aux runs Memory ouverts ; DSH utilise les options publiques
+de son fournisseur pi-ai sans modifier son moteur. Une corrélation inconnue ou ambiguë échoue explicitement.
+Les flux interrompus gardent leur trace d’échec. Migration 036 : usage jsonb et provenance du coût ; une mesure
+absente ne devient plus un coût nul. Voir EXECUTION.md et llm/README.md pour les limites et le retour arrière.
