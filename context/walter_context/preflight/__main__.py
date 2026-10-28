@@ -68,6 +68,18 @@ def subjects(d: dict) -> tuple[list[dict], str | None, float | None]:
         return [], None, None
 
 
+def _attach_run(run_id: str, plan: dict) -> None:
+    """Walter Memory's Run Plane through its command (declared interface); never blocks the preflight."""
+    import subprocess
+    thread = (plan.get("thread") or {}).get("id")
+    try:
+        subprocess.run(["walter-memory", "runs", "update"], input=json.dumps(
+            {"run_id": run_id, "level": plan.get("level"), "thread_id": thread if thread and thread != "new" else None}),
+            capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
 def handle(d: dict, shadow: bool) -> tuple[dict | None, dict]:
     """One request → (plan or None, record row). Shared by the CLI and the service; never raises.
     Without candidates in the request, the subjects come from Walter Memory (step D). In shadow mode the context
@@ -92,6 +104,9 @@ def handle(d: dict, shadow: bool) -> tuple[dict | None, dict]:
                "message_head": req.message[:160], "plan": plan,
                "subjects": {"candidates": [c.get("id") for c in cands], "waiting": waiting,
                             "waiting_age_s": waiting_age}, "plan_ms": round((time.time() - t0) * 1000)}
+        if d.get("run_id"):                 # Walter Run Plane: the plan's level and thread belong to the run
+            row["run_id"] = d["run_id"]
+            _attach_run(d["run_id"], plan)
         if shadow and req.privacy_class != "local_only":
             from ..assembly import pack
             from ..retrieval import gather
