@@ -83,6 +83,75 @@ class Vault:
             break
         raise SecretError(f"bw {args[0]} failed (diagnostic suppressed)")
 
+    def _bw_stdin(self, data: str, *args: str, timeout: int = 120) -> str:
+        """bw with its payload on stdin: an item never travels on a command line (visible to every process)."""
+        session = self._session()
+        for attempt in (1, 2):
+            env = {**os.environ, "BW_SESSION": session, "BW_NOINTERACTION": "true"}
+            r = subprocess.run(["bw", *args, "--nointeraction"], input=data, capture_output=True, text=True,
+                               timeout=timeout, env=env)
+            if not r.returncode:
+                return r.stdout
+            if attempt == 1 and "locked" in (r.stderr + r.stdout).lower():
+                from .unlock import fingerprint
+                session = self._session(stale=fingerprint(session))
+                continue
+            break
+        raise SecretError(f"bw {args[0]} failed (diagnostic suppressed)")
+
+    # ── write (owner, 2026-10-28: Walter stores the logins and API keys it creates) ──────────────────────────
+    def store(self, name: str, kind: str, value: str, *, username: str | None = None, uris: list[str] | None = None,
+              fields: dict[str, str] | None = None, notes: str | None = None, update: bool = False,
+              reprompt: bool = False) -> dict:
+        """Create (or, with update=True, replace the value of) a vault item. kind: login (value = password),
+        api_key (a login whose password is the key, so `{{bw:<id>:password}}` and `exec --bind` work as for any
+        login), note (value = the secure note). Returns metadata and a value-free reference, never the value."""
+        import base64
+        if kind not in ("login", "api_key", "note"):
+            raise SecretError("kind must be login, api_key or note")
+        if not name.strip() or not value:
+            raise SecretError("name and a non-empty value are required")
+        with self._lock:
+            self._listed = 0.0
+            same = [i for i in self.items() if i["name"] == name]
+            if same and not update:
+                raise SecretError(f"an item named {name!r} exists ({same[0]['id']}): use --update to replace its value")
+            if len(same) > 1:
+                raise SecretError(f"{len(same)} items named {name!r}: refuse to guess which one to update")
+            extra = [{"name": k, "value": v, "type": 0} for k, v in (fields or {}).items()]
+            if same:
+                item = json.loads(self._bw("get", "item", same[0]["id"]))
+                if kind == "note":
+                    item["notes"] = value
+                else:
+                    item.setdefault("login", {})["password"] = value
+                    if username is not None:
+                        item["login"]["username"] = username
+                if extra:
+                    keep = [f for f in item.get("fields") or [] if f.get("name") not in (fields or {})]
+                    item["fields"] = keep + extra
+                payload = base64.b64encode(json.dumps(item).encode()).decode()
+                out = json.loads(self._bw_stdin(payload, "edit", "item", item["id"]))
+                action = "updated"
+            else:
+                item = {"type": 2 if kind == "note" else 1, "name": name, "reprompt": 1 if reprompt else 0,
+                        "favorite": False, "folderId": None, "fields": extra,
+                        "notes": value if kind == "note" else notes}
+                if kind == "note":
+                    item["secureNote"] = {"type": 0}
+                else:
+                    item["login"] = {"username": username, "password": value,
+                                     "uris": [{"match": None, "uri": u} for u in (uris or [])]}
+                    if kind == "api_key":
+                        item["fields"] = [{"name": "kind", "value": "api_key", "type": 0}] + extra
+                payload = base64.b64encode(json.dumps(item).encode()).decode()
+                out = json.loads(self._bw_stdin(payload, "create", "item"))
+                action = "created"
+            self._listed = 0.0
+            field = "notes" if kind == "note" else "password"
+            return {"ok": True, action: True, "id": out["id"], "name": out["name"], "kind": kind, "field": field,
+                    "reference": f"{{{{bw:{out['id']}:{field}}}}}"}
+
     def items(self) -> list[dict]:
         with self._lock:
             now = time.time()
