@@ -283,3 +283,13 @@ It is the one with:
 - the right credential scope
 - the right amount of context
 - the right verification loop
+
+## Vérifier une intégration fournisseur jusque dans les routes ordinaires
+
+Après l’ajout d’un fournisseur, vérifier une route sans imposer de modèle ni de fournisseur : `walter-router route 'Raisonnement complexe' --task general --level L3`. Répéter via MCP `walter_route(request="Raisonnement complexe", task="general", level="L3")`. Un appel avec `provider` imposé ne prouve pas que les consommateurs ordinaires utilisent la nouvelle intégration.
+
+Pour les routes texte, imposer l’invariant suivant après le classement effectif : `provider == execution[0].provider` si une route existe ; sinon, ne conserver aucun fournisseur périmé. Calculer ce résumé après l’application des abonnements, quotas et critères de disponibilité. Après une exécution avec secours, lire `routed.provider` pour identifier le fournisseur réellement utilisé.
+
+Résoudre la racine avec `walter path router`. Pour diagnostiquer une contradiction entre résumé et exécution, examiner `serve/routes.py`, `serve/named.py` et `serve/agent_view.py`. Examiner `serve/execution.py` pour expliquer l’ordre des fournisseurs. Vérifier les indicateurs courants, notamment `probe_ok`, avant d’attribuer cet ordre au prix : un fournisseur moins cher peut passer après un fournisseur disponible lorsque sa sonde échoue.
+
+Ajouter des tests de non-régression couvrant une priorité d’abonnement, un changement d’ordre et l’absence de route. Vérifier les parcours ordinaires et nommés, puis refaire les lectures CLI et MCP. Exécuter `walter-router docs --check` si les descriptions ou références générées changent. Pour une nouvelle intégration d’exécution, valider aussi un appel réel avec outil et le streaming ; une décision de routage seule ne valide pas le transport.
