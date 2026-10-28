@@ -14,11 +14,12 @@ Only after the transaction commits does the phone receive `{"result":"ok"}`. Aut
 
 The response centrally applies a managed profile, including on retries, so a lost HTTP response cannot permanently lose configuration. It uses the newest valid point within 10 minutes, accuracy 0–200 m; older backlog does not change settings.
 
-- Walking, cycling, running or driving (or speed >0.8 m/s): send about every 30 seconds.
-- Otherwise: send about every 2 minutes.
-- Battery <20%, unplugged: send about every 5 minutes, desired accuracy 100 m and distance filter 100 m.
-- Normal: desired accuracy 10 m, distance filter 50 m; minimum logging time 30 s.
-- Standard + significant change tracking, automatic pause, resume geofence 100 m, background indicator, all data queued (batch 200).
+- Daily background tracking: desired accuracy 100 m; standard + significant change, Visit Tracking on, automatic pause and resume geofence 200 m.
+- Walking, cycling, running or driving (or speed >0.8 m/s): send about every 2 minutes; otherwise every 5 minutes.
+- Battery <20%, unplugged: send about every 10 minutes.
+- Voluntary active trip (top-level trip telemetry): send about every minute; trip accuracy 10 m (100 m if low battery), screen may lock normally.
+- Daily filters: 100 m / 1 minute; trip filters: 50 m / 30 s. These reduce stored samples, not GPS acquisition power by themselves.
+- All data queued, batch 200, background indicator on. Actual accuracy can be better or worse than requested. Do not claim a battery percentage saving without measurement.
 
 The interval is a request to iOS, never a guarantee; automatic pause/geofence can delay resumption. These thresholds need field validation during a real walk before claiming production tracking quality. This connector does not yet cluster stays, reverse-geocode, notify on movement or send coordinates to an external model. Raw GPS remains excluded from cloud-safe recall under the existing privacy policy. Explicit local-only reads must stay inside a local processing context.
 
