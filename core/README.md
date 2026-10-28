@@ -61,3 +61,11 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$PWD" walter-python -m pytest -q -p no:cac
   tests/test_guardians.py tests/test_guardians_regressions.py tests/test_scenario_regressions.py \
   tests/test_matrix_qualified.py tests/test_qualification_regressions.py
 ```
+
+### Échec d’un enfant DSH dans le banc
+
+Le chemin d’erreur de DSH ne déclenche pas systématiquement Stop. Après la sortie échouée ou le timeout
+du processus enfant, le banc retrouve uniquement le run de sa session et appelle le port public Memory
+`runs end RUN_ID` avec le statut failed. Il ne synthétise aucun succès ni Stop normal. Le port est idempotent
+et ne réécrit pas un run déjà fermé. Le fonctionnement DSH en dehors du banc garde son adaptateur natif ;
+un run sans événement de fin reste soumis au mécanisme d’abandon existant.

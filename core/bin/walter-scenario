@@ -136,8 +136,11 @@ def step_harness(step: dict, env: dict) -> dict:
         out = subprocess.run([step.get("dsh", "/opt/dsh/node_modules/.bin/dsh"), "--profile", step.get("profile", "headless"),
                               "--json", step["prompt"]], capture_output=True, text=True, cwd=ws, env=e,
                              timeout=int(step.get("timeout", 900)))
-    except subprocess.TimeoutExpired:
-        return {"ok": False, "error": "timeout"}
+    except subprocess.TimeoutExpired as exc:
+        partial = exc.stdout or ""
+        if isinstance(partial, bytes):
+            partial = partial.decode(errors="replace")
+        out = subprocess.CompletedProcess([], 124, stdout=partial, stderr="")
     sid, answer, tin, tout, steps = None, None, 0, 0, 0
     for line in out.stdout.splitlines():
         try:
@@ -158,7 +161,20 @@ def step_harness(step: dict, env: dict) -> dict:
         time.sleep(2)                       # the Stop hook closes the run synchronously in dsh; let it land
         f = subprocess.run(["walter-memory", "runs", "find", "--session", key], capture_output=True, text=True, timeout=60)
         run_id = (json.loads(f.stdout or "{}") or {}).get("run_id")
-    return {"ok": out.returncode == 0 and answer is not None, "runtime": rt, "session": key, "run_id": run_id,
+    successful = out.returncode == 0 and answer is not None
+    cleanup = {}
+    if not successful and run_id:
+        # DSH's Stop hook is not fired on every error path. The child has exited and
+        # this exact run belongs to our bench; record failure, never a synthetic success.
+        try:
+            closed = subprocess.run(["walter-memory", "runs", "end", run_id], input=json.dumps({"status": "failed"}),
+                                    capture_output=True, text=True, timeout=20)
+            if closed.returncode:
+                cleanup["cleanup_error"] = "run_end_failed"
+        except (OSError, subprocess.SubprocessError):
+            cleanup["cleanup_error"] = "run_end_unavailable"
+    return {"ok": successful, **cleanup, **({"error": "timeout"} if out.returncode == 124 else {}),
+            "runtime": rt, "session": key, "run_id": run_id,
             "answer": (answer or "")[:600], "steps": steps, "input_tokens": tin, "output_tokens": tout,
             "seconds": round(time.time() - t0, 1)}
 
