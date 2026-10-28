@@ -120,3 +120,58 @@ The `memory-guarded-maintenance.service` runs with `--max-delete 50` by default.
 sed -i 's/--max-delete 50/--max-delete 200/' /etc/systemd/system/memory-guarded-maintenance.service
 systemctl daemon-reload
 ```
+
+## Memory Connectors (Telegram/Beeper → Hindsight)
+
+Script: `/root/.hermes/scripts/memory_connectors.py`
+State file: `~/.hermes/scripts/.connector_state.json`
+Cron: `Memory External Connectors` (Hermes cron, daily 5h UTC)
+
+### Beeper/WhatsApp Personal Chat Ingestion Guard
+
+External chat connectors must not bulk-retain personal chat logs into Hindsight by default. Require either explicit durable-memory markers (`[SAVE]`, `#remember`, `à retenir`, etc.) or operational W.Alter/Hermes terms before retaining Beeper/WhatsApp messages. Personal chat ingestion should stay disabled unless `HINDSIGHT_INGEST_PERSONAL_CHATS=1` is set for a deliberate run. If noisy content is already present, backup first, invalidate `memory_facts`, delete legacy `memory_units` + dependent links, remove matching Qdrant points, and process the PG→Qdrant outbox.
+
+### Retain API format
+
+The correct Hindsight API endpoint for ingesting external messages:
+
+
+```
+POST /v1/default/banks/{bank_id}/memories
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "content": "[Beeper:whatsapp:Name] sender: message text",
+      "context": "beeper:chat_id",
+      "tags": ["beeper", "network:whatsapp", "chat:Name"]
+    }
+  ]
+}
+```
+
+**Field name is `content`, NOT `text`.** Using `text` returns 422 validation error.
+
+### Beeper connector pattern
+
+Fetch recent messages from each single chat via `/v1/chats/{id}/messages?limit=10`, track last-seen timestamp per chat in state file. Only ingest messages newer than last-seen.
+
+**Do NOT use `/v0/messages`** — returns 404. The correct endpoints are:
+- `/v1/chats` — list all chats
+- `/v1/chats/{id}/messages?limit=N` — fetch messages from a specific chat
+
+### Telegram connector pitfall
+
+Telegram Bot API `getUpdates` returns 409 Conflict if another process (e.g., Hermes gateway) is already polling the same bot. The connector script should skip Telegram when the gateway is running, or use a separate bot token for memory ingestion.
+
+### Cron environment
+
+The Hermes cron scheduler does NOT inherit shell environment variables. Tokens must be read from the vault inside the script:
+```python
+subprocess.run(["vault", "get", "telegram/bot_token"], capture_output=True, text=True)
+```
+
+Never use `os.environ.get("TELEGRAM_BOT_TOKEN")` in cron-scheduled scripts — the variable won't be set.
+
+See **`references/memory-connectors.md`** for the full integration pattern and troubleshooting.
