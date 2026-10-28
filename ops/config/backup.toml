@@ -1,0 +1,12 @@
+# walter-backup — shipped defaults (neutral). The instance overrides them in @instance/config/backup/backup.toml.
+# Each kind of backup names the existing mechanism it wraps (a systemd unit), where its output lands and how old the
+# newest one may be before it is reported. Nothing here runs a model or needs another Walter module.
+
+[restore]
+min_free_gib_drill = 16          # the isolated restore drill needs about 2x the database plus downloads
+
+[git]
+dirty_warn_hours = 48            # uncommitted work older than this is reported (it is in no backup ref)
+
+[raw_vault]
+sample = 3                       # objects re-downloaded and checked against their sha256 by `verify`
