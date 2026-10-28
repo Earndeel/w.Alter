@@ -1,0 +1,11 @@
+{
+ "base_sha": "be6e6d8dfb5961ac87ad7a051066a764ff2bd0e15d7cf63ddfc61cbb5b9cf963",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-28T03:11:10.522395+00:00",
+ "domain": "media",
+ "kind": "patch",
+ "reason": "Correction explicite de Monsieur : choisir la VF dans l’intitulé du torrent avant lancement. La session fournit aussi des pièges reproductibles : ADB installé hors PATH SSH, numéros de candidats dépendant du classement, pause involontaire lors de la navigation, et lancement demandé sans preuve de lecture. Le premier fichier sondé contenait bien français et anglais, mais cela ne prouvait pas la piste active ; les tentatives suivantes n’ont pas établi une lecture VF réussie. [session hermes/main/20261026_155031_50609e]",
+ "runtime": "learner",
+ "session_id": "hermes/main/20261026_155031_50609e",
+ "target": "tv-stremio-play"
+}
