@@ -4,18 +4,22 @@
     "contracts/lab.json",
     "walter_lab/core.py",
     "walter_lab/cli.py",
-    "bin/walter-lab"
+    "bin/walter-lab",
+    "walter_lab/sandbox.py"
   ],
   "requires": [],
   "external": [
-    "walter-scenario (core) as the shared bench"
+    "walter-scenario (core) as the shared bench",
+    "Docker daemon and reviewed locally available image (sandbox only)",
+    "Linux O_NOFOLLOW/dir_fd APIs (sandbox only)"
   ],
   "data": [
     "experiment reports"
   ],
   "core_paths": [
     "walter_lab/core.py",
-    "walter_lab/cli.py"
+    "walter_lab/cli.py",
+    "walter_lab/sandbox.py"
   ],
   "backup_paths": [
     ".",
@@ -23,7 +27,9 @@
   ],
   "interfaces": [
     "CLI walter-lab run|history|list",
-    "Experiment v1 (experiments/*.yaml)"
+    "Experiment v1 (experiments/*.yaml)",
+    "CLI walter-lab sandbox run|probe",
+    "Python walter_lab.sandbox.run"
   ],
   "bindings": {
     "hermes": "CLI under host execution permissions",
@@ -32,9 +38,14 @@
     "claude-code": "CLI under host execution permissions"
   },
   "limitations": [
-    "Minimal (P6): variants are environment switches the modules already honour; no scout, no sandbox yet.",
+    "Scenario experiments inherit host permissions and environment; sandbox execution is a separate explicit interface.",
     "Proposals only: nothing is ever applied by Lab.",
-    "External code (scout) must run in a sandbox without secrets nor production data — not built yet."
+    "No external-source scout or runtime-neutral runtime comparison yet.",
+    "Sandbox uses an unprivileged Docker container with no network; host copies reject links and special files and have byte/entry/depth limits.",
+    "Known credential names are excluded from input; arbitrary secret contents still require an approved sanitised source and image.",
+    "The writable bind has no disk quota during execution; unsuitable where a hard disk bound is required. Docker shares the host kernel.",
+    "Sandbox requires a reviewed image already present locally; no automatic image pull or network mode.",
+    "After backend changes run the real sandbox probe; mocked host-boundary tests do not qualify Docker isolation."
   ],
   "services": [],
   "optional": [
@@ -42,7 +53,7 @@
   ],
   "contract": {
     "schema_version": 1,
-    "version": "0.1.0",
+    "version": "0.1.1",
     "owner": "lab",
     "kind": "capability",
     "purpose": "Chercher, mesurer et proposer des améliorations de Walter, sans jamais les appliquer seul.",
@@ -50,12 +61,16 @@
     "config_paths": [],
     "permissions": [
       "lancer des scénarios du banc",
-      "écrire ses rapports"
+      "écrire ses rapports",
+      "lancer un conteneur Docker local sans réseau sur une copie approuvée",
+      "exporter uniquement des fichiers ordinaires validés vers un répertoire neuf"
     ],
     "invariants": [
       "Une expérience a sa règle de décision écrite avant les essais.",
       "Lab propose ; il n'applique rien.",
-      "Pas de code externe hors d'un bac à sable sans secrets."
+      "Pas de code externe hors d'un bac à sable sans secrets.",
+      "Les copies hôte refusent les liens et fichiers spéciaux et ne changent jamais les permissions de la source.",
+      "Un résultat sandbox est validé et exporté uniquement après arrêt confirmé du conteneur."
     ],
     "errors": [
       "invalid_request",
@@ -74,6 +89,22 @@
         "access": "execute",
         "timeout_seconds": 7200,
         "timeout_status": "target"
+      },
+      {
+        "id": "sandbox-run",
+        "transport": "cli",
+        "interface": "walter-lab sandbox run",
+        "access": "execute",
+        "timeout_seconds": 600,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "sandbox-probe",
+        "transport": "cli",
+        "interface": "walter-lab sandbox probe",
+        "access": "execute",
+        "timeout_seconds": 120,
+        "timeout_status": "implemented"
       }
     ],
     "resources": [
@@ -103,6 +134,21 @@
         "id": "rule-first",
         "assertion": "La décision proposée découle de la règle écrite avant les essais.",
         "scope": "unit"
+      },
+      {
+        "id": "host-copy-boundary",
+        "assertion": "Liens, hardlinks multiples et fichiers spéciaux sont refusés ; une course de remplacement ne lit pas hors de la source et un export ne fusionne jamais une destination existante.",
+        "scope": "unit"
+      },
+      {
+        "id": "protocol-preserved",
+        "assertion": "Checkpoints et rapport final gardent le même protocole sans écrire les valeurs d’environnement.",
+        "scope": "unit"
+      },
+      {
+        "id": "sandbox-isolation",
+        "assertion": "Le probe Docker réel vérifie UID, réseau, accès hôte et écritures racine ; timeout ou code non nul sont des échecs.",
+        "scope": "integration"
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"

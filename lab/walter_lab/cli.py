@@ -14,7 +14,7 @@ def main(argv: list[str] | None = None) -> int:
     r = sub.add_parser("run"); r.add_argument("experiment"); r.add_argument("--repeats", type=int)
     h = sub.add_parser("history"); h.add_argument("experiment")
     sub.add_parser("list")
-    sb = sub.add_parser("sandbox", help="run untrusted code in a disposable, networkless, secret-free container")
+    sb = sub.add_parser("sandbox", help="run an approved source copy in a disposable container without network access")
     sb.add_argument("action", choices=["run", "probe"]); sb.add_argument("--src")
     sb.add_argument("--image", default=None); sb.add_argument("--timeout", type=int, default=600)
     argv = list(sys.argv[1:] if argv is None else argv)

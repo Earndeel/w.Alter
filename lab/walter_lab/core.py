@@ -5,7 +5,7 @@ Curator organises skills — no overlap. An experiment can conclude that nothing
 change: it records a proposal with its evidence; the module's owner (or the owner of the instance) decides. Experiments run on the
 same end-to-end scenarios as the bench (walter-scenario), with each variant expressed as environment switches the
 modules already honour (WALTER_RUN_CONTEXT, WALTER_RUN_TOOLS, …). External code found by a scout is untrusted and
-will need a sandbox without secrets nor production data before any experiment runs it (not built yet).
+must use the separate sandbox interface and an approved, sanitised source tree; host scenarios keep their host permissions.
 
 Experiment v1 (experiments/<name>.yaml):
   name, hypothesis, scenario (a walter-scenario name), repeats,
@@ -16,6 +16,7 @@ Experiment v1 (experiments/<name>.yaml):
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import statistics
 import subprocess
@@ -93,6 +94,13 @@ def decide(exp: dict, summary: dict) -> dict:
 
 def run(name: str, repeats: int | None = None) -> dict:
     exp = load(name)
+    protocol = {"schema_version": 2, "scenario": exp["scenario"], "metrics": exp.get("metrics") or ["ok"],
+                "decision": exp.get("decision") or {}, "variant_order": list(exp["variants"]),
+                "variant_env_keys": {key: sorted((value.get("env") or {})) for key, value in exp["variants"].items()},
+                "order": "interleaved",
+                "experiment_sha256": hashlib.sha256(json.dumps(exp, sort_keys=True, default=str).encode()).hexdigest(),
+                "implementation_sha256": hashlib.sha256(b"".join(
+                    p.name.encode() + b"\\0" + p.read_bytes() for p in sorted((MODULE / "walter_lab").glob("*.py")))).hexdigest()}
     n = int(repeats or exp.get("repeats") or 3)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out_dir = instance_root() / "state" / "lab" / exp["name"]
@@ -103,11 +111,11 @@ def run(name: str, repeats: int | None = None) -> dict:
         for vid, v in exp["variants"].items():
             r = run_scenario(exp["scenario"], v.get("env") or {}, vid)
             results.append({"variant": vid, "repeat": i + 1, **r})
-            path.write_text(json.dumps({"experiment": exp, "at": stamp, "results": results}, ensure_ascii=False,
+            path.write_text(json.dumps({"experiment": exp["name"], "protocol": protocol, "at": stamp, "results": results}, ensure_ascii=False,
                                        indent=1, default=str))
     summary = summarise(results, exp.get("metrics") or ["ok"])
     report = {"experiment": exp["name"], "hypothesis": exp["hypothesis"], "at": stamp, "repeats": n,
-              "summary": summary, "decision": decide(exp, summary), "results": results}
+              "protocol": protocol, "summary": summary, "decision": decide(exp, summary), "results": results}
     path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str))
     report["file"] = str(path)
     return report

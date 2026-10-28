@@ -27,12 +27,39 @@ def test_missing_measures_never_make_a_condition_true():
     assert d["proposal"].startswith("ne rien changer")
 
 
+def test_reports_keep_protocol_without_environment_values(monkeypatch, tmp_path):
+    import copy
+    import json
+    from pathlib import Path
+    exp = copy.deepcopy(EXP)
+    exp["variants"]["new"] = {"env": {"API_TOKEN": "fixture-private-value"}}
+    monkeypatch.setattr(core, "load", lambda name: exp)
+    monkeypatch.setattr(core, "instance_root", lambda: tmp_path)
+    monkeypatch.setattr(core, "run_scenario", lambda *args: {"ok": True, "metrics": {"model_calls": 1}})
+    writes = []
+    original_write = Path.write_text
+
+    def record(path, content, *args, **kwargs):
+        writes.append(json.loads(content))
+        return original_write(path, content, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", record)
+    report = core.run("x", repeats=1)
+    assert all("fixture-private-value" not in json.dumps(payload) for payload in writes)
+    assert all(payload["protocol"] == report["protocol"] for payload in writes)
+    assert report["protocol"]["scenario"] == "s"
+    assert report["protocol"]["variant_env_keys"]["new"] == ["API_TOKEN"]
+    assert len(report["protocol"]["experiment_sha256"]) == 64
+    assert len(report["protocol"]["implementation_sha256"]) == 64
+
+
 def test_sandbox_command_is_isolated(monkeypatch, tmp_path):
     """The docker invocation itself: no network, read-only, no capability, unprivileged, only the work copy mounted."""
     from walter_lab import sandbox
     seen = {}
     import subprocess as sp
     monkeypatch.setattr(sandbox.subprocess, "run", lambda argv, **kw: seen.setdefault("argv", argv) and sp.CompletedProcess(argv, 0, "", ""))
+    monkeypatch.setattr(sandbox, "_execute", lambda argv, **kw: seen.setdefault("argv", argv) and sp.CompletedProcess(argv, 0, "", ""))
     sandbox.run(None, ["true"], timeout=5)
     a = seen["argv"]
     assert a[a.index("--network") + 1] == "none" and "--read-only" in a and a[a.index("--cap-drop") + 1] == "ALL"
