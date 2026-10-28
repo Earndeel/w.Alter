@@ -18,8 +18,8 @@ ARENA_URL = "https://arena.ai/leaderboard/"
 
 
 # Arena.ai page -> board key stored in models.benchmarks.task (benchmark = 'arena')
-ARENA_BOARDS = {"chat/text": "text", "text/french": "text_french", "text/coding": "text_coding",
-                "text/creative-writing": "text_creative", "code/webdev": "webdev",
+ARENA_BOARDS = {"chat/text": "text", "text/french": "text_french", "chat/text/coding": "text_coding",
+                "chat/text/creative-writing": "text_creative", "code/webdev": "webdev",
                 "code/image-to-webdev": "image_to_webdev", "chat/vision": "vision", "chat/document": "document",
                 "chat/search": "search", "agent": "agent", "image/text-to-image": "text_to_image",
                 "image/image-edit/single-image": "image_edit",   # moved there on 2026-10-10 (was image-edit)

@@ -11,6 +11,7 @@ import subprocess
 
 from walter_router import paths
 from walter_router.analysis import alerts
+from walter_router.research.sources import arena_coverage
 
 RUN_MAX_AGE_H = 54        # the cycle runs every 48 h
 TEST_TIMEOUT = 600
@@ -29,6 +30,17 @@ def sources(conn) -> list[dict]:
         if float(r["age_h"]) > limit:
             out.append({"key": f'source:{r["kind"]}', "kind": "source_stale", "subject": r["kind"],
                         "detail": {"age_h": round(float(r["age_h"]), 1), "limit_h": limit}})
+    arena = conn.execute("""select raw from models.snapshots where kind = 'arena'
+                            order by fetched_at desc, snapshot_id desc limit 1""").fetchone()
+    coverage = arena_coverage(arena["raw"]) if arena else None
+    if coverage and not coverage["complete"]:
+        existing = next((problem for problem in out if problem["subject"] == "arena"), None)
+        if existing:
+            existing["detail"]["coverage"] = coverage
+        else:
+            out.append({"key": "source:arena", "kind": "source_error", "subject": "arena",
+                        "detail": {"error": "incomplete collection; retained boards are not freshly read",
+                                   "coverage": coverage}})
     last = conn.execute("select summary from models.runs order by run_id desc limit 1").fetchone()
     for kind, info in (((last or {}).get("summary") or {}).get("sources") or {}).items():
         if "error" in info and not any(p["subject"] == kind for p in out):

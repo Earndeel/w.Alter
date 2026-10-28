@@ -5,6 +5,7 @@ import subprocess
 
 from walter_router.analysis import alerts
 from walter_router.store import db
+from walter_router.research.sources import arena_coverage
 
 RUN_MAX_AGE_H = 54  # the cycle runs every 48 h
 
@@ -45,6 +46,9 @@ def health() -> dict:
         for kind, age in ages.items():
             if age > alerts.STALE_HOURS.get(kind, 48):
                 issues.append(f"source {kind} vieille de {age:.0f} h")
+        arena = conn.execute("""select raw from models.snapshots where kind = 'arena'
+                                order by fetched_at desc, snapshot_id desc limit 1""").fetchone()
+        coverage = {"arena": arena_coverage(arena["raw"])} if arena else {}
         dossiers = conn.execute("select count(*) as n from models.latest_dossiers").fetchone()["n"]
         if not dossiers:
             issues.append("aucun dossier de tâche pour le dernier refresh réussi")
@@ -55,7 +59,10 @@ def health() -> dict:
                where window_name = 'weekly' and source <> 'calibration'""")}
     warnings = [f'provider {p} indisponible au dernier test : {v["detail"][:100]}' for p, v in providers.items()
                 if not v["ok"]]
+    if coverage.get("arena") and not coverage["arena"]["complete"]:
+        warnings.append("source arena : collecte incomplète, anciens tableaux conservés lorsque disponibles")
     return {"ok": not issues, "issues": issues, "warnings": warnings, "providers": providers,
+            "source_coverage": coverage,
             "subscriptions": subs,  # weekly % per plan, information only (no routing effect)
             "last_run": ok_run and {"run_id": ok_run["run_id"],
             "finished_at": ok_run["finished_at"]}, "sources_age_h": ages, "dossiers": dossiers}
