@@ -285,7 +285,11 @@ def run(path: Path) -> dict:
             if r.get("run_id"):
                 report["run_id"] = r["run_id"]
                 report.setdefault("runs", []).append(r["run_id"])
-            report["harness"] = {k: r.get(k) for k in ("runtime", "session", "steps", "input_tokens", "output_tokens", "seconds")}
+            report.setdefault("harness_steps", []).append(r)
+            hs = report["harness_steps"]
+            report["harness"] = {"runtime": r.get("runtime"), "session": r.get("session"), "runs": len(hs),
+                                 **{k: round(sum(float(x.get(k) or 0) for x in hs), 1)
+                                    for k in ("steps", "input_tokens", "output_tokens", "seconds")}}
         elif kind == "wait":
             time.sleep(float(step["wait"])); r = {"waited": step["wait"]}
         elif kind == "cmd":                 # a deterministic tool on the run's data; {run_id} is substituted
@@ -302,7 +306,12 @@ def run(path: Path) -> dict:
         out = subprocess.run(["walter-memory", "runs", "show", report["run_id"]], capture_output=True, text=True, timeout=60)
         shown = json.loads(out.stdout or "{}")
     for a in sc.get("assertions") or []:
-        if "run" in a or "episode_of" in a:          # another run of the scenario (0 = first request) or its episode
+        if "harness_answer" in a:           # the i-th harness step's final answer (case-insensitive)
+            hs = report.get("harness_steps") or []
+            ans = (hs[a["harness_answer"]].get("answer") if a["harness_answer"] < len(hs) else "") or ""
+            ok = any(w.lower() in ans.lower() for w in a.get("contains_any") or [])
+            detail = f"answer {a['harness_answer']}: {'✓' if ok else '✗'} {ans[:140]!r}"
+        elif "run" in a or "episode_of" in a:          # another run of the scenario (0 = first request) or its episode
             idx = a.get("run", a.get("episode_of"))
             rid = (report.get("runs") or [None])[idx] if idx < len(report.get("runs") or []) else None
             sub = ["walter-memory", "episodes", "show", rid or ""] if "episode_of" in a else ["walter-memory", "runs", "show", rid or ""]
@@ -321,8 +330,10 @@ def run(path: Path) -> dict:
             ok, detail = check(a, shown) if shown else (False, "no run recorded")
         report["assertions"].append({"ok": ok, "assert": a, "detail": detail})
     report["ok"] = bool(report["assertions"]) and all(a["ok"] for a in report["assertions"])
+    answers = [x for x in report["assertions"] if "harness_answer" in x["assert"]]
     report["metrics"] = {**metrics(shown), **{f"harness_{k}": v for k, v in (report.get("harness") or {}).items()
-                                                 if k in ("steps", "input_tokens", "output_tokens", "seconds")}}
+                                                 if k in ("steps", "input_tokens", "output_tokens", "seconds")},
+                         **({"answers_correct": sum(1 for x in answers if x["ok"]), "answers": len(answers)} if answers else {})}
     report["variant"] = os.environ.get("WALTER_LAB_VARIANT")
     if report["ok"] and not report["variant"]:
         qualify(sc, report)

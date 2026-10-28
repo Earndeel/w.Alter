@@ -54,11 +54,14 @@ HEADER = ("Mémoire W.Alter (injectée automatiquement pour ce message ; ce sont
 
 
 def log(msg: str) -> None:
-    try:
-        with LOG.open("a") as f:
-            f.write(f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ} {msg}\n")
-    except OSError:
-        pass
+    line = f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ} {msg}\n"
+    for path in (LOG, Path("/tmp/walter-runs/walter-hook.log")):   # a sandboxed hook (DSH) only writes /tmp
+        try:
+            with path.open("a") as f:
+                f.write(line)
+            return
+        except OSError:
+            continue
 
 
 def _privacy():
@@ -180,6 +183,44 @@ def _last_texts(lines: list[str]) -> dict[str, tuple[str, str]]:
         if len(found) == 2:
             break
     return found
+
+
+def inject_mode(runtime: str) -> str:
+    """Real context injection trials (owner, 2026-10-27/28): `pack` = walter-context's pack replaces the legacy memory
+    block, for DSH only (the compatible runtime); `legacy` = today's injection. Environment first (a Lab variant),
+    then the instance switch @instance/config/context/inject.json {"dsh": "pack"}; default legacy."""
+    if runtime != "dsh":
+        return "legacy"
+    env = os.environ.get("WALTER_HOOK_INJECT_DSH")
+    if env in ("pack", "legacy"):
+        return env
+    try:
+        import runctx
+        cfg = json.loads((runctx._dir().parents[2] / "config" / "context" / "inject.json").read_text())
+        return cfg.get(runtime) if cfg.get(runtime) in ("pack", "legacy") else "legacy"
+    except (OSError, ValueError, IndexError):
+        return "legacy"
+
+
+def context_pack(prompt: str, runtime: str, session_id: str, transcript: str | None, run_id: str | None) -> str:
+    """walter-context's pack for this message (plan → retrieval → assembly), through the warm preflight service.
+    Raises on any failure: the caller falls back to the legacy memory block."""
+    import urllib.request
+    secret = any(cat == "secret" for cat, _ in _privacy().detect(prompt))
+    if secret:
+        raise RuntimeError("local_only message: no cloud pack")
+    req = {"turn_id": f"{session_id}:{int(time.time() * 1000)}", "message": prompt[:6000],
+           "previous": previous_exchange(transcript), "runtime": runtime, "session_id": session_id,
+           "privacy_class": "cloud_allowed", "run_id": run_id,
+           "exclude_blocks": ["capabilities"]}           # DSH's profile already carries the modules' presentation
+    port = os.environ.get("WALTER_CONTEXT_PREFLIGHT_PORT", "8897")
+    r = urllib.request.Request(f"http://127.0.0.1:{port}/preflight?inject=1", data=json.dumps(req).encode(),
+                               headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(r, timeout=7) as resp:
+        out = json.loads(resp.read())
+    if out.get("error") or not out.get("plan"):
+        raise RuntimeError(out.get("error") or "no plan")
+    return out.get("text") or ""        # empty = the plan's own decision (L0: nothing beyond the message)
 
 
 def preflight_shadow(prompt: str, runtime: str, session_id: str, transcript: str | None,
@@ -347,16 +388,27 @@ def claude_code(ev: dict) -> dict | None:
             return None
         import runctx
         hpid = runctx.harness_pid()
+        mode = inject_mode(runtime)
         with ThreadPoolExecutor(3) as ex:  # run, memory and skills in parallel; each fails open on its own
-            ex.submit(run_start, runtime, f"{runtime}/vm/{sid}" if sid else runtime, prompt,
-                      channel="machine" if machine_prompt(prompt) else "owner", record_pid=hpid)
-            fm = ex.submit(memory_context, prompt, caller, sid)
+            frun = ex.submit(run_start, runtime, f"{runtime}/vm/{sid}" if sid else runtime, prompt,
+                             channel="machine" if machine_prompt(prompt) else "owner", record_pid=hpid)
+            if mode == "pack":
+                def pack_or_legacy():
+                    try:
+                        return context_pack(prompt, runtime, f"{runtime}/vm/{sid}", ev.get("transcript_path"),
+                                            frun.result(timeout=5))
+                    except Exception as e:  # noqa: BLE001 — never lose the context: legacy block instead
+                        log(f"pack injection failed {type(e).__name__}: {str(e)[:120]}")
+                        return memory_context(prompt, caller, sid)
+                fm = ex.submit(pack_or_legacy)
+            else:
+                fm = ex.submit(memory_context, prompt, caller, sid)
             fs = ex.submit(skills, "message", prompt, runtime, f"{runtime}/vm/{sid}" if sid else "",
                            previous_turn(ev.get("transcript_path")))
             parts = []
             for f, label in ((fm, "memory"), (fs, "skills")):
                 try:
-                    if f.result(timeout=8):
+                    if f.result(timeout=11 if mode == "pack" else 8):
                         parts.append(f.result())
                 except Exception as e:
                     log(f"{label} error {type(e).__name__}: {str(e)[:160]}")
