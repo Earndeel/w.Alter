@@ -54,7 +54,7 @@ def test_closed_gate_refuses_and_open_gate_forwards_with_a_budget(servers):
         up, org, gate = await servers()
         gport, oport = gate.sockets[0].getsockname()[1], org.sockets[0].getsockname()[1]
         X.minute.clear(); X.day.clear(); X.refused.clear()
-        X.state.update(route="closed", why="mac is on Lucas")
+        X.state.update(route="closed", why="the machine is on its France tunnel")
         assert b"403" in (await http_get_via(gport, oport)).split(b"\r\n")[0]
         X.state.update(route="open", why="test")
         assert (await http_get_via(gport, oport)).endswith(b"ok")

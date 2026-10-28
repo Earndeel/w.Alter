@@ -1397,7 +1397,7 @@ LOCAL_EXIT = "http://127.0.0.1:1084"   # walter-exit-local: the owner's real IP,
 def _enforce_exit(args: argparse.Namespace) -> None:
     """Page reads never leave from the server's bare IP, whatever the caller (an old facade loaded in a long-lived
     MCP server included): without an explicit WALTER_BROWSE_PROXY, the owner's local exit is imposed here, where the
-    requests are made. Key-authenticated search (--search) keeps the server's own route (Monsieur, 2026-10-28)."""
+    requests are made. Key-authenticated search (--search) keeps the server's own route (owner decision, 2026-10-28)."""
     if args.search:
         return
     proxy = os.environ.get("WALTER_BROWSE_PROXY") or os.environ.get("WALTER_BROWSE_EXIT_LOCAL", LOCAL_EXIT)

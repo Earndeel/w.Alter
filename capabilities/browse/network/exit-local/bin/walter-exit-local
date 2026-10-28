@@ -1,9 +1,9 @@
 #!/usr/bin/env walter-python
 """walter-exit-local — Walter's exit through the owner's real local IP (the Mac without its France tunnel).
 
-Monsieur, 2026-10-28: Camoufox and Walter's non-browser reads (HTTP, static HTML, Scrapling) go out through his
+Owner decision, 2026-10-28: Camoufox and Walter's non-browser reads (HTTP, static HTML, Scrapling) go out through his
 own residential IP — his usual fingerprint, far fewer captchas than the server's datacenter IP — but never through
-the parents' Freebox (that IP is kept for the Chromium profile, [default] / walter-exit-default) and never through
+the instance's France exit (that IP is kept for the Chromium profile, [default] / walter-exit-default) and never through
 the server's bare IP. Serves on the instance's [local] proxy (network.toml), e.g. 127.0.0.1:1084:
 
   SOCKS5 (CONNECT)  and  HTTP proxy (CONNECT for https, absolute-URI requests for http)  on the same port.
@@ -18,7 +18,7 @@ the owner's IP; over budget the connection is refused and logged.
   walter-exit-local serve       run it (systemd unit walter-exit-local)
   walter-exit-local status      state: open/closed, why, exit IP and country, hosts over budget today
   walter-exit-local probe       egress check of every Browse exit (JSON; exit 1 on a violation): Chromium's exit
-                                must be the parents' Freebox, this exit must refuse or be a non-France owner IP,
+                                must be the instance's France exit, this exit must refuse or be a non-France owner IP,
                                 and each engine must be configured on its exit (guardian building block)
 """
 from __future__ import annotations
@@ -113,7 +113,7 @@ def decide() -> tuple[str, str]:
     if on_vpn is None:
         return "closed", f"{cfg['ssh']} unreachable"
     if on_vpn:
-        return "closed", f"{cfg['ssh']} is on {cfg['vpn']} (France): its IP would be the parents'"
+        return "closed", f"{cfg['ssh']} is on {cfg['vpn']} (France): its IP would be the France exit's"
     if not port_open(cfg["up"].hostname, cfg["up"].port):
         return "closed", f"{cfg['up'].netloc} (Mac SOCKS) down"
     if time.time() - state["checked_ip_at"] > IP_EVERY_S or not state["ip"]:
@@ -285,7 +285,7 @@ def probe() -> int:
     ip, country = exit_ip("socks5h://127.0.0.1:1083")
     out["chromium_exit"] = {"ip": ip, "country": country}
     if not ip or ip not in fr:
-        bad.append("Chromium's exit (:1083) is not the parents' Freebox")
+        bad.append("Chromium's exit (:1083) is not the instance's France exit")
     ip, country = exit_ip(f"socks5h://{cfg['listen'].netloc}")
     st = json.loads(STATE.read_text()) if STATE.exists() else {}
     out["local_exit"] = {"ip": ip, "country": country, "route": st.get("route"), "why": st.get("why")}
