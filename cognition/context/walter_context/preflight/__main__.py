@@ -74,7 +74,8 @@ def _attach_run(run_id: str, plan: dict) -> None:
     thread = (plan.get("thread") or {}).get("id")
     try:
         subprocess.run(["walter-memory", "runs", "update"], input=json.dumps(
-            {"run_id": run_id, "level": plan.get("level"), "thread_id": thread if thread and thread != "new" else None}),
+            {"run_id": run_id, "level": plan.get("level"), "act": plan.get("act"),
+             "thread_id": thread if thread and thread != "new" else None}),
             capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.TimeoutExpired):
         pass

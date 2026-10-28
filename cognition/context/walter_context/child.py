@@ -85,6 +85,24 @@ def _thread(spec: dict) -> Block | None:
     return Block("subject:overview", 3, f"Sujet du run {key} :\n{r['content']}", sources=[key])
 
 
+def _observations(spec: dict) -> Block | None:
+    """P4 reuse: fresh sourced observations the caller points at (constraints.reuse = words of subject/seller), so
+    the sub-agent only fills what is missing or stale."""
+    query = (spec.get("constraints") or {}).get("reuse") if isinstance(spec.get("constraints"), dict) else None
+    if not query:
+        return None
+    from walter_memory import observations
+    hours = float((spec.get("constraints") or {}).get("reuse_max_age_hours") or 24)
+    rows = observations.recent(str(query), max_age_hours=hours, limit=30)
+    if not rows:
+        return None
+    lines = [f"- {r['attributes'].get('seller')} | {r['attributes'].get('subject')} | {r['attributes'].get('values')} | "
+             f"{r['attributes'].get('method')} | lu le {str(r['observed_at'])[:16]} | {r['attributes'].get('source_url')}"
+             for r in rows]
+    return Block("observations", 3, f"Observations déjà relevées (moins de {hours:g} h) — ne relis que ce qui manque "
+                 "ou paraît douteux :\n" + "\n".join(lines), sources=[str(r["item_id"]) for r in rows])
+
+
 def _memory(goal: str) -> Block | None:
     from walter_memory import context
     r = context.get_context(goal, budget=MEMORY_BUDGET, max_privacy="cloud_allowed", include_profile=False)
@@ -99,6 +117,7 @@ def build(spec: dict) -> dict:
     toolsets = list(spec.get("toolsets") or [])
     steps = [("mission", lambda: _mission(spec)), ("capabilities", lambda: _capabilities(toolsets)),
              ("skills", lambda: _skills(spec["goal"])), ("thread", lambda: _thread(spec)),
+             ("observations", lambda: _observations(spec)),
              ("memory", lambda: _memory(spec["goal"]))]
     blocks, notes = [], []
     for name, step in steps:
