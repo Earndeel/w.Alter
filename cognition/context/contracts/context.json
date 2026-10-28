@@ -8,10 +8,12 @@
   ],
   "requires": [],
   "external": [
-    "Walter Logs (recover: originals of compacted outputs); DSH keeps its own raw journal"
+    "Python 3.11+ standard library for local compression; optional public clients are loaded only by their consuming operation",
+    "Host compaction/context APIs; DSH retains its own raw journal"
   ],
   "data": [
-    "per-session projection epochs; recoverable originals in logs"
+    "per-session projection epochs and caches (ephemeral)",
+    "preflight plans/pack observations and published module notes in instance state; canonical sources stay owned by Memory/Logs/Skills"
   ],
   "core_paths": [
     "walter_context"
@@ -24,32 +26,50 @@
     "Hermes ContextEngine adapter",
     "DSH CompactionEngine adapter",
     "CLI walter-context",
-    "HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it)"
+    "CLI walter-context capability router (versioned stable note)",
+    "Python walter_context.capabilities.TurnNotes",
+    "JSON bridge op=capability for trusted module notes",
+    "CLI walter-context capability all [--write] (Modules W.Alter layer from walter present notes)",
+    "HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it)",
+    "Python walter_context.retrieval.gather and walter_context.assembly.pack",
+    "Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON)",
+    "POST /preflight?inject=1 -> plan/text/pack/error; POST /preflight?shadow=1 -> private instance record without injection"
   ],
   "bindings": {
     "hermes": "native compressor until walter-context replaces it (plan lot 6)",
-    "dsh": "Walter compaction adapter",
-    "codex": "native compaction",
-    "claude-code": "native compaction"
+    "dsh": "Public checkpoint adapter selected by composition; per-message injection legacy by default, pack opt-in",
+    "codex": "Native compaction; additive module notes and hook preflight",
+    "claude-code": "Native compaction; additive module notes and hook preflight",
+    "router": "Text sub-agents request ChildContextSpec v1 through walter-context-child; caller-only mode remains available"
   },
   "limitations": [
     "DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.",
     "Hermes runs its native compressor (walter-compress retired 2026-10-21); the walter-context Hermes port is not activated.",
-    "Structural and known-answer tests do not certify semantic model quality."
+    "Structural and known-answer tests do not certify semantic model quality.",
+    "Capability-note preparation does not activate the lot-4 composer or inject into an unconnected host.",
+    "Memory, Skills, Core, Router, Logs and Soul are optional at module startup; their dependent operations degrade or fail when unavailable.",
+    "retrieval, assembly, preflight and child are implemented; their availability is separate from activation and semantic quality.",
+    "Source failures omit only the affected retrieval/child block and leave a note; absence of a block does not prove absence of matching knowledge.",
+    "Preflight can write plan metadata through the Memory runs CLI; it does not own canonical memory, notebooks or procedures.",
+    "Local compression has no general semantic quality proof; recoverability depends on source availability and privacy."
   ],
   "services": [
     "walter-context-preflight"
   ],
   "optional": [
+    "core",
     "logs",
-    "llm"
+    "memory",
+    "router",
+    "skills",
+    "soul"
   ],
   "contract": {
     "schema_version": 1,
-    "version": "1.1.0",
+    "version": "1.3.0",
     "owner": "context",
     "kind": "capability",
-    "purpose": "Décider de ce qui entre dans la fenêtre d'un modèle à chaque appel (quoi, combien, où, sous quelle forme) ; le moteur de compression (compress) en est le premier sous-module.",
+    "purpose": "Préparer et ordonner le contexte par message et par sous-agent, et compresser l’historique selon le contrat du harness ; les données canoniques restent dans leurs modules propriétaires.",
     "target_root": "context",
     "config_paths": [
       "config/walter-context.toml"
@@ -82,6 +102,38 @@
         "access": "read",
         "timeout_seconds": 60,
         "timeout_status": "target"
+      },
+      {
+        "id": "capability-note",
+        "transport": "library",
+        "interface": "router note preparation and TurnNotes",
+        "access": "read",
+        "timeout_seconds": 10,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "preflight",
+        "transport": "http",
+        "interface": "POST /preflight[?shadow=1|?inject=1]",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "child",
+        "transport": "cli",
+        "interface": "walter-context-child, ChildContextSpec v1",
+        "access": "read",
+        "timeout_seconds": 45,
+        "timeout_status": "target"
+      },
+      {
+        "id": "publish-module-notes",
+        "transport": "cli",
+        "interface": "walter-context capability all --write",
+        "access": "write",
+        "timeout_seconds": 150,
+        "timeout_status": "target"
       }
     ],
     "resources": [
@@ -96,6 +148,24 @@
         "role": "consumer",
         "owner": "logs",
         "durability": "canonical"
+      },
+      {
+        "id": "postgres:core",
+        "role": "consumer",
+        "owner": "memory",
+        "durability": "canonical"
+      },
+      {
+        "id": "skills-git-store",
+        "role": "consumer",
+        "owner": "skills",
+        "durability": "canonical"
+      },
+      {
+        "id": "context-preflight-observations",
+        "role": "owner",
+        "owner": "context",
+        "durability": "projection"
       }
     ],
     "migrations": [

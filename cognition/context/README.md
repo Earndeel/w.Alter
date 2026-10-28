@@ -1,79 +1,97 @@
 # walter-context
 
-Decides what enters a model's window on each call: what, how much, where and in what form. The target has no
-sessions and is dynamic. Activity is cut into threads that cross sessions and runtimes. Context is recomputed for each
-owner message — walter-context first understands its intent — then stays stable for the turn so the provider cache keeps working. History is compressed without
-silent loss. The core is runtime-neutral Python 3.11+ stdlib. Hosts plug in through `ports/`.
+walter-context prépare ce qui entre dans la fenêtre d’un modèle et compresse l’historique selon le contrat du
+harness. La compression locale, la préparation d’un contexte par message et le contexte d’un sous-agent sont des
+fonctions distinctes. Elles sont implémentées ; leur présence ne prouve pas leur activation dans un processus.
 
-Spec, plan and measurements: `docs/walter-memory/CONTEXT-ENGINE.md` (instance documentation). Dated decisions:
-`DECISIONS.md` next to it.
+Les sujets, vues et originaux appartiennent à Walter Memory/Logs. Context les lit par leurs interfaces publiques ;
+il ne possède pas leurs données canoniques. Le preflight peut rattacher son plan au run via `walter-memory runs
+update`. La cible de continuité entre sessions et runtimes reste une direction d’architecture, pas une garantie
+que les sessions ont disparu de tous les ports.
 
-## Sub-modules
+[Maintenance, dépendances, activation et retrait](docs/MAINTENANCE.md) ·
+[Contrat du module](contracts/context.json) · [Validation de rétention](docs/ACCEPTANCE.md).
+La spécification et les décisions propres à une instance restent dans sa documentation, hors du logiciel neutre.
 
-| Sub-module | Role | State |
+## Composants présents
+
+| Composant | Responsabilité | État et limite |
 |---|---|---|
-| `compress` | The compression engine: history in, its most useful form for the budget out | built (projection + checkpoint) |
-| `recover` | Originals behind compacted refs, read from walter_logs with privacy classes applied | built |
-| `config` | The only tunables (`config/walter-context.toml`): projection, policy, model profiles | built |
-| `bridge` | Versioned JSON bridge for out-of-process hosts (DSH) | built |
-| `sense` | Local pre-selection: candidate threads and memory from local embeddings, entities, recency | plan, lot 4 |
-| `intent` | Understands the input in its conversation: thread (or new), act, context plan, level, task family (handed to the Router) | measured (lot 1), built in lot 4 |
-| `gather` | Thread notebook, verbatim excerpts (walter_logs), memory (reranked only when over budget) | plan, lot 4 |
-| `compose` | Layers ordered from stable to volatile, one budget, provider cache markers | plan, lot 4 |
+| `compress` | Projection `head → record → compact → live` et checkpoint | Implémenté ; contrats différents selon le host |
+| `recover` | Lire les originaux associés aux références de sortie d’outil | Implémenté ; dépend de la disponibilité et de la confidentialité du journal source |
+| `config` | Charger la politique de compression, les profils et les notes de capacités | Implémenté ; des budgets de retrieval/child restent des constantes dans leur code |
+| `bridge` | Protocole JSON version 1 hors processus pour les ports | Implémenté ; plan, summarize et capability |
+| `plan`, `preflight` | Produire un ContextPlan : sujet, acte, niveau, capacités et profil demandé au Router | Implémenté ; règles locales puis décision routée quand nécessaire, repli local L1 |
+| `retrieval` | Récupérer présentations de modules, vues, mémoire, registres et échanges selon le plan | Implémenté ; une source en échec retire son bloc et ajoute une note |
+| `assembly` | Ordonner les blocs stables avant les blocs volatils et compter l’injection | Implémenté ; ajoute du contexte sans remplacer l’historique natif du host |
+| `child` | Préparer mission, capacités, suggestions de skills, sujet, observations et mémoire d’un sous-agent | Implémenté ; sources optionnelles isolées, contexte de l’appelant conservé |
 
-Threads and their notebooks belong to Walter Memory. They are derived, revisable data with provenance.
-walter-context reads them and renders them. It never writes them.
+Les anciens noms de plan `sense`, `gather` et `compose` ne désignent pas trois sous-modules à construire : la
+sélection des sujets est fournie par Memory, la récupération est dans `retrieval`, la composition dans `assembly`.
+Le routage des modèles concrets reste la responsabilité de Router.
 
-## The compression engine (`compress`)
+## Compression et récupération
 
 ```text
 payload = head | record | compact | live
-          system earlier turns    tool digests,    recent host messages
-          rows   as inert record  clipped text    with original sidecars
 ```
 
-- **Journal is truth, payload is a projection.** Every zone is a pure function of what it covers. Cut points only
-  move forward. Between boundaries the payload only grows, and at a boundary already-compacted entries render to
-  the same bytes, so the prefix stays cached.
-- **Boundaries are priced** (`compress/policy.py`) against the model profile: cached/write costs, TTL and calls per
-  turn. Past the effective budget, quality wins over cache.
-- **One record, one retention ladder, two host contracts.** *Projection* is request-only: the host keeps its
-  history (`Session.select/observe/turn_complete/compact_all`). *Checkpoint* means the host persists the record
-  (`checkpoint.plan/summarize`, through `bridge`). Both render the same record (`layers.dialogue`): every owner and
-  visible assistant text verbatim and in order, every action with its status and ref. The ladder is:
-  - tool outputs go to a digest plus a ref;
-  - reasoning is not replayed;
-  - old turns go to one line, but the owner's request is kept whole;
-  - a turn is omitted only when even one line per turn exceeds the record's whole share, and the record then says so.
+Le journal reste la référence ; le payload en est une projection. Les coupures avancent et les zones déjà
+compactées gardent une représentation stable entre coupures. La politique évalue budget et coûts relatifs de
+cache ; ces estimations ne sont pas une mesure de facturation fournisseur.
 
-  Checkpoint keeps its stricter rule: if the full dialogue does not fit, it refuses, so DSH keeps its surface.
-  Per-turn Walter injections (`<memory-context>`, `<walter-context>`) are not the owner's words and are not copied.
-- **Nothing is lost.** A compacted tool output keeps its call id as `ref`, and `walter-context recover <ref>` reads
-  the original.
+La projection peut remplacer des sorties d’outils par un digest et une référence, omettre le raisonnement, réduire
+les anciens tours et, si le budget l’impose, signaler l’omission de tours. Le checkpoint DSH exige de conserver
+le dialogue visible complet ou refuse la compression. Une référence permet de demander un original lorsqu’il est
+encore disponible et autorisé ; elle ne rend pas ce contenu visible automatiquement dans chaque requête.
+Les injections des tours précédents ne sont pas recopiées comme des paroles de l’utilisateur.
 
-No mode has a general proof of semantic answer quality. Tool references make evidence recoverable; they do not put
-it in every request.
+Les tests structurels et à réponses attendues vérifient la présence de preuves et les refus. Ils ne certifient pas
+la qualité sémantique générale des réponses, le cache réel d’un fournisseur ou la compréhension multimodale.
 
-## Ports
+## Ports et activation
 
-| Host | Contract | State |
+| Port | Contrat | État connu et portée |
 |---|---|---|
-| DSH | public compaction transaction (`ports/dsh`, checkpoint) | active on new launches |
-| Hermes | public `ContextEngine` (`ports/hermes`, projection) | built, not activated. Hermes runs its native compressor (walter-compress retired 2026-10-21) until lot 6 |
-| Claude Code, Codex | native compaction; additive context only through hooks / MCP | lot 4 |
+| DSH | Transaction publique de compaction, checkpoint | Port sélectionné dans la configuration observée le 29 octobre 2026 ; chargement à confirmer par lancement/trace |
+| Hermes | `ContextEngine`, projection | Adaptateur disponible ; configuration observée : compresseur natif, port Context non activé |
+| Codex et Claude Code | Compaction native ; contexte additionnel via hook/MCP | Notes de modules et preflight disponibles ; aucune substitution du compresseur natif |
+| Hook DSH | Pack par message via le service de preflight | Mode `legacy` par défaut ; mode `pack` uniquement par interrupteur d’instance ou variable d’expérience |
+| Router, sous-agent texte | `walter-context-child` | Construction du pack appelée par Router ; le mode et le comportement en échec sont définis côté consommateur |
 
-## Commands
+L’état d’un port de compression ne détermine pas le mode d’injection par message. Les essais `pack` ne constituent
+pas une décision de migration globale. Voir la maintenance pour les commandes et les modes dégradés.
 
-```bash
-walter-context recover <call-id> [--offset N]     # original of a compacted output
-walter-context bench --sessions 40                # replay: tokens, simulated cache, cost
-walter-context acceptance                         # synthetic exact-retention corpus, offline
-walter-context quality --samples 30               # judged retention, estimate by default
-walter-context threads --gold FILE --mode both    # thread attachment on the real stream; --decide adds the decision model
-walter-python -m pytest -q tests                  # from the module root
-node tests/test_dsh.mjs
+## Interfaces
+
+```sh
+walter-context recover <call-id> [--offset N]
+walter-context acceptance
+walter-context bench --sessions 40
+walter-context quality --samples 30
+walter-context threads --gold FILE --mode both
+walter-context-preflight --report --days 1
 ```
 
-`threads` reads walter_logs and embeds locally. Only `--decide` and `quality --run` call a model, through
-`walter_memory.llm`, and they send `cloud_allowed` data only. Reference sets that contain the owner's data live in
-the instance (`@instance/state/context/`), never in this module.
+`quality` estime par défaut ; `quality --run` et `threads --decide` peuvent appeler un modèle. Le preflight peut
+également appeler le modèle de décision via l’interface Memory/Router, et la mémoire récupérée applique sa propre
+politique de modèles et de confidentialité. Les jeux de référence privés et les rapports résident dans l’instance.
+La compression synthétique `acceptance` n’utilise ni modèle, ni historique privé, ni réseau.
+
+Le service local de preflight expose `GET /health` et `POST /preflight` : réponse ContextPlan,
+`?shadow=1` pour enregistrer sans injection, `?inject=1` pour rendre `{plan,text,pack,error}`. Il s’agit d’un port
+local de confiance, pas d’une API publique à exposer sur Internet. Le CLI `walter-context-child` reçoit un
+ChildContextSpec v1 JSON et retourne `{version,text,summary}`.
+
+## Notes de capacités
+
+`walter-context capability router --tool walter_route --tool walter_run --tool walter_decide --tool walter_plans`
+prépare la note versionnée fournie par `walter-router brief --json`. Identité, taille, version et empreinte sont
+vérifiées ; si l’inventaire d’outils requis manque, `injection_allowed` est faux. Le host conserve `TurnNotes` et
+son snapshot pendant le tour ; un bridge ponctuel ne possède pas cette continuité à lui seul.
+
+`walter-context capability all --tool <name> …` compose la couche « Modules W.Alter » via `walter present notes` :
+navigation `module_index`/`module_guide`, présentations et briefs déclarés dans les contrats. Les notes invalides
+sont rejetées et le budget `layer_max_chars` est appliqué. `TurnLayer` garde le snapshot du tour. L’option `--write`
+écrit `@instance/state/context/modules.md` et demande un rendu des profils lorsque le fichier change ; préparer
+une note sans cette option n’active aucun port ni n’injecte dans un host non raccordé.
