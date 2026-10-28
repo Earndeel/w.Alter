@@ -835,6 +835,7 @@ Live /models of OpenAI-compatible providers configured in Hermes (config/provide
 
 The source registry: collect every source into models.snapshots (a failing source keeps its last good snapshot), retention.
 
+- `arena_coverage(doc: dict)` — Coverage is distinct from snapshot age: retained boards remain usable, with their failures visible.
 - `merge(kind: str, old: dict, new: dict)` — The last complete document with the freshly read parts replacing theirs.
 - `collect_all(conn, store, only: list[str] | None=None, parts: dict[str, set | None] | None=None)` — Collect every source (or `only` these kinds, or `parts`: kind -> parts to read, None = whole source); a failing
 - `prune(conn, keep_days: int=30)` — Delete snapshots older than keep_days, always keeping the latest one of each kind.
