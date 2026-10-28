@@ -162,6 +162,7 @@ def sync_if_changed() -> dict:
         return {}
     out = sync()
     ingestion.set_checkpoint(PROCESSOR, "files", {"digest": digest, "files": len(stamp)})
+    ingestion.mark_success(PROCESSOR)
     return out
 
 
