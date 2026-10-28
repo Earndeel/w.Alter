@@ -170,6 +170,40 @@ class DigestReader:
     def read(self,n=-1):
         b=self.f.read(n);self.hash.update(b);return b
 
+def required_paths_missing(required,entries):
+    """Prove logical requirements using only links and targets in this archive.
+
+    Module compatibility links remain links, with one canonical copy of their files.
+    Never consult the live filesystem when verifying a payload or accept a missing,
+    cyclic, or root-escaping target as evidence that a required file was archived.
+    """
+    def resolve(name):
+        logical=pathlib.PurePosixPath(name)
+        if logical.is_absolute() or '..' in logical.parts:return None
+        pending=list(logical.parts);resolved=[];hops=0
+        while pending:
+            part=pending.pop(0)
+            if part in ('','.'):
+                continue
+            if part=='..':
+                if not resolved:return None
+                resolved.pop();continue
+            entry=entries.get('/'.join([*resolved,part]))
+            if entry is None:return None
+            kind=entry.get('kind','file')
+            if kind=='symlink':
+                hops+=1
+                if hops>40 or not entry['target']:return None
+                target=pathlib.PurePosixPath(entry['target'])
+                if target.is_absolute():resolved=[]
+                pending=list(target.parts[1:] if target.is_absolute() else target.parts)+pending
+            else:
+                if pending and kind!='directory':return None
+                resolved.append(part)
+        name='/'.join(resolved)
+        return name if name in entries else None
+    return sorted(name for name in required if resolve(name) is None)
+
 def create(output,root=pathlib.Path('/'),sources=None,required=None,include_dependencies=True):
     root=pathlib.Path(root).resolve();output=pathlib.Path(output)
     contract_state=contracts_check(root)
@@ -227,7 +261,7 @@ def create(output,root=pathlib.Path('/'),sources=None,required=None,include_depe
                 with snap.open('rb') as f:
                     reader=DigestReader(f);archive.addfile(info,reader)
                 entries[name]={'kind':'sqlite_snapshot','bytes':info.size,'sha256':reader.hash.hexdigest(),'mode':info.mode};snapshots.append(name)
-        missing=[n for n in required if n not in entries]
+        missing=required_paths_missing(required,entries)
         if missing:raise RuntimeError('required paths not archived: '+', '.join(missing))
         if contracts_check(root)!=contract_state:raise RuntimeError('module contracts changed during backup')
         if contract_state.get('degraded'):
@@ -273,7 +307,7 @@ def verify(path,expected_required=()):
             if record['sha256']!=actual.get('sha256') or record['bytes']!=actual.get('bytes'):raise ValueError('checksum mismatch: '+name)
         elif any(actual.get(k)!=v for k,v in record.items()):raise ValueError('member metadata mismatch: '+name)
         if 'mode' in record and record['mode']!=actual['mode']:raise ValueError('mode mismatch: '+name)
-    missing=(set(manifest['required'])|set(expected_required))-set(entries)
+    missing=required_paths_missing(set(manifest['required'])|set(expected_required),declared)
     if missing:raise ValueError('required paths missing: '+', '.join(sorted(missing)))
     return {'ok':True,'entries':len(entries),'required':len(manifest['required']),
             'modules':sorted(n for n in manifest['sources'] if n.startswith('opt/walter-')),
