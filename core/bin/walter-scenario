@@ -119,6 +119,48 @@ def step_mcp(step: dict, env: dict) -> dict:
             "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("output") or res.get("answer") or res.get("raw") or "")[:600]}
 
 
+def step_harness(step: dict, env: dict) -> dict:
+    """The request played inside a real runtime (runtime-neutral bench, P7 prep 2026-10-28): its own loop, model and
+    Walter adapter (hooks, MCP). DSH today: `dsh --profile headless --json`. Returns the harness session key, the
+    final answer and the runtime's own token usage; the run is the one the harness's hook opened."""
+    import tempfile
+    rt = step.get("runtime", "dsh")
+    if rt != "dsh":
+        return {"ok": False, "error": f"runtime {rt} not wired yet (dsh only)"}
+    ws = tempfile.mkdtemp(prefix="walter-scenario-dsh-")
+    e = {**env, "DSH_HOME": step.get("dsh_home", "/opt/dsh/home")}
+    t0 = time.time()
+    try:
+        out = subprocess.run([step.get("dsh", "/opt/dsh/node_modules/.bin/dsh"), "--profile", step.get("profile", "headless"),
+                              "--json", step["prompt"]], capture_output=True, text=True, cwd=ws, env=e,
+                             timeout=int(step.get("timeout", 900)))
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "timeout"}
+    sid, answer, tin, tout, steps = None, None, 0, 0, 0
+    for line in out.stdout.splitlines():
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if ev.get("type") == "session":
+            sid = ev.get("sessionId")
+        elif ev.get("type") == "final":
+            answer = ev.get("text")
+        elif ev.get("type") == "status" and ev.get("phase") == "step_end":
+            steps += 1
+            tin += (ev.get("usage") or {}).get("inputTokens") or 0
+            tout += (ev.get("usage") or {}).get("outputTokens") or 0
+    key = f"dsh/vm/{sid}" if sid else None
+    run_id = None
+    if key:
+        time.sleep(2)                       # the Stop hook closes the run synchronously in dsh; let it land
+        f = subprocess.run(["walter-memory", "runs", "find", "--session", key], capture_output=True, text=True, timeout=60)
+        run_id = (json.loads(f.stdout or "{}") or {}).get("run_id")
+    return {"ok": out.returncode == 0 and answer is not None, "runtime": rt, "session": key, "run_id": run_id,
+            "answer": (answer or "")[:600], "steps": steps, "input_tokens": tin, "output_tokens": tout,
+            "seconds": round(time.time() - t0, 1)}
+
+
 def step_cmd(step: dict, run_id: str | None) -> dict:
     cmd = step["shell"].replace("{run_id}", run_id or "")
     out = subprocess.run(["sh", "-c", cmd], capture_output=True, text=True, timeout=int(step.get("timeout", 120)),
@@ -161,8 +203,11 @@ def _tool_calls(session_id: str) -> list[str]:
 def check(assertion: dict, shown: dict) -> tuple[bool, str]:
     if "tool_called" in assertion:
         sessions = [t.get("session_id") for t in shown.get("tasks") or [] if t.get("session_id")]
+        sessions += [l.get("ref") for l in shown.get("links") or [] if l.get("kind") == "session"]
         tools = [x for s in sessions for x in _tool_calls(s)]
-        return assertion["tool_called"] in tools, f"tools in task sessions: {sorted(set(filter(None, tools)))}"
+        name = assertion["tool_called"]           # runtimes prefix MCP tools (mcp__walter__x, walter__x, walter.x)
+        hit = any(t and (t == name or t.endswith("_" + name) or t.endswith("." + name)) for t in tools)
+        return hit, f"tools in the run's sessions: {sorted(set(filter(None, tools)))[:12]}"
     if "link_kind" in assertion:
         n = sum(1 for l in shown.get("links") or [] if l.get("kind") == assertion["link_kind"])
         return n >= assertion.get("min", 1), f"links of kind {assertion['link_kind']}: {n}"
@@ -235,6 +280,12 @@ def run(path: Path) -> dict:
             with ThreadPoolExecutor(len(step["parallel"])) as ex:
                 futs = [ex.submit(step_mcp, s["mcp"], env) for s in step["parallel"]]
                 r = {"results": [f.result() for f in futs]}
+        elif kind == "harness":
+            r = step_harness(step["harness"], env)
+            if r.get("run_id"):
+                report["run_id"] = r["run_id"]
+                report.setdefault("runs", []).append(r["run_id"])
+            report["harness"] = {k: r.get(k) for k in ("runtime", "session", "steps", "input_tokens", "output_tokens", "seconds")}
         elif kind == "wait":
             time.sleep(float(step["wait"])); r = {"waited": step["wait"]}
         elif kind == "cmd":                 # a deterministic tool on the run's data; {run_id} is substituted
@@ -270,7 +321,8 @@ def run(path: Path) -> dict:
             ok, detail = check(a, shown) if shown else (False, "no run recorded")
         report["assertions"].append({"ok": ok, "assert": a, "detail": detail})
     report["ok"] = bool(report["assertions"]) and all(a["ok"] for a in report["assertions"])
-    report["metrics"] = metrics(shown)
+    report["metrics"] = {**metrics(shown), **{f"harness_{k}": v for k, v in (report.get("harness") or {}).items()
+                                                 if k in ("steps", "input_tokens", "output_tokens", "seconds")}}
     report["variant"] = os.environ.get("WALTER_LAB_VARIANT")
     if report["ok"] and not report["variant"]:
         qualify(sc, report)

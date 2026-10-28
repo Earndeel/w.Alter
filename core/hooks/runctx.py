@@ -19,6 +19,9 @@ POINTER = Path("/etc/walter/instance")
 STALE_S = 6 * 3600
 
 
+FALLBACK = Path("/tmp/walter-runs")   # harness sandboxes that only allow /tmp (DSH hooks)
+
+
 def _dir() -> Path:
     root = os.environ.get("WALTER_INSTANCE")
     if not root:
@@ -30,13 +33,22 @@ def _dir() -> Path:
 
 
 def record(pid: int, run_id: str, session_id: str, runtime: str) -> None:
-    d = _dir()
-    d.mkdir(parents=True, exist_ok=True, mode=0o700)
-    tmp = d / f".{pid}.{os.getpid()}.tmp"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        json.dump({"run_id": run_id, "session_id": session_id, "runtime": runtime, "at": time.time()}, f)
-    os.replace(tmp, d / f"{pid}.json")
+    """Instance state first; a sandboxed hook that cannot write there falls back to a private /tmp directory."""
+    data = {"run_id": run_id, "session_id": session_id, "runtime": runtime, "at": time.time()}
+    last = None
+    for d in (_dir(), FALLBACK):
+        try:
+            d.mkdir(parents=True, exist_ok=True, mode=0o700)
+            os.chmod(d, 0o700)
+            tmp = d / f".{pid}.{os.getpid()}.tmp"
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as f:
+                json.dump(data, f)
+            os.replace(tmp, d / f"{pid}.json")
+            return
+        except OSError as exc:
+            last = exc
+    raise last
 
 
 def current(pid: int | None = None) -> dict | None:
@@ -44,11 +56,14 @@ def current(pid: int | None = None) -> dict | None:
     if os.environ.get("WALTER_RUN_ID"):
         return {"run_id": os.environ["WALTER_RUN_ID"], "session_id": os.environ.get("WALTER_SESSION_ID"),
                 "task_id": os.environ.get("WALTER_TASK_ID")}
-    try:
-        data = json.loads((_dir() / f"{pid or os.getppid()}.json").read_text())
-    except (OSError, ValueError):
-        return None
-    return data if time.time() - float(data.get("at", 0)) < STALE_S else None
+    found = []
+    for d in (_dir(), FALLBACK):
+        try:
+            found.append(json.loads((d / f"{pid or os.getppid()}.json").read_text()))
+        except (OSError, ValueError):
+            pass
+    data = max(found, key=lambda x: float(x.get("at", 0))) if found else None
+    return data if data and time.time() - float(data.get("at", 0)) < STALE_S else None
 
 
 def env(pid: int | None = None) -> dict[str, str]:

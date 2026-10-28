@@ -1,0 +1,20 @@
+# P7 preparation (2026-10-28) — the same kind of request played inside a real runtime (DSH headless) instead of the
+# MCP-from-runner path: DSH's own loop, its model through walter-llm (Router poste), Walter's tools through MCP, the
+# run opened and closed by the hook adapter in DSH's sandbox. The step makes the bench runtime-neutral for walter-lab.
+name: dsh-recherche
+milestone: P7-prep
+qualifies:
+  - {harness: dsh, capability: browse, scope: "DSH's own agent reads the web through walter_browse (MCP)"}
+  - {harness: dsh, capability: model, scope: "DSH's main model is the Router's choice (walter-llm poste), recorded as applied"}
+  - {harness: dsh, capability: logs, scope: "the DSH run is opened, closed and journaled by the Walter hook adapter"}
+steps:
+  - harness:
+      runtime: dsh
+      prompt: >-
+        Utilise l'outil walter_browse (recherche web) pour trouver le prix d'un americano glacé All Café de 7-Eleven
+        en Thaïlande. Réponds en une ligne JSON {"prix_thb": nombre ou null, "source": url}. N'invente rien.
+      timeout: 600
+assertions:
+  - {path: run.status, equals: ended}
+  - {path: run.routing.applied, equals: true}
+  - {tool_called: walter_browse}

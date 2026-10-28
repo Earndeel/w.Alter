@@ -257,10 +257,13 @@ def run_start(runtime: str, session_key: str, prompt: str, *, channel: str = "ow
         secret = any(cat == "secret" for cat, _ in _privacy().detect(prompt))
         run_id = runs.start(origin={"channel": channel, "runtime": runtime, "session_id": session_key},
                             goal=prompt, privacy_class="local_only" if secret else "cloud_allowed", dedupe_key=dedupe)
-        if record_pid:
-            runctx.record(record_pid, run_id, session_key, runtime)
         runs.safe(runs.routing, run_id, {"applied": True, "via": "walter-llm poste (DSH provider walter)"} if runtime == "dsh"
                   else {"applied": False, "constraint": "harness_imposed", "runtime": runtime})
+        if record_pid:
+            try:
+                runctx.record(record_pid, run_id, session_key, runtime)
+            except OSError as e:          # the run exists; only its lookup by the harness's tools is lost
+                log(f"run record failed {type(e).__name__}")
         if int(time.time() * 1000) % 50 == 0:          # now and then: close runs that never got an end,
             runs.safe(runs.sweep)                         # and write the episodes a lost detached build missed
             runctx.sweep()
