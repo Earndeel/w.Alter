@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Walter Browse watchdog in Incident v1 (2026-10-28): engines, exits, egress rule (walter-exit-local probe)."""
+import json, subprocess, sys, time, urllib.request
+
+
+def sh(*cmd, timeout=60):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(cmd, 124, "", str(exc))
+
+
+def active(unit):
+    return sh("systemctl", "is-active", unit).stdout.strip() == "active"
+
+
+def http_json(url, timeout=5):
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return json.loads(r.read())
+    except Exception as exc:  # noqa: BLE001
+        return {"_error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
+
+def inc(module, key, kind, severity, summary, evidence=None, level="G0"):
+    return {"version": 1, "module": module, "key": key, "kind": kind, "severity": severity, "summary": summary,
+            "evidence": evidence or {}, "suggested_level": level}
+
+
+def units_down(module, units, severity="high"):
+    return [inc(module, f"service:{u}", "service_down", severity, f"Le service {u} n'est pas actif.", {"unit": u}, "G1")
+            for u in units if not active(u)]
+
+
+out = units_down("browse", ["camoufox-max", "cloakbrowser-max", "walter-exit-default", "walter-exit-local", "walter-exit-mac"])
+r = sh("walter-exit-local", "probe", timeout=120)
+try:
+    p = json.loads(r.stdout)
+    for v in p.get("violations") or []:
+        out.append(inc("browse", "egress:" + v[:60], "egress_violation", "critical",
+                       f"Règle de sortie réseau enfreinte : {v}.", {"chromium_exit_country": (p.get("chromium_exit") or {}).get("country")}, "G3"))
+    loc = p.get("local_exit") or {}
+    if loc.get("route") == "closed":
+        out.append(inc("browse", "exit-local:closed", "exit_closed", "info",
+                       "Sortie locale fermée : Camoufox et les lectures de page sont refusés.", {"why": loc.get("why")}, "G0"))
+except ValueError:
+    out.append(inc("browse", "egress:probe", "check_failed", "high", "La sonde de sortie réseau ne répond pas.", {"rc": r.returncode}))
+print(json.dumps(out, ensure_ascii=False))

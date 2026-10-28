@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "module": "browse",
+  "check": [
+    "python3",
+    "/walter/browse/guardian/check"
+  ],
+  "max_level": "G1",
+  "levels": {
+    "G0": "moteurs, sorties réseau, règle d'égress",
+    "G1": "relancer un moteur ou une sortie"
+  },
+  "note": "Une violation de la règle de sortie est G3 : seul le propriétaire décide.",
+  "format": "incident-v1",
+  "timeout_seconds": 240
+}
