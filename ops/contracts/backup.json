@@ -1,0 +1,145 @@
+{
+  "id": "backup",
+  "anchors": [
+    "contracts/backup.json",
+    "walter_backup/core.py",
+    "walter_backup/cli.py",
+    "bin/walter-backup"
+  ],
+  "requires": [],
+  "external": [
+    "systemd units walter-pg-backup, walter-statedb-backup, walter-offsite-backup, walter-offsite-restore-test, walter-restore-isolated (wrapped, not owned yet)",
+    "git",
+    "docker (PostgreSQL container for db checkpoints and dump checks)",
+    "zstd, tar"
+  ],
+  "data": [
+    "checkpoint log",
+    "checkpoint archives and dumps",
+    "git checkpoint refs (refs/walter-backup/*)"
+  ],
+  "core_paths": [
+    "walter_backup/core.py",
+    "walter_backup/cli.py"
+  ],
+  "backup_paths": [
+    ".",
+    "@instance/config/backup",
+    "@instance/state/backup"
+  ],
+  "interfaces": [
+    "CLI walter-backup status|check|run|verify|git|checkpoint|checkpoints",
+    "Incident v1 (check) for the guardian supervisor"
+  ],
+  "bindings": {
+    "hermes": "CLI under host execution permissions",
+    "dsh": "CLI under host execution permissions",
+    "codex": "CLI under host execution permissions",
+    "claude-code": "CLI under host execution permissions"
+  },
+  "limitations": [
+    "Façade: the backup units and scripts stay where they are until qualified (owner decision 2026-10-28).",
+    "Restores are described, never executed by the tool.",
+    "A git checkpoint holds tracked files only; untracked files are listed, not captured.",
+    "Optional modules: memory (Raw Vault sample of verify), core (walter contracts for conformity)."
+  ],
+  "services": [],
+  "optional": [
+    "memory",
+    "core"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "0.1.0",
+    "owner": "backup",
+    "kind": "foundation",
+    "purpose": "Conserver, versionner, sauvegarder, vérifier et restaurer l'état de Walter, indépendamment des autres modules.",
+    "target_root": "backup",
+    "config_paths": [
+      "config/backup.toml",
+      "@instance/config/backup/backup.toml"
+    ],
+    "permissions": [
+      "lecture des sauvegardes et des unités",
+      "démarrage des unités de sauvegarde existantes",
+      "aucune restauration sans accord du propriétaire"
+    ],
+    "invariants": [
+      "Fonctionne sans Router, Context, Hermes, DSH ni modèle ; Memory seulement pour l'échantillon du Raw Vault.",
+      "Conformité, santé des sauvegardes et restaurabilité restent trois réponses distinctes.",
+      "Aucune valeur secrète dans les sorties."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Une commande interrompue ne laisse qu'un fichier partiel supprimé ou une référence git cohérente.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "status",
+        "transport": "cli",
+        "interface": "walter-backup status",
+        "access": "read",
+        "timeout_seconds": 180,
+        "timeout_status": "target"
+      },
+      {
+        "id": "checkpoint",
+        "transport": "cli",
+        "interface": "walter-backup checkpoint",
+        "access": "write",
+        "timeout_seconds": 3600,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "checkpoints",
+        "role": "owner",
+        "owner": "backup",
+        "durability": "canonical"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat ; déplacer une implémentation existante seulement après qualification, avec lien de compatibilité."
+    ],
+    "recovery": {
+      "backup": [
+        "Le module et sa configuration sont dans le paquet config offsite ; ses points de reprise sont des fichiers et des références git."
+      ],
+      "restore": [
+        "Réinstaller le module depuis le paquet config ; il ne dépend d'aucun autre module pour démarrer."
+      ],
+      "verification": [
+        "walter-backup status puis verify ; l'exercice isolé reste la preuve complète."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "independent",
+        "assertion": "status et check répondent avec Router, Memory et Hermes arrêtés.",
+        "scope": "integration"
+      },
+      {
+        "id": "three-answers",
+        "assertion": "Une dérive de registre n'empêche ni la sauvegarde ni le rapport de santé.",
+        "scope": "integration"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Backup",
+    "order": 85,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "tools": []
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "module": "backup",
+  "check": [
+    "walter-backup",
+    "check"
+  ],
+  "format": "incident-v1",
+  "timeout_seconds": 240,
+  "max_level": "G1",
+  "levels": {
+    "G0": "constat",
+    "G1": "relancer une unité de sauvegarde existante"
+  },
+  "note": "Le watchdog de walter-backup lui-même ; aucune réparation automatique au-delà de G1."
+}

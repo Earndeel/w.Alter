@@ -253,7 +253,7 @@ def checkpoint(level: str, scope: str, *, schemas: list[str] | None = None, note
 
 def _pg_user() -> str:
     try:
-        return Path("/root/.pgpass").read_text().splitlines()[0].split(":")[3]
+        return Path(os.environ.get("PGPASSFILE") or Path.home() / ".pgpass").read_text().splitlines()[0].split(":")[3]
     except (OSError, IndexError):
         return "hindsight"
 
