@@ -409,3 +409,11 @@ Le parseur actuel lit les pages officielles ; la collecte était bloquée sur HT
 utilise le CLI public de Core/Browse, session dédiée, tailles/délais bornés et identité de classement vérifiée.
 Les routes canoniques observées changent, les clés de board restent stables. Aucune analyse, notification
 ou modification de modèle n’est ajoutée à la collecte. Détails : ARENA.md.
+
+
+### 2026-10-29 — Arena conserve les tableaux non rafraîchis
+
+Une collecte complète partielle pouvait masquer les tableaux précédents. La fusion conserve désormais leurs
+preuves, refuse les tableaux vides et garde les erreurs par catégorie ; health et Guardian exposent la couverture
+incomplète même avec 15 tableaux disponibles. Les routes officielles coding/creative sont actualisées. Réparation
+append-only de la collecte partielle ; les reprises encore bloquées par le transport restent signalées. Voir ARENA.md.
