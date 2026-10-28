@@ -6,6 +6,7 @@ import json
 import math
 import os
 import secrets
+import sys
 import time
 from collections import deque
 from datetime import datetime, timezone, timedelta
@@ -117,6 +118,15 @@ def store(batch):
         result = events.record_events(batch, conn=conn)
         conn.execute("update ingestion.connectors set last_success_at=now() where connector='overland'")
     return result
+
+
+@app.middleware("http")
+async def safe_status_log(request: Request, call_next):
+    response = await call_next(request)
+    if request.method == "POST":
+        # Deliberately exclude path/query, headers, body and error text.
+        print(f"overland ingress: HTTP {response.status_code}", file=sys.stderr, flush=True)
+    return response
 
 
 @app.get("/health")
