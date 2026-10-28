@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "module": "context",
+  "check": [
+    "python3",
+    "/walter/context/guardian/check"
+  ],
+  "max_level": "G1",
+  "levels": {
+    "G0": "service du preflight et latence",
+    "G1": "relancer le service"
+  },
+  "note": "Mode fantôme : un incident n'affecte aucune réponse.",
+  "format": "incident-v1",
+  "timeout_seconds": 240
+}
