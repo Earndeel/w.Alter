@@ -66,7 +66,10 @@ def normalize(body):
         geo = feature.get("geometry")
         payload = {"device_id": DEVICE, "raw": feature}
         kind = "location.telemetry"
-        if isinstance(geo, dict) and geo.get("type") == "Point":
+        # Trip/action records may contain a placeholder Point (0,0); they are
+        # telemetry, never observations of the phone's current position.
+        if (isinstance(geo, dict) and geo.get("type") == "Point"
+                and props.get("type") in (None, "location", "visit")):
             coords = geo.get("coordinates")
             if (not isinstance(coords, list) or len(coords) < 2 or
                     not all(number(v) for v in coords[:2]) or

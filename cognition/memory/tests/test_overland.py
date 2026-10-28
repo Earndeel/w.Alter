@@ -77,3 +77,10 @@ def test_editable_device_label_uses_authenticated_identity():
     assert batch[0]['source_account'] == m.DEVICE
     assert batch[0]['payload']['device_id'] == m.DEVICE
     assert batch[0]['payload']['raw']['properties']['device_id'] == 'iPhone 13 Pro'
+
+
+def test_trip_placeholder_is_not_a_gps_sample():
+    batch = m.normalize({'locations': [point(type='trip', start_location=None, end_location=None)]})
+    assert batch[0]['event_type'] == 'location.telemetry'
+    assert 'lat' not in batch[0]['payload']
+    assert m.settings_for(batch) == {}
