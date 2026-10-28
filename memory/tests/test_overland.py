@@ -70,3 +70,10 @@ def test_oversize_and_bad_json(monkeypatch):
     headers = {'Authorization': 'Bearer test-only-token'}
     assert client.post('/overland', content=b'0'*(m.MAX_BYTES+1), headers=headers).status_code == 413
     assert client.post('/overland', content=b'{"locations":[NaN]}', headers=headers).status_code == 422
+
+
+def test_editable_device_label_uses_authenticated_identity():
+    batch = m.normalize({'locations': [point(device_id='iPhone 13 Pro')]})
+    assert batch[0]['source_account'] == m.DEVICE
+    assert batch[0]['payload']['device_id'] == m.DEVICE
+    assert batch[0]['payload']['raw']['properties']['device_id'] == 'iPhone 13 Pro'

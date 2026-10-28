@@ -60,8 +60,8 @@ def normalize(body):
         if not isinstance(props, dict):
             raise ValueError("properties required")
         dt = timestamp(props.get("timestamp"))
-        if props.get("device_id") not in (None, "", DEVICE):
-            raise ValueError("unexpected device")
+        # The dedicated credential identifies the device; its editable display label
+        # is preserved in raw properties and must not reject otherwise valid samples.
         geo = feature.get("geometry")
         payload = {"device_id": DEVICE, "raw": feature}
         kind = "location.telemetry"
