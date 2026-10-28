@@ -38,7 +38,8 @@
     "HTTP :8890",
     "CLI",
     "MCP",
-    "Overland authenticated HTTP :3010"
+    "Overland authenticated HTTP :3010",
+    "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer"
   ],
   "bindings": {
     "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
@@ -61,7 +62,7 @@
   ],
   "contract": {
     "schema_version": 1,
-    "version": "1.0.0",
+    "version": "1.1.0",
     "owner": "memory",
     "kind": "capability",
     "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
