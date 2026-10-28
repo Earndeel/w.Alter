@@ -114,8 +114,9 @@ def main(argv=None) -> None:
     ob.add_argument("action", choices=["add", "run", "recent"]); ob.add_argument("arg", nargs="?", default="")
     ob.add_argument("--max-age-hours", type=float, default=24)
     rn = sub.add_parser("runs", help="Walter Run Plane: runs, their tasks, model calls and links (P0, 2026-10-27)")
-    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update", "link", "find"])
+    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update", "link", "find", "routing"])
     rn.add_argument("--session", default="", help="find: the latest run of this harness session key"); rn.add_argument("run_id", nargs="?", default="")
+    rn.add_argument("--open-only", action="store_true", help="find: unique open session run or exact run_id; metadata only")
     rn.add_argument("--limit", type=int, default=20)
     a = p.parse_args(argv)
 
@@ -272,10 +273,32 @@ def main(argv=None) -> None:
                                              act=spec.get("act"))}
         elif a.action == "find":            # the latest run of a harness session (a runner that only knows the session)
             from .db import connect
+            fields = "run_id, status, privacy_class" if a.open_only else "run_id"
+            opened = "and status = 'open'" if a.open_only else ""
+            by_id = a.open_only and bool(a.run_id)
+            identity = "run_id" if by_id else "origin->>'session_id'"
+            reference = a.run_id if by_id else a.session
+            limit = 2 if a.open_only and not by_id else 1
             with connect() as conn:
-                row = conn.execute("""select run_id from runs.runs where origin->>'session_id' = %s
-                                      order by started_at desc limit 1""", (a.session,)).fetchone()
+                rows = conn.execute(f"""select {fields} from runs.runs where {identity} = %s {opened}
+                                        order by started_at desc limit {limit}""", (reference,)).fetchall()
+            ambiguous = len(rows) > 1
+            row = rows[0] if rows and not ambiguous else None
             res = {"run_id": str(row["run_id"]) if row else None}
+            if a.open_only:
+                res.update({key: row[key] if row else None for key in ("status", "privacy_class")})
+                if ambiguous:
+                    res["error"] = "ambiguous_open_runs"
+        elif a.action == "routing":         # observed route only; caller content never enters the decision
+            if not a.run_id:
+                p.error("runs routing requires an explicit run_id")
+            spec = json.load(sys.stdin)
+            if not isinstance(spec, dict):
+                p.error("runs routing expects a JSON object on stdin")
+            decision = {key: spec[key] for key in ("applied", "via", "model_id", "model", "provider", "observed_model")
+                        if key in spec}
+            runs.routing(a.run_id, decision)
+            res = {"ok": True}
         elif a.action == "link":            # {"run_id", "kind", "refs": [...]}: what the run used or produced
             spec = json.load(sys.stdin)
             for ref in spec.get("refs") or []:
