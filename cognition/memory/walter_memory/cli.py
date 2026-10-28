@@ -106,7 +106,7 @@ def main(argv=None) -> None:
     vw.add_argument("--depth", default="overview"); vw.add_argument("--domain"); vw.add_argument("--horizon")
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
     rn = sub.add_parser("runs", help="Walter Run Plane: runs, their tasks, model calls and links (P0, 2026-10-27)")
-    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end"]); rn.add_argument("run_id", nargs="?", default="")
+    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update"]); rn.add_argument("run_id", nargs="?", default="")
     rn.add_argument("--limit", type=int, default=20)
     a = p.parse_args(argv)
 
@@ -228,6 +228,10 @@ def main(argv=None) -> None:
             res = runs.recent(a.limit)
         elif a.action == "show":
             res = runs.show(a.run_id) or {"error": "unknown run"}
+        elif a.action == "update":          # what is learned after the start (walter-context preflight): JSON on stdin
+            spec = json.load(sys.stdin)
+            runs.update(spec["run_id"], thread_id=spec.get("thread_id"), level=spec.get("level"))
+            res = {"ok": True}
         elif a.action == "task-start":      # a sub-agent runner (walter-router run): JSON on stdin
             spec = json.load(sys.stdin)
             res = {"task_id": runs.task_start(spec["run_id"], kind=spec.get("kind", "walter_run"), goal=spec.get("goal"),
