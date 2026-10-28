@@ -417,3 +417,12 @@ Une collecte complète partielle pouvait masquer les tableaux précédents. La f
 preuves, refuse les tableaux vides et garde les erreurs par catégorie ; health et Guardian exposent la couverture
 incomplète même avec 15 tableaux disponibles. Les routes officielles coding/creative sont actualisées. Réparation
 append-only de la collecte partielle ; les reprises encore bloquées par le transport restent signalées. Voir ARENA.md.
+
+
+### 2026-10-29 — Couverture Arena restaurée après reprise réseau
+
+Après le rétablissement observé de la sortie réseau et une sonde publique réussie, les reprises ciblées média5
+puis texte3 ont rafraîchi les huit tableaux conservés. Snapshot308 :15 tableaux,2328 lignes, aucune erreur de
+couverture, aucune session de collecte restante. Les échecs précédents restent historiques ; la fraîcheur est
+prouvée par les trois collectes réussies, pas par la seule date du dernier document. Aucun modèle, analyse ou
+notification déclenché. Détails et limites de la couverture : ARENA.md.

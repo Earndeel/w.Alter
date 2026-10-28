@@ -51,4 +51,12 @@ Réparation du 28 octobre UTC : un nouveau snapshot append-only a réuni les 7 t
 qui avaient disparu de la collecte partielle. Les deux snapshots sources et leurs dates sont conservés dans
 la provenance ; les 8 erreurs restent visibles. Les reprises publiques ciblées média/texte ont ensuite échoué
 sur le transport navigateur (`NS_ERROR_CONNECTION_REFUSED`). Les données anciennes restent utilisables mais
-la source est explicitement dégradée. Aucune sélection de modèles, analyse ou notification n’a été déclenchée.
+la source est alors explicitement dégradée. Aucune sélection de modèles, analyse ou notification n’a été déclenchée.
+
+
+Après rétablissement constaté de la sortie réseau Mac, une nouvelle sonde publique a réussi. Deux reprises
+ciblées ont ensuite rafraîchi les cinq tableaux médias (snapshot307), puis les trois catégories texte restantes
+(snapshot308). À 19:37:46 UTC le 28 octobre, les15 tableaux sont disponibles sans erreur de couverture ;
+2328 lignes sont parsées. La preuve de fraîcheur combine les7 tableaux du snapshot298 et ces8 reprises réussies,
+pas la seule date globale du dernier snapshot. La provenance `collection_repair` héritée décrit la réparation
+historique299 ; elle ne constitue pas une liste de fraîcheur courante. Les échecs initiaux restent historiques.
