@@ -1,0 +1,11 @@
+{
+ "base_sha": "ec4b5be08c35e08b52e469728258f88bc864da62a3da97f73f705cf29aea2198",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-28T04:14:57.073979+00:00",
+ "domain": "model-routing",
+ "kind": "patch",
+ "reason": "La session a révélé un défaut concret : L3 exécutait prioritairement claude-pro, mais le résumé provider conservait kie issu d’un ancien classement. La correction a été vérifiée en CLI et MCP, avec 32 tests ciblés réussis. Elle a aussi établi que le secours OpenRouter précédait Kie à cause de probe_ok=false chez Kie. Cette procédure complète le skill de routage existant sans créer de doublon. [session codex/Codex Desktop/01a177fa-19ad-7523-9a27-2825aa9c89bf]",
+ "runtime": "learner",
+ "session_id": "codex/Codex Desktop/01a177fa-19ad-7523-9a27-2825aa9c89bf",
+ "target": "multi-model-coder-router"
+}
