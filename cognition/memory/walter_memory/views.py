@@ -71,11 +71,21 @@ def _json(text: str) -> dict:
 
 
 # ── exchanges from walter_logs ─────────────────────────────────────────────────────────────────────────────────────
+TEST_CWD = ("/tmp/walter-scenario-", "/tmp/walter-lab-", "/tmp/dsh-probe")
+
+
+def is_test_session(session_id: str, cwd: str = "") -> bool:
+    """Bench and Lab runs (walter-scenario, walter-lab, probes) are not the owner's activity: no subject from them
+    (2026-10-28: the DSH context trials had created 17 subjects out of their own test questions)."""
+    return "/scenario-" in session_id or any(cwd.startswith(p) for p in TEST_CWD)
+
+
 def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict]:
     """Owner exchanges (message + last visible answer of the turn), cloud_allowed only, in time order."""
     rows = conn.execute("""
         select e.session_id, e.seq, e.type, e.occurred_at, e.text, e.privacy_class, s.runtime,
-               coalesce(s.platform, '') platform, coalesce(s.model, '') model, s.privacy_class session_privacy
+               coalesce(s.platform, '') platform, coalesce(s.model, '') model, s.privacy_class session_privacy,
+               coalesce(s.cwd, '') cwd
         from walter_logs.events e join walter_logs.sessions s using (session_id)
         where e.occurred_at >= %s and e.occurred_at < %s
           and s.runtime in ('claude_code', 'codex', 'hermes', 'dsh')
@@ -84,7 +94,7 @@ def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict
     out, cur, seen, replayed = [], {}, set(), set()
     for r in rows:
         sid = r["session_id"]
-        if (r["model"] == "codex-auto-review" or r["session_privacy"] == "local_only"
+        if (r["model"] == "codex-auto-review" or r["session_privacy"] == "local_only" or is_test_session(sid, r["cwd"])
                 or (r["runtime"] == "claude_code" and ":" in sid)                       # subagent prompts
                 or (r["runtime"] == "hermes" and r["platform"] not in ("telegram", "desktop", "tui", "cli"))):
             continue

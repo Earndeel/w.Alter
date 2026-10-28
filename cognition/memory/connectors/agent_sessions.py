@@ -302,7 +302,14 @@ def files(runtime: str) -> list[Path]:
     return sorted(CODEX_DIR.glob("*/*/*/rollout-*.jsonl"))
 
 
+TEST_WORKSPACES = ("--tmp-walter-scenario-", "--tmp-walter-lab-", "--tmp-dsh-probe")
+
+
 def sync_file(runtime: str, path: Path) -> tuple[int, int]:
+    # Bench / Lab / probe sessions are agents testing Walter, not the owner's life: they stay in walter_logs (what the
+    # agents did) and never reach core.events (2026-10-28: the DSH context trials had put their questions there).
+    if runtime == "dsh" and any(path.parent.parent.name.startswith(w) for w in TEST_WORKSPACES):
+        return 0, 0
     from walter_memory import events, ingestion
     from walter_memory.db import connection
     stream = f"{runtime}:{path}"
