@@ -50,5 +50,9 @@
   {"name": "event.corrected", "description": "Correction of an earlier event (append-only history: the old event stays).",
    "json_schema": {"type": "object", "required": ["target_event_id"], "properties": {"target_event_id": {"type": "string"}, "reason": {"type": "string"}}}},
   {"name": "event.retracted", "description": "An earlier event is declared wrong/irrelevant (the old event stays; readers hide it).",
-   "json_schema": {"type": "object", "required": ["target_event_id"], "properties": {"target_event_id": {"type": "string"}, "reason": {"type": "string"}}}}
+   "json_schema": {"type": "object", "required": ["target_event_id"], "properties": {"target_event_id": {"type": "string"}, "reason": {"type": "string"}}}},
+  {"name": "document.section", "description": "One version of a section of a curated record the instance declares (decisions register, owner rules written down by an agent): its text at that version. A changed section is a new event; the previous one is retracted (walter_memory.documents).",
+   "json_schema": {"type": "object", "required": ["doc_key", "source", "path", "sha"], "properties": {
+     "doc_key": {"type": "string"}, "source": {"type": "string"}, "path": {"type": "string"}, "title": {"type": "string"},
+     "sha": {"type": "string"}}}}
 ]
