@@ -39,11 +39,30 @@ def default_toolsets() -> list[str]:
 def _memory(action: str, payload: dict) -> dict:
     """Walter Memory's Run Plane through its command (declared interface); never blocks the sub-agent."""
     try:
-        out = subprocess.run(["walter-memory", "runs", action], input=json.dumps(payload, default=str),
+        cmd = ["walter-memory", "observations", "add"] if action == "observations-add" else ["walter-memory", "runs", action]
+        out = subprocess.run(cmd, input=json.dumps(payload, default=str),
                              capture_output=True, text=True, timeout=60)
         return json.loads(out.stdout) if out.returncode == 0 else {}
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return {}
+
+
+def _persist_observations(output: str, run_id: str | None, task_id: str | None, geo: dict | None) -> dict:
+    """persist="observations": the answer's "observations" list becomes sourced observations of the run (Walter
+    Memory validates each one: subject and source required, unknown stays unknown). The sub-agent holds no write tool."""
+    text = output.strip()
+    if text.startswith("```"):
+        text = text.strip("`").split("\n", 1)[1] if "\n" in text else text
+        text = text.rsplit("```", 1)[0]
+    try:
+        data = json.loads(text[text.find("{"): text.rfind("}") + 1])
+    except ValueError:
+        return {"stored": 0, "errors": [{"error": "answer is not JSON"}]}
+    items = data.get("observations") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return {"stored": 0, "errors": [{"error": 'answer has no "observations" list'}]}
+    return _memory("observations-add", {"run_id": run_id, "task_id": task_id, "geo": geo, "items": items}) or \
+        {"stored": 0, "errors": [{"error": "walter-memory unavailable"}]}
 
 
 def _child_context(spec: dict) -> dict:
@@ -153,7 +172,8 @@ def _text(conn, d: dict, spec: dict) -> dict:
         os.environ["WALTER_TASK_ID"] = task_id          # read by execution.log and passed to the Tool Gateway
         _memory("task-start", {"run_id": run_id, "task_id": task_id, "kind": "walter_run", "goal": spec["goal"],
                                "session_id": session_id,
-                               "spec": {k: spec.get(k) for k in ("task", "level", "max_turns", "budget_seconds")} |
+                               "spec": {k: spec.get(k) for k in ("task", "level", "max_turns", "budget_seconds",
+                                                                 "constraints", "output_schema", "persist")} |
                                        {"toolsets": list(toolsets), "requested_task": d.get("requested_task")}})
     # P2-b: the sub-agent gets a pack built for its task by walter-context (context.build scope=child), the caller's
     # context kept verbatim inside it; WALTER_RUN_CONTEXT=caller restores the caller's string alone.
@@ -176,6 +196,11 @@ def _text(conn, d: dict, spec: dict) -> dict:
         if gateway:
             gateway.close()
     route = state["route"]
+    persisted = None
+    if spec.get("persist") == "observations" and result.get("ok"):
+        persisted = _persist_observations(result.get("output") or "", run_id, task_id,
+                                          (spec.get("constraints") or {}).get("geo"))
+        result = {**result, "persisted": persisted}
     if run_id:
         _memory("task-end", {"run_id": run_id, "task_id": task_id, "session_id": session_id, "goal": spec["goal"],
                              "parent_session_id": os.environ.get("WALTER_SESSION_ID"),
@@ -187,6 +212,8 @@ def _text(conn, d: dict, spec: dict) -> dict:
                                          "model_id": d.get("model_id"), "provider": route["provider"] if route else None,
                                          "applied": True},
                              "result": {"ok": result.get("ok"), "error": result.get("error"),
+                                        "persisted": {k: (persisted or {}).get(k) for k in ("stored", "skipped", "errors")}
+                                        if persisted else None,
                                         "tools": len(result.get("tools") or []),
                                         "seconds": round(time.monotonic() - started, 1)}})
     user_notice = "\n".join(n["message"] for n in notices)

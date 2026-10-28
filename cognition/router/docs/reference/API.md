@@ -41,6 +41,9 @@ Exécuter une sous-tâche texte ou une génération autorisée ; transmettre use
 | `duration` | integer | 0 | False | Durée média demandée, en secondes ; dépend des capacités du modèle.  |
 | `resolution` | string |  | False | Résolution média ; la valeur peut être normalisée selon les formats du modèle.  |
 | `paid_fallback` | boolean | false | False | Autorise le passage d'un rôle prévu en interface manuelle à une génération payante ; exige la demande de l'utilisateur.  |
+| `constraints` | ["object", "null"] | — | False | Contraintes du sous-agent texte ; geo = {zone, pays, devise, langue} pour une recherche locale (la zone est choisie explicitement sur les sites).  |
+| `output_schema` | ["object", "null"] | — | False | Forme JSON exigée de la réponse du sous-agent texte.  |
+| `persist` | string |  | False | observations = chaque élément de la liste "observations" de la réponse est enregistré comme observation sourcée du run. enum: ["", "observations"] |
 
 ## walter_decide
 
