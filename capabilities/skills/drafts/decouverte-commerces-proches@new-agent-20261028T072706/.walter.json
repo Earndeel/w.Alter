@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-10-28T07:27:06.941881+00:00",
+ "description": "Use when a local shopping research needs the shops and sources that serve a zone (chains, apps, official menus) before comparing offers.",
+ "domain": "research",
+ "kind": "new",
+ "reason": "P3 verticale café glacé (DECISIONS 2026-10-27/28) : skill d'entrée + procédures isolées, Pareto déterministe",
+ "runtime": null,
+ "session_id": "claude_code/vm/7f42f505-1d5b-49d0-ba06-95f9ad649e8d",
+ "target": "decouverte-commerces-proches"
+}
