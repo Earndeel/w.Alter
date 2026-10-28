@@ -22,7 +22,7 @@ SESSION='22222222-2222-4222-8222-222222222222'
 def gateway(tmp_path, monkeypatch):
     source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
     tree=ast.parse(source.read_text())
-    names={'_usage','_number','_telemetry','_uuid','_correlation','_session_run','_run_metadata','_record_attempt','log','build_app'}
+    names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_session_run','_run_metadata','_record_attempt','log','build_app'}
     nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in names]
     agents=tmp_path/'agents.json'
     agents.write_text(json.dumps({hashlib.sha256(b'fixture-token').hexdigest():{'agent':'dsh'}}))
@@ -295,3 +295,14 @@ def test_observed_dsh_routing_uses_public_cli_after_actual_response(tmp_path,mon
     assert len(calls)==1
     calls.clear();ns['_record_attempt']({}, {**entry,'agent':'other'})
     assert len(calls)==1
+
+
+def test_real_dsh_session_prefix_is_resolved_without_rewriting_its_identity(tmp_path,monkeypatch):
+    ns=gateway(tmp_path,monkeypatch);seen=[]
+    native='session-'+SESSION
+    async def complete(*a,**kw):return response()
+    ns.update(provider_completion=complete,log=lambda entry:None,
+              _session_run=lambda sid:seen.append(sid) or {'run_id':RUN,'status':'open','privacy_class':'cloud_allowed'})
+    result=post(ns['build_app'](),{'messages':[],'prompt_cache_key':native})
+    assert result.status_code==200
+    assert seen==['dsh/vm/'+native]
