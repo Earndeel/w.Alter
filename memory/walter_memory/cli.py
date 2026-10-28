@@ -112,7 +112,8 @@ def main(argv=None) -> None:
     ob.add_argument("action", choices=["add", "run", "recent"]); ob.add_argument("arg", nargs="?", default="")
     ob.add_argument("--max-age-hours", type=float, default=24)
     rn = sub.add_parser("runs", help="Walter Run Plane: runs, their tasks, model calls and links (P0, 2026-10-27)")
-    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update", "link"]); rn.add_argument("run_id", nargs="?", default="")
+    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update", "link", "find"])
+    rn.add_argument("--session", default="", help="find: the latest run of this harness session key"); rn.add_argument("run_id", nargs="?", default="")
     rn.add_argument("--limit", type=int, default=20)
     a = p.parse_args(argv)
 
@@ -258,6 +259,12 @@ def main(argv=None) -> None:
             spec = json.load(sys.stdin)
             res = {"ok": True, **runs.update(spec["run_id"], thread_id=spec.get("thread_id"), level=spec.get("level"),
                                              act=spec.get("act"))}
+        elif a.action == "find":            # the latest run of a harness session (a runner that only knows the session)
+            from .db import connect
+            with connect() as conn:
+                row = conn.execute("""select run_id from runs.runs where origin->>'session_id' = %s
+                                      order by started_at desc limit 1""", (a.session,)).fetchone()
+            res = {"run_id": str(row["run_id"]) if row else None}
         elif a.action == "link":            # {"run_id", "kind", "refs": [...]}: what the run used or produced
             spec = json.load(sys.stdin)
             for ref in spec.get("refs") or []:
