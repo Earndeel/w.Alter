@@ -184,6 +184,10 @@ def _text(conn, d: dict, spec: dict) -> dict:
                                "budget": {"seconds": budget, "turns": max_turns}, "run_id": run_id, "task_id": task_id})
         if pack.get("text"):
             context, pack_summary = pack["text"], pack.get("summary")
+            reused = [ref for b in (pack_summary or {}).get("blocks") or [] if b.get("id") == "observations"
+                      for ref in b.get("sources") or []]
+            if run_id and reused:                       # provenance: what the run relied on without re-reading
+                _memory("link", {"run_id": run_id, "kind": "observation_reused", "refs": reused})
     walter_tools = sorted({t for ts in toolsets for t in TOOLSET_TOOLS.get(ts, [])})
     gateway = None
     try:
