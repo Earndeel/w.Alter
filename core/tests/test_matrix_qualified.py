@@ -15,5 +15,7 @@ def test_recent_passes_qualify_old_ones_do_not(tmp_path, monkeypatch):
         "claude-code:skills": {"scenario": "x", "at": "not-a-date"}}}))
     from walter_platform import instance
     monkeypatch.setattr(instance, "state", lambda *parts, **kw: str(f))
+    from walter_platform import qualification
+    monkeypatch.setattr(qualification, "current", lambda q: q.get("scenario") == "e2e-minimal")
     q = harness_matrix._scenario_qualifications()
     assert set(q) == {"claude-code:browse"} and q["claude-code:browse"]["run_id"] == "r1"

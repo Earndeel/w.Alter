@@ -12,7 +12,7 @@ follow-up, repair on a copy behind deterministic gates, sparse Telegram).
  "timeout_seconds": 120, "max_level": "G1", "levels": {"G0": "…", "G1": "…"}, "note": "…"}
 ```
 
-- `check` prints a JSON list of **Incident v1** (`contracts/schemas/incident-v1.json`); `[]` = healthy. No model, no
+- `check` exits with code 0 and prints a JSON list of **Incident v1** (`contracts/schemas/incident-v1.json`); only code 0 plus `[]` means healthy. No model, no
   side effect, fast. It is the module's watchdog (G0); its guardian agent and maintenance executor, when they exist,
   stay inside the module (router: `walter-router-guardian run`).
 - `max_level` = the most the module's own guardian may do without the owner: G0 observe · G1 routine reversible action
@@ -24,6 +24,31 @@ follow-up, repair on a copy behind deterministic gates, sparse Telegram).
 
 `walter-guardians check [--no-notify]` runs every declared check (parallel, bounded), keeps open incidents by
 `module:key` in `@instance/state/guardians/state.json`, appends openings/closings to `incidents.jsonl`, and sends
-Telegram (Bot API directly, no Hermes) only for **new** `high`/`critical` incidents. A check that fails, times out or
-prints something else becomes the incident `guardian:unreachable` of that module. `walter-guardians status` reads
+Telegram (Bot API directly, no Hermes) for new `high`/`critical` incidents and severity escalations. A nonzero exit,
+timeout, invalid JSON, invalid Incident v1, duplicate key, or incident attributed to a module outside the declaration
+fails the complete watchdog response and becomes `guardian:unreachable`. Failure to read the module inventory
+becomes `core:guardian:unreachable`; an existing but invalid maintenance declaration becomes the same incident
+for its module. Neither discovery failure can be reported as an empty healthy pass. Invalid items are never silently discarded.
+The supervisor preserves previously open incidents for a watchdog that failed; failure cannot establish recovery.
+A later valid response can close them. `walter-guardians status` reads
 the state. Timer `walter-guardians.timer` (every 15 min). Standard library, system `python3`.
+
+
+## Notification delivery (2026-10-29)
+
+The open incident state is also the persistent delivery queue. A failed send stays pending across supervisor
+invocations. Attempts are bounded to five per incident/severity, with delays of 15, 30, 60 and 120 minutes before
+the remaining attempts (maximum configured delay 6 hours). A severity escalation resets delivery attempts;
+a successful send suppresses repeats while the incident stays unchanged. Resolving the incident removes its
+pending alert. `--no-notify` observes and updates incidents without sending or consuming an attempt; pending
+alerts remain available for a later notified pass. Each batch contains at most ten bounded incident summaries,
+so incidents omitted from a batch are not falsely acknowledged. `check` returns pending/exhausted counts.
+An exhausted alert remains visible in state/status and requires operational review; it is not retried forever.
+
+State is replaced atomically after each pass; incident openings, closings and escalations are appended to
+`incidents.jsonl`. The supervisor stores return codes and invalid-response metadata, never raw watchdog stderr
+(which could include secrets). The Telegram transport is unchanged; isolated tests replace it with a fake
+function and never access the grant or send a real message.
+
+Coverage is limited to modules with a maintenance declaration. A missing declaration does not claim a healthy module
+and does not invent a watchdog; use `walter-guardians list` to inspect the actual coverage.

@@ -35,10 +35,10 @@ def test_life_cycle_and_sparse_notification(tmp_path, monkeypatch):
     assert events.count("opened") == 3 and events.count("closed") == 3
 
 
-def test_malformed_incidents_are_dropped_not_trusted(tmp_path, monkeypatch):
+def test_malformed_incidents_fail_the_watchdog(tmp_path, monkeypatch):
     monkeypatch.setenv("WALTER_INSTANCE", str(tmp_path / "inst"))
     monkeypatch.setattr(G, "_telegram", lambda text: True)
     bad = json.dumps([{"module": "c", "key": "k", "severity": "high"}, {"version": 1, "module": "c", "key": "ok",
                                                                          "kind": "x", "severity": "loud", "summary": "?"}])
     monkeypatch.setattr(G, "declarations", lambda: [_decl(tmp_path, "c", bad)])
-    assert G.check(notify=False)["opened"] == []
+    assert G.check(notify=False)["opened"] == ["c:guardian:unreachable"]

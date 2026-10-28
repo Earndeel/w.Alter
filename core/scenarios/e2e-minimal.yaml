@@ -4,7 +4,7 @@
 name: e2e-minimal
 milestone: P1
 qualifies:
-  - {harness: claude-code, capability: browse, scope: "a routed walter_run sub-agent reads the web through walter_browse (Tool Gateway)"}
+  - {harness: claude-code, capability: browse, scope: "a successful routed sub-agent returns two distinct sourced offers through walter_browse; snippets are labelled, missing prices remain explicit"}
   - {harness: claude-code, capability: logs, scope: "the run and the sub-agent's full trace are recorded and linked"}
   - {harness: claude-code, capability: model, scope: "sub-agents run on the Router's choice (the main model stays the harness's)"}
 steps:
@@ -16,7 +16,12 @@ steps:
         goal: >-
           Trouve 2 offres réelles de café glacé All Café vendues par 7-Eleven en Thaïlande. Utilise walter_browse
           (recherche puis lecture des pages). Pour chaque offre : produit, prix en THB, volume si visible, URL source.
-          N'invente rien : écris "inconnu" si une valeur manque. Réponds en JSON {"offers": [...]} uniquement.
+          N'invente rien : écris la chaîne littérale "inconnu" si prix ou volume manque. Un prix connu est un
+          nombre JSON sans guillemets (55, jamais "55"). Réponds uniquement avec {"offers": [...]} ; chaque offre
+          contient product (nom texte), price_thb (nombre JSON ou "inconnu"), volume (texte ou "inconnu"),
+          source_url (URL texte), method (search_snippet|http|static_html|browser|api). Si seule une recherche est
+          lisible, utilise "search_snippet". N'annonce une page lue (http, static_html, browser ou api) qu'après un
+          appel walter_browse sur son URL réussi avec un contenu retourné ; sinon ne fabrique pas cette preuve.
         task: research
         level: L2
         max_turns: 12
@@ -29,3 +34,6 @@ assertions:
   - {path: "tasks[*].kind", contains: walter_run}
   - {path: model_calls, min_len: 1}
   - {tool_called: walter_browse}
+  - {path: "tasks[*].status", all: ended}
+  - {path: "tasks[*].result.ok", all: true}
+  - {task_offers: 2, kind: walter_run}

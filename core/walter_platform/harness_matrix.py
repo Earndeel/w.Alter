@@ -29,12 +29,21 @@ def _scenario_qualifications():
         return {}
     out={}
     limit=datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=QUALIFICATION_MAX_AGE_DAYS)
-    for key,q in data.get('pairs',{}).items():
+    pairs = data.get('pairs', {}) if isinstance(data, dict) else {}
+    if not isinstance(pairs, dict):return {}
+    from .qualification import current
+    verified = {}
+    for key,q in pairs.items():
+        if not isinstance(q, dict):continue
         try:
             at=datetime.datetime.strptime(q['at'],'%Y%m%dT%H%M%SZ').replace(tzinfo=datetime.timezone.utc)
-        except (KeyError,ValueError):
+        except (KeyError,ValueError,TypeError):
             continue
-        if at>=limit:out[key]={**q,'evidence':'walter-scenario run '+q['scenario']+' (assertions on the recorded run)'}
+        if not (limit <= at <= datetime.datetime.now(datetime.timezone.utc)) or not q.get('run_id'):
+            continue
+        ident = json.dumps([q.get('scenario'), q.get('attestation')], sort_keys=True)
+        if ident not in verified:verified[ident] = current(q)
+        if verified[ident]:out[key]={**q,'evidence':'walter-scenario run '+q['scenario']+' (assertions and source attestation)'}
     return out
 
 
@@ -93,5 +102,5 @@ def matrix():
             'definitions':{'available':'Declared module anchors are present locally.',
                            'bound':'Configuration selects a Walter port/surface, with stated scope; process reload is not inferred.',
                            'in_use':'A dated historical interface invocation/ingestion was observed; success or current revision is not inferred. Null means unknown.',
-                           'qualified':'A recent (14 days) passing end-to-end scenario on real traces for the stated scope (walter-scenario qualifies:); null means not demonstrated.'},
+                           'qualified':'A recent (14 days) passing scenario with matching source/version/scenario attestation for the stated scope; legacy or changed-source evidence is historical only. Null means not demonstrated.'},
             'observation_snapshot_at':evidence.get('generated_at'),'bindings':rows}

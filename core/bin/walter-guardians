@@ -2,7 +2,7 @@
 """walter-guardians — the minimal health supervisor of Walter's modules (P5, 2026-10-28; GUARDIANS.md).
 
 It runs every module's declared watchdog (`<module root>/contracts/maintenance.json`), follows incidents by
-module:key, and tells the owner on Telegram only about NEW high/critical incidents. It holds no diagnosis of its own:
+module:key, and delivers new or escalated high/critical incidents with bounded retries. It holds no diagnosis of its own:
 each module's guardian owns that. It must work with Router, Memory, Hermes and every model provider down, so it is
 standard-library Python run by the system interpreter, and it reaches Telegram's Bot API directly (token from the
 walter-secrets grant `telegram-bot`).
@@ -27,6 +27,9 @@ from urllib.request import Request, urlopen
 
 NOTIFY = {"high", "critical"}
 SEVERITIES = ("info", "warning", "high", "critical")
+MAX_ATTEMPTS = 5
+RETRY_SECONDS = 900
+MAX_NOTIFY_BATCH = 10
 
 
 def sh(*cmd: str, timeout: float = 60) -> subprocess.CompletedProcess:
@@ -49,46 +52,81 @@ def state_dir() -> Path:
 
 
 def declarations() -> list[dict]:
-    """Every `contracts/maintenance.json` of the registered modules (each file once, whatever shares its root)."""
+    """Declared watchdogs once per root. A failed discovery/declaration is itself observable."""
     r = sh("walter", "modules", timeout=60)
+    failure = lambda module, error: {"version": 1, "module": module, "check": [], "_error": error}
     try:
-        roots = {m["root"] for m in json.loads(r.stdout).get("modules", [])}
-    except ValueError:
-        roots = set()
+        inventory = json.loads(r.stdout)
+        modules = inventory.get("modules") if isinstance(inventory, dict) else None
+        if r.returncode or not isinstance(modules, list) or not modules:
+            raise ValueError("module_discovery_failed")
+        roots, registered = {}, set()
+        for module in modules:
+            if (not isinstance(module, dict) or not isinstance(module.get("id"), str)
+                    or not isinstance(module.get("root"), str) or not Path(module["root"]).is_absolute()):
+                raise ValueError("invalid_module_inventory")
+            roots.setdefault(module["root"], set()).add(module["id"])
+            registered.add(module["id"])
+    except (ValueError, TypeError):
+        return [failure("core", "module_discovery_failed")]
     seen, out = set(), []
-    for root in sorted(roots):
+    for root, names in sorted(roots.items()):
         p = Path(root) / "contracts" / "maintenance.json"
         try:
             real = p.resolve()
             if real in seen or not p.exists():
-                continue
+                continue  # Absence is not declared coverage; status lists only registered checks.
             seen.add(real)
             d = json.loads(p.read_text())
-            if d.get("version") == 1 and d.get("check"):
-                out.append({**d, "_file": str(p)})
-        except (OSError, ValueError):
-            continue
+            if (not isinstance(d, dict) or d.get("version") != 1 or d.get("module") not in names
+                    or not isinstance(d.get("check"), list) or not d["check"]
+                    or any(not isinstance(arg, str) or not arg for arg in d["check"])):
+                raise ValueError("invalid_maintenance_declaration")
+            timeout = float(d.get("timeout_seconds", 120))
+            if not (0 < timeout <= 3600):
+                raise ValueError("invalid_check_timeout")
+            if "modules" in d and (not isinstance(d["modules"], list) or any(not isinstance(name, str) or name not in registered for name in d["modules"])):
+                raise ValueError("invalid_module_ownership")
+            out.append({**d, "_file": str(p)})
+        except (OSError, ValueError, TypeError):
+            out.append({**failure(sorted(names)[0], "invalid_maintenance_declaration"), "_file": str(p)})
     return out
 
 
 def run_check(decl: dict) -> tuple[dict, list[dict], dict]:
     t0 = time.time()
-    r = sh(*decl["check"], timeout=float(decl.get("timeout_seconds", 120)))
+    r = (subprocess.CompletedProcess([], 1, "", "") if decl.get("_error")
+         else sh(*decl["check"], timeout=float(decl.get("timeout_seconds", 120))))
     meta = {"module": decl["module"], "rc": r.returncode, "seconds": round(time.time() - t0, 1),
             "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     try:
+        if r.returncode != 0:
+            raise ValueError("nonzero_exit")
         items = json.loads(r.stdout)
         if not isinstance(items, list):
-            raise ValueError("not a list")
-        good = [i for i in items if isinstance(i, dict) and i.get("version") == 1 and i.get("key")
-                and i.get("severity") in SEVERITIES]
+            raise ValueError("not_a_list")
+        allowed = set(decl.get("modules") or []) | {decl["module"]}
+        keys = set()
+        for i in items:
+            if (not isinstance(i, dict) or type(i.get("version")) is not int or i["version"] != 1
+                    or any(not isinstance(i.get(k), str) or not i[k].strip()
+                           for k in ("module", "key", "kind", "severity", "summary"))
+                    or i["module"] not in allowed or i["severity"] not in SEVERITIES
+                    or ("evidence" in i and not isinstance(i["evidence"], dict))
+                    or ("suggested_level" in i and i["suggested_level"] not in ("G0", "G1", "G2", "G3"))):
+                raise ValueError("invalid_incident")
+            key = (i["module"], i["key"])
+            if key in keys:
+                raise ValueError("duplicate_incident")
+            keys.add(key)
         meta["ok"] = True
-        return decl, good, meta
+        return decl, items, meta
     except ValueError:
         meta["ok"] = False
         return decl, [{"version": 1, "module": decl["module"], "key": "guardian:unreachable", "kind": "guardian_unreachable",
-                       "severity": "high", "summary": f"Le watchdog du module {decl['module']} ne répond pas.",
-                       "evidence": {"rc": r.returncode, "stderr": (r.stderr or "")[-200:]}, "suggested_level": "G0"}], meta
+                       "severity": "high", "summary": f"Le watchdog du module {decl['module']} ne répond pas correctement.",
+                       "evidence": {"rc": r.returncode, "invalid_response": True,
+                                    **({"declaration_error": decl["_error"]} if decl.get("_error") else {})}, "suggested_level": "G0"}], meta
 
 
 def _telegram(text: str) -> bool:
@@ -127,34 +165,56 @@ def check(notify: bool = True) -> dict:
         state["modules"][decl["module"]] = {**meta, "incidents": len(items), "max_level": decl.get("max_level")}
         for i in items:
             seen[f"{i['module']}:{i['key']}"] = i
+    escalated = []
     for key, i in seen.items():
         if key in state["open"]:
+            old = state["open"][key]["incident"]["severity"]
+            if SEVERITIES.index(i["severity"]) > SEVERITIES.index(old):
+                escalated.append(key)
+                state["open"][key].update(notified=False, attempts=0, next_attempt=0)
             state["open"][key].update(last_seen=now, incident=i)
         else:
             state["open"][key] = {"first_seen": now, "last_seen": now, "incident": i, "notified": False}
             opened.append(key)
     checked = {d["module"] for d, _, m in results}
+    healthy = {name for d, _, m in results if m["ok"] for name in (set(d.get("modules") or []) | {d["module"]})}
     for key in list(state["open"]):
-        if key.split(":", 1)[0] in checked and key not in seen:
+        if key.split(":", 1)[0] in healthy and key not in seen:
             closed.append(key)
             state["open"].pop(key)
     with open(sd / "incidents.jsonl", "a") as f:
         for k in opened:
             f.write(json.dumps({"at": now, "event": "opened", "key": k, "incident": seen[k]}, ensure_ascii=False) + "\n")
+        for k in escalated:
+            f.write(json.dumps({"at": now, "event": "escalated", "key": k, "incident": seen[k]}, ensure_ascii=False) + "\n")
         for k in closed:
             f.write(json.dumps({"at": now, "event": "closed", "key": k}, ensure_ascii=False) + "\n")
-    to_tell = [k for k in opened if seen[k]["severity"] in NOTIFY]
-    sent = False
+    # The open-incident state is the delivery queue. --no-notify keeps pending items untouched.
+    due = time.time()
+    pending = [k for k, v in state["open"].items() if v["incident"]["severity"] in NOTIFY
+               and not v.get("notified") and v.get("attempts", 0) < MAX_ATTEMPTS]
+    to_tell = [k for k in pending if state["open"][k].get("next_attempt", 0) <= due][:MAX_NOTIFY_BATCH]
+    sent = None
     if notify and to_tell:
-        lines = ["W.Alter — guardians"] + [f"• {seen[k]['module']} ({seen[k]['severity']}) : {seen[k]['summary']}"
-                                           for k in to_tell]
+        lines = ["W.Alter — guardians"] + [f"• {state['open'][k]['incident']['module'][:50]} "
+                    f"({state['open'][k]['incident']['severity']}) : {state['open'][k]['incident']['summary'][:250]}"
+                    for k in to_tell]
         sent = _telegram("\n".join(lines))
         for k in to_tell:
-            state["open"][k]["notified"] = sent
+            item = state["open"][k]
+            attempts = item.get("attempts", 0) + 1
+            item.update(notified=sent, attempts=attempts, last_attempt=now,
+                        next_attempt=due + min(RETRY_SECONDS * 2 ** (attempts - 1), 21600))
     state["last_pass"] = now
-    st_path.write_text(json.dumps(state, ensure_ascii=False, indent=1))
+    tmp = st_path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False, indent=1))
+    tmp.replace(st_path)
     return {"at": now, "modules": {m: v for m, v in state["modules"].items() if m in checked},
-            "opened": opened, "closed": closed, "open": len(state["open"]), "notified": sent if to_tell else None}
+            "opened": opened, "escalated": escalated, "closed": closed, "open": len(state["open"]),
+            "notified": sent, "pending_notifications": sum(1 for v in state["open"].values()
+                if v["incident"]["severity"] in NOTIFY and not v.get("notified")),
+            "exhausted_notifications": sum(1 for v in state["open"].values()
+                if not v.get("notified") and v.get("attempts", 0) >= MAX_ATTEMPTS)}
 
 
 def status() -> dict:
@@ -165,7 +225,9 @@ def status() -> dict:
     by_sev = {}
     for k, v in s["open"].items():
         by_sev.setdefault(v["incident"]["severity"], []).append(f"{k} — {v['incident']['summary']}")
-    return {"last_pass": s.get("last_pass"), "modules": s["modules"],
+    delivery = {k: {field: v.get(field) for field in ("notified", "attempts", "last_attempt", "next_attempt")}
+                for k, v in s["open"].items() if v["incident"]["severity"] in NOTIFY and not v.get("notified")}
+    return {"last_pass": s.get("last_pass"), "modules": s["modules"], "pending_delivery": delivery,
             "open": {sev: by_sev.get(sev, []) for sev in reversed(SEVERITIES) if by_sev.get(sev)}}
 
 
