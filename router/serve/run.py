@@ -133,13 +133,15 @@ def _text(conn, d: dict, spec: dict) -> dict:
             if available <= 0:
                 raise RuntimeError("budget_exhausted")
             t0 = time.monotonic()
-            entry = {"provider": route["provider"], "model": route["model"]}
+            entry = {"provider": route["provider"], "model": route["model"],
+                     "usage": None, "cost_usd": None, "cost_status": "unknown"}
             try:
                 # Keep time for this model's remaining providers when one endpoint hangs.
                 attempt_timeout = available / (len(candidates) - state["index"])
                 response = text_agent.complete(route, messages, tools, attempt_timeout)
                 entry.update(ok=True, response_id=response.get("response_id"),
-                             response_model=response.get("response_model"))
+                             response_model=response.get("response_model"), usage=response.get("usage"),
+                             cost_usd=response.get("cost_usd"), cost_status=response.get("cost_status") or "unknown")
             except (RuntimeError, OSError, ValueError, KeyError) as exc:
                 entry.update(ok=False, error=str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__)
                 response = None
@@ -147,7 +149,8 @@ def _text(conn, d: dict, spec: dict) -> dict:
             attempts.append(entry)
             execution.log(conn, {"task": d.get("task"), "role": d.get("role"), "model_id": d.get("model_id"),
                                  "provider": route["provider"], "model": route["model"],
-                                 "ok": entry["ok"], "seconds": entry["seconds"]})
+                                 "ok": entry["ok"], "seconds": entry["seconds"], "usage": entry["usage"],
+                                 "cost_usd": entry["cost_usd"], "cost_status": entry["cost_status"]})
             conn.commit()
             if response is not None:
                 state["route"] = route
