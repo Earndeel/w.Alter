@@ -27,3 +27,28 @@ sans assez de classements est refusée. Lire la couverture réelle, pas seulemen
 `walter-router research --source arena --no-notify` collecte sans analyse ni notification. Ne pas ajouter
 `--analyse` pour une simple réparation de collecte : cette option recalcule les choix et republie la page.
 Le retour arrière applicatif rétablit arena.py et le contrat ; les snapshots publics restent historiques.
+
+
+## Conservation et couverture d’une collecte partielle
+
+Une collecte incomplète fusionne seulement ses tableaux valides avec le dernier document connu. Un tableau
+vide ou absent ne remplace jamais la preuve précédente. Les erreurs de chaque tableau restent présentes ;
+une reprise ciblée ne les efface que pour les tableaux réellement relus. Les tableaux demandés mais absents
+sans erreur explicite sont eux aussi signalés. Un échec complet ne crée pas de snapshot vide.
+
+`health.source_coverage.arena` distingue tableaux disponibles, manquants, en échec et conservés. Une liste de
+15 tableaux disponibles ne signifie pas 15 tableaux rafraîchis : `complete` reste faux en présence d’erreurs.
+Health garde un warning et Guardian un incident `source_error` même quand la date globale du snapshot est récente.
+Le seuil d’âge reste un contrôle distinct ; il ne remplace pas la couverture.
+
+Deux routes spécialisées ont été confirmées sur les pages officielles :
+[coding](https://arena.ai/leaderboard/chat/text/coding) et
+[creative writing](https://arena.ai/leaderboard/chat/text/creative-writing).
+Les clés `text_coding` et `text_creative` restent stables en base. Une route non vérifiée n’est pas déduite
+par analogie avec ces deux pages.
+
+Réparation du 28 octobre UTC : un nouveau snapshot append-only a réuni les 7 tableaux relus avec les 8 anciens
+qui avaient disparu de la collecte partielle. Les deux snapshots sources et leurs dates sont conservés dans
+la provenance ; les 8 erreurs restent visibles. Les reprises publiques ciblées média/texte ont ensuite échoué
+sur le transport navigateur (`NS_ERROR_CONNECTION_REFUSED`). Les données anciennes restent utilisables mais
+la source est explicitement dégradée. Aucune sélection de modèles, analyse ou notification n’a été déclenchée.
