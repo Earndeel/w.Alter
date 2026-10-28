@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/domain-registrar-transfer-safety",
+  "sha": "18130b1b0c5fbf8ebacb5a74907d62eb8a31944365b8de6475454455a8dcc67a",
+  "state": "active"
+ },
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "proposed_by": "hermes",
+ "reason": "created by the Hermes agent (skill_manage)",
+ "store_sha": "18130b1b0c5fbf8ebacb5a74907d62eb8a31944365b8de6475454455a8dcc67a"
+}
