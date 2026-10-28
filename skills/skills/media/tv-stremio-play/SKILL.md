@@ -104,3 +104,15 @@ film/series. **Not yet verified end to end**; screenshots after every key:
 
 Subtitles missing (server down), dongle unreachable, sleep, app crashes → skill `tv-dongle-maintenance`.
 TV power only → skill `tv-power`. Script options and internals → hub skill `android-tv-stremio-dongle`.
+
+## Choisir la VF avant lancement et vérifier la lecture
+
+- Choisir la langue dans l’intitulé de la release avant de lancer : Monsieur l’a explicitement demandé. Préférer une release indiquant FRENCH ou VF ; MULTi seul ne garantit pas le français. MULTi.VFi indique une piste française disponible, sans prouver qu’elle sera sélectionnée.
+- Sur le Mac, utiliser `/usr/local/bin/adb` ou exporter `PATH=/usr/local/bin:$PATH` : `adb` était absent du PATH de la session SSH malgré son installation.
+- Lister les candidats depuis le Mac : `ssh mac 'export PATH=/usr/local/bin:$PATH; cd ~/walter-tv && python3 stremio.py "south park" --s 12 --e 6 --lang fr --list'`. Adapter titre, saison et épisode. Lire les intitulés complets avant tout lancement.
+- Ne pas mémoriser un numéro de candidat : il dépend de la liste courante. Relister immédiatement avant `--pick N` et vérifier que le numéro désigne toujours la release voulue. Si l’interface existante permet une sélection par intitulé, exiger une correspondance unique.
+- Si nécessaire, sonder le média avant lancement avec ffprobe pour connaître les pistes, leurs langues et dispositions. Garder les URL signées privées et ne publier que les métadonnées utiles. Une piste unique sans étiquette de langue ne prouve pas à elle seule la VF.
+- Après lancement, contrôler `ssh mac 'export PATH=/usr/local/bin:$PATH; adb -s 192.168.1.37:5555 shell dumpsys media_session'`. Vérifier la session `com.stremio.one`, les métadonnées du bon épisode et `PlaybackState` : `state=3` signifie lecture, `state=2` pause. Comparer deux positions espacées de quelques secondes pour confirmer la progression.
+- Si l’état reste ambigu, capturer l’écran : `ssh mac 'export PATH=/usr/local/bin:$PATH; adb -s 192.168.1.37:5555 exec-out screencap -p > /tmp/stremio-check.png'`, puis récupérer et inspecter l’image. Une activité Stremio au premier plan ou un retour ADB OK ne prouve pas que la vidéo joue.
+- Éviter les séquences de touches à l’aveugle pour chercher la VF après lancement. Dans cette session, la navigation a laissé le lecteur en pause et `uiautomator dump` n’a fourni aucun texte exploitable. Inspecter le focus avant toute activation nécessaire.
+- Ne pas présenter comme réparation validée les essais de deep link ou de force-stop : cette session n’a pas établi qu’ils résolvaient l’échec de lancement.
