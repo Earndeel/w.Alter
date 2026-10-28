@@ -1,0 +1,188 @@
+#!/usr/bin/python3
+"""walter-guardians — the minimal health supervisor of Walter's modules (P5, 2026-10-28; GUARDIANS.md).
+
+It runs every module's declared watchdog (`<module root>/contracts/maintenance.json`), follows incidents by
+module:key, and tells the owner on Telegram only about NEW high/critical incidents. It holds no diagnosis of its own:
+each module's guardian owns that. It must work with Router, Memory, Hermes and every model provider down, so it is
+standard-library Python run by the system interpreter, and it reaches Telegram's Bot API directly (token from the
+walter-secrets grant `telegram-bot`).
+
+  walter-guardians check [--no-notify] [--json]   one pass (timer walter-guardians.timer)
+  walter-guardians status [--json]                open incidents and the last pass of each module
+  walter-guardians list                           declared watchdogs
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.request import Request, urlopen
+
+NOTIFY = {"high", "critical"}
+SEVERITIES = ("info", "warning", "high", "critical")
+
+
+def sh(*cmd: str, timeout: float = 60) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(cmd, 124, "", str(exc))
+
+
+def state_dir() -> Path:
+    root = os.environ.get("WALTER_INSTANCE")
+    if not root:
+        try:
+            root = Path("/etc/walter/instance").read_text().strip()
+        except OSError:
+            root = "/var/lib/walter"
+    d = Path(root) / "state" / "guardians"
+    d.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return d
+
+
+def declarations() -> list[dict]:
+    """Every `contracts/maintenance.json` of the registered modules (each file once, whatever shares its root)."""
+    r = sh("walter", "modules", timeout=60)
+    try:
+        roots = {m["root"] for m in json.loads(r.stdout).get("modules", [])}
+    except ValueError:
+        roots = set()
+    seen, out = set(), []
+    for root in sorted(roots):
+        p = Path(root) / "contracts" / "maintenance.json"
+        try:
+            real = p.resolve()
+            if real in seen or not p.exists():
+                continue
+            seen.add(real)
+            d = json.loads(p.read_text())
+            if d.get("version") == 1 and d.get("check"):
+                out.append({**d, "_file": str(p)})
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def run_check(decl: dict) -> tuple[dict, list[dict], dict]:
+    t0 = time.time()
+    r = sh(*decl["check"], timeout=float(decl.get("timeout_seconds", 120)))
+    meta = {"module": decl["module"], "rc": r.returncode, "seconds": round(time.time() - t0, 1),
+            "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    try:
+        items = json.loads(r.stdout)
+        if not isinstance(items, list):
+            raise ValueError("not a list")
+        good = [i for i in items if isinstance(i, dict) and i.get("version") == 1 and i.get("key")
+                and i.get("severity") in SEVERITIES]
+        meta["ok"] = True
+        return decl, good, meta
+    except ValueError:
+        meta["ok"] = False
+        return decl, [{"version": 1, "module": decl["module"], "key": "guardian:unreachable", "kind": "guardian_unreachable",
+                       "severity": "high", "summary": f"Le watchdog du module {decl['module']} ne répond pas.",
+                       "evidence": {"rc": r.returncode, "stderr": (r.stderr or "")[-200:]}, "suggested_level": "G0"}], meta
+
+
+def _telegram(text: str) -> bool:
+    tok = sh("walter-secret", "grant", "access", "telegram-bot", timeout=60)
+    token = tok.stdout.strip()
+    chat = os.environ.get("TELEGRAM_HOME_CHANNEL")
+    if not chat:
+        for cfg in (Path.home() / ".hermes" / "config.yaml",):
+            try:
+                m = re.search(r"^TELEGRAM_HOME_CHANNEL:\s*'?(-?\d+)'?\s*$", cfg.read_text(), re.M)
+                chat = m.group(1) if m else None
+            except OSError:
+                pass
+    if tok.returncode or not token or not chat:
+        return False
+    try:
+        req = Request(f"https://api.telegram.org/bot{token}/sendMessage",
+                      data=json.dumps({"chat_id": chat, "text": text[:4000], "disable_web_page_preview": True}).encode(),
+                      headers={"Content-Type": "application/json"})
+        with urlopen(req, timeout=20) as resp:
+            return json.loads(resp.read()).get("ok", False)
+    except Exception:  # noqa: BLE001 — never leak the token in an error
+        return False
+
+
+def check(notify: bool = True) -> dict:
+    sd = state_dir()
+    st_path = sd / "state.json"
+    state = json.loads(st_path.read_text()) if st_path.exists() else {"open": {}, "modules": {}}
+    decls = declarations()
+    with ThreadPoolExecutor(max(1, len(decls))) as ex:
+        results = list(ex.map(run_check, decls))
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    seen, opened, closed = {}, [], []
+    for decl, items, meta in results:
+        state["modules"][decl["module"]] = {**meta, "incidents": len(items), "max_level": decl.get("max_level")}
+        for i in items:
+            seen[f"{i['module']}:{i['key']}"] = i
+    for key, i in seen.items():
+        if key in state["open"]:
+            state["open"][key].update(last_seen=now, incident=i)
+        else:
+            state["open"][key] = {"first_seen": now, "last_seen": now, "incident": i, "notified": False}
+            opened.append(key)
+    checked = {d["module"] for d, _, m in results}
+    for key in list(state["open"]):
+        if key.split(":", 1)[0] in checked and key not in seen:
+            closed.append(key)
+            state["open"].pop(key)
+    with open(sd / "incidents.jsonl", "a") as f:
+        for k in opened:
+            f.write(json.dumps({"at": now, "event": "opened", "key": k, "incident": seen[k]}, ensure_ascii=False) + "\n")
+        for k in closed:
+            f.write(json.dumps({"at": now, "event": "closed", "key": k}, ensure_ascii=False) + "\n")
+    to_tell = [k for k in opened if seen[k]["severity"] in NOTIFY]
+    sent = False
+    if notify and to_tell:
+        lines = ["W.Alter — guardians"] + [f"• {seen[k]['module']} ({seen[k]['severity']}) : {seen[k]['summary']}"
+                                           for k in to_tell]
+        sent = _telegram("\n".join(lines))
+        for k in to_tell:
+            state["open"][k]["notified"] = sent
+    state["last_pass"] = now
+    st_path.write_text(json.dumps(state, ensure_ascii=False, indent=1))
+    return {"at": now, "modules": {m: v for m, v in state["modules"].items() if m in checked},
+            "opened": opened, "closed": closed, "open": len(state["open"]), "notified": sent if to_tell else None}
+
+
+def status() -> dict:
+    p = state_dir() / "state.json"
+    if not p.exists():
+        return {"error": "no pass yet (walter-guardians check)"}
+    s = json.loads(p.read_text())
+    by_sev = {}
+    for k, v in s["open"].items():
+        by_sev.setdefault(v["incident"]["severity"], []).append(f"{k} — {v['incident']['summary']}")
+    return {"last_pass": s.get("last_pass"), "modules": s["modules"],
+            "open": {sev: by_sev.get(sev, []) for sev in reversed(SEVERITIES) if by_sev.get(sev)}}
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("action", choices=["check", "status", "list"])
+    p.add_argument("--no-notify", action="store_true"); p.add_argument("--json", action="store_true")
+    a = p.parse_args()
+    if a.action == "list":
+        out = [{k: d[k] for k in ("module", "check", "max_level", "_file") if k in d} for d in declarations()]
+    elif a.action == "status":
+        out = status()
+    else:
+        out = check(notify=not a.no_notify)
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
