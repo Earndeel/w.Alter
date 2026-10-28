@@ -35,7 +35,9 @@
     "CLI contracts, matrix, doctor",
     "Declarative harness compositions",
     "Offline source release and staged installation",
-    "walter standby"
+    "walter standby",
+    "walter matrix: qualified evidence requires matching source/scenario/version/configuration attestation (bench protocol 2)",
+    "walter-guardians: strict Incident v1 validation, explicit check failures and bounded notification retry/backoff"
   ],
   "bindings": {
     "hermes": "native adapters + lifecycle hook (no duplicate MCP attachment)",
@@ -53,7 +55,7 @@
   "optional": [],
   "contract": {
     "schema_version": 1,
-    "version": "1.0.0",
+    "version": "1.1.0",
     "owner": "core",
     "kind": "foundation",
     "purpose": "Exposer les capacités et installer les raccordements des harnesses.",
