@@ -145,15 +145,22 @@ def register(mcp,client='unknown',*,local_control=True):
     def walter_run(request: str,goal: str='',context: str='',task: str='',level: str='',model: str='',provider: str='',
                    require: str='',conversation: str='',toolsets: list[str]|None=None,max_turns: int=0,
                    budget_seconds: int=0,role: str='',image_urls: list[str]|None=None,aspect_ratio: str='',
-                   duration: int=0,resolution: str='',paid_fallback: bool=False) -> str:
+                   duration: int=0,resolution: str='',paid_fallback: bool=False,constraints: dict|None=None,
+                   output_schema: dict|None=None,persist: str='') -> str:
         """Do the job on the model Walter Router picks (or the one the user named, never replaced). TEXT: a sub-agent
-        with tools on that model — goal = complete instructions, context = what it needs (it does not see this
-        conversation). IMAGE / VIDEO / MUSIC / VOICE: generated, files returned — COSTS MONEY, only when the user
-        asked. Your own model stays yours."""
+        with Walter's tools (web through walter_browse, skills, memory) on that model — goal = complete instructions;
+        it does not see this conversation but gets a context built for its task (mission, Walter modules, matching
+        skills, memory); context = anything more it needs. constraints = {"geo": {"zone", "pays", "devise", "langue"},
+        …} for local research; output_schema = the JSON its answer must follow; persist="observations" stores each
+        item of its answer's "observations" list as a sourced observation of the current run. IMAGE / VIDEO / MUSIC
+        / VOICE: generated, files returned — COSTS MONEY, only when the user asked. Your own model stays yours."""
         spec={k:v for k,v in dict(request=request,goal=goal,context=context,task=task,level=level,model=model,
               provider=provider,require=require,conversation=conversation,toolsets=toolsets,max_turns=max_turns,
               budget_seconds=budget_seconds,role=role,image_urls=image_urls,aspect_ratio=aspect_ratio,duration=duration,
-              resolution=resolution,paid_fallback=paid_fallback).items() if v not in ('',0,None,[],False)}
+              resolution=resolution,paid_fallback=paid_fallback,constraints=constraints,output_schema=output_schema,
+              persist=persist).items() if v not in ('',0,None,[],False,{})}
+        if spec.get('persist') not in (None,'observations'):
+            return json.dumps({'ok':False,'error':'persist must be "observations" or empty'})
         for key in ('task','level','model','provider','require','role','aspect_ratio','resolution'):
             if key in spec and not _ROUTER_WORD.fullmatch(str(spec[key])):
                 return json.dumps({'ok':False,'error':f'invalid {key}'})
