@@ -57,9 +57,12 @@ Model cards: what a model does, what it costs per resolution, where to call it a
 
 What CHANGED since the previous cycle — the only thing worth a Telegram message (2026-10-04).
 
+- `_versions(conn, snapshot_id: int)` — Board -> version label of a snapshot. The first AA v5.0 snapshot (2026-10-28) only had `index_version`.
+- `rebased_boards(conn, cur: int, prev: int)` — {board: {'before', 'after'}} for the boards whose version label changed. A label missing from the latest
 - `_previous(conn, kind: str)` — 
-- `events(conn)` — {'new': {model_id: [why]}, 'nerf': {model_id: [why]}, 'price_drop': {model_id: [why]}}.
+- `events(conn)` — {'new': {model_id: [why]}, 'nerf': {model_id: [why]}, 'price_drop': {model_id: [why]},
 - `changed(ev: dict, model_id: str)` — Reasons a model counts as news (new or cheaper).
+- `rebased_intelligence(ev: dict)` — The reason to put every text tier to the owner again: the AA Intelligence Index changed version.
 - `frontier_entrants(conn, run_id: int)` — Text Pareto frontier points of this run that were not on the previous run's frontier.
 - `latest_snapshot_ids(conn)` — 
 
@@ -112,6 +115,7 @@ Writes a snapshot and its parsed rows, with identities (models.canonical / alias
 The owner's model knowledge and the intent-aware decision built on it.
 
 - `load()` — 
+- `set_level(task: str, level: str, pin: str, why: str, provider: str | None=None, description: str | None=None, evidence: str | None=None, fallback=KEEP)` — One writer for the owner's declared text tiers (knowledge.json "levels"), the source `declare` re-applies
 - `norm(text: str)` — 
 - `hits(text: str, signals: list[str])` — 
 - `declare(conn, doc: dict | None=None)` — Apply knowledge.json: profiles, roles (favourites per objective), retired roles, affinities. Idempotent.
@@ -605,15 +609,20 @@ Leaderboards and evaluations, one module per site (fetch only; parsing is analys
 
 ## research/benchmarks/aa.py
 
-Artificial Analysis Intelligence Index and its cost per task, per model x reasoning level. Read from the
+Artificial Analysis Intelligence Index and its cost per task, per model x reasoning level.
 
 - `finite_number(value: Any)` — 
 - `decode_rsc_string(encoded: str)` — 
 - `strip_rsc_prefix(decoded: str)` — Strip a single-letter RSC flight-stream prefix such as ``c:`` or ``d:``.
-- `find_intelligence_models_payload(value: Any)` — Find AA's complete language-model context inside a decoded RSC payload.
-- `find_current_intelligence_models(value: Any)` — Collect page-specific models that AA may omit from its global catalog.
-- `parse_intelligence_rsc(script_text: str)` — 
-- `records(raw_models: list[dict[str, Any]])` — 
+- `flight_text(page: str)` — The page's whole flight stream, decoded (a row may span several pushes).
+- `leaderboard_models(page: str)` — The `initialModels` array of the leaderboard page: one object per model x reasoning level.
+- `task_cost(value: Any)` — Cost per AA task: a number on the leaderboard page, {'cost': {'total': …}} on the older model pages.
+- `records(raw_models: list[dict[str, Any]], api: dict[str, dict] | None=None)` — One record per scored model x reasoning level; the API's score wins over the page's, and a model only the
+- `api_key()` — The instance's AA key, read from its vault through walter-secrets (host.json `aa_api_key`: item + field).
+- `api_scores()` — {slug: {'score', 'name'}} from the free Data API, and an error label when it could not be read.
+- `index_version()` — The current Intelligence Index version from AA's methodology page; None when it cannot be read.
+- `updates()` — AA's own map of recently changed evaluations ({slug: {'type': 'updated'|'new'|'underReview', 'description',
+- `disagreement(raw_models: list[dict[str, Any]], scores: dict[str, dict])` — 
 - `source_aa()` — 
 
 ## research/benchmarks/aa_decision.py
@@ -632,6 +641,7 @@ Artificial Analysis evaluations and domain indexes, one score per model x reason
 - `_num(v: Any)` — 
 - `merge(objects: list[dict[str, Any]])` — slug -> {name, slug, <key>: value} keeping the first non-null value of each evaluation.
 - `source_aa_eval()` — 
+- `versions(badges: dict[str, dict], intelligence: str | None)` — Board -> version label (analysis.changes never compares a board across labels): the domain indexes are built
 
 ## research/benchmarks/aa_media.py
 
@@ -962,7 +972,8 @@ Do the job on the chosen model — one entry for every runtime (Hermes plugin, w
 
 - `default_toolsets()` — 
 - `_memory(action: str, payload: dict)` — Walter Memory's Run Plane through its command (declared interface); never blocks the sub-agent.
-- `_events(goal: str, context: str, result: dict, model: str | None)` — The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write).
+- `_child_context(spec: dict)` — walter-context's pack for a sub-agent, through its command (declared interface); {} when unavailable.
+- `_events(goal: str, context: str, result: dict, model: str | None, pack: dict | None=None)` — The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write).
 - `decide(conn, spec: dict)` — 
 - `_text(conn, d: dict, spec: dict)` — The router alone owns failover. Preserve the conversation across providers of this model.
 - `_run(conn, spec: dict)` — 
