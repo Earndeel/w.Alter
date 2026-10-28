@@ -49,8 +49,10 @@ CONNECTOR = ["walter-memory", "agent-sessions"]   # Walter Memory CLI on the PAT
 LOG = Path("/root/.hermes/logs/walter-hook.log")
 BUDGET = {"profile": 0, "people": 300, "knowledge": 600, "evidence": 300}
 MIN_WORDS = 4
-HEADER = ("Mémoire W.Alter (injectée automatiquement pour ce message ; ce sont des souvenirs datés, vérifie l'état "
-          "réel avant de les affirmer ; approfondir avec memory_search / person_lookup) :")
+# 2026-10-28: "vérifie l'état réel avant de les affirmer" made a model without tools refuse what the block said
+HEADER = ("Mémoire W.Alter (injectée automatiquement pour ce message ; souvenirs datés : réponds à partir d'eux en citant "
+          "la date, le plus récent l'emporte ; si l'état réel compte et que tu as les outils, vérifie-le ; approfondir "
+          "avec memory_search / person_lookup) :")
 
 
 def log(msg: str) -> None:
@@ -392,7 +394,7 @@ def claude_code(ev: dict) -> dict | None:
         with ThreadPoolExecutor(3) as ex:  # run, memory and skills in parallel; each fails open on its own
             frun = ex.submit(run_start, runtime, f"{runtime}/vm/{sid}" if sid else runtime, prompt,
                              channel="machine" if machine_prompt(prompt) else "owner", record_pid=hpid)
-            if mode == "pack":
+            if mode == "pack" and os.environ.get("WALTER_HOOK_CONTEXT", "on") != "off":
                 def pack_or_legacy():
                     try:
                         return context_pack(prompt, runtime, f"{runtime}/vm/{sid}", ev.get("transcript_path"),

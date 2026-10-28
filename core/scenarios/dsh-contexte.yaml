@@ -4,6 +4,9 @@
 # The scenario's own pass criterion is loose (it measures; the experiment decides): at least one correct answer.
 name: dsh-contexte
 milestone: P2-inject
+# Both injection modes need the hook's memory and skills on (absent = off in walter-scenario): until 28/10 the legacy
+# variant ran with no memory at all and the comparison was pack vs nothing.
+modules: [memory, skills]
 steps:
   - harness: {runtime: dsh, timeout: 300, prompt: "Sans utiliser aucun outil, réponds en une phrase : dans quel pays Monsieur vit-il en ce moment ?"}
   - harness: {runtime: dsh, timeout: 300, prompt: "Sans utiliser aucun outil, réponds en une phrase : pour les images, Walter Router doit-il prendre le meilleur rapport qualité-prix ou le meilleur modèle disponible ?"}
