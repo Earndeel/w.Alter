@@ -1,0 +1,49 @@
+# P3 (2026-10-28) — reference vertical: local iced-coffee research with a Pareto front, on real traces.
+# The orchestrator's moves are played as L2 would after reading skill recherche-produit-locale: one routed sub-agent
+# per shop in parallel (geo constraint, Observation v1 contract, persist), then the deterministic Pareto script.
+name: cafe-glace
+milestone: P3
+steps:
+  - hook: {event: UserPromptSubmit, prompt: "Je suis à Asok, Bangkok. Trouve le meilleur café glacé (americano ou latte) à 7-Eleven et Café Amazon : prix, volumes, Pareto."}
+  - parallel:
+      - mcp:
+          tool: walter_run
+          arguments:
+            request: "Recherche web : cafés glacés All Café chez 7-Eleven Thaïlande, prix et tailles."
+            goal: >-
+              Relève les cafés glacés All Café (americano, latte) vendus par 7-Eleven en Thaïlande : une observation par
+              boisson et par taille, avec prix en THB et volume. Utilise walter_browse (recherche en thaï et en anglais,
+              puis lecture des pages officielles 7eleven.co.th). Si une page ne peut pas être lue, garde ce que montre
+              l'extrait de recherche avec method "search_snippet" et confidence "low". Réponds uniquement en JSON.
+            task: research
+            level: L2
+            max_turns: 12
+            budget_seconds: 300
+            constraints: {geo: {zone: "Asok, Bangkok", pays: TH, devise: THB, langue: th}}
+            output_schema: {observations: [{subject: str, seller: str, source_url: str, values: {price: "number|null", currency: str, volume: "str|null"}, method: "search_snippet|http|static_html|browser|api", confidence: "high|medium|low"}]}
+            persist: observations
+      - mcp:
+          tool: walter_run
+          arguments:
+            request: "Recherche web : cafés glacés Café Amazon Thaïlande, prix et tailles."
+            goal: >-
+              Relève les cafés glacés (americano, latte) de Café Amazon en Thaïlande : une observation par boisson et
+              par taille, avec prix en THB et volume. Utilise walter_browse (recherche en thaï et en anglais, puis lecture
+              du menu officiel). Si une page ne peut pas être lue, garde ce que montre l'extrait de recherche avec method
+              "search_snippet" et confidence "low". Réponds uniquement en JSON.
+            task: research
+            level: L2
+            max_turns: 12
+            budget_seconds: 300
+            constraints: {geo: {zone: "Asok, Bangkok", pays: TH, devise: THB, langue: th}}
+            output_schema: {observations: [{subject: str, seller: str, source_url: str, values: {price: "number|null", currency: str, volume: "str|null"}, method: "search_snippet|http|static_html|browser|api", confidence: "high|medium|low"}]}
+            persist: observations
+  - cmd: {name: pareto, shell: "walter-memory observations run {run_id} | python3 /walter/skills/skills/research/recherche-produit-locale/scripts/pareto.py --min price --min price_per_100ml --max volume_ml"}
+  - hook: {event: Stop}
+assertions:
+  - {path: run.status, equals: ended}
+  - {path: tasks, min_len: 2}
+  - {path: "tasks[*].status", all: ended}
+  - {tool_called: walter_browse}
+  - {link_kind: observation, min: 2}
+  - {step: pareto, path: front, min_len: 1}

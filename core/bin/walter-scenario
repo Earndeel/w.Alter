@@ -18,6 +18,9 @@ Assertions (on `walter-memory runs show <run_id>`; `$` = that JSON):
   - {path: model_calls, min_len: 1}       - {path: tasks, min_len: 1}
   - {path: model_calls[*].ok, all: true}  - {path: links[*].kind, contains: session}
   - {tool_called: walter_browse, in: tasks}   the sub-agent's walter_logs session holds that tool call
+  - {link_kind: observation, min: 2}         sourced observations attached to the run
+  - {step: <cmd name>, path: front, min_len: 1}   on the JSON printed by a `cmd` step
+Steps also: parallel: [{mcp: …}, …] (at once), cmd: {name, shell: "… {run_id} …"}.
 Per-message modules (memory context, skills, preflight, views) are off unless the scenario sets `modules: on`.
 Reports: <instance>/state/scenarios/<name>/<time>.json.
 """
@@ -98,6 +101,17 @@ def step_mcp(step: dict, env: dict) -> dict:
             "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("output") or res.get("answer") or res.get("raw") or "")[:600]}
 
 
+def step_cmd(step: dict, run_id: str | None) -> dict:
+    cmd = step["shell"].replace("{run_id}", run_id or "")
+    out = subprocess.run(["sh", "-c", cmd], capture_output=True, text=True, timeout=int(step.get("timeout", 120)),
+                         cwd=step.get("cwd"))
+    try:
+        data = json.loads(out.stdout)
+    except ValueError:
+        data = None
+    return {"rc": out.returncode, "json": data, "stderr": out.stderr[-300:]}
+
+
 def _get(data, path: str):
     """run.status, model_calls, model_calls[*].ok, links[*].kind"""
     cur = [data]
@@ -131,6 +145,9 @@ def check(assertion: dict, shown: dict) -> tuple[bool, str]:
         sessions = [t.get("session_id") for t in shown.get("tasks") or [] if t.get("session_id")]
         tools = [x for s in sessions for x in _tool_calls(s)]
         return assertion["tool_called"] in tools, f"tools in task sessions: {sorted(set(filter(None, tools)))}"
+    if "link_kind" in assertion:
+        n = sum(1 for l in shown.get("links") or [] if l.get("kind") == assertion["link_kind"])
+        return n >= assertion.get("min", 1), f"links of kind {assertion['link_kind']}: {n}"
     value = _get(shown, assertion["path"])
     if "equals" in assertion:
         return value == assertion["equals"], f"{assertion['path']} = {value!r}"
@@ -150,6 +167,7 @@ def run(path: Path) -> dict:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     session = f"scenario-{name}-{stamp}"
     env = _env(sc.get("modules") == "on")
+    outputs: dict = {}
     report = {"scenario": name, "at": stamp, "session": f"claude_code/vm/{session}", "steps": [], "assertions": []}
     for step in sc.get("steps") or []:
         kind = next(iter(step))
@@ -159,6 +177,14 @@ def run(path: Path) -> dict:
             r = step_router(step["router"], env)
         elif kind == "mcp":
             r = step_mcp(step["mcp"], env)
+        elif kind == "parallel":            # independent steps at once (an orchestrator delegating to several agents)
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(len(step["parallel"])) as ex:
+                futs = [ex.submit(step_mcp, s["mcp"], env) for s in step["parallel"]]
+                r = {"results": [f.result() for f in futs]}
+        elif kind == "cmd":                 # a deterministic tool on the run's data; {run_id} is substituted
+            r = step_cmd(step["cmd"], report.get("run_id"))
+            outputs[step["cmd"].get("name", f"cmd{len(outputs)}")] = r.get("json")
         else:
             r = {"error": f"unknown step {kind}"}
         report["steps"].append({kind: r})
@@ -169,7 +195,11 @@ def run(path: Path) -> dict:
         out = subprocess.run(["walter-memory", "runs", "show", report["run_id"]], capture_output=True, text=True, timeout=60)
         shown = json.loads(out.stdout or "{}")
     for a in sc.get("assertions") or []:
-        ok, detail = check(a, shown) if shown else (False, "no run recorded")
+        if "step" in a:
+            ok, detail = check({k: v for k, v in a.items() if k != "step"}, outputs.get(a["step"]) or {})
+            detail = f"{a['step']}: {detail}"
+        else:
+            ok, detail = check(a, shown) if shown else (False, "no run recorded")
         report["assertions"].append({"ok": ok, "assert": a, "detail": detail})
     report["ok"] = bool(report["assertions"]) and all(a["ok"] for a in report["assertions"])
     out_dir = _instance() / "state" / "scenarios" / name
