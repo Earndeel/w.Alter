@@ -47,6 +47,37 @@ Le producteur n'atteste `applied:true` qu'après une exécution réussie sur la 
 de départ ne prouve pas son utilisation ; les hooks peuvent déclarer séparément `applied:false` et leur état
 de configuration par la bibliothèque existante. Cette commande ne remplace pas le journal d'appels du modèle.
 
+## Clore explicitement un tour en erreur
+
+`walter-memory runs end <run-id>` reçoit sur stdin un objet JSON avec un **statut explicite obligatoire** :
+`{"status":"ended"}`, `{"status":"failed"}` ou `{"status":"cancelled"}`. Une cible absente, un statut
+manquant ou un autre état sont refusés avant le writer. La commande appelle `runs.end()` ; elle ne contient
+aucun SQL externe ni clôture implicite du dernier run d'une session.
+
+Le writer ne modifie qu'un run encore ouvert et émet son unique `run.ended` dans la même transaction. Un retry
+ne duplique pas l'événement et ne réétiquette pas un run déjà échoué en succès. La réponse `{"ok":true}`
+accuse la requête au writer, pas la réussite du scénario ; le contrôleur conserve le résultat original et
+vérifie le statut persistant. Une erreur du harness doit demander `failed`, jamais `ended` par défaut.
+
+Le parser Logs DSH (`walter_memory.logs.parse_dsh`) conserve déjà `turn/end`, son `reason`, `interrupted` et
+`usage`, mais n'appelle pas le Run Plane. Le connecteur canonique `agent_sessions.parse_dsh` n'en dérive pas
+d'événement de clôture. Les hooks Stop n'arrivent pas nécessairement lors d'une erreur de requête DSH.
+
+Le correctif minimal pour un banc ou un adaptateur qui connaît l'identifiant créé au début du tour est un
+`finally` appelant ce port avec cet identifiant exact et le statut réel. Garder l'exception initiale et les
+assertions métier : une fermeture réussie ne transforme pas `INVALID_REQUEST` en scénario réussi. En cas
+d'échec du writer, signaler que le run reste à réconcilier, sans remplacer le diagnostic initial.
+
+Une récupération générique à partir des Logs peut réutiliser le watcher existant et la bibliothèque Memory,
+mais doit relier le `turn/end` au **même tour** (identifiant/corrélation conservée au départ). Clore le dernier
+run ouvert de la session au replay est dangereux : un ancien événement terminal pourrait fermer un tour plus
+récent. Tant que cette corrélation n'est pas prouvée et les raisons terminales officiellement mappées, garder
+ce recovery en proposition ; aucun nouveau service ni fermeture automatique heuristique n'est ajouté ici.
+
+`tests/test_runs_end.py` exécute la CLI, le vrai writer et le bus contre une base SQLite transactionnelle
+éphémère : échec, annulation, terminaison, retry, non-réécriture d'un statut terminal et refus des entrées
+invalides. Aucun PostgreSQL réel n'est utilisé par ces tests.
+
 ## Comptabilité des appels du run
 
 `walter-memory runs show <run-id>` retourne aussi `usage` et `cost_status` dans chaque entrée de
