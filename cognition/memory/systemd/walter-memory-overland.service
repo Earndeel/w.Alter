@@ -1,0 +1,21 @@
+[Unit]
+Description=Walter Memory Overland GPS ingress
+After=network-online.target docker.service
+
+[Service]
+WorkingDirectory=/opt/walter-memory
+EnvironmentFile=/instances/monsieur/bootstrap/overland.env
+Environment=PGPASSFILE=/root/.pgpass
+Environment=WALTER_MEMORY_POOL_MAX=2
+ExecStart=/usr/local/bin/walter-python -m uvicorn walter_memory.overland:app --host 127.0.0.1 --port 3010 --no-access-log --log-level critical --limit-concurrency 8 --timeout-keep-alive 5
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+MemoryMax=384M
+
+[Install]
+WantedBy=multi-user.target

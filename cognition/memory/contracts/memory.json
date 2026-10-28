@@ -6,7 +6,8 @@
     "walter_memory/objects.py",
     "walter_memory/client.py",
     "walter_memory/read_policy.py",
-    "ports/hermes/__init__.py"
+    "ports/hermes/__init__.py",
+    "walter_memory/overland.py"
   ],
   "requires": [],
   "external": [
@@ -29,13 +30,15 @@
   "backup_paths": [
     ".",
     "/root/.pgpass",
-    "/root/.hermes/plugins/walter-memory"
+    "/root/.hermes/plugins/walter-memory",
+    "@instance/bootstrap/overland.env"
   ],
   "interfaces": [
     "Python library",
     "HTTP :8890",
     "CLI",
-    "MCP"
+    "MCP",
+    "Overland authenticated HTTP :3010"
   ],
   "bindings": {
     "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
@@ -50,7 +53,8 @@
     "Existing desktop provider instances change on next session initialization; not force-restarted."
   ],
   "services": [
-    "walter-memory-gateway"
+    "walter-memory-gateway",
+    "walter-memory-overland"
   ],
   "optional": [
     "llm"
