@@ -114,7 +114,7 @@ def main(argv=None) -> None:
     ob.add_argument("action", choices=["add", "run", "recent"]); ob.add_argument("arg", nargs="?", default="")
     ob.add_argument("--max-age-hours", type=float, default=24)
     rn = sub.add_parser("runs", help="Walter Run Plane: runs, their tasks, model calls and links (P0, 2026-10-27)")
-    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update", "link", "find", "routing"])
+    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update", "link", "find", "routing", "end"])
     rn.add_argument("--session", default="", help="find: the latest run of this harness session key"); rn.add_argument("run_id", nargs="?", default="")
     rn.add_argument("--open-only", action="store_true", help="find: unique open session run or exact run_id; metadata only")
     rn.add_argument("--limit", type=int, default=20)
@@ -298,6 +298,14 @@ def main(argv=None) -> None:
             decision = {key: spec[key] for key in ("applied", "via", "model_id", "model", "provider", "observed_model")
                         if key in spec}
             runs.routing(a.run_id, decision)
+            res = {"ok": True}
+        elif a.action == "end":             # explicit completion, including harness errors without a Stop hook
+            if not a.run_id:
+                p.error("runs end requires an explicit run_id")
+            spec = json.load(sys.stdin)
+            if not isinstance(spec, dict) or spec.get("status") not in ("ended", "failed", "cancelled"):
+                p.error("runs end expects an explicit status: ended, failed or cancelled")
+            runs.end(a.run_id, status=spec["status"])
             res = {"ok": True}
         elif a.action == "link":            # {"run_id", "kind", "refs": [...]}: what the run used or produced
             spec = json.load(sys.stdin)
