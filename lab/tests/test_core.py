@@ -11,7 +11,7 @@ def r(variant, ok, calls):
 
 def test_summary_counts_failures_and_ignores_their_metrics():
     s = core.summarise([r("base", True, 6), r("base", False, 40), r("new", True, 4), r("new", True, 5)], EXP["metrics"])
-    assert s["base"] == {"n": 2, "ok_rate": 0.5, "median model_calls": 6}
+    assert s["base"] == {"n": 2, "ok_rate": 0.5, "median model_calls": 23}
     assert s["new"] == {"n": 2, "ok_rate": 1.0, "median model_calls": 4.5}
 
 

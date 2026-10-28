@@ -66,7 +66,9 @@ def summarise(results: list[dict], metrics: list[str]) -> dict:
         for m in metrics:
             if m == "ok":
                 continue
-            vals = [r["metrics"].get(m) for r in rs if r["ok"] and r["metrics"].get(m) is not None]
+            # a scenario that measures (answers_correct…) fails its own strict assertions without being broken:
+            # its measures count whenever they exist
+            vals = [r["metrics"].get(m) for r in rs if r["metrics"].get(m) is not None]
             s[f"median {m}"] = statistics.median(vals) if vals else None
         out[variant] = s
     return out
