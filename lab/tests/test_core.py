@@ -25,3 +25,17 @@ def test_decision_proposes_the_candidate_only_when_every_condition_holds():
 def test_missing_measures_never_make_a_condition_true():
     d = core.decide(EXP, {"base": {"ok_rate": 1.0}, "new": {"ok_rate": 1.0}})
     assert d["proposal"].startswith("ne rien changer")
+
+
+def test_sandbox_command_is_isolated(monkeypatch, tmp_path):
+    """The docker invocation itself: no network, read-only, no capability, unprivileged, only the work copy mounted."""
+    from walter_lab import sandbox
+    seen = {}
+    import subprocess as sp
+    monkeypatch.setattr(sandbox.subprocess, "run", lambda argv, **kw: seen.setdefault("argv", argv) and sp.CompletedProcess(argv, 0, "", ""))
+    sandbox.run(None, ["true"], timeout=5)
+    a = seen["argv"]
+    assert a[a.index("--network") + 1] == "none" and "--read-only" in a and a[a.index("--cap-drop") + 1] == "ALL"
+    assert a[a.index("--user") + 1] == "65534:65534" and "no-new-privileges" in a
+    mounts = [a[i + 1] for i, x in enumerate(a) if x == "-v"]
+    assert len(mounts) == 1 and mounts[0].endswith(":/work") and "walter-lab-sandbox-" in mounts[0]
