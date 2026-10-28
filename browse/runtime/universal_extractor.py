@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import hashlib
 import json
 import re
@@ -367,7 +368,8 @@ class PersistentSessionPool:
         async with self._lock:
             session = self._sessions.get(domain)
             if session is None:
-                session = self._session_factory(headless=self.headless, max_pages=self.max_pages)
+                extra = {"proxy": os.environ["WALTER_BROWSE_PROXY"]} if os.environ.get("WALTER_BROWSE_PROXY") else {}
+                session = self._session_factory(headless=self.headless, max_pages=self.max_pages, **extra)
                 await session.start()
                 self._sessions[domain] = session
             return session
@@ -477,6 +479,8 @@ class UniversalExtractor:
                 "page_action": page_action,
                 "locale": "en-US",
             }
+            if os.environ.get("WALTER_BROWSE_PROXY") and self._session_pool is None:   # 2026-10-28: never the
+                fetch_kwargs["proxy"] = os.environ["WALTER_BROWSE_PROXY"]                 # server's bare IP
             if self._session_pool is not None:
                 response = await self._session_pool.fetch(url, **fetch_kwargs)
             else:
@@ -524,6 +528,8 @@ class UniversalExtractor:
                 "timeout": self.timeout_ms,
                 "locale": "en-US",
             }
+            if os.environ.get("WALTER_BROWSE_PROXY") and self._session_pool is None:   # 2026-10-28: never the
+                fetch_kwargs["proxy"] = os.environ["WALTER_BROWSE_PROXY"]                 # server's bare IP
             if cookies:
                 header = "; ".join(
                     f"{str(c.get('name', ''))}={str(c.get('value', ''))}" for c in cookies

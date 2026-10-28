@@ -1,0 +1,17 @@
+# Walter's exit through the owner's real local IP (2026-10-28): the Mac without its France tunnel, for Camoufox and
+# non-browser reads; fail closed otherwise; per-host budget. Install: copy to /etc/systemd/system/.
+[Unit]
+Description=Walter browse — local exit (owner's real IP via the Mac, never on its France VPN), SOCKS5+HTTP 127.0.0.1:1084
+After=network-online.target tailscaled.service walter-exit-mac.service
+Wants=network-online.target walter-exit-mac.service
+
+[Service]
+User=root
+ExecStart=/usr/local/bin/walter-exit-local serve
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/walter-exit-local.log
+StandardError=append:/var/log/walter-exit-local.log
+
+[Install]
+WantedBy=multi-user.target
