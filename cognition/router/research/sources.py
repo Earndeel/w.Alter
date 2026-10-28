@@ -11,7 +11,7 @@ from walter_router.research.benchmarks.aa_decision import source_aa_decision
 from walter_router.research.benchmarks.aa_evaluations import source_aa_eval
 from walter_router.research.benchmarks.aa_stt import source_aa_stt
 from walter_router.research.benchmarks.agentset import source_agentset
-from walter_router.research.benchmarks.arena import source_arena
+from walter_router.research.benchmarks.arena import ARENA_BOARDS, source_arena
 from walter_router.research.benchmarks.bridgebench import source_bridgebench
 from walter_router.research.benchmarks.mteb import source_mteb
 from walter_router.research.prices.codex import source_codex
@@ -31,6 +31,18 @@ SOURCES["claude_pro"] = source_claude_pro
 
 # Sources shared by several categories can be read in parts; the parts are merged into the last snapshot.
 PARTIAL = {"arena": "boards", "mm": "modules", "da": "categories"}
+
+
+def arena_coverage(doc: dict) -> dict:
+    """Coverage is distinct from snapshot age: retained boards remain usable, with their failures visible."""
+    expected = set(ARENA_BOARDS.values())
+    present = {key for key, board in (doc.get("boards") or {}).items()
+               if isinstance(board, dict) and board.get("rows")}
+    failed = set(doc.get("errors") or {})
+    return {"expected_boards": len(expected), "available_boards": len(expected & present),
+            "missing_boards": sorted(expected - present), "failed_boards": sorted(failed),
+            "retained_boards": sorted(expected & present & failed),
+            "complete": not (expected - present or failed)}
 
 
 def merge(kind: str, old: dict, new: dict) -> dict:
@@ -58,14 +70,25 @@ def collect_all(conn, store, only: list[str] | None = None, parts: dict[str, set
             continue
         want = (parts or {}).get(kind)
         try:
-            if want and kind in PARTIAL:
-                doc, fetched_at, url = fn(parts=set(want))
+            doc, fetched_at, url = fn(parts=set(want)) if want and kind in PARTIAL else fn()
+            incomplete_arena = False
+            if kind == "arena":
+                doc = json.loads(json.dumps(doc))
+                requested = set(want) if want else set(ARENA_BOARDS.values())
+                available = {key for key, board in (doc.get("boards") or {}).items()
+                             if isinstance(board, dict) and board.get("rows")}
+                # Empty/invalid boards must not replace a usable previous board or clear its failure.
+                doc["boards"] = {key: board for key, board in (doc.get("boards") or {}).items() if key in available}
+                # Never silently treat an absent requested board as a successful refresh.
+                errors = doc.setdefault("errors", {})
+                for key in requested - available:
+                    errors.setdefault(key, "requested board absent from collection")
+                incomplete_arena = not arena_coverage(doc)["complete"]
+            if (want and kind in PARTIAL) or incomplete_arena:
                 last = conn.execute("""select raw from models.snapshots where kind = %s
                                        order by fetched_at desc, snapshot_id desc limit 1""", (kind,)).fetchone()
                 if last:
                     doc = merge(kind, last["raw"], doc)
-            else:
-                doc, fetched_at, url = fn()
             with conn.transaction():
                 sid, new = store(conn, kind, doc, fetched_at, url)
             report[kind] = {"snapshot_id": sid, "new": new, **({"parts": sorted(want)} if want and kind in PARTIAL else {})}
