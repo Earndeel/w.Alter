@@ -18,4 +18,5 @@ assertions:
   - {path: run.status, equals: ended}
   - {path: run.routing.applied, equals: true}
   - {tool_called: walter_browse}
+  - {tool_succeeded: walter_browse}
   - {path: model_calls, min_len: 1}

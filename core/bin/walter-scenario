@@ -18,6 +18,7 @@ Assertions (on `walter-memory runs show <run_id>`; `$` = that JSON):
   - {path: model_calls, min_len: 1}       - {path: tasks, min_len: 1}
   - {path: model_calls[*].ok, all: true}  - {path: links[*].kind, contains: session}
   - {tool_called: walter_browse, in: tasks}   the sub-agent's walter_logs session holds that tool call
+  - {tool_succeeded: walter_browse}          matched successful Browse result with returned evidence
   - {link_kind: observation, min: 2}         sourced observations attached to the run
   - {step: <cmd name>, path: front, min_len: 1}   on the JSON printed by a `cmd` step
 Steps also: parallel: [{mcp: …}, …] (at once), cmd: {name, shell: "… {run_id} …"}.
@@ -229,6 +230,28 @@ def _browse_tool(name) -> bool:
     return isinstance(name, str) and (name == "walter_browse" or name.endswith("_walter_browse") or name.endswith(".walter_browse"))
 
 
+def _successful_browse(rows: list[dict]) -> list[tuple[dict, dict]]:
+    """Decode recorded Browse call/result pairs for both task provenance and harness acceptance."""
+    calls, successful = {}, []
+    for row in rows:
+        if not _browse_tool(row.get("tool")):
+            continue
+        call_id = row.get("call_id")
+        if not isinstance(call_id, str) or not call_id:
+            continue
+        try:
+            payload = json.loads(row.get("text") or "{}")
+        except (ValueError, TypeError):
+            continue
+        if row.get("type") == "tool/call" and isinstance(payload, dict):
+            calls[call_id] = payload
+        elif row.get("type") == "tool/result" and row.get("status") == "ok" and isinstance(payload, dict):
+            if payload.get("success") is False or payload.get("ok") is False or payload.get("error"):
+                continue
+            successful.append((calls.get(call_id, {}), payload))
+    return successful
+
+
 def _task_offers(task: dict, minimum: int) -> bool:
     """Validate the full final JSON and source provenance from this successful task's recorded trace.
 
@@ -249,21 +272,7 @@ def _task_offers(task: dict, minimum: int) -> bool:
     offers = data.get("offers") if isinstance(data, dict) else None
     if not isinstance(offers, list) or len(offers) < minimum:
         return False
-    calls = {}
-    successful = []
-    for row in rows:
-        if not _browse_tool(row.get("tool")):
-            continue
-        try:
-            payload = json.loads(row.get("text") or "{}")
-        except (ValueError, TypeError):
-            continue
-        if row.get("type") == "tool/call" and isinstance(payload, dict):
-            calls[row.get("call_id")] = payload
-        elif row.get("type") == "tool/result" and row.get("status") == "ok" and isinstance(payload, dict):
-            if payload.get("success") is False or payload.get("ok") is False or payload.get("error"):
-                continue
-            successful.append((calls.get(row.get("call_id"), {}), payload))
+    successful = _successful_browse(rows)
     def strings(value):
         if isinstance(value, str):
             yield value
@@ -311,6 +320,14 @@ def check(assertion: dict, shown: dict) -> tuple[bool, str]:
         tasks = [t for t in shown.get("tasks") or [] if t.get("kind") == assertion.get("kind", "walter_run")]
         ok = bool(tasks) and all(_task_offers(t, int(assertion["task_offers"])) for t in tasks)
         return ok, f"successful tasks with sourced JSON offers (minimum {assertion['task_offers']}): {ok}"
+    if "tool_succeeded" in assertion:
+        if assertion["tool_succeeded"] != "walter_browse":
+            return False, "successful-result assertion is only defined for walter_browse"
+        sessions = {t.get("session_id") for t in shown.get("tasks") or [] if t.get("session_id")}
+        sessions.update(l.get("ref") for l in shown.get("links") or [] if l.get("kind") == "session" and l.get("ref"))
+        hit = any(args and any(payload.get(key) for key in ("records", "results", "content", "text"))
+                  for session in sorted(sessions) for args, payload in _successful_browse(_session_events(session)))
+        return hit, f"matched successful walter_browse result with returned evidence: {hit}"
     if "tool_called" in assertion:
         sessions = [t.get("session_id") for t in shown.get("tasks") or [] if t.get("session_id")]
         sessions += [l.get("ref") for l in shown.get("links") or [] if l.get("kind") == "session"]

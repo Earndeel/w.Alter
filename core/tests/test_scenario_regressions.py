@@ -31,14 +31,16 @@ def task(status="ended", ok=True):
     return {"kind": "walter_run", "status": status, "result": {"ok": ok}, "session_id": "task/1"}
 
 
-def fixture_run(monkeypatch, tmp_path, tasks, trace, attestor=None):
+def fixture_run(monkeypatch, tmp_path, tasks, trace, attestor=None, scenario="e2e-minimal"):
     monkeypatch.setenv("WALTER_INSTANCE", str(tmp_path))
     from walter_platform import qualification
     monkeypatch.setattr(qualification, "attest", attestor or (lambda *a: {"fixture": True}))
     monkeypatch.setattr(S, "step_hook", lambda *a: {})
     monkeypatch.setattr(S, "step_mcp", lambda *a: {"ok": True})
+    monkeypatch.setattr(S, "step_harness", lambda *a: {"ok": True, "run_id": "fixture-run"})
     monkeypatch.setattr(S.runctx, "current", lambda *a: {"run_id": "fixture-run"})
-    shown = {"run": {"status": "ended"}, "tasks": tasks, "model_calls": [{"ok": True}], "links": [{"kind": "session", "ref": "task/1"}]}
+    shown = {"run": {"status": "ended", "routing": {"applied": True}}, "tasks": tasks,
+             "model_calls": [{"ok": True}], "links": [{"kind": "session", "ref": "task/1"}]}
     def fake_run(argv, **kw):
         data = trace if "timeline" in argv else shown
         if "timeline" in argv:
@@ -46,7 +48,7 @@ def fixture_run(monkeypatch, tmp_path, tasks, trace, attestor=None):
             data = [{**row, "text": row.get("text", "")[:limit]} for row in data]
         return SimpleNamespace(returncode=0, stdout=json.dumps(data), stderr="")
     monkeypatch.setattr(S.subprocess, "run", fake_run)
-    return S.run(ROOT / "scenarios/e2e-minimal.yaml")
+    return S.run(ROOT / "scenarios" / (scenario + ".yaml"))
 
 
 def test_failed_task_and_missing_offers_cannot_qualify(tmp_path, monkeypatch):
@@ -98,3 +100,44 @@ def test_page_provenance_reads_full_record_instead_of_a_timeline_excerpt(tmp_pat
 def test_known_price_strings_are_rejected_instead_of_coerced(tmp_path, monkeypatch):
     offers = [{**offer(), "price_thb": "35"}, offer("latte")]
     assert fixture_run(monkeypatch, tmp_path, [task()], events(offers))["ok"] is False
+
+
+@pytest.mark.parametrize("status,payload,expected", [
+    ("failed", {"success": True, "records": [{"content": "menu"}]}, False),
+    ("ok", {"success": False, "records": [{"content": "menu"}]}, False),
+    ("ok", {"ok": False, "records": [{"content": "menu"}]}, False),
+    ("ok", {"success": True, "records": [{"content": "menu"}]}, True),
+    ("ok", {"success": True, "records": []}, False),
+])
+def test_dsh_browse_requires_successful_recorded_result(tmp_path, monkeypatch, status, payload, expected):
+    trace = [{"type": "tool/call", "tool": "walter__walter_browse", "call_id": "browse-1",
+              "text": json.dumps({"query": "menu"})},
+             {"type": "tool/result", "tool": "walter__walter_browse", "call_id": "browse-1", "status": status,
+              "text": json.dumps(payload)}]
+    report = fixture_run(monkeypatch, tmp_path, [], trace, scenario="dsh-recherche")
+    assert report["ok"] is expected
+    assert (tmp_path / "state/scenarios/qualifications.json").exists() is expected
+
+
+@pytest.mark.parametrize("name", ["walter_browse", "mcp__walter__walter_browse", "walter.walter_browse"])
+def test_successful_browse_assertion_accepts_runtime_tool_prefixes(monkeypatch, name):
+    trace = events([])[:2]
+    for row in trace:
+        row["tool"] = name
+    monkeypatch.setattr(S, "_session_events", lambda session: trace)
+    ok, _ = S.check({"tool_succeeded": "walter_browse"}, {"links": [{"kind": "session", "ref": "dsh/session"}]})
+    assert ok
+
+
+@pytest.mark.parametrize("trace", [
+    [{"type": "tool/call", "tool": "walter_browse", "call_id": "s", "text": '{"query":"menu"}'}],
+    [{"type": "tool/result", "tool": "walter_browse", "call_id": "orphan", "status": "ok",
+      "text": '{"success":true,"records":[{"content":"menu"}]}'}],
+    [{"type": "tool/call", "tool": "walter_browse", "text": '{"query":"menu"}'},
+     {"type": "tool/result", "tool": "walter_browse", "status": "ok",
+      "text": '{"success":true,"records":[{"content":"menu"}]}'}],
+])
+def test_call_without_result_or_result_without_call_cannot_prove_browse(monkeypatch, trace):
+    monkeypatch.setattr(S, "_session_events", lambda session: trace)
+    ok, _ = S.check({"tool_succeeded": "walter_browse"}, {"links": [{"kind": "session", "ref": "dsh/session"}]})
+    assert not ok
