@@ -105,6 +105,9 @@ def main(argv=None) -> None:
     vw.add_argument("--limit", type=int, default=500); vw.add_argument("--dry", action="store_true")
     vw.add_argument("--depth", default="overview"); vw.add_argument("--domain"); vw.add_argument("--horizon")
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
+    ob = sub.add_parser("observations", help="Sourced observations (P3): add (JSON on stdin), of a run, recent by words")
+    ob.add_argument("action", choices=["add", "run", "recent"]); ob.add_argument("arg", nargs="?", default="")
+    ob.add_argument("--max-age-hours", type=float, default=24)
     rn = sub.add_parser("runs", help="Walter Run Plane: runs, their tasks, model calls and links (P0, 2026-10-27)")
     rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update"]); rn.add_argument("run_id", nargs="?", default="")
     rn.add_argument("--limit", type=int, default=20)
@@ -222,6 +225,17 @@ def main(argv=None) -> None:
             else:
                 res = logs.stats(conn)
         print(json.dumps(res, default=str, ensure_ascii=False, indent=1) if a.json else logs.render(a.action, res))
+    elif a.cmd == "observations":
+        from . import observations
+        if a.action == "add":            # {"run_id", "task_id", "geo", "items": [Observation v1…]}
+            spec = json.load(sys.stdin)
+            res = observations.record(spec.get("items") or [], run_id=spec.get("run_id"), task_id=spec.get("task_id"),
+                                      geo=spec.get("geo"))
+        elif a.action == "run":
+            res = observations.of_run(a.arg)
+        else:
+            res = observations.recent(a.arg, max_age_hours=a.max_age_hours)
+        print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
     elif a.cmd == "runs":
         from . import runs
         if a.action == "list":
