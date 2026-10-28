@@ -2,12 +2,18 @@
 name: domain-registrar-transfer-safety
 description: Use when transferring a domain registrar. Preserve DNS.
 version: 1.0.0
+author: W.Alter
+license: MIT
 metadata:
   hermes:
     tags: [domains, registrar, cloudflare, hostinger, dns, transfer]
 ---
 
 # Safe registrar transfers
+
+## When to Use
+
+Use for registrar transfers and associated DNS migration, access, pricing and continuity checks, especially Hostinger to Cloudflare.
 
 ## Access and scope
 

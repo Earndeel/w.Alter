@@ -1,13 +1,12 @@
 {
  "hermes": {
   "path": "/root/.hermes/skills/devops/domain-registrar-transfer-safety",
-  "pending_sha": "abde921f45c94eab2a6bc5ab73f96f374f331197315fe10354c29ef6cb362c72",
-  "sha": "18130b1b0c5fbf8ebacb5a74907d62eb8a31944365b8de6475454455a8dcc67a",
+  "sha": "abde921f45c94eab2a6bc5ab73f96f374f331197315fe10354c29ef6cb362c72",
   "state": "active"
  },
  "origin": "hermes-agent",
  "owner": "walter",
  "proposed_by": "hermes",
  "reason": "created by the Hermes agent (skill_manage)",
- "store_sha": "18130b1b0c5fbf8ebacb5a74907d62eb8a31944365b8de6475454455a8dcc67a"
+ "store_sha": "abde921f45c94eab2a6bc5ab73f96f374f331197315fe10354c29ef6cb362c72"
 }
