@@ -129,3 +129,14 @@ Setting `auxiliary.compression.provider: groq` with `model: gemini-3.1-flash-lit
 **Verification**: `curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY" | python3 -c "import sys,json; [print(m['id']) for m in json.load(sys.stdin)['data']]"`
 
 **General rule**: always verify a provider actually hosts the target model before configuring it. The `provider:` in config.yaml must match the API endpoint, not the model family name.
+
+## Extraction Model Selection
+
+Use Gemini 3.1 Flash Lite for memory extraction. Tested 2026-05-15: 8/8 tests passed, $0.002 for 8 tests (~$1/month for 500 extractions). Structured JSON output works with `responseMimeType: application/json`.
+
+```bash
+# Test extraction quality via Hindsight API
+curl -s -X POST "http://127.0.0.1:8888/v1/default/banks/walter/memories" \
+  -H "Content-Type: application/json" \
+  -d '{"items": [{"content": "test text", "context": "test", "document_id": "test_1"}], "async": false}'
+```
