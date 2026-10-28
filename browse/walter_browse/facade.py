@@ -324,10 +324,10 @@ def _build_router_command(request: Mapping[str, Any]) -> list[str]:
     return command
 
 
-# Network exits (Monsieur, 2026-10-28): page reads (HTTP probes, static HTML, Scrapling) leave through the owner's
+# Network exits (owner decision, 2026-10-28): page reads (HTTP probes, static HTML, Scrapling) leave through the owner's
 # real local IP (walter-exit-local, fail closed, per-host budget), never the server's bare IP; search APIs
 # authenticated by a key (Brave) leave from the server, which keeps the owner's IP out of search-engine volume.
-# Browser engines use their own exits (Camoufox: walter-exit-local; Chromium: the parents' Freebox).
+# Browser engines use their own exits (Camoufox: walter-exit-local; Chromium: the instance's France exit).
 _LOCAL_EXIT = "http://127.0.0.1:1084"
 
 

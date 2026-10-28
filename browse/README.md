@@ -67,14 +67,14 @@ Usage : `walter-browser -e chromium -s <session> login SITE|new` (la session ret
 Version la plus récente (Chromium 155, 87 patchs) : gratuite avec une connexion GitHub, une session simultanée
 (`cloakbrowser login`) ; non activée.
 
-## Sorties réseau par type de trafic (Monsieur, 28/10/2026)
+## Sorties réseau par type de trafic (décision du propriétaire, 28/10/2026)
 
 Aucune sortie Browse par l'IP nue du serveur. Trois sorties, chacune fermée par défaut :
 
 | Trafic | Sortie | Port |
 |---|---|---|
-| Chromium (CloakBrowser) : profil des démarches lancées en France | IP de la Freebox des parents (`walter-exit-default` : Mac sur « Lucas » ou `freebox-fr`, même IP) | `:1083` |
-| Camoufox + lectures sans navigateur de `walter_browse` (sonde HTTP, HTML statique, Scrapling) | IP réelle locale du propriétaire (Mac **hors** « Lucas ») ; refus si le Mac est sur « Lucas », endormi ou hors ligne ; budget par site (`[local]` de `network.toml`) | `:1084` (`walter-exit-local`, SOCKS5 + proxy HTTP) |
+| Chromium (CloakBrowser) : profil des démarches lancées en France | IP résidentielle de la sortie France de l'instance (`walter-exit-default` : machine sur son tunnel France ou la sortie WireGuard France, même IP) | `:1083` |
+| Camoufox + lectures sans navigateur de `walter_browse` (sonde HTTP, HTML statique, Scrapling) | IP réelle locale du propriétaire (machine **hors** de son tunnel France) ; refus si la machine est sur son tunnel France, endormi ou hors ligne ; budget par site (`[local]` de `network.toml`) | `:1084` (`walter-exit-local`, SOCKS5 + proxy HTTP) |
 | Recherche par API authentifiée par clé (Brave) | serveur (pas d'antibot, l'IP du propriétaire reste hors du volume de recherche) | — |
 
 Le facade pose le proxy dans l'environnement du sous-processus de lecture (`_router_env`) et Scrapling le reçoit

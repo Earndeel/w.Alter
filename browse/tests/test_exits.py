@@ -1,4 +1,4 @@
-"""Network exits of walter_browse (Monsieur, 2026-10-28): page reads leave through the owner's local exit, never the
+"""Network exits of walter_browse (owner decision, 2026-10-28): page reads leave through the owner's local exit, never the
 server's bare IP; key-authenticated search leaves from the server; inherited proxy settings never leak through."""
 from walter_browse import facade
 
