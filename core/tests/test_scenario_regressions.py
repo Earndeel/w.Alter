@@ -141,3 +141,29 @@ def test_call_without_result_or_result_without_call_cannot_prove_browse(monkeypa
     monkeypatch.setattr(S, "_session_events", lambda session: trace)
     ok, _ = S.check({"tool_succeeded": "walter_browse"}, {"links": [{"kind": "session", "ref": "dsh/session"}]})
     assert not ok
+
+
+@pytest.mark.parametrize("status,success,expected", [("ok", True, True), ("ok", False, False),
+                                                    ("failed", True, False)])
+def test_dsh_native_result_inherits_browse_identity_only_from_matching_call(tmp_path, monkeypatch,
+                                                                          status, success, expected):
+    # Real DSH canonical logs name tool/call but leave tool/result.tool null.
+    # Identifiers and public search content are reduced to a local fixture.
+    trace = [{"type": "tool/call", "tool": "mcp__walter__walter_browse", "call_id": "toolu_fixture",
+              "status": None, "text": '{"query":"menu"}'},
+             {"type": "tool/result", "tool": None, "call_id": "toolu_fixture", "status": status,
+              "text": json.dumps({"success": success, "query": "menu", "count": 1,
+                                  "results": [{"title": "Menu", "url": "https://example.test/menu"}],
+                                  "backend": "brave", "elapsed_ms": 10, "error": None,
+                                  "objective": "search", "router_exit_code": 0})}]
+    report = fixture_run(monkeypatch, tmp_path, [], trace, scenario="dsh-recherche")
+    assert report["ok"] is expected
+    assert (tmp_path / "state/scenarios/qualifications.json").exists() is expected
+
+
+def test_explicitly_different_result_tool_cannot_inherit_browse_identity(monkeypatch):
+    trace = events([])[:2]
+    trace[1]["tool"] = "other_tool"
+    monkeypatch.setattr(S, "_session_events", lambda session: trace)
+    ok, _ = S.check({"tool_succeeded": "walter_browse"}, {"links": [{"kind": "session", "ref": "dsh/session"}]})
+    assert not ok

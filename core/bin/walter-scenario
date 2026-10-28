@@ -234,18 +234,26 @@ def _successful_browse(rows: list[dict]) -> list[tuple[dict, dict]]:
     """Decode recorded Browse call/result pairs for both task provenance and harness acceptance."""
     calls, successful = {}, []
     for row in rows:
-        if not _browse_tool(row.get("tool")):
-            continue
         call_id = row.get("call_id")
         if not isinstance(call_id, str) or not call_id:
+            continue
+        kind = row.get("type")
+        if kind == "tool/call":
+            if not _browse_tool(row.get("tool")):
+                continue
+        elif kind == "tool/result":
+            # Native DSH results omit the tool name; their matching call establishes it.
+            if call_id not in calls or (row.get("tool") is not None and not _browse_tool(row.get("tool"))):
+                continue
+        else:
             continue
         try:
             payload = json.loads(row.get("text") or "{}")
         except (ValueError, TypeError):
             continue
-        if row.get("type") == "tool/call" and isinstance(payload, dict):
+        if kind == "tool/call" and isinstance(payload, dict):
             calls[call_id] = payload
-        elif row.get("type") == "tool/result" and row.get("status") == "ok" and isinstance(payload, dict):
+        elif kind == "tool/result" and row.get("status") == "ok" and isinstance(payload, dict):
             if payload.get("success") is False or payload.get("ok") is False or payload.get("error"):
                 continue
             successful.append((calls.get(call_id, {}), payload))
