@@ -46,10 +46,21 @@ def _memory(action: str, payload: dict) -> dict:
         return {}
 
 
-def _events(goal: str, context: str, result: dict, model: str | None) -> list[dict]:
+def _child_context(spec: dict) -> dict:
+    """walter-context's pack for a sub-agent, through its command (declared interface); {} when unavailable."""
+    try:
+        out = subprocess.run(["walter-context-child"], input=json.dumps(spec, default=str), capture_output=True,
+                             text=True, timeout=45)
+        return json.loads(out.stdout) if out.returncode == 0 else {}
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return {}
+
+
+def _events(goal: str, context: str, result: dict, model: str | None, pack: dict | None = None) -> list[dict]:
     """The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write)."""
     now = lambda t=None: datetime.fromtimestamp(t or time.time(), timezone.utc).isoformat()
-    evs = [{"type": "user/message", "text": goal + ("\n\nContext:\n" + context if context else "")}]
+    evs = [{"type": "system/context", "text": json.dumps(pack, ensure_ascii=False, default=str)[:20000]}] if pack else []
+    evs.append({"type": "user/message", "text": goal + ("\n\nContext:\n" + context if context else "")})
     for i, t in enumerate(result.get("tools") or []):
         cid = f"call-{i}"
         evs.append({"type": "tool/call", "tool": t.get("name"), "call_id": cid, "at": now(t.get("at")),
@@ -144,13 +155,21 @@ def _text(conn, d: dict, spec: dict) -> dict:
                                "session_id": session_id,
                                "spec": {k: spec.get(k) for k in ("task", "level", "max_turns", "budget_seconds")} |
                                        {"toolsets": list(toolsets), "requested_task": d.get("requested_task")}})
+    # P2-b: the sub-agent gets a pack built for its task by walter-context (context.build scope=child), the caller's
+    # context kept verbatim inside it; WALTER_RUN_CONTEXT=caller restores the caller's string alone.
+    context, pack_summary = spec.get("context") or "", None
+    if os.environ.get("WALTER_RUN_CONTEXT", "walter") != "caller":
+        pack = _child_context({"goal": spec["goal"], "toolsets": list(toolsets), "caller_context": context,
+                               "constraints": spec.get("constraints"), "output_schema": spec.get("output_schema"),
+                               "budget": {"seconds": budget, "turns": max_turns}, "run_id": run_id, "task_id": task_id})
+        if pack.get("text"):
+            context, pack_summary = pack["text"], pack.get("summary")
     walter_tools = sorted({t for ts in toolsets for t in TOOLSET_TOOLS.get(ts, [])})
     gateway = None
     try:
         if walter_tools:
             gateway = text_agent.Gateway(walter_tools)
-        result = text_agent.run(spec["goal"], spec.get("context") or "", list(toolsets), max_turns, deadline, call,
-                                gateway=gateway)
+        result = text_agent.run(spec["goal"], context, list(toolsets), max_turns, deadline, call, gateway=gateway)
     except (RuntimeError, OSError, ValueError, KeyError) as exc:
         result = {"ok": False, "error": str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__}
     finally:
@@ -161,8 +180,8 @@ def _text(conn, d: dict, spec: dict) -> dict:
         _memory("task-end", {"run_id": run_id, "task_id": task_id, "session_id": session_id, "goal": spec["goal"],
                              "parent_session_id": os.environ.get("WALTER_SESSION_ID"),
                              "model": route["model"] if route else None,
-                             "events": _events(spec["goal"], spec.get("context") or "", result,
-                                               route["model"] if route else None),
+                             "events": _events(spec["goal"], context, result, route["model"] if route else None,
+                                               pack_summary),
                              "status": "ended" if result.get("ok") else "failed",
                              "routing": {"task": d.get("requested_task") or d.get("task"), "executed_as": d.get("task"),
                                          "model_id": d.get("model_id"), "provider": route["provider"] if route else None,

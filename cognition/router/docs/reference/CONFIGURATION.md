@@ -22,6 +22,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/changes.py | `NERF_ELO` | 15.0 |  |
 | analysis/changes.py | `BENCH_KINDS` | ["aa", "aa_eval", "aa_decision", "mm", "da", "arena", "bridgebench", "aa_stt", "agentset", "mteb"] |  |
 | analysis/changes.py | `OFFER_KINDS` | ["openrouter", "kie", "hermes_providers"] |  |
+| analysis/changes.py | `INTELLIGENCE` | aa_intelligence:intelligence |  |
 | analysis/decision_pareto.py | `FREE` | {"clef": "Workers AI (allocation gratuite)", "clef-flash": "Workers AI (allocation gratuite)", "mercury-decide": "OpenRouter :free"} |  |
 | analysis/dossier.py | `RULES` | ["1. Les favoris de {owner} priment : choisir le rôle qui correspond à l'objectif de la demande (signaux), sinon le rôle « default ».", "2. Sans favori : prendre le premier candidat (score composite pondéré multi-benchmarks).", "3. Égalité (écart dans la marge) : préférence de {owner}, puis accès par abonnement (Codex, crédits Flow).", "4. Workflow d'un modèle (références, prompt adapté…) : le planifier avant de générer.", "5. Demande sans restriction : uniquement un modèle 'unrestricted' (ou 'permissive' avec avertissement).", "6. Ne jamais changer un favori sans l'accord de {owner}."] |  |
 | analysis/identity.py | `TIERS` | ["non-reasoning", "minimal", "low", "medium", "high", "xhigh", "max"] |  |
@@ -125,7 +126,13 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | research/agent/review.py | `MY_PROVIDERS` | ["openrouter", "kie", "codex", "arnict", "google-flow"] |  |
 | research/benchmarks/aa.py | `AA_MODEL_URL` | https://artificialanalysis.ai/models/{} |  |
 | research/benchmarks/aa.py | `ANCHORS` | ["gpt-6-luna", "gpt-5-6-luna", "claude-opus-5-5", "deepseek-v4-pro"] |  |
-| research/benchmarks/aa.py | `MIN_MODELS` | 300 | a smaller parse means the page changed: keep the last good snapshot |
+| research/benchmarks/aa.py | `AA_LEADERBOARD_URL` | https://artificialanalysis.ai/leaderboards/models |  |
+| research/benchmarks/aa.py | `AA_API_URL` | https://artificialanalysis.ai/api/v2/data/llms/models |  |
+| research/benchmarks/aa.py | `AA_METHODOLOGY_URL` | https://artificialanalysis.ai/methodology/intelligence-benchmarking |  |
+| research/benchmarks/aa.py | `MIN_PRICED` | 40 |  |
+| research/benchmarks/aa.py | `MAX_DISAGREEMENT` | 0.25 |  |
+| research/benchmarks/aa.py | `SCORE_TOLERANCE` | 0.05 |  |
+| research/benchmarks/aa.py | `AA_INDEXES_URL` | https://artificialanalysis.ai/indexes |  |
 | research/benchmarks/aa_decision.py | `AA_DECISION_URL` | https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index |  |
 | research/benchmarks/aa_evaluations.py | `EVAL_URL` | https://artificialanalysis.ai/evaluations/{} |  |
 | research/benchmarks/aa_evaluations.py | `INDEX_URL` | https://artificialanalysis.ai/indexes/{} |  |
@@ -258,6 +265,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `OPENROUTER_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
 | `OPENROUTER_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
 | `WALTER_RUN_ID` | serve/run.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
+| `WALTER_RUN_CONTEXT` | serve/run.py | get | 'walter' | caller = le sous-agent walter_run reçoit seulement le contexte de l'appelant ; sinon le paquet walter-context (context.build scope=child). |
 | `WALTER_RUN_TOOLS` | serve/run.py | get | aucun | legacy = anciens toolsets par défaut de walter_run (web, walter-web, file, terminal) ; sinon capacités Walter via le Tool Gateway. |
 | `WALTER_SESSION_ID` | serve/run.py | get | aucun | Session walter_logs de l'appelant ; parent de la session du sous-agent walter_run. |
 | `WALTER_ROUTER_DATABASE_URL` | store/db.py | get | 'postgresql://hindsight@127.0.0.1:5433/hindsight' | DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée. |
@@ -323,7 +331,8 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/aliases_auto.json | `aliases.seedream-v4.reason` | str | BytePlus ModelArk identifie le modèle comme Seedream 4.0 (version seedream-4-0-250828) ; seedream-v4 et seedream-4 sont deux écritures de cette même génération. https://docs.byteplus.com/en/docs/ModelArk/1824718 |
 | config/declared_offers.json | `_doc` | str | Offers declared by the instance's owner that no provider API lists (web interfaces, subscriptions). Only explicit declarations go here; an instance keeps its own in config/router/declared_offers.json. |
 | config/declared_offers.json | `offers` | list | [] |
-| config/host.json | `_doc` | str | Host bindings of an instance (shipped default: none). An instance overrides this file in config/router/host.json. Paths: absolute, ~/ or @instance/. log_dir: cycle logs; collect_script: leaderboard collection (empty = skipped); control_env: HMAC secret of the manual trigger; control_origin / library_domain: where the library page and its trigger are served (empty = not published). |
+| config/host.json | `_doc` | str | Host bindings of an instance (shipped default: none). An instance overrides this file in config/router/host.json. Paths: absolute, ~/ or @instance/. log_dir: cycle logs; collect_script: leaderboard collection (empty = skipped); control_env: HMAC secret of the manual trigger; control_origin / library_domain: where the library page and its trigger are served (empty = not published). aa_api_key: vault item and field of the Artificial Analysis Data API key, read through walter-secrets (null = scores from the leaderboard page only). |
+| config/host.json | `aa_api_key` | NoneType | — |
 | config/host.json | `cloudflare_cli` | str |  |
 | config/host.json | `collect_script` | str |  |
 | config/host.json | `control_env` | str | @instance/bootstrap/router-control.env |

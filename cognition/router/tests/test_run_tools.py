@@ -45,3 +45,10 @@ def test_trace_events_are_walter_logs_vocabulary():
     assert [e["type"] for e in evs] == ["user/message", "tool/call", "tool/result", "assistant/message"]
     assert evs[1]["tool"] == "walter_browse" and json.loads(evs[1]["text"]) == {"query": "q"}
     assert all(e.get("at") for e in evs)
+
+
+def test_child_context_is_optional_and_the_pack_is_traced(monkeypatch):
+    monkeypatch.setattr(run.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(OSError("absent")))
+    assert run._child_context({"goal": "g"}) == {}                       # walter-context missing: caller's context
+    evs = run._events("g", "pack", {"ok": True, "output": "x"}, "m", {"tokens": 10, "blocks": []})
+    assert evs[0]["type"] == "system/context" and evs[1]["type"] == "user/message"
