@@ -71,7 +71,7 @@ def reach(host, port):
 print(json.dumps({
   "uid": os.getuid(),
   "env_keys": sorted(k for k in os.environ if k not in ("PATH", "HOME", "HOSTNAME", "LANG", "GPG_KEY", "PYTHON_VERSION", "PYTHON_SHA256")),
-  "root_home_visible": os.path.exists("/root/.hermes") or os.path.exists("/instances") or os.path.exists("/walter"),
+  "root_home_visible": os.path.exists("/etc/walter") or os.path.exists("/instances") or os.path.exists("/walter"),
   "internet": reach("1.1.1.1", 443),
   "host_browser_api": reach("172.17.0.1", 9377),
   "host_postgres": reach("172.17.0.1", 5433),
