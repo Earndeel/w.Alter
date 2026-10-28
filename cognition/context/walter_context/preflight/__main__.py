@@ -81,7 +81,7 @@ def _attach_run(run_id: str, plan: dict) -> None:
         pass
 
 
-def handle(d: dict, shadow: bool) -> tuple[dict | None, dict]:
+def handle(d: dict, shadow: bool, want_pack: bool = False) -> tuple[dict | None, dict]:
     """One request → (plan or None, record row). Shared by the CLI and the service; never raises.
     Without candidates in the request, the subjects come from Walter Memory (step D). In shadow mode the context
     pack the plan asks for is assembled and recorded next to the host's current injection, nothing is injected."""
@@ -108,11 +108,14 @@ def handle(d: dict, shadow: bool) -> tuple[dict | None, dict]:
         if d.get("run_id"):                 # Walter Run Plane: the plan's level and thread belong to the run
             row["run_id"] = d["run_id"]
             _attach_run(d["run_id"], plan)
-        if shadow and req.privacy_class != "local_only":
+        if (shadow or want_pack) and req.privacy_class != "local_only":
             from ..assembly import pack
             from ..retrieval import gather
             blocks, notes = gather(plan_obj, req.message, session_key=session_key(d),
                                    native_history=d.get("runtime") in ("claude_code", "codex", "dsh"))
+            skip = set(d.get("exclude_blocks") or [])      # what the host already shows natively (its profile)
+            blocks = [b for b in blocks if b.id not in skip]
+            row["mode"] = "inject" if want_pack else "shadow"
             p = pack(plan_obj, blocks, notes)
             cur = d.get("current_injection") or {}
             row["pack"] = p.summary()
@@ -122,7 +125,7 @@ def handle(d: dict, shadow: bool) -> tuple[dict | None, dict]:
     except Exception as exc:  # noqa: BLE001 — fail-open
         row, plan = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                      "error": f"{type(exc).__name__}: {str(exc)[:200]}"}, None
-    if shadow:
+    if shadow or want_pack:
         try:
             _record(row)
         except OSError:
