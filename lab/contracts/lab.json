@@ -1,0 +1,118 @@
+{
+  "id": "lab",
+  "anchors": [
+    "contracts/lab.json",
+    "walter_lab/core.py",
+    "walter_lab/cli.py",
+    "bin/walter-lab"
+  ],
+  "requires": [],
+  "external": [
+    "walter-scenario (core) as the shared bench"
+  ],
+  "data": [
+    "experiment reports"
+  ],
+  "core_paths": [
+    "walter_lab/core.py",
+    "walter_lab/cli.py"
+  ],
+  "backup_paths": [
+    ".",
+    "@instance/state/lab"
+  ],
+  "interfaces": [
+    "CLI walter-lab run|history|list",
+    "Experiment v1 (experiments/*.yaml)"
+  ],
+  "bindings": {
+    "hermes": "CLI under host execution permissions",
+    "dsh": "CLI under host execution permissions",
+    "codex": "CLI under host execution permissions",
+    "claude-code": "CLI under host execution permissions"
+  },
+  "limitations": [
+    "Minimal (P6): variants are environment switches the modules already honour; no scout, no sandbox yet.",
+    "Proposals only: nothing is ever applied by Lab.",
+    "External code (scout) must run in a sandbox without secrets nor production data — not built yet."
+  ],
+  "services": [],
+  "optional": [
+    "core"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "0.1.0",
+    "owner": "lab",
+    "kind": "capability",
+    "purpose": "Chercher, mesurer et proposer des améliorations de Walter, sans jamais les appliquer seul.",
+    "target_root": "lab",
+    "config_paths": [],
+    "permissions": [
+      "lancer des scénarios du banc",
+      "écrire ses rapports"
+    ],
+    "invariants": [
+      "Une expérience a sa règle de décision écrite avant les essais.",
+      "Lab propose ; il n'applique rien.",
+      "Pas de code externe hors d'un bac à sable sans secrets."
+    ],
+    "errors": [
+      "invalid_request",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Une expérience interrompue garde les essais déjà mesurés dans son rapport."
+    ],
+    "operations": [
+      {
+        "id": "run",
+        "transport": "cli",
+        "interface": "walter-lab run",
+        "access": "execute",
+        "timeout_seconds": 7200,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "experiment-reports",
+        "role": "owner",
+        "owner": "lab",
+        "durability": "canonical"
+      }
+    ],
+    "migrations": [
+      "Versionner le format Experiment ; garder la lecture des anciens rapports."
+    ],
+    "recovery": {
+      "backup": [
+        "Module et rapports dans le paquet config offsite."
+      ],
+      "restore": [
+        "Réinstaller le module ; les rapports sont des fichiers."
+      ],
+      "verification": [
+        "walter-lab history <expérience>."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "rule-first",
+        "assertion": "La décision proposée découle de la règle écrite avant les essais.",
+        "scope": "unit"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Lab",
+    "order": 90,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "tools": []
+  }
+}
