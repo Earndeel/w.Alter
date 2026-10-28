@@ -22,3 +22,13 @@ def test_build_orders_layers_keeps_caller_context_and_survives_failing_sources(m
 
 def test_toolsets_select_only_their_modules():
     assert child.TOOLSET_MODULES["walter-web"] == ["browse"] and "terminal" not in child.TOOLSET_MODULES
+
+
+def test_reuse_block_only_when_the_caller_points_at_observations(monkeypatch):
+    assert child._observations({"goal": "g"}) is None
+    import walter_memory.observations as O
+    monkeypatch.setattr(O, "recent", lambda q, max_age_hours, limit: [{"item_id": "i1", "observed_at": "2026-10-28T07:29",
+        "attributes": {"seller": "7-Eleven", "subject": "americano 16 oz", "values": {"price": 35}, "method": "static_html",
+                       "source_url": "https://x"}}])
+    b = child._observations({"goal": "g", "constraints": {"reuse": "americano 7-eleven"}})
+    assert b.id == "observations" and b.sources == ["i1"] and "ne relis que ce qui manque" in b.text
