@@ -58,8 +58,9 @@ exports remove the partial fresh directory. Normal/aborted runs remove their sta
 container is confirmed stopped.
 
 The input omits caches and known credential names: `.git`, `node_modules`, virtual environments, `__pycache__`,
-`.env`/`.env.*`, `.aws`, `.ssh`, `.gnupg`, `.config`, `.kube`, `.docker`, `.pgpass`, `.netrc`, common
-`credentials`/`secrets` filenames, SSH private key names, and private-key extensions such as `.pem`/`.key`.
+`.env`/`.env.*` and all `*.env` files, `.aws`, `.ssh`, `.gnupg`, `.config`, `.kube`, `.docker`, `.pgpass`, `.netrc`,
+common `credentials`/`secrets` filenames and their hidden variants, `auth.json`/`.auth.json`, SSH private key names,
+and private-key extensions such as `.pem`/`.key`. Matching is case insensitive for credential names/extensions.
 Links and special files are rejected before exclusions are considered. This name filter is a precaution:
 **it cannot identify a secret or production data stored under an arbitrary name. Approve and sanitise the source
 tree and image before execution.**

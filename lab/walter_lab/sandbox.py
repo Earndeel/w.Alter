@@ -35,12 +35,13 @@ _IGNORED = {".git", "node_modules", "venv", ".venv", "__pycache__"}
 _CREDENTIALS = {".aws", ".ssh", ".gnupg", ".config", ".kube", ".docker", ".pgpass", ".netrc",
                 "credentials", "credentials.json", "credentials.yaml", "credentials.yml",
                 "secrets", "secrets.json", "secrets.yaml", "secrets.yml", "id_rsa", "id_ed25519",
-                "id_ecdsa", "id_dsa", "service-account.json", "service_account.json"}
+                "id_ecdsa", "id_dsa", "service-account.json", "service_account.json", "auth.json"}
 
 
 def _excluded(name: str) -> bool:
     lower = name.lower()
-    return (name in _IGNORED or lower in _CREDENTIALS or lower == ".env" or lower.startswith(".env.")
+    return (name in _IGNORED or lower in _CREDENTIALS or lower.removeprefix(".") in _CREDENTIALS
+            or lower.endswith(".env") or lower.startswith(".env.")
             or lower.endswith((".pem", ".key", ".p12", ".pfx", ".agekey")))
 
 

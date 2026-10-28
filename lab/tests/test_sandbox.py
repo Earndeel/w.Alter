@@ -223,3 +223,29 @@ def test_output_streams_are_drained_with_bounded_tails():
     result = sandbox._execute([sys.executable, "-c", "import os; os.write(1, b'x' * 200000); os.write(2, b'y' * 200000)"], timeout=5)
     assert result.returncode == 0
     assert result.stdout == b"x" * 4000 and result.stderr == b"y" * 2000
+
+
+@pytest.mark.parametrize('name', ['.credentials.yaml', '.credentials.yml', '.credentials.json', '.credentials',
+                                  '.secrets.yaml', '.secrets.json', 'auth.json', '.auth.json',
+                                  'browse-search.env', '.browse-search.env', 's3.env', 'BROWSE-SEARCH.ENV'])
+def test_known_credential_variants_are_never_mounted(tmp_path, docker, name):
+    source = tmp_path / 'source'
+    source.mkdir()
+    (source / name).write_text('synthetic fixture only')
+    (source / 'safe.py').write_text('print("fixture")')
+    mounted = []
+    docker[0].produce = lambda work: mounted.extend(path.name for path in (work / 'src').iterdir())
+    sandbox.run(str(source), ['true'])
+    assert mounted == ['safe.py']
+
+
+def test_credential_filter_keeps_unrelated_document_and_code_names(tmp_path, docker):
+    source = tmp_path / 'source'
+    source.mkdir()
+    names = ['auth-notes.json', 'credentials-guide.md', 'environment.py', 'safe.env.example']
+    for name in names:
+        (source / name).write_text('synthetic fixture only')
+    mounted = []
+    docker[0].produce = lambda work: mounted.extend(path.name for path in (work / 'src').iterdir())
+    sandbox.run(str(source), ['true'])
+    assert set(mounted) == set(names)

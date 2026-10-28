@@ -40,3 +40,12 @@ aller-retour source/résultat factice. Les quotas de copie ne constituent pas un
 les détails et restrictions figurent dans le README. Une exclusion de noms ne détecte pas un secret arbitraire.
 Ce correctif ne revendique pas l'isolation d'une VM ni un backend de stockage à quota. Aucun historique d'expérience
 existant n'est modifié par le correctif.
+
+## Complément : variantes des noms de credentials
+
+Le filtre initial excluait `credentials.yaml` mais oubliait sa variante cachée `.credentials.yaml`, les fichiers
+nommés `browse-search.env`/`s3.env` et le fichier de jeton CLI `auth.json`. Le filtre reconnaît désormais les mêmes
+noms connus avec un point initial, `auth.json` et les suffixes `.env`, sans inspecter le contenu ni élargir la règle
+aux fichiers dont le nom contient seulement un mot comme « auth ». Douze fixtures de noms ont reproduit le défaut
+en RED ; un cas positif vérifie que les noms ordinaires de documentation/code restent copiés. Aucun secret réel
+n'a été utilisé. Les limites du filtrage par noms et la validation de la source restent inchangées.
