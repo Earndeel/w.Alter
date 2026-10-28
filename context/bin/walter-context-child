@@ -1,0 +1,4 @@
+#!/bin/sh
+# walter-context child: ChildContextSpec v1 JSON on stdin -> the pack of a delegated sub-agent (context.build scope=child).
+root="$(dirname "$(readlink -f "$0")")/.."
+cd "$root" && PYTHONPATH="$root" exec walter-python -m walter_context.child
