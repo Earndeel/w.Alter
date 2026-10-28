@@ -4,6 +4,7 @@ walter-context-preflight). A one-shot process pays ~0.4 s per message before the
 
     POST /preflight            JSON request (same as the CLI's stdin) → 200 ContextPlan, 422 error row
     POST /preflight?shadow=1   plan recorded in the instance (lot 4 shadow), 204
+    POST /preflight?inject=1   real injection trials: {plan, text (the pack to inject), pack (its summary)}, recorded too
     GET  /health               {"ok": true, "router_cached": bool}
 
 Loopback only, no token. Since step D (26/10) it reads Walter Memory's subject views (candidates, cards) and, in
@@ -56,9 +57,13 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as exc:
             return self._send(400, {"error": f"invalid request: {exc}"[:200]})
         shadow = parse_qs(url.query).get("shadow") == ["1"]
-        plan, row = handle(d, shadow)
+        inject = parse_qs(url.query).get("inject") == ["1"]      # real injection trials (owner, 2026-10-27/28)
+        plan, row = handle(d, shadow, want_pack=inject)
         if shadow:
             return self._send(204, None)
+        if inject:
+            return self._send(200, {"plan": plan, "text": row.get("pack_text"), "pack": row.get("pack"),
+                                    "error": row.get("error")})
         self._send(200, plan) if plan is not None else self._send(422, row)
 
     def log_message(self, *args) -> None:       # message text never reaches the journal
