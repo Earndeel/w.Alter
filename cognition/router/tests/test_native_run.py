@@ -17,6 +17,11 @@ from walter_router.serve import run, text_agent
 @pytest.fixture
 def execution(monkeypatch):
     rows = []
+    # Native-loop tests do not contact the active Tool Gateway, Context or Memory.
+    monkeypatch.setattr(run, "default_toolsets", lambda: [])
+    monkeypatch.setenv("WALTER_RUN_CONTEXT", "caller")
+    monkeypatch.delenv("WALTER_RUN_ID", raising=False)
+    monkeypatch.delenv("WALTER_TASK_ID", raising=False)
     monkeypatch.setattr(run.execution, "log", lambda conn, row: rows.append(row))
     return SimpleNamespace(conn=SimpleNamespace(commit=lambda: None), logs=rows)
 
@@ -103,6 +108,51 @@ def test_success_without_failover_does_not_emit_a_warning(monkeypatch, execution
     assert out["ok"] and not out["user_notification_required"] and not out["notices"]
 
 
+@pytest.mark.parametrize("cost,status", [(0.125, "reported"), (0.07, "estimated"), (0, "reported"),
+                                       (None, "unknown")])
+def test_response_telemetry_reaches_attempt_and_execution_log(monkeypatch, execution, cost, status):
+    telemetry = {"usage": {"prompt_tokens": 41, "completion_tokens": 17, "total_tokens": 58},
+                 "cost_usd": cost, "cost_status": status}
+    monkeypatch.setattr(text_agent, "complete", lambda route, *args: answer(route, **telemetry))
+    out = run._text(execution.conn, decision(), {"goal": "test"})
+    assert out["ok"]
+    for row in (out["routed"]["attempts"][0], execution.logs[0]):
+        assert {key: row[key] for key in telemetry} == telemetry
+
+
+def test_unmeasured_and_failed_attempts_keep_unknown_telemetry(monkeypatch, execution):
+    def complete(route, *args):
+        if route["provider"] == "kie":
+            raise RuntimeError("provider_timeout")
+        return answer(route)  # an older gateway can omit telemetry entirely
+    monkeypatch.setattr(text_agent, "complete", complete)
+    out = run._text(execution.conn, decision(), {"goal": "test"})
+    assert out["ok"] and [row["ok"] for row in execution.logs] == [False, True]
+    for row in out["routed"]["attempts"] + execution.logs:
+        assert {key: row[key] for key in ("usage", "cost_usd", "cost_status")} == {
+            "usage": None, "cost_usd": None, "cost_status": "unknown"}
+
+
+def test_each_tool_turn_keeps_its_own_telemetry(monkeypatch, execution, tmp_path):
+    marker = tmp_path / "measured.txt"
+    calls = []
+    def complete(route, *args):
+        calls.append(route["provider"])
+        telemetry = {"usage": {"total_tokens": len(calls) * 10},
+                     "cost_usd": len(calls) / 100, "cost_status": "reported"}
+        if len(calls) == 1:
+            return answer(route, None, **telemetry, message={"role": "assistant", "tool_calls": [
+                {"id": "measured-tool", "type": "function", "function": {"name": "terminal",
+                 "arguments": __import__("json").dumps({"command": f"printf x > '{marker}'"})}}]})
+        return answer(route, **telemetry)
+    monkeypatch.setattr(text_agent, "complete", complete)
+    out = run._text(execution.conn, decision(), {"goal": "test", "toolsets": ["terminal"]})
+    assert out["ok"] and marker.read_text() == "x" and len(calls) == 2
+    for rows in (out["routed"]["attempts"], execution.logs):
+        assert [(row["usage"]["total_tokens"], row["cost_usd"], row["cost_status"]) for row in rows] == [
+            (10, 0.01, "reported"), (20, 0.02, "reported")]
+
+
 def test_a_hanging_provider_leaves_time_for_its_fallback(monkeypatch, execution):
     clock, limits = [100.0], []
     monkeypatch.setattr(run.time, "monotonic", lambda: clock[0])
@@ -164,7 +214,9 @@ def _gateway_function():
     tree = ast.parse((paths.ROOT / "llm" / "gateway.py").read_text())
     nodes = [n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name in {"exact_call", "provider_completion"}]
     ns = {"litellm_target": lambda route: {"model": route["model"], "api_key": "test-key"},
-          "_usage": lambda response: {}, "_install_codex_auth": lambda: None}
+          "_usage": lambda response: {}, "_telemetry": lambda response: {
+              "usage": {}, "cost_usd": None, "cost_status": "unknown"},
+          "_install_codex_auth": lambda: None}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), "gateway.py", "exec"), ns)
     return ns["exact_call"]
 
