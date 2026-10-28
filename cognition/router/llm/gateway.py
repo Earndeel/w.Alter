@@ -298,7 +298,7 @@ async def exact_call(spec: dict) -> dict:
         if not message.get("content") and not message.get("tool_calls"):
             return {"ok": False, "error": "empty_provider_response"}
         return {"ok": True, "message": message, "provider": provider, "model": model,
-                "response_model": returned_model, "response_id": response.id, "usage": _usage(response)}
+                "response_model": returned_model, "response_id": response.id, **_telemetry(response)}
     except Exception as exc:
         # Provider exception text can contain credentials, payloads and URLs: return only its type.
         status = getattr(exc, "status_code", None)

@@ -22,7 +22,7 @@ SESSION='22222222-2222-4222-8222-222222222222'
 def gateway(tmp_path, monkeypatch):
     source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
     tree=ast.parse(source.read_text())
-    names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_session_run','_run_metadata','_record_attempt','log','build_app'}
+    names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_session_run','_run_metadata','_record_attempt','exact_call','log','build_app'}
     nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in names]
     agents=tmp_path/'agents.json'
     agents.write_text(json.dumps({hashlib.sha256(b'fixture-token').hexdigest():{'agent':'dsh'}}))
@@ -306,3 +306,15 @@ def test_real_dsh_session_prefix_is_resolved_without_rewriting_its_identity(tmp_
     result=post(ns['build_app'](),{'messages':[],'prompt_cache_key':native})
     assert result.status_code==200
     assert seen==['dsh/vm/'+native]
+
+
+def test_exact_transport_returns_common_usage_and_cost_provenance(tmp_path,monkeypatch):
+    ns=gateway(tmp_path,monkeypatch)
+    msg=SimpleNamespace(model_dump=lambda **kw:{'content':'OK'})
+    result=SimpleNamespace(usage={'prompt_tokens':5,'completion_tokens':1,'cost':0.003},_hidden_params={},
+                           choices=[SimpleNamespace(message=msg,finish_reason='stop')],model='fixture-model',id='fixture-response')
+    async def complete(*a,**kw):return result
+    ns['provider_completion']=complete
+    out=asyncio.run(ns['exact_call']({'route':{'provider':'openrouter','model':'fixture-model'},'messages':[]}))
+    assert out['ok'] is True and out['usage']['in']==5
+    assert out.get('cost_usd')==0.003 and out.get('cost_status')=='reported'

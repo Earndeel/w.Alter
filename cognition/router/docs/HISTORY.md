@@ -396,3 +396,9 @@ Les requêtes HTTP sont corrélées individuellement aux runs Memory ouverts ; D
 de son fournisseur pi-ai sans modifier son moteur. Une corrélation inconnue ou ambiguë échoue explicitement.
 Les flux interrompus gardent leur trace d’échec. Migration 036 : usage jsonb et provenance du coût ; une mesure
 absente ne devient plus un coût nul. Voir EXECUTION.md et llm/README.md pour les limites et le retour arrière.
+
+### 2026-10-29 — Télémétrie du texte natif et session DSH réelle
+
+Le format de session DSH `session-UUID` est conservé exactement pour le lookup local. Les essais réels
+ont vérifié la corrélation et le routage observé. Le port CLI exact partage désormais la télémétrie du
+port HTTP ; la boucle native transmet usage et provenance du coût à chaque tentative et au journal.

@@ -156,3 +156,7 @@ appels dépourvus d’identité Memory.
 reste inconnu ; un zéro explicitement retourné dans usage.cost est conservé. Les flux accumulent la dernière
 mesure disponible ; une annulation ou un échec de fermeture est journalisé en échec. Les appels sans coût
 ne permettent pas de calculer un coût total complet. Installer la migration 036 avant les lecteurs et le gateway.
+
+Le transport CLI exact retourne les mêmes mesures que le port HTTP. La boucle texte native conserve
+`usage`, `cost_usd`, `cost_status` dans chaque tentative et dans le journal d’exécution, sans recalcul
+concurrent des prix. Une réponse sans mesure, ou une tentative échouée sans mesure, reste inconnue.
