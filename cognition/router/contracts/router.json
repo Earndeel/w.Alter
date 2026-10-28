@@ -50,10 +50,13 @@
   "services": [
     "walter-router-guardian.timer"
   ],
-  "optional": [],
+  "optional": [
+    "core",
+    "browse"
+  ],
   "contract": {
     "schema_version": 1,
-    "version": "1.1.0",
+    "version": "1.2.0",
     "owner": "router",
     "kind": "capability",
     "purpose": "Choisir les modèles par poste avec décisions et coûts traçables.",

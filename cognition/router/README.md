@@ -155,3 +155,6 @@ model is substituted. The budget covers all providers and tools together.
 ## Route d’abonnement Claude
 
 La route `claude-pro` est exécutée dans la passerelle du Router, avec les messages, outils et paramètres du consommateur. Le transport natif ne conserve que l’attribution technique du fournisseur ; sa boucle d’agent et son contexte ne sont pas délégués. Configuration, renouvellement, quotas réels, streaming et limites : [docs/CLAUDE-SUBSCRIPTION.md](docs/CLAUDE-SUBSCRIPTION.md).
+
+La collecte Arena dispose d’un repli public borné par le navigateur partagé, avec contrôle de l’identité
+des classements : [transport, limites et vérification](docs/ARENA.md).

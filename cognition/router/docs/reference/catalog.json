@@ -7852,12 +7852,27 @@
         "file": "research/benchmarks/arena.py",
         "functions": [
           {
+            "description": "Keep each result attached to the declared public leaderboard identity.",
+            "name": "_board_matches",
+            "signature": "key: str, board: dict | None"
+          },
+          {
             "description": "Leaderboard rows embedded in an Arena.ai page (Next.js flight data): pairwise boards carry 'entries'",
             "name": "arena_board",
             "signature": "page: str"
           },
           {
-            "description": "Every board, or only `parts` (board keys, for a research category run; merged later into the last snapshot).",
+            "description": "Close only the dedicated public collection session, with a bounded wait.",
+            "name": "_close_browser",
+            "signature": "session: str, *, timeout: float=5"
+          },
+          {
+            "description": "Read a public Arena page via the supported CLI, isolated session, no login or cookie export.",
+            "name": "_browser_text",
+            "signature": "url: str, *, timeout: float=BROWSER_TIMEOUT, session: dict | None=None"
+          },
+          {
+            "description": "Every board, or only requested keys. A challenged HTTP transport falls back for this collection only.",
             "name": "source_arena",
             "signature": "parts: set[str] | None=None"
           }
@@ -15267,21 +15282,54 @@
         "name": "ARENA_BOARDS",
         "value": {
           "agent": "agent",
+          "chat/document": "document",
+          "chat/search": "search",
+          "chat/text": "text",
+          "chat/vision": "vision",
           "code/image-to-webdev": "image_to_webdev",
           "code/webdev": "webdev",
-          "document": "document",
-          "image-to-video": "image_to_video",
           "image/image-edit/single-image": "image_edit",
-          "search": "search",
-          "text": "text",
-          "text-to-image": "text_to_image",
-          "text-to-video": "text_to_video",
+          "image/text-to-image": "text_to_image",
           "text/coding": "text_coding",
           "text/creative-writing": "text_creative",
           "text/french": "text_french",
-          "video-edit": "video_edit",
-          "vision": "vision"
+          "video/image-to-video": "image_to_video",
+          "video/text-to-video": "text_to_video",
+          "video/video-edit": "video_edit"
         }
+      },
+      {
+        "comment": "",
+        "file": "research/benchmarks/arena.py",
+        "name": "BOARD_NAMES",
+        "value": {
+          "document": "document-overall-raw",
+          "image_edit": "image_edit-overall-raw",
+          "image_to_video": "image_to_video-overall-raw",
+          "image_to_webdev": "image_to_webdev-overall-raw",
+          "search": "search-overall-raw",
+          "text": "text-overall-style_control",
+          "text_coding": "text-coding-style_control",
+          "text_creative": "text-creative_writing-style_control",
+          "text_french": "text-french-style_control",
+          "text_to_image": "text_to_image-overall-raw",
+          "text_to_video": "text_to_video-overall-raw",
+          "video_edit": "video_to_video-overall-raw",
+          "vision": "vision-overall-style_control",
+          "webdev": "webdev-overall-raw"
+        }
+      },
+      {
+        "comment": "one public page, including navigation and bounded CLI reads",
+        "file": "research/benchmarks/arena.py",
+        "name": "BROWSER_TIMEOUT",
+        "value": 90
+      },
+      {
+        "comment": "shared across the collection; no per-board timeout multiplication without a ceiling",
+        "file": "research/benchmarks/arena.py",
+        "name": "BROWSER_BUDGET",
+        "value": 600
       },
       {
         "comment": "",
@@ -16461,7 +16509,7 @@
     "config/providers.json": "ea7f381395589799ef723a1a4e93540d4a3b4bc08549a42207a22857940be430",
     "config/subscriptions.json": "d2e56aa07e15344a1986746b1f8608842873639f5d37788e37e9896d6ba67017",
     "contracts/maintenance.json": "e053f12f7d4b27ad89789cc2cf90cdfeaf85e673c1a088a5e4a1bb6df0d9a209",
-    "contracts/router.json": "d52d10e173e0b31bdeca9716e1a88dc203bb7cf614b523b985bcf7648fb178f8",
+    "contracts/router.json": "ea6c3de46c6b48ddc120dcef459dd834802baf7a0190931b1e7851fa2386fdcb",
     "documentation.py": "201a77980a92a68cf6438408ad29e4946ccb473afa447bd47afdcb4ff043e9ef",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
@@ -16502,7 +16550,7 @@
     "research/benchmarks/aa_media.py": "d5bcaa8f542417f1e76b0d54d2c3c0511714c50156acbadc8530310c67080e67",
     "research/benchmarks/aa_stt.py": "1df780e8e54d6a6a4e5eaea618f952de41bc3ff5878c8320d6a1efd49b320afe",
     "research/benchmarks/agentset.py": "1c73bb7619c1b0807e70b8177f4f2822e14cde7ad074af12767dcaa10dd81291",
-    "research/benchmarks/arena.py": "a47adacb152fcd4c68fffdb14057d782c963e6bf5cb178ea56d06a178f670f2d",
+    "research/benchmarks/arena.py": "94ae45ee0b0216c896e618ab41a666a42fd129df73572d4a277659b6bf2faa76",
     "research/benchmarks/bridgebench.py": "70b09d7ab29a9b97598734808067d149e694c4f6f15c1bf5bf1e79236e9a2e26",
     "research/benchmarks/design_arena.py": "e999ca9aacd247194488aca9dda7ef4b524dc61e1c695ef77b487f049b52981f",
     "research/benchmarks/mteb.py": "81a7f0df351157f3cdf8e26a7378191d2a1e4e15197c17b56da2f09e9722baad",

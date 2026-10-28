@@ -402,3 +402,10 @@ absente ne devient plus un coût nul. Voir EXECUTION.md et llm/README.md pour le
 Le format de session DSH `session-UUID` est conservé exactement pour le lookup local. Les essais réels
 ont vérifié la corrélation et le routage observé. Le port CLI exact partage désormais la télémétrie du
 port HTTP ; la boucle native transmet usage et provenance du coût à chaque tentative et au journal.
+
+### 2026-10-29 — Collecte Arena par interface navigateur partagée
+
+Le parseur actuel lit les pages officielles ; la collecte était bloquée sur HTTP/FlareSolverr. Le repli
+utilise le CLI public de Core/Browse, session dédiée, tailles/délais bornés et identité de classement vérifiée.
+Les routes canoniques observées changent, les clés de board restent stables. Aucune analyse, notification
+ou modification de modèle n’est ajoutée à la collecte. Détails : ARENA.md.
