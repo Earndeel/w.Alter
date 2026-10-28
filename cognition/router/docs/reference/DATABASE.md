@@ -479,10 +479,13 @@ Every routed execution attempt (walter_run, generate, walter-llm): provider, mod
 | `kind` | text | False | 'text'::text | Catégorie du fait, de l'alerte ou de l'exécution. |
 | `run_id` | uuid | True | — | Walter run (runs.runs.run_id) this execution served, from WALTER_RUN_ID; null outside a run. |
 | `task_id` | uuid | True | — | Sub-agent task (runs.tasks.task_id) this execution served (walter_run); null otherwise. |
+| `usage` | jsonb | True | — | Measured token counts for this execution attempt (in/out/cached); NULL means unavailable, never zero by inference. |
+| `cost_status` | text | False | 'unknown'::text | Cost provenance: unknown when unavailable; reported from provider usage; estimated by transport; legacy for historical values with no provenance. |
 
 constraints :
 
 ```sql
+CHECK ((cost_status = ANY (ARRAY['unknown'::text, 'reported'::text, 'estimated'::text, 'legacy'::text])))
 PRIMARY KEY (exec_id)
 ```
 

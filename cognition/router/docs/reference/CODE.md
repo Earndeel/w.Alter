@@ -491,6 +491,13 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `as_json(text: str | None)` — The JSON object of a Codex answer; ValueError (= next route, which honours response_format) when there is none.
 - `exact_call(spec: dict)` — Local router transport: one provider, one model, no retries or model fallbacks.
 - `_usage(resp)` — 
+- `_number(value)` — A finite nonnegative measurement, or unknown when missing or malformed.
+- `_telemetry(resp)` — Vendor-reported cost and transport estimate stay distinguishable; absence is never zero.
+- `_uuid(value)` — Validate a local correlation identifier without echoing its supplied value.
+- `_session_run(session: str)` — The public metadata-only lookup; no database import or global most-recent-run guess.
+- `_run_metadata(run_id: str)` — Validate explicit request correlation through Memory's metadata-only public CLI.
+- `_correlation(request, body: dict, agent: str)` — Request-local transport metadata. DSH's public pi-ai cache key carries its native session identity only
+- `_record_attempt(row: dict, entry: dict)` — Persist through public ports. DSH routing becomes applied only after an observed response.
 - `log(entry: dict)` — 
 - `build_app()` — 
 - `add_agent(name: str, cred_file: str, ref: str='WALTER_LLM_TOKEN')` — New token for NAME (one per agent: rotates). cred_file = a DSH credentials YAML, or `env:FILE[:VAR]` = a
@@ -888,7 +895,7 @@ What the router (and the orchestrator) calls: pick the model for a task, the own
 
 ## serve/execution.py
 
-From a chosen model to something Hermes can run: ordered execution routes and live provider probes.
+Ordered provider routes and execution metadata for Walter consumers.
 
 - `_runnable(offer: dict)` — (Hermes provider, model id at that provider, status key) or None when Hermes cannot run this offer.
 - `reliability(conn, provider: str, model: str)` — Recent real executions of this provider x model (models.exec_log, skipped attempts excluded).

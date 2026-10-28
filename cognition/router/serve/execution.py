@@ -1,7 +1,7 @@
-"""From a chosen model to something Hermes can run: ordered execution routes and live provider probes.
+"""Ordered provider routes and execution metadata for Walter consumers.
 
-A route = (walter provider, Hermes provider name, model id at that provider, reasoning level). The Hermes plugin
-runs the first route with `hermes chat --oneshot --provider P -m M` and falls back to the next one on failure.
+Native Walter text execution owns its tools and uses the public walter-llm exact-call port.
+Hermes direct-provider bindings remain available through the host-owned runtime adapter.
 """
 from __future__ import annotations
 
@@ -171,13 +171,16 @@ def _uuid(value) -> str | None:
 def log(conn, entry: dict) -> int:
     """One routed execution attempt (from the Hermes plugin or the media executor)."""
     keys = ("task", "role", "model_id", "provider", "model", "ok", "skipped", "seconds", "cost_usd", "fallback_for", "kind",
-            "run_id", "task_id")
+            "run_id", "task_id", "usage", "cost_status")
     row = {k: entry.get(k) for k in keys}
     row["ok"] = bool(row["ok"])
     row["kind"] = row["kind"] or "text"
     # Walter Run Plane: the caller's run and sub-agent task travel as WALTER_RUN_ID / WALTER_TASK_ID.
-    row["run_id"] = _uuid(row["run_id"] or os.environ.get("WALTER_RUN_ID"))
-    row["task_id"] = _uuid(row["task_id"] or os.environ.get("WALTER_TASK_ID"))
+    row["run_id"] = _uuid(entry["run_id"] if "run_id" in entry else os.environ.get("WALTER_RUN_ID"))
+    row["task_id"] = _uuid(entry["task_id"] if "task_id" in entry else os.environ.get("WALTER_TASK_ID"))
+    row["usage"] = json.dumps(row["usage"]) if isinstance(row["usage"], dict) else None
+    row["cost_status"] = row["cost_status"] if row["cost_status"] in {"unknown", "reported", "estimated", "legacy"} else \
+        ("legacy" if row["cost_usd"] is not None else "unknown")
     return conn.execute(f"""insert into models.exec_log ({", ".join(keys)}) values ({", ".join(["%s"] * len(keys))})
                             returning exec_id""", [row[k] for k in keys]).fetchone()["exec_id"]
 

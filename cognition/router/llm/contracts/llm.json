@@ -32,14 +32,19 @@
     "codex": "specialist module calls; primary native",
     "claude-code": "specialist module calls; primary native"
   },
-  "limitations": [],
+  "limitations": [
+    "Identified HTTP runs require Memory metadata; unresolved, local_only and redacted_cloud contexts are refused. Untracked legacy requests are outside this check.",
+    "Cost telemetry distinguishes reported, estimated, legacy and unknown; missing usage or a synthetic zero does not prove free execution."
+  ],
   "services": [
     "walter-llm"
   ],
-  "optional": [],
+  "optional": [
+    "memory"
+  ],
   "contract": {
     "schema_version": 1,
-    "version": "1.1.0",
+    "version": "1.2.0",
     "owner": "llm",
     "kind": "capability",
     "purpose": "Exécuter les appels modèles des consommateurs autorisés via les postes du Router.",
