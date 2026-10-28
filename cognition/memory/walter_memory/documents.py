@@ -168,7 +168,7 @@ def sync_if_changed() -> dict:
 
 def listing() -> list[dict]:
     with connect() as conn:
-        return conn.execute("""select attributes->>'source' source, attributes->>'title' title, valid_from::date day,
+        return conn.execute("""select attributes->>'source' source, attributes->>'title' title, valid_from::date as day,
                                       privacy_class, length(content) chars from core.derived_items
                                where kind = %s and status = 'derived' order by valid_from desc""", (KIND,)).fetchall()
 
