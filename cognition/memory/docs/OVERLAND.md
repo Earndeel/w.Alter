@@ -14,12 +14,12 @@ Only after the transaction commits does the phone receive `{"result":"ok"}`. Aut
 
 The response centrally applies a managed profile, including on retries, so a lost HTTP response cannot permanently lose configuration. It uses the newest valid point within 10 minutes, accuracy 0–200 m; older backlog does not change settings.
 
-- Daily background tracking: desired accuracy 100 m; standard + significant change, Visit Tracking on, automatic pause and resume geofence 200 m.
-- Walking, cycling, running or driving (or speed >0.8 m/s): send about every 2 minutes; otherwise every 5 minutes.
-- Battery <20%, unplugged: send about every 10 minutes.
-- Voluntary active trip (top-level trip telemetry): send about every minute; trip accuracy 10 m (100 m if low battery), screen may lock normally.
-- Daily filters: 100 m / 1 minute; trip filters: 50 m / 30 s. These reduce stored samples, not GPS acquisition power by themselves.
-- All data queued, batch 200, background indicator on. Actual accuracy can be better or worse than requested. Do not claim a battery percentage saving without measurement.
+- Precision requested: 10 m in daily tracking and trips, including low battery. Monsieur rejected 100 m because most activity is within one condo on different floors.
+- Standard + significant change, Visit Tracking on, automatic pause and resume geofence 100 m. A geofence does not distinguish floors or guarantee resumption for indoor movement.
+- Set `discard_stationary=true`: supported current upstream discards stationary samples except a first stopping point and an hourly heartbeat. Motion & Fitness permission is required. Presence/support of this setting in the installed App Store version remains to verify. Do not claim a true movement-triggered wake or zero overnight transmissions from a server setting alone.
+- Normal send intervals remain 2 min moving / 5 min otherwise; low battery 10 min, voluntary trip 1 min. This is a queue flush cadence, not mandatory empty pings: current upstream returns before HTTP when queue is empty. A stock hourly heartbeat/visit/action record can still produce a request.
+- Daily distance filter disabled so short indoor movements/changed Wi-Fi at similar coordinates are not discarded purely by horizontal distance. Time filter 30 s; trip filters 50 m / 30 s. Filters alone do not shut down GPS.
+- All data queued, batch 200, background indicator on. Actual accuracy is not guaranteed indoors. No automatic floor identification is implemented. Wi-Fi SSID/BSSID or an explicit local check-in is required to map indoor venues; confirm observed Wi-Fi and installed app capabilities before implementing.
 
 The interval is a request to iOS, never a guarantee; automatic pause/geofence can delay resumption. These thresholds need field validation during a real walk before claiming production tracking quality. This connector does not yet cluster stays, reverse-geocode, notify on movement or send coordinates to an external model. Raw GPS remains excluded from cloud-safe recall under the existing privacy policy. Explicit local-only reads must stay inside a local processing context.
 
