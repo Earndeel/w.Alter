@@ -1391,9 +1391,26 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+LOCAL_EXIT = "http://127.0.0.1:1084"   # walter-exit-local: the owner's real IP, fail closed (2026-10-28)
+
+
+def _enforce_exit(args: argparse.Namespace) -> None:
+    """Page reads never leave from the server's bare IP, whatever the caller (an old facade loaded in a long-lived
+    MCP server included): without an explicit WALTER_BROWSE_PROXY, the owner's local exit is imposed here, where the
+    requests are made. Key-authenticated search (--search) keeps the server's own route (Monsieur, 2026-10-28)."""
+    if args.search:
+        return
+    proxy = os.environ.get("WALTER_BROWSE_PROXY") or os.environ.get("WALTER_BROWSE_EXIT_LOCAL", LOCAL_EXIT)
+    os.environ.update(WALTER_BROWSE_PROXY=proxy, HTTP_PROXY=proxy, HTTPS_PROXY=proxy, http_proxy=proxy,
+                      https_proxy=proxy, NO_PROXY="127.0.0.1,localhost,::1", no_proxy="127.0.0.1,localhost,::1")
+    for k in ("ALL_PROXY", "all_proxy"):
+        os.environ.pop(k, None)
+
+
 async def _run_cli(args: argparse.Namespace) -> int:
     if not args.capability and not args.url and not args.search:
         raise SystemExit("Provide --url, --search, or --capability")
+    _enforce_exit(args)
     if args.search:
         # Lot 4 correction — search-lite: the universal web entry point's
         # lightest route. No LLM, no browser, ~1s.
