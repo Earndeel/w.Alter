@@ -23,6 +23,8 @@ DOMAIN_MODULES = {"relations": ["memory"], "agenda": ["memory"], "profile": ["me
 SUBJECT_DEPTH = {"L0": None, "L1": "index", "L2": "overview", "L3": "synthesis", "L4": "synthesis"}
 MEMORY_BUDGET = {"L3": {"profile": 0, "people": 300, "knowledge": 600, "evidence": 300},
                  "L4": {"profile": 0, "people": 600, "knowledge": 1200, "evidence": 800}}
+RECORDS_BUDGET = {"profile": 0, "people": 0, "records": 900, "knowledge": 0, "evidence": 0}
+UNSURE_PLAN = 0.5               # below this plan confidence, the cheap records lookup is added (calibration 28/10)
 BOARD_TOKENS = 350
 RECENT_EXCHANGES = 3
 
@@ -86,9 +88,13 @@ def subject(plan: ContextPlan) -> Block | None:
                  sources=[{"view": key, "version": r.get("version"), "stale": r.get("stale")}])
 
 
+def _gets_memory(plan: ContextPlan) -> bool:
+    return plan.level != "L0" and bool(MEMORY_BUDGET.get(plan.level) or (set(plan.domains) - {"projects"}))
+
+
 def memory(plan: ContextPlan, message: str) -> Block | None:
     budget = MEMORY_BUDGET.get(plan.level)
-    if not budget and not (set(plan.domains) - {"projects"}):
+    if not _gets_memory(plan):
         return None
     from walter_memory import context
     r = context.get_context(message, budget=budget or MEMORY_BUDGET["L3"], include_profile=False)
@@ -96,6 +102,21 @@ def memory(plan: ContextPlan, message: str) -> Block | None:
         return None
     refs = [ref for s in (r.get("trace") or {}).get("sections", {}).values() for ref in (s.get("refs") or [])]
     return Block("memory", 4, r["text"], sources=refs[:20])
+
+
+def records(plan: ContextPlan, message: str) -> Block | None:
+    """The curated records (decisions register, owner rules) matching the message, when the plan gets no memory block
+    but says the answer must be looked up, or is unsure of itself. Calibration 2026-10-28 (DSH trials): questions on
+    Walter's own setup or the owner's decisions were planned L0 « tools suffice » with low confidence, and a model
+    without tools then had nothing to answer from."""
+    conf = ((plan.decision or {}).get("confidence") or {}).get("plan")
+    if "search" not in plan.capabilities and not (conf is not None and conf < UNSURE_PLAN):
+        return None
+    from walter_memory import context
+    r = context.get_context(message, budget=RECORDS_BUDGET, include_profile=False)
+    if not r.get("text"):
+        return None
+    return Block("records", 4, r["text"], sources=(r.get("trace") or {}).get("sections", {}).get("records", {}).get("refs", []))
 
 
 def recent(session_key: str | None, native: bool) -> Block | None:
@@ -115,11 +136,13 @@ def recent(session_key: str | None, native: bool) -> Block | None:
 
 
 def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, native_history: bool = True) -> tuple[list[Block], list[str]]:
-    """The blocks the plan asks for. L0: capabilities only. Returns (blocks, notes on failed sources)."""
+    """The blocks the plan asks for. L0: capabilities (+ records when unsure or a lookup is needed). Returns (blocks, notes on failed sources)."""
     steps = [("capabilities", lambda: capabilities(plan))]
     if plan.level != "L0":
         steps += [("board", board), ("subject", lambda: subject(plan)), ("memory", lambda: memory(plan, message)),
                   ("recent", lambda: recent(session_key, native_history))]
+    if not _gets_memory(plan):
+        steps.append(("records", lambda: records(plan, message)))
     blocks, notes = [], []
     for name, step in steps:
         t0 = time.perf_counter()
