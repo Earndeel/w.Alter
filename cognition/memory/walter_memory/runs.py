@@ -89,10 +89,31 @@ def end_open(session_id: str, status: str = "ended") -> str | None:
     return None
 
 
-def update(run_id: str, *, thread_id: str | None = None, level: str | None = None) -> None:
+def update(run_id: str, *, thread_id: str | None = None, level: str | None = None, act: str | None = None) -> dict:
+    """What is learned after the start (preflight). act correct/continue links the run to the run it follows: the
+    previous run of the same harness session, else of the same thread (a correction never rewrites its parent)."""
+    out = {}
     with connect() as conn:
         conn.execute("""update runs.runs set thread_id = coalesce(%s, thread_id), level = coalesce(%s, level),
-                        updated_at = now() where run_id = %s""", (thread_id, level, run_id))
+                        act = coalesce(%s, act), updated_at = now() where run_id = %s""", (thread_id, level, act, run_id))
+        if act in ("correct", "continue"):
+            run = conn.execute("select * from runs.runs where run_id = %s", (run_id,)).fetchone()
+            if run and not run["parent_run_id"]:
+                prev = conn.execute(
+                    """select run_id from runs.runs where run_id <> %s and started_at < %s
+                       and (origin->>'session_id' = %s or (%s::text is not null and thread_id = %s))
+                       order by (origin->>'session_id' = %s) desc, started_at desc limit 1""",
+                    (run_id, run["started_at"], (run["origin"] or {}).get("session_id"), run["thread_id"],
+                     run["thread_id"], (run["origin"] or {}).get("session_id"))).fetchone()
+                if prev:
+                    parent = str(prev["run_id"])
+                    conn.execute("""update runs.runs set parent_run_id = %s, correction = coalesce(correction, %s)
+                                    where run_id = %s""",
+                                 (parent, json.dumps({"scope": "run"}) if act == "correct" else None, run_id))
+                    _emit(conn, "run.corrected" if act == "correct" else "run.continued", run_id,
+                          {"run_id": run_id, "parent_run_id": parent})
+                    out["parent_run_id"] = parent
+    return out
 
 
 def routing(run_id: str, decision: dict, task_id: str | None = None) -> None:

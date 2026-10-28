@@ -105,11 +105,14 @@ def main(argv=None) -> None:
     vw.add_argument("--limit", type=int, default=500); vw.add_argument("--dry", action="store_true")
     vw.add_argument("--depth", default="overview"); vw.add_argument("--domain"); vw.add_argument("--horizon")
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
+    ep = sub.add_parser("episodes", help="Episodes of runs (P4): build <run_id>, pending (catch-up), show <run_id>")
+    ep.add_argument("action", choices=["build", "pending", "show"]); ep.add_argument("run_id", nargs="?", default="")
+    ep.add_argument("--no-summary", action="store_true")
     ob = sub.add_parser("observations", help="Sourced observations (P3): add (JSON on stdin), of a run, recent by words")
     ob.add_argument("action", choices=["add", "run", "recent"]); ob.add_argument("arg", nargs="?", default="")
     ob.add_argument("--max-age-hours", type=float, default=24)
     rn = sub.add_parser("runs", help="Walter Run Plane: runs, their tasks, model calls and links (P0, 2026-10-27)")
-    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update"]); rn.add_argument("run_id", nargs="?", default="")
+    rn.add_argument("action", choices=["list", "show", "sweep", "task-start", "task-end", "update", "link"]); rn.add_argument("run_id", nargs="?", default="")
     rn.add_argument("--limit", type=int, default=20)
     a = p.parse_args(argv)
 
@@ -225,6 +228,15 @@ def main(argv=None) -> None:
             else:
                 res = logs.stats(conn)
         print(json.dumps(res, default=str, ensure_ascii=False, indent=1) if a.json else logs.render(a.action, res))
+    elif a.cmd == "episodes":
+        from . import episodes
+        if a.action == "build":
+            res = episodes.build(a.run_id, summarise=not a.no_summary)
+        elif a.action == "pending":
+            res = episodes.pending()
+        else:
+            res = episodes.latest(a.run_id) or {"error": "no episode"}
+        print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
     elif a.cmd == "observations":
         from . import observations
         if a.action == "add":            # {"run_id", "task_id", "geo", "items": [Observation v1…]}
@@ -244,8 +256,13 @@ def main(argv=None) -> None:
             res = runs.show(a.run_id) or {"error": "unknown run"}
         elif a.action == "update":          # what is learned after the start (walter-context preflight): JSON on stdin
             spec = json.load(sys.stdin)
-            runs.update(spec["run_id"], thread_id=spec.get("thread_id"), level=spec.get("level"))
-            res = {"ok": True}
+            res = {"ok": True, **runs.update(spec["run_id"], thread_id=spec.get("thread_id"), level=spec.get("level"),
+                                             act=spec.get("act"))}
+        elif a.action == "link":            # {"run_id", "kind", "refs": [...]}: what the run used or produced
+            spec = json.load(sys.stdin)
+            for ref in spec.get("refs") or []:
+                runs.link(spec["run_id"], spec["kind"], str(ref))
+            res = {"linked": len(spec.get("refs") or [])}
         elif a.action == "task-start":      # a sub-agent runner (walter-router run): JSON on stdin
             spec = json.load(sys.stdin)
             res = {"task_id": runs.task_start(spec["run_id"], kind=spec.get("kind", "walter_run"), goal=spec.get("goal"),
