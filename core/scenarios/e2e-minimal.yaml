@@ -3,6 +3,10 @@
 # finds the run through its parent's record), then asserts on what the tables recorded.
 name: e2e-minimal
 milestone: P1
+qualifies:
+  - {harness: claude-code, capability: browse, scope: "a routed walter_run sub-agent reads the web through walter_browse (Tool Gateway)"}
+  - {harness: claude-code, capability: logs, scope: "the run and the sub-agent's full trace are recorded and linked"}
+  - {harness: claude-code, capability: model, scope: "sub-agents run on the Router's choice (the main model stays the harness's)"}
 steps:
   - hook: {event: UserPromptSubmit, prompt: "Scénario e2e-minimal : offres de café glacé 7-Eleven en Thaïlande."}
   - mcp:

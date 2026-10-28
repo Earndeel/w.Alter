@@ -48,6 +48,13 @@
       "manifest": "contracts/core.json"
     },
     {
+      "id": "lab",
+      "target": "lab",
+      "legacy": "/opt/walter-lab",
+      "manifest": "contracts/lab.json",
+      "neutral": true
+    },
+    {
       "id": "llm",
       "target": "router/llm",
       "legacy": "/opt/walter-llm",

@@ -17,8 +17,30 @@ def _file_evidence(path):
             'sha256':hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None}
 
 
+QUALIFICATION_MAX_AGE_DAYS=14
+
+
+def _scenario_qualifications():
+    """Latest passing end-to-end scenario per harness:capability (walter-scenario, P6 2026-10-28), recent only."""
+    try:
+        from . import instance
+        data=json.loads(Path(instance.state('scenarios','qualifications.json')).read_text())
+    except (OSError,ValueError,ImportError,AttributeError):
+        return {}
+    out={}
+    limit=datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=QUALIFICATION_MAX_AGE_DAYS)
+    for key,q in data.get('pairs',{}).items():
+        try:
+            at=datetime.datetime.strptime(q['at'],'%Y%m%dT%H%M%SZ').replace(tzinfo=datetime.timezone.utc)
+        except (KeyError,ValueError):
+            continue
+        if at>=limit:out[key]={**q,'evidence':'walter-scenario run '+q['scenario']+' (assertions on the recorded run)'}
+    return out
+
+
 def matrix():
     now=datetime.datetime.now(datetime.timezone.utc).isoformat()
+    qualifications=_scenario_qualifications()
     evidence_path=COMPOSITIONS/'observations.json'
     evidence=json.loads(evidence_path.read_text()) if evidence_path.exists() else {'observations':[]}
     modules={x['id']:x for x in registry.load()['modules']}
@@ -61,13 +83,15 @@ def matrix():
             used=True if observations else None
             if host=='codex':limits.append('Nested tools inside exec are not individually attributed by the current log metadata; lack of evidence is not non-use.')
             refs.extend(observations)
+            qualified=qualifications.get(f'{host}:{capability}')
+            if qualified:used=True
             rows.append({'harness':host,'capability':capability,'module':MODULE[capability],
-                         'available':available,'bound':bound,'in_use':used,'qualified':None,
+                         'available':available,'bound':bound,'in_use':used,'qualified':qualified,
                          'provider':provider,'verification_at':now,'evidence':refs,'limitations':limits,
                          'qualification_scope':'Full end-to-end capability acceptance pending; unit/contract tests are separate evidence.'})
     return {'version':1,'generated_at':now,'ok':True,'read_only':True,
             'definitions':{'available':'Declared module anchors are present locally.',
                            'bound':'Configuration selects a Walter port/surface, with stated scope; process reload is not inferred.',
                            'in_use':'A dated historical interface invocation/ingestion was observed; success or current revision is not inferred. Null means unknown.',
-                           'qualified':'Full acceptance of the declared capability scope; null means not demonstrated.'},
+                           'qualified':'A recent (14 days) passing end-to-end scenario on real traces for the stated scope (walter-scenario qualifies:); null means not demonstrated.'},
             'observation_snapshot_at':evidence.get('generated_at'),'bindings':rows}

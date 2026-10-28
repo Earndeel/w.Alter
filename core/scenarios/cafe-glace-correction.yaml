@@ -2,6 +2,8 @@
 # browsing), and re-versions its episode; satisfaction becomes "corrected", never inferred from silence.
 name: cafe-glace-correction
 milestone: P4
+qualifies:
+  - {harness: claude-code, capability: context, scope: "preflight act links a correction to its run; child pack shows reusable observations (shadow, nothing injected in the main window)"}
 modules: [preflight]
 steps:
   - hook: {event: UserPromptSubmit, prompt: "Je suis à Asok, Bangkok. Trouve le meilleur café glacé americano chez 7-Eleven : prix et volumes."}

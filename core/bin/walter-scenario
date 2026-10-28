@@ -179,6 +179,41 @@ def check(assertion: dict, shown: dict) -> tuple[bool, str]:
     return False, f"unknown assertion {assertion}"
 
 
+def metrics(shown: dict) -> dict:
+    """What a run cost and did, from its records (the common measures of the bench, reused by walter-lab)."""
+    run = (shown or {}).get("run") or {}
+    tasks = (shown or {}).get("tasks") or []
+    results = [t.get("result") or {} for t in tasks]
+    calls = (shown or {}).get("model_calls") or []
+    links = (shown or {}).get("links") or []
+    def secs(a, b):
+        try:
+            return round((datetime.fromisoformat(str(b)) - datetime.fromisoformat(str(a))).total_seconds(), 1)
+        except (TypeError, ValueError):
+            return None
+    return {"run_seconds": secs(run.get("started_at"), run.get("ended_at")),
+            "tasks": len(tasks), "tasks_ok": sum(1 for r in results if r.get("ok")),
+            "task_seconds": round(sum(float(r.get("seconds") or 0) for r in results), 1),
+            "tool_calls": sum(int(r.get("tools") or 0) for r in results),
+            "model_calls": len(calls), "model_failures": sum(1 for c in calls if not c.get("ok")),
+            "cost_usd": round(sum(float(c.get("cost_usd") or 0) for c in calls), 4),
+            "observations": sum(1 for l in links if l.get("kind") == "observation"),
+            "observations_reused": sum(1 for l in links if l.get("kind") == "observation_reused")}
+
+
+def qualify(sc: dict, report: dict) -> None:
+    """A passing scenario is evidence for the (harness, capability) pairs it declares (`qualifies:`); walter matrix
+    reads it. Only the latest pass per pair is kept, with its run, so the claim can be checked."""
+    path = _instance() / "state" / "scenarios" / "qualifications.json"
+    data = json.loads(path.read_text()) if path.exists() else {"version": 1, "pairs": {}}
+    for q in sc.get("qualifies") or []:
+        data["pairs"][f"{q['harness']}:{q['capability']}"] = {
+            "scenario": report["scenario"], "at": report["at"], "run_id": report.get("run_id"),
+            "scope": q.get("scope", ""), "milestone": sc.get("milestone")}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+
+
 def run(path: Path) -> dict:
     sc = yaml.safe_load(path.read_text())
     name = sc.get("name") or path.stem
@@ -235,6 +270,10 @@ def run(path: Path) -> dict:
             ok, detail = check(a, shown) if shown else (False, "no run recorded")
         report["assertions"].append({"ok": ok, "assert": a, "detail": detail})
     report["ok"] = bool(report["assertions"]) and all(a["ok"] for a in report["assertions"])
+    report["metrics"] = metrics(shown)
+    report["variant"] = os.environ.get("WALTER_LAB_VARIANT")
+    if report["ok"] and not report["variant"]:
+        qualify(sc, report)
     out_dir = _instance() / "state" / "scenarios" / name
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{stamp}.json").write_text(json.dumps({**report, "run": shown}, ensure_ascii=False, indent=2, default=str))
@@ -255,7 +294,7 @@ def main() -> int:
     if a.json:
         print(json.dumps(rep, ensure_ascii=False, indent=2, default=str))
     else:
-        print(f"{rep['scenario']}: {'OK' if rep['ok'] else 'FAILED'}  run {rep.get('run_id')}")
+        print(f"{rep['scenario']}: {'OK' if rep['ok'] else 'FAILED'}  run {rep.get('run_id')}  {json.dumps(rep['metrics'])}")
         for s in rep["assertions"]:
             print(f"  {'✓' if s['ok'] else '✗'} {s['detail']}")
     return 0 if rep["ok"] else 1

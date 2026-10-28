@@ -3,6 +3,9 @@
 # per shop in parallel (geo constraint, Observation v1 contract, persist), then the deterministic Pareto script.
 name: cafe-glace
 milestone: P3
+qualifies:
+  - {harness: claude-code, capability: memory, scope: "sourced observations stored and read back for the run"}
+  - {harness: claude-code, capability: skills, scope: "a skill's deterministic script used through walter-skills read"}
 steps:
   - hook: {event: UserPromptSubmit, prompt: "Je suis à Asok, Bangkok. Trouve le meilleur café glacé (americano ou latte) à 7-Eleven et Café Amazon : prix, volumes, Pareto."}
   - parallel:
