@@ -11,6 +11,7 @@
   walter-secret grant access <id> [part]        usable secret of a grant (fresh token for OAuth / subscriptions)
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -47,6 +48,8 @@ def main(argv: list[str]) -> int:
             return 1
         print("usage: walter-secret grants [ID] | grant access <id> [part]", file=sys.stderr)
         return 2
+    if argv and argv[0] == "store":
+        return store_main(argv[1:])
     if not argv or argv[0] not in ("get", "search", "file", "otp"):
         print(__doc__, file=sys.stderr)
         return 2
@@ -76,6 +79,47 @@ def main(argv: list[str]) -> int:
         return 1
     return 0
 
+
+
+def store_main(argv: list[str]) -> int:
+    """walter-secret store NAME --kind login|api_key|note [--username U] [--uri URL]… [--field K=V]…
+    [--stdin (default) | --from-file PATH | --from-env VAR | --generate [N]] [--update] [--reprompt]
+    The value never comes on the command line and is never printed: the answer is the item's id and a reference."""
+    import argparse
+    import secrets as _s
+    import string
+    p = argparse.ArgumentParser(prog="walter-secret store")
+    p.add_argument("name"); p.add_argument("--kind", choices=["login", "api_key", "note"], required=True)
+    p.add_argument("--username"); p.add_argument("--uri", action="append", default=[])
+    p.add_argument("--field", action="append", default=[], help="K=V metadata (not secret)")
+    src = p.add_mutually_exclusive_group()
+    src.add_argument("--stdin", action="store_true"); src.add_argument("--from-file")
+    src.add_argument("--from-env"); src.add_argument("--generate", nargs="?", const=32, type=int)
+    p.add_argument("--update", action="store_true"); p.add_argument("--reprompt", action="store_true")
+    a = p.parse_args(argv)
+    if a.generate:
+        alphabet = string.ascii_letters + string.digits + "-_.!@#%+="
+        value = "".join(_s.choice(alphabet) for _ in range(max(16, a.generate)))
+    elif a.from_file:
+        value = open(a.from_file).read().rstrip("\n")
+    elif a.from_env:
+        value = os.environ.get(a.from_env, "")
+    else:
+        value = sys.stdin.read().rstrip("\n")
+    try:
+        fields = dict(f.split("=", 1) for f in a.field)
+        out = VAULT.store(a.name, a.kind, value, username=a.username, uris=a.uri, fields=fields, update=a.update,
+                          reprompt=a.reprompt)
+    except (SecretError, ValueError) as e:
+        print(f"walter-secret: {e}", file=sys.stderr)
+        return 1
+    finally:
+        value = ""
+    out["generated"] = bool(a.generate)
+    audit("store", {"name": out["name"], "id": out["id"]}, out["field"], via="cli", kind=a.kind,
+          action="updated" if out.get("updated") else "created", generated=bool(a.generate))
+    print(json.dumps(out, ensure_ascii=False, indent=1))
+    return 0
 
 
 def safe_main(argv: list[str]) -> int:
