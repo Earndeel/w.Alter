@@ -38,7 +38,7 @@ steps:
             constraints: {geo: {zone: "Asok, Bangkok", pays: TH, devise: THB, langue: th}}
             output_schema: {observations: [{subject: str, seller: str, source_url: str, values: {price: "number|null", currency: str, volume: "str|null"}, method: "search_snippet|http|static_html|browser|api", confidence: "high|medium|low"}]}
             persist: observations
-  - cmd: {name: pareto, shell: "walter-memory observations run {run_id} | python3 /walter/skills/skills/research/recherche-produit-locale/scripts/pareto.py --min price --min price_per_100ml --max volume_ml"}
+  - cmd: {name: pareto, shell: "walter-skills read recherche-produit-locale --file scripts/pareto.py > /tmp/walter-pareto-{run_id}.py && walter-memory observations run {run_id} | python3 -I /tmp/walter-pareto-{run_id}.py --min price --min price_per_100ml --max volume_ml; rm -f /tmp/walter-pareto-{run_id}.py"}
   - hook: {event: Stop}
 assertions:
   - {path: run.status, equals: ended}
