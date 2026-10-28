@@ -183,7 +183,7 @@ def _last_texts(lines: list[str]) -> dict[str, tuple[str, str]]:
 
 
 def preflight_shadow(prompt: str, runtime: str, session_id: str, transcript: str | None,
-                     current: dict | None = None) -> None:
+                     current: dict | None = None, run_id: str | None = None) -> None:
     """walter-context lot 4 in shadow: the preflight runs detached; with Walter Memory's subjects it records its
     ContextPlan and the context pack it would have injected, next to `current` (what this hook injects today) for
     the comparison. Nothing is injected and the prompt is not delayed. A message that looks like it holds a secret
@@ -193,7 +193,8 @@ def preflight_shadow(prompt: str, runtime: str, session_id: str, transcript: str
     secret = any(cat == "secret" for cat, _ in _privacy().detect(prompt))
     req = {"turn_id": f"{session_id}:{int(time.time() * 1000)}", "message": prompt[:6000],
            "previous": previous_exchange(transcript), "runtime": runtime, "session_id": session_id,
-           "current_injection": current or {}, "privacy_class": "local_only" if secret else "cloud_allowed"}
+           "current_injection": current or {}, "privacy_class": "local_only" if secret else "cloud_allowed",
+           "run_id": run_id}
     p = subprocess.Popen(["walter-context-preflight", "--shadow"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True)
     p.stdin.write(json.dumps(req, ensure_ascii=False).encode())
@@ -258,6 +259,8 @@ def run_start(runtime: str, session_key: str, prompt: str, *, channel: str = "ow
                             goal=prompt, privacy_class="local_only" if secret else "cloud_allowed", dedupe_key=dedupe)
         if record_pid:
             runctx.record(record_pid, run_id, session_key, runtime)
+        runs.safe(runs.routing, run_id, {"applied": True, "via": "walter-llm poste (DSH provider walter)"} if runtime == "dsh"
+                  else {"applied": False, "constraint": "harness_imposed", "runtime": runtime})
         if int(time.time() * 1000) % 50 == 0:          # now and then: close runs that never got an end
             runs.safe(runs.sweep)
             runctx.sweep()
@@ -349,7 +352,8 @@ def claude_code(ev: dict) -> dict | None:
         ctx = ours(runtime, "\n\n".join(parts))
         try:   # after the current injection is known, so the shadow can compare; detached, adds no delay
             preflight_shadow(prompt, runtime, sid, ev.get("transcript_path"),
-                             {"text": ctx[:20000], "parts": [p.split("\n", 1)[0][:80] for p in parts]})
+                             {"text": ctx[:20000], "parts": [p.split("\n", 1)[0][:80] for p in parts]},
+                             run_id=(runctx.current(hpid) or {}).get("run_id"))
         except Exception as e:  # noqa: BLE001 — shadow mode never affects the prompt
             log(f"preflight shadow error {type(e).__name__}: {str(e)[:160]}")
         return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": ctx}} if ctx else None
