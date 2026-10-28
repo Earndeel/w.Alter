@@ -31,14 +31,14 @@ def test_current_wins_over_backlog():
     now = datetime.now(timezone.utc)
     batch = m.normalize({'locations': [point(now-timedelta(days=1), motion=['stationary'])],
                          'current': point(now, motion=['walking'])})
-    assert m.settings_for(batch)['send_interval'] == '30s'
+    assert m.settings_for(batch)['send_interval'] == '2m'
     batch = m.normalize({'locations': [point(now-timedelta(days=1), motion=['walking'])]})
     assert m.settings_for(batch) == {}
 
 
 def test_low_battery():
     batch = m.normalize({'locations': [point(motion=['walking'], battery_level=0.1)]})
-    assert m.settings_for(batch)['send_interval'] == '5m'
+    assert m.settings_for(batch)['send_interval'] == '10m'
 
 
 def test_api(monkeypatch):
@@ -84,3 +84,18 @@ def test_trip_placeholder_is_not_a_gps_sample():
     assert batch[0]['event_type'] == 'location.telemetry'
     assert 'lat' not in batch[0]['payload']
     assert m.settings_for(batch) == {}
+
+
+def test_daily_and_voluntary_trip_profiles():
+    batch = m.normalize({'locations': [point(motion=['stationary'])]})
+    settings = m.settings_for(batch)
+    assert settings['send_interval'] == '5m'
+    assert settings['main']['desired_accuracy'] == '100m'
+    assert settings['main']['visit_tracking'] is True
+    assert settings['main']['pause_automatically'] is True
+    assert settings['main']['resume_with_geofence'] == '200m'
+    batch.append({'payload': {'trip': {'start': 'active'}}, 'event_type': 'location.telemetry'})
+    settings = m.settings_for(batch)
+    assert settings['send_interval'] == '1m'
+    assert settings['trip']['desired_accuracy'] == '10m'
+    assert settings['trip']['prevent_screen_lock'] is False

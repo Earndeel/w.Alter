@@ -107,13 +107,20 @@ def settings_for(batch, now=None):
     moving = (number(speed) and speed > 0.8) or any(m in motion for m in ("walking", "running", "cycling", "driving"))
     battery = props.get("battery_level")
     low = number(battery) and 0 <= battery < 0.2 and props.get("battery_state") not in ("charging", "full")
-    return {"send_interval": "5m" if low else "30s" if moving else "2m",
-            "main": {"tracking_mode": "both", "desired_accuracy": "100m" if low else "10m",
+    active_trip = any(e["payload"].get("trip") for e in batch)
+    return {"send_interval": "10m" if low else "1m" if active_trip else "2m" if moving else "5m",
+            "main": {"tracking_mode": "both", "desired_accuracy": "100m",
+                     "visit_tracking": True,
                      "activity_type": "other", "pause_automatically": True,
-                     "resume_with_geofence": "100m", "background_indicator": True,
+                     "resume_with_geofence": "200m", "background_indicator": True,
                      "logging_mode": "all", "batch_size": 200,
-                     "min_distance": "100m" if low else "50m", "min_time": "30s",
-                     "discard_stationary": False, "discard_without_gps": False}}
+                     "min_distance": "100m", "min_time": "1m",
+                     "discard_stationary": False, "discard_without_gps": False},
+            "trip": {"desired_accuracy": "100m" if low else "10m",
+                     "background_indicator": True, "prevent_screen_lock": False,
+                     "logging_mode": "all", "batch_size": 200,
+                     "min_distance": "50m", "min_time": "30s"}}
+
 
 
 def store(batch):
