@@ -30,3 +30,14 @@ schemas = ["bus", "core", "ingestion", "kardex", "models", "privacy", "runs", "s
 # Objects created at run time, not by migrations ("TYPE schema.name" patterns): monthly partitions of core.events.
 runtime_objects = ["TABLE core.events_*", "TABLE ATTACH core.events_*", "INDEX core.events_*", "INDEX ATTACH core.events_*",
                    "INDEX ATTACH core.*_20*", "INDEX ATTACH core.*_19*", "CONSTRAINT core.events_*"]
+
+# Data class declarations of each module (contracts/data-classes.json, resolved with `walter path`). Every table of
+# the compared schemas must be declared; reference rows are what Walter Clean ships.
+[[data]]
+module = "memory"
+
+[[data]]
+module = "router"
+
+[[data]]
+module = "skills"

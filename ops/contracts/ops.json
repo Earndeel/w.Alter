@@ -41,6 +41,8 @@
   "interfaces": [
     "CLI walter-ops backup|git|check|recovery|deploy|status (install, onboard: planned)",
     "CLI walter-ops install migrations-check [--keep-dumps DIR] (Walter Clean, PostgreSQL part: replay every module's migrations on a disposable database, compare the structure with the live one)",
+    "CLI walter-ops install data-check (every table classified by its module's contracts/data-classes.json; reference rows searched for the instance's private markers, counts only)",
+    "CLI walter-ops install seed-export DIR | clean-db-check [--seeds DIR | --keep-seeds DIR] (Walter Clean database built from migrations + reference rows on a disposable PostgreSQL, proven marker-free)",
     "CLI walter-backup status|check|run|verify|git|checkpoint|checkpoints (compatibility alias, same outputs)",
     "CLI walter-ops backup env <pg|statedb|offsite|restore_test> (shell parameters of the backup jobs)",
     "Incident v1 (check) for the guardian supervisor"
@@ -53,7 +55,7 @@
   },
   "limitations": [
     "Renamed from walter-backup on 2026-10-29 (owner decision): compatibility kept — command walter-backup, paths /walter/backup and /opt/walter-backup, unit names, config @instance/config/backup and state @instance/state/backup (the backup sub-component keeps its name).",
-    "installer: the PostgreSQL part of Walter Clean is checked (install migrations-check, bench scenario clean-migrations); clean-install itself, onboarding and personal-restore are designed, not built yet (walter-ops install clean|personal and onboard answer 'planned').",
+    "installer: the database of Walter Clean is built and proven (install migrations-check, data-check, clean-db-check; bench scenarios clean-migrations, clean-database); clean-install of the software, onboarding and personal-restore are designed, not built yet (walter-ops install clean|personal and onboard answer 'planned').",
     "deploy wraps the core platform's release/install/export; Ops does not own the other modules' code, contracts or migrations.",
     "Backup scripts (pg, statedb, offsite, restore test) moved into backup/scripts on 2026-10-29, each qualified by a real run; host paths /usr/local/sbin/walter-* link to them. Every location comes from the instance (walter-ops backup env <kind>). The isolated restore drill stays in Walter Memory.",
     "Restores are described, never executed by the tool.",
