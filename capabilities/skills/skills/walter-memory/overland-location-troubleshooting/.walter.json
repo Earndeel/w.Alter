@@ -1,10 +1,7 @@
 {
- "created_at": "2026-10-29T04:15:44.893728+00:00",
- "description": "Use when verifying Overland iPhone position updates in Walter Memory, diagnosing missing transmissions, or tuning stationary tracking without losing small movements.",
- "domain": "walter-memory",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session established a working Overland receiver and canonical location.sample ingestion, then exposed several reusable diagnostic pitfalls: an active receiver with samples nearly five hours old, send intervals confused with sample generation, an upstream stationary-discard option absent from the installed app, and a distance filter that discarded needed condo movements. None of the listed related skills covers this iPhone-to-memory tracking workflow. [session codex/Codex Desktop/01a180e7-85a4-7ec0-a647-6a791e2df8be]",
- "runtime": "learner",
- "session_id": "codex/Codex Desktop/01a180e7-85a4-7ec0-a647-6a791e2df8be",
- "target": "overland-location-troubleshooting"
+ "store_sha": "24b98a21cb370d1f3d7decd8d0241f0e0a4260100ee94cdeb81075ac8ea39000"
 }
