@@ -26,6 +26,9 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 NOTIFY = {"high", "critical"}
+# Renamed modules (old id -> new id): open incidents and pass records follow the module, so a rename neither closes
+# nor reopens anything (no spurious notification). walter-backup became walter/ops on 2026-10-29.
+RENAMED = {"backup": "ops"}
 SEVERITIES = ("info", "warning", "high", "critical")
 MAX_ATTEMPTS = 5
 RETRY_SECONDS = 900
@@ -152,10 +155,27 @@ def _telegram(text: str) -> bool:
         return False
 
 
+def _renamed(state: dict) -> dict:
+    """Carry incidents and pass records of renamed modules over to their new id (idempotent)."""
+    for old, new in RENAMED.items():
+        if old in state.get("modules", {}):
+            state["modules"].setdefault(new, state["modules"].pop(old))
+        for key in [k for k in state.get("open", {}) if k.split(":", 1)[0] == old]:
+            item = state["open"].pop(key)
+            if isinstance(item.get("incident"), dict):
+                item["incident"]["module"] = new
+            state["open"].setdefault(new + key[len(old):], item)
+    return state
+
+
+def _load_state(path: Path) -> dict:
+    return _renamed(json.loads(path.read_text())) if path.exists() else {"open": {}, "modules": {}}
+
+
 def check(notify: bool = True) -> dict:
     sd = state_dir()
     st_path = sd / "state.json"
-    state = json.loads(st_path.read_text()) if st_path.exists() else {"open": {}, "modules": {}}
+    state = _load_state(st_path)
     decls = declarations()
     with ThreadPoolExecutor(max(1, len(decls))) as ex:
         results = list(ex.map(run_check, decls))
@@ -221,7 +241,7 @@ def status() -> dict:
     p = state_dir() / "state.json"
     if not p.exists():
         return {"error": "no pass yet (walter-guardians check)"}
-    s = json.loads(p.read_text())
+    s = _load_state(p)
     by_sev = {}
     for k, v in s["open"].items():
         by_sev.setdefault(v["incident"]["severity"], []).append(f"{k} — {v['incident']['summary']}")

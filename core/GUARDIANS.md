@@ -17,7 +17,7 @@ follow-up, repair on a copy behind deterministic gates, sparse Telegram).
   stay inside the module (router: `walter-router-guardian run`).
 - `max_level` = the most the module's own guardian may do without the owner: G0 observe · G1 routine reversible action
   (restart a unit, re-read a source, regenerate an index) · G2 repair on a copy behind gates, with
-  `walter-backup checkpoint` before landing · G3 owner only.
+  `walter-ops backup checkpoint` (alias `walter-backup checkpoint`) before landing · G3 owner only.
 - A module sharing a directory with others declares once with `"modules": [...]`.
 
 ## Supervisor — `walter-guardians` (walter-core)

@@ -73,7 +73,9 @@ def _catalog(catalog=None):
 
 
 def entry(name, catalog=None):
-    found = _catalog(catalog).get(name)
+    """A catalog entry by id, or by a former id kept in ``aliases`` (walter-backup became ops on 2026-10-29)."""
+    entries = _catalog(catalog)
+    found = entries.get(name) or next((e for e in entries.values() if name in (e.get('aliases') or [])), None)
     if found is None:
         raise ValueError('unknown Walter module: ' + str(name))
     return found
@@ -127,7 +129,16 @@ def layout(*, catalog=None, filesystem='/'):
             p = _on(filesystem, legacy)
             link = 'compat-link' if p.is_symlink() and p.resolve() == _on(filesystem, target).resolve() else (
                 'absent' if not p.exists() and not p.is_symlink() else 'conflict')
+        extra = {}
+        for value in item.get('compat_links') or []:               # former names kept as links (renamed modules)
+            p = _on(filesystem, _safe_absolute(value, 'compatibility link'))
+            extra[value] = ('compat-link' if p.is_symlink() and p.resolve() == _on(filesystem, target).resolve()
+                            else 'absent' if not p.exists() and not p.is_symlink() else 'conflict')
         rows.append({'id': name, 'root': str(current), 'target': str(target),
-                     'legacy': str(legacy) if legacy else None, 'moved': current == target, 'legacy_link': link})
+                     'legacy': str(legacy) if legacy else None, 'moved': current == target, 'legacy_link': link,
+                     **({'aliases': item['aliases']} if item.get('aliases') else {}),
+                     **({'compat_links': extra} if extra else {})})
     return {'walter_root': str(walter_root()), 'modules': rows,
-            'ok': all(r['legacy_link'] in (None, 'compat-link', 'absent') for r in rows)}
+            'ok': all(r['legacy_link'] in (None, 'compat-link', 'absent')
+                      and all(v in ('compat-link', 'absent') for v in (r.get('compat_links') or {}).values())
+                      for r in rows)}

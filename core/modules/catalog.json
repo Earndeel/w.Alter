@@ -2,13 +2,6 @@
   "schema_version": 1,
   "modules": [
     {
-      "id": "backup",
-      "target": "backup",
-      "legacy": "/opt/walter-backup",
-      "manifest": "contracts/backup.json",
-      "neutral": true
-    },
-    {
       "id": "browse",
       "target": "browse",
       "legacy": "/opt/walter-browse",
@@ -72,6 +65,20 @@
       "target": "memory",
       "legacy": "/opt/walter-memory",
       "manifest": "contracts/memory.json"
+    },
+    {
+      "id": "ops",
+      "target": "ops",
+      "legacy": "/opt/walter-backup",
+      "aliases": [
+        "backup"
+      ],
+      "compat_links": [
+        "/walter/backup",
+        "/opt/walter-ops"
+      ],
+      "manifest": "contracts/ops.json",
+      "neutral": true
     },
     {
       "id": "raw-vault",
