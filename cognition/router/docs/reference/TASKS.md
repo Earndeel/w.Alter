@@ -15,7 +15,7 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | `decision` | decisions | True | best_available | AA Decision Index: classification, tool-calling decisions (When2Call), knowledge with "I don't know" (non-hallucination), reasoning; speed and cost per 1M tasks ; {} |
 | `decision_vision` | decisions | True | best_available | Decision models that also read images (OpenRouter input modalities). AA Decision Index has no vision test yet: ranked on the text index, filtered on image input. ; {} |
 | `document` | chat | False | best_available | Arena Document ; {} |
-| `embeddings` | embedding | True | best_available | Vecteurs de la mémoire Hindsight : qualité de recherche (ELO Agentset) et recherche en français (MTEB MIRACL fr) ; seuls les modèles mesurés sur le classement principal sont rangés (revectoriser ne se décide pas sur un seul test). Changer de modèle oblige à revectoriser toute la banque : jamais sans l’utilisateur. ; {"on_change": "Changer de modèle d'embeddings = revectoriser toutes les banques Hindsight (walter, walter-shadow) : opération lourde, à planifier avec l’utilisateur. Hindsight garde son modèle dans sa configuration tant que ce n'est pas fait (walter-voice-memory n'est pas concerné : vecteurs locaux).", "require_primary": true, "revectorize_on_change": true} |
+| `embeddings` | embedding | True | best_available | Vecteurs de la mémoire : qualité de recherche (ELO Agentset) et recherche en français (MTEB MIRACL fr) ; seuls les modèles mesurés sur le classement principal sont rangés (revectoriser ne se décide pas sur un seul test). Changer de modèle oblige à revectoriser toute la banque : jamais sans l'accord du propriétaire. ; {"on_change": "Changer de modèle d'embeddings = revectoriser tout l'index de la mémoire : opération lourde, à planifier avec le propriétaire de l'instance ; l'ancien modèle reste en place tant que ce n'est pas fait.", "require_primary": true, "revectorize_on_change": true} |
 | `engineering` | chat | False | best_available | Travail d'ingénieur : analyse de conception, calculs techniques, normes, documentation technique. AA Engineering Index. ; {} |
 | `finance` | chat | False | best_available | Comptabilité, analyse financière, fiscalité, prévisions et analyse économique quantitative. AA Finance & Accounting et Economics Index. ; {} |
 | `frontend` | chat | False | best_available | Design Arena Website ; {} |
@@ -37,7 +37,7 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | `science` | chat | False | best_available | Problèmes scientifiques de niveau recherche : physique, chimie, biologie, mathématiques, calcul scientifique. ; {} |
 | `speech_to_speech` | audio | False | best_available | AA Speech to Speech Index ; {} |
 | `strategy` | chat | False | best_available | Travail de consultant : stratégie d'entreprise, organisation, opérations, analyse de marché. AA Strategy & Ops Index. ; {} |
-| `stt` | transcription | True | best_available | Transcrire les messages vocaux de l’utilisateur (français) : fidélité d'abord (AA-WER, mesuré en anglais : AA ne publie pas de résultat français), puis vitesse. Modèles de transcription et modèles de chat qui entendent l'audio. ; {"language": "fr", "on_change": "Adopter un modèle de transcription dédié (Whisper, MAI, Scribe…) : le plugin Hermes gemini-stt appelle aujourd'hui chat/completions avec input_audio ; il devra appeler l'API de transcription d'OpenRouter."} |
+| `stt` | transcription | True | best_available | Transcrire les messages vocaux du propriétaire, dans sa langue : fidélité d'abord (AA-WER, mesuré en anglais : AA ne publie pas de résultat français), puis vitesse. Modèles de transcription et modèles de chat qui entendent l'audio. ; {"language": "fr", "on_change": "Adopter un modèle de transcription dédié (Whisper, MAI, Scribe…) : le plugin Hermes gemini-stt appelle aujourd'hui chat/completions avec input_audio ; il devra appeler l'API de transcription d'OpenRouter."} |
 | `summarization` | chat | True | level | Résumer fidèlement un long contexte (conversation, journal) sans rien inventer : tâche de fond, volume élevé. ; {"level": "L1", "min_context": 256000} |
 | `svg` | chat | False | best_available | Design Arena SVG ; {} |
 | `text_to_image` | image | False | best_available | AA Text-to-Image Arena ; {} |
@@ -129,7 +129,7 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | video_edit | arena | video_edit | true | 1.0 | — |
 | vision | aa_eval | mmmu_pro | false | 0.4 | MMMU-Pro : raisonnement sur images |
 | vision | arena | vision | true | 0.6 | — |
-| voice_assist | arena | text_french | false | 0.3 | l’utilisateur parle français |
+| voice_assist | arena | text_french | false | 0.3 | Classement en français : la langue de l'instance |
 | voice_assist | bridgebench | speed | true | 0.5 | latence d'un appel vocal |
 | voice_assist | bridgebench | trustworthiness | false | 0.2 | ne rien inventer au téléphone |
 | writing | arena | text_creative | true | 0.6 | Arena écriture créative (votes humains) |

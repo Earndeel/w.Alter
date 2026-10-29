@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "module": "router",
+  "note": "Data classes of the Router's tables (addendum 2026-10-29, C.2). reference = shipped with Walter Clean (rows matching instance_rows excluded); instance = the person's data (empty in Clean, restored by Walter Personal); runtime = recomputed by the Router (empty in Clean). Walter Clean keeps the engine, catalogue, rankings, prices, task definitions and strategies; it drops usage, budgets, preferences, accounts and everything written for the owner.",
+  "tables": {
+    "models.canonical": {"class": "reference"},
+    "models.aliases": {"class": "reference", "instance_rows": "origin = 'manual'"},
+    "models.snapshots": {"class": "reference", "instance_rows": "kind in ('declared', 'codex', 'claude_pro', 'hermes_providers')"},
+    "models.benchmarks": {"class": "reference", "instance_rows": "snapshot_id in (select snapshot_id from models.snapshots where kind in ('declared', 'codex', 'claude_pro', 'hermes_providers'))"},
+    "models.offers": {"class": "reference", "instance_rows": "snapshot_id in (select snapshot_id from models.snapshots where kind in ('declared', 'codex', 'claude_pro', 'hermes_providers')) or access = 'subscription'"},
+    "models.endpoints": {"class": "reference", "instance_rows": "snapshot_id in (select snapshot_id from models.snapshots where kind in ('declared', 'codex', 'claude_pro', 'hermes_providers'))"},
+    "models.tasks": {"class": "reference"},
+    "models.task_benchmarks": {"class": "reference"},
+    "models.dossiers": {"class": "instance", "note": "written for the owner by the analysis model; a new instance rebuilds them on its first cycle"},
+    "models.selection": {"class": "runtime", "note": "computed from catalogue, preferences and subscriptions"},
+    "models.provider_status": {"class": "runtime"},
+    "models.runs": {"class": "instance", "note": "the instance's past cycles"},
+    "models.alerts": {"class": "instance"},
+    "models.guardian_incidents": {"class": "instance"},
+    "models.exec_log": {"class": "instance"},
+    "models.feedback": {"class": "instance"},
+    "models.preferences": {"class": "instance"},
+    "models.profiles": {"class": "instance"},
+    "models.affinities": {"class": "instance"},
+    "models.plan_evidence": {"class": "instance"},
+    "models.subscription_usage": {"class": "instance"},
+    "models.subscription_costs": {"class": "instance"},
+    "models.schema_migrations": {"class": "runtime", "note": "written by the Router's migration runner"}
+  }
+}

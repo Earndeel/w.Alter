@@ -963,7 +963,7 @@
       "bench_task": "text_french",
       "benchmark": "arena",
       "is_primary": false,
-      "note": "l’utilisateur parle français",
+      "note": "Classement en français : la langue de l'instance",
       "task": "voice_assist",
       "weight": 0.3
     },
@@ -16513,6 +16513,7 @@
     "config/media_models.json": "1a00950c74b50b046e5a6d9ab534def777ea8c349f3058e2a842800168b1ea7a",
     "config/providers.json": "ea7f381395589799ef723a1a4e93540d4a3b4bc08549a42207a22857940be430",
     "config/subscriptions.json": "d2e56aa07e15344a1986746b1f8608842873639f5d37788e37e9896d6ba67017",
+    "contracts/data-classes.json": "217f14d84e0a54ca65532010abdbc80281a1671ea3af2652d9a8689eed620b81",
     "contracts/maintenance.json": "e053f12f7d4b27ad89789cc2cf90cdfeaf85e673c1a088a5e4a1bb6df0d9a209",
     "contracts/router.json": "ea6c3de46c6b48ddc120dcef459dd834802baf7a0190931b1e7851fa2386fdcb",
     "documentation.py": "201a77980a92a68cf6438408ad29e4946ccb473afa447bd47afdcb4ff043e9ef",
@@ -16597,7 +16598,7 @@
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
     "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",
     "store/migrations/001_models.sql": "dfdcb4be9930086cbdc935eb7cffe07f6705cb1562169c162f74f7b2205dcc37",
-    "store/migrations/002_tasks.sql": "e5537560cd6a75e6b59174f884f813ff5601f0566896d4583fc08dbe5f8d320b",
+    "store/migrations/002_tasks.sql": "90cb0c200c4ecdd8165caf7eccbdd6abd0fe85b77e8949c44154195d0bee45d2",
     "store/migrations/003_roles_and_declared_offers.sql": "46766227cc3ec1f8517816f5dec24ce0a449da5cce41934db371b03c8afa7272",
     "store/migrations/004_catalog_modes_arena.sql": "9aa21a66f069a3d7e52f9d517a9961ee278f32395f9228f9de8b62646299577c",
     "store/migrations/005_open_unrestricted_top3.sql": "f40bd6c9c8a1c99e802f93402cddbbaed512e5d037d1ba57a8893d0e566cdbac",
@@ -16631,7 +16632,9 @@
     "store/migrations/033_guardian.sql": "8013f62d521b5e243ee6651b6b40c8d19b4097f44bf1434ce9783dcde086a244",
     "store/migrations/034_guardian_docs.sql": "bb25f74a84385740452d3890e06759a9ccb4c4845719176d4eba14396260069e",
     "store/migrations/035_exec_log_run.sql": "3bdbdf329f83c83a305285a692850a7052bc033caf9115f47a6eaf04fa2262cd",
-    "store/migrations/036_exec_telemetry.sql": "22728fe19ef56564fa75c99995101232578c331942aaaeec0e4887670415eb52"
+    "store/migrations/036_exec_telemetry.sql": "22728fe19ef56564fa75c99995101232578c331942aaaeec0e4887670415eb52",
+    "store/migrations/037_neutral_task_texts.sql": "9a776b3d51975ef7fb6a780bad99240ac47ffa50bb53908ca4370de78ea53bff",
+    "store/migrations/038_neutral_embeddings_requirement.sql": "399cbec430a8090dbd319089de215d173cb4655762ff71c699945171dec20649"
   },
   "tasks": [
     {
@@ -16751,7 +16754,7 @@
     {
       "consumers": "Hindsight embeddings (banques walter, walter-shadow)",
       "default_objective": "best_available",
-      "description": "Vecteurs de la mémoire Hindsight : qualité de recherche (ELO Agentset) et recherche en français (MTEB MIRACL fr) ; seuls les modèles mesurés sur le classement principal sont rangés (revectoriser ne se décide pas sur un seul test). Changer de modèle oblige à revectoriser toute la banque : jamais sans l’utilisateur.",
+      "description": "Vecteurs de la mémoire : qualité de recherche (ELO Agentset) et recherche en français (MTEB MIRACL fr) ; seuls les modèles mesurés sur le classement principal sont rangés (revectoriser ne se décide pas sur un seul test). Changer de modèle oblige à revectoriser toute la banque : jamais sans l'accord du propriétaire.",
       "intent_hint": null,
       "interface": "embedding",
       "internal": true,
@@ -16760,7 +16763,7 @@
       "quality_benchmark": "agentset",
       "quality_task": "embeddings",
       "requirements": {
-        "on_change": "Changer de modèle d'embeddings = revectoriser toutes les banques Hindsight (walter, walter-shadow) : opération lourde, à planifier avec l’utilisateur. Hindsight garde son modèle dans sa configuration tant que ce n'est pas fait (walter-voice-memory n'est pas concerné : vecteurs locaux).",
+        "on_change": "Changer de modèle d'embeddings = revectoriser tout l'index de la mémoire : opération lourde, à planifier avec le propriétaire de l'instance ; l'ancien modèle reste en place tant que ce n'est pas fait.",
         "require_primary": true,
         "revectorize_on_change": true
       },
@@ -17078,7 +17081,7 @@
     {
       "consumers": "Hermes stt + plugin gemini-stt",
       "default_objective": "best_available",
-      "description": "Transcrire les messages vocaux de l’utilisateur (français) : fidélité d'abord (AA-WER, mesuré en anglais : AA ne publie pas de résultat français), puis vitesse. Modèles de transcription et modèles de chat qui entendent l'audio.",
+      "description": "Transcrire les messages vocaux du propriétaire, dans sa langue : fidélité d'abord (AA-WER, mesuré en anglais : AA ne publie pas de résultat français), puis vitesse. Modèles de transcription et modèles de chat qui entendent l'audio.",
       "intent_hint": null,
       "interface": "transcription",
       "internal": true,
