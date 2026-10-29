@@ -137,9 +137,9 @@ CREATE TABLE kardex.claims (
     disclosure_state text DEFAULT 'externally_discovered'::text NOT NULL,
     mention_policy text DEFAULT 'contextual_only'::text NOT NULL,
     sensitivity text DEFAULT 'normal'::text NOT NULL,
-    monsieur_knows boolean,
-    contact_told_monsieur boolean,
-    contact_knows_monsieur_knows boolean DEFAULT false NOT NULL,
+    owner_knows boolean,
+    contact_told_owner boolean,
+    contact_knows_owner_knows boolean DEFAULT false NOT NULL,
     CONSTRAINT ck_claims_disclosure_state CHECK ((disclosure_state = ANY (ARRAY['explicitly_told_me'::text, 'mutually_known'::text, 'plausibly_known'::text, 'externally_discovered'::text, 'inferred_only'::text, 'restricted'::text, 'unknown'::text]))),
     CONSTRAINT ck_claims_knowledge_origin CHECK ((knowledge_origin = ANY (ARRAY['direct_statement'::text, 'observed_behavior'::text, 'shared_contact'::text, 'public_osint'::text, 'private_osint'::text, 'inference'::text, 'user_supplied'::text, 'system_observation'::text, 'unknown'::text]))),
     CONSTRAINT ck_claims_mention_policy CHECK ((mention_policy = ANY (ARRAY['free'::text, 'contextual_only'::text, 'indirect_only'::text, 'never_reference'::text]))),
@@ -437,11 +437,11 @@ CREATE TABLE kardex.corrections (
     rule text NOT NULL,
     scope text DEFAULT 'global'::text,
     status text DEFAULT 'active'::text,
-    created_by text DEFAULT 'lucas'::text,
+    created_by text DEFAULT 'owner'::text,
     created_at timestamp with time zone DEFAULT now()
 );
 
-COMMENT ON TABLE kardex.corrections IS 'Lucas corrections that become extraction rules. Example: daddy is not an alias.';
+COMMENT ON TABLE kardex.corrections IS 'Owner corrections that become extraction rules. Example: a nickname is not an alias.';
 
 CREATE SEQUENCE kardex.corrections_id_seq
     START WITH 1
@@ -1026,7 +1026,7 @@ CREATE TABLE kardex.social_graph (
     contact_id integer,
     related_person_name text NOT NULL,
     relationship_to_contact text,
-    relationship_to_lucas text,
+    relationship_to_owner text,
     importance integer DEFAULT 1,
     notes text,
     status text DEFAULT 'active'::text,

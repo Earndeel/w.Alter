@@ -35,3 +35,12 @@ def test_foundation_never_casts_a_missing_relation():
     text = (migrate.DIR / "001_foundation.sql").read_text()
     assert "'vault.objects'::regclass" not in text and "to_regclass('vault.objects')" in text
     assert "create table if not exists core.object_links" in text
+
+
+def test_kardex_base_already_has_the_names_020_gives():
+    import re
+    renames = re.findall(r"\('(\w+)', '(\w+)', '(\w+)'\)", (migrate.DIR / "020_kardex_neutral_names.sql").read_text())
+    base = (migrate.DIR / "004b_kardex_base.sql").read_text()
+    assert len(renames) == 4
+    for _table, old, new in renames:
+        assert f"    {new} " in base and f"    {old} " not in base
