@@ -2,6 +2,27 @@
 # Each kind of backup names the existing mechanism it wraps (a systemd unit), where its output lands and how old the
 # newest one may be before it is reported. Nothing here runs a model or needs another Walter module.
 
+# Retention and staging of the backup jobs (backup/scripts). Where each job reads and writes is the instance's:
+# kinds.<kind>.dir, .pattern, .source, and [pg] container/database/user.
+[kinds.pg]
+keep_daily = 7                   # newest daily dumps kept
+keep_weekly = 4                  # Sunday copies kept
+
+[kinds.statedb]
+keep = 3                         # newest compressed snapshots kept
+staging = "/dev/shm"             # uncompressed snapshot staged in memory, never on the slow volume
+
+[offsite]                        # where and which kinds are the instance's: remote, recipient, identity, kinds
+workdir = "/var/tmp"             # encrypted files are staged here before upload (never a clear copy)
+keep_daily = 7                   # remote retention per kind: newest days, Sundays, first of the month
+keep_weekly = 4
+keep_monthly = 12
+
+[restore_test]
+scratch_database = "restore_test_offsite"           # dropped before and after the monthly test
+compare_tables = ["core.events", "walter_logs.events", "core.objects", "skills.catalog", "models.tasks"]
+min_vault_items = 1              # a decrypted vault export with fewer items fails the test
+
 [restore]
 min_free_gib_drill = 16          # the isolated restore drill needs about 2x the database plus downloads
 

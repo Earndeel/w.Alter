@@ -1,4 +1,4 @@
-"""walter-backup — status | check | run <kind> | verify | git | checkpoint | checkpoints  (JSON on stdout)."""
+"""walter-backup — status | check | run <kind> | verify | git | checkpoint | checkpoints  (JSON on stdout); env <kind> (shell)."""
 from __future__ import annotations
 
 import argparse
@@ -25,7 +25,17 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--schema", action="append", default=[], help="db: schema to dump (repeatable)")
     c.add_argument("--note", default="")
     sub.add_parser("checkpoints", help="the recorded checkpoints and how to restore each (restores are never run)")
+    e = sub.add_parser("env", help="shell parameters of a backup job (read by backup/scripts/*)")
+    e.add_argument("kind")
     a = p.parse_args(argv)
+    if a.cmd == "env":
+        import shlex
+        try:
+            env = core.job_env(a.kind)
+        except ValueError as exc:
+            print(f"echo {shlex.quote('walter-backup env: ' + str(exc))} >&2; exit 78"); return 1
+        print("\n".join(f"export {k}={shlex.quote(v)}" for k, v in sorted(env.items())))
+        return 0
     if a.cmd == "status":
         out = core.status()
     elif a.cmd == "check":

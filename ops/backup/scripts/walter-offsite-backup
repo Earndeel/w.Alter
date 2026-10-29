@@ -1,0 +1,80 @@
+#!/bin/bash
+# Walter offsite backup: encrypts (age, the instance's recovery PUBLIC key) and copies off the machine.
+# Ported into walter/ops on 2026-10-29 from walter-memory's ops/walter-offsite-backup (2026-10-01, P0.2): same steps,
+# same verification and retention; every location comes from the instance (`walter-ops backup env offsite`).
+# Kinds (offsite.kinds):
+#   pg/        newest local PostgreSQL dump        (walter-pg-backup)
+#   statedb/   newest agent-runtime state snapshot (walter-statedb-backup)
+#   bitwarden/ vault export, already age-encrypted by Walter Secrets (`walter-secret vault-export`)
+#   config/    config bundle of the modules and their integrations (Walter Memory's backup_bundle, fail closed)
+# Remote retention per kind: keep_daily + keep_weekly (Sunday) + keep_monthly (1st). Upload is hash-verified by rclone.
+# Restore: rclone copy "<remote>/<kind>/<file>.age" . && age -d -i <recovery key> <file>.age > <file>
+# Without a copy of the PRIVATE recovery key off the machine, these files are unreadable once the machine is gone.
+set -euo pipefail
+umask 077
+eval "$(walter-ops backup env offsite)"
+REC="$WALTER_OFFSITE_RECIPIENT"
+REMOTE="$WALTER_OFFSITE_REMOTE"
+WORK=$(mktemp -d "$WALTER_OFFSITE_WORKDIR/walter-offsite.XXXXXX"); trap 'rm -rf "$WORK"' EXIT
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+wants() { case " $WALTER_OFFSITE_KINDS " in *" $1 "*) return 0;; *) return 1;; esac; }
+
+push() {  # push <kind> <local file> [remote name]
+  local kind=$1 src=$2 name=${3:-$(basename "$2")}
+  if rclone lsf "$REMOTE/$kind/" 2>/dev/null | grep -qxF "$name.age"; then echo "skip $kind/$name (already offsite)"; return; fi
+  age -R "$REC" -o "$WORK/$name.age" "$src"
+  rclone copyto "$WORK/$name.age" "$REMOTE/$kind/$name.age" --drive-chunk-size 64M
+  echo "pushed $kind/$name.age ($(du -h "$WORK/$name.age" | cut -f1))"; rm -f "$WORK/$name.age"
+}
+newest() { ls -1t "$1"/$2 2>/dev/null | head -1 || true; }    # newest <dir> <pattern>
+
+if wants pg; then pg=$(newest "$WALTER_PG_DIR" "$WALTER_PG_PATTERN"); [ -n "$pg" ] && push pg "$pg"; fi
+if wants statedb; then sdb=$(newest "$WALTER_STATEDB_DIR" "$WALTER_STATEDB_PATTERN"); [ -n "$sdb" ] && push statedb "$sdb"; fi
+
+# Vault export: encrypted in memory by Walter Secrets (never written in clear), kept locally and offsite. A failed
+# export does not stop the rest, but the run exits 1 at the end so the unit shows failed.
+BW_FAILED=0
+if wants bitwarden; then
+  BWDIR="$WALTER_OFFSITE_VAULT_DIR"
+  if walter-secret vault-export "$BWDIR/vault-$TS.json.age"   # Walter Secrets interface
+  then
+    rclone copyto "$BWDIR/vault-$TS.json.age" "$REMOTE/bitwarden/vault-$TS.json.age"   # already age-encrypted
+    echo "pushed bitwarden/vault-$TS.json.age ($(du -h "$BWDIR/vault-$TS.json.age" | cut -f1))"
+    walter-secret vault-prune >/dev/null
+  else
+    BW_FAILED=1; echo "WARNING: vault export failed" >&2
+  fi
+fi
+
+# Fail closed: inventory modules + mutual integrations; verify every archived file (Walter Memory's bundle).
+if wants config; then
+  walter-python -m walter_memory.backup_bundle create "$WORK/config-$TS.tar"
+  zstd -q -T2 -10 --rm "$WORK/config-$TS.tar" -o "$WORK/config-$TS.tar.zst"
+  push config "$WORK/config-$TS.tar.zst"
+fi
+
+# Remote retention
+python3 - "$REMOTE" "$WALTER_OFFSITE_KINDS" "$WALTER_OFFSITE_KEEP_DAILY" "$WALTER_OFFSITE_KEEP_WEEKLY" "$WALTER_OFFSITE_KEEP_MONTHLY" <<'PY'
+import json, re, subprocess, sys
+from datetime import date
+remote, kinds = sys.argv[1], sys.argv[2].split()
+n_days, n_weeks, n_months = map(int, sys.argv[3:6])
+for kind in kinds:
+    out = subprocess.run(["rclone", "lsjson", f"{remote}/{kind}/"], capture_output=True, text=True)
+    if out.returncode: continue
+    files = []
+    for f in json.loads(out.stdout or "[]"):
+        m = re.search(r"(\d{8})T\d{6}Z", f["Name"])
+        if m: files.append((date(int(m[1][:4]), int(m[1][4:6]), int(m[1][6:])), f["Name"]))
+    files.sort(reverse=True)
+    keep, days, weeks, months = set(), [], [], []
+    for d, n in files:
+        if d not in days and len(days) < n_days: days.append(d); keep.add(n)
+        if d.isoweekday() == 7 and d not in weeks and len(weeks) < n_weeks: weeks.append(d); keep.add(n)
+        if (d.year, d.month) not in months and len(months) < n_months: months.append((d.year, d.month)); keep.add(n)
+    for d, n in files:
+        if n not in keep:
+            subprocess.run(["rclone", "deletefile", f"{remote}/{kind}/{n}"], check=False); print("pruned", kind, n)
+PY
+[ "$BW_FAILED" = 0 ] || { echo "offsite backup done $TS, but the vault export FAILED" >&2; exit 1; }
+echo "offsite backup ok $TS"

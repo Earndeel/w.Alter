@@ -39,3 +39,37 @@ def test_installer_is_planned_not_pretended(capsys):
 def test_unknown_and_bad_usage_fail(capsys):
     assert ops_cli.main(["recovery", "everything"]) == 2
     assert ops_cli.main(["nope"]) == 2
+
+
+def test_job_parameters_come_from_configuration(tmp_path, monkeypatch):
+    import pytest
+    monkeypatch.setenv("WALTER_INSTANCE", str(tmp_path))
+    (tmp_path / "config" / "backup").mkdir(parents=True)
+    conf = tmp_path / "config" / "backup" / "backup.toml"
+    conf.write_text('[kinds.pg]\ndir = "/b/pg"\npattern = "db-*.dump"\n[pg]\ncontainer = "c"\ndatabase = "d"\nuser = "u"\n'
+                    '[offsite]\nremote = "r:x"\nrecipient = "/k.pub"\nkinds = ["pg", "config"]\nvault_export_dir = "/v"\n'
+                    '[kinds.statedb]\ndir = "/b/s"\npattern = "s-*.zst"\nsource = "/s.db"\n')
+    env = core.job_env("pg")
+    assert (env["WALTER_BACKUP_PREFIX"], env["WALTER_BACKUP_SUFFIX"]) == ("db-", ".dump")
+    assert env["WALTER_BACKUP_KEEP_DAILY"] == "7" and env["WALTER_PG_CONTAINER"] == "c"   # module default retention
+    assert core.job_env("offsite")["WALTER_OFFSITE_KINDS"] == "pg config"
+    conf.write_text('[kinds.pg]\npattern = "db-*.dump"\n')
+    with pytest.raises(ValueError, match="kinds.pg.dir"):
+        core.job_env("pg")                                        # never a guessed location
+    with pytest.raises(ValueError):
+        core.job_env("unknown")
+
+
+def test_scripts_carry_no_location_of_their_own():
+    from pathlib import Path
+    for script in (Path(__file__).resolve().parents[1] / "backup" / "scripts").iterdir():
+        text = script.read_text()
+        assert "walter-ops backup env" in text and str(Path.home()) + "/" not in text and "/home/" not in text, script.name
+
+
+def test_a_restore_proven_seconds_ago_counts(monkeypatch):
+    monkeypatch.setattr(core, "unit_last", lambda unit: {"unit": unit, "result": "success", "last_success_age_h": 0.0})
+    cfg = {"kinds": {"restore_test": {"unit": "u", "max_age_hours": 840}}}
+    assert core.restorability(cfg)["offsite_restore_test"]["ok"] is True
+    monkeypatch.setattr(core, "unit_last", lambda unit: {"unit": unit, "result": "success", "last_success_age_h": None})
+    assert core.restorability(cfg)["offsite_restore_test"]["ok"] is False

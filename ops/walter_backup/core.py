@@ -124,8 +124,9 @@ def restorability(cfg: dict) -> dict:
     kinds = cfg.get("kinds") or {}
     if "restore_test" in kinds:
         u = unit_last(kinds["restore_test"]["unit"])
-        out["offsite_restore_test"] = {**u, "ok": u["result"] == "success" and (u["last_success_age_h"] or 1e9)
-                                       <= kinds["restore_test"].get("max_age_hours", 840)}
+        age = u["last_success_age_h"]                      # 0.0 = just proven, not "unknown"
+        out["offsite_restore_test"] = {**u, "ok": u["result"] == "success" and age is not None
+                                       and age <= kinds["restore_test"].get("max_age_hours", 840)}
     if "restore_drill" in kinds:
         k = kinds["restore_drill"]
         rep = Path(k.get("report", ""))
@@ -408,6 +409,55 @@ def _raw_vault_sample(n: int) -> dict:
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return {"ok": all(x["ok"] for x in results) if results else None, "checked": results}
+
+
+# ---- parameters of the backup jobs (scripts under backup/scripts read them; 2026-10-29) ------------------------
+
+JOB_KEYS = {
+    "pg": {"WALTER_BACKUP_DIR": ("kinds", "pg", "dir"), "WALTER_BACKUP_PATTERN": ("kinds", "pg", "pattern"),
+           "WALTER_BACKUP_KEEP_DAILY": ("kinds", "pg", "keep_daily"), "WALTER_BACKUP_KEEP_WEEKLY": ("kinds", "pg", "keep_weekly"),
+           "WALTER_PG_CONTAINER": ("pg", "container"), "WALTER_PG_DATABASE": ("pg", "database"), "WALTER_PG_USER": ("pg", "user")},
+    "statedb": {"WALTER_BACKUP_DIR": ("kinds", "statedb", "dir"), "WALTER_BACKUP_PATTERN": ("kinds", "statedb", "pattern"),
+                "WALTER_BACKUP_KEEP": ("kinds", "statedb", "keep"), "WALTER_STATEDB_SOURCE": ("kinds", "statedb", "source"),
+                "WALTER_BACKUP_STAGING": ("kinds", "statedb", "staging")},
+    "offsite": {"WALTER_OFFSITE_REMOTE": ("offsite", "remote"), "WALTER_OFFSITE_RECIPIENT": ("offsite", "recipient"),
+                "WALTER_OFFSITE_KINDS": ("offsite", "kinds"), "WALTER_OFFSITE_WORKDIR": ("offsite", "workdir"),
+                "WALTER_OFFSITE_KEEP_DAILY": ("offsite", "keep_daily"), "WALTER_OFFSITE_KEEP_WEEKLY": ("offsite", "keep_weekly"),
+                "WALTER_OFFSITE_KEEP_MONTHLY": ("offsite", "keep_monthly"),
+                "WALTER_OFFSITE_VAULT_DIR": ("offsite", "vault_export_dir"),
+                "WALTER_PG_DIR": ("kinds", "pg", "dir"), "WALTER_PG_PATTERN": ("kinds", "pg", "pattern"),
+                "WALTER_STATEDB_DIR": ("kinds", "statedb", "dir"), "WALTER_STATEDB_PATTERN": ("kinds", "statedb", "pattern")},
+    "restore_test": {"WALTER_OFFSITE_REMOTE": ("offsite", "remote"), "WALTER_OFFSITE_IDENTITY": ("offsite", "identity"),
+                     "WALTER_OFFSITE_WORKDIR": ("offsite", "workdir"),
+                     "WALTER_PG_CONTAINER": ("pg", "container"), "WALTER_PG_DATABASE": ("pg", "database"),
+                     "WALTER_PG_USER": ("pg", "user"), "WALTER_RESTORE_SCRATCH_DB": ("restore_test", "scratch_database"),
+                     "WALTER_RESTORE_COMPARE": ("restore_test", "compare_tables"),
+                     "WALTER_RESTORE_MIN_VAULT_ITEMS": ("restore_test", "min_vault_items")},
+}
+
+
+def job_env(kind: str) -> dict[str, str]:
+    """The parameters of a backup job, from the module defaults and the instance's configuration. A job never
+    carries a path of its own: a missing value is an error, not a guess."""
+    if kind not in JOB_KEYS:
+        raise ValueError(f"no job parameters for {kind!r}; known: {sorted(JOB_KEYS)}")
+    cfg, out, missing = config(), {}, []
+    for var, path in JOB_KEYS[kind].items():
+        node = cfg
+        for part in path:
+            node = node.get(part) if isinstance(node, dict) else None
+        if node is None or node == "" or node == []:
+            missing.append(".".join(path))
+        else:
+            out[var] = " ".join(map(str, node)) if isinstance(node, list) else str(node)
+    if missing:
+        raise ValueError("backup configuration incomplete: " + ", ".join(missing))
+    for var in [v for v in out if v.endswith("_PATTERN")]:
+        if "*" not in out[var]:
+            raise ValueError(f"{var}: a file pattern must contain '*'")
+    if "WALTER_BACKUP_PATTERN" in out:
+        out["WALTER_BACKUP_PREFIX"], out["WALTER_BACKUP_SUFFIX"] = out["WALTER_BACKUP_PATTERN"].split("*", 1)
+    return out
 
 
 # ---- the module's own watchdog (G0): Incident v1 ---------------------------------------------------------------

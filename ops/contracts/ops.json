@@ -6,15 +6,20 @@
     "bin/walter-ops",
     "walter_backup/core.py",
     "walter_backup/cli.py",
-    "bin/walter-backup"
+    "bin/walter-backup",
+    "backup/scripts/walter-pg-backup",
+    "backup/scripts/walter-statedb-backup",
+    "backup/scripts/walter-offsite-backup",
+    "backup/scripts/walter-offsite-restore-test"
   ],
   "requires": [],
   "external": [
-    "systemd units walter-pg-backup, walter-statedb-backup, walter-offsite-backup, walter-offsite-restore-test, walter-restore-isolated (wrapped, not owned yet)",
+    "systemd units walter-pg-backup, walter-statedb-backup, walter-offsite-backup, walter-offsite-restore-test (unit files on the host; their scripts are backup/scripts/* since 2026-10-29), walter-restore-isolated (Walter Memory's restore drill, started by Ops)",
     "git",
-    "docker (PostgreSQL container for db checkpoints and dump checks)",
-    "zstd, tar",
-    "walter release|install|export (core platform) for deploy"
+    "docker (PostgreSQL container: dumps, db checkpoints, scratch restore)",
+    "zstd, tar, age, rclone",
+    "walter release|install|export (core platform) for deploy",
+    "Walter Memory backup_bundle (config bundle) and Walter Secrets vault-export (offsite kinds config and bitwarden)"
   ],
   "data": [
     "checkpoint log",
@@ -24,7 +29,8 @@
   "core_paths": [
     "walter_ops/cli.py",
     "walter_backup/core.py",
-    "walter_backup/cli.py"
+    "walter_backup/cli.py",
+    "backup/scripts"
   ],
   "backup_paths": [
     ".",
@@ -34,6 +40,7 @@
   "interfaces": [
     "CLI walter-ops backup|git|check|recovery|deploy|status (install, onboard: planned)",
     "CLI walter-backup status|check|run|verify|git|checkpoint|checkpoints (compatibility alias, same outputs)",
+    "CLI walter-ops backup env <pg|statedb|offsite|restore_test> (shell parameters of the backup jobs)",
     "Incident v1 (check) for the guardian supervisor"
   ],
   "bindings": {
@@ -46,7 +53,7 @@
     "Renamed from walter-backup on 2026-10-29 (owner decision): compatibility kept — command walter-backup, paths /walter/backup and /opt/walter-backup, unit names, config @instance/config/backup and state @instance/state/backup (the backup sub-component keeps its name).",
     "installer (clean-install, onboarding, personal-restore) is designed, not built yet (report 2026-10-29-walter-addendum-ops-clean-personal.md): walter-ops install|onboard answer 'planned'.",
     "deploy wraps the core platform's release/install/export; Ops does not own the other modules' code, contracts or migrations.",
-    "Façade: the backup units and scripts stay where they are until qualified (owner decision 2026-10-28).",
+    "Backup scripts (pg, statedb, offsite, restore test) moved into backup/scripts on 2026-10-29, each qualified by a real run; host paths /usr/local/sbin/walter-* link to them. Every location comes from the instance (walter-ops backup env <kind>). The isolated restore drill stays in Walter Memory.",
     "Restores are described, never executed by the tool.",
     "A git checkpoint holds tracked files only; untracked files are listed, not captured.",
     "Optional modules: memory (Raw Vault sample of verify), core (walter contracts for conformity).",
@@ -57,7 +64,8 @@
   "services": [],
   "optional": [
     "memory",
-    "core"
+    "core",
+    "secrets"
   ],
   "contract": {
     "schema_version": 1,
