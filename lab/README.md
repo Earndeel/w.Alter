@@ -1,11 +1,22 @@
 # walter-lab
 
+> **Paused until production (owner decision, 2026-10-29).** Lab starts nothing on its own initiative: no scouting,
+> no spontaneous experiment, no self-improvement loop, nothing ever applied. `walter-lab run` refuses unless the owner
+> asked for it (`--requested-by owner --reason "…"`, recorded in the report). `walter-lab status` shows the mode
+> (`@instance/config/lab/lab.toml`, module default `config/lab.toml`). Reactivation: `mode = "active"` once the
+> production decision is recorded. **The bench is not paused**: `walter-scenario`, the scenarios and `walter matrix`
+> stay available to every module; the sandbox, history and reports too.
+>
+> Scope: Lab is transverse R&D (new routing algorithms, runtime comparisons, new navigation technology). Each module
+> keeps its own research and upkeep — the Router's 48 h cycle, the Skills curator, Browse's recipes — and its guardian.
+
 Measured experiments on the system. Lab compares variants on the shared end-to-end bench (`walter-scenario`),
 interleaves their runs and evaluates the decision rule written in advance. It can conclude that nothing should
 change. Lab records proposals and never applies them. Guardian checks operation; Curator organises skills.
 
 ## Interfaces and dependencies
 
+* `walter-lab status`
 * `walter-lab list`
 * `walter-lab run <experiment> [--repeats N]`
 * `walter-lab history <experiment>`

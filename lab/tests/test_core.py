@@ -44,7 +44,7 @@ def test_reports_keep_protocol_without_environment_values(monkeypatch, tmp_path)
         return original_write(path, content, *args, **kwargs)
 
     monkeypatch.setattr(Path, "write_text", record)
-    report = core.run("x", repeats=1)
+    report = core.run("x", repeats=1, requested_by="owner", reason="test")   # Lab is paused by default (2026-10-29)
     assert all("fixture-private-value" not in json.dumps(payload) for payload in writes)
     assert all(payload["protocol"] == report["protocol"] for payload in writes)
     assert report["protocol"]["scenario"] == "s"

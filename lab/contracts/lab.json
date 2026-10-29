@@ -26,7 +26,7 @@
     "@instance/state/lab"
   ],
   "interfaces": [
-    "CLI walter-lab run|history|list",
+    "CLI walter-lab status|run|history|list",
     "Experiment v1 (experiments/*.yaml)",
     "CLI walter-lab sandbox run|probe",
     "Python walter_lab.sandbox.run"
@@ -38,6 +38,9 @@
     "claude-code": "CLI under host execution permissions"
   },
   "limitations": [
+    "Paused until production (owner decision 2026-10-29): no experiment on Lab's own initiative; `run` needs the owner's explicit request (--requested-by owner --reason), recorded in the report. Mode in @instance/config/lab/lab.toml (module default: paused).",
+    "Scope: transverse R&D and global self-improvement only. Each module keeps its own research, refresh, learning and guardian (Router cycle, Skills curator, Browse recipes); none of them needs Lab.",
+    "The shared bench (walter-scenario, scenarios, qualifications read by `walter matrix`) is never paused; it still lives in core until its public interfaces exist (addendum 2026-10-29, F).",
     "Scenario experiments inherit host permissions and environment; sandbox execution is a separate explicit interface.",
     "Proposals only: nothing is ever applied by Lab.",
     "No external-source scout or runtime-neutral runtime comparison yet.",

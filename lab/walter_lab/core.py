@@ -7,6 +7,12 @@ same end-to-end scenarios as the bench (walter-scenario), with each variant expr
 modules already honour (WALTER_RUN_CONTEXT, WALTER_RUN_TOOLS, …). External code found by a scout is untrusted and
 must use the separate sandbox interface and an approved, sanitised source tree; host scenarios keep their host permissions.
 
+Scope and pause (owner decision, 2026-10-29): Lab is transverse R&D only; each module keeps its own research, refresh,
+learning and guardian. Until production, Lab is **paused**: no experiment starts on Lab's own initiative. `run`
+refuses unless the owner asked explicitly (`requested_by="owner"` and a reason, recorded in the report). The shared
+bench (walter-scenario, `walter matrix`), the sandbox, history and reports stay available. Mode: `lab.toml`
+(`@instance/config/lab/lab.toml`, else the module default `config/lab.toml`).
+
 Experiment v1 (experiments/<name>.yaml):
   name, hypothesis, scenario (a walter-scenario name), repeats,
   variants: {<id>: {env: {VAR: value}, note}}            the first variant is the current behaviour (baseline)
@@ -23,9 +29,15 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+import tomllib
 import yaml
 
 MODULE = Path(__file__).resolve().parent.parent
+MODES = ("paused", "active")
+
+
+class LabPaused(RuntimeError):
+    pass
 
 
 def instance_root() -> Path:
@@ -36,6 +48,20 @@ def instance_root() -> Path:
         except OSError:
             root = str(MODULE)
     return Path(root)
+
+
+def mode() -> dict:
+    """The Lab mode: the instance's lab.toml, else the module default. An unreadable or unknown value is `paused`."""
+    for src in (instance_root() / "config" / "lab" / "lab.toml", MODULE / "config" / "lab.toml"):
+        if src.is_file():
+            try:
+                cfg = tomllib.loads(src.read_text())
+            except (OSError, ValueError):
+                return {"mode": "paused", "source": str(src), "error": "unreadable"}
+            value = cfg.get("mode")
+            return {"mode": value if value in MODES else "paused", "since": cfg.get("since"), "reason": cfg.get("reason"),
+                    "source": str(src)}
+    return {"mode": "paused", "source": None}
 
 
 def load(name: str) -> dict:
@@ -92,7 +118,12 @@ def decide(exp: dict, summary: dict) -> dict:
             "applied": False, "note": "Lab propose ; le propriétaire du module ou de l'instance décide."}
 
 
-def run(name: str, repeats: int | None = None) -> dict:
+def run(name: str, repeats: int | None = None, *, requested_by: str | None = None, reason: str | None = None) -> dict:
+    state = mode()
+    request = {"mode": state["mode"], "requested_by": requested_by, "reason": (reason or "").strip() or None}
+    if state["mode"] != "active" and not (requested_by == "owner" and request["reason"]):
+        raise LabPaused("Lab is paused until production (owner decision 2026-10-29): an experiment runs only on the "
+                        "owner's explicit request (--requested-by owner --reason ...). The bench (walter-scenario) stays available.")
     exp = load(name)
     protocol = {"schema_version": 2, "scenario": exp["scenario"], "metrics": exp.get("metrics") or ["ok"],
                 "decision": exp.get("decision") or {}, "variant_order": list(exp["variants"]),
@@ -111,11 +142,11 @@ def run(name: str, repeats: int | None = None) -> dict:
         for vid, v in exp["variants"].items():
             r = run_scenario(exp["scenario"], v.get("env") or {}, vid)
             results.append({"variant": vid, "repeat": i + 1, **r})
-            path.write_text(json.dumps({"experiment": exp["name"], "protocol": protocol, "at": stamp, "results": results}, ensure_ascii=False,
+            path.write_text(json.dumps({"experiment": exp["name"], "request": request, "protocol": protocol, "at": stamp, "results": results}, ensure_ascii=False,
                                        indent=1, default=str))
     summary = summarise(results, exp.get("metrics") or ["ok"])
     report = {"experiment": exp["name"], "hypothesis": exp["hypothesis"], "at": stamp, "repeats": n,
-              "protocol": protocol, "summary": summary, "decision": decide(exp, summary), "results": results}
+              "request": request, "protocol": protocol, "summary": summary, "decision": decide(exp, summary), "results": results}
     path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str))
     report["file"] = str(path)
     return report
