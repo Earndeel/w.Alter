@@ -29,9 +29,9 @@ def test_paused_refuses_without_owner_request(tmp_path, monkeypatch):
 
 def test_owner_request_runs_and_is_recorded(tmp_path, monkeypatch):
     calls = _instance(tmp_path, monkeypatch, 'mode = "paused"\n')
-    rep = core.run("x", requested_by="owner", reason="Monsieur: compare les deux modes")
+    rep = core.run("x", requested_by="owner", reason="owner: compare both modes")
     assert calls == ["base", "new"]
-    assert rep["request"] == {"mode": "paused", "requested_by": "owner", "reason": "Monsieur: compare les deux modes"}
+    assert rep["request"] == {"mode": "paused", "requested_by": "owner", "reason": "owner: compare both modes"}
 
 
 def test_module_default_is_paused_and_unknown_mode_is_paused(tmp_path, monkeypatch):
