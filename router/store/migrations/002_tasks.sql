@@ -28,12 +28,8 @@ on conflict (task) do update set label = excluded.label, interface = excluded.in
   quality_benchmark = excluded.quality_benchmark, quality_task = excluded.quality_task,
   default_objective = excluded.default_objective, description = excluded.description;
 
--- The owner's declared preference (2026-10-02): images = always the best available, even if a better ratio exists.
-insert into models.preferences (task, objective, note, declared_at)
-values ('text_to_image', 'best_available',
-        'Déclaration : pour les images, toujours le meilleur disponible, même s''il existe un meilleur ratio qualité/prix.',
-        '2026-10-02T00:00:00Z')
-on conflict (task) do nothing;
+-- Until 2026-10-29 this migration also inserted the first instance's declared preference for images. Preferences are
+-- an instance's data (models.preferences), never a software default: a new database starts with none (Walter Clean).
 
 insert into models.schema_migrations (version) values ('002_tasks') on conflict do nothing;
 commit;
