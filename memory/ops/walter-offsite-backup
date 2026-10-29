@@ -1,4 +1,6 @@
 #!/bin/bash
+# SUPERSEDED 2026-10-29: the live copy is walter/ops backup/scripts/walter-offsite-backup (the host unit links there).
+# Kept unchanged below for rollback only; do not edit here.
 # W.Alter offsite backup (2026-10-01, Walter Memory P0.2).
 # Encrypts (age, W.Alter recovery key) and copies to Google Drive "W.Alter Backups":
 #   pg/        newest local PG dump        (walter-pg-backup, 03:30 UTC)
