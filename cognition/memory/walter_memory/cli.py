@@ -108,6 +108,7 @@ def main(argv=None) -> None:
     mg = sub.add_parser("migrate", help="apply this module's migrations in order and record them (status, baseline)")
     mg.add_argument("--status", action="store_true"); mg.add_argument("--dry", action="store_true")
     mg.add_argument("--baseline-through", help="record files up to this name as already applied, without running them")
+    mg.add_argument("--accept-change", metavar="FILE", help="record the new content of a baseline file (never run here)")
     dc = sub.add_parser("documents", help="the instance's curated records as knowledge (doc_section): sync, list")
     dc.add_argument("action", choices=["sync", "list", "register"]); dc.add_argument("--dry", action="store_true")
     ep = sub.add_parser("episodes", help="Episodes of runs (P4): build <run_id>, pending (catch-up), show <run_id>")
@@ -250,7 +251,8 @@ def main(argv=None) -> None:
         print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
     elif a.cmd == "migrate":
         from . import migrate
-        res = migrate.status() if a.status else migrate.migrate(baseline_through=a.baseline_through, dry_run=a.dry)
+        res = (migrate.status() if a.status else migrate.accept_change(a.accept_change) if a.accept_change
+               else migrate.migrate(baseline_through=a.baseline_through, dry_run=a.dry))
         print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
     elif a.cmd == "documents":
         from . import documents

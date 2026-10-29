@@ -114,3 +114,17 @@ def migrate(*, baseline_through: str | None = None, dry_run: bool = False) -> di
                          "on conflict (version) do nothing", (p.name, _sha(p), mode))
             done = recorded(conn)
     return out
+
+
+def accept_change(name: str) -> dict:
+    """Record the new content of a 'baseline' file (never run on this database: its old and new content are history
+    only). An 'applied' file is refused: a change to what ran must be a new migration."""
+    p = DIR / name
+    with connect() as conn:
+        row = recorded(conn).get(name)
+        if not row:
+            return {"error": f"{name} is not recorded"}
+        if row["mode"] != "baseline":
+            return {"error": f"{name} ran on this database: fix forward with a new migration"}
+        conn.execute("update core.schema_migrations set sha256 = %s where version = %s", (_sha(p), name))
+    return {"accepted": name, "previous_sha256": row["sha256"], "sha256": _sha(p)}
