@@ -1,0 +1,276 @@
+{
+  "version": 1,
+  "module": "memory",
+  "note": "Data classes of Walter Memory's tables, including its logs, bus and raw-vault catalogue (addendum 2026-10-29, C.2). Memory is empty in Walter Clean except the event types and source definitions; its connectors exist as code and register when connected. Walter Personal restores everything.",
+  "tables": {
+    "bus.cursors": {
+      "class": "runtime"
+    },
+    "bus.dead": {
+      "class": "instance"
+    },
+    "bus.events": {
+      "class": "instance"
+    },
+    "core.derived_items": {
+      "class": "instance"
+    },
+    "core.entities": {
+      "class": "instance"
+    },
+    "core.event_keys": {
+      "class": "instance"
+    },
+    "core.event_types": {
+      "class": "reference",
+      "note": "seed event_types/v1.json"
+    },
+    "core.events": {
+      "class": "instance"
+    },
+    "core.identity_links": {
+      "class": "instance"
+    },
+    "core.object_links": {
+      "class": "instance"
+    },
+    "core.objects": {
+      "class": "instance"
+    },
+    "core.provenance": {
+      "class": "instance"
+    },
+    "core.relationships": {
+      "class": "instance"
+    },
+    "core.schema_migrations": {
+      "class": "runtime",
+      "note": "written by walter-memory migrate"
+    },
+    "core.source_identities": {
+      "class": "instance"
+    },
+    "core.sources": {
+      "class": "reference",
+      "instance_rows": "source = 'test'"
+    },
+    "ingestion.checkpoints": {
+      "class": "instance"
+    },
+    "ingestion.connectors": {
+      "class": "instance",
+      "note": "names carry accounts (gmail:<account>); each connector registers when it is connected"
+    },
+    "ingestion.failures": {
+      "class": "instance"
+    },
+    "ingestion.jobs": {
+      "class": "instance"
+    },
+    "ingestion.reconciliation_runs": {
+      "class": "instance"
+    },
+    "kardex.action_recommendations": {
+      "class": "instance"
+    },
+    "kardex.actions": {
+      "class": "instance"
+    },
+    "kardex.boundaries": {
+      "class": "instance"
+    },
+    "kardex.channels": {
+      "class": "instance"
+    },
+    "kardex.claim_evidence": {
+      "class": "instance"
+    },
+    "kardex.claims": {
+      "class": "instance"
+    },
+    "kardex.communication_deviations": {
+      "class": "instance"
+    },
+    "kardex.communication_patterns": {
+      "class": "instance"
+    },
+    "kardex.contact_merge_audit": {
+      "class": "instance"
+    },
+    "kardex.contact_merge_candidates": {
+      "class": "instance"
+    },
+    "kardex.contacts": {
+      "class": "instance"
+    },
+    "kardex.context_packs": {
+      "class": "instance"
+    },
+    "kardex.conversation_episodes": {
+      "class": "instance"
+    },
+    "kardex.corrections": {
+      "class": "instance"
+    },
+    "kardex.disclosure_transitions": {
+      "class": "instance"
+    },
+    "kardex.entities": {
+      "class": "instance"
+    },
+    "kardex.episode_items": {
+      "class": "instance"
+    },
+    "kardex.events": {
+      "class": "instance"
+    },
+    "kardex.evidence": {
+      "class": "instance"
+    },
+    "kardex.extraction_runs": {
+      "class": "instance"
+    },
+    "kardex.health_notes": {
+      "class": "instance"
+    },
+    "kardex.hindsight_sync_state": {
+      "class": "instance"
+    },
+    "kardex.identity_clusters": {
+      "class": "instance"
+    },
+    "kardex.identity_links": {
+      "class": "instance"
+    },
+    "kardex.identity_mentions": {
+      "class": "instance"
+    },
+    "kardex.journal_entries": {
+      "class": "instance"
+    },
+    "kardex.media": {
+      "class": "instance"
+    },
+    "kardex.messages": {
+      "class": "instance"
+    },
+    "kardex.open_loops": {
+      "class": "instance"
+    },
+    "kardex.preferences": {
+      "class": "instance"
+    },
+    "kardex.psychological_claims": {
+      "class": "instance"
+    },
+    "kardex.raw_items": {
+      "class": "instance"
+    },
+    "kardex.recommendations": {
+      "class": "instance"
+    },
+    "kardex.rel_disclosure_transitions": {
+      "class": "instance"
+    },
+    "kardex.relationship_baselines": {
+      "class": "instance"
+    },
+    "kardex.relationship_events": {
+      "class": "instance"
+    },
+    "kardex.relationship_evidence": {
+      "class": "instance"
+    },
+    "kardex.relationship_metrics": {
+      "class": "instance"
+    },
+    "kardex.relationships": {
+      "class": "instance"
+    },
+    "kardex.social_graph": {
+      "class": "instance"
+    },
+    "kardex.source_threads": {
+      "class": "instance"
+    },
+    "kardex.style_profiles": {
+      "class": "instance"
+    },
+    "kardex.sync_state": {
+      "class": "instance"
+    },
+    "privacy.detections": {
+      "class": "instance"
+    },
+    "privacy.policies": {
+      "class": "reference"
+    },
+    "runs.episodes": {
+      "class": "instance"
+    },
+    "runs.links": {
+      "class": "instance"
+    },
+    "runs.runs": {
+      "class": "instance"
+    },
+    "runs.tasks": {
+      "class": "instance"
+    },
+    "search.chunks": {
+      "class": "runtime",
+      "note": "index rebuilt from canonical rows; its text and embeddings are personal"
+    },
+    "system.agent_calls": {
+      "class": "instance"
+    },
+    "system.audit_log": {
+      "class": "instance"
+    },
+    "system.budgets": {
+      "class": "instance"
+    },
+    "system.context_requests": {
+      "class": "instance"
+    },
+    "system.model_calls": {
+      "class": "instance"
+    },
+    "system.model_prices": {
+      "class": "runtime"
+    },
+    "system.processors": {
+      "class": "runtime"
+    },
+    "system.purges": {
+      "class": "instance"
+    },
+    "triage.decisions": {
+      "class": "instance"
+    },
+    "views.cursor": {
+      "class": "runtime"
+    },
+    "views.ledger": {
+      "class": "instance"
+    },
+    "views.member": {
+      "class": "instance"
+    },
+    "views.version": {
+      "class": "instance"
+    },
+    "views.view": {
+      "class": "instance"
+    },
+    "walter_logs.duplicates": {
+      "class": "instance"
+    },
+    "walter_logs.events": {
+      "class": "instance"
+    },
+    "walter_logs.sessions": {
+      "class": "instance"
+    }
+  }
+}
