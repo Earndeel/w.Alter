@@ -105,6 +105,9 @@ def main(argv=None) -> None:
     vw.add_argument("--limit", type=int, default=500); vw.add_argument("--dry", action="store_true")
     vw.add_argument("--depth", default="overview"); vw.add_argument("--domain"); vw.add_argument("--horizon")
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
+    mg = sub.add_parser("migrate", help="apply this module's migrations in order and record them (status, baseline)")
+    mg.add_argument("--status", action="store_true"); mg.add_argument("--dry", action="store_true")
+    mg.add_argument("--baseline-through", help="record files up to this name as already applied, without running them")
     dc = sub.add_parser("documents", help="the instance's curated records as knowledge (doc_section): sync, list")
     dc.add_argument("action", choices=["sync", "list", "register"]); dc.add_argument("--dry", action="store_true")
     ep = sub.add_parser("episodes", help="Episodes of runs (P4): build <run_id>, pending (catch-up), show <run_id>")
@@ -244,6 +247,10 @@ def main(argv=None) -> None:
             res = episodes.pending()
         else:
             res = episodes.latest(a.run_id) or {"error": "no episode"}
+        print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
+    elif a.cmd == "migrate":
+        from . import migrate
+        res = migrate.status() if a.status else migrate.migrate(baseline_through=a.baseline_through, dry_run=a.dry)
         print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
     elif a.cmd == "documents":
         from . import documents
