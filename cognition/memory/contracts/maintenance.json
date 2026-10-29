@@ -9,7 +9,7 @@
   ],
   "check": [
     "python3",
-    "/opt/walter-memory/guardian/check"
+    "/walter/memory/guardian/check"
   ],
   "max_level": "G1",
   "levels": {
