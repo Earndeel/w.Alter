@@ -6,6 +6,8 @@
   walter-ops status                  backup status + where each Ops sub-component stands
   walter-ops recovery drill|test     start the isolated restore drill / the offsite restore test (systemd, not waited)
   walter-ops deploy <inspect|environments|rollback|export|install> ...   the core platform's release mechanism
+  walter-ops install migrations-check [--keep-dumps DIR]   replay every module's migrations on a disposable database
+                                     and compare its structure with the live one (Walter Clean, PostgreSQL part)
   walter-ops install clean|personal, walter-ops onboard ...            designed, not built yet: answer "planned"
 """
 from __future__ import annotations
@@ -57,6 +59,13 @@ def main(argv: list[str] | None = None) -> int:
             _print({"error": "dependency_unavailable", "detail": "the core platform command `walter` is not on PATH"})
             return 1
         return subprocess.run(["walter", *DEPLOY[rest[0]], *rest[1:]]).returncode
+    if cmd == "install" and rest[:1] == ["migrations-check"]:
+        from pathlib import Path
+        from . import clean
+        keep = Path(rest[rest.index("--keep-dumps") + 1]) if "--keep-dumps" in rest else None
+        out = clean.migrations_check(keep_dumps=keep)
+        _print(out)
+        return 0 if out.get("ok") else 1
     if cmd in ("install", "onboard"):
         _print({"status": "planned", "component": "installer", "detail": f"walter-ops {cmd} is designed, not built",
                 "design": PLAN})

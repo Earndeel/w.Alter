@@ -1,0 +1,32 @@
+# walter-ops — Walter Clean (installer). Neutral defaults; an instance may override them in @instance/config/ops/clean.toml.
+# PostgreSQL Clean is built from the modules' own migrations (addendum 2026-10-29, C.3), never from a copy of an
+# instance's database. `walter-ops install migrations-check` replays them on a disposable database without network and
+# compares the structure with the instance's live database (structure only, no row is read).
+
+[postgres]
+image = "pgvector/pgvector:pg16"     # the same image as the live database (checked by its id when both exist)
+database = "walter"
+
+# Migration sets, applied in this order. dir is relative to the module (resolved with `walter path <module> <dir>`).
+[[migrations]]
+module = "memory"
+dir = "migrations"
+
+[[migrations]]
+module = "router"
+dir = "store/migrations"
+
+[[migrations]]
+module = "skills"
+dir = "migrations"
+
+[compare]
+# Schemas the software owns. Retired or personal schemas (public = retired Hindsight, walter_voice, user_model,
+# walter_audit, x_research) are not part of Walter Clean and are not compared.
+# legacy holds the retired pre-2026-10 pipeline tables of the first instance (kept read-only for provenance): the
+# migrations create the empty schema only, so it is not compared either.
+schemas = ["bus", "core", "ingestion", "kardex", "models", "privacy", "runs", "search", "skills", "system", "triage",
+           "vault", "views", "walter_logs"]
+# Objects created at run time, not by migrations ("TYPE schema.name" patterns): monthly partitions of core.events.
+runtime_objects = ["TABLE core.events_*", "TABLE ATTACH core.events_*", "INDEX core.events_*", "INDEX ATTACH core.events_*",
+                   "INDEX ATTACH core.*_20*", "INDEX ATTACH core.*_19*", "CONSTRAINT core.events_*"]
