@@ -99,9 +99,12 @@ create index if not exists relationships_object on core.relationships (object_id
 -- ───────────────────────────── objects (A5: single registry) ─────────────────────────────
 -- vault.objects / vault.links (created earlier today) become core.objects / core.object_links;
 -- vault.* stay as updatable views so existing callers keep working during the transition.
+-- On a blank database (Walter Clean, 2026-10-29) there is no vault.* to move: the same tables, constraints and indexes
+-- are created directly. The relkind test reads pg_class through to_regclass so it never casts a missing name.
+create schema if not exists vault;
 do $$
 begin
-  if to_regclass('vault.objects') is not null and (select relkind from pg_class where oid = 'vault.objects'::regclass) = 'r' then
+  if (select relkind from pg_class where oid = to_regclass('vault.objects')) = 'r' then
     alter table vault.objects set schema core;
     alter table vault.links rename to object_links;
     alter table vault.object_links set schema core;
@@ -109,10 +112,26 @@ begin
 end $$;
 create table if not exists core.objects (            -- no-op when migrated above
     id uuid primary key default gen_random_uuid(), sha256 text not null unique, size_bytes bigint not null,
-    mime text, kind text not null, storage_key text not null, original_name text, captured_at timestamptz,
+    mime text, kind text not null
+        check (kind in ('image','video','audio','document','screenshot','archive','other')),
+    storage_key text not null, original_name text, captured_at timestamptz,
     source text not null, source_ref jsonb not null default '{}', meta jsonb not null default '{}',
-    derived_text text, derived_kind text, derived_model text, derived_at timestamptz,
-    status text not null default 'stored', ingested_at timestamptz not null default now());
+    derived_text text, derived_kind text check (derived_kind in ('ocr','transcript','caption','extract')),
+    derived_model text, derived_at timestamptz,
+    status text not null default 'stored' check (status in ('stored','derived','retained','error')),
+    ingested_at timestamptz not null default now());
+create table if not exists core.object_links (       -- no-op when migrated above (vault.links keeps its key names)
+    object_id   uuid not null,
+    target_type text not null check (target_type ~ '^[a-z_]+$'),
+    target_id   text not null,
+    role        text not null default 'appears_in',
+    constraint links_pkey primary key (object_id, target_type, target_id, role),
+    constraint links_object_id_fkey foreign key (object_id) references core.objects(id) on delete cascade);
+create index if not exists objects_captured on core.objects (captured_at desc);
+create index if not exists objects_derived_fts on core.objects
+    using gin (to_tsvector('french', coalesce(derived_text, '') || ' ' || coalesce(original_name, '')));
+create index if not exists objects_pending on core.objects (status) where status <> 'retained';
+create index if not exists objects_source on core.objects (source, kind);
 alter table core.objects add column if not exists privacy_class text not null default 'cloud_allowed'
     check (privacy_class in ('local_only','redacted_cloud','cloud_allowed'));
 alter table core.objects add column if not exists storage_zone text not null default 'clear'
