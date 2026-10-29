@@ -1,4 +1,23 @@
-# walter-backup
+# walter/ops (formerly walter-backup)
+
+**Renamed on 2026-10-29 (owner decision).** Ops installs, deploys, versions, keeps and restores the Walter software
+and its instances. It coordinates the other modules through their public interfaces and owns none of their code,
+contracts or migrations.
+
+| Sub-component | State | Entry point |
+|---|---|---|
+| backup | built (the `walter_backup` package below, unchanged) | `walter-ops backup …` = `walter-backup …` |
+| git | built | `walter-ops git` |
+| recovery | built: isolated restore drill, monthly offsite restore test (implementations in walter-memory and host units) | `walter-ops recovery drill\|test` |
+| deploy | wraps the core platform's `walter release\|install\|export` | `walter-ops deploy …` |
+| installer | **planned**: clean-install (Walter Clean), onboarding, personal-restore (Walter Personal) | `walter-ops install\|onboard` answer `planned` |
+| guardian | built (Incident v1) | `walter-ops check` |
+
+Compatibility kept until every consumer is qualified: command `walter-backup` (same outputs), paths `/walter/backup`,
+`/opt/walter-backup` (links to `/walter/ops`), systemd unit names (`walter-pg-backup`, …), the backup sub-component's
+config `@instance/config/backup/backup.toml` and state `@instance/state/backup/`. `walter path backup` resolves to ops.
+
+## Backup sub-component (walter-backup)
 
 Façade over Walter's existing backup, restore and versioning mechanisms (P5, 2026-10-28). It wraps what exists —
 the PG, state.db and offsite units, the monthly offsite restore test, the isolated restore drill, git — without moving

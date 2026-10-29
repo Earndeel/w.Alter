@@ -413,7 +413,7 @@ def _raw_vault_sample(n: int) -> dict:
 # ---- the module's own watchdog (G0): Incident v1 ---------------------------------------------------------------
 
 def incident(key: str, kind: str, severity: str, summary: str, evidence: dict, level: str = "G0") -> dict:
-    return {"version": INCIDENT_VERSION, "module": "backup", "key": key, "kind": kind, "severity": severity,
+    return {"version": INCIDENT_VERSION, "module": "ops", "key": key, "kind": kind, "severity": severity,
             "summary": summary, "evidence": evidence, "suggested_level": level}
 
 

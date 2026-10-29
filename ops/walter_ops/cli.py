@@ -1,0 +1,69 @@
+"""walter-ops — backup | git | check | status | recovery | deploy | install | onboard   (JSON on stdout).
+
+  walter-ops backup <status|check|run|verify|git|checkpoint|checkpoints> ...   = walter-backup ... (same outputs)
+  walter-ops git                     repositories, uncommitted work, remotes, checkpoints
+  walter-ops check                   the module's guardian watchdog (Incident v1)
+  walter-ops status                  backup status + where each Ops sub-component stands
+  walter-ops recovery drill|test     start the isolated restore drill / the offsite restore test (systemd, not waited)
+  walter-ops deploy <inspect|environments|rollback|export|install> ...   the core platform's release mechanism
+  walter-ops install clean|personal, walter-ops onboard ...            designed, not built yet: answer "planned"
+"""
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+import sys
+
+from walter_backup import cli as backup_cli
+from walter_backup import core as backup
+
+PLAN = "addendum architectural du 2026-10-29 (Ops, Walter Clean, Walter Personal), rapport de l'instance"
+COMPONENTS = {"backup": "built (walter_backup)", "git": "built (walter_backup.git_inventory, checkpoints)",
+              "recovery": "built: restore drill + monthly offsite restore test (implementations in walter-memory "
+                          "and host units, started by Ops)",
+              "deploy": "wraps `walter release|install|export` (core platform)",
+              "installer": "planned: clean-install, onboarding, personal-restore", "guardian": "built (walter-ops check)"}
+RECOVERY = {"drill": "restore_drill", "test": "restore_test"}
+DEPLOY = {"inspect": ["release", "inspect"], "environments": ["release", "environments"],
+          "rollback": ["release", "rollback"], "export": ["export"], "install": ["install"]}
+
+
+def _print(out) -> None:
+    print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0 if argv else 2
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "backup":
+        return backup_cli.main(rest)
+    if cmd in ("git", "check"):
+        return backup_cli.main([cmd, *rest])
+    if cmd == "status":
+        _print({"backup": backup.status(), "components": COMPONENTS})
+        return 0
+    if cmd == "recovery":
+        if not rest or rest[0] not in RECOVERY:
+            _print({"error": f"usage: walter-ops recovery {'|'.join(RECOVERY)}"}); return 2
+        return backup_cli.main(["run", RECOVERY[rest[0]]])
+    if cmd == "deploy":
+        if not rest or rest[0] not in DEPLOY:
+            _print({"error": f"usage: walter-ops deploy {'|'.join(DEPLOY)} ..."}); return 2
+        if not shutil.which("walter"):
+            _print({"error": "dependency_unavailable", "detail": "the core platform command `walter` is not on PATH"})
+            return 1
+        return subprocess.run(["walter", *DEPLOY[rest[0]], *rest[1:]]).returncode
+    if cmd in ("install", "onboard"):
+        _print({"status": "planned", "component": "installer", "detail": f"walter-ops {cmd} is designed, not built",
+                "design": PLAN})
+        return 2
+    _print({"error": f"unknown command {cmd!r}; see walter-ops --help"})
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

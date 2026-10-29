@@ -1,7 +1,9 @@
 {
-  "id": "backup",
+  "id": "ops",
   "anchors": [
-    "contracts/backup.json",
+    "contracts/ops.json",
+    "walter_ops/cli.py",
+    "bin/walter-ops",
     "walter_backup/core.py",
     "walter_backup/cli.py",
     "bin/walter-backup"
@@ -11,7 +13,8 @@
     "systemd units walter-pg-backup, walter-statedb-backup, walter-offsite-backup, walter-offsite-restore-test, walter-restore-isolated (wrapped, not owned yet)",
     "git",
     "docker (PostgreSQL container for db checkpoints and dump checks)",
-    "zstd, tar"
+    "zstd, tar",
+    "walter release|install|export (core platform) for deploy"
   ],
   "data": [
     "checkpoint log",
@@ -19,6 +22,7 @@
     "git checkpoint refs (refs/walter-backup/*)"
   ],
   "core_paths": [
+    "walter_ops/cli.py",
     "walter_backup/core.py",
     "walter_backup/cli.py"
   ],
@@ -28,7 +32,8 @@
     "@instance/state/backup"
   ],
   "interfaces": [
-    "CLI walter-backup status|check|run|verify|git|checkpoint|checkpoints",
+    "CLI walter-ops backup|git|check|recovery|deploy|status (install, onboard: planned)",
+    "CLI walter-backup status|check|run|verify|git|checkpoint|checkpoints (compatibility alias, same outputs)",
     "Incident v1 (check) for the guardian supervisor"
   ],
   "bindings": {
@@ -38,6 +43,9 @@
     "claude-code": "CLI under host execution permissions"
   },
   "limitations": [
+    "Renamed from walter-backup on 2026-10-29 (owner decision): compatibility kept — command walter-backup, paths /walter/backup and /opt/walter-backup, unit names, config @instance/config/backup and state @instance/state/backup (the backup sub-component keeps its name).",
+    "installer (clean-install, onboarding, personal-restore) is designed, not built yet (report 2026-10-29-walter-addendum-ops-clean-personal.md): walter-ops install|onboard answer 'planned'.",
+    "deploy wraps the core platform's release/install/export; Ops does not own the other modules' code, contracts or migrations.",
     "Façade: the backup units and scripts stay where they are until qualified (owner decision 2026-10-28).",
     "Restores are described, never executed by the tool.",
     "A git checkpoint holds tracked files only; untracked files are listed, not captured.",
@@ -53,11 +61,11 @@
   ],
   "contract": {
     "schema_version": 1,
-    "version": "0.1.1",
-    "owner": "backup",
+    "version": "0.2.0",
+    "owner": "ops",
     "kind": "foundation",
-    "purpose": "Conserver, versionner, sauvegarder, vérifier et restaurer l'état de Walter, indépendamment des autres modules.",
-    "target_root": "backup",
+    "purpose": "Installer, déployer, versionner, conserver et restaurer le logiciel Walter et ses instances (installer, deploy, git, backup, recovery, guardian), indépendamment des autres modules.",
+    "target_root": "ops",
     "config_paths": [
       "config/backup.toml",
       "@instance/config/backup/backup.toml"
@@ -87,7 +95,7 @@
       {
         "id": "status",
         "transport": "cli",
-        "interface": "walter-backup status",
+        "interface": "walter-ops backup status",
         "access": "read",
         "timeout_seconds": 180,
         "timeout_status": "target"
@@ -95,7 +103,7 @@
       {
         "id": "checkpoint",
         "transport": "cli",
-        "interface": "walter-backup checkpoint",
+        "interface": "walter-ops backup checkpoint",
         "access": "write",
         "timeout_seconds": 3600,
         "timeout_status": "target"
@@ -105,7 +113,7 @@
       {
         "id": "checkpoints",
         "role": "owner",
-        "owner": "backup",
+        "owner": "ops",
         "durability": "canonical"
       }
     ],
@@ -120,7 +128,7 @@
         "Réinstaller le module depuis le paquet config ; il ne dépend d'aucun autre module pour démarrer."
       ],
       "verification": [
-        "walter-backup status puis verify ; l'exercice isolé reste la preuve complète."
+        "walter-ops backup status puis verify ; l'exercice isolé reste la preuve complète."
       ]
     },
     "acceptance": [
@@ -144,7 +152,7 @@
   },
   "presentation": {
     "audience": "agent",
-    "title": "Walter Backup",
+    "title": "Walter Ops",
     "order": 85,
     "summary": "manifest/SUMMARY.md",
     "manifest": "manifest/MANIFEST.md",

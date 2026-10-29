@@ -1,1 +1,1 @@
-Sauvegardes, versions et restauration de Walter : `walter-backup status` (conformité, santé, restaurabilité), `checkpoint` avant une modification risquée.
+Installer, déployer, versionner, sauvegarder et restaurer Walter : `walter-ops backup status` (conformité, santé, restaurabilité), `walter-ops backup checkpoint` avant une modification risquée (`walter-backup` reste un alias).
