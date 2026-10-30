@@ -476,6 +476,14 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_instance_path(value: str)` — 
 - `provider_key(env_name: str)` — Value of the vault item mapped to `env_name` (walter_secrets.mapping), cached in this process only. A stale
 - `_read_key(env_name: str)` — 
+- `_ledger()` — 
+- `_ledger_add(entry: dict)` — 
+- `test_budget()` — Paid spend of test runs over the window against the cap (+ the owner's approvals in the same window), USD.
+- `_price_usd(route: dict, usage: dict | None, body: dict)` — Cost of one call from its usage (or, before the call, from the request size) at the route's price.
+- `test_gate(route: dict, body: dict)` — None when this paid call of a test fits the budget, else the refusal (and one Telegram notice per window).
+- `_charge(route: dict, entry: dict, telemetry: dict, body: dict)` — Record the paid spend of a test call (provider cost, else estimated from its usage or size).
+- `_telegram(text: str)` — One message to the owner through Hermes' gateway (best effort).
+- `approve_tests(eur: float, note: str='')` — The owner's approval of EUR more paid spend for tests, valid for the window.
 - `_router(*args: str)` — 
 - `_refresh(task: str)` — task = a router task, or task/LEVEL for one of the instance's text tiers ("general/L2").
 - `decision(task: str)` — The router's routes for a task. A stale entry is served at once and refreshed in the background (a phone call
@@ -483,6 +491,8 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `chat_tasks()` — 
 - `litellm_target(route: dict)` — LiteLLM arguments for one router route, or None when this gateway cannot run it (yet).
 - `provider_completion(route: dict, **kwargs)` — One provider transport; Claude's native client contributes no agent context or tools.
+- `_rate_limited(exc: BaseException)` — 
+- `start_completion(route: dict, kwargs: dict, stream: bool)` — (response, iterator, first chunk): the call, up to its first token when streaming. A subscription's rate-limit
 - `codex_access_token()` — W.Alter's Codex access token, from its grant (renewed through the Codex CLI by walter-secrets).
 - `_codex_account_id()` — 
 - `_install_codex_auth()` — LiteLLM's chatgpt provider reads W.Alter's Codex CLI session (read-only) instead of its own device login.
@@ -903,7 +913,7 @@ What the router (and the orchestrator) calls: pick the model for a task, the own
 Ordered provider routes and execution metadata for Walter consumers.
 
 - `_runnable(offer: dict)` — (Hermes provider, model id at that provider, status key) or None when Hermes cannot run this offer.
-- `reliability(conn, provider: str, model: str)` — Recent real executions of this provider x model (models.exec_log, skipped attempts excluded).
+- `reliability(conn, provider: str, model: str)` — Recent real executions of this provider x model (models.exec_log, skipped attempts excluded: walter-llm logs a
 - `subscription_costs(conn)` — route provider (codex) -> latest cost price of its subscription + plan name (models.latest_subscription_costs).
 - `host_order(conn, model_id: str, usage: str='interactive')` — Usable hosts behind OpenRouter for this model, cheapest first (models.usable_endpoints); flex tier only for
 - `routes(conn, model_id: str, variant: str='', preferred: str | None=None, usage: str='interactive', modes: list[str] | None=None)` — Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not
