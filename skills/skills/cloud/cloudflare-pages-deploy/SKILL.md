@@ -137,3 +137,31 @@ A "landing page rebuild" may need to integrate with the Worker's API endpoints (
 - **`.html` links get 308-redirected and strip query parameters** — Cloudflare Pages serves `/foo.html` and `/foo` as the same content, but requests to `/foo.html` receive HTTP 308 → `/foo`. The 308 redirect DROPS query parameters and fragment hashes on some clients, which breaks any flow that relies on URL params (OAuth state, modal-open flags like `?signin=1`, tracking UTMs, anchor links to specific tabs). **Always link to the extensionless path** (`href="/login"`, not `href="/login.html"`). For OAuth flows, link directly to the backend endpoint (`https://api.example.com/api/auth/google`) rather than to a frontend page that bounces. Verify with: `curl -sI https://site/page.html | grep -i location` — if it shows a 308, the link is wrong.
 - **Do not create backup files inside the directory being deployed** — `wrangler pages deploy pages/admin` uploads/serves everything under that folder, and unknown paths can also fall back to the current `index.html`. Keep backups in `/tmp`, outside the Pages source dir, or name them in a non-deployed workspace. After a cleanup deploy, verify the intended custom domain and hash URL contain the new strings.
 - **`wrangler pages deploy` may serve stale HTML after repeated deploys** — Cloudflare Pages caches aggressively. If the HTML appears broken (line numbers showing, corrupted content) after a deploy that should have worked, it's likely the `write_file` tool corrupting HTML files by injecting line-number prefixes (e.g. `     1|     1|     1|<!DOCTYPE html>`). **Fix:** Write HTML using a Python `write_file` call or the `terminal` heredoc, NOT `execute_code` with inline Python string concatenation. After fixing, `rm -rf .wrangler` before re-deploying.
+
+## Raccorder un domaine Cloudflare à Sites et diagnostiquer une délégation en cache
+
+1. Vérifier la délégation avant de conclure quel fournisseur gère les DNS. Pour myscroll.shop :
+```sh
+dig +short NS myscroll.shop @1.1.1.1
+dig +short NS myscroll.shop @8.8.8.8
+dig +trace NS myscroll.shop
+```
+Si les résolveurs divergent, examiner la délégation retournée par le registre dans la trace et interroger les serveurs faisant autorité. Une réponse récursive Hostinger peut rester en cache après l’activation de Cloudflare ; ne pas en déduire qu’il faut modifier la zone Hostinger.
+
+2. Charger les accès Cloudflare via les outils W.Alter de recherche et de référence de secrets, puis les injecter avec `walter-secret exec` sans afficher leur valeur. Interroger `GET https://api.cloudflare.com/client/v4/zones?name=myscroll.shop`, vérifier `status` et `name_servers`, puis lire `GET /client/v4/zones/{zone_id}/dns_records`. Sauvegarder les enregistrements dans un fichier local avant toute modification. Un refus 403 de l’API de l’ancien fournisseur ne prouve pas que le raccordement est bloqué chez le fournisseur faisant actuellement autorité.
+
+3. Pour un site hébergé par Sites, lire le `project_id` exact dans `.openai/hosting.json`. Appeler `sites_add_custom_domain` avec ce projet et le hostname, ou reprendre l’association existante. Conserver le `custom_domain_id` retourné. Utiliser les cibles et les enregistrements de validation de cette réponse pour configurer Cloudflare ; ne pas appliquer par défaut une recette Cloudflare Pages. Pour l’apex, utiliser les `apex_proxy_ipv4_targets` fournis. Préserver les enregistrements sans rapport avec ce raccordement. Ne jamais recopier des jetons de validation depuis une ancienne exécution.
+
+4. Vérifier les nouvelles réponses directement auprès d’un serveur faisant autorité. Dans cette session, `chin.ns.cloudflare.com` était l’un de ceux de myscroll.shop :
+```sh
+dig +short A myscroll.shop @chin.ns.cloudflare.com
+```
+Redécouvrir les serveurs actuels lors d’une prochaine intervention. Appeler ensuite `sites_refresh_custom_domain_status` avec le `project_id` et le `custom_domain_id`. Distinguer le statut du domaine du statut SSL : une association créée peut encore afficher `pending_validation`.
+
+5. Tester HTTPS avec une adresse retournée par Sites afin de contourner un cache DNS local obsolète :
+```sh
+curl -sS -I --resolve "${DOMAIN}:443:${APEX_IP}" --max-time 15 "https://${DOMAIN}"
+```
+Définir `DOMAIN` et `APEX_IP` à partir du domaine demandé et de la réponse actuelle de Sites. Conserver la validation TLS ; ne pas utiliser `-k`. Rafraîchir le statut après la validation du certificat, puis tester aussi l’URL sans `--resolve`.
+
+6. Rapporter séparément la délégation, les réponses DNS faisant autorité, l’activation du certificat et l’accès applicatif. Un certificat valide suivi d’une réponse d’authentification est compatible avec un site Sites privé : le raccordement peut être opérationnel alors que l’accès anonyme reste fermé. Ne pas annoncer une ouverture publique sur cette seule base.
