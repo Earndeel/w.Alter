@@ -1,0 +1,11 @@
+{
+ "base_sha": "2495dd0610536060b8f96a56b143fb44fcff5528c5a2becc50378706d16d0230",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-30T04:12:36.227271+00:00",
+ "domain": "model-routing",
+ "kind": "patch",
+ "reason": "The session exposed a reusable audit procedure and concrete pitfalls: mapping-row indexing failed, a guessed endpoint column failed, raw snapshot presence was confused with usable access, and an ingestion filter hid free offers from the existing L1 research agent. Live OpenRouter checks corrected stale availability conclusions. This extends the existing intelligence-loop skill with evidence tracing and offer-lifecycle checks rather than duplicating its research workflow. [session claude_code/vm/e82e2c0f-160d-42a0-bcb4-a5505a798c0e]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/e82e2c0f-160d-42a0-bcb4-a5505a798c0e",
+ "target": "model-router-intelligence-loop"
+}
