@@ -52,4 +52,24 @@ try:
         out.append(inc("memory", "autopilot:" + str(e)[:60], "autopilot_error", "high", f"Autopilot mémoire : {e}.", {"score": s.get("score")}, "G1"))
 except (OSError, ValueError, KeyError):
     out.append(inc("memory", "autopilot:missing", "supervisor_stale", "warning", "Rapport de l autopilot mémoire introuvable."))
-print(json.dumps(out, ensure_ascii=False))
+
+
+def merged(items):
+    """One incident per key (Incident v1 rejects duplicates): a connector both stale and failing yields two problems
+    with the same `health:<connector>` key, which made the whole response invalid (2026-10-30)."""
+    by_key = {}
+    for i in items:
+        k = i["key"]
+        if k not in by_key:
+            by_key[k] = i
+            continue
+        m = by_key[k]
+        sev = ("info", "warning", "high", "critical")
+        if sev.index(i["severity"]) > sev.index(m["severity"]):
+            m["severity"] = i["severity"]
+        m["summary"] = f"{m['summary']} {i['summary']}"[:400]
+        m["evidence"].setdefault("also", []).append(i["evidence"])
+    return list(by_key.values())
+
+
+print(json.dumps(merged(out), ensure_ascii=False))
