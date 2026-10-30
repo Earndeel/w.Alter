@@ -1,0 +1,377 @@
+#!/usr/bin/python3
+"""walter-guardian — the shared engine of a module's guardian (2026-10-30; GUARDIANS.md § Guardian agent).
+
+Owner, 2026-10-30: « Les guardians sont censés être des agents intelligents qui doivent comprendre les situations et les
+régler d'eux-mêmes ». The supervisor (walter-guardians) no longer tells the owner what a watchdog saw: it hands each
+new high/critical incident to the module's guardian first. This engine is that guardian for every module that
+declares `"guardian": ["walter-guardian", "run", "--module", "<id>"]` in its maintenance.json, driven by the module's
+own `guardian/playbook.json` (what is normal, what to look at, which actions it may take). It holds no knowledge of
+any module.
+
+One run, per incident:
+  1. Evidence   read-only commands declared by the playbook for the incident's kind (no model).
+  2. Decide     a model through walter-llm (Walter Router poste, never a hardcoded model) reads notes, incidents,
+                evidence and history and answers JSON: act / expected / external / needs_owner, and a French message.
+                Without a model: the playbook's deterministic fallback action, else `unknown`.
+  3. Act        only declared actions, level <= the module's max_level, parameters from the declared allow-list,
+                at most MAX_ROUNDS action rounds per incident per ROUND_WINDOW (gates in code, not in the prompt).
+  4. Verify     the module's check again after `settle_seconds`: gone = fixed. Still there and rounds exhausted =
+                needs_owner, with what was tried.
+
+  walter-guardian run --module M [--dry-run]   stdin {"incidents": [Incident v1...]} -> stdout {"verdicts": {key: …}}
+  walter-guardian playbook --module M          the validated playbook
+
+Outcomes: fixed · pending (an asynchronous action is running) · expected · external · needs_owner · failed · unknown.
+Standard library, system python3. Secrets: evidence is masked before it reaches a model; the walter-llm token is read
+from the instance state (0600), never printed.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.request import Request, urlopen
+
+LEVELS = ("G0", "G1", "G2", "G3")
+MAX_ROUNDS = 2                 # action rounds per incident per window, then the owner is told
+ROUND_WINDOW = 12 * 3600
+MAX_ACTIONS_PER_RUN = 3
+EVIDENCE_CHARS = 2500
+POSTE = os.environ.get("WALTER_GUARDIAN_POSTE", "general/L2")
+LLM_URL = os.environ.get("WALTER_LLM_URL", "http://127.0.0.1:8894/v1/chat/completions")
+OUTCOMES = ("act", "expected", "external", "needs_owner")
+SAFE_PARAM = re.compile(r"^[A-Za-z0-9@._:+-]{1,80}$")
+SECRET_PATTERNS = [
+    (re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]{12,}"), r"\1***"),
+    (re.compile(r"(?i)((?:password|passwd|secret|token|api[_-]?key|session)[\"']?\s*[:=]\s*[\"']?)[^\s\"',;]{4,}"), r"\1***"),
+    (re.compile(r"\b(?:sk|wllm|ghp|gho|xox[abp]|AKIA)[A-Za-z0-9_-]{12,}"), "***"),
+    (re.compile(r"\b[A-Za-z0-9+/_-]{40,}={0,2}"), "***"),
+]
+
+
+def sh(*cmd: str, timeout: float = 60) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(cmd, 124, "", str(exc))
+
+
+def mask(text: str) -> str:
+    for pat, rep in SECRET_PATTERNS:
+        text = pat.sub(rep, text)
+    return text
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def state_dir() -> Path:
+    root = os.environ.get("WALTER_INSTANCE")
+    if not root:
+        try:
+            root = Path("/etc/walter/instance").read_text().strip()
+        except OSError:
+            root = "/var/lib/walter"
+    d = Path(root) / "state" / "guardians"
+    (d / "agent").mkdir(parents=True, exist_ok=True, mode=0o700)
+    return d
+
+
+# ---- the module: root, declaration, playbook ------------------------------------------------------------------
+
+def module_root(module: str) -> Path:
+    r = sh("walter", "modules", timeout=60)
+    for m in (json.loads(r.stdout or "{}").get("modules") or []):
+        if m.get("id") == module:
+            return Path(m["root"])
+    raise ValueError(f"unknown module {module}")
+
+
+def load(module: str, root: Path | None = None) -> tuple[dict, dict]:
+    """(maintenance declaration, validated playbook). Raises ValueError on anything malformed."""
+    root = root or module_root(module)
+    decl = json.loads((root / "contracts" / "maintenance.json").read_text())
+    pb = json.loads((root / "guardian" / "playbook.json").read_text())
+    if pb.get("version") != 1 or pb.get("module") != decl.get("module"):
+        raise ValueError("playbook: version 1 and the declaration's module required")
+    if not isinstance(pb.get("notes", []), list) or not isinstance(pb.get("evidence", {}), dict):
+        raise ValueError("playbook: notes list / evidence map")
+    for kind, cmds in pb.get("evidence", {}).items():
+        if not isinstance(cmds, list) or any(not isinstance(c, list) or not c or any(not isinstance(a, str) for a in c)
+                                             for c in cmds):
+            raise ValueError(f"playbook: evidence {kind} must be a list of commands")
+    for aid, a in (pb.get("actions") or {}).items():
+        if (a.get("level") not in LEVELS or not isinstance(a.get("command"), list) or not a["command"]
+                or any(not isinstance(x, str) for x in a["command"])
+                or not isinstance(a.get("params", {}), dict)
+                or any(not isinstance(v, list) or any(not SAFE_PARAM.match(str(x)) for x in v) for v in a.get("params", {}).values())):
+            raise ValueError(f"playbook: action {aid} malformed")
+        for name in re.findall(r"\{(\w+)\}", " ".join(a["command"])):
+            if name not in a.get("params", {}):
+                raise ValueError(f"playbook: action {aid} uses {{{name}}} without an allow-list")
+    for kind, fb in (pb.get("fallback") or {}).items():
+        if fb.get("action") not in (pb.get("actions") or {}):
+            raise ValueError(f"playbook: fallback {kind} names an unknown action")
+    return decl, pb
+
+
+def allowed_actions(decl: dict, pb: dict) -> dict:
+    cap = LEVELS.index(decl.get("max_level", "G0"))
+    return {k: a for k, a in (pb.get("actions") or {}).items() if LEVELS.index(a["level"]) <= cap}
+
+
+# ---- 1. evidence ------------------------------------------------------------------------------------------------
+
+def _fill(cmd: list[str], values: dict) -> list[str] | None:
+    out = []
+    for arg in cmd:
+        for name in re.findall(r"\{(\w+)\}", arg):
+            v = str(values.get(name, ""))
+            if not SAFE_PARAM.match(v):
+                return None
+            arg = arg.replace("{" + name + "}", v)
+        out.append(arg)
+    return out
+
+
+def evidence(pb: dict, incident: dict, decl: dict | None = None) -> list[dict]:
+    values = {k: v for k, v in (incident.get("evidence") or {}).items() if isinstance(v, (str, int))}
+    cmds = (pb.get("evidence") or {}).get(incident["kind"], []) + (pb.get("evidence") or {}).get("*", [])
+    if incident["kind"] == "guardian_unreachable" and decl:   # the watchdog itself: what does it answer now?
+        cmds = [decl["check"]] + cmds
+    out = []
+    for cmd in cmds[:6]:
+        filled = _fill(cmd, values)
+        if not filled:
+            continue
+        r = sh(*filled, timeout=60)
+        text = mask(((r.stdout or "") + ("\n" + r.stderr if r.stderr else "")).strip())
+        out.append({"command": " ".join(filled), "rc": r.returncode, "output": text[-EVIDENCE_CHARS:]})
+    return out
+
+
+# ---- 2. decide ----------------------------------------------------------------------------------------------------
+
+PROMPT = """You are the guardian of the W.Alter module « {module} » on the owner's VM (the owner is addressed as
+« Monsieur », he speaks French). Your job: keep the module working WITHOUT bothering him. He wants to hear about a
+problem only when you could not fix it or when only he can act (payment, password, physical action, a decision).
+
+Module notes (what is normal here, what incidents mean):
+{notes}
+
+Actions you may take (anything else is refused by code):
+{actions}
+
+Incidents to handle now, each with read-only evidence and what was already tried:
+{incidents}
+
+For each incident decide one outcome:
+- "act": a listed action can plausibly fix it -> give the actions (id + params from the allowed values).
+- "expected": a normal, known situation per the notes; nothing to do and nobody to tell.
+- "external": the cause is outside W.Alter (provider outage, network, the owner's machine asleep) and should
+  recover by itself; nothing to tell yet.
+- "needs_owner": only Monsieur can resolve it, or the actions already tried did not work.
+Never repeat an action that already failed for this incident unless the evidence shows a different cause.
+
+Answer with ONE JSON object and nothing else:
+{{"incidents": [{{"key": "<incident key>", "outcome": "act|expected|external|needs_owner",
+  "diagnosis_fr": "<one short French sentence: what is really going on>",
+  "actions": [{{"id": "<action id>", "params": {{"<name>": "<allowed value>"}}}}],
+  "message_fr": "<only for needs_owner: 2-3 short plain French sentences for Monsieur: what happened, what you
+  tried, what you need from him. No commands, no jargon.>"}}]}}"""
+
+
+def llm_token() -> str | None:
+    try:
+        for line in (state_dir() / "llm.env").read_text().splitlines():
+            if line.startswith("WALTER_LLM_TOKEN="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return None
+
+
+def ask_model(prompt: str, timeout: float = 240) -> tuple[dict | None, dict]:
+    """(parsed answer or None, call metadata). Never raises."""
+    token = llm_token()
+    meta = {"poste": POSTE}
+    if not token:
+        return None, {**meta, "error": "no_token"}
+    try:
+        req = Request(LLM_URL, data=json.dumps({"model": POSTE, "messages": [{"role": "user", "content": prompt}]}).encode(),
+                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"})
+        with urlopen(req, timeout=timeout) as resp:
+            meta["route"] = resp.headers.get("x-walter-route")
+            content = json.loads(resp.read())["choices"][0]["message"].get("content") or ""
+    except Exception as exc:  # noqa: BLE001 — the token never appears in the error kept
+        return None, {**meta, "error": type(exc).__name__}
+    decoder = json.JSONDecoder()
+    for m in reversed(list(re.finditer(r"\{", content))):
+        try:
+            obj, _ = decoder.raw_decode(content[m.start():])
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and isinstance(obj.get("incidents"), list):
+            return obj, meta
+    return None, {**meta, "error": "no_json"}
+
+
+def _describe(actions: dict) -> str:
+    return "\n".join(f"- {k} (level {a['level']}): {a.get('describe', '')}"
+                     + (f" params: {json.dumps(a.get('params'), ensure_ascii=False)}" if a.get("params") else "")
+                     + (" [asynchronous: its effect is checked on a later pass]" if a.get("async") else "")
+                     for k, a in actions.items()) or "- none: you can only diagnose"
+
+
+# ---- 3. act -----------------------------------------------------------------------------------------------------
+
+def run_action(actions: dict, req: dict) -> dict:
+    """Execute one declared action if the code gates allow it."""
+    a = actions.get(req.get("id"))
+    params = req.get("params") if isinstance(req.get("params"), dict) else {}
+    if not a:
+        return {"id": req.get("id"), "ok": False, "refused": "not_allowed"}
+    for name, allowed in (a.get("params") or {}).items():
+        if str(params.get(name)) not in [str(x) for x in allowed]:
+            return {"id": req["id"], "params": params, "ok": False, "refused": f"param_{name}"}
+    cmd = _fill(a["command"], params)
+    if not cmd:
+        return {"id": req["id"], "params": params, "ok": False, "refused": "params"}
+    r = sh(*cmd, timeout=float(a.get("timeout_seconds", 120)))
+    return {"id": req["id"], "params": {k: params[k] for k in (a.get("params") or {})}, "ok": r.returncode == 0,
+            "rc": r.returncode, "async": bool(a.get("async")), "at": now_iso()}
+
+
+def module_check(decl: dict) -> set[str] | None:
+    r = sh(*decl["check"], timeout=float(decl.get("timeout_seconds", 120)))
+    try:
+        return {f"{i['module']}:{i['key']}" for i in json.loads(r.stdout)} if r.returncode == 0 else None
+    except (ValueError, TypeError, KeyError):
+        return None
+
+
+# ---- the run --------------------------------------------------------------------------------------------------
+
+def _history(module: str) -> tuple[Path, dict]:
+    p = state_dir() / "agent" / f"{module}.json"
+    try:
+        h = json.loads(p.read_text())
+    except (OSError, ValueError):
+        h = {}
+    cutoff = time.time() - 7 * 86400
+    return p, {k: v for k, v in h.items() if v.get("updated", 0) >= cutoff}
+
+
+def _tried_text(rounds: list[dict]) -> str:
+    done = [f"{a['id']}({', '.join(f'{k}={v}' for k, v in (a.get('params') or {}).items())})"
+            for r in rounds for a in r.get("actions", []) if a.get("ok")]
+    return ", ".join(done)
+
+
+def run(module: str, incidents: list[dict], dry_run: bool = False, root: Path | None = None) -> dict:
+    decl, pb = load(module, root)
+    actions = allowed_actions(decl, pb)
+    hist_path, hist = _history(module)
+    t = time.time()
+    blocks, verdicts = [], {}
+    for i in incidents:
+        key = f"{i['module']}:{i['key']}"
+        h = hist.setdefault(key, {"rounds": []})
+        recent = [r for r in h["rounds"] if t - r.get("t", 0) < ROUND_WINDOW]
+        i["_ev"] = evidence(pb, i, decl)
+        blocks.append(json.dumps({"key": key, "severity": i["severity"], "kind": i["kind"], "summary": i["summary"],
+                                  "watchdog_evidence": i.get("evidence"), "evidence": i["_ev"],
+                                  "already_tried": recent[-4:], "rounds_left": MAX_ROUNDS - len(recent)},
+                                 ensure_ascii=False, default=str))
+    prompt = PROMPT.format(module=module, notes="\n".join(f"- {n}" for n in pb.get("notes", [])) or "- (none)",
+                           actions=_describe(actions), incidents="\n".join(blocks))
+    answer, meta = ask_model(mask(prompt))
+    decided = {d.get("key"): d for d in (answer or {}).get("incidents", []) if isinstance(d, dict)}
+    did_act = False
+    for i in incidents:
+        key = f"{i['module']}:{i['key']}"
+        h = hist[key]
+        recent = [r for r in h["rounds"] if t - r.get("t", 0) < ROUND_WINDOW]
+        d = decided.get(key)
+        if d and d.get("outcome") in OUTCOMES:
+            v = {"outcome": d["outcome"], "diagnosis_fr": str(d.get("diagnosis_fr") or "")[:300],
+                 "message_fr": str(d.get("message_fr") or "")[:600], "by": meta.get("route") or POSTE}
+            reqs = [a for a in (d.get("actions") or []) if isinstance(a, dict)][:MAX_ACTIONS_PER_RUN]
+        else:   # no model (or no usable answer): the playbook's deterministic fallback for this kind
+            fb = (pb.get("fallback") or {}).get(i["kind"])
+            params = {n: (i.get("evidence") or {}).get(src) for n, src in (fb or {}).get("params", {}).items()}
+            v = {"outcome": "act" if fb else "unknown", "diagnosis_fr": "", "message_fr": "",
+                 "by": "fallback", "model_error": meta.get("error")}
+            reqs = [{"id": fb["action"], "params": params}] if fb else []
+        if v["outcome"] == "act":
+            if not reqs:
+                v["outcome"] = "failed"
+            elif len(recent) >= MAX_ROUNDS:
+                tried = _tried_text(recent)
+                v["outcome"] = "needs_owner"
+                v["message_fr"] = v["message_fr"] or (f"{i['summary']} J'ai déjà tenté {tried or 'des réparations'}"
+                                                      f" sans succès ; il faut votre regard.")
+            elif dry_run:
+                v["planned"] = reqs
+            else:
+                done = [run_action(actions, r) for r in reqs]
+                v["actions"] = done
+                recent.append({"t": t, "at": now_iso(), "actions": done})
+                h["rounds"] = (h["rounds"] + [recent[-1]])[-10:]
+                did_act = did_act or any(a.get("ok") for a in done)
+                if not any(a.get("ok") for a in done):
+                    v["outcome"] = "failed"
+                with open(state_dir() / "actions.jsonl", "a") as f:
+                    f.write(json.dumps({"at": now_iso(), "key": key, "actions": done,
+                                        "diagnosis_fr": v["diagnosis_fr"]}, ensure_ascii=False) + "\n")
+        h.update(updated=t, last=v)
+        verdicts[key] = v
+    if did_act:   # 4. verify
+        time.sleep(float(pb.get("settle_seconds", 20)))
+        still = module_check(decl)
+        for key, v in verdicts.items():
+            if not v.get("actions"):
+                continue
+            ok = [a for a in v["actions"] if a.get("ok")]
+            if still is not None and key not in still:
+                v["outcome"] = "fixed"
+            elif ok and all(a.get("async") for a in ok):
+                v["outcome"] = "pending"
+            else:
+                v["outcome"] = "failed"
+            hist[key]["last"] = v
+    if not dry_run:
+        tmp = hist_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(hist, ensure_ascii=False, indent=1, default=str))
+        tmp.replace(hist_path)
+    return {"module": module, "at": now_iso(), "model": meta, "verdicts": verdicts}
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("action", choices=["run", "playbook"])
+    p.add_argument("--module", required=True)
+    p.add_argument("--dry-run", action="store_true")
+    a = p.parse_args()
+    try:
+        if a.action == "playbook":
+            out = load(a.module)[1]
+        else:
+            data = json.load(sys.stdin)
+            out = run(a.module, [i for i in data.get("incidents", []) if isinstance(i, dict)], a.dry_run)
+    except (OSError, ValueError, KeyError) as exc:
+        print(json.dumps({"error": f"{type(exc).__name__}: {str(exc)[:200]}"}))
+        return 1
+    print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from test_guardians import G
+from test_guardians import G, _decl
 
 
 def decl(tmp_path, payload, rc=0):
@@ -120,3 +120,30 @@ def test_malformed_existing_declaration_is_an_incident(tmp_path, monkeypatch):
     monkeypatch.setattr(G, "sh", lambda *a, **kw: subprocess.CompletedProcess(a, 0, json.dumps({"modules": [{"id": "a", "root": str(root)}]}), ""))
     report = G.check(notify=False)
     assert report["opened"] == ["a:guardian:unreachable"]
+
+
+def test_flapping_incident_is_not_re_notified_but_escalation_is(tmp_path, monkeypatch):
+    """2026-10-30: walter-exit-mac / memory watchdog closed and reopened every ~30 min all night, one Telegram each."""
+    monkeypatch.setenv("WALTER_INSTANCE", str(tmp_path / "inst"))
+    sent = []
+    monkeypatch.setattr(G, "_telegram", lambda text: sent.append(text) or True)
+    inc = lambda sev: json.dumps([{"version": 1, "module": "a", "key": "k", "kind": "x", "severity": sev, "summary": "panne"}])
+    down, up, worse = _decl(tmp_path, "a", inc("high")), _decl(tmp_path, "up", "[]"), _decl(tmp_path, "w", inc("critical"))
+    up["module"] = worse["module"] = "a"
+    for decl in (down, up, down, up, down):
+        monkeypatch.setattr(G, "declarations", lambda d=decl: [d])
+        G.check(notify=True)
+    assert len(sent) == 1                                                            # reopened twice, told once
+    monkeypatch.setattr(G, "declarations", lambda: [up]); G.check(notify=True)
+    monkeypatch.setattr(G, "declarations", lambda: [worse]); G.check(notify=True)
+    assert len(sent) == 2                                                            # worse than before: told again
+    state = json.loads((tmp_path / "inst/state/guardians/state.json").read_text())
+    for v in state["recent_closed"].values():
+        v["closed_at"] -= G.FLAP_SECONDS + 1                                          # window elapsed
+    (tmp_path / "inst/state/guardians/state.json").write_text(json.dumps(state))
+    monkeypatch.setattr(G, "declarations", lambda: [up]); G.check(notify=True)
+    st = json.loads((tmp_path / "inst/state/guardians/state.json").read_text())
+    st["recent_closed"]["a:k"]["closed_at"] -= G.FLAP_SECONDS + 1
+    (tmp_path / "inst/state/guardians/state.json").write_text(json.dumps(st))
+    monkeypatch.setattr(G, "declarations", lambda: [down]); G.check(notify=True)
+    assert len(sent) == 3                                                            # a new outage after the window

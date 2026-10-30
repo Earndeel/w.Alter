@@ -52,3 +52,36 @@ function and never access the grant or send a real message.
 
 Coverage is limited to modules with a maintenance declaration. A missing declaration does not claim a healthy module
 and does not invent a watchdog; use `walter-guardians list` to inspect the actual coverage.
+
+## Flap damping (2026-10-30)
+
+An incident that reopens less than `FLAP_SECONDS` (6 h) after a notified closing, at the same or a lower severity, is
+recorded (opened/closed in `incidents.jsonl`, `suppressed: "flap"` in state) but not re-sent; a higher severity is
+always sent. Watchdogs should still not flap: an expectedly absent dependency (the owner's Mac asleep for
+`walter-exit-mac`) is `info`, and a watchdog emits one incident per key.
+
+## Module guardians: repair first, tell only when needed (2026-10-30)
+
+Owner, 2026-10-30: « Les guardians sont censés être des agents intelligents qui doivent comprendre les situations et
+les régler d'eux-mêmes ; pour le Mac qui se déconnecte, pas besoin de me notifier à chaque fois. »
+
+- **Declaration.** `maintenance.json` gains `"guardian"`: a command (`["walter-guardian", "run", "--module", "<id>"]`)
+  that reads `{"incidents": [...]}` on stdin and answers `{"verdicts": {"<module>:<key>": {outcome, diagnosis_fr,
+  message_fr, actions}}}`, or `"self"` for a module whose guardian tells the owner itself (router).
+- **Supervisor.** A new high/critical incident is handed to its module's guardian before anyone is told (one run per
+  module per pass; again after `GUARDIAN_RETRY`, or `GUARDIAN_RECHECK[outcome]`). Telegram only for: `critical`
+  (at once, with the guardian's words when it has them), `needs_owner`, `external` lasting 12 h, `failed` lasting 2 h,
+  no verdict after a 30 min grace (never silence). `fixed`, `pending`, `expected` are never told. A module without a
+  `guardian` keeps the old rule (the watchdog's word is final); `"self"` modules are told about only when their
+  watchdog itself is unreachable. `--no-act` observes without handing anything over.
+- **Engine** `walter-guardian` (walter-core, stdlib): evidence = read-only commands from the module's
+  `guardian/playbook.json` (masked before any model) → decision by a Walter Router poste through walter-llm
+  (`general/L2`, token `@instance/state/guardians/llm.env`) → only declared actions, level ≤ the module's
+  `max_level`, parameters from the playbook's allow-list, ≤ 3 per run, 2 rounds per incident per 12 h → module check
+  again after `settle_seconds` (`fixed`), or `pending` for asynchronous actions → rounds exhausted = `needs_owner`
+  with what was tried. Without a model: the playbook's `fallback` action for that kind, else `unknown`.
+  History `@instance/state/guardians/agent/<module>.json`, actions `actions.jsonl`.
+- **Playbook** (`<module>/guardian/playbook.json`, version 1): `notes` (what is normal, what incidents mean, what only
+  the owner can do), `evidence` by incident kind (`*` = always), `actions` (`level`, `command` with `{param}`,
+  `params` allow-lists, `async`, `timeout_seconds`), `fallback` by kind, `settle_seconds`. Written for browse,
+  memory, secrets, skills, context, ops. Adding knowledge to a guardian = editing its playbook, not the engine.
