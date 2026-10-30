@@ -2,11 +2,16 @@
 Description=Walter browse — default network exit through the owner's Mac (SOCKS 127.0.0.1:1082 over ssh mac / Tailscale)
 After=network-online.target tailscaled.service
 Wants=network-online.target
+# The Mac sleeps or leaves the network: that is normal. Never give up (no start limit), but back off from 15 s to
+# 5 min between attempts instead of ~280 restarts an hour (2026-10-30); the browse guardian reports it as info only.
+StartLimitIntervalSec=0
 
 [Service]
 ExecStart=/usr/bin/ssh -N -D 127.0.0.1:1082 -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 mac
 Restart=always
 RestartSec=15
+RestartSteps=6
+RestartMaxDelaySec=300
 
 [Install]
 WantedBy=multi-user.target

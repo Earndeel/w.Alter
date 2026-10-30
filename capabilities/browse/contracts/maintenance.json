@@ -12,5 +12,11 @@
   },
   "note": "Une violation de la règle de sortie est G3 : seul le propriétaire décide.",
   "format": "incident-v1",
-  "timeout_seconds": 240
+  "timeout_seconds": 240,
+  "guardian": [
+    "walter-guardian",
+    "run",
+    "--module",
+    "browse"
+  ]
 }
