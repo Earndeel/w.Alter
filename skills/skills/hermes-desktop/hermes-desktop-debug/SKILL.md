@@ -1,6 +1,6 @@
 ---
 name: hermes-desktop-debug
-description: Diagnose and fix Hermes V2 Electron desktop app failures on macOS — white screen, boot loop, ECONNREFUSED, auth failures, Tailscale connectivity.
+description: "Use when diagnosing or fixing Hermes V2 macOS Electron desktop failures such as white screens, boot loops, connectivity or auth errors, or investigating connection-file precedence, TLS rejection, supervised proxies, dashboard reloads, and recurring WebSocket disconnects."
 ---
 
 # Hermes Desktop Debug
@@ -131,3 +131,13 @@ See `references/runtime-reload-boundaries.md` for a compact diagnosis and verifi
 - **Host header rejection (v0.18.2+)**: The dashboard now validates `Host` headers against the bound interface (GHSA-ppp5-vxwm-4cf7). Tailscale IP or MagicDNS connections are rejected with 400. Fix: add the server's Tailscale addresses to `_TAILSCALE_ACCEPTED_HOSTS` in `web_server.py`, or switch to an SSH tunnel (Host becomes `127.0.0.1`). See `desktop-app-tailscale` references for the code patch.
 - **Build artifact missing after update**: If `hermes desktop --force-build` was interrupted or failed, `dist/` may be missing. The app loads a blank page silently — no error dialog.
 - **`/usr/bin/ssh: cannot execute binary file` on Mac**: Indicates corrupted SSH binary or architecture mismatch. Not a Hermes issue but blocks tunnel-based connectivity.
+
+## Also covers (hermes-desktop-debugging)
+
+Read `references/merged-hermes-desktop-debugging/hermes-desktop-debugging.md` for connection resolution, TLS failures, current v0.20.x proxy/Host behavior, dashboard cgroup restart traps, or Desktop cycling despite successful REST probes.
+
+It documents `connection.json` taking precedence over environment variables, then local bootstrap. Electron rejects self-signed/internal-PKI certificates; use the documented plain-HTTP forwarding path. For the current deployment, keep Dashboard on loopback and use the supervised Mac proxy: `127.0.0.1:9119` → Tailscale server `8788` → Dashboard `127.0.0.1:8787`, rewriting upstream Host to the loopback authority. `HERMES_DASHBOARD_ACCEPTED_HOSTS` is unused; do not set `dashboard.public_url` to a Tailscale IP as a Host workaround. Verify protected routes reject unauthenticated requests and arbitrary Hosts remain rejected.
+
+Its detached dashboard reload helper addresses session shells inside the service cgroup; retain the kept skill's approval and process-ownership guardrails. For recurring disconnects, soak an authenticated WebSocket beyond the relay timeout; Python relays must clear the upstream timeout after connecting.
+
+Read `references/merged-hermes-desktop-debugging/references/commands.md` for diagnostic steps and `references/merged-hermes-desktop-debugging/references/server-config.md` for service, auth, Host, and port details.
