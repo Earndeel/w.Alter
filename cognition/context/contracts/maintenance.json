@@ -12,5 +12,11 @@
   },
   "note": "Mode fantôme : un incident n'affecte aucune réponse.",
   "format": "incident-v1",
-  "timeout_seconds": 240
+  "timeout_seconds": 240,
+  "guardian": [
+    "walter-guardian",
+    "run",
+    "--module",
+    "context"
+  ]
 }
