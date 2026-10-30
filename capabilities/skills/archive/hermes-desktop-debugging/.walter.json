@@ -1,4 +1,8 @@
 {
+ "absorbed_into": "hermes-desktop-debug",
+ "archived_at": "2026-10-30T04:14:43+00:00",
+ "archived_reason": "merged into hermes-desktop-debug",
+ "domain": "hermes-desktop",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/hermes-desktop-debugging",
   "sha": "beff5c1d6a9ca327a442ad318227bcff476e689120686b2df147c2851ebf6739",
