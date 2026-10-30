@@ -7144,6 +7144,46 @@
           },
           {
             "description": "",
+            "name": "_ledger",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "_ledger_add",
+            "signature": "entry: dict"
+          },
+          {
+            "description": "Paid spend of test runs over the window against the cap (+ the owner's approvals in the same window), USD.",
+            "name": "test_budget",
+            "signature": ""
+          },
+          {
+            "description": "Cost of one call from its usage (or, before the call, from the request size) at the route's price.",
+            "name": "_price_usd",
+            "signature": "route: dict, usage: dict | None, body: dict"
+          },
+          {
+            "description": "None when this paid call of a test fits the budget, else the refusal (and one Telegram notice per window).",
+            "name": "test_gate",
+            "signature": "route: dict, body: dict"
+          },
+          {
+            "description": "Record the paid spend of a test call (provider cost, else estimated from its usage or size).",
+            "name": "_charge",
+            "signature": "route: dict, entry: dict, telemetry: dict, body: dict"
+          },
+          {
+            "description": "One message to the owner through Hermes' gateway (best effort).",
+            "name": "_telegram",
+            "signature": "text: str"
+          },
+          {
+            "description": "The owner's approval of EUR more paid spend for tests, valid for the window.",
+            "name": "approve_tests",
+            "signature": "eur: float, note: str=''"
+          },
+          {
+            "description": "",
             "name": "_router",
             "signature": "*args: str"
           },
@@ -7176,6 +7216,16 @@
             "description": "One provider transport; Claude's native client contributes no agent context or tools.",
             "name": "provider_completion",
             "signature": "route: dict, **kwargs"
+          },
+          {
+            "description": "",
+            "name": "_rate_limited",
+            "signature": "exc: BaseException"
+          },
+          {
+            "description": "(response, iterator, first chunk): the call, up to its first token when streaming. A subscription's rate-limit",
+            "name": "start_completion",
+            "signature": "route: dict, kwargs: dict, stream: bool"
           },
           {
             "description": "W.Alter's Codex access token, from its grant (renewed through the Codex CLI by walter-secrets).",
@@ -8331,7 +8381,7 @@
             "signature": "offer: dict"
           },
           {
-            "description": "Recent real executions of this provider x model (models.exec_log, skipped attempts excluded).",
+            "description": "Recent real executions of this provider x model (models.exec_log, skipped attempts excluded: walter-llm logs a",
             "name": "reliability",
             "signature": "conn, provider: str, model: str"
           },
@@ -14977,6 +15027,25 @@
         ]
       },
       {
+        "comment": "providers billed per call (subscriptions are not)",
+        "file": "llm/gateway.py",
+        "name": "PAID",
+        "value": [
+          "arnict",
+          "kie",
+          "openrouter"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/gateway.py",
+        "name": "RATE_LIMIT_WAITS",
+        "value": [
+          4,
+          12
+        ]
+      },
+      {
         "comment": "",
         "file": "plan/mail.py",
         "name": "API",
@@ -16264,6 +16333,13 @@
         "operation": "setdefault"
       },
       {
+        "default_expression": "aucun",
+        "description": "test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation de Monsieur.",
+        "file": "llm/gateway.py",
+        "name": "WALTER_RUN_CHANNEL",
+        "operation": "get"
+      },
+      {
         "default_expression": "'8894'",
         "description": "Port HTTP loopback de la passerelle (défaut logiciel 8894).",
         "file": "llm/gateway.py",
@@ -16428,6 +16504,7 @@
       "WALTER_LLM_PORT",
       "WALTER_ROUTER_CLI",
       "WALTER_ROUTER_DATABASE_URL",
+      "WALTER_RUN_CHANNEL",
       "WALTER_RUN_CONTEXT",
       "WALTER_RUN_ID",
       "WALTER_RUN_TOOLS",
@@ -16516,7 +16593,7 @@
     "contracts/data-classes.json": "217f14d84e0a54ca65532010abdbc80281a1671ea3af2652d9a8689eed620b81",
     "contracts/maintenance.json": "e053f12f7d4b27ad89789cc2cf90cdfeaf85e673c1a088a5e4a1bb6df0d9a209",
     "contracts/router.json": "ea6c3de46c6b48ddc120dcef459dd834802baf7a0190931b1e7851fa2386fdcb",
-    "documentation.py": "201a77980a92a68cf6438408ad29e4946ccb473afa447bd47afdcb4ff043e9ef",
+    "documentation.py": "19726a1a74efcf5f69cc02fcebc9c3da0f3e540918071db95014dd6fb7a2b7e4",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
@@ -16535,9 +16612,9 @@
     "interface/site/functions/api/status.js": "37fbd922a3eae2e33236fe4cda7d4546dafd6b69f7d76b50aea92d2deafd92cb",
     "interface/translate.py": "0f2af8b1272f4a61f561e7f5bb6ae2ab258ceb7916cbdfee5d5ffad09cf5205f",
     "llm/claude_subscription.py": "96b53a70d801791fdb8a1cead6695a60469e1295dd86c019a76f141d4397cc89",
-    "llm/config/gateway.json": "8220ddfa6a365a83e43a772fbcf0e07aa142209f7f985a9d19f34d127f41c19b",
+    "llm/config/gateway.json": "09023b4c0849eeec2517b60c06e371b5a6ce6136cdbdf625760d210187f5f119",
     "llm/contracts/llm.json": "17a51a635cfd54e506593c5be38b0aaa2a847f9646ee56f77e075df79dcd589d",
-    "llm/gateway.py": "7c16db3bc3b3816b6ec818f15a8908e581b0c8a0b805b2880951f9f46782d746",
+    "llm/gateway.py": "971689222b59d1d080d0f18d94f40efc208f46931f4235db9897f2b639e93bc0",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",
@@ -16586,7 +16663,7 @@
     "serve/api.py": "9b04510dd95c3ffa62de95158326f921ca07ac2785cc4a04a8870324938ed1af",
     "serve/brief.py": "33ca79121e190834adabe6fbc573b408ef84d4cf29a93736cf4f8de48275c3ab",
     "serve/choose.py": "e8894e22b18bc0d87f30878bd1a6a75f216090cd64bd5a9f91ab27bb76dfa6ea",
-    "serve/execution.py": "712071ac7bb3911a7eb11e3793b87caf9b791aadd54fbeafb1f6523060404063",
+    "serve/execution.py": "cdad716e8777211f3f387fff573e4cb1b6e8d6268bb33bbb4640ab5d33b23a40",
     "serve/hermes_sync.py": "1dc99d9f119e45cc958e5954fac64ba29802505d04ccd2ef096c3aba3db633cc",
     "serve/intent.py": "8f8c1adcbc776fce3e38d1aa751bcea89b1a71b00c1918c0b6ab9dd71b2c75cf",
     "serve/media_exec.py": "442b830d7a13cb3c0502b4b6767af964dd0adcf38fefc3d851bb28a455e7b016",
