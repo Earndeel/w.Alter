@@ -250,3 +250,48 @@ Quand la collecte et le calcul sont déjà terminés et que seules les correctio
    ```
 5. Relire `alias-list` pour confirmer la paire enregistrée. Cette vérification confirme l’écriture, pas l’identité des modèles.
 6. Respecter strictement le périmètre de mutation : ne pas modifier directement la base, la configuration ou les fichiers du projet, ni lancer une collecte ou un recalcul. Sans autorisation distincte de produire un fichier de rapport, rendre l’analyse dans la réponse. Distinguer les constats du cycle, les alias effectivement corrigés et les candidats encore incertains.
+
+## Audit model identity and offer lifecycle across the 48 h cycle
+
+When a model is absent, renamed, newly paid, or no longer offered, trace it through collection, parsing, canonical identity, executable access, and the research agent's input before changing aliases.
+
+1. Inspect the live provider catalogue alongside stored snapshots. For OpenRouter, query both catalogue variants; do not infer absence from the default response alone:
+
+```sh
+curl -fsS --max-time 30 https://openrouter.ai/api/v1/models -o /tmp/walter-openrouter-default.json
+curl -fsS --max-time 30 'https://openrouter.ai/api/v1/models?output_modalities=all' -o /tmp/walter-openrouter-all.json
+/walter/router/venv/bin/python -I - <<'PY'
+import json
+for path in ['/tmp/walter-openrouter-default.json', '/tmp/walter-openrouter-all.json']:
+    with open(path) as f:
+        models = json.load(f)['data']
+    print(path, 'count', len(models))
+    for m in models:
+        if 'elephant' in m['id'].lower() or m['id'].startswith('liquid/d1'):
+            print(m['id'], m.get('name'), m.get('pricing'), m.get('architecture'), m.get('description'))
+PY
+```
+
+Adapt the model filter to the incident. Record retrieval time and exact IDs. Treat prices and availability as time-dependent evidence.
+
+2. Inspect database schema before querying guessed columns. Use the router's connection helper rather than reconstructing credentials:
+
+```sh
+/walter/router/venv/bin/python -I - <<'PY'
+import sys
+sys.path.insert(0, '/walter/router')
+from store.db import connect
+with connect() as c:
+    rows = c.execute("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'models' ORDER BY table_name, ordinal_position").fetchall()
+    for row in rows:
+        print(dict(row))
+PY
+```
+
+The connection returns mapping rows; numeric indexing caused `KeyError: 0`. `models.endpoints` did not have the guessed `provider` column. Follow the discovered schema to compare `snapshots`, `offers`, `canonical`, scores, and endpoints. Presence in raw snapshots does not establish an ingested or routable offer.
+
+3. Read `/walter/router/analysis/parse.py`, `/walter/router/analysis/ingest.py`, `/walter/router/analysis/identity.py`, and `/walter/router/analysis/aliases_admin.py`. Inspect filtering before blaming identity matching. In this session, the parser discarded IDs containing `:free`; the research agent therefore could not investigate those offers through its normal input. Normalization also produced `elephant-1` and `d1-1`, which does not by itself establish correspondence to benchmark names.
+
+4. Inspect `/opt/walter-router/bin/walter-router-cycle`, `/walter/router/research/agent/prompt.md`, and `/walter/router/research/agent/review.py`. Verify the actual model and actions from the latest run under `/root/.hermes/logs/walter-router/`; do not assume the configured L1 executed successfully. The observed cycle collected and analyzed data, ran a research agent capable of evidence-backed aliases, then analyzed again. Agent availability does not prove that missing offers reached its input.
+
+5. Separate identity from offer lifecycle. Establish model equivalence with provider descriptions and supporting web evidence; check `walter-router alias-add --help` before applying a justified alias. Independently compare successive complete snapshots for removed IDs, replacement IDs, prices, modalities, and access. An alias alone does not retire an obsolete free endpoint or activate its paid replacement. Verify each resulting database and routing state before claiming resolution. Do not promise that the next refresh will fix a case without checking collection, parsing, and identity prerequisites.
