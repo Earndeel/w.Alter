@@ -1,0 +1,12 @@
+{
+ "version": 1,
+ "module": "context",
+ "notes": ["walter-context-preflight (:8897) prepares context before a model call; when it is down nothing is injected (ghost mode), it restarts safely."],
+ "evidence": {"service_down": [["systemctl","status","--no-pager","-n","0","{unit}"], ["journalctl","-u","{unit}","-n","40","--no-pager","-o","short-iso"]], "service_unhealthy": [["journalctl", "-u", "walter-context-preflight", "-n", "40", "--no-pager", "-o", "short-iso"]]},
+ "actions": {
+  "restart_unit": {"level": "G1", "describe": "restart the context preflight",
+                   "command": ["systemctl", "restart", "{unit}"], "params": {"unit": ["walter-context-preflight"]}}
+ },
+ "fallback": {"service_down": {"action": "restart_unit", "params": {"unit": "unit"}}},
+ "settle_seconds": 15
+}
