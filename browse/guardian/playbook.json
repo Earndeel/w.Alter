@@ -1,0 +1,22 @@
+{
+ "version": 1,
+ "module": "browse",
+ "notes": [
+  "walter-exit-mac is an ssh SOCKS tunnel to the owner's Mac. The Mac sleeps or leaves the network regularly: that is normal and never worth telling. The watchdog already reports it as info.",
+  "When the owner's machine is not on its tunnel, the local exit fails closed by design (exit-local:closed, info) and the WireGuard fallback exit takes over: not a problem.",
+  "An egress violation (traffic leaving through a forbidden IP) is critical and level G3: never act, always needs_owner.",
+  "camoufox-max and cloakbrowser-max are the browser engines; restarting them interrupts a browsing session in progress but is safe."
+ ],
+ "evidence": {
+  "service_down": [["systemctl","status","--no-pager","-n","0","{unit}"], ["journalctl","-u","{unit}","-n","40","--no-pager","-o","short-iso"]],
+  "check_failed": [["walter-exit-local", "probe"]],
+  "*": [["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "mac", "true"]]
+ },
+ "actions": {
+  "restart_unit": {"level": "G1", "describe": "restart one of the module's services",
+                   "command": ["systemctl", "restart", "{unit}"],
+                   "params": {"unit": ["camoufox-max", "cloakbrowser-max", "walter-exit-default", "walter-exit-local", "walter-exit-mac"]}}
+ },
+ "fallback": {"service_down": {"action": "restart_unit", "params": {"unit": "unit"}}},
+ "settle_seconds": 20
+}

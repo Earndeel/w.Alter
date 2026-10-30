@@ -32,7 +32,28 @@ def units_down(module, units, severity="high"):
             for u in units if not active(u)]
 
 
-out = units_down("browse", ["camoufox-max", "cloakbrowser-max", "walter-exit-default", "walter-exit-local", "walter-exit-mac"])
+def mac_reachable(host_alias="mac", timeout=5):
+    """True when the owner's Mac answers on its ssh port (address read from the ssh config, never hardcoded)."""
+    import socket
+    cfg = dict(l.split(" ", 1) for l in sh("ssh", "-G", host_alias, timeout=10).stdout.splitlines() if " " in l)
+    try:
+        socket.create_connection((cfg.get("hostname", host_alias), int(cfg.get("port", 22))), timeout).close()
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+out = units_down("browse", ["camoufox-max", "cloakbrowser-max", "walter-exit-default", "walter-exit-local"])
+# walter-exit-mac is an ssh tunnel to the owner's Mac. While the Mac sleeps or is offline, systemd restarts it every
+# ~25 s, so `is-active` alternates and the incident used to reopen (and re-notify) all night (2026-10-30). A Mac that
+# does not answer is expected and already fails closed (exit-local:closed): info, no Telegram. High only when the Mac
+# answers but the tunnel stays down.
+if not active("walter-exit-mac"):
+    if mac_reachable():
+        out += units_down("browse", ["walter-exit-mac"])
+    else:
+        out.append(inc("browse", "exit-mac:mac-offline", "host_offline", "info",
+                       "Mac injoignable (veille ou hors ligne) : la sortie réseau via le Mac est suspendue.", {}, "G0"))
 r = sh("walter-exit-local", "probe", timeout=120)
 try:
     p = json.loads(r.stdout)
