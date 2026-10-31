@@ -1,0 +1,11 @@
+{
+ "base_sha": "d758b0759dc6df17833ef23e90e2e24b0b1f4f597fd40fccc1990fbf1b64229e",
+ "changed": "SKILL.md",
+ "created_at": "2026-10-31T04:16:22.727632+00:00",
+ "domain": "model-routing",
+ "kind": "patch",
+ "reason": "The session established a repeatable multi-step provider onboarding procedure: inspect Walter Router and walter-secrets internals, store the key in Bitwarden, declare the mapping in the instance secret config, add an OpenAI-compatible provider and model, restart `walter-llm`, validate health, native calls and provider probes, regenerate documentation, run tests, and diagnose neutrality failures. Evidence included the exact paths `/walter/router`, `/walter/secrets`, `/instances/monsieur/config/secrets/walter-secrets.toml`, the `walter-secret` workflow, successful Venice HTTP 200/native model tests, and discovered pitfalls involving stale generated docs, unrelated pre-existing test failures, and private markers in generated/source files. [session claude_code/vm/0378553f-4383-4aee-a4f3-1ae1db7e6044]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/0378553f-4383-4aee-a4f3-1ae1db7e6044",
+ "target": "walter-model-router"
+}
