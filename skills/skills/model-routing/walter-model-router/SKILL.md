@@ -203,3 +203,71 @@ After changing the instance's gateway configuration, restart `walter-llm`; do no
 6. Ajouter des fixtures couvrant le nouveau payload, les tableaux absents ou incomplets, les variantes et le changement de version. Depuis la racine du router, exécuter `venv/bin/python -m pytest -q tests/test_research.py tests/test_tiers.py`.
 7. Après validation du lecteur et du traitement des versions, collecter uniquement AA avec `walter-router research --source aa`. Examiner le snapshot, puis recalculer avec `walter-router refresh --skip-collect --no-notify`. Cette commande persiste un nouveau run : ce n’est pas un dry-run. Comparer les niveaux L1/L2/L3, les variantes, les frontières et les alertes avec le run précédent, sur chacune des bases de prix disponibles. Séparer les recommandations recalculées des choix effectivement épinglés.
 8. Exécuter `walter-router docs --write`, `walter-router docs --check`, puis `venv/bin/python -m pytest -q`. Terminer par `walter-router health` et `walter-router alerts --all`. Documenter la migration dans `docs/DATA.md` et `docs/HISTORY.md`. Signaler explicitement tout test encore en échec ; une collecte réparée ne suffit pas à valider toute la suite.
+
+## Add a provider backed by Bitwarden and validate it
+
+When adding a provider to Walter Router, store the API key in Bitwarden through `walter-secret`, declare the key in `/instances/monsieur/config/secrets/walter-secrets.toml`, and keep the secret out of `.env` files and repository configuration. For Venice, use the vault item `W.Alter · venice` and the model `deepseek-v4-1-flash-1017-uncensored`.
+
+Inspect the existing provider and secret mechanisms first:
+
+```bash
+cd /walter/router
+sed -n '240,330p' llm/gateway.py
+cat config/providers.json
+cd /walter/secrets
+sed -n '96,150p' walter_secrets/vault.py
+walter-secret --help
+```
+
+Store or update the key by piping it through standard input; never put the value in a command argument or file:
+
+```bash
+printf '%s' '<VENICE_API_KEY>' | walter-secret store 'W.Alter · venice' --kind api_key --stdin --uri https://api.venice.ai
+```
+
+Add the corresponding declared secret mapping in `/instances/monsieur/config/secrets/walter-secrets.toml`, then verify that the mapping resolves without printing the secret:
+
+```bash
+walter-secret search venice
+python3 -c 'from walter_secrets import mapping; print(mapping.entry("VENICE_API_KEY"))'
+```
+
+Add Venice using the same provider configuration and gateway adapter conventions as the existing OpenAI-compatible providers. Validate the JSON and run the router checks:
+
+```bash
+cd /walter/router
+python3 -I -c 'import json; json.load(open("config/providers.json")); print("json ok")'
+timeout 300 walter check
+```
+
+Restart the gateway before live validation and confirm the service and health endpoint:
+
+```bash
+systemctl restart walter-llm
+systemctl is-active walter-llm
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8894/health
+```
+
+Test the exact model through the native Walter path and run the provider probe:
+
+```bash
+printf '%s\n' '{"route":{"provider":"venice","model":"deepseek-v4-1-flash-1017-uncensored"},"messages":[{"role":"user","content":"Réponds seulement: OK"}],"timeout":60}' | timeout 120 walter-llm call
+cd /walter/router
+timeout 300 walter-router probe --provider venice
+```
+
+Regenerate and check generated documentation after changing provider metadata:
+
+```bash
+walter-router docs --write
+timeout 60 walter-router docs --check
+```
+
+Run the relevant tests, recording unrelated pre-existing failures separately:
+
+```bash
+timeout 900 venv/bin/python -m pytest -q --ignore=tests/test_gateway_telemetry.py
+timeout 600 venv/bin/python -m pytest -q tests/test_documentation.py
+```
+
+Before declaring success, confirm that the live call, native `walter-llm` call, provider probe, health endpoint, and JSON/config checks pass. Check `walter check` for neutrality failures: generated reference files and router/LLM source can contain owner-specific markers after documentation generation, so inspect the reported files and remove any newly introduced private names from shipped module files. Do not overwrite unrelated uncommitted work; inspect `git diff --stat` and preserve existing changes.
