@@ -132,9 +132,9 @@ See `references/runtime-reload-boundaries.md` for a compact diagnosis and verifi
 - **Build artifact missing after update**: If `hermes desktop --force-build` was interrupted or failed, `dist/` may be missing. The app loads a blank page silently — no error dialog.
 - **`/usr/bin/ssh: cannot execute binary file` on Mac**: Indicates corrupted SSH binary or architecture mismatch. Not a Hermes issue but blocks tunnel-based connectivity.
 
-## Also covers (hermes-desktop-debugging)
+## Also covers (hermes-desktop-debug)
 
-Read `references/merged-hermes-desktop-debugging/hermes-desktop-debugging.md` for connection resolution, TLS failures, current v0.20.x proxy/Host behavior, dashboard cgroup restart traps, or Desktop cycling despite successful REST probes.
+Read `references/merged-hermes-desktop-debugging/hermes-desktop-debug.md` for connection resolution, TLS failures, current v0.20.x proxy/Host behavior, dashboard cgroup restart traps, or Desktop cycling despite successful REST probes.
 
 It documents `connection.json` taking precedence over environment variables, then local bootstrap. Electron rejects self-signed/internal-PKI certificates; use the documented plain-HTTP forwarding path. For the current deployment, keep Dashboard on loopback and use the supervised Mac proxy: `127.0.0.1:9119` → Tailscale server `8788` → Dashboard `127.0.0.1:8787`, rewriting upstream Host to the loopback authority. `HERMES_DASHBOARD_ACCEPTED_HOSTS` is unused; do not set `dashboard.public_url` to a Tailscale IP as a Host workaround. Verify protected routes reject unauthenticated requests and arbitrary Hosts remain rejected.
 
