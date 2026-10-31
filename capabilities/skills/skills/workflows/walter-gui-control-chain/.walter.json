@@ -1,0 +1,11 @@
+{
+ "created_at": "2026-10-31T04:21:54.356510+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "walter-computer-use",
+  "computer-use",
+  "remote-computer-use"
+ ]
+}
