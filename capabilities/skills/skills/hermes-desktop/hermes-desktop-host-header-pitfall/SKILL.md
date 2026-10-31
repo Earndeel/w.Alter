@@ -106,5 +106,5 @@ For WebSocket, connect to `ws://<tailscale_ip>:<tailscale_forward_port>/api/ws?t
 
 ## Related
 
-Load `hermes-desktop-debugging` for the full decision tree.
+Load `hermes-desktop-debug` for the full decision tree.
 Load `hermes-desktop-tunnel-recovery` for tunnel-specific recovery.
