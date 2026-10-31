@@ -1,10 +1,7 @@
 {
- "created_at": "2026-10-31T04:15:43.939712+00:00",
- "description": "Use when W.Alter sends repeated Telegram guardian alerts, module watchdogs flap, or guardian repair and notification behavior needs diagnosis on Monsieur's VM.",
- "domain": "operations",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session established a reusable VM-specific workflow for tracing Telegram alert flapping, diagnosing detector validation and Mac tunnel behavior, repairing through constrained module guardians, and verifying silent recovery. Evidence includes repeated incident reopenings, an engine-level playbook validation failure, targeted tests, and an actual walter-skills-bus restart without notification. None of the listed image-generation skills covers guardian operations. [session claude_code/vm/785105dc-185b-4ba0-a059-39585b8ee01a]",
- "runtime": "learner",
- "session_id": "claude_code/vm/785105dc-185b-4ba0-a059-39585b8ee01a",
- "target": "walter-guardians-alert-repair"
+ "store_sha": "7dc1fd110804dab7bc9036d8cb0e0cfd6339504cb80e90da77b01702b0e19bc1"
 }
