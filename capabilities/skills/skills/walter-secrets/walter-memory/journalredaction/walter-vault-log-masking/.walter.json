@@ -1,10 +1,7 @@
 {
- "created_at": "2026-10-31T04:15:18.843218+00:00",
- "description": "Use when a vault credential appears in W.Alter logs or memory, or when maintaining and verifying vault fingerprint masking across walter-secrets and walter-memory.",
- "domain": "walter-secrets/walter-memory/journalredaction",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session uncovered and implemented a reusable cross-module procedure absent from the listed provider and routing skills: detecting arbitrary vault credentials with keyed fingerprints, wiring masking into both journal and memory writes, rebuilding the index on vault changes, and verifying historical remediation. Concrete evidence includes the new fingerprints module and CLI, active-instance index paths and permissions, three service names, 42 passing secrets tests, a reproduced pre-existing memory test failure, the missing host psql workaround, the append-only maintenance setting and content-hash repair, and an explicitly rejected transcript edit. The incomplete routing investigation does not justify a separate routing skill. [session claude_code/vm/58b4a7c7-e892-4b69-bff2-f938bb229102]",
- "runtime": "learner",
- "session_id": "claude_code/vm/58b4a7c7-e892-4b69-bff2-f938bb229102",
- "target": "walter-vault-log-masking"
+ "store_sha": "8951bc2aaeaf99773fe6f550b7e9f5f13eff484a9968ecfcda97c81b8dfd731c"
 }
