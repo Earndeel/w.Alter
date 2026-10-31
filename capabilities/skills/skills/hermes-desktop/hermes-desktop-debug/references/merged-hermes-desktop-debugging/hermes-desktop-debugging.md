@@ -1,5 +1,5 @@
 ---
-name: hermes-desktop-debugging
+name: hermes-desktop-debug
 description: Decision-tree for Hermes V2 Electron desktop failures (white screen, connectivity, auth). Load references/ for commands.
 category: devops
 tags: [hermes, electron, desktop, debugging]
