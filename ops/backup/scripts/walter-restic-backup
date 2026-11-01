@@ -97,8 +97,10 @@ print(json.dumps({"at": sys.argv[2], "ok": sys.argv[3] == "0", "snapshots": rows
                   "repository_bytes": stats.get("total_size"), "repository_uncompressed": stats.get("total_uncompressed_size")},
                  indent=1))
 PY
-python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))
-for r in d["snapshots"]: print(f"{r[\"tag\"]:8} new {((r[\"added_bytes\"] or 0)/1e6):9.1f} MB of {((r[\"total_bytes\"] or 0)/1e6):9.1f} MB read")' \
-  "$WALTER_RESTIC_STATE/restic-last.json"
+python3 - "$WALTER_RESTIC_STATE/restic-last.json" <<'PY'
+import json, sys
+for r in json.load(open(sys.argv[1]))["snapshots"]:
+    print(f"{r['tag']:8} new {(r['added_bytes'] or 0) / 1e6:9.1f} MB of {(r['total_bytes'] or 0) / 1e6:9.1f} MB read")
+PY
 [ "$FAILED" = 0 ] || { echo "restic backup done $TS with ERRORS" >&2; exit 1; }
 echo "restic backup ok $TS"
