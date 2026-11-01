@@ -19,6 +19,28 @@ explains the module. Hermes uses `walter_skills_index` / `walter_skills_manifest
 `shortlist` keeps the former per-message ranking policy for comparisons/rollback. Search ranking and error assistance
 remain available. Existing MCP sessions need their tool schemas refreshed to see the two new operations.
 
+## Library layout and lifecycle (reorganised 2026-11-01)
+
+- `skills/<domain>/<name>/` — the **active** library: 21 plain domains (walter, secrets, hermes, web, computer-use,
+  research, shopping, models, images, video, cloudflare, gpu, code, design, devops, messaging, productivity, home,
+  learning, scena, + reserve-only audio/business). One small procedure per intent; a short **entry** skill
+  (`kind: entry` in the sidecar) routes a domain when it has shared rules (web, cloudflare, image-generation,
+  video-generation, walter-model-router, hermes-memory-ops, bitwarden-logins, android-tv-stremio-dongle…). Workflows
+  live in the domain of their first step.
+- `archive/<name>/` with `reserve: true` — the **reserve**: dormant skills. Tier-2 search ranks them with the active
+  library (flagged « réserve »), the domain index lists them after the active entries, and **reading one restores
+  it** (`walter_skills/reserve.py`: move back to its domain, commit, ledger `reserve/restore`). `walter-skills read
+  --peek` reads without restoring.
+- `archive/<name>/` with `absorbed_into: <hub>` — **merged**: the original text is copied verbatim in
+  `<hub>/references/merged-<name>/`; search answers the old name with the hub (`via`), reads point to the hub.
+- `archive/<name>/` with `retired: true` — **retired**: describes a system that no longer exists (Hindsight, Jarvis,
+  the voice stack, the Hermes dashboard, the hand-written identity). Never searched, never restored; readable by name
+  as history.
+- Curator: dormant 30 days (no read, not needed by a real message in 30 days — synthetic bench labels never protect)
+  → reserve; entries are never archived or merged; a workflow whose steps already exist is never written again.
+- No secret in a skill: values come from Walter Secrets / helpers (`walter-cloudflare`, `walter-secret`). The whole
+  store was checked against the vault fingerprint index on 2026-11-01.
+
 ## Shape: one core, thin ports, one loop
 
 ```
@@ -72,13 +94,13 @@ by the hourly reconciliation (`jobs.quick`, run by the consumer when idle). Fail
 - Service down → `client.py` searches and reads the git store directly; exposure fails open (nothing injected).
 - Everything derived can be rebuilt from git + walter_logs: delete `.cache/`, run `walter-skills nightly`.
 - A new ranker is promoted only if not worse on the held-out slice; the service hot-swaps it (no restart).
-- Curation never deletes: archive/ + git history; shadow mode on branch `curator/<date>` until `shadow_until`.
+- Curation never deletes: archive/ (reserve, merged, retired) + git history; shadow mode on branch `curator/<date>` until `shadow_until`.
 
 ## Commands
 
 ```
 walter-skills search "message"          walter-skills expose "message" --runtime hermes --first
-walter-skills read <name> [--file f]    walter-skills nightly [--only step,…]
+walter-skills read <name> [--file f] [--peek]    walter-skills nightly [--only step,…]
 walter-skills train [--force]           walter-skills curate [--shadow|--apply] [--only op,…]
 walter-skills health                    python bench/run.py --hermes
 /opt/walter-memory/venv/bin/python -m pytest -q tests
