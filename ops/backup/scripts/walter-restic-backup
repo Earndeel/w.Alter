@@ -1,0 +1,104 @@
+#!/bin/bash
+# Walter offsite backup, deduplicated (2026-11-01, owner decision: "comme GitHub, ne pousser que ce qui change").
+# restic splits everything into encrypted chunks and uploads only the chunks the repository does not have yet; every
+# night is still a complete snapshot that can be restored on its own. Every location comes from the instance
+# (`walter-ops backup env restic`). One snapshot per tag:
+#   pg       plain SQL dump streamed from PostgreSQL (uncompressed on purpose: unchanged rows deduplicate)
+#   statedb  newest agent-runtime state snapshot, decompressed for the same reason (walter-statedb-backup)
+#   config   config bundle of the modules and their integrations (Walter Memory's backup_bundle, fail closed)
+#   folders  the owner's folder, projects, apps and their data, vault exports (restic.folders minus restic.exclude)
+# Retention per tag: keep_daily + keep_weekly + keep_monthly; unreferenced chunks pruned on Sundays; repository
+# checked on Sundays (structure) and on the 1st (2 % of the data re-read).
+# Restore: restic -r <repository> restore latest --tag <tag> --target <dir>   (password: Bitwarden
+# « W.Alter restic repository (Drive) », copy in the user folder's bootstrap/restic).
+set -euo pipefail
+umask 077
+eval "$(walter-ops backup env restic)"
+export RESTIC_REPOSITORY="$WALTER_RESTIC_REPOSITORY" RESTIC_PASSWORD_FILE="$WALTER_RESTIC_PASSWORD_FILE"
+export RESTIC_CACHE_DIR="${WALTER_RESTIC_CACHE:-/var/cache/walter-restic}"
+WORK=$(mktemp -d "$WALTER_OFFSITE_WORKDIR/walter-restic.XXXXXX"); trap 'rm -rf "$WORK"' EXIT
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+SUMMARY="$WORK/summary.jsonl"
+FAILED=0
+R=(restic)
+B=(restic backup --host "$(hostname -s)")
+
+record() {  # record <tag> <restic --json output file>  → one summary line (snapshot, new bytes)
+  python3 - "$1" "$2" >> "$SUMMARY" <<'PY'
+import json, sys
+tag, path = sys.argv[1], sys.argv[2]
+s = {}
+for line in open(path):
+    try:
+        d = json.loads(line)
+    except ValueError:
+        continue
+    if d.get("message_type") == "summary":
+        s = d
+print(json.dumps({"tag": tag, "snapshot": s.get("snapshot_id", "")[:8], "files_new": s.get("files_new"),
+                  "added_bytes": s.get("data_added"), "total_bytes": s.get("total_bytes_processed")}))
+PY
+}
+
+stream() {  # stream <tag> <filename> <command…>: back up a command's output; a failed command leaves no snapshot
+  local tag=$1 name=$2; shift 2
+  if "$@" | "${B[@]}" --stdin --stdin-filename "$name" --tag "$tag" --json > "$WORK/$tag.json"; then
+    record "$tag" "$WORK/$tag.json"; echo "snapshot $tag ok"
+  else
+    local sid; sid=$(python3 -c 'import json,sys
+for l in open(sys.argv[1]):
+    try: d=json.loads(l)
+    except ValueError: continue
+    if d.get("message_type")=="summary": print(d.get("snapshot_id",""))' "$WORK/$tag.json" 2>/dev/null || true)
+    [ -n "$sid" ] && "${R[@]}" forget --quiet "$sid" >/dev/null 2>&1 || true
+    FAILED=1; echo "ERROR: $tag not saved (source command failed)" >&2
+  fi
+}
+
+# 1. memory (PostgreSQL), streamed: nothing written on the VM's disk
+stream pg "$WALTER_PG_DATABASE.sql" docker exec "$WALTER_PG_CONTAINER" pg_dump -U "$WALTER_PG_USER" -d "$WALTER_PG_DATABASE"
+
+# 2. agent-runtime state (newest local snapshot, decompressed on the fly)
+sdb=$(ls -1t "$WALTER_STATEDB_DIR"/$WALTER_STATEDB_PATTERN 2>/dev/null | head -1 || true)
+if [ -n "$sdb" ]; then stream statedb state.db zstd -dc "$sdb"; else FAILED=1; echo "ERROR: no state.db snapshot" >&2; fi
+
+# 3. config bundle (fail closed on missing required paths; rebuildable parts left out by WALTER_BUNDLE_EXCLUDE)
+if walter-python -m walter_memory.backup_bundle create "$WORK/config.tar" >/dev/null; then
+  stream config config.tar cat "$WORK/config.tar"; rm -f "$WORK/config.tar"
+else
+  FAILED=1; echo "ERROR: config bundle refused" >&2
+fi
+
+# 4. folders (restic skips unchanged files by size and modification time, then uploads only new chunks)
+set -f; folders=(); for d in $WALTER_RESTIC_FOLDERS; do [ -e "$d" ] && folders+=("$d"); done
+ex=(); for p in node_modules .venv venv __pycache__ .next .cache .pytest_cache ${WALTER_RESTIC_EXCLUDE:-}; do ex+=(--exclude "$p"); done
+set +f
+if "${B[@]}" "${ex[@]}" --tag folders --json "${folders[@]}" > "$WORK/folders.json"; then
+  record folders "$WORK/folders.json"; echo "snapshot folders ok"
+else
+  rc=$?; [ $rc -eq 3 ] && { record folders "$WORK/folders.json"; echo "snapshot folders ok (some files unreadable)"; } \
+    || { FAILED=1; echo "ERROR: folders not saved" >&2; }
+fi
+
+# Retention, pruning and checks
+"${R[@]}" forget --quiet --group-by host,tags --keep-daily "$WALTER_OFFSITE_KEEP_DAILY" --keep-weekly "$WALTER_OFFSITE_KEEP_WEEKLY" \
+  --keep-monthly "$WALTER_OFFSITE_KEEP_MONTHLY" >/dev/null
+if [ "$(date -u +%u)" = 7 ]; then "${R[@]}" prune --quiet >/dev/null && echo "pruned"; "${R[@]}" check --quiet >/dev/null && echo "check ok" || { FAILED=1; echo "ERROR: restic check" >&2; }; fi
+if [ "$(date -u +%d)" = 01 ]; then "${R[@]}" check --quiet --read-data-subset 2% >/dev/null && echo "data check ok" || { FAILED=1; echo "ERROR: restic data check" >&2; }; fi
+
+# What this night really sent, for walter-ops backup status
+stats=$("${R[@]}" stats --mode raw-data --json 2>/dev/null || echo '{}')
+mkdir -p "$WALTER_RESTIC_STATE"
+python3 - "$SUMMARY" "$TS" "$FAILED" "$stats" > "$WALTER_RESTIC_STATE/restic-last.json" <<'PY'
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1])] if sys.argv[1] else []
+stats = json.loads(sys.argv[4] or "{}")
+print(json.dumps({"at": sys.argv[2], "ok": sys.argv[3] == "0", "snapshots": rows,
+                  "repository_bytes": stats.get("total_size"), "repository_uncompressed": stats.get("total_uncompressed_size")},
+                 indent=1))
+PY
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))
+for r in d["snapshots"]: print(f"{r[\"tag\"]:8} new {((r[\"added_bytes\"] or 0)/1e6):9.1f} MB of {((r[\"total_bytes\"] or 0)/1e6):9.1f} MB read")' \
+  "$WALTER_RESTIC_STATE/restic-last.json"
+[ "$FAILED" = 0 ] || { echo "restic backup done $TS with ERRORS" >&2; exit 1; }
+echo "restic backup ok $TS"

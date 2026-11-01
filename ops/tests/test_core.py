@@ -88,3 +88,13 @@ def test_push_offsite_encrypts_then_copies_and_removes_the_encrypted_copy(tmp_pa
 def datetime_now():
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_restic_status_reads_last_run_and_password_copy(tmp_path, monkeypatch):
+    import json, subprocess
+    (tmp_path / "restic-last.json").write_text(json.dumps({"at": "x", "ok": True, "snapshots": [{"tag": "pg"}],
+                                                           "repository_bytes": 2**30}))
+    monkeypatch.setattr(core, "sh", lambda *a, **k: subprocess.CompletedProcess(a, 0, json.dumps([{"name": "P"}]), ""))
+    out = core.restic({"restic": {"repository": "r", "state_dir": str(tmp_path), "password_item": "P"}})
+    assert out["last"]["ok"] is True and out["last"]["repository_gib"] == 1.0 and out["password_off_vm"] is True
+    assert core.restic({}) == {"configured": False}

@@ -177,10 +177,36 @@ def offsite(cfg: dict) -> dict:
     return out
 
 
+def restic(cfg: dict) -> dict:
+    """The deduplicated offsite backup: what the last run sent (state file written by walter-restic-backup) and a
+    copy of the repository password outside the VM (owner's vault, looked up by name, metadata only)."""
+    r = cfg.get("restic") or {}
+    if not r.get("repository"):
+        return {"configured": False}
+    out = {"repository": r["repository"]}
+    try:
+        last = json.loads((Path(r.get("state_dir", "")) / "restic-last.json").read_text())
+        out["last"] = {"at": last.get("at"), "ok": last.get("ok"), "snapshots": last.get("snapshots"),
+                       "repository_gib": round((last.get("repository_bytes") or 0) / 2**30, 2)}
+    except (OSError, ValueError):
+        out["last"] = {"ok": False, "error": "no run recorded"}
+    item = r.get("password_item")
+    if item:
+        res = sh("walter-secret", "search", item, timeout=120)
+        try:
+            d = json.loads(res.stdout)
+            items = d if isinstance(d, list) else d.get("items") or d.get("results") or []
+            out["password_off_vm"] = any((i.get("name") or "").strip() == item for i in items)
+        except ValueError:
+            out["password_off_vm"] = None
+    return out
+
+
 def status() -> dict:
     cfg = config()
     return {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "conformity": conformity(),
-            "backup_health": backup_health(cfg), "offsite": offsite(cfg), "restorability": restorability(cfg)}
+            "backup_health": backup_health(cfg), "offsite": offsite(cfg), "restic": restic(cfg),
+            "restorability": restorability(cfg)}
 
 
 # ---- versioning (Git Manager) ----------------------------------------------------------------------------------
@@ -428,6 +454,12 @@ JOB_KEYS = {
                 "WALTER_PG_DIR": ("kinds", "pg", "dir"), "WALTER_PG_PATTERN": ("kinds", "pg", "pattern"),
                 "WALTER_STATEDB_DIR": ("kinds", "statedb", "dir"), "WALTER_STATEDB_PATTERN": ("kinds", "statedb", "pattern")},
     "git_publish": {"WALTER_GIT_PUBLISH_REMOTE": ("git_publish", "remote"), "WALTER_GIT_PUBLISH_WORKDIR": ("offsite", "workdir")},
+    "restic": {"WALTER_RESTIC_REPOSITORY": ("restic", "repository"), "WALTER_RESTIC_PASSWORD_FILE": ("restic", "password_file"),
+               "WALTER_RESTIC_FOLDERS": ("restic", "folders"), "WALTER_RESTIC_STATE": ("restic", "state_dir"),
+               "WALTER_PG_CONTAINER": ("pg", "container"), "WALTER_PG_DATABASE": ("pg", "database"), "WALTER_PG_USER": ("pg", "user"),
+               "WALTER_STATEDB_DIR": ("kinds", "statedb", "dir"), "WALTER_STATEDB_PATTERN": ("kinds", "statedb", "pattern"),
+               "WALTER_OFFSITE_WORKDIR": ("offsite", "workdir"), "WALTER_OFFSITE_KEEP_DAILY": ("offsite", "keep_daily"),
+               "WALTER_OFFSITE_KEEP_WEEKLY": ("offsite", "keep_weekly"), "WALTER_OFFSITE_KEEP_MONTHLY": ("offsite", "keep_monthly")},
     "restore_test": {"WALTER_OFFSITE_REMOTE": ("offsite", "remote"), "WALTER_OFFSITE_IDENTITY": ("offsite", "identity"),
                      "WALTER_OFFSITE_WORKDIR": ("offsite", "workdir"),
                      "WALTER_PG_CONTAINER": ("pg", "container"), "WALTER_PG_DATABASE": ("pg", "database"),
@@ -443,6 +475,8 @@ JOB_OPTIONAL_KEYS = {
                 "WALTER_OFFSITE_FOLDER_EXCLUDE": ("offsite", "folder_exclude"),  # paths left out of those archives
                 "WALTER_BUNDLE_EXCLUDE": ("offsite", "config_exclude"),          # rebuildable parts of the config bundle
                 "WALTER_OFFSITE_STATE": ("offsite", "state_dir")},               # last pushed fingerprints (skip if same)
+    "restic": {"WALTER_RESTIC_EXCLUDE": ("restic", "exclude"), "WALTER_RESTIC_CACHE": ("restic", "cache"),
+               "WALTER_BUNDLE_EXCLUDE": ("offsite", "config_exclude")},
     "git_publish": {"WALTER_GIT_PUBLISH_EXCLUDE": ("git_publish", "exclude"),     # module repositories never published
                     "WALTER_GIT_PUBLISH_DENY": ("git_publish", "deny_paths")},    # JSON {module: [path globs]}
 }
@@ -510,6 +544,15 @@ def check() -> list[dict]:
                             "La clé privée de récupération n'existe que sur la VM : si la VM meurt, toutes les "
                             "sauvegardes du Drive sont illisibles. Une copie doit être rangée dans le coffre du propriétaire.",
                             {"expected_item": (cfg.get("offsite") or {}).get("recovery_key_item")}, "G3"))
+    rs = st.get("restic") or {}
+    if rs.get("configured", True) and rs.get("last", {}).get("ok") is False:
+        out.append(incident("restic:last", "restic_failed", "critical",
+                            "La dernière sauvegarde dédupliquée (restic) a échoué ou n'a jamais tourné.", rs.get("last"), "G1"))
+    if rs.get("password_off_vm") is False:
+        out.append(incident("restic:password", "restic_password_on_vm_only", "critical",
+                            "Le mot de passe du dépôt restic n'existe que sur la VM : si la VM meurt, la sauvegarde "
+                            "dédupliquée est illisible. Une copie doit être rangée dans le coffre du propriétaire.",
+                            {"expected_item": (cfg.get("restic") or {}).get("password_item")}, "G3"))
     r = st["restorability"]
     for name in ("offsite_restore_test", "isolated_drill"):
         if name in r and not r[name].get("ok"):
