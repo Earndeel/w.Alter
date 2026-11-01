@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "describes a system retired on 2026-10-19 (Hindsight)",
+ "domain": "walter",
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hindsight-debug-and-repair",
+  "sha": "91a38a833670b45dec1bb48a6483a744e326e7977e1eed3edd8bdb81e848fde5",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "91a38a833670b45dec1bb48a6483a744e326e7977e1eed3edd8bdb81e848fde5"
+}

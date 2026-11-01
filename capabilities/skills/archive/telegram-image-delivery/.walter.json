@@ -1,0 +1,17 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "not read by any agent for 30+ days",
+ "domain": "messaging",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/telegram-image-delivery",
+  "sha": "3c9abe330e8bbb3c58a09ee47eb55aad9ef3e83a85c599024c18733f1b685b62",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "reserve": true,
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "3c9abe330e8bbb3c58a09ee47eb55aad9ef3e83a85c599024c18733f1b685b62"
+}

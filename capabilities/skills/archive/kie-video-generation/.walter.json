@@ -1,0 +1,16 @@
+{
+ "absorbed_into": "kie-video-generation-operations",
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "merged into kie-video-generation-operations (2026-11-01 reorganisation)",
+ "domain": "video",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/kie-video-generation",
+  "sha": "acd0c90f664de9e5030b1231fb3a70c8223c34e423ab1eedf41a48cab2306318",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "acd0c90f664de9e5030b1231fb3a70c8223c34e423ab1eedf41a48cab2306318"
+}

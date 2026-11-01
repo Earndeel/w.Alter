@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "never read by any agent",
+ "domain": "code",
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/python-debugpy",
+  "sha": "af5feb976184ba27b81cdf8bb2b9180e43597d318aef88494212620a90d49b8d",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "reserve": true,
+ "store_sha": "af5feb976184ba27b81cdf8bb2b9180e43597d318aef88494212620a90d49b8d"
+}

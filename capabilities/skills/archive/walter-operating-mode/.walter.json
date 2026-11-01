@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "superseded by walter-soul (identity rendered from /instances/monsieur/soul)",
+ "domain": "walter",
+ "hermes": {
+  "path": "/root/.hermes/skills/walter-operating-mode",
+  "sha": "f69ed2eeea7aff090cd2c1cef0daf78d3adf191aad3912ee67402822b3eb0a83",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "15897a07b43debc8124d741534b21aebbf2514f63eb496296d06b788d9bbaa00"
+}

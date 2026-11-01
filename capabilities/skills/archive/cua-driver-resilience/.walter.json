@@ -1,0 +1,17 @@
+{
+ "absorbed_into": "remote-computer-use",
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "merged into remote-computer-use (2026-11-01 reorganisation)",
+ "domain": "computer-use",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/cua-driver-resilience",
+  "sha": "bd6f50fe7c3a2e2a36a4fa3bf49ed28e6b356c4cf62d83f6ca6e48f9f6788322",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "bd6f50fe7c3a2e2a36a4fa3bf49ed28e6b356c4cf62d83f6ca6e48f9f6788322"
+}
