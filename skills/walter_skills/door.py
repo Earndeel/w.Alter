@@ -31,10 +31,23 @@ class Refused(ValueError):
 def _check_text(label: str, text: str, limit: int) -> None:
     if len(text) > limit:
         raise Refused(f"{label}: {len(text)} chars > {limit}")
-    secrets = [kind for cat, kind in privacy.detect(text) if cat == "secret"]
+    # A Walter Secrets placeholder {{bw:<item>:<field>}} is the right way to name a secret: not a value.
+    secrets = [kind for cat, kind in privacy.detect(re.sub(r"\{\{bw:[^{}]+\}\}", "", text)) if cat == "secret"]
     if secrets:
         raise Refused(f"{label} looks like it contains a secret ({', '.join(sorted(set(secrets)))}): reference where "
                       "it is stored (e.g. Bitwarden item, env var name), never its value")
+
+
+def _referenced(text: str | None) -> str | None:
+    """Vault values in a proposal become Walter Secrets placeholders {{bw:<item>:<field>}} before any check or write
+    (2026-11-01): the agent keeps a working procedure, the store never holds the value."""
+    if not text:
+        return text
+    try:
+        from . import secret_refs
+        return secret_refs.to_placeholders(text)[0]
+    except Exception:
+        return text  # Walter Secrets unavailable: the shape checks below still refuse obvious credentials
 
 
 def _check_skill_md(name: str, skill_md: str) -> dict:
@@ -55,8 +68,9 @@ def _files(files: dict | None) -> dict[str, str]:
         rel = str(rel).lstrip("/")
         if ".." in Path(rel).parts or not re.match(r"^(references|scripts|templates)/[\w./-]+$", rel):
             raise Refused(f"file path {rel!r}: only references/, scripts/ or templates/ inside the skill")
-        _check_text(rel, str(content), MAX_FILE)
-        out[rel] = str(content)
+        content = _referenced(str(content))
+        _check_text(rel, content, MAX_FILE)
+        out[rel] = content
     if len(out) > MAX_FILES:
         raise Refused(f"too many files ({len(out)} > {MAX_FILES})")
     return out
@@ -90,6 +104,7 @@ def propose(name: str, skill_md: str, reason: str, files: dict | None = None, do
         raise Refused("name must be kebab-case, 3-64 chars, e.g. 'stripe-refund-flow'")
     if store.find(name, include_archived=True):
         raise Refused(f"skill {name!r} already exists: use skill_patch to improve it")
+    skill_md = _referenced(skill_md)
     fm = _check_skill_md(name, skill_md)
     extra = _files(files)
     if len((reason or "").strip()) < 15:
@@ -118,11 +133,13 @@ def patch(name: str, reason: str, skill_md: str | None = None, file_path: str | 
         raise Refused("reason: what was wrong or missing, and the evidence (command output, session)")
     if bool(skill_md) == bool(file_path):
         raise Refused("give either the full new skill_md, or file_path + content for one linked file")
+    skill_md = _referenced(skill_md)
     if skill_md:  # every check happens before anything is written
         _check_skill_md(name, skill_md)
         changed = "SKILL.md"
     else:
-        changed = next(iter(_files({file_path: content or ""})))
+        content = _referenced(content or "")
+        changed = next(iter(_files({file_path: content})))
     d = _draft_dir(name, "patch", runtime)
     if skill_md:
         (d / "SKILL.md").write_text(skill_md.rstrip() + "\n")

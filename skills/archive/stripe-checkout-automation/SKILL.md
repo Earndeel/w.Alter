@@ -40,7 +40,7 @@ curl -s -X POST http://localhost:9378/tab/click-at \
 
 # 5. Type card number (30ms delay per keystroke)
 curl -s -X POST http://localhost:9378/tab/keyboard-type \
-  -d '{"tabId":"...","text":"«secret:vault»","delay":30}'
+  -d '{"tabId":"...","text":"{{bw:Carte – Vast.ai:number}}","delay":30}'
 
 # 6. Tab to expiry, type it
 curl -s -X POST http://localhost:9378/tab/keyboard-press -d '{"tabId":"...","key":"Tab"}'
@@ -72,7 +72,7 @@ Fields use standard IDs: `#cardNumber`, `#cardExpiry`, `#cardCvc`, `#billingName
 ```python
 card = frame.query_selector('#cardNumber')
 card.click(click_count=3)  # select all
-card.type('«secret:vault»', delay=20)
+card.type('{{bw:Carte – Vast.ai:number}}', delay=20)
 ```
 
 JS `value` assignment + `dispatchEvent('input')` does NOT trigger Stripe's internal validation — fields appear filled but submit fails silently.

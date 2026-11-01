@@ -72,7 +72,7 @@ If Lucas loses his Mac or phone, he needs a way to access the VPS from any devic
 ### Setup
 1. Generate a passphrase-protected key:
    ```bash
-   ssh-keygen -t ed25519 -f /tmp/ssh-backup-key -C "backup@w-alter" -N "«secret:vault»"
+   ssh-keygen -t ed25519 -f /tmp/ssh-backup-key -C "backup@w-alter" -N "{{bw:W.Alter · ssh:field:backup_passphrase}}"
    ```
 
 2. Add public key to VPS `~/.ssh/authorized_keys` (NO `from=` restriction — accessible from any IP):
@@ -83,7 +83,7 @@ If Lucas loses his Mac or phone, he needs a way to access the VPS from any devic
 3. Store private key + passphrase in vault:
    ```bash
    vault add ssh backup_private_key "$(cat /tmp/ssh-backup-key)"
-   vault add ssh backup_passphrase "«secret:vault»"
+   vault add ssh backup_passphrase "{{bw:W.Alter · ssh:field:backup_passphrase}}"
    ```
 
 4. Store in Bitwarden as secure note "W.Alter SSH Backup Key" with instructions.

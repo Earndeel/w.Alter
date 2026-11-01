@@ -25,7 +25,7 @@ aws ec2 terminate-instances --instance-ids <id>
 
 ```bash
 aws budgets create-budget \
-  --account-id «secret:vault» \
+  --account-id {{bw:W.Alter · aws:field:account_id}} \
   --budget '{
     "BudgetName": "explore-aws-budget",
     "BudgetLimit": {"Amount": "100", "Unit": "USD"},
@@ -34,7 +34,7 @@ aws budgets create-budget \
   }'
 
 # Cleanup
-aws budgets delete-budget --account-id «secret:vault» --budget-name explore-aws-budget
+aws budgets delete-budget --account-id {{bw:W.Alter · aws:field:account_id}} --budget-name explore-aws-budget
 ```
 
 ## Activity 3: Bedrock Model
@@ -104,7 +104,7 @@ cd /tmp && zip lambda_function.zip lambda_function.py
 aws lambda create-function \
   --function-name explore-aws-function \
   --runtime python3.12 \
-  --role arn:aws:iam::«secret:vault»:role/explore-aws-lambda-role \
+  --role arn:aws:iam::{{bw:W.Alter · aws:field:account_id}}:role/explore-aws-lambda-role \
   --handler lambda_function.handler \
   --zip-file fileb:///tmp/lambda_function.zip \
   --timeout 30 --memory-size 128

@@ -78,7 +78,7 @@ import requests
 
 CF_API_KEY = "cfk_..."       # Global API Key, NOT cfut_ token
 CF_EMAIL = "lucas.jouvencon@gmail.com"
-ACCOUNT_ID = "«secret:vault»"
+ACCOUNT_ID = "{{bw:W.Alter · cloudflare:field:account_id}}"
 DB_ID = "3567d347-37d7-45d5-b348-3dfc5f674006"
 
 url = f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/d1/database/{DB_ID}/query"

@@ -2,7 +2,7 @@
  "hermes": {
   "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/devops/ssh-mac-remote-control",
-  "sha": "d0f376dd4c891f3a2c09ab205167cff9b8b53f5e0c4e300f177e1a90f85e76bd",
+  "sha": "a7b4cf5330e6f8036c74e8408419a80dd1765eb0c19a86dac6aa2da3a2f424b1",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

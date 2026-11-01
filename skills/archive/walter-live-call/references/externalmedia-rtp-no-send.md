@@ -31,7 +31,7 @@ Evidence:
 ## SIP signaling findings
 - AMI Originate `Context`+`Exten` creates 2 legs → immediate BYE. Fix: `Application: Stasis` + `Data: hermes_bridge`
 - Linphone iOS 6.0.3 sends `488 Not acceptable here` for plain RTP → set "Media encryption" to "None" in Linphone settings
-- Earndeel password `«secret:vault»` → 403 Forbidden (wrong password for SIP registration)
+- Earndeel password `{{bw:account.appen.com (lucas.jouvencon@gmail.com):password}}` → 403 Forbidden (wrong password for SIP registration)
 - pjsip.conf missing `[section-name]` headers cause options to bleed into adjacent sections → `auth_type` parse errors
 - SIP registration works: `w.alter.ai@sip.linphone.org` registered via `transport-public` (10.0.0.24:5060)
 - SIP outbound works: `PJSIP/earndeel` → iPhone rings, answers (200 OK), BYE comes from iPhone after ~15s of silence

@@ -10,6 +10,6 @@ SIP is deceptively complex. Building a minimal stack required: message parsing, 
 **Do not rebuild infrastructure that already exists.** The bottleneck is ExternalMedia quality (ulaw 8kHz), not SIP signaling. Focus effort on: (1) bridge resampling quality (scipy polyphase — done), (2) wider-band ExternalMedia in newer Asterisk, (3) FreeSWITCH media-only via ESL, or (4) accept 8kHz ceiling.
 
 ## What DID work
-- SIP registration with qop=auth to sip.linphone.org: password `«secret:vault»` (NOT `h3rm3s_2026_s1p` from pjsip.conf)
+- SIP registration with qop=auth to sip.linphone.org: password `{{bw:9a13ec17-b3c5-4278-a6bc-a5e8517a5187:password}}` (NOT `h3rm3s_2026_s1p` from pjsip.conf)
 - Outbound INVITE: 100/110/180/200 OK, Gemini Live connected, but 482 Loop Detected (both accounts on same proxy)
 - DNS: `sip.linphone.org` resolves to IPv6 first. Use `176.31.149.179` on IPv4-only VPS.

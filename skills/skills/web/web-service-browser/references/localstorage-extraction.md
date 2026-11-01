@@ -41,7 +41,7 @@ for m in re.finditer(rb'_https://DOMAIN\.TLD.*?({\\\"id\\\".*?})', data):
 - **Multiple snapshots exist** in LevelDB (append-only) — use the LAST match for most recent state, or sort by `updated_at` field
 - **Account**: earndeel@gmail.com, ID 3401
 - **API endpoints**: `/api/v1/keys` (masked keys), `/api/v1/user/self` (profile). All use Bearer JWT from `auth_token`.
-- **API key masking**: Dashboard masks keys in DOM (`«secret:vault»`) and API responses. Full keys only visible in "Use Key" modal → use **screenshot + vision_analyze** to extract. See `references/api-key-extraction.md` in `camoufox-social-scrape`. **Full API key extraction & usage details**: See `references/aiprimetech-api.md`.
+- **API key masking**: Dashboard masks keys in DOM (`{{bw:W.Alter · ANTHROPIC_AUTH_TOKEN:field:ANTHROPIC_AUTH_TOKEN}}`) and API responses. Full keys only visible in "Use Key" modal → use **screenshot + vision_analyze** to extract. See `references/api-key-extraction.md` in `camoufox-social-scrape`. **Full API key extraction & usage details**: See `references/aiprimetech-api.md`.
 
 ## Gotchas
 

@@ -58,7 +58,7 @@ def eval_js(expr, timeout=5):
     r = requests.post(f"{BASE}/tab/evaluate", json={"tabId": TAB, "expression": expr}, timeout=timeout)
     return r.json().get("result", "")
 
-MESSAGE = """URGENT: All bedrock-mantle quota requests have been in CASE_OPENED status for over 48 hours with no resolution. All Anthropic Claude models remain completely blocked with AccessDeniedException errors. EULA accepted, use case form submitted. Account «secret:vault» has promotional credits that cannot be used. Please expedite."""
+MESSAGE = """URGENT: All bedrock-mantle quota requests have been in CASE_OPENED status for over 48 hours with no resolution. All Anthropic Claude models remain completely blocked with AccessDeniedException errors. EULA accepted, use case form submitted. Account {{bw:W.Alter · aws:field:account_id}} has promotional credits that cannot be used. Please expedite."""
 
 # Fill textarea
 eval_js(f"""

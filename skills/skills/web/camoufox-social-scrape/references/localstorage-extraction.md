@@ -59,7 +59,7 @@ LevelDB `.ldb` files are compacted snapshots. Multiple entries for the same key 
 - **`auth_token` key** = actual JWT used for API calls (`Bearer eyJhbG...`)
 - After login via browser, SPA stores all three. The old `_token` may persist alongside the new `auth_token` — always read `auth_token` for API calls.
 - API key (`sk-...`): separate from dashboard auth — only for LLM calls, NOT for usage/billing endpoints
-- Dashboard API: `/api/v1/keys` returns masked keys (`«secret:vault»`). Full keys only shown in "Use Key" modal.
+- Dashboard API: `/api/v1/keys` returns masked keys (`{{bw:W.Alter · ANTHROPIC_AUTH_TOKEN:field:ANTHROPIC_AUTH_TOKEN}}`). Full keys only shown in "Use Key" modal.
 - Cost monitoring: read `auth_user.balance` from successive LevelDB snapshots to track spend over time without browser access.
 
 ## Injecting auth into Camoufox (SPA login pattern)
@@ -91,7 +91,7 @@ SPA dashboards (One-API, Sub2API, AIPrimeTech) mask API keys in both DOM and API
 1. Navigate to API Keys page in Camoufox
 2. Click "Use Key" or equivalent button for the target key
 3. Take a **screenshot** of the modal (`GET /tab/screenshot`)
-4. Use `vision_analyze` to read the full key from the screenshot — vision models read the full unmasked string even when the DOM serves `«secret:vault»`
+4. Use `vision_analyze` to read the full key from the screenshot — vision models read the full unmasked string even when the DOM serves `{{bw:W.Alter · ANTHROPIC_AUTH_TOKEN:field:ANTHROPIC_AUTH_TOKEN}}`
 
 ```python
 # Take screenshot of the "Use Key" modal

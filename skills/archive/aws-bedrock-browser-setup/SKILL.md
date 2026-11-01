@@ -7,7 +7,7 @@ tags: [aws, bedrock, camoufox, browser, iam, credentials]
 # AWS Bedrock Browser Setup
 
 ## Context
-AWS Bedrock credentials obtained via Camoufox anti-detect browser + Mac Brave cookies + Tailscale exit node. Account «secret:vault» (earndeel), $100 credits.
+AWS Bedrock credentials obtained via Camoufox anti-detect browser + Mac Brave cookies + Tailscale exit node. Account {{bw:W.Alter · aws:field:account_id}} (earndeel), $100 credits.
 
 ## Prerequisites
 - Camoufox-max server running on port 9377/9378
@@ -192,7 +192,7 @@ New AWS accounts (especially free tier) may have ALL `bedrock-mantle` service qu
 - URL: `https://repost.aws/questions/ask`
 - Category: "Amazon Bedrock" → "General"
 - Title: "bedrock-mantle service quotas stuck at 0 — all models blocked"
-- Body: Request all `bedrock-mantle` quotas be set to default values for account «secret:vault»
+- Body: Request all `bedrock-mantle` quotas be set to default values for account {{bw:W.Alter · aws:field:account_id}}
 
 **Resolution**: Request quota increase via API with `DesiredValue=20000001.0` (>20M phantom default). See `aws-bedrock-setup` skill §7b for the full fix. For cases that go to `CASE_OPENED` status, wait 24-72h. The Marketplace SaaS registration ("Set up your account") is a billing entitlement step — NOT the API access blocker. Focus on quotas first.
 1. Navigate to `https://repost.aws/questions/ask`

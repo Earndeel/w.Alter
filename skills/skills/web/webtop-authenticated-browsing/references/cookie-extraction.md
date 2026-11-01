@@ -129,7 +129,7 @@ Cookie values are AES-128-CBC encrypted. The key is stored in macOS Keychain und
 ```bash
 security find-generic-password -s "Brave Safe Storage" -a "Brave" -w
 ```
-He pastes the result (e.g., `«secret:vault»`). Store in vault as `macos/brave_keychain_key`.
+He pastes the result (e.g., `{{bw:W.Alter · macos:field:brave_keychain_key}}`). Store in vault as `macos/brave_keychain_key`.
 
 **Automated via osascript with credentials (UNRELIABLE — 2026-05-24 tested, consistent failure):**
 ```bash
@@ -145,7 +145,7 @@ import hashlib, json
 from Crypto.Cipher import AES
 
 # The keychain value is the PBKDF2 password (NOT the raw AES key)
-keychain_value = b'<from keychain>'  # e.g. b'«secret:vault»'
+keychain_value = b'<from keychain>'  # e.g. b'{{bw:W.Alter · macos:field:brave_keychain_key}}'
 derived_key = hashlib.pbkdf2_hmac('sha1', keychain_value, b'saltysalt', 1003, dklen=16)
 
 def decrypt_cookie(encrypted_hex):

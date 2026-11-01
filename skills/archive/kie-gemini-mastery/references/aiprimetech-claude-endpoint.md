@@ -33,7 +33,7 @@ anthropic-version: 2023-06-01
 
 ## Key Extraction Workflow
 
-AIPrimeTech masks API keys in the UI (`«secret:vault»`). To get the full key:
+AIPrimeTech masks API keys in the UI (`{{bw:W.Alter · ANTHROPIC_AUTH_TOKEN:field:ANTHROPIC_AUTH_TOKEN}}`). To get the full key:
 
 1. Navigate to `https://aiprimetech.io/keys` in Camoufox (authenticated via localStorage JWT)
 2. Click "Use Key" on the Claude row (not the Codex or Image rows)

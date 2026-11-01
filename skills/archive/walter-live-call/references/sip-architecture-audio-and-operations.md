@@ -4,7 +4,7 @@ Built raw SIP/UDP server at `/opt/sip-gemini-bridge/sip_bridge.py`. Systemd serv
 
 **What works:**
 - SIP registration with sip.linphone.org (digest auth, qop=auth with nc+cnonce)
-- Correct password: `«secret:vault»` (from FreeSWITCH config, not the Asterisk one)
+- Correct password: `{{bw:9a13ec17-b3c5-4278-a6bc-a5e8517a5187:password}}` (from FreeSWITCH config, not the Asterisk one)
 - Inbound calls from Linphone → bridge → Gemini Live → audio back
 
 **What doesn't work:**

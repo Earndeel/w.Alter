@@ -241,7 +241,7 @@ curl -s -X POST http://localhost:9378/tab/click-at \
 
 # 3. Type into focused field
 curl -s -X POST http://localhost:9378/tab/keyboard-type \
-  -d '{"tabId":"...","text":"«secret:vault»","delay":30}'
+  -d '{"tabId":"...","text":"{{bw:Carte – Vast.ai:number}}","delay":30}'
 
 # 4. Tab to next field
 curl -s -X POST http://localhost:9378/tab/keyboard-press \

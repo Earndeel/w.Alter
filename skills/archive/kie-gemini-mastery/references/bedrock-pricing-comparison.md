@@ -50,7 +50,7 @@ Need to verify if Bedrock supports `cache_control` markers.
 Stored in vault:
 - `vault get aws/access_key_id` — AKIA...OVXT
 - `vault get aws/secret_access_key` — secret key
-- `vault get aws/account_id` — «secret:vault»
+- `vault get aws/account_id` — {{bw:W.Alter · aws:field:account_id}}
 - `vault get aws/region` — «secret:vault»
 
 CLI usage:

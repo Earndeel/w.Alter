@@ -247,7 +247,7 @@ The `cfut_` token from mcporter may have R2 write permissions but NOT D1 write p
 ```bash
 CF_GLOBAL=$(vault get cloudflare/global_api_key)
 CF_EMAIL="lucas.jouvencon@gmail.com"
-CF_ACCOUNT="«secret:vault»"
+CF_ACCOUNT="{{bw:W.Alter · cloudflare:field:account_id}}"
 
 # Create D1 database
 curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/d1/database" \

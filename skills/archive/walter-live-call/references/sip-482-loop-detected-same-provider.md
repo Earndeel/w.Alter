@@ -23,7 +23,7 @@ Asterisk PJSIP/earndeel with `outbound_auth=linphone-walter-auth` succeeds (180 
 - Initial parser bug: `split(",", 1)[0]` only reads first param (realm), loses nonce/qop/opaque
 - Fix: split all params individually: `for part in params_str.split(",")`
 - qop=auth requires nc + cnonce in the response hash
-- Correct password for w.alter.ai@sip.linphone.org: `«secret:vault»`
+- Correct password for w.alter.ai@sip.linphone.org: `{{bw:9a13ec17-b3c5-4278-a6bc-a5e8517a5187:password}}`
 - Asterisk's pjsip.conf uses `h3rm3s_2026_s1p` (different password, same account — may have been changed)
 
 ## Verified test

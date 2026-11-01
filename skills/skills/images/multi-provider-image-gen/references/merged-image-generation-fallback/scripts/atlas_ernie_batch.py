@@ -50,7 +50,7 @@ def main():
     parser.add_argument("--key", help="Atlas API key (or set ATLAS_KEY env var)")
     args = parser.parse_args()
 
-    key = args.key or "«secret:vault»"
+    key = args.key or "{{bw:W.Alter · atlas:field:api_key}}"
     set_key(key)
 
     with open(args.prompts_file) as f:

@@ -6,7 +6,7 @@ Output: /tmp/cookies-{gemini,suno,grok,...}.json
 import hashlib, json, sys
 from Crypto.Cipher import AES
 
-keychain_value = b'«secret:vault»'
+keychain_value = b'{{bw:W.Alter · macos:field:brave_keychain_key}}'
 dk = hashlib.pbkdf2_hmac('sha1', keychain_value, b'saltysalt', 1003, dklen=16)
 
 def dec(h):

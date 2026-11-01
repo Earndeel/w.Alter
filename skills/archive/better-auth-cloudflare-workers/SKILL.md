@@ -36,7 +36,7 @@ The mcporter `cfut_` token may lack D1 write permissions. Use the Global API Key
 ```bash
 CF_GLOBAL=$(vault get cloudflare/global_api_key)
 CF_EMAIL="lucas.jouvencon@gmail.com"
-CF_ACCOUNT="«secret:vault»"
+CF_ACCOUNT="{{bw:W.Alter · cloudflare:field:account_id}}"
 
 # Create D1 database via REST API
 curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/d1/database" \

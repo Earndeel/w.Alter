@@ -56,7 +56,7 @@ ua='Scena-P0-Hardening/1.0'
 with urllib.request.urlopen(urllib.request.Request(
     base+'/api/admin/login', method='POST',
     headers={'Content-Type':'application/json','User-Agent':ua},
-    data=json.dumps({'password':'«secret:vault»'}).encode()), timeout=30) as r:
+    data=json.dumps({'password':'{{bw:admin-scena.walter-ai.cloud:password}}'}).encode()), timeout=30) as r:
     token=json.loads(r.read().decode())['token']
 headers={'Authorization':'Bearer '+token,'Content-Type':'application/json','User-Agent':ua}
 for path, body in [
