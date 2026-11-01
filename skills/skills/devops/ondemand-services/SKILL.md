@@ -12,6 +12,8 @@ triggers:
 
 # On-Demand Services
 
+> **State on 2026-11-01.** Some services in the table below no longer exist (asterisk and qdrant retired 2026-10-19, Hindsight API retired). `ondemand.sh` and `ondemand-watchdog.timer` are still live (checked 2026-11-01): run `ondemand.sh status` for the real list.
+
 Services that are too heavy to run 24/7 are managed by `ondemand.sh`.
 
 ## When to Use

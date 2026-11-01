@@ -11,6 +11,8 @@ metadata:
 
 # Mac Brave W.Alter Instance
 
+> **State on 2026-11-01.** To act as Monsieur on a site, the normal path is `walter_browse` (Hermes) or `browser_session` + `walter-browser` (Claude Code, Codex, DSH): his cookies are injected server-side and the agent only gets metadata. Never extract Brave cookies, keychain keys or LevelDB yourself; the extraction steps below are history and debugging material. Entry: `walter-browse-orchestrator`.
+
 A separate Brave browser instance on the Mac with its own profile, for sites requiring a real macOS fingerprint (DataDome, Cloudflare strict, etc.). Does NOT interfere with the user's main Brave.
 
 ## Architecture

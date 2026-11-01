@@ -10,6 +10,8 @@ triggers:
 
 # Hermes Session Database (SQLite)
 
+> **State on 2026-11-01.** Hindsight API (:8888), hybrid search (:8889), Qdrant and the pg_qdrant sync worker were retired (2026-10-01 / 2026-10-19). Extracted knowledge now lives in Walter Memory (`core.events`, `search.chunks`, Kardex) in the same `hindsight-pg` database; `hindsight_recall` no longer exists — use `memory_search` / `memory_context`. Everything the agents did, from every runtime, is in `walter_logs` (`walter-memory logs …`). The state.db parts below are still accurate.
+
 ## Overview
 
 **File**: `~/.hermes/state.db` (≈1.2 GB as of 2026-06-15)
