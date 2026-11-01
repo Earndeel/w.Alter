@@ -21,7 +21,7 @@ remain available. Existing MCP sessions need their tool schemas refreshed to see
 
 ## Library layout and lifecycle (reorganised 2026-11-01)
 
-- `skills/<domain>/<name>/` — the **active** library: 21 plain domains (walter, secrets, hermes, web, computer-use,
+- `skills/<domain>/<name>/` — the **active** library: 20 plain domains (walter, secrets, hermes, web, computer-use,
   research, shopping, models, images, video, cloudflare, gpu, code, design, devops, messaging, productivity, home,
   learning, scena, + reserve-only audio/business). One small procedure per intent; a short **entry** skill
   (`kind: entry` in the sidecar) routes a domain when it has shared rules (web, cloudflare, image-generation,
