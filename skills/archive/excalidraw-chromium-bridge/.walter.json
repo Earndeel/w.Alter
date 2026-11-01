@@ -4,8 +4,9 @@
  "archived_reason": "not read by any agent for 30+ days",
  "domain": "design",
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/creative/excalidraw-chromium-bridge",
-  "sha": "edbf366bcb8fc3b3d20289509b28e9593539a06bc27f884220f1f7bea5f49e7e",
+  "sha": "e424507dee032db497139d76090364eeee735afb21536e918c571622bf781c9a",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

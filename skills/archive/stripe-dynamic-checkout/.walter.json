@@ -4,8 +4,9 @@
  "archived_reason": "never read by any agent",
  "domain": "business",
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/devops/stripe-dynamic-checkout",
-  "sha": "05edf3b5ed1a1819ef1644634ba67729fd26435a1e735d109a2e90799c84a7f5",
+  "sha": "d5cc187183248328a273448a4f2f78f8f7d8a7b339ac9eb1527df9fd0e098b56",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

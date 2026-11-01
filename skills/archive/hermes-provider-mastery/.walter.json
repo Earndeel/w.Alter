@@ -4,8 +4,9 @@
  "archived_reason": "not read by any agent for 30+ days",
  "domain": "hermes",
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/devops/hermes-provider-mastery",
-  "sha": "d44f960a55386bb082af6187caa91edb08dff275c6c46e7691394a9ab229a412",
+  "sha": "c715ebf2bf0f22dc13bc64bb28e25500c70ef40e1350e4e2e3bca4498bb0fe54",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

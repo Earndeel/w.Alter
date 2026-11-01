@@ -1,8 +1,8 @@
 {
  "hermes": {
-  "note": "secret scrub applied on both sides",
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/scena-video-factory",
-  "sha": "2f08173963b668dcfc7b4af7ad9b41c913d11ee297f4f53cae68a84f90bc0434",
+  "sha": "a6779d19e22fdd56c66ba0a4f39bf38767d9ebf0d6b1c67f375667a9e264d6ba",
   "state": "active",
   "synced_at": "2026-11-01T18:00:00+00:00"
  },

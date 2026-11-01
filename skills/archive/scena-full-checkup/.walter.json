@@ -4,8 +4,9 @@
  "archived_reason": "not read by any agent for 30+ days",
  "domain": "scena",
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/devops/scena-full-checkup",
-  "sha": "82b34e1299f75f2536f55cd539b398e4f6da36be8cb41dbf8772f3655706845f",
+  "sha": "d99935f3710b7ff7c5645d38e00d848da82abccbf0a6c310b0eabdc2d7f5d6fd",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",
