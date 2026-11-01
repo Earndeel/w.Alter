@@ -7,7 +7,9 @@
 #   statedb/   newest agent-runtime state snapshot (walter-statedb-backup)
 #   bitwarden/ vault export, already age-encrypted by Walter Secrets (`walter-secret vault-export`)
 #   config/    config bundle of the modules and their integrations (Walter Memory's backup_bundle, fail closed)
-#   projects/  the owner's project folders (offsite.projects), without rebuildable dependencies (2026-11-01)
+#   projects/  the owner's project folders (offsite.projects)                       } folder archives (2026-11-01):
+#   user/      the owner's folder (offsite.user), without its local backups and cache   } rebuildable dependencies and
+#   apps/      installed apps, their local changes and data (offsite.apps)              } offsite.folder_exclude left out
 # Remote retention per kind: keep_daily + keep_weekly (Sunday) + keep_monthly (1st). Upload is hash-verified by rclone.
 # Restore: rclone copy "<remote>/<kind>/<file>.age" . && age -d -i <recovery key> <file>.age > <file>
 # Without a copy of the PRIVATE recovery key off the machine, these files are unreadable once the machine is gone.
@@ -54,18 +56,21 @@ if wants config; then
   push config "$WORK/config-$TS.tar.zst"
 fi
 
-# Project folders: sources, git history and data; dependencies that a reinstall rebuilds are left out.
-# tar exits 1 when a file changes while it is read (a live site writing a log): accepted, anything else stops.
-if wants projects && [ -n "${WALTER_OFFSITE_PROJECTS:-}" ]; then
-  rel=(); for d in $WALTER_OFFSITE_PROJECTS; do [ -d "$d" ] && rel+=("${d#/}"); done
-  if [ ${#rel[@]} -gt 0 ]; then
-    tar -C / -cf "$WORK/projects-$TS.tar" --warning=no-file-changed \
-      --exclude=node_modules --exclude=.venv --exclude=venv --exclude=__pycache__ --exclude=.next \
-      --exclude=.cache --exclude=.pytest_cache "${rel[@]}" || [ $? -eq 1 ]
-    zstd -q -T2 -10 --rm "$WORK/projects-$TS.tar" -o "$WORK/projects-$TS.tar.zst"
-    push projects "$WORK/projects-$TS.tar.zst"
-  fi
-fi
+# Folder archives: sources, git history and data; what a reinstall rebuilds is left out, and so are the paths of
+# offsite.folder_exclude. tar exits 1 when a file changes while it is read (a live site writing a log): accepted.
+archive_folders() {  # archive_folders <kind> <absolute folders...>
+  local -; set -f; local kind=$1; shift; local rel=() ex=()   # no glob expansion of the patterns
+  for d in "$@"; do [ -d "$d" ] && rel+=("${d#/}"); done
+  [ ${#rel[@]} -gt 0 ] || return 0
+  for p in node_modules .venv venv __pycache__ .next .cache .pytest_cache ${WALTER_OFFSITE_FOLDER_EXCLUDE:-}; do
+    ex+=("--exclude=${p#/}"); done
+  tar -C / -cf "$WORK/$kind-$TS.tar" --warning=no-file-changed "${ex[@]}" "${rel[@]}" || [ $? -eq 1 ]
+  zstd -q -T2 -10 --rm "$WORK/$kind-$TS.tar" -o "$WORK/$kind-$TS.tar.zst"
+  push "$kind" "$WORK/$kind-$TS.tar.zst"
+}
+if wants projects && [ -n "${WALTER_OFFSITE_PROJECTS:-}" ]; then archive_folders projects $WALTER_OFFSITE_PROJECTS; fi
+if wants user && [ -n "${WALTER_OFFSITE_USER:-}" ]; then archive_folders user $WALTER_OFFSITE_USER; fi
+if wants apps && [ -n "${WALTER_OFFSITE_APPS:-}" ]; then archive_folders apps $WALTER_OFFSITE_APPS; fi
 
 # Remote retention
 python3 - "$REMOTE" "$WALTER_OFFSITE_KINDS" "$WALTER_OFFSITE_KEEP_DAILY" "$WALTER_OFFSITE_KEEP_WEEKLY" "$WALTER_OFFSITE_KEEP_MONTHLY" <<'PY'

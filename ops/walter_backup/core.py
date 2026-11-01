@@ -437,7 +437,11 @@ JOB_KEYS = {
 }
 # Optional parameters: exported only when the instance sets them (no default location, no error when absent).
 JOB_OPTIONAL_KEYS = {
-    "offsite": {"WALTER_OFFSITE_PROJECTS": ("offsite", "projects")},   # folders archived by the `projects` kind
+    "offsite": {"WALTER_OFFSITE_PROJECTS": ("offsite", "projects"),     # folders archived by the `projects` kind
+                "WALTER_OFFSITE_USER": ("offsite", "user"),             # the owner's folder (`user` kind)
+                "WALTER_OFFSITE_APPS": ("offsite", "apps"),             # installed apps and their data (`apps` kind)
+                "WALTER_OFFSITE_FOLDER_EXCLUDE": ("offsite", "folder_exclude"),  # paths left out of those archives
+                "WALTER_BUNDLE_EXCLUDE": ("offsite", "config_exclude")},         # rebuildable parts of the config bundle
     "git_publish": {"WALTER_GIT_PUBLISH_EXCLUDE": ("git_publish", "exclude"),     # module repositories never published
                     "WALTER_GIT_PUBLISH_DENY": ("git_publish", "deny_paths")},    # JSON {module: [path globs]}
 }
