@@ -69,58 +69,6 @@ $HERMES_HOME/cache/aa-pareto/model_profiles.csv
 
 If `HERMES_HOME` is absent, the collectors resolve the active Hermes home when possible and otherwise use the default profile home.
 
-## Design Arena stage (human preference > synthetic benchmarks)
-
-`refresh.py` covers the AA Intelligence benchmark and optional Kie.ai pricing. Add the **Design Arena** stage to bring in human preference,
-which ranks real judged HTML output (website, UI component, game, data-viz, 3D)
-and can disagree with synthetic indexes:
-
-```bash
-python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/collect_designarena.py --quiet
-```
-
-- Collects the `models` arena (public variation) across `allcategories`
-  (overall), `website`, `uicomponent`, `gamedev`, `dataviz`, `3d`, `svg`,
-  `graphicdesign`, `logo` — each row: model, Elo, win rate, battles, generation
-  time. Also snapshots the full `/api/registry` (display names, providers,
-  arenas).
-- `modelId` uses dots (`gpt-5.6-sol`); AA slugs use hyphens (`gpt-5-6-sol`).
-  Join on the normalized `slug_norm` field included in each Design Arena row
-  and in `registry`. Roughly 78 frontier models match AA; unmatched tail
-  models (mostly DA-only/codec variants) stay in `registry` for reference.
-- The former cron wrapper `~/.hermes/scripts/aa_pareto_daily_refresh.py` (no longer scheduled) runs
-  every stage sequentially (`refresh.py --with-kie` → `subscription.py` →
-  `refresh_modalities.py` → `collect_designarena.py` → `build_model_profiles.py`
-  → `router.py`) under the system Python, and exits non-zero if any stage fails.
-
-Design Arena endpoints (reverse-engineered, no auth):
-- `POST /api/leaderboard` with `{arenaType:"models"|"agents"|"builders", category, variationName:"public", inputModality?}` — Elo leaderboards. Valid models categories: `allcategories` (overall), `website`, `uicomponent`, `gamedev`, `dataviz`, `3d`, `svg`, `graphicdesign`, `logo`. Valid agents categories: `fullstack`, `agon_webapps`, `mobileapps`, `nativeapps`, `agentic_3d`, `agon_dataviz`, `agon_html` (some return 0 rows). `webapps` is invalid; "Image/Video to Website" = `website` + `inputModality`.
-- `GET /api/registry` — full model catalog (display names, providers, arenas).
-- A polite `sleep(0.5)` between categories plus backoff retries avoids the API's transient 400/429 rate limiting (individual curl calls pass; rapid bursts get 400).
-
-## Per-model competence profiles (AA + Design Arena join)
-
-`build_model_profiles.py` joins the AA Pareto snapshot with Design Arena into
-per-model profiles: for every AA model that matches a DA model you get
-the Intelligence Index + its matching AA cost per task, plus a Design Arena
-competence block per category (Elo, win rate, battles, and the model's rank
-within that category).
-
-```bash
-python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/build_model_profiles.py --quiet
-```
-
-- AA slugs carry reasoning-tier suffixes (`gpt-5-6-luna-high`) while DA keys
-  models at base level (`gpt-5.6-luna`); the join strips tier suffixes and
-  normalizes dots/underscores to hyphens, so tiered AA rows inherit the base
-  model's competence profile.
-- Outputs `model_profiles.json` (full profiles) and `model_profiles.csv`
-  (one row per AA slug; columns per category: Elo + rank). Read the CSV for
-  reporting — it is the join table for "model X is good at Y".
-- About 136 of 582 AA rows match DA (base models; the rest are tier/date
-  variants or models DA does not publish).
-- The former wrapper (manual run only) chains refresh → collect → profiles.
-
 ## Live extraction contract
 
 ### Intelligence
@@ -168,108 +116,6 @@ Each row in `latest.json.data` is one AA model configuration on the Intelligence
 
 Compare only Intelligence Index against its matching Intelligence Cost per Task. Multimodal metrics are separate and use their own published units.
 
-## Pareto policy
-
-Compute the Intelligence surface only:
-
-```text
-frontiers.intelligence_aa:
-  maximize intelligence_index
-  minimize aa_cost_per_task_intelligence_usd
-```
-
-### 1. `strict_frontier`
-
-All mathematically non-dominated rows:
-
-```text
-A dominates B when:
-A.score >= B.score
-AND A.cost <= B.cost
-AND at least one inequality is strict
-```
-
-This remains the reference frontier.
-
-### 2. `supported_frontier`
-
-Upper concave envelope of score versus natural-log cost. These are globally supported trade-offs under a proportional-cost utility. This view is useful mathematically but may be too aggressive for practical tier discovery.
-
-### 3. `upgrade_ladder` — primary decision view
-
-Pareto optimality alone cannot decide whether a score gain justifies a price increase without an explicit utility policy. Use a transparent marginal-return policy:
-
-1. choose the strongest knee on the global `supported_frontier` as the `value_anchor`;
-2. keep strict-frontier rows above that anchor in ascending raw AA task cost;
-3. compute each incremental return as `delta score / delta task cost`;
-4. build the upper concave envelope by removing every interior row where marginal return rises toward the next model instead of diminishing;
-5. retain the maximum-score endpoint as `quality_ceiling`.
-
-The retained sequence has monotonically decreasing marginal score gained per additional dollar. This is the set of discrete models that can be optimal for some linear willingness to pay for benchmark score. There is no fixed 5% performance band and no configurable score-spacing threshold in this decision layer.
-
-Each tier reports:
-
-```text
-actual_uplift_pct_from_anchor
-score_gain_from_anchor
-cost_multiple_from_anchor
-previous_tier
-score_gain_from_previous_tier
-cost_increase_from_previous_tier_usd
-marginal_score_per_dollar_from_previous
-incremental_cost_per_score_point
-marginal_return_retained_vs_previous_segment_pct
-```
-
-Use `incremental_cost_per_score_point` as the break-even interpretation: advance to that tier only when one extra Index point is worth at least that many dollars per benchmark task. `removed_by_marginal_return` preserves every omitted row plus its previous/next models and incoming, outgoing, and bypass marginal returns.
-
-A point such as GLM-5.2 or GPT-5.6 Sol xhigh may remain mathematically non-dominated yet be removed from the upgrade ladder when a later model offers a more efficient incremental upgrade. Never delete it from `strict_frontier`.
-
-`quality_ceiling` remains visible because maximum quality can be rational when cost has near-zero weight, even if its final marginal return is poor.
-
-### 4. `pragmatic_frontier` — value-filtered report view
-
-Build this view for the Intelligence axis only; modality metrics are handled in their separate task datasets:
-
-1. start from `epsilon_frontier`;
-2. remove score steps below `minimum_gain` (default `0.5` Index points) compared with the last retained candidate;
-3. walk candidates from cheapest to most expensive, comparing each with the last retained candidate;
-4. remove a candidate when its incremental AA benchmark-task cost exceeds `max_incremental_cost_per_score_point` (default `$0.75` per additional Index point); after a removal, compare the next candidate against the last retained one.
-
-This absolute marginal-cost cap is a practical value filter, not part of strict Pareto mathematics. A point can remain in `strict_frontier` and be removed from `pragmatic_frontier`; inspect `removed_by_cost_inefficiency` for the rejected model, comparison model, incremental cost, and threshold. The `quality_ceiling` stays separately visible in `upgrade_ladder` even when it exceeds the practical cap.
-
-### 5. `standout_frontier` — local diagnostic only
-
-Compare each interior strict-frontier point with its immediate cheaper and dearer neighbors. Keep endpoints and local knees whose incoming/outgoing marginal score-per-log-cost ratio reaches `--min-knee-strength` (default `2.0`).
-
-Use this view to explain local geometry, never as the normal recommendation shortlist. Immediate-neighbor artifacts can make a globally redundant model look exceptional.
-
-### Compatibility views
-
-`epsilon_frontier` and `pragmatic_frontier` remain available in schema version 10. `strict_frontier` remains the mathematical audit view; use the `pragmatic_frontier` for the value-filtered report table and `upgrade_ladder` for normal recommendations.
-
-## Thresholds
-
-Defaults:
-
-```text
-Intelligence Index > 35
-minimum knee strength = 2.0 (diagnostic only)
-maximum marginal AA task cost = $0.75 per additional Index point
-```
-
-The upgrade ladder has no score-step threshold. Override the practical frontier's value cap, eligibility, or diagnostic knee when needed:
-
-```bash
-python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/refresh.py \
-  --min-intel 45 \
-  --min-gain 0.5 \
-  --min-knee-strength 2.5 \
-  --max-incremental-cost-per-score-point 0.75
-```
-
-AA-only is the default. `--with-kie` is the optional live Kie.ai stage. When enabled, `refresh.py` reads the public pricing-table API (`https://api.kie.ai/client/v1/model-pricing/page`) and groups its per-direction records (Input, Cached Input, Cache Writes, Output) by model family before falling back to model-page HTML. A model page showing a placeholder such as `wocx` is not evidence that pricing is absent: verify the pricing-table API first. Kie translated costs remain estimates obtained from the Kie/AA blended token-price ratio and must be reported separately from the AA frontier.
-
 ## Recompute an existing snapshot
 
 Use `pareto.py`; it writes the standout view to CSV:
@@ -302,45 +148,6 @@ Raw snapshots exist for debugging, not normal reasoning.
 ## Scheduled refresh
 
 No longer scheduled: Walter Router owns the periodic collection (2026-10-21). Run the scripts by hand when an ad-hoc report needs a fresh cache.
-
-## Router engine (historical: superseded by Walter Router)
-
-Walter Router now owns routing (tiers L1/L2/L3 by the owner's method in `/walter/router/docs/TIERS.md`, specialised
-tasks by weighted leaderboards): do not route from `router_matrix.json`; use `walter-router route "<request>"` or
-`walter-router pick <task>`. `router.py` stays for comparison only, after a fresh collection. It implemented the
-owner's original routing philosophy:
-
-1. **Three intelligence levels derived from the AA Intelligence Pareto optimum**
-   (from `upgrade_ladder` in the fresh snapshot):
-   - L1 standard = the current `value_anchor`; never pin a historical named winner.
-   - L2 high     = the current ladder knee: the last tier before the sharpest fall in
-     `marginal_score_per_dollar_from_previous` (`ladder_knee()` in `router.py`).
-   - L3 max      = the current `quality_ceiling`.
-2. **Default routing** stays on the required level's model (cheapest sufficient).
-3. **Conditional escalation, only when the specific action needs a domain
-   skill**: then take the BEST model of that domain per Design Arena human
-   preference (e.g. frontend → Kimi K3, gamedev → Claude Opus 5, SVG → GPT-5.6
-   Sol), with the cost delta vs the default shown. A compromise line also shows
-   the best design model whose AA task cost does not exceed the default level's current
-   task cost (read from the fresh ladder, never a pinned constant).
-
-```bash
-python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/router.py            # full report
-python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/router.py "landing page"
-python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/router.py --level 2 "webapp react"
-python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/router.py --list-domains
-```
-
-- Domains: `frontend`, `3d`, `gamedev`, `dataviz`, `svg`, `brand`, `build`,
-  `slides` — each with keyword triggers (length-weighted) mapped to specific
-  Design Arena categories (NOT the Overall scale: a domain leader is the top
-  Elo of its primary category; e.g. dataviz → Claude Opus 5 at 1389 in Data
-  Viz, not Kimi K3's generic Overall score).
-- Brand/logo may point to image generators (gpt-image-2) outside the text-LLM
-  pool; they are flagged `in_llm_pool=false`.
-- Outputs `router_matrix.json` + `router_matrix.csv` (levels + domain leaders).
-- Needs `latest.json`, `designarena.json`, `model_profiles.json` in the cache
-  (the former wrapper, manual run only, chains all four stages).
 
 ## Interpretation order
 
@@ -401,6 +208,12 @@ Then verify:
 - **Unexpectedly tiny Intelligence universe:** reject the run and inspect RSC extraction rather than falling back silently to a comparison chart.
 - **Modalities missing:** rerun `refresh_modalities.py`; it must match each AA task table's expected headers. Do not substitute API list prices for benchmark costs, or stale modality data for a failed refresh.
 - **Stale result:** compare `generated_at` with the requested freshness window and rerun the collector;
+
+## Further reading (moved out of this file on 2026-11-01, unchanged)
+
+- `references/historical-router-engine.md` — The former router engine, superseded by Walter Router (history).
+- `references/pareto-policy.md` — Pareto policy and thresholds.
+- `references/design-arena-and-profiles.md` — The Design Arena stage and per-model competence profiles (AA + Design Arena join).
 
 ## Also covers (merged 2026-11-01)
 

@@ -11,6 +11,8 @@ metadata:
 
 # Webtop Authenticated Browsing
 
+> **State on 2026-11-01.** To act as Monsieur on a site, the normal path is `walter_browse` (Hermes) or `browser_session` + `walter-browser` (Claude Code, Codex, DSH): his cookies are injected server-side and the agent only gets metadata. Never extract Brave cookies, keychain keys or LevelDB yourself; the extraction steps below are history and debugging material. Entry: `walter-browse-orchestrator`.
+
 Browse sites where Lucas is logged in on Mac Brave, using anti-detect Camoufox or Webtop Chromium with injected cookies. Covers the full pipeline: extract → inject → navigate → interact → screenshot.
 
 ## Always-on rules

@@ -10,6 +10,8 @@ metadata:
 
 # Contact Intelligence Systems
 
+> **State on 2026-11-01.** Kardex is now the `kardex` schema of Walter Memory (decision A10, 2026-10-11), fed only by walter-memory processors from `core.events` and read through `person_lookup` / `memory_context`. Qdrant and `kardex-hindsight-sync.timer` are retired: semantic search is `search.chunks` (pgvector). Read the Qdrant sections below as design history; check `/walter/docs/ARCHITECTURE.md` before building anything.
+
 Use this skill when Monsieur asks to build, extend, audit, or operate a Kardex-style system: a living contact dossier that aggregates conversations across Beeper, Instagram, Facebook Messenger, WhatsApp, iMessage, Gmail, Android/SMS/calls, images, audio, and video.
 
 ## Core Principle

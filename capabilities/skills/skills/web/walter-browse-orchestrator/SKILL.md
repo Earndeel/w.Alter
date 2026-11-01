@@ -1,6 +1,6 @@
 ---
 name: walter-browse-orchestrator
-description: Any web task uses walter_browse, the single web front door.
+description: "Use first for any web task (search, read or extract a page, interact with a site, use Monsieur's logged-in session): walter_browse is the single front door; also says which web procedure to open."
 version: 1.0.0
 author: W.Alter
 license: MIT
@@ -85,3 +85,40 @@ backend Web reste interne à `walter_browse`; le backend GUI reste interne à
 
 L'outil renvoie du JSON compact (results/records). Résume à l'utilisateur en
 français, ne balance pas le JSON brut sauf si demandé.
+
+## Hors Hermes (Claude Code, Codex, DSH) — état 2026-11-01
+
+- Même porte : l'outil MCP `walter_browse` (serveur `walter`).
+- Utiliser un site **comme Monsieur** (compte connecté) : `browser_session(site, session)` (MCP), puis
+  `/opt/walter-core/bin/walter-browser [-e chromium] -s <session> new|nav|snap|click|clickxy|ktype|shot|eval|upload|fetch|close`
+  (ou `walter-browser -s <session> login SITE`). Moteurs : Camoufox Max (127.0.0.1:9377, par défaut) ; CloakBrowser,
+  Chromium furtif (127.0.0.1:9378), avec `-e chromium` quand le site exige Chromium. Sites configurés :
+  `browser_sites` (MCP) — ajouter un site dans `/opt/walter-core/browser_sites.json`.
+- **Ne jamais extraire de cookies soi-même** (base Cookies de Brave, clé du trousseau, LevelDB) : les cookies de
+  Monsieur sont injectés côté serveur, l'agent ne reçoit que des métadonnées. Les procédures plus anciennes qui
+  décrivent une extraction à la main (`web-service-browser`, `webtop-authenticated-browsing`, `mac-brave-walter`…)
+  servent d'historique et de dépannage, pas de chemin normal.
+- Mot de passe, création de compte, code 2FA ou code reçu par e-mail : `bitwarden-logins` (domaine secrets) — jamais de
+  mot de passe dans le chat ni dans les arguments.
+
+## Quel skill ouvrir (domaine web)
+
+| Besoin | Skill |
+|---|---|
+| Recherche / extraction publique, choix du backend, repli quand un backend échoue | `universal-web-extraction-router` |
+| Page bloquée : 403/429, paywall, WAF, mur anti-bot | `blocked-page-recovery` |
+| Extraction en masse / crawl (diagnostic Scrapling) | `scrapling` |
+| Session authentifiée qui ne tient pas (cookies présents mais pas de session) | `authenticated-session-fallbacks` |
+| Récupérer un document derrière un portail connecté (OTP, Cloudflare) | `authenticated-portal-document-retrieval` |
+| Étape sensible que Monsieur doit faire lui-même | `human-in-the-loop-gate` |
+| Remplir un profil de service connecté avec preuves | `authenticated-profile-evidence-gates` |
+| API du serveur Camoufox Max (contrat, smoke test, extraction de pages dynamiques, automatisation React/SPA) | `camoufox-max-api-current` |
+| Chromium réel via Playwright CDP dans le conteneur webtop ; administration du webtop | `playwright-cdp-browser-control`, `webtop-authenticated-browsing` |
+| Brave séparé sur le Mac (CDP 9226) pour DataDome / Cloudflare | `mac-brave-walter` |
+| Services web avec session (Gemini, Suno, Grok…) | `web-service-browser` |
+| Google Flow ; sessions Google OAuth persistantes | `google-flow-authenticated-access`, `google-oauth-session-persistence` |
+| Profils X / Facebook / Instagram sans API | `camoufox-social-scrape` |
+
+En réserve (`skill_read` le ramène automatiquement) : `anti-bot-navigation`, `agentic-web-navigation`,
+`hermes-camoufox-setup`, `google-auth-novnc`.
+

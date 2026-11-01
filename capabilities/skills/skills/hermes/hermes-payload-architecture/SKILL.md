@@ -6,6 +6,8 @@ version: 1.0.0
 
 # Hermes Payload Architecture
 
+> **State on 2026-11-01.** Hindsight was retired on 2026-10-19: where this skill says "Hindsight cards", read the Walter Memory context block (`memory_context`, provider `walter-memory`). The layering principles are unchanged. For DSH, payload assembly is walter-context (`/walter/context`).
+
 Use this skill when diagnosing or redesigning Hermes Agent prompt payload composition: static prefix caching, memory injection, Hindsight selection, compressed history, raw tail, latest-message authority, tool schema selection, and context bloat.
 
 ## Target payload layers
