@@ -47,6 +47,9 @@ def test_peek_and_merged_skills_are_not_restored(tmp_path, monkeypatch):
     assert (tmp_path / "archive/cloudflare-pages-deployment-patterns").exists()
     retrieval.read_skill("notion", restore=False)
     assert (tmp_path / "archive/notion").exists()
+    _skill(tmp_path, "archive", "jarvis-memory-system", meta={"retired": True, "archived_reason": "retired"})
+    assert "RETIRED" in retrieval.read_skill("jarvis-memory-system")
+    assert (tmp_path / "archive/jarvis-memory-system").exists()
 
 
 def test_index_lists_entries_first_and_the_reserve_last(tmp_path, monkeypatch):

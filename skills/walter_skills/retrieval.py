@@ -174,6 +174,9 @@ def read_skill(name: str, file_path: str | None = None, restore: bool = True, ru
         if hub:
             note = (f"[walter-skills: `{s.name}` was merged into `{hub}`; its original text follows unchanged. "
                     f"Current entry: skill_read('{hub}'); this text is also in `{hub}`/references/merged-{s.name}/]\n")
+        elif s.meta.get("retired"):
+            note = (f"[walter-skills: `{s.name}` is RETIRED ({s.meta.get('archived_reason', 'system no longer exists')}). "
+                    "History only: do not follow its commands.]\n")
         elif restore and reserve.restorable(s):
             s = reserve.restore(s.name, "read by an agent", runtime) or s
             note = f"[walter-skills: `{s.name}` was in the reserve; it is active again.]\n"
