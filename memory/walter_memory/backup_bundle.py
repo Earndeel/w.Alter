@@ -4,7 +4,7 @@ This module builds/verifies a tar payload; the offsite runner applies zstd + age
 It never prints file contents or credentials. Source state.db is backed up separately.
 """
 from __future__ import annotations
-import argparse,datetime,hashlib,importlib.util,io,json,os,pathlib,shlex,sqlite3,subprocess,tarfile,tempfile
+import argparse,datetime,fnmatch,hashlib,importlib.util,io,json,os,pathlib,shlex,sqlite3,subprocess,tarfile,tempfile
 
 MANIFEST='walter-backup-manifest.json'
 CORE_MODULES=('core','memory','router','skills','context','llm','soul','voice-memory','raw-vault')
@@ -16,8 +16,13 @@ SKIP_PREFIXES=('root/.hermes/hermes-agent/.git','opt/walter-memory/models/embedd
                'walter/memory/models/embeddings', 'root/.hermes/skills/.curator_backups','opt/dsh/home/sessions')
 PROFILE_TRANSIENT={'cache','audio_cache','image_cache','images','sessions','sandboxes','workspace','logs','lsp'}
 
+# Extra exclusions chosen by the caller (walter/ops passes the instance's list): rebuildable binaries, builds,
+# transient checkpoints. Shell-style patterns on archive names; a required path stays required (fail closed).
+EXTRA_EXCLUDE=tuple(x for x in os.environ.get('WALTER_BUNDLE_EXCLUDE','').split() if x)
+
 def excluded(name):
     p=pathlib.PurePosixPath(name)
+    if EXTRA_EXCLUDE and any(fnmatch.fnmatchcase(name,x) or fnmatch.fnmatchcase(name,x+'/*') for x in EXTRA_EXCLUDE):return True
     if any(x in SKIP_PARTS for x in p.parts):return True
     if any(name==x or name.startswith(x+'/') for x in SKIP_PREFIXES):return True
     if name.startswith('root/.hermes/profiles/'):
