@@ -6,7 +6,7 @@
  "hermes": {
   "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/devops/stripe-dynamic-checkout",
-  "sha": "d5cc187183248328a273448a4f2f78f8f7d8a7b339ac9eb1527df9fd0e098b56",
+  "sha": "e0c212fd5824a0beee4618ba69887128de33e5dac5477effe78f3f5595273341",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

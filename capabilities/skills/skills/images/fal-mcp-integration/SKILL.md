@@ -32,7 +32,7 @@ Binaires: `/usr/local/bin/fal-mcp`, `fal-mcp-dual`, `fal-mcp-http`
   }
 }
 ```
-- **CRITICAL**: `FAL_KEY` format: `uid:key` (ex: `«secret:vault»`)
+- **CRITICAL**: `FAL_KEY` format: `uid:key` (ex: `{{bw:W.Alter · FAL_KEY:field:FAL_KEY}}`)
 - Sans `FAL_KEY` exportee, `fal-mcp --help` retourne vide
 - Validation: `mcporter list` doit afficher `fal (18 tools, ~0.7s)`
 

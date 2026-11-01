@@ -9,7 +9,7 @@ Atlas Cloud is a Chinese proxy API (One-API/New-API backend) providing access to
 
 ## Auth
 - `Authorization: Bearer apikey-<hex>` (standard Bearer)
-- Key format: `«secret:vault»`
+- Key format: `{{bw:W.Alter · atlas:field:api_key}}`
 - Stored in vault: `atlas/api_key`
 
 ## 🔑 IMAGE GENERATION — ERNIE-Image-Turbo (VERIFIED WORKING)

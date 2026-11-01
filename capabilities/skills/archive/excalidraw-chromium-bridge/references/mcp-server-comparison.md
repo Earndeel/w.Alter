@@ -13,7 +13,7 @@ Tested 2026-06-29. Covers all delivery paths for Excalidraw diagrams from W.Alte
 - Generate JSON → POST to ExcaliDash API → instant collaborative board
 - **Best for:** Live collaboration, multi-board management, iteration
 - **Dependencies:** ExcaliDash running (Docker: frontend :6767 + backend :8000)
-- **Credentials:** `lucas@walter-ai.cloud` / `«secret:vault»`
+- **Credentials:** `lucas@walter-ai.cloud` / `{{bw:draw.walter-ai.cloud:password}}`
 - **API flow:** GET `/api/csrf-token` → POST `/api/auth/login` → POST `/api/drawings`
 - **Note:** In-memory storage. Server restart clears boards.
 

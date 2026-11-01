@@ -50,7 +50,7 @@ generic_session_share = 0.08
 cooldown_days = 30
 max_chars = 24000
 learner_sessions_per_night = 3
-always_active = ["drafts"]   # judged one by one, never destructive: applied on master even during the shadow period
+always_active = ["secrets", "drafts"]   # never destructive: applied on master at every quick run (secrets: vault values -> {{bw:…}})
 max_moves = 400            # organise: folder moves per run (names never change)
 max_domain_size = 30       # organise: a domain larger than this (or 'misc') triggers a re-organisation
 

@@ -20,7 +20,7 @@ from Crypto.Cipher import AES
 
 # Key from vault: vault get macos/brave_keychain_key
 # USE THE STRING AS-IS (not base64-decoded)
-keychain_str = "«secret:vault»"  # example
+keychain_str = "{{bw:W.Alter · macos:field:brave_keychain_key}}"  # example
 derived_key = hashlib.pbkdf2_hmac('sha1', keychain_str.encode('utf-8'), b'saltysalt', 1003, dklen=16)
 
 def decrypt(hex_val):
@@ -68,7 +68,7 @@ curl -s -b /tmp/sj.txt -b "$COOKIES" \
 
 Success = 302 redirect to `/account`. API key appears in HTML alert:
 ```
-API key has been generated:<br>«secret:vault»
+API key has been generated:<br>{{bw:W.Alter · smmflare:field:api_key}}
 ```
 
 Extract with: `grep -oE "API key has been generated:<br>[a-f0-9]+" | grep -oE "[a-f0-9]+$"`

@@ -18,7 +18,7 @@ The vault stores the raw Keychain password as a string (base64-encoded). Use it 
 import base64, hashlib, binascii
 from Crypto.Cipher import AES
 
-key_b64 = vault.get("macos/brave_keychain_key")  # e.g. "«secret:vault»"
+key_b64 = vault.get("macos/brave_keychain_key")  # e.g. "{{bw:W.Alter · macos:field:brave_keychain_key}}"
 password = key_b64.encode('utf-8')  # STRING, not decoded bytes
 salt = b'saltysalt'
 dk = hashlib.pbkdf2_hmac('sha1', password, salt, 1003, dklen=16)

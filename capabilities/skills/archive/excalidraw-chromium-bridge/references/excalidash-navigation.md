@@ -21,7 +21,7 @@ import time
 
 DOMAIN = "draw.walter-ai.cloud"
 EMAIL = "lucas@walter-ai.cloud"
-PASSWORD = "«secret:vault»"
+PASSWORD = "{{bw:draw.walter-ai.cloud:password}}"
 DRAWING_ID = "1bd29c80-2439-4cc8-a92e-7731f48ae0dd"
 
 with sync_playwright() as p:

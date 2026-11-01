@@ -10,7 +10,7 @@ import re
 import shutil
 from pathlib import Path
 
-from .. import postes, registry, store
+from .. import hermes_sync, postes, registry, secret_refs, store
 from . import base, signals
 
 RETIRED = {
@@ -249,6 +249,41 @@ def issues_body(verdict: dict | None) -> str:
     return ("\n\nJudge:\n" + "\n".join(f"- {i}" for i in issues)) if issues else ""
 
 
+class Secrets:
+    """No secret value in a skill (2026-11-01, Monsieur): every Bitwarden value becomes its Walter Secrets placeholder
+    {{bw:<item>:<field>}}, resolved at execution, never shown to a model. Covers the store (active, reserve, drafts)
+    and, for security only, Hermes' own copies (otherwise never edited). Value-free detection; always active."""
+    name, limit, editor = "secrets", None, False
+
+    def propose(self, ctx: base.Context) -> list[dict]:
+        if not secret_refs.available():
+            return []
+        roots = [ctx.root / d for d in ("skills", "archive", "drafts")]
+        if ctx.root == store.ROOT:
+            roots.append(hermes_sync.HERMES)
+        files = secret_refs.scan(roots)
+        return [{"files": [str(f) for f in files]}] if files else []
+
+    def apply(self, ctx: base.Context, p: dict) -> dict:
+        paths = [Path(f) for f in p["files"]]
+        # A Hermes copy that matched our last sync before the rewrite is realigned, so the rewrite is not drafted
+        # back as a "Hermes change"; a copy Hermes really changed keeps its pending state.
+        hermes_files = [f for f in paths if str(f).startswith(str(hermes_sync.HERMES) + "/")]
+        touched = {n: d for n, (d, _) in hermes_sync.hermes_active().items()
+                   if any(str(f).startswith(str(d) + "/") for f in hermes_files)} if hermes_files else {}
+        ours = {s.name: s for s in store.iter_skills(include_archived=True, root=ctx.root)}
+        in_sync = {n for n, d in touched.items()
+                   if n in ours and (ours[n].meta.get("hermes") or {}).get("sha") == store.tree_hash(d)}
+        r = secret_refs.fix(paths)
+        for n in in_sync:
+            s = ours[n]
+            store.write_sidecar(s.path, s.meta | {"hermes": (s.meta.get("hermes") or {}) | {"sha": store.tree_hash(touched[n])}})
+        c = ctx.commit(f"curator: secrets -> Bitwarden placeholders ({r['placeholders']} placeholders, "
+                       f"{r['generic_masks']} generic masks, {r['files']} files)", "secrets", None,
+                       r | {"hermes_files": len(hermes_files)})
+        return {"status": "done", "commit": c, **r}
+
+
 class Drafts:
     """Agents' proposals (write door) and Hermes' own changes → live at once, no model judge (git keeps the trace)."""
     name, limit, editor = "drafts", None, False
@@ -368,4 +403,4 @@ class Flags:
         return {"status": "reported"}
 
 
-OPERATORS = [Drafts(), Archive(), Links(), Merge(), Split(), Workflow(), Organize(), Flags()]
+OPERATORS = [Secrets(), Drafts(), Archive(), Links(), Merge(), Split(), Workflow(), Organize(), Flags()]

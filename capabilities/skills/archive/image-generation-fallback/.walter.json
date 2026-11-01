@@ -7,7 +7,7 @@
  "hermes": {
   "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/mlops/image-generation-fallback",
-  "sha": "05dcc3e5a06e6a15980a9d8aa80f4bc54475c1e245ad240fa471f3158cb340cc",
+  "sha": "66e9fdd173cd2a57221105000621f07a99623f945da01e5116d6cf5f7ea791e8",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

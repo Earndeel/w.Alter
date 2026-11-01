@@ -12,7 +12,7 @@ Each API key is scoped to a **group** that determines which models it can access
 
 | Group | Key (masked) | Models | Status |
 |-------|-------------|--------|--------|
-| **Claude Max** | `«secret:vault»` | Anthropic models (claude-opus-4-5, etc.) | ✅ Working |
+| **Claude Max** | `{{bw:W.Alter · ANTHROPIC_AUTH_TOKEN:field:ANTHROPIC_AUTH_TOKEN}}` | Anthropic models (claude-opus-4-5, etc.) | ✅ Working |
 | **Image-2** | `sk-aba...94f4` | `gpt-image-2` only | ⚠️ Backend 503s common |
 | **Codex** | `sk-e03...1c07` | OpenAI models (gpt-5.5, gpt-4o, etc.) | ✅ Working |
 

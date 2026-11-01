@@ -20,7 +20,7 @@ Direct `security find-generic-password -w` fails via SSH (errSecInteractionNotAl
 ```bash
 security find-generic-password -s "Brave Safe Storage" -a "Brave" -w
 ```
-He sends the result (e.g., `«secret:vault»`). This is the **PBKDF2 password** for decryption.
+He sends the result (e.g., `{{bw:W.Alter · macos:field:brave_keychain_key}}`). This is the **PBKDF2 password** for decryption.
 
 **Automated method (unreliable):** `osascript` with administrator privileges:
 ```bash
@@ -34,7 +34,7 @@ osascript -e 'do shell script "security list-keychains -d user -s ~/Library/Keyc
 ```
 **Reality (2026-05-22):** This often returns `errSecAuthFailed` (exit 36) or `-25308`. The direct-on-Mac method is 100% reliable — use it as the primary approach. Don't burn 15+ attempts trying osascript variants.
 
-The returned value (e.g., `«secret:vault»`) is the **PBKDF2 password**, not the raw AES key.
+The returned value (e.g., `{{bw:W.Alter · macos:field:brave_keychain_key}}`) is the **PBKDF2 password**, not the raw AES key.
 
 ## Decryption (AES-128-CBC)
 ```python

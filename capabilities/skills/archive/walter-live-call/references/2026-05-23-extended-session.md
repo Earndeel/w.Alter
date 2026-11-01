@@ -9,7 +9,7 @@
 ## SIP-Gemini direct bridge (abandoned)
 - Built raw SIP/UDP server at /opt/sip-gemini-bridge/sip_bridge.py
 - Registration with sip.linphone.org works with qop=auth (nc+cnonce, strip "Digest " prefix)
-- Correct password: «secret:vault»
+- Correct password: {{bw:9a13ec17-b3c5-4278-a6bc-a5e8517a5187:password}}
 - Outbound INVITE to earndeel@sip.linphone.org → 482 Loop Detected (same provider)
 - Routing through Asterisk ARI originate → Stasis race condition (call disappears before bridge attaches)
 - Conclusion: overengineering. Asterisk already handles SIP perfectly.

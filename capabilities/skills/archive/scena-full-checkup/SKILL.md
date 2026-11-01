@@ -54,7 +54,7 @@ Ops tables: ops_runs, ops_checks, ops_incidents, ops_repair_actions, ops_researc
 Test each route with requests:
 - GET /health → 200
 - GET /ping → 200
-- POST /api/admin/login → 200 (with {"password": "«secret:vault»"})
+- POST /api/admin/login → 200 (with {"password": "{{bw:admin-scena.walter-ai.cloud:password}}"})
 - GET /api/admin/stats, /clients, /jobs, /image-jobs → 200 (with Bearer token)
 - GET /api/admin/ops/runs → 200 and latest run should be `completed` with `risk_level=low` for production-ready; `medium` means there are still incidents or historical jobs to triage.
 - GET /api/saas/presets with a valid `sk_scena_*` key → 200 with enabled presets. Without a SaaS key, 401 is correct.

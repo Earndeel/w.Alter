@@ -10,7 +10,7 @@ description: Complete mastery of Cloudflare via MCP/mcporter -- 89 tools across 
 
 ### Comptes
 - **Email**: `lucas.jouvencon@gmail.com`
-- **Account ID**: `«secret:vault»`
+- **Account ID**: `{{bw:W.Alter · cloudflare:field:account_id}}`
 - **Global API Key** (compromis): `<secret retiré — clé globale Cloudflare : walter-cloudflare l'injecte (CLOUDFLARE_API_KEY)>`
 
 ### Emplacement config mcporter
@@ -30,10 +30,10 @@ TOUJOURS ecrire le JSON a la main. `mcporter config add` masque le token (`***`)
   "mcpServers": {
     "cloudflare": {
       "command": "npx",
-      "args": ["-y", "@cloudflare/mcp-server-cloudflare", "run", "«secret:vault»"],
+      "args": ["-y", "@cloudflare/mcp-server-cloudflare", "run", "{{bw:W.Alter · cloudflare:field:account_id}}"],
       "env": {
         "CLOUDFLARE_API_TOKEN": "<TOKEN_ICI>",
-        "CLOUDFLARE_ACCOUNT_ID": "«secret:vault»"
+        "CLOUDFLARE_ACCOUNT_ID": "{{bw:W.Alter · cloudflare:field:account_id}}"
       }
     }
   }
@@ -261,7 +261,7 @@ import urllib.request, json
 
 CF_KEY = "cfk_..."
 CF_EMAIL = "lucas.jouvencon@gmail.com"
-CF_ACCOUNT = "«secret:vault»"
+CF_ACCOUNT = "{{bw:W.Alter · cloudflare:field:account_id}}"
 
 with open("/path/to/worker.js") as f:
     script = f.read()

@@ -205,11 +205,11 @@ PIAPI_API_KEY=77a21faddd5fddbc661e26472dc1c482480c627c36fc08c96bcaf6573e33e197
 CLOUDFLARE_API_TOKEN=cfut_...  (scoped, limited permissions)
 CLOUDFLARE_GLOBAL_KEY=<secret retiré — clé globale Cloudflare : walter-cloudflare l'injecte (CLOUDFLARE_API_KEY)>  (full access)
 CLOUDFLARE_EMAIL=lucas.jouvencon@gmail.com
-CLOUDFLARE_ACCOUNT_ID=«secret:vault»
+CLOUDFLARE_ACCOUNT_ID={{bw:W.Alter · cloudflare:field:account_id}}
 CLOUDFLARE_ZONE_ID=ba01ee08564dc4b2f66fa60b968a75f8
 STRIPE_SECRET_KEY=...
 CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 ADMIN_USER=scena
-ADMIN_PASS=«secret:vault»
+ADMIN_PASS={{bw:admin-scena.walter-ai.cloud:password}}
 ```

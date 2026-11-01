@@ -268,7 +268,7 @@ Every Excalidraw element has these common fields:
 
 When ExcaliDash is available (draw.walter-ai.cloud), push diagrams via REST API instead of Chromium fiber traversal. Simpler, no browser dependency, supports multi-board.
 
-**Credentials:** `lucas@walter-ai.cloud` / `«secret:vault»`
+**Credentials:** `lucas@walter-ai.cloud` / `{{bw:draw.walter-ai.cloud:password}}`
 
 **Board registry:** `draw.walter-ai.cloud` → drawing `1bd29c80-2439-4cc8-a92e-7731f48ae0dd` (Hermes Agent Payload Architecture). Use `/editor/{id}` for browser access, NOT `/d/{id}` (broken SPA routing).
 
@@ -286,7 +286,7 @@ cookie = resp.getheader("Set-Cookie", "").split(";")[0]
 
 conn2 = http.client.HTTPSConnection("draw.walter-ai.cloud", timeout=10, context=ctx)
 conn2.request("POST", "/api/auth/login",
-    body=json.dumps({"username": "lucas", "password": "«secret:vault»"}),
+    body=json.dumps({"username": "lucas", "password": "{{bw:draw.walter-ai.cloud:password}}"}),
     headers={"Content-Type": "application/json", "x-csrf-token": csrf, "Cookie": cookie})
 resp2 = conn2.getresponse(); resp2.read()
 for h in resp2.getheaders():
@@ -363,7 +363,7 @@ print(f"https://draw.walter-ai.cloud/d/{result['id']}")
 
 22. **MCP server `create_from_mermaid` needs full frontend**: The canvas-only Docker image (`ghcr.io/yctimlin/mcp_excalidraw-canvas:latest`) supports REST API but NOT Mermaid conversion. Mermaid → Excalidraw requires the full Vite frontend build. For mindmaps, JSON direct with pill nodes and elbow arrows produces better results than Mermaid auto-layout anyway. See `references/mcp-server-comparison.md`.
 
-23. **ExcaliDash API is simpler than Chromium fiber traversal for delivery**: When the goal is "push diagram to user's browser", use ExcaliDash REST API (`POST /api/drawings`) instead of Chromium fiber injection. No Playwright dependency, no font rendering issues, supports multi-board. Credentials: `lucas@walter-ai.cloud` / `«secret:vault»`. See "ExcaliDash API Delivery" section above.
+23. **ExcaliDash API is simpler than Chromium fiber traversal for delivery**: When the goal is "push diagram to user's browser", use ExcaliDash REST API (`POST /api/drawings`) instead of Chromium fiber injection. No Playwright dependency, no font rendering issues, supports multi-board. Credentials: `lucas@walter-ai.cloud` / `{{bw:draw.walter-ai.cloud:password}}`. See "ExcaliDash API Delivery" section above.
 
 24. **Official Excalidraw Docker (`excalidraw/excalidraw`) is UNUSABLE for headless programmatic scene population**: The official Docker image is a pure client-side React SPA with zero server-side API. Tested 15 distinct approaches — ALL failed to produce reliable headless rendering:
 

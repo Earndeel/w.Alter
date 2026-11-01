@@ -3,8 +3,8 @@
 ## Problem
 
 SPA dashboards (One-API, Sub2API, AIPrimeTech, OpenRouter, etc.) mask API keys in:
-- **DOM**: `<code>«secret:vault»</code>` — truncated, not the full key
-- **API responses**: `/api/v1/keys` returns `{"key": "«secret:vault»"}` — same masked value
+- **DOM**: `<code>{{bw:W.Alter · ANTHROPIC_AUTH_TOKEN:field:ANTHROPIC_AUTH_TOKEN}}</code>` — truncated, not the full key
+- **API responses**: `/api/v1/keys` returns `{"key": "{{bw:W.Alter · ANTHROPIC_AUTH_TOKEN:field:ANTHROPIC_AUTH_TOKEN}}"}` — same masked value
 - **Clipboard**: "Copy" buttons copy the masked value
 
 The full key is only displayed **visually** in the "Use Key" / "Configure" modal.

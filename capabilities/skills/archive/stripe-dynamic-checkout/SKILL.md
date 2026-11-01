@@ -100,7 +100,7 @@ When Stripe checkout triggers 3D Secure (SMS/iMessage code), automate the full l
    ```python
    card = f.query_selector('#cardNumber')
    card.click(click_count=3)  # select all
-   card.type('«secret:vault»', delay=20)
+   card.type('{{bw:Carte – Vast.ai:number}}', delay=20)
    # Same pattern for #cardExpiry, #cardCvc, #billingName
    ```
 4. Submit: `f.evaluate("document.querySelector('[data-testid=\"hosted-payment-submit-button\"]')?.click()")`

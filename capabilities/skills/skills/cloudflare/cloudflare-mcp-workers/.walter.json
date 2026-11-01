@@ -2,7 +2,7 @@
  "hermes": {
   "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/cloud/cloudflare-mcp-workers",
-  "sha": "049857ba7f59ca104c223ff1e5ae30ffb85218d8bfad414b62c8714cdf1ae705",
+  "sha": "cab32ec8a35730840bd7e4c6097e902d45a4bb6f21b79760b9c32d7fbac02044",
   "state": "active",
   "synced_at": "2026-11-01T18:00:00+00:00"
  },
