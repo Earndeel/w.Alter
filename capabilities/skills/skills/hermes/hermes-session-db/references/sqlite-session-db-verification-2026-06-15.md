@@ -116,7 +116,7 @@ ID=102660 | role=assistant
 ID=102658 | role=assistant
   tool_calls: [{"id": "chatcmpl-tool-82ca551c3fa23b67", "call_id": "chatcmpl-tool-82ca551c3fa23b67", "response_item_id": "fc_chatcmpl-tool-82ca551c3fa23b67", "type": "function", "function": {"name": "terminal", "arguments": "{\"command\": \"aws bedrock-runtime invoke-model --model-id \\\"us.anthropic.claude-opus-4-8-20260213-v1:0\\\" --region «secret:vault» --content-type \\\"application/json\\\" --accept \\\"application/json\\\" --body '{\\\"anthropic_version\\\":\\\"bedrock-2023-05-31\\\",\\\"max_tokens\\\":50,\\\"messages\\\":[{\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"Say OK\\\"}]}' /tmp/bedrock_test.json 2>&1\"}}]
   tool_name: None
-  reasoning: Credentials are verified - account 604179600405. Now let me test Bedrock Opus 4.8.
+  reasoning: Credentials are verified - account {{bw:W.Alter · aws:field:account_id}}. Now let me test Bedrock Opus 4.8.
 ```
 
 ## Conclusion
