@@ -62,7 +62,7 @@ def manifest() -> str:
         return _call("GET", "/v1/manifest", timeout=10)
     except Exception:
         try:
-            return (STORE / "MANIFEST.md").read_text()
+            return (STORE / "manifest" / "GUIDE.md").read_text()
         except OSError:
             return "Module manifest unavailable; search/read remain available."
 

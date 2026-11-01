@@ -58,7 +58,19 @@ STEPS = [
     ("cards_after", cards.refresh),
     ("train", learning.train_and_promote),
     ("domain_map", lambda: len(domains.build())),
+    ("module_layer", lambda: publish_module_layer()),
 ]
+
+
+def publish_module_layer() -> dict:
+    """The file profiles (Codex, DSH) carry this module's overview in the 'Modules W.Alter' layer: walter-context
+    republishes it (only when it changed) through its CLI. MCP clients compose it themselves at session start."""
+    import shutil
+    import subprocess
+    if not shutil.which("walter-context"):
+        return {"skipped": "walter-context unavailable"}
+    out = subprocess.run(["walter-context", "capability", "all", "--write"], capture_output=True, text=True, timeout=180)
+    return json.loads(out.stdout) if out.returncode == 0 else {"error": "walter-context write failed"}
 
 
 def nightly(only: set[str] | None = None, steps=None, key: str = "nightly") -> dict:
