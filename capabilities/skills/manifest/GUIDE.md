@@ -1,4 +1,4 @@
-# walter-skills — manifeste du module
+# walter-skills — guide détaillé
 
 ## Objectif
 

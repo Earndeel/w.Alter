@@ -76,8 +76,9 @@ def expose(kind: str, message: str, *, context: str = "", session_id: str | None
     msg = (message or "").strip()
     out = Exposure()
 
+    layered = runtime in p.get("layer_runtimes", [])  # the module layer already shows the map
     if kind == "session_start":
-        if p["domain_map"]:
+        if p["domain_map"] and not layered:
             out.text, out.mode = _safe(lambda: domains.render(search_tool), ""), "map"
             out.shown = []
         return _done(out, t0, runtime, session_id, msg, journal=False)
@@ -88,7 +89,7 @@ def expose(kind: str, message: str, *, context: str = "", session_id: str | None
 
     if kind == "message" and p.get("discovery", "shortlist") == "on_demand":
         out.reason = "on-demand discovery"
-        if first_turn and p["domain_map"]:
+        if first_turn and p["domain_map"] and not layered:
             out.text, out.mode = _safe(lambda: domains.render(search_tool), ""), "map"
         return _done(out, t0, runtime, session_id, msg, journal=False)
 
@@ -143,7 +144,7 @@ def expose(kind: str, message: str, *, context: str = "", session_id: str | None
         out.text = _cards_text(shown, read_tool)
         out.shown, out.mode = [r["name"] for r in shown], "inject"
         out.reason = "confident" if confident else "ambiguous"
-    if first_turn and p["domain_map"]:
+    if first_turn and p["domain_map"] and not layered:
         tier0 = _safe(lambda: domains.render(search_tool), "")
         if tier0:
             out.text = tier0 + ("\n\n" + out.text if out.text else "")

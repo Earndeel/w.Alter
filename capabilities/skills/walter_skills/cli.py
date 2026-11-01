@@ -32,6 +32,8 @@ def main() -> int:
     for c in ("sync", "cards", "catalog", "implicit", "judge", "sessions", "map", "digest", "health", "quick"):
         sub.add_parser(c)
     sub.add_parser("manifest")
+    br = sub.add_parser("brief")
+    br.add_argument("--json", action="store_true"); br.add_argument("--map-only", action="store_true"); br.add_argument("--search-tool", default="skills_search")
     ix = sub.add_parser("index")
     ix.add_argument("--domain", default="")
     ix.add_argument("--offset", type=int, default=0)
@@ -88,6 +90,13 @@ def main() -> int:
         from . import domains
         domains.build()
         print(domains.render("skills_search"))
+    elif a.cmd == "brief":
+        from . import domains
+        if a.map_only:
+            print(domains.domain_map())
+            return
+        doc = domains.brief_document(a.search_tool)
+        print(json.dumps(doc, ensure_ascii=False) if a.json else doc["content"])
     elif a.cmd == "manifest":
         from . import domains
         print(domains.manifest())

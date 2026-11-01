@@ -80,7 +80,7 @@ def index(domain: str = '', offset: int = 0, limit: int = 20, *, root: Path | No
 
 
 def manifest(root: Path | None = None) -> str:
-    return ((root or Path(__file__).resolve().parent.parent) / 'MANIFEST.md').read_text()
+    return ((root or Path(__file__).resolve().parent.parent) / 'manifest' / 'GUIDE.md').read_text()
 
 
 def render(search_tool: str) -> str:
@@ -93,3 +93,23 @@ def render(search_tool: str) -> str:
               f"{search_tool}(query=…) cherche par intention. Lis ensuite le skill choisi et seulement ses références utiles.\n"
               "Index compact des domaines (total / workflows) :\n")
     return header + '\n'.join(f"- {d['domain']} : {d['count']} / {d['workflows']}" for d in data['domains'])
+
+
+def domain_map() -> str:
+    """Live part of the module's level-1 manifest: the compact domain map (manifest/MANIFEST.md says how to use it)."""
+    data = index()
+    return ("Domaines (total / workflows) :\n"
+            + '\n'.join(f"- {d['domain']} : {d['count']} / {d['workflows']}" for d in data['domains']))
+
+
+def brief_document(search_tool: str = 'skills_search') -> dict:
+    """Level 0 of the module in the shared v1 note envelope consumed by walter-context (walter present)."""
+    import hashlib
+    hermes = search_tool.startswith('walter_')
+    content = '### W.Alter Skills — procédures et workflows partagés entre les agents\n' + render(search_tool).split('\n', 1)[1]
+    tools = ([search_tool, 'walter_skills_index', 'walter_skill_read'] if hermes
+             else [search_tool, 'skills_index', 'skill_read'])
+    return {'schema_version': 1, 'note_version': 1, 'id': 'walter-skills.brief', 'module': 'skills',
+            'format': 'text/markdown', 'content': content, 'sha256': hashlib.sha256(content.encode()).hexdigest(),
+            'chars': len(content), 'required_tools': tools, 'placement': 'stable_capabilities',
+            'refresh': 'next_owner_message', 'source': {'command': 'walter-skills', 'args': ['brief', '--json']}}

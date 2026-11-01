@@ -4,7 +4,7 @@
     "config/walter-skills.toml",
     "contracts/skills.json",
     "walter_skills/api.py",
-    "MANIFEST.md"
+    "manifest/GUIDE.md"
   ],
   "requires": [
     "bus"
@@ -164,5 +164,32 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "W.Alter Skills",
+    "order": 80,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "manifest_command": [
+      "walter-skills",
+      "brief",
+      "--map-only"
+    ],
+    "tools": [
+      "skills_search",
+      "skills_index",
+      "skill_read"
+    ],
+    "index": {
+      "command": [
+        "walter-skills",
+        "index"
+      ],
+      "section_arg": "--domain",
+      "paged": true,
+      "sections": "domaines (sans section : la liste des domaines)"
+    }
   }
 }
