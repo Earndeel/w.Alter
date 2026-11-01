@@ -26,7 +26,7 @@ def run(apply: bool | None = None, use_models: bool = True, only: set[str] | Non
     ctx = base.Context(root=root, mode=mode, day=day, cfg=cfg, cards=registry.cards(), aliases=aliases(),
                        use_models=use_models)
     active = list(store.iter_skills(root=root))
-    ctx.sig = {"active": active, "usage": signals.usage(ctx.aliases), "needed": signals.judged_needed(),
+    ctx.sig = {"active": active, "usage": signals.usage(ctx.aliases), "needed": signals.judged_needed(cfg["archive_after_days"]),
                "pins": signals.pinned(), "cool": signals.recently_curated(cfg["cooldown_days"]),
                "successors": signals.successors(), "sim": signals.similarity(active, ctx.cards, Encoder.get())}
     editor_ok = use_models and postes.available("editor")

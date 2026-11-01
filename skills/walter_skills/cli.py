@@ -27,6 +27,7 @@ def main() -> int:
     x.add_argument("--session"); x.add_argument("--first", action="store_true"); x.add_argument("--kind", default="message")
     r = sub.add_parser("read")
     r.add_argument("name"); r.add_argument("--file", default=None)
+    r.add_argument("--peek", action="store_true", help="read without restoring a skill from the reserve")
     n = sub.add_parser("nightly")
     n.add_argument("--only", default="")
     for c in ("sync", "cards", "catalog", "implicit", "judge", "sessions", "map", "digest", "health", "quick"):
@@ -56,7 +57,7 @@ def main() -> int:
         print(f"[{e.mode} · {e.reason} · {e.latency_ms} ms]\n{e.text}")
     elif a.cmd == "read":
         from .retrieval import read_skill
-        text = read_skill(a.name, a.file)
+        text = read_skill(a.name, a.file, restore=not a.peek, runtime="cli")
         if text is None:
             print(f"unknown: {a.name}", file=sys.stderr)
             return 1

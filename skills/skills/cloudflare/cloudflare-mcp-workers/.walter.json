@@ -1,8 +1,10 @@
 {
  "hermes": {
+  "note": "secret scrub applied on both sides",
   "path": "/root/.hermes/skills/cloud/cloudflare-mcp-workers",
-  "sha": "ca8601fb947fab8047907f108e92bd733a324a9f3cca67010888911d7d0d30ae",
-  "state": "active"
+  "sha": "55b5f760d7a8871fc769c75b705c94e68d98b86be731e0021df4130c5271c666",
+  "state": "active",
+  "synced_at": "2026-11-01T18:00:00+00:00"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",

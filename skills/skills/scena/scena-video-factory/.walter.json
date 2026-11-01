@@ -1,8 +1,10 @@
 {
  "hermes": {
+  "note": "secret scrub applied on both sides",
   "path": "/root/.hermes/skills/scena-video-factory",
-  "sha": "85a006a8c525e066c52babab8ebbcb3f6552d5b4a59ae93d1f5b36e4ecf8882c",
-  "state": "active"
+  "sha": "2f08173963b668dcfc7b4af7ad9b41c913d11ee297f4f53cae68a84f90bc0434",
+  "state": "active",
+  "synced_at": "2026-11-01T18:00:00+00:00"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",

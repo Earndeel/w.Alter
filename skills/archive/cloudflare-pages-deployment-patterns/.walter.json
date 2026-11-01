@@ -5,9 +5,11 @@
  "archived_reason": "merged into cloudflare-pages-deploy (2026-11-01 reorganisation)",
  "domain": "cloudflare",
  "hermes": {
+  "note": "secret scrub applied on both sides",
   "path": "/root/.hermes/skills/cloudflare-pages-deployment-patterns",
-  "sha": "04fbfa4a1445ffae8eee74681f7ef1be8b2ec4f56a2fe9783eb2fdf461b64dff",
-  "state": "active"
+  "sha": "5f22ca57527c796c4676c657d15b65efe89d9ca95e187abbf5b1c21b086123d4",
+  "state": "active",
+  "synced_at": "2026-11-01T18:00:00+00:00"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",

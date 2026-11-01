@@ -38,7 +38,7 @@ eval_min_cases = 150
 [curation]
 mode = "active"
 shadow_until = "2026-10-23"   # before this date: a git branch curator/<date> + report, master untouched
-archive_after_days = 60
+archive_after_days = 30    # 2026-11-01 (Monsieur): dormant 30 days -> reserve; the reserve is searched and restored on read
 max_merges = 5
 max_workflows = 3
 max_splits = 3

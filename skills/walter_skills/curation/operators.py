@@ -24,7 +24,8 @@ RETIRED = {
 
 
 class Archive:
-    """Dead skills: no read by any agent for N days, never labelled as needed, not pinned → archive/."""
+    """Dormant skills: no read by any agent for N days, not needed by a real message in N days, not pinned, not an
+    entry → the reserve (archive/ + `reserve: true`): still found by search and restored as soon as an agent reads it."""
     name, limit, editor = "archive", None, False
 
     def propose(self, ctx: base.Context) -> list[dict]:
@@ -33,7 +34,8 @@ class Archive:
             u = sig["usage"].get(s.name, {})
             idle = (signals.now() - u["last"]).days if u.get("last") else None
             age = signals.content_age_days(s)
-            if (s.name not in sig["pins"] and not sig["needed"].get(s.name) and age >= ctx.cfg["archive_after_days"]
+            if (s.name not in sig["pins"] and not sig["needed"].get(s.name) and s.meta.get("kind") != "entry"
+                    and age >= ctx.cfg["archive_after_days"]
                     and (idle is None or idle >= ctx.cfg["archive_after_days"])):
                 out.append({"skill": s.name, "idle_days": idle, "content_age_days": age,
                             "reason": "never read by any agent" if idle is None else f"not read for {idle} days"})
@@ -43,8 +45,9 @@ class Archive:
         s = ctx.skills().get(p["skill"])
         if not s:
             return {"status": "skipped"}
-        base.archive(ctx.root, s, p["reason"])
-        c = ctx.commit(f"curator: archive {s.name} ({p['reason']}; never labelled as needed)", "archive", s.name, p)
+        base.archive(ctx.root, s, p["reason"], {"reserve": True})
+        c = ctx.commit(f"curator: reserve {s.name} ({p['reason']}; not needed by a real message lately)", "archive",
+                       s.name, p)
         return {"status": "done", "commit": c}
 
 
@@ -144,7 +147,7 @@ class Merge:
             for j in range(i + 1, len(act)):
                 a, b = act[i], act[j]
                 if sim[i, j] < ctx.cfg["dup_cosine"] or "upstream" in (a.meta.get("owner"), b.meta.get("owner")) \
-                        or {a.name, b.name} & (sig["cool"] | sig["pins"]) or "workflow" in (a.meta.get("kind"), b.meta.get("kind")):
+                        or {a.name, b.name} & (sig["cool"] | sig["pins"]) or {"workflow", "entry"} & {a.meta.get("kind"), b.meta.get("kind")}:
                     continue
                 out.append({"a": a.name, "b": b.name, "cosine": round(float(sim[i, j]), 3),
                             "reads_60d": [sig["usage"].get(a.name, {}).get("n60", 0),
@@ -197,8 +200,14 @@ class Workflow:
 
     def propose(self, ctx: base.Context) -> list[dict]:
         pos = {s.name: i for i, s in enumerate(ctx.sig["active"])}
+        # A chain already covered by a workflow, active or archived, is never written again (until 2026-11-01 the
+        # same three steps came back every night under a new name).
+        known = {frozenset(s.meta.get("requires") or []) for s in store.iter_skills(include_archived=True, root=ctx.root)
+                 if (s.meta.get("kind") == "workflow" or s.meta.get("absorbed_into")) and s.meta.get("requires")}
         out = []
         for w in signals.workflow_chains(ctx.aliases, set(pos), ctx.cfg):
+            if frozenset(w["steps"]) in known:
+                continue
             ix = [pos[n] for n in w["steps"]]
             top = max(float(ctx.sig["sim"][i, j]) for i in ix for j in ix if i != j)
             if top < ctx.cfg["workflow_max_step_cosine"]:  # too similar = variants of one tool, not a chain
@@ -223,9 +232,9 @@ class Workflow:
         name = re.sub(r"[^a-z0-9-]", "-", str(obj.get("name", "")).lower()).strip("-")
         missing = [s.name for s in steps if s.name not in obj["skill_md"]]
         # No model judge (2026-10-26, Monsieur): every step named, workflow type, free name.
-        if missing or "type: workflow" not in obj["skill_md"] or not name or name in sk:
+        if missing or "type: workflow" not in obj["skill_md"] or not name or name in sk or store.find(name):
             return {"status": "rejected", "name": name, "missing_steps": missing}
-        dst = ctx.root / "skills" / "workflows" / name
+        dst = ctx.root / "skills" / (steps[0].domain or "workflows") / name  # lives in the domain of its first step
         dst.mkdir(parents=True, exist_ok=True)
         (dst / "SKILL.md").write_text(obj["skill_md"].rstrip() + "\n")
         store.write_sidecar(dst, {"origin": "walter-curator", "owner": "walter", "kind": "workflow",
