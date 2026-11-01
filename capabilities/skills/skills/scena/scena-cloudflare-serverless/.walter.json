@@ -1,7 +1,8 @@
 {
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/devops/scena-cloudflare-serverless",
-  "sha": "4b6f92d3a4461a50d8994a7020031ff9d1e38dde0e4d9cbb10d89951c7487fcd",
+  "sha": "fd09db333ebcbf4da38fba43ae7019651d835de57ba5dd5b2427c20c9c193be5",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

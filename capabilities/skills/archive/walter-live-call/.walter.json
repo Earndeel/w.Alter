@@ -4,8 +4,9 @@
  "archived_reason": "describes a system retired on 2026-10-19 (voice calls, Asterisk)",
  "domain": "audio",
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/devops/walter-live-call",
-  "sha": "5496049afbb3487e9290f16d07899f97fdec4dd39d6d2ed16c6c113c5b0c5068",
+  "sha": "1147389644cfcd0ab98e01a847a43f41eabffd60cb66541c4723e07032d6720b",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

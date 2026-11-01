@@ -5,9 +5,9 @@
  "archived_reason": "merged into cloudflare-pages-deploy (2026-11-01 reorganisation)",
  "domain": "cloudflare",
  "hermes": {
-  "note": "secret scrub applied on both sides",
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/cloudflare-pages-deployment-patterns",
-  "sha": "5f22ca57527c796c4676c657d15b65efe89d9ca95e187abbf5b1c21b086123d4",
+  "sha": "1e0278ade08ed9e9074d00c73e92316b5ae53323920acf258cee639c679104e8",
   "state": "active",
   "synced_at": "2026-11-01T18:00:00+00:00"
  },

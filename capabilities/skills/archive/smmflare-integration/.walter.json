@@ -3,8 +3,9 @@
  "archived_reason": "never read by any agent",
  "domain": "misc",
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/smmflare-integration",
-  "sha": "26959114e5ff1b7bad16e8480eda94662c1734c1701dc5236731131f2b94409a",
+  "sha": "6b94b1f0bb3eaac083062b03501645009c24f5d6704dc984e96a4a2d2f21ee92",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

@@ -4,8 +4,9 @@
  "archived_reason": "not read by any agent for 30+ days",
  "domain": "business",
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/devops/stripe-checkout-automation",
-  "sha": "e674ae68ad556095c406bc5f1788d260a09cf710b470585e024a65bee254367a",
+  "sha": "6a4bf62339b86cf2e94efa3a10c3fdb0bf3e58a259e811f552314a06b783f593",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

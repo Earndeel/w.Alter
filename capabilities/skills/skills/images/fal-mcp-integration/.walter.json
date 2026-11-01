@@ -1,7 +1,8 @@
 {
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/mcp/fal-mcp-integration",
-  "sha": "6cebab720245ab2dfd307cfd6983b11a1ccc826f7ba6fe0dcc7f67225f019380",
+  "sha": "aeae0c44403e3a627e62ffa6d8e0f9969696b717ee8f21f0916f2dcce6c68632",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

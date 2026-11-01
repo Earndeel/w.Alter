@@ -1,7 +1,8 @@
 {
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/devops/webtop-authenticated-browsing",
-  "sha": "5cb809c552dc9a99f907c2c85fed1d8799c4b7be89dfed89e406cf60c2419006",
+  "sha": "2b4df47b4979f26c582591a255ca7bff76511993e68532c15a86ffbe256b6b29",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",

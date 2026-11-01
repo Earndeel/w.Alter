@@ -5,8 +5,9 @@
  "archived_reason": "merged into multi-provider-image-gen (2026-11-01 reorganisation)",
  "domain": "images",
  "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/mlops/image-generation-fallback",
-  "sha": "c6617f8b3ff2b7d18ff18c8bcafd42e1e77f09e6a0cfb495cb3e130928791071",
+  "sha": "05dcc3e5a06e6a15980a9d8aa80f4bc54475c1e245ad240fa471f3158cb340cc",
   "state": "active"
  },
  "imported_at": "2026-10-09T17:16:13+00:00",
