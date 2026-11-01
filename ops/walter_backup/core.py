@@ -441,7 +441,8 @@ JOB_OPTIONAL_KEYS = {
                 "WALTER_OFFSITE_USER": ("offsite", "user"),             # the owner's folder (`user` kind)
                 "WALTER_OFFSITE_APPS": ("offsite", "apps"),             # installed apps and their data (`apps` kind)
                 "WALTER_OFFSITE_FOLDER_EXCLUDE": ("offsite", "folder_exclude"),  # paths left out of those archives
-                "WALTER_BUNDLE_EXCLUDE": ("offsite", "config_exclude")},         # rebuildable parts of the config bundle
+                "WALTER_BUNDLE_EXCLUDE": ("offsite", "config_exclude"),          # rebuildable parts of the config bundle
+                "WALTER_OFFSITE_STATE": ("offsite", "state_dir")},               # last pushed fingerprints (skip if same)
     "git_publish": {"WALTER_GIT_PUBLISH_EXCLUDE": ("git_publish", "exclude"),     # module repositories never published
                     "WALTER_GIT_PUBLISH_DENY": ("git_publish", "deny_paths")},    # JSON {module: [path globs]}
 }

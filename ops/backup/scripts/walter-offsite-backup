@@ -31,6 +31,16 @@ push() {  # push <kind> <local file> [remote name]
 }
 newest() { ls -1t "$1"/$2 2>/dev/null | head -1 || true; }    # newest <dir> <pattern>
 
+# Unchanged content is not sent again (2026-11-01): the fingerprint of what was last pushed per kind is kept in
+# offsite.state_dir; same fingerprint → skipped, and the copy already on Drive stays the newest one.
+unchanged() {  # unchanged <kind> <fingerprint>
+  [ -n "${WALTER_OFFSITE_STATE:-}" ] && [ "$(cat "$WALTER_OFFSITE_STATE/offsite-$1.sha256" 2>/dev/null)" = "$2" ]
+}
+remember() {  # remember <kind> <fingerprint>
+  [ -n "${WALTER_OFFSITE_STATE:-}" ] || return 0
+  mkdir -p "$WALTER_OFFSITE_STATE"; printf '%s\n' "$2" > "$WALTER_OFFSITE_STATE/offsite-$1.sha256"
+}
+
 if wants pg; then pg=$(newest "$WALTER_PG_DIR" "$WALTER_PG_PATTERN"); [ -n "$pg" ] && push pg "$pg"; fi
 if wants statedb; then sdb=$(newest "$WALTER_STATEDB_DIR" "$WALTER_STATEDB_PATTERN"); [ -n "$sdb" ] && push statedb "$sdb"; fi
 
@@ -52,8 +62,14 @@ fi
 # Fail closed: inventory modules + mutual integrations; verify every archived file (Walter Memory's bundle).
 if wants config; then
   walter-python -m walter_memory.backup_bundle create "$WORK/config-$TS.tar"
-  zstd -q -T2 -10 --rm "$WORK/config-$TS.tar" -o "$WORK/config-$TS.tar.zst"
-  push config "$WORK/config-$TS.tar.zst"
+  # Fingerprint = every archived file's own digest (from the bundle manifest), not the dated manifest itself.
+  fp=$(tar -xOf "$WORK/config-$TS.tar" walter-backup-manifest.json | python3 -c \
+    'import hashlib,json,sys; print(hashlib.sha256(json.dumps(json.load(sys.stdin)["entries"],sort_keys=True).encode()).hexdigest())')
+  if unchanged config "$fp"; then echo "unchanged config (nothing sent)"; rm -f "$WORK/config-$TS.tar"
+  else
+    zstd -q -T2 -10 --rm "$WORK/config-$TS.tar" -o "$WORK/config-$TS.tar.zst"
+    push config "$WORK/config-$TS.tar.zst" && remember config "$fp"
+  fi
 fi
 
 # Folder archives: sources, git history and data; what a reinstall rebuilds is left out, and so are the paths of
@@ -64,9 +80,11 @@ archive_folders() {  # archive_folders <kind> <absolute folders...>
   [ ${#rel[@]} -gt 0 ] || return 0
   for p in node_modules .venv venv __pycache__ .next .cache .pytest_cache ${WALTER_OFFSITE_FOLDER_EXCLUDE:-}; do
     ex+=("--exclude=${p#/}"); done
-  tar -C / -cf "$WORK/$kind-$TS.tar" --warning=no-file-changed "${ex[@]}" "${rel[@]}" || [ $? -eq 1 ]
+  tar -C / -cf "$WORK/$kind-$TS.tar" --sort=name --warning=no-file-changed "${ex[@]}" "${rel[@]}" || [ $? -eq 1 ]
+  local fp; fp=$(sha256sum "$WORK/$kind-$TS.tar" | cut -d' ' -f1)
+  if unchanged "$kind" "$fp"; then echo "unchanged $kind (nothing sent)"; rm -f "$WORK/$kind-$TS.tar"; return 0; fi
   zstd -q -T2 -10 --rm "$WORK/$kind-$TS.tar" -o "$WORK/$kind-$TS.tar.zst"
-  push "$kind" "$WORK/$kind-$TS.tar.zst"
+  push "$kind" "$WORK/$kind-$TS.tar.zst" && remember "$kind" "$fp"
 }
 if wants projects && [ -n "${WALTER_OFFSITE_PROJECTS:-}" ]; then archive_folders projects $WALTER_OFFSITE_PROJECTS; fi
 if wants user && [ -n "${WALTER_OFFSITE_USER:-}" ]; then archive_folders user $WALTER_OFFSITE_USER; fi
