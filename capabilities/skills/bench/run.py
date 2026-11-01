@@ -16,7 +16,7 @@ from pathlib import Path
 from walter_skills import evaluate, registry
 from walter_skills.learning import _cases_by_qid
 from walter_skills.ranker import Corpus, Encoder, Ranker
-from walter_skills.retrieval import corpus_skills
+from walter_skills.retrieval import search_corpus_skills
 
 DATA = Path(__file__).parent / "data"
 
@@ -44,7 +44,7 @@ def main() -> None:
     a = ap.parse_args()
     row = registry.ranker()
     r = Ranker.loads(bytes(row["blob"]))
-    c = Corpus(corpus_skills(), registry.cards(), Encoder.get())
+    c = Corpus(search_corpus_skills(), registry.cards(), Encoder.get())
     ev = evaluate.examples(_cases_by_qid(), holdout=True, sources=("bench", "judge"))
     print(json.dumps({"ranker": row["version"], "held_out": evaluate.measure(c, r, ev)}, indent=1))
     if a.hermes:

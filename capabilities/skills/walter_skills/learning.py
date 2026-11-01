@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import config, evaluate, history, postes, registry
 from .ranker import Corpus, Encoder, train as train_ranker
-from .retrieval import aliases, corpus_skills
+from .retrieval import aliases, search_corpus_skills
 
 JUDGE_RUBRIC = """You are a relevance judge for W.Alter's skill library (procedures an AI agent loads before acting). The
 user is "Monsieur" (French). For EVERY candidate skill, label how much the agent should load it to handle the CURRENT
@@ -104,7 +104,7 @@ def train_and_promote(force: bool = False) -> dict:
     t0 = time.time()
     cfg = config.get("learning")
     enc = Encoder.get()
-    skills = corpus_skills()
+    skills = search_corpus_skills()  # the ranker is trained and graded on what search ranks
     corpus = Corpus(skills, registry.cards(), enc)
     by_qid = _cases_by_qid()
     hist_cases = [c for c in by_qid.values() if c["gold"]]

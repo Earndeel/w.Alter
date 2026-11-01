@@ -80,7 +80,7 @@ def search(body: SearchIn) -> dict:
 
 @app.get("/v1/skill/{name}", response_class=PlainTextResponse)
 def skill(name: str, file_path: str | None = None, runtime: str | None = None, session_id: str | None = None) -> str:
-    text = read_skill(name, file_path or None)
+    text = read_skill(name, file_path or None, runtime=runtime)
     if text is None:
         raise HTTPException(404, f"unknown skill or file: {name} {file_path or ''}")
     try:

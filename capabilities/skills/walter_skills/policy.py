@@ -168,10 +168,11 @@ def search(query: str, context: str = "", k: int = 8, include_archived: bool = F
     """Tier 2 — the agent's own search."""
     t0 = time.perf_counter()
     e = engine()
-    rows = e.rank(query, context, k=k) + (e.rank_archived(query) if include_archived else [])
+    rows = e.rank(query, context, k=k) + e.rank_archived(query) if include_archived else e.search(query, context, k)
     try:
         registry.journal_retrieval(runtime, session_id, "search", query, rows, [], round(1000 * (time.perf_counter() - t0)),
                                    e.version)
     except Exception:
         pass
     return rows
+

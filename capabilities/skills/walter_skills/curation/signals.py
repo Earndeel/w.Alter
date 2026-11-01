@@ -54,9 +54,15 @@ def usage(aliases: dict[str, str]) -> dict[str, dict]:
     return out
 
 
-def judged_needed() -> Counter:
-    """How many labelled messages needed each skill (label 2, any source)."""
-    return Counter(s for lab in registry.labels().values() for s, (v, _) in lab.items() if v == 2)
+def judged_needed(days: int) -> Counter:
+    """How many real messages needed each skill in the last `days` days (label 2 from the judge, an opened card or a
+    search miss). Bench labels are synthetic questions: since 2026-11-01 they no longer protect a skill from the
+    reserve, and an old judgement no longer protects it forever."""
+    with registry.db() as c:
+        rows = c.execute("""select skill, count(distinct qid) n from skills.labels
+                            where label = 2 and source <> 'bench' and at > now() - make_interval(days => %s)
+                            group by skill""", (days,)).fetchall()
+    return Counter({r["skill"]: r["n"] for r in rows})
 
 
 def pinned() -> set[str]:

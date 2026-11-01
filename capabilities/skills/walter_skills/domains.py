@@ -14,6 +14,11 @@ from pathlib import Path
 from . import registry, store
 
 
+def _order(e: dict) -> tuple:
+    """Entry skills first (they route), then workflows, then procedures."""
+    return ({'entry': 0, 'workflow': 1}.get(e['kind'], 2), e['name'])
+
+
 def _snapshot(root: Path | None = None) -> Path:
     return (root or store.ROOT) / '.cache' / 'library-index.json'
 
@@ -32,11 +37,20 @@ def build(top: int = 5) -> list[dict]:
             'purpose': ' '.join((s.description or card.get('summary') or s.name).split())[:240],
             'requires': list(requires) if isinstance(requires, list) else [],
         })
+    reserve = defaultdict(list)  # archived with reserve: true (not merged): listed, read restores them
+    for s in store.iter_skills(include_archived=True):
+        if s.state == 'archived' and s.meta.get('reserve') and not s.meta.get('absorbed_into'):
+            card = cards.get(s.name, {})
+            reserve[s.meta.get('domain') or 'uncategorized'].append({
+                'name': s.name, 'kind': 'reserve',
+                'purpose': ' '.join((s.description or card.get('summary') or s.name).split())[:240]})
     out = []
-    for domain, entries in sorted(groups.items()):
-        entries.sort(key=lambda e: (e['kind'] != 'workflow', e['name']))
+    for domain in sorted(set(groups) | set(reserve)):
+        entries = sorted(groups.get(domain, []), key=_order)
+        res = sorted(reserve.get(domain, []), key=lambda e: e['name'])
         out.append({'domain': domain, 'count': len(entries),
-                    'workflows': sum(e['kind'] == 'workflow' for e in entries), 'entries': entries})
+                    'workflows': sum(e['kind'] == 'workflow' for e in entries), 'entries': entries,
+                    'reserve': len(res), 'reserve_entries': res})
     # Build the whole document before publishing. Readers never observe half an index.
     path = _snapshot()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -68,11 +82,13 @@ def index(domain: str = '', offset: int = 0, limit: int = 20, *, root: Path | No
     """Empty domain lists domains; a selected domain returns a bounded page, workflows first."""
     m = _load(root)
     if not domain:
-        return {'domains': [{k: d[k] for k in ('domain', 'count', 'workflows')} for d in m],
-                'total': sum(d['count'] for d in m)}
-    entries = [e | {'domain': d['domain']} for d in m
-               if d['domain'] == domain or d['domain'].startswith(domain + '/') for e in d['entries']]
-    entries.sort(key=lambda e: (e['kind'] != 'workflow', e['name']))
+        return {'domains': [{k: d.get(k, 0) for k in ('domain', 'count', 'workflows', 'reserve')} for d in m],
+                'total': sum(d['count'] for d in m), 'reserve': sum(d.get('reserve', 0) for d in m)}
+    mine = [d for d in m if d['domain'] == domain or d['domain'].startswith(domain + '/')]
+    entries = sorted((e | {'domain': d['domain']} for d in mine for e in d['entries']), key=_order)
+    # The reserve comes after the active entries: skill_read on one of them puts it back in service.
+    entries += sorted((e | {'domain': d['domain']} for d in mine for e in d.get('reserve_entries', [])),
+                      key=lambda e: e['name'])
     offset, limit = max(0, offset), max(1, min(limit, 20))
     end = offset + limit
     return {'domain': domain, 'entries': entries[offset:end], 'total': len(entries),
@@ -91,15 +107,19 @@ def render(search_tool: str) -> str:
     header = ("W.Alter Skills — bibliothèque de procédures et workflows, partagée entre les agents.\n"
               f"{manifest_tool} explique le module ; {index_tool}(domain=…) indique à quoi sert chaque entrée. "
               f"{search_tool}(query=…) cherche par intention. Lis ensuite le skill choisi et seulement ses références utiles.\n"
-              "Index compact des domaines (total / workflows) :\n")
-    return header + '\n'.join(f"- {d['domain']} : {d['count']} / {d['workflows']}" for d in data['domains'])
+              "Index compact des domaines (total / workflows ; réserve = skills dormants, toujours trouvables, "
+              "réactivés dès qu'on les lit) :\n")
+    return header + '\n'.join(_line(d) for d in data['domains'])
+
+
+def _line(d: dict) -> str:
+    return f"- {d['domain']} : {d['count']} / {d['workflows']}" + (f" · réserve {d['reserve']}" if d.get('reserve') else "")
 
 
 def domain_map() -> str:
     """Live part of the module's level-1 manifest: the compact domain map (manifest/MANIFEST.md says how to use it)."""
     data = index()
-    return ("Domaines (total / workflows) :\n"
-            + '\n'.join(f"- {d['domain']} : {d['count']} / {d['workflows']}" for d in data['domains']))
+    return ("Domaines (total / workflows · réserve) :\n" + '\n'.join(_line(d) for d in data['domains']))
 
 
 def brief_document(search_tool: str = 'skills_search') -> dict:
