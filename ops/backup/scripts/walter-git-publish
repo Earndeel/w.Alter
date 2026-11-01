@@ -10,8 +10,9 @@ every module is a folder (`memory/`, `router/`…) with its full history, then f
   3. one `main` commit whose parents are the module heads and whose tree joins their folders + a README;
   4. fail-closed gate (`walter_backup.secret_gate`): any vault value or credential shape left → nothing is pushed.
 Only committed work leaves the machine; personal data stays in the user folder, which is never published.
-Settings: [git_publish] in the instance's backup.toml (remote, exclude, deny_paths)."""
-import json, os, shutil, subprocess, sys, tempfile, tomllib
+Settings: [git_publish] in the instance's backup.toml (remote, exclude, deny_paths), read through
+`walter-ops backup env git_publish`."""
+import json, os, shlex, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 
@@ -33,11 +34,15 @@ def run(*cmd, cwd=None, env=None, capture=True):
 
 
 def settings():
-    path = run('walter', 'instance', 'config', 'backup', 'backup.toml')
-    cfg = tomllib.loads(Path(path).read_text()).get('git_publish') or {}
-    if not cfg.get('remote'):
-        raise SystemExit('git_publish.remote missing in the instance backup.toml')
-    return cfg
+    """Locations and rules from the instance, through Ops' job parameters (`walter-ops backup env git_publish`)."""
+    env = {}
+    for line in run('walter-ops', 'backup', 'env', 'git_publish').splitlines():
+        if line.startswith('export '):
+            key, _, value = line[7:].partition('=')
+            env[key] = shlex.split(value)[0] if value else ''
+    return {'remote': env['WALTER_GIT_PUBLISH_REMOTE'], 'workdir': env['WALTER_GIT_PUBLISH_WORKDIR'],
+            'exclude': env.get('WALTER_GIT_PUBLISH_EXCLUDE', '').split(),
+            'deny_paths': json.loads(env.get('WALTER_GIT_PUBLISH_DENY') or '{}')}
 
 
 def modules(cfg):
@@ -114,7 +119,7 @@ def main():
     from walter_backup import secret_gate
     secrets_root = run('walter', 'path', 'secrets')
     pattern = secret_gate.TOKEN_SHAPES
-    work = Path(tempfile.mkdtemp(prefix='walter-git-publish.', dir=cfg.get('workdir', '/var/tmp')))
+    work = Path(tempfile.mkdtemp(prefix='walter-git-publish.', dir=cfg['workdir']))
     try:
         mono = work / 'mono.git'
         run('git', 'init', '--quiet', '--bare', '-b', 'main', str(mono))

@@ -427,6 +427,7 @@ JOB_KEYS = {
                 "WALTER_OFFSITE_VAULT_DIR": ("offsite", "vault_export_dir"),
                 "WALTER_PG_DIR": ("kinds", "pg", "dir"), "WALTER_PG_PATTERN": ("kinds", "pg", "pattern"),
                 "WALTER_STATEDB_DIR": ("kinds", "statedb", "dir"), "WALTER_STATEDB_PATTERN": ("kinds", "statedb", "pattern")},
+    "git_publish": {"WALTER_GIT_PUBLISH_REMOTE": ("git_publish", "remote"), "WALTER_GIT_PUBLISH_WORKDIR": ("offsite", "workdir")},
     "restore_test": {"WALTER_OFFSITE_REMOTE": ("offsite", "remote"), "WALTER_OFFSITE_IDENTITY": ("offsite", "identity"),
                      "WALTER_OFFSITE_WORKDIR": ("offsite", "workdir"),
                      "WALTER_PG_CONTAINER": ("pg", "container"), "WALTER_PG_DATABASE": ("pg", "database"),
@@ -437,6 +438,8 @@ JOB_KEYS = {
 # Optional parameters: exported only when the instance sets them (no default location, no error when absent).
 JOB_OPTIONAL_KEYS = {
     "offsite": {"WALTER_OFFSITE_PROJECTS": ("offsite", "projects")},   # folders archived by the `projects` kind
+    "git_publish": {"WALTER_GIT_PUBLISH_EXCLUDE": ("git_publish", "exclude"),     # module repositories never published
+                    "WALTER_GIT_PUBLISH_DENY": ("git_publish", "deny_paths")},    # JSON {module: [path globs]}
 }
 
 
@@ -460,8 +463,9 @@ def job_env(kind: str) -> dict[str, str]:
         node = cfg
         for part in path:
             node = node.get(part) if isinstance(node, dict) else None
-        if node not in (None, "", []):
-            out[var] = " ".join(map(str, node)) if isinstance(node, list) else str(node)
+        if node not in (None, "", [], {}):
+            out[var] = (json.dumps(node, sort_keys=True) if isinstance(node, dict)
+                        else " ".join(map(str, node)) if isinstance(node, list) else str(node))
     for var in [v for v in out if v.endswith("_PATTERN")]:
         if "*" not in out[var]:
             raise ValueError(f"{var}: a file pattern must contain '*'")
