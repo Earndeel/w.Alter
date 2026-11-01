@@ -23,7 +23,8 @@ def merged_into(s: store.Skill) -> str | None:
 
 
 def restorable(s: store.Skill) -> bool:
-    return s.state == "archived" and not s.meta.get("absorbed_into")
+    """Merged skills live in their hub; retired ones describe systems that no longer exist (history only)."""
+    return s.state == "archived" and not s.meta.get("absorbed_into") and not s.meta.get("retired")
 
 
 def restore(name: str, reason: str, runtime: str | None = None) -> store.Skill | None:

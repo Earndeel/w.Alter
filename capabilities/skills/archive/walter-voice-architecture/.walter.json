@@ -11,6 +11,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
- "reserve": true,
+ "retired": true,
  "store_sha": "540444c475ce011c9ef02dbdbf60088338eae482f23534adbce079038b8a0fa4"
 }
