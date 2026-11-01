@@ -1,0 +1,16 @@
+{
+ "absorbed_into": "kie-ai-api-direct",
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "merged into kie-ai-api-direct (2026-11-01 reorganisation)",
+ "domain": "models",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/kie-gemini-mastery",
+  "sha": "f533f8a6dce872c6b5df5ec036dc1b58ab4d1efefe51904a56e5705c33dcee40",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "f533f8a6dce872c6b5df5ec036dc1b58ab4d1efefe51904a56e5705c33dcee40"
+}

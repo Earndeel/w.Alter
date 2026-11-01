@@ -1,6 +1,6 @@
 ---
 name: remote-computer-use
-description: Use when a VPS must control a remote Mac GUI safely.
+description: "Use when a VPS must control a remote Mac GUI safely. Also covers: cua driver resilience; computer use driver wiring."
 version: 1.0.0
 author: W.Alter
 license: MIT
@@ -365,3 +365,12 @@ on the VPS is not Mac E2E proof.
 - `computer-use` — generic action vocabulary and background escalation ladder.
 - `mac-computer-use-ssh` — existing Mac screen-server skill and TCC history.
 - `ssh-mac-remote-control` — SSH/Tailscale tunnel and LaunchAgent operations.
+
+## Also covers (merged 2026-11-01)
+
+These procedures were separate skills; their full original text is kept here, unchanged.
+
+- **cua-driver-resilience** — CuaDriver / AX capture that is black, partial, stale or wrongly targeted: separate the three contracts, read-only diagnosis, fail-closed capture integrity, window selection by identity.
+  Read `references/merged-cua-driver-resilience/cua-driver-resilience.md` (+ 4 supporting files in that folder).
+- **computer-use-driver-wiring** — Why Hermes' computer_use driver fails to start: spawn and embedded-daemon contracts, permission_mode, custom/remote driver commands and stdio shims.
+  Read `references/merged-computer-use-driver-wiring/computer-use-driver-wiring.md` (+ 5 supporting files in that folder).

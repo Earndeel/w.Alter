@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "not read by any agent for 30+ days",
+ "domain": "code",
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/react-agent-prompting",
+  "sha": "f75db3c02662866cae1b240516aa774a3f9348243f8056004ce0ba09c0a61c9f",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "f75db3c02662866cae1b240516aa774a3f9348243f8056004ce0ba09c0a61c9f"
+}

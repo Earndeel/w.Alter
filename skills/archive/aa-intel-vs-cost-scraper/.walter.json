@@ -1,0 +1,16 @@
+{
+ "absorbed_into": "aa-pareto-model-optimizer",
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "merged into aa-pareto-model-optimizer (2026-11-01 reorganisation)",
+ "domain": "models",
+ "hermes": {
+  "path": "/root/.hermes/skills/aa-intel-vs-cost-scraper",
+  "sha": "ca350ef111fe3b11ba5f7c89c7a7bd2f9405783f58a1db64001b72f202c4ead0",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "ca350ef111fe3b11ba5f7c89c7a7bd2f9405783f58a1db64001b72f202c4ead0"
+}

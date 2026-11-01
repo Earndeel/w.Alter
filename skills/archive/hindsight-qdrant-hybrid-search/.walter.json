@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "describes a system retired on 2026-10-19 (Hindsight, Qdrant)",
+ "domain": "walter",
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hindsight-qdrant-hybrid-search",
+  "sha": "c6bf3f10a374473cc88405fed41e180b1366ed25d40ba85397377def8734f45b",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "c6bf3f10a374473cc88405fed41e180b1366ed25d40ba85397377def8734f45b"
+}

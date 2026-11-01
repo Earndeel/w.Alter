@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "not read by any agent for 30+ days",
+ "domain": "design",
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/architecture-diagram",
+  "sha": "7fb9288cd31a8d419ab858368f16a2eb5ef166fac7e499524a31dd8daea13c00",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "reserve": true,
+ "store_sha": "7fb9288cd31a8d419ab858368f16a2eb5ef166fac7e499524a31dd8daea13c00"
+}

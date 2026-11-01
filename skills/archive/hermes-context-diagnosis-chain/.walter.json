@@ -1,0 +1,16 @@
+{
+ "absorbed_into": "hermes-context-evidence-workflow",
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "merged into hermes-context-evidence-workflow (2026-11-01 reorganisation)",
+ "created_at": "2026-11-01T04:19:28.838549+00:00",
+ "domain": "hermes",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "hermes-payload-architecture",
+  "hermes-context-management",
+  "hermes-session-db"
+ ]
+}
