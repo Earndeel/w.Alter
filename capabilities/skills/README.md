@@ -38,8 +38,11 @@ remain available. Existing MCP sessions need their tool schemas refreshed to see
   as history.
 - Curator: dormant 30 days (no read, not needed by a real message in 30 days — synthetic bench labels never protect)
   → reserve; entries are never archived or merged; a workflow whose steps already exist is never written again.
-- No secret in a skill: values come from Walter Secrets / helpers (`walter-cloudflare`, `walter-secret`). The whole
-  store was checked against the vault fingerprint index on 2026-11-01.
+- No secret in a skill: the curator operator `secrets` (always active, every quick run) and the write door turn
+  every Bitwarden value into its Walter Secrets placeholder `{{bw:<item>:<field>}}` (`walter_skills/secret_refs.py`;
+  resolved at execution by Hermes' hook or `walter-secret get <item> <field>`, never shown to a model). It covers the
+  store (active, reserve, drafts) and Hermes' copies (security only). Short visible fields (e.g. an AWS region) are
+  configuration and stay readable; a value indexed but gone from the vault gets the generic mask `«secret:vault»`.
 
 ## Shape: one core, thin ports, one loop
 
