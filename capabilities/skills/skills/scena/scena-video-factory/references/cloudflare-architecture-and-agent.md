@@ -246,7 +246,7 @@ Hunyuan             → model:"hunyuan"                          → ELO 1014
 ### Wrangler Deploy (Cloudflare Global Key)
 **Scoped API tokens DON'T work for D1/Workers creation.** Must use Global API Key:
 ```bash
-CLOUDFLARE_API_KEY=«secret:vault» \
+CLOUDFLARE_API_KEY=<secret retiré — clé globale Cloudflare : walter-cloudflare l'injecte (CLOUDFLARE_API_KEY)> \
 CLOUDFLARE_EMAIL=lucas.jouvencon@gmail.com \
 wrangler deploy
 ```

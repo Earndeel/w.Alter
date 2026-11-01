@@ -223,7 +223,7 @@ This single Worker handles ALL clients — no per-client infrastructure needed.
 
 The Global API Key (`cfk_...`) requires TWO env vars:
 ```bash
-CLOUDFLARE_API_KEY=«secret:vault»
+CLOUDFLARE_API_KEY=<secret retiré — clé globale Cloudflare : walter-cloudflare l'injecte (CLOUDFLARE_API_KEY)>
 CLOUDFLARE_EMAIL=lucas.jouvencon@gmail.com
 ```
 

@@ -159,7 +159,7 @@ import requests
 
 AUDIO_PATH = "/tmp/blague_henri.ogg"  # or any .ogg/opus file
 CHAT_ID = "1146774717"
-TOKEN = "«secret:vault»"
+TOKEN = "<secret retiré — token du bot : TELEGRAM_BOT_TOKEN, lu via walter-secret>"
 
 url = f"https://api.telegram.org/bot{TOKEN}/sendVoice"
 

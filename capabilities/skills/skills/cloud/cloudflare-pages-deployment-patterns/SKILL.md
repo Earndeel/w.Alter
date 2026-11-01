@@ -26,7 +26,7 @@ curl -s -X PUT https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers
 ```
 
 ## Current Token Status (as of 2026-04-06)
-- Token: `«secret:vault»`
+- Token: `<secret retiré — token Cloudflare : walter-cloudflare l'injecte (CLOUDFLARE_API_TOKEN)>`
 - Source: `/root/.mcporter/mcporter.json` → `mcpServers.cloudflare.env.CLOUDFLARE_API_TOKEN`
 - **WORKS for Pages deploy** via `wrangler pages deploy` with explicit env vars
 - Token ID: `632d027acf474cdeea3eb56cc116f427` (verified active via GET /tokens/verify)

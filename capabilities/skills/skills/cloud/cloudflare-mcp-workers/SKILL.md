@@ -11,7 +11,7 @@ description: Complete mastery of Cloudflare via MCP/mcporter -- 89 tools across 
 ### Comptes
 - **Email**: `lucas.jouvencon@gmail.com`
 - **Account ID**: `«secret:vault»`
-- **Global API Key** (compromis): `«secret:vault»`
+- **Global API Key** (compromis): `<secret retiré — clé globale Cloudflare : walter-cloudflare l'injecte (CLOUDFLARE_API_KEY)>`
 
 ### Emplacement config mcporter
 **ATTENTION**: mcporter ne lit PAS `~/.hermes/mcp/mcporter.json`. Il cherche UNIQUEMENT dans :
@@ -50,7 +50,7 @@ TOUJOURS ecrire le JSON a la main. `mcporter config add` masque le token (`***`)
 
 **Pour mcporter + MCP**: il FAUT un **API Token**. Creer via Dashboard > My Profile > API Tokens > Create Token.
 - Template recommande: **"Edit Cloudflare Workers"** puis ajouter `Zone > DNS > Edit` + **All Zones**.
-- Token actuel: `«secret:vault»` (creer 2026-04-05)
+- Token actuel: `<secret retiré — token Cloudflare : walter-cloudflare l'injecte (CLOUDFLARE_API_TOKEN)>` (creer 2026-04-05)
 
 ### Fallback: Global Key quand le MCP est bloque
 Si le MCP ne repond pas (token expire, revoke, etc.), la Global API Key reste utilisable pour **TOUT faire** via deux methodes equivalents couvrant les 89 outils :
