@@ -11,6 +11,7 @@ Le critère de réussite est une tâche correctement accomplie avec un contexte 
 1. **Repère de session** : objectif de la bibliothèque, outils de navigation et liste compacte des domaines. Aucun corps de skill et aucune liste de candidats par message en mode `on_demand`.
 2. **Index à la demande** : choisir un domaine pour consulter les noms, types, usages et composants des workflows. Les pages sont bornées à 20 entrées ; `next_offset` donne la suite. Les workflows précèdent les procédures individuelles. L'index ne contient que les entrées actives.
 3. **Recherche par intention** : si le domaine est inconnu, décrire le besoin en français ou en anglais ; le moteur local retrouve des candidats ciblés.
+3b. **Réserve** : les skills dormants restent trouvables (marqués « réserve » dans les résultats et en fin de page d'index) ; les lire les remet en service automatiquement. Un nom fusionné renvoie vers le skill qui le contient ; un skill retiré n'est lisible que comme historique.
 4. **Lecture et exécution** : ouvrir le `SKILL.md` choisi, puis seulement les références ou scripts nécessaires. Un workflow orchestre d'autres skills ; consulter leurs procédures selon les étapes utiles.
 
 Le modèle choisit la procédure à lire. Le Curator entretient la bibliothèque en arrière-plan ; il ne décide pas à chaque demande utilisateur. Après une erreur, la politique peut encore proposer au plus deux fiches décrivant le symptôme.
