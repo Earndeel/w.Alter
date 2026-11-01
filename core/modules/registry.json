@@ -12,12 +12,17 @@
         "/walter/browse/ops/browse-display-container.sh",
         "/walter/browse/ops/camoufox-max-display.conf",
         "/walter/browse/ops/walter-exit-mac.service",
-        "/walter/browse/ops/camoufox-max-identity.conf"
+        "/walter/browse/ops/camoufox-max-identity.conf",
+        "/walter/browse/ops/cloakbrowser-max.service",
+        "/walter/browse/ops/walter-exit-default.service",
+        "/walter/browse/network/exit-default/bin/walter-exit-default"
       ],
       "requires": [],
       "external": [
         "Scrapling isolated environment",
         "Camoufox :9377 (display :101, Selkies walter-browse-display, Tailscale :3011)",
+        "CloakBrowser Chromium :9378 (free v146 linux-arm64 build, ~/.cloakbrowser; same display :101)",
+        "WireGuard France exit (walter-wg-exit freebox-fr, docker), fallback of the default exit",
         "optional Webtop CDP"
       ],
       "data": [
@@ -35,7 +40,7 @@
       ],
       "backup_paths": [
         "/walter/browse",
-        "/instances/monsieur/state/browse"
+        "/user/Lucas/state/browse"
       ],
       "interfaces": [
         "shared request contract",
@@ -55,8 +60,10 @@
       ],
       "services": [
         "camoufox-max",
+        "cloakbrowser-max",
         "walter-browse-display",
-        "walter-exit-mac"
+        "walter-exit-mac",
+        "walter-exit-default"
       ],
       "optional": [
         "secrets",
@@ -70,7 +77,7 @@
         "purpose": "Rechercher, extraire et gérer les parcours web avec un moteur commun.",
         "target_root": "/walter/browse",
         "config_paths": [
-          "/instances/monsieur/bootstrap/browse-search.env"
+          "/user/Lucas/bootstrap/browse-search.env"
         ],
         "permissions": [
           "sessions de navigateur gérées",
@@ -152,14 +159,27 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Browse",
+        "order": 50,
+        "summary": "/walter/browse/manifest/SUMMARY.md",
+        "manifest": "/walter/browse/manifest/MANIFEST.md",
+        "guide": "/walter/browse/manifest/GUIDE.md",
+        "tools": [
+          "walter_browse",
+          "browser_session",
+          "browser_sites"
+        ]
       }
     },
     {
       "id": "bus",
-      "root": "/opt/walter-memory",
+      "root": "/walter/memory",
       "anchors": [
-        "/opt/walter-memory/contracts/bus.json",
-        "/opt/walter-memory/walter_memory/bus.py"
+        "/walter/memory/contracts/bus.json",
+        "/walter/memory/walter_memory/bus.py"
       ],
       "requires": [
         "memory"
@@ -169,10 +189,10 @@
         "bus.*"
       ],
       "core_paths": [
-        "/opt/walter-memory/walter_memory/bus.py"
+        "/walter/memory/walter_memory/bus.py"
       ],
       "backup_paths": [
-        "/opt/walter-memory"
+        "/walter/memory"
       ],
       "interfaces": [
         "Python emit/Consumer",
@@ -413,7 +433,7 @@
         "/root/walter-computer-use",
         "/root/.config/walter-device-node",
         "/etc/tmpfiles.d/walter-computer.conf",
-        "/instances/monsieur/config/computer"
+        "/user/Lucas/config/computer"
       ],
       "interfaces": [
         "OperatorSessions",
@@ -446,7 +466,7 @@
         "config_paths": [
           "/root/.config/walter-device-node",
           "/walter/computer/config/config.json",
-          "/instances/monsieur/config/computer/config.json"
+          "/user/Lucas/config/computer/config.json"
         ],
         "permissions": [
           "read/input/foreground/pixels/vision accordés par le host",
@@ -528,6 +548,17 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Computer",
+        "order": 60,
+        "summary": "/walter/computer/manifest/SUMMARY.md",
+        "manifest": "/walter/computer/manifest/MANIFEST.md",
+        "guide": "/walter/computer/manifest/GUIDE.md",
+        "tools": [
+          "computer_use"
+        ]
       }
     },
     {
@@ -541,10 +572,12 @@
       ],
       "requires": [],
       "external": [
-        "Walter Logs (recover: originals of compacted outputs); DSH keeps its own raw journal"
+        "Python 3.11+ standard library for local compression; optional public clients are loaded only by their consuming operation",
+        "Host compaction/context APIs; DSH retains its own raw journal"
       ],
       "data": [
-        "per-session projection epochs; recoverable originals in logs"
+        "per-session projection epochs and caches (ephemeral)",
+        "preflight plans/pack observations and published module notes in instance state; canonical sources stay owned by Memory/Logs/Skills"
       ],
       "core_paths": [
         "/walter/context/walter_context"
@@ -556,30 +589,51 @@
         "Python Session (walter_context.compress)",
         "Hermes ContextEngine adapter",
         "DSH CompactionEngine adapter",
-        "CLI walter-context"
+        "CLI walter-context",
+        "CLI walter-context capability router (versioned stable note)",
+        "Python walter_context.capabilities.TurnNotes",
+        "JSON bridge op=capability for trusted module notes",
+        "CLI walter-context capability all [--write] (Modules W.Alter layer from walter present notes)",
+        "HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it)",
+        "Python walter_context.retrieval.gather and walter_context.assembly.pack",
+        "Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON)",
+        "POST /preflight?inject=1 -> plan/text/pack/error; POST /preflight?shadow=1 -> private instance record without injection"
       ],
       "bindings": {
         "hermes": "native compressor until walter-context replaces it (plan lot 6)",
-        "dsh": "Walter compaction adapter",
-        "codex": "native compaction",
-        "claude-code": "native compaction"
+        "dsh": "Public checkpoint adapter selected by composition; per-message injection legacy by default, pack opt-in",
+        "codex": "Native compaction; additive module notes and hook preflight",
+        "claude-code": "Native compaction; additive module notes and hook preflight",
+        "router": "Text sub-agents request ChildContextSpec v1 through walter-context-child; caller-only mode remains available"
       },
       "limitations": [
         "DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.",
         "Hermes runs its native compressor (walter-compress retired 2026-10-21); the walter-context Hermes port is not activated.",
-        "Structural and known-answer tests do not certify semantic model quality."
+        "Structural and known-answer tests do not certify semantic model quality.",
+        "Capability-note preparation does not activate the lot-4 composer or inject into an unconnected host.",
+        "Memory, Skills, Core, Router, Logs and Soul are optional at module startup; their dependent operations degrade or fail when unavailable.",
+        "retrieval, assembly, preflight and child are implemented; their availability is separate from activation and semantic quality.",
+        "Source failures omit only the affected retrieval/child block and leave a note; absence of a block does not prove absence of matching knowledge.",
+        "Preflight can write plan metadata through the Memory runs CLI; it does not own canonical memory, notebooks or procedures.",
+        "Local compression has no general semantic quality proof; recoverability depends on source availability and privacy."
       ],
-      "services": [],
+      "services": [
+        "walter-context-preflight"
+      ],
       "optional": [
+        "core",
         "logs",
-        "llm"
+        "memory",
+        "router",
+        "skills",
+        "soul"
       ],
       "contract": {
         "schema_version": 1,
-        "version": "1.1.0",
+        "version": "1.3.0",
         "owner": "context",
         "kind": "capability",
-        "purpose": "Décider de ce qui entre dans la fenêtre d'un modèle à chaque appel (quoi, combien, où, sous quelle forme) ; le moteur de compression (compress) en est le premier sous-module.",
+        "purpose": "Préparer et ordonner le contexte par message et par sous-agent, et compresser l’historique selon le contrat du harness ; les données canoniques restent dans leurs modules propriétaires.",
         "target_root": "/walter/context",
         "config_paths": [
           "/walter/context/config/walter-context.toml"
@@ -612,6 +666,38 @@
             "access": "read",
             "timeout_seconds": 60,
             "timeout_status": "target"
+          },
+          {
+            "id": "capability-note",
+            "transport": "library",
+            "interface": "router note preparation and TurnNotes",
+            "access": "read",
+            "timeout_seconds": 10,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "preflight",
+            "transport": "http",
+            "interface": "POST /preflight[?shadow=1|?inject=1]",
+            "access": "write",
+            "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "child",
+            "transport": "cli",
+            "interface": "walter-context-child, ChildContextSpec v1",
+            "access": "read",
+            "timeout_seconds": 45,
+            "timeout_status": "target"
+          },
+          {
+            "id": "publish-module-notes",
+            "transport": "cli",
+            "interface": "walter-context capability all --write",
+            "access": "write",
+            "timeout_seconds": 150,
+            "timeout_status": "target"
           }
         ],
         "resources": [
@@ -626,6 +712,24 @@
             "role": "consumer",
             "owner": "logs",
             "durability": "canonical"
+          },
+          {
+            "id": "postgres:core",
+            "role": "consumer",
+            "owner": "memory",
+            "durability": "canonical"
+          },
+          {
+            "id": "skills-git-store",
+            "role": "consumer",
+            "owner": "skills",
+            "durability": "canonical"
+          },
+          {
+            "id": "context-preflight-observations",
+            "role": "owner",
+            "owner": "context",
+            "durability": "projection"
           }
         ],
         "migrations": [
@@ -668,35 +772,35 @@
     },
     {
       "id": "core",
-      "root": "/opt/walter-core",
+      "root": "/walter/core",
       "anchors": [
-        "/opt/walter-core/contracts/core.json",
-        "/opt/walter-core/hooks/walter_hook.py",
-        "/opt/walter-core/server.py",
-        "/opt/walter-core/modules/catalog.json",
-        "/opt/walter-core/modules/registry.json",
-        "/opt/walter-core/systemd/walter-standby.service",
-        "/opt/walter-core/systemd/walter-standby.timer",
-        "/opt/walter-core/config/standby.toml"
+        "/walter/core/contracts/core.json",
+        "/walter/core/hooks/walter_hook.py",
+        "/walter/core/server.py",
+        "/walter/core/modules/catalog.json",
+        "/walter/core/modules/registry.json",
+        "/walter/core/systemd/walter-standby.service",
+        "/walter/core/systemd/walter-standby.timer",
+        "/walter/core/config/standby.toml"
       ],
       "requires": [],
       "external": [],
       "data": [],
       "core_paths": [
-        "/opt/walter-core/walter_platform"
+        "/walter/core/walter_platform"
       ],
       "backup_paths": [
-        "/opt/walter-core",
+        "/walter/core",
         "/root/.codex/config.toml",
         "/root/.claude.json",
         "/root/.claude/settings.json",
         "/opt/dsh/home/cordis.patch.yml",
         "/opt/dsh/home/walter-hooks.json",
         "/usr/local/bin/walter",
-        "/instances/monsieur/instance.toml",
-        "/instances/monsieur/config",
-        "/instances/monsieur/accounts",
-        "/instances/monsieur/bootstrap"
+        "/user/Lucas/instance.toml",
+        "/user/Lucas/config",
+        "/user/Lucas/accounts",
+        "/user/Lucas/bootstrap"
       ],
       "interfaces": [
         "MCP stdio",
@@ -704,7 +808,9 @@
         "CLI contracts, matrix, doctor",
         "Declarative harness compositions",
         "Offline source release and staged installation",
-        "walter standby"
+        "walter standby",
+        "walter matrix: qualified evidence requires matching source/scenario/version/configuration attestation (bench protocol 2)",
+        "walter-guardians: strict Incident v1 validation, explicit check failures and bounded notification retry/backoff"
       ],
       "bindings": {
         "hermes": "native adapters + lifecycle hook (no duplicate MCP attachment)",
@@ -722,13 +828,13 @@
       "optional": [],
       "contract": {
         "schema_version": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "owner": "core",
         "kind": "foundation",
         "purpose": "Exposer les capacités et installer les raccordements des harnesses.",
         "target_root": "/walter/core",
         "config_paths": [
-          "/opt/walter-core/modules/computer-policy.json"
+          "/walter/core/modules/computer-policy.json"
         ],
         "permissions": [
           "configurations clients",
@@ -807,6 +913,188 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "walter-core",
+        "order": 95,
+        "summary": "/walter/core/manifest/SUMMARY.md",
+        "manifest": "/walter/core/manifest/MANIFEST.md",
+        "guide": "/walter/core/manifest/GUIDE.md",
+        "tools": [
+          "walter_health",
+          "ask_hermes",
+          "module_guide",
+          "module_index"
+        ]
+      }
+    },
+    {
+      "id": "lab",
+      "root": "/walter/lab",
+      "anchors": [
+        "/walter/lab/contracts/lab.json",
+        "/walter/lab/walter_lab/core.py",
+        "/walter/lab/walter_lab/cli.py",
+        "/walter/lab/bin/walter-lab",
+        "/walter/lab/walter_lab/sandbox.py"
+      ],
+      "requires": [],
+      "external": [
+        "walter-scenario (core) as the shared bench",
+        "Docker daemon and reviewed locally available image (sandbox only)",
+        "Linux O_NOFOLLOW/dir_fd APIs (sandbox only)"
+      ],
+      "data": [
+        "experiment reports"
+      ],
+      "core_paths": [
+        "/walter/lab/walter_lab/core.py",
+        "/walter/lab/walter_lab/cli.py",
+        "/walter/lab/walter_lab/sandbox.py"
+      ],
+      "backup_paths": [
+        "/walter/lab",
+        "/user/Lucas/state/lab"
+      ],
+      "interfaces": [
+        "CLI walter-lab status|run|history|list",
+        "Experiment v1 (experiments/*.yaml)",
+        "CLI walter-lab sandbox run|probe",
+        "Python walter_lab.sandbox.run"
+      ],
+      "bindings": {
+        "hermes": "CLI under host execution permissions",
+        "dsh": "CLI under host execution permissions",
+        "codex": "CLI under host execution permissions",
+        "claude-code": "CLI under host execution permissions"
+      },
+      "limitations": [
+        "Paused until production (owner decision 2026-10-29): no experiment on Lab's own initiative; `run` needs the owner's explicit request (--requested-by owner --reason), recorded in the report. Mode in @instance/config/lab/lab.toml (module default: paused).",
+        "Scope: transverse R&D and global self-improvement only. Each module keeps its own research, refresh, learning and guardian (Router cycle, Skills curator, Browse recipes); none of them needs Lab.",
+        "The shared bench (walter-scenario, scenarios, qualifications read by `walter matrix`) is never paused; it still lives in core until its public interfaces exist (addendum 2026-10-29, F).",
+        "Scenario experiments inherit host permissions and environment; sandbox execution is a separate explicit interface.",
+        "Proposals only: nothing is ever applied by Lab.",
+        "No external-source scout or runtime-neutral runtime comparison yet.",
+        "Sandbox uses an unprivileged Docker container with no network; host copies reject links and special files and have byte/entry/depth limits.",
+        "Known credential names are excluded from input; arbitrary secret contents still require an approved sanitised source and image.",
+        "The writable bind has no disk quota during execution; unsuitable where a hard disk bound is required. Docker shares the host kernel.",
+        "Sandbox requires a reviewed image already present locally; no automatic image pull or network mode.",
+        "After backend changes run the real sandbox probe; mocked host-boundary tests do not qualify Docker isolation."
+      ],
+      "services": [],
+      "optional": [
+        "core"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "0.1.1",
+        "owner": "lab",
+        "kind": "capability",
+        "purpose": "Chercher, mesurer et proposer des améliorations de Walter, sans jamais les appliquer seul.",
+        "target_root": "/walter/lab",
+        "config_paths": [],
+        "permissions": [
+          "lancer des scénarios du banc",
+          "écrire ses rapports",
+          "lancer un conteneur Docker local sans réseau sur une copie approuvée",
+          "exporter uniquement des fichiers ordinaires validés vers un répertoire neuf"
+        ],
+        "invariants": [
+          "Une expérience a sa règle de décision écrite avant les essais.",
+          "Lab propose ; il n'applique rien.",
+          "Pas de code externe hors d'un bac à sable sans secrets.",
+          "Les copies hôte refusent les liens et fichiers spéciaux et ne changent jamais les permissions de la source.",
+          "Un résultat sandbox est validé et exporté uniquement après arrêt confirmé du conteneur."
+        ],
+        "errors": [
+          "invalid_request",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Une expérience interrompue garde les essais déjà mesurés dans son rapport."
+        ],
+        "operations": [
+          {
+            "id": "run",
+            "transport": "cli",
+            "interface": "walter-lab run",
+            "access": "execute",
+            "timeout_seconds": 7200,
+            "timeout_status": "target"
+          },
+          {
+            "id": "sandbox-run",
+            "transport": "cli",
+            "interface": "walter-lab sandbox run",
+            "access": "execute",
+            "timeout_seconds": 600,
+            "timeout_status": "implemented"
+          },
+          {
+            "id": "sandbox-probe",
+            "transport": "cli",
+            "interface": "walter-lab sandbox probe",
+            "access": "execute",
+            "timeout_seconds": 120,
+            "timeout_status": "implemented"
+          }
+        ],
+        "resources": [
+          {
+            "id": "experiment-reports",
+            "role": "owner",
+            "owner": "lab",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le format Experiment ; garder la lecture des anciens rapports."
+        ],
+        "recovery": {
+          "backup": [
+            "Module et rapports dans le paquet config offsite."
+          ],
+          "restore": [
+            "Réinstaller le module ; les rapports sont des fichiers."
+          ],
+          "verification": [
+            "walter-lab history <expérience>."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "rule-first",
+            "assertion": "La décision proposée découle de la règle écrite avant les essais.",
+            "scope": "unit"
+          },
+          {
+            "id": "host-copy-boundary",
+            "assertion": "Liens, hardlinks multiples et fichiers spéciaux sont refusés ; une course de remplacement ne lit pas hors de la source et un export ne fusionne jamais une destination existante.",
+            "scope": "unit"
+          },
+          {
+            "id": "protocol-preserved",
+            "assertion": "Checkpoints et rapport final gardent le même protocole sans écrire les valeurs d’environnement.",
+            "scope": "unit"
+          },
+          {
+            "id": "sandbox-isolation",
+            "assertion": "Le probe Docker réel vérifie UID, réseau, accès hôte et écritures racine ; timeout ou code non nul sont des échecs.",
+            "scope": "integration"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Lab",
+        "order": 90,
+        "summary": "/walter/lab/manifest/SUMMARY.md",
+        "manifest": "/walter/lab/manifest/MANIFEST.md",
+        "tools": []
       }
     },
     {
@@ -820,7 +1108,9 @@
         "router",
         "secrets"
       ],
-      "external": [],
+      "external": [
+        "Optional native Claude Code client, path provisioned by instance"
+      ],
       "data": [
         "local consumer tokens",
         "provider routing configuration"
@@ -828,12 +1118,13 @@
       "core_paths": [],
       "backup_paths": [
         "/walter/router/llm",
-        "/instances/monsieur/config/llm",
-        "/instances/monsieur/state/llm",
-        "/root/.hermes/walter-llm"
+        "/user/Lucas/config/llm",
+        "/user/Lucas/state/llm",
+        "/user/Lucas/bootstrap/walter-llm"
       ],
       "interfaces": [
-        "OpenAI-compatible :8894"
+        "OpenAI-compatible :8894",
+        "CLI walter-llm call: one exact model/provider, JSON stdin/stdout, no implicit retry or fallback"
       ],
       "bindings": {
         "dsh": "configured provider",
@@ -841,21 +1132,26 @@
         "codex": "specialist module calls; primary native",
         "claude-code": "specialist module calls; primary native"
       },
-      "limitations": [],
+      "limitations": [
+        "Identified HTTP runs require Memory metadata; unresolved, local_only and redacted_cloud contexts are refused. Untracked legacy requests are outside this check.",
+        "Cost telemetry distinguishes reported, estimated, legacy and unknown; missing usage or a synthetic zero does not prove free execution."
+      ],
       "services": [
         "walter-llm"
       ],
-      "optional": [],
+      "optional": [
+        "memory"
+      ],
       "contract": {
         "schema_version": 1,
-        "version": "1.0.0",
+        "version": "1.2.0",
         "owner": "llm",
         "kind": "capability",
         "purpose": "Exécuter les appels modèles des consommateurs autorisés via les postes du Router.",
         "target_root": "/walter/router/llm",
         "config_paths": [
           "/walter/router/llm/config/gateway.json",
-          "/instances/monsieur/config/llm/gateway.json"
+          "/user/Lucas/config/llm/gateway.json"
         ],
         "permissions": [
           "jeton local par consommateur",
@@ -864,7 +1160,8 @@
         "invariants": [
           "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
           "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
-          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+          "Les données privées et secrets ne sont pas exposés par les diagnostics.",
+          "Claude subscription forwards caller-owned messages and tools plus validated technical attribution; native agent output never executes tools."
         ],
         "errors": [
           "invalid_request",
@@ -942,11 +1239,11 @@
     },
     {
       "id": "logs",
-      "root": "/opt/walter-memory",
+      "root": "/walter/memory",
       "anchors": [
-        "/opt/walter-memory/connectors/walter_logs.py",
-        "/opt/walter-memory/contracts/logs.json",
-        "/opt/walter-memory/walter_memory/logs.py"
+        "/walter/memory/connectors/walter_logs.py",
+        "/walter/memory/contracts/logs.json",
+        "/walter/memory/walter_memory/logs.py"
       ],
       "requires": [
         "memory"
@@ -956,10 +1253,10 @@
         "walter_logs.*"
       ],
       "core_paths": [
-        "/opt/walter-memory/walter_memory/logs.py"
+        "/walter/memory/walter_memory/logs.py"
       ],
       "backup_paths": [
-        "/opt/walter-memory"
+        "/walter/memory"
       ],
       "interfaces": [
         "Writer",
@@ -1070,18 +1367,32 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "walter-logs",
+        "order": 20,
+        "summary": "/walter/memory/manifest/logs/SUMMARY.md",
+        "manifest": "/walter/memory/manifest/logs/MANIFEST.md",
+        "guide": "/walter/memory/manifest/logs/GUIDE.md",
+        "tools": [
+          "logs_search",
+          "logs_timeline",
+          "logs_get"
+        ]
       }
     },
     {
       "id": "memory",
-      "root": "/opt/walter-memory",
+      "root": "/walter/memory",
       "anchors": [
-        "/opt/walter-memory/contracts/memory.json",
-        "/opt/walter-memory/walter_memory/events.py",
-        "/opt/walter-memory/walter_memory/objects.py",
-        "/opt/walter-memory/walter_memory/client.py",
-        "/opt/walter-memory/walter_memory/read_policy.py",
-        "/opt/walter-memory/ports/hermes/__init__.py"
+        "/walter/memory/contracts/memory.json",
+        "/walter/memory/walter_memory/events.py",
+        "/walter/memory/walter_memory/objects.py",
+        "/walter/memory/walter_memory/client.py",
+        "/walter/memory/walter_memory/read_policy.py",
+        "/walter/memory/ports/hermes/__init__.py",
+        "/walter/memory/walter_memory/overland.py"
       ],
       "requires": [],
       "external": [
@@ -1098,19 +1409,22 @@
         "kardex.*"
       ],
       "core_paths": [
-        "/opt/walter-memory/walter_memory/events.py",
-        "/opt/walter-memory/walter_memory/objects.py"
+        "/walter/memory/walter_memory/events.py",
+        "/walter/memory/walter_memory/objects.py"
       ],
       "backup_paths": [
-        "/opt/walter-memory",
+        "/walter/memory",
         "/root/.pgpass",
-        "/root/.hermes/plugins/walter-memory"
+        "/root/.hermes/plugins/walter-memory",
+        "/user/Lucas/bootstrap/overland.env"
       ],
       "interfaces": [
         "Python library",
         "HTTP :8890",
         "CLI",
-        "MCP"
+        "MCP",
+        "Overland authenticated HTTP :3010",
+        "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer"
       ],
       "bindings": {
         "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
@@ -1125,20 +1439,21 @@
         "Existing desktop provider instances change on next session initialization; not force-restarted."
       ],
       "services": [
-        "walter-memory-gateway"
+        "walter-memory-gateway",
+        "walter-memory-overland"
       ],
       "optional": [
         "llm"
       ],
       "contract": {
         "schema_version": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "owner": "memory",
         "kind": "capability",
         "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
         "target_root": "/walter/memory",
         "config_paths": [
-          "/opt/walter-memory/.env"
+          "/walter/memory/.env"
         ],
         "permissions": [
           "classification de confidentialité",
@@ -1266,14 +1581,203 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Memory",
+        "order": 10,
+        "summary": "/walter/memory/manifest/SUMMARY.md",
+        "manifest": "/walter/memory/manifest/MANIFEST.md",
+        "guide": "/walter/memory/manifest/GUIDE.md",
+        "tools": [
+          "memory_context",
+          "memory_search",
+          "memory_events",
+          "person_lookup",
+          "memory_retain"
+        ]
+      }
+    },
+    {
+      "id": "ops",
+      "root": "/walter/ops",
+      "anchors": [
+        "/walter/ops/contracts/ops.json",
+        "/walter/ops/walter_ops/cli.py",
+        "/walter/ops/bin/walter-ops",
+        "/walter/ops/walter_backup/core.py",
+        "/walter/ops/walter_backup/cli.py",
+        "/walter/ops/bin/walter-backup",
+        "/walter/ops/backup/scripts/walter-pg-backup",
+        "/walter/ops/backup/scripts/walter-statedb-backup",
+        "/walter/ops/backup/scripts/walter-offsite-backup",
+        "/walter/ops/backup/scripts/walter-offsite-restore-test"
+      ],
+      "requires": [],
+      "external": [
+        "systemd units walter-pg-backup, walter-statedb-backup, walter-offsite-backup, walter-offsite-restore-test (unit files on the host; their scripts are backup/scripts/* since 2026-10-29), walter-restore-isolated (Walter Memory's restore drill, started by Ops)",
+        "git",
+        "docker (PostgreSQL container: dumps, db checkpoints, scratch restore)",
+        "zstd, tar, age, rclone",
+        "walter release|install|export (core platform) for deploy",
+        "Walter Memory backup_bundle (config bundle) and Walter Secrets vault-export (offsite kinds config and bitwarden)",
+        "Docker image pgvector/pgvector:pg16 (disposable database without network for migrations-check)"
+      ],
+      "data": [
+        "checkpoint log",
+        "checkpoint archives and dumps",
+        "git checkpoint refs (refs/walter-backup/*)"
+      ],
+      "core_paths": [
+        "/walter/ops/walter_ops/cli.py",
+        "/walter/ops/walter_backup/core.py",
+        "/walter/ops/walter_backup/cli.py",
+        "/walter/ops/backup/scripts"
+      ],
+      "backup_paths": [
+        "/walter/ops",
+        "/user/Lucas/config/backup",
+        "/user/Lucas/state/backup"
+      ],
+      "interfaces": [
+        "CLI walter-ops backup|git|check|recovery|deploy|status (install, onboard: planned)",
+        "CLI walter-ops install migrations-check [--keep-dumps DIR] (Walter Clean, PostgreSQL part: replay every module's migrations on a disposable database, compare the structure with the live one)",
+        "CLI walter-ops install data-check (every table classified by its module's contracts/data-classes.json; reference rows searched for the instance's private markers, counts only)",
+        "CLI walter-ops install seed-export DIR | clean-db-check [--seeds DIR | --keep-seeds DIR] (Walter Clean database built from migrations + reference rows on a disposable PostgreSQL, proven marker-free)",
+        "CLI walter-backup status|check|run|verify|git|checkpoint|checkpoints (compatibility alias, same outputs)",
+        "CLI walter-ops backup env <pg|statedb|offsite|restore_test> (shell parameters of the backup jobs)",
+        "Incident v1 (check) for the guardian supervisor"
+      ],
+      "bindings": {
+        "hermes": "CLI under host execution permissions",
+        "dsh": "CLI under host execution permissions",
+        "codex": "CLI under host execution permissions",
+        "claude-code": "CLI under host execution permissions"
+      },
+      "limitations": [
+        "Renamed from walter-backup on 2026-10-29 (owner decision): compatibility kept — command walter-backup, paths /walter/backup and /opt/walter-backup, unit names, config @instance/config/backup and state @instance/state/backup (the backup sub-component keeps its name).",
+        "installer: the database of Walter Clean is built and proven (install migrations-check, data-check, clean-db-check; bench scenarios clean-migrations, clean-database); clean-install of the software, onboarding and personal-restore are designed, not built yet (walter-ops install clean|personal and onboard answer 'planned').",
+        "deploy wraps the core platform's release/install/export; Ops does not own the other modules' code, contracts or migrations.",
+        "Backup scripts (pg, statedb, offsite, restore test) moved into backup/scripts on 2026-10-29, each qualified by a real run; host paths /usr/local/sbin/walter-* link to them. Every location comes from the instance (walter-ops backup env <kind>). The isolated restore drill stays in Walter Memory.",
+        "Restores are described, never executed by the tool.",
+        "A git checkpoint holds tracked files only; untracked files are listed, not captured.",
+        "Optional modules: memory (Raw Vault sample of verify), core (walter contracts for conformity).",
+        "Repository hygiene reports G0 warnings only; it never removes, stages or commits files.",
+        "Uncommitted age is estimated from visible file mtimes; touching/deleting a file limits that estimate.",
+        "Configured preserved evidence paths remain visible but are excluded from hygiene warnings; intentional compatibility is not inferred to be obsolete."
+      ],
+      "services": [],
+      "optional": [
+        "memory",
+        "core",
+        "secrets"
+      ],
+      "contract": {
+        "schema_version": 1,
+        "version": "0.2.0",
+        "owner": "ops",
+        "kind": "foundation",
+        "purpose": "Installer, déployer, versionner, conserver et restaurer le logiciel Walter et ses instances (installer, deploy, git, backup, recovery, guardian), indépendamment des autres modules.",
+        "target_root": "/walter/ops",
+        "config_paths": [
+          "/walter/ops/config/backup.toml",
+          "/user/Lucas/config/backup/backup.toml"
+        ],
+        "permissions": [
+          "lecture des sauvegardes et des unités",
+          "démarrage des unités de sauvegarde existantes",
+          "aucune restauration sans accord du propriétaire"
+        ],
+        "invariants": [
+          "Fonctionne sans Router, Context, Hermes, DSH ni modèle ; Memory seulement pour l'échantillon du Raw Vault.",
+          "Conformité, santé des sauvegardes et restaurabilité restent trois réponses distinctes.",
+          "Aucune valeur secrète dans les sorties."
+        ],
+        "errors": [
+          "invalid_request",
+          "permission_denied",
+          "dependency_unavailable",
+          "deadline_exceeded",
+          "internal_error"
+        ],
+        "cancellation": [
+          "Une commande interrompue ne laisse qu'un fichier partiel supprimé ou une référence git cohérente.",
+          "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+        ],
+        "operations": [
+          {
+            "id": "status",
+            "transport": "cli",
+            "interface": "walter-ops backup status",
+            "access": "read",
+            "timeout_seconds": 180,
+            "timeout_status": "target"
+          },
+          {
+            "id": "checkpoint",
+            "transport": "cli",
+            "interface": "walter-ops backup checkpoint",
+            "access": "write",
+            "timeout_seconds": 3600,
+            "timeout_status": "target"
+          }
+        ],
+        "resources": [
+          {
+            "id": "checkpoints",
+            "role": "owner",
+            "owner": "ops",
+            "durability": "canonical"
+          }
+        ],
+        "migrations": [
+          "Versionner le contrat ; déplacer une implémentation existante seulement après qualification, avec lien de compatibilité."
+        ],
+        "recovery": {
+          "backup": [
+            "Le module et sa configuration sont dans le paquet config offsite ; ses points de reprise sont des fichiers et des références git."
+          ],
+          "restore": [
+            "Réinstaller le module depuis le paquet config ; il ne dépend d'aucun autre module pour démarrer."
+          ],
+          "verification": [
+            "walter-ops backup status puis verify ; l'exercice isolé reste la preuve complète."
+          ]
+        },
+        "acceptance": [
+          {
+            "id": "independent",
+            "assertion": "status et check répondent avec Router, Memory et Hermes arrêtés.",
+            "scope": "integration"
+          },
+          {
+            "id": "three-answers",
+            "assertion": "Une dérive de registre n'empêche ni la sauvegarde ni le rapport de santé.",
+            "scope": "integration"
+          },
+          {
+            "id": "repository-hygiene",
+            "assertion": "Les caches déjà suivis et le travail non suivi ancien déclenchent un warning G0 ; archives et rapports conservés sont distingués, sans suppression automatique.",
+            "scope": "unit"
+          }
+        ],
+        "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Ops",
+        "order": 85,
+        "summary": "/walter/ops/manifest/SUMMARY.md",
+        "manifest": "/walter/ops/manifest/MANIFEST.md",
+        "tools": []
       }
     },
     {
       "id": "raw-vault",
-      "root": "/opt/walter-raw-vault",
+      "root": "/walter/memory/vault",
       "anchors": [
-        "/opt/walter-raw-vault/contracts/raw-vault.json",
-        "/opt/walter-raw-vault/rawvault.py"
+        "/walter/memory/vault/contracts/raw-vault.json",
+        "/walter/memory/vault/rawvault.py"
       ],
       "requires": [
         "memory"
@@ -1289,7 +1793,7 @@
       ],
       "core_paths": [],
       "backup_paths": [
-        "/opt/walter-raw-vault",
+        "/walter/memory/vault",
         "/root/.config/rclone/rclone.conf",
         "/root/.hermes/raw-vault"
       ],
@@ -1403,6 +1907,19 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Raw Vault",
+        "order": 30,
+        "summary": "/walter/memory/vault/manifest/SUMMARY.md",
+        "manifest": "/walter/memory/vault/manifest/MANIFEST.md",
+        "guide": "/walter/memory/vault/manifest/GUIDE.md",
+        "tools": [
+          "vault_search",
+          "vault_get",
+          "vault_put"
+        ]
       }
     },
     {
@@ -1410,7 +1927,10 @@
       "root": "/walter/router",
       "anchors": [
         "/walter/router/contracts/router.json",
-        "/walter/router/cli.py"
+        "/walter/router/cli.py",
+        "/walter/router/docs/README.md",
+        "/walter/router/serve/api.py",
+        "/walter/router/documentation.py"
       ],
       "requires": [],
       "external": [
@@ -1419,21 +1939,26 @@
       ],
       "data": [
         "models.*",
-        "config"
+        "config",
+        "models.guardian_incidents"
       ],
       "core_paths": [
         "/walter/router/store/db.py"
       ],
       "backup_paths": [
         "/walter/router",
-        "/instances/monsieur/config/router",
-        "/instances/monsieur/state/router"
+        "/user/Lucas/config/router",
+        "/user/Lucas/state/router"
       ],
       "interfaces": [
         "CLI",
         "walter-llm task routes",
         "MCP walter_route / walter_run / walter_decide / walter_plans",
-        "agents' brief (`walter-router brief`, @instance/state/router/brief.md)"
+        "agents' brief (`walter-router brief`, @instance/state/router/brief.md)",
+        "CLI walter-router schema (public tool contract v1)",
+        "CLI walter-router docs --write/--check [--offline]",
+        "CLI walter-router brief --json (versioned orchestrator note v1)",
+        "CLI walter-router-guardian check | run | status (the module's own maintenance)"
       ],
       "bindings": {
         "hermes": "router plugin (same tools, brief as a system-prompt section) + auxiliary configuration adapter",
@@ -1444,13 +1969,19 @@
       "limitations": [
         "New model choices remain subject to the owner's approval; no automatic switching introduced.",
         "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
-        "Text sub-agents run as one-shot runs of the Hermes runtime (the runtime here that runs every provider)."
+        "Text runs execute natively with bounded terminal/file tools; only providers of the selected model are tried, and callers must forward user_notice on failover.",
+        "The guardian lands repairs only in research/, analysis/parse.py, analysis/identity.py, analysis/aliases.json, interface/ and tests/, through deterministic gates; owner choices, execution policy, schema and units are never changed by it."
       ],
-      "services": [],
-      "optional": [],
+      "services": [
+        "walter-router-guardian.timer"
+      ],
+      "optional": [
+        "core",
+        "browse"
+      ],
       "contract": {
         "schema_version": 1,
-        "version": "1.0.0",
+        "version": "1.2.0",
         "owner": "router",
         "kind": "capability",
         "purpose": "Choisir les modèles par poste avec décisions et coûts traçables.",
@@ -1550,8 +2081,35 @@
         "conventions_status": "required; enforced per port only after qualification evidence"
       },
       "public": [
-        "@instance/state/router/brief.md"
-      ]
+        "@instance/state/router/brief.md",
+        "@instance/state/router/brief.json"
+      ],
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Router",
+        "order": 70,
+        "summary": "/walter/router/manifest/SUMMARY.md",
+        "manifest": "/walter/router/manifest/MANIFEST.md",
+        "guide": "/walter/router/manifest/GUIDE.md",
+        "manifest_command": [
+          "walter-router",
+          "brief",
+          "--json"
+        ],
+        "tools": [
+          "walter_route",
+          "walter_run",
+          "walter_decide",
+          "walter_plans"
+        ],
+        "index": {
+          "command": [
+            "walter-router",
+            "tasks"
+          ],
+          "sections": "tâches (clé, libellé, interface)"
+        }
+      }
     },
     {
       "id": "runtime",
@@ -1690,13 +2248,13 @@
       "backup_paths": [
         "/walter/secrets",
         "/root/.config/Bitwarden CLI/data.json",
-        "/instances/monsieur/config/secrets",
-        "/instances/monsieur/state/secrets",
-        "/root/.hermes/vault",
+        "/user/Lucas/config/secrets",
+        "/user/Lucas/state/secrets",
+        "/user/Lucas/bootstrap/vault",
         "/root/.hermes/logs/walter-secrets.jsonl",
         "/root/.hermes/logs/walter-secrets-sync.status.json",
         "/root/.hermes/logs/walter-secrets-sync.log",
-        "/instances/monsieur/accounts"
+        "/user/Lucas/accounts"
       ],
       "interfaces": [
         "safe MCP metadata/reference",
@@ -1721,14 +2279,14 @@
       "optional": [],
       "contract": {
         "schema_version": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "owner": "secrets",
         "kind": "capability",
         "purpose": "Gérer les références au coffre et injecter localement les valeurs autorisées.",
         "target_root": "/walter/secrets",
         "config_paths": [
           "/walter/secrets/config/walter-secrets.toml",
-          "/instances/monsieur/config/secrets/walter-secrets.toml"
+          "/user/Lucas/config/secrets/walter-secrets.toml"
         ],
         "permissions": [
           "approbations locales pour utilisation",
@@ -1813,15 +2371,28 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "Walter Secrets",
+        "order": 40,
+        "summary": "/walter/secrets/manifest/SUMMARY.md",
+        "manifest": "/walter/secrets/manifest/MANIFEST.md",
+        "guide": "/walter/secrets/manifest/GUIDE.md",
+        "tools": [
+          "secret_search",
+          "secret_reference"
+        ]
       }
     },
     {
       "id": "skills",
-      "root": "/opt/walter-skills",
+      "root": "/walter/skills",
       "anchors": [
-        "/opt/walter-skills/config/walter-skills.toml",
-        "/opt/walter-skills/contracts/skills.json",
-        "/opt/walter-skills/walter_skills/api.py"
+        "/walter/skills/config/walter-skills.toml",
+        "/walter/skills/contracts/skills.json",
+        "/walter/skills/walter_skills/api.py",
+        "/walter/skills/manifest/GUIDE.md"
       ],
       "requires": [
         "bus"
@@ -1835,11 +2406,12 @@
         "skills.*"
       ],
       "core_paths": [
-        "/opt/walter-skills/walter_skills/client.py",
-        "/opt/walter-skills/walter_skills/policy.py"
+        "/walter/skills/walter_skills/client.py",
+        "/walter/skills/walter_skills/policy.py",
+        "/walter/skills/walter_skills/domains.py"
       ],
       "backup_paths": [
-        "/opt/walter-skills"
+        "/walter/skills"
       ],
       "interfaces": [
         "HTTP :8891",
@@ -1863,13 +2435,13 @@
       ],
       "contract": {
         "schema_version": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "owner": "skills",
         "kind": "capability",
         "purpose": "Gérer le contenu, la recherche, les propositions et la curation des procédures.",
         "target_root": "/walter/skills",
         "config_paths": [
-          "/opt/walter-skills/config/walter-skills.toml"
+          "/walter/skills/config/walter-skills.toml"
         ],
         "permissions": [
           "propositions en brouillon",
@@ -1878,7 +2450,8 @@
         "invariants": [
           "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
           "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
-          "Les données privées et secrets ne sont pas exposés par les diagnostics."
+          "Les données privées et secrets ne sont pas exposés par les diagnostics.",
+          "La découverte charge le manifeste et l'index par niveau ; les procédures complètes sont lues à la demande."
         ],
         "errors": [
           "invalid_request",
@@ -1906,6 +2479,14 @@
             "interface": "skill_propose/skill_patch",
             "access": "write",
             "timeout_seconds": 60,
+            "timeout_status": "target"
+          },
+          {
+            "id": "discovery",
+            "transport": "mcp",
+            "interface": "skills_manifest/skills_index",
+            "access": "read",
+            "timeout_seconds": 10,
             "timeout_status": "target"
           }
         ],
@@ -1963,9 +2544,41 @@
             "id": "restore",
             "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
             "scope": "recovery"
+          },
+          {
+            "id": "progressive-discovery",
+            "assertion": "Le repère de session ne contient aucun corps de procédure ; un domaine expose les usages et workflows ; une publication active du Curator met à jour l'index sans injecter de candidats à chaque message.",
+            "scope": "integration"
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "W.Alter Skills",
+        "order": 80,
+        "summary": "/walter/skills/manifest/SUMMARY.md",
+        "manifest": "/walter/skills/manifest/MANIFEST.md",
+        "guide": "/walter/skills/manifest/GUIDE.md",
+        "manifest_command": [
+          "walter-skills",
+          "brief",
+          "--map-only"
+        ],
+        "tools": [
+          "skills_search",
+          "skills_index",
+          "skill_read"
+        ],
+        "index": {
+          "command": [
+            "walter-skills",
+            "index"
+          ],
+          "section_arg": "--domain",
+          "paged": true,
+          "sections": "domaines (sans section : la liste des domaines)"
+        }
       }
     },
     {
@@ -1987,10 +2600,10 @@
       "core_paths": [],
       "backup_paths": [
         "/walter/soul",
-        "/instances/monsieur/soul",
-        "/instances/monsieur/config/soul",
-        "/instances/monsieur/state/soul",
-        "/instances/monsieur/profiles"
+        "/user/Lucas/soul",
+        "/user/Lucas/config/soul",
+        "/user/Lucas/state/soul",
+        "/user/Lucas/profiles"
       ],
       "interfaces": [
         "renderer",
@@ -2092,6 +2705,17 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
+      },
+      "presentation": {
+        "audience": "agent",
+        "title": "walter-soul",
+        "order": 90,
+        "summary": "/walter/soul/manifest/SUMMARY.md",
+        "manifest": "/walter/soul/manifest/MANIFEST.md",
+        "guide": "/walter/soul/manifest/GUIDE.md",
+        "tools": [
+          "walter_profile"
+        ]
       }
     }
   ]
