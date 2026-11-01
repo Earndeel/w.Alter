@@ -434,6 +434,10 @@ JOB_KEYS = {
                      "WALTER_RESTORE_COMPARE": ("restore_test", "compare_tables"),
                      "WALTER_RESTORE_MIN_VAULT_ITEMS": ("restore_test", "min_vault_items")},
 }
+# Optional parameters: exported only when the instance sets them (no default location, no error when absent).
+JOB_OPTIONAL_KEYS = {
+    "offsite": {"WALTER_OFFSITE_PROJECTS": ("offsite", "projects")},   # folders archived by the `projects` kind
+}
 
 
 def job_env(kind: str) -> dict[str, str]:
@@ -452,6 +456,12 @@ def job_env(kind: str) -> dict[str, str]:
             out[var] = " ".join(map(str, node)) if isinstance(node, list) else str(node)
     if missing:
         raise ValueError("backup configuration incomplete: " + ", ".join(missing))
+    for var, path in JOB_OPTIONAL_KEYS.get(kind, {}).items():
+        node = cfg
+        for part in path:
+            node = node.get(part) if isinstance(node, dict) else None
+        if node not in (None, "", []):
+            out[var] = " ".join(map(str, node)) if isinstance(node, list) else str(node)
     for var in [v for v in out if v.endswith("_PATTERN")]:
         if "*" not in out[var]:
             raise ValueError(f"{var}: a file pattern must contain '*'")

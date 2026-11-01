@@ -7,6 +7,7 @@
 #   statedb/   newest agent-runtime state snapshot (walter-statedb-backup)
 #   bitwarden/ vault export, already age-encrypted by Walter Secrets (`walter-secret vault-export`)
 #   config/    config bundle of the modules and their integrations (Walter Memory's backup_bundle, fail closed)
+#   projects/  the owner's project folders (offsite.projects), without rebuildable dependencies (2026-11-01)
 # Remote retention per kind: keep_daily + keep_weekly (Sunday) + keep_monthly (1st). Upload is hash-verified by rclone.
 # Restore: rclone copy "<remote>/<kind>/<file>.age" . && age -d -i <recovery key> <file>.age > <file>
 # Without a copy of the PRIVATE recovery key off the machine, these files are unreadable once the machine is gone.
@@ -51,6 +52,19 @@ if wants config; then
   walter-python -m walter_memory.backup_bundle create "$WORK/config-$TS.tar"
   zstd -q -T2 -10 --rm "$WORK/config-$TS.tar" -o "$WORK/config-$TS.tar.zst"
   push config "$WORK/config-$TS.tar.zst"
+fi
+
+# Project folders: sources, git history and data; dependencies that a reinstall rebuilds are left out.
+# tar exits 1 when a file changes while it is read (a live site writing a log): accepted, anything else stops.
+if wants projects && [ -n "${WALTER_OFFSITE_PROJECTS:-}" ]; then
+  rel=(); for d in $WALTER_OFFSITE_PROJECTS; do [ -d "$d" ] && rel+=("${d#/}"); done
+  if [ ${#rel[@]} -gt 0 ]; then
+    tar -C / -cf "$WORK/projects-$TS.tar" --warning=no-file-changed \
+      --exclude=node_modules --exclude=.venv --exclude=venv --exclude=__pycache__ --exclude=.next \
+      --exclude=.cache --exclude=.pytest_cache "${rel[@]}" || [ $? -eq 1 ]
+    zstd -q -T2 -10 --rm "$WORK/projects-$TS.tar" -o "$WORK/projects-$TS.tar.zst"
+    push projects "$WORK/projects-$TS.tar.zst"
+  fi
 fi
 
 # Remote retention

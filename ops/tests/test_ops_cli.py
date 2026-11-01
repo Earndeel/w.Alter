@@ -53,6 +53,9 @@ def test_job_parameters_come_from_configuration(tmp_path, monkeypatch):
     assert (env["WALTER_BACKUP_PREFIX"], env["WALTER_BACKUP_SUFFIX"]) == ("db-", ".dump")
     assert env["WALTER_BACKUP_KEEP_DAILY"] == "7" and env["WALTER_PG_CONTAINER"] == "c"   # module default retention
     assert core.job_env("offsite")["WALTER_OFFSITE_KINDS"] == "pg config"
+    assert "WALTER_OFFSITE_PROJECTS" not in core.job_env("offsite")   # optional: absent unless the instance sets it
+    conf.write_text(conf.read_text().replace('vault_export_dir = "/v"\n', 'vault_export_dir = "/v"\nprojects = ["/p", "/q"]\n'))
+    assert core.job_env("offsite")["WALTER_OFFSITE_PROJECTS"] == "/p /q"
     conf.write_text('[kinds.pg]\npattern = "db-*.dump"\n')
     with pytest.raises(ValueError, match="kinds.pg.dir"):
         core.job_env("pg")                                        # never a guessed location
