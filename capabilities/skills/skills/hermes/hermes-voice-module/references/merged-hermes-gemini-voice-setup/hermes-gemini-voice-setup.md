@@ -1,5 +1,5 @@
 ---
-name: hermes-gemini-voice-setup
+name: hermes-voice-module
 category: devops
 description: Add Gemini as STT and TTS provider in Hermes. Transcription with Gemini 3.1 Flash Lite, speech synthesis with Gemini 3.1 Flash TTS.
 tags: [gemini, stt, tts, voice, telegram, hermes]
