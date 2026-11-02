@@ -1,12 +1,12 @@
 ---
-name: model-value-analysis
+name: model-benchmark-comparison
 description: Determine which LLMs are really worth it by task type — cross-references cost_per_task, intelligence, coding, agentic, and reasoning benchmarks. Complements model-benchmark-comparison.
 version: 1.6.0
 author: W.Alter
 metadata:
   hermes:
     tags: [mlops, benchmarks, model-selection, cost-optimization, value-analysis]
-    related_skills: [model-benchmark-comparison, aa-intel-vs-cost-scraper, aa-pareto-model-optimizer]
+    related_skills: [model-benchmark-comparison, aa-pareto-model-optimizer, aa-pareto-model-optimizer]
 ---
 
 # Model Value Analysis — "Which Models Are Worth It?"
@@ -54,7 +54,7 @@ A mix such as `100k input + 20k output` is a named scenario, not a universal “
 
 1. **Load `model-benchmark-comparison`** — for the API workflow, evaluation catalog, and `aa_analysis.py` script when API-wide catalog data is needed.
 2. **Load `aa-pareto-model-optimizer`** for the current merged Intelligence + Agentic + Kie.ai snapshot. Its deterministic `scripts/refresh.py` path avoids spending reasoning tokens re-scraping rows in the conversation.
-3. **Load `aa-intel-vs-cost-scraper`** when debugging the Recharts cost-per-task extraction itself.
+3. **Load `aa-pareto-model-optimizer`** when debugging the Recharts cost-per-task extraction itself.
 4. Get the AA API key from the vault only when the API path is required: `vault get artificialanalysis/api_key` (prefix `aa_mgBk...`). The public browser/RSC collector does not require the key.
 
 For the reusable live data contract, Kie verification rules, and cron-safe refresh recipe, read
@@ -92,7 +92,7 @@ GPT-5.6 is token-efficient. Grok 4.5 sits in between.
 Use the Recharts scraper:
 ```bash
 # In a venv with playwright:
-python3 /root/.hermes/skills/aa-intel-vs-cost-scraper/scripts/extract_recharts.py gpt-5-5 > cost_data.json
+python3 /root/.hermes/skills/aa-pareto-model-optimizer/scripts/extract_recharts.py gpt-5-5 > cost_data.json
 ```
 (Any model slug works — the scatter chart is the same across all pages. `gpt-5-5` is a stable default.)
 

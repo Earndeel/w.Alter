@@ -16,7 +16,7 @@ Use this whenever a model/tier requested for an Intelligence-vs-cost analysis is
 The reusable probe is:
 
 ```bash
-python3 /root/.hermes/skills/aa-intel-vs-cost-scraper/scripts/extract_recharts.py <exact-aa-model-slug>
+python3 /root/.hermes/skills/aa-pareto-model-optimizer/scripts/extract_recharts.py <exact-aa-model-slug>
 ```
 
 The `x` field is USD per Intelligence benchmark task; `y` is the Intelligence Index.

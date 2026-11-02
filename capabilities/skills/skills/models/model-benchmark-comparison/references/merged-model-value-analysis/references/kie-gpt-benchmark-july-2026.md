@@ -82,7 +82,7 @@ Live agentic tool-use comparison: same 3-tool debugging task (search_docs → re
 
 ## Tool-Use Format Reference
 
-For the exact Responses API format and multi-turn conversation structure, see the `kie-gemini-mastery` skill §7. The critical format differences from Chat Completions:
+For the exact Responses API format and multi-turn conversation structure, see the `kie-ai-api-direct` skill §7. The critical format differences from Chat Completions:
 
 | Concept | Chat Completions | Responses API (Kie.ai GPT) |
 |---|---|---|
