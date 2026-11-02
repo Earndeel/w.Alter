@@ -1,0 +1,11 @@
+{
+ "created_at": "2026-11-02T04:18:43.035102+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "colab-external-gpu",
+  "universal-web-extraction-router",
+  "scrapling"
+ ]
+}
