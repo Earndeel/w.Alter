@@ -247,5 +247,5 @@ Full doc: `references/lot4-integration-robustness.md`.
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **web-extraction-fallbacks** — Backend fallbacks and evidence validation once walter_browse has chosen the web route (resilient extraction when the first backend fails).
-  Read `references/merged-web-extraction-fallbacks/web-extraction-fallbacks.md` (+ 12 supporting files in that folder).
+- **universal-web-extraction-router** — Backend fallbacks and evidence validation once walter_browse has chosen the web route (resilient extraction when the first backend fails).
+  Read `references/merged-web-extraction-fallbacks/universal-web-extraction-router.md` (+ 12 supporting files in that folder).
