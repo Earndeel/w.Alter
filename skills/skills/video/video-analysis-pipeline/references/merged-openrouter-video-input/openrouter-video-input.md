@@ -1,5 +1,5 @@
 ---
-name: openrouter-video-input
+name: video-analysis-pipeline
 category: mlops
 description: 'Send video to LLMs via OpenRouter native video support -- model catalog, payload formats, and R2 upload workflow for efficient transmission'
 ---
