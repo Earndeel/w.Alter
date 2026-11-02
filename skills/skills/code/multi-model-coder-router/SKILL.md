@@ -298,5 +298,5 @@ Ajouter des tests de non-régression couvrant une priorité d’abonnement, un c
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **coder-profile** — The `hephaestus` Hermes coding-worker profile in practice: invocation, task capsule template, Kie provider integration, external routing, live validation checklist.
-  Read `references/merged-coder-profile/coder-profile.md`.
+- **multi-model-coder-router** — The `hephaestus` Hermes coding-worker profile in practice: invocation, task capsule template, Kie provider integration, external routing, live validation checklist.
+  Read `references/merged-coder-profile/multi-model-coder-router.md`.

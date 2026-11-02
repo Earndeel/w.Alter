@@ -1,5 +1,5 @@
 ---
-name: coder-profile
+name: multi-model-coder-router
 category: devops
 description: "Dedicated Hermes coding worker profile (hephaestus). W.Alter stays the only user-facing orchestrator; coding tasks are executed by the `hephaestus` profile, which routes models internally by task type."
 tags: [coding, profile, routing, hermes, orchestrator]
@@ -476,7 +476,7 @@ Recommended enabled set for the live coder profile:
 - `cloudflare-pages-deploy`
 - `cloudflare-worker-deploy-curl`
 - `code-review`
-- `coder-profile`
+- `multi-model-coder-router`
 - `codex`
 - `design-frontend-specialization`
 - `github-auth`
