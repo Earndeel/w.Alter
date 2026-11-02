@@ -27,12 +27,14 @@
     "codex": "lifecycle adapter",
     "claude-code": "lifecycle adapter"
   },
-  "limitations": [],
+  "limitations": [
+    "Livraison sans trou : un consommateur ne lit que les transactions terminées (tx < xmin) ; une transaction ouverte longtemps retarde la livraison sans la perdre (bus.lag held)."
+  ],
   "services": [],
   "optional": [],
   "contract": {
     "schema_version": 1,
-    "version": "1.0.0",
+    "version": "1.1.0",
     "owner": "bus",
     "kind": "foundation",
     "purpose": "Livrer les événements entre modules et conserver les curseurs de traitement.",

@@ -92,8 +92,8 @@ def _card_lines(entity_id: str) -> list[str]:
     k = c["kardex"].get("contact") or {}
     if k:
         lines.append("  " + ", ".join(f"{x}: {k[x]}" for x in ("relationship_type", "occupation", "location_current") if k.get(x)))
-    lines += [f"  • {cl['claim']}" for cl in (c["kardex"].get("claims") or [])[:5]
-              if cl["mention_policy"] in ("free", "contextual_only")]
+    lines += [f"  • {cl['claim']}" + ("" if cl.get("confirmed", True) else " (non confirmé)")
+              for cl in (c["kardex"].get("claims") or [])[:5]]          # already filtered by read_policy (cloud_model)
     lines += list(dict.fromkeys(f"  ⚠ {d['observation']}" for d in c["deviations"]))[:2]
     return lines
 

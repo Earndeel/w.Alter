@@ -159,17 +159,20 @@ def sync_chat(bp: Beeper, chat: dict, backfill_pages: int) -> tuple[int, int]:
             if ingestion.enqueue(MEDIA_QUEUE, job, dedupe_key=f"beeper_media:{job['source_id']}:{job['url']}", priority=200):
                 media_n += 1
 
-    # 1) newest pages until the known sortKey
+    # 1) newest pages until the known sortKey. newest_sort_key moves only once known history is reached: a run that
+    #    stops in the middle of a burst (Mac asleep, timeout) re-reads it next time instead of skipping the pages it
+    #    did not get to (inserts are idempotent). Fixed 2026-11-02.
     page = bp.messages(chat["id"])
     first_oldest = page.get("oldestCursor")
     newest = max((int(m.get("sortKey") or 0) for m in page["items"]), default=newest_known)
     while page["items"]:
         fresh = [m for m in page["items"] if int(m.get("sortKey") or 0) > newest_known]
-        upd = {"newest_sort_key": max(newest, newest_known)}
+        reached = len(fresh) < len(page["items"]) or not page.get("hasMore") or newest_known == 0
+        upd = {"newest_sort_key": max(newest, newest_known)} if reached else {}
         if "backfill_cursor" not in cp:
             upd["backfill_cursor"] = page.get("oldestCursor")
         write(fresh, upd)
-        if len(fresh) < len(page["items"]) or not page.get("hasMore") or newest_known == 0:
+        if reached:
             break                          # reached known history (or first run: backfill continues below)
         page = bp.messages(chat["id"], cursor=page["oldestCursor"], direction="before")
     if newest_known == 0 and "backfill_cursor" not in cp:
@@ -182,6 +185,59 @@ def sync_chat(bp: Beeper, chat: dict, backfill_pages: int) -> tuple[int, int]:
         done = not page.get("hasMore") or not page["items"]
         write(page["items"], {"backfill_cursor": page.get("oldestCursor") or cp["backfill_cursor"], "backfill_done": done})
     return inserted, media_n
+
+
+def reconcile_chat(bp: Beeper, chat: dict, since: datetime) -> tuple[int, int]:
+    """Re-read a chat back to `since` and write everything (idempotent): repairs messages a run missed and catches
+    edits, deletions and reactions on recent messages, which the incremental pass (new sortKeys only) never sees.
+    Returns (messages seen, events inserted)."""
+    people = {p["id"]: p for p in ((chat.get("participants") or {}).get("items") or [])}
+    seen = inserted = 0
+    page = bp.messages(chat["id"])
+    while page["items"]:
+        msgs = [m for m in page["items"] if datetime.fromisoformat(m["timestamp"].replace("Z", "+00:00")) >= since]
+        seen += len(msgs)
+        evs, _ = to_events(chat, msgs, people)
+        if evs:
+            inserted += events.record_events(evs)["inserted"]
+        if len(msgs) < len(page["items"]) or not page.get("hasMore"):
+            break
+        page = bp.messages(chat["id"], cursor=page["oldestCursor"], direction="before")
+    return seen, inserted
+
+
+def reconcile(bp: Beeper, chats: list[dict], days: int) -> dict:
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    with connection() as conn:
+        run_id = conn.execute("""insert into ingestion.reconciliation_runs (connector, stream) values (%s, %s)
+                                 returning run_id""", (CONNECTOR, f"last {days} days")).fetchone()["run_id"]
+    seen = inserted = errors = 0
+    repaired_chats = []
+    for chat in chats:
+        try:
+            s, i = reconcile_chat(bp, chat, since)
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            errors += 1
+            if errors >= 3:
+                break                      # the Mac went away: the next daily run starts again
+            continue
+        seen += s; inserted += i
+        if i:
+            repaired_chats.append({"chat": chat["id"], "inserted": i})
+    with connection() as conn:
+        conn.execute("""update ingestion.reconciliation_runs set finished_at = now(), source_count = %s, walter_count = %s,
+                          gaps = %s, repaired = %s, details = %s where run_id = %s""",
+                     (seen, seen, inserted, inserted, json.dumps({"since": since.isoformat(), "chats": len(chats),
+                                                                   "connection_errors": errors,
+                                                                   "repaired_chats": repaired_chats[:50]}), run_id))
+    return {"messages_seen": seen, "events_repaired": inserted, "connection_errors": errors}
+
+
+def _reconcile_due(hours: int = 24) -> bool:
+    with connection() as conn:
+        r = conn.execute("""select max(finished_at) at from ingestion.reconciliation_runs where connector = %s
+                            and (details->>'connection_errors')::int < 3""", (CONNECTOR,)).fetchone()
+    return r["at"] is None or r["at"] < datetime.now(timezone.utc) - timedelta(hours=hours)
 
 
 def run_media(bp: Beeper, limit: int) -> int:
@@ -209,6 +265,8 @@ def main() -> None:
     ap.add_argument("--backfill-pages", type=int, default=20, help="older pages per chat per run (20 msgs/page)")
     ap.add_argument("--media", type=int, default=50, help="media downloads per run")
     ap.add_argument("--chats", type=int, default=0, help="limit number of chats (testing)")
+    ap.add_argument("--reconcile-days", type=int, default=7,
+                    help="once a day, re-read the last N days of every chat (missed messages, edits, reactions)")
     a = ap.parse_args()
     ingestion.register_connector(CONNECTOR, "beeper", "pull", "Beeper Desktop API on Monsieur's Mac (read-only)",
                                  timedelta(minutes=10))
@@ -218,21 +276,35 @@ def main() -> None:
         if a.chats:
             chats = chats[:a.chats]
         total_ins = total_media = 0
+        unreachable = 0
         for n, chat in enumerate(chats, 1):
             try:
                 ins, med = sync_chat(bp, chat, a.backfill_pages)
                 total_ins += ins; total_media += med
+                ingestion.resolve_failures(CONNECTOR, chat["id"])     # this chat is in sync again
+                unreachable = 0
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                unreachable += 1
+                if unreachable >= 3:          # the Mac is gone: one failure for the run, not one per chat
+                    ingestion.record_failure(CONNECTOR, f"source unreachable: {type(e).__name__}: {e}",
+                                             details={"stopped_at_chat": n, "chats": len(chats)})
+                    break
             except Exception as e:
                 ingestion.record_failure(CONNECTOR, f"{type(e).__name__}: {e}", stream=chat["id"])
             if n % 25 == 0:
                 ingestion.mark_success(CONNECTOR)   # long backfill runs still report liveness
+        if unreachable >= 3:
+            print(json.dumps({"chats": len(chats), "events_inserted": total_ins, "stopped": "source unreachable"}))
+            return
+        reconciled = reconcile(bp, chats, a.reconcile_days) if a.reconcile_days and _reconcile_due() else None
         media_done = run_media(bp, a.media) if a.media else 0
         ingestion.mark_success(CONNECTOR)
+        ingestion.resolve_failures(CONNECTOR, "")
         with connection() as conn:
             pending = conn.execute("""select count(*) filter (where not coalesce((cursor->>'backfill_done')::boolean, false)) n
                                       from ingestion.checkpoints where connector = %s""", (CONNECTOR,)).fetchone()["n"]
         print(json.dumps({"chats": len(chats), "events_inserted": total_ins, "media_queued": total_media,
-                          "media_stored": media_done, "chats_backfilling": pending}))
+                          "media_stored": media_done, "chats_backfilling": pending, "reconciled": reconciled}))
     except Exception as e:
         ingestion.record_failure(CONNECTOR, f"{type(e).__name__}: {e}")
         raise

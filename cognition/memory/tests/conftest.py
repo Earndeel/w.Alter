@@ -1,0 +1,44 @@
+"""Tests never touch the production database (2026-11-02).
+
+Every test runs against the throwaway database of tests/testdb.sh (WALTER_MEMORY_TEST_DATABASE_URL, default
+127.0.0.1:5440). The production DSN is refused outright. When the test database is down, the tests that need a
+database are skipped (the pure ones still run): start it with `tests/testdb.sh up`.
+"""
+import os
+import re
+
+import pytest
+
+TEST_DSN = os.environ.get("WALTER_MEMORY_TEST_DATABASE_URL",
+                          "postgresql://hindsight:walter-test-only@127.0.0.1:5440/hindsight")
+if re.search(r"[:@/]5433\b", TEST_DSN) or "hindsight-pg" in TEST_DSN:
+    raise pytest.UsageError("tests refuse the production database (port 5433): use tests/testdb.sh")
+os.environ["WALTER_MEMORY_DATABASE_URL"] = TEST_DSN   # read by walter_memory.db at import, before any test module
+
+_NEEDS_DB = re.compile(r"\b(connection\(\)|connect\(\)|record_events?\(|bus\.emit\(|\.drain)")
+
+
+def _db_up() -> bool:
+    try:
+        import psycopg
+        with psycopg.connect(TEST_DSN, connect_timeout=2) as c:
+            c.execute("select 1 from core.schema_migrations limit 1")
+        return True
+    except Exception:
+        return False
+
+
+def pytest_collection_modifyitems(config, items):
+    if _db_up():
+        return
+    skip = pytest.mark.skip(reason="test database down: tests/testdb.sh up")
+    seen: dict[str, bool] = {}
+    for item in items:
+        path = str(item.fspath)
+        if path not in seen:
+            try:
+                seen[path] = bool(_NEEDS_DB.search(open(path, encoding="utf-8").read()))
+            except OSError:
+                seen[path] = False
+        if seen[path]:
+            item.add_marker(skip)

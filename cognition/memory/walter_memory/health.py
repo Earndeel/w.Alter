@@ -32,6 +32,26 @@ def check() -> tuple[list[str], dict]:
         secrets = conn.execute("""select count(*) n from privacy.detections where category = 'secret' and reviewed_at is null
                                   and at > now() - interval '1 day'""").fetchone()["n"]
         m["new_secret_flags_24h"] = secrets
+    try:   # Memory V1 pipeline: bus delivery and extraction freshness (a notification is not proof of memory)
+        from . import bus, extract2
+        lg = bus.lag("memory.extract", ["memory.event"])
+        m["bus:memory.extract"] = lg
+        if lg["oldest_s"] > 900:
+            problems.append(f"memory pipeline {lg['oldest_s'] // 60} min behind on the bus ({lg['pending']} events)")
+        if lg["held"] > 1000:
+            problems.append(f"{lg['held']} bus events held behind a long-running transaction")
+        if lg["dead"]:
+            problems.append(f"memory pipeline: {lg['dead']} dead letters (walter-memory bus dead / replay)")
+        st = extract2.stats(24)
+        m["extraction_backlog"] = st["backlog"]
+        if (st["backlog"]["oldest_s"] or 0) > 6 * 3600:
+            problems.append(f"extraction backlog: {st['backlog']['n']} messages, oldest waiting "
+                            f"{st['backlog']['oldest_s'] // 3600} h")
+        failed = next((r["segments"] for r in st["segments"] if r["status"] == "failed"), 0)
+        if failed:
+            problems.append(f"extraction: {failed} segments failed in 24 h (walter-memory extract2 replay)")
+    except Exception as e:
+        problems.append(f"memory pipeline health unreadable: {type(e).__name__}")
     for b in ("recurring", "backfill"):
         s = budget_status(b)
         m[f"budget:{b}"] = f"{float(s['spent_usd']):.2f}/{float(s['limit_usd']):.0f}"
