@@ -1,5 +1,5 @@
 ---
-name: hermes-desktop-setup
+name: hermes-desktop-recovery
 description: Diagnose and fix Hermes V2 Mac desktop app connection failures to a remote server. Covers token mismatch, env var injection, and forwarding architecture.
 ---
 

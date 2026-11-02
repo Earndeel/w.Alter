@@ -1,5 +1,5 @@
 ---
-name: hermes-desktop-host-header-pitfall
+name: hermes-desktop-recovery
 description: Diagnose and resolve the Host header validation 400 error that started appearing after Hermes v0.18.2 update on Mac desktop app connections.
 category: devops
 tags: [hermes, desktop, debugging, host-header]
