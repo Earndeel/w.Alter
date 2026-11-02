@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [artificial-analysis, llm, pareto, intelligence, tts, speech-to-speech, image, video]
-    related_skills: [aa-intel-vs-cost-scraper, model-value-analysis, model-benchmark-comparison]
+    related_skills: [aa-pareto-model-optimizer, model-benchmark-comparison, model-benchmark-comparison]
 ---
 
 # Artificial Analysis Pareto Optimizer
@@ -219,5 +219,5 @@ Then verify:
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **aa-intel-vs-cost-scraper** — Extracting live Artificial Analysis intelligence and cost-per-task figures from the page (Recharts extractor script) and the metric discipline for cost per task.
-  Read `references/merged-aa-intel-vs-cost-scraper/aa-intel-vs-cost-scraper.md` (+ 1 supporting file in that folder).
+- **aa-pareto-model-optimizer** — Extracting live Artificial Analysis intelligence and cost-per-task figures from the page (Recharts extractor script) and the metric discipline for cost per task.
+  Read `references/merged-aa-intel-vs-cost-scraper/aa-pareto-model-optimizer.md` (+ 1 supporting file in that folder).

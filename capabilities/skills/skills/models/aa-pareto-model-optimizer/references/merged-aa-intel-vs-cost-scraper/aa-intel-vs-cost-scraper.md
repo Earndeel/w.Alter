@@ -1,5 +1,5 @@
 ---
-name: aa-intel-vs-cost-scraper
+name: aa-pareto-model-optimizer
 description: Use for live AA Intelligence and benchmark cost-per-task data.
 version: 2.1.0
 author: W.Alter
@@ -76,7 +76,7 @@ Use `kie_pricing_status` as the gate. A row marked `unverified`, `not_found`, or
 The original Recharts extractor remains available for debugging:
 
 ```bash
-python3 ~/.hermes/skills/research/aa-intel-vs-cost-scraper/scripts/extract_recharts.py gpt-5-5
+python3 ~/.hermes/skills/research/aa-pareto-model-optimizer/scripts/extract_recharts.py gpt-5-5
 ```
 
 Use its JSON output only as an extraction diagnostic; use the unified refresh
