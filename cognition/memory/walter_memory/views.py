@@ -168,16 +168,17 @@ def _render(card: dict) -> tuple[str, str]:
     return index, overview
 
 
-def candidates(conn, ex: dict, embed) -> list[dict]:
-    """Active subjects awake at that time, closest first (local embedding of the message vs the subject's)."""
+def candidates(conn, ex: dict, embed, generations: list[str] | None = None) -> list[dict]:
+    """Active subjects awake at that time, closest first (local embedding of the message vs the subject's).
+    generations: only views of these memory generations (readers); None = all (this builder's own attachment)."""
     v = embed([ex["message"][:1500]])[0]
     from .search import vec
     return list(conn.execute("""
         select view_key, title, last_at, 1 - (embedding <=> %s::vector) as sim
         from views.view where status = 'active' and domain = 'projects' and embedding is not null
-          and last_at >= %s and last_at <= %s
+          and last_at >= %s and last_at <= %s and (%s::text[] is null or generation = any(%s::text[]))
         order by embedding <=> %s::vector limit %s""",
-        (vec(v), ex["at"] - AWAKE, ex["at"], vec(v), SHORTLIST)).fetchall())
+        (vec(v), ex["at"] - AWAKE, ex["at"], generations, generations, vec(v), SHORTLIST)).fetchall())
 
 
 def _previous(conn, ex: dict) -> dict | None:
@@ -340,10 +341,12 @@ def read(q: dict) -> dict:
         return {"error": "depth in index|overview|synthesis|details|sources and a key or a domain"}
     max_tokens = int(q.get("max_tokens") or 800)
     allowed = PRIVACY_RANK.get(q.get("privacy") or "cloud_allowed", 0)
+    from .generations import read_set
+    gens = read_set(bool(q.get("history")))      # memory generations (P1.0): None = no filter
     with connection() as conn:
         if q.get("key"):
             view = conn.execute("select * from views.view where view_key = %s", (q["key"],)).fetchone()
-            if not view or PRIVACY_RANK[view["privacy_class"]] > allowed:
+            if not view or PRIVACY_RANK[view["privacy_class"]] > allowed or (gens is not None and view["generation"] not in gens):
                 return {"error": f"no view {q['key']}"}
             last_member = conn.execute("select max(occurred_at) m from views.member where view_key = %s",
                                        (q["key"],)).fetchone()["m"]
@@ -378,9 +381,10 @@ def read(q: dict) -> dict:
                                from views.view v join lateral (select content from views.version
                                     where view_key = v.view_key and depth = 'index' order by version desc limit 1) x on true
                                where v.domain = %s and v.status = 'active' and (%s::timestamptz is null or v.last_at >= %s)
+                                 and (%s::text[] is null or v.generation = any(%s::text[]))
                                order by v.last_at desc limit 200""",
                             (q["domain"], _now() - horizon_since if horizon_since else None,
-                             _now() - horizon_since if horizon_since else None)).fetchall()
+                             _now() - horizon_since if horizon_since else None, gens, gens)).fetchall()
         lines, used = [], 0
         for r in rows:
             if PRIVACY_RANK[r["privacy_class"]] > allowed:
@@ -405,8 +409,9 @@ def subject_candidates(message: str, session_id: str | None = None, at: datetime
         from .search import embed
     at = at or _now()
     ex = {"message": message or "", "at": at, "session_id": session_id or ""}
+    from .generations import read_set
     with connection() as conn:
-        rows = candidates(conn, ex, embed)[:limit] if message else []
+        rows = candidates(conn, ex, embed, read_set())[:limit] if message else []
         waiting = _previous(conn, ex) if session_id else None
         if waiting and all(r["view_key"] != waiting["view_key"] for r in rows):
             row = conn.execute("select view_key, title, last_at from views.view where view_key = %s",

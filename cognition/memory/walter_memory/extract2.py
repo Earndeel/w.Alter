@@ -184,7 +184,8 @@ def _known(conn, source: str, thread_id: str, text: str) -> list[dict]:
     similar ones anywhere (local embeddings, no model call)."""
     rows = conn.execute("""select item_id::text, kind, content, attributes->>'state' as state, created_at
                            from core.derived_items where derived_by = %s and status in ('derived','verified')
-                             and kind <> 'summary' and source_refs->>'thread' = %s and source_refs->>'source' = %s
+                             and generation = 'g1' and kind <> 'summary' and source_refs->>'thread' = %s
+                             and source_refs->>'source' = %s
                            order by created_at desc limit %s""",
                         (PROCESSOR, thread_id, source, KNOWN_THREAD)).fetchall()
     try:
@@ -193,7 +194,7 @@ def _known(conn, source: str, thread_id: str, text: str) -> list[dict]:
         rows += conn.execute("""select d.item_id::text, d.kind, d.content, d.attributes->>'state' as state, d.created_at
                                 from search.chunks c join core.derived_items d on d.item_id = c.ref_id
                                 where c.kind = 'derived' and c.embedding is not null and d.derived_by = %s
-                                  and d.status in ('derived','verified') and d.kind <> 'summary'
+                                  and d.generation = 'g1' and d.status in ('derived','verified') and d.kind <> 'summary'
                                 order by c.embedding <=> %s::vector limit %s""",
                              (PROCESSOR, v, KNOWN_SIMILAR)).fetchall()
     except Exception as e:  # the embedder is an optimisation: the thread's own items are enough to go on
@@ -355,8 +356,9 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
         base_refs = {"segment": sid, "thread": thread_id, "source": source}
         if data.get("summary"):
             conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by,
-                                processor_version, model, prompt_hash, source_event_ids, source_refs, valid_from, privacy_class)
-                            values ('summary', %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s)""",
+                                processor_version, model, prompt_hash, source_event_ids, source_refs, valid_from, privacy_class,
+                                generation)
+                            values ('summary', %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s, 'g1')""",
                          (data["summary"], json.dumps({"topics": data.get("topics") or [], "projects": data.get("projects") or [],
                                                        "people": data.get("people") or [], "from": str(seg[0]["occurred_at"]),
                                                        "to": str(seg[-1]["occurred_at"]), "pipeline": "v1"}, ensure_ascii=False),
@@ -382,8 +384,8 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                 attrs["contested"] = True
             new_id = conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by,
                                          processor_version, model, prompt_hash, source_event_ids, source_refs, valid_from,
-                                         confidence, privacy_class)
-                                     values (%s, %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s, %s)
+                                         confidence, privacy_class, generation)
+                                     values (%s, %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s, %s, 'g1')
                                      on conflict (derived_by, (source_refs->>'ref')) where source_refs ? 'ref' do nothing
                                      returning item_id::text""",
                                   (it["kind"], it["text"], json.dumps(attrs, ensure_ascii=False), PROCESSOR, VERSION,
