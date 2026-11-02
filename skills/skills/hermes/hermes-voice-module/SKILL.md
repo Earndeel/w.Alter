@@ -246,5 +246,5 @@ For Telegram delivery, use `sendAudio` endpoint with `title` and `caption` field
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **hermes-gemini-voice-setup** — Step-by-step installation of Gemini STT/TTS in Hermes (SDK, API key, config.yaml, gateway restart), the mandatory verification checklist, quick STT diagnosis and long-text TTS segmentation.
-  Read `references/merged-hermes-gemini-voice-setup/hermes-gemini-voice-setup.md` (+ 2 supporting files in that folder).
+- **hermes-voice-module** — Step-by-step installation of Gemini STT/TTS in Hermes (SDK, API key, config.yaml, gateway restart), the mandatory verification checklist, quick STT diagnosis and long-text TTS segmentation.
+  Read `references/merged-hermes-gemini-voice-setup/hermes-voice-module.md` (+ 2 supporting files in that folder).
