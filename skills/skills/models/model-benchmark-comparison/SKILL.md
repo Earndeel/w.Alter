@@ -6,7 +6,7 @@ author: W.Alter
 metadata:
   hermes:
     tags: [mlops, benchmarks, model-selection, openrouter, cost-optimization]
-    related_skills: [hermes-agent, openrouter-video-input]
+    related_skills: [hermes-agent, video-analysis-pipeline]
 ---
 
 # Model Benchmark Comparison
@@ -307,5 +307,5 @@ The key can be used for authenticated requests if a stable API endpoint is disco
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **model-value-analysis** — "Which models are worth it" analyses by task type: cost-unit discipline (tokens first, AA tasks separately), the epsilon value policy and dated comparison write-ups.
-  Read `references/merged-model-value-analysis/model-value-analysis.md` (+ 16 supporting files in that folder).
+- **model-benchmark-comparison** — "Which models are worth it" analyses by task type: cost-unit discipline (tokens first, AA tasks separately), the epsilon value policy and dated comparison write-ups.
+  Read `references/merged-model-value-analysis/model-benchmark-comparison.md` (+ 16 supporting files in that folder).
