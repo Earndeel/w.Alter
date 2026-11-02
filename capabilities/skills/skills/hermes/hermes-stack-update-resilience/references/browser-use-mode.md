@@ -73,7 +73,7 @@ structured extraction — that is exactly why the router backend shape is right.
 ## Cross-reference: React state introspection
 
 For reading React/SPA internals under anti-detect (the other half of the
-"comprendre tout style de page" requirement), see `camoufox-automation`
+"comprendre tout style de page" requirement), see `camoufox-max-api-current`
 skill section 5 + `references/react-fiber-hook.md` — the DevTools-hook bypass
 verified on Excalidraw (509 fiber nodes) and OneForma (React 19.2.7).
 
