@@ -204,12 +204,14 @@
         "codex": "lifecycle adapter",
         "claude-code": "lifecycle adapter"
       },
-      "limitations": [],
+      "limitations": [
+        "Livraison sans trou : un consommateur ne lit que les transactions terminées (tx < xmin) ; une transaction ouverte longtemps retarde la livraison sans la perdre (bus.lag held)."
+      ],
       "services": [],
       "optional": [],
       "contract": {
         "schema_version": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "owner": "bus",
         "kind": "foundation",
         "purpose": "Livrer les événements entre modules et conserver les curseurs de traitement.",
@@ -1406,7 +1408,8 @@
         "privacy.*",
         "search.*",
         "system.*",
-        "kardex.*"
+        "kardex.*",
+        "extraction.*"
       ],
       "core_paths": [
         "/walter/memory/walter_memory/events.py",
@@ -1440,14 +1443,15 @@
       ],
       "services": [
         "walter-memory-gateway",
-        "walter-memory-overland"
+        "walter-memory-overland",
+        "walter-memory-pipeline"
       ],
       "optional": [
         "llm"
       ],
       "contract": {
         "schema_version": 1,
-        "version": "1.1.0",
+        "version": "1.2.0",
         "owner": "memory",
         "kind": "capability",
         "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
