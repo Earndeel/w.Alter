@@ -167,5 +167,5 @@ See `references/kie-upload-egress.md` for the reproducible diagnostic and wrappe
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **kie-video-generation** — The full Kie.ai video API reference: endpoints (legacy and Market), every supported model (Seedance 2.0 / Fast, Kling, Hailuo, Wan, Sora2, Grok Imagine), payload formats, pricing comparisons, and the Kie chat-model notes. Read it for a model or payload this procedure does not cover.
-  Read `references/merged-kie-video-generation/kie-video-generation.md` (+ 12 supporting files in that folder).
+- **kie-video-generation-operations** — The full Kie.ai video API reference: endpoints (legacy and Market), every supported model (Seedance 2.0 / Fast, Kling, Hailuo, Wan, Sora2, Grok Imagine), payload formats, pricing comparisons, and the Kie chat-model notes. Read it for a model or payload this procedure does not cover.
+  Read `references/merged-kie-video-generation/kie-video-generation-operations.md` (+ 12 supporting files in that folder).
