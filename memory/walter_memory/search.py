@@ -149,18 +149,19 @@ def _index_rows(conn, rows: list[dict], kind: str) -> int:
             cur.execute(
                 """insert into search.chunks (kind, ref_id, chunk_no, occurred_at, source, label, thread_id,
                                               actor_identity_id, text, lang, tsv, embedding, privacy_class, hidden,
-                                              hidden_reason, content_hash, indexer_version)
+                                              hidden_reason, content_hash, indexer_version, generation)
                    values (%(kind)s, %(ref)s, %(no)s, %(at)s, %(source)s, %(label)s, %(thread)s, %(actor)s, %(text)s, %(lang)s,
                            setweight(to_tsvector('simple', search.f_unaccent(%(text)s)), 'A') ||
                            to_tsvector(%(lang_cfg)s::text::regconfig, %(text)s),
-                           %(vec)s::vector, %(privacy)s, %(hidden)s, %(reason)s, md5(%(text)s), %(ver)s)
+                           %(vec)s::vector, %(privacy)s, %(hidden)s, %(reason)s, md5(%(text)s), %(ver)s, %(gen)s)
                    on conflict (kind, ref_id, chunk_no) do nothing""",
                 {"kind": kind, "ref": r["ref_id"], "no": i, "at": r.get("occurred_at"), "source": r["source"],
                  "label": r["label"], "thread": r.get("thread_id"), "actor": r.get("actor_identity_id"),
                  "text": part, "lang": lang, "lang_cfg": lang, "vec": vec(v),
                  "privacy": privacy.strictest(r["privacy_class"], *(privacy.classify(conn, {"source": r["source"],
                             "categories": {c for c, _ in privacy.detect(part)}})[0] for _ in [0] if privacy.detect(part))),
-                 "hidden": r["hidden_reason"] is not None, "reason": r["hidden_reason"], "ver": INDEXER_VERSION})
+                 "hidden": r["hidden_reason"] is not None, "reason": r["hidden_reason"], "ver": INDEXER_VERSION,
+                 "gen": r.get("generation") if kind == "derived" else None})
     # cross-source duplicates (same text within 3 minutes, e.g. Telegram seen by Hermes and by Beeper)
     conn.execute("""update search.chunks c set dup_of = o.chunk_id
                     from search.chunks o
@@ -202,6 +203,7 @@ def index_pending(limit: int = 20000) -> dict:
     with connection() as conn:
         rows = conn.execute("""select d.item_id as ref_id, coalesce(d.valid_from, d.created_at) as occurred_at,
                                       d.derived_by as source, d.kind as label, d.content as text, d.privacy_class,
+                                      d.generation,
                                       coalesce((d.attributes->>'quarantined')::boolean, false) as hidden
                                from core.derived_items d
                                where d.status in ('legacy_derived','derived','verified') and d.kind not in ('document','signal_candidate')
@@ -259,7 +261,7 @@ LABEL_WEIGHT = {"summary": 0.5, "open_loop": 0.5}
 def search_lanes(query: str, *, lanes: tuple[str, ...] = ("knowledge", "evidence"), limit: int = 10,
                  sources: list[str] | None = None, labels: list[str] | None = None, since: Any = None,
                  until: Any = None, thread_id: str | None = None, max_privacy: str = "local_only",
-                 candidates: int = 60) -> dict[str, list[dict]]:
+                 candidates: int = 60, generations: list[str] | None = None) -> dict[str, list[dict]]:
     """Hybrid search (FTS + vectors fused by RRF) per lane, each lane ranked on its own. For cloud callers every row
     is checked against its canonical owner (read_policy) before the cut, so a filtered row doesn't shorten the list."""
     where, args = ["not c.hidden", "c.dup_of is null", "c.privacy_class = any(%s)"], [privacy.allowed_classes(max_privacy)]
@@ -273,6 +275,8 @@ def search_lanes(query: str, *, lanes: tuple[str, ...] = ("knowledge", "evidence
         where.append("c.occurred_at < %s"); args.append(until)
     if thread_id:
         where.append("c.thread_id = %s"); args.append(thread_id)
+    if generations is not None:   # memory generations (P1.0): interpretations of the readable generations; evidence always
+        where.append("(c.generation is null or c.generation = any(%s))"); args.append(generations)
     qv = vec(embed([query])[0])
     out: dict[str, list[dict]] = {}
     with connection() as conn:
@@ -297,7 +301,7 @@ def search_lanes(query: str, *, lanes: tuple[str, ...] = ("knowledge", "evidence
                     scores[r["chunk_id"]] = scores.get(r["chunk_id"], 0) + 1 / (60 + rank) * LABEL_WEIGHT.get(r["label"], 1)
             top = sorted(scores, key=scores.get, reverse=True)[:max(limit * 2, limit + 10)]
             rows = conn.execute("""select c.chunk_id, c.kind, c.ref_id::text, c.occurred_at, c.source, c.label,
-                                          c.thread_id, c.text, c.privacy_class, i.display_name as actor
+                                          c.thread_id, c.text, c.privacy_class, c.generation, i.display_name as actor
                                    from search.chunks c left join core.source_identities i
                                      on i.identity_id = c.actor_identity_id
                                    where c.chunk_id = any(%s)""", (top,)).fetchall()
@@ -305,7 +309,7 @@ def search_lanes(query: str, *, lanes: tuple[str, ...] = ("knowledge", "evidence
             ranked_rows = [by_id[i] for i in top if i in by_id]
             if max_privacy == "cloud_allowed":
                 from .read_policy import filter_cloud_rows
-                ranked_rows = filter_cloud_rows(conn, ranked_rows)
+                ranked_rows = filter_cloud_rows(conn, ranked_rows, generations=generations)
             out[lane] = ranked_rows[:limit]
     return out
 
@@ -348,13 +352,16 @@ def _fts(conn, where: str, args: list, kws: list[tuple[str, float]], limit: int)
 def search(query: str, *, limit: int = 10, sources: list[str] | None = None, labels: list[str] | None = None,
            since: Any = None, until: Any = None, thread_id: str | None = None, include_derived: bool = True,
            max_privacy: str = "local_only", rerank: bool = False, candidates: int = 60,
-           lanes: tuple[str, ...] | None = None) -> list[dict]:
-    """Both lanes fused by score (or the given lanes), optionally reranked."""
+           lanes: tuple[str, ...] | None = None, history: bool = False) -> list[dict]:
+    """Both lanes fused by score (or the given lanes), optionally reranked. Derived knowledge comes from the readable
+    memory generations; history=True reads every generation (pre-V1 interpretations included, labelled)."""
+    from .generations import read_set
     t0 = time.perf_counter()
+    gens = read_set(history)
     lanes = lanes or (("knowledge", "evidence") if include_derived else ("evidence",))
     per_lane = search_lanes(query, lanes=lanes, limit=max(limit, candidates if rerank else limit), sources=sources,
                             labels=labels, since=since, until=until, thread_id=thread_id, max_privacy=max_privacy,
-                            candidates=max(10, candidates // len(lanes)))
+                            candidates=max(10, candidates // len(lanes)), generations=gens)
     results = sorted((r for rows in per_lane.values() for r in rows), key=lambda r: r["score"], reverse=True)
     if rerank and results:
         results = _rerank(query, results, limit)

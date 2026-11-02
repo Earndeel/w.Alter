@@ -72,11 +72,13 @@ def main(argv=None) -> None:
     sq.add_argument("--label", action="append"); sq.add_argument("--since"); sq.add_argument("--until")
     sq.add_argument("--no-derived", action="store_true"); sq.add_argument("--rerank", action="store_true")
     sq.add_argument("--cloud-safe", action="store_true", help="only rows allowed to leave the VM")
+    sq.add_argument("--history", action="store_true", help="also pre-V1 interpretations (archived memory generations)")
     so = sub.add_parser("social", help="P4: resolve identities, groups, baselines, deviations; person cards")
     so.add_argument("action", choices=["refresh", "person", "deviations"]); so.add_argument("query", nargs="?")
     so.add_argument("--cloud-safe", action="store_true")
     cx = sub.add_parser("context", help="P6: assemble the memory context for a query")
     cx.add_argument("query"); cx.add_argument("--no-profile", action="store_true"); cx.add_argument("--trace", action="store_true")
+    cx.add_argument("--history", action="store_true", help="also pre-V1 interpretations, marked « pré-V1 »")
     ex = sub.add_parser("extract", help="P5 L3: summarise W.Alter conversations into derived knowledge")
     ex.add_argument("--limit", type=int, default=20); ex.add_argument("--since"); ex.add_argument("--budget", default="recurring")
     ex.add_argument("--session")
@@ -88,6 +90,9 @@ def main(argv=None) -> None:
     x2.add_argument("--force", action="store_true", help="thread: also process the tail still waiting")
     pl = sub.add_parser("pipeline", help="V1 event pipeline: run the consumers (service) or show their health")
     pl.add_argument("action", nargs="?", default="run", choices=["run", "health"])
+    gn = sub.add_parser("generations", help="memory generations g0 (pre-V1) / g1 (V1): status, preview, switch, rollback")
+    gn.add_argument("action", choices=["status", "preview", "switch", "rollback"]); gn.add_argument("--query", action="append")
+    gn.add_argument("--to", default="g1"); gn.add_argument("--confirm", action="store_true"); gn.add_argument("--note", default="")
     bu = sub.add_parser("bus", help="Walter bus: lag, dead letters, replay, prune")
     bu.add_argument("action", choices=["lag", "dead", "replay", "prune"]); bu.add_argument("--consumer")
     bu.add_argument("--types", default="memory.event"); bu.add_argument("--event", type=int)
@@ -195,10 +200,10 @@ def main(argv=None) -> None:
     elif a.cmd == "search":
         from . import search
         res = search.search(a.query, limit=a.limit, sources=a.source, labels=a.label, since=a.since, until=a.until,
-                            include_derived=not a.no_derived, rerank=a.rerank,
+                            include_derived=not a.no_derived, rerank=a.rerank, history=a.history,
                             max_privacy="cloud_allowed" if a.cloud_safe else "local_only")
-        _print([{k: (r[k][:300] if k == "text" else r[k]) for k in ("occurred_at", "source", "label", "actor", "text", "kind",
-                                                                     "ref_id", "latency_ms")} for r in res])
+        _print([{k: (r[k][:300] if k == "text" else r.get(k)) for k in ("occurred_at", "source", "label", "actor", "text", "kind",
+                                                                         "ref_id", "generation", "latency_ms")} for r in res])
     elif a.cmd == "social":
         from . import social
         if a.action == "refresh":
@@ -217,7 +222,7 @@ def main(argv=None) -> None:
                                        order by d.detected_on desc limit 30""").fetchall())
     elif a.cmd == "context":
         from . import context
-        res = context.get_context(a.query, include_profile=not a.no_profile)
+        res = context.get_context(a.query, include_profile=not a.no_profile, history=a.history)
         print(res["text"])
         if a.trace:
             _print(res["trace"])
@@ -248,6 +253,18 @@ def main(argv=None) -> None:
     elif a.cmd == "pipeline":
         from . import pipeline
         pipeline.run() if a.action == "run" else _print(pipeline.health())
+    elif a.cmd == "generations":
+        from . import generations
+        if a.action == "status":
+            _print(generations.status())
+        elif a.action == "preview":
+            if not a.query:
+                p.error("generations preview needs --query (repeatable)")
+            _print([generations.preview(q) for q in a.query])
+        elif a.action == "switch":
+            _print(generations.switch(a.to, confirm=a.confirm, note=a.note))
+        else:
+            _print(generations.rollback(confirm=a.confirm))
     elif a.cmd == "bus":
         from . import bus
         if a.action == "lag":

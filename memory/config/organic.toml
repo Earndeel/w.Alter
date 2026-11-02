@@ -1,0 +1,7 @@
+# Memory V1 "organic memory" switches (P1). The instance overrides this file with
+# `walter instance config memory organic.toml` (an instance copy under its config/memory/).
+# Every P1 step ships behind its switch; false = the behaviour before that step.
+
+[generations]
+# P1.0: read derived knowledge only from readable generations (core.generations); false = no generation filter.
+enforce = true

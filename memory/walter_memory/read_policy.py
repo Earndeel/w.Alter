@@ -60,8 +60,12 @@ def _readable(owner: dict | None) -> bool:
     return bool(owner) and owner["privacy_class"] == "cloud_allowed" and bool(owner.get("allowed"))
 
 
-def canonical_filter(conn, rows: list[dict]) -> list[dict]:
-    """The rows (order kept) whose canonical owner is currently cloud-readable and still contains the fragment."""
+def canonical_filter(conn, rows: list[dict], generations: list[str] | None | str = "readable") -> list[dict]:
+    """The rows (order kept) whose canonical owner is currently cloud-readable and still contains the fragment.
+    Derived knowledge must also belong to `generations` (default: the readable ones; None = no generation filter)."""
+    if generations == "readable":
+        from .generations import read_set
+        generations = read_set()
     rows = [r for r in rows if r.get("privacy_class") == "cloud_allowed"]
     by_kind: dict[str, set[str]] = {}
     for r in rows:
@@ -74,7 +78,7 @@ def canonical_filter(conn, rows: list[dict]) -> list[dict]:
     if by_kind.get("derived"):
         items = conn.execute("""select item_id::text as id, privacy_class, content, status,
                                        coalesce(attributes->>'quarantined','false') in ('true','1') as quarantined,
-                                       coalesce(valid_to > now(), true) as current,
+                                       coalesce(valid_to > now(), true) as current, generation,
                                        source_event_ids, source_object_ids
                                 from core.derived_items where item_id = any(%s::uuid[])""",
                              (list(by_kind["derived"]),)).fetchall()
@@ -85,7 +89,8 @@ def canonical_filter(conn, rows: list[dict]) -> list[dict]:
                          [src_o.get(str(o)) for o in d["source_object_ids"]]
             owners[("derived", d["id"])] = {
                 "privacy_class": d["privacy_class"], "content": d["content"],
-                "allowed": d["status"] in READABLE_DERIVED and not d["quarantined"] and d.get("current", True) and bool(provenance)
+                "allowed": d["status"] in READABLE_DERIVED and not d["quarantined"] and d.get("current", True)
+                           and (generations is None or d.get("generation", "g0") in generations) and bool(provenance)
                            and all(_readable(p) for p in provenance)}
     out = []
     for r in rows:
@@ -99,13 +104,13 @@ def canonical_filter(conn, rows: list[dict]) -> list[dict]:
     return out
 
 
-def canonical_allowed(conn, row: dict) -> bool:
-    """Check current canonical privacy, all provenance, retractions and index freshness."""
-    return bool(canonical_filter(conn, [row]))
+def canonical_allowed(conn, row: dict, generations: list[str] | None | str = "readable") -> bool:
+    """Check current canonical privacy, all provenance, retractions, index freshness and generation."""
+    return bool(canonical_filter(conn, [row], generations))
 
 
-def filter_cloud_rows(conn, rows):
-    return [row for row in canonical_filter(conn, rows)
+def filter_cloud_rows(conn, rows, generations: list[str] | None | str = "readable"):
+    return [row for row in canonical_filter(conn, rows, generations)
             if not any(category == 'secret' for category, _ in privacy.detect(row.get('text') or ''))]
 
 

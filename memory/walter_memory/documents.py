@@ -229,8 +229,8 @@ def _record(conn, src: dict, path: str, s: dict, key: str, body: str, sha: str, 
                                and event_type = 'document.section'""", (PROCESSOR, source_id)).fetchone()["event_id"]
     conn.execute(
         """insert into core.derived_items (kind, content, attributes, status, derived_by, processor_version, source_event_ids,
-               source_refs, confidence, valid_from, privacy_class)
-           values (%s, %s, %s, 'derived', %s, %s, %s, %s, 1.0, %s, %s)""",
+               source_refs, confidence, valid_from, privacy_class, generation)
+           values (%s, %s, %s, 'derived', %s, %s, %s, %s, 1.0, %s, %s, 'g1')""",
         (KIND, body, json.dumps(meta, ensure_ascii=False), PROCESSOR, VERSION, [event_id],
          json.dumps([{"type": "file", "path": path, "section": s["key"]}], ensure_ascii=False), s["date"], pclass))
 

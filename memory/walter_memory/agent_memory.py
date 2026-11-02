@@ -70,7 +70,9 @@ def recall(query: str, budget: str = 'mid', max_tokens: int = 2048, *, caller: s
     # Candidates: local potion embeddings + SQL. Ordering: Walter Router's rerank poste, like the context engine —
     # only for a cloud-allowed/redactable query (search._rerank re-checks it) over cloud-readable rows (bench
     # 2026-10-19, knowledge lane: 10 → 17/30 Hindsight-gold hits, 28 → 30/30 answers, ~+0.5 s); else the local order.
-    lanes = search.search_lanes(query, limit=max(20, count * 2), candidates=max(40, count * 4), max_privacy='cloud_allowed')
+    from .generations import read_set
+    lanes = search.search_lanes(query, limit=max(20, count * 2), candidates=max(40, count * 4), max_privacy='cloud_allowed',
+                                generations=read_set())
     # Knowledge (derived facts, incl. legacy Hindsight facts) first; original evidence tops up — more of it when the
     # question is about what was said/when (same hint as the context engine).
     from .context import EVIDENCE_HINT
