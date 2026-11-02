@@ -21,7 +21,8 @@
     "privacy.*",
     "search.*",
     "system.*",
-    "kardex.*"
+    "kardex.*",
+    "extraction.*"
   ],
   "core_paths": [
     "walter_memory/events.py",
@@ -55,14 +56,15 @@
   ],
   "services": [
     "walter-memory-gateway",
-    "walter-memory-overland"
+    "walter-memory-overland",
+    "walter-memory-pipeline"
   ],
   "optional": [
     "llm"
   ],
   "contract": {
     "schema_version": 1,
-    "version": "1.1.0",
+    "version": "1.2.0",
     "owner": "memory",
     "kind": "capability",
     "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",

@@ -147,13 +147,19 @@ def store_threads(g: Google, me: str, gate: Gate, thread_ids) -> int:
     return n
 
 
-def store_if_kept(g: Google, me: str, gate: Gate, ids) -> int:
-    """Metadata first; full fetch only for kept messages. A new message from Monsieur pulls its whole thread."""
+def store_if_kept(g: Google, me: str, gate: Gate, ids, failed: list | None = None) -> int:
+    """Metadata first; full fetch only for kept messages. A new message from Monsieur pulls its whole thread.
+    A message that cannot be read goes to `failed` (retried next run) instead of being silently skipped."""
     keep_full, new_threads = [], []
     for mid in dict.fromkeys(ids):
         try:
             m = g.get(f"{API}/messages/{mid}", format="metadata", metadataHeaders=["From", "To", "Cc", "Subject"])
-        except Exception:
+        except Exception as e:
+            if "404" in str(e):          # deleted before we read it: nothing to keep
+                continue
+            if failed is not None:
+                failed.append(mid)
+            ingestion.record_failure(CONNECTOR, f"metadata: {type(e).__name__}: {e}", item_ref=mid)
             continue
         if "SENT" in (m.get("labelIds") or []) and m["threadId"] not in gate.stored_threads:
             gate.learn(m); new_threads.append(m["threadId"]); continue
@@ -165,10 +171,60 @@ def store_if_kept(g: Google, me: str, gate: Gate, ids) -> int:
     return n + (store(g, me, full) if full else 0)
 
 
+def reconcile(g: Google, me: str, gate: Gate, days: int) -> dict:
+    """Compare Gmail with core.events over the last `days`: every message the gate keeps must be stored; missing ones
+    are stored now. Recorded in ingestion.reconciliation_runs (listed / kept by the gate / already stored / repaired)."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    with connection() as conn:
+        run_id = conn.execute("""insert into ingestion.reconciliation_runs (connector, stream) values (%s, %s)
+                                 returning run_id""", (CONNECTOR, f"last {days} days")).fetchone()["run_id"]
+    ids, token = [], None
+    while True:
+        lst = g.get(f"{API}/messages", maxResults=500, pageToken=token, q=f"after:{since:%Y/%m/%d} -in:chats",
+                    includeSpamTrash="false")
+        ids += [x["id"] for x in lst.get("messages", [])]
+        token = lst.get("nextPageToken")
+        if not token:
+            break
+    with connection() as conn:
+        have = {r["source_id"] for r in conn.execute(
+            "select source_id from core.events where source = 'gmail' and source_id = any(%s)", (ids,))}
+    kept, missing, failed = 0, [], []
+    for mid in ids:
+        try:
+            m = g.get(f"{API}/messages/{mid}", format="metadata", metadataHeaders=["From", "To", "Cc", "Subject"])
+        except Exception:
+            failed.append(mid); continue
+        gate.learn(m)
+        if gate.ok(m):
+            kept += 1
+            if mid not in have:
+                missing.append(mid)
+    repaired = store(g, me, [g.get(f"{API}/messages/{mid}", format="full") for mid in missing]) if missing else 0
+    with connection() as conn:
+        conn.execute("""update ingestion.reconciliation_runs set finished_at = now(), source_count = %s, walter_count = %s,
+                          gaps = %s, repaired = %s, details = %s where run_id = %s""",
+                     (len(ids), len(have), len(missing), repaired,
+                      json.dumps({"since": since.isoformat(), "kept_by_gate": kept, "dropped_by_gate": len(ids) - kept - len(failed),
+                                  "unreadable": len(failed)}), run_id))
+    return {"listed": len(ids), "kept_by_gate": kept, "stored_before": len(have), "repaired": repaired,
+            "unreadable": len(failed)}
+
+
+def _reconcile_due(hours: int = 24) -> bool:
+    with connection() as conn:
+        r = conn.execute("select max(finished_at) at from ingestion.reconciliation_runs where connector = %s",
+                         (CONNECTOR,)).fetchone()
+    return r["at"] is None or r["at"] < datetime.now(timezone.utc) - timedelta(hours=hours)
+
+
 def main() -> None:
     ingestion.register_connector(CONNECTOR, "gmail", "pull", "Gmail lucas.jouvencon@gmail.com (read-only, human only)",
                                  timedelta(minutes=15))
-    pages = int(sys.argv[1]) if len(sys.argv) > 1 else 5
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    pages = int(args[0]) if args else 5
+    rec_days = next((int(a.split("=", 1)[1]) for a in sys.argv[1:] if a.startswith("--reconcile-days=")), 3)
+    force_reconcile = "--reconcile-now" in sys.argv
     try:
         g = Google()
         prof = g.get(f"{API}/profile")
@@ -205,13 +261,18 @@ def main() -> None:
                     token = h.get("nextPageToken")
                     if not token:
                         break
-                total += store_if_kept(g, me, gate, hist)
+                failed: list = []
+                total += store_if_kept(g, me, gate, list(cp.get("retry_ids") or []) + hist, failed)
                 cp["history_id"] = h.get("historyId", cp["history_id"])
+                cp["retry_ids"] = failed[-500:]           # unreadable now: read again next run, never skipped
                 ingestion.set_checkpoint(CONNECTOR, key, cp)
             except SyncTokenExpired:
                 ingestion.set_checkpoint(CONNECTOR, key, {})   # full re-scan, idempotent
+        reconciled = None
+        if cp.get("sent_done") and cp.get("rest_done") and rec_days and (force_reconcile or _reconcile_due()):
+            reconciled = reconcile(g, me, gate, rec_days)
         ingestion.mark_success(CONNECTOR)
-        print(json.dumps({"account": me, "events_inserted": total,
+        print(json.dumps({"account": me, "events_inserted": total, "reconciled": reconciled,
                           "lanes": {k: cp.get(k) for k in ("sent_done", "rest_done")}}))
     except Exception as e:
         ingestion.record_failure(CONNECTOR, f"{type(e).__name__}: {e}")

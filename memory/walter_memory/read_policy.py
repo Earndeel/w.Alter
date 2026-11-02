@@ -6,7 +6,8 @@ events are looked up with their occurred_at (from core.event_keys) so Postgres p
 an event_id lookup alone plans against every partition (15-90 ms each, 2026-10-19).
 
 Derived knowledge is readable when status is derived/verified, or legacy_derived (A2: Hindsight / user_model history,
-read as legacy knowledge, never promoted) — always with non-empty provenance that is itself readable.
+read as legacy knowledge, never promoted), not past its valid_to (superseded items get one) — always with non-empty
+provenance that is itself readable. Knowledge about people (Kardex) goes through kardex_claim_visible below.
 """
 from __future__ import annotations
 
@@ -73,6 +74,7 @@ def canonical_filter(conn, rows: list[dict]) -> list[dict]:
     if by_kind.get("derived"):
         items = conn.execute("""select item_id::text as id, privacy_class, content, status,
                                        coalesce(attributes->>'quarantined','false') in ('true','1') as quarantined,
+                                       coalesce(valid_to > now(), true) as current,
                                        source_event_ids, source_object_ids
                                 from core.derived_items where item_id = any(%s::uuid[])""",
                              (list(by_kind["derived"]),)).fetchall()
@@ -83,7 +85,7 @@ def canonical_filter(conn, rows: list[dict]) -> list[dict]:
                          [src_o.get(str(o)) for o in d["source_object_ids"]]
             owners[("derived", d["id"])] = {
                 "privacy_class": d["privacy_class"], "content": d["content"],
-                "allowed": d["status"] in READABLE_DERIVED and not d["quarantined"] and bool(provenance)
+                "allowed": d["status"] in READABLE_DERIVED and not d["quarantined"] and d.get("current", True) and bool(provenance)
                            and all(_readable(p) for p in provenance)}
     out = []
     for r in rows:
@@ -114,3 +116,81 @@ def query_privacy(query, caller='walter'):
                                        'event_type': 'note.recorded',
                                        'categories': {category for category, _ in detections}})
     return privacy.strictest(cls, 'local_only' if any(c == 'secret' for c, _ in detections) else 'cloud_allowed')
+
+
+# ───────────── Kardex disclosure policy (2026-11-02): the one decision point for knowledge about people ─────────────
+# Audiences: owner_local = the owner reading on the VM, or a local process; cloud_model = anything that will reach a
+# cloud model (MCP tools of cloud agents, Context packs, extraction prompts); third_party = shown to someone else.
+AUDIENCES = ("owner_local", "cloud_model", "third_party")
+CURRENT_CLAIM = ("active", "confirmed", "proposed")       # proposed = unconfirmed: shown as such, never as a fact
+_SENS = {"normal": 0, "personal": 1, "sensitive": 2, "highly_sensitive": 3}
+_RULES = {   # audience → (max sensitivity, mention policies, refused disclosure states, refused origins)
+    "owner_local": (3, {"free", "contextual_only", "indirect_only"}, set(), set()),
+    "cloud_model": (1, {"free", "contextual_only"}, {"restricted"}, {"private_osint"}),
+    "third_party": (0, {"free"}, {"restricted", "inferred_only", "externally_discovered", "explicitly_told_me",
+                                  "unknown"}, {"private_osint", "inference"}),
+}
+
+
+def audience_for(max_privacy: str) -> str:
+    return "owner_local" if max_privacy == "local_only" else "cloud_model"
+
+
+def kardex_claim_visible(claim: dict, audience: str, now=None) -> tuple[bool, str | None]:
+    """→ (visible, reason refused). claim: status, valid_to, sensitivity, mention_policy, disclosure_state,
+    knowledge_origin and evidence_sensitivity (the strictest sensitivity of its evidence, may be None)."""
+    from datetime import datetime, timezone
+    if audience not in _RULES:
+        raise ValueError(f"unknown audience {audience!r}")
+    now = now or datetime.now(timezone.utc)
+    if (claim.get("status") or "active") not in CURRENT_CLAIM:
+        return False, "not_current"                    # superseded, retracted, rejected: history, not truth
+    if claim.get("valid_to") and claim["valid_to"] <= now:
+        return False, "expired"
+    if claim.get("mention_policy") == "never_reference":
+        return False, "never_reference"
+    max_sens, policies, refused_disclosure, refused_origin = _RULES[audience]
+    sens = max(_SENS.get(claim.get("sensitivity") or "normal", 3), _SENS.get(claim.get("evidence_sensitivity") or "normal", 3))
+    if sens > max_sens:
+        return False, "sensitivity"
+    if (claim.get("mention_policy") or "contextual_only") not in policies:
+        return False, "mention_policy"
+    if (claim.get("disclosure_state") or "unknown") in refused_disclosure:
+        return False, "disclosure_state"
+    if (claim.get("knowledge_origin") or "unknown") in refused_origin:
+        return False, "knowledge_origin"
+    return True, None
+
+
+def kardex_claims(conn, contact_id: int, audience: str, limit: int = 15) -> list[dict]:
+    """Claims about one contact that `audience` may see, best first, each with `confirmed`."""
+    rows = conn.execute("""select c.claim, c.claim_type, c.status, c.valid_to, c.mention_policy, c.knowledge_origin,
+                                  c.disclosure_state, c.sensitivity, c.confidence,
+                                  (select e.sensitivity from kardex.claim_evidence ce join kardex.evidence e on e.id = ce.evidence_id
+                                   where ce.claim_id = c.id order by array_position(array['highly_sensitive','sensitive',
+                                     'personal','normal'], e.sensitivity) limit 1) as evidence_sensitivity
+                           from kardex.claims c where c.contact_id = %s
+                           order by (c.status = 'confirmed') desc, c.confidence desc nulls last, c.id desc""",
+                        (contact_id,)).fetchall()
+    out = []
+    for r in rows:
+        ok, _ = kardex_claim_visible(r, audience)
+        if ok:
+            out.append({"claim": r["claim"], "mention_policy": r["mention_policy"], "knowledge_origin": r["knowledge_origin"],
+                        "confidence": r["confidence"], "confirmed": r["status"] in ("active", "confirmed")})
+        if len(out) >= limit:
+            break
+    return out
+
+
+CONTACT_FIELDS = {   # audience → contact fields it may see
+    "owner_local": ("canonical_name", "relationship_type", "relationship_status", "occupation", "location_current",
+                    "languages", "interests"),
+    "cloud_model": ("canonical_name", "relationship_type", "relationship_status", "occupation", "languages", "interests"),
+    "third_party": ("canonical_name",),
+}
+
+
+def mask_phone(p: str) -> str:
+    digits = [c for c in p if c.isdigit()]
+    return ("•" * max(0, len(digits) - 2) + "".join(digits[-2:])) if digits else p

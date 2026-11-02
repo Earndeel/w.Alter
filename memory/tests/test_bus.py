@@ -1,5 +1,5 @@
 """Walter bus: emit → wake-up → consume, cursor catch-up, dedupe, dead letters, batches. Uses type 'pytest.*' events
-and consumer names 'pytest-*', removed at the end. Run: cd /opt/walter-memory && venv/bin/python -m pytest -q tests/"""
+and consumer names 'pytest-*', removed at the end. Run: tests/testdb.sh up && walter-python -m pytest -q tests/ (never the production database)"""
 import threading
 import time
 import uuid
@@ -54,7 +54,8 @@ def test_failing_event_goes_to_dead_and_the_stream_moves_on():
             raise ValueError("boom")
         seen.append(e["subject"])
     assert c.drain(handler) == 2 and seen == ["good"]
-    assert bus.lag(c.name, c.types) == {"pending": 0, "oldest_s": 0, "dead_24h": 1}
+    lag = bus.lag(c.name, c.types)
+    assert (lag["pending"], lag["oldest_s"], lag["dead_24h"], lag["retrying"]) == (0, 0, 1, 1)
     with connection() as conn:
         assert conn.execute("select event_id from bus.dead where consumer = %s", (c.name,)).fetchone()["event_id"] == bad
     assert good > bad

@@ -80,6 +80,18 @@ def main(argv=None) -> None:
     ex = sub.add_parser("extract", help="P5 L3: summarise W.Alter conversations into derived knowledge")
     ex.add_argument("--limit", type=int, default=20); ex.add_argument("--since"); ex.add_argument("--budget", default="recurring")
     ex.add_argument("--session")
+    x2 = sub.add_parser("extract2", help="V1 knowledge extraction, every runtime, per segment (pipeline service does it live)")
+    x2.add_argument("action", choices=["tick", "thread", "reconcile", "enqueue", "replay", "stats", "start"])
+    x2.add_argument("--source"); x2.add_argument("--thread"); x2.add_argument("--since")
+    x2.add_argument("--status", default="failed"); x2.add_argument("--hours", type=int, default=24)
+    x2.add_argument("--limit", type=int, default=8); x2.add_argument("--budget", default="recurring")
+    x2.add_argument("--force", action="store_true", help="thread: also process the tail still waiting")
+    pl = sub.add_parser("pipeline", help="V1 event pipeline: run the consumers (service) or show their health")
+    pl.add_argument("action", nargs="?", default="run", choices=["run", "health"])
+    bu = sub.add_parser("bus", help="Walter bus: lag, dead letters, replay, prune")
+    bu.add_argument("action", choices=["lag", "dead", "replay", "prune"]); bu.add_argument("--consumer")
+    bu.add_argument("--types", default="memory.event"); bu.add_argument("--event", type=int)
+    bu.add_argument("--status"); bu.add_argument("--days", type=int, default=30)
     sub.add_parser("health", help="supervision: connectors freshness, failures, queues, budgets, index lag")
     sub.add_parser("privacy-rescan", help="re-run detectors and tighten privacy classes (never loosen)")
     j = sub.add_parser("jobs"); j.add_argument("action", choices=["requeue-stale"])
@@ -212,6 +224,42 @@ def main(argv=None) -> None:
     elif a.cmd == "extract":
         from . import extract
         _print(extract.summarize_session(a.session, a.budget) if a.session else extract.run(a.limit, a.since, a.budget))
+    elif a.cmd == "extract2":
+        from . import extract2
+        if a.action == "tick":
+            _print(extract2.tick(a.limit, budget=a.budget))
+        elif a.action == "thread":
+            if not (a.source and a.thread):
+                p.error("extract2 thread needs --source and --thread")
+            _print(extract2.process_thread(a.source, a.thread, budget=a.budget, force=a.force))
+        elif a.action == "reconcile":
+            _print(extract2.reconcile())
+        elif a.action == "enqueue":
+            if not (a.since or a.thread):
+                p.error("extract2 enqueue needs --since or --thread (no automatic pre-V1 backfill)")
+            _print({"threads_marked": extract2.enqueue(since=a.since, thread=a.thread, source=a.source)})
+        elif a.action == "replay":
+            _print({"segments_replayed": extract2.replay(status=a.status, thread=a.thread)})
+        elif a.action == "start":
+            from datetime import datetime as _dt
+            _print({"v1_start": extract2.set_v1_start(_dt.fromisoformat(a.since) if a.since else None)})
+        else:
+            _print(extract2.stats(a.hours))
+    elif a.cmd == "pipeline":
+        from . import pipeline
+        pipeline.run() if a.action == "run" else _print(pipeline.health())
+    elif a.cmd == "bus":
+        from . import bus
+        if a.action == "lag":
+            _print(bus.lag(a.consumer or "memory.extract", a.types.split(",")))
+        elif a.action == "dead":
+            _print(bus.dead(a.consumer, a.status))
+        elif a.action == "replay":
+            if not a.consumer:
+                p.error("bus replay needs --consumer")
+            _print({"replayed": bus.replay(a.consumer, a.event, a.status or "dead")})
+        else:
+            _print({"pruned": bus.prune(a.days)})
     elif a.cmd == "health":
         from . import health
         problems, metrics = health.check()

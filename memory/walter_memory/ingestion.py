@@ -58,6 +58,14 @@ def record_failure(connector: str, error: str, *, stream: str = "", item_ref: st
                      (error[:500], connector))
 
 
+def resolve_failures(connector: str, stream: str | None = None) -> int:
+    """Close open failures once the stream (or the whole connector, stream=None) has synced successfully since."""
+    with connection() as conn:
+        return len(conn.execute("""update ingestion.failures set resolved_at = now()
+                                   where connector = %s and resolved_at is null and (%s::text is null or stream = %s)
+                                   returning failure_id""", (connector, stream, stream)).fetchall())
+
+
 # ───────────── job queue ─────────────
 def enqueue(queue: str, payload: dict, *, dedupe_key: str | None = None, priority: int = 100,
             delay: timedelta | None = None, max_attempts: int = 5) -> int | None:

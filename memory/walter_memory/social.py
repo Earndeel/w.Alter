@@ -257,16 +257,23 @@ def find_entities(query: str, limit: int = 5) -> list[dict]:
             order by coalesce(b.messages, 0) desc limit %(n)s""", {"q": f"%{query}%", "raw": query, "n": limit}).fetchall()
 
 
-def person_card(entity_id: str, max_privacy: str = "local_only") -> dict:
-    """Fast social card (§24): identity, accounts, relationship metrics, deviations, Kardex knowledge (mention policy
-    respected), shared groups, recent interactions, media counts. Deep dive happens through events/objects."""
-    from . import privacy
-    allowed = privacy.allowed_classes(max_privacy)
+def person_card(entity_id: str, max_privacy: str = "local_only", audience: str | None = None) -> dict:
+    """Fast social card (§24): identity, accounts, relationship metrics, deviations, Kardex knowledge, shared groups,
+    recent interactions, media counts. Deep dive happens through events/objects.
+    What may be shown is decided by read_policy (one place for every reader): audience owner_local (max_privacy
+    local_only), cloud_model (cloud_allowed: anything that reaches a cloud model) or third_party. Only current claims
+    (not superseded/retracted/expired), within the audience's sensitivity, mention policy, disclosure and origin
+    rules; unconfirmed claims are marked; phones are masked and the current location withheld outside owner_local."""
+    from . import privacy, read_policy
+    audience = audience or read_policy.audience_for(max_privacy)
+    allowed = privacy.allowed_classes("local_only" if audience == "owner_local" else "cloud_allowed")
     with connection() as conn:
         en = conn.execute("select * from core.entities where entity_id = %s", (entity_id,)).fetchone()
         accounts = conn.execute("""select si.source, si.account, si.display_name, si.handles, si.phones, l.method
                                    from core.identity_links l join core.source_identities si on si.identity_id = l.identity_id
                                    where l.entity_id = %s and l.status = 'confirmed'""", (entity_id,)).fetchall()
+        if audience != "owner_local":
+            accounts = [{**a, "phones": [read_policy.mask_phone(p) for p in (a["phones"] or [])]} for a in accounts]
         metrics = {r["window_name"]: {k: r[k] for k in ("messages", "from_me", "from_them", "msgs_per_day", "initiation_ratio_me",
                                                          "median_reply_me_s", "median_reply_them_s", "avg_len_me", "avg_len_them",
                                                          "first_contact", "last_contact", "channels")}
@@ -276,19 +283,20 @@ def person_card(entity_id: str, max_privacy: str = "local_only") -> dict:
                                   (entity_id,)).fetchall()
         kardex = {}
         if en["kardex_contact_id"] is not None:
-            c = conn.execute("""select canonical_name, relationship_type, relationship_status, occupation, location_current,
-                                       languages, interests from kardex.contacts where id = %s""", (en["kardex_contact_id"],)).fetchone()
-            claims = conn.execute("""select claim, mention_policy, knowledge_origin, confidence from kardex.claims
-                                     where contact_id = %s and status <> 'superseded' and mention_policy <> 'never_reference'
-                                     order by confidence desc limit 15""", (en["kardex_contact_id"],)).fetchall()
-            kardex = {"contact": c, "claims": claims}
+            fields = read_policy.CONTACT_FIELDS[audience]
+            c = conn.execute(f"select {', '.join(fields)} from kardex.contacts where id = %s",
+                             (en["kardex_contact_id"],)).fetchone()
+            kardex = {"contact": c, "claims": read_policy.kardex_claims(conn, en["kardex_contact_id"], audience)}
         groups = conn.execute("""select g.canonical_name, g.attributes->>'network' network from core.relationships r
                                  join core.entities g on g.entity_id = r.object_id
                                  where r.subject_id = %s and r.predicate = 'member_of' limit 15""", (entity_id,)).fetchall()
-        recent = conn.execute("""select e.occurred_at, e.event_type, e.source_account, left(e.content, 200) content
+        recent = [] if audience == "third_party" else conn.execute("""
+                                 select e.occurred_at, e.event_type, e.source_account, left(e.content, 200) content
                                  from core.events e join core.identity_links l on l.identity_id = e.actor_identity_id
                                  where l.entity_id = %s and l.status = 'confirmed' and e.event_type like 'message.%%'
                                    and e.privacy_class = any(%s)
+                                   and not exists (select 1 from core.events r where r.event_type = 'event.retracted'
+                                                   and r.payload @> jsonb_build_object('target_event_id', e.event_id::text))
                                  order by e.occurred_at desc limit 8""", (entity_id, allowed)).fetchall()
         media = conn.execute("""select o.kind, count(*) n from core.objects o join core.object_links ol on ol.object_id = o.id
                                 where ol.target_type = 'beeper_message' and split_part(ol.target_id, '|', 1) in (
@@ -297,4 +305,5 @@ def person_card(entity_id: str, max_privacy: str = "local_only") -> dict:
                                 group by 1""", (entity_id,)).fetchall()
     return {"entity": {k: en[k] for k in ("entity_id", "entity_type", "canonical_name", "aliases", "kardex_contact_id")},
             "accounts": accounts, "relationship": metrics, "deviations": deviations, "kardex": kardex,
-            "shared_groups": groups, "recent_interactions": recent, "media": {m["kind"]: m["n"] for m in media}}
+            "shared_groups": groups, "recent_interactions": recent, "media": {m["kind"]: m["n"] for m in media},
+            "audience": audience}
