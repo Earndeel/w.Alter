@@ -102,6 +102,6 @@ If a subagent runs on the wrong model:
 
 ## Related Skills
 
-- `hermes-delegate-task-routing` — recipes for the routing block, gateway restart procedures, and the now-obsolete `_load_config()` patch. The patch's intent (YAML-first merge) is already in the installed code; verify before applying.
+- `hermes-delegate-model-routing` — recipes for the routing block, gateway restart procedures, and the now-obsolete `_load_config()` patch. The patch's intent (YAML-first merge) is already in the installed code; verify before applying.
 - `hermes-multi-agent-profiles` — profile architecture for orchestrator → specialist dispatch. The cleanest way to get per-subagent model routing.
 - `hermes-provider-mastery` — provider configuration, credential resolution, and the three-layer config model.

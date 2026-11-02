@@ -9,7 +9,7 @@ triggers:
 metadata:
   hermes:
     tags: [delegate_task, model-routing, delegation, subagent]
-    related_skills: [hermes-delegate-task-routing]
+    related_skills: [hermes-delegate-model-routing]
 ---
 
 # Delegate Task — Per-Task Model Override
