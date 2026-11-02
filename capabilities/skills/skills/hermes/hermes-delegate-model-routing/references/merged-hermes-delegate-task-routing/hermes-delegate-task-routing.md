@@ -1,5 +1,5 @@
 ---
-name: hermes-delegate-task-routing
+name: hermes-delegate-model-routing
 category: devops
 description: Route delegate_task subagents to a different provider:model by patching config.yaml and delegate_tool.py. Solves the silent config loading bug.
 tags: [hermes, delegate_task, subagent, model-routing, config]

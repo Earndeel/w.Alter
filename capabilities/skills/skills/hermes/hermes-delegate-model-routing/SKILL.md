@@ -221,5 +221,5 @@ Class-level rules:
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **hermes-delegate-task-routing** — The older config.yaml / delegate_tool.py patch that routes delegate_task subagents to another provider:model, and the silent-config pitfall it solved.
-  Read `references/merged-hermes-delegate-task-routing/hermes-delegate-task-routing.md` (+ 1 supporting file in that folder).
+- **hermes-delegate-model-routing** — The older config.yaml / delegate_tool.py patch that routes delegate_task subagents to another provider:model, and the silent-config pitfall it solved.
+  Read `references/merged-hermes-delegate-task-routing/hermes-delegate-model-routing.md` (+ 1 supporting file in that folder).
