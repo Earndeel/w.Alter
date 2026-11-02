@@ -5,7 +5,7 @@ Use skill_view with the explicit archived names below to recover original method
 - `.archive/ai-model-research`
 - `.archive/human-preference-model-leaderboards`
 - `.archive/model-selection-strategy`
-- `.archive/model-value-analysis`
+- `.archive/model-benchmark-comparison`
 - `.archive/open-weight-llm-deployment-economics`
 - `.archive/personal-model-stack-optimizer`
 
