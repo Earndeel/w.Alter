@@ -37,7 +37,7 @@ Camoufox strips ALL non-standard own properties from DOM elements as an anti-fin
 
 ## When to Use Chromium Instead
 
-Use Chromium (via `playwright-cdp-browser-control` or `webtop-chromium-cdp`) when you need to:
+Use Chromium (via `playwright-cdp-browser-control` or `webtop-authenticated-browsing`) when you need to:
 - Read React component state programmatically
 - Access internal APIs (Excalidraw, Google Docs, etc.)
 - Intercept app-generated data (clipboard, downloads)

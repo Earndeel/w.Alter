@@ -14,7 +14,7 @@ Camoufox (anti-detection Firefox wrapper) **does not work** inside Docker contai
 1. **better-sqlite3 ESM binding resolution failure** — `bindings` npm package can't find native addon from ESM context
 2. **Firefox HOME/user ownership check** — binary refuses to start if `$HOME` ownership doesn't match running user
 
-**Recommendation**: Use Chromium CDP (see `webtop-chromium-cdp` skill) for containerized browser automation. Run Camoufox on the host directly (see `hermes-camoufox-setup` skill) when anti-detection is required.
+**Recommendation**: Use Chromium CDP (see `webtop-authenticated-browsing` skill) for containerized browser automation. Run Camoufox on the host directly (see `hermes-camoufox-setup` skill) when anti-detection is required.
 
 ## Blocker A: better-sqlite3 ESM/bindings Resolution
 
@@ -55,7 +55,7 @@ Running Camoufox as root in a regular user's session is not supported.
 If anti-detection is essential (fingerprint resistance, WebGL spoofing), options:
 
 1. **Run Camoufox on the host** — direct execution on the VPS/desktop, no container. See `hermes-camoufox-setup` skill.
-2. **Webtop Chromium CDP** — less anti-detection but works in containers. See `webtop-chromium-cdp` skill.
+2. **Webtop Chromium CDP** — less anti-detection but works in containers. See `webtop-authenticated-browsing` skill.
 3. **Camoufox with Xvfb on host + noVNC** — run Camoufox in Xvfb on the host, expose via noVNC for user interaction. Avoids the container issues entirely.
 
 ## Environment Tested

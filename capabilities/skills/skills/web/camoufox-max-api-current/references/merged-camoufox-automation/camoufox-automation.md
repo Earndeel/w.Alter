@@ -1,5 +1,5 @@
 ---
-name: camoufox-automation
+name: camoufox-max-api-current
 description: "Advanced anti-detection browser automation using Camoufox: max variant, persistent session state, SPA/React handling, and session crash troubleshooting."
 version: 1.1.0
 author: Orchestra Research
@@ -141,7 +141,7 @@ async function improvedBrowserSession(tabId, callback) {
 }
 ```
 
-See `camoufox-max-server` skill for the full production server implementation including `activeTabs` tracking, WebSocket frame error handling, and page error logging.
+See `camoufox-max-api-current` skill for the full production server implementation including `activeTabs` tracking, WebSocket frame error handling, and page error logging.
 
 **Why this matters**: Without health checks, long sessions (AWS console, multi-step auth flows) fail silently. The server reports success but the browser is dead. Auto-restart + tab recovery recovers transparently — the client gets a valid response instead of a cryptic "Target page closed" error.
 
