@@ -1,5 +1,5 @@
 ---
-name: kie-qwen-image-ops
+name: kie-image-generation-operations
 description: Generate images with a named model on Kie.ai Market API.
 version: 1.1.0
 author: W.Alter

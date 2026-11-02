@@ -135,5 +135,5 @@ See `references/provider-migration-stateful-workers.md` for provider migrations 
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **kie-qwen-image-ops** — Generating with a specific named model (e.g. Qwen Image) on the Kie.ai Market API.
-  Read `references/merged-kie-qwen-image-ops/kie-qwen-image-ops.md`.
+- **kie-image-generation-operations** — Generating with a specific named model (e.g. Qwen Image) on the Kie.ai Market API.
+  Read `references/merged-kie-qwen-image-ops/kie-image-generation-operations.md`.
