@@ -1,5 +1,5 @@
 ---
-name: hermes-remote-connection
+name: hermes-desktop-recovery
 description: Connect Hermes desktop or TUI client to a remote server when the local gateway is unavailable. Covers ECONNREFUSED 127.0.0.1:9119 and port architecture.
 category: devops
 ---

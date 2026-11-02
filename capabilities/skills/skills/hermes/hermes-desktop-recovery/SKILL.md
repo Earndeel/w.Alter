@@ -3,7 +3,7 @@ name: hermes-desktop-recovery
 description: "Recovery patterns when Hermes V2 Mac desktop app fails to connect — ECONNREFUSED, timeout, or gateway errors after dashboard restart. Also covers: hermes desktop setup; hermes remote connection; hermes desktop host header pitfall."
 category: devops
 tags: [hermes, desktop, recovery, connectivity]
-related_skills: [hermes-desktop-tailscale, hermes-desktop-setup, hermes-desktop-debug]
+related_skills: [hermes-desktop-tailscale, hermes-desktop-recovery, hermes-desktop-debug]
 ---
 
 # Hermes Desktop Recovery
@@ -84,9 +84,9 @@ Before retiring a service, map its Desktop/API dependants: removing the browser 
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **hermes-desktop-setup** — Desktop app → remote server connection chain: token mismatch, environment variable injection, forwarding.
-  Read `references/merged-hermes-desktop-setup/hermes-desktop-setup.md` (+ 1 supporting file in that folder).
-- **hermes-remote-connection** — ECONNREFUSED 127.0.0.1:9119 from the desktop or TUI client: port architecture, SSH mode, Tailscale direct, legacy SSH tunnel, attach mode, token auth.
-  Read `references/merged-hermes-remote-connection/hermes-remote-connection.md` (+ 4 supporting files in that folder).
-- **hermes-desktop-host-header-pitfall** — `400: Invalid Host header` after the v0.18.2 update, the WebSocket 403 on the chat tab, stale dashboard processes.
-  Read `references/merged-hermes-desktop-host-header-pitfall/hermes-desktop-host-header-pitfall.md` (+ 1 supporting file in that folder).
+- **hermes-desktop-recovery** — Desktop app → remote server connection chain: token mismatch, environment variable injection, forwarding.
+  Read `references/merged-hermes-desktop-setup/hermes-desktop-recovery.md` (+ 1 supporting file in that folder).
+- **hermes-desktop-recovery** — ECONNREFUSED 127.0.0.1:9119 from the desktop or TUI client: port architecture, SSH mode, Tailscale direct, legacy SSH tunnel, attach mode, token auth.
+  Read `references/merged-hermes-remote-connection/hermes-desktop-recovery.md` (+ 4 supporting files in that folder).
+- **hermes-desktop-recovery** — `400: Invalid Host header` after the v0.18.2 update, the WebSocket 403 on the chat tab, stale dashboard processes.
+  Read `references/merged-hermes-desktop-host-header-pitfall/hermes-desktop-recovery.md` (+ 1 supporting file in that folder).
