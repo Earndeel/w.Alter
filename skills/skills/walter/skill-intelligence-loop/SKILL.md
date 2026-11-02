@@ -338,3 +338,16 @@ for key in ('drafts_accepted', 'drafts_rejected', 'drafts_pending', 'hermes_conf
 PY
 ```
 Check pending decisions and Hermes conflicts before treating a draft as accepted; a shadow review does not publish changes.
+
+## Vérifier la conversion des secrets en références par le curator
+
+Lors d'un audit des secrets de la bibliothèque, vérifier ensemble l'opérateur `secrets` du curator et la porte d'entrée des propositions/corrections. Une suppression du secret n'est complète que si l'agent dispose encore d'une référence utilisable.
+
+1. Résoudre le module avec `walter path skills`. Examiner `walter_skills/secret_refs.py`, `walter_skills/curation/operators.py`, `walter_skills/door.py` et la configuration des passages rapides. Vérifier que l'opérateur couvre les skills actifs, archivés, les brouillons et les copies Hermes.
+2. Utiliser le format officiel `{{bw:<élément>:<champ>}}`. Vérifier les interfaces avec `walter-secret --help`. Pour obtenir une référence sans valeur, utiliser `walter-secret ref <élément> <champ>`. Ne jamais afficher les valeurs pour établir le diagnostic.
+3. Convertir les valeurs connues du coffre avant les contrôles et écritures de la porte d'entrée. Vérifier que le détecteur distingue les références officielles des secrets en clair : une ligne portant une étiquette de mot de passe peut produire un faux positif même après conversion.
+4. Pour réparer d'anciens marqueurs génériques `«secret:vault»`, retrouver la correspondance exacte depuis la sauvegarde antérieure au masquage, traitée localement. Ne pas deviner l'élément à partir du seul marqueur. Sauvegarder avant modification et ne journaliser que les chemins, comptes et références sans valeur.
+5. Depuis la racine du module, lancer `walter-python -m pytest -q tests/test_secret_refs.py`, puis les contrôles pertinents de la porte et du curator. Exécuter ensuite le passage rapide documenté dans la version installée et contrôler les actions `secrets` dans `skills.ledger`. Un test unitaire réussi ne prouve pas que le passage réel couvre toute la bibliothèque.
+6. Vérifier la synchronisation Hermes après les conversions. Comparer les contenus avant de mettre à jour les empreintes des sidecars ; ne pas masquer une divergence réelle en remplaçant simplement leur SHA.
+
+Ne pas présenter la comparaison d'empreintes comme une absence totale de manipulation des valeurs : la construction des correspondances et la réécriture peuvent nécessiter leur lecture locale. Garder ces valeurs hors des sorties d'outils et du contexte du modèle.
