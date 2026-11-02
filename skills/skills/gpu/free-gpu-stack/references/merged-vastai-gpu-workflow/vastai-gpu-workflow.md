@@ -1,5 +1,5 @@
 ---
-name: vastai-gpu-workflow
+name: free-gpu-stack
 description: "Vast.ai GPU provisioning — search offers, create/destroy instances, templates, cost optimization, pre-built environments. Use for on-demand GPU workloads (TRELLIS, inference, training)."
 version: 1.0.0
 tags: [gpu, vastai, cloud, trellis, 3d, inference, cuda]

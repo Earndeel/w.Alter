@@ -343,5 +343,5 @@ ssh -o StrictHostKeyChecking=no -p <PORT> root@ssh4.vast.ai "nvidia-smi"
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **vastai-gpu-workflow** — Paid GPUs on Vast.ai: searching offers, creating and destroying instances, templates, cost optimisation.
-  Read `references/merged-vastai-gpu-workflow/vastai-gpu-workflow.md` (+ 1 supporting file in that folder).
+- **free-gpu-stack** — Paid GPUs on Vast.ai: searching offers, creating and destroying instances, templates, cost optimisation.
+  Read `references/merged-vastai-gpu-workflow/free-gpu-stack.md` (+ 1 supporting file in that folder).
