@@ -1,5 +1,5 @@
 ---
-name: web-extraction-fallbacks
+name: universal-web-extraction-router
 description: Resilient backend fallbacks and evidence validation after walter_browse selects the web route.
 version: 2.0.0
 author: W.Alter
