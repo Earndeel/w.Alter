@@ -1,5 +1,5 @@
 ---
-name: kie-ai-provider-mastery
+name: kie-ai-api-direct
 description: Kie.ai provider — endpoints, tool-use, Cloudflare, pitfalls.
 version: 1.0.0
 author: W.Alter
