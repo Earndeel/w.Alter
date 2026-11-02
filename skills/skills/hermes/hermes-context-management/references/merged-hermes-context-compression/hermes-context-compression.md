@@ -1,5 +1,5 @@
 ---
-name: hermes-context-compression
+name: hermes-context-management
 category: devops
 description: Configure, audit, and verify Hermes live context compression so long sessions keep a compact timestamped history plus a clean recent tail.
 created: 2026-06-25

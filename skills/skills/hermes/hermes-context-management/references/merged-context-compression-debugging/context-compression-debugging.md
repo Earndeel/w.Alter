@@ -1,5 +1,5 @@
 ---
-name: context-compression-debugging
+name: hermes-context-management
 category: devops
 description: Debug ContextCompressor IndexError and boundary conditions — reproduction, fix, and payload measurement. Extends hermes-context-management with hard-won bug patterns.
 created: 2026-07-13
@@ -78,7 +78,7 @@ Tool-result content often dominates long transcripts, but do not assume it. Meas
 1. persisted message-role content in `state.db`; and
 2. fixed wire overhead (`instructions` plus serialized tool schemas), which can dominate short or freshly compacted turns.
 
-Choose prompt-view tool-result slimming only when the first layer is actually dominant. When tool schemas or the skills catalog dominate the wire payload, use lazy tool routing or selective skill injection instead; see `hermes-prompt-payload-slimming`.
+Choose prompt-view tool-result slimming only when the first layer is actually dominant. When tool schemas or the skills catalog dominate the wire payload, use lazy tool routing or selective skill injection instead; see `hermes-payload-architecture`.
 
 ## Pitfalls
 

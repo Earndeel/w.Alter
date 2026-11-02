@@ -356,7 +356,7 @@ conn.close()
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **hermes-context-compression** — Configuring, auditing and verifying Hermes' live context compression (compact timestamped history plus a clean recent tail).
-  Read `references/merged-hermes-context-compression/hermes-context-compression.md`.
-- **context-compression-debugging** — ContextCompressor IndexError and boundary bugs: reproduction, fix and payload measurement.
-  Read `references/merged-context-compression-debugging/context-compression-debugging.md` (+ 3 supporting files in that folder).
+- **hermes-context-management** — Configuring, auditing and verifying Hermes' live context compression (compact timestamped history plus a clean recent tail).
+  Read `references/merged-hermes-context-compression/hermes-context-management.md`.
+- **hermes-context-management** — ContextCompressor IndexError and boundary bugs: reproduction, fix and payload measurement.
+  Read `references/merged-context-compression-debugging/hermes-context-management.md` (+ 3 supporting files in that folder).
