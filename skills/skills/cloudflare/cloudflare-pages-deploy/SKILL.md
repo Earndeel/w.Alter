@@ -170,5 +170,5 @@ Définir `DOMAIN` et `APEX_IP` à partir du domaine demandé et de la réponse a
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **cloudflare-pages-deployment-patterns** — Deploying Pages or Workers through the REST API when wrangler fails, token-permission checks (read-only token symptoms, error 10405), D1 creation and migration by API, SSL errors on a fresh custom domain, deleting a deployment. Credentials: always through `walter-cloudflare` (see the `cloudflare` entry).
-  Read `references/merged-cloudflare-pages-deployment-patterns/cloudflare-pages-deployment-patterns.md` (+ 1 supporting file in that folder).
+- **cloudflare-pages-deploy** — Deploying Pages or Workers through the REST API when wrangler fails, token-permission checks (read-only token symptoms, error 10405), D1 creation and migration by API, SSL errors on a fresh custom domain, deleting a deployment. Credentials: always through `walter-cloudflare` (see the `cloudflare` entry).
+  Read `references/merged-cloudflare-pages-deployment-patterns/cloudflare-pages-deploy.md` (+ 1 supporting file in that folder).

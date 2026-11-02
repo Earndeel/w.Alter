@@ -1,5 +1,5 @@
 ---
-name: cloudflare-pages-deployment-patterns
+name: cloudflare-pages-deploy
 category: cloud
 description: 'Deploy static sites and Workers to Cloudflare Pages/Workers via REST API, wrangler CLI, and fallbacks -- including token permission workarounds'
 ---
