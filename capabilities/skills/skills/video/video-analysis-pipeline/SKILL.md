@@ -254,5 +254,5 @@ CREATE TABLE video_analysis (
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **openrouter-video-input** — Sending video to models through OpenRouter's native video input: model catalogue, payload formats and the R2 upload workflow for large files.
-  Read `references/merged-openrouter-video-input/openrouter-video-input.md` (+ 1 supporting file in that folder).
+- **video-analysis-pipeline** — Sending video to models through OpenRouter's native video input: model catalogue, payload formats and the R2 upload workflow for large files.
+  Read `references/merged-openrouter-video-input/video-analysis-pipeline.md` (+ 1 supporting file in that folder).
