@@ -8,7 +8,7 @@ platforms: [linux, macos, windows]
 # MiniMax H3 native UGC
 
 ## When to use
-Use for MiniMax H3 via Kie.ai, especially native-voice, single-character, variable-duration UGC. Load `kie-video-generation` for shared account/task operations and `reference-video-fidelity` plus `flow-selfie-physical-qa` for acceptance. Do not confuse the exact H3 contract with legacy Hailuo. This skill stores procedures, not credentials, credit balances or project progress.
+Use for MiniMax H3 via Kie.ai, especially native-voice, single-character, variable-duration UGC. Load `kie-video-generation-operations` for shared account/task operations and `reference-video-fidelity` plus `flow-selfie-physical-qa` for acceptance. Do not confuse the exact H3 contract with legacy Hailuo. This skill stores procedures, not credentials, credit balances or project progress.
 
 ## Prerequisites
 Use Walter's web front door to read the live official sources before paid submissions:
