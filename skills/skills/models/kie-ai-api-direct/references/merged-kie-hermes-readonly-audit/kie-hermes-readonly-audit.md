@@ -1,5 +1,5 @@
 ---
-name: kie-hermes-readonly-audit
+name: kie-ai-api-direct
 description: Read-only audit of Kie.ai GPT-5.6-Luna through the Hermes Codex Responses transport.
 version: 1.0.0
 author: W.Alter

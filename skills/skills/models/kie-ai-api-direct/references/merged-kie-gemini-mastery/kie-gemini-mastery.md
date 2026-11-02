@@ -1,12 +1,12 @@
 ---
-name: kie-gemini-mastery
+name: kie-ai-api-direct
 description: "Kie.ai Gemini, Claude & GPT models — complete guide: dynamic URL routing (unified single provider), OpenAI-compatible Hermes provider setup, naming quirks, Cloudflare WAF bypass, SSE streaming diagnostics, exact per-token pricing catalog, and pitfalls. Covers Gemini 3/3.5 Flash, 3.1 Pro, Claude Opus (4.5-4.8), Sonnet (4.5-4.6), Haiku 4.5, Claude Fable 5, GPT-5.2/5.4/5.5, Codex, Kling 3.0/O1, Seedance 2.0, Sora 2, OmniHuman 1.5, HappyHorse 1.1, and full marketplace catalog (176+ models: video/image/audio)."
 version: 2.1.0
 author: W.Alter
 metadata:
   hermes:
     tags: [kie, gemini, claude, gpt, llm, api, google, anthropic, provider, hermes, cloudflare, waf, marketplace]
-    related_skills: [kie-video-generation, hermes-agent, vault-lookup, hermes-provider-mastery]
+    related_skills: [kie-video-generation-operations, hermes-agent, vault-lookup, hermes-provider-mastery]
 ---
 
 # Kie.ai Gemini, Claude & GPT Mastery

@@ -196,9 +196,9 @@ Use a temporary config/copy, cap the number of paid calls, and write a machine-r
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **kie-gemini-mastery** — Kie.ai Gemini, Claude and GPT models in depth: dynamic URL routing, the OpenAI-compatible Hermes provider setup, tool use, streaming and pitfalls.
-  Read `references/merged-kie-gemini-mastery/kie-gemini-mastery.md` (+ 10 supporting files in that folder).
-- **kie-ai-provider-mastery** — Kie.ai as a Hermes provider: endpoints, tool-use behaviour, Cloudflare blocks and known pitfalls.
-  Read `references/merged-kie-ai-provider-mastery/kie-ai-provider-mastery.md` (+ 7 supporting files in that folder).
-- **kie-hermes-readonly-audit** — A read-only audit procedure of a Kie.ai model through the Hermes Codex Responses transport.
-  Read `references/merged-kie-hermes-readonly-audit/kie-hermes-readonly-audit.md`.
+- **kie-ai-api-direct** — Kie.ai Gemini, Claude and GPT models in depth: dynamic URL routing, the OpenAI-compatible Hermes provider setup, tool use, streaming and pitfalls.
+  Read `references/merged-kie-gemini-mastery/kie-ai-api-direct.md` (+ 10 supporting files in that folder).
+- **kie-ai-api-direct** — Kie.ai as a Hermes provider: endpoints, tool-use behaviour, Cloudflare blocks and known pitfalls.
+  Read `references/merged-kie-ai-provider-mastery/kie-ai-api-direct.md` (+ 7 supporting files in that folder).
+- **kie-ai-api-direct** — A read-only audit procedure of a Kie.ai model through the Hermes Codex Responses transport.
+  Read `references/merged-kie-hermes-readonly-audit/kie-ai-api-direct.md`.
