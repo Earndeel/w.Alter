@@ -178,5 +178,5 @@ curl -s -F photo=@/tmp/gen_output.jpg "https://api.telegram.org/bot${BOT_TOKEN}/
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **fal-openapi-schema-discovery** — Reading the exact parameter schema of any Fal.ai model from its OpenAPI endpoint when the MCP catalog or documentation is incomplete.
-  Read `references/merged-fal-openapi-schema-discovery/fal-openapi-schema-discovery.md`.
+- **fal-mcp-integration** — Reading the exact parameter schema of any Fal.ai model from its OpenAPI endpoint when the MCP catalog or documentation is incomplete.
+  Read `references/merged-fal-openapi-schema-discovery/fal-mcp-integration.md`.
