@@ -33,7 +33,7 @@ The rule: slim only `api_messages` before the provider call. Never touch `state.
 
 ## Payload Composition Baseline
 
-Real-world measurements from live sessions (see `context-compression-debugging` skill for measurement script):
+Real-world measurements from live sessions (see `hermes-context-management` skill for measurement script):
 
 | Role | Typical % of total chars |
 |------|--------------------------|

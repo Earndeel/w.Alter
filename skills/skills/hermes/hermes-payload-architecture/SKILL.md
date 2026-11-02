@@ -134,7 +134,7 @@ See `references/end-to-end-harness-payload-audit.md` for the coverage matrix, me
 
 ## Live Compression, Wire Pruning, and Skill Index Budgets
 
-This umbrella absorbs the former `hermes-context-compression`, `hermes-wire-context-pruning`, and `hermes-skills-index-optimization` skills. Treat them as three implementation branches of one payload architecture problem: keep the static prefix cacheable, keep the dynamic payload relevant, and keep exact evidence recoverable outside the prompt.
+This umbrella absorbs the former `hermes-context-management`, `hermes-wire-context-pruning`, and `hermes-skills-index-optimization` skills. Treat them as three implementation branches of one payload architecture problem: keep the static prefix cacheable, keep the dynamic payload relevant, and keep exact evidence recoverable outside the prompt.
 
 ### Live context compression
 - Trigger compression from real prompt footprint, including cached-token accounting and soft caps for both transcript history and total prompt budget.
@@ -206,7 +206,7 @@ See `references/system-prompt-slimming-registry-progressive-disclosure.md` for t
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **hermes-payload-validation** — Production validation of provider payloads: prompt slimming, tool-result digests, exact_recall, cache-hit behaviour.
-  Read `references/merged-hermes-payload-validation/hermes-payload-validation.md` (+ 3 supporting files in that folder).
-- **hermes-prompt-payload-slimming** — Separating the raw conversation ledger from a slim prompt-render view, especially for oversized tool results.
-  Read `references/merged-hermes-prompt-payload-slimming/hermes-prompt-payload-slimming.md` (+ 7 supporting files in that folder).
+- **hermes-payload-architecture** — Production validation of provider payloads: prompt slimming, tool-result digests, exact_recall, cache-hit behaviour.
+  Read `references/merged-hermes-payload-validation/hermes-payload-architecture.md` (+ 3 supporting files in that folder).
+- **hermes-payload-architecture** — Separating the raw conversation ledger from a slim prompt-render view, especially for oversized tool results.
+  Read `references/merged-hermes-prompt-payload-slimming/hermes-payload-architecture.md` (+ 7 supporting files in that folder).
