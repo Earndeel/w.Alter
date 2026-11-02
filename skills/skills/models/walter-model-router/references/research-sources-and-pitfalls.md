@@ -52,7 +52,7 @@ latency, tool-use transport, and provider availability as separate routing
 criteria.
 
 The deterministic live contract and parser evidence are maintained in
-`model-value-analysis/references/live-aa-kie-refresh.md`; dated percentages are
+`model-benchmark-comparison/references/live-aa-kie-refresh.md`; dated percentages are
 examples, not catalog truth.
 
 ### Research pitfalls (from the August collectors, still valid)

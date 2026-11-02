@@ -37,5 +37,5 @@ The API v2 is reliable only for:
 - Pricing data (accurate)
 - Benchmark scores (GPQA, HLE, etc. — these are the same regardless)
 
-When computing Pareto frontiers, use the `aa-intel-vs-cost-scraper` DOM scrape
+When computing Pareto frontiers, use the `aa-pareto-model-optimizer` DOM scrape
 method to get Recharts data (`cost_per_task` + reasoning intel), not the API v2.
