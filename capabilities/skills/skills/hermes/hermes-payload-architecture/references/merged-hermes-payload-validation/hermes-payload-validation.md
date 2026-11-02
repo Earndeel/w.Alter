@@ -1,5 +1,5 @@
 ---
-name: hermes-payload-validation
+name: hermes-payload-architecture
 description: Production-grade validation of Hermes provider payloads, prompt slimming, tool-result digests, exact_recall, and cache-hit behavior.
 created: 2026-07-04
 updated: 2026-07-04

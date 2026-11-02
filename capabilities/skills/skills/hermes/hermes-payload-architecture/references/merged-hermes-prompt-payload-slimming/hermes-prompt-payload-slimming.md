@@ -1,5 +1,5 @@
 ---
-name: hermes-prompt-payload-slimming
+name: hermes-payload-architecture
 category: devops
 description: Optimize Hermes LLM payloads by separating raw conversation ledgers from slim prompt-render views, especially oversized tool results and repeated skill_view outputs.
 created: 2026-07-04
@@ -156,4 +156,4 @@ Record metrics on the agent/session for inspection:
 
 See `references/prompt-view-tool-result-slimming.md` for a concrete implementation recipe and measurement checklist.
 
-For payload composition measurement from live sessions and ContextCompressor bug patterns (IndexError on all-tool middle), see also the companion skill `context-compression-debugging`.
+For payload composition measurement from live sessions and ContextCompressor bug patterns (IndexError on all-tool middle), see also the companion skill `hermes-context-management`.

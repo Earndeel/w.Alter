@@ -83,7 +83,7 @@ Core Hermes tools are never deferred. The same pattern can apply to skills.
 Current flow (compact index + on-demand search):
 - System prompt contains category-only index (~1.2K tokens)
 - Agent calls `skill_search("video generation")` → ranked results with score
-- Agent calls `skill_view("multi-model-video-gen")` → full content
+- Agent calls `skill_view("multi-model-video-pipeline")` → full content
 
 ### What was built
 
