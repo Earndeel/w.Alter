@@ -67,5 +67,5 @@ page.screenshot(path="/tmp/step-N.png")
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **webtop-chromium-cdp** — Webtop container administration: Chromium + CDP startup script, stale Singleton locks, s6-overlay boot service, cron persistence, verifying browser access.
-  Read `references/merged-webtop-chromium-cdp/webtop-chromium-cdp.md`.
+- **webtop-authenticated-browsing** — Webtop container administration: Chromium + CDP startup script, stale Singleton locks, s6-overlay boot service, cron persistence, verifying browser access.
+  Read `references/merged-webtop-chromium-cdp/webtop-authenticated-browsing.md`.

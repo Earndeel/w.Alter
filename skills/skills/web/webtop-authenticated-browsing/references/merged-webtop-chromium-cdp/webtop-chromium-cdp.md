@@ -1,5 +1,5 @@
 ---
-name: webtop-chromium-cdp
+name: webtop-authenticated-browsing
 category: devops
 description: Manage Webtop container with Chromium CDP access via s6-overlay and cron persistence. Includes container setup, CDP configuration, Singleton lock fixes, and browser access verification.
 ---
