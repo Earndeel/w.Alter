@@ -1,5 +1,5 @@
 ---
-name: multi-model-video-gen
+name: multi-model-video-pipeline
 category: ad-pipeline
 description: Multi-model video generation system — parameterized pipeline supporting multiple AI video models via Fal.ai, with Higgsfield MCP as primary and FAL direct API as fallback
 created: 2026-04-08

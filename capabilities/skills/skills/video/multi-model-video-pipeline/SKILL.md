@@ -113,5 +113,5 @@ cfg['id'] = os.path.basename(model_dir)  # id = directory name
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **multi-model-video-gen** — The earlier parameterised multi-model video generator via Fal.ai with Higgsfield MCP as an alternative.
-  Read `references/merged-multi-model-video-gen/multi-model-video-gen.md` (+ 1 supporting file in that folder).
+- **multi-model-video-pipeline** — The earlier parameterised multi-model video generator via Fal.ai with Higgsfield MCP as an alternative.
+  Read `references/merged-multi-model-video-gen/multi-model-video-pipeline.md` (+ 1 supporting file in that folder).
