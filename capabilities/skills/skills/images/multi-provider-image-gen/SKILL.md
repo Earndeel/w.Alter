@@ -87,7 +87,7 @@ Submit returns `data.id`. Poll at `/api/v1/model/prediction/{id}`:
 
 ### Video models (Grok Imagine, etc.)
 
-Video models on Kie have **full parameters** — `resolution`, `duration`, `aspect_ratio`, prompts, etc. See `kie-video-generation` skill for details.
+Video models on Kie have **full parameters** — `resolution`, `duration`, `aspect_ratio`, prompts, etc. See `kie-video-generation-operations` skill for details.
 
 ### Polling & Download
 
@@ -198,5 +198,5 @@ See `references/atlas-cloud-provider.md` (if present) for complete endpoint deta
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **image-generation-fallback** — The provider fallback chain for images (OpenAI direct → Codex → Fal MCP → Atlas Cloud → Pollinations) when the preferred provider fails.
-  Read `references/merged-image-generation-fallback/image-generation-fallback.md` (+ 2 supporting files in that folder).
+- **multi-provider-image-gen** — The provider fallback chain for images (OpenAI direct → Codex → Fal MCP → Atlas Cloud → Pollinations) when the preferred provider fails.
+  Read `references/merged-image-generation-fallback/multi-provider-image-gen.md` (+ 2 supporting files in that folder).

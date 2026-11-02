@@ -1,5 +1,5 @@
 ---
-name: image-generation-fallback
+name: multi-provider-image-gen
 description: Multi-provider image generation with fallback chain — OpenAI Direct API → OpenAI Codex → Fal MCP → Atlas Cloud → Pollinations.ai (zero-key). Includes local serving trick for CLI delivery.
 category: mlops
 ---
