@@ -6,7 +6,7 @@
 - **.env path**: `admin/integrations/*.py` needs 3× dirname to reach factory root. `admin/*.py` needs 2× dirname. `admin/dashboard/*.py` needs 1× dirname (it's deeper)
 - **Chrome Basic Auth popup**: Caused by `WWW-Authenticate: Basic` header on 401. Remove it. Return `jsonify({"error":"..."}), 401` instead
 - **CNAME + trycloudflare**: Cloudflare rejects proxied CNAME to trycloudflare.com. Must use named tunnels with `{tunnel_id}.cfargotunnel.com`
-- **Fal.ai OpenAPI schemas**: Use `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<model_id>` to get exact parameter schemas. See `fal-openapi-schema-discovery` skill.
+- **Fal.ai OpenAPI schemas**: Use `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<model_id>` to get exact parameter schemas. See `fal-mcp-integration` skill.
 - **Seedance 2.0 endpoints**: `bytedance/seedance-2.0/{text-to-video,image-to-video,reference-to-video}` + `/fast/` variants. No `fal-ai/` prefix.
 - **Seedance Reference format**: Uses `image_urls` (array), `video_urls` (array), `audio_urls` (array) — NOT `reference_image_urls`. Prompt uses `@Image1`, `@Video1` syntax.
 - **Asset preprocessor for Seedance**: Upload video → extract 3 frames via ffmpeg → upload frames + video to Fal.ai storage → get public URLs → inject into `image_urls` + `video_urls`
