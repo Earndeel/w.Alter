@@ -1,5 +1,5 @@
 ---
-name: camoufox-max-server
+name: camoufox-max-api-current
 description: "camoufox-max server (port 9378) — advanced browser automation with JS execution, crash recovery, and React form filling. Used for AWS console, React SPAs, and complex multi-step flows."
 tags: [browser, automation, react, aws, camoufox]
 related_skills: [hermes-camoufox-setup, anti-bot-navigation, aws-bedrock-browser-setup]

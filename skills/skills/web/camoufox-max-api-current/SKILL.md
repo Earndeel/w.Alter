@@ -79,7 +79,7 @@ For approved Google Flow video generation, reference-conditioned clips, current 
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **camoufox-automation** — Advanced Camoufox automation: standard vs max variant, React/SPA property setters and event dispatch, health check and auto-restart for long sessions, AWS console automation and the MFA resend-code pitfall.
-  Read `references/merged-camoufox-automation/camoufox-automation.md` (+ 10 supporting files in that folder).
-- **camoufox-max-server** — Historical camoufox-max server internals (JS execution, crash recovery, smart tab reuse, React form filling, Discord/localStorage auth). The port it names (9378) is now CloakBrowser: always call /health and use the port that reports `flavor: max`.
-  Read `references/merged-camoufox-max-server/camoufox-max-server.md` (+ 8 supporting files in that folder).
+- **camoufox-max-api-current** — Advanced Camoufox automation: standard vs max variant, React/SPA property setters and event dispatch, health check and auto-restart for long sessions, AWS console automation and the MFA resend-code pitfall.
+  Read `references/merged-camoufox-automation/camoufox-max-api-current.md` (+ 10 supporting files in that folder).
+- **camoufox-max-api-current** — Historical camoufox-max server internals (JS execution, crash recovery, smart tab reuse, React form filling, Discord/localStorage auth). The port it names (9378) is now CloakBrowser: always call /health and use the port that reports `flavor: max`.
+  Read `references/merged-camoufox-max-server/camoufox-max-api-current.md` (+ 8 supporting files in that folder).
