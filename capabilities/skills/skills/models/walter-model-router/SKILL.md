@@ -72,3 +72,11 @@ The old store (schema `walter_router`, fixed weight vectors, router_matrix.json)
 - `references/providers-and-transport.md` — Native text execution and provider failover, the Claude subscription transport, diagnosing a Kie outage without downgrading its media, adding a Bitwarden-backed provider.
 - `references/documentation-and-orchestrator.md` — Which documentation is maintained, and the orchestrator note (2026-10-23).
 
+## Review a deterministic 48-hour cycle under alias-only authorization
+
+- Read `walter-router review` and `walter-router health`; correlate the run ID, source errors and snapshot ages before interpreting rankings. Report stale or failed sources as limits on the analysis; do not repair collectors during an alias-only review.
+- Read `walter-router docs` and `walter-router --help` to discover current documentation and commands. Use `walter-router dossier <task>` for task-specific evidence and `walter-router alias-list` for existing mappings.
+- Treat `/opt/walter-router/walter_router/aliases.json` as a legacy location: it was absent in this session; the file was found at `/opt/walter-router/analysis/aliases.json`. Resolve the module root with `walter path router` and verify the current layout before reading implementation files. Never edit the alias file directly.
+- Treat unmatched-name candidates as investigation leads, not established equivalences. Verify identity using primary provider documentation; similar names, shared parameter counts, date suffixes, experimental variants and specialist suffixes do not establish equivalence.
+- Before an authorized correction, inspect `walter-router alias-add --help` for the exact current syntax. Apply only verified equivalences through `alias-add`, then check `alias-list` and rerun `review` to verify the result. If evidence is insufficient, leave the candidate unresolved.
+- Keep the authorization boundary explicit: an alias-only analysis permits no direct database writes, configuration changes, collector repairs, model switches or report-file creation unless separately authorized. Return the analysis in the response when file writes are excluded.
