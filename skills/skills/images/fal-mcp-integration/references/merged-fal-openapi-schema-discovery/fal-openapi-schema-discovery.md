@@ -1,5 +1,5 @@
 ---
-name: fal-openapi-schema-discovery
+name: fal-mcp-integration
 category: mcp
 description: Discover exact parameter schemas for any Fal.ai model via their OpenAPI endpoint. Bypasses MCP limitations and documentation gaps by fetching the raw OpenAPI 3.0.4 spec directly.
 tags: [fal.ai, openapi, schema, model-parameters, video-generation, image-generation]
