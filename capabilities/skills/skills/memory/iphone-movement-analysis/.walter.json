@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-02T04:16:13.024148+00:00",
- "description": "Use when Monsieur asks to reconstruct recent movements, stops or journeys from iPhone location samples stored in Walter Memory.",
- "domain": "memory",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session exposed a distinct reusable workflow absent from the listed skills: reconstructing movements from core.events location.sample payloads, filtering iPhone accuracy, processing stops and distances locally, and reporting coverage and place uncertainty. Concrete evidence includes the failed postgres-role connection, successful hindsight-role queries, Asia/Bangkok timestamp conversion, payload field inspection, and analysis of 8,219 samples retained at accuracy ≤100 m. Segmentation code was truncated, so its thresholds are deliberately not presented as established settings. [session claude_code/vm/7eadb4f7-5668-45d5-a33c-5f88848bf386]",
- "runtime": "learner",
- "session_id": "claude_code/vm/7eadb4f7-5668-45d5-a33c-5f88848bf386",
- "target": "iphone-movement-analysis"
+ "store_sha": "81b7554f36e3039a0cfd9c69a0f309162a380180554ecd6bd657e3c2ea571ea1"
 }
