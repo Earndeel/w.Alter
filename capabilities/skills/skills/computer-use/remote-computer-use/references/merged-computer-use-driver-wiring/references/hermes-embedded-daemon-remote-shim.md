@@ -1,6 +1,6 @@
 # Traced audit: embedded cua-driver daemon vs remote stdio shim
 
-Session-specific evidence behind `computer-use-driver-wiring`. Findings from an
+Session-specific evidence behind `remote-computer-use`. Findings from an
 audit of the reported startup failure:
 
 > `embedded cua-driver exited during startup: walter-cua-remote: remote driver

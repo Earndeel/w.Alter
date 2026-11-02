@@ -370,7 +370,7 @@ on the VPS is not Mac E2E proof.
 
 These procedures were separate skills; their full original text is kept here, unchanged.
 
-- **cua-driver-resilience** — CuaDriver / AX capture that is black, partial, stale or wrongly targeted: separate the three contracts, read-only diagnosis, fail-closed capture integrity, window selection by identity.
-  Read `references/merged-cua-driver-resilience/cua-driver-resilience.md` (+ 4 supporting files in that folder).
-- **computer-use-driver-wiring** — Why Hermes' computer_use driver fails to start: spawn and embedded-daemon contracts, permission_mode, custom/remote driver commands and stdio shims.
-  Read `references/merged-computer-use-driver-wiring/computer-use-driver-wiring.md` (+ 5 supporting files in that folder).
+- **remote-computer-use** — CuaDriver / AX capture that is black, partial, stale or wrongly targeted: separate the three contracts, read-only diagnosis, fail-closed capture integrity, window selection by identity.
+  Read `references/merged-cua-driver-resilience/remote-computer-use.md` (+ 4 supporting files in that folder).
+- **remote-computer-use** — Why Hermes' computer_use driver fails to start: spawn and embedded-daemon contracts, permission_mode, custom/remote driver commands and stdio shims.
+  Read `references/merged-computer-use-driver-wiring/remote-computer-use.md` (+ 5 supporting files in that folder).

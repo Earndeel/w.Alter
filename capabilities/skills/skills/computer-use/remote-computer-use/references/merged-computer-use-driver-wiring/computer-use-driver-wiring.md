@@ -1,5 +1,5 @@
 ---
-name: computer-use-driver-wiring
+name: remote-computer-use
 description: "Use when auditing computer_use spawn, schema, or fresh-session routing."
 version: 1.1.0
 author: Hermes
@@ -8,7 +8,7 @@ metadata:
   hermes:
     tags: [computer-use, cua-driver, backend, embedded-daemon, driver-command, permission-mode, wrapper-shim]
     category: desktop
-    related_skills: [computer-use, cua-driver-resilience, walter-computer-use]
+    related_skills: [computer-use, remote-computer-use, walter-computer-use]
 ---
 
 # Computer use driver wiring (spawn / embedding contracts)
@@ -40,7 +40,7 @@ Governs how Hermes' `computer_use` backend locates and spawns the driver
 executable (`tools/computer_use/cua_backend.py`), what the "embedded daemon"
 is, and how custom/remote driver commands (e.g. a stdio-forwarder shim) must
 behave to stay compatible. GUI action semantics stay in `computer-use`;
-capture/AX integrity lives in `cua-driver-resilience`; the Walter remote route
+capture/AX integrity lives in `remote-computer-use`; the Walter remote route
 itself lives in `walter-computer-use`.
 
 ## The spawn contract

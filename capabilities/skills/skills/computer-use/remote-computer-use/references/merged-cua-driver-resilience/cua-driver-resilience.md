@@ -1,5 +1,5 @@
 ---
-name: cua-driver-resilience
+name: remote-computer-use
 description: "Use when CuaDriver/AX capture or window targeting degrades."
 version: 1.0.0
 author: W.Alter
