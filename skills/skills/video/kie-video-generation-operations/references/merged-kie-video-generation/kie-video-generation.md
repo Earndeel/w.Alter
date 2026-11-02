@@ -1,5 +1,5 @@
 ---
-name: kie-video-generation
+name: kie-video-generation-operations
 description: Kie.ai video generation API integration — Seedance 2.0, Seedance 2.0 Fast, Kling, Hailuo, Wan, Sora2, and other video models via unified task API.
 version: 1.0.0
 author: W.Alter
