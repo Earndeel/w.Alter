@@ -6,7 +6,7 @@ import tomllib
 from functools import lru_cache
 from pathlib import Path
 
-DEFAULTS = {"generations": {"enforce": True}}
+DEFAULTS = {"generations": {"enforce": True}, "working_memory": {"mode": "shadow"}, "consolidation": {"mode": "shadow", "poste": "general/L3"}}
 
 
 @lru_cache(maxsize=1)

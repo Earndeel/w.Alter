@@ -46,7 +46,11 @@ RUNTIMES = ("hermes", "claude_code", "codex", "dsh")
 MESSAGE_TYPES = ("message.sent", "message.received")    # sent = the owner, received = the assistant
 KINDS = ("fact", "decision", "preference", "goal", "constraint", "commitment", "correction")
 OWNER_KINDS = {"decision", "preference", "goal", "constraint", "correction"}
-STATES = {"decision": {"proposed", "decided", "executed", "abandoned"}, "commitment": {"open", "done"}}
+# Stage of an intention (P1.2): a request is not a decision, a decision is not an execution, a report is not a proof.
+STAGES = {"decision": {"requested", "proposed", "decided", "executed", "abandoned"},
+          "goal": {"requested", "decided", "executed", "abandoned"}, "commitment": {"open", "done"}}
+STATES = STAGES                     # P1.1 name
+SCOPES = {"durable", "task", "until"}
 SEGMENT_CHARS = 24000
 MSG_CHARS = 3000
 IDLE = timedelta(minutes=20)
@@ -58,6 +62,17 @@ KNOWN_THREAD, KNOWN_SIMILAR = 15, 10
 
 AUTOMATED = re.compile(r"^\s*(The following is the Codex agent history|\{\s*\"risk_level\"|\[IMPORTANT: Background process|"
                        r"\[The user sent a voice message~? Here's what they said: \"\s*\"\])", re.S)
+# Adaptive working memory (P1.1): an owner message that sets something interprets at once; the rest is grouped.
+DIRECTIVE = re.compile(r"(?i)(\btu (peux|pourrais|dois)\b|peux[- ]tu|\b(fais|fait|refais|refait|cr[ée]e[rsz]?|ajoute|mets|installe|"
+                       r"connecte|configure|corrige|r[ée]pare|supprime|envoie|r[ée]ponds|insiste|tourne|d[ée]dui[st]|utilise|"
+                       r"passe|teste|analyse|v[ée]rifie|regarde|montre|explique|prends|continue|reprends|commence|mesure)\b)")
+MARKERS = re.compile(r"(?i)(je valide|valid[eé]|on garde|on part sur|je veux|je ne veux|\bne (pas|jamais|plus)\b|jamais|"
+                     r"toujours|désormais|dorénavant|finalement|plutôt|arr[eê]te|\bstop\b|décid|renomm|supprim|\bgarde|"
+                     r"retire|oublie|priorit|d.abord|à partir de|il faut|faut (le|la|les|qu)|surtout|uniquement|interdit|"
+                     r"oblig|n.envoie|envoi[es]?\b|commit|lance|vas[- ]?y)")
+LONG_MESSAGE = 600
+ADAPT_QUIET = timedelta(minutes=5)
+ADAPT_TURNS = 3
 # Text the runtime appends to an owner message (not his words): removed before reading and quoting.
 RUNTIME_NOTES = re.compile(r"\[Your active task list was preserved across context compression\].*$", re.S)
 
@@ -78,7 +93,8 @@ Rends un JSON :
   "items": [{{"kind": "fact|decision|preference|goal|constraint|commitment|correction",
               "text": "une seule connaissance, autonome et compréhensible sans la conversation",
               "subject": "owner | walter | project:<nom> | person:<nom> | other",
-              "state": "decision: proposed|decided|executed|abandoned ; commitment: open|done ; sinon stated",
+              "stage": "decision/goal : requested|proposed|decided|executed|abandoned ; commitment : open|done ; sinon stated",
+              "scope": "durable | task | until", "until": "AAAA-MM-JJ si scope = until, sinon null",
               "msgs": [numéros des messages qui l'établissent],
               "quote": "extrait EXACT (copié mot pour mot, 5 à 25 mots) d'un des messages cités",
               "same_as": "K… si c'est la même connaissance qu'une connaissance déjà enregistrée, sinon null",
@@ -86,11 +102,15 @@ Rends un JSON :
               "confidence": 0.0}}]}}
 
 Ce qui compte comme connaissance durable :
-- décision : un choix de Monsieur, ou une proposition de W.Alter qu'il a acceptée (state=decided) ; executed seulement si un message dit que c'est fait ; proposed si personne n'a tranché ;
+- étape (stage), sans jamais en sauter une : requested = Monsieur demande ou veut quelque chose ; proposed = W.Alter propose et Monsieur n'a pas tranché ; decided = Monsieur a décidé ou validé ; executed = un message dit que c'est fait (c'est un compte rendu, pas une preuve) ; abandoned = Monsieur y renonce. Une demande de Monsieur est requested, jamais executed ;
+- portée (scope) : durable = vaut au-delà du travail en cours ; task = ne vaut que pour le travail en cours (« ne touche pas aux fichiers que Codex modifie », « attends mon accord avant l'étape suivante ») ; until = jusqu'à une date (until) ;
 - préférence / contrainte : une règle, un goût, une manière de travailler, une limite à respecter ;
 - objectif : ce que Monsieur veut atteindre ; engagement : ce que quelqu'un s'est engagé à faire (open/done) ;
 - correction : Monsieur corrige une information ou une erreur ; fait : une information durable sur Monsieur, ses proches, ses projets, son environnement, ou l'architecture et l'état de W.Alter ;
-- les choix techniques et d'architecture d'un projet SONT des décisions à garder ; ne garde pas les détails passagers (commandes lancées, erreurs corrigées, essais) sauf s'ils fixent une règle durable.
+- les choix techniques et d'architecture d'un projet SONT des décisions à garder ; ne garde pas les détails passagers des actions de W.Alter (commandes lancées, erreurs corrigées, essais) sauf s'ils fixent une règle durable ;
+- une demande de Monsieur (« tu peux… », « analyse… », « fais… », « envoie ») est un objectif (goal) ou une décision de Monsieur à l'étape requested, même si W.Alter l'exécute aussitôt ;
+- une approbation courte de Monsieur (« oui », « vas-y », « envoi », « ok ») d'une proposition de W.Alter est une décision de Monsieur : écris la décision complète et cite à la fois le message de W.Alter qui la propose et celui de Monsieur qui l'approuve ;
+- une question de Monsieur qui exprime clairement une attente (« pourquoi tu ne le fais pas toi-même ? ») est une contrainte.
 Règles : uniquement ce qui est dit dans les messages numérotés ; une affirmation de W.Alter n'est pas une décision de Monsieur ;
 une affirmation d'un tiers n'est pas un fait vérifié (dis « selon … ») ; listes vides si rien de durable ; chaque item cite ses numéros et une citation exacte."""
 PROMPT_HASH = hashlib.sha256(PROMPT.encode()).hexdigest()[:16]
@@ -182,8 +202,10 @@ def _context(conn, source: str, thread_id: str, before) -> list[dict]:
 def _known(conn, source: str, thread_id: str, text: str) -> list[dict]:
     """Current v2 knowledge the model may restate, supersede or contradict: this thread's latest items and the most
     similar ones anywhere (local embeddings, no model call)."""
-    rows = conn.execute("""select item_id::text, kind, content, attributes->>'state' as state, created_at
+    rows = conn.execute("""select item_id::text, kind, content, coalesce(stage, attributes->>'state') as state,
+                                  created_at, lineage_id::text
                            from core.derived_items where derived_by = %s and status in ('derived','verified')
+                             and (valid_to is null or valid_to > now())
                              and generation = 'g1' and kind <> 'summary' and source_refs->>'thread' = %s
                              and source_refs->>'source' = %s
                            order by created_at desc limit %s""",
@@ -191,10 +213,12 @@ def _known(conn, source: str, thread_id: str, text: str) -> list[dict]:
     try:
         from . import search
         v = search.vec(search.embed([text[:4000]])[0])
-        rows += conn.execute("""select d.item_id::text, d.kind, d.content, d.attributes->>'state' as state, d.created_at
+        rows += conn.execute("""select d.item_id::text, d.kind, d.content, coalesce(d.stage, d.attributes->>'state') as state,
+                                       d.created_at, d.lineage_id::text
                                 from search.chunks c join core.derived_items d on d.item_id = c.ref_id
                                 where c.kind = 'derived' and c.embedding is not null and d.derived_by = %s
                                   and d.generation = 'g1' and d.status in ('derived','verified') and d.kind <> 'summary'
+                                  and (d.valid_to is null or d.valid_to > now())
                                 order by c.embedding <=> %s::vector limit %s""",
                              (PROCESSOR, v, KNOWN_SIMILAR)).fetchall()
     except Exception as e:  # the embedder is an optimisation: the thread's own items are enough to go on
@@ -227,6 +251,46 @@ def due_segments(msgs: list[dict], now: datetime | None = None) -> tuple[list[li
         if quiet or waited:
             segs.append(cur); cur = []
     return segs, cur
+
+
+def adaptive_due(msgs: list[dict], now: datetime | None = None) -> tuple[list[list[dict]], list[dict], str | None]:
+    """Adaptive policy (P1.1): segments ready now, the waiting tail, and why. The tail is interpreted at once when its
+    turn is closed (the assistant answered) and an owner message in it is long or sets something (MARKERS); otherwise
+    when ADAPT_TURNS owner turns accumulate, after ADAPT_QUIET of calm, or after MAX_WAIT. Full segments as before."""
+    now = now or datetime.now(timezone.utc)
+    segs, cur, size = [], [], 0
+    for m in msgs:
+        if cur and size + _size(m) > SEGMENT_CHARS:
+            segs.append(cur); cur, size = [], 0
+        cur.append(m); size += _size(m)
+    if not cur:
+        return segs, [], "full" if segs else None
+    owners = [m for m in cur if m["event_type"] == "message.sent"]
+    closed = cur[-1]["event_type"] == "message.received"
+    clean = [RUNTIME_NOTES.sub("", m["content"] or "") for m in owners]
+    reason = None
+    if now - max(m["occurred_at"] for m in cur) >= ADAPT_QUIET:
+        reason = "quiet"
+    elif closed and any(len(t) >= LONG_MESSAGE for t in clean):
+        reason = "long"
+    elif closed and any(MARKERS.search(t) for t in clean):
+        reason = "marker"
+    elif closed and any(DIRECTIVE.search(t) for t in clean):
+        reason = "directive"
+    elif closed and len(owners) >= ADAPT_TURNS:
+        reason = "turns"
+    elif now - min(m["ingested_at"] for m in cur) >= MAX_WAIT:
+        reason = "max_wait"
+    if reason:
+        return segs + [cur], [], reason
+    return segs, cur, ("full" if segs else None)
+
+
+def policy() -> str:
+    """organic.toml [working_memory] mode: 'adaptive' = the adaptive trigger drives extraction; 'shadow' (default) =
+    the 20-minute policy drives it and the adaptive decisions are only recorded; 'off' = neither."""
+    from . import organic
+    return organic.settings().get("working_memory", {}).get("mode", "shadow")
 
 
 # ───────────────────────────── validation ─────────────────────────────
@@ -265,14 +329,28 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict 
     if not quote_found(item.get("quote") or "", [m["content"] or "" for m in cited]):
         return None, "quote_not_found"
     by_owner = any(m["event_type"] == "message.sent" for m in cited)
-    if kind in OWNER_KINDS and not by_owner:
-        return None, "no_owner_evidence"
-    state = (item.get("state") or "stated").strip().lower()
-    if kind in STATES:
-        if state not in STATES[kind]:
-            state = "decided" if kind == "decision" else "open"
+    by_agent = any(m["event_type"] == "message.received" for m in cited)
+    stage = (item.get("stage") or item.get("state") or "stated").strip().lower()
+    if kind in STAGES:
+        if stage not in STAGES[kind]:
+            stage = "requested" if kind in ("decision", "goal") else "open"
     else:
-        state = "stated"
+        stage = "stated"
+    if kind in OWNER_KINDS and not by_owner and not (kind == "decision" and stage == "proposed"):
+        return None, "no_owner_evidence"          # a W.Alter proposal is kept as proposed, never as the owner's choice
+    if stage in ("decided", "requested", "abandoned") and not by_owner:
+        stage = "proposed"
+    if stage == "executed" and not by_agent:      # "it is done" needs a report of it; the owner's request is not one
+        stage = "decided" if by_owner else "proposed"
+    scope = (item.get("scope") or "durable").strip().lower()
+    scope = scope if scope in SCOPES else "durable"
+    until = None
+    if scope == "until":
+        try:
+            until = datetime.fromisoformat(str(item.get("until"))[:10]).replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            scope = "task"
+    state = stage
     refs = lambda key: [k for k in (item.get(key) or []) if isinstance(k, str) and k in known]
     same = item.get("same_as") if isinstance(item.get("same_as"), str) and item.get("same_as") in known else None
     supersedes, contradicts = refs("supersedes"), refs("contradicts")
@@ -282,9 +360,11 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict 
         conf = max(0.0, min(1.0, float(item.get("confidence") or 0.7)))
     except (TypeError, ValueError):
         conf = 0.7
-    return {"kind": kind, "text": text, "state": state, "subject": (item.get("subject") or "other")[:120],
+    return {"kind": kind, "text": text, "state": state, "stage": stage, "scope": scope, "until": until,
+            "subject": (item.get("subject") or "other")[:120],
             "quote": (item.get("quote") or "")[:400], "cited": cited, "by_owner": by_owner,
-            "epistemic": "owner_stated" if by_owner else "agent_reported", "same_as": same,
+            "epistemic": "owner_stated" if by_owner else "agent_reported",
+            "epistemic_v": "stated_owner" if by_owner else "agent_reported", "same_as": same,
             "supersedes": supersedes, "contradicts": contradicts, "confidence": conf}, None
 
 
@@ -382,15 +462,19 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                 attrs["holder"] = "owner" if it["by_owner"] else "walter"
             if it["contradicts"]:
                 attrs["contested"] = True
+            lineage = known[it["supersedes"][0]].get("lineage_id") if it["supersedes"] else None
             new_id = conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by,
                                          processor_version, model, prompt_hash, source_event_ids, source_refs, valid_from,
-                                         confidence, privacy_class, generation)
-                                     values (%s, %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s, %s, 'g1')
+                                         confidence, privacy_class, generation, lineage_id, epistemic, stage, scope,
+                                         valid_to)
+                                     values (%s, %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s, %s, 'g1',
+                                             %s, %s, %s, %s, %s)
                                      on conflict (derived_by, (source_refs->>'ref')) where source_refs ? 'ref' do nothing
                                      returning item_id::text""",
                                   (it["kind"], it["text"], json.dumps(attrs, ensure_ascii=False), PROCESSOR, VERSION,
                                    res.get("model"), PROMPT_HASH, ev_ids, json.dumps({**base_refs, "ref": f"{sid}:{k}"}),
-                                   it["cited"][-1]["occurred_at"], it["confidence"], cls)).fetchone()
+                                   it["cited"][-1]["occurred_at"], it["confidence"], cls, lineage, it["epistemic_v"],
+                                   it["stage"], it["scope"], it["until"])).fetchone()
             if not new_id:
                 continue
             new_id = new_id["item_id"]
@@ -415,14 +499,20 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                              (new_id, old))
         conn.execute("update extraction.segments set items = %s, reused = %s, superseded = %s where segment_id = %s",
                      (out["items"], out["reused"], out["superseded"], sid))
+    try:   # P1.2: the consolidated views built on this thread are rebuilt from the new state (targeted invalidation)
+        from . import consolidate
+        consolidate.invalidate(threads=[(source, thread_id)])
+    except Exception as e:
+        log.warning("view invalidation failed (extraction kept): %s", e)
     out["segment_id"] = sid
     return out
 
 
 # ───────────────────────────── one thread ─────────────────────────────
 def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "recurring", now=None,
-                   force: bool = False) -> dict:
-    """Handle what is due in one thread. force=True processes the waiting tail too (explicit runs, tests)."""
+                   force: bool = False, mode: str | None = None) -> dict:
+    """Handle what is due in one thread. force=True processes the waiting tail too (explicit runs, tests).
+    mode: 'adaptive' or 'idle' (the 20-minute policy); default = the [working_memory] switch."""
     out = {"segments": 0, "items": 0, "reused": 0, "superseded": 0, "rejected": 0, "filtered": 0,
            "local_only": 0, "cost_usd": 0.0, "waiting": 0}
     with connection() as conn:
@@ -446,7 +536,10 @@ def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "rec
                          rejected=[{"event_id": str(m["event_id"]), "reason": _noise(m)} for m in noise[:50]])
         out["filtered"] += len(noise)
     usable = [m for m in cloud if not _noise(m)]
-    segs, tail = due_segments(usable, now)
+    if (mode or policy()) == "adaptive":
+        segs, tail, out["reason"] = adaptive_due(usable, now)
+    else:
+        segs, tail = due_segments(usable, now)
     if force and tail:
         segs, tail = segs + [tail], []
     out["waiting"] = len(tail)
