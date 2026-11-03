@@ -346,7 +346,8 @@ def read(q: dict) -> dict:
     with connection() as conn:
         if q.get("key"):
             view = conn.execute("select * from views.view where view_key = %s", (q["key"],)).fetchone()
-            if not view or PRIVACY_RANK[view["privacy_class"]] > allowed or (gens is not None and view["generation"] not in gens):
+            if not view or PRIVACY_RANK[view["privacy_class"]] > allowed or (gens is not None and view["generation"] not in gens) \
+                    or (view["status"] == "shadow" and not q.get("shadow")):
                 return {"error": f"no view {q['key']}"}
             last_member = conn.execute("select max(occurred_at) m from views.member where view_key = %s",
                                        (q["key"],)).fetchone()["m"]

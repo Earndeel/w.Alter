@@ -90,6 +90,9 @@ def main(argv=None) -> None:
     x2.add_argument("--force", action="store_true", help="thread: also process the tail still waiting")
     pl = sub.add_parser("pipeline", help="V1 event pipeline: run the consumers (service) or show their health")
     pl.add_argument("action", nargs="?", default="run", choices=["run", "health"])
+    cs = sub.add_parser("consolidate", help="P1.2 views rebuilt from current V1 knowledge (shadow): build, tick, expire, reconsolidate, show")
+    cs.add_argument("action", choices=["build", "tick", "expire", "reconsolidate", "show"]); cs.add_argument("--subject")
+    cs.add_argument("--depth", default="overview"); cs.add_argument("--variant", default="cloud"); cs.add_argument("--force", action="store_true")
     gn = sub.add_parser("generations", help="memory generations g0 (pre-V1) / g1 (V1): status, preview, switch, rollback")
     gn.add_argument("action", choices=["status", "preview", "switch", "rollback"]); gn.add_argument("--query", action="append")
     gn.add_argument("--to", default="g1"); gn.add_argument("--confirm", action="store_true"); gn.add_argument("--note", default="")
@@ -253,6 +256,22 @@ def main(argv=None) -> None:
     elif a.cmd == "pipeline":
         from . import pipeline
         pipeline.run() if a.action == "run" else _print(pipeline.health())
+    elif a.cmd == "consolidate":
+        from . import consolidate, views
+        if a.action in ("build", "reconsolidate", "show") and not a.subject:
+            p.error(f"consolidate {a.action} needs --subject")
+        if a.action == "build":
+            _print(consolidate.build_subject(a.subject, force=a.force))
+        elif a.action == "tick":
+            _print(consolidate.tick())
+        elif a.action == "expire":
+            _print(consolidate.expire())
+        elif a.action == "reconsolidate":
+            _print(consolidate.reconsolidate(a.subject))
+        else:
+            r = views.read({"depth": a.depth, "key": consolidate.key_for(a.subject, a.variant), "shadow": True,
+                            "privacy": "local_only" if a.variant == "local" else "cloud_allowed", "max_tokens": 6000})
+            print(r.get("content") or r)
     elif a.cmd == "generations":
         from . import generations
         if a.action == "status":

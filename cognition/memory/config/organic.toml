@@ -5,3 +5,16 @@
 [generations]
 # P1.0: read derived knowledge only from readable generations (core.generations); false = no generation filter.
 enforce = true
+
+[working_memory]
+# P1.1: "shadow" = extraction keeps its 20-minute policy; the working state and the adaptive decisions are only
+# recorded (extraction.working_shadow), nothing new is injected. "adaptive" = the adaptive trigger drives extraction.
+# "off" = no working-state records.
+mode = "shadow"
+
+[consolidation]
+# P1.2: g1 subject views rebuilt from current V1 knowledge and evidence (status 'shadow': built, not served).
+# "shadow" = views built, reconsolidation proposals recorded only; "apply" = proposals applied; "off" = nothing.
+mode = "shadow"
+# Router tier for reconsolidation (the memory_extraction route proposed nothing on real subjects; L3 did, 2026-11-02)
+poste = "general/L3"
