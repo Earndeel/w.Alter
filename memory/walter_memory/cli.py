@@ -119,12 +119,21 @@ def main(argv=None) -> None:
     lg.add_argument("--cloud-safe", action="store_true", help="hide local_only, pseudonymise redacted_cloud")
     lg.add_argument("--json", action="store_true")
     vw = sub.add_parser("views", help="Memory Views (lot 3): attach exchanges to subjects, read a view at a depth")
-    vw.add_argument("action", choices=["run", "read", "board", "stats"])
+    vw.add_argument("action", choices=["run", "read", "board", "stats", "find"])
     vw.add_argument("key", nargs="?", default="", help="read: a view key (subject:…)")
     vw.add_argument("--since", help="run: ISO time to start from (else the cursor)"); vw.add_argument("--until")
     vw.add_argument("--limit", type=int, default=500); vw.add_argument("--dry", action="store_true")
     vw.add_argument("--depth", default="overview"); vw.add_argument("--domain"); vw.add_argument("--horizon")
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
+    vw.add_argument("--query", default="", help="find: the V1 views closest to these words (subjects, episodes, periods)")
+    vw.add_argument("--local", action="store_true", help="owner reading on the VM: local_only views too")
+    ds = sub.add_parser("disclosure", help="P1.7: may this outgoing message leave? allow | ask | block, with reasons")
+    ds.add_argument("action", choices=["check"]); ds.add_argument("--to", default=None); ds.add_argument("--text", default=None)
+    ds.add_argument("--channel", default="cli"); ds.add_argument("--no-model", action="store_true")
+    ep2 = sub.add_parser("organic", help="P1.3-P1.6: entities, flows, episodes, periods (seed, link, flows, plans, episodes, periods, period)")
+    ep2.add_argument("action", choices=["seed", "link", "flows", "plans", "episodes", "periods", "period"])
+    ep2.add_argument("--days", type=int, default=7); ep2.add_argument("--kind", default="day", choices=["day", "week", "month"])
+    ep2.add_argument("--date", default=None); ep2.add_argument("--limit", type=int, default=None)
     mg = sub.add_parser("migrate", help="apply this module's migrations in order and record them (status, baseline)")
     mg.add_argument("--status", action="store_true"); mg.add_argument("--dry", action="store_true")
     mg.add_argument("--baseline-through", help="record files up to this name as already applied, without running them")
@@ -431,10 +440,15 @@ def main(argv=None) -> None:
                             until=_dt.fromisoformat(a.until) if a.until else None, limit=a.limit, dry=a.dry)
         elif a.action == "read":
             res = views.read({"depth": a.depth, "key": a.key or None, "domain": a.domain, "horizon": a.horizon,
-                              "max_tokens": a.max_tokens})
+                              "max_tokens": a.max_tokens, "privacy": "local_only" if a.local else "cloud_allowed"})
         elif a.action == "board":
             res = views.read({"depth": "index", "domain": a.domain or "projects", "horizon": a.horizon,
                               "max_tokens": a.max_tokens})
+        elif a.action == "find":
+            from . import consolidate
+            lines = consolidate.related_views(a.query or a.key, max_privacy="local_only" if a.local else "cloud_allowed",
+                                              limit=10, min_sim=0.2)
+            res = {"content": "\n".join(lines) or "(aucune vue V1 proche)"}
         else:
             with connection() as conn:
                 res = {r["k"]: r["n"] for r in conn.execute(
@@ -444,6 +458,35 @@ def main(argv=None) -> None:
             print(json.dumps(res, default=str, ensure_ascii=False, indent=1))
         else:
             print(res.get("content") or json.dumps(res, default=str, ensure_ascii=False, indent=1))
+    elif a.cmd == "disclosure":
+        from . import disclosure
+        text = a.text if a.text is not None else sys.stdin.read()
+        r = disclosure.check(text, to=a.to, channel=a.channel, model=not a.no_model)
+        _print({**r, "explanation": disclosure.explain(r)})
+    elif a.cmd == "organic":
+        from datetime import date as _d, datetime as _dt, timedelta as _td, timezone as _tz
+        since = _dt.now(_tz.utc) - _td(days=a.days)
+        if a.action == "seed":
+            from . import entities
+            _print(entities.seed())
+        elif a.action == "link":
+            from . import entities
+            _print(entities.link_items())
+        elif a.action == "flows":
+            from . import flows
+            _print(flows.tick(since))
+        elif a.action == "plans":
+            from . import episodic
+            _print(episodic.plans(since, limit=a.limit))
+        elif a.action == "episodes":
+            from . import episodic
+            _print(episodic.build(since))
+        elif a.action == "periods":
+            from . import periods
+            _print(periods.tick(days=a.days))
+        else:
+            from . import periods
+            _print(periods.build(a.kind, _d.fromisoformat(a.date) if a.date else _dt.now(_tz.utc).date(), force=True))
     elif a.cmd == "purge":
         _print(purge.purge(reason=a.reason, requested_by=a.by, event_ids=a.event, object_refs=a.object,
                            pattern=a.pattern, include_hindsight=a.hindsight, execute=a.execute,

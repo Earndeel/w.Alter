@@ -352,6 +352,23 @@ def read(q: dict) -> dict:
                 return {"error": f"no view {q['key']}"}
             last_member = conn.execute("select max(occurred_at) m from views.member where view_key = %s",
                                        (q["key"],)).fetchone()["m"]
+            if depth == "sources" and view["generation"] == "g1":     # V1: what the view is built from (views.evidence)
+                ev = conn.execute("""select x.ref_kind, x.ref_id, x.role, x.privacy_class, d.kind, d.content,
+                                            coalesce(d.valid_from, d.created_at) at, d.source_event_ids
+                                     from views.evidence x left join core.derived_items d
+                                       on x.ref_kind = 'derived' and d.item_id::text = x.ref_id
+                                     where x.view_key = %s order by at nulls last limit %s""",
+                                  (q["key"], max(1, max_tokens // 40))).fetchall()
+                srcs = []
+                for r in ev:
+                    if PRIVACY_RANK[r["privacy_class"]] > allowed:
+                        continue
+                    srcs.append({"kind": r["ref_kind"], "ref": r["ref_id"], "role": r["role"], "item_kind": r["kind"],
+                                 "at": r["at"], "text": (r["content"] or "")[:300] or None,
+                                 "events": [str(e) for e in (r["source_event_ids"] or [])[:5]]})
+                return {"key": q["key"], "depth": "sources", "version": None, "content": None, "built_at": None,
+                        "watermark": None, "stale": False, "sources": srcs, "deeper": [],
+                        "note": "originals: memory_events (event ids) ; a sub-view: memory_view(ref)"}
             if depth == "sources":
                 rows = conn.execute("""select session_id, seq, occurred_at, runtime from views.member
                                        where view_key = %s order by occurred_at desc limit %s""",
