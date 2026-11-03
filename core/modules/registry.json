@@ -1409,7 +1409,8 @@
         "search.*",
         "system.*",
         "kardex.*",
-        "extraction.*"
+        "extraction.*",
+        "processing.*"
       ],
       "core_paths": [
         "/walter/memory/walter_memory/events.py",
