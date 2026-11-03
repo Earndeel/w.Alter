@@ -1,8 +1,8 @@
 """assembly: the blocks retrieval fetched, ordered for the model and its provider's cache (lot 4, step D).
 
 Stable first, volatile last, so a provider prefix cache reuses as much as possible between messages:
-    0 capabilities (session)  1 subjects board  3 subject view  4 memory for this message  5 recent exchanges
-Session State (layer 2) comes in step F. The host's own system prompt and native history stay the host's: for
+    0 capabilities (session)  1 subjects board  2 session state (owner rules + working state of the thread, Memory
+    V1 P1.1)  3 subject view  4 memory for this message  5 recent exchanges The host's own system prompt and native history stay the host's: for
 Claude Code / Codex walter-context only adds (a block the host already shows is counted, not injected).
 
 `pack()` returns what would be injected, as text plus a per-block summary; in shadow mode only the summary and the

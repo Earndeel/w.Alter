@@ -21,9 +21,11 @@ CAPABILITY_MODULES = {"skills": ["skills"], "search": ["memory"], "delegation": 
 DOMAIN_MODULES = {"relations": ["memory"], "agenda": ["memory"], "profile": ["memory"], "activities": ["memory"],
                   "decisions": ["memory"], "goals": ["memory"]}
 SUBJECT_DEPTH = {"L0": None, "L1": "index", "L2": "overview", "L3": "synthesis", "L4": "synthesis"}
-MEMORY_BUDGET = {"L3": {"profile": 0, "people": 300, "knowledge": 600, "evidence": 300},
-                 "L4": {"profile": 0, "people": 600, "knowledge": 1200, "evidence": 800}}
-RECORDS_BUDGET = {"profile": 0, "people": 0, "records": 900, "knowledge": 0, "evidence": 0}
+MEMORY_BUDGET = {"L3": {"profile": 0, "rules": 0, "working": 0, "people": 300, "knowledge": 600, "evidence": 300, "views": 200},
+                 "L4": {"profile": 0, "rules": 0, "working": 0, "people": 600, "knowledge": 1200, "evidence": 800, "views": 300}}
+RECORDS_BUDGET = {"profile": 0, "rules": 0, "working": 0, "people": 0, "records": 900, "knowledge": 0, "evidence": 0,
+                  "views": 0}
+STATE_BUDGET = {"rules": 350, "working": 1200}   # layer 2 (Memory V1 P1.1): every level but L0 without a thread
 UNSURE_PLAN = 0.5               # below this plan confidence, the cheap records lookup is added (calibration 28/10)
 BOARD_TOKENS = 350
 RECENT_EXCHANGES = 3
@@ -75,15 +77,37 @@ def board() -> Block | None:
     return Block("subjects_board", 1, "Sujets en cours (un par ligne) :\n" + r["content"], sources=r.get("views", []))
 
 
+def session_state(plan: ContextPlan, message: str, session_key: str | None) -> Block | None:
+    """Layer 2, SessionState (Memory V1 P1.1): the owner's durable rules in force (always, stable) and the working
+    state of this session's thread — interpreted decisions and constraints of the thread and of its subject in other
+    runtimes, the owner's words not interpreted yet verbatim, the agent's plan. Rebuilt from Memory at each message, so
+    a compression or another runtime loses nothing."""
+    from walter_memory import context
+    source, thread = None, None
+    if session_key and session_key.count("/") >= 2:
+        source, _, thread = session_key.split("/", 2)
+        source = {"claude-code": "claude_code"}.get(source, source)
+    budget = {k: 0 for k in ("profile", "people", "records", "knowledge", "evidence", "views")} | STATE_BUDGET
+    r = context.get_context(message, budget=budget, include_profile=False,
+                            session=(source, thread) if source and thread else None)
+    if not r.get("text"):
+        return None
+    refs = [ref for s in (r.get("trace") or {}).get("sections", {}).values() for ref in (s.get("refs") or [])]
+    return Block("session_state", 2, r["text"], sources=refs[:30])
+
+
 def subject(plan: ContextPlan) -> Block | None:
     depth = SUBJECT_DEPTH.get(plan.level)
     key = plan.thread.id
     if not depth or not key or not key.startswith("subject:"):
         return None
     from walter_memory import views
-    r = views.read({"depth": depth, "key": key, "max_tokens": 900})
+    r = views.read({"depth": depth, "key": "g1:" + key, "max_tokens": 900})     # V1 view, rebuilt from knowledge
+    if "error" in r:
+        r = views.read({"depth": depth, "key": key, "max_tokens": 900})
     if "error" in r:
         return None
+    key = r.get("key") or key
     return Block(f"subject:{r['depth']}", 3, f"Sujet {key} ({r['depth']}) :\n{r['content']}",
                  sources=[{"view": key, "version": r.get("version"), "stale": r.get("stale")}])
 
@@ -139,7 +163,8 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
     """The blocks the plan asks for. L0: capabilities (+ records when unsure or a lookup is needed). Returns (blocks, notes on failed sources)."""
     steps = [("capabilities", lambda: capabilities(plan))]
     if plan.level != "L0":
-        steps += [("board", board), ("subject", lambda: subject(plan)), ("memory", lambda: memory(plan, message)),
+        steps += [("board", board), ("session_state", lambda: session_state(plan, message, session_key)),
+                  ("subject", lambda: subject(plan)), ("memory", lambda: memory(plan, message)),
                   ("recent", lambda: recent(session_key, native_history))]
     if not _gets_memory(plan):
         steps.append(("records", lambda: records(plan, message)))
