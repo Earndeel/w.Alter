@@ -87,7 +87,7 @@ def run(tick_every: float = 60.0, reconcile_every: float = 3600.0, prune_every: 
                         log.info("expire %s", r_exp)
                 r_views = consolidate.tick()
                 if r_views.get("built"):
-                    log.info("views (g1, shadow) %s", r_views)
+                    log.info("views (g1) %s", r_views)
             except Exception:
                 log.exception("consolidated views failed (extraction unaffected)")
             try:   # P1.4-P1.6: flows, episodes and periods (deterministic; plans = capped model calls)
@@ -126,7 +126,7 @@ def run(tick_every: float = 60.0, reconcile_every: float = 3600.0, prune_every: 
             try:
                 shadow = shadow_working()
                 if shadow:
-                    log.info("working-memory shadow: %s threads recorded", shadow)
+                    log.info("working-memory states recorded: %s threads", shadow)
             except Exception:
                 log.exception("working-memory shadow failed (extraction unaffected)")
             if now - last["prune"] >= prune_every:
