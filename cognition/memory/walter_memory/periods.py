@@ -61,14 +61,18 @@ def title_of(kind: str, start: datetime, end: datetime) -> str:
 
 
 def inputs(conn, start: datetime, end: datetime, allowed: list[str]) -> dict:
-    know = conn.execute("""select item_id::text id, kind, content, status, stage, scope, epistemic, valid_to, privacy_class,
-                                  coalesce(valid_from, created_at) at, attributes->>'superseded_by' superseded_by,
-                                  subject_entity_ids
-                           from core.derived_items where generation = 'g1' and derived_by = 'l3.extract'
-                             and kind = any(%s) and coalesce(valid_from, created_at) >= %s
-                             and coalesce(valid_from, created_at) < %s and privacy_class = any(%s)
-                             and status in ('derived', 'verified', 'superseded')
-                           order by at""", (list(TITLES), start, end, allowed)).fetchall()
+    know = conn.execute("""select d.item_id::text id, d.kind, d.content, d.status, d.stage, d.scope, d.epistemic, d.valid_to,
+                                  d.privacy_class, coalesce(d.valid_from, d.created_at) at,
+                                  d.attributes->>'superseded_by' superseded_by, d.subject_entity_ids,
+                                  case when n.privacy_class = any(%s) then n.content end replaced_by,
+                                  coalesce(n.valid_from, n.created_at) replaced_at
+                           from core.derived_items d
+                           left join core.derived_items n on n.item_id::text = d.attributes->>'superseded_by'
+                           where d.generation = 'g1' and d.derived_by = 'l3.extract'
+                             and d.kind = any(%s) and coalesce(d.valid_from, d.created_at) >= %s
+                             and coalesce(d.valid_from, d.created_at) < %s and d.privacy_class = any(%s)
+                             and d.status in ('derived', 'verified', 'superseded')
+                           order by at""", (allowed, list(TITLES), start, end, allowed)).fetchall()
     obs = conn.execute("""select item_id::text id, kind, content, attributes, privacy_class, valid_from at
                           from core.derived_items where generation = 'g1' and status = 'derived'
                             and kind in ('work_session', 'appointment', 'visit', 'conversation')
@@ -138,14 +142,19 @@ def render(kind: str, start: datetime, end: datetime, data: dict, *, local: bool
             top = rank[:4]
             compact_lines.append(f"- {proj or 'Divers'} ({len(items)}) :")
             for k in top:
-                fate = " → remplacé" if k["status"] == "superseded" else ""
+                fate = ""
+                if k["status"] == "superseded":
+                    fate = " → remplacé" + (f" le {k['replaced_at'].astimezone(z):%d/%m} : {_compact(k['replaced_by'], k['superseded_by'] or '')}"
+                                            if k["replaced_by"] else "")
                 compact_lines.append(f"  - {TITLES[k['kind']]} : {_compact(k['content'], k['id'])}{fate}")
             for k in items:
                 if shown >= limit:
                     break
                 fate = ""
                 if k["status"] == "superseded":
-                    fate = " → remplacé depuis" + (f" (par {k['superseded_by'][:8]})" if k["superseded_by"] else "")
+                    fate = " → remplacé depuis" + (f" (le {k['replaced_at'].astimezone(z):%d/%m} : {k['replaced_by']} "
+                                                   f"[{k['superseded_by'][:8]}])" if k["replaced_by"] else
+                                                   f" (par {k['superseded_by'][:8]})" if k["superseded_by"] else "")
                 elif k["valid_to"] and k["valid_to"] <= datetime.now(timezone.utc):
                     fate = " → n'est plus en vigueur"
                 stage = STAGE.get(k["stage"] or "", "")
@@ -239,7 +248,8 @@ def build(kind: str, d: date, *, force: bool = False) -> dict:
             data = inputs(conn, start, end, allowed)
             refs = [k["id"] for k in data["knowledge"]] + [o["id"] for o in data["observations"]] + \
                    [c["id"] for c in data["open_commitments"]]
-            sig = sorted((k["id"], k["status"], str(k["valid_to"]), k["stage"] or "") for k in data["knowledge"])
+            sig = sorted((k["id"], k["status"], str(k["valid_to"]), k["stage"] or "", k["replaced_by"] or "")
+                         for k in data["knowledge"])
             h = hashlib.sha256(json.dumps([sig, sorted(refs), [(e["view_key"], e["title"], e["epistemic"])
                                                               for e in data["episodes"]]], default=str).encode()).hexdigest()[:20]
             last = conn.execute("""select inputs_hash, stale_since from views.version where view_key = %s and depth = 'overview'

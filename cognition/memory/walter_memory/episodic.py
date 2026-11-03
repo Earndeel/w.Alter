@@ -37,8 +37,9 @@ MIN_OUTING = timedelta(minutes=20)
 TIME_HINT = re.compile(r"(?i)(\b\d{1,2}\s?[h:]\s?\d{0,2}\b|\b\d{1,2}\s?(am|pm)\b|demain|ce soir|ce midi|ce matin|"
                        r"samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|tomorrow|tonight|weekend|week-end|"
                        r"rdv|rendez-vous|on se voit|see you|meet|พรุ่งนี้|คืนนี้|โมง|นัด)")
-PLAN_PROMPT = """Conversation de Monsieur (messages numérotés, horodatés, fuseau {tz}). Les noms de personnes ont été
-remplacés par des pseudonymes : garde-les tels quels.
+PLAN_PROMPT = """Conversation de Monsieur (messages numérotés, horodatés avec l'année, fuseau {tz}). Les noms de
+personnes ont été remplacés par des pseudonymes : garde-les tels quels. Les dates relatives (« samedi », « demain »,
+« ce soir ») se calculent à partir de la date du message qui les contient.
 
 {messages}
 
@@ -48,6 +49,7 @@ livraisons, pas les rappels génériques). Réponds en JSON :
 "end": "… ou null", "where": "lieu tel qu'écrit ou null", "with": ["pseudonymes"],
 "agreed": "yes | no | unclear (Monsieur a-t-il accepté ?)", "msgs": [numéros], "quote": "extrait exact 3-20 mots"}}]}}
 Liste vide s'il n'y a aucun projet daté."""
+ATTEST_SIM = 0.3
 STATUS_RANK = {"candidate": 0, "probable": 1, "confirmed": 2, "rejected": -1}
 FACET_WORD = {"candidate": "à confirmer", "probable": "probable", "confirmed": "confirmé", "rejected": "démenti"}
 
@@ -96,7 +98,7 @@ def plans(since: datetime | None = None, *, chat=None, limit: int | None = None)
             continue
         out["bursts"] += 1
         names = sorted({m["who"] for m in msgs if m["who"]})
-        lines = "\n".join(f"{k}. [{m['occurred_at'].astimezone(z):%a %d/%m %H:%M}] "
+        lines = "\n".join(f"{k}. [{_day(m['occurred_at'].astimezone(z))} {m['occurred_at'].astimezone(z):%d/%m/%Y %H:%M}] "
                           f"{'Monsieur' if m['event_type'] in ('message.sent', 'email.sent') else (m['who'] or 'Contact')} : "
                           f"{(m['content'] or '')[:600]}" for k, m in enumerate(msgs, 1))
         try:
@@ -118,6 +120,31 @@ def plans(since: datetime | None = None, *, chat=None, limit: int | None = None)
     return out
 
 
+DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+
+
+def _day(t: datetime) -> str:
+    return DAYS[t.weekday()]
+
+
+def resolve_when(text: str, said_at: datetime) -> datetime | None:
+    """A relative day and hour in a plan ('samedi soir… 22h', 'demain 19h30') from the message's own date, when the
+    model left it open. None when there is no explicit hour."""
+    low = (text or "").lower()
+    h = re.search(r"\b(\d{1,2})\s?(?:h|:)\s?(\d{2})?\b", low)
+    if not h or int(h.group(1)) > 23:
+        return None
+    base = said_at.date()
+    if "après-demain" in low or "apres-demain" in low:
+        d = base + timedelta(days=2)
+    elif "demain" in low:
+        d = base + timedelta(days=1)
+    else:
+        wd = next((k for k, n in enumerate(DAYS) if n in low), None)
+        d = base + timedelta(days=(wd - base.weekday()) % 7) if wd is not None else base
+    return datetime.combine(d, datetime.min.time(), said_at.tzinfo).replace(hour=int(h.group(1)), minute=int(h.group(2) or 0))
+
+
 def _mark(item_id: str, how: str) -> None:
     with connection() as conn:
         conn.execute("update core.derived_items set attributes = attributes || jsonb_build_object('plans_checked', %s::text) "
@@ -130,6 +157,12 @@ def _store_plan(burst: dict, msgs: list[dict], p: dict, k: int, z) -> bool:
         start = datetime.fromisoformat(str(p.get("start"))[:16]).replace(tzinfo=z) if p.get("start") else None
     except ValueError:
         start = None
+    if start is None:   # the model left the date open: resolve it from the cited messages' own dates, if explicit
+        cited0 = [msgs[i - 1] for i in p.get("msgs") or [] if isinstance(i, int) and 1 <= i <= len(msgs)] or msgs
+        for m in cited0:
+            start = resolve_when(m["content"] or "", m["occurred_at"].astimezone(z))
+            if start:
+                break
     if not start or not p.get("what"):
         return False
     try:
@@ -227,13 +260,16 @@ def facets(g: list[dict], attest: dict | None = None) -> dict:
     if attest:
         occurred = "confirmed" if attest["verdict"] == "confirms" else "rejected" if attest["verdict"] == "contradicts" else occurred
     out["a eu lieu"] = occurred
+    said = (attest or {}).get("text", "").lower() if attest and attest["verdict"] == "confirms" else ""
     with_ = {n for s in planned for n in (s["attributes"] or {}).get("with") or []}
-    if with_:
-        out["avec " + ", ".join(sorted(with_))] = "confirmed" if attest and attest["verdict"] == "confirms" and \
-            attest.get("with_confirmed") else ("probable" if occurred in ("probable", "confirmed") else "candidate")
+    if with_:   # a participant is confirmed only when the owner names them himself
+        out["avec " + ", ".join(sorted(with_))] = "confirmed" if said and all(n.lower() in said for n in with_) \
+            else ("probable" if occurred in ("probable", "confirmed") else "candidate")
     places = {(s["attributes"] or {}).get("where") or (s["attributes"] or {}).get("location") for s in planned} - {None, ""}
     if places:
-        out["lieu : " + sorted(places)[0]] = "probable" if "visit" in kinds else "candidate"
+        place = sorted(places)[0]
+        out["lieu : " + place] = "confirmed" if said and place.lower().split(",")[0] in said else \
+            ("probable" if "visit" in kinds else "candidate")
     return out
 
 
@@ -273,7 +309,7 @@ def _attestation(conn, g: list[dict], text: str) -> dict | None:
                            order by c.embedding <=> %s::vector limit 3""",
                         (vec(embed([text])[0]), start - timedelta(hours=6), end + timedelta(days=3),
                          vec(embed([text])[0]))).fetchall()
-    rows = [r for r in rows if (r["sim"] or 0) >= 0.45]
+    rows = [r for r in rows if (r["sim"] or 0) >= ATTEST_SIM]        # shortlist only: the decision model judges
     if not rows:
         return None
     from . import llm
