@@ -90,6 +90,27 @@ def run(tick_every: float = 60.0, reconcile_every: float = 3600.0, prune_every: 
                     log.info("views (g1, shadow) %s", r_views)
             except Exception:
                 log.exception("consolidated views failed (extraction unaffected)")
+            try:   # P1.4-P1.6: flows, episodes and periods (deterministic; plans = capped model calls)
+                from . import organic
+                ep = organic.settings().get("episodes", {})
+                if ep.get("mode", "active") != "off" and now - last.get("flows", 0.0) >= float(ep.get("every_s", 600)):
+                    from . import episodic, flows, periods
+                    r_f = flows.tick()
+                    r_p = episodic.plans() if now - last.get("plans", 0.0) >= float(ep.get("plans_every_s", 1800)) else None
+                    if r_p is not None:
+                        last["plans"] = now
+                    r_e = episodic.build()
+                    r_t = periods.tick()
+                    last["flows"] = now
+                    log.info("flows %s plans %s episodes %s periods %s", {k: v for k, v in r_f.items()}, r_p, r_e, r_t)
+                elif ep.get("mode", "active") != "off":
+                    from . import periods
+                    with __import__("walter_memory.db", fromlist=["connection"]).connection() as conn:
+                        stale = periods.stale_keys(conn)
+                    if stale:     # a correction: rebuild only the touched periods, without waiting for the cycle
+                        log.info("periods (stale) %s", periods.tick(days=0))
+            except Exception:
+                log.exception("flows / episodes / periods failed (extraction unaffected)")
             try:
                 shadow = shadow_working()
                 if shadow:
