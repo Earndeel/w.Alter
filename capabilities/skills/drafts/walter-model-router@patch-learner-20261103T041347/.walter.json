@@ -1,0 +1,11 @@
+{
+ "base_sha": "0f0b9d1fa1a6d6b9dd3f1fc99dde49df654d8ccec0e2a81e9c59679df4b48b36",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-03T04:13:47.660342+00:00",
+ "domain": "models",
+ "kind": "patch",
+ "reason": "Ajoute la maintenance d'une voie d'abonnement désormais installée, sans créer un doublon du skill routeur. La session fournit une commande de catalogue authentifié, le HOME dédié, un appel gateway réellement réussi et plusieurs pièges constatés : sous-commande `exact` incorrecte, identifiants différents entre couches, dépendances de test réparties entre environnements et documentation générée devenue obsolète. La demande finale de Monsieur rend récurrente la vérification de futurs modèles ; elle exige de distinguer découverte, validation et sélection par les tâches. [session claude_code/vm/454e67e2-61d1-424e-9a83-8b7276e72c16]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/454e67e2-61d1-424e-9a83-8b7276e72c16",
+ "target": "walter-model-router"
+}
