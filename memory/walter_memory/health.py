@@ -50,6 +50,20 @@ def check() -> tuple[list[str], dict]:
         failed = next((r["segments"] for r in st["segments"] if r["status"] == "failed"), 0)
         if failed:
             problems.append(f"extraction: {failed} segments failed in 24 h (walter-memory extract2 replay)")
+        # event-driven assimilation (memory.organic, 2026-11-03): delivery, overdue keys, failing processors
+        from . import assimilation, processing
+        if assimilation.engine() == "events":
+            lo = bus.lag(assimilation.CONSUMER, assimilation.TYPES)
+            m["bus:memory.organic"] = lo
+            if lo["oldest_s"] > 900:
+                problems.append(f"memory assimilation {lo['oldest_s'] // 60} min behind on the bus ({lo['pending']} events)")
+            for b in processing.backlog():
+                if (b["oldest_due_s"] or 0) > 3600:
+                    problems.append(f"assimilation {b['processor']}: {b['due']} keys overdue for {b['oldest_due_s'] // 60} min")
+                if b["failing"]:
+                    problems.append(f"assimilation {b['processor']}: {b['failing']} keys failing (walter-memory assimilation status)")
+            m["assimilation_24h"] = {r["processor"]: {k: int(v or 0) for k, v in r.items() if k != "processor"}
+                                     for r in processing.summary(24)}
     except Exception as e:
         problems.append(f"memory pipeline health unreadable: {type(e).__name__}")
     for b in ("recurring", "backfill"):

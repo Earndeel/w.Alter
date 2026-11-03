@@ -289,6 +289,10 @@ def invalidate(*, item_ids: list[str] | None = None, threads: list[tuple[str, st
             conn.execute("""update views.version v set stale_since = coalesce(stale_since, now())
                             where v.view_key = any(%s) and v.version = (select max(version) from views.version x
                                   where x.view_key = v.view_key and x.depth = v.depth)""", (list(keys),))
+            from . import periods    # a stale period is due for its rebuild (event-driven, 2026-11-03)
+            for k in keys:
+                if k.startswith("period:"):
+                    periods.mark_key(conn, k, reason="invalidated")
     return len(keys)
 
 
@@ -387,12 +391,21 @@ def reconsolidate(subject: str, *, chat=None, apply: bool | None = None) -> dict
     text = "\n".join(f"{k} | {i['kind']} | {i['stage'] or '-'} | {i['scope'] or '-'} | {i['epistemic'] or '-'} | "
                      f"{(i['valid_from'] or i['created_at']):%d/%m %H:%M} | {i['content']}" for k, i in short.items())
     poste = organic.settings().get("consolidation", {}).get("poste", "general/L3")   # a Router tier, never a model
-    res = chat([{"role": "user", "content": RECON_PROMPT.format(items=text)}], poste=poste,
-               processor="consolidate.reconsolidate", processor_version="1", privacy_class="cloud_allowed",
-               budget="recurring", purpose=f"reconsolidate {subject}", response_format={"type": "json_object"},
-               max_tokens=3000, timeout=300)
-    c = res["content"] or "{}"
-    data = json.loads(c[c.find("{"):c.rfind("}") + 1] or "{}")
+    prompt = RECON_PROMPT.format(items=text)
+
+    def call():
+        res = chat([{"role": "user", "content": prompt}], poste=poste,
+                   processor="consolidate.reconsolidate", processor_version="1", privacy_class="cloud_allowed",
+                   budget="recurring", purpose=f"reconsolidate {subject}", response_format={"type": "json_object"},
+                   max_tokens=3000, timeout=300)
+        c = res["content"] or "{}"
+        return (json.loads(c[c.find("{"):c.rfind("}") + 1] or "{}"), res.get("model")), res.get("model")
+
+    from . import processing   # the same current items were already reviewed: nothing new to propose (2026-11-03)
+    (data, model), reused = processing.decide_once("consolidate.reconsolidate", "1", {"prompt": prompt, "poste": poste}, call,
+                                          privacy_class="cloud_allowed", refs=[i["id"] for i in items],
+                                          input_key=subject)
+    # reused: the same current items were reviewed before — their answer is applied again (idempotent), no model call
     when = lambda i: i["valid_from"] or i["created_at"]
     ok = {"merge": [], "supersede": [], "expire": []}
     for group in data.get("merge") or []:
@@ -413,7 +426,7 @@ def reconsolidate(subject: str, *, chat=None, apply: bool | None = None) -> dict
     with connection() as conn:
         conn.execute("insert into views.ledger (view_key, action, detail) values (%s, %s, %s)",
                      (key_for(subject), "reconsolidate.applied" if apply else "reconsolidate.proposed",
-                      json.dumps({**ok, "withheld": held, "items": len(items), "model": res.get("model")})))
+                      json.dumps({**ok, "withheld": held, "items": len(items), "model": model})))
         if apply:
             for group in ok["merge"]:
                 keep = group[-1]

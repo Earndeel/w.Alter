@@ -260,16 +260,25 @@ def build(kind: str, d: date, *, force: bool = False) -> dict:
             data = inputs(conn, start, end, allowed)
             refs = [k["id"] for k in data["knowledge"]] + [o["id"] for o in data["observations"]] + \
                    [c["id"] for c in data["open_commitments"]]
-            sig = sorted((k["id"], k["status"], str(k["valid_to"]), k["stage"] or "", k["replaced_by"] or "")
-                         for k in data["knowledge"])
-            h = hashlib.sha256(json.dumps([sig, sorted(refs), [(e["view_key"], e["title"], e["epistemic"])
-                                                              for e in data["episodes"]]], default=str).encode()).hexdigest()[:20]
+            # every input, content included (an observation whose text changed must change the hash)
+            h = hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()[:20]
             last = conn.execute("""select inputs_hash, stale_since from views.version where view_key = %s and depth = 'overview'
                                    order by version desc limit 1""", (vkey,)).fetchone()
             if last and last["inputs_hash"] == h and not last["stale_since"] and not force:
                 out[variant] = {"key": vkey, "rebuilt": False}
                 continue
             texts = render(kind, start, end, data, local=variant == "local" or privacy.cloud_readable("local_only"))
+            if last and not force:
+                # stale or new inputs, same text: no new version (2026-11-03) — the latest one is current again
+                prev = {r["depth"]: r["content"] for r in conn.execute(
+                    """select distinct on (depth) depth, content from views.version where view_key = %s
+                       order by depth, version desc""", (vkey,))}
+                if prev == texts:
+                    conn.execute("""update views.version v set inputs_hash = %s, stale_since = null
+                                    where v.view_key = %s and v.version = (select max(version) from views.version x
+                                          where x.view_key = v.view_key and x.depth = v.depth)""", (h, vkey))
+                    out[variant] = {"key": vkey, "rebuilt": False, "same_text": True}
+                    continue
             conn.execute("""insert into views.view (view_key, domain, horizon, title, status, generation, kind, starts_at, ends_at,
                                 tz, attributes, privacy_class, first_at, last_at)
                             values (%s, 'activities', %s, %s, 'active', 'g1', 'period', %s, %s, %s, %s, 'cloud_allowed', %s, %s)
@@ -308,6 +317,9 @@ def build(kind: str, d: date, *, force: bool = False) -> dict:
             set_embedding(conn, vkey, texts["index"] + "\n" + texts["overview"][:1500])
             conn.execute("insert into views.ledger (view_key, action, detail) values (%s, 'rebuilt', %s)",
                          (vkey, json.dumps({"builder": BUILDER, "refs": len(refs), "privacy_class": vclass})))
+            from . import bus
+            bus.emit("memory.view", "memory", vkey, {"kind": "period", "period": kind, "starts_at": start,
+                                                     "ends_at": end, "privacy_class": vclass}, conn=conn)
             out[variant] = {"key": vkey, "rebuilt": True, "refs": len(refs), "privacy_class": vclass,
                             "tokens": len(texts["overview"]) // 4}
     return out
@@ -328,6 +340,34 @@ def _parse(key: str) -> tuple[str, date]:
         y, w = label.split("-W")
         return kind, date.fromisocalendar(int(y), int(w), 1)
     return kind, date.fromisoformat(label + "-01")
+
+
+PROCESSORS = {"day": "periods.day", "week": "periods.week", "month": "periods.month"}
+SETTLE_S = 20.0
+
+
+def window_key(kind: str, d: date) -> str:
+    """Queue key of a period: the first local day of its window (one key per period, whatever day touched it)."""
+    return window(kind, d)[0].date().isoformat()
+
+
+def mark(conn, d: date, *, reason: str = "") -> None:
+    """Something dated `d` (local day) changed: its day, week and month are due, after a short settle (a burst of
+    changes → one rebuild each)."""
+    from . import processing
+    for kind, proc in PROCESSORS.items():
+        processing.mark(conn, proc, window_key(kind, d), reason=reason, settle=SETTLE_S)
+
+
+def mark_key(conn, view_key: str, *, reason: str = "") -> None:
+    from . import processing
+    kind, d = _parse(view_key.removesuffix(":local"))
+    processing.mark(conn, PROCESSORS[kind], window_key(kind, d), reason=reason, settle=SETTLE_S)
+
+
+def build_key(kind: str, key: str) -> dict:
+    """Event-driven: one period (both projections), rebuilt only if its text changes."""
+    return build(kind, date.fromisoformat(key))
 
 
 def tick(days: int = 2) -> dict:

@@ -20,7 +20,7 @@ def main() -> None:
     a = ap.parse_args()
     ingestion.register_connector(triage.CONNECTOR, "beeper", "pull",
                                  "Triage of new incoming events (Beeper, Gmail, Calendar) by Clef + Monsieur rules",
-                                 timedelta(minutes=15))
+                                 timedelta(hours=2))   # event-driven since 2026-11-03: this run = hourly reconciliation
     try:
         out = triage.run(a.limit, a.dry)
         if not a.dry:

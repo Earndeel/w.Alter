@@ -4,6 +4,9 @@ core.events ──trigger, same transaction──▶ bus.events (memory.event) �
   memory.extract   marks runtime threads dirty (extract2.on_bus_events); every minute the worker extracts the
                    segments that are due (extract2.tick); every hour a reconciliation sweep re-finds anything
                    uncovered (extract2.reconcile); once a day old bus rows are pruned.
+  memory.organic   (assimilation.py, a thread) memory.event / memory.derived / memory.view → only the flows, plans,
+                   episodes and periods each event touches (processing.queue), model decisions reused while their
+                   inputs are unchanged (processing.decisions); reconciliation every 6 h.
 The search index keeps its 2-minute timer for now (its cursor re-reads a 3-day overlap, so late commits are safe).
 A failure in a consumer never touches the canonical event: it is retried, then kept as a dead letter.
 Run: `walter-memory pipeline` (systemd: walter-memory-pipeline.service).
@@ -91,10 +94,13 @@ def run(tick_every: float = 60.0, reconcile_every: float = 3600.0, prune_every: 
                     log.info("views (g1) %s", r_views)
             except Exception:
                 log.exception("consolidated views failed (extraction unaffected)")
-            try:   # P1.4-P1.6: flows, episodes and periods (deterministic; plans = capped model calls)
-                from . import organic
+            try:   # P1.4-P1.6: flows, plans, episodes and periods
+                # engine "events" (2026-11-03): the memory.organic consumer (assimilation.py, a thread of this service)
+                # recomputes only what each event touches; "timer" = the former 10-minute window rebuild, kept as a
+                # switch (now harmless: unchanged rows are not rewritten and model decisions are reused)
+                from . import assimilation, organic
                 ep = organic.settings().get("episodes", {})
-                if ep.get("mode", "active") != "off" and now - last.get("flows", 0.0) >= float(ep.get("every_s", 600)):
+                if assimilation.engine() == "timer" and now - last.get("flows", 0.0) >= float(ep.get("every_s", 600)):
                     from . import episodic, flows, periods
                     r_f = flows.tick()
                     r_p = episodic.plans() if now - last.get("plans", 0.0) >= float(ep.get("plans_every_s", 1800)) else None
@@ -104,12 +110,6 @@ def run(tick_every: float = 60.0, reconcile_every: float = 3600.0, prune_every: 
                     r_t = periods.tick()
                     last["flows"] = now
                     log.info("flows %s plans %s episodes %s periods %s", {k: v for k, v in r_f.items()}, r_p, r_e, r_t)
-                elif ep.get("mode", "active") != "off":
-                    from . import periods
-                    with __import__("walter_memory.db", fromlist=["connection"]).connection() as conn:
-                        stale = periods.stale_keys(conn)
-                    if stale:     # a correction: rebuild only the touched periods, without waiting for the cycle
-                        log.info("periods (stale) %s", periods.tick(days=0))
             except Exception:
                 log.exception("flows / episodes / periods failed (extraction unaffected)")
             try:   # Kardex enrichment from the owner's conversations (pseudonymised, capped), once a day
@@ -136,11 +136,18 @@ def run(tick_every: float = 60.0, reconcile_every: float = 3600.0, prune_every: 
         except Exception:
             log.exception("pipeline idle step failed (retried next minute)")
 
+    import threading
+    from . import assimilation
+    threading.Thread(target=assimilation.run, name="memory.organic", daemon=True).start()
     bus.Consumer(CONSUMER, TYPES, batch=500, settle=2.0).run(extract2.on_bus_events, idle=idle,
                                                             idle_every=tick_every, batch=True)
 
 
 def health() -> dict:
+    from . import assimilation, processing
     lag = bus.lag(CONSUMER, TYPES)
     st = extract2.stats(24)
-    return {"bus": lag, "extraction": st}
+    return {"bus": lag, "extraction": st, "organic": {"engine": assimilation.engine(),
+                                                      "bus": bus.lag(assimilation.CONSUMER, assimilation.TYPES),
+                                                      "backlog": processing.backlog(),
+                                                      "last_24h": processing.summary(24)}}
