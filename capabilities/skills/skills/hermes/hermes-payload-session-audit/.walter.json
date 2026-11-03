@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-11-03T04:16:52.586254+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "hermes-payload-architecture",
+  "hermes-session-db"
+ ]
+}
