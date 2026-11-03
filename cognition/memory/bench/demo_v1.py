@@ -124,7 +124,39 @@ def case_kardex() -> dict:
             "local_report": report, "checks": checks, "pass": all(checks.values())}
 
 
-CASES = {"decision": case_decision, "context": case_context, "kardex": case_kardex}
+def case_everything() -> dict:
+    """« Oui tout » (2026-11-03): the cloud model really uses messaging and GPS knowledge. DSH (cloud model, no tools)
+    is asked about the most active contact and about yesterday evening's whereabouts; checks compare its answers with
+    what Memory holds (claims, place names) — contents go to the local report only."""
+    from walter_memory import kardex_enrich, social
+    from walter_memory.flows import tz
+    from datetime import timedelta
+    eid = kardex_enrich.top_contacts(1)[0]
+    card = social.person_card(eid, "cloud_allowed")
+    name = card["entity"]["canonical_name"]
+    claims = [c["claim"] for c in (card.get("kardex") or {}).get("claims") or []]
+    words = {w.lower().strip(".,;:!?«»()") for c in claims for w in c.split() if len(w) >= 6} - {name.lower()}
+    q1 = f"Sans utiliser aucun outil, réponds en trois phrases : que sais-tu de {name} et de nos derniers échanges ?"
+    on1, off1 = e2e.ask_dsh(q1, production=True), e2e.ask_dsh(q1, memory=False, production=True)
+    z = tz()
+    with connection() as conn:
+        places = [r["canonical_name"] for r in conn.execute(
+            "select canonical_name from core.entities where entity_type = 'place' and status = 'active'")]
+    q2 = "Sans utiliser aucun outil, réponds en une phrase : où étais-je ces derniers jours, d'après mes positions GPS ?"
+    on2 = e2e.ask_dsh(q2, production=True)
+    hits1 = sorted(w for w in words if w in (on1["answer"] or "").lower())
+    hit2 = [p for p in places if p and p.lower() in (on2["answer"] or "").lower()]
+    checks = {"contact_knowledge_used": len(hits1) >= 2, "control_does_not_know": len(
+                  [w for w in words if w in (off1["answer"] or "").lower()]) < len(hits1),
+              "gps_places_used": bool(hit2)}
+    report = {"contact": name, "answer_contact": on1, "control": off1, "answer_places": on2, "claim_words_hit": hits1,
+              "places_hit": hit2}
+    return {"case": "everything", "counts": {"claim_words_hit": len(hits1), "places_hit": len(hit2),
+                                             "answer_chars": [len(on1["answer"] or ""), len(on2["answer"] or "")]},
+            "local_report": report, "checks": checks, "pass": all(checks.values())}
+
+
+CASES = {"decision": case_decision, "context": case_context, "kardex": case_kardex, "everything": case_everything}
 
 
 def main() -> None:
@@ -140,7 +172,7 @@ def main() -> None:
         p.chmod(0o600)
     for r in results:
         print(r["case"], "PASS" if r["pass"] else "FAIL", json.dumps(r["checks"]), json.dumps(r.get("counts", {})))
-        if r["case"] != "kardex":
+        if r["case"] not in ("kardex", "everything"):
             for k in ("with_memory", "control_without_memory"):
                 if k in r:
                     print(f"  {k}: {r[k]['answer']!r} ({r[k]['seconds']} s)")

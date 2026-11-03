@@ -192,8 +192,9 @@ def related_views(query: str, *, max_privacy: str = "cloud_allowed", limit: int 
             from views.view v join lateral (select content, stale_since from views.version where view_key = v.view_key
                                             and depth = 'index' order by version desc limit 1) x on true
             where v.generation = 'g1' and v.status = 'active' and v.privacy_class = any(%s) and v.embedding is not null
-              and (v.view_key not like '%%:local' or %s)        -- a cloud reader gets the cloud projection, once
-            order by v.embedding <=> %s::vector limit %s""", (qv, allowed, max_privacy == "local_only", qv, limit * 3)).fetchall()
+              and case when %s then not exists (select 1 from views.view t where t.view_key = v.view_key || ':local')
+                       else v.view_key not like '%%:local' end      -- each view once: its most complete readable projection
+            order by v.embedding <=> %s::vector limit %s""", (qv, allowed, "local_only" in allowed, qv, limit * 3)).fetchall()
     out = []
     for r in rows:
         if r["sim"] is None or r["sim"] < min_sim:

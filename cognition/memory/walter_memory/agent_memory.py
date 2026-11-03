@@ -64,7 +64,7 @@ def recall(query: str, budget: str = 'mid', max_tokens: int = 2048, *, caller: s
     count, cap = BUDGETS.get(budget, BUDGETS['mid'])
     cap = max(128, min(int(max_tokens), cap, 8192))
     cls = _classify(query, caller=caller)
-    if cls == 'local_only':
+    if not privacy.model_may_receive(cls):
         return {'status': 'refused_privacy', 'backend': 'walter-memory', 'privacy_class': cls,
                 'text': 'This query is local_only; use a local authorized memory client.'}
     # Candidates: local potion embeddings + SQL. Ordering: Walter Router's rerank poste, like the context engine —
@@ -139,7 +139,7 @@ def retain(content: str, context: str = '', tags: list[str] | None = None, *, ca
 
 def reflect(question: str, budget: str = 'mid', *, caller: str = 'walter') -> dict:
     cls = _classify(question, caller=caller)
-    if cls == 'local_only':
+    if not privacy.model_may_receive(cls):
         return {'status': 'refused_privacy', 'backend': 'walter-memory', 'privacy_class': cls,
                 'text': 'This question is local_only; cloud reflection is unavailable.'}
     # Never restore private identifiers into a result returned to a cloud caller.

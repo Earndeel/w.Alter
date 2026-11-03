@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 
+from . import privacy
 from .db import connect
 
 PROMPT = ("Tu écris l'épisode d'une exécution de W.Alter, en français, 3 à 6 phrases factuelles, à partir du seul JSON "
@@ -45,11 +46,11 @@ def _material(conn, run_id: str) -> dict | None:
                                order by started_at""", (run_id,)).fetchall()
     answer = None
     sid = (run["origin"] or {}).get("session_id")
-    if sid and run["privacy_class"] != "local_only":
+    if sid and privacy.cloud_readable(run["privacy_class"]):
         row = conn.execute("""select text from walter_logs.events where session_id = %s and type = 'assistant/message'
                               and occurred_at >= %s and occurred_at <= coalesce(%s, now()) + interval '2 minutes'
-                              and privacy_class = 'cloud_allowed' order by seq desc limit 1""",
-                           (sid, run["started_at"], run["ended_at"])).fetchone()
+                              and privacy_class = any(%s) order by seq desc limit 1""",
+                           (sid, run["started_at"], run["ended_at"], privacy.allowed_classes("cloud_allowed"))).fetchone()
         answer = (row["text"] or "")[:2500] if row else None
     return {"run": run, "tasks": tasks, "calls": calls, "observations": obs, "reused": reused, "children": children,
             "answer": answer}
@@ -114,7 +115,7 @@ def build(run_id: str, *, reason: str = "run_ended", summarise: bool = True) -> 
         version = conn.execute("select coalesce(max(version), 0) + 1 v from runs.episodes where run_id = %s",
                                (run_id,)).fetchone()["v"]
     summary = model = None
-    if summarise and m["run"]["privacy_class"] != "local_only":
+    if summarise and privacy.cloud_readable(m["run"]["privacy_class"]):
         from . import llm
         try:
             r = llm.chat([{"role": "system", "content": PROMPT},

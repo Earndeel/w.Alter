@@ -649,8 +649,11 @@ def _show(text: str | None, cls: str, max_privacy: str, limit: int | None = None
 
 
 def _cloud_view(max_privacy: str) -> list[str]:
-    """A cloud agent may see cloud_allowed as is and redacted_cloud pseudonymised."""
-    return ["cloud_allowed", "redacted_cloud"] if max_privacy == "cloud_allowed" else _visible(max_privacy)
+    """A cloud agent sees what the cloud ceiling allows (privacy.cloud_ceiling: at least redacted_cloud, which is
+    pseudonymised when [privacy] pseudonymise is on)."""
+    if max_privacy == "cloud_allowed":
+        return sorted({"cloud_allowed", "redacted_cloud", *privacy.allowed_classes("cloud_allowed")}, key=privacy.ORDER.index)
+    return _visible(max_privacy)
 
 
 def resolve_session(conn, ref: str) -> str | None:
@@ -767,7 +770,8 @@ def sessions(conn, *, runtime: str | None = None, text: str | None = None, since
              limit: int = 20, max_privacy: str = "local_only") -> list[dict]:
     where, args = ["true"], []
     if max_privacy == "cloud_allowed":
-        where.append("privacy_class <> 'local_only'")
+        if not privacy.cloud_readable("local_only"):
+            where.append("privacy_class <> 'local_only'")
     if runtime:
         where.append("runtime = %s"); args.append(runtime)
     if text:

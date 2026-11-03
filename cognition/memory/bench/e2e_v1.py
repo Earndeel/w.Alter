@@ -278,10 +278,13 @@ def case_episode() -> dict:
         after = ask_dsh(q)
     out |= {"local_before": loc1, "cloud_before": cl1, "local_after": loc2, "cloud_after": cl2,
             "injected_before": ctx1["text"], "injected_after": ctx2["text"], "dsh_before": before, "dsh_after": after}
+    from walter_memory import privacy
+    full = privacy.cloud_readable("local_only")   # « oui tout » (2026-11-03): the cloud model sees the GPS presence too
     checks = {"one_episode_local_probable": bool(loc1) and loc1["epistemic"] == "probable" and loc1["privacy_class"] == "local_only",
-              "cloud_projection_planned_only": bool(cl1) and cl1["epistemic"] == "candidate" and cl1["privacy_class"] == "cloud_allowed",
+              "cloud_projection_matches_policy": bool(cl1) and (cl1["epistemic"] == "probable" if full else
+                                                               cl1["epistemic"] == "candidate" and cl1["privacy_class"] == "cloud_allowed"),
               "never_confirmed_without_owner": all(v and v["epistemic"] != "confirmed" for v in (loc1, cl1)),
-              "confirmed_after_owner_words": bool(cl2) and cl2["epistemic"] == "confirmed",
+              "confirmed_after_owner_words": bool(cl2) and cl2["epistemic"] == "confirmed" and loc2["epistemic"] == "confirmed",
               "model_hedged_before": not has(before["answer"], "oui, vous") and has(before["answer"], "pas", "non", "prévu",
                                                                                    "confirm", "sûr", "certain"),
               "model_sure_after": has(after["answer"], "oui", "avez vu", "êtes allé", "confirm")}

@@ -266,13 +266,14 @@ def person_card(entity_id: str, max_privacy: str = "local_only", audience: str |
     rules; unconfirmed claims are marked; phones are masked and the current location withheld outside owner_local."""
     from . import privacy, read_policy
     audience = audience or read_policy.audience_for(max_privacy)
+    shown_as = "owner_local" if audience == "cloud_model" and read_policy._reasoning_full() else audience
     allowed = privacy.allowed_classes("local_only" if audience == "owner_local" else "cloud_allowed")
     with connection() as conn:
         en = conn.execute("select * from core.entities where entity_id = %s", (entity_id,)).fetchone()
         accounts = conn.execute("""select si.source, si.account, si.display_name, si.handles, si.phones, l.method
                                    from core.identity_links l join core.source_identities si on si.identity_id = l.identity_id
                                    where l.entity_id = %s and l.status = 'confirmed'""", (entity_id,)).fetchall()
-        if audience != "owner_local":
+        if shown_as != "owner_local":
             accounts = [{**a, "phones": [read_policy.mask_phone(p) for p in (a["phones"] or [])]} for a in accounts]
         metrics = {r["window_name"]: {k: r[k] for k in ("messages", "from_me", "from_them", "msgs_per_day", "initiation_ratio_me",
                                                          "median_reply_me_s", "median_reply_them_s", "avg_len_me", "avg_len_them",
@@ -283,7 +284,7 @@ def person_card(entity_id: str, max_privacy: str = "local_only", audience: str |
                                   (entity_id,)).fetchall()
         kardex = {}
         if en["kardex_contact_id"] is not None:
-            fields = read_policy.CONTACT_FIELDS[audience]
+            fields = read_policy.CONTACT_FIELDS[shown_as]
             c = conn.execute(f"select {', '.join(fields)} from kardex.contacts where id = %s",
                              (en["kardex_contact_id"],)).fetchone()
             kardex = {"contact": c, "claims": read_policy.kardex_claims(conn, en["kardex_contact_id"], audience)}

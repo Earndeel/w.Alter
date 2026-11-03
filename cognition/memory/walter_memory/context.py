@@ -20,12 +20,12 @@ import re
 import time
 from pathlib import Path
 
-from . import search, social
+from . import privacy, search, social
 from .db import connection
 
 USER_MD = Path("/root/.hermes/memories/USER.md")
 DEFAULT_BUDGET = {"profile": 600, "rules": 300, "working": 700, "people": 400, "records": 700, "knowledge": 900,
-                  "evidence": 500, "views": 200}
+                  "evidence": 500, "views": 200, "periods": 700}
 RECORD_CHARS = 1200
 EVIDENCE_HINT = re.compile(r"(?i)\b(quand|when|qui a dit|who said|m'a dit|told me|a écrit|wrote|message|mail|e-?mail|"
                            r"conversation|discut|parl[ée]|dernière fois|last time|hier|yesterday|semaine dernière|last week|"
@@ -34,6 +34,11 @@ EVIDENCE_HINT = re.compile(r"(?i)\b(quand|when|qui a dit|who said|m'a dit|told m
 # pulled unrelated records ahead of the right one (2026-10-28). Only the search query drops it, never the message.
 FORM_PREAMBLE = re.compile(r"(?is)^\s*[^:?\n]{0,120}\b(r[ée]ponds?|r[ée]pondre|answer|dis[- ]moi|explique|sans utiliser|"
                            r"without using|en une phrase|in one sentence|bri[eè]vement|briefly)\b[^:?\n]{0,120}:\s*(?=\S)")
+# A message about a moment or a whereabouts: the synthesis of that period (P1.6) enters the context directly.
+PERIOD_HINT = re.compile(r"(?i)\b(hier|avant-hier|aujourd'hui|ce (matin|midi|soir)|cette nuit|cette semaine|la semaine (derni[eè]re|"
+                         r"pass[ée]e)|ces derniers jours|ce week-?end|ce mois|le mois dernier|o[uù] (é|e)tais-je|o[uù] suis-je "
+                         r"all[ée]|positions?|gps|qu'ai-je fait|qu'est-ce que j'ai fait|ma journ[ée]e|ma semaine|yesterday|"
+                         r"today|this week|last week|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b")
 _names_cache: tuple[float, list[tuple[str, str]]] | None = None
 
 
@@ -98,10 +103,50 @@ def _card_lines(entity_id: str) -> list[str]:
     k = c["kardex"].get("contact") or {}
     if k:
         lines.append("  " + ", ".join(f"{x}: {k[x]}" for x in ("relationship_type", "occupation", "location_current") if k.get(x)))
-    lines += [f"  • {cl['claim']}" + ("" if cl.get("confirmed", True) else " (non confirmé)")
-              for cl in (c["kardex"].get("claims") or [])[:5]]          # already filtered by read_policy (cloud_model)
+    def tag(cl):   # what the model may know but must never repeat to someone else
+        t = [] if cl.get("confirmed", True) else ["non confirmé"]
+        if cl.get("mention_policy") in ("never_reference", "indirect_only") or cl.get("sensitivity") in ("sensitive", "highly_sensitive"):
+            t.append("sensible : ne jamais le mentionner à un tiers")
+        return f" ({' ; '.join(t)})" if t else ""
+    lines += [f"  • {cl['claim']}{tag(cl)}" for cl in (c["kardex"].get("claims") or [])[:8]]   # read_policy decides
     lines += list(dict.fromkeys(f"  ⚠ {d['observation']}" for d in c["deviations"]))[:2]
     return lines
+
+
+def _periods(message: str, max_privacy: str, budget: int) -> tuple[str, list[str]]:
+    """The period views the message points at: yesterday / today → the day; the week / these last days → this week;
+    last week → last week. Each read at overview depth, the most complete projection the reader may see."""
+    from datetime import datetime, timedelta, timezone
+    from . import periods, views
+    from .flows import tz
+    low = message.lower()
+    today = datetime.now(timezone.utc).astimezone(tz()).date()
+    wanted = []
+    if re.search(r"avant-hier", low):
+        wanted.append(("day", today - timedelta(days=2)))
+    if re.search(r"\bhier\b|yesterday", low):
+        wanted.append(("day", today - timedelta(days=1)))
+    if re.search(r"aujourd'hui|ce (matin|midi|soir)|cette nuit|today|ma journ", low):
+        wanted.append(("day", today))
+    if re.search(r"semaine derni|semaine pass|last week|mois dernier", low):
+        wanted.append(("week", today - timedelta(days=7)))
+    if re.search(r"cette semaine|ces derniers jours|ma semaine|this week|week-?end|o[uù] (é|e)tais|positions?|gps|"
+                 r"qu'ai-je fait|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche", low) or not wanted:
+        wanted.append(("week", today))
+    out, keys, used = [], [], 0
+    for kind, d in dict.fromkeys(wanted):
+        key = periods.window(kind, d)[2]
+        for k in (key + ":local", key):
+            r = views.read({"depth": "overview", "key": k, "max_tokens": budget, "privacy": max_privacy})
+            if r.get("content"):
+                text = r["content"]
+                if used + tokens(text) > budget:
+                    text = text[: max(0, budget - used) * 4].rsplit("\n", 1)[0] + f"\n(suite : memory_view {k} details)"
+                out.append(text); keys.append(k); used += tokens(text)
+                break
+        if used >= budget:
+            break
+    return "\n\n".join(out), keys
 
 
 def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "cloud_allowed",
@@ -229,10 +274,21 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
             trace["sections"]["views"] = {"tokens": used, "ms": round((time.perf_counter() - t) * 1000)}
         except Exception as e:
             trace["sections"]["views"] = {"error": type(e).__name__}
-    order = ["profile", "rules", "working", "people", "records", "knowledge", "views", "evidence"]
-    sections = {k: sections[k] for k in order if k in sections}
+    if b.get("periods", 0) > 0 and PERIOD_HINT.search(message):
+        t = time.perf_counter()
+        try:
+            text, keys = _periods(message, max_privacy, b["periods"])
+            if text:
+                sections["periods"] = text
+            trace["sections"]["periods"] = {"tokens": tokens(text) if text else 0, "refs": keys,
+                                            "ms": round((time.perf_counter() - t) * 1000)}
+        except Exception as e:
+            trace["sections"]["periods"] = {"error": type(e).__name__}
+    order = ["profile", "rules", "working", "people", "records", "knowledge", "periods", "views", "evidence"]
+    sections = {k: privacy.mask_secrets(sections[k]) for k in order if k in sections}
     titles = {"profile": "Profil de Monsieur", "people": "Personnes concernées (Kardex)",
               "rules": "Règles durables de Monsieur (en vigueur)",
+              "periods": "Synthèse de la période (reconstruite depuis les épisodes, connaissances et mesures)",
               "working": "État de travail de ce fil (reconstruit par la mémoire, identique après compression)",
               "views": "Vues consolidées à approfondir (memory_view clé, profondeur overview|synthesis|details)",
               "records": "Décisions et règles consignées (texte en vigueur, daté)",
