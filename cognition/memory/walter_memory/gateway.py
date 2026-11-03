@@ -127,12 +127,19 @@ def post_views_candidates(body: dict):
                                     limit=max(1, min(int(body.get("limit") or 5), 10)))
 
 
+# The hooks' callers and the runtime (core.events source) whose thread their session_id names (P1.1 working state)
+RUNTIME_OF_CALLER = {"claude-code-hook": "claude_code", "codex-hook": "codex", "dsh-hook": "dsh",
+                     "hermes-shell-hook": "hermes", "hermes": "hermes"}
+
+
 @app.post("/v1/context", dependencies=[Depends(auth)])
 def post_context(body: ContextIn):
     import hashlib
     import json as _json
     from . import context
-    res = context.get_context(body.query, budget=body.budget, include_profile=body.include_profile)
+    source = RUNTIME_OF_CALLER.get(body.caller)
+    session = (source, body.session_id.rsplit("/", 1)[-1]) if source and body.session_id else None
+    res = context.get_context(body.query, budget=body.budget, include_profile=body.include_profile, session=session)
     with connection() as conn:
         conn.execute("""insert into system.context_requests (caller, mode, session_id, query_sha, total_tokens, sections, latency_ms)
                         values (%s,%s,%s,%s,%s,%s,%s)""",

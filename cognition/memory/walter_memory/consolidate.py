@@ -17,7 +17,9 @@ disappears because a summary dropped it.
                  version is never looser than its view
   reconsolidate  one Router call over a subject's current items proposes merges of duplicates, replacements and
                  expirations ([consolidation] mode: "shadow" = proposals recorded in views.ledger, nothing applied)
-P1.2 runs in shadow: g1 views have status 'shadow' and are not served unless a reader asks for them.
+Modes ([consolidation] mode): "active" (2026-11-03) = g1 views are served (status active) and reconsolidation applies
+only what is safe (strict duplicates, finished task items, replaced decisions; a durable rule is never closed by a
+model: such proposals stay recorded); "shadow" = views built, not served, nothing applied; "off" = nothing.
 """
 from __future__ import annotations
 
@@ -44,7 +46,12 @@ def _now() -> datetime:
 
 
 def mode() -> str:
-    return organic.settings().get("consolidation", {}).get("mode", "shadow")
+    m = organic.settings().get("consolidation", {}).get("mode", "shadow")
+    return "active" if m == "apply" else m
+
+
+def view_status() -> str:
+    return "active" if mode() == "active" else "shadow"
 
 
 def key_for(subject: str, variant: str = "cloud") -> str:
@@ -154,10 +161,47 @@ def render_details(title: str, items: list[dict], now: datetime) -> str:
 
 # ───────────────────────────── building ─────────────────────────────
 def _ensure_view(conn, key: str, subject: str, title: str, variant: str) -> None:
+    status = view_status()
     conn.execute("""insert into views.view (view_key, domain, horizon, title, status, generation, kind, attributes, privacy_class)
-                    values (%s, 'projects', 'medium', %s, 'shadow', 'g1', 'subject', %s, 'cloud_allowed')
-                    on conflict (view_key) do update set title = excluded.title, updated_at = now()""",
-                 (key, title, json.dumps({"mirrors": subject, "variant": variant, "builder": BUILDER})))
+                    values (%s, 'projects', 'medium', %s, %s, 'g1', 'subject', %s, 'cloud_allowed')
+                    on conflict (view_key) do update set title = excluded.title, updated_at = now(),
+                        status = case when views.view.status in ('shadow', 'active') then excluded.status
+                                      else views.view.status end""",
+                 (key, title, status, json.dumps({"mirrors": subject, "variant": variant, "builder": BUILDER})))
+
+
+def set_embedding(conn, key: str, text: str) -> None:
+    """Local embedding of a view (its index + overview), for related_views(): no model call, nothing leaves the VM."""
+    try:
+        from .search import embed, vec
+        conn.execute("update views.view set embedding = %s::vector where view_key = %s", (vec(embed([text[:2000]])[0]), key))
+    except Exception as e:  # an embedding is an optimisation
+        log.warning("view embedding failed for %s: %s", key, e)
+
+
+def related_views(query: str, *, max_privacy: str = "cloud_allowed", limit: int = 6, min_sim: float = 0.3) -> list[str]:
+    """Index lines of the active V1 views (subjects, episodes, periods, people, projects) closest to the query: pointers
+    a model can open with memory_view(key, depth) — a short context that says where the details are."""
+    from .search import embed, vec
+    allowed = privacy.allowed_classes(max_privacy)
+    qv = vec(embed([query[:2000]])[0])
+    with connection() as conn:
+        rows = conn.execute("""
+            select v.view_key, v.kind, v.epistemic, v.last_at, x.content, x.stale_since,
+                   1 - (v.embedding <=> %s::vector) as sim
+            from views.view v join lateral (select content, stale_since from views.version where view_key = v.view_key
+                                            and depth = 'index' order by version desc limit 1) x on true
+            where v.generation = 'g1' and v.status = 'active' and v.privacy_class = any(%s) and v.embedding is not null
+            order by v.embedding <=> %s::vector limit %s""", (qv, allowed, qv, limit * 3)).fetchall()
+    out = []
+    for r in rows:
+        if r["sim"] is None or r["sim"] < min_sim:
+            continue
+        flag = " (à reconstruire)" if r["stale_since"] else ""
+        out.append(f"- [{r['view_key']}] {r['content']}{flag}")
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _sync_evidence(conn, key: str, cur: list[dict]) -> None:
@@ -202,6 +246,7 @@ def build_subject(subject: str, *, now: datetime | None = None, force: bool = Fa
             refs = {"items": [i["id"] for i in items], "current": [i["id"] for i in cur], "threads": threads,
                     "builder": BUILDER}
             watermark = max((i["created_at"] for i in items), default=None)
+            set_embedding(conn, key, texts["index"] + "\n" + texts["overview"])
             for depth, content in texts.items():
                 conn.execute("""insert into views.version (view_key, depth, version, content, source_refs, watermark, builder,
                                     model, privacy_class, inputs_hash)
@@ -322,7 +367,7 @@ def reconsolidate(subject: str, *, chat=None, apply: bool | None = None) -> dict
     merge, the replacing item is newer and stated by the owner) and recorded; applied only in mode 'apply'."""
     from . import llm
     chat = chat or llm.chat
-    apply = (mode() == "apply") if apply is None else apply
+    apply = (mode() == "active") if apply is None else apply
     now = _now()
     with connection() as conn:
         items = current(items_of(conn, threads_of(conn, subject), ["cloud_allowed"]), now)
@@ -352,10 +397,13 @@ def reconsolidate(subject: str, *, chat=None, apply: bool | None = None) -> dict
         it = short.get(str(e.get("id")))
         if it and it["scope"] == "task" and it["kind"] != "correction":   # a correction ends only by a newer one
             ok["expire"].append({"id": it["id"], "why": str(e.get("why", ""))[:300]})
+    held = {"merge": [], "supersede": []}
+    if apply:      # safe application only (owner, 2026-11-03): no destructive or uncertain closing of a durable rule
+        ok, held = _safe(ok, {i["id"]: i for i in items})
     with connection() as conn:
         conn.execute("insert into views.ledger (view_key, action, detail) values (%s, %s, %s)",
                      (key_for(subject), "reconsolidate.applied" if apply else "reconsolidate.proposed",
-                      json.dumps({**ok, "items": len(items), "model": res.get("model")})))
+                      json.dumps({**ok, "withheld": held, "items": len(items), "model": res.get("model")})))
         if apply:
             for group in ok["merge"]:
                 keep = group[-1]
@@ -363,6 +411,10 @@ def reconsolidate(subject: str, *, chat=None, apply: bool | None = None) -> dict
                     _supersede(conn, old, keep, "merged")
             for s in ok["supersede"]:
                 _supersede(conn, s["old"], s["new"], "superseded")
+            for s in held["supersede"]:     # a durable rule stays in force, flagged so a reader knows it may be outdated
+                conn.execute("""update core.derived_items set attributes = attributes || jsonb_build_object(
+                                  'replacement_proposed', jsonb_build_object('by', %s::text, 'why', %s::text, 'at', now()))
+                                where item_id = %s and status in ('derived','verified')""", (s["new"], s["why"], s["old"]))
             for e in ok["expire"]:
                 kind = next(i["kind"] for i in items if i["id"] == e["id"])
                 if kind in ("decision", "goal", "commitment"):   # done is not gone: the decision stays, as executed
@@ -376,7 +428,44 @@ def reconsolidate(subject: str, *, chat=None, apply: bool | None = None) -> dict
     if apply:
         invalidate(item_ids=[x for g in ok["merge"] for x in g] + [s["old"] for s in ok["supersede"]]
                    + [e["id"] for e in ok["expire"]])
-    return {"proposals": ok, "applied": apply, "items": len(items)}
+    return {"proposals": ok, "withheld": held, "applied": apply, "items": len(items)}
+
+
+DURABLE_RULES = ("constraint", "preference", "correction")
+
+
+def _safe(ok: dict, by_id: dict) -> tuple[dict, dict]:
+    """What may be applied without the owner: merges of strict duplicates only (same kind and scope, close meaning,
+    mostly the same words, the same numbers — working._same), replacements that do not close a durable rule, and the
+    already-guarded expirations of task items. The rest is withheld (kept in the ledger as proposals)."""
+    from .working import _same
+    applied, held = {"merge": [], "supersede": [], "expire": ok["expire"]}, {"merge": [], "supersede": []}
+    try:
+        from .search import embed
+    except Exception:
+        embed = None
+    for group in ok["merge"]:
+        keep = by_id[group[-1]]
+        same = [group[-1]]
+        for old in group[:-1]:
+            o = by_id[old]
+            cos = 0.0
+            if embed is not None:
+                v = embed([o["content"][:400], keep["content"][:400]])
+                cos = float(v[0] @ v[1])
+            if o["scope"] == keep["scope"] and _same(o["content"], keep["content"], cos):
+                same.insert(0, old)
+            else:
+                held["merge"].append([old, group[-1]])
+        if len(same) >= 2:
+            applied["merge"].append(same)
+    for sp in ok["supersede"]:
+        old = by_id[sp["old"]]
+        if old["kind"] in DURABLE_RULES and (old["scope"] or "durable") != "task":
+            held["supersede"].append(sp)
+        else:
+            applied["supersede"].append(sp)
+    return applied, held
 
 
 def _supersede(conn, old: str, new: str, how: str) -> None:
