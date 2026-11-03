@@ -20,3 +20,18 @@ mode = "adaptive"
 mode = "active"
 # Router tier for reconsolidation (the memory_extraction route proposed nothing on real subjects; L3 did, 2026-11-02)
 poste = "general/L3"
+
+[episodes]
+# P1.4-P1.5 (2026-11-03): flows (GPS visits computed on the VM, conversation bursts, appointments, work sessions) and
+# multi-source episodes every `every_s`; dated plans read from pseudonymised conversation bursts (one model call per
+# burst where the owner wrote and a time is mentioned) every `plans_every_s`, at most `plans_per_run` bursts.
+# "off" = none of it. Hypotheses never go past "probable" without the owner's words (`attest`: decision model).
+mode = "active"
+every_s = 600
+plans_every_s = 1800
+plans_per_run = 20
+attest = true
+
+[periods]
+# P1.6: the owner's local time zone for days, weeks and months.
+tz = "Asia/Bangkok"

@@ -487,11 +487,13 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                                     (it["cited"][-1]["occurred_at"], new_id, old)).fetchone()
                 if done:
                     out["superseded"] += 1
+                    out.setdefault("changed", []).append(old)
                     conn.execute("""insert into core.provenance (target_table, target_id, source_type, source_id, role)
                                     values ('derived_items', %s, 'derived', %s, 'supersedes') on conflict do nothing""",
                                  (new_id, old))
             for ref in it["contradicts"]:
                 old = known[ref]["item_id"]
+                out.setdefault("changed", []).append(old)
                 conn.execute("""update core.derived_items set attributes = attributes || '{"contested": true}'
                                 where item_id = %s""", (old,))
                 conn.execute("""insert into core.provenance (target_table, target_id, source_type, source_id, role)
@@ -499,13 +501,23 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                              (new_id, old))
         conn.execute("update extraction.segments set items = %s, reused = %s, superseded = %s where segment_id = %s",
                      (out["items"], out["reused"], out["superseded"], sid))
-    try:   # P1.2: the consolidated views built on this thread are rebuilt from the new state (targeted invalidation)
+    try:   # P1.2: the consolidated views built on this thread are rebuilt from the new state (targeted invalidation);
+        # P1.6: a replaced or contested item also marks the episodes and periods that list it (and their parents)
         from . import consolidate
-        consolidate.invalidate(threads=[(source, thread_id)])
+        consolidate.invalidate(threads=[(source, thread_id)], item_ids=out.pop("changed", None))
+        from . import entities
+        entities.link_items(conn_items_of_segment(sid))
     except Exception as e:
-        log.warning("view invalidation failed (extraction kept): %s", e)
+        log.warning("view invalidation / entity links failed (extraction kept): %s", e)
     out["segment_id"] = sid
     return out
+
+
+def conn_items_of_segment(sid) -> list[str]:
+    with connection() as conn:
+        return [r["item_id"] for r in conn.execute("""select item_id::text from core.derived_items
+                                                      where derived_by = %s and source_refs->>'ref' like %s""",
+                                                   (PROCESSOR, f"{sid}:%"))]
 
 
 # ───────────────────────────── one thread ─────────────────────────────

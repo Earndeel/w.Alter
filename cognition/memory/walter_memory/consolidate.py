@@ -265,7 +265,8 @@ def build_subject(subject: str, *, now: datetime | None = None, force: bool = Fa
 
 
 def invalidate(*, item_ids: list[str] | None = None, threads: list[tuple[str, str]] | None = None) -> int:
-    """Mark stale the latest versions of the g1 views that depend on these items (evidence, backwards) or threads."""
+    """Mark stale the latest versions of the g1 views that depend on these items (evidence, backwards) or threads, and
+    of every view that contains or indexes a stale view (episode → day → week → month)."""
     keys: set[str] = set()
     with connection() as conn:
         if item_ids:
@@ -275,6 +276,13 @@ def invalidate(*, item_ids: list[str] | None = None, threads: list[tuple[str, st
             subjects = {r["view_key"] for r in conn.execute(
                 "select distinct view_key from views.member where session_id like %s", (f"{source}/%/{thread}",))}
             keys |= {key_for(s) for s in subjects} | {key_for(s, "local") for s in subjects}
+        frontier = set(keys)
+        while frontier:    # parents: a day lists an episode, a week indexes its days, a month its weeks (P1.6)
+            parents = {r["view_key"] for r in conn.execute(
+                "select distinct view_key from views.evidence where ref_kind = 'view' and ref_id = any(%s)",
+                (list(frontier),))} - keys
+            keys |= parents
+            frontier = parents
         if keys:
             conn.execute("""update views.version v set stale_since = coalesce(stale_since, now())
                             where v.view_key = any(%s) and v.version = (select max(version) from views.version x
