@@ -35,3 +35,12 @@ attest = true
 [periods]
 # P1.6: the owner's local time zone for days, weeks and months.
 tz = "Asia/Bangkok"
+
+[kardex]
+# Kardex enrichment (2026-11-03): once a day, the `per_run` people the owner exchanged with most in 1:1 recently; their
+# last `days` of messages (redacted_cloud only, pseudonymised) → claims about the CONTACT only, status proposed,
+# sensitivity tightened by type, mention policy derived. "off" = only on demand (walter-memory organic kardex).
+mode = "daily"
+per_run = 5
+days = 60
+max_messages = 160

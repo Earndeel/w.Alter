@@ -9,7 +9,7 @@ from pathlib import Path
 DEFAULTS = {"generations": {"enforce": True}, "working_memory": {"mode": "shadow"},
             "consolidation": {"mode": "shadow", "poste": "general/L3"},
             "episodes": {"mode": "active", "every_s": 600, "plans_every_s": 1800, "plans_per_run": 20, "attest": True},
-            "periods": {"tz": "Asia/Bangkok"}}
+            "periods": {"tz": "Asia/Bangkok"}, "kardex": {"mode": "daily", "per_run": 5, "days": 60, "max_messages": 160}}
 
 
 @lru_cache(maxsize=1)
