@@ -80,3 +80,23 @@ The old store (schema `walter_router`, fixed weight vectors, router_matrix.json)
 - Treat unmatched-name candidates as investigation leads, not established equivalences. Verify identity using primary provider documentation; similar names, shared parameter counts, date suffixes, experimental variants and specialist suffixes do not establish equivalence.
 - Before an authorized correction, inspect `walter-router alias-add --help` for the exact current syntax. Apply only verified equivalences through `alias-add`, then check `alias-list` and rerun `review` to verify the result. If evidence is insufficient, leave the candidate unresolved.
 - Keep the authorization boundary explicit: an alias-only analysis permits no direct database writes, configuration changes, collector repairs, model switches or report-file creation unless separately authorized. Return the analysis in the response when file writes are excluded.
+
+## Vérifier et maintenir la voie Antigravity de Google AI Pro
+
+- Utiliser la CLI officielle `agy` et l'adaptateur existant ; consulter `docs/ANTIGRAVITY-SUBSCRIPTION.md` et `llm/antigravity_subscription.py` dans le module retourné par `walter path router` avant toute modification. Ne pas déduire l'accès Antigravity de l'installation ou de l'authentification de Gemini CLI.
+- Sur l'instance de Monsieur, interroger le catalogue avec le HOME dédié à l'abonnement :
+  ```bash
+  A=/user/Lucas/state/router/antigravity
+  (cd "$A/home" && HOME="$A/home" timeout 60 "$A/bin/agy" models </dev/null)
+  ```
+  Conserver le code de sortie et les erreurs : une authentification expirée ne signifie pas que le catalogue est vide. Ne jamais afficher les fichiers d'identifiants.
+- Distinguer les variantes de réflexion des modèles distincts. Vérifier les identifiants publiés par la CLI et leur correspondance dans l'adaptateur : le catalogue observé utilisait notamment `gemini-3.8-flash`, tandis que d'autres couches employaient `gemini-3-8-flash`.
+- Le cycle de collecte de 48 h découvre les modèles ; cette découverte ne prouve pas qu'ils fonctionnent et ne les autorise pas automatiquement. Avant d'étendre la liste des modèles vérifiés, effectuer un appel réel via le gateway, puis vérifier les capacités annoncées : plusieurs tours, streaming et JSON si elles doivent être exposées.
+- Pour tester une route précise, utiliser la sous-commande `call`, et non `exact` :
+  ```bash
+  ROUTER_ROOT=$(walter path router)
+  printf '%s\n' '{"route":{"provider":"antigravity","model":"gemini-3.8-flash","reasoning":"low","access":"subscription"},"messages":[{"role":"user","content":"Dis bonjour en trois mots."}],"timeout":120}' | "$ROUTER_ROOT/llm/gateway.py" call
+  ```
+  Examiner la réponse complète, son champ `ok`, le modèle retourné et le code de sortie. Une réponse textuelle réussie ne suffit pas à valider le streaming ni les outils. La voie installée sert du texte, avec les outils CLI désactivés.
+- Vérifier séparément l'offre d'abonnement et le choix des tâches : une offre disponible et prioritaire ne signifie pas qu'une tâche la sélectionne. Ne pas changer les modèles des tâches simplement parce qu'un modèle devient disponible dans l'abonnement.
+- Après modification du routeur, régénérer sa référence avec `walter-router docs --write`, puis exécuter les tests concernés. La session a rencontré des environnements Python distincts : LiteLLM était absent du Python de test et pytest absent du venv LLM ; un échec d'import doit être distingué d'une régression de l'adaptateur. Vérifier ensuite `systemctl is-active walter-llm` et `curl -fsS http://127.0.0.1:8894/health` si le service a été redémarré.
