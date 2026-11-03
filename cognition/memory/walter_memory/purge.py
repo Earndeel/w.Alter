@@ -80,6 +80,8 @@ def purge(*, reason: str, requested_by: str, event_ids=None, object_refs=None, p
         refs = [*targets["events"], *targets["derived"], *targets["objects"]]
         if refs:
             conn.execute("delete from search.chunks where ref_id = any(%s::uuid[])", (refs,))
+            # model decisions recorded from them (their outcome may quote the purged text)
+            conn.execute("delete from processing.decisions where refs && %s::uuid[]", (refs,))
             conn.execute("delete from privacy.detections where target_ref = any(%s)", ([str(r) for r in refs] + src_refs,))
         for oid in targets["objects"]:
             row = conn.execute("select storage_key, storage_zone from core.objects where id = %s", (oid,)).fetchone()

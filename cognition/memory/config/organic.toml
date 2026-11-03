@@ -27,6 +27,11 @@ poste = "general/L3"
 # burst where the owner wrote and a time is mentioned) every `plans_every_s`, at most `plans_per_run` bursts.
 # "off" = none of it. Hypotheses never go past "probable" without the owner's words (`attest`: decision model).
 mode = "active"
+# engine (2026-11-03): "events" = event-driven assimilation (memory.organic consumer: only what each event touches,
+# model decisions reused while their inputs are unchanged); "timer" = the former window rebuild every `every_s`
+# (now harmless: unchanged rows are not rewritten, decisions are reused) — kept as the rollback switch; restart
+# walter-memory-pipeline after a change
+engine = "events"
 every_s = 600
 plans_every_s = 1800
 plans_per_run = 20

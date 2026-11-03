@@ -40,6 +40,11 @@ def _agent_sessions(args) -> None:
     raise SystemExit(module.main())
 
 
+def bus_lag(assimilation) -> dict:
+    from . import bus
+    return bus.lag(assimilation.CONSUMER, assimilation.TYPES)
+
+
 def main(argv=None) -> None:
     import sys
     argv = sys.argv[1:] if argv is None else list(argv)
@@ -90,6 +95,10 @@ def main(argv=None) -> None:
     x2.add_argument("--force", action="store_true", help="thread: also process the tail still waiting")
     pl = sub.add_parser("pipeline", help="V1 event pipeline: run the consumers (service) or show their health")
     pl.add_argument("action", nargs="?", default="run", choices=["run", "health"])
+    asm = sub.add_parser("assimilation", help="event-driven P1.4-P1.6 (memory.organic): status, step (drain + work now), "
+                                              "reconcile, seed (record decisions taken before the ledger)")
+    asm.add_argument("action", choices=["status", "step", "reconcile", "seed"])
+    asm.add_argument("--hours", type=int, default=24)
     cs = sub.add_parser("consolidate", help="P1.2 views rebuilt from current V1 knowledge (shadow): build, tick, expire, reconsolidate, show")
     cs.add_argument("action", choices=["build", "tick", "expire", "reconsolidate", "show"]); cs.add_argument("--subject")
     cs.add_argument("--depth", default="overview"); cs.add_argument("--variant", default="cloud"); cs.add_argument("--force", action="store_true")
@@ -265,6 +274,17 @@ def main(argv=None) -> None:
     elif a.cmd == "pipeline":
         from . import pipeline
         pipeline.run() if a.action == "run" else _print(pipeline.health())
+    elif a.cmd == "assimilation":
+        from . import assimilation, episodic, processing
+        if a.action == "status":
+            _print({"engine": assimilation.engine(), "bus": bus_lag(assimilation), "backlog": processing.backlog(),
+                    "summary": processing.summary(a.hours)})
+        elif a.action == "step":
+            _print(assimilation.step())
+        elif a.action == "reconcile":
+            _print(assimilation.reconcile())
+        else:
+            _print(episodic.seed_ledger())
     elif a.cmd == "consolidate":
         from . import consolidate, views
         if a.action in ("build", "reconsolidate", "show") and not a.subject:

@@ -59,3 +59,15 @@ def _strict_privacy_by_default(request, monkeypatch):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "owner_privacy: run under the owner's current privacy choice (organic.toml)")
+
+
+@pytest.fixture(autouse=True)
+def _no_decision_carried_over():
+    """Recorded model decisions (processing.decisions) belong to one test: the same fixture text in another test or a
+    previous run must not turn a model call into a reuse (2026-11-03)."""
+    try:
+        import psycopg
+        with psycopg.connect(TEST_DSN, connect_timeout=2, autocommit=True) as c:
+            c.execute("delete from processing.decisions")
+    except Exception:
+        pass

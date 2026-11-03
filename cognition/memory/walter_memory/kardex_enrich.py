@@ -92,14 +92,26 @@ def enrich(entity_id: str, *, chat=None, days: int | None = None, max_messages: 
     who = name if not privacy.pseudonymise() else "Contact"     # real names when pseudonymisation is off
     lines = "\n".join(f"{k}. [{m['occurred_at']:%d/%m/%Y}] {who if m['from_contact'] else 'Monsieur'} : "
                       f"{privacy.mask_secrets(m['content'] or '')[:500]}" for k, m in enumerate(msgs, 1))
-    res = chat([{"role": "user", "content": PROMPT.format(who=who, messages=lines[:24000])}], poste="memory_extraction",
-               processor="kardex.enrich", processor_version="1",
-               privacy_class=privacy.strictest(*(m["privacy_class"] for m in msgs)), names=[name],
-               budget="recurring", purpose="kardex: what a contact says about themselves",
-               response_format={"type": "json_object"}, max_tokens=2500, timeout=240)
-    c = res["content"] or "{}"
-    data = json.loads(c[c.find("{"):c.rfind("}") + 1] or "{}")
-    out = {"entity": entity_id, "messages": len(msgs), "claims": 0, "reused": 0, "rejected": 0, "model": res.get("model")}
+    from . import processing
+    cls = privacy.strictest(*(m["privacy_class"] for m in msgs))
+    prompt = PROMPT.format(who=who, messages=lines[:24000])
+
+    def call():
+        res = chat([{"role": "user", "content": prompt}], poste="memory_extraction",
+                   processor="kardex.enrich", processor_version="1", privacy_class=cls, names=[name],
+                   budget="recurring", purpose="kardex: what a contact says about themselves",
+                   response_format={"type": "json_object"}, max_tokens=2500, timeout=240)
+        c = res["content"] or "{}"
+        return {"data": json.loads(c[c.find("{"):c.rfind("}") + 1] or "{}"), "model": res.get("model")}, res.get("model")
+
+    # the same messages were already read (2026-11-03): their claims are recorded, nothing to ask again
+    got, reused = processing.decide_once("kardex.enrich", "1", {"prompt": prompt, "names": [name], "class": cls}, call,
+                                         privacy_class=cls, refs=[m["event_id"] for m in msgs if m.get("event_id")],
+                                         input_key=entity_id)
+    if reused:
+        return {"entity": entity_id, "skipped": "no new message since the last reading"}
+    data = got["data"]
+    out = {"entity": entity_id, "messages": len(msgs), "claims": 0, "reused": 0, "rejected": 0, "model": got.get("model")}
     with connection() as conn:
         cid = contact_for(conn, entity_id)
         known = conn.execute("select id, claim from kardex.claims where contact_id = %s", (cid,)).fetchall()
@@ -132,7 +144,7 @@ def enrich(entity_id: str, *, chat=None, days: int | None = None, max_messages: 
                                        values (%s, %s, %s, %s, %s, 'proposed', %s, %s, %s, %s, 'direct_statement',
                                                'explicitly_told_me', %s, %s, true, true) returning id""",
                                     (cid, ctype, ctype, text, json.dumps(it, ensure_ascii=False), _conf(it),
-                                     src[0]["occurred_at"], METHOD, json.dumps({"model": res.get("model"),
+                                     src[0]["occurred_at"], METHOD, json.dumps({"model": got.get("model"),
                                                                                 "event_ids": [m["event_id"] for m in src]}),
                                      POLICY[sens], sens)).fetchone()["id"]
             _evidence(conn, cid, claim_id, src[0], quote, sens)
