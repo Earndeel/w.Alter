@@ -45,6 +45,15 @@ class WalterMemoryProvider(MemoryProvider):
                 'Conversation persistence is handled by the Walter collector.')
 
     def _request(self, query):
+        # Memory V1 (2026-11-03): the same context as the other runtimes (owner rules, this session's working state,
+        # knowledge, views); the plain recall stays the fallback.
+        try:
+            r = client.call('context', {'query': query, 'session_id': self._session, 'source': 'hermes'},
+                            caller=self._caller(), timeout=10)
+            if r.get('status') == 'ok':
+                return r
+        except Exception:
+            pass
         return client.call('recall', {'query': query, 'budget': 'low', 'max_tokens': 1024},
                            caller=self._caller(), timeout=8)
 
