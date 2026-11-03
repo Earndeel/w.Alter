@@ -100,3 +100,40 @@ The old store (schema `walter_router`, fixed weight vectors, router_matrix.json)
   Examiner la réponse complète, son champ `ok`, le modèle retourné et le code de sortie. Une réponse textuelle réussie ne suffit pas à valider le streaming ni les outils. La voie installée sert du texte, avec les outils CLI désactivés.
 - Vérifier séparément l'offre d'abonnement et le choix des tâches : une offre disponible et prioritaire ne signifie pas qu'une tâche la sélectionne. Ne pas changer les modèles des tâches simplement parce qu'un modèle devient disponible dans l'abonnement.
 - Après modification du routeur, régénérer sa référence avec `walter-router docs --write`, puis exécuter les tests concernés. La session a rencontré des environnements Python distincts : LiteLLM était absent du Python de test et pytest absent du venv LLM ; un échec d'import doit être distingué d'une régression de l'adaptateur. Vérifier ensuite `systemctl is-active walter-llm` et `curl -fsS http://127.0.0.1:8894/health` si le service a été redémarré.
+
+## Auditer les appels Codex et retrouver les entrées/sorties mémoire
+
+1. Interroger `models.exec_log` en lecture seule avec `walter-python` et le compte PostgreSQL `hindsight`. Le compte `postgres` ne correspondait pas à l’authentification disponible dans cette session. Laisser libpq utiliser `/root/.pgpass` sans afficher son contenu.
+
+```bash
+walter-python - <<'PY'
+import psycopg
+from datetime import datetime, timezone, timedelta
+end = datetime.now(timezone.utc)
+start = end - timedelta(hours=48)
+with psycopg.connect('host=127.0.0.1 port=5433 dbname=hindsight user=hindsight') as c:
+    c.execute('SET TRANSACTION READ ONLY')
+    print('Fenêtre UTC :', start.isoformat(), end.isoformat())
+    rows = c.execute('''
+        SELECT exec_id, at, task, role, model, ok, skipped,
+               seconds, usage, run_id
+        FROM models.exec_log
+        WHERE provider = 'codex' AND at >= %s AND at < %s
+        ORDER BY at, exec_id
+    ''', (start, end)).fetchall()
+    for row in rows:
+        print(row)
+PY
+```
+
+2. Fixer une seule fenêtre `[start, end)` pour toutes les requêtes du rapport. Préciser le fuseau affiché et distinguer 48 heures glissantes de deux jours calendaires. Pour l’extraction mémoire, filtrer `task='memory_extraction'`, puis regrouper par `role`, `model`, `ok` et `skipped`. Les compteurs de jetons observés sont `usage->>'in'` et `usage->>'out'`. Distinguer les fiches de sujets de Walter Memory du compilateur de profil, qui partagent ce poste.
+
+3. Vérifier le routage actuel avec `walter-router pick memory_extraction`. Rapporter séparément le modèle historique enregistré dans `exec_log` et le niveau de raisonnement actuellement configuré. Ne pas attribuer rétroactivement ce niveau à chaque appel si aucune trace historique ne le conserve.
+
+4. Pour les fiches de sujets, lire le code `walter_memory/views.py` du module Memory, notamment `CARD_PROMPT` et la construction des messages. Inspecter le schéma de `views.version`, puis consulter `built_at`, `view_key`, `content` et `source_refs` avec `depth='overview'`. Les références permettent de retrouver les échanges via `logs_timeline` et `logs_get`. Chercher également la version précédente de la fiche lorsque l’entrée la comprend.
+
+5. Distinguer la sortie persistée dans une fiche, une entrée reconstruite depuis le code et les échanges, et une requête/réponse brute effectivement journalisée. Une proximité entre `exec_log.at` et `views.version.built_at` ne prouve pas une correspondance : plusieurs opérations peuvent se suivre à quelques secondes d’intervalle. Marquer ces rapprochements comme probables et signaler les appels sans résultat attribuable.
+
+6. Pour les appels Guardians, distinguer le superviseur général `walter-guardians` du Guardian du routeur. Consulter `walter-guardians status` et l’état du Guardian concerné ; ne pas supposer que `models.guardian_incidents` contient les incidents du superviseur général. Un verdict conservé ne constitue pas la réponse JSON brute complète.
+
+7. Présenter tous les appels de la fenêtre demandée, les agrégats et les limites de reconstruction. Ne jamais promettre les inputs/outputs exacts lorsque seuls les métadonnées, les fiches dérivées ou les verdicts ont été conservés.
