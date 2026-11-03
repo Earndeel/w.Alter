@@ -115,6 +115,7 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
 
     def mark(r):   # a line from a generation that is not read by default (history request only)
         return " — pré-V1" if history and r.get("generation") and r["generation"] not in readable else ""
+    message = query                                  # the whole message (the working state guesses its subject from it)
     query = FORM_PREAMBLE.sub("", query, count=1) or query
     t0 = time.perf_counter()
     sections, trace = {}, {"query_chars": len(query), "sections": {}}
@@ -128,7 +129,7 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
         t = time.perf_counter()
         try:
             from . import working
-            st = working.state(session[0], session[1], audience=audience)
+            st = working.state(session[0], session[1], audience=audience, message=message)
             ids: list = []
             text = working.render(st, shown=ids)
             text = text.split("\n", 1)[1] if text.startswith("## ") else text

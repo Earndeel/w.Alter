@@ -176,6 +176,7 @@ def candidates(conn, ex: dict, embed, generations: list[str] | None = None) -> l
     return list(conn.execute("""
         select view_key, title, last_at, 1 - (embedding <=> %s::vector) as sim
         from views.view where status = 'active' and domain = 'projects' and embedding is not null
+          and not (attributes ? 'mirrors')            -- a V1 mirror is never an attachment target
           and last_at >= %s and last_at <= %s and (%s::text[] is null or generation = any(%s::text[]))
         order by embedding <=> %s::vector limit %s""",
         (vec(v), ex["at"] - AWAKE, ex["at"], generations, generations, vec(v), SHORTLIST)).fetchall())
