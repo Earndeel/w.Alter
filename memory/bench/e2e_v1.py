@@ -24,7 +24,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DSN = os.environ.get("WALTER_MEMORY_DATABASE_URL", "")
-assert DSN and ":5433/" not in DSN, "e2e writes only to the test database (tests/testdb.sh up)"
+def require_test_db() -> None:
+    assert DSN and ":5433/" not in DSN, "e2e writes only to the test database (tests/testdb.sh up)"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from walter_memory import events, extract2, generations, ingestion, llm, search  # noqa: E402
 from walter_memory.db import connection  # noqa: E402
@@ -122,6 +123,7 @@ def has(text: str | None, *words) -> bool:
 
 # ───────────────────────────── case 1: a decision changes, another runtime finds the current one ──────────────────
 def setup() -> None:
+    require_test_db()
     ingestion.register_connector("search_indexer", "walter", "agent", "e2e", timedelta(minutes=10))
     extract2.set_v1_start(NOW - timedelta(days=30))
     generations.rollback(confirm=True)
@@ -341,6 +343,7 @@ CASES = {"decision": case_decision, "working": case_working, "episode": case_epi
 
 
 def main() -> None:
+    require_test_db()
     ap = argparse.ArgumentParser()
     ap.add_argument("case", choices=[*CASES, "all"])
     ap.add_argument("--out", default="")

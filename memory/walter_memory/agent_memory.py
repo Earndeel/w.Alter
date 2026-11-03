@@ -167,6 +167,21 @@ def reflect(question: str, budget: str = 'mid', *, caller: str = 'walter') -> di
             'notice': 'Synthesis over permitted canonical evidence via Walter Router; this is not a Hindsight reflect call.'}
 
 
+def context(query: str, session_id: str = '', source: str = 'hermes', *, caller: str = 'walter') -> dict:
+    """The same per-message context as the hooks (Memory V1): the owner's durable rules, the working state of the
+    caller's thread (its session), people, curated records, knowledge, views to open, evidence — cloud-safe."""
+    from . import context as ctx
+    q = (query or '').strip()
+    if len(q.split()) < 3:
+        return {'status': 'ok', 'text': '', 'records': []}
+    r = ctx.get_context(q[:4000], budget={'profile': 0, 'people': 300, 'knowledge': 600, 'evidence': 300},
+                        include_profile=False, session=(source, session_id) if session_id else None)
+    secs = (r.get('trace') or {}).get('sections') or {}
+    refs = [x for s in secs.values() for x in (s.get('refs') or [])]
+    return {'status': 'ok', 'text': r.get('text') or '', 'records': refs or ([1] if r.get('text') else []),
+            'tokens': (r.get('trace') or {}).get('total_tokens')}
+
+
 def dispatch(request: dict) -> dict:
     if request.get('version') != 1:
         raise ValueError('unsupported agent memory protocol version')
@@ -175,7 +190,7 @@ def dispatch(request: dict) -> dict:
     args = request.get('args') or {}
     if not isinstance(args, dict):
         raise ValueError('args must be an object')
-    functions = {'recall': recall, 'retain': retain, 'reflect': reflect}
+    functions = {'recall': recall, 'retain': retain, 'reflect': reflect, 'context': context}
     if method not in functions:
         raise ValueError('unknown agent memory method')
     return functions[method](**args, caller=caller)
