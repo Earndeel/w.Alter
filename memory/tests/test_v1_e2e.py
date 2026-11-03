@@ -21,6 +21,9 @@ def setup(monkeypatch):
     ingestion.register_connector("search_indexer", "walter", "agent", "pytest", timedelta(minutes=10))
 
 
+RUN = uuid.uuid4().hex[:6]     # this run's own project: earlier runs on the same test database are other projects
+
+
 def model(messages, **kw):
     prompt = messages[0]["content"]
     part = prompt.split("seuls citables) :", 1)[1].split("\n\nRends un JSON", 1)[0]
@@ -29,8 +32,8 @@ def model(messages, **kw):
     for i, line in enumerate([l for l in part.strip().splitlines() if re.match(r"^\d+\. \[", l)], 1):
         m = "[Monsieur" in line and re.search(r"(le serveur de démo (?:tournera|tourne finalement) sur (\w+))", line)
         if m:
-            sup = [k for k, v in known.items() if "serveur de démo" in v]
-            items.append({"kind": "decision", "text": f"Le serveur de démo du projet Zéphyr tourne sur {m.group(2)}",
+            sup = [k for k, v in known.items() if "serveur de démo" in v and "Zéphyr" in v and RUN in v]
+            items.append({"kind": "decision", "text": f"Le serveur de démo du projet Zéphyr {RUN} tourne sur {m.group(2)}",
                           "state": "decided", "msgs": [i], "quote": m.group(1), "supersedes": sup})
     return {"content": json.dumps({"summary": "", "items": items}), "cost_usd": 0, "model": "scripted"}
 

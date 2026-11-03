@@ -203,7 +203,7 @@ def _known(conn, source: str, thread_id: str, text: str) -> list[dict]:
     """Current v2 knowledge the model may restate, supersede or contradict: this thread's latest items and the most
     similar ones anywhere (local embeddings, no model call)."""
     rows = conn.execute("""select item_id::text, kind, content, coalesce(stage, attributes->>'state') as state,
-                                  created_at, lineage_id::text
+                                  created_at, lineage_id::text, coalesce(valid_from, created_at) as at
                            from core.derived_items where derived_by = %s and status in ('derived','verified')
                              and (valid_to is null or valid_to > now())
                              and generation = 'g1' and kind <> 'summary' and source_refs->>'thread' = %s
@@ -214,7 +214,7 @@ def _known(conn, source: str, thread_id: str, text: str) -> list[dict]:
         from . import search
         v = search.vec(search.embed([text[:4000]])[0])
         rows += conn.execute("""select d.item_id::text, d.kind, d.content, coalesce(d.stage, d.attributes->>'state') as state,
-                                       d.created_at, d.lineage_id::text
+                                       d.created_at, d.lineage_id::text, coalesce(d.valid_from, d.created_at) as at
                                 from search.chunks c join core.derived_items d on d.item_id = c.ref_id
                                 where c.kind = 'derived' and c.embedding is not null and d.derived_by = %s
                                   and d.generation = 'g1' and d.status in ('derived','verified') and d.kind <> 'summary'
@@ -479,6 +479,16 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                 continue
             new_id = new_id["item_id"]
             out["items"] += 1
+            stated_at = it["cited"][-1]["occurred_at"]
+            newer = [ref for ref in it["supersedes"] if known[ref].get("at") and known[ref]["at"] > stated_at]
+            if newer:      # a replayed older message never replaces newer knowledge: it is that knowledge's past
+                ref = newer[0]
+                conn.execute("""update core.derived_items set status = 'superseded', valid_to = %s, lineage_id = %s::uuid,
+                                  attributes = attributes || jsonb_build_object('superseded_by', %s::text,
+                                                                               'replayed_older', true)
+                                where item_id = %s""", (known[ref]["at"], known[ref].get("lineage_id"),
+                                                        known[ref]["item_id"], new_id))
+                it["supersedes"] = [r for r in it["supersedes"] if r not in newer]
             for ref in it["supersedes"]:
                 old = known[ref]["item_id"]
                 done = conn.execute("""update core.derived_items set status = 'superseded', valid_to = %s,
