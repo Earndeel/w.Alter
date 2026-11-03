@@ -304,11 +304,11 @@ def _attestation(conn, g: list[dict], text: str) -> dict | None:
     rows = conn.execute("""select d.item_id::text id, d.content, d.created_at, 1 - (c.embedding <=> %s::vector) sim
                            from core.derived_items d join search.chunks c on c.kind = 'derived' and c.ref_id = d.item_id
                            where d.generation = 'g1' and d.derived_by = 'l3.extract' and d.epistemic = 'stated_owner'
-                             and d.status in ('derived', 'verified') and d.privacy_class = 'cloud_allowed'
+                             and d.status in ('derived', 'verified') and d.privacy_class = any(%s)
                              and coalesce(d.valid_from, d.created_at) between %s and %s
                            order by c.embedding <=> %s::vector limit 3""",
-                        (vec(embed([text])[0]), start - timedelta(hours=6), end + timedelta(days=3),
-                         vec(embed([text])[0]))).fetchall()
+                        (vec(embed([text])[0]), privacy.allowed_classes("cloud_allowed"), start - timedelta(hours=6),
+                         end + timedelta(days=3), vec(embed([text])[0]))).fetchall()
     rows = [r for r in rows if (r["sim"] or 0) >= ATTEST_SIM]        # shortlist only: the decision model judges
     if not rows:
         return None
@@ -322,7 +322,7 @@ def _attestation(conn, g: list[dict], text: str) -> dict | None:
     for r in rows:
         try:
             a = llm.decide({"episode": text, "owner_statement": r["content"]}, q, processor="episodic.attest",
-                           privacy_class="cloud_allowed", purpose="episode attestation", budget="recurring")
+                           privacy_class=privacy.strictest(*(s["privacy_class"] for s in g)), purpose="episode attestation", budget="recurring")
             v = (a["answers"].get("verdict") or {}).get("choice")
         except Exception as e:  # noqa: BLE001 — no decision: no attestation
             log.warning("attestation: %s", e)
@@ -343,7 +343,7 @@ def build(since: datetime | None = None, until: datetime | None = None) -> dict:
         groups = group(_signals(conn, since, until), _home(conn))
     for g in groups:
         key = _key(g)
-        cloud = [s for s in g if s["privacy_class"] == "cloud_allowed"]
+        cloud = [s for s in g if privacy.cloud_readable(s["privacy_class"])]   # what a cloud reader may see
         with connection() as conn:
             att = _attestation(conn, cloud, label(cloud, facets(cloud), z)) if cloud else None
         for variant, sigs in (("local", g), ("cloud", cloud)):

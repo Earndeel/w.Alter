@@ -132,7 +132,7 @@ def chat(messages: list[dict], *, model: str | None = None, poste: str | None = 
         _log(**base, status="refused_budget", error=f"OpenRouter balance {bal:.2f} USD below floor")
         raise BudgetExceeded(f"OpenRouter balance {bal:.2f} USD below the {budget} floor {ACCOUNT_FLOOR_USD.get(budget)} USD")
     mapping: dict[str, str] = {}
-    if privacy_class == "redacted_cloud":
+    if privacy_class == "redacted_cloud" and privacy.pseudonymise():
         red = []
         for m in messages:
             text, mp = privacy.redact(m["content"], names)
@@ -261,7 +261,7 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
         _log(processor=processor, model=chain[0], purpose=purpose, budget=budget, privacy_class=privacy_class,
              status="refused_privacy")
         raise PrivacyRefused(f"{processor}: local_only data cannot be sent to {chain[0]}")
-    if privacy_class == "redacted_cloud":
+    if privacy_class == "redacted_cloud" and privacy.pseudonymise():
         state = _redact_tree(state, names, {})
     errors = []
     for m in chain:

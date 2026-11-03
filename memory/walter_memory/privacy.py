@@ -64,9 +64,38 @@ def tighten_derived_sources(processor='l3.conversation_summary', *, dry_run=True
         return out
 
 
+def cloud_ceiling() -> str:
+    """The strictest class a cloud reader (a cloud model's context, MCP tools of cloud agents) may read.
+    organic.toml [privacy] cloud_context: "cloud_allowed" (before 2026-11-03) or "redacted_cloud" (Monsieur,
+    2026-11-03: messaging content may enter cloud contexts). local_only never leaves: the value is clamped."""
+    try:
+        from . import organic
+        c = (organic.settings().get("privacy") or {}).get("cloud_context", "cloud_allowed")
+    except Exception:
+        c = "cloud_allowed"
+    return c if c in ("cloud_allowed", "redacted_cloud") else "cloud_allowed"
+
+
+def pseudonymise() -> bool:
+    """organic.toml [privacy] pseudonymise: redacted_cloud content is pseudonymised before a cloud model sees it
+    (default true; Monsieur, 2026-11-03: not needed for now)."""
+    try:
+        from . import organic
+        return bool((organic.settings().get("privacy") or {}).get("pseudonymise", True))
+    except Exception:
+        return True
+
+
 def allowed_classes(max_privacy: str) -> list[str]:
-    """Classes a caller may read. 'cloud_allowed' → only cloud_allowed rows; 'local_only' → everything."""
+    """Classes a caller may read. 'cloud_allowed' = a cloud reader → up to cloud_ceiling(); 'local_only' →
+    everything; 'redacted_cloud' → cloud_allowed and redacted_cloud."""
+    if max_privacy == "cloud_allowed":
+        max_privacy = cloud_ceiling()
     return ORDER[: ORDER.index(max_privacy) + 1]
+
+
+def cloud_readable(cls: str | None) -> bool:
+    return (cls or "local_only") in allowed_classes("cloud_allowed")
 
 
 # ───────────────────────── detectors (deterministic, L0) ─────────────────────────

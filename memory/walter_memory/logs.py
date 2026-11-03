@@ -641,7 +641,7 @@ def _show(text: str | None, cls: str, max_privacy: str, limit: int | None = None
         return None
     if cls not in _cloud_view(max_privacy):
         return "[contenu local uniquement]"
-    if cls == "redacted_cloud" and max_privacy == "cloud_allowed":
+    if cls == "redacted_cloud" and max_privacy == "cloud_allowed" and privacy.pseudonymise():
         text = privacy.redact(text)[0]
     if limit and len(text) > limit:
         return text[:limit] + f"… [+{len(text) - limit} car.]"

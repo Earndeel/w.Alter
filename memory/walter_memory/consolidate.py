@@ -224,7 +224,7 @@ def build_subject(subject: str, *, now: datetime | None = None, force: bool = Fa
         title = (src or {}).get("title") or subject
         threads = threads_of(conn, subject)
         everything = items_of(conn, threads, privacy.allowed_classes("local_only"))
-    has_local = any(i["privacy_class"] != "cloud_allowed" for i in everything)
+    has_local = any(not privacy.cloud_readable(i["privacy_class"]) for i in everything)
     for variant in ("cloud", "local"):
         if variant == "local" and not has_local:
             continue

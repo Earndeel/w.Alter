@@ -44,3 +44,12 @@ mode = "daily"
 per_run = 5
 days = 60
 max_messages = 160
+
+[privacy]
+# What a cloud reader (a cloud model's context, MCP tools of cloud agents) may read (Monsieur, 2026-11-03: « tout peut
+# rentrer dans le contexte des modèles cloud pour l'instant, pas besoin de pseudonymiser »): "redacted_cloud" =
+# messaging content (Beeper, Gmail, Kardex) enters cloud contexts as is; "cloud_allowed" = the stricter rule before.
+# local_only (GPS, places, conversations marked local) never leaves, whatever this says.
+cloud_context = "redacted_cloud"
+# true = redacted_cloud content is pseudonymised before any cloud model call (extraction, decisions, logs for agents).
+pseudonymise = false
