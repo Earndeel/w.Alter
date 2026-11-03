@@ -65,15 +65,17 @@ def tighten_derived_sources(processor='l3.conversation_summary', *, dry_run=True
 
 
 def cloud_ceiling() -> str:
-    """The strictest class a cloud reader (a cloud model's context, MCP tools of cloud agents) may read.
-    organic.toml [privacy] cloud_context: "cloud_allowed" (before 2026-11-03) or "redacted_cloud" (Monsieur,
-    2026-11-03: messaging content may enter cloud contexts). local_only never leaves: the value is clamped."""
+    """The strictest class a cloud reader (a cloud model's context or call, MCP tools of cloud agents) may read.
+    organic.toml [privacy] cloud_context: "cloud_allowed" (the strict rule before 2026-11-03), "redacted_cloud", or
+    "local_only" (Monsieur, 2026-11-03: Walter has no local model, all its reasoning is cloud — « oui tout »).
+    Classes stay on every row (audit, a future local model, a stricter setting); only who may read them changes.
+    What leaves towards a PERSON is decided apart (disclosure.py)."""
     try:
         from . import organic
         c = (organic.settings().get("privacy") or {}).get("cloud_context", "cloud_allowed")
     except Exception:
         c = "cloud_allowed"
-    return c if c in ("cloud_allowed", "redacted_cloud") else "cloud_allowed"
+    return c if c in ORDER else "cloud_allowed"
 
 
 def pseudonymise() -> bool:
@@ -92,6 +94,25 @@ def allowed_classes(max_privacy: str) -> list[str]:
     if max_privacy == "cloud_allowed":
         max_privacy = cloud_ceiling()
     return ORDER[: ORDER.index(max_privacy) + 1]
+
+
+def mask_secrets(text: str | None) -> str | None:
+    """Credentials (passwords, codes, keys, IBAN, cards) are masked in place — the message stays readable, the value
+    never reaches a model (Monsieur's rule: credentials live in Bitwarden only)."""
+    if not text:
+        return text
+    from .logs import mask
+    return mask(text)
+
+
+def model_may_receive(cls: str | None) -> bool:
+    """May a cloud model CALL receive data of this class? redacted_cloud always could (pseudonymised when
+    pseudonymise() is on); local_only only when the cloud ceiling allows it (no local model: « oui tout »)."""
+    return (cls or "local_only") != "local_only" or cloud_ceiling() == "local_only"
+
+
+def model_classes() -> list[str]:
+    return [c for c in ORDER if model_may_receive(c)]
 
 
 def cloud_readable(cls: str | None) -> bool:

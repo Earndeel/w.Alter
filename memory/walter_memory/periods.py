@@ -225,13 +225,25 @@ def render(kind: str, start: datetime, end: datetime, data: dict, *, local: bool
     return {"index": index, "overview": overview, "details": details}
 
 
-def _overview(lines: list[str], budget_chars: int = 2400) -> str:
-    out, used, skipped = [], 0, 0
+def _overview(lines: list[str], budget_chars: int = 2400, per_section: int = 4) -> str:
+    """Every section keeps its heading and its first lines (a period is work, decisions, places, people alike), then
+    the remaining budget goes to the rest in order; what is left out is counted, never silent."""
+    sections, cur = [], []
     for l in lines:
-        if used + len(l) > budget_chars and not l.startswith("#"):
-            skipped += 1
-            continue
-        out.append(l); used += len(l)
+        if l.startswith("## ") and cur:
+            sections.append(cur); cur = []
+        cur.append(l)
+    if cur:
+        sections.append(cur)
+    keep = [s[:1 + per_section] for s in sections]
+    used = sum(len(l) for s in keep for l in s)
+    for k, s in enumerate(sections):
+        for l in s[1 + per_section:]:
+            if used + len(l) > budget_chars:
+                break
+            keep[k].append(l); used += len(l)
+    skipped = sum(len(s) for s in sections) - sum(len(s) for s in keep)
+    out = [l for s in keep for l in s]
     if skipped:
         out.append(f"(+{skipped} lignes : profondeur details)")
     return "\n".join(out)
@@ -257,7 +269,7 @@ def build(kind: str, d: date, *, force: bool = False) -> dict:
             if last and last["inputs_hash"] == h and not last["stale_since"] and not force:
                 out[variant] = {"key": vkey, "rebuilt": False}
                 continue
-            texts = render(kind, start, end, data, local=variant == "local")
+            texts = render(kind, start, end, data, local=variant == "local" or privacy.cloud_readable("local_only"))
             conn.execute("""insert into views.view (view_key, domain, horizon, title, status, generation, kind, starts_at, ends_at,
                                 tz, attributes, privacy_class, first_at, last_at)
                             values (%s, 'activities', %s, %s, 'active', 'g1', 'period', %s, %s, %s, %s, 'cloud_allowed', %s, %s)

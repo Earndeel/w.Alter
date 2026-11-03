@@ -21,7 +21,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from . import organic
+from . import organic, privacy
 from .db import connection
 
 log = logging.getLogger("walter.kardex")
@@ -72,10 +72,10 @@ def messages_with(conn, entity_id: str, days: int, limit: int) -> list[dict]:
         from core.events e left join core.identity_links l on l.identity_id = e.actor_identity_id
         where e.thread_id in (select thread_id from threads) and e.occurred_at > now() - make_interval(days => %s)
           and e.event_type in ('message.sent', 'message.received', 'email.sent', 'email.received')
-          and e.privacy_class = 'redacted_cloud' and coalesce(e.content, '') <> ''
+          and e.privacy_class = any(%s) and coalesce(e.content, '') <> ''
           and not exists (select 1 from core.events r where r.event_type = 'event.retracted'
                           and r.payload @> jsonb_build_object('target_event_id', e.event_id::text))
-        order by e.occurred_at desc limit %s""", (entity_id, days, entity_id, days, limit)).fetchall()
+        order by e.occurred_at desc limit %s""", (entity_id, days, entity_id, days, privacy.model_classes(), limit)).fetchall()
 
 
 def enrich(entity_id: str, *, chat=None, days: int | None = None, max_messages: int | None = None) -> dict:
@@ -89,11 +89,12 @@ def enrich(entity_id: str, *, chat=None, days: int | None = None, max_messages: 
         msgs = list(reversed(messages_with(conn, entity_id, days, max_messages)))
     if len([m for m in msgs if m["from_contact"]]) < 3:
         return {"entity": entity_id, "skipped": "too few messages from the contact"}
-    who = "Contact"
+    who = name if not privacy.pseudonymise() else "Contact"     # real names when pseudonymisation is off
     lines = "\n".join(f"{k}. [{m['occurred_at']:%d/%m/%Y}] {who if m['from_contact'] else 'Monsieur'} : "
-                      f"{(m['content'] or '')[:500]}" for k, m in enumerate(msgs, 1))
+                      f"{privacy.mask_secrets(m['content'] or '')[:500]}" for k, m in enumerate(msgs, 1))
     res = chat([{"role": "user", "content": PROMPT.format(who=who, messages=lines[:24000])}], poste="memory_extraction",
-               processor="kardex.enrich", processor_version="1", privacy_class="redacted_cloud", names=[name],
+               processor="kardex.enrich", processor_version="1",
+               privacy_class=privacy.strictest(*(m["privacy_class"] for m in msgs)), names=[name],
                budget="recurring", purpose="kardex: what a contact says about themselves",
                response_format={"type": "json_object"}, max_tokens=2500, timeout=240)
     c = res["content"] or "{}"

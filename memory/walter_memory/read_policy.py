@@ -110,8 +110,14 @@ def canonical_allowed(conn, row: dict, generations: list[str] | None | str = "re
 
 
 def filter_cloud_rows(conn, rows, generations: list[str] | None | str = "readable"):
-    return [row for row in canonical_filter(conn, rows, generations)
-            if not any(category == 'secret' for category, _ in privacy.detect(row.get('text') or ''))]
+    """Cloud-readable rows; a credential inside one is masked in place, the row is kept (2026-11-03: no systematic
+    suppression that would degrade the model's understanding; credentials never reach a model)."""
+    out = []
+    for row in canonical_filter(conn, rows, generations):
+        if any(category == 'secret' for category, _ in privacy.detect(row.get('text') or '')):
+            row = {**row, "text": privacy.mask_secrets(row.get("text"))}
+        out.append(row)
+    return out
 
 
 def query_privacy(query, caller='walter'):
@@ -137,6 +143,17 @@ _RULES = {   # audience → (max sensitivity, mention policies, refused disclosu
 }
 
 
+def _reasoning_full() -> bool:
+    """organic.toml [privacy] kardex_cloud = "full" (Monsieur, 2026-11-03: no local model, so the cloud model is the one
+    that reasons): a cloud model sees what the owner sees about people, each claim keeping its mention policy so it
+    is never repeated to someone else. "policy" = the earlier filtered view."""
+    try:
+        from . import organic
+        return (organic.settings().get("privacy") or {}).get("kardex_cloud", "policy") == "full"
+    except Exception:
+        return False
+
+
 def audience_for(max_privacy: str) -> str:
     return "owner_local" if max_privacy == "local_only" else "cloud_model"
 
@@ -147,18 +164,21 @@ def kardex_claim_visible(claim: dict, audience: str, now=None) -> tuple[bool, st
     from datetime import datetime, timezone
     if audience not in _RULES:
         raise ValueError(f"unknown audience {audience!r}")
+    reasoning = audience == "cloud_model" and _reasoning_full()
+    if reasoning:          # the model reasons with it; mention policies travel with the claim (never repeated)
+        audience = "owner_local"
     now = now or datetime.now(timezone.utc)
     if (claim.get("status") or "active") not in CURRENT_CLAIM:
         return False, "not_current"                    # superseded, retracted, rejected: history, not truth
     if claim.get("valid_to") and claim["valid_to"] <= now:
         return False, "expired"
-    if claim.get("mention_policy") == "never_reference":
+    if claim.get("mention_policy") == "never_reference" and not reasoning:
         return False, "never_reference"
     max_sens, policies, refused_disclosure, refused_origin = _RULES[audience]
     sens = max(_SENS.get(claim.get("sensitivity") or "normal", 3), _SENS.get(claim.get("evidence_sensitivity") or "normal", 3))
     if sens > max_sens:
         return False, "sensitivity"
-    if (claim.get("mention_policy") or "contextual_only") not in policies:
+    if (claim.get("mention_policy") or "contextual_only") not in policies and not reasoning:
         return False, "mention_policy"
     if (claim.get("disclosure_state") or "unknown") in refused_disclosure:
         return False, "disclosure_state"
@@ -181,7 +201,8 @@ def kardex_claims(conn, contact_id: int, audience: str, limit: int = 15) -> list
     for r in rows:
         ok, _ = kardex_claim_visible(r, audience)
         if ok:
-            out.append({"claim": r["claim"], "mention_policy": r["mention_policy"], "knowledge_origin": r["knowledge_origin"],
+            out.append({"claim": r["claim"], "mention_policy": r["mention_policy"], "sensitivity": r["sensitivity"],
+                        "knowledge_origin": r["knowledge_origin"],
                         "confidence": r["confidence"], "confirmed": r["status"] in ("active", "confirmed")})
         if len(out) >= limit:
             break

@@ -120,9 +120,9 @@ def chat(messages: list[dict], *, model: str | None = None, poste: str | None = 
     base = {"processor": processor, "processor_version": processor_version, "model": model or f"router:{poste}",
             "purpose": purpose, "budget": budget, "privacy_class": privacy_class,
             "provider": "walter-llm" if poste else "openrouter"}
-    if privacy_class == "local_only":
+    if not privacy.model_may_receive(privacy_class):
         _log(**base, status="refused_privacy")
-        raise PrivacyRefused(f"{processor}: local_only data cannot be sent to {model}")
+        raise PrivacyRefused(f"{processor}: {privacy_class} data cannot be sent to {model}")
     b = budget_status(budget)
     if b and b["hard_stop"] and b["spent_usd"] >= b["limit_usd"]:
         _log(**base, status="refused_budget")
@@ -257,10 +257,10 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
     "cloudflare/clef" or "clef" = Workers AI). local_only state is refused; redacted_cloud state is pseudonymised
     (strings, recursively) before leaving the VM. Returns {"answers": {...}, "usage": {...}, "model": ...}."""
     chain = (model,) if model else (models or decide_chain())
-    if privacy_class == "local_only":
+    if not privacy.model_may_receive(privacy_class):
         _log(processor=processor, model=chain[0], purpose=purpose, budget=budget, privacy_class=privacy_class,
              status="refused_privacy")
-        raise PrivacyRefused(f"{processor}: local_only data cannot be sent to {chain[0]}")
+        raise PrivacyRefused(f"{processor}: {privacy_class} data cannot be sent to {chain[0]}")
     if privacy_class == "redacted_cloud" and privacy.pseudonymise():
         state = _redact_tree(state, names, {})
     errors = []

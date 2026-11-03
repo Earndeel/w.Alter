@@ -80,7 +80,7 @@ def plans(since: datetime | None = None, *, chat=None, limit: int | None = None)
     for b in bursts:
         if out["bursts"] >= limit:
             break
-        if b["privacy_class"] == "local_only":
+        if not privacy.model_may_receive(b["privacy_class"]):
             out["skipped_local"] += 1
             _mark(b["item_id"], "local_only")
             continue
@@ -104,7 +104,7 @@ def plans(since: datetime | None = None, *, chat=None, limit: int | None = None)
         try:
             res = chat([{"role": "user", "content": PLAN_PROMPT.format(tz=str(z), messages=lines[:12000])}],
                        poste="memory_extraction", processor="episodic.plans", processor_version="1",
-                       privacy_class="redacted_cloud", names=names, budget="recurring",
+                       privacy_class=b["privacy_class"], names=names, budget="recurring",
                        purpose="dated plans in a conversation", response_format={"type": "json_object"},
                        max_tokens=1200, timeout=180)
             c = res["content"] or "{}"

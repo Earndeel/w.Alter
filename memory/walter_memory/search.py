@@ -397,19 +397,20 @@ def _rerank(query: str, results: list[dict], limit: int, timeout: float = 8) -> 
     """Rerank only current permitted canonical records; private queries stay local."""
     from .read_policy import filter_cloud_rows, query_privacy
     query_class = query_privacy(query)
-    if query_class == 'local_only':
+    if not privacy.model_may_receive(query_class):
         return results
+    query = privacy.mask_secrets(query)
     with connection() as conn:
         cloud = filter_cloud_rows(conn, results)
     if not cloud:
         return results
-    if query_class == 'redacted_cloud':
+    if query_class == 'redacted_cloud' and privacy.pseudonymise():
         query = privacy.redact(query)[0]
     from .llm import _key
     docs = []
     for r in cloud:
         text = r["text"]
-        if r["privacy_class"] == "redacted_cloud":
+        if r["privacy_class"] == "redacted_cloud" and privacy.pseudonymise():
             text, _ = privacy.redact(text, [r.get("actor") or ""])
         docs.append(text[:2000])
     from .llm import router_model

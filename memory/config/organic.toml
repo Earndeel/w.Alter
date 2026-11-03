@@ -46,10 +46,13 @@ days = 60
 max_messages = 160
 
 [privacy]
-# What a cloud reader (a cloud model's context, MCP tools of cloud agents) may read (Monsieur, 2026-11-03: « tout peut
-# rentrer dans le contexte des modèles cloud pour l'instant, pas besoin de pseudonymiser »): "redacted_cloud" =
-# messaging content (Beeper, Gmail, Kardex) enters cloud contexts as is; "cloud_allowed" = the stricter rule before.
-# local_only (GPS, places, conversations marked local) never leaves, whatever this says.
-cloud_context = "redacted_cloud"
-# true = redacted_cloud content is pseudonymised before any cloud model call (extraction, decisions, logs for agents).
+# What a cloud reader (a cloud model's context or call, MCP tools of cloud agents) may read. Monsieur, 2026-11-03:
+# « Oui tout » — Walter has no local model, all its reasoning is cloud: "local_only" = everything (GPS, places,
+# conversations marked local, messaging). Earlier values: "redacted_cloud", "cloud_allowed" (the strict rule).
+# Classes stay on every row; what goes to a PERSON is decided apart (disclosure check on outgoing messages).
+cloud_context = "local_only"
+# false = no pseudonymisation before a cloud model call or in a cloud context (real names).
 pseudonymise = false
+# "full" = the cloud model reasons with everything Kardex knows about people (each claim tagged when it must never be
+# repeated to someone else); "policy" = the filtered view used before.
+kardex_cloud = "full"
