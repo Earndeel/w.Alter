@@ -7,14 +7,16 @@
 enforce = true
 
 [working_memory]
-# P1.1: "shadow" = extraction keeps its 20-minute policy; the working state and the adaptive decisions are only
-# recorded (extraction.working_shadow), nothing new is injected. "adaptive" = the adaptive trigger drives extraction.
-# "off" = no working-state records.
-mode = "shadow"
+# P1.1: "adaptive" (2026-11-03, owner: integrate, no long shadow) = the adaptive trigger drives extraction (long,
+# marked or directive owner messages at once, the rest grouped) and the working state is injected by Context;
+# "shadow" = extraction keeps its 20-minute policy, states only recorded (extraction.working_shadow); "off" = neither.
+mode = "adaptive"
 
 [consolidation]
 # P1.2: g1 subject views rebuilt from current V1 knowledge and evidence (status 'shadow': built, not served).
-# "shadow" = views built, reconsolidation proposals recorded only; "apply" = proposals applied; "off" = nothing.
-mode = "shadow"
+# "active" (2026-11-03) = views served, reconsolidation applies only the safe proposals (strict duplicates, finished
+# task items, replaced decisions; never closes a durable rule — those stay proposals in views.ledger);
+# "shadow" = views built, proposals recorded only; "off" = nothing.
+mode = "active"
 # Router tier for reconsolidation (the memory_extraction route proposed nothing on real subjects; L3 did, 2026-11-02)
 poste = "general/L3"

@@ -133,7 +133,14 @@ def test_privacy_from_creation_is_enforced_by_the_database():
     assert "error" in read(consolidate.key_for(s))
 
 
-def test_shadow_views_are_not_served_by_default():
+def _mode(monkeypatch, value):
+    from walter_memory import organic
+    cur = organic.settings()
+    monkeypatch.setattr(organic, "settings", lambda: {**cur, "consolidation": {**cur["consolidation"], "mode": value}})
+
+
+def test_shadow_views_are_not_served_by_default(monkeypatch):
+    _mode(monkeypatch, "shadow")
     t = f"s-{uuid.uuid4().hex[:8]}"
     say("dsh", t, "owner", "on garde Rust pour l'outil", NOW - timedelta(hours=3))
     extract("dsh", t, [{"kind": "decision", "text": "L'outil sera en Rust", "stage": "decided", "msgs": [1],
@@ -144,7 +151,8 @@ def test_shadow_views_are_not_served_by_default():
     assert "Rust" in read(consolidate.key_for(s))["content"]
 
 
-def test_reconsolidation_proposals_are_validated_and_only_recorded_in_shadow():
+def test_reconsolidation_proposals_are_validated_and_only_recorded_in_shadow(monkeypatch):
+    _mode(monkeypatch, "shadow")
     t = f"r-{uuid.uuid4().hex[:8]}"
     texts = ["on garde Redis pour le cache", "le cache utilise Redis", "on passe à Valkey pour le cache",
              "attends avant de toucher au cache"]
@@ -221,3 +229,49 @@ def test_budget_never_drops_rules_silently():
     text = working.render(st)
     assert len(text) // 4 < 600 and "+" in text and "non affichés faute de place" in text
     assert "Règle numéro 29" in text                                     # the most recent stays
+
+
+def test_active_views_are_served_and_found_by_related_views(monkeypatch):
+    _mode(monkeypatch, "active")
+    t = f"a-{uuid.uuid4().hex[:8]}"
+    say("codex", t, "owner", "on garde Zig pour le moteur audio", NOW - timedelta(hours=2))
+    extract("codex", t, [{"kind": "decision", "text": "Le moteur audio sera écrit en Zig", "stage": "decided",
+                          "msgs": [1], "quote": "on garde Zig pour le moteur audio"}])
+    s = subject_with(("codex", t))
+    consolidate.build_subject(s)
+    r = views.read({"depth": "overview", "key": consolidate.key_for(s)})
+    assert "Zig" in r["content"]
+    assert any(consolidate.key_for(s) in line for line in consolidate.related_views("moteur audio en Zig", min_sim=0.0, limit=50))
+
+
+def test_safe_application_never_closes_a_durable_rule(monkeypatch):
+    _mode(monkeypatch, "active")
+    t = f"d-{uuid.uuid4().hex[:8]}"
+    texts = ["jamais de push sans mon accord", "désormais tu peux pousser sur les branches de test",
+             "on garde Redis pour le cache", "on passe à Valkey pour le cache"]
+    for k, tx in enumerate(texts):
+        say("claude_code", t, "owner", tx, NOW - timedelta(hours=6 - k))
+    extract("claude_code", t, [
+        {"kind": "constraint", "text": "Jamais de push sans l'accord de Monsieur", "msgs": [1], "quote": texts[0]},
+        {"kind": "constraint", "text": "W.Alter peut pousser sur les branches de test", "msgs": [2], "quote": texts[1]},
+        {"kind": "decision", "text": "Le cache utilise Redis", "stage": "decided", "msgs": [3], "quote": texts[2]},
+        {"kind": "decision", "text": "Le cache passe à Valkey", "stage": "decided", "msgs": [4], "quote": texts[3]}])
+    s = subject_with(("claude_code", t))
+    with connection() as conn:
+        ids = {r["content"]: r["item_id"][:8] for r in conn.execute(
+            "select item_id::text, content from core.derived_items where source_refs->>'thread' = %s and kind <> 'summary'", (t,))}
+
+    def chat(messages, **kw):
+        return {"content": json.dumps({"merge": [[ids["Jamais de push sans l'accord de Monsieur"],
+                                                  ids["W.Alter peut pousser sur les branches de test"]]],
+                                       "supersede": [{"old": ids["Jamais de push sans l'accord de Monsieur"],
+                                                      "new": ids["W.Alter peut pousser sur les branches de test"], "why": "?"},
+                                                     {"old": ids["Le cache utilise Redis"], "new": ids["Le cache passe à Valkey"],
+                                                      "why": "changement"}], "expire": []}), "model": "scripted"}
+    r = consolidate.reconsolidate(s, chat=chat)            # mode active: safe application
+    assert r["applied"] and len(r["withheld"]["supersede"]) == 1 and len(r["withheld"]["merge"]) == 1
+    with connection() as conn:
+        st = {row["content"]: row["status"] for row in conn.execute(
+            "select content, status from core.derived_items where source_refs->>'thread' = %s and kind <> 'summary'", (t,))}
+    assert st["Jamais de push sans l'accord de Monsieur"] == "derived"          # the durable rule stays in force
+    assert st["Le cache utilise Redis"] == "superseded" and st["Le cache passe à Valkey"] == "derived"

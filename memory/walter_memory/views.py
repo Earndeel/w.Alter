@@ -382,6 +382,7 @@ def read(q: dict) -> dict:
                                from views.view v join lateral (select content from views.version
                                     where view_key = v.view_key and depth = 'index' order by version desc limit 1) x on true
                                where v.domain = %s and v.status = 'active' and (%s::timestamptz is null or v.last_at >= %s)
+                                 and not (v.attributes ? 'mirrors')     -- a V1 mirror is read through its subject's key
                                  and (%s::text[] is null or v.generation = any(%s::text[]))
                                order by v.last_at desc limit 200""",
                             (q["domain"], _now() - horizon_since if horizon_since else None,

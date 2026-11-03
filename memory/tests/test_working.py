@@ -142,3 +142,26 @@ def test_shadow_records_state_and_decision_without_injecting():
     with connection() as conn:   # shadow: nothing was extracted
         assert conn.execute("select count(*) n from extraction.covered c join core.events e on e.event_id = c.event_id "
                             "where e.thread_id = %s", (t,)).fetchone()["n"] == 0
+
+
+def test_context_injects_the_rules_and_the_working_state_of_the_callers_thread(monkeypatch):
+    """P1.1 activated (2026-11-03): get_context(session=…) carries the thread's state and the owner's durable rules
+    from any thread; a task-scoped rule stays in its thread; rules are never duplicated in the knowledge section."""
+    from walter_memory import context, search
+    monkeypatch.setattr(search, "search", lambda *a, **k: [])        # no index / rerank in this test
+    a, b = f"r-{uuid.uuid4().hex[:8]}", f"s-{uuid.uuid4().hex[:8]}"
+    say("codex", a, "owner", "désormais, toujours répondre en français dans les rapports", NOW - timedelta(hours=5))
+    extract2.process_thread("codex", a, force=True, chat=model_from([
+        {"kind": "preference", "text": "Les rapports sont toujours rédigés en français", "msgs": [1], "scope": "durable",
+         "quote": "toujours répondre en français dans les rapports"}]))
+    say("claude_code", b, "owner", "pour ce chantier, ne touche pas au dossier vendor", NOW - timedelta(minutes=20))
+    extract2.process_thread("claude_code", b, force=True, chat=model_from([
+        {"kind": "constraint", "text": "Ne pas modifier le dossier vendor pendant ce chantier", "msgs": [1], "scope": "task",
+         "quote": "ne touche pas au dossier vendor"}]))
+    say("claude_code", b, "owner", "tu peux lancer la migration du schéma maintenant", NOW - timedelta(minutes=1))
+    r = context.get_context("on lance la migration ?", session=("claude_code", b), include_profile=False)
+    assert "Les rapports sont toujours rédigés en français" in r["sections"]["rules"]
+    assert "dossier vendor" in r["sections"]["working"] and "tu peux lancer la migration" in r["sections"]["working"]
+    assert "dossier vendor" not in r["sections"].get("rules", "")       # task scope: its own thread only
+    r2 = context.get_context("on lance la migration ?", include_profile=False)  # no session: no working state
+    assert "working" not in r2["sections"] and "rapports" in r2["sections"]["rules"]

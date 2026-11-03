@@ -2,6 +2,11 @@
 
 Sections (in this order, stable first so provider prompt caches keep hitting):
   1. profile     — compiled profile (USER.md), stable across turns
+  1b. rules      — the owner's durable rules in force (V1, every thread and runtime): always there, a weak
+                   classification of the message never loses them (P1.1/P1.8 stable layer)
+  1c. working    — the working state of the caller's thread when the session is known (P1.1): interpreted V1
+                   knowledge of the thread and of its subject (other runtimes), the owner's words not interpreted
+                   yet verbatim, the agent's plan — rebuilt from Memory, so it survives a compression
   2. people      — short Kardex card for people actually named in the query (L0 name match)
   3. records     — the current sections of the instance's curated records (decisions register, owner rules:
                    walter_memory.documents) that match the query; decisions taken outside Hermes live only there
@@ -19,7 +24,8 @@ from . import search, social
 from .db import connection
 
 USER_MD = Path("/root/.hermes/memories/USER.md")
-DEFAULT_BUDGET = {"profile": 600, "people": 400, "records": 900, "knowledge": 900, "evidence": 500}
+DEFAULT_BUDGET = {"profile": 600, "rules": 350, "working": 800, "people": 400, "records": 900, "knowledge": 900,
+                  "evidence": 500, "views": 250}
 RECORD_CHARS = 1200
 EVIDENCE_HINT = re.compile(r"(?i)\b(quand|when|qui a dit|who said|m'a dit|told me|a écrit|wrote|message|mail|e-?mail|"
                            r"conversation|discut|parl[ée]|dernière fois|last time|hier|yesterday|semaine dernière|last week|"
@@ -99,7 +105,8 @@ def _card_lines(entity_id: str) -> list[str]:
 
 
 def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "cloud_allowed",
-                include_profile: bool = True, history: bool = False) -> dict:
+                include_profile: bool = True, history: bool = False,
+                session: tuple[str, str] | None = None) -> dict:
     """Returns {"text": assembled block, "sections": {...}, "trace": {...}}. Knowledge comes from the readable memory
     generations; history=True also reads archived ones, each such line marked « pré-V1 »."""
     from .generations import read_set
@@ -115,6 +122,38 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
         text, used = _clip(USER_MD.read_text().splitlines(), b["profile"])
         sections["profile"] = text
         trace["sections"]["profile"] = {"tokens": used}
+    audience = "owner_local" if max_privacy == "local_only" else "cloud_model"
+    shown_ids: set[str] = set()
+    if session and session[1] and b.get("working", 0) > 0:
+        t = time.perf_counter()
+        try:
+            from . import working
+            st = working.state(session[0], session[1], audience=audience)
+            ids: list = []
+            text = working.render(st, shown=ids)
+            text = text.split("\n", 1)[1] if text.startswith("## ") else text
+            if text and tokens(text) > b["working"]:
+                text = text[: b["working"] * 4].rsplit("\n", 1)[0] + "\n- (état tronqué : memory_view details)"
+            if text:
+                sections["working"] = text
+                shown_ids |= set(ids)
+            trace["sections"]["working"] = {"tokens": tokens(text) if text else 0, "ms": round((time.perf_counter() - t) * 1000),
+                                            "pending": len(st["pending"]), "threads": len(st["threads"]),
+                                            "privacy_class": st["privacy_class"]}
+        except Exception as e:  # the working state is an addition: never lose the rest of the context
+            trace["sections"]["working"] = {"error": type(e).__name__}
+    if b.get("rules", 0) > 0:
+        t = time.perf_counter()
+        try:
+            from . import working
+            r = working.owner_rules(query, audience=audience, budget=b["rules"], exclude=shown_ids)
+            if r["text"]:
+                sections["rules"] = r["text"]
+                shown_ids |= set(r["ids"])
+            trace["sections"]["rules"] = {"tokens": r["tokens"], "ms": round((time.perf_counter() - t) * 1000),
+                                          "refs": r["ids"]}
+        except Exception as e:
+            trace["sections"]["rules"] = {"error": type(e).__name__}
     named = people_in(query) if b["people"] > 0 or b["evidence"] > 0 else []
     if b["people"] > 0:
         t = time.perf_counter()
@@ -142,7 +181,8 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
             res = search.dedupe(res + search.search(query, limit=12, max_privacy=max_privacy, rerank=True,
                                                     history=history))
         lines = [f"- {r['text'].strip()} ({str(r['occurred_at'] or '')[:10]}{mark(r)})" for r in res
-                 if not (b.get("records", 0) > 0 and r.get("label") == "doc_section")]     # already in records
+                 if not (b.get("records", 0) > 0 and r.get("label") == "doc_section")     # already in records
+                 and str(r.get("ref_id")) not in shown_ids]                                  # already in rules/working
         text, used = _clip(list(dict.fromkeys(lines)), b["knowledge"])
         if text:
             sections["knowledge"] = text
@@ -166,7 +206,23 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
             sections["evidence"] = text
         trace["sections"]["evidence"] = {"tokens": used, "ms": round((time.perf_counter() - t) * 1000),
                                          "refs": [r["ref_id"] for r in res[:8]]}
+    if b.get("views", 0) > 0:
+        t = time.perf_counter()
+        try:
+            from . import consolidate
+            lines = consolidate.related_views(query, max_privacy=max_privacy, limit=6)
+            text, used = _clip(lines, b["views"])
+            if text:
+                sections["views"] = text
+            trace["sections"]["views"] = {"tokens": used, "ms": round((time.perf_counter() - t) * 1000)}
+        except Exception as e:
+            trace["sections"]["views"] = {"error": type(e).__name__}
+    order = ["profile", "rules", "working", "people", "records", "knowledge", "views", "evidence"]
+    sections = {k: sections[k] for k in order if k in sections}
     titles = {"profile": "Profil de Monsieur", "people": "Personnes concernées (Kardex)",
+              "rules": "Règles durables de Monsieur (en vigueur)",
+              "working": "État de travail de ce fil (reconstruit par la mémoire, identique après compression)",
+              "views": "Vues consolidées à approfondir (memory_view clé, profondeur overview|synthesis|details)",
               "records": "Décisions et règles consignées (texte en vigueur, daté)",
               "knowledge": "Mémoire pertinente", "evidence": "Sources d'origine"}
     block = "\n\n".join(f"## {titles[k]}\n{v}" for k, v in sections.items())
