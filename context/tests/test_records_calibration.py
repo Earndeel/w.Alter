@@ -29,7 +29,7 @@ def test_records_when_lookup_needed_or_unsure(monkeypatch):
 
 def test_no_records_block_when_memory_block_runs(monkeypatch):
     monkeypatch.setattr(retrieval, "capabilities", lambda plan: None)
-    for name in ("board", "recent"):
+    for name in ("board", "recent", "session_state"):
         monkeypatch.setattr(retrieval, name, lambda *a, **k: None)
     monkeypatch.setattr(retrieval, "subject", lambda plan: None)
     monkeypatch.setattr(retrieval, "memory", lambda plan, m: retrieval.Block("memory", 4, "m") if retrieval._gets_memory(plan) else None)
@@ -38,3 +38,14 @@ def test_no_records_block_when_memory_block_runs(monkeypatch):
     assert ids(_plan(level="L3", caps=("tools", "search"))) == ["memory"]
     assert ids(_plan(level="L0", caps=("tools", "search"))) == ["records"]
     assert ids(_plan(level="L2", caps=("tools", "search"), domains=("projects",))) == ["records"]
+
+
+def test_session_state_is_layer_two_beyond_l0(monkeypatch):
+    """Memory V1 P1.1 (2026-11-03): the owner's rules and the thread's working state ride in layer 2 at L1+."""
+    calls = []
+    ctx = types.SimpleNamespace(get_context=lambda m, **k: calls.append(k) or {"text": "État", "trace": {"sections": {}}})
+    monkeypatch.setitem(sys.modules, "walter_memory.context", ctx)
+    monkeypatch.setitem(sys.modules, "walter_memory", types.SimpleNamespace(context=ctx))
+    b = retrieval.session_state(_plan(level="L2"), "x", "claude-code/vm/abc")
+    assert b.layer == 2 and b.id == "session_state" and calls[0]["session"] == ("claude_code", "abc")
+    assert calls[0]["budget"]["knowledge"] == 0 and calls[0]["budget"]["working"] > 0
