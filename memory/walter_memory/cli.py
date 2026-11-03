@@ -131,7 +131,7 @@ def main(argv=None) -> None:
     ds.add_argument("action", choices=["check"]); ds.add_argument("--to", default=None); ds.add_argument("--text", default=None)
     ds.add_argument("--channel", default="cli"); ds.add_argument("--no-model", action="store_true")
     ep2 = sub.add_parser("organic", help="P1.3-P1.6: entities, flows, episodes, periods (seed, link, flows, plans, episodes, periods, period)")
-    ep2.add_argument("action", choices=["seed", "link", "flows", "plans", "episodes", "periods", "period"])
+    ep2.add_argument("action", choices=["seed", "link", "flows", "plans", "episodes", "periods", "period", "kardex"])
     ep2.add_argument("--days", type=int, default=7); ep2.add_argument("--kind", default="day", choices=["day", "week", "month"])
     ep2.add_argument("--date", default=None); ep2.add_argument("--limit", type=int, default=None)
     mg = sub.add_parser("migrate", help="apply this module's migrations in order and record them (status, baseline)")
@@ -484,6 +484,12 @@ def main(argv=None) -> None:
         elif a.action == "periods":
             from . import periods
             _print(periods.tick(days=a.days))
+        elif a.action == "kardex":
+            from . import kardex_enrich
+            r = kardex_enrich.run(a.limit)
+            _print({k: v for k, v in r.items() if k != "results"} | {"per_contact": [
+                {k: v for k, v in x.items() if k in ("messages", "claims", "reused", "rejected", "skipped", "error")}
+                for x in r["results"]]})
         else:
             from . import periods
             _print(periods.build(a.kind, _d.fromisoformat(a.date) if a.date else _dt.now(_tz.utc).date(), force=True))

@@ -111,6 +111,18 @@ def run(tick_every: float = 60.0, reconcile_every: float = 3600.0, prune_every: 
                         log.info("periods (stale) %s", periods.tick(days=0))
             except Exception:
                 log.exception("flows / episodes / periods failed (extraction unaffected)")
+            try:   # Kardex enrichment from the owner's conversations (pseudonymised, capped), once a day
+                from . import organic
+                kx = organic.settings().get("kardex", {})
+                if kx.get("mode", "daily") == "daily" and now - last.get("kardex", 0.0) >= 86400:
+                    last["kardex"] = now
+                    if last.get("kardex_started"):        # not at the service's start: a restart must not re-run it
+                        from . import kardex_enrich
+                        r_k = kardex_enrich.run()
+                        log.info("kardex enrich %s", {k: v for k, v in r_k.items() if k != "results"})
+                    last["kardex_started"] = True
+            except Exception:
+                log.exception("kardex enrichment failed (extraction unaffected)")
             try:
                 shadow = shadow_working()
                 if shadow:
