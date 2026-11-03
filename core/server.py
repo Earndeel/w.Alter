@@ -239,12 +239,15 @@ def _walter_memory(*args: str, timeout: float = 600) -> str:
 
 @mcp.tool()
 def memory_search(query: str, limit: int = 10, source: str = "", since: str = "", until: str = "",
-                  evidence_only: bool = False) -> str:
+                  evidence_only: bool = False, history: bool = False) -> str:
     """Unified search over everything W.Alter has observed and learned: knowledge (derived memories) AND original
     evidence (messages with W.Alter, Beeper chats, e-mails, calendar, files' extracted text), each result with its
     source and date. Full-text + semantic + rerank. evidence_only=True skips derived knowledge (raw history only).
-    since/until: ISO dates. Prefer this to find *when/where/who said what*; memory_recall for synthesised facts."""
+    since/until: ISO dates. Prefer this to find *when/where/who said what*; memory_recall for synthesised facts.
+    history=True also reads pre-V1 interpretations (archived memory generations), each marked as such."""
     args = ["search", query, "--limit", str(max(1, min(int(limit), 50))), "--rerank", "--cloud-safe"]
+    if history:
+        args.append("--history")
     for flag, value in (("--source", source), ("--since", since), ("--until", until)):
         if value:
             args += [flag, value]
@@ -254,12 +257,29 @@ def memory_search(query: str, limit: int = 10, source: str = "", since: str = ""
 
 
 @mcp.tool()
-def memory_context(query: str, include_profile: bool = False) -> str:
-    """Ready-to-use memory context for a request: Kardex card of people named in it, relevant knowledge
-    (deduplicated), and original sources when the request is about who/when/what was said. Budgeted (~2k tokens),
-    cloud-safe. Call this first when answering anything personal; then go deeper with memory_search/person_lookup."""
-    args = ["context", query] + ([] if include_profile else ["--no-profile"])
+def memory_context(query: str, include_profile: bool = False, history: bool = False) -> str:
+    """Ready-to-use memory context for a request: the owner's durable rules in force, Kardex card of people named in
+    it, relevant knowledge (deduplicated), pointers to consolidated views (memory_view), and original sources when the
+    request is about who/when/what was said. Budgeted (~2k tokens), cloud-safe. Call this first when answering
+    anything personal; then go deeper with memory_view / memory_search / person_lookup. history=True also reads
+    pre-V1 interpretations, marked « pré-V1 »."""
+    args = ["context", query] + ([] if include_profile else ["--no-profile"]) + (["--history"] if history else [])
     return _walter_memory(*args, timeout=120)
+
+
+@mcp.tool()
+def memory_view(key: str = "", query: str = "", depth: str = "overview", max_tokens: int = 1500) -> str:
+    """Walter Memory's consolidated views (Memory V1), rebuilt from current knowledge and evidence: a subject of work
+    (g1:subject:…), an episode (episode:…: hypotheses keep their status — candidate / probable / confirmed), a period
+    (period:day:YYYY-MM-DD, period:week:YYYY-Www, period:month:YYYY-MM). Give `key` to read one at a depth: index
+    (one line) · overview (budgeted current state) · synthesis (how it evolved) · details (every item with stage and id)
+    · sources (what it is built from: knowledge, observations, sub-views, with event ids for memory_events). Give
+    `query` instead to find the views closest to some words. Cloud-safe: local-only views are never returned."""
+    if key:
+        d = depth if depth in ("index", "overview", "synthesis", "details", "sources") else "overview"
+        return _walter_memory("views", "read", key, "--depth", d, "--max-tokens", str(max(100, min(int(max_tokens), 8000))),
+                              *(["--json"] if d == "sources" else []), timeout=60)
+    return _walter_memory("views", "find", "--query", query or "", timeout=60)
 
 
 @mcp.tool()
