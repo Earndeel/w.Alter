@@ -24,8 +24,8 @@ from . import search, social
 from .db import connection
 
 USER_MD = Path("/root/.hermes/memories/USER.md")
-DEFAULT_BUDGET = {"profile": 600, "rules": 350, "working": 800, "people": 400, "records": 900, "knowledge": 900,
-                  "evidence": 500, "views": 250}
+DEFAULT_BUDGET = {"profile": 600, "rules": 300, "working": 700, "people": 400, "records": 700, "knowledge": 900,
+                  "evidence": 500, "views": 200}
 RECORD_CHARS = 1200
 EVIDENCE_HINT = re.compile(r"(?i)\b(quand|when|qui a dit|who said|m'a dit|told me|a écrit|wrote|message|mail|e-?mail|"
                            r"conversation|discut|parl[ée]|dernière fois|last time|hier|yesterday|semaine dernière|last week|"
@@ -119,6 +119,20 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     query = FORM_PREAMBLE.sub("", query, count=1) or query
     t0 = time.perf_counter()
     sections, trace = {}, {"query_chars": len(query), "sections": {}}
+    # The searches are independent (each with its own rerank call): run them at once, read them in section order.
+    from concurrent.futures import ThreadPoolExecutor
+    pool = ThreadPoolExecutor(4)
+    fut = {}
+    if b.get("records", 0) > 0:
+        fut["records"] = pool.submit(lambda: search.dedupe(search.search(
+            query, limit=4, labels=["doc_section"], max_privacy=max_privacy, rerank=True, history=history)))
+    if b["knowledge"] > 0:
+        fut["knowledge"] = pool.submit(lambda: search.dedupe(search.search(
+            query, limit=12, lanes=("knowledge",), max_privacy=max_privacy, rerank=True, history=history)))
+    if b["evidence"] > 0 and EVIDENCE_HINT.search(query):
+        fut["evidence"] = pool.submit(lambda: search.search(query, limit=8, include_derived=False,
+                                                            max_privacy=max_privacy, rerank=True, history=history))
+    pool.shutdown(wait=False)
     if include_profile and b["profile"] > 0 and USER_MD.exists():
         text, used = _clip(USER_MD.read_text().splitlines(), b["profile"])
         sections["profile"] = text
@@ -165,8 +179,7 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
         trace["sections"]["people"] = {"tokens": used, "ms": round((time.perf_counter() - t) * 1000)}
     if b.get("records", 0) > 0:
         t = time.perf_counter()
-        res = search.dedupe(search.search(query, limit=4, labels=["doc_section"], max_privacy=max_privacy, rerank=True,
-                                           history=history))
+        res = fut["records"].result()
         lines = [f"- [{str(r['occurred_at'] or '')[:10]}] {_window(r['text'], query)}" for r in res]
         text, used = _clip(lines, b["records"])
         if text:
@@ -176,8 +189,7 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     if b["knowledge"] > 0:
         t = time.perf_counter()
         # derived knowledge only (evidence has its own section); both lanes when knowledge is thin
-        res = search.dedupe(search.search(query, limit=12, lanes=("knowledge",), max_privacy=max_privacy, rerank=True,
-                                          history=history))
+        res = fut["knowledge"].result()
         if len(res) < 3:
             res = search.dedupe(res + search.search(query, limit=12, max_privacy=max_privacy, rerank=True,
                                                     history=history))
@@ -193,8 +205,7 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
                            "source": r.get("source"), "text": r["text"][:120]} for r in res]
     if b["evidence"] > 0 and EVIDENCE_HINT.search(query):
         t = time.perf_counter()
-        res = search.search(query, limit=8, include_derived=False, max_privacy=max_privacy, rerank=True,
-                            history=history)
+        res = fut["evidence"].result()
         direct = []
         for eid in named:   # "what did X tell me": X's own latest messages first
             card = social.person_card(eid, max_privacy)
