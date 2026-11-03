@@ -139,3 +139,37 @@ def test_day_and_week_rebuild_after_a_correction_and_only_their_path(monkeypatch
 def consolidate_read(key):
     from walter_memory import views
     return views.read({"depth": "details", "key": key, "max_tokens": 6000})["content"]
+
+
+def test_a_replayed_older_message_never_replaces_newer_knowledge():
+    """Onboarding g1 re-extracts older messages: an older statement the model thinks 'supersedes' a newer item becomes
+    that item's past (superseded), the newer one stays in force."""
+    t = f"r-{uuid.uuid4().hex[:6]}"
+    now = datetime.now(timezone.utc)
+
+    def scripted(items):
+        def chat(messages, **kw):
+            known = dict(__import__("re").findall(r"^(K\d+)\. \[[^\]]+\] (.*)$", messages[0]["content"], __import__("re").M))
+            out = []
+            for it in items:
+                it = dict(it)
+                if "supersedes_text" in it:
+                    needle = it.pop("supersedes_text")
+                    it["supersedes"] = [k for k, v in known.items() if needle in v]
+                out.append(it)
+            return {"content": json.dumps({"summary": "", "items": out}), "cost_usd": 0, "model": "scripted"}
+        return chat
+    ev(event_type="message.sent", source="codex", thread_id=t, occurred_at=now - timedelta(hours=1),
+       content="finalement on garde Valkey pour le cache")
+    extract2.process_thread("codex", t, force=True, chat=scripted([
+        {"kind": "decision", "text": f"Le cache {t} utilise Valkey", "stage": "decided", "msgs": [1],
+         "quote": "finalement on garde Valkey pour le cache"}]))
+    ev(event_type="message.sent", source="codex", thread_id=t, occurred_at=now - timedelta(days=5),
+       content="on garde Redis pour le cache")      # an older message, read only now (re-extraction of history)
+    extract2.process_thread("codex", t, force=True, chat=scripted([
+        {"kind": "decision", "text": f"Le cache {t} utilise Redis", "stage": "decided", "msgs": [1],
+         "quote": "on garde Redis pour le cache", "supersedes_text": f"Le cache {t} utilise Valkey"}]))
+    with connection() as conn:
+        st = {r["content"]: r["status"] for r in conn.execute(
+            "select content, status from core.derived_items where source_refs->>'thread' = %s and kind <> 'summary'", (t,))}
+    assert st[f"Le cache {t} utilise Valkey"] == "derived" and st[f"Le cache {t} utilise Redis"] == "superseded"
