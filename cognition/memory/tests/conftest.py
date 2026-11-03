@@ -42,3 +42,19 @@ def pytest_collection_modifyitems(config, items):
                 seen[path] = False
         if seen[path]:
             item.add_marker(skip)
+
+
+@pytest.fixture(autouse=True)
+def _strict_privacy_by_default(request, monkeypatch):
+    """The privacy mechanisms are tested under the strict rule (cloud readers see cloud_allowed only, redacted_cloud is
+    pseudonymised); the owner's current choice (2026-11-03: messaging content in cloud contexts, no pseudonymisation)
+    is tested explicitly with the `owner_privacy` marker."""
+    from walter_memory import organic
+    cur = organic.settings()
+    mode = ({"cloud_context": "redacted_cloud", "pseudonymise": False} if request.node.get_closest_marker("owner_privacy")
+            else {"cloud_context": "cloud_allowed", "pseudonymise": True})
+    monkeypatch.setattr(organic, "settings", lambda: {**cur, "privacy": mode})
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "owner_privacy: run under the owner's current privacy choice (organic.toml)")

@@ -543,13 +543,13 @@ def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "rec
     if not msgs:
         return out
     # 1. never to a cloud model, never retried by this version
-    closed = [m for m in msgs if m["privacy_class"] != "cloud_allowed"]
+    closed = [m for m in msgs if not privacy.cloud_readable(m["privacy_class"])]
     if closed:
         with connection() as conn:
             _segment_row(conn, source=source, thread_id=thread_id, status="local_only_unavailable", msgs=closed,
                          error="no authorised local model: kept in history, not interpreted")
         out["local_only"] += len(closed)
-    cloud = [m for m in msgs if m["privacy_class"] == "cloud_allowed"]
+    cloud = [m for m in msgs if privacy.cloud_readable(m["privacy_class"])]
     # 2. noise: covered without a model call
     noise = [m for m in cloud if _noise(m)]
     if noise:

@@ -48,7 +48,8 @@ def shadow_working(limit: int = 20) -> int:
         with connection() as conn:
             msgs = extract2.pending_events(conn, r["source"], r["thread_id"],
                                            extract2._thread_start(conn, r["source"], r["thread_id"]))
-        usable = [m for m in msgs if m["privacy_class"] == "cloud_allowed" and not extract2._noise(m)]
+        from . import privacy
+        usable = [m for m in msgs if privacy.cloud_readable(m["privacy_class"]) and not extract2._noise(m)]
         now = datetime.now(timezone.utc)
         segs_a, _, reason = extract2.adaptive_due(usable, now)
         segs_l, _ = extract2.due_segments(usable, now)

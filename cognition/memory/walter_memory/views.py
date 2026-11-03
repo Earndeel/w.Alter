@@ -341,7 +341,9 @@ def read(q: dict) -> dict:
     if depth not in DEPTHS or not (q.get("key") or q.get("domain")):
         return {"error": "depth in index|overview|synthesis|details|sources and a key or a domain"}
     max_tokens = int(q.get("max_tokens") or 800)
-    allowed = PRIVACY_RANK.get(q.get("privacy") or "cloud_allowed", 0)
+    from .privacy import cloud_ceiling
+    asked = q.get("privacy") or "cloud_allowed"
+    allowed = PRIVACY_RANK.get(cloud_ceiling() if asked == "cloud_allowed" else asked, 0)
     from .generations import read_set
     gens = read_set(bool(q.get("history")))      # memory generations (P1.0): None = no filter
     with connection() as conn:

@@ -187,9 +187,9 @@ def render(kind: str, start: datetime, end: datetime, data: dict, *, local: bool
         lines.append("## Épisodes (statut de chaque hypothèse conservé)")
         lines += [f"- [{e['view_key']}] {e['title']} ({e['epistemic']})" for e in data["episodes"][:15]]
         lines.append("")
-    if local:
-        visits = [o for o in obs if o["kind"] == "visit"]
-        convs = [o for o in obs if o["kind"] == "conversation"]
+    visits = [o for o in obs if o["kind"] == "visit"]          # only in the local projection (local_only evidence)
+    convs = [o for o in obs if o["kind"] == "conversation"]    # also in the cloud one when messaging may be read there
+    if local or convs:
         if visits:
             lines.append("## Lieux (GPS, calculé sur la VM)")
             if kind == "day":

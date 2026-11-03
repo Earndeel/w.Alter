@@ -57,7 +57,7 @@ def _objects(conn, ids) -> dict[str, dict]:
 
 
 def _readable(owner: dict | None) -> bool:
-    return bool(owner) and owner["privacy_class"] == "cloud_allowed" and bool(owner.get("allowed"))
+    return bool(owner) and privacy.cloud_readable(owner["privacy_class"]) and bool(owner.get("allowed"))
 
 
 def canonical_filter(conn, rows: list[dict], generations: list[str] | None | str = "readable") -> list[dict]:
@@ -66,7 +66,7 @@ def canonical_filter(conn, rows: list[dict], generations: list[str] | None | str
     if generations == "readable":
         from .generations import read_set
         generations = read_set()
-    rows = [r for r in rows if r.get("privacy_class") == "cloud_allowed"]
+    rows = [r for r in rows if privacy.cloud_readable(r.get("privacy_class"))]
     by_kind: dict[str, set[str]] = {}
     for r in rows:
         by_kind.setdefault(r.get("kind"), set()).add(str(r.get("ref_id")))
