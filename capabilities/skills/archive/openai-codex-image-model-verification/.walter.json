@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-11-04T04:18:33+00:00",
+ "archived_reason": "not read for 30 days",
+ "domain": "images",
  "hermes": {
   "path": "/root/.hermes/skills/mlops/openai-codex-image-model-verification",
   "sha": "7f9915f52a8807a3c5a600d096b9bc513584bd3bb5307d343a741212e669c74e",
@@ -7,5 +10,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
+ "reserve": true,
  "store_sha": "7f9915f52a8807a3c5a600d096b9bc513584bd3bb5307d343a741212e669c74e"
 }
