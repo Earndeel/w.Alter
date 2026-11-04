@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-11-04T04:17:42.580038+00:00",
+ "description": "Use when Walter Memory shows unexpectedly high model usage, rerank bursts, repeated decisions, or unnecessary periodic recomputation.",
+ "domain": "walter-memory",
+ "kind": "new",
+ "reason": "Adds a concrete Walter Memory usage-investigation and remediation procedure beyond generic debugging or model selection. Evidence includes attribution of 164 rerank calls to two benchmark runs, discovery of overwritten processing markers and uncached decisions, and an equal-duration production comparison showing attestation calls fall from 45 to 2 and plans calls from 8 to 0. [session claude_code/vm/1ede2cf6-39ae-4b1e-825d-4faff1ab4dbc]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/1ede2cf6-39ae-4b1e-825d-4faff1ab4dbc",
+ "target": "walter-memory-repeated-model-calls"
+}
