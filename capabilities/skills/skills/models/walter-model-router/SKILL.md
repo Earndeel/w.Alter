@@ -137,3 +137,13 @@ PY
 6. Pour les appels Guardians, distinguer le superviseur général `walter-guardians` du Guardian du routeur. Consulter `walter-guardians status` et l’état du Guardian concerné ; ne pas supposer que `models.guardian_incidents` contient les incidents du superviseur général. Un verdict conservé ne constitue pas la réponse JSON brute complète.
 
 7. Présenter tous les appels de la fenêtre demandée, les agrégats et les limites de reconstruction. Ne jamais promettre les inputs/outputs exacts lorsque seuls les métadonnées, les fiches dérivées ou les verdicts ont été conservés.
+
+## Analyser un cycle de 48 h et corriger les alias
+- Respecter le périmètre du cycle : si seule la commande `alias-add` est autorisée en écriture, ne modifier ni fichiers, ni configuration, ni base ; ne pas enregistrer de rapport sur disque.
+- Lire `walter-router review`, `walter-router health` et `walter-router alias-list`. Distinguer les erreurs de collecte, la fraîcheur des sources, les problèmes de providers et les candidats de rapprochement de noms. Une source périmée ne prouve pas une régression du modèle.
+- Pour interpréter les résultats, consulter `walter-router dossier <tâche>` et les documents `docs/TIERS.md` et `config/knowledge.json` du module, dont la racine se résout avec `walter path router`.
+- Utiliser `walter-router alias-list` pour lire les alias : le chemin historique `walter_router/aliases.json` peut ne plus exister. Ne pas recréer ce fichier.
+- Avant tout rapprochement, vérifier auprès d'une source officielle que les deux identifiants désignent exactement la même version du modèle. Une famille, un nom commercial proche ou une nouvelle génération ne suffisent pas. Laisser les cas ambigus inchangés.
+- Appliquer uniquement les correspondances établies avec `walter-router alias-add <alias-source> <model_id-canonique> --reason '<preuve précise et URL officielle>'`. Vérifier le sens de la correspondance dans la liste existante.
+- Relire `walter-router alias-list` après chaque ajout. Examiner le code de sortie et le JSON : l'enveloppe d'un outil peut afficher « error » alors que la commande a terminé avec le code 0 et renvoyé `added` et `model_id`.
+- Pour examiner les alertes historiques et le catalogue, utiliser `walter-router alerts --all` et `walter-router library --json`. Rapporter les anomalies restantes sans tenter de réparer les collecteurs lorsque cette réparation sort du périmètre autorisé.
