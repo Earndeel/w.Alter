@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-11-04T04:17:12.581049+00:00",
+ "description": "Use when changing Walter Memory's cloud reasoning policy and verifying that previously filtered knowledge reaches model calls and injected context without weakening credential masking or outbound disclosure controls.",
+ "domain": "walter-memory",
+ "kind": "new",
+ "reason": "The session exposed a reusable Memory-specific rollout procedure absent from the listed skills: cloud access depended on multiple independent filters, redacted payload admission differed from reader visibility, Kardex had successive gates, previously skipped processing needed catch-up, and accessible knowledge still failed to reach answers because of indexing and context truncation. Generic debugging or review skills would not capture this dependency chain. [session claude_code/vm/023b3b09-beea-4576-bcde-42cd97be6870]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/023b3b09-beea-4576-bcde-42cd97be6870",
+ "target": "walter-memory-policy-rollout"
+}
