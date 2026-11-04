@@ -1,0 +1,11 @@
+{
+ "base_sha": "05b893c467bc787e8ea7d753853e4ad15065bbca470c7a6b99be97741c25062d",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-04T04:18:07.594242+00:00",
+ "domain": "computer-use",
+ "kind": "patch",
+ "reason": "The session demonstrated a reusable extension to remote Mac troubleshooting: the agent environment could not observe the LAN directly, cached ARP entries required live verification, a target on another private subnet routed through the VPN, and bounded Bonjour browsing was needed to investigate AirPlay. These steps fit the existing SSH/Mac skill without retaining shared-network device identities or locations. [session codex/Codex Desktop/01a19bc0-ae67-79a3-8f69-712a3721a6f0]",
+ "runtime": "learner",
+ "session_id": "codex/Codex Desktop/01a19bc0-ae67-79a3-8f69-712a3721a6f0",
+ "target": "ssh-mac-remote-control"
+}
