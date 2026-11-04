@@ -1,0 +1,14 @@
+{
+ "created_at": "2026-11-04T13:34:17+00:00",
+ "domain": "code",
+ "evidence": {},
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/evidence-and-execution-operations",
+  "sha": "ce2d26b1193f6e3d8e04d79d58501f30399167574f4c0ff74802e3713e53b12f",
+  "state": "active"
+ },
+ "kind": "hermes_update",
+ "reason": "Hermes changed a skill Walter also changed (manual merge)",
+ "runtime": "hermes",
+ "target": "evidence-and-execution-operations"
+}
