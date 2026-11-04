@@ -499,7 +499,7 @@ def main():
                     help="sonder les pistes audio réelles de la source --pick, sans rien lancer")
     ap.add_argument("--state", action="store_true",
                     help="lecture en cours et piste audio retenue par Stremio pour ce titre")
-    ap.add_argument("--host", default="192.168.1.37")
+    ap.add_argument("--host", default="192.168.1.38")  # IP DHCP du dongle, changée de .37 à .38 le 2026-11-04
     a = ap.parse_args()
 
     if a.off:
