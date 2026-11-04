@@ -324,3 +324,38 @@ SH
 
 - `references/cmux-workflows.md` — cmux: multi-session reconnection, SSH config for tunnel-based cmux, configuration, the Hermes shortcut (fresh TUI in the same workspace).
 
+## Diagnose LAN reachability and AirPlay from the Mac
+
+Run LAN diagnostics from Monsieur’s Mac through `ssh -o BatchMode=yes -o ConnectTimeout=8 mac`; the VM or agent sandbox is not an observation point on the Mac’s Wi-Fi network. The SSH alias uses Tailscale and does not establish which LAN the Mac currently occupies.
+
+1. Establish the current interface, address, mask and routes before scanning:
+   ```sh
+   ssh -o BatchMode=yes -o ConnectTimeout=8 mac 'networksetup -listallhardwareports; route -n get default; ipconfig getifaddr en0; ifconfig en0; arp -an; command -v nmap'
+   ```
+   Replace `en0` if the hardware-port listing identifies another active Wi-Fi interface. Derive the subnet from the live address and mask; never reuse a previous session’s LAN range. Treat ARP entries as cached observations, not proof that devices are currently online.
+
+2. For a particular address, inspect its route before interpreting probe failures:
+   ```sh
+   ssh -o BatchMode=yes -o ConnectTimeout=8 mac 'route -n get TARGET_IP; ping -c 2 -W 1000 TARGET_IP; arp -n TARGET_IP'
+   ```
+   Replace `TARGET_IP` with the requested address. A route through a VPN tunnel can explain why another private subnet is unreachable. Report failure as “unreachable from this Mac through the current route”; do not infer that the device is powered off. Likewise, successful ping counts measure responding addresses rather than a complete device inventory.
+
+3. If `nmap` is absent, use the Mac’s Python 3 with bounded `concurrent.futures.ThreadPoolExecutor` workers and `socket.create_connection((address, port), timeout=1)` to test selected ports. Useful service hints include TCP 22, 80, 443, 445, 548, 631, 8008, 8009, 8080, 8443 and 9100. An open port is evidence of a reachable service, not a reliable device identity. Keep scans within the requested scope.
+
+4. For missing AirPlay destinations, browse both Bonjour service types from the Mac:
+   ```python
+   import subprocess
+   for service in ('_airplay._tcp', '_raop._tcp'):
+       print('SERVICE', service, flush=True)
+       try:
+           result = subprocess.run(
+               ['dns-sd', '-B', service, 'local.'],
+               capture_output=True, text=True, timeout=8)
+           output = result.stdout
+       except subprocess.TimeoutExpired as exc:
+           output = exc.stdout or b''
+       if isinstance(output, bytes):
+           output = output.decode(errors='replace')
+       print(output, flush=True)
+   ```
+   Execute this script remotely using an SSH heredoc. `dns-sd -B` runs continuously; bound its duration and preserve captured output when it times out. A missing advertisement does not prove lack of AirPlay support: discovery may be filtered between Wi-Fi and wired networks or VLANs. A control panel’s IP address may also differ from the receiver’s address. Check the receiver name visible on the intended playback device, and distinguish discovery from reachability of the audio destination. Diagnose before changing network or zone settings on a shared installation.
