@@ -1,6 +1,6 @@
 ---
 name: design-frontend-specialization
-category: coder-profile
+category: multi-model-coder-router
 description: Frontend design specialization for the coder profile — React + Tailwind + Motion (motion.dev) + GSAP + 21st.dev community components. Systematic workflow for building polished, animated UIs with complex timelines and scroll-driven effects.
 tags: [design, frontend, react, motion, gsap, animation, tailwind, components, ui, ux]
 ---
