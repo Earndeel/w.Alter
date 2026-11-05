@@ -177,3 +177,45 @@ cinema.addEventListener('mousemove', (e) => {
   cinema.style.setProperty('--mouse-y', `${((e.clientY - rect.top) / rect.height) * 100}%`);
 });
 ```
+
+## Motion for Static HTML (Vanilla JS)
+
+For static sites (Cloudflare Pages, vanilla HTML), Motion can be loaded via ESM CDN — no build step required.
+
+### ESM CDN Import
+```html
+<script type="module">
+import { animate, inView, spring } from "https://cdn.jsdelivr.net/npm/motion@12.0.0/+esm";
+</script>
+```
+
+### Pattern V1: Scroll-triggered reveals
+```html
+<script type="module">
+import { animate, inView, spring } from "https://cdn.jsdelivr.net/npm/motion@12.0.0/+esm";
+
+inView('.page-hero', () => {
+  animate('.page-hero > *', 
+    { opacity: [0,1], y: [30,0] }, 
+    { duration: 0.7, delay: (i) => i * 0.1, ease: spring({ stiffness: 100, damping: 20 }) }
+  );
+});
+
+inView('.card-grid', () => {
+  animate('.card-grid .card', 
+    { opacity: [0,1], y: [40,0] }, 
+    { duration: 0.6, delay: (i) => i * 0.12, ease: "easeOut" }
+  );
+});
+</script>
+```
+
+### Pattern V2: Stagger helper for vanilla
+```javascript
+function stagger(delay) {
+  return (i) => i * delay;
+}
+// Usage: { delay: stagger(0.1) }
+```
+
+---

@@ -88,3 +88,85 @@ inView('.hero', () => {
 
 - `prefers-reduced-motion: reduce` disables all animations
 - Aurora animation stops, transitions become instant
+
+## Design Patterns: Aurora + Glassmorphism
+
+Modern dark-mode premium aesthetic used for Scena and similar SaaS landing pages.
+
+### Aurora Background (CSS-only)
+```css
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: -2;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(139,92,246,.15), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(6,182,212,.1), transparent),
+    radial-gradient(ellipse 50% 30% at 50% 0%, rgba(244,114,182,.08), transparent);
+  animation: aurora 20s ease-in-out infinite alternate;
+}
+@keyframes aurora {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(2%, -1%) scale(1.02); }
+  66% { transform: translate(-1%, 2%) scale(0.98); }
+  100% { transform: translate(1%, -2%) scale(1.01); }
+}
+```
+
+### Gradient Border (pseudo-element mask)
+```css
+.card-featured {
+  position: relative;
+  border-radius: 20px;
+  background: rgba(255,255,255,.03);
+}
+.card-featured::before {
+  content: '';
+  position: absolute; inset: -1px;
+  border-radius: 20px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(139,92,246,.4), rgba(6,182,212,.2), transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+```
+
+### Glassmorphism Nav
+```css
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(3,3,5,.7);
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  backdrop-filter: blur(32px) saturate(140%);
+  -webkit-backdrop-filter: blur(32px) saturate(140%);
+}
+```
+
+### Magnetic Hover (vanilla JS)
+```javascript
+document.querySelectorAll('.btn').forEach(btn => {
+  btn.addEventListener('mousemove', (e) => {
+    const rect = btn.getBoundingClientRect();
+    const x = e.clientX - rect.left - rect.width / 2;
+    const y = e.clientY - rect.top - rect.height / 2;
+    btn.style.transform = `translate(${x * 0.1}px, ${y * 0.1}px)`;
+  });
+  btn.addEventListener('mouseleave', () => {
+    btn.style.transform = '';
+  });
+});
+```
+
+### Text Gradient
+```css
+.gradient-text {
+  background: linear-gradient(135deg, #fff 0%, #c4b5fd 40%, var(--accent-2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+```
+
+---
