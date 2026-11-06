@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-06T04:13:41.936675+00:00",
- "description": "Use when Walter Memory triage spends model calls on irrelevant incoming messages or needs deterministic filters before model invocation.",
- "domain": "walter-memory",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session exposed a reusable Walter Memory procedure absent from the listed skills: attribute excessive calls using system.model_calls and triage context, move deterministic exclusions before inference, reload the bus pipeline, and verify persisted decisions. Evidence: 125 Line-group triage calls over seven days, 123 model ignores; the session added a configurable pre-model gate, focused tests and historical replay. Live eligible-message verification remained pending. [session claude_code/vm/aa2547f7-76d8-4a57-ac3b-b17026929b7b]",
- "runtime": "learner",
- "session_id": "claude_code/vm/aa2547f7-76d8-4a57-ac3b-b17026929b7b",
- "target": "walter-memory-triage-filtering"
+ "store_sha": "6126323c218d63b327266555b57fbd5105f961fcdebdb55e137d813be712a910"
 }
