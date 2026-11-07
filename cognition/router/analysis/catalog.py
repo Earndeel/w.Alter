@@ -45,9 +45,11 @@ def card(conn, model_id: str, interface: str, modes: list[str] | None = None) ->
         if raw:
             prices[""] = {"price": raw["unit_price"], "provider": raw["provider"], "unit": raw["unit"].strip().lower()}
     price_in = row["price_in_1m"] if row else None
-    if interface == "decisions" and price_in is None:   # the catalog view prices chat only; decisions bill input tokens
+    if interface in ("decisions", "rerank") and price_in is None:
+        # the catalog view prices chat only; decisions and newer rerankers bill input tokens
         p = conn.execute("""select min(o.price_in_1m) as p from models.offers o join models.latest_snapshots s
-                            using (snapshot_id) where o.model_id = %s and o.interface = 'decisions'""", (model_id,)).fetchone()
+                            using (snapshot_id) where o.model_id = %s and o.interface = %s""",
+                         (model_id, interface)).fetchone()
         price_in = p["p"] if p else None
     return {"model_id": model_id, "interface": interface, "name": name["n"] if name else model_id,
             "modes": list(row["modes"]) if row else [], "providers": list(row["providers"]) if row else [],
@@ -69,7 +71,8 @@ def money(x: float) -> str:
 
 
 def price_text(c: dict) -> str:
-    if c.get("interface") == "decisions" and c.get("price_in_1m") is not None:
+    if c.get("price_in_1m") is not None and (c.get("interface") == "decisions" or (
+            c.get("interface") == "rerank" and not c["prices"])):   # newer rerankers: per input token, no search unit
         return f'{money(c["price_in_1m"])} $ par M tokens d’entrée'
     if c.get("interface") == "chat" and c.get("price_in_1m") is not None:
         sub = " (inclus abonnement)" if c.get("subscriptions") else ""

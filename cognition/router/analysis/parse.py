@@ -266,6 +266,11 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
             pr = m.get("pricing") or {}
             pin, pout = _num(pr.get("prompt")), _num(pr.get("completion"))
             interface = _or_interface(m)
+            if interface == "rerank" and not pin:
+                # newer rerankers (Cohere Rerank 5, Voyage rerank-3) are billed per input token: the API says 0, the
+                # page's token entry is the real price (older ones are per search, read below as a unit offer)
+                pin = next((_num(e.get("price")) for e in m.get("_display_pricing") or []
+                            if e.get("kind") == "token" and "input" in (e.get("sku_label") or "").lower()), pin)
             created = datetime.fromtimestamp(m["created"], timezone.utc) if m.get("created") else None
             # media models report 0/0 token prices in the API: that is not a price; neither is the prompt "token"
             # price of a service whose page prices it per unit (whisper per second, MAI per hour, rerank per search)

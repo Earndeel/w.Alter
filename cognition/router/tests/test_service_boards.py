@@ -91,6 +91,11 @@ def test_service_offers_land_on_their_interface_with_comparable_prices():
         {"id": "cohere/rerank-4-fast", "name": "Cohere: Rerank 4 Fast",
          "architecture": {"input_modalities": ["text"], "output_modalities": ["rerank"]},
          "pricing": {"prompt": "0", "completion": "0"}},
+        {"id": "cohere/rerank-5-fast", "name": "Cohere: Rerank 5 Fast",
+         "architecture": {"input_modalities": ["text"], "output_modalities": ["rerank"]},
+         "pricing": {"prompt": "0", "completion": "0"},
+         "_display_pricing": [{"kind": "token", "sku_label": "Input tokens", "price": "0.00000002",
+                               "displayMultiplier": 1000000, "unitLabel": "/M input tokens"}]},
     ]}
     rows = {r["offer_key"]: r for r in parse.parse_offers("openrouter", doc)}
     whisper = rows["openai/whisper-large-v3-turbo"]
@@ -103,6 +108,7 @@ def test_service_offers_land_on_their_interface_with_comparable_prices():
     emb = rows["openai/text-embedding-3-small"]
     assert emb["interface"] == "embedding" and emb["norm_price"] == pytest.approx(0.02) and emb["norm_unit"] == "per 1m tokens"
     assert rows["cohere/rerank-4-fast"]["interface"] == "rerank" and rows["cohere/rerank-4-fast"]["price_in_1m"] is None
+    assert rows["cohere/rerank-5-fast"]["price_in_1m"] == pytest.approx(0.02)   # billed per input token (page)
     assert media.norm_price("transcription", 0.1, "per hour", "Audio Hours") == (pytest.approx(0.1 / 60), "per minute")
 
 
