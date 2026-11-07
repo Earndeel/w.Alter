@@ -129,6 +129,33 @@ def resolve_project(name: str) -> str | None:
     return None
 
 
+# Project names that are also everyday words: alone they say nothing about the owner's memory.
+COMMON_ALIASES = {"llm", "ops", "bus", "lab", "logs", "soul", "core", "arena", "memory", "backup", "browse", "skills",
+                  "secrets", "context", "runtime", "computer", "guardian", "paysages"}
+ANCHOR_TTL_S = 600
+_ANCHOR_AT = [0.0]
+
+
+def anchors(text: str) -> list[dict]:
+    """The owner's projects and organisations a message names (whole words, distinctive aliases of 3+ chars), one
+    per entity. Deterministic and local, no model: walter-context uses it so a named project always reaches the
+    owner's memory, whatever a decision model guessed (« Le site EDGEWISE, c'est où ? » planned as a web question,
+    07/11). Names only, never content."""
+    import time
+    if time.time() - _ANCHOR_AT[0] > ANCHOR_TTL_S:     # long-lived callers see new projects within minutes
+        _aliases.cache_clear()
+        _ANCHOR_AT[0] = time.time()
+    n = f" {norm(text)} "
+    out, seen = [], set()
+    for a, eid, etype in _aliases():
+        if eid in seen or len(a) < 3 or a in COMMON_ALIASES:
+            continue
+        if re.search(rf"(?<![a-z0-9]){re.escape(a)}(?![a-z0-9])", n):
+            seen.add(eid)
+            out.append({"alias": a, "entity_id": eid, "type": etype})
+    return out
+
+
 def resolve_person(conn, name: str) -> str | None:
     n = (name or "").strip().lower()
     if len(n) < 3:
