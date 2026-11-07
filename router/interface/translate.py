@@ -184,6 +184,17 @@ PHRASES.update({
  "ex. google-ai-pro": "e.g. google-ai-pro",
  "ids séparés par des virgules": "comma-separated ids"
 })
+# Leaderboard labels ("Arena vidéo depuis texte", analysis.telegram._board_fr), shown on the page when a board is
+# unreachable (2026-11-07: the banner was the only French left on the English page while Arena collection failed).
+BOARD_TASKS_EN = {"vidéo depuis texte": "text to video", "animation d'image": "image animation", "retouche d'image": "image editing",
+                  "voix": "voice", "musique": "music", "texte": "text", "fidélité (100 − WER)": "accuracy (100 − WER)",
+                  "vitesse": "speed", "rerank latence": "rerank latency", "embeddings latence": "embeddings latency",
+                  "recherche en français": "French retrieval"}
+_SOURCES = ("AA", "AA Decision", "AA STT", "Design Arena", "Arena", "BridgeBench", "Agentset", "MTEB")
+for _src in _SOURCES:
+    for _fr, _en in BOARD_TASKS_EN.items():
+        for _k, _v in ((_fr, _en), (_fr.replace("'", "&#x27;"), _en)):
+            PHRASES.setdefault(f"{_src} {_k}", f"{_src} {_v}")
 _ORDER = sorted(PHRASES, key=len, reverse=True)
 _DECIMAL = re.compile(r"(?<=\d),(?=\d)")
 _DATE = re.compile(r"\b(\d{2})/(\d{2})/(\d{4}), (\d{2}:\d{2}) UTC")

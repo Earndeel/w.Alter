@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -22,7 +23,10 @@ SESSION='22222222-2222-4222-8222-222222222222'
 def gateway(tmp_path, monkeypatch):
     source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
     tree=ast.parse(source.read_text())
-    names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_session_run','_run_metadata','_record_attempt','exact_call','log','build_app'}
+    names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_session_run','_run_metadata','_record_attempt','exact_call','log','build_app',
+           'start_completion','_rate_limited','_charge','_price_usd','_priced','test_budget','test_gate','_ledger','_ledger_add','approve_tests',
+           'planned_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing',
+           'route_state','selection_plan','selection_check','log_selection','cost_headers'}
     nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in names]
     agents=tmp_path/'agents.json'
     agents.write_text(json.dumps({hashlib.sha256(b'fixture-token').hexdigest():{'agent':'dsh'}}))
@@ -36,7 +40,10 @@ def gateway(tmp_path, monkeypatch):
         'warm':lambda:None,'_install_codex_auth':lambda:None,'chat_tasks':lambda:['coding'],
         'decision':lambda task:{'model_id':'fixture-model','execution':[{'provider':'fixture','model':'fixture-model'}]},
         '_run_metadata':lambda run:{'run_id':run,'status':'open','privacy_class':'cloud_allowed'},
-        'litellm_target':lambda route:{'model':'fixture-model'},'as_json':lambda x:x,'json_instruction':lambda x:'JSON'}
+        'litellm_target':lambda route:{'model':'fixture-model'},'as_json':lambda x:x,'json_instruction':lambda x:'JSON',
+        'PAID':{'kie','openrouter','arnict'},'QUOTA_SWITCH':90.0,'RATE_LIMIT_WAITS':(0,0),'Path':Path,'os':os,'_telegram':lambda *a:None,
+        'TEST_BUDGET':{'paid_limit_eur':2.0,'usd_per_eur':1.10,'window_hours':24,'ledger':str(tmp_path/'test-spend.jsonl')},
+        '_instance_path':lambda value:Path(value)}
     monkeypatch.setitem(sys.modules,'litellm',SimpleNamespace())
     # Only local fixture lookups run here. Avoid the sandbox's executor-shutdown stall;
     # concurrent ASGI requests still interleave at the provider's awaited barrier.
@@ -115,6 +122,23 @@ def test_absent_cost_is_unknown_and_estimate_is_labelled(tmp_path,monkeypatch):
     ns.update(log=logs.append,provider_completion=complete)
     assert post(ns['build_app'](),{'messages':[]}).status_code==200
     assert logs[-1].get('cost_usd')==0.0004 and logs[-1].get('cost_status')=='estimated'
+
+def test_paid_call_without_reported_cost_gets_the_router_price_never_zero(tmp_path,monkeypatch):
+    """C10 (2026-11-07): Venice/Kie report no cost; the call is priced at the route's router price, labelled."""
+    for host,expected in (({'price_in_1m':1.0,'price_out_1m':4.0},(3*1.0+1*4.0)/1e6),({},None)):
+        ns=gateway(tmp_path,monkeypatch);logs=[]
+        ns['decision']=lambda task,host=host:{'model_id':'m','execution':[{'provider':'kie','model':'m','host':host}]}
+        async def complete(*a,**kw):
+            r=response(SimpleNamespace(prompt_tokens=3,completion_tokens=1,prompt_tokens_details=None));r._hidden_params={}
+            return r
+        ns.update(log=logs.append,provider_completion=complete)
+        assert post(ns['build_app'](),{'messages':[]}).status_code==200
+        assert logs[-1].get('cost_usd')==expected
+        assert logs[-1].get('cost_status')==('estimated_price' if expected else 'unknown')
+        r=post(ns['build_app'](),{'messages':[]})      # the caller's own ledger gets the same, labelled
+        assert (r.headers.get('x-walter-cost-usd') is not None)==(expected is not None)
+        if expected:
+            assert abs(float(r.headers['x-walter-cost-usd'])-expected)<1e-9 and r.headers['x-walter-cost-status']=='estimated_price'
 
 def test_usage_dict_and_zero_are_preserved(tmp_path,monkeypatch):
     ns=gateway(tmp_path,monkeypatch)
@@ -318,3 +342,175 @@ def test_exact_transport_returns_common_usage_and_cost_provenance(tmp_path,monke
     out=asyncio.run(ns['exact_call']({'route':{'provider':'openrouter','model':'fixture-model'},'messages':[]}))
     assert out['ok'] is True and out['usage']['in']==5
     assert out.get('cost_usd')==0.003 and out.get('cost_status')=='reported'
+
+
+
+class RateLimitError(Exception):
+    status_code = 429
+
+
+def test_subscription_rate_limit_is_waited_out_before_any_fallback(tmp_path,monkeypatch):
+    ns=gateway(tmp_path,monkeypatch);logs=[];calls=[]
+    ns['decision']=lambda task:{'model_id':'m','execution':[{'provider':'claude-pro','model':'m','access':'subscription'},
+                                                               {'provider':'openrouter','model':'m','access':'paid'}]}
+    async def complete(route,**kw):
+        calls.append(route['provider'])
+        if len(calls)<3:raise RateLimitError()
+        return response()
+    ns.update(log=logs.append,provider_completion=complete)
+    assert post(ns['build_app'](),{'model':'coding','messages':[]}).status_code==200
+    assert calls==['claude-pro']*3 and [e['provider'] for e in logs]==['claude-pro'] and logs[0]['ok'] is True
+
+
+def test_exhausted_rate_limit_is_logged_skipped_not_failed(tmp_path,monkeypatch):
+    ns=gateway(tmp_path,monkeypatch);logs=[]
+    ns['decision']=lambda task:{'model_id':'m','execution':[{'provider':'claude-pro','model':'m','access':'subscription'},
+                                                               {'provider':'openrouter','model':'m','access':'paid'}]}
+    async def complete(route,**kw):
+        if route['provider']=='claude-pro':raise RateLimitError()
+        return response()
+    ns.update(log=logs.append,provider_completion=complete)
+    assert post(ns['build_app'](),{'model':'coding','messages':[]}).status_code==200
+    assert logs[0]['provider']=='claude-pro' and logs[0]['skipped']=='rate_limit'
+    assert logs[1]['provider']=='openrouter' and logs[1]['ok'] is True and 'skipped' not in logs[1]
+
+
+def test_test_runs_paid_spend_is_charged_then_refused_above_the_cap(tmp_path,monkeypatch):
+    ns=gateway(tmp_path,monkeypatch);logs=[];calls=[]
+    ns['_run_metadata']=lambda run:{'run_id':run,'status':'open','privacy_class':'cloud_allowed','channel':'test'}
+    ns['decision']=lambda task:{'model_id':'m','execution':[{'provider':'openrouter','model':'m','access':'paid',
+                                                                'host':{'price_in_1m':4.0,'price_out_1m':20.0}}]}
+    async def complete(route,**kw):
+        calls.append(1)
+        return SimpleNamespace(usage={'prompt_tokens':100,'completion_tokens':10,'cost':1.5},_hidden_params={},
+                               choices=[],model_dump=lambda:{'choices':[]})
+    ns.update(log=logs.append,provider_completion=complete)
+    app=ns['build_app']()
+    assert post(app,{'model':'coding','messages':[]},{'X-Walter-Run-Id':RUN}).status_code==200
+    assert ns['test_budget']()['spent_usd']==1.5
+    assert post(app,{'model':'coding','messages':[]},{'X-Walter-Run-Id':RUN}).status_code==200   # 1.5 $ < cap 2.2 $
+    assert ns['test_budget']()['spent_usd']==3.0
+    refused=post(app,{'model':'coding','messages':[]},{'X-Walter-Run-Id':RUN})
+    assert refused.status_code==502 and 'test_budget' in refused.text and len(calls)==2
+    assert logs[-2]['skipped']=='test_budget' and logs[-1]['error']=='all routes failed'
+    assert post(app,{'model':'coding','messages':[]}).status_code==200   # owner's untracked calls are never capped
+    ns['approve_tests'](2.0,'fixture')
+    assert post(app,{'model':'coding','messages':[]},{'X-Walter-Run-Id':RUN}).status_code==200
+
+
+def test_second_claude_account_is_tried_without_waiting_and_each_attempt_names_its_account(tmp_path,monkeypatch):
+    """2026-11-07: two Claude accounts = two routes; a refusal on the first goes straight to the second (no burst wait,
+    no paid route), and every attempt is traceable to its account."""
+    ns=gateway(tmp_path,monkeypatch);logs=[];calls=[]
+    ns['RATE_LIMIT_WAITS']=(30,30)   # would stall the test if waited
+    ns['decision']=lambda task:{'model_id':'m','execution':[
+        {'provider':'claude-pro','model':'m','access':'subscription','account':'anthropic-pro'},
+        {'provider':'claude-pro','model':'m','access':'subscription','account':'anthropic-pro-2'},
+        {'provider':'openrouter','model':'m','access':'paid'}]}
+    async def complete(route,**kw):
+        calls.append(route.get('account') or route['provider'])
+        if route.get('account')=='anthropic-pro':raise RateLimitError()
+        return response()
+    ns.update(log=logs.append,provider_completion=complete)
+    t0=time.monotonic()
+    assert post(ns['build_app'](),{'model':'coding','messages':[]}).status_code==200
+    assert time.monotonic()-t0<10 and calls==['anthropic-pro','anthropic-pro-2']
+    assert [(e['account'],e.get('skipped'),e['ok']) for e in logs]==[('anthropic-pro','rate_limit',False),('anthropic-pro-2',None,True)]
+
+
+def test_claude_account_secret_comes_from_the_gateway_setting_never_from_the_route(monkeypatch):
+    source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
+    tree=ast.parse(source.read_text())
+    nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in {'provider_completion','claude_accounts'}]
+    asked=[]
+    grants=SimpleNamespace(access=lambda grant:asked.append(grant) or 'token')
+    monkeypatch.setitem(sys.modules,'walter_secrets',SimpleNamespace(grants=grants))
+    async def completion(config,token,**kw):return config['account']
+    monkeypatch.setitem(sys.modules,'claude_subscription',SimpleNamespace(completion=completion))
+    async def inline(fn,*args,**kwargs):return fn(*args,**kwargs)
+    monkeypatch.setattr(asyncio,'to_thread',inline)
+    ns={'_CONF':{'claude_subscription':{'grant':'claude-subscription','accounts':{'anthropic-pro':'claude-subscription',
+                                                                                 'anthropic-pro-2':'claude-subscription-2'}}},
+        '_instance_path':lambda v:Path(v)}
+    exec(compile(ast.Module(body=nodes,type_ignores=[]),str(source),'exec'),ns)
+    run=lambda route:asyncio.run(ns['provider_completion']({'provider':'claude-pro',**route}))
+    assert run({'account':'anthropic-pro-2','grant':'telegram-bot'})=='anthropic-pro-2' and asked==['claude-subscription-2']
+    assert run({})=='anthropic-pro' and asked[-1]=='claude-subscription'
+    with pytest.raises(ValueError):run({'account':'someone-else'})
+    assert len(asked)==2
+
+
+def plan_gateway(tmp_path, monkeypatch, requested):
+    ns=gateway(tmp_path,monkeypatch);logs=[];asked=[]
+    extra=['planned_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing']
+    source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
+    tree=ast.parse(source.read_text())
+    nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in extra]
+    exec(compile(ast.Module(body=nodes,type_ignores=[]),str(source),'exec'),ns)
+    ns['chat_tasks']=lambda:['coding','general','document']
+    ns['owner_tasks']=lambda:['coding','general','document']
+    ns['_session_run']=lambda session:{'run_id':RUN,'status':'open','privacy_class':'cloud_allowed','requested':requested}
+    def decision(task):
+        asked.append(task);return {'model_id':'m','execution':[{'provider':'fixture','model':'m'}]}
+    async def complete(route,**kw):return response()
+    ns.update(log=logs.append,decision=decision,provider_completion=complete)
+    return ns,logs,asked
+
+
+def test_auto_follows_the_plan_and_an_explicit_task_only_takes_its_tier(tmp_path,monkeypatch):
+    ns,logs,asked=plan_gateway(tmp_path,monkeypatch,{'task':'general','level':'L2'})
+    app=ns['build_app']()
+    for model in ('auto','coding'):
+        assert post(app,{'model':model,'messages':[{'role':'user','content':'x'}],'prompt_cache_key':SESSION}).status_code==200
+    assert asked==['general/L2','coding/L2'] and logs[0]['plan']=='task+level' and logs[1]['plan']=='level'
+    ns,logs,asked=plan_gateway(tmp_path,monkeypatch,{'task':'unknown-task','level':'L9'})
+    assert post(ns['build_app'](),{'model':'auto','messages':[]},).status_code==200 and asked==['coding']
+    ns,logs,asked=plan_gateway(tmp_path,monkeypatch,{'task':'memory_extraction','level':'L1'})   # internal poste
+    ns['owner_tasks']=lambda:['coding','general']
+    assert post(ns['build_app'](),{'model':'auto','messages':[],'prompt_cache_key':SESSION}).status_code==200 and asked==['coding/L1']
+
+
+def test_rule_answer_needs_the_exact_owner_message_and_calls_no_model(tmp_path,monkeypatch):
+    sha=hashlib.sha256(b'12*7').hexdigest()
+    ns,logs,asked=plan_gateway(tmp_path,monkeypatch,{'task':'general','level':'L1','fast_path':'trivial','answer':'12*7 = 84','message_sha':sha})
+    ns['_rule_routing']=lambda run=None:None
+    app=ns['build_app']()
+    r=post(app,{'model':'auto','messages':[{'role':'user','content':[{'type':'text','text':' 12*7 '}]}],'prompt_cache_key':SESSION})
+    assert r.status_code==200 and r.json()['choices'][0]['message']['content']=='12*7 = 84' and asked==[]
+    assert r.headers['X-Walter-Route']=='walter-context/rule' and logs[-1]['rule']=='trivial'
+    s=post(app,{'model':'auto','stream':True,'messages':[{'role':'user','content':'12*7'}],'prompt_cache_key':SESSION})
+    assert '12*7 = 84' in s.text and s.text.rstrip().endswith('[DONE]') and asked==[]
+    dsh=[{'role':'system','content':'runtime'},{'role':'user','content':'<walter-context>x</walter-context>'},
+         {'role':'user','content':[{'type':'text','text':'12*7'}]},{'role':'user','content':'<system-reminder>AGENTS</system-reminder>'},
+         {'role':'user','content':'Current runtime context. ...'}]                           # DSH appends 2 user rows
+    assert post(app,{'model':'auto','messages':dsh,'prompt_cache_key':SESSION}).json()['choices'][0]['message']['content']=='12*7 = 84'
+    assert asked==[]
+    for messages in ([{'role':'user','content':'12*7'},{'role':'tool','content':'84'}],     # a tool step
+                     [{'role':'user','content':'12*7'},{'role':'assistant','content':'84'},{'role':'user','content':'Current runtime context.'}],
+                     [{'role':'user','content':'Write a title for: 12*7'}]):              # another request
+        assert post(app,{'model':'auto','messages':messages,'prompt_cache_key':SESSION}).status_code==200
+    assert asked==['general/L1','general/L1','general/L1']
+
+
+def test_every_request_leaves_one_selection_line_with_its_plan_reasons_and_passed_routes(tmp_path,monkeypatch):
+    """2026-11-07 (Monsieur: « une télémétrie claire sur chaque sélection »): the plan in order with each route's state,
+    the route that answered, the routes passed over and why, and whether subscriptions came first."""
+    ns=gateway(tmp_path,monkeypatch);logs=[]
+    plan=[{'provider':'claude-pro','account':'anthropic-pro-2','model':'m','access':'subscription',
+           'subscription':{'quota_used_percent':29.0,'session_used_percent':5.0}},
+          {'provider':'openrouter','model':'x/m','access':'paid','probe_ok':True},
+          {'provider':'claude-pro','account':'anthropic-pro','model':'m','access':'subscription',
+           'subscription':{'quota_used_percent':100.0,'session_used_percent':0.0}}]
+    ns['decision']=lambda task:{'model_id':'m','source':'default_objective','execution':plan}
+    async def complete(route,**kw):
+        if route['provider']=='claude-pro':raise RateLimitError()
+        return response(SimpleNamespace(prompt_tokens=3,completion_tokens=1,prompt_tokens_details=None))
+    ns.update(log=logs.append,provider_completion=complete,RATE_LIMIT_WAITS=())
+    assert post(ns['build_app'](),{'messages':[]}).status_code==200
+    line=json.loads((tmp_path/'log.jsonl').read_text().splitlines()[-1])
+    assert line['event']=='selection' and line['subscription_first'] is True and line['chosen']==1
+    assert [r['state'] for r in line['plan']]==['subscription_available','paid','subscription_spent']
+    assert line['passed']==[{'position':0,'reason':'rate_limit'}] and line['chosen_route']['provider']=='openrouter'
+    assert line['plan'][0]['account']=='anthropic-pro-2' and line['plan'][0]['quota']==29.0
+    assert ns['selection_check']([{'position':0,'provider':'openrouter','state':'paid'},
+                                  {'position':1,'provider':'codex','state':'subscription_available'}]) is False

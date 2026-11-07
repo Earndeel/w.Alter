@@ -37,7 +37,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/parse.py | `MM_TASKS` | {"index": "speech_to_speech", "provider_voice": "tts"} |  |
 | analysis/parse.py | `KIE_DIMENSION_FIXES` | {"('claude-opus-5-5', 'claude-opus-5')": "output"} |  |
 | analysis/parse.py | `OR_BASE_UNITS` | {"/1K calls": "per call", "/M UTF-8 bytes": "per utf-8 byte", "/M characters": "per character", "/M tokens": "per token", "/minute": "per second"} |  |
-| analysis/parse.py | `OFFER_KINDS` | ["openrouter", "kie", "codex", "claude_pro", "declared", "hermes_providers"] |  |
+| analysis/parse.py | `OFFER_KINDS` | ["openrouter", "kie", "codex", "claude_pro", "antigravity", "declared", "hermes_providers"] |  |
 | analysis/postes.py | `BOARDS` | {"agentic": ["arena", "agent"], "intelligence": ["aa_intelligence", "intelligence"], "reliability": ["bridgebench", "trustworthiness"], "speed": ["bridgebench", "speed"]} |  |
 | analysis/scoring.py | `SHRINK_K` | 0.25 |  |
 | analysis/scoring.py | `FEEDBACK_POINTS` | 3.0 | per net rating point from the owner on that task (capped at +/-3 -> +/-9 composite points) |
@@ -80,7 +80,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | hermes-plugins/walter-router/__init__.py | `PLANS_SCHEMA` | {"description": "The owner's AI subscriptions as Walter Router knows them (ChatGPT Plus, Claude Pro, Google AI Pro…): list them, or record a change he tells you about (new plan, price, end of an offer, models included) or a cancellation. Plan ids are lowercase with dashes (openai-plus, google-ai-pro). Only on his word: never invent a plan or a price.", "name": "walter_plans", "parameters": {"properties": {"action": {"enum": ["list", "set", "retire"], "type": "string"}, "models": {"items": {"type": "string"}, "type": "array"}, "note": {"type": "string"}, "plan": {"type": "string"}, "plan_id": {"type": "string"}, "price_usd_month": {"type": "number"}, "since": {"description": "YYYY-MM-DD", "type": "string"}, "until": {"description": "YYYY-MM-DD", "type": "string"}, "vendor": {"type": "string"}, "why": {"description": "His words, short.", "type": "string"}}, "required": ["action"], "type": "object"}} |  |
 | hermes-plugins/walter-router/__init__.py | `HERMES_RULES` | Walter Router dans Hermes : pour générer une image, une vidéo, une musique ou une voix, appelle walter_run avec la demande mot pour mot (via tool_call si l'outil est différé). Ses favoris et objectifs priment sur tout skill propre à un modèle ; un skill sert ensuite à exécuter le modèle choisi. Quand l'utilisateur répond « adopter N » ou « ignorer N » à une alerte Walter Router, appelle walter_verdict ; quand il juge le résultat d'un modèle (« nul », « parfait »…), walter_feedback ; quand il parle d'un changement d'abonnement IA (nouveau forfait, prix, fin d'offre, résiliation), walter_plans. |  |
 | instance.py | `NEUTRAL_OWNER` | l'utilisateur | only when no instance answers |
-| interface/library.py | `PROV` | {"arnict": "Arnict", "claude-pro": "Claude Pro", "codex": "Codex (abonnement)", "google-flow": "Flow", "kie": "Kie", "kie-codex": "Kie", "openai-codex": "Codex (abonnement)", "openrouter": "OpenRouter"} |  |
+| interface/library.py | `PROV` | {"antigravity": "Antigravity (AI Pro)", "arnict": "Arnict", "claude-pro": "Claude Pro", "codex": "Codex (abonnement)", "google-flow": "Flow", "kie": "Kie", "kie-codex": "Kie", "openai-codex": "Codex (abonnement)", "openrouter": "OpenRouter", "venice": "Venice"} |  |
 | interface/library.py | `MODES` | {"graphic_design": "t2i", "image_edit": "i2i", "image_to_video": "i2v", "logo": "t2i", "music": "music", "text_to_image": "t2i", "text_to_video": "t2v", "tts": "tts", "video_edit": "v2v"} |  |
 | interface/library.py | `IMAGE_TOKENS` | [1056, 4160] | medium / high 1024x1024 output tokens (OpenAI gpt-image token tables) |
 | interface/library.py | `ROLE_ORDER` | case p.role when 'default' then 0 when 'L1' then 0 when 'L2' then 1 when 'L3' then 2 else 5 end |  |
@@ -98,6 +98,13 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | interface/translate.py | `FRENCH_MARKERS` | ["Fournisseur", "Secours", "Abonnement", "Modèle", "Tâche", "réflexion", "Calculé", "mesuré", "Économique", "Vidéo", "Coût", "Rechercher", "Lancer", "généré", "estimé", "Équilibré"] |  |
 | interface/translate.py | `JS` | {"' $ par tâche'": "' $ per task'", "' (échec)'": "' (failed)'", "'Enregistré, la page se met à jour…'": "'Saved, the page is updating…'", "'Envoi…'": "'Sending…'", "'Indice '": "'Index '", "'Refusé'": "'Refused'", "'Résilier ce plan ? Il sortira de tes abonnements (gardé dans l’historique).'": "'Cancel this plan? It leaves your plans (kept in the history).'", "'démarrage'": "'starting'", "'fr-FR'": "'en-GB'", "'Échec de l’envoi'": "'Sending failed'", "Cycle en cours — ": "Cycle running — ", "Dernier cycle complet : ": "Last full cycle: ", "Lancement…": "Starting…", "Lancer maintenant le cycle complet ? Collecte des classements, recalcul, analyse par le modèle économique, notifications et republication de cette page (20 à 60 minutes).": "Run the full cycle now? Leaderboard collection, recomputation, analysis by the economy model, notifications and republication of this page (20 to 60 minutes).", "Statut indisponible": "Status unavailable", "Échec du lancement": "Launch failed"} |  |
 | interface/translate.py | `STEPS` | {"1/4 recherche et analyse": "1/4 research and analysis", "2/4 agent de recherche (modèle économique)": "2/4 research agent (economy model)", "3/4 analyse finale et notifications": "3/4 final analysis and notifications", "4/4 Hermes et page": "4/4 Hermes and page"} |  |
+| interface/translate.py | `BOARD_TASKS_EN` | {"animation d'image": "image animation", "embeddings latence": "embeddings latency", "fidélité (100 − WER)": "accuracy (100 − WER)", "musique": "music", "recherche en français": "French retrieval", "rerank latence": "rerank latency", "retouche d'image": "image editing", "texte": "text", "vidéo depuis texte": "text to video", "vitesse": "speed", "voix": "voice"} |  |
+| interface/translate.py | `_SOURCES` | ["AA", "AA Decision", "AA STT", "Design Arena", "Arena", "BridgeBench", "Agentset", "MTEB"] |  |
+| llm/antigravity_subscription.py | `PROVIDER` | antigravity |  |
+| llm/antigravity_subscription.py | `DENY_ALL` | {"permissions": {"deny": ["read_file(*)", "write_file(*)", "read_url(*)", "execute_url(*)", "command(*)", "mcp(*)", "unsandboxed(*)"]}} |  |
+| llm/antigravity_subscription.py | `EFFORTS` | ["low", "medium", "high"] |  |
+| llm/antigravity_subscription.py | `EFFORT_OF` | {"high": "high", "low": "low", "max": "high", "medium": "medium", "minimal": "low", "non-reasoning": "low", "none": "low", "xhigh": "high"} |  |
+| llm/antigravity_subscription.py | `NO_TOOLS` | Answer directly in text from your own knowledge. You have no tools: do not try to read or write files, run commands or open pages. |  |
 | llm/claude_subscription.py | `PROVIDER` | claude-pro |  |
 | llm/claude_subscription.py | `GRANT` | claude-subscription |  |
 | llm/claude_subscription.py | `UPSTREAM` | https://api.anthropic.com/v1/messages |  |
@@ -108,8 +115,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/gateway.py | `KEY_TTL` | 600 |  |
 | llm/gateway.py | `ROUTE_TTL` | 600 |  |
 | llm/gateway.py | `KIE_GPT` | ["gpt-"] |  |
-| llm/gateway.py | `PAID` | ["arnict", "kie", "openrouter"] | providers billed per call (subscriptions are not) |
+| llm/gateway.py | `PAID` | ["arnict", "kie", "openrouter", "venice"] | providers billed per call (subscriptions are not) |
 | llm/gateway.py | `RATE_LIMIT_WAITS` | [4, 12] |  |
+| llm/gateway.py | `ANTHROPIC_CACHE_POINTS` | [{"location": "message", "role": "system"}, {"index": -1, "location": "message"}] |  |
 | plan/mail.py | `API` | https://gmail.googleapis.com/gmail/v1/users/me |  |
 | plan/mail.py | `GRANT` | google-memory |  |
 | plan/mail.py | `VENDORS` | {"anthropic.com": "Anthropic", "cursor.com": "Cursor", "elevenlabs.io": "ElevenLabs", "google.com": "Google", "kie.ai": "Kie", "midjourney.com": "Midjourney", "mistral.ai": "Mistral", "openai.com": "OpenAI", "openrouter.ai": "OpenRouter", "perplexity.ai": "Perplexity", "runwayml.com": "Runway", "suno.com": "Suno", "x.ai": "xAI"} |  |
@@ -204,6 +212,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/choose.py | `POLICY` | coalesce(pr.content_policy, c.content_policy) |  |
 | serve/choose.py | `INPUTS` | {"video_input": ["video"]} | requirement -> inputs every route of the choice must read |
 | serve/execution.py | `HERMES_PROVIDERS` | {"arnict": "arnict", "codex": "openai-codex", "kie": "kie", "openrouter": "openrouter"} |  |
+| serve/execution.py | `NATIVE_ONLY` | ["antigravity", "venice"] | providers walter-llm runs itself (2026-10-30), with no Hermes provider |
 | serve/execution.py | `KIE_CODEX_MODELS` | ["gpt-5-5", "gpt-5-6-luna", "gpt-5-6-sol", "gpt-5-6-terra", "gpt-6-1-sol", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol"] |  |
 | serve/execution.py | `MIN_CREDIT_USD` | 1.0 | below this, OpenRouter routes go last (a 402 after minutes of agent work is worse) |
 | serve/execution.py | `SLOW_MS` | 30000 | a 5-token probe slower than this = degraded (Kie Claude took 64 s on 2026-10-02) |
@@ -233,7 +242,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/media_exec.py | `KIE_USD_PER_CREDIT` | 0.005 | 6 credits = 0.03 $ (Sunburst 1K, 2026-10-02) |
 | serve/media_exec.py | `TIMEOUTS` | {"audio": 300, "image": 360, "music": 600, "video": 1200} |  |
 | serve/media_exec.py | `FALLBACK_COST_X` | 2.0 |  |
-| serve/named.py | `PROVIDERS` | {"arnict": "arnict", "chatgpt": "codex", "codex": "codex", "flow": "google-flow", "google-flow": "google-flow", "kie": "kie", "kie-codex": "kie", "kie.ai": "kie", "openai-codex": "codex", "openrouter": "openrouter"} |  |
+| serve/named.py | `PROVIDERS` | {"arnict": "arnict", "chatgpt": "codex", "codex": "codex", "flow": "google-flow", "google-flow": "google-flow", "kie": "kie", "kie-codex": "kie", "kie.ai": "kie", "openai-codex": "codex", "openrouter": "openrouter", "venice": "venice"} |  |
 | serve/named.py | `DEFAULT_TASK` | {"audio": "tts", "chat": "general", "image": "text_to_image", "music": "music", "video": "text_to_video"} |  |
 | serve/run.py | `ALLOWED_TOOLSETS` | ["web", "walter-web", "file", "terminal", "vision", "skills", "code_execution", "memory"] |  |
 | serve/run.py | `DEFAULT_TOOLSETS` | ["walter-web", "skills", "memory"] |  |
@@ -973,6 +982,7 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/knowledge.json | `task_hints.video_edit` | str | Modifier une vidéo existante (changer le style, remplacer un élément, prolonger) |
 | config/knowledge.json | `task_hints.vision` | str | Analyser ou décrire une image ou une photo fournie (que voit-on, lire du texte dans l'image) |
 | config/knowledge.json | `task_hints.weather` | str | Météo actuelle ou prévisions pour un lieu |
+| config/knowledge.json | `unrestricted_favourites` | list | [] |
 | config/knowledge.json | `unrestricted_signals[]` | str | sans censure |
 | config/knowledge.json | `unrestricted_signals[]` | str | uncensored |
 | config/knowledge.json | `unrestricted_signals[]` | str | unrestricted |
@@ -1041,13 +1051,19 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/media_models.json | `models.wan-3.kind` | str | video |
 | config/media_models.json | `models.wan-3.openrouter` | str | alibaba/wan-3.0 |
 | config/media_models.json | `models.wan-3.prompt_style` | str | A vivid English video prompt: subject, action and motion, camera movement, setting, lighting, sound if relevant. Keep every requested element. |
-| config/providers.json | `_doc` | str | OpenAI-compatible providers configured in Hermes whose live /models catalogue (with prices) is collected. The key is read at run time from the Hermes .env of the instance (never stored here or in the unit file) and sent as a header only. |
+| config/providers.json | `_doc` | str | OpenAI-compatible providers whose live /models catalogue (with prices) is collected. The key is read at run time from the environment, else from the instance's vault (walter_router.instance.secret_value: Hermes .env, or walter-secrets declared keys) and sent as a header only. hermes_provider null = no Hermes provider: the Router runs it natively through walter-llm. |
 | config/providers.json | `providers[].api` | str | https://api.arnict.com/v1 |
 | config/providers.json | `providers[].hermes_provider` | str | arnict |
 | config/providers.json | `providers[].key_env` | str | ARNICT_API_KEY |
 | config/providers.json | `providers[].name` | str | Arnict AI |
 | config/providers.json | `providers[].note` | str | Uncensored open-weights fine-tunes (GLM 5.3 Flash Uncensored...) |
 | config/providers.json | `providers[].provider` | str | arnict |
+| config/providers.json | `providers[].api` | str | https://api.venice.ai/api/v1 |
+| config/providers.json | `providers[].hermes_provider` | NoneType | — |
+| config/providers.json | `providers[].key_env` | str | VENICE_API_KEY |
+| config/providers.json | `providers[].name` | str | Venice AI |
+| config/providers.json | `providers[].note` | str | Venice inference (uncensored DeepSeek V4.1 Flash 1017, pay per token). |
+| config/providers.json | `providers[].provider` | str | venice |
 | config/subscriptions.json | `_doc` | str | the owner's subscriptions (declared by him), for information only: no routing effect (2026-10-14). Shown on the library page with two sources only: our own measurement (meters + the tokens W.Alter's runtimes really used, priced at list API rates) and SemiAnalysis' published plan values. Readings go to models.subscription_usage. |
 | config/subscriptions.json | `semianalysis.date` | str | 2026-10-05 |
 | config/subscriptions.json | `semianalysis.definition` | str | API-equivalent value = the plan's full monthly usage limit priced at first-party list API rates. |

@@ -3627,6 +3627,13 @@
             "name": "cost_status",
             "nullable": false,
             "type": "text"
+          },
+          {
+            "default": null,
+            "description": "Subscription (config subscriptions.json id, e.g. anthropic-pro-2) whose account served this attempt when its provider has several accounts; null otherwise.",
+            "name": "account",
+            "nullable": true,
+            "type": "text"
           }
         ],
         "constraints": [
@@ -5893,6 +5900,11 @@
             "signature": "task: str, level: str | None"
           },
           {
+            "description": "Models the owner declared to run when every provider of `model_id` failed, in order, as (model_id, variant):",
+            "name": "declared_fallbacks",
+            "signature": "model_id: str, task: str, level: str | None, require: str | None"
+          },
+          {
             "description": "",
             "name": "effective_policy",
             "signature": "conn, model_id: str"
@@ -6918,6 +6930,11 @@
             "signature": "name: str"
           },
           {
+            "description": "A key from the environment, else from the instance's vault (walter-secrets map or its declared keys). Keys",
+            "name": "secret_value",
+            "signature": "name: str"
+          },
+          {
             "description": "A file the Router generates for the instance (state/router/<name>), e.g. the agents' brief.",
             "name": "state_file",
             "signature": "name: str"
@@ -7093,6 +7110,62 @@
         ]
       },
       {
+        "description": "Antigravity subscription transport (Google AI Pro / Ultra): the official Antigravity CLI, text only.",
+        "file": "llm/antigravity_subscription.py",
+        "functions": [
+          {
+            "description": "Router offer key of a CLI model id: the reasoning level is a route parameter, not a model",
+            "name": "base_id",
+            "signature": "cli_id: str"
+          },
+          {
+            "description": "The verified CLI id for a router model + reasoning level (the closest level the account offers).",
+            "name": "cli_model",
+            "signature": "model: str, effort: str | None, verified: list[str]"
+          },
+          {
+            "description": "",
+            "name": "_text",
+            "signature": "content"
+          },
+          {
+            "description": "One prompt from OpenAI chat messages: instructions, then the conversation, then the message to answer.",
+            "name": "prompt_of",
+            "signature": "messages: list[dict], response_format: dict | None=None"
+          },
+          {
+            "description": "",
+            "name": "_paths",
+            "signature": "config: dict"
+          },
+          {
+            "description": "Delete what the CLI kept of this call; summaries of past calls only when no other call is running.",
+            "name": "_forget",
+            "signature": "state: Path, conversation: str | None"
+          },
+          {
+            "description": "",
+            "name": "_command",
+            "signature": "config: dict, model: str, schema: dict | None, timeout: float"
+          },
+          {
+            "description": "",
+            "name": "_usage",
+            "signature": "u: dict | None"
+          },
+          {
+            "description": "",
+            "name": "_failure",
+            "signature": "result: dict, stderr: str"
+          },
+          {
+            "description": "OpenAI-shaped answer (ModelResponse, or an async iterator of chunks when streaming) from one CLI call.",
+            "name": "completion",
+            "signature": "config: dict, *, model: str, messages: list, stream: bool=False, timeout=None, reasoning_effort: str | None=None, response_format: dict | None=None, tools=None, **_"
+          }
+        ]
+      },
+      {
         "description": "Claude subscription transport; Walter owns every message, tool and model parameter.",
         "file": "llm/claude_subscription.py",
         "functions": [
@@ -7163,6 +7236,11 @@
             "signature": "route: dict, usage: dict | None, body: dict"
           },
           {
+            "description": "A paid call the provider reports no cost for (Venice, Kie…) gets its cost at the router's price for this",
+            "name": "_priced",
+            "signature": "route: dict, telemetry: dict, body: dict"
+          },
+          {
             "description": "None when this paid call of a test fits the budget, else the refusal (and one Telegram notice per window).",
             "name": "test_gate",
             "signature": "route: dict, body: dict"
@@ -7208,6 +7286,11 @@
             "signature": ""
           },
           {
+            "description": "Chat tasks an owner message can ask for: the internal postes (memory extraction, compression, voice…) are",
+            "name": "owner_tasks",
+            "signature": ""
+          },
+          {
             "description": "LiteLLM arguments for one router route, or None when this gateway cannot run it (yet).",
             "name": "litellm_target",
             "signature": "route: dict"
@@ -7218,6 +7301,11 @@
             "signature": "route: dict, **kwargs"
           },
           {
+            "description": "subscription id -> Walter Secrets grant, first = the default account (before accounts: one grant).",
+            "name": "claude_accounts",
+            "signature": "config: dict"
+          },
+          {
             "description": "",
             "name": "_rate_limited",
             "signature": "exc: BaseException"
@@ -7225,7 +7313,7 @@
           {
             "description": "(response, iterator, first chunk): the call, up to its first token when streaming. A subscription's rate-limit",
             "name": "start_completion",
-            "signature": "route: dict, kwargs: dict, stream: bool"
+            "signature": "route: dict, kwargs: dict, stream: bool, waits: tuple | None=None"
           },
           {
             "description": "W.Alter's Codex access token, from its grant (renewed through the Codex CLI by walter-secrets).",
@@ -7301,6 +7389,36 @@
             "description": "Request-local transport metadata. DSH's public pi-ai cache key carries its native session identity only",
             "name": "_correlation",
             "signature": "request, body: dict, agent: str"
+          },
+          {
+            "description": "(Router task for this call, what the plan set). Lot 2 (2026-11-07): `auto` takes the task and tier the",
+            "name": "planned_task",
+            "signature": "asked: str, requested: dict | None"
+          },
+          {
+            "description": "",
+            "name": "_text_parts",
+            "signature": "content"
+          },
+          {
+            "description": "The preflight's rule answer, only when this request ends on the very owner message it answers (its hash):",
+            "name": "rule_answer",
+            "signature": "requested: dict | None, body: dict"
+          },
+          {
+            "description": "",
+            "name": "_rule_completion",
+            "signature": "text: str"
+          },
+          {
+            "description": "",
+            "name": "_rule_stream",
+            "signature": "text: str"
+          },
+          {
+            "description": "",
+            "name": "_rule_routing",
+            "signature": "run_id: str"
           },
           {
             "description": "Persist through public ports. DSH routing becomes applied only after an observed response.",
@@ -7508,9 +7626,9 @@
             "signature": "since: datetime | None, root: Path=CODEX_SESSIONS"
           },
           {
-            "description": "Actual model usage of the subscription bridge (not the CLI's synthetic acknowledgement).",
+            "description": "Actual model usage of the subscription bridge (not the CLI's synthetic acknowledgement), for one account:",
             "name": "walter_claude_usage",
-            "signature": "since: datetime | None"
+            "signature": "since: datetime | None, sub: dict | None=None"
           },
           {
             "description": "",
@@ -8048,6 +8166,32 @@
         "functions": []
       },
       {
+        "description": "Google AI Pro through the official Antigravity CLI: the account's model list, as offers the instance qualified.",
+        "file": "research/prices/antigravity.py",
+        "functions": [
+          {
+            "description": "Runtime bindings live in the active instance's llm gateway settings.",
+            "name": "settings",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "_path",
+            "signature": "value: str"
+          },
+          {
+            "description": "Offer key of a CLI id: the reasoning level is a route parameter (same rule as walter-llm's adapter).",
+            "name": "base_id",
+            "signature": "cli_id: str"
+          },
+          {
+            "description": "`agy models` (the CLI's own read of the account); only instance-qualified models become executable offers.",
+            "name": "source_antigravity",
+            "signature": ""
+          }
+        ]
+      },
+      {
         "description": "Read the subscription catalogue/quota through Walter Secrets' declared grant interface.",
         "file": "research/prices/claude_pro.py",
         "functions": [
@@ -8057,9 +8201,14 @@
             "signature": ""
           },
           {
-            "description": "Fixed read-only Anthropic account endpoints; token is never returned in diagnostics.",
+            "description": "The Walter Secrets grant of one Claude account (subscription id), from the gateway's own `accounts` setting.",
+            "name": "grant_of",
+            "signature": "conf: dict, account: str | None"
+          },
+          {
+            "description": "Fixed read-only Anthropic account endpoints; token is never returned in diagnostics. `account` = subscription",
             "name": "account_json",
-            "signature": "endpoint: str"
+            "signature": "endpoint: str, account: str | None=None"
           },
           {
             "description": "Only instance-verified models become executable offers; catalogue presence alone is not validation.",
@@ -8067,9 +8216,9 @@
             "signature": ""
           },
           {
-            "description": "Real five-hour/weekly meters, without account identifiers, credit balances or token values.",
+            "description": "Real five-hour/weekly meters of one account, without account identifiers, credit balances or token values.",
             "name": "read_usage",
-            "signature": ""
+            "signature": "account: str | None=None"
           }
         ]
       },
@@ -8386,7 +8535,12 @@
             "signature": "conn, provider: str, model: str"
           },
           {
-            "description": "route provider (codex) -> latest cost price of its subscription + plan name (models.latest_subscription_costs).",
+            "description": "route provider -> its subscriptions in declaration order, each with its own quota and cost price. Several",
+            "name": "subscription_accounts",
+            "signature": "conn"
+          },
+          {
+            "description": "route provider (codex) -> its first subscription: cost price, plan name, quotas (see subscription_accounts).",
             "name": "subscription_costs",
             "signature": "conn"
           },
@@ -12890,6 +13044,12 @@
         "type": "str"
       },
       {
+        "default": [],
+        "file": "config/knowledge.json",
+        "key": "unrestricted_favourites",
+        "type": "list"
+      },
+      {
         "default": "sans censure",
         "file": "config/knowledge.json",
         "key": "unrestricted_signals[]",
@@ -13298,7 +13458,7 @@
         "type": "str"
       },
       {
-        "default": "OpenAI-compatible providers configured in Hermes whose live /models catalogue (with prices) is collected. The key is read at run time from the Hermes .env of the instance (never stored here or in the unit file) and sent as a header only.",
+        "default": "OpenAI-compatible providers whose live /models catalogue (with prices) is collected. The key is read at run time from the environment, else from the instance's vault (walter_router.instance.secret_value: Hermes .env, or walter-secrets declared keys) and sent as a header only. hermes_provider null = no Hermes provider: the Router runs it natively through walter-llm.",
         "file": "config/providers.json",
         "key": "_doc",
         "type": "str"
@@ -13335,6 +13495,42 @@
       },
       {
         "default": "arnict",
+        "file": "config/providers.json",
+        "key": "providers[].provider",
+        "type": "str"
+      },
+      {
+        "default": "https://api.venice.ai/api/v1",
+        "file": "config/providers.json",
+        "key": "providers[].api",
+        "type": "str"
+      },
+      {
+        "default": null,
+        "file": "config/providers.json",
+        "key": "providers[].hermes_provider",
+        "type": "NoneType"
+      },
+      {
+        "default": "VENICE_API_KEY",
+        "file": "config/providers.json",
+        "key": "providers[].key_env",
+        "type": "str"
+      },
+      {
+        "default": "Venice AI",
+        "file": "config/providers.json",
+        "key": "providers[].name",
+        "type": "str"
+      },
+      {
+        "default": "Venice inference (uncensored DeepSeek V4.1 Flash 1017, pay per token).",
+        "file": "config/providers.json",
+        "key": "providers[].note",
+        "type": "str"
+      },
+      {
+        "default": "venice",
         "file": "config/providers.json",
         "key": "providers[].provider",
         "type": "str"
@@ -13746,6 +13942,7 @@
           "kie",
           "codex",
           "claude_pro",
+          "antigravity",
           "declared",
           "hermes_providers"
         ]
@@ -14311,6 +14508,7 @@
         "file": "interface/library.py",
         "name": "PROV",
         "value": {
+          "antigravity": "Antigravity (AI Pro)",
           "arnict": "Arnict",
           "claude-pro": "Claude Pro",
           "codex": "Codex (abonnement)",
@@ -14318,7 +14516,8 @@
           "kie": "Kie",
           "kie-codex": "Kie",
           "openai-codex": "Codex (abonnement)",
-          "openrouter": "OpenRouter"
+          "openrouter": "OpenRouter",
+          "venice": "Venice"
         }
       },
       {
@@ -14966,6 +15165,94 @@
       },
       {
         "comment": "",
+        "file": "interface/translate.py",
+        "name": "BOARD_TASKS_EN",
+        "value": {
+          "animation d'image": "image animation",
+          "embeddings latence": "embeddings latency",
+          "fidélité (100 − WER)": "accuracy (100 − WER)",
+          "musique": "music",
+          "recherche en français": "French retrieval",
+          "rerank latence": "rerank latency",
+          "retouche d'image": "image editing",
+          "texte": "text",
+          "vidéo depuis texte": "text to video",
+          "vitesse": "speed",
+          "voix": "voice"
+        }
+      },
+      {
+        "comment": "",
+        "file": "interface/translate.py",
+        "name": "_SOURCES",
+        "value": [
+          "AA",
+          "AA Decision",
+          "AA STT",
+          "Design Arena",
+          "Arena",
+          "BridgeBench",
+          "Agentset",
+          "MTEB"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/antigravity_subscription.py",
+        "name": "PROVIDER",
+        "value": "antigravity"
+      },
+      {
+        "comment": "",
+        "file": "llm/antigravity_subscription.py",
+        "name": "DENY_ALL",
+        "value": {
+          "permissions": {
+            "deny": [
+              "read_file(*)",
+              "write_file(*)",
+              "read_url(*)",
+              "execute_url(*)",
+              "command(*)",
+              "mcp(*)",
+              "unsandboxed(*)"
+            ]
+          }
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/antigravity_subscription.py",
+        "name": "EFFORTS",
+        "value": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/antigravity_subscription.py",
+        "name": "EFFORT_OF",
+        "value": {
+          "high": "high",
+          "low": "low",
+          "max": "high",
+          "medium": "medium",
+          "minimal": "low",
+          "non-reasoning": "low",
+          "none": "low",
+          "xhigh": "high"
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/antigravity_subscription.py",
+        "name": "NO_TOOLS",
+        "value": "Answer directly in text from your own knowledge. You have no tools: do not try to read or write files, run commands or open pages."
+      },
+      {
+        "comment": "",
         "file": "llm/claude_subscription.py",
         "name": "PROVIDER",
         "value": "claude-pro"
@@ -15033,7 +15320,8 @@
         "value": [
           "arnict",
           "kie",
-          "openrouter"
+          "openrouter",
+          "venice"
         ]
       },
       {
@@ -15043,6 +15331,21 @@
         "value": [
           4,
           12
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/gateway.py",
+        "name": "ANTHROPIC_CACHE_POINTS",
+        "value": [
+          {
+            "location": "message",
+            "role": "system"
+          },
+          {
+            "index": -1,
+            "location": "message"
+          }
         ]
       },
       {
@@ -15947,6 +16250,15 @@
         }
       },
       {
+        "comment": "providers walter-llm runs itself (2026-10-30), with no Hermes provider",
+        "file": "serve/execution.py",
+        "name": "NATIVE_ONLY",
+        "value": [
+          "antigravity",
+          "venice"
+        ]
+      },
+      {
         "comment": "",
         "file": "serve/execution.py",
         "name": "KIE_CODEX_MODELS",
@@ -16183,7 +16495,8 @@
           "kie-codex": "kie",
           "kie.ai": "kie",
           "openai-codex": "codex",
-          "openrouter": "openrouter"
+          "openrouter": "openrouter",
+          "venice": "venice"
         }
       },
       {
@@ -16557,7 +16870,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "9862e1be9e615f52b9d1a6d23ebeac8a5f37e7c3264e9e627e2c855c2f28962e",
+    "analysis/alerts.py": "192d7772a83b3f8374dc441b4ad44872535905cdec65d650dba709e5dd25e97a",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "94b7ead0cc20d98b7d16545f88cc64683fb8fb3bea6191a625ab67f3dfa2e1f4",
@@ -16566,10 +16879,10 @@
     "analysis/dossier.py": "31cb4cdb76c9ada3510f040f9dd8fc30861d25b44a97db3add8a563cae4e2872",
     "analysis/identity.py": "06626cefaeea94adda2153e9b7400ab948b5bece0a821b36211546f00e8aca9f",
     "analysis/ingest.py": "d952e8f16448734710ec8d64667ce2124b422f0de0309065a64881074afa18af",
-    "analysis/knowledge.py": "864d0f907b6098c415491c9002088ce0fc5b867532946003af85b7ef84d8c7e6",
+    "analysis/knowledge.py": "193ee45063f29a805e08eece0d2988d503c38571f13c4a476e5068556ceae768",
     "analysis/media.py": "c61030754e36087f9b9b4caf86641ec786e97eccf3b33345d04b5f2d7eb1b267",
     "analysis/pareto.py": "00621f7e0584567022991ee1bd154dfe15b64b9443dd0c89a6faf26f11d23f0f",
-    "analysis/parse.py": "73547e8af7950879ad37066bb93001f14db0f519cf9b2ac9f7e2e1602bb817fc",
+    "analysis/parse.py": "8e353d3cc032eb97bd2c21f8627e0163db7736c3a4e8e8e354707dac79b90b8b",
     "analysis/postes.py": "afa1053ad1f28e64ba1763abce019c9844571cdee8e19796dc4909b2f95baa42",
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
     "analysis/refresh.py": "17a00934a816292587e26c292795177ce6e3199ce05b3612fd5a580a5487822a",
@@ -16581,17 +16894,17 @@
     "bin/walter-router-control": "3373221954bd9c6b4a6092a3be30d9c0a616fa34dbc4b5f034fa68b5b6493932",
     "bin/walter-router-cycle": "e308e52f2992c9bb02599595b11b52a9dab1350d602ffbc31be44691496fec3e",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "0e895626a841920598c814960377774ae84e42a638971db95a52f32060eb4341",
+    "cli.py": "6786e04346d73fbefd9e7cafc9ddc724759223f1a313e242a4f6f46620c574f0",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
     "config/kie_media_schemas.json": "278e5d624ffa274e473eaaf6ab044df1c454c43bb39df40613e6cde9c6f8edd1",
-    "config/knowledge.json": "0cf72bda34b1ee65b24edf782906860b8ae9820c7a18b044f368b02f9a61b9a0",
+    "config/knowledge.json": "4d8ff8f4e3cd712e48bd19d3048b9ad3a32ed78566688ec6c5c56fa8927a5a7b",
     "config/media_models.json": "1a00950c74b50b046e5a6d9ab534def777ea8c349f3058e2a842800168b1ea7a",
-    "config/providers.json": "ea7f381395589799ef723a1a4e93540d4a3b4bc08549a42207a22857940be430",
+    "config/providers.json": "82b0a50103f1b932ab876bf06f27b50e183dc1631159bfa258c8752de168f938",
     "config/subscriptions.json": "d2e56aa07e15344a1986746b1f8608842873639f5d37788e37e9896d6ba67017",
-    "contracts/data-classes.json": "217f14d84e0a54ca65532010abdbc80281a1671ea3af2652d9a8689eed620b81",
-    "contracts/maintenance.json": "e053f12f7d4b27ad89789cc2cf90cdfeaf85e673c1a088a5e4a1bb6df0d9a209",
+    "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
+    "contracts/maintenance.json": "b8f0e3ee29e57454855286b6b80b182d5bf17c1c59f7dfc216cc9bcef631cd54",
     "contracts/router.json": "ea6c3de46c6b48ddc120dcef459dd834802baf7a0190931b1e7851fa2386fdcb",
     "documentation.py": "19726a1a74efcf5f69cc02fcebc9c3da0f3e540918071db95014dd6fb7a2b7e4",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
@@ -16602,26 +16915,27 @@
     "health.py": "ba5e621b77cc19022ef7b0bcc0822abb8b87360cad74dadbdf3389ce3d0f0f3c",
     "hermes-plugins/kie-compat/__init__.py": "aba770c340305899abfca6172a3774b0e56b400328e6f0f3350ab79a688daace",
     "hermes-plugins/walter-router/__init__.py": "0304d91d38ac0059f7665587f447fa8098bb4e7cb562a24cac4b4e92e3458f4d",
-    "instance.py": "4fc4844d5bad57ce6e0125473b9cb521b035f9cd92bb9ca3076262e73dc33103",
+    "instance.py": "9de10d051b0cc3ec3d49c7554fa4aff3e72eaf8b25775b5dd439406035a7fa6b",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
-    "interface/library.py": "1bdb8a380ab83266ca89c5fcaf92a6d5c6ad398c4e54b102f6ce889fba83cd56",
+    "interface/library.py": "649216011e2545152c4a2c7387a335fcd5a7c59bf49748283c98de725055a570",
     "interface/page.py": "e52afc7458a85fceb867a2ad52c803eddf735ff403849434e407470d9a4d0fa0",
     "interface/site/functions/_middleware.js": "7698f9a6d90639f63790b347aaa8d4b7473f128e5ac2f130158481768217a12f",
     "interface/site/functions/api/plans.js": "636563511ae2c5c794990c5d0571eb731de30d05eae457e32fe62b8378abd69f",
     "interface/site/functions/api/run.js": "f0c5e0aaae262eae630e2b685f2f3c28e4c1430bca9451e3015f5c4d9f7506f3",
     "interface/site/functions/api/status.js": "37fbd922a3eae2e33236fe4cda7d4546dafd6b69f7d76b50aea92d2deafd92cb",
-    "interface/translate.py": "0f2af8b1272f4a61f561e7f5bb6ae2ab258ceb7916cbdfee5d5ffad09cf5205f",
-    "llm/claude_subscription.py": "96b53a70d801791fdb8a1cead6695a60469e1295dd86c019a76f141d4397cc89",
-    "llm/config/gateway.json": "09023b4c0849eeec2517b60c06e371b5a6ce6136cdbdf625760d210187f5f119",
+    "interface/translate.py": "a1796785414cd3fac4908088dab4a23780bf67976bd5ce0677b0a3469ddd4171",
+    "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
+    "llm/claude_subscription.py": "47d8e25c6e8a53a174a09bb0c8b767c331091544322cf2f3c586bae98103fb2c",
+    "llm/config/gateway.json": "851e8d18906830a95da4be421a12c5ecb315fd46d1675959488a82b8cd063fc9",
     "llm/contracts/llm.json": "17a51a635cfd54e506593c5be38b0aaa2a847f9646ee56f77e075df79dcd589d",
-    "llm/gateway.py": "971689222b59d1d080d0f18d94f40efc208f46931f4235db9897f2b639e93bc0",
+    "llm/gateway.py": "de31d653013395ffb3a142d61fbd72148f47841707481d7c08c61a0c535d06a9",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",
     "plan/mail.py": "541e27d036223253091b2349aa5ca4844fd72f478582b465d83abb22cc1da534",
     "plan/news.py": "cb79f91afd5eb20ceb83399d9281c9efa2eaa81997cc5df35c07541311972a22",
     "plan/quota_watch.py": "1af365d976fa20bec06c3c2277de5753255a805ead05f4cdff4310ae4912de2f",
-    "plan/subscriptions.py": "5517d3273a6deeaf5b2849d4f8cea2375262adc8d6e2eafea3e0e4566216e87a",
+    "plan/subscriptions.py": "998dae4ce195008cb98e84d27b35665c5cc546285c70614525ab86dbcd627384",
     "plan/watch.py": "9721d7f8f85084b42536b9e4c206b4845576fc5bf3325d035ab0a148b8c2dd04",
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",
@@ -16644,33 +16958,34 @@
     "research/categories/image.py": "f39f6484813dab019565736084ca1aa8bbfd8e92674faf072caf71f498d0ca32",
     "research/categories/memory.py": "b21868f984bd131cc49fee4023696ebd564b38ea23607900dedbcdccdccd56ed",
     "research/categories/plans.py": "49ca8fcd13c21ce0f1a194f42e230b58c70ce9688144323dd3b5177d46ed488f",
-    "research/categories/prices.py": "4d19abf551dd48f57c056587554072c616abe8f4f55323f1490e55cae67cecec",
+    "research/categories/prices.py": "6559bbcdd3e13f3ea297a20976585c095afe36bc02d3b399c1e3ec7dadd99da8",
     "research/categories/text.py": "582bc57007adf51d82fe13b930f43257db091e4069713b16296066c5e511a872",
     "research/categories/video.py": "45f4500f0604e8a2677bdb76d80e6cd052b8b69d74d742f227556e5abf688c80",
     "research/prices/__init__.py": "1198eb22372b5ec637affeb36abf7bb4f262f4a44452910ee4ace979bbfe2eda",
-    "research/prices/claude_pro.py": "3199c03caa19ea85ad65126c42cb940878fa0b126ab17678a6fe26d53b15bb81",
+    "research/prices/antigravity.py": "b2b484892d4758791d3cda87f5137ecbfca892952f0f3dfd863d671a8ef13bfb",
+    "research/prices/claude_pro.py": "4bb165ba806f3ef3219c584c5343f45f397ed3cfb220a3b3f211ed4361ec9463",
     "research/prices/codex.py": "73542f7a34e12efa89245fe0c1e33e8c4f2bd052fd857e323deaea721a44eaba",
     "research/prices/declared.py": "37756c77c42d4740aaf33f20532eba9676babb4d263b0f07e52f48070408a0b7",
     "research/prices/kie.py": "c5f72a270421f475faba4a15b1c70e63f07fddc6ccb41ef9210f1ebfb0dba018",
     "research/prices/openrouter.py": "1301d99d11624c50a619146c67ef4a0af7c6a4f0b983f178966b3a4389df3f0b",
     "research/prices/openrouter_endpoints.py": "641fd7d9faf03d2c4b5ba2b71a40d28aa369ac1c3d9d4110e883c4cf319d6ac9",
-    "research/prices/providers.py": "eb14dbe8781a6d9849ebd1648b3c714826af820b709553b5766d482690f1f440",
+    "research/prices/providers.py": "65f3d4d680016a9162b935356adb09f49a9cca0a48569402945b47fd112a811a",
     "research/run.py": "8dac1620e046f83923397e86c92d95318c9c703b4ca9187f4f4efca0b7dcf774",
-    "research/sources.py": "1107442fbe67ea0e6711beda21f4baf3dfee67766d4bbee9a2e68005dd16dd7e",
+    "research/sources.py": "b872c4f0bc274c5c05612712b9bc04b756a52db9c837d4a5e63ec3097974cad0",
     "research/web.py": "71e3bf9073480552ab10f369cc69ca3f0e462027b2bf0829a7c02e13353276ca",
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
     "serve/agent_view.py": "144454b28cfc6ba0cf8678aa072a38f9c0fe857eab59cd66fbd676414a461367",
     "serve/api.py": "9b04510dd95c3ffa62de95158326f921ca07ac2785cc4a04a8870324938ed1af",
     "serve/brief.py": "33ca79121e190834adabe6fbc573b408ef84d4cf29a93736cf4f8de48275c3ab",
-    "serve/choose.py": "e8894e22b18bc0d87f30878bd1a6a75f216090cd64bd5a9f91ab27bb76dfa6ea",
-    "serve/execution.py": "cdad716e8777211f3f387fff573e4cb1b6e8d6268bb33bbb4640ab5d33b23a40",
+    "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
+    "serve/execution.py": "ab10712acda6c3ea7ebd913c0b10125e1c040c060d61fe24235ef731de070bf1",
     "serve/hermes_sync.py": "1dc99d9f119e45cc958e5954fac64ba29802505d04ccd2ef096c3aba3db633cc",
     "serve/intent.py": "8f8c1adcbc776fce3e38d1aa751bcea89b1a71b00c1918c0b6ab9dd71b2c75cf",
-    "serve/media_exec.py": "442b830d7a13cb3c0502b4b6767af964dd0adcf38fefc3d851bb28a455e7b016",
-    "serve/named.py": "9faaa5031f319ffef3f708b2de78a3b96fd2c2d8c1c010ff7bc2e44afb38d264",
-    "serve/oneshot.py": "12239c7c99038605afeb49f40264dc08b84975ffef4f9f0f54e1f842f45b85ae",
+    "serve/media_exec.py": "8fe8e8d41e1141f6e96f6c6912b1fdac3ebacadde7ceacdf18ad2ef994db63cd",
+    "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
+    "serve/oneshot.py": "d6f582794d9d49314f54cfb13240d6062855dc7df48ca5d2121932e1fd4a02da",
     "serve/routes.py": "492e8e75f102e42856bcd66f612dfe7b30cc21c14c8776aeb352d9d2e7e420fb",
-    "serve/run.py": "b65d4bb3b013bf9ce804df1cbac6fdc52cebd5be1cc1282b55603451a4410cbc",
+    "serve/run.py": "01f870b43d752fac173728d2a8a78e02d00294f22cc07f96f7b387d21b733d4f",
     "serve/text_agent.py": "4e910f3619c717895c9970d78178766d8b7c6f3c56a1c8313374a50d93e9a705",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
     "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",
@@ -16711,7 +17026,8 @@
     "store/migrations/035_exec_log_run.sql": "3bdbdf329f83c83a305285a692850a7052bc033caf9115f47a6eaf04fa2262cd",
     "store/migrations/036_exec_telemetry.sql": "22728fe19ef56564fa75c99995101232578c331942aaaeec0e4887670415eb52",
     "store/migrations/037_neutral_task_texts.sql": "9a776b3d51975ef7fb6a780bad99240ac47ffa50bb53908ca4370de78ea53bff",
-    "store/migrations/038_neutral_embeddings_requirement.sql": "399cbec430a8090dbd319089de215d173cb4655762ff71c699945171dec20649"
+    "store/migrations/038_neutral_embeddings_requirement.sql": "399cbec430a8090dbd319089de215d173cb4655762ff71c699945171dec20649",
+    "store/migrations/039_exec_log_account.sql": "f1711eeb24fa9d054e25ae9993a83465a5bf220315dab33261e44481a5833a75"
   },
   "tasks": [
     {

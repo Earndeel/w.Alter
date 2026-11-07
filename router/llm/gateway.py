@@ -725,6 +725,71 @@ def log(entry: dict) -> None:
         threading.Thread(target=_record_attempt, args=(row, entry), daemon=True).start()
 
 
+def cost_headers(telemetry: dict) -> dict:
+    """The call's cost for the caller's own ledger (Walter Memory's system.model_calls): reported by the provider, or
+    the router's price estimate for providers that report none (Venice, Kie), labelled. 2026-11-07: a bench's 142
+    Venice calls were booked at zero."""
+    if telemetry.get("cost_usd") is None:
+        return {}
+    return {"X-Walter-Cost-USD": repr(float(telemetry["cost_usd"])), "X-Walter-Cost-Status": str(telemetry.get("cost_status") or "unknown")}
+
+
+# ───────────────────────── selection telemetry (2026-11-07) ─────────────────────────
+# One line per request (event "selection") in walter-llm.jsonl: the router's whole plan in order, why each route sits
+# where it does (subscription with quota / spent / paid, probe, reliability), the route that answered and every route
+# passed over before it with its reason. Attempt lines keep their own shape (models.exec_log).
+QUOTA_SWITCH = 90.0   # same threshold as the Router's execution.routes (weekly %), mirrored for the trace only
+
+
+def route_state(route: dict) -> str:
+    if route.get("access") == "subscription":
+        sub = route.get("subscription") or {}
+        q, session = sub.get("quota_used_percent"), sub.get("session_used_percent")
+        if (q is not None and q >= QUOTA_SWITCH) or (session is not None and session >= 100):
+            return "subscription_spent"
+        return "subscription_available"
+    if route.get("probe_ok") is False:
+        return "paid_probe_failed"
+    if route.get("unreliable"):
+        return "paid_unreliable"
+    return "paid" if route.get("provider") in PAID else route.get("access") or "other"
+
+
+def selection_plan(d: dict) -> list[dict]:
+    out = []
+    for i, r in enumerate(d.get("execution") or []):
+        sub = r.get("subscription") or {}
+        row = {"position": i, "provider": r["provider"], "model": r["model"], "state": route_state(r)}
+        if r.get("account"):
+            row["account"] = r["account"]
+        if r.get("access") == "subscription":
+            row.update(quota=sub.get("quota_used_percent"), session=sub.get("session_used_percent"))
+        out.append(row)
+    return out
+
+
+def selection_check(plan: list[dict]) -> bool:
+    """True when every subscription route with quota left comes before every paid route (the owner's rule)."""
+    subs = [r["position"] for r in plan if r["state"] == "subscription_available"]
+    paid = [r["position"] for r in plan if r["provider"] in PAID]
+    return not (subs and paid and max(subs) > min(paid))
+
+
+def log_selection(agent: str, task: str, d: dict, chosen: int | None, passed: list[dict], correlation: dict) -> None:
+    plan = selection_plan(d)
+    entry = {"event": "selection", "agent": agent, "task": task, "model_id": d.get("model_id"),
+             "source": d.get("source"), "role": d.get("role"), "level": d.get("level"), "plan": plan,
+             "subscription_first": selection_check(plan), "chosen": chosen,
+             "chosen_route": plan[chosen] if chosen is not None and chosen < len(plan) else None,
+             "passed": passed, **{k: correlation[k] for k in ("run_id", "session", "channel") if correlation.get(k)}}
+    entry = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), **entry}
+    try:
+        with LOG.open("a") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
 # ───────────────────────── HTTP ─────────────────────────
 def build_app():
     import asyncio
@@ -782,7 +847,7 @@ def build_app():
             d = decision(task)
         except Exception:
             raise HTTPException(400, "no route for requested task") from None
-        errors = []
+        errors, passed = [], []
         plan = d.get("execution") or []
         for index, route in enumerate(plan):
             t0 = time.perf_counter()
@@ -797,13 +862,16 @@ def build_app():
                 if refused:
                     errors.append(f"{route['provider']}/{route['model']}: {refused}")
                     log({**base, "ok": False, "seconds": 0, "skipped": "test_budget"})
+                    passed.append({"position": index, "reason": "test_budget"})
                     continue
             try:
                 target = litellm_target(route)
             except Exception as e:                            # key missing in Bitwarden, vault locked…
                 errors.append(f"{route['provider']}/{route['model']}: {type(e).__name__}")
+                passed.append({"position": index, "reason": f"no_target:{type(e).__name__}"})
                 continue
             if target is None:
+                passed.append({"position": index, "reason": "no_target"})
                 continue
             # Kie's endpoints answer a quick Cloudflare 502 on about half the calls (2026-10-16): one retry there
             # costs ~3 s and spares an OpenRouter fallback (paid, low credit)
@@ -827,7 +895,9 @@ def build_app():
                          **telemetry, **({"host": getattr(resp, "provider", None) or
                                             (resp.model_dump().get("provider"))} if route["provider"] == "openrouter" else {})})
                     _charge(route, base, telemetry, body)
-                    return JSONResponse(resp.model_dump(), headers={"X-Walter-Route": f"{route['provider']}/{route['model']}"})
+                    log_selection(agent, task, d, index, passed, correlation)
+                    return JSONResponse(resp.model_dump(), headers={"X-Walter-Route": f"{route['provider']}/{route['model']}",
+                                                                    **cost_headers(telemetry)})
             except asyncio.CancelledError:
                 log({**base, "ok": False, "seconds": round(time.perf_counter() - t0, 2),
                      "stream": stream, "error": "CancelledError"})
@@ -837,6 +907,8 @@ def build_app():
                 log({**base, "ok": False, "seconds": round(time.perf_counter() - t0, 2), "error": type(e).__name__,
                      "params": sorted(k for k in body if k != "messages"),
                      **({"skipped": "rate_limit"} if route.get("access") == "subscription" and _rate_limited(e) else {})})
+                passed.append({"position": index, "reason": ("rate_limit" if route.get("access") == "subscription"
+                                                              and _rate_limited(e) else "error:" + type(e).__name__)})
                 continue
 
             async def sse(first=first, it=it, base=base, t0=t0, route=route):
@@ -875,9 +947,11 @@ def build_app():
                              "observed_model": observed_model, **telemetry, **({"error": failure} if failure else {})})
                         _charge(route, base, telemetry, body)
 
+            log_selection(agent, task, d, index, passed, correlation)   # first token received: this route answers
             return StreamingResponse(sse(), media_type="text/event-stream",
                                      headers={"X-Walter-Route": f"{route['provider']}/{route['model']}"})
         log({"agent": agent, "task": task, "ok": False, "error": "all routes failed", **correlation})
+        log_selection(agent, task, d, None, passed, correlation)
         raise HTTPException(502, {"message": "every route failed", "attempts": errors})
 
     return app

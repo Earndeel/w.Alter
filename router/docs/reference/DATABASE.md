@@ -481,6 +481,7 @@ Every routed execution attempt (walter_run, generate, walter-llm): provider, mod
 | `task_id` | uuid | True | — | Sub-agent task (runs.tasks.task_id) this execution served (walter_run); null otherwise. |
 | `usage` | jsonb | True | — | Measured token counts for this execution attempt (in/out/cached); NULL means unavailable, never zero by inference. |
 | `cost_status` | text | False | 'unknown'::text | Cost provenance: unknown when unavailable; reported from provider usage; estimated by transport; legacy for historical values with no provenance. |
+| `account` | text | True | — | Subscription (config subscriptions.json id, e.g. anthropic-pro-2) whose account served this attempt when its provider has several accounts; null otherwise. |
 
 constraints :
 

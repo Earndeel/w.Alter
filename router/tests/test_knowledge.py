@@ -21,14 +21,17 @@ def conn():
         c.rollback()
 
 
-@pytest.mark.parametrize("intent,role,model", [
-    ("Fais-moi une pub cinématique pour un parfum", "premium", "seedance-2-5"),
-    ("Course poursuite avec explosion", "action", "minimax-h3"),
-    ("Témoignage face caméra pour TikTok", "ugc", "gemini-omni-flash-1-1"),
-    ("20 variantes en brouillon", "budget", "grok-imagine-video-1-5"),
-    ("Un coucher de soleil sur la mer", "default", "minimax-h3"),
+@pytest.mark.parametrize("intent,role", [
+    ("Fais-moi une pub cinématique pour un parfum", "premium"),
+    ("Course poursuite avec explosion", "action"),
+    ("Témoignage face caméra pour TikTok", "ugc"),
+    ("20 variantes en brouillon", "budget"),
+    ("Un coucher de soleil sur la mer", "default"),
 ])
-def test_video_request_goes_to_the_role_of_its_objective(conn, intent, role, model):
+def test_video_request_goes_to_the_role_of_its_objective(conn, intent, role):
+    # the favourite of each role is the instance's (Monsieur moved budget from Grok to HeyGen on 2026-10-24/25),
+    # not a model named here: the test checks that the request lands on its role and gets that role's model
+    model = knowledge.load()["roles"][role]["model"]
     d = knowledge.decide(conn, "text_to_video", intent)
     assert (d["role"], d["model_id"]) == (role, model) and d["brief"].count("\n") >= 4
 
