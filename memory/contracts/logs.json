@@ -127,5 +127,18 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "walter-logs",
+    "order": 20,
+    "summary": "manifest/logs/SUMMARY.md",
+    "manifest": "manifest/logs/MANIFEST.md",
+    "guide": "manifest/logs/GUIDE.md",
+    "tools": [
+      "logs_search",
+      "logs_timeline",
+      "logs_get"
+    ]
   }
 }
