@@ -70,6 +70,38 @@ def capabilities(plan: ContextPlan, ttl: float = 600) -> Block | None:
     return Block("capabilities", 0, text, sources=ids)
 
 
+# capability → modules whose agent brief (M1) is shown *for this message* (tool cards, layer 4): the host lists only a
+# core toolset and every module's one line (M0), so the plan says which modules' tools fit the request (07/11: a web
+# question answered with `curl` from the VM because nothing pointed at walter_browse). Delegation has none: walter_run
+# carries its own description.
+TOOL_CARD_MODULES = {"web": ["browse"], "browser": ["browse", "computer"], "secrets": ["secrets"],
+                     "memory": ["memory"], "skills": ["skills"]}
+_CARD_CACHE: dict[str, tuple[float, str]] = {}
+
+
+def _card(module: str, ttl: float = 600) -> str:
+    hit = _CARD_CACHE.get(module)
+    if hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    out = json.loads(subprocess.run(["walter", "present", "notes", "--form", "m0", "--m1", module],
+                                    capture_output=True, text=True, timeout=20).stdout)
+    text = "\n\n".join(n["content"].strip() for n in out.get("notes") or []
+                        if n.get("module") == module and str(n.get("id", "")).endswith(".manifest") and n.get("content"))
+    _CARD_CACHE[module] = (time.time(), text)
+    return text
+
+
+def tool_cards(plan: ContextPlan) -> Block | None:
+    """The briefs of the modules the plan's capabilities need, in the volatile layer (the cached prefix stays the same)."""
+    mods = list(dict.fromkeys(m for c in plan.capabilities for m in TOOL_CARD_MODULES.get(c, [])))
+    texts = [(m, _card(m)) for m in mods]
+    texts = [(m, t) for m, t in texts if t]
+    if not texts:
+        return None
+    return Block("tool_cards", 4, "Outils W.Alter pour cette demande :\n\n" + "\n\n".join(t for _, t in texts),
+                 sources=[m for m, _ in texts])
+
+
 def board() -> Block | None:
     """The active subjects, one line each (changes when a subject changes state)."""
     from walter_memory import views
@@ -166,7 +198,7 @@ def recent(session_key: str | None, native: bool) -> Block | None:
 
 def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, native_history: bool = True) -> tuple[list[Block], list[str]]:
     """The blocks the plan asks for. L0: capabilities (+ records when unsure or a lookup is needed). Returns (blocks, notes on failed sources)."""
-    steps = [("capabilities", lambda: capabilities(plan))]
+    steps = [("capabilities", lambda: capabilities(plan)), ("tool_cards", lambda: tool_cards(plan))]
     if plan.level != "L0":
         steps += [("board", board), ("session_state", lambda: session_state(plan, message, session_key)),
                   ("subject", lambda: subject(plan)), ("memory", lambda: memory(plan, message)),
