@@ -85,3 +85,28 @@ cache = "prefix"
 cache_ttl_s = 300
 cached_cost = 0.25
 write_cost = 1.0
+
+# Trusted, bounded capability notes; unchanged within an owner turn. No model call.
+[capabilities]
+router_enabled = true
+timeout_seconds = 10
+max_chars = 6000
+# Module layer: every agent-facing module's level-0 brief (walter present notes), composed once per owner turn.
+modules_enabled = true
+layer_max_chars = 20000
+
+# Entrance: a large tool output reduced when it enters the context (Claude Code PostToolUse), before the model reads
+# it. shadow = record what would be cut (numbers only, @instance/state/context/shadow/entrance-<day>.jsonl);
+# off = nothing. "on" is refused until the hook journals originals itself (walter_logs keeps what the model saw).
+[entrance]
+mode = "shadow"
+min_chars = 8000             # outputs below this stay verbatim (2.3 % of outputs = 26 % of the volume, 14 days, 06/11)
+head_chars = 1000            # kept from the start
+tail_chars = 800             # kept from the end (exit status, final lines)
+signal_lines = 8             # at most this many middle lines matching signal_words, with their line numbers
+signal_line_chars = 160
+signal_words = ["error", "erreur", "failed", "échec", "exception", "traceback", "warning", "denied", "fatal",
+                "panic", "not found", "refused", "timeout"]
+exempt_tools = ["Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Skill", "mcp__walter__skill_read",
+                "mcp__walter__module_guide", "mcp__visualize__read_me"]   # instructions the model needs whole
+chars_per_token = 3.5        # report only: estimated tokens from characters
