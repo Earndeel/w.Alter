@@ -165,3 +165,19 @@ def test_service_answers_like_the_cli_and_records_shadow_plans(fake_llm, monkeyp
             assert json.loads(r.read()) == {"ok": True, "router_cached": True}
     finally:
         srv.shutdown()
+
+
+def test_named_project_forces_memory(monkeypatch):
+    """A decision model that reads « Le site EDGEWISE, c'est où ? » as a web question still gets the owner's memory."""
+    from walter_context import preflight as pf
+    monkeypatch.setattr(pf, "_anchors", lambda m: ["edgewise"] if "edgewise" in m.lower() else [])
+    monkeypatch.setattr(pf, "router_tasks", lambda: {})
+    monkeypatch.setattr(pf, "decision_chain", lambda: None)
+    import walter_memory.llm as llm
+    answers = {"act": {"choice": "new"}, "plan": {"choice": "none", "confidence": 0.8}, "cap_web": {"noul": 0.9}}
+    monkeypatch.setattr(llm, "decide", lambda *a, **k: {"answers": answers, "model": "fake"})
+    p = pf.run(pf.Request(turn_id="t", message="Le site EDGEWISE, c'est quoi et il est où ?"))
+    assert p.capabilities[:2] == ["tools", "memory"] and "web" in p.capabilities
+    assert p.decision["anchors"] == ["edgewise"]
+    q = pf.run(pf.Request(turn_id="t2", message="Quel est le prix du Bitcoin ?"))
+    assert "memory" not in q.capabilities and "anchors" not in q.decision

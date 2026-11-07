@@ -21,8 +21,8 @@ def _fake_memory(monkeypatch, calls):
 def test_records_when_lookup_needed_or_unsure(monkeypatch):
     calls = []
     _fake_memory(monkeypatch, calls)
-    assert retrieval.records(_plan(caps=("tools", "search")), "port ?").sources == ["r1"]
-    assert retrieval.records(_plan(conf=0.2), "port ?") is not None
+    assert retrieval.records(_plan(caps=("tools", "memory")), "port ?").sources == ["r1"]
+    assert retrieval.records(_plan(conf=0.2), "quel port ?") is not None
     assert retrieval.records(_plan(conf=0.9), "port ?") is None
     assert calls and calls[0]["records"] > 0 and calls[0]["knowledge"] == 0
 
@@ -35,9 +35,9 @@ def test_no_records_block_when_memory_block_runs(monkeypatch):
     monkeypatch.setattr(retrieval, "memory", lambda plan, m: retrieval.Block("memory", 4, "m") if retrieval._gets_memory(plan) else None)
     monkeypatch.setattr(retrieval, "records", lambda plan, m: retrieval.Block("records", 4, "r"))
     ids = lambda p: [b.id for b in retrieval.gather(p, "x")[0]]          # noqa: E731
-    assert ids(_plan(level="L3", caps=("tools", "search"))) == ["memory"]
-    assert ids(_plan(level="L0", caps=("tools", "search"))) == ["records"]
-    assert ids(_plan(level="L2", caps=("tools", "search"), domains=("projects",))) == ["records"]
+    assert ids(_plan(level="L3", caps=("tools", "memory"))) == ["memory"]
+    assert ids(_plan(level="L0", caps=("tools", "memory"))) == ["records"]
+    assert ids(_plan(level="L2", caps=("tools", "memory"), domains=("projects",))) == ["records"]
 
 
 def test_session_state_is_layer_two_beyond_l0(monkeypatch):
@@ -49,3 +49,22 @@ def test_session_state_is_layer_two_beyond_l0(monkeypatch):
     b = retrieval.session_state(_plan(level="L2"), "x", "claude-code/vm/abc")
     assert b.layer == 2 and b.id == "session_state" and calls[0]["session"] == ("claude_code", "abc")
     assert calls[0]["budget"]["knowledge"] == 0 and calls[0]["budget"]["working"] > 0
+
+
+def test_unsure_web_question_gets_no_memory_records(monkeypatch):
+    """« Quel est le prix du Bitcoin ? » planned L0, unsure, web: the owner's records are not looked up (07/11)."""
+    calls = []
+    monkeypatch.setattr(retrieval, "_ctx_calls", calls, raising=False)
+    import walter_memory.context as ctx
+    monkeypatch.setattr(ctx, "get_context", lambda *a, **k: calls.append(k) or {"text": "x", "trace": {}})
+    assert retrieval.records(_plan(caps=("tools", "web"), conf=0.2), "prix du bitcoin ?") is None
+    assert retrieval.records(_plan(caps=("tools", "browser"), conf=0.2), "connecte-toi") is None
+    assert retrieval.records(_plan(caps=("tools", "web", "memory"), conf=0.9), "x") is not None
+    assert len(calls) == 1
+
+
+def test_lone_unsure_word_gets_no_records(monkeypatch):
+    import walter_memory.context as ctx
+    monkeypatch.setattr(ctx, "get_context", lambda *a, **k: {"text": "x", "trace": {}})
+    assert retrieval.records(_plan(conf=0.2), "test") is None
+    assert retrieval.records(_plan(conf=0.2), "port du proxy mac ?") is not None
