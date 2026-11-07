@@ -392,10 +392,11 @@ def main(argv=None) -> None:
         elif a.action == "update":          # what is learned after the start (walter-context preflight): JSON on stdin
             spec = json.load(sys.stdin)
             res = {"ok": True, **runs.update(spec["run_id"], thread_id=spec.get("thread_id"), level=spec.get("level"),
-                                             act=spec.get("act"))}
+                                             act=spec.get("act"), requested=spec.get("requested"))}
         elif a.action == "find":            # the latest run of a harness session (a runner that only knows the session)
             from .db import connect
-            fields = "run_id, status, privacy_class, origin->>'channel' as channel" if a.open_only else "run_id"
+            fields = ("run_id, status, privacy_class, origin->>'channel' as channel, routing->'requested' as requested"
+                      if a.open_only else "run_id")
             opened = "and status = 'open'" if a.open_only else ""
             by_id = a.open_only and bool(a.run_id)
             identity = "run_id" if by_id else "origin->>'session_id'"
@@ -408,7 +409,7 @@ def main(argv=None) -> None:
             row = rows[0] if rows and not ambiguous else None
             res = {"run_id": str(row["run_id"]) if row else None}
             if a.open_only:
-                res.update({key: row[key] if row else None for key in ("status", "privacy_class", "channel")})
+                res.update({key: row[key] if row else None for key in ("status", "privacy_class", "channel", "requested")})
                 if ambiguous:
                     res["error"] = "ambiguous_open_runs"
         elif a.action == "routing":         # observed route only; caller content never enters the decision
