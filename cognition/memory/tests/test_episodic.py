@@ -12,6 +12,7 @@ from walter_memory.db import connection
 
 Z = flows.tz()
 DAY = (datetime.now(timezone.utc) - timedelta(days=3)).astimezone(Z).date()
+SESSION_START = datetime.now(timezone.utc)
 
 
 def at(h, m=0, day=None):
@@ -105,6 +106,11 @@ def test_owner_attestation_confirms_and_a_correction_rejects(monkeypatch):
 
 
 def test_day_and_week_rebuild_after_a_correction_and_only_their_path(monkeypatch):
+    # The day view lists 30 decisions and counts the rest: knowledge left on DAY by earlier sessions on the reused test
+    # database would push this one out (failed from the ~5th full run of a day, 2026-11-07). Start from this session's rows.
+    with connection() as conn:
+        conn.execute("delete from core.derived_items where created_at < %s and valid_from >= %s and valid_from < %s",
+                     (SESSION_START, at(0), at(0) + timedelta(days=1)))
     t = f"p-{uuid.uuid4().hex[:8]}"
     e1 = ev(event_type="message.sent", source="codex", thread_id=t, occurred_at=at(10), content="on garde Redis pour le cache")
     with connection() as conn:

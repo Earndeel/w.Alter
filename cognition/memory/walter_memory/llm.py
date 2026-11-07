@@ -154,17 +154,23 @@ def chat(messages: list[dict], *, model: str | None = None, poste: str | None = 
     except Exception as e:
         _log(**base, status="error", error=str(e)[:500], latency_ms=int((time.perf_counter() - t0) * 1000))
         raise
+    usage = data.get("usage") or {}
+    cost = usage.get("cost")
     if poste:   # the route that answered ("kie/gpt-6-luna"), for the ledger and the derived items' provenance
         prov, _, used = (r.headers.get("x-walter-route") or "walter-llm/").partition("/")
         base.update(provider=prov, model=used or base["model"])
-    usage = data.get("usage") or {}
+        if cost is None and r.headers.get("x-walter-cost-usd"):   # providers that report no cost: the gateway's price
+            try:
+                cost = float(r.headers["x-walter-cost-usd"])
+            except ValueError:
+                cost = None
     content = data["choices"][0]["message"].get("content") or ""
     if mapping:
         content = privacy.restore(content, mapping)
     _log(**base, status="ok", latency_ms=int((time.perf_counter() - t0) * 1000),
          input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),
-         cached_tokens=(usage.get("prompt_tokens_details") or {}).get("cached_tokens"), cost_usd=usage.get("cost"))
-    return {"content": content, "usage": usage, "cost_usd": usage.get("cost"), "model": base["model"],
+         cached_tokens=(usage.get("prompt_tokens_details") or {}).get("cached_tokens"), cost_usd=cost)
+    return {"content": content, "usage": usage, "cost_usd": cost, "model": base["model"],
             "provider": base["provider"]}
 
 
