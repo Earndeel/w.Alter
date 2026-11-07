@@ -149,12 +149,20 @@ to respect that provider restriction.
 
 `notices` records every switch, with source, destination and reason. When `user_notification_required`
 is true the caller **must tell the user `user_notice`**, including on failure. `output` remains the task’s
-answer so structured-output requests remain usable. If every provider fails, `ok` is false and no other
-model is substituted. The budget covers all providers and tools together.
+answer so structured-output requests remain usable. If every provider of a model fails, the run moves to the
+next model the owner declared as its fallback (`knowledge.json`: `unrestricted_favourites` for an unrestricted request,
+the tier's `fallback`), with a `model_fallback` notice; a model that was not declared is never substituted. If the whole
+chain fails, `ok` is false. `routed.executed_model_id` names the model that answered. The budget covers all providers and tools together.
 
 ## Route d’abonnement Claude
 
 La route `claude-pro` est exécutée dans la passerelle du Router, avec les messages, outils et paramètres du consommateur. Le transport natif ne conserve que l’attribution technique du fournisseur ; sa boucle d’agent et son contexte ne sont pas délégués. Configuration, renouvellement, quotas réels, streaming et limites : [docs/CLAUDE-SUBSCRIPTION.md](docs/CLAUDE-SUBSCRIPTION.md).
+
+## Route d’abonnement Google AI Pro
+
+La route `antigravity` sert les modèles de l’abonnement Google AI Pro (Gemini 3.8 Flash, Claude Sonnet/Opus 4.6,
+GPT-OSS 120B) par la CLI officielle Antigravity, texte seul, tous ses outils refusés, rien de conservé après l’appel :
+[raisons, transport, quota et vérification](docs/ANTIGRAVITY-SUBSCRIPTION.md).
 
 La collecte Arena dispose d’un repli public borné par le navigateur partagé, avec contrôle de l’identité
 des classements : [transport, limites et vérification](docs/ARENA.md).
