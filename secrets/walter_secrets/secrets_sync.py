@@ -85,7 +85,7 @@ def bw(*args: str) -> str:
     sess = session()
     for attempt in (1, 2):
         r = subprocess.run(["bw", *args, "--nointeraction"], capture_output=True, text=True, timeout=180,
-                           env={**os.environ, "BW_SESSION": sess, "BW_NOINTERACTION": "true"})
+                           env=settings.bw_env(BW_SESSION=sess, BW_NOINTERACTION="true"))
         if not r.returncode:
             return r.stdout
         if attempt == 1 and "locked" in (r.stderr + r.stdout).lower():   # dead cached session: renew once

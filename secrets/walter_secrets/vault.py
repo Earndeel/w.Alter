@@ -21,6 +21,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import settings
 from .settings import UNLOCK, AUDIT, FILES
 # FILES is a tmpfs location, explicitly configured.
 #          # tmpfs: decrypted documents never touch the disk
@@ -71,7 +72,7 @@ class Vault:
     def _bw(self, *args: str, timeout: int = 120) -> str:
         session = self._session()
         for attempt in (1, 2):
-            env = {**os.environ, "BW_SESSION": session, "BW_NOINTERACTION": "true"}
+            env = settings.bw_env(BW_SESSION=session, BW_NOINTERACTION="true")
             r = subprocess.run(["bw", *args, "--nointeraction"], capture_output=True, text=True, timeout=timeout, env=env)
             if not r.returncode:
                 return r.stdout
@@ -87,7 +88,7 @@ class Vault:
         """bw with its payload on stdin: an item never travels on a command line (visible to every process)."""
         session = self._session()
         for attempt in (1, 2):
-            env = {**os.environ, "BW_SESSION": session, "BW_NOINTERACTION": "true"}
+            env = settings.bw_env(BW_SESSION=session, BW_NOINTERACTION="true")
             r = subprocess.run(["bw", *args, "--nointeraction"], input=data, capture_output=True, text=True,
                                timeout=timeout, env=env)
             if not r.returncode:

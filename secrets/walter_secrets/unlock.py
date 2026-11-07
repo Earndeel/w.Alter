@@ -21,6 +21,8 @@ class UnlockError(RuntimeError):
 
 
 def _run(argv, *, env=None):
+    if argv[0] == 'bw':     # always the pinned bw data directory, whatever the caller's HOME/cwd
+        env = settings.bw_env(**(env or {}))
     try:
         result = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.SubprocessError) as exc:
