@@ -1,19 +1,23 @@
-"""The contracts walter-context works with (v1), as plain data with validation. Stdlib only.
+"""The contracts walter-context works with, as plain data with validation. Stdlib only.
 
 ContextPlan     what the preflight decides for one owner message: walter-context's own output, traced.
 SessionState    the working state of a thread between calls (walter-context owns it).
 ThreadHint      walter-context's guess of the thread, sent to Walter Memory, which owns the final attachment.
 MemoryViewQuery what walter-context asks Walter Memory for: a domain, a horizon, a depth (Memory owns the views).
 
-JSON Schemas of the same contracts: contracts/schemas/*.v1.json. Vocabularies are closed: a new value is a new
-contract version, not a silent extension.
+JSON Schemas of the same contracts: contracts/schemas/*.vN.json. Vocabularies are closed: a new value is a new
+contract version, not a silent extension. ContextPlan v2 (2026-11-07): the v1 capability `search` mixed the owner's
+memory and the web, so a web question (« prix du Bitcoin ») pulled memory records; it is split into `memory` and
+`web`, and `browser` (act in a web page or an app as the owner) is added. A v1 plan still reads: `search` becomes
+`memory` + `web` (nothing lost).
 """
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-VERSION = 1
+VERSION = 1                 # SessionState, ThreadHint, MemoryViewQuery
+PLAN_VERSION = 2            # ContextPlan
 
 # Context level: how much the model needs to see beyond the message itself.
 LEVELS = {
@@ -29,7 +33,8 @@ ACTS = ("new", "continue", "approve", "correct", "inform")
 DOMAINS = ("projects", "profile", "activities", "relations", "agenda", "decisions", "goals")
 HORIZONS = ("instant", "day", "medium", "long", "stable")
 DEPTHS = ("index", "overview", "synthesis", "details", "sources")
-CAPABILITIES = ("tools", "skills", "search", "delegation", "secrets")
+CAPABILITIES = ("tools", "skills", "memory", "web", "browser", "delegation", "secrets")
+V1_CAPABILITIES = {"search": ("memory", "web")}     # v1 value -> v2 values
 MODEL_LEVELS = ("L1", "L2", "L3")          # Walter Router's text tiers (not the context levels above)
 FAST_PATHS = ("short_reply", "trivial")
 
@@ -83,11 +88,11 @@ class ContextPlan:
     escalated: bool = False              # a stronger model settled part of it
     decision: dict = field(default_factory=dict)          # model, latency_ms, confidences: for the trace only
     answer: str | None = None            # fast_path trivial only: the exact answer, no model needed (lot 2, 07/11)
-    version: int = VERSION
+    version: int = PLAN_VERSION
 
     def validate(self) -> "ContextPlan":
-        if self.version != VERSION:
-            raise ContractError(f"ContextPlan version {self.version} != {VERSION}")
+        if self.version != PLAN_VERSION:
+            raise ContractError(f"ContextPlan version {self.version} != {PLAN_VERSION}")
         if not self.turn_id:
             raise ContractError("turn_id required")
         if self.thread.new == (self.thread.id is not None):
@@ -110,14 +115,18 @@ class ContextPlan:
 
     @classmethod
     def from_dict(cls, d: dict) -> "ContextPlan":
+        version, caps = d.get("version", PLAN_VERSION), list(d.get("capabilities") or [])
+        if version == 1:                 # a traced v1 plan: same meaning in the v2 vocabulary
+            caps = list(dict.fromkeys(c2 for c in caps for c2 in V1_CAPABILITIES.get(c, (c,))))
+            version = PLAN_VERSION
         try:
             plan = cls(turn_id=d["turn_id"], thread=ThreadChoice(**d["thread"]), act=d["act"], level=d["level"],
                        domains=list(d.get("domains") or []), horizons=list(d.get("horizons") or []),
-                       capabilities=list(d.get("capabilities") or []),
+                       capabilities=caps,
                        model_profile=ModelProfile(**(d.get("model_profile") or {})),
                        fast_path=d.get("fast_path"), escalated=bool(d.get("escalated")),
                        decision=dict(d.get("decision") or {}), answer=d.get("answer"),
-                       version=d.get("version", VERSION))
+                       version=version)
         except (KeyError, TypeError) as exc:
             raise ContractError(f"malformed ContextPlan: {exc}") from exc
         return plan.validate()
@@ -214,12 +223,12 @@ _STRS = {"type": "array", "items": {"type": "string"}}
 def schemas() -> dict[str, dict]:
     base = "https://walter.local/contracts/context/"
     return {
-        "context-plan.v1.json": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": base + "context-plan.v1.json",
-            "title": "ContextPlan v1", "description": "What the preflight decides for one owner message (walter-context output, traced).", "type": "object",
+        "context-plan.v2.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": base + "context-plan.v2.json",
+            "title": "ContextPlan v2", "description": "What the preflight decides for one owner message (walter-context output, traced).", "type": "object",
             "required": ["version", "turn_id", "thread", "act", "level"],
             "properties": {
-                "version": {"const": VERSION}, "turn_id": {"type": "string", "minLength": 1},
+                "version": {"const": PLAN_VERSION}, "turn_id": {"type": "string", "minLength": 1},
                 "thread": {"type": "object", "required": ["id", "new"], "properties": {
                     "id": {"type": ["string", "null"]}, "new": {"type": "boolean"}, "confidence": _PROB,
                     "alternates": _STRS}},

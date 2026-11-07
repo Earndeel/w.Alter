@@ -15,9 +15,11 @@ import time
 from dataclasses import asdict, dataclass, field
 
 from .plan import ContextPlan
+from .preflight import _words
 
 # capability → module whose brief (M1) the model gets in full; every module's one line (M0) is always there
-CAPABILITY_MODULES = {"skills": ["skills"], "search": ["memory"], "delegation": ["router"], "secrets": ["secrets"]}
+CAPABILITY_MODULES = {"skills": ["skills"], "memory": ["memory"], "web": ["browse"], "browser": ["browse", "computer"],
+                      "delegation": ["router"], "secrets": ["secrets"]}
 DOMAIN_MODULES = {"relations": ["memory"], "agenda": ["memory"], "profile": ["memory"], "activities": ["memory"],
                   "decisions": ["memory"], "goals": ["memory"]}
 SUBJECT_DEPTH = {"L0": None, "L1": "index", "L2": "overview", "L3": "synthesis", "L4": "synthesis"}
@@ -132,9 +134,12 @@ def records(plan: ContextPlan, message: str) -> Block | None:
     """The curated records (decisions register, owner rules) matching the message, when the plan gets no memory block
     but says the answer must be looked up, or is unsure of itself. Calibration 2026-10-28 (DSH trials): questions on
     Walter's own setup or the owner's decisions were planned L0 « tools suffice » with low confidence, and a model
-    without tools then had nothing to answer from."""
+    without tools then had nothing to answer from. ContextPlan v2 (07/11): only a *memory* lookup asks for them; an
+    unsure plan that needs the web and not the owner's memory (« prix du Bitcoin ») gets none."""
     conf = ((plan.decision or {}).get("confidence") or {}).get("plan")
-    if "search" not in plan.capabilities and not (conf is not None and conf < UNSURE_PLAN):
+    caps = set(plan.capabilities)
+    unsure = conf is not None and conf < UNSURE_PLAN and not caps & {"web", "browser"} and len(_words(message)) >= 2
+    if "memory" not in caps and not unsure:       # a lone word (« test ») names nothing to look up
         return None
     from walter_memory import context
     r = context.get_context(message, budget=RECORDS_BUDGET, include_profile=False)

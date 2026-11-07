@@ -64,7 +64,11 @@ HORIZON_CRITERIA = {"instant": "right now, the last hours", "day": "today or yes
                     "none": "no time span: no stored knowledge needed"}
 CAPABILITY_QUESTIONS = {
     "skills": "Would a tested procedure (a skill) for the owner's tools, infrastructure or projects help?",
-    "search": "Does answering need to look information up (memory, history, the web), beyond the conversation?",
+    "memory": ("Does answering need what is stored about the owner and their work (past conversations, people, decisions, "
+               "projects, their setup or history), beyond this conversation?"),
+    "web": "Does answering need current public information from the internet (prices, news, weather, docs, a web page)?",
+    "browser": ("Does the work need to act in a web page or an application as the owner (sign in, click, fill a form, "
+                "use their account), not just read public information?"),
     "delegation": "Would part of the work best be done by another model or a sub-agent (e.g. image, video, long job)?",
     "secrets": "Does the work need an account, a password, an API key or a login?"}
 
@@ -268,6 +272,9 @@ def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPl
         level = "L1"                                                       # plan floor
     domain, horizon = pick("domain"), pick("horizon")
     caps = [c for c in CAPABILITIES if c != "tools" and ((a.get("cap_" + c) or {}).get("noul") or 0) >= 0.5]
+    named = _anchors(req.message)
+    if named and "memory" not in caps:      # a project the owner's memory knows is named: memory, whatever the model said
+        caps.insert(0, "memory")
     task = pick("task") if pick("task") in router_tasks() else "general"
     plan = ContextPlan(
         turn_id=req.turn_id, thread=thread, act=pick("act") if pick("act") in ACTS else "continue", level=level,
@@ -276,8 +283,17 @@ def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPl
         model_profile=ModelProfile(task=task, level=pick("model_level") if pick("model_level") in MODEL_LEVELS else "L1"),
         decision={"model": res.get("model"), "ms": round((time.perf_counter() - t0) * 1000),
                   "confidence": {k: conf(k) for k in ("thread", "act", "plan", "domain", "horizon", "task")
-                                 if conf(k) is not None}})
+                                 if conf(k) is not None}, **({"anchors": named} if named else {})})
     return plan.validate()
+
+
+def _anchors(message: str) -> list[str]:
+    """Walter Memory's names (projects, organisations) the message cites; [] when Memory is unavailable."""
+    try:
+        from walter_memory import entities
+        return [x["alias"] for x in entities.anchors(message)][:5]
+    except Exception:  # noqa: BLE001 — the plan stays the decision model's alone
+        return []
 
 
 def _default_thread(req: Request) -> ThreadChoice:
