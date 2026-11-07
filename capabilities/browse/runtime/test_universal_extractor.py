@@ -85,6 +85,18 @@ class UniversalExtractorUnitTests(unittest.TestCase):
         self.assertEqual(records[0]["price"], 310)
         self.assertTrue(records[0]["_price_path"].startswith("$context."))
 
+    def test_single_object_answer_is_one_record_only_when_it_carries_the_ask(self) -> None:
+        spec = ExtractionSpec(expected_fields={"amount": ("amount",), "base": ("base",), "currency": ("currency",)})
+        spot = {"data": {"amount": "67950.1", "base": "BTC", "currency": "EUR"}}
+        _, matched, count = score_payload(spot, spec)
+        self.assertEqual(count, 1)
+        self.assertTrue(meets_spec(matched, count, spec))
+        self.assertEqual(project_records(spot, spec)[0]["amount"], "67950.1")
+        stray = {"consent": {"currency": "EUR", "vendors": 412}}
+        _, matched, count = score_payload(stray, spec)
+        self.assertEqual(count, 0)
+        self.assertFalse(meets_spec(matched, count, self.spec))
+
     def test_json_capture_accepts_direct_api_documents_but_not_html(self) -> None:
         self.assertTrue(is_json_response_candidate("document", "application/json"))
         self.assertTrue(is_json_response_candidate("xhr", "application/json; charset=utf-8"))

@@ -312,5 +312,43 @@ class _FailOnUseSpyScrapling:
         raise AssertionError("scrapling second fetch must not happen when probe satisfies")
 
 
+class SingleObjectJsonTests(unittest.IsolatedAsyncioTestCase):
+    """A JSON API answering one object (spot price, status) is served by the probe, with no browser (2026-11-07:
+    CoinGecko simple/price and Coinbase spot failed the contract, cost 31 s each and made the agent search around)."""
+
+    BODY = '{"bitcoin": {"eur": 67950, "usd": 75740, "eur_24h_change": -0.24, "last_updated_at": 1762540380}}'
+
+    async def _route(self, spec):
+        import universal_router as mod
+
+        async def fake_probe(url, *, timeout=0.0, content_hints=None):
+            return {"status": 200, "content_type": "application/json; charset=utf-8", "bytes": len(self.BODY),
+                    "is_json": True, "has_scripts": False, "html_ratio": 1.0, "looks_spa": False,
+                    "content_present": False, "challenge": False, "redirect_target": None, "error": None,
+                    "probe_ms": 5, "body": self.BODY}
+
+        router = UniversalRouter(scrapling_extractor=_FailOnUseSpyScrapling(), camoufox_client=_FailOnUseSpyCamoufox(),
+                                 webtop_client=_FailOnUseSpyWebtop())
+        original = mod.http_probe
+        mod.http_probe = fake_probe
+        try:
+            return await router.extract_one("https://api.coins.test/simple/price?ids=bitcoin", spec)
+        finally:
+            mod.http_probe = original
+
+    async def test_fields_of_a_single_object_are_one_record(self) -> None:
+        spec = ExtractionSpec(expected_fields={"eur": ("eur",), "usd": ("usd",), "updated": ("last_updated_at",)})
+        routed = await self._route(spec)
+        self.assertEqual(routed.route, "probe-http")
+        self.assertEqual(routed.result.records[0]["eur"], 67950)
+        self.assertEqual(routed.result.records[0]["usd"], 75740)
+
+    async def test_a_json_url_read_as_text_returns_the_document(self) -> None:
+        spec = ExtractionSpec(expected_fields={"content": ("content", "text", "description", "body")})
+        routed = await self._route(spec)
+        self.assertEqual(routed.route, "probe-http")
+        self.assertIn('"eur": 67950', routed.result.records[0]["content"])
+
+
 if __name__ == "__main__":
     unittest.main()

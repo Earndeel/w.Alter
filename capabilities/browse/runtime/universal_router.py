@@ -967,6 +967,10 @@ class UniversalRouter:
                 try:
                     direct_payload = json.loads(body)
                     direct_score, direct_matched, direct_count = score_payload(direct_payload, spec)
+                    if _wants_content(spec) and not meets_spec(direct_matched, direct_count, spec):
+                        # Reading mode on a JSON URL: the document itself is the content to read.
+                        direct_payload = {"content": body[:200_000]}
+                        direct_score, direct_matched, direct_count = 100.0, ("content",), 1
                     if meets_spec(direct_matched, direct_count, spec):
                         direct_started = time.perf_counter()
                         candidate = ResponseCandidate(
