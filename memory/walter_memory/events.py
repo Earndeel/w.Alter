@@ -116,10 +116,16 @@ def record_event(**event) -> dict:
 
 def get_events(*, source: str | None = None, event_types: list[str] | None = None, thread_id: str | None = None,
                actor_identity_id: str | None = None, since: Any = None, until: Any = None, text: str | None = None,
-               limit: int = 50, include_retracted: bool = False, max_privacy: str = "local_only") -> list[dict]:
-    """Read events newest first. Retracted events are hidden unless include_retracted.
-    max_privacy: 'cloud_allowed' returns only cloud_allowed rows (for callers that will ship them to a cloud model)."""
+               limit: int = 50, include_retracted: bool = False, max_privacy: str = "local_only",
+               order: str = "desc", event_id: str | None = None) -> list[dict]:
+    """Read events newest first (order="asc": oldest first, e.g. « the first event about X »). Retracted events are
+    hidden unless include_retracted. max_privacy: 'cloud_allowed' returns only cloud_allowed rows (for callers that
+    will ship them to a cloud model)."""
+    if order not in ("asc", "desc"):
+        raise ValueError("order must be asc or desc")
     where, args = [], []
+    if event_id:
+        where.append("e.event_id = %s::uuid"); args.append(event_id)
     if source:
         where.append("e.source = %s"); args.append(source)
     if event_types:
@@ -144,9 +150,32 @@ def get_events(*, source: str | None = None, event_types: list[str] | None = Non
                      i.display_name as actor_name, i.is_self as actor_is_self
               from core.events e left join core.source_identities i on i.identity_id = e.actor_identity_id
               {'where ' + ' and '.join(where) if where else ''}
-              order by e.occurred_at desc limit %s"""
+              order by e.occurred_at {order}, e.event_id {order} limit %s"""
     with connection() as conn:
         return conn.execute(sql, (*args, int(limit))).fetchall()
+
+
+def compact(rows: list[dict], text: str | None = None, width: int = 500, budget: int = 16000) -> dict:
+    """Events as an agent reads them: no payload, the content cut to a window around the searched text, the whole
+    answer bounded. One full event = get_events(event_id=…). A 50-event answer used to be ~56K chars: spilled to a
+    file, then grepped, then searched again (11 steps for « the first event about Sagora », 07/11)."""
+    out, used, low = [], 0, (text or "").lower()
+    for r in rows:
+        content = r.get("content") or ""
+        i = content.lower().find(low) if low else -1
+        start = max(0, i - width // 3) if i > 0 else 0
+        snippet = ("…" if start else "") + content[start:start + width] + ("…" if start + width < len(content) else "")
+        item = {"event_id": r["event_id"], "occurred_at": str(r["occurred_at"]), "source": r["source"],
+                "event_type": r["event_type"], "thread_id": r.get("thread_id"), "actor": r.get("actor_name"),
+                "chars": len(content), "content": snippet}
+        size = len(json.dumps(item, ensure_ascii=False, default=str))
+        if out and used + size > budget:
+            break
+        out.append(item); used += size
+    more = len(rows) - len(out)
+    return {"events": out, "truncated": more,
+            **({"hint": f"{more} more not shown: narrow with since/until, or read one event in full by event_id"}
+               if more else {})}
 
 
 def stats() -> list[dict]:
