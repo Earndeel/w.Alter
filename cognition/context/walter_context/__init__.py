@@ -8,5 +8,5 @@ hosts plug in through ports/.
 from .compress import Epoch, Selection, Session, View, project
 from .config import Config, load
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = ["Config", "Epoch", "Selection", "Session", "View", "load", "project"]
