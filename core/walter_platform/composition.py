@@ -29,7 +29,7 @@ DSH_OFF=('tool-web','tool-skill','skill-filesystem','web','web-search-deepseek',
          'deepseek-llm-api-extensions','deepseek-account','llm-deepseek','llm-deepseek-account')
 DSH_PRESET_OWNED={'persona':'soul','skill-filesystem':'skills','tool-skill':'skills','tool-web':'browse'}
 DSH_WEB_OFF=('preset-ptc','preset-minimal','preset-cordis','account-controller')
-DSH_TASKS=('coding','general','document','summarization')   # Walter Router tasks offered to DSH
+DSH_TASKS=('auto','coding','general','document','summarization')   # Walter Router tasks offered to DSH
 DSH_TITLE={'targetWords':5,'targetCjkCharacters':10,'maxInputBytes':4096,'maxOutputTokens':64,'timeoutMs':60000,
            'provider':'walter','model':'summarization'}
 
@@ -88,17 +88,45 @@ def _dsh_addition(data, entry):
     return {'insert':[entry]}
 
 
+def _yaml_rows(text):
+    """Top-level rows of a DSH patch as (parsed row, raw source slice); raw slices keep `!!js` tags and layout."""
+    import yaml
+    node=yaml.compose(text,Loader=yaml.SafeLoader)
+    if node is None:return []
+    if not isinstance(node,yaml.SequenceNode):raise ValueError('DSH profile patch is not a list of rows')
+    starts=[text.rfind('\n',0,item.start_mark.index)+1 for item in node.value]
+    raws=[text[s:e] for s,e in zip(starts,starts[1:]+[len(text)])]
+    return [(_dsh_yaml(raw)[0],raw) for raw in raws]
+
+
+def _rows_sha(rows):
+    return hashlib.sha256(json.dumps(rows,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
+
+
 def _managed_yaml(original, content, name):
-    """`_managed_text` for YAML files: the Walter block is fenced by YAML comments, other bytes are preserved."""
-    pattern=re.compile(r'# walter:'+re.escape(name)+r' sha256=([a-f0-9]{64})\n(.*?)\n# /walter:'+re.escape(name)+r'\n?',re.S)
+    """`_managed_text` for YAML files: the Walter block is fenced by YAML comments, other bytes are preserved.
+    The fence records a hash of the parsed Walter rows and their count, not of their bytes: DSH web re-serialises
+    the file when it saves a UI setting and appends its own rows at the end of the document, inside the fence when
+    the block is last (2026-11-07, `ui-settings-general`). Re-indentation is therefore not an edit, and rows after
+    Walter's are DSH's: they are kept, moved just after the block. Changing a Walter row is still refused."""
+    fence=re.escape(name)
+    pattern=re.compile(r'# walter:'+fence+r' (sha256|json-sha256)=([a-f0-9]{64})(?: rows=(\d+))?\n(.*?)\n# /walter:'+fence+r'\n?',re.S)
     matches=list(pattern.finditer(original))
     if len(matches)>1:raise ValueError('duplicate managed DSH profile sections')
-    body=content.rstrip('\n');sha=hashlib.sha256(body.encode()).hexdigest()
-    block=f'# walter:{name} sha256={sha}\n{body}\n# /walter:{name}\n'
+    body=content.rstrip('\n');walter=_dsh_yaml(body)
+    block=f'# walter:{name} json-sha256={_rows_sha(walter)} rows={len(walter)}\n{body}\n# /walter:{name}\n'
     if matches:
-        m=matches[0]
-        if hashlib.sha256(m[2].encode()).hexdigest()!=m[1]:raise ValueError('managed DSH profile section was edited; refusing overwrite')
-        return original[:m.start()]+block+original[m.end():]
+        m=matches[0];kind,sha,count,old=m[1],m[2],m[3],m[4]
+        rows=_yaml_rows(old)
+        if kind=='json-sha256':
+            n=int(count or 0)
+            if _rows_sha([r for r,_ in rows[:n]])!=sha:raise ValueError('managed DSH profile section was edited; refusing overwrite')
+        elif hashlib.sha256(old.encode()).hexdigest()==sha:n=len(rows)
+        else:   # legacy byte hash: accept only a re-serialisation of exactly what Walter writes today
+            n=len(walter)
+            if [r for r,_ in rows[:n]]!=walter:raise ValueError('managed DSH profile section was edited; refusing overwrite')
+        foreign=''.join(raw for _,raw in rows[n:]).strip('\n')
+        return original[:m.start()]+block+(foreign+'\n' if foreign else '')+original[m.end():]
     if '# walter:'+name in original:raise ValueError('invalid managed DSH profile section')
     original=re.sub(r'(?m)^\[\]\s*$\n?','',original)   # DSH writes an empty profile patch as `[]`
     return original.rstrip('\n')+('\n\n' if original.strip() else '')+block
@@ -218,6 +246,12 @@ def _plan(host,home=None,profile_dir=None):
             if len(rows)>1:raise ValueError('duplicate DSH patch target requires manual reconciliation')
             if not rows:add({'id':ident,'disabled':True})
             elif rows[0].get('disabled') is not True:rows[0]['disabled']=True;merged=True
+        # Lot 2 (2026-11-07): `auto` = the preflight's plan picks the Router task and tier; the earlier default
+        # (`coding`, set by this composition) moves to it. Any other default stays a conflict to reconcile by hand.
+        old=[x for x in data if x.get('id')=='agent-default-model']
+        if (spec['model']=='auto' and len(old)==1 and old[0].get('config',{}).get('provider')==spec['provider']
+                and old[0].get('config',{}).get('model')=='coding'):
+            old[0]['config']['model']='auto';merged=True
         add(_dsh_patch(data,'agent-default-model',{'provider':spec['provider'],'model':spec['model']}))
         add(_dsh_patch(data,'system-prompt',{'includeHarnessIdentity':False,'personaPrefix':'','personaSuffix':''}))
         add(_dsh_patch(data,'session-title-llm',DSH_TITLE))
@@ -232,10 +266,10 @@ def _plan(host,home=None,profile_dir=None):
                 llm[0].setdefault('config',{}).setdefault('providers',{})['walter']=provider;merged=True
             else:
                 if any(existing.get(k)!=provider[k] for k in ('api','baseURL','apiKeyEnv')):raise ValueError('custom Walter provider transport conflicts')
-                if spec['model'] not in {m.get('id') for m in existing.get('models',[])}:raise ValueError('Walter task is missing from DSH provider')
                 for name in DSH_TASKS:
                     if name not in {m.get('id') for m in existing.get('models',[])}:
                         existing.setdefault('models',[]).append({'id':name,'name':'Walter '+name,'contextWindow':200000});merged=True
+                if spec['model'] not in {m.get('id') for m in existing.get('models',[])}:raise ValueError('Walter task is missing from DSH provider')
         else:add({'id':'llm-pi-ai','config':{'providers':{'walter':provider}}})
         cp=p/'.credentials.yaml'
         if not cp.exists():link(cp,spec['credential_source'],'credentials')

@@ -229,6 +229,24 @@ def context_pack(prompt: str, runtime: str, session_id: str, transcript: str | N
     return out.get("text") or ""        # empty = the plan's own decision (L0: nothing beyond the message)
 
 
+def preflight_plan(prompt: str, runtime: str, session_id: str, transcript: str | None, run_id: str | None) -> dict:
+    """Lot 2 (2026-11-07): the preflight's ContextPlan for this owner message, computed before the harness calls a
+    model; with run_id the warm service writes it on the run (level, act, thread, what is asked of the Router), where
+    the model gateway reads it. The plan prepares, it never removes a tool. Raises on failure (caller logs)."""
+    import urllib.request
+    if not run_id:
+        raise RuntimeError("no run: nothing to attach the plan to")
+    secret = any(cat == "secret" for cat, _ in _privacy().detect(prompt))
+    req = {"turn_id": f"{session_id}:{int(time.time() * 1000)}", "message": prompt[:6000],
+           "previous": previous_exchange(transcript), "runtime": runtime, "session_id": session_id,
+           "privacy_class": "local_only" if secret else "cloud_allowed", "run_id": run_id}
+    port = os.environ.get("WALTER_CONTEXT_PREFLIGHT_PORT", "8897")
+    r = urllib.request.Request(f"http://127.0.0.1:{port}/preflight", data=json.dumps(req).encode(),
+                               headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(r, timeout=7) as resp:
+        return json.loads(resp.read())
+
+
 def preflight_shadow(prompt: str, runtime: str, session_id: str, transcript: str | None,
                      current: dict | None = None, run_id: str | None = None) -> None:
     """walter-context lot 4 in shadow: the preflight runs detached; with Walter Memory's subjects it records its
@@ -422,7 +440,7 @@ def claude_code(ev: dict) -> dict | None:
         import runctx
         hpid = runctx.harness_pid()
         mode = inject_mode(runtime)
-        with ThreadPoolExecutor(3) as ex:  # run, memory and skills in parallel; each fails open on its own
+        with ThreadPoolExecutor(4) as ex:  # run, memory, skills (and the DSH plan) in parallel; each fails open
             frun = ex.submit(run_start, runtime, f"{runtime}/vm/{sid}" if sid else runtime, prompt,
                              channel="machine" if machine_prompt(prompt) else "owner", record_pid=hpid)
             if mode == "pack" and os.environ.get("WALTER_HOOK_CONTEXT", "on") != "off":
@@ -438,6 +456,10 @@ def claude_code(ev: dict) -> dict | None:
                 fm = ex.submit(memory_context, prompt, caller, sid)
             fs = ex.submit(skills, "message", prompt, runtime, f"{runtime}/vm/{sid}" if sid else "",
                            previous_turn(ev.get("transcript_path")))
+            fp = None   # DSH: the plan on the run before the first model call (the pack already computes it)
+            if runtime == "dsh" and mode != "pack" and os.environ.get("WALTER_HOOK_PREFLIGHT", "on") != "off":
+                fp = ex.submit(lambda: preflight_plan(prompt, runtime, f"{runtime}/vm/{sid}",
+                                                      ev.get("transcript_path"), frun.result(timeout=5)))
             parts = []
             for f, label in ((fm, "memory"), (fs, "skills")):
                 try:
@@ -445,6 +467,13 @@ def claude_code(ev: dict) -> dict | None:
                         parts.append(f.result())
                 except Exception as e:
                     log(f"{label} error {type(e).__name__}: {str(e)[:160]}")
+            if fp is not None:
+                try:
+                    plan = fp.result(timeout=9)
+                    log(f"dsh plan {plan.get('level')} {(plan.get('model_profile') or {}).get('task')}/"
+                        f"{(plan.get('model_profile') or {}).get('level')} fast={plan.get('fast_path')}")
+                except Exception as e:  # noqa: BLE001 — no plan: walter-llm keeps the selected task
+                    log(f"dsh plan error {type(e).__name__}: {str(e)[:160]}")
         ctx = ours(runtime, "\n\n".join(parts))
         try:   # after the current injection is known, so the shadow can compare; detached, adds no delay
             preflight_shadow(prompt, runtime, sid, ev.get("transcript_path"),

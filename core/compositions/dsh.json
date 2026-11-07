@@ -23,7 +23,7 @@
   "mcp": true,
   "skill_source": "/opt/walter-core/skills/walter-skills/SKILL.md",
   "context": "walter-context",
-  "model": "coding",
+  "model": "auto",
   "provider": "walter",
   "endpoint": "http://127.0.0.1:8894/v1",
   "credential_source": "/opt/dsh/home/.credentials.yaml",
