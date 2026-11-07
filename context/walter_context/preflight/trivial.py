@@ -1,4 +1,4 @@
-"""Answers the preflight can give without any model (lot 2, 2026-11-07, Monsieur: « les demandes triviales sont
+"""Answers the preflight can give without any model (lot 2, 2026-11-07, owner: « les demandes triviales sont
 répondues sans LLM »): a bare calculation, the time or the date. Only for messages the TRIVIAL rule already matched;
 anything this module cannot settle exactly returns None and the model answers as before."""
 from __future__ import annotations
