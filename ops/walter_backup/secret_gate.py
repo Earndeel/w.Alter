@@ -12,8 +12,10 @@ MAX_BLOB = 3_000_000
 
 
 def scrubber():
-    sys.path.insert(0, subprocess.run(['walter', 'path', 'secrets'], capture_output=True, text=True).stdout.strip()
-                    or '/walter/secrets')
+    root = subprocess.run(['walter', 'path', 'secrets'], capture_output=True, text=True).stdout.strip()
+    if not root:   # the module is found through its interface only, never a guessed path (fail closed)
+        raise SystemExit('walter path secrets gave nothing: refusing to clear a history')
+    sys.path.insert(0, root)
     from walter_secrets import fingerprints
     if not fingerprints.status().get('ok'):
         raise SystemExit('vault fingerprint index unavailable: refusing to clear a history')
