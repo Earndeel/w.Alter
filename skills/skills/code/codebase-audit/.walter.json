@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/codebase-audit",
+  "sha": "d8ccb9f53cb227a8ae9d2f277952799ffb1f0d487b2488f7cf70f7b9f4092484",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "d8ccb9f53cb227a8ae9d2f277952799ffb1f0d487b2488f7cf70f7b9f4092484"
+}

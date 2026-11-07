@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/osint-process-lessons",
+  "sha": "df0b1df15d50c37446ff9315f8afcca04af44983d92ccbcc736bd74aae28cdbf",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "df0b1df15d50c37446ff9315f8afcca04af44983d92ccbcc736bd74aae28cdbf"
+}

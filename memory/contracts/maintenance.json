@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "module": "memory",
+  "modules": [
+    "memory",
+    "logs",
+    "bus",
+    "raw-vault"
+  ],
+  "check": [
+    "python3",
+    "/walter/memory/guardian/check"
+  ],
+  "max_level": "G1",
+  "levels": {
+    "G0": "santé, autopilot",
+    "G1": "autofix « safe » de memory-autopilot"
+  },
+  "note": "memory-autopilot (quotidien) reste le superviseur interne ; il deviendra le guardian du module.",
+  "format": "incident-v1",
+  "timeout_seconds": 240,
+  "guardian": [
+    "walter-guardian",
+    "run",
+    "--module",
+    "memory"
+  ]
+}

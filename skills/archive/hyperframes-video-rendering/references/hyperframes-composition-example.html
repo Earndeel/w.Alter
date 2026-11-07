@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080, height=1920">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<style>
+/* Scena-themed HyperFrames composition — 15s vertical (1080×1920) */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#050508}
+.aurora{position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 30% 40%,rgba(139,92,246,.15),transparent),radial-gradient(ellipse 60% 40% at 70% 60%,rgba(6,182,212,.1),transparent),radial-gradient(ellipse 50% 30% at 50% 0%,rgba(244,114,182,.08),transparent)}
+.grain{position:absolute;inset:0;opacity:.04;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-repeat:repeat;background-size:200px}
+.scanlines{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 1px,rgba(0,0,0,.06) 1px,rgba(0,0,0,.06) 3px)}
+.vignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.6) 100%)}
+.title{font-family:'Space Grotesk',sans-serif;font-weight:700;color:#f0f0f0;text-align:center;letter-spacing:-.02em}
+.gradient-text{background:linear-gradient(135deg,#fff,#c4b5fd 40%,#06b6d4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sub{font-family:'Space Grotesk',sans-serif;font-weight:300;color:#666;text-align:center;line-height:1.5}
+.mono{font-family:'JetBrains Mono',monospace;color:#555;text-transform:uppercase;letter-spacing:.2em}
+.orb{position:absolute;border-radius:50%;filter:blur(80px)}
+.orb-1{width:300px;height:300px;background:rgba(139,92,246,.2);top:10%;left:-5%}
+.orb-2{width:250px;height:250px;background:rgba(6,182,212,.15);top:50%;right:-10%}
+.orb-3{width:180px;height:180px;background:rgba(244,114,182,.12);bottom:20%;left:20%}
+.logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:28px;color:#fff;position:absolute;top:80px;left:80px}
+.logo span{color:#06b6d4}
+.feature{position:absolute;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:16px;padding:32px;width:400px}
+.feature h3{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:#8b5cf6;margin-bottom:8px}
+.feature p{font-family:'Space Grotesk',sans-serif;font-size:16px;color:#888;line-height:1.5}
+.data-point{position:absolute;font-family:'JetBrains Mono',monospace;font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.1em}
+.data-point span{display:block;color:#06b6d4;font-size:24px;font-weight:700;margin-top:4px}
+.cta-box{position:absolute;background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(6,182,212,.1));border:1px solid rgba(139,92,246,.2);border-radius:24px;padding:40px 60px;text-align:center}
+.cta-box h2{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:42px;color:#fff;margin-bottom:8px}
+.cta-box p{font-family:'Space Grotesk',sans-serif;font-size:16px;color:#888;margin-bottom:24px}
+.btn{display:inline-block;padding:16px 40px;border-radius:100px;background:linear-gradient(135deg,#8b5cf6,#06b6d4);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px}
+.end-screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;background:#050508}
+.end-screen h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:80px;color:#fff}
+.end-screen p{font-family:'JetBrains Mono',monospace;font-size:14px;color:#555;margin-top:24px;letter-spacing:.15em}
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="15" data-width="1080" data-height="1920">
+<div id="bg-aurora" class="clip aurora" data-start="0" data-duration="15" data-track-index="0"></div>
+<div id="bg-grain" class="clip grain" data-start="0" data-duration="15" data-track-index="0"></div>
+<div id="bg-scanlines" class="clip scanlines" data-start="0" data-duration="15" data-track-index="0"></div>
+<div id="bg-vignette" class="clip vignette" data-start="0" data-duration="15" data-track-index="0"></div>
+<div id="orb1" class="clip orb orb-1" data-start="0" data-duration="15" data-track-index="0"></div>
+<div id="orb2" class="clip orb orb-2" data-start="0" data-duration="15" data-track-index="0"></div>
+<div id="orb3" class="clip orb orb-3" data-start="0" data-duration="15" data-track-index="0"></div>
+<div id="logo" class="clip logo" data-start="0" data-duration="15" data-track-index="1">S<span>cena</span></div>
+<div id="dp1" class="clip data-point" data-start="1" data-duration="12" data-track-index="1" style="top:25%;left:80px">Rendering<br><span>1080×1920</span></div>
+<div id="dp2" class="clip data-point" data-start="1.5" data-duration="11" data-track-index="1" style="top:55%;right:80px;text-align:right">Timeline<br><span>15s</span></div>
+<div id="hero-title" class="clip title gradient-text" data-start="0.5" data-duration="5" data-track-index="1" style="top:20%;left:80px;right:80px;font-size:72px;line-height:.95;text-align:left">Vibe Code<br>Your Video</div>
+<div id="hero-sub" class="clip sub" data-start="1.5" data-duration="4" data-track-index="1" style="top:50%;left:80px;width:600px;text-align:left;font-size:20px">Write HTML. Animate with GSAP. Render to MP4.</div>
+<div id="f1" class="clip feature" data-start="5" data-duration="5" data-track-index="1" style="top:15%;left:80px"><h3>01 — HTML Native</h3><p>Describe your video in plain HTML with data attributes. No DSL, no React.</p></div>
+<div id="f2" class="clip feature" data-start="6" data-duration="4" data-track-index="1" style="top:40%;left:80px"><h3>02 — GSAP Timelines</h3><p>Frame-accurate seeking. Paused registration for deterministic rendering.</p></div>
+<div id="f3" class="clip feature" data-start="7" data-duration="4" data-track-index="1" style="top:65%;left:80px"><h3>03 — Puppeteer + FFmpeg</h3><p>Headless Chrome frame capture → FFmpeg encode → perfect MP4.</p></div>
+<div id="cta-box" class="clip cta-box" data-start="10" data-duration="3" data-track-index="1" style="top:10%;left:140px;right:140px"><h2>Ready to render?</h2><p>hyperframes render → MP4</p><div class="btn">Start free</div></div>
+<div id="end" class="clip end-screen" data-start="13" data-duration="2" data-track-index="1"><h1 class="gradient-text">Scena × HyperFrames</h1><p>AI video infrastructure for SaaS and creators</p></div>
+</div>
+<script>
+window.__timelines = window.__timelines || {};
+const tl = gsap.timeline({ paused: true });
+tl.to("#orb1", { x: 30, y: -20, duration: 10, ease: "sine.inOut" }, 0);
+tl.to("#orb2", { x: -20, y: 15, duration: 12, ease: "sine.inOut" }, 0);
+tl.to("#orb3", { x: 15, y: -10, duration: 8, ease: "sine.inOut" }, 0);
+tl.from("#logo", { opacity: 0, y: -20, duration: 0.6, ease: "power2.out" }, 0);
+tl.from("#dp1", { opacity: 0, x: -20, duration: 0.5, ease: "power2.out" }, 1);
+tl.from("#dp2", { opacity: 0, x: 20, duration: 0.5, ease: "power2.out" }, 1.5);
+tl.from("#hero-title", { opacity: 0, y: 60, duration: 0.9, ease: "power3.out" }, 0.5);
+tl.from("#hero-sub", { opacity: 0, y: 30, duration: 0.7, ease: "power2.out" }, 1.5);
+tl.from("#f1", { opacity: 0, x: -40, duration: 0.6, ease: "power2.out" }, 5);
+tl.from("#f2", { opacity: 0, x: -40, duration: 0.6, ease: "power2.out" }, 6);
+tl.from("#f3", { opacity: 0, x: -40, duration: 0.6, ease: "power2.out" }, 7);
+tl.from("#cta-box", { opacity: 0, scale: 0.95, y: 20, duration: 0.7, ease: "power2.out" }, 10);
+tl.from("#end", { opacity: 0, scale: 1.05, duration: 0.8, ease: "power2.out" }, 13);
+window.__timelines["main"] = tl;
+</script>
+</body>
+</html>

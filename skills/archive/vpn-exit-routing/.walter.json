@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/vpn-exit-routing",
+  "sha": "e9b629b2ddd450d092912869f68a324d1f862f406b528a97c693ec7c78f28d50",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e9b629b2ddd450d092912869f68a324d1f862f406b528a97c693ec7c78f28d50"
+}

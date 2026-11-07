@@ -1,0 +1,17 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "not read by any agent for 30+ days",
+ "domain": "business",
+ "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
+  "path": "/root/.hermes/skills/devops/stripe-checkout-automation",
+  "sha": "9d01701a1efbb55fb87827ce600947ea426730d31ad4026a9032d4badfca97d6",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "e674ae68ad556095c406bc5f1788d260a09cf710b470585e024a65bee254367a"
+}

@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
+ "reason": "The session established a distinct, reusable repair workflow absent from the listed skills: distinguish event identity from source position, backfill stable keys, quarantine historical copies, and verify replay safety plus downstream references. Evidence includes transcript offsets changing, Hermes row IDs changing, 39,356 copies quarantined across 103 sessions, migrations 015/016, dedicated idempotence tests, and service/health checks. [session claude_code/vm/0a5f1986-69ae-4701-9db8-a0383096a1f9]",
+ "store_sha": "9a010949b43d159f6d66ffc3bb1b086040d1697fd643d0d79b5fe8d647489f50"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/autonomous-video-production-workers",
+  "sha": "295a4d586d4b063f11338f5552f78d4d0871fef7db909d37a1298a77484025fb",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "295a4d586d4b063f11338f5552f78d4d0871fef7db909d37a1298a77484025fb"
+}

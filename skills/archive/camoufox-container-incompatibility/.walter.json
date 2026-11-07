@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/camoufox-container-incompatibility",
+  "sha": "7ce258abba4a215145078de1a2673eea3b913b0e3be849cb37b10561543e96be",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "7ce258abba4a215145078de1a2673eea3b913b0e3be849cb37b10561543e96be"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-dashboard-web-ui",
+  "sha": "c501f7302540eb71feb0d59f345fbd5dcc09fb9d86ed5ef473838fdeadffff40",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "c501f7302540eb71feb0d59f345fbd5dcc09fb9d86ed5ef473838fdeadffff40"
+}

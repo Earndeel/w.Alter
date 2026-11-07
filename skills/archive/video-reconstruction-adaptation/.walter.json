@@ -1,0 +1,12 @@
+{
+ "domain": "media",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/video-reconstruction-adaptation",
+  "sha": "a7580e02300f3da74658a8b21060f11dca0d9da24f336ec776493d9f3acc8506",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "a7580e02300f3da74658a8b21060f11dca0d9da24f336ec776493d9f3acc8506"
+}

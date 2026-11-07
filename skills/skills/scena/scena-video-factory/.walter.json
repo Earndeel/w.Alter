@@ -1,0 +1,13 @@
+{
+ "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
+  "path": "/root/.hermes/skills/scena-video-factory",
+  "sha": "0fd5d98557d0192daee605c7f9648a2de0448622a5b28108b6207741a69874d2",
+  "state": "active",
+  "synced_at": "2026-11-01T18:00:00+00:00"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "85a006a8c525e066c52babab8ebbcb3f6552d5b4a59ae93d1f5b36e4ecf8882c"
+}

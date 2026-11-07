@@ -1,0 +1,17 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "not read by any agent for 30+ days",
+ "domain": "design",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/authenticated-frontend-surfaces",
+  "sha": "22ea64d520b314d82694e0d61a46c0c97a2ef26a608ff751f933c8624e580cb4",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "reserve": true,
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "22ea64d520b314d82694e0d61a46c0c97a2ef26a608ff751f933c8624e580cb4"
+}

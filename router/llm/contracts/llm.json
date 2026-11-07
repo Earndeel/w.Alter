@@ -1,0 +1,139 @@
+{
+  "id": "llm",
+  "anchors": [
+    "contracts/llm.json",
+    "gateway.py"
+  ],
+  "requires": [
+    "router",
+    "secrets"
+  ],
+  "external": [
+    "Optional native Claude Code client, path provisioned by instance"
+  ],
+  "data": [
+    "local consumer tokens",
+    "provider routing configuration"
+  ],
+  "core_paths": [],
+  "backup_paths": [
+    ".",
+    "@instance/config/llm",
+    "@instance/state/llm",
+    "@instance:backup"
+  ],
+  "interfaces": [
+    "OpenAI-compatible :8894",
+    "CLI walter-llm call: one exact model/provider, JSON stdin/stdout, no implicit retry or fallback"
+  ],
+  "bindings": {
+    "dsh": "configured provider",
+    "hermes": "auxiliary/module calls; main provider host-owned",
+    "codex": "specialist module calls; primary native",
+    "claude-code": "specialist module calls; primary native"
+  },
+  "limitations": [
+    "Identified HTTP runs require Memory metadata; unresolved, local_only and redacted_cloud contexts are refused. Untracked legacy requests are outside this check.",
+    "Cost telemetry distinguishes reported, estimated, legacy and unknown; missing usage or a synthetic zero does not prove free execution."
+  ],
+  "services": [
+    "walter-llm"
+  ],
+  "optional": [
+    "memory"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.2.0",
+    "owner": "llm",
+    "kind": "capability",
+    "purpose": "Exécuter les appels modèles des consommateurs autorisés via les postes du Router.",
+    "target_root": "router/llm",
+    "config_paths": [
+      "config/gateway.json",
+      "@instance/config/llm/gateway.json"
+    ],
+    "permissions": [
+      "jeton local par consommateur",
+      "clés fournisseur hors contexte modèle"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics.",
+      "Claude subscription forwards caller-owned messages and tools plus validated technical attribution; native agent output never executes tools."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "http",
+        "interface": "OpenAI-compatible loopback :8894",
+        "access": "execute",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "model-consumer-tokens",
+        "role": "owner",
+        "owner": "llm",
+        "durability": "configuration"
+      },
+      {
+        "id": "postgres:models",
+        "role": "consumer",
+        "owner": "router",
+        "durability": "configuration"
+      },
+      {
+        "id": "bitwarden-vault",
+        "role": "consumer",
+        "owner": "secrets",
+        "durability": "external"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "consumer-auth",
+        "assertion": "Un jeton absent ou invalide est refusé et un poste choisi utilise la route attendue.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  }
+}

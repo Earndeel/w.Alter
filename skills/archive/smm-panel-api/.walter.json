@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/smm-panel-api",
+  "sha": "9fca67529e82cae80c21ab4e6bcb56620f4abbc4b25b0fbab6a0518e6a8fe5ad",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "9fca67529e82cae80c21ab4e6bcb56620f4abbc4b25b0fbab6a0518e6a8fe5ad"
+}

@@ -1,0 +1,54 @@
+{
+  "sessions": 21,
+  "calls": 1102,
+  "seconds": 0.9,
+  "results": [
+    {
+      "policy": "full",
+      "calls": 1102,
+      "mean_tokens": 103674,
+      "p50": 74670,
+      "p95": 290885,
+      "max": 362968,
+      "cached_pct": 96.4,
+      "uncached_mean": 3713,
+      "cost_units": 15283321,
+      "cost_vs_full": 1.0,
+      "boundaries": {},
+      "select_ms_p95": 0.0
+    },
+    {
+      "policy": "walter-context",
+      "calls": 1102,
+      "mean_tokens": 57808,
+      "p50": 58432,
+      "p95": 94304,
+      "max": 116531,
+      "cached_pct": 94.1,
+      "uncached_mean": 3390,
+      "cost_units": 9824492,
+      "cost_vs_full": 0.643,
+      "boundaries": {
+        "compact": 2,
+        "fold": 19,
+        "live": 5,
+        "live+fold": 9
+      },
+      "select_ms_p95": 0.6
+    },
+    {
+      "policy": "hermes (real)",
+      "calls": 940,
+      "mean_tokens": 71857,
+      "p50": 73358,
+      "p95": 99962,
+      "max": 161803,
+      "cached_pct": 93.4,
+      "uncached_mean": 4707,
+      "cost_units": 10862145,
+      "cost_vs_full": 0.711,
+      "boundaries": {},
+      "select_ms_p95": 0.0
+    }
+  ]
+}

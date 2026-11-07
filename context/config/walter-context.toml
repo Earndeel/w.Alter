@@ -1,0 +1,112 @@
+# walter-context — the ONLY place for tunables (code holds no magic numbers).
+# Profiles are priors: the replay bench (bench/replay.py) is what justifies changing them.
+
+[projection]
+keep_turns = 1               # completed turns kept verbatim after a boundary, besides the live turn
+live_keep_steps = 4          # emergency mid-turn cut: last assistant steps of the live turn kept verbatim
+tool_keep_chars = 600        # compact zone: tool outputs up to this size stay verbatim (a digest would not pay)
+excerpt_chars = 280          # compact zone: excerpt kept from a compacted tool output
+args_chars = 240             # compact zone: tool-call arguments longer than this are clipped
+text_clip_chars = 6000       # compact zone: assistant text longer than this keeps head + tail (owner text: never)
+brief_answer_chars = 160     # record, one-line level: the answer kept beside the owner's full request
+user_label = "User"
+assistant_label = "Assistant"
+
+[policy]
+horizon_calls = 12           # prior for cached reuses after a boundary; replaced by the session's own calls-per-turn
+min_gain_tokens = 6000       # a boundary must remove at least this much
+compact_share = 0.4          # fold the compact zone into the record when it exceeds this share of the effective budget
+record_share = 0.3           # condense the record beyond this share (oldest turns to one line, owner text kept), down to half
+regret_tokens = 4000         # mid-turn, weigh moves again only after the payload grew this much over budget
+emergency_share = 0.92       # host-side compression only above this share of the context window (should never fire)
+
+# Model profiles: first `match` (fnmatch on the lower-cased model id) wins; the last one is the default.
+# effective_budget = where quality starts to suffer (not the advertised window); hard_budget = never exceed.
+# cache: prefix (automatic prefix cache) | breakpoints (explicit markers) | none.  Costs are relative to input = 1.
+[[model]]
+match = "gpt-6*"
+effective_budget = 96000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 900
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "gpt-5*"
+effective_budget = 80000
+hard_budget = 140000
+cache = "prefix"
+cache_ttl_s = 900
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "claude-*"
+effective_budget = 120000
+hard_budget = 180000
+cache = "breakpoints"
+cache_ttl_s = 300
+cached_cost = 0.10
+write_cost = 1.25
+
+[[model]]
+match = "gemini-*"
+effective_budget = 64000
+hard_budget = 200000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.25
+write_cost = 1.0
+
+[[model]]
+match = "*deepseek*"
+effective_budget = 64000
+hard_budget = 110000
+cache = "prefix"
+cache_ttl_s = 3600
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "*glm*"
+effective_budget = 64000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 600
+cached_cost = 0.20
+write_cost = 1.0
+
+[[model]]
+match = "*"
+effective_budget = 64000
+hard_budget = 100000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.25
+write_cost = 1.0
+
+# Trusted, bounded capability notes; unchanged within an owner turn. No model call.
+[capabilities]
+router_enabled = true
+timeout_seconds = 10
+max_chars = 6000
+# Module layer: every agent-facing module's level-0 brief (walter present notes), composed once per owner turn.
+modules_enabled = true
+layer_max_chars = 20000
+
+# Entrance: a large tool output reduced when it enters the context (Claude Code PostToolUse), before the model reads
+# it. shadow = record what would be cut (numbers only, @instance/state/context/shadow/entrance-<day>.jsonl);
+# off = nothing. "on" is refused until the hook journals originals itself (walter_logs keeps what the model saw).
+[entrance]
+mode = "shadow"
+min_chars = 8000             # outputs below this stay verbatim (2.3 % of outputs = 26 % of the volume, 14 days, 06/11)
+head_chars = 1000            # kept from the start
+tail_chars = 800             # kept from the end (exit status, final lines)
+signal_lines = 8             # at most this many middle lines matching signal_words, with their line numbers
+signal_line_chars = 160
+signal_words = ["error", "erreur", "failed", "échec", "exception", "traceback", "warning", "denied", "fatal",
+                "panic", "not found", "refused", "timeout"]
+exempt_tools = ["Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Skill", "mcp__walter__skill_read",
+                "mcp__walter__module_guide", "mcp__visualize__read_me"]   # instructions the model needs whole
+chars_per_token = 3.5        # report only: estimated tokens from characters

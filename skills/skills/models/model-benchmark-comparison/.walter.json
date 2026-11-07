@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/model-benchmark-comparison",
+  "sha": "4f831da1ca872120491fd66c144e1a6b422de2ef61ffe8b5c927f2093173b809",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "4f831da1ca872120491fd66c144e1a6b422de2ef61ffe8b5c927f2093173b809"
+}

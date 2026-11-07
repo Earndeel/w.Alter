@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/research-paper-writing",
+  "sha": "8496718ccf6739502acb01cb98a5fe04639a79e4fd3fa8f3c9b87b0cdbb97aad",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "store_sha": "8496718ccf6739502acb01cb98a5fe04639a79e4fd3fa8f3c9b87b0cdbb97aad"
+}

@@ -1,0 +1,15 @@
+# Walter Clean, PostgreSQL part (addendum 2026-10-29, C.3 / lot 2): every module's migrations, replayed in order on a
+# disposable database without network, must build the structure of the live database's software schemas. A failing
+# migration or an undeclared difference (missing, extra, different) fails the scenario; a column order that differs
+# only because one history used ALTER and the other CREATE is reported as order_only and does not fail.
+# No row of the live database is read (pg_dump --schema-only). The disposable container is always removed.
+name: clean-migrations
+milestone: clean-L2
+steps:
+  - cmd: {name: migrations, shell: "walter-ops install migrations-check", timeout: 900}
+assertions:
+  - {step: migrations, path: ok, equals: true}
+  - {step: migrations, path: "sets[*].failed", all: null}
+  - {step: migrations, path: counts.missing, equals: 0}
+  - {step: migrations, path: counts.extra, equals: 0}
+  - {step: migrations, path: counts.different, equals: 0}

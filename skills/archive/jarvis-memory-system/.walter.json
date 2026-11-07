@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "describes a system retired on 2026-10-01 (Jarvis memory)",
+ "domain": "walter",
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/jarvis-memory-system",
+  "sha": "829ec1acb83a6aebee500c39e35b254d49bec075a52377c33c4cf4affdd441f3",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "retired": true,
+ "store_sha": "829ec1acb83a6aebee500c39e35b254d49bec075a52377c33c4cf4affdd441f3"
+}

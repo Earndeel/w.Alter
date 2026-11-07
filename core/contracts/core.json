@@ -1,0 +1,158 @@
+{
+  "id": "core",
+  "anchors": [
+    "contracts/core.json",
+    "hooks/walter_hook.py",
+    "server.py",
+    "modules/catalog.json",
+    "modules/registry.json",
+    "systemd/walter-standby.service",
+    "systemd/walter-standby.timer",
+    "config/standby.toml"
+  ],
+  "requires": [],
+  "external": [],
+  "data": [],
+  "core_paths": [
+    "walter_platform"
+  ],
+  "backup_paths": [
+    ".",
+    "/root/.codex/config.toml",
+    "/root/.claude.json",
+    "/root/.claude/settings.json",
+    "/opt/dsh/home/cordis.patch.yml",
+    "/opt/dsh/home/walter-hooks.json",
+    "/usr/local/bin/walter",
+    "@instance/instance.toml",
+    "@instance/config",
+    "@instance/accounts",
+    "@instance/bootstrap"
+  ],
+  "interfaces": [
+    "MCP stdio",
+    "walter CLI",
+    "CLI contracts, matrix, doctor",
+    "Declarative harness compositions",
+    "Offline source release and staged installation",
+    "walter standby",
+    "walter matrix: qualified evidence requires matching source/scenario/version/configuration attestation (bench protocol 2)",
+    "walter-guardians: strict Incident v1 validation, explicit check failures and bounded notification retry/backoff"
+  ],
+  "bindings": {
+    "hermes": "native adapters + lifecycle hook (no duplicate MCP attachment)",
+    "dsh": "MCP + lifecycle adapter",
+    "codex": "MCP + lifecycle adapter",
+    "claude-code": "MCP + lifecycle adapter"
+  },
+  "limitations": [
+    "MCP client must reconnect to discover newly installed tools.",
+    "CLI attachment installs common MCP; context/model/lifecycle bindings are checked independently."
+  ],
+  "services": [
+    "walter-standby.timer"
+  ],
+  "optional": [],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.1.0",
+    "owner": "core",
+    "kind": "foundation",
+    "purpose": "Exposer les capacités et installer les raccordements des harnesses.",
+    "target_root": "core",
+    "config_paths": [
+      "modules/computer-policy.json"
+    ],
+    "permissions": [
+      "configurations clients",
+      "permissions du harness"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "mcp",
+        "interface": "walter_modules",
+        "access": "read",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "install",
+        "transport": "cli",
+        "interface": "walter harness install",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "harness-bindings",
+        "role": "owner",
+        "owner": "core",
+        "durability": "configuration"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "read-only-discovery",
+        "assertion": "Un module optionnel absent ne désactive pas les capacités restantes.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "walter-core",
+    "order": 95,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "walter_health",
+      "ask_hermes",
+      "module_guide",
+      "module_index"
+    ]
+  }
+}

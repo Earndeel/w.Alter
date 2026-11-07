@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/contact-project-brief-planning",
+  "sha": "715f39f5cfcac687cc120fff04a4a57a996533a619a757af443a318cd934a19b",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "715f39f5cfcac687cc120fff04a4a57a996533a619a757af443a318cd934a19b"
+}

@@ -1,0 +1,17 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "not read by any agent for 30+ days",
+ "domain": "hermes",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-model-picker",
+  "sha": "51fc8f7364622c31737c2178b58c863ce341a7f29222e3ff056806fcb7700246",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "reserve": true,
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "51fc8f7364622c31737c2178b58c863ce341a7f29222e3ff056806fcb7700246"
+}

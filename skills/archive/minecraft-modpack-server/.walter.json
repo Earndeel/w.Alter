@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:08+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "gaming",
+ "hermes": {
+  "path": "/root/.hermes/skills/gaming/minecraft-modpack-server",
+  "sha": "7b280be63bf365e98ee8c32b574d323101d63ead46e7934e8a17d9daf89742e2",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "7b280be63bf365e98ee8c32b574d323101d63ead46e7934e8a17d9daf89742e2"
+}

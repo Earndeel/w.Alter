@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-11-04T04:20:22.179453+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "aa-pareto-model-optimizer",
+  "hermes-agent-skill-authoring"
+ ]
+}

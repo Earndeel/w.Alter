@@ -1,0 +1,12 @@
+{
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/sketch",
+  "sha": "ddedf8147e5bbcbdefc3594564d2e8ff02a454da8983c35b5804d7a1cf99b87c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "store_sha": "ddedf8147e5bbcbdefc3594564d2e8ff02a454da8983c35b5804d7a1cf99b87c"
+}

@@ -1,0 +1,88 @@
+#!/opt/walter-core/venv/bin/python
+"""walter-tools — the Tool Gateway: Walter's capabilities for runtimes that are not MCP clients (P1, 2026-10-27).
+
+One process per caller session, line-delimited JSON on stdin/stdout, a fixed allow-list of walter-core MCP tools.
+It holds one session to the walter-core MCP server (the same tools, descriptions and checks as every harness);
+nothing is re-implemented here. The caller's environment (WALTER_RUN_ID, WALTER_TASK_ID, WALTER_SESSION_ID) reaches
+the server, so module calls stay attached to the run.
+
+  walter-tools serve --allow walter_browse,memory_search,...
+      → {"op": "list"}                                   ← {"ok": true, "tools": [{name, description, input_schema}]}
+      → {"op": "call", "name": "...", "arguments": {}}  ← {"ok": true, "result": <tool text, parsed when JSON>}
+  Tools outside the allow-list are neither listed nor callable. Some tools are never allowed (NEVER).
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import os
+import sys
+from pathlib import Path
+
+CORE = Path(__file__).resolve().parent.parent
+# Never through the gateway: recursion, secret material, writes to skills/vault, desktop control, owner settings.
+NEVER = {"walter_run", "secret_search", "secret_reference", "vault_put", "skill_patch", "skill_propose",
+         "computer_use", "walter_plans", "ask_hermes", "memory_retain"}
+
+
+def _parse(text: str):
+    try:
+        value = json.loads(text)
+    except ValueError:
+        return text
+    if isinstance(value, dict) and set(value) == {"result"} and isinstance(value["result"], str):
+        try:
+            return json.loads(value["result"])
+        except ValueError:
+            return value["result"]
+    return value
+
+
+async def serve(allow: set[str]) -> None:
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    params = StdioServerParameters(command=str(CORE / "venv/bin/python"), args=[str(CORE / "server.py")],
+                                   env={**os.environ, "WALTER_CLIENT_TAG": os.environ.get("WALTER_CLIENT_TAG", "walter-tools")})
+    loop = asyncio.get_running_loop()
+    async with stdio_client(params, errlog=open(os.devnull, "w")) as (r, w):
+        async with ClientSession(r, w) as session:
+            await session.initialize()
+            listed = (await session.list_tools()).tools
+            tools = {t.name: t for t in listed if t.name in allow and t.name not in NEVER}
+            while True:
+                line = await loop.run_in_executor(None, sys.stdin.readline)
+                if not line:
+                    return
+                try:
+                    req = json.loads(line)
+                    if req.get("op") == "list":
+                        out = {"ok": True, "tools": [{"name": t.name, "description": t.description or "",
+                                                      "input_schema": t.inputSchema} for t in tools.values()]}
+                    elif req.get("op") == "call":
+                        name = req.get("name")
+                        if name not in tools:
+                            out = {"ok": False, "error": "tool_not_allowed", "name": name}
+                        else:
+                            res = await session.call_tool(name, req.get("arguments") or {})
+                            text = "".join(getattr(c, "text", "") for c in res.content)
+                            out = {"ok": not res.isError, "result": _parse(text)}
+                    else:
+                        out = {"ok": False, "error": "unknown_op"}
+                except Exception as exc:  # noqa: BLE001 — one bad request never ends the session
+                    out = {"ok": False, "error": type(exc).__name__, "detail": str(exc)[:300]}
+                sys.stdout.write(json.dumps(out, ensure_ascii=False, default=str) + "\n")
+                sys.stdout.flush()
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("action", choices=["serve"])
+    p.add_argument("--allow", required=True, help="comma-separated walter-core MCP tool names")
+    a = p.parse_args()
+    asyncio.run(serve({x.strip() for x in a.allow.split(",") if x.strip()}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

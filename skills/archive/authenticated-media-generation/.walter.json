@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/authenticated-media-generation",
+  "sha": "d139b7a51231496a59790554660f7bd25a98e7c41a518d94d5ac995b8cf937ed",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "d139b7a51231496a59790554660f7bd25a98e7c41a518d94d5ac995b8cf937ed"
+}

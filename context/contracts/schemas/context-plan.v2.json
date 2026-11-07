@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/context/context-plan.v2.json",
+  "title": "ContextPlan v2",
+  "description": "What the preflight decides for one owner message (walter-context output, traced).",
+  "type": "object",
+  "required": [
+    "version",
+    "turn_id",
+    "thread",
+    "act",
+    "level"
+  ],
+  "properties": {
+    "version": {
+      "const": 2
+    },
+    "turn_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "thread": {
+      "type": "object",
+      "required": [
+        "id",
+        "new"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "new": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "alternates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "act": {
+      "enum": [
+        "new",
+        "continue",
+        "approve",
+        "correct",
+        "inform"
+      ]
+    },
+    "level": {
+      "enum": [
+        "L0",
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "description": "L0: nothing beyond the message: the assistant's tools suffice; L1: the last exchange of its thread; L2: its thread at overview depth (card, recent exchanges); L3: its thread at synthesis depth plus targeted memory (people, decisions, other sources); L4: extensive: several sources, history, multi-step retrieval"
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "projects",
+          "profile",
+          "activities",
+          "relations",
+          "agenda",
+          "decisions",
+          "goals"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "horizons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "instant",
+          "day",
+          "medium",
+          "long",
+          "stable"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "tools",
+          "skills",
+          "memory",
+          "web",
+          "browser",
+          "delegation",
+          "secrets"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "model_profile": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3"
+          ]
+        },
+        "require": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Asked of Walter Router; the Router alone picks the concrete model."
+    },
+    "fast_path": {
+      "enum": [
+        "short_reply",
+        "trivial",
+        null
+      ]
+    },
+    "escalated": {
+      "type": "boolean"
+    },
+    "decision": {
+      "type": "object",
+      "description": "trace only"
+    }
+  }
+}

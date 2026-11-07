@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/tui-resize-propagation",
+  "sha": "54edbe5d7afdf485009dd18537f6c3fb8f56319e3790287ca77f4bc2594cfe53",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "54edbe5d7afdf485009dd18537f6c3fb8f56319e3790287ca77f4bc2594cfe53"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/scena-security",
+  "sha": "2305ef306e8017d6636f929173c5af1de7a2c5aea5f086d0237d6ae9d7d9f23d",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "2305ef306e8017d6636f929173c5af1de7a2c5aea5f086d0237d6ae9d7d9f23d"
+}

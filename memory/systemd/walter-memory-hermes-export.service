@@ -1,0 +1,13 @@
+[Unit]
+Description=Walter Memory: daily raw export of every Hermes profile state.db (JSONL.zst) into the Raw Vault (D1)
+After=network-online.target raw-vault-s3.service
+
+[Service]
+Type=oneshot
+UMask=0077
+WorkingDirectory=/opt/walter-memory
+Environment=PGPASSFILE=/root/.pgpass
+Nice=10
+IOSchedulingClass=idle
+ExecStart=/usr/local/bin/walter-python connectors/hermes.py --export-only --all-profiles --export-days 31 --export-seconds 900
+TimeoutStartSec=3h

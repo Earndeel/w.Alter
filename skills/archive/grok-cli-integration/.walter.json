@@ -1,0 +1,12 @@
+{
+ "domain": "autonomous-ai-agents",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/grok-cli-integration",
+  "sha": "e227f45d4ffc0c4fe59c83aa01553da35b49df28d7249724dfeb1096e10c3e42",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e227f45d4ffc0c4fe59c83aa01553da35b49df28d7249724dfeb1096e10c3e42"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "mlops/inference",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/serving-llms-vllm",
+  "sha": "a06e6ef2428b338d50c0e8c6d3d4f344f8230b3e867149cf9806df297d1bf1de",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "store_sha": "a06e6ef2428b338d50c0e8c6d3d4f344f8230b3e867149cf9806df297d1bf1de"
+}

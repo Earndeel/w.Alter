@@ -1,0 +1,17 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "not read by any agent for 30+ days",
+ "domain": "design",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/headless-screenshot-qa",
+  "sha": "2c6082d95fd72a3a894bdfd32f2d88cee9cd20ffefe3f8f79fa057e397df0394",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "reserve": true,
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "2c6082d95fd72a3a894bdfd32f2d88cee9cd20ffefe3f8f79fa057e397df0394"
+}

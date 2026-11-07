@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/debugging-hermes-tui-commands",
+  "sha": "2ba1e1b975f76ebebafff0e51447566bb0fabcd44852dc2a63161d1cde844567",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "2ba1e1b975f76ebebafff0e51447566bb0fabcd44852dc2a63161d1cde844567"
+}

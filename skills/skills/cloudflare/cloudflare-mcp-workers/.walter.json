@@ -1,0 +1,13 @@
+{
+ "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
+  "path": "/root/.hermes/skills/cloud/cloudflare-mcp-workers",
+  "sha": "cab32ec8a35730840bd7e4c6097e902d45a4bb6f21b79760b9c32d7fbac02044",
+  "state": "active",
+  "synced_at": "2026-11-01T18:00:00+00:00"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "ca8601fb947fab8047907f108e92bd733a324a9f3cca67010888911d7d0d30ae"
+}

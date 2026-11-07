@@ -1,0 +1,5 @@
+#!/bin/sh
+# walter-ops: install, deploy, version, keep and restore Walter. System python3 on purpose: it must work with every
+# other Walter module, the shared runtime and every model provider down.
+root="$(dirname "$(readlink -f "$0")")/.."
+PYTHONPATH="$root" exec /usr/bin/python3 -m walter_ops.cli "$@"

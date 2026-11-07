@@ -1,0 +1,12 @@
+# Walter guardians supervisor (P5, 2026-10-28): runs every module's declared watchdog, tells the owner only about new
+# high/critical incidents. System python3, no model, no Hermes. Install: copy to /etc/systemd/system/.
+[Unit]
+Description=Walter guardians — one pass of every module watchdog (walter-guardians check)
+After=network-online.target
+
+[Service]
+User=root
+Environment=HOME=/root
+Type=oneshot
+ExecStart=/usr/local/bin/walter-guardians check
+TimeoutStartSec=900

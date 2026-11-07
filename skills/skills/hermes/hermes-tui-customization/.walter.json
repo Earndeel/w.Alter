@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hermes-tui-customization",
+  "sha": "92fb0943a27e20bc9ee1bcd3a55fb72f6935539ab5a85b80363e0316436ae65d",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "92fb0943a27e20bc9ee1bcd3a55fb72f6935539ab5a85b80363e0316436ae65d"
+}

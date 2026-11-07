@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:06+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "data-science",
+ "hermes": {
+  "path": "/root/.hermes/skills/data-science/jupyter-live-kernel",
+  "sha": "5eb40567439d0504900866aeafa547a6085f50ffa68be07d3277f0b1c16fe2ae",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "5eb40567439d0504900866aeafa547a6085f50ffa68be07d3277f0b1c16fe2ae"
+}

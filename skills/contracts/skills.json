@@ -1,0 +1,195 @@
+{
+  "id": "skills",
+  "anchors": [
+    "config/walter-skills.toml",
+    "contracts/skills.json",
+    "walter_skills/api.py",
+    "manifest/GUIDE.md"
+  ],
+  "requires": [
+    "bus"
+  ],
+  "external": [
+    "PostgreSQL skills schema",
+    "walter-llm for curation"
+  ],
+  "data": [
+    "git skill store",
+    "skills.*"
+  ],
+  "core_paths": [
+    "walter_skills/client.py",
+    "walter_skills/policy.py",
+    "walter_skills/domains.py"
+  ],
+  "backup_paths": [
+    "."
+  ],
+  "interfaces": [
+    "HTTP :8891",
+    "stdlib client",
+    "MCP",
+    "Hermes plugin"
+  ],
+  "bindings": {
+    "hermes": "native walter-skills adapter and lifecycle hook",
+    "dsh": "common MCP",
+    "codex": "common MCP",
+    "claude-code": "common MCP"
+  },
+  "limitations": [],
+  "services": [
+    "walter-skills",
+    "walter-skills-bus"
+  ],
+  "optional": [
+    "llm"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.1.0",
+    "owner": "skills",
+    "kind": "capability",
+    "purpose": "Gérer le contenu, la recherche, les propositions et la curation des procédures.",
+    "target_root": "skills",
+    "config_paths": [
+      "config/walter-skills.toml"
+    ],
+    "permissions": [
+      "propositions en brouillon",
+      "politique de publication commune"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics.",
+      "La découverte charge le manifeste et l'index par niveau ; les procédures complètes sont lues à la demande."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "mcp",
+        "interface": "skills_search/skill_read",
+        "access": "read",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "propose",
+        "transport": "mcp",
+        "interface": "skill_propose/skill_patch",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "discovery",
+        "transport": "mcp",
+        "interface": "skills_manifest/skills_index",
+        "access": "read",
+        "timeout_seconds": 10,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "skills-git-store",
+        "role": "owner",
+        "owner": "skills",
+        "durability": "canonical"
+      },
+      {
+        "id": "postgres:skills",
+        "role": "owner",
+        "owner": "skills",
+        "durability": "configuration"
+      },
+      {
+        "id": "postgres:bus",
+        "role": "consumer",
+        "owner": "bus",
+        "durability": "canonical"
+      },
+      {
+        "id": "embedding-models",
+        "role": "consumer",
+        "owner": "memory",
+        "durability": "projection"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "shared-skill",
+        "assertion": "Une procédure publiée est retrouvée depuis deux harnesses et une proposition reste en brouillon.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      },
+      {
+        "id": "progressive-discovery",
+        "assertion": "Le repère de session ne contient aucun corps de procédure ; un domaine expose les usages et workflows ; une publication active du Curator met à jour l'index sans injecter de candidats à chaque message.",
+        "scope": "integration"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "W.Alter Skills",
+    "order": 80,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "manifest_command": [
+      "walter-skills",
+      "brief",
+      "--map-only"
+    ],
+    "tools": [
+      "skills_search",
+      "skills_index",
+      "skill_read"
+    ],
+    "index": {
+      "command": [
+        "walter-skills",
+        "index"
+      ],
+      "section_arg": "--domain",
+      "paged": true,
+      "sections": "domaines (sans section : la liste des domaines)"
+    }
+  }
+}

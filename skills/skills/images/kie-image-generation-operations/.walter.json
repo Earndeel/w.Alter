@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kie-image-generation-operations",
+  "sha": "52c5cbd96fea974b103a8c587bc44ef12d7e87fb2a02e816b62f9a5c7b54969c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "52c5cbd96fea974b103a8c587bc44ef12d7e87fb2a02e816b62f9a5c7b54969c"
+}

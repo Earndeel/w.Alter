@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
+  "path": "/root/.hermes/skills/devops/webtop-authenticated-browsing",
+  "sha": "6fc21f5d26c394322c7e275240c21003f17f1147851ab280c997ff8bc16c3df0",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "5cb809c552dc9a99f907c2c85fed1d8799c4b7be89dfed89e406cf60c2419006"
+}

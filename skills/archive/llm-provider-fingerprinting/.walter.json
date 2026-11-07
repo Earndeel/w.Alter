@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/llm-provider-fingerprinting",
+  "sha": "e9c3146c9c6d83fa544173bfe1eaacbdf3e659a02e2a9f9580ea7089b4a4ddaa",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e9c3146c9c6d83fa544173bfe1eaacbdf3e659a02e2a9f9580ea7089b4a4ddaa"
+}

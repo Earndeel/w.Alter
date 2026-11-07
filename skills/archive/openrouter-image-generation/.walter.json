@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/openrouter-image-generation",
+  "sha": "dfd3c33594da337298a540ed8f1e189d32461a4703167969c3787e85d78f6a16",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "dfd3c33594da337298a540ed8f1e189d32461a4703167969c3787e85d78f6a16"
+}

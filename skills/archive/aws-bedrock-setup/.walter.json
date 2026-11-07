@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/aws-bedrock-setup",
+  "sha": "835755f43e7d684159f2723e6c2e391b032ed28b7935b07785229c3ebd606750",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "835755f43e7d684159f2723e6c2e391b032ed28b7935b07785229c3ebd606750"
+}

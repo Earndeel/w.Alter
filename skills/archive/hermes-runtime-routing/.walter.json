@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-runtime-routing",
+  "sha": "c0d053cf74acf1d9122518bd65fb232cdd8dca43b23734c263b3dcb437c16085",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "c0d053cf74acf1d9122518bd65fb232cdd8dca43b23734c263b3dcb437c16085"
+}

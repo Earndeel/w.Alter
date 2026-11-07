@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:10+00:00",
+ "archived_reason": "not read for 155 days",
+ "domain": "mlops/inference",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/inference/outlines",
+  "sha": "8743f83557012c814566cf71bacd1c6c6ca7113a2b7814a8b026a17fe9915c69",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "store_sha": "8743f83557012c814566cf71bacd1c6c6ca7113a2b7814a8b026a17fe9915c69"
+}

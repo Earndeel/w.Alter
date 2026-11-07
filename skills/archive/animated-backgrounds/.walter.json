@@ -1,0 +1,12 @@
+{
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/animated-backgrounds",
+  "sha": "67a4e754c6a75e708e0f6bc83995b90d0de2eae1dfddbbc293cf264efa7a9bd9",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "67a4e754c6a75e708e0f6bc83995b90d0de2eae1dfddbbc293cf264efa7a9bd9"
+}

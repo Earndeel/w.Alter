@@ -1,0 +1,218 @@
+{
+  "id": "memory",
+  "anchors": [
+    "contracts/memory.json",
+    "walter_memory/events.py",
+    "walter_memory/objects.py",
+    "walter_memory/client.py",
+    "walter_memory/read_policy.py",
+    "ports/hermes/__init__.py",
+    "walter_memory/overland.py"
+  ],
+  "requires": [],
+  "external": [
+    "PostgreSQL hindsight-pg:5433",
+    "pgvector",
+    "walter-llm for derived extraction"
+  ],
+  "data": [
+    "core.*",
+    "ingestion.*",
+    "privacy.*",
+    "search.*",
+    "system.*",
+    "kardex.*",
+    "extraction.*",
+    "processing.*"
+  ],
+  "core_paths": [
+    "walter_memory/events.py",
+    "walter_memory/objects.py"
+  ],
+  "backup_paths": [
+    ".",
+    "/root/.pgpass",
+    "/root/.hermes/plugins/walter-memory",
+    "@instance/bootstrap/overland.env"
+  ],
+  "interfaces": [
+    "Python library",
+    "HTTP :8890",
+    "CLI",
+    "MCP",
+    "Overland authenticated HTTP :3010",
+    "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer"
+  ],
+  "bindings": {
+    "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
+    "dsh": "common MCP",
+    "codex": "common MCP",
+    "claude-code": "common MCP",
+    "voice": "Authenticated canonical gateway through voice-memory HTTP port"
+  },
+  "limitations": [
+    "Canonical reads exclude stale, retracted, private and unprovenanced legacy cognitive rows.",
+    "Wild profile reads are refused by the cloud-safe port; local-only history remains local.",
+    "Existing desktop provider instances change on next session initialization; not force-restarted."
+  ],
+  "services": [
+    "walter-memory-gateway",
+    "walter-memory-overland",
+    "walter-memory-pipeline"
+  ],
+  "optional": [
+    "llm"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.2.0",
+    "owner": "memory",
+    "kind": "capability",
+    "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
+    "target_root": "memory",
+    "config_paths": [
+      ".env"
+    ],
+    "permissions": [
+      "classification de confidentialité",
+      "budget des traitements modèle"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "mcp",
+        "interface": "memory_recall",
+        "access": "read",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "retain",
+        "transport": "mcp",
+        "interface": "memory_retain",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "reflect",
+        "transport": "mcp",
+        "interface": "memory_reflect",
+        "access": "execute",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "postgres:core",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "canonical"
+      },
+      {
+        "id": "postgres:ingestion",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "configuration"
+      },
+      {
+        "id": "postgres:privacy",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "configuration"
+      },
+      {
+        "id": "postgres:search",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "projection"
+      },
+      {
+        "id": "postgres:system",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "configuration"
+      },
+      {
+        "id": "postgres:kardex",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "projection"
+      },
+      {
+        "id": "embedding-models",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "projection"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "privacy-provenance",
+        "assertion": "Les lectures refusent les sources privées, purgées ou rétractées et les fragments périmés.",
+        "scope": "integration"
+      },
+      {
+        "id": "temporal-decisions",
+        "assertion": "Les décisions datées et remplacées ne sont pas présentées comme des instructions actuelles.",
+        "scope": "live"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Memory",
+    "order": 10,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "memory_context",
+      "memory_search",
+      "memory_events",
+      "person_lookup",
+      "memory_retain"
+    ]
+  }
+}

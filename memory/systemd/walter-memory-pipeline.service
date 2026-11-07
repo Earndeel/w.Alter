@@ -1,0 +1,14 @@
+[Unit]
+Description=Walter Memory pipeline (V1): core.events → bus memory.event → extraction per segment for every runtime (live), hourly reconciliation, daily bus prune
+After=network-online.target docker.service walter-llm.service
+
+[Service]
+WorkingDirectory=/opt/walter-memory
+Environment=PGPASSFILE=/root/.pgpass
+ExecStart=/usr/local/bin/walter-memory pipeline run
+Restart=always
+RestartSec=10
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

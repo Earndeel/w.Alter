@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/walter-computer-use",
+  "sha": "9eff41a2bdffeccb508220da0ed4063120233757167d67bbe3ac9f5531771e34",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "kind": "entry",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "9eff41a2bdffeccb508220da0ed4063120233757167d67bbe3ac9f5531771e34"
+}

@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "never read by any agent",
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/research/osint-public-profile-lookup",
+  "sha": "fbad465a2ad9a8b43c9796f9a2d60f41cb8adfed2c702eea6408b67499b78336",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "fbad465a2ad9a8b43c9796f9a2d60f41cb8adfed2c702eea6408b67499b78336"
+}

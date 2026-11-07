@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:10+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "mlops/research",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/research/dspy",
+  "sha": "eed8df1d7735fa5ed5f6fb6a08485945266a4eea2de9816a0d6b8423f0e53e6e",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "eed8df1d7735fa5ed5f6fb6a08485945266a4eea2de9816a0d6b8423f0e53e6e"
+}

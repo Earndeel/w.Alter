@@ -1,0 +1,5 @@
+# Modules whose Python package is importable in the runtime (their root is put on sys.path).
+# Resolved with `walter path <module>` so a module move only needs `walter-runtime sync`.
+memory
+skills
+secrets

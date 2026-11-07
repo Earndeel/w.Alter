@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/github-key-hunter",
+  "sha": "1f4c85e639e7f6c32b932da0cf34ad2c76196cf390d097ee90a0093d38111633",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "1f4c85e639e7f6c32b932da0cf34ad2c76196cf390d097ee90a0093d38111633"
+}

@@ -1,0 +1,16 @@
+{
+  "_doc": "the owner's subscriptions (declared by him), for information only: no routing effect (2026-10-14). Shown on the library page with two sources only: our own measurement (meters + the tokens W.Alter's runtimes really used, priced at list API rates) and SemiAnalysis' published plan values. Readings go to models.subscription_usage.",
+  "semianalysis": {
+    "report": "Anthropic Subscriptions Offer 5x+ More Value Than OpenAI",
+    "date": "2026-10-05",
+    "url": "https://newsletter.semianalysis.com/p/anthropic-subscriptions-offer-5x",
+    "definition": "API-equivalent value = the plan's full monthly usage limit priced at first-party list API rates.",
+    "workload_mix": {
+      "cache_read": 0.966,
+      "cache_write": 0.026,
+      "input": 0.004,
+      "output": 0.003
+    }
+  },
+  "subscriptions": []
+}

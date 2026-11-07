@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/research-evidence-verification",
+  "sha": "89f8db2cd3a9cde627c099d49d2b73db7b65604add651d7a6a2fa22026ba4651",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "89f8db2cd3a9cde627c099d49d2b73db7b65604add651d7a6a2fa22026ba4651"
+}

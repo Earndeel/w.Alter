@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-ui-runtime-operations",
+  "sha": "802fd096436067a1649207c7ee37264a11bccdd1ffe5aa732489ba8cb10476af",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "802fd096436067a1649207c7ee37264a11bccdd1ffe5aa732489ba8cb10476af"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/pxpipe-workflows",
+  "sha": "f4a969996d7149c12c08c7efaf9f3f70c6a342437d04dd2b1fafe12e6ad64589",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "f4a969996d7149c12c08c7efaf9f3f70c6a342437d04dd2b1fafe12e6ad64589"
+}

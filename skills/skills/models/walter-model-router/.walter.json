@@ -1,0 +1,13 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/walter-model-router",
+  "sha": "1da0d404cdcf6b96d61a76884a57bc8d80d5595f6bc431b1c8ef4d4f2e923f46",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "kind": "entry",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "1da0d404cdcf6b96d61a76884a57bc8d80d5595f6bc431b1c8ef4d4f2e923f46"
+}

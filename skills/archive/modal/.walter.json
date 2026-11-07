@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:09+00:00",
+ "archived_reason": "not read for 155 days",
+ "domain": "mlops/cloud",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/cloud/modal",
+  "sha": "91c0baaaf36edf265810bc165425d748161fff175bd0c27dbc938e24d6a73918",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "store_sha": "91c0baaaf36edf265810bc165425d748161fff175bd0c27dbc938e24d6a73918"
+}

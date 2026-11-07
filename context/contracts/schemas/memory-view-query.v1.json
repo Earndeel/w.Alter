@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/context/memory-view-query.v1.json",
+  "title": "MemoryViewQuery v1",
+  "description": "walter-context -> Walter Memory. The answer (owned by Memory) carries key, version, depth, content, built_at, watermark, stale, sources[] and deeper[].",
+  "type": "object",
+  "required": [
+    "version",
+    "depth"
+  ],
+  "anyOf": [
+    {
+      "required": [
+        "key"
+      ]
+    },
+    {
+      "required": [
+        "domain"
+      ]
+    }
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "depth": {
+      "enum": [
+        "index",
+        "overview",
+        "synthesis",
+        "details",
+        "sources"
+      ]
+    },
+    "key": {
+      "type": "string"
+    },
+    "domain": {
+      "enum": [
+        "projects",
+        "profile",
+        "activities",
+        "relations",
+        "agenda",
+        "decisions",
+        "goals"
+      ]
+    },
+    "horizon": {
+      "enum": [
+        "instant",
+        "day",
+        "medium",
+        "long",
+        "stable"
+      ]
+    },
+    "max_tokens": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64000
+    },
+    "max_age_s": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "privacy": {
+      "enum": [
+        "cloud_allowed",
+        "redacted_cloud",
+        "local_only"
+      ]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-media-delivery",
+  "sha": "f634c74f70d1fef139c3513572ba3ed7eabced05f6873f7dc2a4579a63716bac",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "f634c74f70d1fef139c3513572ba3ed7eabced05f6873f7dc2a4579a63716bac"
+}

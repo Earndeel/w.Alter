@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "scope": "composition bindings; host runtime/environment provisioning is a prerequisite",
+  "fallback": "explicit failure; no silent replacement of a configured Walter capability",
+  "modules": [
+    "soul",
+    "memory",
+    "logs",
+    "skills",
+    "secrets",
+    "browse",
+    "computer",
+    "router",
+    "raw-vault"
+  ],
+  "id": "codex",
+  "native": [
+    "agent_loop",
+    "permissions",
+    "model",
+    "compression"
+  ],
+  "identity_source": "/opt/walter-profiles/codex/AGENTS.md",
+  "identity_scope": "workspace",
+  "mcp": true,
+  "skill_source": "/opt/walter-core/skills/walter-skills/SKILL.md",
+  "hooks": {
+    "notify": [
+      "/opt/walter-core/hooks/walter_hook.py",
+      "codex-notify"
+    ]
+  },
+  "limitations": [
+    "notify is post-turn, not a pre-prompt context injection hook",
+    "Identity applies to sessions launched in the Walter profile directory"
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "modules": [
+    {
+      "id": "browse",
+      "target": "browse",
+      "legacy": "/opt/walter-browse",
+      "manifest": "contracts/browse.json",
+      "neutral": true
+    },
+    {
+      "id": "bus",
+      "target": "memory",
+      "legacy": "/opt/walter-memory",
+      "manifest": "contracts/bus.json"
+    },
+    {
+      "id": "colab",
+      "target": "colab",
+      "legacy": "/opt/walter-colab",
+      "manifest": "contracts/colab.json"
+    },
+    {
+      "id": "computer",
+      "target": "computer",
+      "legacy": "/opt/walter-computer",
+      "manifest": "contracts/computer.json",
+      "neutral": true
+    },
+    {
+      "id": "context",
+      "target": "context",
+      "legacy": "/opt/walter-context",
+      "manifest": "contracts/context.json",
+      "neutral": true
+    },
+    {
+      "id": "core",
+      "target": "core",
+      "legacy": "/opt/walter-core",
+      "manifest": "contracts/core.json"
+    },
+    {
+      "id": "lab",
+      "target": "lab",
+      "legacy": "/opt/walter-lab",
+      "manifest": "contracts/lab.json",
+      "neutral": true
+    },
+    {
+      "id": "llm",
+      "target": "router/llm",
+      "legacy": "/opt/walter-llm",
+      "manifest": "contracts/llm.json",
+      "neutral": true
+    },
+    {
+      "id": "logs",
+      "target": "memory",
+      "legacy": "/opt/walter-memory",
+      "manifest": "contracts/logs.json"
+    },
+    {
+      "id": "memory",
+      "target": "memory",
+      "legacy": "/opt/walter-memory",
+      "manifest": "contracts/memory.json"
+    },
+    {
+      "id": "ops",
+      "target": "ops",
+      "legacy": "/opt/walter-backup",
+      "aliases": [
+        "backup"
+      ],
+      "compat_links": [
+        "/walter/backup",
+        "/opt/walter-ops"
+      ],
+      "manifest": "contracts/ops.json",
+      "neutral": true
+    },
+    {
+      "id": "raw-vault",
+      "target": "memory/vault",
+      "legacy": "/opt/walter-raw-vault",
+      "manifest": "contracts/raw-vault.json"
+    },
+    {
+      "id": "router",
+      "target": "router",
+      "legacy": "/opt/walter-router",
+      "manifest": "contracts/router.json",
+      "neutral": true
+    },
+    {
+      "id": "runtime",
+      "target": "runtime",
+      "legacy": null,
+      "manifest": "contracts/runtime.json",
+      "neutral": true
+    },
+    {
+      "id": "secrets",
+      "target": "secrets",
+      "legacy": "/opt/walter-secrets",
+      "manifest": "contracts/secrets.json",
+      "neutral": true
+    },
+    {
+      "id": "skills",
+      "target": "skills",
+      "legacy": "/opt/walter-skills",
+      "manifest": "contracts/skills.json"
+    },
+    {
+      "id": "soul",
+      "target": "soul",
+      "legacy": "/opt/walter-soul",
+      "manifest": "contracts/soul.json",
+      "neutral": true
+    }
+  ]
+}

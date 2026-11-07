@@ -1,0 +1,12 @@
+{
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/html5-game-clones",
+  "sha": "4f1674b7732dc07c925dc42b91936653639612d2fda239d6feba6b6318733388",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "4f1674b7732dc07c925dc42b91936653639612d2fda239d6feba6b6318733388"
+}

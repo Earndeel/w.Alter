@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-stack-update-resilience",
+  "sha": "516291af837e8f61d469eb64f1cd55b0aa285be311b447db6e667295f980aff2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "516291af837e8f61d469eb64f1cd55b0aa285be311b447db6e667295f980aff2"
+}

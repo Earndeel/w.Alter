@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-agentic-worker-integration",
+  "sha": "8f0978cd83a493b86a03dc7c281ed435d6cae9cedfcddc2f430781a168edee64",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "8f0978cd83a493b86a03dc7c281ed435d6cae9cedfcddc2f430781a168edee64"
+}

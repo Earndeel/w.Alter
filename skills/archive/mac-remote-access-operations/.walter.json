@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/mac-remote-access-operations",
+  "sha": "954571b81b4baa41454e71d14b49ae550813fd607e885f14b5fa8ad54914c8b2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "954571b81b4baa41454e71d14b49ae550813fd607e885f14b5fa8ad54914c8b2"
+}

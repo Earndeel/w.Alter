@@ -1,0 +1,324 @@
+{
+  "_doc": "The instance's model knowledge (dated declarations). Applied with `walter-router declare` (idempotent). Leaderboards rank; this file says what each model is FOR, what it demands, and which words of a request call for it. Signals are matched accent- and case-insensitively on whole words.",
+  "profiles": {
+    "seedance-2-5": {
+      "strengths": [
+        "premium",
+        "cinematic",
+        "character_consistency",
+        "storytelling"
+      ],
+      "weaknesses": [
+        "most_expensive",
+        "needs_preparation"
+      ],
+      "effort": "workflow",
+      "workflow": [
+        "Créer les références d'abord (personnages, décor, produit) avec le modèle image favori, en planche cohérente",
+        "Adapter le prompt à Seedance : découpage plan par plan, cadrage et mouvement de caméra, action, durée, références jointes",
+        "Valider en 480p/720p, puis rendu final en 1080p ou 4K",
+        "Router le rendu sur le provider le moins cher à résolution égale (OpenRouter aujourd'hui ; 4K seulement chez OpenRouter)"
+      ],
+      "cost_note": "Le plus cher du panier : à réserver aux rendus qui le justifient.",
+      "note": "2026-10-02 : le top du top, mais demande un workflow avec création de références et un prompting adapté.",
+      "declared_at": "2026-10-02"
+    },
+    "minimax-h3": {
+      "strengths": [
+        "balanced",
+        "value",
+        "action"
+      ],
+      "weaknesses": [],
+      "effort": "direct",
+      "workflow": [
+        "Prompt direct ; 768p via Kie pour le meilleur prix"
+      ],
+      "cost_note": "Meilleur ratio qualité/prix, surtout via Kie.ai.",
+      "content_policy": "permissive",
+      "note": "2026-10-02 : bonne balance, meilleur ratio, très bon en scènes d'action ; open source et peut-être unrestricted (à vérifier).",
+      "declared_at": "2026-10-02"
+    },
+    "gemini-omni-flash-1-1": {
+      "strengths": [
+        "ugc",
+        "realism"
+      ],
+      "weaknesses": [],
+      "effort": "guided",
+      "workflow": [
+        "Générer dans Flow (interface web Google) en pilotant l'interface, avec les crédits mensuels gratuits de l'abonnement Gemini AI Pro",
+        "Si les crédits sont épuisés : Kie en payant (prix par seconde du catalogue)"
+      ],
+      "access_note": "Crédits mensuels gratuits via l'abonnement Gemini AI Pro, dans l'interface Flow (pas d'API).",
+      "cost_note": "0 $ tant qu'il reste des crédits Flow du mois.",
+      "note": "2026-10-02 : très bon en UGC.",
+      "declared_at": "2026-10-02"
+    },
+    "grok-imagine-video-1-5": {
+      "strengths": [
+        "cheap",
+        "drafts"
+      ],
+      "weaknesses": [
+        "lower_quality"
+      ],
+      "effort": "direct",
+      "workflow": [
+        "Prompt direct ; 480p/720p via Kie"
+      ],
+      "cost_note": "Vraiment pas cher sur Kie, mais pas au niveau des autres.",
+      "note": "2026-10-02.",
+      "declared_at": "2026-10-02"
+    },
+    "gpt-6-luna": {
+      "strengths": [
+        "fast",
+        "cheap",
+        "subscription"
+      ],
+      "effort": "direct",
+      "access_note": "Inclus dans l'abonnement ChatGPT (Codex).",
+      "note": "2026-10-02 : préféré à MiMo 2.6 Flash à niveau égal, surtout avec l'abonnement Codex.",
+      "declared_at": "2026-10-02"
+    }
+  },
+  "roles": {
+    "_tasks": [
+      "text_to_video",
+      "image_to_video"
+    ],
+    "default": {
+      "label": "Équilibré",
+      "model": "minimax-h3",
+      "provider": "kie",
+      "watch": "dominance",
+      "priority": 0,
+      "description": "Demande vidéo sans objectif particulier : bonne balance qualité/prix, direct, sans préparation.",
+      "signals": []
+    },
+    "premium": {
+      "label": "Premium / cinématique",
+      "model": "seedance-2-5",
+      "provider": null,
+      "watch": "quality",
+      "priority": 40,
+      "description": "Rendu final haut de gamme : pub, clip, film, personnage récurrent. Lance le workflow références + prompt adapté.",
+      "signals": [
+        "pub",
+        "publicite",
+        "publicitaire",
+        "spot",
+        "cinematique",
+        "cinema",
+        "film",
+        "court metrage",
+        "clip",
+        "trailer",
+        "bande annonce",
+        "haut de gamme",
+        "premium",
+        "luxe",
+        "qualite max",
+        "meilleure qualite",
+        "top qualite",
+        "rendu final",
+        "storytelling",
+        "personnage recurrent",
+        "coherence des personnages",
+        "seedance"
+      ]
+    },
+    "action": {
+      "label": "Action",
+      "model": "minimax-h3",
+      "provider": "kie",
+      "watch": "dominance",
+      "priority": 20,
+      "description": "Scènes d'action, mouvement rapide, pour pas cher.",
+      "signals": [
+        "action",
+        "combat",
+        "bagarre",
+        "baston",
+        "poursuite",
+        "course poursuite",
+        "explosion",
+        "cascade",
+        "fight",
+        "chase",
+        "sport",
+        "drift",
+        "dynamique",
+        "mouvement rapide",
+        "arts martiaux",
+        "h3",
+        "minimax"
+      ]
+    },
+    "ugc": {
+      "label": "UGC",
+      "model": "gemini-omni-flash-1-1",
+      "provider": "google-flow",
+      "watch": "none",
+      "priority": 30,
+      "description": "Contenu type créateur : face caméra, témoignage, avis client, TikTok/Reels. Via Flow avec les crédits gratuits.",
+      "signals": [
+        "ugc",
+        "temoignage",
+        "face camera",
+        "avis client",
+        "tiktok",
+        "reel",
+        "reels",
+        "story",
+        "stories",
+        "selfie",
+        "influenceur",
+        "influenceuse",
+        "unboxing",
+        "vlog",
+        "createur",
+        "testimonial",
+        "authentique",
+        "smartphone",
+        "omni",
+        "flow"
+      ]
+    },
+    "budget": {
+      "label": "Budget / brouillon",
+      "model": "grok-imagine-video-1-5",
+      "provider": "kie",
+      "watch": "dominance",
+      "priority": 10,
+      "description": "Essais, brouillons, beaucoup de variantes, quand le prix compte plus que la qualité.",
+      "signals": [
+        "pas cher",
+        "brouillon",
+        "test",
+        "essai",
+        "maquette",
+        "previsualisation",
+        "preview",
+        "draft",
+        "variantes",
+        "batch",
+        "economique",
+        "low cost",
+        "grok"
+      ]
+    }
+  },
+  "retired_roles": {
+    "_tasks": [
+      "text_to_video",
+      "image_to_video"
+    ],
+    "roles": [
+      "value"
+    ],
+    "reason": "2026-10-02 : Omni 1.1 n'est plus le « meilleur ratio » (c'est H3) mais le choix UGC."
+  },
+  "affinities": [],
+  "unrestricted_favourites": [],
+  "unrestricted_signals": [
+    "sans censure",
+    "uncensored",
+    "unrestricted",
+    "sans restriction",
+    "nsfw",
+    "explicite",
+    "non censure"
+  ],
+  "task_hints": {
+    "general": "Réponse texte : question, explication, résumé, rédaction, traduction, conseil, analyse ou comparaison (pas de code, pas de média, pas de fichier joint)",
+    "research": "Recherche web d'informations récentes ou de sources : actualités, prix du moment, qui/quand/où sur un fait actuel",
+    "weather": "Météo actuelle ou prévisions pour un lieu",
+    "calculation": "Calcul arithmétique ou conversion d'unités exacte",
+    "coding": "Écrire, corriger, expliquer ou relire du code, scripts, API, back-end, automatisation",
+    "frontend": "Créer un site web ou une landing page (HTML/CSS/JS, design web)",
+    "ui_component": "Créer un composant d'interface isolé (bouton, formulaire, carte, tableau de bord) en code",
+    "3d": "Créer une scène 3D interactive ou du WebGL/Three.js en code",
+    "gamedev": "Créer un petit jeu jouable (HTML5/canvas) en code",
+    "dataviz": "Créer un graphique ou une visualisation de données en code",
+    "svg": "Créer une illustration ou une icône vectorielle SVG en code",
+    "fullstack": "Construire une application web complète avec front-end, back-end et base de données",
+    "mobile_app": "Construire une application mobile",
+    "vision": "Analyser ou décrire une image ou une photo fournie (que voit-on, lire du texte dans l'image)",
+    "document": "Analyser un fichier fourni : PDF, contrat, rapport, tableur, document joint",
+    "text_to_image": "Générer une image, une photo, une illustration à partir d'une description",
+    "image_edit": "Modifier ou retoucher une image existante (changer le fond, ajouter/retirer un objet, style)",
+    "logo": "Créer un logo ou une identité visuelle",
+    "graphic_design": "Créer une affiche, un flyer, une bannière, un visuel graphique avec texte",
+    "text_to_video": "Générer une vidéo (clip, scène animée, pub vidéo, plan cinéma) à partir d'une description",
+    "image_to_video": "Animer une image ou une photo existante pour en faire une vidéo",
+    "video_edit": "Modifier une vidéo existante (changer le style, remplacer un élément, prolonger)",
+    "tts": "Lire un texte à voix haute, générer une voix off ou un audio parlé",
+    "speech_to_speech": "Conversation vocale en temps réel",
+    "music": "Composer ou générer une musique, une chanson, un jingle"
+  },
+  "levels": {
+    "_doc": "The instance's text tiers, determined by the tier method (walter_router/tiers.py, docs/TIERS.md): strict AA Pareto frontier of callable model x reasoning level at real provider cost; L1 = first knee above 35 AA; L2 = best points-per-extra-dollar from L1; L3 = best points-per-extra-dollar from L2 within 5 points of the ceiling. Recomputed nightly; a different result raises one 'tier' alert, the owner adopts or ignores. pin = model_id/variant.",
+    "general": {
+      "L1": {
+        "label": "Économique",
+        "pin": "gpt-6-luna/max",
+        "provider": "codex",
+        "watch": "none",
+        "description": "Quotidien et tâches légères : GPT-6 Luna en raisonnement max (38,1 AA, 0,020 $/tâche, inclus Codex).",
+        "evidence": "frontière AA : +467 pts/$ depuis Luna xhigh ; domine MiMo 2.6 Flash (37,9 pour 0,062 $)"
+      },
+      "L2": {
+        "label": "Intermédiaire",
+        "pin": "gpt-6-1-sol/medium",
+        "provider": "codex",
+        "watch": "none",
+        "description": "Analyse, comparatif, rédaction soignée : GPT-6.1 Sol en raisonnement medium (47,8 AA, 0,064 $/tâche, inclus Codex).",
+        "evidence": "coude de Sol : 229 pts/$ jusqu'à medium, puis 78 (high), 36 (xhigh), 8 (max)"
+      },
+      "L3": {
+        "label": "Haut de gamme",
+        "pin": "claude-opus-5-5/high",
+        "provider": "kie",
+        "watch": "none",
+        "fallback": "gpt-6-astra/xhigh",
+        "description": "Raisonnement le plus exigeant, enjeux importants : Claude Opus 5.5 en high (53,6 AA, 0,73 $/tâche).",
+        "evidence": "coude du haut : 14,5 pts/$ jusqu'à Opus high, puis 3,7 (xhigh), 1,6 (max) ; repli Astra xhigh via Codex (52,4)"
+      }
+    }
+  },
+  "postes": {
+    "_doc": "Fiches de poste (2026-10-02): weights over model attributes (0-100 each, see walter_router/postes.py). min_context in tokens. The orchestrator poste is compared with the model Hermes actually runs; a clearly better one (>= margin points) is proposed to the owner, never switched automatically.",
+    "orchestrator": {
+      "label": "Orchestrateur de Walter",
+      "margin": 3.0,
+      "min_context": 400000,
+      "weights": {
+        "agentic": 0.3,
+        "intelligence": 0.25,
+        "reliability": 0.15,
+        "speed": 0.15,
+        "access": 0.15
+      },
+      "why": "Mène la conversation et pilote les outils : fiabilité des appels d'outils, intelligence, peu d'hallucinations, réactivité, et accès par abonnement (il tourne en permanence)."
+    },
+    "agent_worker": {
+      "label": "Sous-agent d'exécution (walter_run)",
+      "margin": 3.0,
+      "min_context": 200000,
+      "weights": {
+        "agentic": 0.35,
+        "intelligence": 0.3,
+        "reliability": 0.2,
+        "speed": 0.05,
+        "access": 0.1
+      },
+      "why": "Exécute des tâches longues avec outils : agentique et intelligence d'abord."
+    }
+  },
+  "decision": {
+    "order": "best_first",
+    "_note": "Modèle de décision (intent + tri). Le meilleur vient du cycle 48 h (tâche 'decision', AA Decision Index). best_first (2026-10-14) = le meilleur (Jev 1.13 aujourd'hui), puis Mercury Decide gratuit, puis Clef (Workers AI) en dernier recours ; free_first = l'inverse (choix du 2026-10-04)."
+  }
+}

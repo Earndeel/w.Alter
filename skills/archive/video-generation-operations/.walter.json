@@ -1,0 +1,12 @@
+{
+ "domain": "media",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/video-generation-operations",
+  "sha": "ea49bbb8f9994bea0c5bdf1f26b890a4dbef63b6d26ff42fda9a5123018661df",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "ea49bbb8f9994bea0c5bdf1f26b890a4dbef63b6d26ff42fda9a5123018661df"
+}

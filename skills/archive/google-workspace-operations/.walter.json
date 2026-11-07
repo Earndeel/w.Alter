@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/google-workspace-operations",
+  "sha": "f6884b7eed123281675b373618385c25d75553902b8fd4876fcdd5762400c40a",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "f6884b7eed123281675b373618385c25d75553902b8fd4876fcdd5762400c40a"
+}

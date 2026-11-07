@@ -1,0 +1,536 @@
+#!/opt/walter-core/venv/bin/python
+"""walter-scenario — end-to-end scenarios checked on real traces (P0, 2026-10-27; reused by walter-lab later).
+
+A scenario (scenarios/*.yaml) plays a request through the real adapters and modules, then asserts on what the
+tables recorded (`walter-memory runs show`, walter_logs), not on return values alone.
+
+  walter-scenario run <file.yaml> [--json]      play it; exit 0 when every assertion holds
+  walter-scenario list                           scenarios shipped with walter-core
+
+Steps:
+  hook:   {event: UserPromptSubmit|Stop, prompt: "..."}  → hooks/walter_hook.py, this process standing in for the
+          harness (WALTER_HARNESS_PID), so the run is found exactly as an MCP server would find it
+  router: {goal, task, level, toolsets, max_turns, budget_seconds} → `walter-router run` with the run's environment
+  mcp:    {tool: name, arguments: {...}} → the walter-core MCP server started as this process' child (the real
+          Claude Code path: the server finds the run through its parent's record)
+Assertions (on `walter-memory runs show <run_id>`; `$` = that JSON):
+  - {path: run.status, equals: ended}
+  - {path: model_calls, min_len: 1}       - {path: tasks, min_len: 1}
+  - {path: model_calls[*].ok, all: true}  - {path: links[*].kind, contains: session}
+  - {tool_called: walter_browse, in: tasks}   the sub-agent's walter_logs session holds that tool call
+  - {tool_succeeded: walter_browse}          matched successful Browse result with returned evidence
+  - {link_kind: observation, min: 2}         sourced observations attached to the run
+  - {step: <cmd name>, path: front, min_len: 1}   on the JSON printed by a `cmd` step
+Steps also: parallel: [{mcp: …}, …] (at once), cmd: {name, shell: "… {run_id} …"}.
+Per-message modules (memory context, skills, preflight, views) are off unless the scenario sets `modules: on`.
+Runs opened by a scenario are channel `test` (WALTER_RUN_CHANNEL): walter-llm caps their paid-provider spend
+(`walter-llm test-budget`), above it the owner approves.
+Reports: <instance>/state/scenarios/<name>/<time>.json.
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import math
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import yaml
+
+CORE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(CORE))  # standalone CLI, independent of caller PYTHONPATH/runtime .pth
+HOOK = CORE / "hooks" / "walter_hook.py"
+sys.path.insert(0, str(CORE / "hooks"))
+import runctx  # noqa: E402
+
+
+def _instance() -> Path:
+    try:
+        return Path(os.environ.get("WALTER_INSTANCE") or Path("/etc/walter/instance").read_text().strip())
+    except OSError:
+        return Path("/instances/monsieur")
+
+
+def _env(modules) -> dict:
+    """modules: "on" (all per-message modules), absent/"off" (none), or a list among preflight, memory, skills, views."""
+    # WALTER_RUN_CHANNEL=test: the runs opened by this scenario are tests; walter-llm caps their paid-provider spend
+    # (Monsieur 2026-10-30: above 2 € a test needs his approval) and never counts them as the owner's work
+    env = {**os.environ, "WALTER_HARNESS_PID": str(os.getpid()), "WALTER_RUN_CHANNEL": "test"}
+    on = {"preflight", "memory", "skills", "views"} if modules == "on" else set(modules or []) if isinstance(modules, list) else set()
+    for name, var in (("memory", "WALTER_HOOK_CONTEXT"), ("skills", "WALTER_HOOK_SKILLS"),
+                      ("preflight", "WALTER_HOOK_PREFLIGHT"), ("views", "WALTER_HOOK_VIEWS")):
+        if name not in on:
+            env[var] = "off"
+        elif var == "WALTER_HOOK_PREFLIGHT":
+            env[var] = "shadow"
+    return env
+
+
+def step_hook(step: dict, session: str, env: dict) -> dict:
+    """transcript: [[user, assistant], …] — the previous exchanges the harness would show the preflight."""
+    path = ""
+    if step.get("transcript"):
+        import tempfile
+        fd, path = tempfile.mkstemp(prefix="walter-scenario-", suffix=".jsonl")
+        now = datetime.now(timezone.utc).isoformat()
+        with os.fdopen(fd, "w") as f:
+            f.write("{}\n")                                   # the reader skips the first (possibly partial) line
+            for u, a in step["transcript"]:
+                f.write(json.dumps({"type": "user", "timestamp": now, "message": {"role": "user", "content": u}}) + "\n")
+                f.write(json.dumps({"type": "assistant", "timestamp": now,
+                                    "message": {"role": "assistant", "content": [{"type": "text", "text": a}]}}) + "\n")
+    ev = {"hook_event_name": step["event"], "session_id": session, "transcript_path": path}
+    if step.get("prompt"):
+        ev["prompt"] = step["prompt"]
+    t0 = time.perf_counter()
+    subprocess.run([str(HOOK)], input=json.dumps(ev), text=True, capture_output=True, env=env, timeout=60)
+    return {"ms": round((time.perf_counter() - t0) * 1000)}
+
+
+def step_router(step: dict, env: dict) -> dict:
+    run_env = {**env, **runctx.env(os.getpid())}
+    out = subprocess.run(["walter-router", "run"], input=json.dumps(step), text=True, capture_output=True,
+                         env=run_env, timeout=int(step.get("budget_seconds") or 300) * 3 + 120)
+    try:
+        res = json.loads(out.stdout)
+    except ValueError:
+        return {"ok": False, "error": (out.stderr or out.stdout)[-300:]}
+    return {"ok": res.get("ok"), "error": res.get("error"), "task_id": res.get("task_id"),
+            "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("output") or res.get("answer") or "")[:400]}
+
+
+async def _mcp(tool: str, arguments: dict, env: dict) -> dict:
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    params = StdioServerParameters(command=str(CORE / "venv/bin/python"), args=[str(CORE / "server.py")],
+                                   env={**env, "WALTER_CLIENT_TAG": "walter-scenario"})
+    async with stdio_client(params) as (r, w):
+        async with ClientSession(r, w) as s:
+            await s.initialize()
+            res = await s.call_tool(tool, arguments)
+            text = "".join(getattr(c, "text", "") for c in res.content)
+    try:
+        return json.loads(json.loads(text).get("result", text)) if text.startswith("{\"result\"") else json.loads(text)
+    except (ValueError, AttributeError, TypeError):
+        return {"raw": text[:2000]}
+
+
+def step_mcp(step: dict, env: dict) -> dict:
+    res = asyncio.run(_mcp(step["tool"], step.get("arguments") or {}, env))
+    return {"ok": res.get("ok"), "error": res.get("error"), "task_id": res.get("task_id"),
+            "model": (res.get("routed") or {}).get("model"), "answer": str(res.get("output") or res.get("answer") or res.get("raw") or "")[:600]}
+
+
+def step_harness(step: dict, env: dict) -> dict:
+    """The request played inside a real runtime (runtime-neutral bench, P7 prep 2026-10-28): its own loop, model and
+    Walter adapter (hooks, MCP). DSH today: `dsh --profile headless --json`. Returns the harness session key, the
+    final answer and the runtime's own token usage; the run is the one the harness's hook opened."""
+    import tempfile
+    rt = step.get("runtime", "dsh")
+    if rt != "dsh":
+        return {"ok": False, "error": f"runtime {rt} not wired yet (dsh only)"}
+    ws = tempfile.mkdtemp(prefix="walter-scenario-dsh-")
+    e = {**env, "DSH_HOME": step.get("dsh_home", "/opt/dsh/test-home")}
+    t0 = time.time()
+    try:
+        out = subprocess.run([step.get("dsh", "/opt/dsh/node_modules/.bin/dsh"), "--profile", step.get("profile", "headless"),
+                              "--json", step["prompt"]], capture_output=True, text=True, cwd=ws, env=e,
+                             timeout=int(step.get("timeout", 900)))
+    except subprocess.TimeoutExpired as exc:
+        partial = exc.stdout or ""
+        if isinstance(partial, bytes):
+            partial = partial.decode(errors="replace")
+        out = subprocess.CompletedProcess([], 124, stdout=partial, stderr="")
+    sid, answer, tin, tout, steps = None, None, 0, 0, 0
+    for line in out.stdout.splitlines():
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if ev.get("type") == "session":
+            sid = ev.get("sessionId")
+        elif ev.get("type") == "final":
+            answer = ev.get("text")
+        elif ev.get("type") == "status" and ev.get("phase") == "step_end":
+            steps += 1
+            tin += (ev.get("usage") or {}).get("inputTokens") or 0
+            tout += (ev.get("usage") or {}).get("outputTokens") or 0
+    key = f"dsh/vm/{sid}" if sid else None
+    run_id = None
+    if key:
+        time.sleep(2)                       # the Stop hook closes the run synchronously in dsh; let it land
+        f = subprocess.run(["walter-memory", "runs", "find", "--session", key], capture_output=True, text=True, timeout=60)
+        run_id = (json.loads(f.stdout or "{}") or {}).get("run_id")
+    successful = out.returncode == 0 and answer is not None
+    cleanup = {}
+    if not successful and run_id:
+        # DSH's Stop hook is not fired on every error path. The child has exited and
+        # this exact run belongs to our bench; record failure, never a synthetic success.
+        try:
+            closed = subprocess.run(["walter-memory", "runs", "end", run_id], input=json.dumps({"status": "failed"}),
+                                    capture_output=True, text=True, timeout=20)
+            if closed.returncode:
+                cleanup["cleanup_error"] = "run_end_failed"
+        except (OSError, subprocess.SubprocessError):
+            cleanup["cleanup_error"] = "run_end_unavailable"
+    return {"ok": successful, **cleanup, **({"error": "timeout"} if out.returncode == 124 else {}),
+            "runtime": rt, "session": key, "run_id": run_id,
+            "answer": (answer or "")[:600], "steps": steps, "input_tokens": tin, "output_tokens": tout,
+            "seconds": round(time.time() - t0, 1)}
+
+
+def step_cmd(step: dict, run_id: str | None) -> dict:
+    cmd = step["shell"].replace("{run_id}", run_id or "")
+    out = subprocess.run(["sh", "-c", cmd], capture_output=True, text=True, timeout=int(step.get("timeout", 120)),
+                         cwd=step.get("cwd"))
+    try:
+        data = json.loads(out.stdout)
+    except ValueError:
+        data = None
+    return {"rc": out.returncode, "json": data, "stderr": out.stderr[-300:]}
+
+
+def _get(data, path: str):
+    """run.status, model_calls, model_calls[*].ok, links[*].kind"""
+    cur = [data]
+    for part in path.split("."):
+        star = part.endswith("[*]")
+        key = part[:-3] if star else part
+        nxt = []
+        for c in cur:
+            v = c.get(key) if isinstance(c, dict) else None
+            if star:
+                nxt.extend(v or [])
+            else:
+                nxt.append(v)
+        cur = nxt
+    return cur if "[*]" in path else (cur[0] if cur else None)
+
+
+def _session_events(session_id: str, event_type: str | None = None) -> list[dict]:
+    cmd = ["walter-memory", "logs", "timeline", session_id, "--limit", "200",
+           "--max-chars", "20000", "--cloud-safe", "--json"]
+    if event_type:
+        cmd += ["--type", event_type]
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    try:
+        rows = json.loads(out.stdout) if out.returncode == 0 else []
+    except ValueError:
+        return []
+    rows = rows.get("events", []) if isinstance(rows, dict) else rows
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def _tool_calls(session_id: str) -> list[str]:
+    return [r.get("tool") for r in _session_events(session_id, "tool/call") if r.get("type", "tool/call") == "tool/call"]
+
+
+def _browse_tool(name) -> bool:
+    return isinstance(name, str) and (name == "walter_browse" or name.endswith("_walter_browse") or name.endswith(".walter_browse"))
+
+
+def _successful_browse(rows: list[dict]) -> list[tuple[dict, dict]]:
+    """Decode recorded Browse call/result pairs for both task provenance and harness acceptance."""
+    calls, successful = {}, []
+    for row in rows:
+        call_id = row.get("call_id")
+        if not isinstance(call_id, str) or not call_id:
+            continue
+        kind = row.get("type")
+        if kind == "tool/call":
+            if not _browse_tool(row.get("tool")):
+                continue
+        elif kind == "tool/result":
+            # Native DSH results omit the tool name; their matching call establishes it.
+            if call_id not in calls or (row.get("tool") is not None and not _browse_tool(row.get("tool"))):
+                continue
+        else:
+            continue
+        try:
+            payload = json.loads(row.get("text") or "{}")
+        except (ValueError, TypeError):
+            continue
+        if kind == "tool/call" and isinstance(payload, dict):
+            calls[call_id] = payload
+        elif kind == "tool/result" and row.get("status") == "ok" and isinstance(payload, dict):
+            if payload.get("success") is False or payload.get("ok") is False or payload.get("error"):
+                continue
+            successful.append((calls.get(call_id, {}), payload))
+    return successful
+
+
+def _task_offers(task: dict, minimum: int) -> bool:
+    """Validate the full final JSON and source provenance from this successful task's recorded trace.
+
+    A search result may support a snippet claim. A page-reading claim additionally needs a successful
+    Browse call for that exact URL. This proves structure/provenance, not semantic truth of every price.
+    """
+    from urllib.parse import urlsplit
+    if task.get("status") != "ended" or (task.get("result") or {}).get("ok") is not True or not task.get("session_id"):
+        return False
+    rows = _session_events(task["session_id"])
+    finals = [r.get("text") for r in rows if r.get("type") == "assistant/message"]
+    if not finals:
+        return False
+    try:
+        data = json.loads(finals[-1])
+    except (ValueError, TypeError):
+        return False
+    offers = data.get("offers") if isinstance(data, dict) else None
+    if not isinstance(offers, list) or len(offers) < minimum:
+        return False
+    successful = _successful_browse(rows)
+    def strings(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for child in value.values():
+                yield from strings(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from strings(child)
+    identities = set()
+    for offer in offers:
+        if not isinstance(offer, dict):
+            return False
+        product, url, price, volume, method = (offer.get(k) for k in ("product", "source_url", "price_thb", "volume", "method"))
+        if not isinstance(product, str) or not product.strip() or not isinstance(url, str):
+            return False
+        try:
+            parsed = urlsplit(url)
+        except ValueError:
+            return False
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return False
+        if not (price == "inconnu" or (type(price) in (int, float) and math.isfinite(price) and price >= 0)):
+            return False
+        if not isinstance(volume, str) or not volume.strip():
+            return False
+        if method not in ("search_snippet", "http", "static_html", "browser", "api"):
+            return False
+        if method == "search_snippet":
+            supported = any(args.get("query") and url in set(strings(payload)) for args, payload in successful)
+        else:
+            supported = any(args.get("url") == url and (payload.get("records") or payload.get("content") or payload.get("text"))
+                            for args, payload in successful)
+        if not supported:
+            return False
+        ident = (product.strip().casefold(), volume.strip().casefold(), url)
+        if ident in identities:
+            return False
+        identities.add(ident)
+    return True
+
+
+def check(assertion: dict, shown: dict) -> tuple[bool, str]:
+    if "task_offers" in assertion:
+        tasks = [t for t in shown.get("tasks") or [] if t.get("kind") == assertion.get("kind", "walter_run")]
+        ok = bool(tasks) and all(_task_offers(t, int(assertion["task_offers"])) for t in tasks)
+        return ok, f"successful tasks with sourced JSON offers (minimum {assertion['task_offers']}): {ok}"
+    if "tool_succeeded" in assertion:
+        if assertion["tool_succeeded"] != "walter_browse":
+            return False, "successful-result assertion is only defined for walter_browse"
+        sessions = {t.get("session_id") for t in shown.get("tasks") or [] if t.get("session_id")}
+        sessions.update(l.get("ref") for l in shown.get("links") or [] if l.get("kind") == "session" and l.get("ref"))
+        hit = any(args and any(payload.get(key) for key in ("records", "results", "content", "text"))
+                  for session in sorted(sessions) for args, payload in _successful_browse(_session_events(session)))
+        return hit, f"matched successful walter_browse result with returned evidence: {hit}"
+    if "tool_called" in assertion:
+        sessions = [t.get("session_id") for t in shown.get("tasks") or [] if t.get("session_id")]
+        sessions += [l.get("ref") for l in shown.get("links") or [] if l.get("kind") == "session"]
+        tools = [x for s in sessions for x in _tool_calls(s)]
+        name = assertion["tool_called"]           # runtimes prefix MCP tools (mcp__walter__x, walter__x, walter.x)
+        hit = any(t and (t == name or t.endswith("_" + name) or t.endswith("." + name)) for t in tools)
+        return hit, f"tools in the run's sessions: {sorted(set(filter(None, tools)))[:12]}"
+    if "link_kind" in assertion:
+        n = sum(1 for l in shown.get("links") or [] if l.get("kind") == assertion["link_kind"])
+        return n >= assertion.get("min", 1), f"links of kind {assertion['link_kind']}: {n}"
+    value = _get(shown, assertion["path"])
+    if "equals" in assertion:
+        return value == assertion["equals"], f"{assertion['path']} = {value!r}"
+    if "min_len" in assertion:
+        n = len(value or [])
+        return n >= assertion["min_len"], f"len({assertion['path']}) = {n}"
+    if "all" in assertion:
+        return bool(value) and all(v == assertion["all"] for v in value), f"{assertion['path']} = {value}"
+    if "contains" in assertion:
+        return assertion["contains"] in (value or []), f"{assertion['path']} = {value}"
+    return False, f"unknown assertion {assertion}"
+
+
+def metrics(shown: dict) -> dict:
+    """What a run cost and did, from its records (the common measures of the bench, reused by walter-lab)."""
+    run = (shown or {}).get("run") or {}
+    tasks = (shown or {}).get("tasks") or []
+    results = [t.get("result") or {} for t in tasks]
+    calls = (shown or {}).get("model_calls") or []
+    links = (shown or {}).get("links") or []
+    def secs(a, b):
+        try:
+            return round((datetime.fromisoformat(str(b)) - datetime.fromisoformat(str(a))).total_seconds(), 1)
+        except (TypeError, ValueError):
+            return None
+    costs = []
+    for call in calls:
+        value = call.get("cost_usd")
+        try:
+            cost = float(value) if value is not None and not isinstance(value, bool) else None
+        except (TypeError, ValueError):
+            cost = None
+        costs.append(cost if cost is not None and math.isfinite(cost) and cost >= 0 else None)
+    total_cost = round(sum(costs), 4) if costs and all(c is not None for c in costs) else None
+    return {"run_seconds": secs(run.get("started_at"), run.get("ended_at")),
+            "tasks": len(tasks), "tasks_ok": sum(1 for r in results if r.get("ok")),
+            "task_seconds": round(sum(float(r.get("seconds") or 0) for r in results), 1),
+            "tool_calls": sum(int(r.get("tools") or 0) for r in results),
+            "model_calls": len(calls), "model_failures": sum(1 for c in calls if not c.get("ok")),
+            "cost_usd": total_cost,
+            "observations": sum(1 for l in links if l.get("kind") == "observation"),
+            "observations_reused": sum(1 for l in links if l.get("kind") == "observation_reused")}
+
+
+def qualify(sc: dict, report: dict) -> None:
+    """A passing scenario is evidence for the (harness, capability) pairs it declares (`qualifies:`); walter matrix
+    reads it. Only the latest pass per pair is kept, with its run, so the claim can be checked."""
+    path = _instance() / "state" / "scenarios" / "qualifications.json"
+    proof = report.get("attestation")
+    if not proof or not report.get("run_id"):
+        report["qualification_status"] = "not_attested"
+        return
+    data = json.loads(path.read_text()) if path.exists() else {"version": 2, "pairs": {}}
+    data["version"] = 2
+    for q in sc.get("qualifies") or []:
+        data["pairs"][f"{q['harness']}:{q['capability']}"] = {
+            "scenario": report["scenario"], "at": report["at"], "run_id": report.get("run_id"),
+            "scope": q.get("scope", ""), "milestone": sc.get("milestone"), "attestation": proof}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+    tmp.replace(path)
+    report["qualification_status"] = "attested"
+
+
+
+def run(path: Path) -> dict:
+    sc = yaml.safe_load(path.read_text())
+    name = sc.get("name") or path.stem
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    session = f"scenario-{name}-{stamp}"
+    # Snapshot before execution; a source/config change during the run must not certify the new revision.
+    from walter_platform.qualification import attest
+    try:
+        before = attest(sc, path) if sc.get("qualifies") else None
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        before = None
+    env = _env(sc.get("modules"))
+    outputs: dict = {}
+    report = {"scenario": name, "at": stamp, "session": f"claude_code/vm/{session}", "steps": [], "assertions": []}
+    for step in sc.get("steps") or []:
+        kind = next(iter(step))
+        if kind == "hook":
+            r = step_hook(step["hook"], session, env)
+        elif kind == "router":
+            r = step_router(step["router"], env)
+        elif kind == "mcp":
+            r = step_mcp(step["mcp"], env)
+        elif kind == "parallel":            # independent steps at once (an orchestrator delegating to several agents)
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(len(step["parallel"])) as ex:
+                futs = [ex.submit(step_mcp, s["mcp"], env) for s in step["parallel"]]
+                r = {"results": [f.result() for f in futs]}
+        elif kind == "harness":
+            r = step_harness(step["harness"], env)
+            if r.get("run_id"):
+                report["run_id"] = r["run_id"]
+                report.setdefault("runs", []).append(r["run_id"])
+            report.setdefault("harness_steps", []).append(r)
+            hs = report["harness_steps"]
+            report["harness"] = {"runtime": r.get("runtime"), "session": r.get("session"), "runs": len(hs),
+                                 **{k: round(sum(float(x.get(k) or 0) for x in hs), 1)
+                                    for k in ("steps", "input_tokens", "output_tokens", "seconds")}}
+        elif kind == "wait":
+            time.sleep(float(step["wait"])); r = {"waited": step["wait"]}
+        elif kind == "cmd":                 # a deterministic tool on the run's data; {run_id} is substituted
+            r = step_cmd(step["cmd"], report.get("run_id"))
+            outputs[step["cmd"].get("name", f"cmd{len(outputs)}")] = r.get("json")
+        else:
+            r = {"error": f"unknown step {kind}"}
+        report["steps"].append({kind: r})
+        if kind == "hook" and step["hook"]["event"] == "UserPromptSubmit":
+            report["run_id"] = (runctx.current(os.getpid()) or {}).get("run_id")
+            report.setdefault("runs", []).append(report["run_id"])
+    shown = {}
+    if report.get("run_id"):
+        out = subprocess.run(["walter-memory", "runs", "show", report["run_id"]], capture_output=True, text=True, timeout=60)
+        shown = json.loads(out.stdout or "{}")
+    for a in sc.get("assertions") or []:
+        if "harness_answer" in a:           # the i-th harness step's final answer (case-insensitive)
+            hs = report.get("harness_steps") or []
+            ans = (hs[a["harness_answer"]].get("answer") if a["harness_answer"] < len(hs) else "") or ""
+            ok = any(w.lower() in ans.lower() for w in a.get("contains_any") or [])
+            detail = f"answer {a['harness_answer']}: {'✓' if ok else '✗'} {ans[:140]!r}"
+        elif "run" in a or "episode_of" in a:          # another run of the scenario (0 = first request) or its episode
+            idx = a.get("run", a.get("episode_of"))
+            rid = (report.get("runs") or [None])[idx] if idx < len(report.get("runs") or []) else None
+            sub = ["walter-memory", "episodes", "show", rid or ""] if "episode_of" in a else ["walter-memory", "runs", "show", rid or ""]
+            data = json.loads(subprocess.run(sub, capture_output=True, text=True, timeout=60).stdout or "{}")
+            want = a.get("equals_run")
+            cond = {k: v for k, v in a.items() if k not in ("run", "episode_of", "equals_run")}
+            if want is not None:
+                cond["equals"] = (report.get("runs") or [None])[want]
+                data = json.loads(json.dumps(data, default=str))
+            ok, detail = check(cond, data)
+            detail = f"{'episode of ' if 'episode_of' in a else ''}run {idx}: {detail}"
+        elif "step" in a:
+            ok, detail = check({k: v for k, v in a.items() if k != "step"}, outputs.get(a["step"]) or {})
+            detail = f"{a['step']}: {detail}"
+        else:
+            ok, detail = check(a, shown) if shown else (False, "no run recorded")
+        report["assertions"].append({"ok": ok, "assert": a, "detail": detail})
+    report["ok"] = bool(report["assertions"]) and all(a["ok"] for a in report["assertions"])
+    answers = [x for x in report["assertions"] if "harness_answer" in x["assert"]]
+    report["metrics"] = {**metrics(shown), **{f"harness_{k}": v for k, v in (report.get("harness") or {}).items()
+                                                 if k in ("steps", "input_tokens", "output_tokens", "seconds")},
+                         **({"answers_correct": sum(1 for x in answers if x["ok"]), "answers": len(answers)} if answers else {})}
+    report["variant"] = os.environ.get("WALTER_LAB_VARIANT")
+    if report["ok"] and not report["variant"]:
+        try:
+            after = attest(sc, path) if before else None
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+            after = None
+        if before and after == before:
+            report["attestation"] = before
+        qualify(sc, report)
+    out_dir = _instance() / "state" / "scenarios" / name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / f"{stamp}.json").write_text(json.dumps({**report, "run": shown}, ensure_ascii=False, indent=2, default=str))
+    return report
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("action", choices=["run", "list"]); p.add_argument("file", nargs="?")
+    p.add_argument("--json", action="store_true")
+    a = p.parse_args()
+    if a.action == "list":
+        for f in sorted((CORE / "scenarios").glob("*.yaml")):
+            print(f.name)
+        return 0
+    path = Path(a.file) if a.file and Path(a.file).exists() else CORE / "scenarios" / f"{a.file}.yaml"
+    rep = run(path)
+    if a.json:
+        print(json.dumps(rep, ensure_ascii=False, indent=2, default=str))
+    else:
+        print(f"{rep['scenario']}: {'OK' if rep['ok'] else 'FAILED'}  run {rep.get('run_id')}  {json.dumps(rep['metrics'])}")
+        for s in rep["assertions"]:
+            print(f"  {'✓' if s['ok'] else '✗'} {s['detail']}")
+    return 0 if rep["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

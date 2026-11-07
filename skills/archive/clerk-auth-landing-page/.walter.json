@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/clerk-auth-landing-page",
+  "sha": "5bae3b45fe6563e9420d6fee813a1b72120bd970a34499a9dc61e52d398fbac1",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5bae3b45fe6563e9420d6fee813a1b72120bd970a34499a9dc61e52d398fbac1"
+}

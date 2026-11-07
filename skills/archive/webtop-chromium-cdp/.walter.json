@@ -1,0 +1,16 @@
+{
+ "absorbed_into": "webtop-authenticated-browsing",
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "merged into webtop-authenticated-browsing (2026-11-01 reorganisation)",
+ "domain": "web",
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/webtop-chromium-cdp",
+  "sha": "8cd478b844e68e66564ab3f6e96738c8f042179f9819160edd28c5507db4a2ed",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "8cd478b844e68e66564ab3f6e96738c8f042179f9819160edd28c5507db4a2ed"
+}

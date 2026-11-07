@@ -1,0 +1,136 @@
+{
+  "id": "soul",
+  "anchors": [
+    "bin/walter-soul",
+    "contracts/soul.json",
+    "config/targets.toml",
+    "defaults/identity.md",
+    "defaults/rules.md"
+  ],
+  "requires": [],
+  "external": [],
+  "data": [
+    "identity sources (instance)",
+    "curated user profile (instance)"
+  ],
+  "core_paths": [],
+  "backup_paths": [
+    ".",
+    "@instance/soul",
+    "@instance/config/soul",
+    "@instance/state/soul",
+    "@instance/profiles"
+  ],
+  "interfaces": [
+    "renderer",
+    "walter-soul render/path/sync/check/init",
+    "walter_profile MCP"
+  ],
+  "bindings": {
+    "hermes": "rendered SOUL.md",
+    "dsh": "rendered AGENTS.md + walter_profile MCP",
+    "codex": "common MCP",
+    "claude-code": "common MCP"
+  },
+  "limitations": [
+    "An instance may keep historical target locations (harness homes, profile workspaces) through its targets override."
+  ],
+  "services": [],
+  "optional": [],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "soul",
+    "kind": "foundation",
+    "purpose": "Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance.",
+    "target_root": "soul",
+    "config_paths": [
+      "config/targets.toml"
+    ],
+    "permissions": [
+      "écriture des profils générés"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "renderer",
+        "interface": "walter-soul sync/check",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "identity-sources",
+        "role": "owner",
+        "owner": "soul",
+        "durability": "canonical"
+      },
+      {
+        "id": "generated-profiles",
+        "role": "owner",
+        "owner": "soul",
+        "durability": "projection"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "render-consistency",
+        "assertion": "Une modification des sources produit des profils cohérents et détecte les retouches manuelles.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "walter-soul",
+    "order": 90,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "walter_profile"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-config-extra-pitfall",
+  "sha": "2f4730be9fa046bca6524c2cfecd392c6c6eaa7bc3bc2fd85e366fbb1c7108a0",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "2f4730be9fa046bca6524c2cfecd392c6c6eaa7bc3bc2fd85e366fbb1c7108a0"
+}

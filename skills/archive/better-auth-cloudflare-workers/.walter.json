@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/better-auth-cloudflare-workers",
+  "sha": "74eb85ee8d8395c321f79648d82c60a532b929d53b1321823409ad1ee08a0ef6",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "74eb85ee8d8395c321f79648d82c60a532b929d53b1321823409ad1ee08a0ef6"
+}

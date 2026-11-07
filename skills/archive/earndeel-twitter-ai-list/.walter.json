@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/earndeel-twitter-ai-list",
+  "sha": "d5cc604dd0bed85c73d986709909712866433f1b7a5bd158c282c6123e7181fb",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "d5cc604dd0bed85c73d986709909712866433f1b7a5bd158c282c6123e7181fb"
+}

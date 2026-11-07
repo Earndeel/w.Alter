@@ -1,0 +1,165 @@
+#!/usr/bin/env -S walter-python -I
+"""Publish Walter's software history to one private Git remote (2026-11-01, owner decision: one repo `walter`).
+
+Each module repository under /walter keeps living on its own; this job builds, outside them, one repository where
+every module is a folder (`memory/`, `router/`…) with its full history, then force-pushes `main`:
+  1. fresh clone of each module (the live repositories are never rewritten);
+  2. git-filter-repo: drop the instance's denied paths, replace every known vault value (Walter Secrets
+     fingerprints) and common credential shapes by a marker, in files and commit messages, then move the module
+     into its folder — deterministic, so an unchanged module keeps the same commits;
+  3. one `main` commit whose parents are the module heads and whose tree joins their folders + a README;
+  4. fail-closed gate (`walter_backup.secret_gate`): any vault value or credential shape left → nothing is pushed.
+Only committed work leaves the machine; personal data stays in the user folder, which is never published.
+Settings: [git_publish] in the instance's backup.toml (remote, exclude, deny_paths), read through
+`walter-ops backup env git_publish`."""
+import json, os, shlex, shutil, subprocess, sys, tempfile
+from pathlib import Path
+
+
+
+def filter_repo_module():
+    """git-filter-repo's module file, run by Walter's interpreter so callbacks can use Walter Secrets."""
+    shim = shutil.which('git-filter-repo')
+    if not shim:
+        raise SystemExit('git-filter-repo not installed (uv tool install git-filter-repo)')
+    interp = Path(shim).read_text().splitlines()[0].removeprefix('#!').strip()
+    return run(interp, '-c', 'import git_filter_repo; print(git_filter_repo.__file__)')
+
+
+def run(*cmd, cwd=None, env=None, capture=True):
+    r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=capture, text=True)
+    if r.returncode:
+        raise SystemExit(f"failed: {' '.join(map(str, cmd))}\n{(r.stderr or '')[-2000:]}")
+    return (r.stdout or '').strip()
+
+
+def settings():
+    """Locations and rules from the instance, through Ops' job parameters (`walter-ops backup env git_publish`)."""
+    env = {}
+    for line in run('walter-ops', 'backup', 'env', 'git_publish').splitlines():
+        if line.startswith('export '):
+            key, _, value = line[7:].partition('=')
+            env[key] = shlex.split(value)[0] if value else ''
+    return {'remote': env['WALTER_GIT_PUBLISH_REMOTE'], 'workdir': env['WALTER_GIT_PUBLISH_WORKDIR'],
+            'exclude': env.get('WALTER_GIT_PUBLISH_EXCLUDE', '').split(),
+            'deny_paths': json.loads(env.get('WALTER_GIT_PUBLISH_DENY') or '{}')}
+
+
+def modules(cfg):
+    root = Path(run('walter', 'path', 'core')).parent
+    out = []
+    for d in sorted(root.iterdir()):
+        if d.is_symlink() or not (d / '.git').is_dir() or d.name in cfg.get('exclude', []):
+            continue
+        out.append(d)
+    return out
+
+
+CALLBACK_SETUP = r'''
+g = globals()
+if '_W_SCRUB' not in g:
+    import re as _re, sys as _sys
+    _sys.path.insert(0, %(secrets)r)
+    from walter_secrets import fingerprints as _fp
+    if not _fp.status().get('ok'):
+        raise SystemExit('vault fingerprint index unavailable')
+    _pat = _re.compile(%(pattern)r)
+    def _scrub(text):
+        return _pat.sub('<secret:redacted>', _fp.scrub(text))
+    g['_W_SCRUB'] = _scrub
+'''
+
+
+def filtered_clone(src, dest, deny, secrets_root, pattern):
+    run('git', 'clone', '--quiet', '--no-local', str(src), str(dest))
+    setup = CALLBACK_SETUP % {'secrets': secrets_root, 'pattern': pattern}
+    blob_cb = setup + r'''
+if len(blob.data) < 3000000:
+    try:
+        t = blob.data.decode('utf-8')
+    except UnicodeDecodeError:
+        t = None
+    if t is not None:
+        s = _W_SCRUB(t)
+        if s != t:
+            blob.data = s.encode('utf-8')
+'''
+    msg_cb = setup + r'''
+t = message.decode('utf-8', 'replace')
+s = _W_SCRUB(t)
+return s.encode('utf-8') if s != t else message
+'''
+    args = [sys.executable, FILTER_REPO_PY, '--force', '--quiet', '--blob-callback', blob_cb, '--message-callback', msg_cb]
+    for p in deny:
+        args += ['--path-glob', p]
+    if deny:
+        args += ['--invert-paths']
+    run(*args, cwd=dest)
+    run(sys.executable, FILTER_REPO_PY, '--force', '--quiet', '--to-subdirectory-filter', src.name, cwd=dest)
+    return run('git', 'rev-parse', 'HEAD', cwd=dest)
+
+
+README = """# Walter
+
+The Walter software, one folder per module, each with its full history (published from the machine by
+`walter-git-publish`). Personal data, keys and the owner's history are never here: they live in the user folder.
+Known secret values and credential shapes are replaced by `«secret:vault»` / `<secret:redacted>` before publishing.
+
+| Folder | Module |
+|---|---|
+{rows}
+"""
+
+
+def main():
+    global FILTER_REPO_PY
+    cfg = settings()
+    FILTER_REPO_PY = filter_repo_module()
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from walter_backup import secret_gate
+    secrets_root = run('walter', 'path', 'secrets')
+    pattern = secret_gate.TOKEN_SHAPES
+    work = Path(tempfile.mkdtemp(prefix='walter-git-publish.', dir=cfg['workdir']))
+    try:
+        mono = work / 'mono.git'
+        run('git', 'init', '--quiet', '--bare', '-b', 'main', str(mono))
+        heads, dates, rows = [], [], []
+        for src in modules(cfg):
+            deny = cfg.get('deny_paths', {}).get(src.name, [])
+            head = filtered_clone(src, work / src.name, deny, secrets_root, pattern)
+            run('git', '--git-dir', str(mono), 'fetch', '--quiet', str(work / src.name), f'HEAD:refs/modules/{src.name}')
+            heads.append((src.name, head))
+            dates.append(int(run('git', '--git-dir', str(mono), 'log', '-1', '--format=%ct', head)))
+            rows.append(f'| `{src.name}/` | {src.name} |')
+        readme = subprocess.run(['git', '--git-dir', str(mono), 'hash-object', '-w', '--stdin'], input=README.format(
+            rows='\n'.join(rows)), capture_output=True, text=True, check=True).stdout.strip()
+        entries = [f'100644 blob {readme}\tREADME.md']
+        entries += [f"040000 tree {run('git', '--git-dir', str(mono), 'rev-parse', f'{head}:{name}')}\t{name}"
+                    for name, head in heads]
+        tree = subprocess.run(['git', '--git-dir', str(mono), 'mktree'], input='\n'.join(entries) + '\n',
+                              capture_output=True, text=True, check=True).stdout.strip()
+        when = f'{max(dates)} +0000'
+        cenv = dict(os.environ, GIT_AUTHOR_NAME='W.Alter', GIT_AUTHOR_EMAIL='walter@localhost', GIT_AUTHOR_DATE=when,
+                    GIT_COMMITTER_NAME='W.Alter', GIT_COMMITTER_EMAIL='walter@localhost', GIT_COMMITTER_DATE=when)
+        parents = [a for _, h in heads for a in ('-p', h)]
+        commit = run('git', '--git-dir', str(mono), 'commit-tree', tree, *parents, '-m',
+                     'walter: modules ' + ', '.join(n for n, _ in heads), env=cenv)
+        run('git', '--git-dir', str(mono), 'update-ref', 'refs/heads/main', commit)
+        for name, _ in heads:
+            run('git', '--git-dir', str(mono), 'update-ref', '-d', f'refs/modules/{name}')
+        found = secret_gate.scan(str(mono), secret_gate.scrubber())
+        if found:
+            print(json.dumps({'refused': found}, ensure_ascii=False, indent=1))
+            raise SystemExit('secret gate: something sensitive is still in the history, nothing pushed')
+        if '--dry-run' in sys.argv:
+            print(f'dry run ok: main {commit[:12]}, {len(heads)} modules, gate clean')
+            return
+        run('git', '--git-dir', str(mono), '-c', 'credential.helper=store', 'push', '--quiet', '--force',
+            cfg['remote'], 'main:main')
+        print(f'published main {commit[:12]} ({len(heads)} modules) to {cfg["remote"]}')
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+if __name__ == '__main__':
+    main()

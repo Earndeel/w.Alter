@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/provider-model-catalog-management",
+  "sha": "9fbc455a608b4495b6c4103e53098146c3fd0b6828d64231626a633c074a850e",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "9fbc455a608b4495b6c4103e53098146c3fd0b6828d64231626a633c074a850e"
+}

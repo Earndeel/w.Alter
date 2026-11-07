@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/xitter",
+  "sha": "c25e0d6bef1bf83a816c51334fa9316c3bff8da8a0a150b4e0265b2a250139dc",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "c25e0d6bef1bf83a816c51334fa9316c3bff8da8a0a150b4e0265b2a250139dc"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/remote-systems-operations",
+  "sha": "293fd9ce46da6cfa817c5f16657d78ca425fc7f370a2e4c8de202d23d2d23f11",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "293fd9ce46da6cfa817c5f16657d78ca425fc7f370a2e4c8de202d23d2d23f11"
+}

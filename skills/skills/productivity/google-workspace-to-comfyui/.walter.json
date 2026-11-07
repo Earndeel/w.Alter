@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-11-06T04:15:24.000929+00:00",
+ "kind": "workflow",
+ "origin": "walter-curator",
+ "owner": "walter",
+ "requires": [
+  "google-workspace",
+  "comfyui"
+ ]
+}

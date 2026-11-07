@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "module": "skills",
+  "check": [
+    "python3",
+    "/walter/skills/guardian/check"
+  ],
+  "max_level": "G1",
+  "levels": {
+    "G0": "service et consommateur du bus",
+    "G1": "relancer le service"
+  },
+  "note": "Santé du service seulement ; le contenu des skills appartient au Curator (pas de juge).",
+  "format": "incident-v1",
+  "timeout_seconds": 240,
+  "guardian": [
+    "walter-guardian",
+    "run",
+    "--module",
+    "skills"
+  ]
+}

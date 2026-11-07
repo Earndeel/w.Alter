@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
+  "path": "/root/.hermes/skills/social-media/camoufox-social-scrape",
+  "sha": "fb290207b8c18957037da13408073ebb85d705e0e26291d5501a32055573bfe9",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "e17d08ed62ec4f2ab6c8c3cec91aad46e8116667aaca53b96b76646a18327621"
+}

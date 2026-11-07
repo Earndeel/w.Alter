@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/ondemand-services",
+  "sha": "7f84131500718187bcfeb60e42b56d5ce74d7912fd44701ca8db59836ce3f857",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "7f84131500718187bcfeb60e42b56d5ce74d7912fd44701ca8db59836ce3f857"
+}

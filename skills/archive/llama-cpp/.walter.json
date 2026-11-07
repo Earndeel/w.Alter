@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:10+00:00",
+ "archived_reason": "not read for 63 days",
+ "domain": "mlops/inference",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/inference/llama-cpp",
+  "sha": "d09d4f8f2774ddd6c28c80900e2b1a4ec78322f8b6512c21c6dedb9231202df7",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "d09d4f8f2774ddd6c28c80900e2b1a4ec78322f8b6512c21c6dedb9231202df7"
+}

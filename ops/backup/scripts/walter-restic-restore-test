@@ -1,0 +1,54 @@
+#!/bin/bash
+# Monthly proof that the deduplicated offsite backup (restic) can really be restored (2026-11-01). Nothing touches
+# the live data: the memory is restored into a scratch database of the same server, files into a temporary folder.
+#   memory    latest `pg` snapshot → scratch database; zero psql error; each compared table present, not larger than
+#             live and at least 98 % of it (the live one keeps growing after the snapshot)
+#   runtime   latest `statedb` snapshot opens and passes SQLite's integrity check
+#   config    latest `config` bundle passes Walter Memory's verification (every file digest, every required path)
+#   folders   identity, settings and accounts of the user folder restore byte-identical
+# Settings: `walter-ops backup env restic` and `… restore_test` (scratch database, compared tables).
+set -uo pipefail
+umask 077
+eval "$(walter-ops backup env restic)"
+eval "$(walter-ops backup env restore_test)"
+export RESTIC_REPOSITORY="$WALTER_RESTIC_REPOSITORY" RESTIC_PASSWORD_FILE="$WALTER_RESTIC_PASSWORD_FILE"
+export RESTIC_CACHE_DIR="${WALTER_RESTIC_CACHE:-/var/cache/walter-restic}"
+W=$(mktemp -d "$WALTER_OFFSITE_WORKDIR/walter-restic-restore.XXXXXX")
+C=$WALTER_PG_CONTAINER; U=$WALTER_PG_USER; DB=$WALTER_RESTORE_SCRATCH_DB
+cleanup() { docker exec "$C" dropdb -U "$U" --if-exists "$DB" >/dev/null 2>&1; rm -rf "$W"; }
+trap cleanup EXIT
+FAIL=0; fail() { FAIL=1; echo "FAIL: $*" >&2; }
+
+echo "== memory"
+docker exec "$C" dropdb -U "$U" --if-exists "$DB" >/dev/null 2>&1; docker exec "$C" createdb -U "$U" "$DB" || fail "scratch database"
+restic dump latest --tag pg "$WALTER_PG_DATABASE.sql" | docker exec -i "$C" psql -U "$U" -d "$DB" -q >/dev/null 2>"$W/psql.err" \
+  || fail "restore stream"
+errors=$(grep -c ERROR "$W/psql.err" || true); echo "psql errors: $errors"; [ "$errors" = 0 ] || fail "psql errors"
+for t in $WALTER_RESTORE_COMPARE; do
+  live=$(docker exec "$C" psql -U "$U" -d "$WALTER_PG_DATABASE" -Atc "select count(*) from $t" 2>/dev/null)
+  got=$(docker exec "$C" psql -U "$U" -d "$DB" -Atc "select count(*) from $t" 2>/dev/null)
+  echo "  $t: live ${live:-?} restored ${got:-?}"
+  python3 -c 'import sys; l,g=int(sys.argv[1]),int(sys.argv[2]); sys.exit(0 if (g<=l and g>=0.98*l and (g>0 or l==0)) else 1)' \
+    "${live:-0}" "${got:--1}" 2>/dev/null || fail "table $t"
+done
+
+echo "== runtime state"
+restic dump latest --tag statedb state.db > "$W/state.db" || fail "statedb dump"
+python3 -c 'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); r=c.execute("pragma quick_check").fetchone()[0]; print("quick_check:", r); sys.exit(r!="ok")' \
+  "$W/state.db" || fail "statedb integrity"
+rm -f "$W/state.db"
+
+echo "== config bundle"
+restic dump latest --tag config config.tar > "$W/config.tar" || fail "config dump"
+walter-python -m walter_memory.backup_bundle verify "$W/config.tar" >/dev/null && echo "bundle verified" || fail "bundle verify"
+rm -f "$W/config.tar"
+
+echo "== folders"
+user=$(walter instance path)
+restic restore latest --tag folders --target "$W/f" --include "$user/soul" --include "$user/config" --include "$user/accounts" \
+  >/dev/null || fail "folders restore"
+for d in soul config accounts; do
+  n=$(diff -rq --no-dereference "$user/$d" "$W/f$user/$d" 2>&1 | wc -l); echo "  $d: $n difference(s)"; [ "$n" = 0 ] || fail "$d differs"
+done
+
+[ "$FAIL" = 0 ] && echo "restic restore test ok" || { echo "restic restore test FAILED" >&2; exit 1; }

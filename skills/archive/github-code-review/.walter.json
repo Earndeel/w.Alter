@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:08+00:00",
+ "archived_reason": "not read for 180 days",
+ "domain": "github",
+ "hermes": {
+  "path": "/root/.hermes/skills/github/github-code-review",
+  "sha": "ea276233dd0f2f47f3caaf9fc6bc9e11b7ffd3afb82bb5ba1bf77cda92082de3",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "ea276233dd0f2f47f3caaf9fc6bc9e11b7ffd3afb82bb5ba1bf77cda92082de3"
+}

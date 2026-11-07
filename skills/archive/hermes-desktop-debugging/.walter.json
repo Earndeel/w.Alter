@@ -1,0 +1,16 @@
+{
+ "absorbed_into": "hermes-desktop-debug",
+ "archived_at": "2026-10-30T04:14:43+00:00",
+ "archived_reason": "merged into hermes-desktop-debug",
+ "domain": "hermes-desktop",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-debugging",
+  "sha": "beff5c1d6a9ca327a442ad318227bcff476e689120686b2df147c2851ebf6739",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "beff5c1d6a9ca327a442ad318227bcff476e689120686b2df147c2851ebf6739"
+}

@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/autonomous-ai-agents/claude-code",
+  "sha": "57c325543ecb78398670d9e669b9e5201f47f2f72a644d7e20679e7857ddbca8",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "57c325543ecb78398670d9e669b9e5201f47f2f72a644d7e20679e7857ddbca8"
+}

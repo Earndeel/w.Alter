@@ -1,0 +1,173 @@
+{
+  "id": "ops",
+  "anchors": [
+    "contracts/ops.json",
+    "walter_ops/cli.py",
+    "bin/walter-ops",
+    "walter_backup/core.py",
+    "walter_backup/cli.py",
+    "bin/walter-backup",
+    "backup/scripts/walter-pg-backup",
+    "backup/scripts/walter-statedb-backup",
+    "backup/scripts/walter-offsite-backup",
+    "backup/scripts/walter-offsite-restore-test"
+  ],
+  "requires": [],
+  "external": [
+    "systemd units walter-pg-backup, walter-statedb-backup, walter-offsite-backup, walter-offsite-restore-test (unit files on the host; their scripts are backup/scripts/* since 2026-10-29), walter-restore-isolated (Walter Memory's restore drill, started by Ops)",
+    "git",
+    "docker (PostgreSQL container: dumps, db checkpoints, scratch restore)",
+    "zstd, tar, age, rclone",
+    "walter release|install|export (core platform) for deploy",
+    "Walter Memory backup_bundle (config bundle) and Walter Secrets vault-export (offsite kinds config and bitwarden)",
+    "Docker image pgvector/pgvector:pg16 (disposable database without network for migrations-check)"
+  ],
+  "data": [
+    "checkpoint log",
+    "checkpoint archives and dumps",
+    "git checkpoint refs (refs/walter-backup/*)"
+  ],
+  "core_paths": [
+    "walter_ops/cli.py",
+    "walter_backup/core.py",
+    "walter_backup/cli.py",
+    "backup/scripts"
+  ],
+  "backup_paths": [
+    ".",
+    "@instance/config/backup",
+    "@instance/state/backup"
+  ],
+  "interfaces": [
+    "CLI walter-ops backup|git|check|recovery|deploy|status (install, onboard: planned)",
+    "CLI walter-ops install migrations-check [--keep-dumps DIR] (Walter Clean, PostgreSQL part: replay every module's migrations on a disposable database, compare the structure with the live one)",
+    "CLI walter-ops install data-check (every table classified by its module's contracts/data-classes.json; reference rows searched for the instance's private markers, counts only)",
+    "CLI walter-ops install seed-export DIR | clean-db-check [--seeds DIR | --keep-seeds DIR] (Walter Clean database built from migrations + reference rows on a disposable PostgreSQL, proven marker-free)",
+    "CLI walter-backup status|check|run|verify|git|checkpoint|checkpoints (compatibility alias, same outputs)",
+    "CLI walter-ops backup env <pg|statedb|offsite|restore_test> (shell parameters of the backup jobs)",
+    "Incident v1 (check) for the guardian supervisor"
+  ],
+  "bindings": {
+    "hermes": "CLI under host execution permissions",
+    "dsh": "CLI under host execution permissions",
+    "codex": "CLI under host execution permissions",
+    "claude-code": "CLI under host execution permissions"
+  },
+  "limitations": [
+    "Renamed from walter-backup on 2026-10-29 (owner decision): compatibility kept — command walter-backup, paths /walter/backup and /opt/walter-backup, unit names, config @instance/config/backup and state @instance/state/backup (the backup sub-component keeps its name).",
+    "installer: the database of Walter Clean is built and proven (install migrations-check, data-check, clean-db-check; bench scenarios clean-migrations, clean-database); clean-install of the software, onboarding and personal-restore are designed, not built yet (walter-ops install clean|personal and onboard answer 'planned').",
+    "deploy wraps the core platform's release/install/export; Ops does not own the other modules' code, contracts or migrations.",
+    "Backup scripts (pg, statedb, offsite, restore test) moved into backup/scripts on 2026-10-29, each qualified by a real run; host paths /usr/local/sbin/walter-* link to them. Every location comes from the instance (walter-ops backup env <kind>). The isolated restore drill stays in Walter Memory.",
+    "Restores are described, never executed by the tool.",
+    "A git checkpoint holds tracked files only; untracked files are listed, not captured.",
+    "Optional modules: memory (Raw Vault sample of verify), core (walter contracts for conformity).",
+    "Repository hygiene reports G0 warnings only; it never removes, stages or commits files.",
+    "Uncommitted age is estimated from visible file mtimes; touching/deleting a file limits that estimate.",
+    "Configured preserved evidence paths remain visible but are excluded from hygiene warnings; intentional compatibility is not inferred to be obsolete."
+  ],
+  "services": [],
+  "optional": [
+    "memory",
+    "core",
+    "secrets"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "0.2.0",
+    "owner": "ops",
+    "kind": "foundation",
+    "purpose": "Installer, déployer, versionner, conserver et restaurer le logiciel Walter et ses instances (installer, deploy, git, backup, recovery, guardian), indépendamment des autres modules.",
+    "target_root": "ops",
+    "config_paths": [
+      "config/backup.toml",
+      "@instance/config/backup/backup.toml"
+    ],
+    "permissions": [
+      "lecture des sauvegardes et des unités",
+      "démarrage des unités de sauvegarde existantes",
+      "aucune restauration sans accord du propriétaire"
+    ],
+    "invariants": [
+      "Fonctionne sans Router, Context, Hermes, DSH ni modèle ; Memory seulement pour l'échantillon du Raw Vault.",
+      "Conformité, santé des sauvegardes et restaurabilité restent trois réponses distinctes.",
+      "Aucune valeur secrète dans les sorties."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Une commande interrompue ne laisse qu'un fichier partiel supprimé ou une référence git cohérente.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "status",
+        "transport": "cli",
+        "interface": "walter-ops backup status",
+        "access": "read",
+        "timeout_seconds": 180,
+        "timeout_status": "target"
+      },
+      {
+        "id": "checkpoint",
+        "transport": "cli",
+        "interface": "walter-ops backup checkpoint",
+        "access": "write",
+        "timeout_seconds": 3600,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "checkpoints",
+        "role": "owner",
+        "owner": "ops",
+        "durability": "canonical"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat ; déplacer une implémentation existante seulement après qualification, avec lien de compatibilité."
+    ],
+    "recovery": {
+      "backup": [
+        "Le module et sa configuration sont dans le paquet config offsite ; ses points de reprise sont des fichiers et des références git."
+      ],
+      "restore": [
+        "Réinstaller le module depuis le paquet config ; il ne dépend d'aucun autre module pour démarrer."
+      ],
+      "verification": [
+        "walter-ops backup status puis verify ; l'exercice isolé reste la preuve complète."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "independent",
+        "assertion": "status et check répondent avec Router, Memory et Hermes arrêtés.",
+        "scope": "integration"
+      },
+      {
+        "id": "three-answers",
+        "assertion": "Une dérive de registre n'empêche ni la sauvegarde ni le rapport de santé.",
+        "scope": "integration"
+      },
+      {
+        "id": "repository-hygiene",
+        "assertion": "Les caches déjà suivis et le travail non suivi ancien déclenchent un warning G0 ; archives et rapports conservés sont distingués, sans suppression automatique.",
+        "scope": "unit"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Ops",
+    "order": 85,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "tools": []
+  }
+}

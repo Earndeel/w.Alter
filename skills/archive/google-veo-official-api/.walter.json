@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/google-veo-official-api",
+  "sha": "8653eb3a459a1bdcd6b6a07039f8b08b879bb073579c5243b4280f5eae3456be",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "8653eb3a459a1bdcd6b6a07039f8b08b879bb073579c5243b4280f5eae3456be"
+}

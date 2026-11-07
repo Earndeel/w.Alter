@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/claude-design",
+  "sha": "d7f3a704ea3d6ab534f9c1ea7d1a1aaa202d8c9de16c88b1000db581ded8c033",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "d7f3a704ea3d6ab534f9c1ea7d1a1aaa202d8c9de16c88b1000db581ded8c033"
+}

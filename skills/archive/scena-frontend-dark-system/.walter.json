@@ -1,0 +1,12 @@
+{
+ "domain": "software-development",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/scena-frontend-dark-system",
+  "sha": "413c3db5bf1def0542c589247a58d87c306584ba94f9fb1b7b8e5d7330fe48e6",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "413c3db5bf1def0542c589247a58d87c306584ba94f9fb1b7b8e5d7330fe48e6"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/live-data-payload-drift",
+  "sha": "0551db39a10a51ad857f51f3910f25674839c9bb26c14db857276fbc75d5dbbe",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "0551db39a10a51ad857f51f3910f25674839c9bb26c14db857276fbc75d5dbbe"
+}

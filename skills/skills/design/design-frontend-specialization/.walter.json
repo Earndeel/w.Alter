@@ -1,0 +1,13 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/coder-profile/design-frontend-specialization",
+  "sha": "02d6c9e1255eb81d28b0bdc9a43340cf98c9fa1d87b05693ac251cc3177b8496",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "restore_reason": "read by an agent",
+ "restored_at": "2026-11-04T13:25:55+00:00",
+ "store_sha": "02d6c9e1255eb81d28b0bdc9a43340cf98c9fa1d87b05693ac251cc3177b8496"
+}

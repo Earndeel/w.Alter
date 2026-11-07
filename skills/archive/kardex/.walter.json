@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kardex",
+  "sha": "1c3f3294daf8572d36767fa1531db94497c2c86c139dc3c357e131b9dbd666fb",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "1c3f3294daf8572d36767fa1531db94497c2c86c139dc3c357e131b9dbd666fb"
+}

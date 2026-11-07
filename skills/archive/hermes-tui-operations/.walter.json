@@ -1,0 +1,12 @@
+{
+ "domain": "hermes-deep",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-tui-operations",
+  "sha": "5a9746ca13ba4164016a69e30ebf06a3d860c92787d06d6f4fbee9dd683fd64a",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5a9746ca13ba4164016a69e30ebf06a3d860c92787d06d6f4fbee9dd683fd64a"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "mcp",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/mcp-provider-operations",
+  "sha": "0de6eda84f4450c728eb4902f2e6e09d700bc0697d468ddbbba332deaa571b1f",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "0de6eda84f4450c728eb4902f2e6e09d700bc0697d468ddbbba332deaa571b1f"
+}

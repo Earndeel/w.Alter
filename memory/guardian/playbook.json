@@ -1,0 +1,31 @@
+{
+ "version": 1,
+ "module": "memory",
+ "notes": [
+  "Walter Memory: Postgres hindsight-pg (127.0.0.1:5433) holds the truth; walter-memory-gateway (:8890) is the write door; walter-logs-watch follows agent logs; connectors are oneshot units walter-memory-<name> run by timers.",
+  "The beeper connector reads the Beeper API on the owner's Mac: when the Mac sleeps it fails or goes stale. That is external and recovers alone when the Mac wakes.",
+  "gmail and calendar connectors wait for an OAuth consent from the owner: their failure needs_owner only if it lasts.",
+  "An OpenRouter balance low or a monthly budget reached is the owner's decision (top up / raise the budget): needs_owner, no action.",
+  "Dead jobs are kept for review, they are info only.",
+  "memory-autopilot is the daily supervisor; it can be started again safely (it takes a few minutes)."
+ ],
+ "evidence": {
+  "service_down": [["systemctl","status","--no-pager","-n","0","{unit}"], ["journalctl","-u","{unit}","-n","40","--no-pager","-o","short-iso"]],
+  "health_problem": [["walter-memory", "health"]],
+  "check_failed": [["walter-memory", "health"], ["journalctl", "-u", "walter-memory-gateway", "-n", "30", "--no-pager", "-o", "short-iso"]],
+  "autopilot_error": [["journalctl", "-u", "memory-autopilot", "-n", "40", "--no-pager", "-o", "short-iso"]],
+  "supervisor_stale": [["systemctl", "list-timers", "--all", "--no-pager", "memory-autopilot.timer"]]
+ },
+ "actions": {
+  "restart_unit": {"level": "G1", "describe": "restart a long-running memory service",
+                   "command": ["systemctl", "restart", "{unit}"],
+                   "params": {"unit": ["walter-memory-gateway", "walter-logs-watch", "raw-vault-s3"]}},
+  "run_connector": {"level": "G1", "describe": "run a connector once now (oneshot unit)", "async": true,
+                    "command": ["systemctl", "start", "--no-block", "walter-memory-{connector}.service"],
+                    "params": {"connector": ["hermes", "beeper", "index", "social", "extract", "triage", "agent-calls", "gmail", "calendar", "overland", "hermes-export"]}},
+  "run_autopilot": {"level": "G1", "describe": "run the daily memory autopilot again now", "async": true,
+                    "command": ["systemctl", "start", "--no-block", "memory-autopilot.service"]}
+ },
+ "fallback": {"service_down": {"action": "restart_unit", "params": {"unit": "unit"}}},
+ "settle_seconds": 20
+}

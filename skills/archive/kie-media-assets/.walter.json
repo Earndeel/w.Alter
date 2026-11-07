@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kie-media-assets",
+  "sha": "87f15167501d63fb08f56656d0c826520e4878d4b22605ebe5eaef24848a0007",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "87f15167501d63fb08f56656d0c826520e4878d4b22605ebe5eaef24848a0007"
+}

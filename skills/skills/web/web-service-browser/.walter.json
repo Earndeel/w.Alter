@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
+  "path": "/root/.hermes/skills/devops/web-service-browser",
+  "sha": "c88d4f493ad71da962f9e9e836ec07b9592299d20bb45d6d876d696d990aa056",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "d0f840e71a20abfdb12fceec4c432348776b690f27bb8e9abcc988691939cccf"
+}
