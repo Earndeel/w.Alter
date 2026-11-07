@@ -286,3 +286,63 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
         return {"answers": res["answers"], "usage": res.get("usage") or {},
                 "model": res.get("model") if provider == "openrouter" and res.get("model") else m}
     raise RuntimeError("no decision model answered: " + "; ".join(errors))
+
+def retrieval(operation: str, *, model: str, processor: str, privacy_class: str,
+              payload: dict, names: list[str] | None = None, budget: str = 'backfill',
+              timeout: float = 60) -> dict:
+    """Guarded specialized retrieval calls for isolated benchmarks and adapters.
+
+    Does not change Router preferences or search defaults. Rejects local_only and
+    secrets before any network call; pseudonymises redacted_cloud recursively.
+    The caller must enforce canonical provenance before supplying memory records.
+    No provider or model fallback is performed.
+    """
+    if operation not in ('embeddings', 'rerank'):
+        raise ValueError('retrieval operation must be embeddings or rerank')
+    if privacy_class not in privacy.ORDER or budget not in ACCOUNT_FLOOR_USD:
+        raise ValueError('invalid privacy class or budget')
+    if not model or not isinstance(payload, dict) or 'model' in payload:
+        raise ValueError('explicit model and model-free payload required')
+    base = dict(processor=processor, model=model, purpose=operation, budget=budget,
+                privacy_class=privacy_class, provider='openrouter')
+    def strings(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, list):
+            for item in value:
+                yield from strings(item)
+        elif isinstance(value, dict):
+            for item in value.values():
+                yield from strings(item)
+    if privacy_class == 'local_only' or any(
+            category == 'secret' for text in strings(payload) for category, _ in privacy.detect(text)):
+        _log(**base, status='refused_privacy')
+        raise PrivacyRefused(f'{processor}: retrieval payload is not cloud-readable')
+    b = budget_status(budget)
+    if b and b['hard_stop'] and b['spent_usd'] >= b['limit_usd']:
+        _log(**base, status='refused_budget')
+        raise BudgetExceeded(f'{budget} budget exhausted')
+    if not model.endswith(':free'):
+        balance = account_balance()
+        if balance is not None and balance < ACCOUNT_FLOOR_USD[budget]:
+            _log(**base, status='refused_budget')
+            raise BudgetExceeded(f'OpenRouter balance below {budget} floor')
+    if privacy_class == 'redacted_cloud' and privacy.pseudonymise():
+        payload = _redact_tree(payload, names, {})
+    t0 = time.perf_counter()
+    try:
+        resp = httpx.post('https://openrouter.ai/api/v1/' + operation,
+                          headers={'Authorization': 'Bearer ' + _key()},
+                          json={'model': model, **payload}, timeout=timeout)
+        resp.raise_for_status()
+        data = resp.json()
+        if not isinstance(data, dict) or ('data' if operation == 'embeddings' else 'results') not in data:
+            raise ValueError('invalid specialized retrieval response')
+    except Exception as exc:
+        # Upstream bodies may echo private input: log the exception type only.
+        _log(**base, status='error', error=type(exc).__name__, latency_ms=int((time.perf_counter()-t0)*1000))
+        raise
+    usage = data.get('usage') or {}
+    _log(**base, status='ok', input_tokens=usage.get('prompt_tokens') or usage.get('total_tokens'),
+         output_tokens=0, cost_usd=usage.get('cost'), latency_ms=int((time.perf_counter()-t0)*1000))
+    return data
