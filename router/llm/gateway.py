@@ -168,6 +168,16 @@ def _price_usd(route: dict, usage: dict | None, body: dict) -> float:
     return (t_in + t_out) * float(blended or 0) / 1e6
 
 
+def _priced(route: dict, telemetry: dict, body: dict) -> dict:
+    """A paid call the provider reports no cost for (Venice, Kie…) gets its cost at the router's price for this
+    route, marked `estimated_price`; without a known price it stays unknown (never zero)."""
+    host = route.get("host") or {}
+    if (telemetry.get("cost_usd") is None and route.get("provider") in PAID and telemetry.get("usage")
+            and (host.get("price_in_1m") is not None or route.get("blended_1m"))):
+        telemetry.update(cost_usd=round(_price_usd(route, telemetry["usage"], body), 6), cost_status="estimated_price")
+    return telemetry
+
+
 def test_gate(route: dict, body: dict) -> str | None:
     """None when this paid call of a test fits the budget, else the refusal (and one Telegram notice per window)."""
     b = test_budget()
@@ -190,7 +200,8 @@ def _charge(route: dict, entry: dict, telemetry: dict, body: dict) -> None:
     cost = telemetry.get("cost_usd")
     usd = float(cost) if cost is not None else _price_usd(route, telemetry.get("usage"), body)
     try:
-        _ledger_add({"kind": "spend", "usd": round(usd, 6), "estimated": cost is None, "provider": route["provider"],
+        _ledger_add({"kind": "spend", "usd": round(usd, 6), "estimated": telemetry.get("cost_status") != "reported",
+                     "provider": route["provider"],
                      "model": route["model"], "run_id": entry.get("run_id"), "agent": entry.get("agent")})
     except OSError:
         pass
@@ -279,9 +290,24 @@ def chat_tasks() -> list[str]:
     hit = _routes.get("__tasks__")
     if hit and time.time() - hit[0] < 3600:
         return hit[1]
-    tasks = [t["task"] for t in _router("tasks") if t.get("interface") == "chat"]
+    rows = [t for t in _router("tasks") if t.get("interface") == "chat"]
+    tasks = [t["task"] for t in rows]
     _routes["__tasks__"] = (time.time(), tasks)
+    _routes["__owner_tasks__"] = (time.time(), [t["task"] for t in rows if not t.get("internal")])
     return tasks
+
+
+def owner_tasks() -> list[str]:
+    """Chat tasks an owner message can ask for: the internal postes (memory extraction, compression, voice…) are
+    for the modules that call them by name, never a plan's choice."""
+    chat_tasks()
+    return _routes["__owner_tasks__"][1]
+
+
+# Anthropic caches only up to explicit markers. Without them every DSH step re-read its whole prompt (2026-11-07:
+# 0 cache reads over the last 200 Claude subscription calls, 2.9 M input tokens). Marker 1 = tools + system (stable
+# for a session), marker 2 = the last message (the conversation so far, re-read by the next step and the next turn).
+ANTHROPIC_CACHE_POINTS = [{"location": "message", "role": "system"}, {"location": "message", "index": -1}]
 
 
 def litellm_target(route: dict) -> dict | None:
@@ -289,7 +315,8 @@ def litellm_target(route: dict) -> dict | None:
     p, m = route["provider"], route["model"]
     if p == "claude-pro":
         config = _CONF.get("claude_subscription") or {}
-        return {"model": m} if config.get("enabled") and m in config.get("verified_models", []) else None
+        return ({"model": m, "cache_control_injection_points": ANTHROPIC_CACHE_POINTS}
+                if config.get("enabled") and m in config.get("verified_models", []) else None)
     if p == "antigravity":                                    # Google AI Pro: the official Antigravity CLI, text only
         from antigravity_subscription import base_id
         config = _CONF.get("antigravity_subscription") or {}
@@ -302,7 +329,8 @@ def litellm_target(route: dict) -> dict | None:
     if p == "kie":                                            # Kie /claude = Anthropic Messages protocol
         key = provider_key("KIE_API_KEY")
         return {"model": f"anthropic/{m}", "api_base": "https://api.kie.ai/claude", "api_key": key,
-                "extra_headers": {"User-Agent": UA, "Authorization": f"Bearer {key}"}}
+                "extra_headers": {"User-Agent": UA, "Authorization": f"Bearer {key}"},
+                "cache_control_injection_points": ANTHROPIC_CACHE_POINTS}
     if p == "openrouter":
         target = {"model": f"openrouter/{m}", "api_key": provider_key("OPENROUTER_API_KEY")}
         if route.get("or_provider"):   # the router's host order: cheapest usable host first, the others as fallbacks
@@ -577,6 +605,7 @@ async def _correlation(request, body: dict, agent: str) -> dict:
             out["run_id"] = checked(row, out["run_id"])
             out["correlation_status"] = "resolved"
             out["channel"] = row.get("channel")
+            out["requested"] = row.get("requested")
         if agent == "dsh":
             session_id = _dsh_session(body.pop("prompt_cache_key", None))
             body.pop("prompt_cache_retention", None)
@@ -586,12 +615,82 @@ async def _correlation(request, body: dict, agent: str) -> dict:
                 found = checked(row)
                 if out["run_id"] and out["run_id"] != found:
                     raise HTTPException(400, "conflicting correlation identifiers")
-                out.update(run_id=found, session_id=session, correlation_status="resolved", channel=row.get("channel"))
+                out.update(run_id=found, session_id=session, correlation_status="resolved", channel=row.get("channel"),
+                           requested=row.get("requested"))
         if out["task_id"] and not out["run_id"]:
             raise HTTPException(409, "task correlation requires a resolved run")
         return {k: v for k, v in out.items() if v is not None}
     except ValueError:
         raise HTTPException(400, "invalid correlation identifier") from None
+
+
+def planned_task(asked: str, requested: dict | None) -> tuple[str, str | None]:
+    """(Router task for this call, what the plan set). Lot 2 (2026-11-07): `auto` takes the task and tier the
+    preflight asked for this owner message (written on the run); an explicitly chosen task keeps its task and gets
+    the plan's tier only. Without a plan nothing changes (auto = DEFAULT_TASK). One plan per owner message, so every
+    model call of the turn gets the same answer (and the same model)."""
+    task = DEFAULT_TASK if asked in ("auto", "walter") and not requested else asked
+    if not requested:
+        return task, None
+    known = set(owner_tasks())
+    level = requested.get("level") if requested.get("level") in ("L1", "L2", "L3") else None
+    if asked in ("auto", "walter"):
+        task = requested.get("task") if requested.get("task") in known else DEFAULT_TASK
+    if level and "/" not in task:
+        return f"{task}/{level}", f"{'task+' if asked in ('auto', 'walter') else ''}level"
+    return task, "task" if asked in ("auto", "walter") else None
+
+
+def _text_parts(content) -> list[str]:
+    if isinstance(content, str):
+        return [content]
+    return [p.get("text", "") for p in content or [] if isinstance(p, dict) and p.get("type") == "text"]
+
+
+def rule_answer(requested: dict | None, body: dict) -> str | None:
+    """The preflight's rule answer, only when this request ends on the very owner message it answers (its hash):
+    never for a tool step, a title request or another message of the session. The owner message is looked for in
+    the trailing block of user rows (no assistant or tool row after it): DSH sends it followed by its own user rows
+    (workspace instructions, runtime snapshot), and the hook's context before it."""
+    if not requested or not requested.get("answer") or not requested.get("message_sha"):
+        return None
+    tail = []
+    for message in reversed(body.get("messages") or []):
+        if not isinstance(message, dict) or message.get("role") != "user":
+            break
+        tail.append(message)
+    for message in tail:
+        parts = _text_parts(message.get("content"))
+        candidates = [*parts, "".join(parts), *(line for p in parts for line in p.split("\n\n"))]
+        if any(hashlib.sha256(c.strip().encode()).hexdigest() == requested["message_sha"] for c in candidates if c.strip()):
+            return str(requested["answer"])
+    return None
+
+
+def _rule_completion(text: str) -> dict:
+    return {"id": f"walter-rule-{uuid.uuid4().hex[:12]}", "object": "chat.completion", "created": int(time.time()),
+            "model": "walter-context-rule", "choices": [{"index": 0, "finish_reason": "stop",
+                                                         "message": {"role": "assistant", "content": text}}],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}
+
+
+async def _rule_stream(text: str):
+    head = {"id": f"walter-rule-{uuid.uuid4().hex[:12]}", "object": "chat.completion.chunk", "created": int(time.time()),
+            "model": "walter-context-rule"}
+    yield "data: " + json.dumps({**head, "choices": [{"index": 0, "delta": {"role": "assistant", "content": text},
+                                                      "finish_reason": None}]}) + "\n\n"
+    yield "data: " + json.dumps({**head, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                                 "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}) + "\n\n"
+    yield "data: [DONE]\n\n"
+
+
+def _rule_routing(run_id: str) -> None:
+    try:
+        subprocess.run(["walter-memory", "runs", "routing", run_id], input=json.dumps(
+            {"applied": True, "via": "walter-context rule answer (no model)", "provider": "none"}),
+            text=True, capture_output=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        pass
 
 
 def _record_attempt(row: dict, entry: dict) -> None:
@@ -664,9 +763,21 @@ def build_app():
         if not isinstance(body, dict):
             raise HTTPException(400, "request must be a JSON object")
         correlation = await _correlation(request, body, agent)
-        task = body.pop("model", None) or DEFAULT_TASK
-        task = DEFAULT_TASK if task in ("auto", "walter") else task.removeprefix("walter/")
+        requested = correlation.pop("requested", None)
+        asked = (body.pop("model", None) or DEFAULT_TASK).removeprefix("walter/")
+        task, plan = planned_task(asked, requested if isinstance(requested, dict) else None)
+        if plan:
+            correlation["plan"] = plan
         stream = bool(body.pop("stream", False))
+        ruled = rule_answer(requested if isinstance(requested, dict) else None, body)
+        if ruled is not None:   # the preflight settled this message by a rule: no model call (lot 2)
+            log({"agent": agent, "task": task, "ok": True, "seconds": 0, "rule": requested.get("fast_path"), **correlation})
+            if agent == "dsh" and correlation.get("run_id"):
+                threading.Thread(target=_rule_routing, args=(correlation["run_id"],), daemon=True).start()
+            if stream:
+                return StreamingResponse(_rule_stream(ruled), media_type="text/event-stream",
+                                         headers={"X-Walter-Route": "walter-context/rule"})
+            return JSONResponse(_rule_completion(ruled), headers={"X-Walter-Route": "walter-context/rule"})
         try:
             d = decision(task)
         except Exception:
@@ -710,7 +821,7 @@ def build_app():
                 if want_json and not stream:
                     resp.choices[0].message.content = as_json(resp.choices[0].message.content)
                 if not stream:
-                    telemetry = _telemetry(resp)
+                    telemetry = _priced(route, _telemetry(resp), body)
                     log({**base, "ok": True, "seconds": round(time.perf_counter() - t0, 2),
                          "observed_model": getattr(resp, "model", None),
                          **telemetry, **({"host": getattr(resp, "provider", None) or
@@ -759,6 +870,7 @@ def build_app():
                         ok, failure = False, type(exc).__name__
                         raise
                     finally:
+                        _priced(route, telemetry, body)
                         log({**base, "ok": ok, "seconds": round(time.perf_counter() - t0, 2), "stream": True,
                              "observed_model": observed_model, **telemetry, **({"error": failure} if failure else {})})
                         _charge(route, base, telemetry, body)
