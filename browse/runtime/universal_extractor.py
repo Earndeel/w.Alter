@@ -179,6 +179,12 @@ def score_payload(payload: Any, spec: ExtractionSpec) -> tuple[float, tuple[str,
             matched.append(canonical)
     record_list = find_record_list(payload, spec)
     record_count = len(record_list[1]) if record_list else 0
+    # A single-object answer (spot price, status, one entity: {"bitcoin": {"eur": …}}) is one record, as
+    # project_records already treats it, when it carries most of what was asked; a blob matching a stray key is not.
+    if (not record_list and isinstance(payload, Mapping) and spec.expected_fields
+            and 2 * len(matched) >= len(spec.expected_fields)
+            and all(field in matched for field in spec.required_fields)):
+        record_count = 1
     score = len(matched) * 10 + min(record_count, 50)
     score += sum(15 for field in spec.required_fields if field in matched)
     if record_count >= spec.min_records:
