@@ -121,5 +121,16 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "walter-soul",
+    "order": 90,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "walter_profile"
+    ]
   }
 }
