@@ -20,3 +20,11 @@ def test_search_leaves_from_the_server_without_any_inherited_proxy(monkeypatch):
 def test_the_local_exit_can_be_overridden_for_tests(monkeypatch):
     monkeypatch.setenv("WALTER_BROWSE_EXIT_LOCAL", "http://127.0.0.1:18999")
     assert facade._router_env({"url": "https://example.com"})["WALTER_BROWSE_PROXY"] == "http://127.0.0.1:18999"
+
+
+def test_a_search_returns_several_sources_by_default():
+    from walter_browse import facade
+    cmd = facade._build_router_command({"query": "prix bitcoin", "min_records": 1})
+    assert cmd[cmd.index("--search-count") + 1] == "5"
+    cmd = facade._build_router_command({"query": "prix bitcoin", "min_records": 8})
+    assert cmd[cmd.index("--search-count") + 1] == "8"
