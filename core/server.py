@@ -440,9 +440,14 @@ register_capabilities(mcp, CLIENT_TAG, local_control="--http" not in sys.argv)
 
 # Every module presents itself (level 0) in one layer composed by walter-context from the module contracts, for the
 # tools this server really exposes; it replaces the router brief alone. Fixed for the life of the server process.
-from walter_capabilities import module_layer  # noqa: E402
-_LAYER = module_layer(sorted(t.name for t in mcp._tool_manager.list_tools()))
+# A client may list a core toolset and the one-line (M0) module layer (config/toolsets.toml, lot 3 2026-11-07); the
+# layer is composed for every tool this server can run, listed or reachable through walter_call.
+from walter_capabilities import apply_toolset, client_profile, module_layer, toolset_note  # noqa: E402
+_PROFILE = client_profile(CLIENT_TAG)
+_LAYER = module_layer(sorted(t.name for t in mcp._tool_manager.list_tools()), _PROFILE["module_layer"])
 _LAYER = _LAYER or router_brief()  # fallback: the router's own brief, as before the module layer
+_HIDDEN = apply_toolset(mcp, _PROFILE["toolset"])
+_LAYER = "\n\n".join(x for x in (_LAYER, toolset_note(_HIDDEN)) if x)
 if _LAYER:
     mcp._mcp_server.instructions = BASE_INSTRUCTIONS + "\n\n" + _LAYER
 

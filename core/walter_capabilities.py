@@ -88,11 +88,11 @@ def router_brief():
     except Exception:return ''
 
 
-def module_layer(tools):
-    """The 'Modules W.Alter' layer composed by walter-context (every module's level-0 brief), for this server's
-    real tool inventory. Empty on any failure: the caller keeps its previous instructions."""
+def module_layer(tools,form='full'):
+    """The 'Modules W.Alter' layer composed by walter-context (every module's level-1 brief, or one line each in
+    form 'm0'), for this server's real tool inventory. Empty on any failure: the caller keeps its previous instructions."""
     try:
-        args=['walter-context','capability','all']
+        args=['walter-context','capability','all','--form',form]
         for t in tools:args+=['--tool',t]
         out=subprocess.run(args,capture_output=True,text=True,timeout=60)
         doc=json.loads(out.stdout)
@@ -248,3 +248,66 @@ def register(mcp,client='unknown',*,local_control=True):
                         ImageContent(type='image',data=pixels,mimeType='image/png')]
             return json.dumps(result,ensure_ascii=False,default=str)
         except Exception as exc:return _error('computer',exc)
+
+
+# ---- Toolset per client (lot 3 C11, 2026-11-07) -------------------------------------------------------------------
+# A client may list only a core set of Walter tools (config/toolsets.toml, keyed by WALTER_CLIENT_TAG; env
+# WALTER_TOOLSET / WALTER_MODULE_LAYER override it, for a stage test). The other tools stay registered in this server
+# and reachable through `walter_call`, with their own argument validation. Fixed for the life of the server process
+# (one tool list per session: the provider cache keeps the tools prefix).
+TOOLSETS = Path(__file__).resolve().parent / 'config' / 'toolsets.toml'
+LAYER_FORMS = ('full', 'm0')
+
+
+def client_profile(client, path=TOOLSETS):
+    """{'name', 'toolset': list of listed tools or None (= all), 'module_layer': 'full'|'m0'} for this client."""
+    import tomllib
+    try:conf=tomllib.loads(Path(path).read_text())
+    except FileNotFoundError:conf={}
+    own=(conf.get('clients') or {}).get(client) or {}
+    name=os.environ.get('WALTER_TOOLSET') or own.get('toolset') or 'all'
+    form=os.environ.get('WALTER_MODULE_LAYER') or own.get('module_layer') or 'full'
+    if form not in LAYER_FORMS:raise ValueError('unknown module layer form')
+    if name=='all':return {'name':'all','toolset':None,'module_layer':form}
+    tools=(conf.get('toolsets') or {}).get(name)
+    if not isinstance(tools,list) or not all(isinstance(t,str) and t for t in tools):raise ValueError('unknown toolset')
+    return {'name':name,'toolset':list(tools),'module_layer':form}
+
+
+def _summary(description):
+    return (description or '').strip().split('\n\n')[0].replace('\n',' ').strip()
+
+
+def apply_toolset(mcp,keep):
+    """List only `keep` (None = everything); the other tools move behind `walter_call`. Returns the hidden names."""
+    if keep is None:return []
+    manager=mcp._tool_manager
+    hidden={t.name:t for t in manager.list_tools() if t.name not in set(keep)}
+    for name in hidden:manager.remove_tool(name)
+    if not hidden:return []
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False,openWorldHint=True))
+    async def walter_call(tool: str='',arguments: dict|None=None,describe: bool=False) -> str:
+        """Call a W.Alter tool that is not in your tool list (the module presentations name them: vault_get,
+        memory_events, logs_timeline, skill_propose…). Without tool: their names and one-line summaries.
+        With describe=true: that tool's full description and parameters. Otherwise runs it with `arguments`."""
+        if not tool:
+            return json.dumps({'tools':[{'name':n,'summary':_summary(t.description)} for n,t in sorted(hidden.items())]},
+                              ensure_ascii=False)
+        target=hidden.get(tool)
+        if target is None:
+            return json.dumps({'error':'not_a_hidden_tool','hint':'call listed tools directly','hidden':sorted(hidden)})
+        if describe:
+            return json.dumps({'name':tool,'description':target.description,'parameters':target.parameters},ensure_ascii=False)
+        result=await target.run(arguments or {})
+        return result if isinstance(result,str) else json.dumps(result,ensure_ascii=False,default=str)
+    return sorted(hidden)
+
+
+def toolset_note(hidden):
+    """One instruction line for a client with a core toolset: where the other tools are."""
+    if not hidden:return ''
+    return ("## Outils W.Alter non listés\n"
+            f"{len(hidden)} outils W.Alter ne sont pas dans ta liste pour l'alléger : {', '.join(hidden)}. "
+            "Appelle-les avec `walter_call(tool, arguments)` ; `walter_call(tool, describe=true)` donne d'abord "
+            "leurs paramètres.")

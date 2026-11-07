@@ -1,0 +1,23 @@
+# Tools each MCP client lists (lot 3 C11, 2026-11-07). Keyed by WALTER_CLIENT_TAG; env WALTER_TOOLSET and
+# WALTER_MODULE_LAYER override it (stage tests). A client absent here lists every tool with the full module layer.
+# Tools not listed stay reachable through `walter_call(tool, arguments)`. The set is read once per server process.
+
+[toolsets]
+# Entry points named first by each module's one-line presentation (M0), plus the module guides.
+core = [
+  "memory_context", "memory_search", "person_lookup",
+  "logs_search",
+  "vault_search",
+  "secret_search",
+  "walter_browse", "browser_session",
+  "computer_use",
+  "walter_run",
+  "skills_search", "skill_read",
+  "walter_profile", "walter_health",
+  "module_index", "module_guide",
+]
+
+[clients.dsh]
+# 2026-11-07 (lot 3, stage-measured): simple messages −38 % / −43 % prompt tokens, same answers and latency.
+toolset = "core"
+module_layer = "m0"
