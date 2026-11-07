@@ -77,3 +77,15 @@ def test_shadow_report_compares_pack_and_current(tmp_path):
     assert r["messages"] == 2 and r["errors"] == 1 and r["levels"] == {"L2": 1, "L1": 1}
     assert r["tokens_per_message"]["walter_context_total"] == 900 and r["tokens_per_message"]["current_hook_total"] == 500
     assert r["nothing_injected"] == {"walter_context": 1, "current_hook": 1} and r["source_failures"] == {"board": 1}
+
+
+def test_tool_cards_follow_the_plan(monkeypatch):
+    """07/11: a web question gets the browse brief for this message; a plain one gets none."""
+    from walter_context import retrieval
+    from walter_context.plan import ContextPlan, ThreadChoice
+    monkeypatch.setattr(retrieval, "_card", lambda m, ttl=600: f"### {m} brief")
+    mk = lambda caps: ContextPlan(turn_id="t", thread=ThreadChoice(id=None, new=True), act="new", level="L0",
+                                  capabilities=["tools", *caps])
+    b = retrieval.tool_cards(mk(["web", "browser"]))
+    assert b.layer == 4 and b.sources == ["browse", "computer"] and "browse brief" in b.text
+    assert retrieval.tool_cards(mk([])) is None and retrieval.tool_cards(mk(["delegation"])) is None
