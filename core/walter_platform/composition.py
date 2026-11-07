@@ -19,6 +19,19 @@ from .harness_transaction import file_change, link_change, commit, rollback
 ROOT=Path(__file__).resolve().parents[1]
 COMPOSITIONS=ROOT/'compositions'
 SKILL_DIR=str(ROOT/'skills')
+DSH_LIB=Path('/opt/dsh/node_modules/@deepseek-ai')
+DSH_OWNER_TURN=ROOT/'hooks'/'dsh'/'owner-turn.mjs'
+# Lot 1 (2026-11-07, /walter/docs/DECISIONS.md): DSH is only the agent loop and technical tool execution. Every DSH
+# row that competes with a Walter module is off: identity → soul, skills → walter-skills, web → walter_browse,
+# context/compaction → walter-context, models/titles → Walter Router; DeepSeek telemetry, accounts and providers.
+DSH_OFF=('tool-web','tool-skill','skill-filesystem','web','web-search-deepseek','web-fetch-http',
+         'session-telemetry-otel','session-log-deepseek','plugin-package-inventory-deepseek',
+         'deepseek-llm-api-extensions','deepseek-account','llm-deepseek','llm-deepseek-account')
+DSH_PRESET_OWNED={'persona':'soul','skill-filesystem':'skills','tool-skill':'skills','tool-web':'browse'}
+DSH_WEB_OFF=('preset-ptc','preset-minimal','preset-cordis','account-controller')
+DSH_TASKS=('coding','general','document','summarization')   # Walter Router tasks offered to DSH
+DSH_TITLE={'targetWords':5,'targetCjkCharacters':10,'maxInputBytes':4096,'maxOutputTokens':64,'timeoutMs':60000,
+           'provider':'walter','model':'summarization'}
 
 
 def _context_port():
@@ -73,6 +86,70 @@ def _dsh_addition(data, entry):
             if e.get('config',{}).get(k)!=v:raise ValueError('custom Walter DSH plugin configuration conflicts')
         return None
     return {'insert':[entry]}
+
+
+def _managed_yaml(original, content, name):
+    """`_managed_text` for YAML files: the Walter block is fenced by YAML comments, other bytes are preserved."""
+    pattern=re.compile(r'# walter:'+re.escape(name)+r' sha256=([a-f0-9]{64})\n(.*?)\n# /walter:'+re.escape(name)+r'\n?',re.S)
+    matches=list(pattern.finditer(original))
+    if len(matches)>1:raise ValueError('duplicate managed DSH profile sections')
+    body=content.rstrip('\n');sha=hashlib.sha256(body.encode()).hexdigest()
+    block=f'# walter:{name} sha256={sha}\n{body}\n# /walter:{name}\n'
+    if matches:
+        m=matches[0]
+        if hashlib.sha256(m[2].encode()).hexdigest()!=m[1]:raise ValueError('managed DSH profile section was edited; refusing overwrite')
+        return original[:m.start()]+block+original[m.end():]
+    if '# walter:'+name in original:raise ValueError('invalid managed DSH profile section')
+    original=re.sub(r'(?m)^\[\]\s*$\n?','',original)   # DSH writes an empty profile patch as `[]`
+    return original.rstrip('\n')+('\n\n' if original.strip() else '')+block
+
+
+def _dsh_yaml(text):
+    """Parse a DSH patch keeping `!!js` expressions as {'__js__': source}."""
+    import yaml
+    class Loader(yaml.SafeLoader):pass
+    Loader.add_constructor('tag:yaml.org,2002:js',lambda loader,node:{'__js__':loader.construct_scalar(node)})
+    return yaml.load(text,Loader) or []
+
+
+def _dsh_preset(port):
+    """Walter's `standard` agent preset: the one shipped with dsh-web-app minus the rows a Walter module owns;
+    compaction-basic → walter-context (single compaction owner). Same preset id, so saved sessions keep resolving."""
+    rows=_dsh_yaml((DSH_LIB/'dsh-web-app'/'presets'/'standard.patch.yml').read_text())
+    row=next(e for r in rows for e in r.get('insert',[]) if e.get('id')=='preset-standard')
+    def walk(entries):
+        out=[]
+        for e in entries:
+            if e.get('id') in DSH_PRESET_OWNED:continue
+            gate=e.get('disabled')
+            if isinstance(gate,dict):   # bash/pwsh platform switch; Walter hosts are Linux
+                if gate['__js__'].replace('"',"'") not in ("process.platform === 'win32'","process.platform !== 'win32'"):
+                    raise ValueError('unknown expression in shipped DSH preset')
+                if '!==' in gate['__js__']:continue
+                e={k:v for k,v in e.items() if k!='disabled'}
+            if e.get('id')=='compaction-basic':e={'id':'walter-context','name':port}
+            if e.get('group') and isinstance(e.get('config'),list):e={**e,'config':walk(e['config'])}
+            out.append(e)
+        return out
+    config={**row['config'],'plugins':walk(row['config']['plugins'])}
+    if '__js__' in json.dumps(config):raise ValueError('unsupported expression in shipped DSH preset')
+    return {'id':'preset-standard','config':config}
+
+
+def _dsh_web_profile(port):
+    """Managed section of the DSH web profile patch (rows that exist only in the web composition)."""
+    import yaml
+    head=('# DSH web GUI: no developer surface text (HMR, pnpm, harness source) in the prompt.\n'
+          '- id: web-runtime\n  config:\n    openBrowser: !!js ctx.webStartup.openBrowser\n    printUrl: true\n'
+          '    surfaceContext: false\n    trustedHosts: !!js ctx.webStartup.trustedHosts\n'
+          '# Presets that carry the DSH "coding agent" persona and DSH skills/web/compaction; DeepSeek account UI.\n')
+    head+=''.join(f'- id: {x}\n  disabled: true\n' for x in DSH_WEB_OFF)
+    return head+'# Walter "standard" preset (generated from the shipped one by walter-core composition).\n'+yaml.safe_dump([_dsh_preset(port)],sort_keys=False,allow_unicode=True,width=120)
+
+
+def _dsh_headless_profile(port):
+    """Managed section of the headless profile patch: it has no agent presets, so the engine is a global row."""
+    return '# One compaction owner: walter-context (the web profile gets it inside its agent preset).\n- insert:\n  - id: walter-context\n    name: '+port+'\n'
 
 
 def _dsh_patch(data, ident, config=None, **extra):
@@ -133,15 +210,20 @@ def _plan(host,home=None,profile_dir=None):
         def add(item):
             if item:additions.append(item);data.append(item)
         add(_dsh_addition(data,{'id':'hooks-walter','name':'@deepseek-ai/dsh-hooks-claude-code','config':{'configPath':str(hp)}}))
-        skill=[x for x in data if x.get('id')=='skill-filesystem']
-        if skill:
-            dirs=skill[0].setdefault('config',{}).setdefault('customSkillDirs',[])
-            if SKILL_DIR not in dirs:dirs.append(SKILL_DIR);merged=True
-        else:add(_dsh_patch(data,'skill-filesystem',{'customSkillDirs':[SKILL_DIR]}))
+        # Records which part of each step the owner wrote, so the hook ignores DSH runtime notices (lot 1).
+        add(_dsh_addition(data,{'id':'walter-owner-turn','name':str(DSH_OWNER_TURN)}))
+        # Rows a Walter module replaces: turned off, any local config kept (lot 1, 2026-11-07).
+        for ident in DSH_OFF:
+            rows=[x for x in data if x.get('id')==ident]
+            if len(rows)>1:raise ValueError('duplicate DSH patch target requires manual reconciliation')
+            if not rows:add({'id':ident,'disabled':True})
+            elif rows[0].get('disabled') is not True:rows[0]['disabled']=True;merged=True
         add(_dsh_patch(data,'agent-default-model',{'provider':spec['provider'],'model':spec['model']}))
+        add(_dsh_patch(data,'system-prompt',{'includeHarnessIdentity':False,'personaPrefix':'','personaSuffix':''}))
+        add(_dsh_patch(data,'session-title-llm',DSH_TITLE))
         # Preserve unrelated providers; an existing Walter provider must agree on the transport.
         provider={'displayName':'W.Alter (Walter Router)','api':'openai-completions','baseURL':spec['endpoint'],
-                  'apiKeyEnv':'WALTER_LLM_TOKEN','models':[{'id':name,'name':'Walter '+name,'contextWindow':200000} for name in ('coding','general','document')]}
+                  'apiKeyEnv':'WALTER_LLM_TOKEN','models':[{'id':name,'name':'Walter '+name,'contextWindow':200000} for name in DSH_TASKS]}
         llm=[x for x in data if x.get('id')=='llm-pi-ai']
         if llm:
             providers=llm[0].get('config',{}).get('providers',{})
@@ -151,18 +233,34 @@ def _plan(host,home=None,profile_dir=None):
             else:
                 if any(existing.get(k)!=provider[k] for k in ('api','baseURL','apiKeyEnv')):raise ValueError('custom Walter provider transport conflicts')
                 if spec['model'] not in {m.get('id') for m in existing.get('models',[])}:raise ValueError('Walter task is missing from DSH provider')
+                for name in DSH_TASKS:
+                    if name not in {m.get('id') for m in existing.get('models',[])}:
+                        existing.setdefault('models',[]).append({'id':name,'name':'Walter '+name,'contextWindow':200000});merged=True
         else:add({'id':'llm-pi-ai','config':{'providers':{'walter':provider}}})
         cp=p/'.credentials.yaml'
         if not cp.exists():link(cp,spec['credential_source'],'credentials')
         else:require(cp,'credentials')
         add(_dsh_patch(data,'credentials',{'path':str(cp)}))
         add(_dsh_patch(data,'compaction-basic',disabled=True))
-        add(_dsh_addition(data,{'id':'walter-context','name':_context_port()}))
-        for dependency in (_context_port(),'/opt/dsh/node_modules/@deepseek-ai/dsh/package.json','/opt/dsh/node_modules/@deepseek-ai/dsh-hooks-claude-code/package.json'):
+        # walter-context is mounted per profile (preset for web, global row for headless): a global row here would
+        # run a second engine beside the preset's. Remove the pre-2026-11-07 global row.
+        for row in [r for r in data if any(e.get('id')=='walter-context' for e in r.get('insert',[]))]:
+            row['insert']=[e for e in row['insert'] if e.get('id')!='walter-context'];merged=True
+            if not row['insert']:data.remove(row)
+        for dependency in (_context_port(),str(DSH_OWNER_TURN),'/opt/dsh/node_modules/@deepseek-ai/dsh/package.json','/opt/dsh/node_modules/@deepseek-ai/dsh-hooks-claude-code/package.json'):
             require(dependency,'dsh_runtime')
-        if merged:text=yaml.safe_dump(data,sort_keys=False)
-        elif additions:text=text.rstrip()+'\n'+yaml.safe_dump(additions,sort_keys=False)
+        if merged:text=('# W.Alter composition for DeepSeek Harness, written by walter-core (`walter compose install dsh`).\n'
+                        '# DSH = agent loop + technical tools; identity, context, memory, skills, web and models are Walter modules.\n'
+                        +yaml.safe_dump(data,sort_keys=False,allow_unicode=True,width=120))
+        elif additions:text=text.rstrip()+'\n'+yaml.safe_dump(additions,sort_keys=False,allow_unicode=True,width=120)
         yaml.safe_load(text);file(path,text,'mcp,lifecycle,skills,model,context')
+        if require(DSH_LIB/'dsh-web-app'/'presets'/'standard.patch.yml','dsh_runtime'):
+            for profile,block in (('web',_dsh_web_profile),('headless',_dsh_headless_profile)):
+                wp=p/'profiles'/profile/'cordis.patch.yml'
+                before=wp.read_text() if wp.exists() else ''
+                after=_managed_yaml(before,block(_context_port()),'dsh-'+profile)
+                _dsh_yaml(after)
+                if after!=before:file(wp,after,'identity,context,skills,browse')
     else:
         import yaml
         plugins=data.setdefault('plugins',{});enabled=plugins.setdefault('enabled',[]);disabled=plugins.get('disabled',[])

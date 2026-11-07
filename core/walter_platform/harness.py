@@ -68,7 +68,12 @@ def check(host,home=None):
     elif host=='dsh':
         result['bindings']['model_route']=any(x.get('id')=='agent-default-model' and x.get('config',{}).get('provider')=='walter' for x in data)
         result['bindings']['lifecycle_hook']=any(x.get('id')=='hooks-walter' and Path(x.get('config',{}).get('configPath','/nonexistent')).is_file() for row in data for x in row.get('insert',[]))
-        result['bindings']['context_plugin']=any('walter-context' in str(x.get('name','')) or 'walter-context' in str(x.get('id','')) for row in data for x in row.get('insert',[]))
+        # walter-context is mounted per profile since 2026-11-07 (inside the web agent preset, global row for headless).
+        profiles=[f.read_text() for f in sorted((p/'profiles').glob('*/cordis.patch.yml'))] if (p/'profiles').is_dir() else []
+        from .paths import module_path
+        port=str(module_path('context','ports','dsh','index.mjs'))
+        result['bindings']['context_plugin']=(any('walter-context' in str(x.get('name','')) or 'walter-context' in str(x.get('id','')) for row in data for x in row.get('insert',[]))
+                                              or (bool(profiles) and all(port in t for t in profiles)))
     else:
         enabled=data.get('plugins',{}).get('enabled',[])
         result['bindings']={'computer_backend':data.get('computer_use',{}).get('backend'),

@@ -370,6 +370,25 @@ def runtime_of(ev: dict) -> str:
 
 
 OWN = re.compile(r"<walter-context>.*?</walter-context>", re.S)
+DSH_OWNER_DIR = Path(os.environ.get("WALTER_DSH_OWNER_DIR", "/run/walter/dsh-owner"))
+
+
+def dsh_owner_prompt(session_id: str, glued: str) -> str | None:
+    """The part of a DSH step the owner wrote, recorded by hooks/dsh/owner-turn.mjs just before the bridge glued every
+    pending message (runtime notices included) into `glued`. "" = no owner message in this step. None = no record
+    describing this step (adapter not mounted, stale or mismatched): the caller keeps the glued text."""
+    if not session_id:
+        return None
+    try:
+        rec = json.loads((DSH_OWNER_DIR / (re.sub(r"[^A-Za-z0-9._-]", "_", session_id) + ".json")).read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(rec, dict) or time.time() * 1000 - float(rec.get("at") or 0) > 60_000:
+        return None
+    parts = [p for p in rec.get("owner") or [] if isinstance(p, str) and p.strip()]
+    if any(p not in glued for p in parts):
+        return None
+    return "\n".join(p.strip() for p in parts)
 
 
 def ours(runtime: str, text: str) -> str:
@@ -392,7 +411,13 @@ def claude_code(ev: dict) -> dict | None:
     if name == "UserPromptSubmit":
         from concurrent.futures import ThreadPoolExecutor
         caller, prompt = f"{runtime.replace('_', '-')}-hook", OWN.sub(" ", ev.get("prompt") or "").strip()
-        if not prompt:  # a dsh step whose only new messages are our own contexts or tool results
+        if runtime == "dsh":  # owner text only: runtime notices never become a run goal, a memory query or a skill
+            owner = dsh_owner_prompt(sid, ev.get("prompt") or "")
+            if owner is not None:
+                if owner != prompt:
+                    log(f"dsh owner text kept: {len(owner)}/{len(prompt)} chars")
+                prompt = owner
+        if not prompt:  # a dsh step whose only new messages are our own contexts, runtime notices or tool results
             return None
         import runctx
         hpid = runctx.harness_pid()
