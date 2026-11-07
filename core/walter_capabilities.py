@@ -88,6 +88,18 @@ def router_brief():
     except Exception:return ''
 
 
+def module_layer(tools):
+    """The 'Modules W.Alter' layer composed by walter-context (every module's level-0 brief), for this server's
+    real tool inventory. Empty on any failure: the caller keeps its previous instructions."""
+    try:
+        args=['walter-context','capability','all']
+        for t in tools:args+=['--tool',t]
+        out=subprocess.run(args,capture_output=True,text=True,timeout=60)
+        doc=json.loads(out.stdout)
+        return doc['content'] if doc.get('injection_allowed') and isinstance(doc.get('content'),str) else ''
+    except Exception:return ''
+
+
 def register(mcp,client='unknown',*,local_control=True):
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     def walter_modules(module: str='') -> str:
@@ -99,6 +111,25 @@ def register(mcp,client='unknown',*,local_control=True):
             rows=[m for m in load()['modules'] if not module or m['id']==module]
             return json.dumps({'modules':[dict(m,observed=inspect_module(m)) for m in rows]},ensure_ascii=False)
         except Exception as exc:return _error('registry',exc)
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+    def module_guide(module: str='') -> str:
+        """Detailed guide of a W.Alter module (manifest/GUIDE.md in its folder): components, interfaces per runtime,
+        privacy and limits. Each module's level 1 (what it is, how to use it) is already in your instructions;
+        open the guide only when the task needs more. Without module: where each module's presentation lives."""
+        try:
+            from walter_platform import presentation
+            return presentation.guide(module) if module else json.dumps(presentation.catalog(),ensure_ascii=False)
+        except Exception as exc:return _error(module or 'presentation',exc)
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+    def module_index(module: str,section: str='',offset: int=0,limit: int=20) -> str:
+        """Level 2 of a W.Alter module: what it contains, kept up to date by the module itself (e.g. skills by
+        domain, router tasks). Without section: the overview; with section: one bounded page (next_offset)."""
+        try:
+            from walter_platform import presentation
+            return json.dumps(presentation.index(module,section,offset,limit),ensure_ascii=False)
+        except Exception as exc:return _error(module,exc)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
     def secret_search(query: str='', kind: str='', limit: int=20) -> str:

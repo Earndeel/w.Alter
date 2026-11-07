@@ -14,6 +14,7 @@ def main(argv=None):
     sub.add_parser('layout')
     q=sub.add_parser('standby');q.add_argument('standby_action',nargs='?',choices=('status','start','stop','ensure','sweep'),default='status');q.add_argument('group',nargs='?');q.add_argument('--by',default='agent')
     q=sub.add_parser('instance');q.add_argument('instance_action',nargs='?',choices=('show','check','path','render','config','harness'),default='show');q.add_argument('parts',nargs='*')
+    q=sub.add_parser('present');q.add_argument('level',choices=('notes','note','catalog','summary','manifest','guide','index'));q.add_argument('module',nargs='?');q.add_argument('--form',choices=('full','m0'),default='full');q.add_argument('--m1',action='append',default=[]);q.add_argument('--level',choices=('M0','M1'),default='M1');q.add_argument('--section',default='');q.add_argument('--offset',type=int,default=0);q.add_argument('--limit',type=int,default=20)
     sub.add_parser('matrix')
     sub.add_parser('doctor')
     q=sub.add_parser('export');q.add_argument('destination');q.add_argument('--apply',action='store_true');q.add_argument('--wheelhouse')
@@ -65,6 +66,15 @@ def main(argv=None):
             if a.instance_action=='render':
                 sys.stdout.write(instance.render(sys.stdin.read()));return 0
             out=instance.check() if a.instance_action=='check' else instance.show()
+        elif a.command=='present':
+            from . import presentation
+            if a.level in ('note','summary','manifest','guide','index') and not a.module:raise ValueError('usage: walter present '+a.level+' <module>')
+            if a.level in ('summary','manifest','guide'):
+                print(getattr(presentation,a.level)(a.module));return 0
+            m1=[x for v in a.m1 for x in v.split(',') if x]
+            out=(presentation.notes(a.form,m1) if a.level=='notes' else presentation.catalog() if a.level=='catalog' else
+                 presentation.note(a.module,a.level) if a.level=='note' else
+                 presentation.index(a.module,a.section,a.offset,a.limit))
         elif a.command=='matrix':
             from . import composition
             out=composition.matrix()

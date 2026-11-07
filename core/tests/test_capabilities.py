@@ -96,7 +96,7 @@ class CapabilityTests(unittest.TestCase):
         walter_generate / walter_plans); the harness keeps its own model, generation is flagged as costly."""
         self.assertEqual(set(self.mcp.tools), {'walter_modules', 'secret_search', 'secret_reference', 'walter_browse',
                                              'walter_route', 'walter_run', 'walter_decide', 'walter_plans',
-                                             'computer_use'})
+                                             'computer_use', 'module_guide', 'module_index'})
         self.assertNotIn('grants', inspect.signature(self.mcp.tools['computer_use']).parameters)
         self.assertNotIn('permissions', inspect.signature(self.mcp.tools['computer_use']).parameters)
         self.assertNotIn('command', inspect.signature(self.mcp.tools['secret_reference']).parameters)

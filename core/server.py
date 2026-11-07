@@ -67,13 +67,12 @@ def _env_value(name: str) -> str:
 
 from walter_capabilities import router_brief  # noqa: E402 — the router's own brief joins the server instructions
 
-ROUTER_BRIEF = router_brief()
-mcp = FastMCP("walter-core", instructions=(
+BASE_INSTRUCTIONS = (
     "W.Alter is the user's modular capability stack on this VM. Use its connected modules across harnesses; keep the host runtime and permissions. These tools share its long-term "
     "memory and skills. The user is addressed as 'Monsieur' and works in French. Recalled memories are dated "
     "snapshots, not live state: verify current config/services before asserting them. Retain only durable "
-    "facts about the user, their projects and decisions — never secrets, credentials or transient logs."
-    + ("\n\n" + ROUTER_BRIEF if ROUTER_BRIEF else "")))
+    "facts about the user, their projects and decisions — never secrets, credentials or transient logs.")
+mcp = FastMCP("walter-core", instructions=BASE_INSTRUCTIONS)  # + module layer, set once the tools are registered
 
 
 def _agent_memory(method: str, args: dict, timeout: float = 180) -> str:
@@ -382,16 +381,19 @@ def vault_put(path: str, source: str = "", captured_at: str = "", links: list[st
 
 
 @mcp.tool()
-def browser_session(site: str, session: str = "", verify: bool = True) -> str:
+def browser_session(site: str, session: str = "", verify: bool = True, engine: str = "camoufox") -> str:
     """Open (or refresh) a Camoufox browser session logged in as Monsieur on a site (google, meta, linkedin, x…; see
     browser_sites), so you can use a web interface on his behalf. His current Brave cookies are copied from his Mac,
     decrypted and injected server-side: only metadata comes back (cookie counts, authenticated yes/no), never a value.
     Then drive the browser with the Camoufox HTTP API on 127.0.0.1:9377 (/tab/new, /tab/navigate, /tab/snapshot,
     /tab/click, /tab/keyboard-type, /tab/fetch-binary, /tab/close) using userId = the returned session name.
-    session: [a-z0-9_-] name, default '<site>-me'. Call again whenever the site shows a sign-in page."""
+    session: [a-z0-9_-] name, default '<site>-me'. Call again whenever the site shows a sign-in page.
+    engine: "camoufox" (Firefox, default) or "chromium" (CloakBrowser stealth Chromium, API on 127.0.0.1:9378) when a
+    site needs Chromium (Chrome-only features, React DevTools hooks, a site that rejects Firefox). Same exit and rules."""
     import browser_auth
     try:
-        return json.dumps(browser_auth.login(site, session, client=CLIENT_TAG, verify=verify), ensure_ascii=False)
+        return json.dumps(browser_auth.login(site, session, client=CLIENT_TAG, verify=verify, engine=engine),
+                          ensure_ascii=False)
     except Exception as e:
         return f"browser_session failed: {e}"
 
@@ -435,6 +437,14 @@ def walter_health() -> str:
 
 from walter_capabilities import register as register_capabilities
 register_capabilities(mcp, CLIENT_TAG, local_control="--http" not in sys.argv)
+
+# Every module presents itself (level 0) in one layer composed by walter-context from the module contracts, for the
+# tools this server really exposes; it replaces the router brief alone. Fixed for the life of the server process.
+from walter_capabilities import module_layer  # noqa: E402
+_LAYER = module_layer(sorted(t.name for t in mcp._tool_manager.list_tools()))
+_LAYER = _LAYER or router_brief()  # fallback: the router's own brief, as before the module layer
+if _LAYER:
+    mcp._mcp_server.instructions = BASE_INSTRUCTIONS + "\n\n" + _LAYER
 
 
 if __name__ == "__main__":

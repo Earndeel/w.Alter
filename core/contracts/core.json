@@ -140,5 +140,19 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "walter-core",
+    "order": 95,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "walter_health",
+      "ask_hermes",
+      "module_guide",
+      "module_index"
+    ]
   }
 }

@@ -143,6 +143,8 @@ def validate(module, *, source=False):
     _require(isinstance(recovery, dict), 'recovery contract required')
     for key in ('backup', 'restore', 'verification'):
         _strings(recovery.get(key), 'recovery.' + key, nonempty=True)
+    if 'presentation' in module:
+        _presentation(module['presentation'], check)
     scenarios = c.get('acceptance')
     _require(isinstance(scenarios, list) and bool(scenarios), 'acceptance scenarios required')
     ids = set()
@@ -154,6 +156,37 @@ def validate(module, *, source=False):
         _require(isinstance(item.get('assertion'), str) and bool(item['assertion']), 'acceptance assertion required')
         _require(item.get('scope') in {'unit', 'integration', 'live', 'recovery'}, 'invalid acceptance scope')
     return module
+
+
+PRESENTATION_KEYS = {'audience', 'title', 'order', 'summary', 'manifest', 'manifest_command', 'guide', 'tools', 'index'}
+TOOL = re.compile(r'[a-z][a-z0-9_]{0,63}\Z')
+
+
+def _presentation(value, check):
+    """How a module presents itself to agents. Texts live in the module folder (manifest/), never in the contract:
+    summary = M0, one line (what it does + the tool to open), always present; manifest = M1, operational brief
+    (what it is, organisation, how to use it); manifest_command = a live part the module generates and appends to M1;
+    guide = M2, full documentation on demand; index = what the module contains (separate axis, module_index)."""
+    _require(isinstance(value, dict) and set(value) <= PRESENTATION_KEYS, 'invalid presentation')
+    _require(value.get('audience') in {'agent', 'internal'}, 'presentation audience required')
+    _require(isinstance(value.get('title'), str) and bool(value['title'].strip()), 'presentation title required')
+    _require(type(value.get('order', 50)) is int and 0 <= value.get('order', 50) <= 999, 'invalid presentation order')
+    check(value.get('summary'))   # M0: one line, always present
+    check(value.get('manifest'))  # M1
+    if 'guide' in value:          # M2
+        check(value['guide'])
+    if 'manifest_command' in value:
+        _strings(value['manifest_command'], 'presentation.manifest_command', nonempty=True)
+    for tool in _strings(value.get('tools'), 'presentation.tools'):
+        _require(TOOL.fullmatch(tool), 'invalid presentation tool')
+    index = value.get('index')
+    if index is not None:
+        _require(isinstance(index, dict) and set(index) <= {'command', 'section_arg', 'paged', 'sections'},
+                 'invalid presentation index')
+        _strings(index.get('command'), 'presentation.index.command', nonempty=True)
+        _require(isinstance(index.get('section_arg', ''), str), 'invalid index section argument')
+        _require(isinstance(index.get('paged', False), bool), 'invalid index paging flag')
+        _require(isinstance(index.get('sections', ''), str), 'invalid index sections description')
 
 
 def expand(manifest, root, target_root):
@@ -172,6 +205,11 @@ def expand(manifest, root, target_root):
                 else:
                     expanded.append(str(layout.join(base, v)))
             raw[key] = expanded
+    pres = raw.get('presentation')
+    if isinstance(pres, dict):
+        for key in ('summary', 'manifest', 'guide'):
+            if isinstance(pres.get(key), str):
+                pres[key] = str(layout.join(base, pres[key]))
     c = raw.get('contract')
     if isinstance(c, dict):
         if isinstance(c.get('config_paths'), list):
