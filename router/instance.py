@@ -114,6 +114,30 @@ def env_value(name: str) -> str | None:
     return os.environ.get(name)
 
 
+def secret_value(name: str) -> str | None:
+    """A key from the environment, else from the instance's vault (walter-secrets map or its declared keys). Keys
+    that are not in Hermes' .env live only in Bitwarden (2026-10-30); the value is never logged or put in a URL."""
+    value = env_value(name)
+    if value:
+        return value
+    try:   # the walter-secrets module root (`walter path secrets`, not an instance path)
+        secrets = subprocess.run(["walter", "path", "secrets"], capture_output=True, text=True, timeout=30).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if not secrets:
+        return None
+    import sys
+    if secrets not in sys.path:
+        sys.path.insert(0, secrets)
+    try:
+        from walter_secrets.mapping import entry
+        from walter_secrets.vault import VAULT
+        e = entry(name)
+        return VAULT.value(e["item_id"], e["field"])
+    except Exception:  # noqa: BLE001 — unknown key or no vault session: the caller reports the key as missing
+        return None
+
+
 def state_file(name: str) -> Path:
     """A file the Router generates for the instance (state/router/<name>), e.g. the agents' brief."""
     root = _walter("path")

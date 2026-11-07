@@ -17,7 +17,7 @@ def ask_l1(conn, prompt: str, source: str, timeout: int = 240, tools: str = "mem
     from walter_router.serve import choose
     d = choose.pick(conn, "general", "L1")
     route = next((r for r in execution.routes(conn, d["model_id"], d.get("variant") or "")
-                  if r.get("probe_ok") is not False), None)
+                  if r.get("probe_ok") is not False and r.get("hermes_provider")), None)
     if not route:
         return None
     cmd = [str(HERMES), "chat", "-q", prompt, "--oneshot", "-Q", "--provider", route["hermes_provider"], "-m",

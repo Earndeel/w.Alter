@@ -70,6 +70,15 @@ os.environ.setdefault("CHATGPT_DEFAULT_INSTRUCTIONS", "You are a precise assista
                       "the system and user instructions exactly; answer in the language of the request.")
 KEY_TTL, ROUTE_TTL = 600, 600
 KIE_GPT = ("gpt-",)
+PAID = {"kie", "openrouter", "arnict", "venice"}   # providers billed per call (subscriptions are not)
+# A subscription's rate-limit refusal is a burst limit (two parallel DSH calls, 2026-10-28), not an empty quota: wait
+# and retry it before any paid route. The refusal is then logged skipped='rate_limit' (not counted as unreliability).
+RATE_LIMIT_WAITS = (4, 12)
+# Tests (walter-scenario, walter-lab: runs of channel `test`) may spend at most this on paid providers per window;
+# above it every paid route is refused to them until the owner approves more (Monsieur, 2026-10-30: « au-dessus de
+# 2 € les tests doivent être validés manuellement »). Ledger = the tests' paid calls and the owner's approvals.
+TEST_BUDGET = {"paid_limit_eur": 2.0, "usd_per_eur": 1.10, "window_hours": 24,
+               "ledger": "@instance/state/llm/test-spend.jsonl", **(_CONF.get("test_budget") or {})}
 
 
 # ───────────────────────── secrets (Bitwarden through walter-secrets) ─────────────────────────
@@ -100,6 +109,107 @@ def _read_key(env_name: str) -> str:
     with _keys_lock:
         _keys[env_name] = (time.time(), value)
     return value
+
+
+# ───────────────────────── test budget ─────────────────────────
+def _ledger() -> Path:
+    return _instance_path(TEST_BUDGET["ledger"])
+
+
+def _ledger_add(entry: dict) -> None:
+    import fcntl
+    path = _ledger()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.write(json.dumps({"ts": time.time(), "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                            **entry}, ensure_ascii=False) + "\n")
+
+
+def test_budget() -> dict:
+    """Paid spend of test runs over the window against the cap (+ the owner's approvals in the same window), USD."""
+    since = time.time() - float(TEST_BUDGET["window_hours"]) * 3600
+    spent = approved = 0.0
+    notified = False
+    try:
+        lines = _ledger().read_text().splitlines()
+    except OSError:
+        lines = []
+    for line in lines:
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if float(e.get("ts") or 0) < since:
+            continue
+        if e.get("kind") == "approval":
+            approved += float(e.get("usd") or 0)
+        elif e.get("kind") == "notice":
+            notified = True
+        else:
+            spent += float(e.get("usd") or 0)
+    rate = float(TEST_BUDGET["usd_per_eur"])
+    limit = float(TEST_BUDGET["paid_limit_eur"]) * rate + approved
+    return {"spent_usd": round(spent, 4), "limit_usd": round(limit, 4), "approved_usd": round(approved, 4),
+            "spent_eur": round(spent / rate, 2), "limit_eur": round(limit / rate, 2),
+            "window_hours": TEST_BUDGET["window_hours"], "notified": notified}
+
+
+def _price_usd(route: dict, usage: dict | None, body: dict) -> float:
+    """Cost of one call from its usage (or, before the call, from the request size) at the route's price."""
+    host = route.get("host") or {}
+    p_in, p_out, blended = host.get("price_in_1m"), host.get("price_out_1m"), route.get("blended_1m")
+    if usage:
+        t_in, t_out = float(usage.get("in") or 0), float(usage.get("out") or 0)
+    else:   # ~4 characters per token; the answer is unknown before the call
+        t_in, t_out = len(json.dumps(body.get("messages") or [], default=str)) / 4, 0.0
+    if p_in is not None:
+        return (t_in * float(p_in) + t_out * float(p_out if p_out is not None else p_in)) / 1e6
+    return (t_in + t_out) * float(blended or 0) / 1e6
+
+
+def test_gate(route: dict, body: dict) -> str | None:
+    """None when this paid call of a test fits the budget, else the refusal (and one Telegram notice per window)."""
+    b = test_budget()
+    if b["spent_usd"] + _price_usd(route, None, body) <= b["limit_usd"]:
+        return None
+    if not b["notified"]:
+        _ledger_add({"kind": "notice"})
+        text = (f"⚠️ Essais W.Alter : budget payant atteint ({b['spent_eur']:.2f} € sur {b['limit_eur']:.2f} € en "
+                f"{b['window_hours']} h). Les routes payantes sont refusées aux essais tant que tu n'as pas validé "
+                f"un montant de plus.")
+        threading.Thread(target=_telegram, args=(text,), daemon=True).start()
+    return (f"test_budget: paid spend of tests {b['spent_eur']:.2f} EUR / {b['limit_eur']:.2f} EUR over "
+            f"{b['window_hours']} h; the owner must approve more (walter-llm test-budget approve EUR)")
+
+
+def _charge(route: dict, entry: dict, telemetry: dict, body: dict) -> None:
+    """Record the paid spend of a test call (provider cost, else estimated from its usage or size)."""
+    if entry.get("channel") != "test" or route["provider"] not in PAID:
+        return
+    cost = telemetry.get("cost_usd")
+    usd = float(cost) if cost is not None else _price_usd(route, telemetry.get("usage"), body)
+    try:
+        _ledger_add({"kind": "spend", "usd": round(usd, 6), "estimated": cost is None, "provider": route["provider"],
+                     "model": route["model"], "run_id": entry.get("run_id"), "agent": entry.get("agent")})
+    except OSError:
+        pass
+
+
+def _telegram(text: str) -> None:
+    """One message to the owner through Hermes' gateway (best effort)."""
+    try:
+        hermes = Path(_walter("instance", "harness", "hermes")) / "hermes-agent" / "venv" / "bin" / "hermes"
+        subprocess.run([str(hermes), "send", "-t", "telegram", text], capture_output=True, timeout=120)
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        pass
+
+
+def approve_tests(eur: float, note: str = "") -> dict:
+    """The owner's approval of EUR more paid spend for tests, valid for the window."""
+    _ledger_add({"kind": "approval", "eur": eur, "usd": round(eur * float(TEST_BUDGET["usd_per_eur"]), 4),
+                 "note": note})
+    return test_budget()
 
 
 # ───────────────────────── routes (Walter Router) ─────────────────────────
@@ -180,6 +290,11 @@ def litellm_target(route: dict) -> dict | None:
     if p == "claude-pro":
         config = _CONF.get("claude_subscription") or {}
         return {"model": m} if config.get("enabled") and m in config.get("verified_models", []) else None
+    if p == "antigravity":                                    # Google AI Pro: the official Antigravity CLI, text only
+        from antigravity_subscription import base_id
+        config = _CONF.get("antigravity_subscription") or {}
+        verified = config.get("verified_models", [])
+        return {"model": m} if config.get("enabled") and m in {*verified, *map(base_id, verified)} else None
     if p == "kie" and m.startswith(KIE_GPT):                 # Kie /codex = OpenAI Responses protocol
         key = provider_key("KIE_API_KEY")
         return {"model": f"openai/responses/{m}", "api_base": "https://api.kie.ai/codex/v1", "api_key": key,
@@ -195,6 +310,8 @@ def litellm_target(route: dict) -> dict | None:
         return target
     if p == "arnict":
         return {"model": f"openai/{m}", "api_base": "https://api.arnict.com/v1", "api_key": provider_key("ARNICT_API_KEY")}
+    if p == "venice":                                         # Venice: OpenAI-compatible chat completions, own key
+        return {"model": f"openai/{m}", "api_base": "https://api.venice.ai/api/v1", "api_key": provider_key("VENICE_API_KEY")}
     if p == "codex":                                          # ChatGPT subscription (Codex models), own login
         if not chatgpt_ready():
             return None
@@ -204,6 +321,12 @@ def litellm_target(route: dict) -> dict | None:
 
 async def provider_completion(route: dict, **kwargs):
     """One provider transport; Claude's native client contributes no agent context or tools."""
+    if route["provider"] == "antigravity":
+        from antigravity_subscription import completion as antigravity
+        config = dict(_CONF["antigravity_subscription"])
+        for key in ("cli", "home"):
+            config[key] = str(_instance_path(config[key]))
+        return await antigravity(config, **kwargs)
     if route["provider"] != "claude-pro":
         import litellm
         return await litellm.acompletion(**kwargs)
@@ -216,6 +339,27 @@ async def provider_completion(route: dict, **kwargs):
             config[key] = str(_instance_path(config[key]))
     token = await asyncio.to_thread(grants.access, config.get("grant", "claude-subscription"))
     return await completion(config, token, **kwargs)
+
+
+def _rate_limited(exc: BaseException) -> bool:
+    return type(exc).__name__ == "RateLimitError" or getattr(exc, "status_code", None) == 429
+
+
+async def start_completion(route: dict, kwargs: dict, stream: bool):
+    """(response, iterator, first chunk): the call, up to its first token when streaming. A subscription's rate-limit
+    refusal is waited out (RATE_LIMIT_WAITS) before the caller falls back to a paid route."""
+    import asyncio
+    for wait in (*RATE_LIMIT_WAITS, None):
+        try:
+            resp = await provider_completion(route, **kwargs)
+            if not stream:
+                return resp, None, None
+            it = resp.__aiter__()
+            return resp, it, await it.__anext__()
+        except Exception as exc:
+            if wait is None or route.get("access") != "subscription" or not _rate_limited(exc):
+                raise
+            await asyncio.sleep(wait)
 
 
 def codex_access_token() -> str:
@@ -269,9 +413,14 @@ async def exact_call(spec: dict) -> dict:
 
     route = spec.get("route") or {}
     provider, model = route.get("provider"), route.get("model")
-    if provider not in {"kie", "openrouter", "codex", "arnict", "claude-pro"} or not isinstance(model, str) or not model.strip():
+    if provider not in {"kie", "openrouter", "codex", "arnict", "venice", "claude-pro", "antigravity"} or not isinstance(model, str) or not model.strip():
         return {"ok": False, "error": "invalid_route"}
     try:
+        test = os.environ.get("WALTER_RUN_CHANNEL") == "test"
+        if test and provider in PAID:
+            refused = test_gate(route, spec)
+            if refused:
+                return {"ok": False, "error": "test_budget", "detail": refused}
         if provider == "codex":
             _install_codex_auth()
         target = litellm_target(route)
@@ -286,6 +435,8 @@ async def exact_call(spec: dict) -> dict:
         if route.get("reasoning") and route["reasoning"] not in {"none", "non-reasoning"}:
             kwargs["reasoning_effort"] = route["reasoning"]
         response = await provider_completion(route, **kwargs)
+        if test:
+            _charge(route, {"channel": "test", "agent": "walter-router"}, _telemetry(response), spec)
         message = response.choices[0].message.model_dump(exclude_none=True)
         returned_model = response.model
         # Provider prefixes and punctuation differ; a different model is never accepted as success.
@@ -412,6 +563,7 @@ async def _correlation(request, body: dict, agent: str) -> dict:
             row = await asyncio.to_thread(_run_metadata, out["run_id"])
             out["run_id"] = checked(row, out["run_id"])
             out["correlation_status"] = "resolved"
+            out["channel"] = row.get("channel")
         if agent == "dsh":
             session_id = _dsh_session(body.pop("prompt_cache_key", None))
             body.pop("prompt_cache_retention", None)
@@ -421,7 +573,7 @@ async def _correlation(request, body: dict, agent: str) -> dict:
                 found = checked(row)
                 if out["run_id"] and out["run_id"] != found:
                     raise HTTPException(400, "conflicting correlation identifiers")
-                out.update(run_id=found, session_id=session, correlation_status="resolved")
+                out.update(run_id=found, session_id=session, correlation_status="resolved", channel=row.get("channel"))
         if out["task_id"] and not out["run_id"]:
             raise HTTPException(409, "task correlation requires a resolved run")
         return {k: v for k, v in out.items() if v is not None}
@@ -457,7 +609,7 @@ def log(entry: dict) -> None:
         row = {"task": entry.get("task"), "model_id": entry.get("model_id"), "provider": entry["provider"],
                "model": entry.get("model"), "ok": entry.get("ok"), "seconds": entry.get("seconds"), "kind": "text",
                "role": f"agent:{entry.get('agent')}",
-               **{k: entry.get(k) for k in ("run_id", "task_id", "usage", "cost_usd", "cost_status")}}
+               **{k: entry.get(k) for k in ("run_id", "task_id", "usage", "cost_usd", "cost_status", "skipped")}}
         threading.Thread(target=_record_attempt, args=(row, entry), daemon=True).start()
 
 
@@ -511,6 +663,12 @@ def build_app():
             t0 = time.perf_counter()
             base = {"agent": agent, "task": task, "model_id": d.get("model_id"), "provider": route["provider"],
                     "model": route["model"], **correlation}
+            if correlation.get("channel") == "test" and route["provider"] in PAID:
+                refused = test_gate(route, body)
+                if refused:
+                    errors.append(f"{route['provider']}/{route['model']}: {refused}")
+                    log({**base, "ok": False, "seconds": 0, "skipped": "test_budget"})
+                    continue
             try:
                 target = litellm_target(route)
             except Exception as e:                            # key missing in Bitwarden, vault locked…
@@ -529,17 +687,17 @@ def build_app():
                 kwargs["messages"] = [{"role": "system", "content": json_instruction(body["response_format"])},
                                       *body.get("messages", [])]
             try:
-                resp = await provider_completion(route, **kwargs)
+                resp, it, first = await start_completion(route, kwargs, stream)   # fail over until the first token
                 if want_json and not stream:
                     resp.choices[0].message.content = as_json(resp.choices[0].message.content)
                 if not stream:
+                    telemetry = _telemetry(resp)
                     log({**base, "ok": True, "seconds": round(time.perf_counter() - t0, 2),
                          "observed_model": getattr(resp, "model", None),
-                         **_telemetry(resp), **({"host": getattr(resp, "provider", None) or
-                                                    (resp.model_dump().get("provider"))} if route["provider"] == "openrouter" else {})})
+                         **telemetry, **({"host": getattr(resp, "provider", None) or
+                                            (resp.model_dump().get("provider"))} if route["provider"] == "openrouter" else {})})
+                    _charge(route, base, telemetry, body)
                     return JSONResponse(resp.model_dump(), headers={"X-Walter-Route": f"{route['provider']}/{route['model']}"})
-                it = resp.__aiter__()
-                first = await it.__anext__()                  # fail over until the first token arrives
             except asyncio.CancelledError:
                 log({**base, "ok": False, "seconds": round(time.perf_counter() - t0, 2),
                      "stream": stream, "error": "CancelledError"})
@@ -547,10 +705,11 @@ def build_app():
             except Exception as e:
                 errors.append(f"{route['provider']}/{route['model']}: {type(e).__name__}")
                 log({**base, "ok": False, "seconds": round(time.perf_counter() - t0, 2), "error": type(e).__name__,
-                     "params": sorted(k for k in body if k != "messages")})
+                     "params": sorted(k for k in body if k != "messages"),
+                     **({"skipped": "rate_limit"} if route.get("access") == "subscription" and _rate_limited(e) else {})})
                 continue
 
-            async def sse(first=first, it=it, base=base, t0=t0):
+            async def sse(first=first, it=it, base=base, t0=t0, route=route):
                 ok, failure = False, None
                 telemetry = _telemetry(first)
                 observed_model = getattr(first, "model", None)
@@ -583,6 +742,7 @@ def build_app():
                     finally:
                         log({**base, "ok": ok, "seconds": round(time.perf_counter() - t0, 2), "stream": True,
                              "observed_model": observed_model, **telemetry, **({"error": failure} if failure else {})})
+                        _charge(route, base, telemetry, body)
 
             return StreamingResponse(sse(), media_type="text/event-stream",
                                      headers={"X-Walter-Route": f"{route['provider']}/{route['model']}"})
@@ -614,8 +774,17 @@ def add_agent(name: str, cred_file: str, ref: str = "WALTER_LLM_TOKEN") -> None:
         return
     p = Path(cred_file)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(f"version: 1\n\nrefs:\n  {ref}: {token}\n")
+    # Rewrite only refs.<ref>: the same file holds DSH's own records (e.g. the web UI's browser-session secret,
+    # whose loss would sign every browser out).
+    lines = p.read_text().splitlines() if p.exists() else []
+    if "refs:" in lines:
+        lines = [ln for ln in lines if not ln.startswith(f"  {ref}:")]
+        lines.insert(lines.index("refs:") + 1, f"  {ref}: {token}")
+    else:
+        lines = ["version: 1", "", "refs:", f"  {ref}: {token}", *[ln for ln in lines if not ln.startswith("version:")]]
+    p.touch(mode=0o600)
     os.chmod(p, 0o600)
+    p.write_text("\n".join(lines) + "\n")
     print(f"agent {name}: token written to {p} (ref {ref})")
 
 
@@ -633,9 +802,14 @@ if __name__ == "__main__":
         sys.exit(0 if answer.get("ok") else 1)
     elif cmd == "add-agent":
         add_agent(sys.argv[2], sys.argv[3])
+    elif cmd == "test-budget":   # status | approve EUR [note…] (only at the owner's explicit request)
+        if len(sys.argv) > 3 and sys.argv[2] == "approve":
+            print(json.dumps(approve_tests(float(sys.argv[3]), " ".join(sys.argv[4:])), indent=1))
+        else:
+            print(json.dumps(test_budget(), indent=1))
     elif cmd == "serve":
         import uvicorn
         uvicorn.run(build_app(), host="127.0.0.1", port=int(os.environ.get("WALTER_LLM_PORT", "8894")), log_level="warning")
     else:
-        print("Usage: walter-llm serve | call | add-agent NAME FILE", file=sys.stderr)
+        print("Usage: walter-llm serve | call | add-agent NAME FILE | test-budget [approve EUR [note]]", file=sys.stderr)
         sys.exit(2)

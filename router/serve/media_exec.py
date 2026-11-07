@@ -112,7 +112,7 @@ def craft_prompt(conn, request: str, style: str | None) -> str:
     try:
         d = choose.pick(conn, "general", "L1")
         route = next((r for r in execution.routes(conn, d["model_id"], d.get("variant") or "")
-                      if r.get("probe_ok") is not False), None)
+                      if r.get("probe_ok") is not False and r.get("hermes_provider")), None)
         if not route:
             return request
         q = (f"Réécris cette demande de {instance.owner()} en prompt pour un modèle génératif. Consigne de style : {style}\n"

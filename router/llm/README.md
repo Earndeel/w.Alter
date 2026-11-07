@@ -53,6 +53,19 @@ et erreur pendant le flux restent des échecs ; aucun repli fournisseur ne rejou
 La fermeture est bornée à cinq secondes et la journalisation se fait aussi quand elle échoue. Les diagnostics de
 la télémétrie conservent des types d'erreur, jamais les messages bruts des exceptions fournisseur.
 
+## Abonnement d'abord, essais plafonnés (2026-10-30)
+
+- Un abonnement qui a encore du quota (Claude Pro, Codex) passe toujours avant toute route payante, même après des
+  échecs récents (`serve/execution.py`). Un refus « rate limit » d'un abonnement est attendu puis réessayé
+  (`RATE_LIMIT_WAITS`, 4 puis 12 s) avant tout repli payant ; il est journalisé `skipped='rate_limit'` et ne rend pas
+  l'abonnement « non fiable ».
+- Les runs ouverts par `walter-scenario` (donc aussi `walter-lab`) sont du canal `test` (`WALTER_RUN_CHANNEL`).
+  Leur dépense chez les fournisseurs payants (Kie, OpenRouter, Arnict) est plafonnée à `test_budget.paid_limit_eur`
+  (2 €) sur 24 h glissantes ; au-delà, chaque route payante leur est refusée (`skipped='test_budget'`) et Monsieur
+  reçoit un message Telegram par fenêtre. Lui seul valide un montant de plus :
+  `walter-llm test-budget approve <EUR> [note]` (valable 24 h) ; `walter-llm test-budget` = état.
+  Journal : `@instance/state/llm/test-spend.jsonl` (coût fournisseur, sinon estimé depuis l'usage ou la taille).
+
 ## Maintenance et validation
 
 Migration Router `036_exec_telemetry` avant activation des producteurs et lecteurs de ces colonnes. En cas de
