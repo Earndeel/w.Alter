@@ -155,5 +155,18 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Browse",
+    "order": 50,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "walter_browse",
+      "browser_session",
+      "browser_sites"
+    ]
   }
 }
