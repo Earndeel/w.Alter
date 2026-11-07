@@ -6,7 +6,7 @@ from datetime import datetime
 from urllib.request import Request, urlopen
 
 from walter_router import paths
-from walter_router.instance import env_value
+from walter_router.instance import secret_value
 from walter_router.research.web import MAX_BYTES, now
 
 PROVIDERS_CONFIG = paths.CONFIG / "providers.json"
@@ -16,7 +16,7 @@ def source_hermes_providers() -> tuple[dict, datetime, str]:
     """Live /models catalogue of OpenAI-compatible providers configured in Hermes (config/providers.json)."""
     out, errors = [], {}
     for p in json.loads(PROVIDERS_CONFIG.read_text())["providers"]:
-        key = env_value(p["key_env"])
+        key = secret_value(p["key_env"])
         if not key:
             errors[p["provider"]] = f'{p["key_env"]} missing'
             continue

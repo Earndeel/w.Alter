@@ -19,6 +19,7 @@ from walter_router.analysis import select as sel
 # walter-router provider -> Hermes provider (config.yaml / built-in). Kie has one Hermes provider per protocol:
 # `kie` = Anthropic endpoint (/claude, Claude models), `kie-codex` = Responses endpoint (/codex/v1, GPT models).
 HERMES_PROVIDERS = {"codex": "openai-codex", "openrouter": "openrouter", "kie": "kie", "arnict": "arnict"}
+NATIVE_ONLY = {"venice", "antigravity"}   # providers walter-llm runs itself (2026-10-30), with no Hermes provider
 KIE_CODEX_MODELS = {"gpt-6-1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5-6-sol", "gpt-5-6-terra",
                     "gpt-5-6-luna", "gpt-5-5"}  # GET https://api.kie.ai/codex/v1/models, 2026-10-02
 MIN_CREDIT_USD = 1.0  # below this, OpenRouter routes go last (a 402 after minutes of agent work is worse)
@@ -35,6 +36,8 @@ def _runnable(offer: dict) -> tuple[str, str, str] | None:
     if offer["provider"] == "claude-pro":
         # Native Walter transport only; never write this provider into Hermes' direct-provider config.
         return None, offer["offer_key"], "claude-pro"
+    if offer["provider"] in NATIVE_ONLY:   # no Hermes provider: walter-llm runs them; Hermes consumers skip them
+        return None, offer["offer_key"], offer["provider"]
     if offer["provider"] == "kie":  # Kie ids are the canonical ids (claude-opus-5-5, gpt-6-1-sol)
         if offer["model_id"].startswith("claude-"):
             return "kie", offer["model_id"], "kie"
@@ -53,7 +56,8 @@ UNRELIABLE_MIN_RUNS, UNRELIABLE_FAIL_RATE, RELIABILITY_DAYS = 3, 0.5, 14
 
 
 def reliability(conn, provider: str, model: str) -> dict:
-    """Recent real executions of this provider x model (models.exec_log, skipped attempts excluded)."""
+    """Recent real executions of this provider x model (models.exec_log, skipped attempts excluded: walter-llm logs a
+    subscription's rate-limit refusal as skipped='rate_limit', a burst limit is not unreliability)."""
     r = conn.execute("""select count(*) as n, count(*) filter (where not ok) as failed from (
                           select ok from models.exec_log where provider = %s and model = %s and skipped is null
                           and at > now() - make_interval(days => %s) order by at desc limit 10) x""",
@@ -96,8 +100,8 @@ def host_order(conn, model_id: str, usage: str = "interactive") -> list[dict]:
 def routes(conn, model_id: str, variant: str = "", preferred: str | None = None, usage: str = "interactive",
            modes: list[str] | None = None) -> list[dict]:
     """Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not
-    nearly spent), Kie (if not much dearer), OpenRouter last — on its cheapest usable host (2026-10-22). Providers whose
-    last probe failed, or that failed most recent real runs, go to the end. Each route carries its price: the
+    nearly spent, always first then), Kie (if not much dearer), OpenRouter last — on its cheapest usable host
+    (2026-10-22). Paid providers whose last probe failed, or that failed most recent real runs, go to their end. Each route carries its price: the
     subscription's cost price per token, Kie's price, the chosen OpenRouter host's price."""
     snaps = sel.latest_snapshots(conn)
     status = {r["provider"]: r for r in conn.execute("select * from models.provider_status")}
@@ -156,8 +160,14 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
             return 3.5  # Kie clearly dearer than OpenRouter here: after it
         return base
 
-    out.sort(key=lambda r: (r["probe_ok"] is False, r["unreliable"], rank(r), r["provider"] != preferred,
-                            r["blended_1m"] if r["blended_1m"] is not None else 1e9))
+    def subscription_first(r: dict) -> bool:
+        """A subscription with quota left always goes before every paid route, whatever its recent failures: trying it
+        costs one quick refusal at worst, while a paid route ahead of it bills every call (2026-10-28: 40 Opus calls
+        on OpenRouter while the Claude subscription had 24 % of its week left; Monsieur, 2026-10-30)."""
+        return r["access"] == "subscription" and not quota_spent(r)
+
+    out.sort(key=lambda r: (not subscription_first(r), r["probe_ok"] is False, r["unreliable"], rank(r),
+                            r["provider"] != preferred, r["blended_1m"] if r["blended_1m"] is not None else 1e9))
     return out
 
 
@@ -252,6 +262,10 @@ def probe(conn, only: str | None = None, timeout: int = 90) -> dict:
                                     {"model": "openai/gpt-6-luna", "max_tokens": 5,
                                      "messages": [{"role": "user", "content": "OK"}]},
                                     {"Authorization": f'Bearer {key("OPENROUTER_API_KEY")}'}),
+        "venice": lambda: _post("https://api.venice.ai/api/v1/chat/completions",
+                                {"model": "deepseek-v4-1-flash-1017-uncensored", "max_tokens": 5,
+                                 "messages": [{"role": "user", "content": "OK"}]},
+                                {"Authorization": f'Bearer {instance.secret_value("VENICE_API_KEY")}'}),
         "arnict": lambda: _post("https://api.arnict.com/v1/chat/completions",
                                 {"model": "zai/glm-5.3-flash-uncensored", "max_tokens": 5,
                                  "messages": [{"role": "user", "content": "OK"}]},
