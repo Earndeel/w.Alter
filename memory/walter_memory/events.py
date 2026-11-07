@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from . import privacy, types
+from .logs import vault_scrub
 from .db import connection
 
 ACTOR_FIELDS = ("account", "external_id", "display_name", "handles", "phones", "emails", "is_self", "attributes")
@@ -70,7 +71,7 @@ def record_events(events: list[dict], *, conn=None) -> dict:
         payload = e.get("payload") or {}
         version = types.validate(e["event_type"], payload)
         occurred = _ts(e["occurred_at"])
-        content = e.get("content")
+        content = vault_scrub(e.get("content"))     # a vault value pasted in a message never enters history
         if content and "\x00" in content:          # PostgreSQL text/jsonb cannot hold NUL
             content = content.replace("\x00", "\ufffd")
         actor_id = e.get("actor_identity_id")
@@ -82,7 +83,8 @@ def record_events(events: list[dict], *, conn=None) -> dict:
             "occurred_at": occurred, "actor_identity_id": actor_id, "thread_id": e.get("thread_id"),
             "reply_to": e.get("reply_to"), "content": content,
             "content_hash": hashlib.sha256(content.encode()).hexdigest() if content else None,
-            "object_refs": [str(o) for o in e.get("object_refs") or []], "payload": json.dumps(payload, default=str).replace("\\u0000", "\\ufffd"),
+            "object_refs": [str(o) for o in e.get("object_refs") or []],
+            "payload": vault_scrub(json.dumps(payload, default=str)).replace("\\u0000", "\\ufffd"),
             "privacy_class": e.get("privacy_class") or privacy.classify_event(conn, e),
         })
     _ensure_partitions(conn, {p["occurred_at"].replace(day=1, hour=0, minute=0, second=0, microsecond=0)
