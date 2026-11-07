@@ -329,7 +329,8 @@ def main(argv: list[str] | None = None) -> int:
                     return 0
                 out = rs
             elif args.cmd == "tasks":
-                out = list(conn.execute("select task, label, interface from models.tasks where interface <> 'decisions' "
+                # internal = a poste the modules call (memory extraction, compression, voice…): never an intent class
+                out = list(conn.execute("select task, label, interface, internal from models.tasks where interface <> 'decisions' "
                                         "order by interface, task"))
             elif args.cmd == "dossier":
                 out = dossier.latest(conn, args.task)
