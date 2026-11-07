@@ -10,7 +10,9 @@ with urgency (now / today / later), category and needs_reply.
 2. Decision model through walter_memory.llm.decide: Mercury Decide free (OpenRouter), Clef (Workers AI) as fallback
    (2026-10-14, AA Decision Index).
 3. Monsieur's deterministic rules (config/triage_rules.json): muted / VIP threads and people, groups only when
-   mentioned or urgent, silence hours (Asia/Bangkok), e-mail categories never notified, hourly cap.
+   mentioned or urgent, silence hours (Asia/Bangkok), e-mail categories never notified, hourly cap. Muted threads and
+   silent groups (networks in silent_group_networks where Monsieur neither writes nor is mentioned) are settled
+   before any model call (2026-11-05).
 One decision per thread per run (the latest incoming message); every other incoming event of the burst is
 'remember'. SHADOW by default: decisions are recorded in triage.decisions, nothing is sent.
 """
@@ -85,11 +87,23 @@ def _thread_context(conn, ev: dict, self_names: list[str]) -> dict:
             "messages": msgs, "content_withheld": local}
 
 
-def _apply_rules(r: dict, ev: dict, ctx: dict, d: dict, now_local: datetime, sent_last_hour: int) -> tuple[str, str]:
-    action, rule = d["action"], ""
+def _without_model(r: dict, ev: dict, ctx: dict) -> tuple[str, str] | None:
+    """Decisions Monsieur's rules settle before any model call (2026-11-05: Line groups cost 125 decision calls a
+    week, 123 of them 'ignore')."""
     thread, people = ev["thread_id"] or "", (ev["payload"] or {}).get("sender_name") or ""
     if thread in r["muted_threads"]:
         return "remember", "muted thread"
+    if thread in r["vip_threads"] or people in r["vip_people"]:
+        return None
+    if (ctx["thread_kind"] == "group" and (ctx["network"] or "").lower() in r.get("silent_group_networks", [])
+            and not ctx["monsieur_messages_30d"] and not ctx["monsieur_mentioned"]):
+        return "ignore", "silent group: Monsieur does not write there and is not mentioned"
+    return None
+
+
+def _apply_rules(r: dict, ev: dict, ctx: dict, d: dict, now_local: datetime, sent_last_hour: int) -> tuple[str, str]:
+    action, rule = d["action"], ""
+    thread, people = ev["thread_id"] or "", (ev["payload"] or {}).get("sender_name") or ""
     if thread in r["vip_threads"] or people in r["vip_people"]:
         if action in ("ignore", "remember"):
             action, rule = "notify", "VIP"
@@ -146,20 +160,26 @@ def run(limit: int = 200, dry: bool = False) -> dict:
                 rec = {"action": "remember", "rule": "same burst: decided on the latest message", "d": {}}
             else:
                 ctx = _thread_context(conn, ev, self_names)
-                try:
-                    res = llm.decide(ctx, QUESTIONS, processor="triage", privacy_class=ev["privacy_class"]
-                                     if ev["privacy_class"] != "local_only" else "redacted_cloud",
-                                     names=self_names, purpose="environmental triage")
-                    a = res["answers"]
-                    d = {"action": a["action"]["choice"], "urgency": a["urgency"]["choice"],
-                         "category": a["category"]["choice"],
-                         "needs_reply": (a["needs_reply"].get("noul") or 0) >= 0.5,  # noul = probability of yes
-                         "confidence": a["action"]["confidence"], "model": res["model"]}
-                except Exception as exc:  # noqa: BLE001 — never lose an event: remember it
-                    out["errors"] += 1
-                    d = {"action": "remember", "urgency": "later", "category": None, "needs_reply": None,
-                         "confidence": None, "model": None, "error": f"{type(exc).__name__}: {exc}"[:200]}
-                action, rule = _apply_rules(r, ev, ctx, d, datetime.now(tz), sent_last_hour)
+                settled = _without_model(r, ev, ctx)
+                if settled:  # Monsieur's rules decide alone: no model call
+                    out["without_model"] = out.get("without_model", 0) + 1
+                    d = {}
+                    action, rule = settled
+                else:
+                    try:
+                        res = llm.decide(ctx, QUESTIONS, processor="triage", privacy_class=ev["privacy_class"]
+                                         if ev["privacy_class"] != "local_only" else "redacted_cloud",
+                                         names=self_names, purpose="environmental triage")
+                        a = res["answers"]
+                        d = {"action": a["action"]["choice"], "urgency": a["urgency"]["choice"],
+                             "category": a["category"]["choice"],
+                             "needs_reply": (a["needs_reply"].get("noul") or 0) >= 0.5,  # noul = probability of yes
+                             "confidence": a["action"]["confidence"], "model": res["model"]}
+                    except Exception as exc:  # noqa: BLE001 — never lose an event: remember it
+                        out["errors"] += 1
+                        d = {"action": "remember", "urgency": "later", "category": None, "needs_reply": None,
+                             "confidence": None, "model": None, "error": f"{type(exc).__name__}: {exc}"[:200]}
+                    action, rule = _apply_rules(r, ev, ctx, d, datetime.now(tz), sent_last_hour)
                 rec = {"action": action, "rule": rule, "d": d,
                        "ctx": {k: ctx[k] for k in ("network", "thread_kind", "monsieur_mentioned",
                                                    "monsieur_answered_after", "monsieur_messages_30d",
