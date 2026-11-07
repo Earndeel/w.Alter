@@ -316,7 +316,8 @@ def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]
               "current": f'{r["pinned_model_id"]}/{r["pinned_variant"]}', "current_score": pinned and pinned["score"]}
         chg = chg or changes.events(conn)
         ev["why"] = changes.changed(chg, r["model_id"]) + [
-            f'{r["pinned_model_id"]} dégradé' for _ in chg["nerf"].get(r["pinned_model_id"], [])[:1]]
+            f'{r["pinned_model_id"]} dégradé' for _ in chg["nerf"].get(r["pinned_model_id"], [])[:1]] + \
+            changes.rebased_intelligence(chg)
         if record(conn, "tier", "general", ev["proposed"], ev, "open" if ev["why"] else "baseline",
                    r["level"]) and ev["why"]:
             created.append(f'{r["level"]}:{ev["proposed"]}')
@@ -329,7 +330,8 @@ def adopt_orchestrator(conn, model_id: str) -> dict:
     import shutil
     from datetime import datetime, timezone
     from walter_router.serve import execution
-    route = next((r for r in execution.routes(conn, model_id) if r.get("probe_ok") is not False), None)
+    route = next((r for r in execution.routes(conn, model_id)
+                  if r.get("probe_ok") is not False and r.get("hermes_provider")), None)
     if not route:
         raise RuntimeError(f"no usable route for {model_id}")
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -478,9 +480,13 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
     if decision == "adopted" and a["kind"] == "tier" and a["role"] == "orchestrator":
         return {"alert_id": alert_id, "status": decision, **adopt_orchestrator(conn, a["subject"])}
     if decision == "adopted" and a["kind"] == "tier":
+        from walter_router.analysis import knowledge
         from walter_router.serve.choose import set_preference
-        set_preference(conn, "general", pin=a["subject"], role=a["role"], watch="dominance",
-                       note=f"Niveau {a['role']} adopté par {instance.owner()} (alerte {alert_id}), méthode des 3 niveaux.")
+        ev = a["evidence"] or {}
+        note = f"Niveau {a['role']} adopté par {instance.owner()} (alerte {alert_id}), méthode des 3 niveaux."
+        knowledge.set_level("general", a["role"], a["subject"], why=f"alerte {alert_id} adoptée",
+                            description=f"{ev.get('name') or a['subject']} ({ev.get('score')} AA) — {note}")
+        set_preference(conn, "general", pin=a["subject"], role=a["role"], watch="dominance", note=note)
         return {"alert_id": alert_id, "status": decision, "pinned": a["subject"]}
     if decision == "adopted" and a["kind"] == "challenger" and ("boards" in a["evidence"] or "challenger" in a["evidence"]):
         from walter_router.serve.choose import set_preference

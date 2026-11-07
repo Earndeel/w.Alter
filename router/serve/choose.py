@@ -93,7 +93,12 @@ def pick_required(conn, t: dict, require: str, limit: int = 5) -> dict[str, Any]
     comp = {c["model_id"]: c["composite"] for c in composite(conn, t["task"])}
     for x in cands:   # the task's own weighted score first, as for any pick; a model it does not measure goes after
         x["composite"] = comp.get(x["model_id"]) or comp.get(x["score_from_base"] or "")
-    cands.sort(key=lambda x: (require == "unrestricted" and x["content_policy"] == "permissive",
+    # the owner's declared favourites for unrestricted requests lead, in their declared order (knowledge.json)
+    from walter_router.analysis import knowledge   # late import (knowledge imports this module)
+    favourites = [f["model_id"] for f in (knowledge.load().get("unrestricted_favourites") or [])] \
+        if require == "unrestricted" else []
+    cands.sort(key=lambda x: (favourites.index(x["model_id"]) if x["model_id"] in favourites else len(favourites),
+                              require == "unrestricted" and x["content_policy"] == "permissive",
                               -(x["composite"] if x["composite"] is not None else -1),
                               order.index(x["board"]) if x["board"] in order else len(order), -(x["score"] or 0),
                               x["price_1m_blended"] or x["cost"] or 0))

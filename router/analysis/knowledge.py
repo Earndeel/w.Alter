@@ -26,6 +26,51 @@ def load() -> dict:
     return json.loads(KNOWLEDGE.read_text())
 
 
+KEEP = object()
+
+
+def set_level(task: str, level: str, pin: str, why: str, provider: str | None = None, description: str | None = None,
+              evidence: str | None = None, fallback=KEEP) -> dict:
+    """One writer for the owner's declared text tiers (knowledge.json "levels"), the source `declare` re-applies
+    every cycle: a tier adopted on Telegram must land here, or the next cycle restores the old pin (2026-10-28).
+    Writes the instance's own copy and keeps the previous file in config/router/history/."""
+    import os
+    import tempfile
+    from datetime import datetime, timezone
+    doc = load()
+    lv = ((doc.get("levels") or {}).get(task) or {}).get(level)
+    if not isinstance(lv, dict):
+        raise KeyError(f"no declared level {task}/{level}")
+    if "/" not in pin:
+        raise ValueError("pin must be model_id/variant")
+    lv.update({"pin": pin, "provider": provider})
+    if not provider:
+        lv.pop("provider")
+    for key, value in (("description", description), ("evidence", evidence)):
+        if value is not None:
+            lv[key] = value
+    if fallback is not KEEP:
+        lv.pop("fallback", None)
+        if fallback:
+            lv["fallback"] = fallback
+    doc.setdefault("changes", []).append({"at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                                          "level": f"{task}/{level}", "pin": pin, "why": why})
+    target = instance.own_file("knowledge.json")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        hist = target.parent / "history"
+        hist.mkdir(exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        (hist / f"knowledge-{stamp}.json").write_text(target.read_text())
+    fd, tmp = tempfile.mkstemp(dir=target.parent, suffix=".json")
+    with os.fdopen(fd, "w") as fh:
+        json.dump(doc, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, target)
+    return {"level": f"{task}/{level}", "pin": pin, "written": str(target)}
+
+
 def norm(text: str) -> str:
     text = unicodedata.normalize("NFKD", text.lower())
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
@@ -138,6 +183,27 @@ def level_fallback(task: str, level: str | None) -> str | None:
     """Declared fallback (model_id/variant) of a text tier, used when every route of the pinned model fails."""
     lv = ((load().get("levels") or {}).get(task) or {}).get(level or "")
     return lv.get("fallback") if isinstance(lv, dict) else None
+
+
+def declared_fallbacks(model_id: str, task: str, level: str | None, require: str | None) -> list[tuple[str, str]]:
+    """Models the owner declared to run when every provider of `model_id` failed, in order, as (model_id, variant):
+    the unrestricted favourites after it (for an unrestricted request), then the text tier's declared fallback.
+    Nothing undeclared: a model is substituted only when the owner named it."""
+    doc = load()
+    out: list[tuple[str, str]] = []
+    if require == "unrestricted":
+        favourites = [f["model_id"] for f in doc.get("unrestricted_favourites") or []]
+        after = favourites[favourites.index(model_id) + 1:] if model_id in favourites else favourites
+        out += [(m, "") for m in after]
+    tier = level_fallback(task, level)
+    if tier and "/" in tier:
+        out.append(tuple(tier.split("/", 1)))
+    seen, chain = {model_id}, []
+    for m, v in out:
+        if m not in seen:
+            seen.add(m)
+            chain.append((m, v))
+    return chain
 
 
 def effective_policy(conn, model_id: str) -> str:

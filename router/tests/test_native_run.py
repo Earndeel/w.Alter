@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import asyncio
 from pathlib import Path
 import subprocess
@@ -216,7 +217,8 @@ def _gateway_function():
     ns = {"litellm_target": lambda route: {"model": route["model"], "api_key": "test-key"},
           "_usage": lambda response: {}, "_telemetry": lambda response: {
               "usage": {}, "cost_usd": None, "cost_status": "unknown"},
-          "_install_codex_auth": lambda: None}
+          "_install_codex_auth": lambda: None, "os": os, "PAID": {"kie", "openrouter", "arnict"},
+          "test_gate": lambda route, spec: None, "_charge": lambda *a: None}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), "gateway.py", "exec"), ns)
     return ns["exact_call"]
 
@@ -244,3 +246,44 @@ def test_real_terminal_assertions_and_checksum():
                                   "print(hashlib.sha256(b\"native-router\").hexdigest())'"}, 10)
     import hashlib
     assert out["exit_code"] == 0 and out["output"].strip() == hashlib.sha256(b"native-router").hexdigest()
+
+
+def unrestricted_decision():
+    return {"task": "general", "model_id": "m-a", "require": "unrestricted", "execution": [
+        {"provider": "venice", "model": "m-a-venice"}]}
+
+
+def favourites(monkeypatch):
+    from walter_router.analysis import knowledge
+    monkeypatch.setattr(knowledge, "load", lambda: {"unrestricted_favourites": [
+        {"model_id": "m-a"}, {"model_id": "m-b"}]})
+    monkeypatch.setattr(run.execution, "routes", lambda conn, mid, variant="", **k: [
+        {"provider": "arnict", "model": f"{mid}-arnict", "model_id": mid, "probe_ok": True}])
+
+
+def test_declared_fallback_model_runs_after_every_provider_of_the_titular(monkeypatch, execution):
+    favourites(monkeypatch)
+    seen = []
+    def complete(route, messages, tools, timeout):
+        seen.append((route["model_id"], route["provider"]))
+        if route["model_id"] == "m-a":
+            raise RuntimeError("provider_timeout")
+        return answer(route)
+    monkeypatch.setattr(text_agent, "complete", complete)
+    out = run._text(execution.conn, unrestricted_decision(), {"goal": "test"})
+    assert out["ok"] and seen == [("m-a", "venice"), ("m-b", "arnict")]
+    assert out["routed"]["executed_model_id"] == "m-b" and out["routed"]["model_id"] == "m-a"
+    assert [n["type"] for n in out["notices"]] == ["model_fallback"] and out["user_notification_required"]
+    assert [(r["model_id"], r["ok"]) for r in execution.logs] == [("m-a", False), ("m-b", True)]
+
+
+def test_no_model_substitution_when_the_request_is_not_declared_as_unrestricted(monkeypatch, execution):
+    favourites(monkeypatch)
+    seen = []
+    def fail(route, *args):
+        seen.append(route["model_id"])
+        raise RuntimeError("provider_timeout")
+    monkeypatch.setattr(text_agent, "complete", fail)
+    d = {**unrestricted_decision(), "require": None}
+    out = run._text(execution.conn, d, {"goal": "test"})
+    assert not out["ok"] and seen == ["m-a"] and "Aucun autre modèle" in out["user_notice"]
