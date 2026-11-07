@@ -103,8 +103,10 @@ def fast_path(req: Request) -> ContextPlan | None:
         return ContextPlan(turn_id=req.turn_id, thread=ThreadChoice(id=waiting), level="L1",
                            act="approve" if APPROVE.match(text) else "continue", fast_path="short_reply")
     if TRIVIAL.match(text):
+        from .trivial import answer, owner_tz
         return ContextPlan(turn_id=req.turn_id, thread=ThreadChoice(id=None, new=True), act="new", level="L0",
-                           fast_path="trivial", model_profile=ModelProfile(task="general", level="L1"))
+                           fast_path="trivial", model_profile=ModelProfile(task="general", level="L1"),
+                           answer=answer(text, owner_tz()))
     return None
 
 
@@ -123,7 +125,8 @@ def refresh_router() -> dict:
     out = {"at": time.time(), "tasks": {}, "chain": []}
     try:
         rows = json.loads(procs["tasks"].communicate(timeout=20)[0])
-        out["tasks"] = {r["task"]: r["label"] for r in rows if r.get("interface") == "chat"}
+        # internal postes (memory extraction, compression, voice…) are called by modules, never asked for by the owner
+        out["tasks"] = {r["task"]: r["label"] for r in rows if r.get("interface") == "chat" and not r.get("internal")}
     except Exception:  # noqa: BLE001 — the task question is then left out
         procs["tasks"].kill()
     try:
