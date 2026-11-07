@@ -5,6 +5,7 @@ derived and rebuildable: `walter-memory index --rebuild`.
 """
 from __future__ import annotations
 
+import hashlib
 import math
 import os
 from pathlib import Path
@@ -393,6 +394,26 @@ def search_norm(text: str) -> str:
         return conn.execute("select search.f_unaccent(lower(%s)) as t", (text,)).fetchone()["t"]
 
 
+RERANK_VERSION = "1"
+
+
+def rerank_pools(query: str, pools: dict[str, tuple[list[dict], int]], timeout: float = 8) -> dict[str, list[dict]]:
+    """Several candidate lists for one query (context sections), reranked by ONE call over their union, then cut
+    back per list: each list keeps only its own rows, in the reranked order, up to its limit. One get_context used to
+    make 3-4 rerank calls over 60 candidates each; a single larger pool costs less and finds more (07/11: « modèles
+    non censurés » reached the Venice decision only with ~150 candidates)."""
+    union, seen = [], set()
+    for rows, _ in pools.values():
+        for r in rows:
+            k = (r.get("ref_id"), r.get("text"))
+            if k not in seen:
+                seen.add(k); union.append(r)
+    ranked = _rerank(query, union, len(union), timeout) if union else []
+    pos = {(r.get("ref_id"), r.get("text")): i for i, r in enumerate(ranked)}
+    return {name: sorted(rows, key=lambda r: pos.get((r.get("ref_id"), r.get("text")), len(pos)))[:limit]
+            for name, (rows, limit) in pools.items()}
+
+
 def _rerank(query: str, results: list[dict], limit: int, timeout: float = 8) -> list[dict]:
     """Rerank only current permitted canonical records; private queries stay local."""
     from .read_policy import filter_cloud_rows, query_privacy
@@ -413,18 +434,30 @@ def _rerank(query: str, results: list[dict], limit: int, timeout: float = 8) -> 
         if r["privacy_class"] == "redacted_cloud" and privacy.pseudonymise():
             text, _ = privacy.redact(text, [r.get("actor") or ""])
         docs.append(text[:2000])
+    if len(cloud) < 2:
+        return results
     from .llm import router_model
+    from . import processing
     model = router_model("rerank", "cohere/rerank-4-fast")   # Walter Router poste (2026-10-16)
-    try:
+    top_n = min(limit, len(docs))
+
+    def call():
         resp = httpx.post("https://openrouter.ai/api/v1/rerank", headers={"Authorization": f"Bearer {_key()}"},
-                          json={"model": model, "query": query, "documents": docs, "top_n": min(limit, len(docs))},
-                          timeout=timeout)
+                          json={"model": model, "query": query, "documents": docs, "top_n": top_n}, timeout=timeout)
         resp.raise_for_status()
         data = resp.json()
-        order = [cloud[x["index"]] for x in data["results"]]
         from .llm import _log
         _log(processor="search.rerank", model=model, purpose="rerank", budget="recurring",
              privacy_class="redacted_cloud", cost_usd=(data.get("usage") or {}).get("cost"), status="ok")
+        return [int(x["index"]) for x in data["results"]], model
+    # The same query over the same documents is never sent twice (a hook and a pack for one message, a bench rerun):
+    # the ledger keeps the order only (indices), keyed by a hash of model, query and documents.
+    inputs = {"model": model, "query": query, "top_n": top_n,
+              "docs": [hashlib.sha256(d.encode()).hexdigest()[:24] for d in docs]}
+    try:
+        idx, _ = processing.decide_once("search.rerank", RERANK_VERSION, inputs, call,
+                                        privacy_class="redacted_cloud")
+        order = [cloud[i] for i in idx if 0 <= i < len(cloud)]
     except Exception:
         return results
     rest = [r for r in results if r not in order]

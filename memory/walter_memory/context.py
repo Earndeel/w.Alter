@@ -149,6 +149,20 @@ def _periods(message: str, max_privacy: str, budget: int) -> tuple[str, list[str
     return "\n\n".join(out), keys
 
 
+# Candidates per section before the single rerank (union ≈ 190; measured 07/11 on the levels bench: records under 60
+# lost paraphrased records, knowledge 60 lost « modèles non censurés » → Venice).
+CANDIDATES = {"records": 60, "knowledge": 90, "evidence": 40}
+
+
+class _Section:
+    """One section's rows out of the shared rerank (same .result() interface as the former per-section futures)."""
+    def __init__(self, ranked, name: str):
+        self._ranked, self._name = ranked, name
+
+    def result(self):
+        return self._ranked.result().get(self._name, [])
+
+
 def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "cloud_allowed",
                 include_profile: bool = True, history: bool = False,
                 session: tuple[str, str] | None = None) -> dict:
@@ -164,20 +178,30 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     query = FORM_PREAMBLE.sub("", query, count=1) or query
     t0 = time.perf_counter()
     sections, trace = {}, {"query_chars": len(query), "sections": {}}
-    # The searches are independent (each with its own rerank call): run them at once, read them in section order.
+    # The candidate searches are local (FTS + vectors) and independent: run them at once; then ONE rerank call over
+    # their union orders every section (search.rerank_pools), instead of one call per section (07/11).
     from concurrent.futures import ThreadPoolExecutor
     pool = ThreadPoolExecutor(4)
-    fut = {}
+    want = {}
     if b.get("records", 0) > 0:
-        fut["records"] = pool.submit(lambda: search.dedupe(search.search(
-            query, limit=4, labels=["doc_section"], max_privacy=max_privacy, rerank=True, history=history)))
+        want["records"] = (dict(labels=["doc_section"]), CANDIDATES["records"], 4)
     if b["knowledge"] > 0:
-        fut["knowledge"] = pool.submit(lambda: search.dedupe(search.search(
-            query, limit=12, lanes=("knowledge",), max_privacy=max_privacy, rerank=True, history=history)))
+        want["knowledge"] = (dict(lanes=("knowledge",)), CANDIDATES["knowledge"], 12)
     if b["evidence"] > 0 and EVIDENCE_HINT.search(query):
-        fut["evidence"] = pool.submit(lambda: search.search(query, limit=8, include_derived=False,
-                                                            max_privacy=max_privacy, rerank=True, history=history))
+        want["evidence"] = (dict(include_derived=False), CANDIDATES["evidence"], 8)
+    cand = {k: pool.submit(lambda kw=kw, n=n: search.search(query, limit=n, max_privacy=max_privacy, history=history,
+                                                             **kw)) for k, (kw, n, _) in want.items()}
+
+    def ranked():
+        pools = {k: (f.result(), want[k][2]) for k, f in cand.items()}
+        if "knowledge" in pools and len(pools["knowledge"][0]) < 3:      # thin knowledge: both lanes
+            pools["both"] = (search.search(query, limit=CANDIDATES["evidence"], max_privacy=max_privacy,
+                                           history=history), 12)
+        out = search.rerank_pools(query, pools)
+        return {k: (v if k == "evidence" else search.dedupe(v)) for k, v in out.items()}
+    rank = pool.submit(ranked)
     pool.shutdown(wait=False)
+    fut = {k: _Section(rank, k) for k in want}
     if include_profile and b["profile"] > 0 and USER_MD.exists():
         text, used = _clip(USER_MD.read_text().splitlines(), b["profile"])
         sections["profile"] = text
@@ -236,8 +260,7 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
         # derived knowledge only (evidence has its own section); both lanes when knowledge is thin
         res = fut["knowledge"].result()
         if len(res) < 3:
-            res = search.dedupe(res + search.search(query, limit=12, max_privacy=max_privacy, rerank=True,
-                                                    history=history))
+            res = search.dedupe(res + rank.result().get("both", []))
         lines = [f"- {r['text'].strip()} ({str(r['occurred_at'] or '')[:10]}{mark(r)})" for r in res
                  if not (b.get("records", 0) > 0 and r.get("label") == "doc_section")     # already in records
                  and str(r.get("ref_id")) not in shown_ids]                                  # already in rules/working
