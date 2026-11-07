@@ -69,7 +69,7 @@ def ask_dsh(prompt: str, *, memory: bool = True, timeout: int = 300, production:
     # Only the memory context comes from the test gateway. The run is a production `test` run (walter-llm serves DSH
     # only within an open run and caps a test run's spend); the bench workspace keeps the session out of core.events.
     env = {k: v for k, v in os.environ.items() if k != "WALTER_MEMORY_DATABASE_URL"}
-    env |= {"DSH_HOME": "/opt/dsh/home", "WALTER_MEMORY_URL": "http://127.0.0.1:8890" if production else f"http://127.0.0.1:{PORT}",
+    env |= {"DSH_HOME": "/opt/dsh/test-home", "WALTER_MEMORY_URL": "http://127.0.0.1:8890" if production else f"http://127.0.0.1:{PORT}",
             "WALTER_HOOK_SKILLS": "off",
             "WALTER_HOOK_PREFLIGHT": "off", "WALTER_HOOK_VIEWS": "off", "WALTER_HOOK_CONTEXT": "on" if memory else "off",
             "WALTER_RUN_CHANNEL": "test"}
