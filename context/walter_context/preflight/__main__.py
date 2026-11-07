@@ -68,14 +68,26 @@ def subjects(d: dict) -> tuple[list[dict], str | None, float | None]:
         return [], None, None
 
 
-def _attach_run(run_id: str, plan: dict) -> None:
+def requested(plan: dict, message: str) -> dict:
+    """What this turn asks of Walter Router (lot 2, 2026-11-07): read by the model gateway from the run. A rule's
+    answer travels with the hash of the owner's message it answers, so it is only ever returned for that message."""
+    profile = plan.get("model_profile") or {}
+    out = {"task": profile.get("task"), "level": profile.get("level"), "require": profile.get("require") or None,
+           "fast_path": plan.get("fast_path")}
+    if plan.get("answer"):
+        out.update(answer=plan["answer"], message_sha=hashlib.sha256(message.strip().encode()).hexdigest())
+    return out
+
+
+def _attach_run(run_id: str, plan: dict, message: str = "") -> None:
     """Walter Memory's Run Plane through its command (declared interface); never blocks the preflight."""
     import subprocess
     thread = (plan.get("thread") or {}).get("id")
     try:
         subprocess.run(["walter-memory", "runs", "update"], input=json.dumps(
             {"run_id": run_id, "level": plan.get("level"), "act": plan.get("act"),
-             "thread_id": thread if thread and thread != "new" else None}),
+             "thread_id": thread if thread and thread != "new" else None,
+             "requested": requested(plan, message)}),
             capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.TimeoutExpired):
         pass
@@ -107,7 +119,7 @@ def handle(d: dict, shadow: bool, want_pack: bool = False) -> tuple[dict | None,
                             "waiting_age_s": waiting_age}, "plan_ms": round((time.time() - t0) * 1000)}
         if d.get("run_id"):                 # Walter Run Plane: the plan's level and thread belong to the run
             row["run_id"] = d["run_id"]
-            _attach_run(d["run_id"], plan)
+            _attach_run(d["run_id"], plan, req.message)
         if (shadow or want_pack) and req.privacy_class != "local_only":
             from ..assembly import pack
             from ..retrieval import gather

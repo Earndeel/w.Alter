@@ -82,6 +82,7 @@ class ContextPlan:
     fast_path: str | None = None         # the plan came from a rule, without a model call
     escalated: bool = False              # a stronger model settled part of it
     decision: dict = field(default_factory=dict)          # model, latency_ms, confidences: for the trace only
+    answer: str | None = None            # fast_path trivial only: the exact answer, no model needed (lot 2, 07/11)
     version: int = VERSION
 
     def validate(self) -> "ContextPlan":
@@ -100,6 +101,8 @@ class ContextPlan:
         _one_of("model_profile.level", self.model_profile.level, MODEL_LEVELS)
         if self.fast_path is not None:
             _one_of("fast_path", self.fast_path, FAST_PATHS)
+        if self.answer is not None and self.fast_path != "trivial":
+            raise ContractError("answer: only a trivial fast path answers without a model")
         return self
 
     def to_dict(self) -> dict:
@@ -113,7 +116,8 @@ class ContextPlan:
                        capabilities=list(d.get("capabilities") or []),
                        model_profile=ModelProfile(**(d.get("model_profile") or {})),
                        fast_path=d.get("fast_path"), escalated=bool(d.get("escalated")),
-                       decision=dict(d.get("decision") or {}), version=d.get("version", VERSION))
+                       decision=dict(d.get("decision") or {}), answer=d.get("answer"),
+                       version=d.get("version", VERSION))
         except (KeyError, TypeError) as exc:
             raise ContractError(f"malformed ContextPlan: {exc}") from exc
         return plan.validate()
