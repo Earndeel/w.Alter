@@ -27,7 +27,9 @@ def _secrets():
         import walter_secrets  # noqa: F401
     except ImportError:
         root = subprocess.run(["walter", "path", "secrets"], capture_output=True, text=True).stdout.strip()
-        sys.path.insert(0, root or "/walter/secrets")
+        if not root:   # found through its interface only, never a guessed path
+            raise
+        sys.path.insert(0, root)
     from walter_secrets import fingerprints, vault
     return fingerprints, vault
 
