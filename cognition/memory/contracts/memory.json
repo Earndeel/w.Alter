@@ -199,5 +199,20 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Memory",
+    "order": 10,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "memory_context",
+      "memory_search",
+      "memory_events",
+      "person_lookup",
+      "memory_retain"
+    ]
   }
 }
