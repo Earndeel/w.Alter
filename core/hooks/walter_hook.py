@@ -11,6 +11,8 @@ One script, several hosts (the wire format is Claude Code's, which Hermes' shell
                                    + the W.Alter skills that fit the message (walter-skills :8891, P10), in parallel
                PostToolUse(Failure)(Bash) → a FAILED command's output goes to the walter-skills policy (skills whose
                                    card lists that symptom, only on a real match); SessionStart also gets the domain map
+               PostToolUse(read tools) → a large output also goes, detached, to walter-context's entrance (SHADOW:
+                                   it records what it would have cut; the model still gets the full output)
                PreCompact        → journal the transcript synchronously, so the recovery pointer is true
                Stop / SessionEnd → journal the transcript in the background (connector agent_sessions)
                                    + bus turn.ended / session.ended (+ Walter Memory subject views, detached;
@@ -49,6 +51,8 @@ CONNECTOR = ["walter-memory", "agent-sessions"]   # Walter Memory CLI on the PAT
 LOG = Path("/root/.hermes/logs/walter-hook.log")
 BUDGET = {"profile": 0, "people": 300, "knowledge": 600, "evidence": 300}
 MIN_WORDS = 4
+ENTRANCE = ["walter-context-entrance"]   # walter-context CLI on the PATH: large tool outputs on their way in (shadow)
+ENTRANCE_FLOOR = 4000                    # transport floor only, below walter-context's [entrance].min_chars
 # 2026-10-28: "vérifie l'état réel avant de les affirmer" made a model without tools refuse what the block said
 HEADER = ("Mémoire W.Alter (injectée automatiquement pour ce message ; souvenirs datés : réponds à partir d'eux en citant "
           "la date, le plus récent l'emporte ; si l'état réel compte et que tu as les outils, vérifie-le ; approfondir "
@@ -298,6 +302,8 @@ def run_start(runtime: str, session_key: str, prompt: str, *, channel: str = "ow
             if prev and prev.get("run_id"):
                 runs.safe(runs.end, prev["run_id"], "cancelled")
         secret = any(cat == "secret" for cat, _ in _privacy().detect(prompt))
+        # a bench or Lab run (walter-scenario sets WALTER_RUN_CHANNEL=test): walter-llm caps its paid spend
+        channel = os.environ.get("WALTER_RUN_CHANNEL") or channel
         run_id = runs.start(origin={"channel": channel, "runtime": runtime, "session_id": session_key},
                             goal=prompt, privacy_class="local_only" if secret else "cloud_allowed", dedupe_key=dedupe)
         runs.safe(runs.routing, run_id, {"applied": False, "configured": True, "via": "walter-llm poste (DSH provider walter)"} if runtime == "dsh"
@@ -423,6 +429,8 @@ def claude_code(ev: dict) -> dict | None:
             log(f"preflight shadow error {type(e).__name__}: {str(e)[:160]}")
         return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": ctx}} if ctx else None
     if name in ("PostToolUse", "PostToolUseFailure"):
+        if name == "PostToolUse":
+            entrance_shadow(ev)
         ctx = ours(runtime, error_skills(ev, runtime, sid))
         return {"hookSpecificOutput": {"hookEventName": name, "additionalContext": ctx}} if ctx else None
     if name == "PreCompact":
@@ -436,6 +444,23 @@ def claude_code(ev: dict) -> dict | None:
             emit("session.ended" if name == "SessionEnd" else "turn.ended", runtime, f"{runtime}/vm/{sid}",
                  {"reason": ev.get("reason")} if name == "SessionEnd" else None)
     return None
+
+
+def entrance_shadow(ev: dict) -> None:
+    """A large tool output goes to walter-context's entrance (shadow: it records what it would cut, numbers only).
+    Detached, so the agent never waits; the event goes through an unlinked temp file (no pipe that could block).
+    WALTER_HOOK_ENTRANCE=off disables it."""
+    if os.environ.get("WALTER_HOOK_ENTRANCE", "on") == "off":
+        return
+    raw = json.dumps(ev, ensure_ascii=False)
+    if len(raw) < ENTRANCE_FLOOR:
+        return
+    import tempfile
+    with tempfile.TemporaryFile("w+", encoding="utf-8") as f:
+        f.write(raw)
+        f.seek(0)
+        subprocess.Popen(ENTRANCE, stdin=f, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
 
 
 def failed_output(ev: dict) -> str:

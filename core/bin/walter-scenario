@@ -23,6 +23,8 @@ Assertions (on `walter-memory runs show <run_id>`; `$` = that JSON):
   - {step: <cmd name>, path: front, min_len: 1}   on the JSON printed by a `cmd` step
 Steps also: parallel: [{mcp: …}, …] (at once), cmd: {name, shell: "… {run_id} …"}.
 Per-message modules (memory context, skills, preflight, views) are off unless the scenario sets `modules: on`.
+Runs opened by a scenario are channel `test` (WALTER_RUN_CHANNEL): walter-llm caps their paid-provider spend
+(`walter-llm test-budget`), above it the owner approves.
 Reports: <instance>/state/scenarios/<name>/<time>.json.
 """
 from __future__ import annotations
@@ -56,7 +58,9 @@ def _instance() -> Path:
 
 def _env(modules) -> dict:
     """modules: "on" (all per-message modules), absent/"off" (none), or a list among preflight, memory, skills, views."""
-    env = {**os.environ, "WALTER_HARNESS_PID": str(os.getpid())}
+    # WALTER_RUN_CHANNEL=test: the runs opened by this scenario are tests; walter-llm caps their paid-provider spend
+    # (Monsieur 2026-10-30: above 2 € a test needs his approval) and never counts them as the owner's work
+    env = {**os.environ, "WALTER_HARNESS_PID": str(os.getpid()), "WALTER_RUN_CHANNEL": "test"}
     on = {"preflight", "memory", "skills", "views"} if modules == "on" else set(modules or []) if isinstance(modules, list) else set()
     for name, var in (("memory", "WALTER_HOOK_CONTEXT"), ("skills", "WALTER_HOOK_SKILLS"),
                       ("preflight", "WALTER_HOOK_PREFLIGHT"), ("views", "WALTER_HOOK_VIEWS")):
@@ -131,7 +135,7 @@ def step_harness(step: dict, env: dict) -> dict:
     if rt != "dsh":
         return {"ok": False, "error": f"runtime {rt} not wired yet (dsh only)"}
     ws = tempfile.mkdtemp(prefix="walter-scenario-dsh-")
-    e = {**env, "DSH_HOME": step.get("dsh_home", "/opt/dsh/home")}
+    e = {**env, "DSH_HOME": step.get("dsh_home", "/opt/dsh/test-home")}
     t0 = time.time()
     try:
         out = subprocess.run([step.get("dsh", "/opt/dsh/node_modules/.bin/dsh"), "--profile", step.get("profile", "headless"),
