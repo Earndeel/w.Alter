@@ -34,7 +34,7 @@ def sources(monkeypatch):
 
 def test_l0_takes_capabilities_only(sources):
     blocks, notes = retrieval.gather(plan("L0"), "54 % de 89")
-    assert [b.id for b in blocks] == ["capabilities"] and sources == ["caps"] and not notes
+    assert [b.id for b in blocks] == ["capabilities", "now"] and sources == ["caps"] and not notes
 
 
 def test_depth_and_memory_follow_the_level(sources):
@@ -89,3 +89,18 @@ def test_tool_cards_follow_the_plan(monkeypatch):
     b = retrieval.tool_cards(mk(["web", "browser"]))
     assert b.layer == 4 and b.sources == ["browse", "computer"] and "browse brief" in b.text
     assert retrieval.tool_cards(mk([])) is None and retrieval.tool_cards(mk(["delegation"])) is None
+
+
+def test_the_present_instant_is_in_every_pack_in_the_owner_zone(monkeypatch):
+    """07/11: nothing gave the model the date; it ran `date` (one more step) and guessed the owner's zone."""
+    from datetime import datetime, timezone
+    import types, sys
+    from walter_context import retrieval
+    fake = types.SimpleNamespace(settings=lambda: {"periods": {"tz": "Asia/Bangkok"}})
+    monkeypatch.setitem(sys.modules, "walter_memory.organic", fake)
+    import walter_memory
+    monkeypatch.setattr(walter_memory, "organic", fake, raising=False)
+    b = retrieval.now(datetime(2026, 11, 7, 20, 4, tzinfo=timezone.utc))
+    assert b.layer == 5 and b.text == ("Maintenant : dimanche 8 novembre 2026, 03:04 heure locale (Asia/Bangkok) ; "
+                                       "2026-11-07 20:04 UTC.")
+    assert b.tokens < 40

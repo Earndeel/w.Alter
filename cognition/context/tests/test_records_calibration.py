@@ -30,7 +30,7 @@ def test_records_when_lookup_needed_or_unsure(monkeypatch):
 def test_no_records_block_when_memory_block_runs(monkeypatch):
     monkeypatch.setattr(retrieval, "capabilities", lambda plan: None)
     monkeypatch.setattr(retrieval, "tool_cards", lambda plan: None)
-    for name in ("board", "recent", "session_state"):
+    for name in ("board", "recent", "session_state", "now"):
         monkeypatch.setattr(retrieval, name, lambda *a, **k: None)
     monkeypatch.setattr(retrieval, "subject", lambda plan: None)
     monkeypatch.setattr(retrieval, "memory", lambda plan, m: retrieval.Block("memory", 4, "m") if retrieval._gets_memory(plan) else None)

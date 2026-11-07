@@ -196,9 +196,32 @@ def recent(session_key: str | None, native: bool) -> Block | None:
     return Block("recent_exchanges", 5, "\n".join(lines), injected=not native, sources=[session_key]) if lines else None
 
 
+_DAYS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
+_MONTHS = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre",
+           "novembre", "décembre")
+
+
+def now(at: "datetime | None" = None) -> Block:
+    """The present instant in the owner's time zone (Walter Memory's setting, the owner's places). No host told the
+    model the date: on 07/11 it ran `date` in a shell (one more step) and guessed « heure de Paris » in its answers."""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    try:
+        from walter_memory import organic
+        tz = str(organic.settings().get("periods", {}).get("tz") or "UTC")
+        zone = ZoneInfo(tz)
+    except Exception:  # noqa: BLE001 — Memory unreachable: UTC is still the truth
+        tz, zone = "UTC", timezone.utc
+    utc = at or datetime.now(timezone.utc)
+    local = utc.astimezone(zone)
+    text = (f"Maintenant : {_DAYS[local.weekday()]} {local.day} {_MONTHS[local.month - 1]} {local.year}, "
+            f"{local:%H:%M} heure locale ({tz}) ; {utc:%Y-%m-%d %H:%M} UTC.")
+    return Block("now", 5, text, sources=[f"tz:{tz}"])
+
+
 def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, native_history: bool = True) -> tuple[list[Block], list[str]]:
     """The blocks the plan asks for. L0: capabilities (+ records when unsure or a lookup is needed). Returns (blocks, notes on failed sources)."""
-    steps = [("capabilities", lambda: capabilities(plan)), ("tool_cards", lambda: tool_cards(plan))]
+    steps = [("capabilities", lambda: capabilities(plan)), ("tool_cards", lambda: tool_cards(plan)), ("now", now)]
     if plan.level != "L0":
         steps += [("board", board), ("session_state", lambda: session_state(plan, message, session_key)),
                   ("subject", lambda: subject(plan)), ("memory", lambda: memory(plan, message)),
