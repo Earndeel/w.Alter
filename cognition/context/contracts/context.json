@@ -33,13 +33,14 @@
     "HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it)",
     "Python walter_context.retrieval.gather and walter_context.assembly.pack",
     "Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON)",
-    "POST /preflight?inject=1 -> plan/text/pack/error; POST /preflight?shadow=1 -> private instance record without injection"
+    "POST /preflight?inject=1 -> plan/text/pack/error; POST /preflight?shadow=1 -> private instance record without injection",
+    "CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow"
   ],
   "bindings": {
     "hermes": "native compressor until walter-context replaces it (plan lot 6)",
     "dsh": "Public checkpoint adapter selected by composition; per-message injection legacy by default, pack opt-in",
     "codex": "Native compaction; additive module notes and hook preflight",
-    "claude-code": "Native compaction; additive module notes and hook preflight",
+    "claude-code": "Native compaction; additive module notes and hook preflight; entrance reduction of large tool outputs in SHADOW (hook PostToolUse, records numbers only)",
     "router": "Text sub-agents request ChildContextSpec v1 through walter-context-child; caller-only mode remains available"
   },
   "limitations": [
@@ -51,7 +52,8 @@
     "retrieval, assembly, preflight and child are implemented; their availability is separate from activation and semantic quality.",
     "Source failures omit only the affected retrieval/child block and leave a note; absence of a block does not prove absence of matching knowledge.",
     "Preflight can write plan metadata through the Memory runs CLI; it does not own canonical memory, notebooks or procedures.",
-    "Local compression has no general semantic quality proof; recoverability depends on source availability and privacy."
+    "Local compression has no general semantic quality proof; recoverability depends on source availability and privacy.",
+    "Entrance runs in shadow only: walter_logs records the text the model saw, so replacing an output needs the hook to journal the original first; [entrance].mode=on is refused until then."
   ],
   "services": [
     "walter-context-preflight"

@@ -56,6 +56,7 @@ la qualité sémantique générale des réponses, le cache réel d’un fourniss
 | DSH | Transaction publique de compaction, checkpoint | Port sélectionné dans la configuration observée le 29 octobre 2026 ; chargement à confirmer par lancement/trace |
 | Hermes | `ContextEngine`, projection | Adaptateur disponible ; configuration observée : compresseur natif, port Context non activé |
 | Codex et Claude Code | Compaction native ; contexte additionnel via hook/MCP | Notes de modules et preflight disponibles ; aucune substitution du compresseur natif |
+| Claude Code, entrée des sorties | Hook PostToolUse → `walter-context-entrance` (`updatedToolOutput` à terme) | **Fantôme** depuis le 6 novembre 2026 : enregistre ce qu’il aurait coupé (chiffres seulement) ; la sortie reste entière pour le modèle |
 | Hook DSH | Pack par message via le service de preflight | Mode `legacy` par défaut ; mode `pack` uniquement par interrupteur d’instance ou variable d’expérience |
 | Router, sous-agent texte | `walter-context-child` | Construction du pack appelée par Router ; le mode et le comportement en échec sont définis côté consommateur |
 
@@ -71,6 +72,7 @@ walter-context bench --sessions 40
 walter-context quality --samples 30
 walter-context threads --gold FILE --mode both
 walter-context-preflight --report --days 1
+walter-context-entrance --report --days 7
 ```
 
 `quality` estime par défaut ; `quality --run` et `threads --decide` peuvent appeler un modèle. Le preflight peut
@@ -82,6 +84,18 @@ Le service local de preflight expose `GET /health` et `POST /preflight` : répon
 `?shadow=1` pour enregistrer sans injection, `?inject=1` pour rendre `{plan,text,pack,error}`. Il s’agit d’un port
 local de confiance, pas d’une API publique à exposer sur Internet. Le CLI `walter-context-child` reçoit un
 ChildContextSpec v1 JSON et retourne `{version,text,summary}`.
+
+## Entrée des sorties d’outils (`compress/entrance`)
+
+Une grosse sortie d’outil est réduite au moment où elle entre dans le contexte, avant que le modèle la lise : début,
+fin, lignes « signal » du milieu (erreurs, échecs) avec leur numéro, et l’endroit où relire l’original. Fait à
+l’entrée, le cut ne réécrit rien de déjà envoyé : il est sans effet sur le cache. Réglages : section `[entrance]` de
+`config/walter-context.toml` (seuil, tailles gardées, outils exemptés, mode). Les sorties que l’hôte a déjà rangées
+dans un fichier (`persistedOutputPath` de Claude Code) ne sont pas comptées.
+
+Mode `shadow` : `@instance/state/context/shadow/entrance-<jour>.jsonl` ne contient que des chiffres (outil, tailles,
+référence d’appel). Le mode `on` est refusé tant que le hook ne journalise pas lui-même l’original : walter_logs
+enregistre le texte que le modèle a vu, une sortie réduite perdrait son original.
 
 ## Notes de capacités
 

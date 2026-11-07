@@ -29,6 +29,7 @@ n’écrit pas directement les notebooks ni les sources canoniques.
 | Notes `all`, `TurnLayer`, retrieval des capacités | `walter present` de Core | Notes absentes ou invalides ignorées ; retrieval conserve une note d’échec du bloc |
 | Preflight et retrieval | API Memory : vues, contexte, registres, Logs ; décision via `walter_memory.llm` et CLI Router | Candidats absents : plan sur la conversation ; modèle indisponible : plan local L1 ; source en panne : bloc omis et note |
 | CLI `walter-context-child` | Client public Skills ; API Memory runs/vues/observations/contexte ; présentations Core | Une source optionnelle en échec ne supprime pas les autres blocs ; mission/contexte de l’appelant restent construits |
+| CLI `walter-context-entrance` (hook PostToolUse de Claude Code) | Aucune pour le fantôme ; `walter instance path` pour l’enregistrement | Instance introuvable : rien n’est enregistré ; toute erreur est muette côté agent (le hook est détaché) ; `WALTER_HOOK_ENTRANCE=off` ou `[entrance].mode = "off"` désactive |
 | Publication `capability all --write` | Core pour le chemin d’instance ; `walter-soul sync` pour le rendu | Échec de publication explicite ; pas de garantie de rechargement des hosts |
 
 `requires` reste vide : la compression locale fonctionne sans ces services. Core, Logs, Memory, Router, Skills et
