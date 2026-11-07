@@ -29,7 +29,7 @@ PARTS = {  # instance sources (identity, rules) + shipped runtime adapters, in o
     "hermes": ["identity", "rules", "hermes"],
     "claude-code": ["identity", "rules", "agent-cli", "claude-code"],
     "codex": ["identity", "rules", "agent-cli", "codex"],
-    "dsh": ["identity", "rules", "agent-cli", "dsh"],
+    "dsh": ["identity", "rules", "dsh"],  # 2026-11-07: tools are described once, by the MCP walter module layer
     "agent": ["identity", "rules"],
 }
 INCLUDE = re.compile(r"^\{\{include (\S+)\}\}$", re.M)
