@@ -1,8 +1,4 @@
 {
- "archived_at": "2026-11-01T17:06:55+00:00",
- "archived_by": "reorg-2026-11-01",
- "archived_reason": "not read by any agent for 30+ days",
- "domain": "research",
  "hermes": {
   "path": "/root/.hermes/skills/research/research-profile",
   "sha": "364b5352ac0a07f6c672e987f98896698e7b923b84378cd1fb8bfa4ca414ec53",
@@ -11,6 +7,7 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
- "reserve": true,
+ "restore_reason": "read by an agent",
+ "restored_at": "2026-11-07T19:33:50+00:00",
  "store_sha": "364b5352ac0a07f6c672e987f98896698e7b923b84378cd1fb8bfa4ca414ec53"
 }
