@@ -395,7 +395,7 @@ def main(argv=None) -> None:
                                              act=spec.get("act"))}
         elif a.action == "find":            # the latest run of a harness session (a runner that only knows the session)
             from .db import connect
-            fields = "run_id, status, privacy_class" if a.open_only else "run_id"
+            fields = "run_id, status, privacy_class, origin->>'channel' as channel" if a.open_only else "run_id"
             opened = "and status = 'open'" if a.open_only else ""
             by_id = a.open_only and bool(a.run_id)
             identity = "run_id" if by_id else "origin->>'session_id'"
@@ -408,7 +408,7 @@ def main(argv=None) -> None:
             row = rows[0] if rows and not ambiguous else None
             res = {"run_id": str(row["run_id"]) if row else None}
             if a.open_only:
-                res.update({key: row[key] if row else None for key in ("status", "privacy_class")})
+                res.update({key: row[key] if row else None for key in ("status", "privacy_class", "channel")})
                 if ambiguous:
                     res["error"] = "ambiguous_open_runs"
         elif a.action == "routing":         # observed route only; caller content never enters the decision
