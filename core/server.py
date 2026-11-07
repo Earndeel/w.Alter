@@ -308,8 +308,8 @@ def memory_events(text: str = "", source: str = "", event_type: str = "", thread
                         ("--since", since), ("--until", until), ("--id", event_id)):
         if value:
             args += [flag, value]
-    if not event_id:
-        args += ["--compact", "500"]
+    if not event_id:   # one event asked (limit=1, « the very first… »): its text whole, within the answer budget
+        args += ["--compact", "16000" if int(limit) <= 1 else "500"]
     return _walter_memory(*args, timeout=60)
 
 
