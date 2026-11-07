@@ -1,5 +1,6 @@
 {
-  "_doc": "Host bindings of an instance (shipped default: none). An instance overrides this file in config/router/host.json. Paths: absolute, ~/ or @instance/. log_dir: cycle logs; collect_script: leaderboard collection (empty = skipped); control_env: HMAC secret of the manual trigger; control_origin / library_domain: where the library page and its trigger are served (empty = not published).",
+  "_doc": "Host bindings of an instance (shipped default: none). An instance overrides this file in config/router/host.json. Paths: absolute, ~/ or @instance/. log_dir: cycle logs; collect_script: leaderboard collection (empty = skipped); control_env: HMAC secret of the manual trigger; control_origin / library_domain: where the library page and its trigger are served (empty = not published). aa_api_key: vault item and field of the Artificial Analysis Data API key, read through walter-secrets (null = scores from the leaderboard page only).",
+  "aa_api_key": null,
   "hermes_profiles_following_router": [],
   "cron_postes": {},
   "cloudflare_cli": "",

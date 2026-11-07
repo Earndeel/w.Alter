@@ -15,7 +15,8 @@ import re
 from datetime import datetime
 from typing import Any
 
-from walter_router.research.benchmarks.aa import AA_MODEL_URL, ANCHORS, RSC_PUSH_PATTERN, decode_rsc_string, strip_rsc_prefix
+from walter_router.research.benchmarks.aa import (AA_MODEL_URL, ANCHORS, RSC_PUSH_PATTERN, decode_rsc_string, index_version,
+                                                  strip_rsc_prefix, updates)
 from walter_router.research.web import fetch_text, now
 
 EVAL_URL = "https://artificialanalysis.ai/evaluations/{}"
@@ -151,7 +152,22 @@ def source_aa_eval() -> tuple[dict, datetime, str]:
                          "time_per_task_s": _num(m.get("timePerTaskSeconds")), "sub_scores": m.get("subScores")}
                         for m in rows if _num(m.get("weightedIndex")) is not None]
         pages[key] = url
+    badges = updates()
     doc = {"generated_at": now().isoformat(), "source_url": used, "pages": pages, "errors": errors,
            "evals": {k: {"field": f, "page": EVAL_URL.format(p), "unit": u} for k, (f, p, u) in EVALS.items()},
-           "data": sorted(models.values(), key=lambda r: r["slug"]), "indexes": indexes}
+           "data": sorted(models.values(), key=lambda r: r["slug"]), "indexes": indexes,
+           "versions": versions(badges, index_version()),
+           "under_review": sorted(k for k, (_, p, _) in EVALS.items() if (badges.get(p) or {}).get("type") == "underReview")}
     return doc, now(), used
+
+
+def versions(badges: dict[str, dict], intelligence: str | None) -> dict[str, str]:
+    """Board -> version label (analysis.changes never compares a board across labels): the domain indexes are built
+    on the Intelligence Index suite and follow its version (v5.0 re-based them, 2026-10-28); an evaluation AA marks
+    'updated' (AA-Omniscience v1.1, Harvey LAB-AA v1.1…) carries AA's description of the update."""
+    out = {f"aa_eval:{key}": f"intelligence {intelligence}" for key in INDEXES} if intelligence else {}
+    for key, (_, page, _) in EVALS.items():
+        badge = badges.get(page) or {}
+        if badge.get("type") == "updated" and badge.get("description"):
+            out[f"aa_eval:{key}"] = badge["description"]
+    return out

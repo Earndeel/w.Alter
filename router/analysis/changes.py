@@ -7,6 +7,10 @@ least MIN_GAP_H earlier (one cycle back), compared by the source's own external 
   price_drop an offer of a model got cheaper by more than PRICE_DROP (same provider, same SKU)
 A static comparison between models already known ("Astra beats Sol on criteria X") is never news: if the owner did
 not choose it before, it was not interesting then and nothing has changed since.
+  rebased    a board changed version (AA Intelligence Index v4 → v5.0 and the domain indexes built on it,
+             AA-Omniscience v1.1, 2026-10-28): every score moved with the methodology, so the board is not compared
+             across versions (no nerf, no "new"); the text tiers recomputed on the new Intelligence Index are put to
+             the owner once (alerts.tiers). Versions are carried by each snapshot (`raw.versions`, board -> label).
 """
 from __future__ import annotations
 
@@ -21,6 +25,24 @@ NERF = {"aa_intelligence": 2.0, "aa_eval": 3.0, "aa_decision": 2.0, "bridgebench
 NERF_ELO = 15.0
 BENCH_KINDS = ("aa", "aa_eval", "aa_decision", "mm", "da", "arena", "bridgebench", "aa_stt", "agentset", "mteb")
 OFFER_KINDS = ("openrouter", "kie", "hermes_providers")
+INTELLIGENCE = "aa_intelligence:intelligence"
+
+
+def _versions(conn, snapshot_id: int) -> dict[str, str]:
+    """Board -> version label of a snapshot. The first AA v5.0 snapshot (2026-10-28) only had `index_version`."""
+    r = conn.execute("select kind, raw->'versions' as v, raw->>'index_version' as iv from models.snapshots "
+                     "where snapshot_id = %s", (snapshot_id,)).fetchone()
+    out = dict(r["v"] or {})
+    if r["kind"] == "aa" and r["iv"]:
+        out.setdefault(INTELLIGENCE, r["iv"])
+    return out
+
+
+def rebased_boards(conn, cur: int, prev: int) -> dict[str, dict]:
+    """{board: {'before', 'after'}} for the boards whose version label changed. A label missing from the latest
+    snapshot (methodology page down, AA's 'updated' mark expired) is not a change."""
+    after, before = _versions(conn, cur), _versions(conn, prev)
+    return {b: {"before": before.get(b), "after": v} for b, v in after.items() if v and v != before.get(b)}
 
 
 def _previous(conn, kind: str) -> tuple[int | None, int | None]:
@@ -35,12 +57,15 @@ def _previous(conn, kind: str) -> tuple[int | None, int | None]:
 
 
 def events(conn) -> dict:
-    """{'new': {model_id: [why]}, 'nerf': {model_id: [why]}, 'price_drop': {model_id: [why]}}."""
-    out: dict[str, dict[str, list]] = {"new": {}, "nerf": {}, "price_drop": {}}
+    """{'new': {model_id: [why]}, 'nerf': {model_id: [why]}, 'price_drop': {model_id: [why]},
+    'rebased': {board: {'before', 'after'}}}."""
+    out: dict[str, dict] = {"new": {}, "nerf": {}, "price_drop": {}, "rebased": {}}
     for kind in BENCH_KINDS:
         cur, prev = _previous(conn, kind)
         if not cur or not prev:
             continue
+        moved = rebased_boards(conn, cur, prev)
+        out["rebased"].update(moved)
         old = {(r["benchmark"], r["task"], r["external_key"]): r["score"] for r in conn.execute(
             "select benchmark, task, external_key, max(score) as score from models.benchmarks where snapshot_id = %s "
             "group by 1, 2, 3", (prev,))}
@@ -49,6 +74,8 @@ def events(conn) -> dict:
                                  from models.benchmarks where snapshot_id = %s group by 1, 2, 3, 4""", (cur,)):
             key = (r["benchmark"], r["task"], r["external_key"])
             board = f'{r["benchmark"]}:{r["task"]}'
+            if board in moved:
+                continue
             if key not in old:
                 if (r["benchmark"], r["task"]) in boards_before:  # a brand-new board is not a new model
                     out["new"].setdefault(r["model_id"], []).append(f"nouveau sur {board}")
@@ -88,6 +115,15 @@ def changed(ev: dict, model_id: str) -> list:
     """Reasons a model counts as news (new or cheaper)."""
     return ev["new"].get(model_id, []) + [f'prix −{p["drop_pct"]} % ({p["provider"]})'
                                           for p in ev["price_drop"].get(model_id, [])]
+
+
+def rebased_intelligence(ev: dict) -> list:
+    """The reason to put every text tier to the owner again: the AA Intelligence Index changed version."""
+    moved = (ev.get("rebased") or {}).get(INTELLIGENCE)
+    if not moved:
+        return []
+    before = f'v{moved["before"]}' if moved["before"] else "version précédente"
+    return [f'nouvel AA Intelligence Index ({before} → v{moved["after"]}) : niveaux recalculés']
 
 
 def frontier_entrants(conn, run_id: int) -> list[dict]:
