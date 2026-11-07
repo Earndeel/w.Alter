@@ -317,7 +317,8 @@ def run_start(runtime: str, session_key: str, prompt: str, *, channel: str = "ow
         import runctx
         if record_pid:                      # a new message while the previous run never got its Stop: interrupted
             prev = runctx.current(record_pid)
-            if prev and prev.get("run_id"):
+            # One harness process may serve several sessions (DSH web): only this session's own run is interrupted.
+            if prev and prev.get("run_id") and prev.get("session_id") in (None, session_key):
                 runs.safe(runs.end, prev["run_id"], "cancelled")
         secret = any(cat == "secret" for cat, _ in _privacy().detect(prompt))
         # a bench or Lab run (walter-scenario sets WALTER_RUN_CHANNEL=test): walter-llm caps its paid spend
@@ -349,7 +350,8 @@ def run_end(runtime: str, session_key: str, *, record_pid: int | None = None, st
         from walter_memory import runs
         import runctx
         cur = runctx.current(record_pid) if record_pid else None
-        if cur and cur.get("run_id"):
+        # The process record names the last session that started a run there; another session's Stop must not end it.
+        if cur and cur.get("run_id") and cur.get("session_id") in (None, session_key):
             runs.end(cur["run_id"], status)
             run_id = cur["run_id"]
         else:
