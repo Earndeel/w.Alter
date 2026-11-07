@@ -19,6 +19,10 @@ Tests `tests/test_agent_memory.py` simulate model calls. A live CLI read validat
 Known scope: long-running MCP processes must be reconnected/restarted to load updated adapters. Hermes' existing Hindsight provider and voice layer are separate integrations; this facade does not claim they have been migrated. Detection/policy classification remains the source of privacy truth; it cannot retrospectively prove that all historical rows were classified perfectly.
 
 
+## Specialized retrieval benchmark calls
+
+`walter_memory.llm.retrieval(operation, model=..., processor=..., privacy_class=..., payload=...)` exposes guarded embeddings/rerank calls for isolated tests. It rejects local-only inputs and detected secrets, recursively pseudonymises redacted-cloud strings, enforces budgets/account floors and records model accounting. The caller must still check canonical provenance. No Router preference, search default, index or provider fallback is changed.
+
 ## Curated document provenance
 
 Curated instance documents enter the knowledge lane through canonical `document.section` occurrences. Their
