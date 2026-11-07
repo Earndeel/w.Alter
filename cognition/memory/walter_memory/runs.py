@@ -116,6 +116,30 @@ def update(run_id: str, *, thread_id: str | None = None, level: str | None = Non
     return out
 
 
+def repair_goal(run_id: str, goal: str, reason: str) -> dict:
+    """Correct a goal recorded from text the owner did not write (e.g. a runtime notice glued to the prompt, lot 1
+    2026-11-07). History is kept: the original goal and the reason go to origin.goal_repairs, a bus event is emitted,
+    and the run's episode gets a new version (the old one stays)."""
+    with connect() as conn:
+        run = conn.execute("select goal, privacy_class from runs.runs where run_id = %s", (run_id,)).fetchone()
+        if not run:
+            return {"error": "unknown run"}
+        new = _goal(goal, run["privacy_class"])
+        if new == run["goal"]:
+            return {"run_id": run_id, "unchanged": True}
+        entry = {"original": run["goal"], "reason": reason, "at": datetime.now(timezone.utc).isoformat()}
+        conn.execute("""update runs.runs set goal = %s, updated_at = now(),
+                        origin = jsonb_set(origin, '{goal_repairs}', coalesce(origin->'goal_repairs', '[]'::jsonb) || %s::jsonb)
+                        where run_id = %s""", (new, json.dumps([entry], ensure_ascii=False), run_id))
+        _emit(conn, "run.goal_repaired", run_id, {"run_id": run_id, "reason": reason})
+        episodic = conn.execute("select 1 from runs.episodes where run_id = %s limit 1", (run_id,)).fetchone()
+    out = {"run_id": run_id, "goal": new}
+    if episodic:
+        from . import episodes
+        out["episode"] = episodes.build(run_id, reason="goal_repaired")
+    return out
+
+
 def routing(run_id: str, decision: dict, task_id: str | None = None) -> None:
     """Record a model decision (`applied` false + `constraint` when the harness keeps its own model)."""
     with connect() as conn:
