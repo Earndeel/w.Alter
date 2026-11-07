@@ -100,6 +100,8 @@ déjà généré. Les valeurs de paramètres dépendent des schémas et valeurs 
 imposé reste strict. Les fournisseurs du même modèle sont essayés dans l'ordre ; un autre modèle n'est possible
 que s'il a été déclaré dans la configuration média. Ce cas est signalé par `fallback_from`.
 
+Pour le texte : si tous les fournisseurs d'un modèle échouent, l'exécution passe au modèle suivant déclaré par le propriétaire (`unrestricted_favourites` pour une demande sans restriction, le `fallback` du palier), avec un avis `model_fallback`. Un modèle non déclaré n'est jamais substitué.
+
 Le schéma d'avis `user_notice` est normalisé pour le texte. Le caller doit examiner les champs `errors`,
 `provider` et `fallback_from` d'un résultat média et signaler un changement pertinent à l'utilisateur. Il ne doit
 pas supposer que toutes les générations implémentent déjà les mêmes champs d'avis que le texte.

@@ -122,7 +122,13 @@ def _text(conn, d: dict, spec: dict) -> dict:
         return {"ok": False, "error": "vision_toolset_requires_an_explicit_image_input"}
     max_turns = max(1, min(int(spec.get("max_turns") or 40), 120))
     # Defend against stale/cached decisions containing the former subscription/model fallback.
-    candidates = [r for r in d.get("execution") or [] if not r.get("fallback_for")]
+    candidates = [dict(r, model_id=d.get("model_id")) for r in d.get("execution") or [] if not r.get("fallback_for")]
+    # The owner's declared fallback models (knowledge.json), after every provider of the chosen model. Nothing else.
+    from walter_router.analysis import knowledge
+    for fb_model, fb_variant in knowledge.declared_fallbacks(d.get("model_id") or "", d.get("task") or "",
+                                                              spec.get("level") or d.get("level"), d.get("require")):
+        candidates += [dict(r, model_id=fb_model) for r in execution.routes(conn, fb_model, fb_variant)
+                       if r.get("probe_ok") is not False and not r.get("fallback_for")]
     attempts, notices = [], []
     state = {"index": 0, "route": None}
 
@@ -133,7 +139,7 @@ def _text(conn, d: dict, spec: dict) -> dict:
             if available <= 0:
                 raise RuntimeError("budget_exhausted")
             t0 = time.monotonic()
-            entry = {"provider": route["provider"], "model": route["model"],
+            entry = {"provider": route["provider"], "model": route["model"], "model_id": route["model_id"],
                      "usage": None, "cost_usd": None, "cost_status": "unknown"}
             try:
                 # Keep time for this model's remaining providers when one endpoint hangs.
@@ -147,7 +153,7 @@ def _text(conn, d: dict, spec: dict) -> dict:
                 response = None
             entry["seconds"] = round(time.monotonic() - t0, 2)
             attempts.append(entry)
-            execution.log(conn, {"task": d.get("task"), "role": d.get("role"), "model_id": d.get("model_id"),
+            execution.log(conn, {"task": d.get("task"), "role": d.get("role"), "model_id": route["model_id"],
                                  "provider": route["provider"], "model": route["model"],
                                  "ok": entry["ok"], "seconds": entry["seconds"], "usage": entry["usage"],
                                  "cost_usd": entry["cost_usd"], "cost_status": entry["cost_status"]})
@@ -158,12 +164,17 @@ def _text(conn, d: dict, spec: dict) -> dict:
             state["index"] += 1
             if state["index"] < len(candidates):
                 nxt = candidates[state["index"]]
-                notice = {"type": "provider_fallback", "model": d["model_id"],
-                          "from_provider": route["provider"], "to_provider": nxt["provider"],
-                          "reason": entry["error"],
-                          "message": f"{route['provider']} n'a pas répondu correctement pour {d['model_id']}. "
-                                     f"Basculement vers {nxt['provider']}, avec le même modèle."}
-                notices.append(notice)
+                if nxt["model_id"] != route["model_id"]:   # the next declared model: all its providers failed first
+                    notices.append({"type": "model_fallback", "model": route["model_id"], "to_model": nxt["model_id"],
+                                    "to_provider": nxt["provider"], "reason": entry["error"],
+                                    "message": f"{route['model_id']} n'a pas pu répondre chez aucun de ses fournisseurs. "
+                                               f"Basculement vers {nxt['model_id']} ({nxt['provider']}), secours déclaré."})
+                else:
+                    notices.append({"type": "provider_fallback", "model": route["model_id"],
+                                    "from_provider": route["provider"], "to_provider": nxt["provider"],
+                                    "reason": entry["error"],
+                                    "message": f"{route['provider']} n'a pas répondu correctement pour {route['model_id']}. "
+                                               f"Basculement vers {nxt['provider']}, avec le même modèle."})
         raise RuntimeError("all_providers_failed")
 
     # Walter Run Plane: inside a run, this execution is a task with its own walter_logs session.
@@ -225,7 +236,9 @@ def _text(conn, d: dict, spec: dict) -> dict:
                                         "seconds": round(time.monotonic() - started, 1)}})
     user_notice = "\n".join(n["message"] for n in notices)
     if not result["ok"]:
-        failure = (f"Aucun fournisseur n'a pu exécuter {d['model_id']}. Aucun autre modèle n'a été utilisé."
+        chain = list(dict.fromkeys(c["model_id"] for c in candidates))
+        failure = ((f"Aucun fournisseur n'a pu exécuter {d['model_id']}. Aucun autre modèle n'a été utilisé."
+                    if len(chain) == 1 else f"Aucun fournisseur n'a pu exécuter la chaîne {' → '.join(chain)}.")
                    if result.get("error") == "all_providers_failed" else
                    f"L'exécution de {d['model_id']} a échoué : {result.get('error')}.")
         user_notice = "\n".join(filter(None, (user_notice, failure)))
@@ -236,6 +249,7 @@ def _text(conn, d: dict, spec: dict) -> dict:
                        "model": route["model"] if route else None,
                        "provider": route["provider"] if route else None,
                        "reasoning": route.get("reasoning") if route else None,
+                       "executed_model_id": route["model_id"] if route else None,
                        "named": d.get("named"), "attempts": attempts,
                        "seconds": round(time.monotonic() - started, 2)}}
 
