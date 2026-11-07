@@ -1,0 +1,145 @@
+#!/usr/bin/env walter-python
+"""walter-wg-exit — scoped WireGuard exits for browser sessions.
+
+  walter-wg-exit list                 exits declared by the instance
+  walter-wg-exit up NAME [--force]    start the exit (refused while a device sharing its key holds the tunnel)
+  walter-wg-exit down NAME            stop it
+  walter-wg-exit status [NAME]        state, proxy URL and exit IP
+  walter-wg-exit url NAME             proxy URL if the exit is up (exit code 1 if down)
+
+Each exit is a container holding the WireGuard tunnel in its own network namespace and serving an
+HTTP proxy on 127.0.0.1:<port>. Only clients pointed at that proxy use it; host routing is untouched.
+The WireGuard file comes from the vault at start (tmpfs, deleted once up) and never touches disk.
+Exits are declared in the instance: `walter instance config browse network.toml`.
+"""
+import json, os, shutil, subprocess, sys, tempfile, time, tomllib
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent.parent
+IMAGE = "walter-wg-exit:latest"
+
+
+def sh(*cmd, timeout=60, check=False):
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if check and r.returncode:
+        sys.exit(f"{cmd[0]} {cmd[1] if len(cmd) > 1 else ''} failed: {r.stderr.strip()[:300]}")
+    return r
+
+
+def exits() -> dict:
+    path = sh("walter", "instance", "config", "browse", "network.toml", check=True).stdout.strip()
+    if not Path(path).is_file():
+        return {}
+    return tomllib.loads(Path(path).read_text()).get("exit", {})
+
+
+def get(name: str) -> dict:
+    e = exits()
+    if name not in e:
+        sys.exit(f"unknown exit {name!r}; declared: {', '.join(e) or 'none'}")
+    return e[name]
+
+
+def container(name: str) -> str:
+    return f"walter-wg-{name}"
+
+
+def running(name: str) -> bool:
+    r = sh("docker", "inspect", "-f", "{{.State.Running}}", container(name))
+    return r.stdout.strip() == "true"
+
+
+def shared_holder(cfg: dict) -> str | None:
+    """Name of the device currently holding the shared key, '' if free, None if it cannot be checked."""
+    s = cfg.get("shared_with")
+    if not s:
+        return ""
+    r = sh("ssh", "-o", "ConnectTimeout=6", "-o", "BatchMode=yes", s["ssh"],
+           f"scutil --nc status {json.dumps(s['macos_vpn'])}", timeout=20)
+    if r.returncode:
+        return None
+    return s["ssh"] if r.stdout.splitlines()[:1] == ["Connected"] else ""
+
+
+def exit_ip(port: int) -> str:
+    r = sh("curl", "-s", "--max-time", "12", "-x", f"http://127.0.0.1:{port}", "https://api.ipify.org", timeout=20)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def up(name: str, force: bool) -> None:
+    cfg = get(name)
+    if running(name):
+        print(f"{name}: already up on http://127.0.0.1:{cfg['port']}"); return
+    holder = shared_holder(cfg)
+    if holder is None and not force:
+        sys.exit(f"{name}: cannot check whether {cfg['shared_with']['ssh']} holds the shared key; refusing (--force to override)")
+    if holder:
+        sys.exit(f"{name}: refused — {holder} is connected with the same WireGuard key "
+                 f"(tunnel {cfg['shared_with']['macos_vpn']!r}). Disconnect it there first.")
+    if sh("docker", "image", "inspect", IMAGE).returncode:
+        sh("docker", "build", "-q", "-t", IMAGE, str(HERE), timeout=600, check=True)
+    if sh("lsmod").stdout.find("wireguard") < 0:
+        sh("modprobe", "wireguard", check=True)
+    src = sh("walter-secret", "file", cfg["secret"], cfg["attachment"], timeout=300, check=True).stdout.strip().splitlines()[-1]
+    run = Path(tempfile.mkdtemp(prefix="walter-wg-", dir="/dev/shm"))
+    try:
+        os.chmod(run, 0o700)
+        shutil.copyfile(src, run / "wg0.conf"); os.chmod(run / "wg0.conf", 0o600)
+        Path(src).unlink(missing_ok=True)
+        sh("docker", "rm", "-f", container(name))
+        sh("docker", "run", "-d", "--name", container(name), "--restart", "no",
+           "--label", f"walter.exit={name}", "--cap-add", "NET_ADMIN",
+           "--sysctl", "net.ipv4.conf.all.src_valid_mark=1", "--sysctl", "net.ipv6.conf.all.disable_ipv6=1",
+           "-p", f"127.0.0.1:{cfg['port']}:8888", "-v", f"{run}:/run/wg:ro", IMAGE, check=True)
+        for _ in range(30):
+            if sh("docker", "exec", container(name), "pgrep", "tinyproxy").returncode == 0:
+                break
+            if not running(name):
+                sys.exit(f"{name}: container stopped: {sh('docker', 'logs', '--tail', '20', container(name)).stderr[-600:]}")
+            time.sleep(1)
+    finally:
+        shutil.rmtree(run, ignore_errors=True)
+    ip = exit_ip(cfg["port"])
+    print(f"{name}: up on http://127.0.0.1:{cfg['port']} — exit IP {ip or 'not reachable yet'}")
+
+
+def down(name: str) -> None:
+    get(name)
+    sh("docker", "rm", "-f", container(name))
+    print(f"{name}: down")
+
+
+def status(names: list[str]) -> None:
+    e = exits()
+    for n in names or list(e):
+        cfg = e.get(n) or get(n)
+        if running(n):
+            print(f"{n}: up  http://127.0.0.1:{cfg['port']}  exit {exit_ip(cfg['port']) or '?'}  ({cfg.get('country', '')})")
+        else:
+            print(f"{n}: down  ({cfg.get('country', '')}, port {cfg['port']})")
+
+
+def main(argv: list[str]) -> None:
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip()); return
+    cmd, rest = argv[0], [a for a in argv[1:] if not a.startswith("--")]
+    if cmd == "list":
+        for n, c in exits().items():
+            print(f"{n}\t{c.get('country', '')}\thttp://127.0.0.1:{c['port']}\t{c.get('description', '')}")
+    elif cmd == "up" and rest:
+        up(rest[0], "--force" in argv)
+    elif cmd == "down" and rest:
+        down(rest[0])
+    elif cmd == "url" and rest:
+        cfg = get(rest[0])
+        if not running(rest[0]):
+            sys.exit(f"{rest[0]}: down — start it with `walter-wg-exit up {rest[0]}`")
+        print(f"http://127.0.0.1:{cfg['port']}")
+    elif cmd == "status":
+        status(rest)
+    else:
+        sys.exit(__doc__.strip())
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
