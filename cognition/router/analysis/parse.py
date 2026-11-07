@@ -50,7 +50,8 @@ def parse_benchmarks(kind: str, doc: dict) -> list[dict]:
             rows.append(dict(benchmark="aa_intelligence", task="intelligence", external_key=r["slug"], model_id=mid,
                              variant=variant, display_name=r.get("name"), score=score, score_unit="AA Intelligence Index",
                              cost=_num(r.get("aa_cost_per_task_intelligence_usd")), cost_unit="usd_per_aa_task",
-                             released=None, extra={}))
+                             released=None,
+                             extra={"index_version": doc["index_version"]} if doc.get("index_version") else {}))
     elif kind == "aa_eval":
         units = {k: v.get("unit") for k, v in (doc.get("evals") or {}).items()}
         for r in doc["data"]:
@@ -242,7 +243,7 @@ def _kie_interface(rec: dict) -> str:
     return kind
 
 
-OFFER_KINDS = ("openrouter", "kie", "codex", "claude_pro", "declared", "hermes_providers")
+OFFER_KINDS = ("openrouter", "kie", "codex", "claude_pro", "antigravity", "declared", "hermes_providers")
 
 
 def _media_fields(interface: str, label: str, unit_price: float | None, unit: str | None,
@@ -348,6 +349,21 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
     elif kind == "hermes_providers":
         for p in doc["providers"]:
             for m in p["models"]:
+                spec = m.get("model_spec")   # Venice: name, USD prices per 1M tokens and capabilities under model_spec
+                if spec is not None:
+                    if m.get("type") != "text":   # Venice's image / video / audio models are not chat offers here
+                        continue
+                    pr = spec.get("pricing") or {}
+
+                    def per_token(side: str) -> float | None:   # Venice quotes USD per 1M tokens
+                        v = _num((pr.get(side) or {}).get("usd"))
+                        return v / 1e6 if v is not None else None
+                    prices = {"prompt": per_token("input"), "completion": per_token("output")}
+                    m = {"id": m["id"], "name": spec.get("name"), "created": m.get("created"),
+                         "quantization": (spec.get("capabilities") or {}).get("quantization"),
+                         "output_modalities": [{"type": "text"}],
+                         "input_modalities": [{"type": "text", "pricing": [
+                             {"type": t, "cost_usd": v} for t, v in prices.items() if v is not None]}]}
                 outs = [x.get("type") for x in m.get("output_modalities") or [] if isinstance(x, dict)] or ["text"]
                 interface = next((i for i in ("video", "image", "audio") if i in outs), "chat")
                 prices = {pr.get("type"): _num(pr.get("cost_usd")) for side in ("input_modalities", "output_modalities")
@@ -360,10 +376,10 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
                                  price_out_1m=pout * 1e6 if pout is not None else None, unit_price=None, unit=None,
                                  provider_created=datetime.fromtimestamp(m["created"], timezone.utc) if m.get("created") else None,
                                  pricing={"prices": prices, "quantization": m.get("quantization"),
-                                          "hermes_provider": p["hermes_provider"]},
+                                          "hermes_provider": p.get("hermes_provider")},
                                  # the base id names the model; a service tier (".../flex") or a raw id is no name
                                  display_name=None if m["id"].count("/") > 1 or "/" in (m.get("name") or "/")
-                                 else m["name"].split(": ", 1)[-1],
+                                 else (m.get("name") or "").split(": ", 1)[-1] or None,
                                  meta={"open_weights": True if m.get("hugging_face_id") else None,
                                        "license": None, "hf": m.get("hugging_face_id")}))
     elif kind == "claude_pro":
@@ -372,6 +388,14 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
             rows.append(dict(provider="claude-pro", offer_key=oid, model_id=mid, interface="chat", access="subscription",
                              price_in_1m=None, price_out_1m=None, unit_price=None, unit=None, provider_created=None,
                              pricing={"subscription": "Claude", "transport": "native-cli", "verified": True},
+                             modes=["text"], offer_kind="generation"))
+    elif kind == "antigravity":   # Google AI Pro: official Antigravity CLI, text only (llm/antigravity_subscription.py)
+        for oid in doc["models"]:
+            mid, _ = identity.normalize("antigravity", oid)
+            rows.append(dict(provider="antigravity", offer_key=oid, model_id=mid, interface="chat", access="subscription",
+                             price_in_1m=None, price_out_1m=None, unit_price=None, unit=None, provider_created=None,
+                             pricing={"subscription": "Google AI Pro", "transport": "official-cli", "verified": True,
+                                      "efforts": (doc.get("efforts") or {}).get(oid), "tools": False, "images": False},
                              modes=["text"], offer_kind="generation"))
     elif kind == "codex":
         for oid in doc["models"]:

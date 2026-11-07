@@ -390,6 +390,38 @@ Kie est testé en trois services distincts : `kie` (API Claude), `kie-codex`, `k
 génération). Les médias suivent `kie-media` ; le détail d'un test garde la raison donnée par le fournisseur
 (« no_available_account »). Le transport d'abonnement Claude refuse un modèle non qualifié avant de charger litellm.
 
+## 2026-10-28 — AA Intelligence Index v5.0 : nouveau lecteur, recalage sans fausses alertes
+
+AA est passé à l'Intelligence Index v5.0 (FrontierCode 2.0, Terminal-Bench 4.0 et Science, HLE-Diamond ajoutés ;
+GDPval-AA, SciCode, AA-LCR et HLE retirés ; quatre catégories à 25 %) et a refait son site le même jour : une page
+modèle ne porte plus le catalogue (28 modèles du graphique, le reste dans un fichier de données encodé). Les scores
+ont été recalés (médiane −9 points sur les modèles communs) et le coût par tâche a changé avec la nouvelle suite.
+
+Le lecteur `aa` lit la page `/leaderboards/models` (score, coût par tâche, prix catalogue de chaque modèle ×
+réflexion) et l'API gratuite d'AA (score ; elle ne publie pas le coût par tâche). La clé reste dans Bitwarden
+(propriétaire : jamais dans un `.env`), liée par `aa_api_key` de host.json et lue par `walter-secret get`. Le score
+de l'API l'emporte, la page et l'API doivent concorder (sinon le snapshot est refusé), au moins 40 modèles chiffrés.
+Couverture v5.0 au lancement : 77 modèles × réflexion notés, 71 chiffrés (la v4 en comptait ~700).
+
+Chaque snapshot porte ses versions par tableau (`raw.versions`, tableau → libellé ; `index_version` pour `aa`).
+`changes.rebased_boards` : un tableau qui change de libellé n'est comparé ni pour les nerfs ni pour les « nouveaux » ;
+les niveaux recalculés sur le nouvel Intelligence Index sont soumis une fois au propriétaire (`alerts.tiers`). Les
+six index de domaine sont bâtis sur la suite de l'Intelligence Index et ont été recalés avec elle (médiane −8,4
+économie, −5,5 ingénierie, −5,3 juridique) : leur libellé est « intelligence <version> ». Une évaluation marquée
+« updated » par AA (carte des changements de son site : AA-Omniscience v1.1, Harvey LAB-AA v1.1) porte la description
+d'AA ; `under_review` liste celles qu'AA audite (SciCode). Aucun n°1 de tâche spécialisée n'a changé (run 352).
+
+Niveaux déclarés par le propriétaire le 2026-10-28 (« les écarts les plus intéressants de la frontière ») : L1
+GPT-6.1 Terra medium (coude : 1 637 pts/$ pour l'atteindre puis 155), L2 GPT-6.1 Sol medium (coude : 127 puis 59 ;
+coupe L1→L3 en +8,0 / +8,4 points, là où Terra high, retenu par la règle du meilleur gain depuis L1 à 155 contre 140
+pts/$, n'apporte que +4,2), L3 GPT-6.1 Sol max (dernier point avant 1 pt/$), repli Claude Opus 5.5 xhigh. Identiques
+sur le prix catalogue, Kie et le prix de revient des abonnements (au rythme d'usage comme à pleine capacité).
+`QUALITY_FLOOR` (35) et `CEILING_BAND` (5) restent ceux calibrés sur la v4 jusqu'à décision du propriétaire.
+
+Correctif : adopter un niveau sur Telegram ne changeait que `models.preferences`, et le cycle suivant rétablissait
+l'ancien niveau depuis knowledge.json. `knowledge.set_level` est désormais l'unique écrivain des niveaux (copie de
+l'instance, version précédente gardée dans history/) ; `alerts.verdict` passe par lui.
+
 ## 2026-10-29 — Corrélation et mesure du gateway
 
 Les requêtes HTTP sont corrélées individuellement aux runs Memory ouverts ; DSH utilise les options publiques
@@ -426,3 +458,33 @@ puis texte3 ont rafraîchi les huit tableaux conservés. Snapshot308 :15 tableau
 couverture, aucune session de collecte restante. Les échecs précédents restent historiques ; la fraîcheur est
 prouvée par les trois collectes réussies, pas par la seule date du dernier document. Aucun modèle, analyse ou
 notification déclenché. Détails et limites de la couverture : ARENA.md.
+
+## 2026-10-30 — Fournisseur Venice (exécution native et catalogue)
+
+Le propriétaire demande Venice pour le modèle `deepseek-v4-1-flash-1017-uncensored` (DeepSeek V4.1 Flash 1017 non censuré,
+1,32 $ / M tokens de sortie, 0,33 $ / M en entrée, prix publics Venice). Clé stockée dans Bitwarden (item « W.Alter · venice »,
+déclarée dans la config d'instance `[keys] declared`), jamais dans un `.env`. `walter-llm` exécute Venice comme un
+fournisseur natif (sans Hermes : `hermes_provider` null, routes ignorées par `sync-hermes`) ; le catalogue
+`hermes_providers` collecte ses modèles texte avec leurs prix. La sonde `probe --provider venice` répond HTTP 200.
+Le catalogue complet de Venice (texte) entre dans le pool de choix : `pick` peut retenir un de ses modèles là où il
+score le mieux. Limites : Venice ne figure pas dans les plans ni les routes Hermes.
+
+## 2026-10-31 — Titulaire des demandes sans restriction
+
+Le propriétaire fait de DeepSeek V4.1 Flash 1017 Uncensored (Venice) le titulaire des demandes sans restriction ; GLM 5.3 Flash
+Uncensored (Arnict) passe en second, en fallback. Déclaré dans `knowledge.json` → `unrestricted_favourites` (ordre
+d'arrivée) : `pick_required` les place en tête, dans cet ordre, dès qu'ils sont appelables pour la tâche. Le
+secours d'exécution texte passe au modèle suivant déclaré quand tous les fournisseurs du premier ont échoué
+(avis `model_fallback`) ; un modèle non déclaré n'est jamais substitué.
+
+## 2026-11-02 — Route d'abonnement Google AI Pro (Antigravity)
+
+À la demande du propriétaire (« utiliser nos crédits Antigravity inclus dans l'abonnement », compte principal),
+ajout du fournisseur `antigravity`. Gemini CLI ne sert plus AI Pro depuis le 18/06/2026 ; seule la CLI officielle
+Antigravity (`agy` 1.4.12) est utilisée, jamais son jeton (Google suspend les comptes qui passent par des outils
+tiers). Texte seul, outils refusés par règle `deny`, environnement vidé, traces supprimées après chaque appel.
+Six variantes qualifiées : Gemini 3.8 Flash (low/medium/high), Claude Sonnet 4.6, Claude Opus 4.6, GPT-OSS 120B.
+Source de catalogue `antigravity` (cycle prix), offres d'abonnement, plan `google-ai-pro` relié. Aucune tâche ne
+choisit encore ces modèles : la route sert en tête quand l'un d'eux est choisi ou nommé. Guide :
+ANTIGRAVITY-SUBSCRIPTION.md.
+

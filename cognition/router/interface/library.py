@@ -16,7 +16,8 @@ from walter_router.analysis import select as sel
 from walter_router import instance
 
 PROV = {"openai-codex": "Codex (abonnement)", "codex": "Codex (abonnement)", "kie-codex": "Kie", "kie": "Kie",
-        "openrouter": "OpenRouter", "arnict": "Arnict", "google-flow": "Flow", "claude-pro": "Claude Pro"}
+        "openrouter": "OpenRouter", "arnict": "Arnict", "venice": "Venice", "google-flow": "Flow", "claude-pro": "Claude Pro",
+        "antigravity": "Antigravity (AI Pro)"}
 MODES = {"text_to_video": "t2v", "image_to_video": "i2v", "text_to_image": "t2i", "image_edit": "i2i", "logo": "t2i",
          "graphic_design": "t2i", "music": "music", "tts": "tts", "video_edit": "v2v"}
 IMAGE_TOKENS = (1056, 4160)   # medium / high 1024x1024 output tokens (OpenAI gpt-image token tables)
@@ -32,7 +33,7 @@ def provider_label(route: dict) -> str:
 
 def subscription_label(routes: list[dict]) -> str:
     """Name the actual subscription instead of labelling every subscription as Codex."""
-    labels = {"codex": "Codex", "claude-pro": "Claude Pro"}
+    labels = {"codex": "Codex", "claude-pro": "Claude Pro", "antigravity": "Google AI Pro"}
     return " + ".join(dict.fromkeys(labels.get(r["provider"], r["provider"])
                                    for r in routes if r.get("access") == "subscription"))
 
@@ -86,7 +87,7 @@ def _route_price(route: dict, offers: dict, mid: str, hosts: dict) -> str:
             return (f'≈ {catalog.money(cp["in"])}/{catalog.money(cp["out"])} $/M (prix de revient, '
                     f'{pct}\u202f% du prix API{quota})')
         return "inclus"
-    return _chat_price(offers, mid, route["hermes_provider"], hosts)
+    return _chat_price(offers, mid, route["hermes_provider"] or route["provider"], hosts)
 
 
 def _media_price(offers: dict, mid: str, prov: str, interface: str) -> str:

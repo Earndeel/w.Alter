@@ -10,9 +10,10 @@ from walter_router.analysis import select as sel
 from walter_router.serve import execution
 
 PROVIDERS = {"openrouter": "openrouter", "kie": "kie", "kie.ai": "kie", "kie-codex": "kie", "codex": "codex",
-             "openai-codex": "codex", "chatgpt": "codex", "arnict": "arnict", "flow": "google-flow",
+             "openai-codex": "codex", "chatgpt": "codex", "arnict": "arnict", "venice": "venice", "flow": "google-flow",
              "google-flow": "google-flow"}
 PROVIDERS.update({"claude-pro": "claude-pro", "claude-subscription": "claude-pro"})
+PROVIDERS.update({"antigravity": "antigravity", "agy": "antigravity", "google-ai-pro": "antigravity"})
 DEFAULT_TASK = {"chat": "general", "image": "text_to_image", "video": "text_to_video", "audio": "tts", "music": "music"}
 
 

@@ -5,3 +5,4 @@ ICON = "💲"
 # source kind -> parts to read (None = the whole source)
 SOURCES = {"openrouter": None, "kie": None, "codex": None, "hermes_providers": None, "declared": None}
 SOURCES["claude_pro"] = None
+SOURCES["antigravity"] = None

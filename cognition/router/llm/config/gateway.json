@@ -9,5 +9,19 @@
     "state_dir": "@instance/state/router/claude/calls",
     "usage_log": "@instance/state/router/claude/usage.jsonl",
     "verified_models": []
+  },
+  "antigravity_subscription": {
+    "enabled": false,
+    "cli": "@instance/state/router/antigravity/bin/agy",
+    "home": "@instance/state/router/antigravity/home",
+    "timeout": 300,
+    "verified_models": []
+  },
+  "test_budget": {
+    "_doc": "Runs of channel test (walter-scenario, walter-lab): paid-provider spend cap per window; above it the owner approves (walter-llm test-budget approve EUR). Monsieur 2026-10-30.",
+    "paid_limit_eur": 2.0,
+    "usd_per_eur": 1.1,
+    "window_hours": 24,
+    "ledger": "@instance/state/llm/test-spend.jsonl"
   }
 }
