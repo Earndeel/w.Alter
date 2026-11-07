@@ -17,14 +17,25 @@ def settings() -> dict:
     return (json.loads(Path(path).read_text()).get("claude_subscription") or {}) if path else {}
 
 
-def account_json(endpoint: str) -> dict:
-    """Fixed read-only Anthropic account endpoints; token is never returned in diagnostics."""
+def grant_of(conf: dict, account: str | None) -> str:
+    """The Walter Secrets grant of one Claude account (subscription id), from the gateway's own `accounts` setting."""
+    accounts = conf.get("accounts") or {"anthropic-pro": conf.get("grant", "claude-subscription")}
+    if account is None:
+        return next(iter(accounts.values()))
+    if account not in accounts:
+        raise ValueError("unknown_claude_account")
+    return accounts[account]
+
+
+def account_json(endpoint: str, account: str | None = None) -> dict:
+    """Fixed read-only Anthropic account endpoints; token is never returned in diagnostics. `account` = subscription
+    id of one Claude account (default: the first)."""
     if endpoint not in {"/v1/models", "/api/oauth/usage"}:
         raise ValueError("invalid_claude_account_endpoint")
     conf = settings()
     if not conf.get("enabled"):
         raise ValueError("claude_subscription_disabled")
-    token = subprocess.run(["walter-secret", "grant", "access", conf.get("grant", "claude-subscription")],
+    token = subprocess.run(["walter-secret", "grant", "access", grant_of(conf, account)],
                            capture_output=True, text=True, timeout=60)
     if token.returncode or not token.stdout.strip():
         raise ValueError("claude_subscription_unavailable")
@@ -53,9 +64,9 @@ def source_claude_pro():
     return {"models": [mid for mid in ids if mid in verified], "catalogue_models": ids}, now(), "https://api.anthropic.com/v1/models"
 
 
-def read_usage() -> list[dict]:
-    """Real five-hour/weekly meters, without account identifiers, credit balances or token values."""
-    data = account_json("/api/oauth/usage")
+def read_usage(account: str | None = None) -> list[dict]:
+    """Real five-hour/weekly meters of one account, without account identifiers, credit balances or token values."""
+    data = account_json("/api/oauth/usage", account)
     rows = []
     for key, name in (("five_hour", "session"), ("seven_day", "weekly"),
                       ("seven_day_opus", "weekly_opus"), ("seven_day_sonnet", "weekly_sonnet")):

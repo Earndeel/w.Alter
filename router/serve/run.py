@@ -154,7 +154,7 @@ def _text(conn, d: dict, spec: dict) -> dict:
             entry["seconds"] = round(time.monotonic() - t0, 2)
             attempts.append(entry)
             execution.log(conn, {"task": d.get("task"), "role": d.get("role"), "model_id": route["model_id"],
-                                 "provider": route["provider"], "model": route["model"],
+                                 "provider": route["provider"], "model": route["model"], "account": route.get("account"),
                                  "ok": entry["ok"], "seconds": entry["seconds"], "usage": entry["usage"],
                                  "cost_usd": entry["cost_usd"], "cost_status": entry["cost_status"]})
             conn.commit()

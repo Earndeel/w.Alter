@@ -140,8 +140,9 @@ def codex_cli_usage(since: datetime | None, root: Path = CODEX_SESSIONS) -> dict
     return acc
 
 
-def walter_claude_usage(since: datetime | None) -> dict:
-    """Actual model usage of the subscription bridge (not the CLI's synthetic acknowledgement)."""
+def walter_claude_usage(since: datetime | None, sub: dict | None = None) -> dict:
+    """Actual model usage of the subscription bridge (not the CLI's synthetic acknowledgement), for one account:
+    rows carry the subscription id that served them; rows from before accounts existed belong to `anthropic-pro`."""
     from walter_router.research.prices.claude_pro import settings
     value = settings().get("usage_log")
     acc, seen = {}, set()
@@ -155,6 +156,8 @@ def walter_claude_usage(since: datetime | None) -> dict:
             try:
                 row = json.loads(line)
                 if row.get("id") in seen or (since and datetime.fromisoformat(row["at"]) < since):
+                    continue
+                if sub and row.get("account", "anthropic-pro") != sub["id"]:
                     continue
                 seen.add(row["id"])
                 _add(acc, row["model"], **row["tokens"])
@@ -170,7 +173,7 @@ USAGE = {"claude_code": claude_code_usage, "hermes_codex": hermes_codex_usage, "
 def usage(sub: dict, since: datetime | None) -> dict:
     acc: dict = {}
     for src in sub["usage_sources"]:
-        for model, row in USAGE[src](since).items():
+        for model, row in (USAGE[src](since, sub) if src == "walter_claude" else USAGE[src](since)).items():
             _add(acc, model, **row)
     return acc
 
@@ -276,7 +279,7 @@ def refresh(conn, only: str | None = None, min_age_s: float = 0) -> dict:
                     w["detail"]["cumulative_tokens"] = cumul["total_tokens"]
             elif source == "claude_usage_api":
                 from walter_router.research.prices.claude_pro import read_usage
-                windows = read_usage()
+                windows = read_usage(sub["id"])
             else:
                 windows = estimate_claude(sub)
         except Exception as exc:  # noqa: BLE001 — one meter down never blocks the others

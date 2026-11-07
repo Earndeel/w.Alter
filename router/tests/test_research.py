@@ -46,6 +46,32 @@ def test_aa_intelligence_records_keep_cost_per_task():
     assert r["aa_cost_per_task_intelligence_usd"] == 0.12 and r["intelligence_status"] == "ok"
 
 
+def test_aa_leaderboard_page_with_api_scores():
+    """2026-10-28 redesign: the leaderboard's initialModels carry the cost per task as a number; the API's score
+    wins, a model only the API scores is kept without a cost, an unscored model is dropped."""
+    page = _flight({"initialModels": [
+        {"slug": "x-high", "shortName": "X (high)", "intelligenceIndex": 50.0, "intelligenceIndexCostPerTask": 0.3,
+         "price1mInputTokens": 1, "price1mOutputTokens": 4},
+        {"slug": "y", "shortName": "Y", "intelligenceIndex": 40.0, "intelligenceIndexCostPerTask": None},
+        {"slug": "z", "shortName": "Z", "intelligenceIndex": None}]})
+    raw = aa.leaderboard_models(page)
+    api = {"x-high": {"score": 50.2, "name": "X (high)"}, "w": {"score": 30.0, "name": "W"}}
+    rows = {r["slug"]: r for r in aa.records(raw, api)}
+    assert set(rows) == {"x-high", "y", "w"}
+    assert rows["x-high"]["intelligence_index"] == 50.2 and rows["x-high"]["score_source"] == "api"
+    assert rows["x-high"]["aa_cost_per_task_intelligence_usd"] == 0.3 and rows["x-high"]["list_price_1m_output"] == 4
+    assert rows["y"]["score_source"] == "page" and rows["y"]["intelligence_status"] == "missing_cost"
+    assert rows["w"]["intelligence_status"] == "missing_cost"
+    assert aa.disagreement(raw, api) == {"compared": 1, "differ": 1, "examples": ["x-high"]}
+
+
+def test_aa_rows_carry_the_index_version():
+    doc = {"index_version": "5.0", "data": [{"slug": "x-high", "name": "X (high)", "intelligence_index": 50.0,
+                                             "aa_cost_per_task_intelligence_usd": 0.3}]}
+    (r,) = parse_benchmarks("aa", doc)
+    assert r["extra"] == {"index_version": "5.0"} and r["cost"] == 0.3
+
+
 def test_specialised_tasks_have_their_boards():
     from walter_router.store import db
     with db.connect() as conn:
@@ -116,16 +142,16 @@ def test_routes_carry_cost_price_quota_and_host_order(monkeypatch):
     from walter_router.serve import execution
     from walter_router.store import db
     with db.connect() as conn:
-        monkeypatch.setattr(execution, "subscription_costs", lambda c: {"codex": {"plan": "P", "ratio_pace": 0.02,
-                                                                                    "used_percent": 10.0}})
+        monkeypatch.setattr(execution, "subscription_accounts", lambda c: {"codex": [{"plan": "P", "ratio_pace": 0.02,
+                                                                                      "used_percent": 10.0, "sub_id": "s"}]})
         rs = execution.routes(conn, "gpt-6-1-sol", "medium")
         sub = next(r for r in rs if r["access"] == "subscription")
         assert rs[0] is sub and sub["cost_price_1m"]["in"] > 0 and sub["subscription"]["cost_ratio"] == 0.02
         orr = next((r for r in rs if r["hermes_provider"] == "openrouter"), None)
         if orr and orr.get("or_provider"):
             assert orr["or_provider"]["allow_fallbacks"] and orr["or_provider"]["order"][0] == orr["host"]["tag"]
-        monkeypatch.setattr(execution, "subscription_costs", lambda c: {"codex": {"plan": "P", "ratio_pace": 0.02,
-                                                                                    "used_percent": 95.0}})
+        monkeypatch.setattr(execution, "subscription_accounts", lambda c: {"codex": [{"plan": "P", "ratio_pace": 0.02,
+                                                                                      "used_percent": 95.0, "sub_id": "s"}]})
         rs = execution.routes(conn, "gpt-6-1-sol", "medium")
         assert rs[0]["access"] != "subscription"
 
