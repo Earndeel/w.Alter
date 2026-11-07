@@ -123,6 +123,7 @@ The owner's model knowledge and the intent-aware decision built on it.
 - `tie_margin(unit: str | None)` — 
 - `tie_break(conn, task: str, rows: list[dict], score='quality', unit='quality_unit')` — Close calls: every model within the tie margin of the current leader forms a group; inside the group
 - `level_fallback(task: str, level: str | None)` — Declared fallback (model_id/variant) of a text tier, used when every route of the pinned model fails.
+- `declared_fallbacks(model_id: str, task: str, level: str | None, require: str | None)` — Models the owner declared to run when every provider of `model_id` failed, in order, as (model_id, variant):
 - `effective_policy(conn, model_id: str)` — 
 - `profile(conn, model_id: str)` — 
 - `_role_line(conn, task: dict, p: dict)` — 
@@ -408,6 +409,7 @@ What the Router needs from the active Walter instance, asked through its public 
 - `hermes_python()` — 
 - `child_env(**extra: str)` — Environment of a Hermes child process run on behalf of the Router.
 - `env_value(name: str)` — A key from Hermes' 0600 .env (or the process environment), read at run time (never logged / put in a URL).
+- `secret_value(name: str)` — A key from the environment, else from the instance's vault (walter-secrets map or its declared keys). Keys
 - `state_file(name: str)` — A file the Router generates for the instance (state/router/<name>), e.g. the agents' brief.
 
 ## interface/__init__.py
@@ -459,6 +461,21 @@ English version of the library page (2026-10-14: « une version anglaise et fran
 - `_tag(tag: str)` — 
 - `to_english(html: str)` — 
 
+## llm/antigravity_subscription.py
+
+Antigravity subscription transport (Google AI Pro / Ultra): the official Antigravity CLI, text only.
+
+- `base_id(cli_id: str)` — Router offer key of a CLI model id: the reasoning level is a route parameter, not a model
+- `cli_model(model: str, effort: str | None, verified: list[str])` — The verified CLI id for a router model + reasoning level (the closest level the account offers).
+- `_text(content)` — 
+- `prompt_of(messages: list[dict], response_format: dict | None=None)` — One prompt from OpenAI chat messages: instructions, then the conversation, then the message to answer.
+- `_paths(config: dict)` — 
+- `_forget(state: Path, conversation: str | None)` — Delete what the CLI kept of this call; summaries of past calls only when no other call is running.
+- `_command(config: dict, model: str, schema: dict | None, timeout: float)` — 
+- `_usage(u: dict | None)` — 
+- `_failure(result: dict, stderr: str)` — 
+- `completion(config: dict, *, model: str, messages: list, stream: bool=False, timeout=None, reasoning_effort: str | None=None, response_format: dict | None=None, tools=None, **_)` — OpenAI-shaped answer (ModelResponse, or an async iterator of chunks when streaming) from one CLI call.
+
 ## llm/claude_subscription.py
 
 Claude subscription transport; Walter owns every message, tool and model parameter.
@@ -480,6 +497,7 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_ledger_add(entry: dict)` — 
 - `test_budget()` — Paid spend of test runs over the window against the cap (+ the owner's approvals in the same window), USD.
 - `_price_usd(route: dict, usage: dict | None, body: dict)` — Cost of one call from its usage (or, before the call, from the request size) at the route's price.
+- `_priced(route: dict, telemetry: dict, body: dict)` — A paid call the provider reports no cost for (Venice, Kie…) gets its cost at the router's price for this
 - `test_gate(route: dict, body: dict)` — None when this paid call of a test fits the budget, else the refusal (and one Telegram notice per window).
 - `_charge(route: dict, entry: dict, telemetry: dict, body: dict)` — Record the paid spend of a test call (provider cost, else estimated from its usage or size).
 - `_telegram(text: str)` — One message to the owner through Hermes' gateway (best effort).
@@ -489,10 +507,12 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `decision(task: str)` — The router's routes for a task. A stale entry is served at once and refreshed in the background (a phone call
 - `warm()` — Fill the route cache at start-up for every chat task (background).
 - `chat_tasks()` — 
+- `owner_tasks()` — Chat tasks an owner message can ask for: the internal postes (memory extraction, compression, voice…) are
 - `litellm_target(route: dict)` — LiteLLM arguments for one router route, or None when this gateway cannot run it (yet).
 - `provider_completion(route: dict, **kwargs)` — One provider transport; Claude's native client contributes no agent context or tools.
+- `claude_accounts(config: dict)` — subscription id -> Walter Secrets grant, first = the default account (before accounts: one grant).
 - `_rate_limited(exc: BaseException)` — 
-- `start_completion(route: dict, kwargs: dict, stream: bool)` — (response, iterator, first chunk): the call, up to its first token when streaming. A subscription's rate-limit
+- `start_completion(route: dict, kwargs: dict, stream: bool, waits: tuple | None=None)` — (response, iterator, first chunk): the call, up to its first token when streaming. A subscription's rate-limit
 - `codex_access_token()` — W.Alter's Codex access token, from its grant (renewed through the Codex CLI by walter-secrets).
 - `_codex_account_id()` — 
 - `_install_codex_auth()` — LiteLLM's chatgpt provider reads W.Alter's Codex CLI session (read-only) instead of its own device login.
@@ -508,6 +528,12 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_session_run(session: str)` — The public metadata-only lookup; no database import or global most-recent-run guess.
 - `_run_metadata(run_id: str)` — Validate explicit request correlation through Memory's metadata-only public CLI.
 - `_correlation(request, body: dict, agent: str)` — Request-local transport metadata. DSH's public pi-ai cache key carries its native session identity only
+- `planned_task(asked: str, requested: dict | None)` — (Router task for this call, what the plan set). Lot 2 (2026-11-07): `auto` takes the task and tier the
+- `_text_parts(content)` — 
+- `rule_answer(requested: dict | None, body: dict)` — The preflight's rule answer, only when this request ends on the very owner message it answers (its hash):
+- `_rule_completion(text: str)` — 
+- `_rule_stream(text: str)` — 
+- `_rule_routing(run_id: str)` — 
 - `_record_attempt(row: dict, entry: dict)` — Persist through public ports. DSH routing becomes applied only after an observed response.
 - `log(entry: dict)` — 
 - `build_app()` — 
@@ -576,7 +602,7 @@ The owner's subscriptions — information only, no routing effect (2026-10-14).
 - `claude_code_usage(since: datetime | None, root: Path=CLAUDE_PROJECTS)` — Tokens per Claude model in the Claude Code transcripts (each API call once).
 - `hermes_codex_usage(since: datetime | None, home: Path=HERMES_HOME)` — Tokens per model of Hermes sessions billed to the ChatGPT subscription (main + every profile, read-only).
 - `codex_cli_usage(since: datetime | None, root: Path=CODEX_SESSIONS)` — Tokens per model of Codex CLI / Codex Desktop sessions (last cumulative token_count of each session).
-- `walter_claude_usage(since: datetime | None)` — Actual model usage of the subscription bridge (not the CLI's synthetic acknowledgement).
+- `walter_claude_usage(since: datetime | None, sub: dict | None=None)` — Actual model usage of the subscription bridge (not the CLI's synthetic acknowledgement), for one account:
 - `usage(sub: dict, since: datetime | None)` — 
 - `list_prices(conn)` — $ per million tokens at list API rates (OpenRouter's first-party pricing) per model.
 - `priced(acc: dict, prices: dict)` — Totals of a usage dict + its API value; models without a list price are counted but not valued.
@@ -786,14 +812,24 @@ Research by category (owner, 2026-10-22: « que le sous-module de recherche soit
 Provider catalogues and prices: OpenRouter, Kie, Codex subscription catalogue, OpenAI-compatible providers, declared offers.
 
 
+## research/prices/antigravity.py
+
+Google AI Pro through the official Antigravity CLI: the account's model list, as offers the instance qualified.
+
+- `settings()` — Runtime bindings live in the active instance's llm gateway settings.
+- `_path(value: str)` — 
+- `base_id(cli_id: str)` — Offer key of a CLI id: the reasoning level is a route parameter (same rule as walter-llm's adapter).
+- `source_antigravity()` — `agy models` (the CLI's own read of the account); only instance-qualified models become executable offers.
+
 ## research/prices/claude_pro.py
 
 Read the subscription catalogue/quota through Walter Secrets' declared grant interface.
 
 - `settings()` — Runtime bindings live in the active instance's llm gateway settings.
-- `account_json(endpoint: str)` — Fixed read-only Anthropic account endpoints; token is never returned in diagnostics.
+- `grant_of(conf: dict, account: str | None)` — The Walter Secrets grant of one Claude account (subscription id), from the gateway's own `accounts` setting.
+- `account_json(endpoint: str, account: str | None=None)` — Fixed read-only Anthropic account endpoints; token is never returned in diagnostics. `account` = subscription
 - `source_claude_pro()` — Only instance-verified models become executable offers; catalogue presence alone is not validation.
-- `read_usage()` — Real five-hour/weekly meters, without account identifiers, credit balances or token values.
+- `read_usage(account: str | None=None)` — Real five-hour/weekly meters of one account, without account identifiers, credit balances or token values.
 
 ## research/prices/codex.py
 
@@ -914,7 +950,8 @@ Ordered provider routes and execution metadata for Walter consumers.
 
 - `_runnable(offer: dict)` — (Hermes provider, model id at that provider, status key) or None when Hermes cannot run this offer.
 - `reliability(conn, provider: str, model: str)` — Recent real executions of this provider x model (models.exec_log, skipped attempts excluded: walter-llm logs a
-- `subscription_costs(conn)` — route provider (codex) -> latest cost price of its subscription + plan name (models.latest_subscription_costs).
+- `subscription_accounts(conn)` — route provider -> its subscriptions in declaration order, each with its own quota and cost price. Several
+- `subscription_costs(conn)` — route provider (codex) -> its first subscription: cost price, plan name, quotas (see subscription_accounts).
 - `host_order(conn, model_id: str, usage: str='interactive')` — Usable hosts behind OpenRouter for this model, cheapest first (models.usable_endpoints); flex tier only for
 - `routes(conn, model_id: str, variant: str='', preferred: str | None=None, usage: str='interactive', modes: list[str] | None=None)` — Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not
 - `_uuid(value)` — 
