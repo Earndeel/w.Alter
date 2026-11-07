@@ -185,7 +185,7 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
     def subscription_first(r: dict) -> bool:
         """A subscription with quota left always goes before every paid route, whatever its recent failures: trying it
         costs one quick refusal at worst, while a paid route ahead of it bills every call (2026-10-28: 40 Opus calls
-        on OpenRouter while the Claude subscription had 24 % of its week left; Monsieur, 2026-10-30)."""
+        on OpenRouter while the Claude subscription had 24 % of its week left; owner, 2026-10-30)."""
         return r["access"] == "subscription" and not quota_spent(r)
 
     out.sort(key=lambda r: (not subscription_first(r), r["probe_ok"] is False, r["unreliable"], rank(r),

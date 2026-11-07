@@ -118,6 +118,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/gateway.py | `PAID` | ["arnict", "kie", "openrouter", "venice"] | providers billed per call (subscriptions are not) |
 | llm/gateway.py | `RATE_LIMIT_WAITS` | [4, 12] |  |
 | llm/gateway.py | `ANTHROPIC_CACHE_POINTS` | [{"location": "message", "role": "system"}, {"index": -1, "location": "message"}] |  |
+| llm/gateway.py | `QUOTA_SWITCH` | 90.0 | same threshold as the Router's execution.routes (weekly %), mirrored for the trace only |
 | plan/mail.py | `API` | https://gmail.googleapis.com/gmail/v1/users/me |  |
 | plan/mail.py | `GRANT` | google-memory |  |
 | plan/mail.py | `VENDORS` | {"anthropic.com": "Anthropic", "cursor.com": "Cursor", "elevenlabs.io": "ElevenLabs", "google.com": "Google", "kie.ai": "Kie", "midjourney.com": "Midjourney", "mistral.ai": "Mistral", "openai.com": "OpenAI", "openrouter.ai": "OpenRouter", "perplexity.ai": "Perplexity", "runwayml.com": "Runway", "suno.com": "Suno", "x.ai": "xAI"} |  |
@@ -262,7 +263,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `HERMES_HOME` | instance.py | get | aucun | Emplacement du runtime historique pour les opérations/adaptateurs qui en dépendent encore. |
 | `CHATGPT_TOKEN_DIR` | llm/gateway.py | setdefault | str(CHATGPT_DIR) | Réglage du transport de l'abonnement ; l'authentification reste fournie par son grant. |
 | `CHATGPT_DEFAULT_INSTRUCTIONS` | llm/gateway.py | setdefault | "You are a precise assistant for W.Alter's background jobs. Follow the system and user instructions exactly; answer in the language of the request." | Instructions de base du transport d'abonnement, indépendantes du goal de la sous-tâche. |
-| `WALTER_RUN_CHANNEL` | llm/gateway.py | get | aucun | test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation de Monsieur. |
+| `WALTER_RUN_CHANNEL` | llm/gateway.py | get | aucun | test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation du propriétaire. |
 | `WALTER_LLM_PORT` | llm/gateway.py | get | '8894' | Port HTTP loopback de la passerelle (défaut logiciel 8894). |
 | `CLAUDE_PROJECTS` | plan/subscriptions.py | get | aucun | Source locale de métriques des sessions Claude pour estimer un abonnement. |
 | `CODEX_SESSIONS` | plan/subscriptions.py | get | aucun | Source locale de métriques des sessions Codex pour estimer un abonnement. |

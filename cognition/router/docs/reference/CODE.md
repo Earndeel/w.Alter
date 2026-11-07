@@ -536,6 +536,11 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_rule_routing(run_id: str)` — 
 - `_record_attempt(row: dict, entry: dict)` — Persist through public ports. DSH routing becomes applied only after an observed response.
 - `log(entry: dict)` — 
+- `cost_headers(telemetry: dict)` — The call's cost for the caller's own ledger (Walter Memory's system.model_calls): reported by the provider, or
+- `route_state(route: dict)` — 
+- `selection_plan(d: dict)` — 
+- `selection_check(plan: list[dict])` — True when every subscription route with quota left comes before every paid route (the owner's rule).
+- `log_selection(agent: str, task: str, d: dict, chosen: int | None, passed: list[dict], correlation: dict)` — 
 - `build_app()` — 
 - `add_agent(name: str, cred_file: str, ref: str='WALTER_LLM_TOKEN')` — New token for NAME (one per agent: rotates). cred_file = a DSH credentials YAML, or `env:FILE[:VAR]` = a
 

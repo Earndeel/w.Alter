@@ -7431,6 +7431,31 @@
             "signature": "entry: dict"
           },
           {
+            "description": "The call's cost for the caller's own ledger (Walter Memory's system.model_calls): reported by the provider, or",
+            "name": "cost_headers",
+            "signature": "telemetry: dict"
+          },
+          {
+            "description": "",
+            "name": "route_state",
+            "signature": "route: dict"
+          },
+          {
+            "description": "",
+            "name": "selection_plan",
+            "signature": "d: dict"
+          },
+          {
+            "description": "True when every subscription route with quota left comes before every paid route (the owner's rule).",
+            "name": "selection_check",
+            "signature": "plan: list[dict]"
+          },
+          {
+            "description": "",
+            "name": "log_selection",
+            "signature": "agent: str, task: str, d: dict, chosen: int | None, passed: list[dict], correlation: dict"
+          },
+          {
             "description": "",
             "name": "build_app",
             "signature": ""
@@ -15349,6 +15374,12 @@
         ]
       },
       {
+        "comment": "same threshold as the Router's execution.routes (weekly %), mirrored for the trace only",
+        "file": "llm/gateway.py",
+        "name": "QUOTA_SWITCH",
+        "value": 90.0
+      },
+      {
         "comment": "",
         "file": "plan/mail.py",
         "name": "API",
@@ -16647,7 +16678,7 @@
       },
       {
         "default_expression": "aucun",
-        "description": "test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation de Monsieur.",
+        "description": "test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation du propriétaire.",
         "file": "llm/gateway.py",
         "name": "WALTER_RUN_CHANNEL",
         "operation": "get"
@@ -16906,7 +16937,7 @@
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "b8f0e3ee29e57454855286b6b80b182d5bf17c1c59f7dfc216cc9bcef631cd54",
     "contracts/router.json": "ea6c3de46c6b48ddc120dcef459dd834802baf7a0190931b1e7851fa2386fdcb",
-    "documentation.py": "19726a1a74efcf5f69cc02fcebc9c3da0f3e540918071db95014dd6fb7a2b7e4",
+    "documentation.py": "03ecc8225957ad8eeaa003928eed8813163c3d1c959203db72987738804819ae",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
@@ -16926,9 +16957,9 @@
     "interface/translate.py": "a1796785414cd3fac4908088dab4a23780bf67976bd5ce0677b0a3469ddd4171",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
     "llm/claude_subscription.py": "47d8e25c6e8a53a174a09bb0c8b767c331091544322cf2f3c586bae98103fb2c",
-    "llm/config/gateway.json": "851e8d18906830a95da4be421a12c5ecb315fd46d1675959488a82b8cd063fc9",
+    "llm/config/gateway.json": "56bfc87cdffe86d4a3ab2ce49e9f643652e2cac1dfec8103c66e2773ea392a05",
     "llm/contracts/llm.json": "17a51a635cfd54e506593c5be38b0aaa2a847f9646ee56f77e075df79dcd589d",
-    "llm/gateway.py": "de31d653013395ffb3a142d61fbd72148f47841707481d7c08c61a0c535d06a9",
+    "llm/gateway.py": "4024bc4fd492f80a907fe54d34189b428dd4cde92b8ac121f401c21fa337c16b",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",
@@ -16978,7 +17009,7 @@
     "serve/api.py": "9b04510dd95c3ffa62de95158326f921ca07ac2785cc4a04a8870324938ed1af",
     "serve/brief.py": "33ca79121e190834adabe6fbc573b408ef84d4cf29a93736cf4f8de48275c3ab",
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
-    "serve/execution.py": "ab10712acda6c3ea7ebd913c0b10125e1c040c060d61fe24235ef731de070bf1",
+    "serve/execution.py": "cd2f898bcdd9120ebd1e3c4a1977cf7ed0aa7593373187c7914638887439f6a5",
     "serve/hermes_sync.py": "1dc99d9f119e45cc958e5954fac64ba29802505d04ccd2ef096c3aba3db633cc",
     "serve/intent.py": "8f8c1adcbc776fce3e38d1aa751bcea89b1a71b00c1918c0b6ab9dd71b2c75cf",
     "serve/media_exec.py": "8fe8e8d41e1141f6e96f6c6912b1fdac3ebacadde7ceacdf18ad2ef994db63cd",
