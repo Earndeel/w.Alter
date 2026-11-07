@@ -104,3 +104,11 @@ def test_quality_replay_rejects_a_chain_containing_non_cloud_events():
         def execute(self,*args): return self
         def fetchall(self): return [{'privacy_class':'local_only','text':'private fixture'}]
     assert messages(Conn(),[{'session_id':'fixture'}],cloud_safe=True) == ([],[])
+
+
+def test_pressure_inside_a_single_live_turn_asks_to_trim_tool_outputs():
+    """2026-11-07: a one-turn deep research overflowed; nothing precedes the live turn, so trimming is the only move."""
+    live = conversation(1, out_chars=12000)
+    p = plan(live, measured_tokens=200000)
+    assert not p['needed'] and p['prune_tools']
+    assert not plan(live, measured_tokens=1000)['prune_tools']

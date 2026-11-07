@@ -176,3 +176,38 @@ test('bridge fails closed on unsupported protocol, preserves full input', async 
   await assert.rejects(bridge({op:'unknown',messages}),/bridge exited/);
   assert.throws(()=>normalize([{role:'user',content:[{type:'future-unknown'}]}]),/unsupported/);
 });
+
+test('a live turn over budget is trimmed by the host pruner on Walter\'s decision, originals recoverable', async () => {
+  const {ctx,session,engine,agent} = setup();
+  const {ToolResultPruner} = require('@deepseek-ai/dsh-compaction-tool-result-pruner');
+  new ToolResultPruner(ctx,{thresholdChars:8192,headChars:4096,tailChars:1024});
+  await new Promise(r=>setTimeout(r,0));
+  session.append('turn/start',{turn:0});
+  session.append('user/message',createUserMessage({content:[{type:'text',text:'deep research'}],source:{kind:'user'}}),{surfaceOp:'append'});
+  for (let s=0;s<40;s++) {   // one live turn, 40 pages read: nothing before it to checkpoint (2026-11-07 overflow)
+    session.append('assistant/message',{turn:0,step:s,stream:[],message:createAssistantMessage({content:[{type:'tool-call',id:`page-${s}`,name:'walter_browse',arguments:'{}'}],source:{provider:'walter',model:'coding'}})},{surfaceOp:'append'});
+    session.append('tool/result',{turn:0,step:s,message:createToolResultMessage({callId:`page-${s}`,content:[{type:'text',text:`HEAD-${s} `+'p'.repeat(20000)+` PAGE_MIDDLE_${s} `+'p'.repeat(20000)}],isError:false})},{surfaceOp:'append'});
+  }
+  const before = ctx.tokenMeter.measure(session).totalTokens;
+  assert.equal(await engine.compactIfNeeded(agent,'pressure',new AbortController().signal), null);
+  const after = ctx.tokenMeter.measure(session).totalTokens;
+  assert.ok(after < before / 4, `${after} vs ${before}`);
+  const text = JSON.stringify(session.deriveMessages());
+  assert.ok(text.includes('HEAD-39') && !text.includes('PAGE_MIDDLE_39'));
+  let offset=0,full='';
+  do { const page=recoverOwn(session,'page-39',offset); full+=page.content; offset=page.next_offset; } while(offset!==null);
+  assert.ok(full.includes('PAGE_MIDDLE_39'));
+});
+
+test('below budget nothing is trimmed', async () => {
+  const {ctx,session,engine,agent} = setup();
+  const {ToolResultPruner} = require('@deepseek-ai/dsh-compaction-tool-result-pruner');
+  new ToolResultPruner(ctx,{}); await new Promise(r=>setTimeout(r,0));
+  session.append('turn/start',{turn:0});
+  session.append('user/message',createUserMessage({content:[{type:'text',text:'one page'}],source:{kind:'user'}}),{surfaceOp:'append'});
+  session.append('assistant/message',{turn:0,step:0,stream:[],message:createAssistantMessage({content:[{type:'tool-call',id:'p',name:'walter_browse',arguments:'{}'}],source:{provider:'walter',model:'coding'}})},{surfaceOp:'append'});
+  session.append('tool/result',{turn:0,step:0,message:createToolResultMessage({callId:'p',content:[{type:'text',text:'x'.repeat(30000)+' KEEP_ALL'}],isError:false})},{surfaceOp:'append'});
+  const before = JSON.stringify(session.deriveMessages());
+  assert.equal(await engine.compactIfNeeded(agent,'pressure',new AbortController().signal), null);
+  assert.equal(JSON.stringify(session.deriveMessages()), before);
+});

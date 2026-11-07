@@ -37,9 +37,14 @@ def plan(messages: list[Message], *, model: str = "", measured_tokens: int = 0,
     # A host must report an indivisible live-turn overflow instead of deleting it.
     keep = cfg.projection.keep_turns + 1
     end = starts[-keep] if len(starts) > keep else head
-    useful = end > head and (force or estimate >= budget)
+    pressure = force or estimate >= budget
+    useful = end > head and pressure
+    # Under pressure, oversized tool outputs the model has already read are trimmed first (head + tail kept, the
+    # original stays in the host journal for context_recover): the only reduction available inside a live turn.
+    # 2026-11-07: one deep-research turn read 52 pages (331K chars) and overflowed the window, nothing being
+    # cuttable before the live turn. `prune_tools` is the decision; the host's pruner is only the mechanism.
     return {"version": 1, "engine": "walter-context", "mode": "checkpoint",
-            "start": head, "end": end if useful else head, "needed": useful,
+            "start": head, "end": end if useful else head, "needed": useful, "prune_tools": pressure,
             "estimated_tokens": estimate, "budget_tokens": budget,
             "kept_turns": keep, "reason": "pressure" if useful else "no_safe_useful_range"}
 

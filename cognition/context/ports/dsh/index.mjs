@@ -113,7 +113,7 @@ export class WalterContextEngine extends BasicCompactionEngine {
     return { summary: [{ type: 'text', text: result.content }], provider: 'walter-context', model: 'extractive-v1' };
   }
 
-  async compactIfNeeded(agent, trigger, signal) {
+  async compactIfNeeded(agent, trigger, signal, pruned = false) {
     signal.throwIfAborted();
     const session = agent.session;
     const header = session.requestHeader();
@@ -131,6 +131,13 @@ export class WalterContextEngine extends BasicCompactionEngine {
     const current = session.deriveMessages();
     if (session.surface.replaceGeneration !== generation || JSON.stringify(current.map(m => m.id)) !== JSON.stringify(ids))
       throw new Error('walter-context: session changed while planning');
+    // Walter's plan decides; the host's tool-result pruner (mounted beside this engine) only trims. Plan again on
+    // the trimmed surface: a checkpoint may no longer be needed.
+    const pruner = this.ctx.get('toolResultPruner');
+    if (result.prune_tools && !pruned && pruner) {
+      pruner.pruneSession(session);
+      return this.compactIfNeeded(agent, trigger, signal, true);
+    }
     if (!result.needed) return null;
     const seqById = new Map(session.surface.nodes.map(seq => [session.deriveEventMessage(session.eventAt(seq))?.id, seq]));
     const start = seqById.get(messages[result.start]?.id);
@@ -145,7 +152,8 @@ export class WalterContextEngine extends BasicCompactionEngine {
 export function recoverOwn(session, ref, offset = 0) {
   if (typeof ref !== 'string' || !ref || ref.length > 200 || !Number.isSafeInteger(offset) || offset < 0)
     throw new Error('walter-context: invalid recovery reference or offset');
-  for (let seq = session.seq - 1; seq >= 0; seq--) {
+  // Oldest first: a trimmed output is a later `tool/result` replacing the original, which is the one to recover.
+  for (let seq = 0; seq < session.seq; seq++) {
     const event = session.eventAt(seq);
     if (event.type !== 'tool/result' || event.data.message.toolCallId !== ref) continue;
     const message = normalize([event.data.message])[0];
