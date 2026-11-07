@@ -309,5 +309,5 @@ def toolset_note(hidden):
     if not hidden:return ''
     return ("## Outils W.Alter non listés\n"
             f"{len(hidden)} outils W.Alter ne sont pas dans ta liste pour l'alléger : {', '.join(hidden)}. "
-            "Appelle-les avec `walter_call(tool, arguments)` ; `walter_call(tool, describe=true)` donne d'abord "
-            "leurs paramètres.")
+            "Appelle-les directement avec `walter_call(tool, arguments)` quand la fiche du module donne leurs "
+            "paramètres ; sinon `walter_call(tool, describe=true)` les donne d'abord.")

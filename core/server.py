@@ -292,16 +292,24 @@ def person_lookup(name: str) -> str:
 
 @mcp.tool()
 def memory_events(text: str = "", source: str = "", event_type: str = "", thread_id: str = "", since: str = "",
-                  limit: int = 20) -> str:
+                  until: str = "", order: str = "newest", event_id: str = "", limit: int = 20) -> str:
     """Read W.Alter's canonical event history (what actually happened: messages, conversations with W.Alter,
     e-mails, calendar, files...). Exact substring search on content; filters: source (hermes, beeper, gmail,
-    calendar, vault, claude…), event_type (message.received, message.sent, tool.called…), thread_id, since (ISO).
-    Use memory_recall for synthesised knowledge, this for the original record. Only cloud_allowed rows are exposed."""
-    args = ["events", "--limit", str(max(1, min(int(limit), 200))), "--cloud-safe"]
+    calendar, vault, claude_code, codex, dsh…), event_type (message.received, message.sent…), thread_id,
+    since/until (ISO). order="oldest" for the first events (« le tout premier message sur X »), "newest" by default.
+    Answer = compact list (event_id, date, source, a window of the content around `text`); event_id="…" returns
+    that one event in full. Use memory_search for synthesised knowledge, this for the original record. Only
+    cloud_allowed rows are exposed."""
+    if order not in ("newest", "oldest"):
+        return json.dumps({"error": "order must be newest or oldest"})
+    args = ["events", "--limit", str(max(1, min(int(limit), 200))), "--cloud-safe",
+            "--order", "asc" if order == "oldest" else "desc"]
     for flag, value in (("--text", text), ("--source", source), ("--type", event_type), ("--thread", thread_id),
-                        ("--since", since)):
+                        ("--since", since), ("--until", until), ("--id", event_id)):
         if value:
             args += [flag, value]
+    if not event_id:
+        args += ["--compact", "500"]
     return _walter_memory(*args, timeout=60)
 
 

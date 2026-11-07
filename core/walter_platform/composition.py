@@ -28,7 +28,21 @@ DSH_OFF=('tool-web','tool-skill','skill-filesystem','web','web-search-deepseek',
          'session-telemetry-otel','session-log-deepseek','plugin-package-inventory-deepseek',
          'deepseek-llm-api-extensions','deepseek-account','llm-deepseek','llm-deepseek-account')
 DSH_PRESET_OWNED={'persona':'soul','skill-filesystem':'skills','tool-skill':'skills','tool-web':'browse'}
-DSH_WEB_OFF=('preset-ptc','preset-minimal','preset-cordis','account-controller')
+# Lean runtime (2026-11-07, owner: « DSH doit uniquement fournir les primitives du runtime »): DSH's own orchestration
+# (goals, plan mode, todo list, sub-agents, workflows, MCP resource browsing) is off; delegation is Walter's
+# (walter_run → Walter Router), the working plan is Walter Memory's (SessionState). 0 calls in 156 DSH sessions;
+# each tool card cost every request ~11K chars. Kept: agent loop, bash/fs/search/jobs, ask-user, present, compaction.
+DSH_ORCHESTRATION=('goal','goal-round-driver','command-goal','tool-goal','plan-mode','subagent','subagent-spawn-in-process',
+                   'subagent-fork-in-process','tool-subagent-control','tool-subagent-list-agents','tool-subagent',
+                   'tool-subagent-fork','workflow-ptc','tool-workflow','tool-ralph','tool-todo','mcp-resources')
+DSH_PRESET_GROUPS_OFF=('planning','delegation')   # preset groups holding only orchestration rows
+DSH_OFF=DSH_OFF+DSH_ORCHESTRATION
+# Web surface (2026-11-07, owner « pas de boutons inutiles »): Walter Router picks the model, the agent profile is
+# Walter's, DSH packages are managed by Walter; the DeepSeek brand gives way to the instance's face (walter-ui).
+DSH_WEB_OFF=('preset-ptc','preset-minimal','preset-cordis','account-controller','ui-brand-official',
+             'ui-model-selection','ui-agent-preset','ui-plugin-manager','ui-settings-plugin-inventory',
+             'ui-settings-plugins','ui-settings-shell','ui-settings-agent-loop','ui-settings-subagent',
+             'ui-settings-web-search')
 DSH_TASKS=('auto','coding','general','document','summarization')   # Walter Router tasks offered to DSH
 DSH_TITLE={'targetWords':5,'targetCjkCharacters':10,'maxInputBytes':4096,'maxOutputTokens':64,'timeoutMs':60000,
            'provider':'walter','model':'summarization'}
@@ -148,7 +162,8 @@ def _dsh_preset(port):
     def walk(entries):
         out=[]
         for e in entries:
-            if e.get('id') in DSH_PRESET_OWNED:continue
+            if e.get('id') in DSH_PRESET_OWNED or e.get('id') in DSH_ORCHESTRATION:continue
+            if e.get('group') and e.get('id') in DSH_PRESET_GROUPS_OFF:continue
             gate=e.get('disabled')
             if isinstance(gate,dict):   # bash/pwsh platform switch; Walter hosts are Linux
                 if gate['__js__'].replace('"',"'") not in ("process.platform === 'win32'","process.platform !== 'win32'"):
@@ -170,8 +185,12 @@ def _dsh_web_profile(port):
     head=('# DSH web GUI: no developer surface text (HMR, pnpm, harness source) in the prompt.\n'
           '- id: web-runtime\n  config:\n    openBrowser: !!js ctx.webStartup.openBrowser\n    printUrl: true\n'
           '    surfaceContext: false\n    trustedHosts: !!js ctx.webStartup.trustedHosts\n'
-          '# Presets that carry the DSH "coding agent" persona and DSH skills/web/compaction; DeepSeek account UI.\n')
+          '# Presets that carry the DSH "coding agent" persona and DSH skills/web/compaction; DeepSeek account UI;\n'
+          '# web controls Walter owns (model, agent profile, packages) and the DeepSeek brand.\n')
     head+=''.join(f'- id: {x}\n  disabled: true\n' for x in DSH_WEB_OFF)
+    # dsh-web-app re-enables some orchestration rows after the global patch: the profile layer is applied last.
+    head+='# DSH orchestration (goals, plan mode, sub-agents, workflows, todo, MCP resources): Walter owns it.\n'
+    head+=''.join(f'- id: {x}\n  disabled: true\n' for x in DSH_ORCHESTRATION)
     return head+'# Walter "standard" preset (generated from the shipped one by walter-core composition).\n'+yaml.safe_dump([_dsh_preset(port)],sort_keys=False,allow_unicode=True,width=120)
 
 
