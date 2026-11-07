@@ -373,6 +373,9 @@ async def provider_completion(route: dict, **kwargs):
         raise ValueError("unknown_claude_account")
     config["account"] = account
     token = await asyncio.to_thread(grants.access, accounts[account])
+    # An agent step (long context, deep reasoning) takes minutes; the transport's own 60 s default is for short
+    # calls that name their timeout. Other providers get litellm's 600 s the same way.
+    kwargs.setdefault("timeout", float(config.get("timeout") or 600))
     return await completion(config, token, **kwargs)
 
 

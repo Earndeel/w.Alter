@@ -204,3 +204,41 @@ def test_usage_reads_only_accounts_the_gateway_declares():
     assert claude_pro.grant_of({"grant": "claude-subscription"}, None) == "claude-subscription"
     with pytest.raises(ValueError):
         claude_pro.grant_of(conf, "telegram")
+
+
+def test_a_deadline_after_headers_marks_the_stream_failed():
+    """2026-11-07: an Opus answer cut at the deadline once headers were sent left no error, the stream ended cleanly
+    and was logged ok with 2 output tokens; the agent retried the same request in a loop."""
+    bridge = transport.NativeBridge({}, "claude-test", "token", 60)
+    try:
+        bridge.sent_headers = True
+        bridge.expire()
+        assert bridge.error == "claude_transport_timeout" and bridge.done.is_set()
+        closed = transport.NativeBridge({}, "claude-test", "token", 60)
+        closed.closed.set()
+        closed.expire()
+        assert closed.error is None          # the caller closed it: its own choice, not a transport failure
+        closed.server.server_close()
+    finally:
+        bridge.server.server_close()
+
+
+def test_an_agent_call_without_a_timeout_gets_minutes_not_the_transport_default(monkeypatch):
+    import types, sys
+    spec_g = importlib.util.spec_from_file_location("walter_gateway_t", paths.ROOT / "llm/gateway.py")
+    seen = {}
+
+    async def fake_completion(config, token, **kwargs):
+        seen.update(kwargs)
+        return "ok"
+    fake_grants = types.SimpleNamespace(access=lambda ref: "token")
+    monkeypatch.setitem(sys.modules, "walter_secrets", types.SimpleNamespace(grants=fake_grants))
+    monkeypatch.setitem(sys.modules, "walter_secrets.grants", fake_grants)
+    monkeypatch.setitem(sys.modules, "claude_subscription", types.SimpleNamespace(completion=fake_completion))
+    gateway = importlib.util.module_from_spec(spec_g)
+    spec_g.loader.exec_module(gateway)
+    monkeypatch.setitem(gateway._CONF, "claude_subscription", {"grant": "g"})
+    asyncio.run(gateway.provider_completion({"provider": "claude-pro"}, model="claude-test", messages=[]))
+    assert seen["timeout"] == 600
+    asyncio.run(gateway.provider_completion({"provider": "claude-pro"}, model="claude-test", messages=[], timeout=60))
+    assert seen["timeout"] == 60

@@ -186,6 +186,15 @@ class NativeBridge:
         self.sent_headers = True
         self.caller.wfile.write(content)
 
+    def expire(self):
+        """Deadline or close before the answer ended. Once headers are sent no error body can follow, so the stream
+        must carry the failure: a cut answer is never a success (2026-11-07: Opus answers cut at 60 s were logged ok
+        with 2 output tokens and the agent retried the same request in a loop)."""
+        if not self.closed.is_set():
+            self.error = self.error or "claude_transport_timeout"
+        self.fail(504, "claude_transport_timeout")
+        self.done.set()
+
     def receive(self, handler, payload):
         with self.claim:
             if self.request_claimed:
@@ -215,8 +224,7 @@ class NativeBridge:
                                         stderr=subprocess.DEVNULL, start_new_session=True)
         while not self.done.wait(0.05):
             if self.closed.is_set() or time.monotonic() >= self.deadline:
-                self.fail(504, "claude_transport_timeout")
-                self.done.set()
+                self.expire()
                 break
             if self.process.poll() is not None and not self.native_claimed:
                 self.fail(502, "claude_native_start_failed")
