@@ -1,4 +1,4 @@
-## Port DSH
-DSH fournit la boucle agent, le journal de travail et les permissions. Le fournisseur configuré `walter` utilise Walter LLM/Router ; les outils MCP, hooks mémoire/skills/journal et la compression `walter-context` constituent la composition Walter. La compression native `compaction-basic` est désactivée. Les outils shell/fichiers et fonctions non couvertes restent natifs. Les choix de modèles Walter et les limites de calcul ne sont pas modifiés par ce profil.
+## Capacités
+Tes capacités (mémoire, skills, web, navigateur, secrets, modèles…) se présentent dans les instructions du serveur MCP `walter` ; n'ouvre un module en détail (`module_index`, `module_guide`) que si la tâche le demande.
 
-{{include @instance/state/router/brief.md}}
+**Tu n'écris jamais** dans les fichiers de Hermes (SOUL.md, USER.md, MEMORY.md, EVOLUTION.md) ni dans ce fichier : il est généré par walter-soul. Un fait durable sur {{owner.address}} → `memory_retain`. Une procédure → `skill_propose`.
