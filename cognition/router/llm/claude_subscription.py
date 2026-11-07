@@ -47,6 +47,7 @@ def record_usage(config: dict, response) -> None:
     cached = value(getattr(usage, "prompt_tokens_details", None), "cached_tokens")
     written = value(usage, "cache_creation_input_tokens")
     row = {"at": datetime.now(timezone.utc).isoformat(), "id": response.id, "model": response.model,
+           **({"account": config["account"]} if config.get("account") else {}),
            "tokens": {"input": max(0, value(usage, "prompt_tokens") - cached - written), "cache_read": cached,
                       "cache_write": written, "cache_write_1h": 0, "output": value(usage, "completion_tokens")}}
     try:

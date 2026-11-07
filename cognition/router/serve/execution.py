@@ -69,22 +69,34 @@ def reliability(conn, provider: str, model: str) -> dict:
 QUOTA_SWITCH = 90.0   # weekly meter %: above it a subscription route goes after the paid ones (quota nearly spent)
 
 
-def subscription_costs(conn) -> dict[str, dict]:
-    """route provider (codex) -> latest cost price of its subscription + plan name (models.latest_subscription_costs)."""
+def subscription_accounts(conn) -> dict[str, list[dict]]:
+    """route provider -> its subscriptions in declaration order, each with its own quota and cost price. Several
+    accounts may serve one provider (two Claude accounts, 2026-11-07): each becomes its own route. An account with no
+    cost row yet (just declared) still gets a route, with its live meters."""
     from walter_router.plan import subscriptions
     by_sub = {r["sub_id"]: dict(r) for r in conn.execute("select * from models.latest_subscription_costs")}
-    meters = {r["sub_id"]: float(r["used_percent"]) for r in conn.execute(   # fresher: read after every agent turn
+    meters = {r["sub_id"]: float(r["used_percent"]) for r in conn.execute(
         """select sub_id, used_percent from models.latest_subscription_usage
            where window_name = 'weekly' and source <> 'calibration'""")}
     sessions = {r["sub_id"]: float(r["used_percent"]) for r in conn.execute(
         "select sub_id, used_percent from models.latest_subscription_usage where window_name = 'session'")}
-    out = {}
+    out: dict[str, list[dict]] = {}
     for sub in subscriptions.load():
-        if sub.get("route_provider") and sub["id"] in by_sub:
-            used = meters.get(sub["id"], by_sub[sub["id"]].get("used_percent"))
-            out[sub["route_provider"]] = {**by_sub[sub["id"]], "used_percent": used, "plan": sub.get("plan"),
-                                          "session_used_percent": sessions.get(sub["id"])}
+        if not sub.get("route_provider") or sub.get("retired"):
+            continue
+        cost = by_sub.get(sub["id"])
+        if cost is None and sub["id"] not in meters:
+            continue
+        out.setdefault(sub["route_provider"], []).append({
+            **(cost or {}), "sub_id": sub["id"], "plan": sub.get("plan"),
+            "used_percent": meters.get(sub["id"], (cost or {}).get("used_percent")),
+            "session_used_percent": sessions.get(sub["id"])})
     return out
+
+
+def subscription_costs(conn) -> dict[str, dict]:
+    """route provider (codex) -> its first subscription: cost price, plan name, quotas (see subscription_accounts)."""
+    return {p: subs[0] for p, subs in subscription_accounts(conn).items()}
 
 
 def host_order(conn, model_id: str, usage: str = "interactive") -> list[dict]:
@@ -121,19 +133,29 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
                     "blended_1m": sel.blended(o), "probe_ok": None if st is None else st["ok"],
                     "unreliable": rel["unreliable"], "recent_runs": rel["runs"], "recent_failures": rel["failed"]})
 
-    costs = subscription_costs(conn)
     list_in = next((o.get("price_in_1m") for o in sel.load_offers(conn, snaps).get(model_id, [])
                     if o["provider"] == "openrouter" and o["interface"] == "chat" and o.get("price_in_1m") is not None), None)
     list_out = next((o.get("price_out_1m") for o in sel.load_offers(conn, snaps).get(model_id, [])
                      if o["provider"] == "openrouter" and o["interface"] == "chat" and o.get("price_out_1m") is not None), None)
     hosts = None
+    accounts = subscription_accounts(conn)
+    expanded = []
+    for r in out:   # one route per account of a subscription provider, in declaration order (keeps its prompt cache)
+        subs = accounts.get(r["provider"]) if r["access"] == "subscription" else None
+        if subs and len(subs) > 1:
+            expanded += [{**r, "account": c["sub_id"], "_sub": c} for c in subs]
+        else:
+            expanded.append({**r, "_sub": subs[0]} if subs else r)
+    out = expanded
     for r in out:
-        if r["access"] == "subscription" and r["provider"] in costs:
-            c = costs[r["provider"]]
+        c = r.pop("_sub", None)
+        if r["access"] == "subscription" and c:
             ratio = c.get("ratio_pace") or c.get("ratio_full")
             r["subscription"] = {"plan": c.get("plan"), "quota_used_percent": c.get("used_percent"),
                                  "session_used_percent": c.get("session_used_percent"),
                                  "cost_ratio": round(ratio, 4) if ratio else None}
+            if r.get("account"):
+                r["subscription"]["account"] = r["account"]
             if ratio and list_in is not None:
                 r["cost_price_1m"] = {"in": round(list_in * ratio, 4), "out": round((list_out or 0) * ratio, 4)}
         if r["hermes_provider"] == "openrouter":
@@ -181,7 +203,7 @@ def _uuid(value) -> str | None:
 def log(conn, entry: dict) -> int:
     """One routed execution attempt (from the Hermes plugin or the media executor)."""
     keys = ("task", "role", "model_id", "provider", "model", "ok", "skipped", "seconds", "cost_usd", "fallback_for", "kind",
-            "run_id", "task_id", "usage", "cost_status")
+            "run_id", "task_id", "usage", "cost_status", "account")
     row = {k: entry.get(k) for k in keys}
     row["ok"] = bool(row["ok"])
     row["kind"] = row["kind"] or "text"

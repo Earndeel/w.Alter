@@ -61,7 +61,7 @@ def test_cli_acknowledgement_never_contains_real_tools_or_model_output():
 
 def test_only_verified_catalogue_models_become_subscription_offers(monkeypatch):
     monkeypatch.setattr(claude_pro, "settings", lambda: {"enabled": True, "verified_models": ["claude-allowed"]})
-    monkeypatch.setattr(claude_pro, "account_json", lambda endpoint: {
+    monkeypatch.setattr(claude_pro, "account_json", lambda endpoint, account=None: {
         "data": [{"id": "claude-allowed"}, {"id": "claude-unverified"}], "has_more": False})
     doc, _, _ = claude_pro.source_claude_pro()
     assert doc["models"] == ["claude-allowed"] and len(doc["catalogue_models"]) == 2
@@ -71,7 +71,7 @@ def test_only_verified_catalogue_models_become_subscription_offers(monkeypatch):
 
 
 def test_usage_comes_from_real_vendor_windows_not_transcript_estimates(monkeypatch):
-    monkeypatch.setattr(claude_pro, "account_json", lambda endpoint: {
+    monkeypatch.setattr(claude_pro, "account_json", lambda endpoint, account=None: {
         "five_hour": {"utilization": 12, "resets_at": None},
         "seven_day": {"utilization": 34, "resets_at": None},
         "extra_usage": {"is_enabled": False}})
@@ -162,3 +162,45 @@ def test_remote_socket_close_failure_cannot_skip_child_cleanup(monkeypatch):
     bridge.close()
     assert calls == ["kill", "wait", "shutdown", "server_close", "join", "cleanup"]
     assert bridge.done.is_set()
+
+
+def test_each_claude_account_is_its_own_route_in_declaration_order(monkeypatch):
+    """2026-11-07: the second account goes first once the first one's week is nearly spent, still before paid routes."""
+    from walter_router.store import db
+    def accounts(spent):
+        return lambda c: {"claude-pro": [{"sub_id": "anthropic-pro", "plan": "Claude Pro", "used_percent": spent},
+                                         {"sub_id": "anthropic-pro-2", "plan": "Claude Pro", "used_percent": 5.0}]}
+    with db.connect() as conn:
+        model = next((m for m in ("claude-opus-5-5", "claude-sonnet-5-5")
+                      if any(r["provider"] == "claude-pro" for r in execution.routes(conn, m))), None)
+        if model is None:
+            pytest.skip("no claude-pro offer in this database")
+        monkeypatch.setattr(execution, "subscription_accounts", accounts(10.0))
+        rs = execution.routes(conn, model)
+        assert [r.get("account") for r in rs[:2]] == ["anthropic-pro", "anthropic-pro-2"]
+        assert rs[1]["subscription"]["account"] == "anthropic-pro-2"
+        monkeypatch.setattr(execution, "subscription_accounts", accounts(100.0))
+        rs = execution.routes(conn, model)
+        assert rs[0].get("account") == "anthropic-pro-2"
+        assert [r.get("account") for r in rs].index("anthropic-pro") > next(i for i, r in enumerate(rs) if r["access"] != "subscription")
+
+
+def test_bridge_usage_is_split_per_account(monkeypatch, tmp_path):
+    from walter_router.plan import subscriptions
+    log = tmp_path / "usage.jsonl"
+    rows = [{"at": "2026-11-07T10:00:00+00:00", "id": "a", "model": "claude-opus-5-5", "tokens": {"input": 1}},
+            {"at": "2026-11-07T10:00:00+00:00", "id": "b", "model": "claude-opus-5-5", "tokens": {"input": 2}, "account": "anthropic-pro-2"}]
+    log.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    monkeypatch.setattr(claude_pro, "settings", lambda: {"usage_log": str(log)})
+    monkeypatch.setattr(subscriptions.instance, "_expand", lambda v: Path(v))
+    one = subscriptions.walter_claude_usage(None, {"id": "anthropic-pro"})
+    two = subscriptions.walter_claude_usage(None, {"id": "anthropic-pro-2"})
+    assert one["claude-opus-5-5"]["input"] == 1 and two["claude-opus-5-5"]["input"] == 2
+
+
+def test_usage_reads_only_accounts_the_gateway_declares():
+    conf = {"accounts": {"anthropic-pro": "claude-subscription", "anthropic-pro-2": "claude-subscription-2"}}
+    assert claude_pro.grant_of(conf, "anthropic-pro-2") == "claude-subscription-2"
+    assert claude_pro.grant_of({"grant": "claude-subscription"}, None) == "claude-subscription"
+    with pytest.raises(ValueError):
+        claude_pro.grant_of(conf, "telegram")

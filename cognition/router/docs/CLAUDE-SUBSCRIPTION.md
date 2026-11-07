@@ -27,6 +27,14 @@ La fiche d'autorisation est de nature `subscription`, fournisseur `anthropic-cla
 
 L'environnement enfant n'hérite d'aucune clé API, ancienne passerelle ou configuration utilisateur/projet. Il ne peut pas choisir de continuer avec des crédits payants. Le registre d'abonnement n'est pas une preuve de facture : le type de compte et l'activation éventuelle d'usage supplémentaire doivent être vérifiés sur le profil.
 
+## Plusieurs comptes
+
+Plusieurs comptes Claude peuvent servir la même route `claude-pro` (deuxième compte ajouté le 2026-11-07). Chaque compte est un abonnement de `config/router/subscriptions.json` (`route_provider: claude-pro`, par exemple `anthropic-pro`, `anthropic-pro-2`) et une autorisation Walter Secrets (`claude-subscription`, `claude-subscription-2`). Le lien entre les deux appartient à la passerelle : `claude_subscription.accounts` dans `config/llm/gateway.json` (`{"anthropic-pro": "claude-subscription", …}`, le premier = compte par défaut). Une route ne nomme que son compte (`account`), jamais une autorisation ; un compte absent de cette table est refusé.
+
+`execution.routes()` produit une route par compte, dans l'ordre de déclaration (rester sur le même compte garde son cache de prompt). Chaque route porte le quota de son compte : un compte au-delà de 90 % de sa semaine, ou à 100 % de sa fenêtre cinq heures, passe après les routes payantes, les autres restent devant. Un refus « rate limit » sur un compte passe tout de suite au compte suivant (les attentes de rafale ne s'appliquent qu'avant une route payante). Chaque tentative note son compte : `models.exec_log.account`, journal walter-llm, journal d'usage du pont (lignes sans compte = `anthropic-pro`). Les quotas se lisent compte par compte (`walter-router subscriptions refresh`).
+
+Ajouter un compte : connexion PKCE officielle (lien `claude.ai/oauth/authorize`, client public de la CLI, portées `user:profile user:inference`, fenêtre de navigation privée pour ne pas reprendre le compte déjà connecté) → `@instance/state/router/claude-N/session.json` (0600), fiche `accounts/claude-subscription-N.toml`, entrée `accounts` de la passerelle, puis `declared.upsert` + `declared.bind_claude_meter` (écrivain unique des abonnements). Vérifier que le profil est un autre compte que les précédents.
+
 ## Catalogue, quotas et usage
 
 `walter-router research --source claude_pro` lit le catalogue du compte et n'insère comme offres que les modèles qualifiés. Le cycle prix de 48 h inclut cette source. Les listes et dates de qualification appartiennent à l'instance, pas au code partagé.

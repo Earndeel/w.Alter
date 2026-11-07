@@ -337,19 +337,32 @@ async def provider_completion(route: dict, **kwargs):
     for key in ("cli", "state_dir", "usage_log"):
         if config.get(key):
             config[key] = str(_instance_path(config[key]))
-    token = await asyncio.to_thread(grants.access, config.get("grant", "claude-subscription"))
+    # The Router names the account when the provider has several (route.account = subscription id); which secret
+    # serves it is this gateway's own setting (`accounts`), never a grant named by a caller.
+    accounts = claude_accounts(config)
+    account = route.get("account") or next(iter(accounts))
+    if account not in accounts:
+        raise ValueError("unknown_claude_account")
+    config["account"] = account
+    token = await asyncio.to_thread(grants.access, accounts[account])
     return await completion(config, token, **kwargs)
+
+
+def claude_accounts(config: dict) -> dict[str, str]:
+    """subscription id -> Walter Secrets grant, first = the default account (before accounts: one grant)."""
+    return dict(config.get("accounts") or {"anthropic-pro": config.get("grant", "claude-subscription")})
 
 
 def _rate_limited(exc: BaseException) -> bool:
     return type(exc).__name__ == "RateLimitError" or getattr(exc, "status_code", None) == 429
 
 
-async def start_completion(route: dict, kwargs: dict, stream: bool):
+async def start_completion(route: dict, kwargs: dict, stream: bool, waits: tuple | None = None):
     """(response, iterator, first chunk): the call, up to its first token when streaming. A subscription's rate-limit
-    refusal is waited out (RATE_LIMIT_WAITS) before the caller falls back to a paid route."""
+    refusal is waited out (RATE_LIMIT_WAITS) before the caller falls back to a paid route; not when another account
+    of the same subscription comes next (waits=())."""
     import asyncio
-    for wait in (*RATE_LIMIT_WAITS, None):
+    for wait in (*(RATE_LIMIT_WAITS if waits is None else waits), None):
         try:
             resp = await provider_completion(route, **kwargs)
             if not stream:
@@ -609,7 +622,7 @@ def log(entry: dict) -> None:
         row = {"task": entry.get("task"), "model_id": entry.get("model_id"), "provider": entry["provider"],
                "model": entry.get("model"), "ok": entry.get("ok"), "seconds": entry.get("seconds"), "kind": "text",
                "role": f"agent:{entry.get('agent')}",
-               **{k: entry.get(k) for k in ("run_id", "task_id", "usage", "cost_usd", "cost_status", "skipped")}}
+               **{k: entry.get(k) for k in ("run_id", "task_id", "usage", "cost_usd", "cost_status", "skipped", "account")}}
         threading.Thread(target=_record_attempt, args=(row, entry), daemon=True).start()
 
 
@@ -659,10 +672,15 @@ def build_app():
         except Exception:
             raise HTTPException(400, "no route for requested task") from None
         errors = []
-        for route in d.get("execution") or []:
+        plan = d.get("execution") or []
+        for index, route in enumerate(plan):
             t0 = time.perf_counter()
+            following = plan[index + 1] if index + 1 < len(plan) else {}
+            other_account = bool(route.get("account") and following.get("provider") == route["provider"]
+                                 and following.get("account") not in (None, route["account"]))
             base = {"agent": agent, "task": task, "model_id": d.get("model_id"), "provider": route["provider"],
-                    "model": route["model"], **correlation}
+                    "model": route["model"], **({"account": route["account"]} if route.get("account") else {}),
+                    **correlation}
             if correlation.get("channel") == "test" and route["provider"] in PAID:
                 refused = test_gate(route, body)
                 if refused:
@@ -687,7 +705,8 @@ def build_app():
                 kwargs["messages"] = [{"role": "system", "content": json_instruction(body["response_format"])},
                                       *body.get("messages", [])]
             try:
-                resp, it, first = await start_completion(route, kwargs, stream)   # fail over until the first token
+                resp, it, first = await start_completion(route, kwargs, stream,   # fail over until the first token
+                                                         () if other_account else None)
                 if want_json and not stream:
                     resp.choices[0].message.content = as_json(resp.choices[0].message.content)
                 if not stream:
