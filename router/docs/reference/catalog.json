@@ -7331,6 +7331,16 @@
             "signature": ""
           },
           {
+            "description": "Parallel tool calls on the ChatGPT backend stream no argument deltas: the arguments come only in each call's",
+            "name": "_install_codex_stream_arguments",
+            "signature": ""
+          },
+          {
+            "description": "The ChatGPT backend keeps a prompt prefix warm on the server a session id is routed to; LiteLLM draws a new id",
+            "name": "codex_cache_session",
+            "signature": "agent: str, task: str, body: dict, correlation: dict"
+          },
+          {
             "description": "",
             "name": "chatgpt_ready",
             "signature": ""
@@ -16959,7 +16969,7 @@
     "llm/claude_subscription.py": "47d8e25c6e8a53a174a09bb0c8b767c331091544322cf2f3c586bae98103fb2c",
     "llm/config/gateway.json": "56bfc87cdffe86d4a3ab2ce49e9f643652e2cac1dfec8103c66e2773ea392a05",
     "llm/contracts/llm.json": "17a51a635cfd54e506593c5be38b0aaa2a847f9646ee56f77e075df79dcd589d",
-    "llm/gateway.py": "4024bc4fd492f80a907fe54d34189b428dd4cde92b8ac121f401c21fa337c16b",
+    "llm/gateway.py": "f5b67d39a1f4c558f2456f1f12090e4441be222bcdbd93ed86e3800797eb7c7f",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",

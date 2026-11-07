@@ -419,6 +419,54 @@ def _install_codex_auth() -> None:
     from litellm.llms.chatgpt.authenticator import Authenticator
     Authenticator.get_access_token = lambda self: codex_access_token()
     Authenticator.get_account_id = lambda self: _codex_account_id()
+    _install_codex_stream_arguments()
+
+
+def _install_codex_stream_arguments() -> None:
+    """Parallel tool calls on the ChatGPT backend stream no argument deltas: the arguments come only in each call's
+    `response.output_item.done`, which LiteLLM's Responses→Chat stream bridge drops (it assumes the deltas carried
+    them). Measured 2026-11-07: two parallel calls reached DSH as `{}` and `{}`. When a call's arguments were not
+    streamed, this emits them from its done event, as one argument delta of that call. Idempotent."""
+    from litellm.completion_extras.litellm_responses_transformation import transformation as T
+    it = T.OpenAiResponsesToChatCompletionStreamIterator
+    if getattr(it.chunk_parser, "_walter_arguments", False):
+        return
+    parse = it.chunk_parser
+
+    def chunk_parser(self, chunk):
+        kind = chunk.get("type") if isinstance(chunk, dict) else None
+        kind = getattr(kind, "value", kind)
+        streamed = self.__dict__.setdefault("_walter_streamed", set())
+        if kind in ("response.function_call_arguments.delta", "response.custom_tool_call_input.delta") \
+                and chunk.get("delta"):
+            streamed.add(chunk.get("output_index", 0))
+        item = chunk.get("item") or {} if isinstance(chunk, dict) else {}
+        if kind == "response.output_item.done" and item.get("type") == "function_call" and item.get("arguments") \
+                and chunk.get("output_index", 0) not in streamed:
+            streamed.add(chunk.get("output_index", 0))
+            return parse(self, {"type": "response.function_call_arguments.delta", "delta": item["arguments"],
+                                "output_index": chunk.get("output_index", 0), "item_id": item.get("id")})
+        return parse(self, chunk)
+
+    chunk_parser._walter_arguments = True
+    it.chunk_parser = chunk_parser
+
+
+def codex_cache_session(agent: str, task: str, body: dict, correlation: dict) -> str:
+    """The ChatGPT backend keeps a prompt prefix warm on the server a session id is routed to; LiteLLM draws a new id
+    per call, so a repeated prefix was cached by chance only (walter-memory: 0 % on 203 calls, 2026-11-07). The id is
+    stable per conversation (the harness session) or per caller and instructions (agent, task, system text), and it is
+    a hash: no internal identifier reaches the provider."""
+    import hashlib
+    import uuid
+    if correlation.get("session_id"):
+        key = "session:" + str(correlation["session_id"])
+    else:
+        system = next((m.get("content") for m in body.get("messages") or []
+                       if isinstance(m, dict) and m.get("role") in ("system", "developer")), "")
+        system = system if isinstance(system, str) else json.dumps(system, ensure_ascii=False, sort_keys=True)
+        key = f"prefix:{agent}:{task.split('/')[0]}:{hashlib.sha256(system[:8000].encode()).hexdigest()}"
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, "walter-llm/codex/" + key))
 
 
 def chatgpt_ready() -> bool:
@@ -876,6 +924,8 @@ def build_app():
             # Kie's endpoints answer a quick Cloudflare 502 on about half the calls (2026-10-16): one retry there
             # costs ~3 s and spares an OpenRouter fallback (paid, low credit)
             kwargs = {**body, **target, "stream": stream, "num_retries": 2 if route["provider"] == "kie" else 0}
+            if route["provider"] == "codex":
+                kwargs.setdefault("litellm_session_id", codex_cache_session(agent, task, body, correlation))
             if route.get("reasoning") and route["reasoning"] not in ("none", "non-reasoning"):
                 kwargs.setdefault("reasoning_effort", route["reasoning"])
             want_json = route["provider"] == "codex" and (body.get("response_format") or {}).get("type") in (

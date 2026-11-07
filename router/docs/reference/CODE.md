@@ -516,6 +516,8 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `codex_access_token()` — W.Alter's Codex access token, from its grant (renewed through the Codex CLI by walter-secrets).
 - `_codex_account_id()` — 
 - `_install_codex_auth()` — LiteLLM's chatgpt provider reads W.Alter's Codex CLI session (read-only) instead of its own device login.
+- `_install_codex_stream_arguments()` — Parallel tool calls on the ChatGPT backend stream no argument deltas: the arguments come only in each call's
+- `codex_cache_session(agent: str, task: str, body: dict, correlation: dict)` — The ChatGPT backend keeps a prompt prefix warm on the server a session id is routed to; LiteLLM draws a new id
 - `chatgpt_ready()` — 
 - `json_instruction(fmt: dict)` — 
 - `as_json(text: str | None)` — The JSON object of a Codex answer; ValueError (= next route, which honours response_format) when there is none.
