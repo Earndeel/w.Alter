@@ -75,7 +75,7 @@ PAID = {"kie", "openrouter", "arnict", "venice"}   # providers billed per call (
 # and retry it before any paid route. The refusal is then logged skipped='rate_limit' (not counted as unreliability).
 RATE_LIMIT_WAITS = (4, 12)
 # Tests (walter-scenario, walter-lab: runs of channel `test`) may spend at most this on paid providers per window;
-# above it every paid route is refused to them until the owner approves more (Monsieur, 2026-10-30: « au-dessus de
+# above it every paid route is refused to them until the owner approves more (owner, 2026-10-30: « au-dessus de
 # 2 € les tests doivent être validés manuellement »). Ledger = the tests' paid calls and the owner's approvals.
 TEST_BUDGET = {"paid_limit_eur": 2.0, "usd_per_eur": 1.10, "window_hours": 24,
                "ledger": "@instance/state/llm/test-spend.jsonl", **(_CONF.get("test_budget") or {})}

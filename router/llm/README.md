@@ -61,7 +61,7 @@ la télémétrie conservent des types d'erreur, jamais les messages bruts des ex
   l'abonnement « non fiable ».
 - Les runs ouverts par `walter-scenario` (donc aussi `walter-lab`) sont du canal `test` (`WALTER_RUN_CHANNEL`).
   Leur dépense chez les fournisseurs payants (Kie, OpenRouter, Arnict) est plafonnée à `test_budget.paid_limit_eur`
-  (2 €) sur 24 h glissantes ; au-delà, chaque route payante leur est refusée (`skipped='test_budget'`) et Monsieur
+  (2 €) sur 24 h glissantes ; au-delà, chaque route payante leur est refusée (`skipped='test_budget'`) et le propriétaire
   reçoit un message Telegram par fenêtre. Lui seul valide un montant de plus :
   `walter-llm test-budget approve <EUR> [note]` (valable 24 h) ; `walter-llm test-budget` = état.
   Journal : `@instance/state/llm/test-spend.jsonl` (coût fournisseur, sinon estimé depuis l'usage ou la taille).

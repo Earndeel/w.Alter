@@ -493,7 +493,7 @@ def test_rule_answer_needs_the_exact_owner_message_and_calls_no_model(tmp_path,m
 
 
 def test_every_request_leaves_one_selection_line_with_its_plan_reasons_and_passed_routes(tmp_path,monkeypatch):
-    """2026-11-07 (Monsieur: « une télémétrie claire sur chaque sélection »): the plan in order with each route's state,
+    """2026-11-07 (owner: « une télémétrie claire sur chaque sélection »): the plan in order with each route's state,
     the route that answered, the routes passed over and why, and whether subscriptions came first."""
     ns=gateway(tmp_path,monkeypatch);logs=[]
     plan=[{'provider':'claude-pro','account':'anthropic-pro-2','model':'m','access':'subscription',

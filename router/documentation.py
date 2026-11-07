@@ -151,7 +151,7 @@ ENV_MEANINGS = {
     "WALTER_ROUTER_DATABASE_URL": "DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée.",
     "WALTER_ROUTER_CLI": "Commande publique appelée par l'adaptateur de tools.",
     "WALTER_RUN_ID": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
-    "WALTER_RUN_CHANNEL": "test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation de Monsieur.",
+    "WALTER_RUN_CHANNEL": "test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation du propriétaire.",
     "WALTER_RUN_CONTEXT": "caller = le sous-agent walter_run reçoit seulement le contexte de l'appelant ; sinon le paquet walter-context (context.build scope=child).",
     "WALTER_RUN_TOOLS": "legacy = anciens toolsets par défaut de walter_run (web, walter-web, file, terminal) ; sinon capacités Walter via le Tool Gateway.",
     "WALTER_SESSION_ID": "Session walter_logs de l'appelant ; parent de la session du sous-agent walter_run.",
