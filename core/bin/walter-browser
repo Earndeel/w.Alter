@@ -1,7 +1,13 @@
 #!/opt/walter-core/venv/bin/python -I
-"""walter-browser — drive a Camoufox Max session (127.0.0.1:9377) from any agent, as Monsieur when logged in.
+"""walter-browser — drive a Walter browser session from any agent, as Monsieur when logged in.
+
+Engines (same API, same exit and owner-cookie rules): camoufox = Camoufox Max, Firefox (127.0.0.1:9377, default);
+chromium = CloakBrowser, stealth Chromium (127.0.0.1:9378) for sites that need Chromium. Choose with -e ENGINE on the
+session's first command (login/exit/new); the session remembers it, later commands follow without -e.
 
   walter-browser [-s SESSION] login SITE          log the session in with Monsieur's cookies (browser_auth; metadata only)
+  walter-browser [-s SESSION] exit EXIT           route this NEW session through a scoped network exit (walter-wg-exit list),
+                                                  before its first `new`/`login`; other sessions stay local
   walter-browser [-s SESSION] new [NAME]          open a tab (becomes the current tab of the session)
   walter-browser [-s SESSION] nav URL             navigate the current tab
   walter-browser [-s SESSION] url                 current URL
@@ -13,7 +19,8 @@
   walter-browser [-s SESSION] fetch URL OUT       download through the authenticated context (labs.google, *.googleusercontent.com)
   walter-browser [-s SESSION] close
 
-SESSION defaults to $WALTER_BROWSER_SESSION or "default". The current tab id lives in ~/.cache/walter-browser/.
+SESSION defaults to $WALTER_BROWSER_SESSION or "default"; ENGINE to $WALTER_BROWSER_ENGINE, else the session's
+engine, else camoufox. The current tab id and the session's engine live in ~/.cache/walter-browser/.
 Cookies are never exported by this tool: there is deliberately no command to read the session's cookie jar.
 """
 from __future__ import annotations
@@ -30,7 +37,9 @@ from pathlib import Path
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-CAMOUFOX = os.environ.get("WALTER_CAMOUFOX_URL", "http://127.0.0.1:9377")
+ENGINES = {"camoufox": os.environ.get("WALTER_CAMOUFOX_URL", "http://127.0.0.1:9377"),
+           "chromium": os.environ.get("WALTER_CHROMIUM_URL", "http://127.0.0.1:9378")}
+CAMOUFOX = ENGINES["camoufox"]  # base URL of the session's engine, set in main()
 STATE = Path.home() / ".cache" / "walter-browser"
 
 
@@ -51,15 +60,30 @@ def tab(session: str) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-s", "--session", default=os.environ.get("WALTER_BROWSER_SESSION", "default"))
+    ap.add_argument("-e", "--engine", choices=sorted(ENGINES), default=os.environ.get("WALTER_BROWSER_ENGINE"))
     ap.add_argument("cmd")
     ap.add_argument("args", nargs="*")
     a = ap.parse_args()
     s, cmd, args = a.session, a.cmd, a.args
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    global CAMOUFOX
+    engine_file = STATE / f"{s}.engine"
+    engine = a.engine or (engine_file.read_text().strip() if engine_file.exists() else "camoufox")
+    if engine not in ENGINES:
+        sys.exit(f"unknown engine {engine}; available: {', '.join(ENGINES)}")
+    if a.engine and cmd in ("login", "exit", "new"):
+        engine_file.write_text(engine)
+    CAMOUFOX = ENGINES[engine]
 
     if cmd == "login":
         import browser_auth
-        print(json.dumps(browser_auth.login(args[0], s, client="walter-browser"), ensure_ascii=False, indent=2))
+        print(json.dumps(browser_auth.login(args[0], s, client="walter-browser", engine=engine), ensure_ascii=False, indent=2))
+    elif cmd == "exit":
+        import subprocess
+        r = subprocess.run(["walter-wg-exit", "url", args[0]], capture_output=True, text=True, timeout=60)
+        if r.returncode:
+            sys.exit((r.stderr or r.stdout).strip())
+        print(json.dumps(post(s, "/session/new", {"proxy": {"server": r.stdout.strip()}}).json()))
     elif cmd == "new":
         t = post(s, "/tab/new", {"listItemId": args[0] if args else "main"}).json()["tabId"]
         (STATE / f"{s}.tab").write_text(t)

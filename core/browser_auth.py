@@ -9,7 +9,8 @@ The agent asks for a *site* (google, meta, linkedin…, see browser_sites.json);
   4. checks the login with a real navigation and returns only metadata: session name, cookie count per host,
      authenticated yes/no, final URL. Cookie values never leave this process and are never logged.
 
-The agent then drives the browser through the Camoufox HTTP API (127.0.0.1:9377) with that userId.
+The agent then drives the browser through the Camoufox HTTP API (127.0.0.1:9377) with that userId, or the same API
+of the Chromium engine (CloakBrowser, 127.0.0.1:9378) with engine="chromium".
 
 CLI (timers, manual checks):  browser_auth.py login google [--session flow]   |   browser_auth.py sites
 """
@@ -32,6 +33,8 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 CONFIG = Path(os.environ.get("WALTER_BROWSER_SITES", Path(__file__).with_name("browser_sites.json")))
 CAMOUFOX = os.environ.get("WALTER_CAMOUFOX_URL", "http://127.0.0.1:9377")
+# Browser engines, same HTTP API: camoufox (Firefox, default) and chromium (CloakBrowser, for sites that need Chromium).
+ENGINES = {"camoufox": CAMOUFOX, "chromium": os.environ.get("WALTER_CHROMIUM_URL", "http://127.0.0.1:9378")}
 AUDIT_LOG = Path(os.environ.get("WALTER_BROWSER_AUDIT", "/root/.hermes/logs/browser-session.log"))
 ANALYTICS = ("_ga", "_gcl", "_gat", "_gid", "_dd", "_fbp", "_hj", "_uet", "_clck", "_clsk")
 SESSION_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,40}$")
@@ -128,37 +131,43 @@ def _to_playwright(row: list, value: str) -> dict | None:
     return c
 
 
-def _camoufox(path: str, body: dict, timeout: float = 60) -> dict:
-    r = httpx.post(f"{CAMOUFOX}{path}", json=body, timeout=timeout)
+def engine_url(engine: str = "camoufox") -> str:
+    if engine not in ENGINES:
+        raise ValueError(f"unknown engine '{engine}'; available: {', '.join(ENGINES)}")
+    return ENGINES[engine]
+
+
+def _camoufox(path: str, body: dict, timeout: float = 60, base: str = CAMOUFOX) -> dict:
+    r = httpx.post(f"{base}{path}", json=body, timeout=timeout)
     if r.status_code >= 400:
-        raise RuntimeError(f"Camoufox {path} → HTTP {r.status_code}: {r.text[:200]}")
+        raise RuntimeError(f"browser {path} → HTTP {r.status_code}: {r.text[:200]}")
     return r.json()
 
 
-def _inject(session: str, cookies: list[dict]) -> tuple[int, int]:
+def _inject(session: str, cookies: list[dict], base: str = CAMOUFOX) -> tuple[int, int]:
     try:
-        _camoufox("/session/cookies", {"userId": session, "cookies": cookies})
+        _camoufox("/session/cookies", {"userId": session, "cookies": cookies}, base=base)
         return len(cookies), 0
     except RuntimeError:  # one malformed cookie rejects the whole batch: retry one by one
         ok = bad = 0
         for c in cookies:
             try:
-                _camoufox("/session/cookies", {"userId": session, "cookies": [c]})
+                _camoufox("/session/cookies", {"userId": session, "cookies": [c]}, base=base)
                 ok += 1
             except RuntimeError:
                 bad += 1
         return ok, bad
 
 
-def _verify(session: str, site: dict) -> dict:
+def _verify(session: str, site: dict, base: str = CAMOUFOX) -> dict:
     check = site.get("check") or {}
     if not check.get("url"):
         return {"authenticated": None, "note": "no check configured for this site"}
-    tab = _camoufox("/tab/new", {"userId": session, "listItemId": "auth-check"})["tabId"]
+    tab = _camoufox("/tab/new", {"userId": session, "listItemId": "auth-check"}, base=base)["tabId"]
     try:
-        nav = _camoufox("/tab/navigate", {"userId": session, "tabId": tab, "url": check["url"]}, timeout=90)
+        nav = _camoufox("/tab/navigate", {"userId": session, "tabId": tab, "url": check["url"]}, timeout=90, base=base)
         time.sleep(float(check.get("settle_s", 4)))
-        snap = _camoufox("/tab/snapshot", {"userId": session, "tabId": tab}, timeout=60)
+        snap = _camoufox("/tab/snapshot", {"userId": session, "tabId": tab}, timeout=60, base=base)
         url = str(snap.get("url") or nav.get("url") or "")
         text = str(snap.get("snapshot") or "")
         signed_out = any(p in url for p in check.get("signed_out_url", [])) or \
@@ -167,7 +176,7 @@ def _verify(session: str, site: dict) -> dict:
         return {"authenticated": bool(signed_in and not signed_out), "final_url": url.split("?")[0]}
     finally:
         try:
-            _camoufox("/tab/close", {"userId": session, "tabId": tab})
+            _camoufox("/tab/close", {"userId": session, "tabId": tab}, base=base)
         except RuntimeError:
             pass
 
@@ -182,8 +191,11 @@ def _audit(entry: dict) -> None:
         pass
 
 
-def login(site_name: str, session: str = "", client: str = "cli", verify: bool = True) -> dict:
-    """Inject Monsieur's Brave cookies for one configured site into Camoufox session `session`. Metadata only."""
+def login(site_name: str, session: str = "", client: str = "cli", verify: bool = True,
+          engine: str = "camoufox") -> dict:
+    """Inject Monsieur's Brave cookies for one configured site into browser session `session` of `engine`
+    (camoufox | chromium). Metadata only."""
+    base = engine_url(engine)
     cfg = load_config()
     site = cfg.get("sites", {}).get(site_name)
     if not site:
@@ -214,19 +226,19 @@ def login(site_name: str, session: str = "", client: str = "cli", verify: bool =
         raise RuntimeError(f"no usable cookie for {site_name} in Brave (undecryptable={undecryptable}, "
                            f"expired={expired}); is Monsieur logged in on Brave?")
     missing = [n for n in site.get("required_cookies", []) if n not in {c["name"] for c in cookies}]
-    injected, rejected = _inject(session, cookies)
-    result = {"site": site_name, "session": session, "cookies_injected": injected, "rejected": rejected,
+    injected, rejected = _inject(session, cookies, base)
+    result = {"site": site_name, "session": session, "engine": engine, "cookies_injected": injected, "rejected": rejected,
               "undecryptable": undecryptable, "expired_skipped": expired, "missing_required": missing,
               "hosts": dict(sorted(hosts.items(), key=lambda x: -x[1])[:12])}
     if verify and injected == 0:
         # Nothing reached the browser (e.g. refused: the owner's network exit is down): never report a login.
         result.update({"authenticated": False, "note": "no cookie injected; nothing to verify"})
     elif verify:
-        result.update(_verify(session, site))
+        result.update(_verify(session, site, base))
     result["seconds"] = round(time.time() - started, 1)
-    result["drive_with"] = f"Camoufox HTTP API {CAMOUFOX} (/tab/new, /tab/navigate, /tab/snapshot…) userId={session}"
+    result["drive_with"] = f"{engine} HTTP API {base} (/tab/new, /tab/navigate, /tab/snapshot…) userId={session}"
     _audit({"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "client": client,
-            **{k: result[k] for k in ("site", "session", "cookies_injected", "rejected", "missing_required")},
+            **{k: result[k] for k in ("site", "session", "engine", "cookies_injected", "rejected", "missing_required")},
             "authenticated": result.get("authenticated")})
     return result
 
@@ -243,10 +255,12 @@ if __name__ == "__main__":
     lg.add_argument("site")
     lg.add_argument("--session", default="")
     lg.add_argument("--no-verify", action="store_true")
+    lg.add_argument("--engine", choices=sorted(ENGINES), default="camoufox")
     sub.add_parser("sites")
     a = ap.parse_args()
     try:
-        out = sites() if a.cmd == "sites" else login(a.site, a.session, client="cli", verify=not a.no_verify)
+        out = sites() if a.cmd == "sites" else login(a.site, a.session, client="cli", verify=not a.no_verify,
+                                                         engine=a.engine)
     except Exception as e:
         print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False))
         sys.exit(1)

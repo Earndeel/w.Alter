@@ -5,40 +5,153 @@
     "brave_key_vault_entry": "macos/brave_keychain_key"
   },
   "sites": {
-    "google": {
-      "domains": ["google.com", "google.fr", "accounts.google.com", "labs.google", "youtube.com", "googleusercontent.com"],
-      "required_cookies": ["SID", "SIDCC", "__Secure-1PSIDCC", "__Secure-3PSIDCC"],
+    "sharefile": {
+      "domains": [
+        "sharefile.eu",
+        "sharefile.io",
+        "sharefile.com"
+      ],
+      "required_cookies": [],
       "check": {
-        "url": "https://myaccount.google.com/",
-        "signed_out_url": ["accounts.google.com/v3/signin", "ServiceLogin", "/signin/"],
+        "url": "https://rwsfiles.sharefile.eu/",
+        "signed_out_url": [
+          "/login",
+          "/signin"
+        ],
+        "signed_out_text": [
+          "Enter your details to sign in to ShareFile"
+        ],
+        "settle_s": 4
+      }
+    },
+    "upwork": {
+      "domains": [
+        "upwork.com"
+      ],
+      "required_cookies": [],
+      "check": {
+        "url": "https://www.upwork.com/nx/find-work/",
+        "signed_out_url": [
+          "/ab/account-security/login",
+          "/signup"
+        ],
+        "settle_s": 5
+      }
+    },
+    "trainai": {
+      "domains": [
+        "trainaiuniversity.learnupon.com",
+        "learnupon.com"
+      ],
+      "required_cookies": [],
+      "check": {
+        "url": "https://trainaiuniversity.learnupon.com/learner-dashboard",
+        "signed_out_url": [
+          "/users/sign_in",
+          "/login"
+        ],
+        "signed_in_text": [
+          "My Learning"
+        ],
+        "settle_s": 2
+      }
+    },
+    "google": {
+      "domains": [
+        "google.com",
+        "google.fr",
+        "accounts.google.com",
+        "labs.google",
+        "youtube.com",
+        "googleusercontent.com"
+      ],
+      "required_cookies": [
+        "SID",
+        "SIDCC",
+        "__Secure-1PSIDCC",
+        "__Secure-3PSIDCC"
+      ],
+      "check": {
+        "url": "https://myaccount.google.com/personal-info",
+        "signed_out_url": [
+          "accounts.google.com",
+          "ServiceLogin",
+          "/signin/",
+          "/intro"
+        ],
         "settle_s": 4
       }
     },
     "meta": {
-      "domains": ["facebook.com", "instagram.com", "meta.com"],
-      "required_cookies": ["c_user", "xs"],
+      "domains": [
+        "facebook.com",
+        "instagram.com",
+        "meta.com"
+      ],
+      "required_cookies": [
+        "c_user",
+        "xs"
+      ],
       "check": {
         "url": "https://www.facebook.com/settings",
-        "signed_out_url": ["/login"],
-        "signed_out_text": ["Créer un compte", "Create new account"],
+        "signed_out_url": [
+          "/login"
+        ],
+        "signed_out_text": [
+          "Créer un compte",
+          "Create new account"
+        ],
         "settle_s": 5
       }
     },
     "linkedin": {
-      "domains": ["linkedin.com"],
-      "required_cookies": ["li_at"],
+      "domains": [
+        "linkedin.com"
+      ],
+      "required_cookies": [
+        "li_at"
+      ],
       "check": {
         "url": "https://www.linkedin.com/feed/",
-        "signed_out_url": ["/login", "/authwall", "/uas/"],
+        "signed_out_url": [
+          "/login",
+          "/authwall",
+          "/uas/"
+        ],
         "settle_s": 5
       }
     },
     "x": {
-      "domains": ["x.com", "twitter.com"],
-      "required_cookies": ["auth_token"],
+      "domains": [
+        "x.com",
+        "twitter.com"
+      ],
+      "required_cookies": [
+        "auth_token"
+      ],
       "check": {
         "url": "https://x.com/home",
-        "signed_out_url": ["/login", "/i/flow/login"],
+        "signed_out_url": [
+          "/login",
+          "/i/flow/login"
+        ],
+        "settle_s": 5
+      }
+    },
+    "torbox": {
+      "domains": [
+        "torbox.app"
+      ],
+      "required_cookies": [],
+      "check": {
+        "url": "https://torbox.app/settings",
+        "signed_out_url": [
+          "/login"
+        ],
+        "signed_out_text": [
+          "Sign in",
+          "Log in"
+        ],
         "settle_s": 5
       }
     }
