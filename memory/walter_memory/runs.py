@@ -89,13 +89,25 @@ def end_open(session_id: str, status: str = "ended") -> str | None:
     return None
 
 
-def update(run_id: str, *, thread_id: str | None = None, level: str | None = None, act: str | None = None) -> dict:
+REQUESTED_KEYS = ("task", "level", "require", "fast_path", "answer", "message_sha")
+
+
+def update(run_id: str, *, thread_id: str | None = None, level: str | None = None, act: str | None = None,
+           requested: dict | None = None) -> dict:
     """What is learned after the start (preflight). act correct/continue links the run to the run it follows: the
-    previous run of the same harness session, else of the same thread (a correction never rewrites its parent)."""
+    previous run of the same harness session, else of the same thread (a correction never rewrites its parent).
+    `requested` = what the preflight asks of Walter Router for this turn (task, text tier, required capabilities,
+    a rule's answer when no model is needed): kept in routing.requested, read by the model gateway (lot 2,
+    2026-11-07); the observed route written later keeps it."""
     out = {}
+    req = {k: requested[k] for k in REQUESTED_KEYS if isinstance(requested, dict) and requested.get(k) not in (None, "", [])}
     with connect() as conn:
         conn.execute("""update runs.runs set thread_id = coalesce(%s, thread_id), level = coalesce(%s, level),
-                        act = coalesce(%s, act), updated_at = now() where run_id = %s""", (thread_id, level, act, run_id))
+                        act = coalesce(%s, act), updated_at = now(),
+                        routing = case when %s::jsonb is null then routing
+                                       else coalesce(routing, '{}'::jsonb) || jsonb_build_object('requested', %s::jsonb) end
+                        where run_id = %s""",
+                     (thread_id, level, act, json.dumps(req) if req else None, json.dumps(req) if req else None, run_id))
         if act in ("correct", "continue"):
             run = conn.execute("select * from runs.runs where run_id = %s", (run_id,)).fetchone()
             if run and not run["parent_run_id"]:
@@ -145,8 +157,9 @@ def routing(run_id: str, decision: dict, task_id: str | None = None) -> None:
     with connect() as conn:
         if task_id:
             conn.execute("update runs.tasks set routing = %s where task_id = %s", (json.dumps(decision), task_id))
-        else:
-            conn.execute("update runs.runs set routing = %s, updated_at = now() where run_id = %s",
+        else:   # what the preflight asked of the Router stays next to the observed route
+            conn.execute("""update runs.runs set routing = jsonb_strip_nulls(jsonb_build_object('requested', routing->'requested'))
+                                                      || %s::jsonb, updated_at = now() where run_id = %s""",
                          (json.dumps(decision), run_id))
         _emit(conn, "routing.selected", run_id, {"run_id": run_id, "task_id": task_id, **decision})
 

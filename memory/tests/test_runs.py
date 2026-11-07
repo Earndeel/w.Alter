@@ -81,3 +81,37 @@ def test_trace_writes_a_masked_walter_logs_session_from_iso_times():
         with connect() as c:
             c.execute("delete from walter_logs.events where session_id = 'pytest-trace/1'")
             c.execute("delete from walter_logs.sessions where session_id = 'pytest-trace/1'")
+
+
+def test_repair_goal_keeps_the_original_and_emits():
+    notice = 'The approval policy changed from "ask" to "never" (changed by the user).'
+    r = runs.start(origin=origin("pytest/s9"), goal=notice + "test")
+    out = runs.repair_goal(r, "test", "dsh runtime notice glued to the owner prompt")
+    run = runs.show(r)["run"]
+    assert out["goal"] == "test" and run["goal"] == "test" and "episode" not in out
+    assert run["origin"]["goal_repairs"][0]["original"] == notice + "test"
+    assert runs.repair_goal(r, "test", "again") == {"run_id": r, "unchanged": True}
+    with connect() as c:
+        assert c.execute("select count(*) n from bus.events where type = 'run.goal_repaired' and subject = %s",
+                         (r,)).fetchone()["n"] == 1
+
+
+def test_preflight_request_is_kept_next_to_the_observed_route():
+    """Lot 2 (2026-11-07): the preflight's request to the Router lives in routing.requested; the gateway's observed
+    route does not erase it, and unknown keys never enter it."""
+    import json, subprocess
+    r = runs.start(origin=origin("pytest/s10"), goal="test")
+    runs.routing(r, {"applied": False, "configured": True})
+    runs.update(r, level="L0", act="new", requested={"task": "general", "level": "L1", "fast_path": "trivial",
+                                                     "answer": "12", "message_sha": "ab", "prompt": "never kept"})
+    runs.routing(r, {"applied": True, "provider": "codex", "model": "m"})
+    routing = runs.show(r)["run"]["routing"]
+    assert routing["applied"] is True and routing["provider"] == "codex" and "configured" not in routing
+    assert routing["requested"] == {"task": "general", "level": "L1", "fast_path": "trivial", "answer": "12",
+                                    "message_sha": "ab"}
+    out = json.loads(subprocess.run(["walter-memory", "runs", "find", r, "--open-only"], capture_output=True,
+                                    text=True, timeout=30).stdout)
+    assert out["requested"]["task"] == "general" and out["status"] == "open"
+    plain = runs.start(origin=origin("pytest/s11"), goal="x")
+    runs.routing(plain, {"applied": False})
+    assert "requested" not in runs.show(plain)["run"]["routing"]
