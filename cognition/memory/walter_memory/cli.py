@@ -58,6 +58,8 @@ def main(argv=None) -> None:
     e = sub.add_parser("events"); e.add_argument("--source"); e.add_argument("--type", action="append")
     e.add_argument("--cloud-safe", action="store_true", help="only cloud_allowed canonical events")
     e.add_argument("--thread"); e.add_argument("--since"); e.add_argument("--text"); e.add_argument("--limit", type=int, default=20)
+    e.add_argument("--until"); e.add_argument("--id", dest="event_id"); e.add_argument("--order", choices=["asc", "desc"], default="desc")
+    e.add_argument("--compact", type=int, default=0, metavar="CHARS", help="agent form: content window of CHARS, no payload")
     t = sub.add_parser("types"); t.add_argument("action", choices=["list", "sync"])
     o = sub.add_parser("objects"); o.add_argument("action", choices=["search", "get", "put", "stats"])
     o.add_argument("ref", nargs="?"); o.add_argument("--dest"); o.add_argument("--source", default="vault")
@@ -173,8 +175,10 @@ def main(argv=None) -> None:
     elif a.cmd == "stats":
         cmd_stats(a)
     elif a.cmd == "events":
-        _print(events.get_events(source=a.source, event_types=a.type, thread_id=a.thread, since=a.since, text=a.text,
-                                 limit=a.limit, max_privacy="cloud_allowed" if a.cloud_safe else "local_only"))
+        rows = events.get_events(source=a.source, event_types=a.type, thread_id=a.thread, since=a.since, until=a.until,
+                                 text=a.text, limit=a.limit, order=a.order, event_id=a.event_id,
+                                 max_privacy="cloud_allowed" if a.cloud_safe else "local_only")
+        _print(events.compact(rows, a.text, a.compact) if a.compact else rows)
     elif a.cmd == "types":
         _print(types.list_types() if a.action == "list" else {"synced": types.sync_seed()})
     elif a.cmd == "objects":

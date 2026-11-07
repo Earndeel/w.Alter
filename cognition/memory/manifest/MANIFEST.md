@@ -6,7 +6,7 @@ Vérité durable de sa vie : ce qui s'est passé (messages Beeper, e-mails, agen
 
 **Utilisation**
 - `memory_context(query)` d'abord pour tout sujet personnel ou de projet (personnes citées, connaissances, sources).
-- `memory_search` : qui/quand/quoi, avec source et date ; `memory_events` : le texte exact d'un événement.
+- `memory_search` : qui/quand/quoi, avec source et date ; `memory_events(text, source, since, until, order="newest"|"oldest", event_id, limit)` : le texte exact d'un événement — liste compacte, `order="oldest"` pour le tout premier, puis `event_id` pour un événement en entier.
 - `person_lookup(name)` : fiche d'une personne ; `memory_recall` / `memory_reflect` : faits synthétisés, synthèse sourcée.
 - `memory_retain(content)` : enregistrer un fait durable, jamais un secret ni un journal transitoire.
 
