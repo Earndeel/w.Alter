@@ -59,7 +59,17 @@ def mask(text: str | None) -> str | None:
     text = _EXTRA_SECRETS[2][1].sub(lambda m: m.group(1) + " «secret»", text)
     text = _EXTRA_SECRETS[3][1].sub("«secret:jwt»", text)
     text = _EXTRA_SECRETS[4][1].sub(lambda m: m.group(1) + "«secret»" + m.group(3), text)
-    return text
+    return vault_scrub(text)
+
+
+def vault_scrub(text: str | None) -> str | None:
+    """Any value of the owner's vault, whatever its shape (a bare hex API key has none), through walter-secrets'
+    value-free fingerprints (2026-10-30). Fail-open: without the index the patterns above still apply."""
+    try:
+        from walter_secrets import fingerprints
+    except ImportError:
+        return text
+    return fingerprints.scrub(text)
 
 
 _MASKED = re.compile(r"«secret[^»]*»")
