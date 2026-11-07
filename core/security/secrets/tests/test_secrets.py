@@ -254,3 +254,21 @@ def test_vault_retries_a_locked_vault_once(monkeypatch):
         return subprocess.CompletedProcess(argv, 0 if ok else 1, stdout='[]' if ok else '', stderr='' if ok else 'Vault is locked.')
     monkeypatch.setattr(vmod.subprocess, 'run', run)
     assert v._bw('list', 'items') == '[]' and seen == ['dead-not-live', 'fresh-not-live']
+
+
+def test_bw_runs_with_pinned_data_directory_whatever_the_cwd(tmp_path, monkeypatch):
+    """A unit without HOME started in another module's directory must not get its own copy of the vault."""
+    from walter_secrets import settings, unlock
+    seen = {}
+    def run(argv, env=None, **kw):
+        seen['env'] = env
+        class R: returncode, stdout = 0, '{"status": "unlocked"}'
+        return R()
+    monkeypatch.delenv('HOME', raising=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(unlock.subprocess, 'run', run)
+    unlock._run(['bw', 'status', '--nointeraction'], env={'BW_SESSION': 'x-not-live'})
+    assert seen['env']['BITWARDENCLI_APPDATA_DIR'] == str(settings.BW_APPDATA)
+    assert seen['env']['HOME'] and not seen['env']['HOME'].startswith(str(tmp_path))
+    assert seen['env']['BW_SESSION'] == 'x-not-live'
+    assert not str(settings.BW_APPDATA).startswith(str(tmp_path))

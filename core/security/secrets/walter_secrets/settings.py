@@ -60,3 +60,12 @@ VAULT_KEY = path('bootstrap_key', DATA_ROOT / 'vault/age-key.txt')
 AUDIT = path('audit', DATA_ROOT / 'logs/walter-secrets.jsonl')
 FILES = path('attachments', '/dev/shm/walter-secrets')
 ENV_CONSUMERS = CONFIG.get('env_consumers', [])
+# The bw CLI keeps its account database (the whole encrypted vault) under $HOME/.config, or under the *working
+# directory* when HOME is unset (systemd units without HOME): a service started in /walter/skills re-logged in and
+# synced a full copy there (2026-11-07). Every bw call gets this one pinned location.
+BW_APPDATA = path('bw_appdata', Path(os.path.expanduser('~')) / '.config/Bitwarden CLI')
+
+
+def bw_env(**extra: str) -> dict:
+    """Environment for a bw subprocess: the caller's, with HOME and the bw data directory pinned."""
+    return {**os.environ, **extra, 'HOME': os.path.expanduser('~'), 'BITWARDENCLI_APPDATA_DIR': str(BW_APPDATA)}

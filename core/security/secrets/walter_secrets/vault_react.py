@@ -75,7 +75,7 @@ def log(msg: str) -> None:
 
 
 def _env() -> dict:
-    return {**os.environ, "HOME": os.path.expanduser("~"), "BW_SESSION": SESSION.read_text().strip(), "BW_NOINTERACTION": "true"}
+    return settings.bw_env(BW_SESSION=SESSION.read_text().strip(), BW_NOINTERACTION="true")
 
 
 def bw(*args: str, stdin: str | None = None, timeout: int = 120) -> str:
