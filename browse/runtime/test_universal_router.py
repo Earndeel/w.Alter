@@ -237,5 +237,82 @@ class WebtopCdpClientTests(unittest.TestCase):
         )
 
 
+class BrowserReadingModeTests(unittest.IsolatedAsyncioTestCase):
+    SPEC = ExtractionSpec(expected_fields={"content": ("content", "text", "description", "body")},
+                          required_fields=("content",))
+
+    def _client(self, page: dict) -> CamoufoxMaxClient:
+        def request(method: str, path: str, payload: dict | None) -> dict:
+            if path == "/tab/new":
+                return {"ok": True, "tabId": "tab-1"}
+            if path == "/tab/network-captures":   # a consent blob that happens to carry a "content" key
+                return {"ok": True, "captures": [{"url": "https://cdn.test/consent.json", "status": 200,
+                                                  "payload": {"items": [{"content": "Accept cookies"}]}}]}
+            if path == "/tab/evaluate":
+                return {"ok": True, "result": page}
+            return {"ok": True}
+        return CamoufoxMaxClient(request_fn=request, capture_wait_seconds=0.5)
+
+    async def test_rendered_text_is_the_content_of_a_page_read(self) -> None:
+        text = "Bitcoin BTC\n$75,815.86\nUp 0.13 percent\n" + "market data " * 20
+        result = await self._client({"htmlBytes": 9000, "payload": None, "visibleText": text}).extract_one(
+            "https://prices.test/bitcoin", self.SPEC)
+        self.assertEqual(len(result.records), 1)
+        self.assertIn("$75,815.86", result.records[0]["content"])
+
+    async def test_a_json_document_read_as_text_returns_its_body(self) -> None:
+        body = '{"bitcoin":{"eur":68020}}'
+        result = await self._client({"htmlBytes": 50, "payload": {"bitcoin": {"eur": 68020}},
+                                     "visibleText": body}).extract_one("https://api.test/price", self.SPEC)
+        self.assertEqual(result.records[0]["content"], body)
+
+
+class ClosedLocalExitTests(unittest.TestCase):
+    def _args(self, **over):
+        import universal_router as U
+        args = U._parser().parse_args(["--url", "https://example.test/"])
+        for k, v in over.items():
+            setattr(args, k, v)
+        return args
+
+    def _route(self, state, **over):
+        import json, os, tempfile
+        import universal_router as U
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            if state is not None:
+                json.dump(state, f)
+        old = os.environ.get("WALTER_EXIT_LOCAL_STATE")
+        os.environ["WALTER_EXIT_LOCAL_STATE"] = f.name
+        try:
+            args = self._args(**over)
+            return U._route_page_reads(args), args
+        finally:
+            os.unlink(f.name)
+            if old is None:
+                os.environ.pop("WALTER_EXIT_LOCAL_STATE", None)
+            else:
+                os.environ["WALTER_EXIT_LOCAL_STATE"] = old
+
+    def test_closed_exit_switches_page_reads_to_chromium(self) -> None:
+        import universal_router as U
+        note, args = self._route({"route": "closed", "why": "on its France tunnel"})
+        self.assertEqual(note["engine"], "chromium")
+        self.assertEqual(args.camoufox_url, U.DEFAULT_CHROMIUM_URL)
+        self.assertEqual(args.mode, "camoufox")
+
+    def test_open_or_unknown_exit_keeps_the_route(self) -> None:
+        import universal_router as U
+        for state in ({"route": "open"}, None, {}):
+            note, args = self._route(state)
+            self.assertIsNone(note)
+            self.assertEqual(args.camoufox_url, U.DEFAULT_CAMOUFOX_URL)
+
+    def test_sessions_and_explicit_engines_keep_their_route(self) -> None:
+        for over in ({"session_id": "s1"}, {"identity": "personal"}, {"mode": "scrapling"},
+                     {"camoufox_url": "http://127.0.0.1:9999"}):
+            note, _ = self._route({"route": "closed", "why": "x"}, **over)
+            self.assertIsNone(note, over)
+
+
 if __name__ == "__main__":
     unittest.main()

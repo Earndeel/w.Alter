@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import asyncio
 import os
 import hashlib
@@ -34,6 +35,7 @@ except ImportError:  # pragma: no cover - older deployments without Lot 2
 
 
 DEFAULT_CAMOUFOX_URL = "http://127.0.0.1:9377"
+DEFAULT_CHROMIUM_URL = "http://127.0.0.1:9378"   # CloakBrowser, same tab API, leaves by the default (France) exit
 DEFAULT_USER_ID = "universal-extractor"
 _CAPTURE_WAIT_SECONDS = 8.0
 _MAX_CAPTURE_ITEMS = 80
@@ -156,9 +158,16 @@ _PAGE_EXPRESSION = r"""
     contentType,
     htmlBytes: (document.documentElement?.outerHTML || "").length,
     payload,
+    visibleText: (document.body?.innerText || "").slice(0, 200000),
   };
 })()
 """
+
+
+def _wants_content(spec: ExtractionSpec) -> bool:
+    """A reading-mode contract: the spec asks for the page's free text."""
+    from universal_extractor import normalize_token as _norm
+    return any("content" in _norm(key) or "text" in _norm(key) for key in spec.expected_fields)
 
 
 class CamoufoxMaxError(RuntimeError):
@@ -364,6 +373,28 @@ class CamoufoxMaxClient:
                             "contentType": page_info.get("contentType") or "application/json",
                             "payload": direct_payload,
                         }
+                    )
+                # Reading mode (content_only), same rule as the HTTP route's HTML_CONTENT_DIRECT: the rendered page's
+                # visible text is the content (captured JSON with a "content" key is usually a consent or i18n blob).
+                visible = re.sub(r"\n{2,}", "\n", str(page_info.get("visibleText") or "")).strip()
+                # A JSON document read as text keeps its own projection when it already holds the fields asked.
+                json_served = direct_payload is not None and meets_spec(*score_payload(direct_payload, spec)[1:], spec)
+                if _wants_content(spec) and visible and not json_served and (
+                        len(visible) >= 120 or direct_payload is not None):
+                    candidates[:] = []   # the rendered text already holds what those responses displayed
+                    candidates.append(
+                        ResponseCandidate(
+                            url=str(page_info.get("url") or url),
+                            method="DOM",
+                            status=200,
+                            content_type="text/html",
+                            response_bytes=len(visible.encode("utf-8", errors="replace")),
+                            elapsed_ms=(time.perf_counter() - started) * 1000,
+                            payload={"content": visible},
+                            matched_fields={"content"},
+                            record_count=1,
+                            score=100.0,
+                        )
                     )
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"[:500]
@@ -1407,10 +1438,36 @@ def _enforce_exit(args: argparse.Namespace) -> None:
         os.environ.pop(k, None)
 
 
+def _local_exit_state() -> dict[str, Any]:
+    try:
+        state = json.loads(Path(os.environ.get("WALTER_EXIT_LOCAL_STATE", "/run/walter-exit-local.json")).read_text())
+    except (OSError, ValueError):
+        return {}
+    return state if isinstance(state, dict) else {}
+
+
+def _route_page_reads(args: argparse.Namespace) -> dict[str, Any] | None:
+    """Owner rule (2026-11-07): when the local exit is closed (the Mac on its France tunnel), a page read switches to
+    the Chromium engine, which always leaves by the default France exit, instead of failing on every site. HTTP reads
+    stay fail closed, so the read goes straight to the browser. Managed sessions and explicit engines keep their own
+    route; an unknown exit state keeps the fail-closed behaviour."""
+    if args.search or args.capability or not args.url or args.session_id or args.identity != "anonymous" \
+            or args.network != "local" or args.persistent or args.mode not in ("auto", "camoufox") \
+            or args.camoufox_url != DEFAULT_CAMOUFOX_URL:
+        return None
+    state = _local_exit_state()
+    if state.get("route") in (None, "open"):
+        return None
+    args.camoufox_url = os.environ.get("WALTER_CHROMIUM_URL", DEFAULT_CHROMIUM_URL)
+    args.mode = "camoufox"
+    return {"local_exit": "closed", "why": state.get("why"), "engine": "chromium", "network": "default exit (France)"}
+
+
 async def _run_cli(args: argparse.Namespace) -> int:
     if not args.capability and not args.url and not args.search:
         raise SystemExit("Provide --url, --search, or --capability")
     _enforce_exit(args)
+    exit_route = _route_page_reads(args)
     if args.search:
         # Lot 4 correction — search-lite: the universal web entry point's
         # lightest route. No LLM, no browser, ~1s.
@@ -1526,6 +1583,8 @@ async def _run_cli(args: argparse.Namespace) -> int:
             else:
                 sctx.expire_stale()
     summary = routed.summary()
+    if exit_route is not None:
+        summary["exit"] = exit_route
     if session_trace is not None:
         summary["session"] = session_trace
     print(json.dumps(summary, ensure_ascii=False, indent=2 if args.pretty else None, default=str))

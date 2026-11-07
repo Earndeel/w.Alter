@@ -271,13 +271,17 @@ def _resolve_router_command() -> list[str]:
     return [str(executable)]
 
 
+_SEARCH_COUNT = 5
+
+
 def _build_router_command(request: Mapping[str, Any]) -> list[str]:
     if request.get("query"):
         # search-lite: the lightest route of the universal web entry point.
         return [
             *_resolve_router_command(),
             "--search", str(request["query"]),
-            "--search-count", str(max(1, min(int(request.get("min_records", 5) or 5), 8))),
+            # A search answers with several sources: min_records (default 1, a page-read contract) only raises it.
+            "--search-count", str(max(_SEARCH_COUNT, min(int(request.get("min_records") or 1), 8))),
         ]
     command = [*_resolve_router_command(), "--url", str(request["url"])]
     if request.get("capability"):
