@@ -15,6 +15,13 @@ from .compress import checkpoint
 def dispatch(request: dict) -> dict:
     if request.get("version") != 1:
         raise ValueError("unsupported protocol version")
+    if request.get("op") == "capability":
+        if request.get("module") not in ("router", "all"):
+            raise ValueError("unsupported capability module")
+        from .capabilities import compose, router_note
+        if request.get("module") == "all":
+            return compose(request.get("available_tools"), request.get("form") or "full", request.get("m1"))
+        return router_note(request.get("available_tools"))
     messages = request.get("messages")
     if not isinstance(messages, list) or not all(isinstance(m, dict) for m in messages):
         raise ValueError("messages must be a list of objects")
