@@ -111,6 +111,9 @@ Le routage (quel service, quelle recette, quelle session) appartient au Walter R
 génération progressive) — ils valident le mécanisme, pas un service externe. ChatGPT : recette apprise et rejouée sur le
 vrai site (activé par le propriétaire malgré l'interdiction d'extraction des conditions d'OpenAI, DECISIONS 2026-11-08).
 L'écho est toujours un élément apparu après l'armement, jamais un comptage : les interfaces démontent les anciens tours.
+La réponse rendue est ce qui reste affiché à la fin : tous les éléments réponse visibles entre l'écho et le tour
+utilisateur suivant (un tour avec outil de ChatGPT affiche d'abord un message d'étape, replié une fois la réponse écrite
+dans un second élément).
 
 Contrôles facultatifs déclarés dans la recette (une recette sans eux reste valide ; chaque champ est conservé par la
 découverte et la réparation) :
@@ -128,6 +131,7 @@ découverte et la réparation) :
   `a.click` / `window.open` / `URL.createObjectURL` interceptés le temps de l'appel) ; les images produites (≥ 128 px)
   sont lues directement. Résultat `files = [{name, mime, size, path, kind}]`, écrits en 0600 sous
   `state/browse/conversations/files/<conversation>/<request_id>/`, purgés après 7 jours ; une réponse faite d'une
-  image seule est une réponse valide. Limite : sur ChatGPT ce contrôle n'a pas d'attribut stable, la recette retient
+  image seule est une réponse valide. Le temps où la page attend que le service livre un fichier (`download_ms`) compte
+  comme externe. Limite : sur ChatGPT ce contrôle n'a pas d'attribut stable, la recette retient
   son libellé `aria-label` dans la langue de l'empreinte (thaï) ; si elle change, déclarer le nouveau libellé.
 

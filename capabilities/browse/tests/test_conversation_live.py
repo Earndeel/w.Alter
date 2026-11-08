@@ -359,6 +359,7 @@ class ConversationLiveTests(unittest.TestCase):
         self.assertTrue(out["ok"], out)
         kinds = {f["kind"]: f for f in out["files"]}
         self.assertEqual(set(kinds), {"image", "file"}, out["files"])
+        self.assertGreater(out["timings"]["download_ms"], 0)   # the service's hand-over, counted as external
         img, csv = Path(kinds["image"]["path"]), Path(kinds["file"]["path"])
         self.assertEqual(img.read_bytes(), chat_fixture.PNG)
         self.assertEqual(kinds["image"]["mime"], "image/png")
@@ -377,6 +378,15 @@ class ConversationLiveTests(unittest.TestCase):
         self.assertEqual(out["reply"], "")
         self.assertEqual(out["match"], "recipe")
         self.assertEqual([f["kind"] for f in out["files"]], ["image"])
+
+    def test_19_tool_turn_progress_message_is_not_the_reply(self):
+        """2026-11-08 real ChatGPT: a tool-using turn shows a progress message first (its own reply element),
+        collapsed once the answer is written in a second one; the reply is what is shown at the end."""
+        out = self.send("Utilise un outil puis réponds", label="tool turn")
+        self.assertTrue(out["ok"], out)
+        self.assertNotIn("étape intermédiaire", out["reply"])
+        self.assertIn("Réponse à : Utilise un outil puis réponds", out["reply"])
+        self.assertTrue(out["reply"].endswith("FIN"))
 
 
 if __name__ == "__main__":

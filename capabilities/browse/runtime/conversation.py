@@ -132,7 +132,7 @@ class Engine:
 # the engine, so waiting is a MutationObserver resolving a promise: no polling from Python.
 _JS = r"""
 (() => {
-const V = 14;
+const V = 15;
 if (window.__wc && window.__wc.v === V) return window.__wc;
 const norm = s => (s || '').replace(/\s+/g, ' ').trim();
 const vis = el => { if (!el || !el.isConnected) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
@@ -285,11 +285,24 @@ wc.wait = (id, ms) => {
   const st = R[id]; if (!st) return { state: 'unknown' };
   return Promise.race([st.done, new Promise(r => setTimeout(() => r('pending'), ms))]).then(() => wc.status(id));
 };
+// The reply as shown at the end: every reply element between the echo and the next user turn that is still
+// displayed, in order (a tool-using turn shows a progress message first, collapsed once the answer is written in
+// a second element — real ChatGPT, 2026-11-08); an element inside another candidate counts once.
+wc.replyText = (st) => {
+  const own = st.reply ? text(st.reply).trim() : '';
+  if (st.mode !== 'recipe' || !st.echo || !st.echo.isConnected || !st.cfg.reply) return own;
+  const next = qa(st.cfg.user).find(u => u !== st.echo && follows(st.echo, u) && !st.echo.contains(u));
+  let rs = qa(st.cfg.reply).filter(r => follows(st.echo, r) && !r.contains(st.echo) && (!next || follows(r, next)));
+  rs = rs.filter(r => !rs.some(o => o !== r && o.contains(r)));
+  const shown = rs.filter(vis);
+  const parts = (shown.length ? shown : rs).map(r => text(r).trim()).filter(Boolean);
+  return parts.length ? parts.join('\n\n') : own;
+};
 wc.status = (id) => {
   const st = R[id]; if (!st) return { state: 'unknown' };
   const base = st.submitAt ?? st.t0;
   const busy = st.cfg.busy ? qa(st.cfg.busy).some(vis) : null;
-  return { state: st.state, mode: st.mode, echo: !!st.echo, busy, busy_seen: !!st.busySeen, reply: st.reply ? text(st.reply).trim() : '', error: st.error,
+  return { state: st.state, mode: st.mode, echo: !!st.echo, busy, busy_seen: !!st.busySeen, reply: wc.replyText(st), error: st.error,
            first_token_ms: st.firstAt === null ? null : Math.round(st.firstAt - base),
            generation_ms: Math.round((st.doneAt ?? performance.now()) - base), href: location.href };
 };
@@ -681,8 +694,9 @@ def _prune_files() -> None:
                     req.rmdir()
 
 
-def _collect(engine: Engine, tab: str, request_id: str, key: str) -> list[dict[str, Any]]:
-    """Read the images and files produced in the reply turn; written 0600 under files/<conv>/<request>/."""
+def _collect(engine: Engine, tab: str, request_id: str, key: str, timings: dict[str, float] | None = None) -> list[dict[str, Any]]:
+    """Read the images and files produced in the reply turn; written 0600 under files/<conv>/<request>/.
+    ``timings["download_ms"]``: the time the page waited for the service to hand each file over (external)."""
     import base64
     import mimetypes
     items = engine.evaluate(tab, _js(f"wc.outputs({_j(request_id)})")) or []
@@ -693,7 +707,10 @@ def _collect(engine: Engine, tab: str, request_id: str, key: str) -> list[dict[s
     folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     try:
         for item in items:
+            t = time.perf_counter()
             got = engine.evaluate(tab, _js(f"wc.grab({_j(request_id)}, {item['i']}, 30000)"), timeout=60) or {}
+            if timings is not None:
+                timings["download_ms"] = round(timings.get("download_ms", 0) + (time.perf_counter() - t) * 1000, 1)
             if not got.get("ok"):
                 saved.append({"kind": item["kind"], "error": got.get("reason") or "unreadable"})
                 continue
@@ -911,7 +928,8 @@ def send(
         # External time = from submit to the end condition minus our own settle window.
         settle = cfg["settle_ms"] if (result.get("busy_seen") and result.get("match") == "recipe") else cfg["quiet_ms"]
         timings["settle_ms"] = settle
-        timings["external_ms"] = max(0.0, timings["generation_ms"] - settle) + (timings.get("upload_ms") or 0)
+        timings["external_ms"] = max(0.0, timings["generation_ms"] - settle) + (timings.get("upload_ms") or 0) \
+            + (timings.get("download_ms") or 0)    # the service's own upload and file hand-over
         timings["walter_ms"] = round(total - timings["external_ms"], 1)
     result["timings"] = timings
     return result
@@ -982,7 +1000,7 @@ def _exchange(engine: Engine, tab: str, cfg: dict[str, Any], message: str, reque
     timings["extract_ms"] = round((time.perf_counter() - t) * 1000, 1)
     if status.get("state") == "done":
         t = time.perf_counter()
-        out["files"] = _collect(engine, tab, request_id, extras.get("key") or "conv")
+        out["files"] = _collect(engine, tab, request_id, extras.get("key") or "conv", timings)
         timings["outputs_ms"] = round((time.perf_counter() - t) * 1000, 1)
     if status.get("state") != "pending":
         engine.evaluate(tab, _js(f"wc.forget({_j(request_id)})"))

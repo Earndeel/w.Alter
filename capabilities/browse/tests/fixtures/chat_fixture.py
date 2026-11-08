@@ -56,6 +56,8 @@ async function send() {
   const files = pending; pending = []; tiles.textContent = '';
   clear(); turn('user', text);
   if (!conv) { conv = crypto.randomUUID().slice(0, 8); history.pushState({}, '', '/c/' + conv); }
+  let interim = null;    // "outil": a tool-using turn shows a progress message first, collapsed (hidden) later
+  if (/outil/i.test(text)) interim = turn('assistant', 'étape intermédiaire en cours');
   const bot = turn('assistant', ''); const dots = document.createElement('span'); dots.textContent = '…'; bot._b.appendChild(dots);
   const anim = setInterval(() => { dots.textContent = dots.textContent.length > 2 ? '.' : dots.textContent + '.'; }, 300);
   ctrl = new AbortController(); stopB.hidden = false; sendB.hidden = true;
@@ -83,6 +85,7 @@ async function send() {
       });
       tile.append(nm, dl); bot.appendChild(tile);
     }
+    if (interim) interim.style.display = 'none';
   } catch (e) { /* aborted by the stop button */ }
   finally { clearInterval(anim); if (first) dots.remove(); ctrl = null; stopB.hidden = true; sendB.hidden = false; }
 }
