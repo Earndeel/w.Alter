@@ -224,8 +224,14 @@ def test_a_deadline_after_headers_marks_the_stream_failed():
 
 
 def test_an_agent_call_without_a_timeout_gets_minutes_not_the_transport_default(monkeypatch):
+    import ast
     import types, sys
-    spec_g = importlib.util.spec_from_file_location("walter_gateway_t", paths.ROOT / "llm/gateway.py")
+    # Exercise the real dispatch functions without importing the HTTP server or
+    # loading the active instance's gateway settings (see test_gateway_telemetry).
+    source = paths.ROOT / "llm/gateway.py"
+    tree = ast.parse(source.read_text())
+    nodes = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+             and n.name in {"provider_completion", "claude_accounts"}]
     seen = {}
 
     async def fake_completion(config, token, **kwargs):
@@ -235,10 +241,12 @@ def test_an_agent_call_without_a_timeout_gets_minutes_not_the_transport_default(
     monkeypatch.setitem(sys.modules, "walter_secrets", types.SimpleNamespace(grants=fake_grants))
     monkeypatch.setitem(sys.modules, "walter_secrets.grants", fake_grants)
     monkeypatch.setitem(sys.modules, "claude_subscription", types.SimpleNamespace(completion=fake_completion))
-    gateway = importlib.util.module_from_spec(spec_g)
-    spec_g.loader.exec_module(gateway)
-    monkeypatch.setitem(gateway._CONF, "claude_subscription", {"grant": "g"})
-    asyncio.run(gateway.provider_completion({"provider": "claude-pro"}, model="claude-test", messages=[]))
+    async def inline(fn, *args, **kwargs):
+        return fn(*args, **kwargs)
+    monkeypatch.setattr(asyncio, "to_thread", inline)
+    ns = {"_CONF": {"claude_subscription": {"grant": "g"}}}
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), "exec"), ns)
+    asyncio.run(ns["provider_completion"]({"provider": "claude-pro"}, model="claude-test", messages=[]))
     assert seen["timeout"] == 600
-    asyncio.run(gateway.provider_completion({"provider": "claude-pro"}, model="claude-test", messages=[], timeout=60))
+    asyncio.run(ns["provider_completion"]({"provider": "claude-pro"}, model="claude-test", messages=[], timeout=60))
     assert seen["timeout"] == 60
