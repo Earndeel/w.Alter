@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 # Transitional link to the instance state for processes started before 2026-10-19 (remove after Hermes restarts)
 /state
+
+# Engine server (camoufox-max / cloakbrowser-max): dependencies installed in place, never committed
+engine/node_modules/
+engine/*.bak
