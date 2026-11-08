@@ -1,0 +1,11 @@
+{
+ "base_sha": "b57a442e5139e53db5070c3abbc52d4382908fbe9dc1d6cb2721f005d5f64a05",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-08T06:41:49.937281+00:00",
+ "domain": "web",
+ "kind": "patch",
+ "reason": "Ajoute une procédure de diagnostic de la sortie réseau partagée et de sa vérification dans les deux moteurs. La session a installé et testé le sélecteur : Mac sur Lucas, secours Freebox, refus lorsque les deux routes sont indisponibles. Elle a aussi rencontré un échec Bitwarden dans le service, puis confirmé le fonctionnement après ajustement de son exécution. Cette procédure complète le skill de navigation authentifiée sans créer un doublon consacré à Chromium. [session claude_code/vm/7b327085-dd8c-41e0-9a3e-49194c3946a8]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/7b327085-dd8c-41e0-9a3e-49194c3946a8",
+ "target": "webtop-authenticated-browsing"
+}
