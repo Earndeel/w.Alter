@@ -230,6 +230,26 @@ def register(mcp,client='unknown',*,local_control=True):
         try:return json.dumps(_router(*args),ensure_ascii=False)
         except Exception as exc:return _router_error(exc)
 
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False,openWorldHint=True))
+    def walter_web(message: str,service: str='',model: str='',files: list[str]|None=None,conversation: str='',
+                   request_id: str='',timeout_s: int=0) -> str:
+        """Talk to a web chat service the user enabled (Walter Router rule, browser, no Walter LLM): the message
+        goes as is, the reply comes back verbatim. service omitted = the only enabled one. model ONLY when the user
+        asks (words of the service's own picker, e.g. a model name and/or a reasoning level); omitted = the model
+        already selected there, nothing is changed. files = local paths attached (max 10, 50 MB each); produced
+        images/files come back as local paths in files[].path. conversation = a named thread kept across calls;
+        request_id = idempotent (a retry returns the same answer, never sends twice). Slow (seconds to minutes):
+        only when the user asks for that service or for what it alone does."""
+        for value in (service,conversation,request_id):
+            if value and not _ROUTER_WORD.fullmatch(value):return json.dumps({'ok':False,'error':'invalid service, conversation or request_id'})
+        spec={k:v for k,v in dict(message=message,service=service,model=model,files=files,conversation=conversation,
+              request_id=request_id,timeout_s=timeout_s).items() if v not in ('',0,None,[])}
+        try:
+            out=subprocess.run(['walter-router','web'],input=json.dumps(spec),capture_output=True,text=True,
+                               timeout=min(int(timeout_s or 300),600)+180,env=_run_env())
+            return json.dumps(json.loads(out.stdout),ensure_ascii=False)
+        except Exception as exc:return _router_error(exc)
+
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False,destructiveHint=True))
     async def computer_use(session_id: str,action: str,arguments: dict|None=None):
         """Call Walter Computer Use directly without delegating to Hermes. Atomic actions: list_apps,

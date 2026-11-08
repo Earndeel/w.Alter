@@ -95,7 +95,7 @@ class CapabilityTests(unittest.TestCase):
         """2026-10-22 (owner): the router's tools are the same in every runtime (walter_route / walter_run /
         walter_generate / walter_plans); the harness keeps its own model, generation is flagged as costly."""
         self.assertEqual(set(self.mcp.tools), {'walter_modules', 'secret_search', 'secret_reference', 'walter_browse',
-                                             'walter_route', 'walter_run', 'walter_decide', 'walter_plans',
+                                             'walter_route', 'walter_run', 'walter_decide', 'walter_plans', 'walter_web',
                                              'computer_use', 'module_guide', 'module_index'})
         self.assertNotIn('grants', inspect.signature(self.mcp.tools['computer_use']).parameters)
         self.assertNotIn('permissions', inspect.signature(self.mcp.tools['computer_use']).parameters)
