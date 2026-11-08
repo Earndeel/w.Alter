@@ -28,7 +28,7 @@ const HOST = process.env.CAMOFOX_MAX_HOST || '0.0.0.0';
 const ENGINE = process.env.CAMOFOX_ENGINE === 'chromium' ? 'chromium' : 'camoufox';
 const CAMOUFOX_HEADLESS = process.env.CAMOUFOX_HEADLESS !== 'false';
 const CONTEXT_DIR = process.env.CAMOFOX_DATA_DIR || 
-  path.join(process.env.HOME || '/root', '.camoufox-max-data');
+  path.join(process.env.HOME || os.homedir(), '.camoufox-max-data');
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_SNAPSHOT_NODES = 500;
