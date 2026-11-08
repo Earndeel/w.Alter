@@ -165,7 +165,9 @@ Une interface de chat sur le web (ChatGPT par exemple) peut servir de service : 
 LLM sur une recette validée), la réponse revient telle quelle sur le canal d'origine. Entrées : `POST /v1/web/converse`
 de walter-llm, commande Telegram `/gpt` (plugin Hermes du Router : propriétaire seul, hors boucle d'agent, idempotente
 par message Telegram, temps de bout en bout journalisés `WALTER_WEB` dans le journal de Hermes). Seul le propriétaire
-active un service ; `chatgpt` est déclaré mais désactivé (conditions d'utilisation d'OpenAI).
+active un service, dans la configuration de son instance ; `chatgpt` est désactivé par défaut (les conditions
+d'utilisation d'OpenAI interdisent l'extraction programmée des sorties) et activable par le propriétaire sur son instance (DECISIONS
+2026-11-08).
 
 ## Route d’abonnement Google AI Pro
 

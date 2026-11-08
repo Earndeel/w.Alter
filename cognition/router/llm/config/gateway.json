@@ -34,7 +34,7 @@
       "site": "chatgpt",
       "session": "chatgpt",
       "timeout_s": 300,
-      "note": "Disabled: OpenAI's Terms of Use forbid automatically or programmatically extracting output from ChatGPT; owner decision pending (DECISIONS 2026-11-08)."
+      "note": "Disabled by default: OpenAI's Terms of Use forbid automatically or programmatically extracting output from ChatGPT; only an instance owner enables it, knowingly, in the instance config (DECISIONS 2026-11-08)."
     }
   }
 }
