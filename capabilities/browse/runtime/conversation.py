@@ -116,23 +116,22 @@ class Engine:
 # the engine, so waiting is a MutationObserver resolving a promise: no polling from Python.
 _JS = r"""
 (() => {
-const V = 6;
+const V = 11;
 if (window.__wc && window.__wc.v === V) return window.__wc;
 const norm = s => (s || '').replace(/\s+/g, ' ').trim();
 const vis = el => { if (!el || !el.isConnected) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
 const text = el => el ? (el.innerText ?? el.textContent ?? '') : '';
 const qa = sel => { if (!sel) return []; try { return Array.from(document.querySelectorAll(sel)); } catch (e) { return []; } };
 const follows = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-const stable = v => v && v.length <= 40 && !/\d{3,}|[0-9a-f]{6,}-|^:|[:\s]/.test(v);
+const stable = v => v && v.length <= 40 && !/\d|[:\s]|^_/.test(v);   // no index, id or framework key
 const stableClass = c => /^[a-zA-Z][a-zA-Z_-]{1,30}$/.test(c) && !/^(css|sc|jsx|tw)-/.test(c);
 function cands(el) {          // structural selectors for el, most specific first; never coordinates
   const out = [], tag = el.tagName.toLowerCase();
   if (el.id && stable(el.id)) out.push('#' + CSS.escape(el.id));
-  for (const a of el.attributes) {
-    if (!a.name.startsWith('data-') || a.name === 'data-ref') continue;
-    if (stable(a.value)) out.push(`${tag}[${a.name}="${CSS.escape(a.value)}"]`);
-    out.push(`${tag}[${a.name}]`);
-  }
+  const data = [...el.attributes].filter(a => a.name.startsWith('data-') && a.name !== 'data-ref');
+  // attribute=value first (data-message-role="assistant"), bare attribute names after
+  for (const a of data) if (stable(a.value)) out.push(`${tag}[${a.name}="${CSS.escape(a.value)}"]`);
+  for (const a of data) out.push(`${tag}[${a.name}]`);
   const role = el.getAttribute('role');
   if (role) out.push(`${tag}[role="${role}"]` + (el.isContentEditable ? '[contenteditable="true"]' : ''));
   if (el.isContentEditable && !role) out.push(`${tag}[contenteditable="true"]`);
@@ -161,20 +160,29 @@ wc.prepare = (cfg) => {       // find + focus + select the input so the paste re
   return { ok: true, input: inputSel, href: location.href, users: qa(cfg.user).length, replies: qa(cfg.reply).length };
 };
 wc.inputText = (cfg) => norm(inputValue(findInput(cfg.input)));
-wc.buttons = () => { const s = new Set(); for (const b of qa('button, [role="button"]')) if (vis(b)) for (const c of cands(b)) if (c.includes('[')) s.add(c); return s; };
+wc.buttons = () => {          // attribute selectors of the visible buttons; the label too (a stop button often has only that)
+  const s = new Set();
+  for (const b of qa('button, [role="button"]')) if (vis(b)) {
+    for (const c of cands(b)) if (c.includes('[')) s.add(c);
+    const l = b.getAttribute('aria-label');
+    if (l && l.length <= 40) s.add(`${b.tagName.toLowerCase()}[aria-label="${CSS.escape(l)}"]`);
+  }
+  return s; };
 wc.arm = (id, cfg, msg, resume) => {    // install the observer BEFORE submit
   wc.forget(id);
   const st = R[id] = { id, cfg, msg: norm(msg), t0: performance.now(), submitAt: null, firstAt: null, doneAt: null,
     lastMut: performance.now(), added: [], echo: null, reply: null, mode: null, state: 'pending', resume: !!resume,
-    baseUsers: qa(cfg.user).length, before: wc.buttons(), during: null, input: findInput(cfg.input),
+    oldUsers: new Set(qa(cfg.user)), before: wc.buttons(), during: null, input: findInput(cfg.input),
     errBefore: new Set(qa(cfg.error).filter(vis)), error: null };
-  if (resume) st.baseUsers = Math.max(0, st.baseUsers - 1);
+  // the echo is a user element that did not exist at arm time, never found by counting: chat UIs unmount
+  // old turns of long conversations (ChatGPT keeps ~7 mounted), so the count can stay the same after a send
+  if (resume) { const u = qa(cfg.user); if (u.length) st.oldUsers.delete(u[u.length - 1]); }
   st.done = new Promise(res => { st.resolve = res; });
   const finish = (state) => { if (st.state !== 'pending') return; st.state = state; st.doneAt = performance.now(); st.obs.disconnect(); clearTimeout(st.timer); st.resolve(state); };
   st.finish = finish;
   const recipeEcho = () => {
     const users = qa(cfg.user);
-    for (let i = users.length - 1; i >= st.baseUsers; i--) { const t = norm(text(users[i])); if (t === st.msg || (st.msg.length > 60 && t.startsWith(st.msg.slice(0, 60)))) return users[i]; }
+    for (let i = users.length - 1; i >= 0; i--) { if (st.oldUsers.has(users[i])) continue; const t = norm(text(users[i])); if (t === st.msg || (st.msg.length > 60 && t.startsWith(st.msg.slice(0, 60)))) return users[i]; }
     return null;
   };
   const genericEcho = () => {
@@ -188,10 +196,15 @@ wc.arm = (id, cfg, msg, resume) => {    // install the observer BEFORE submit
     return null;
   };
   const genericReply = (echo) => {
+    // The reply sits between the echo and the composer: page chrome below the composer (disclaimers,
+    // footers re-rendered on the conversation view) is never a reply.
+    const inp = findInput(cfg.input) || (st.input && st.input.isConnected ? st.input : null);
+    const below = inp && follows(echo, inp);
     let best = null, len = 0;
     for (const el of st.added) {
       if (!el.isConnected || el.contains(echo) || echo.contains(el) || !follows(echo, el)) continue;
-      if (st.input && (st.input.contains(el) || el.contains(st.input))) continue;
+      if (inp && (inp.contains(el) || el.contains(inp))) continue;
+      if (below && follows(inp, el)) continue;
       const l = norm(text(el)).length; if (l > len) { best = el; len = l; }
     }
     return best;
@@ -207,13 +220,18 @@ wc.arm = (id, cfg, msg, resume) => {    // install the observer BEFORE submit
     st.echo = echo; st.reply = reply; st.mode = mode;
     const t = reply ? norm(text(reply)) : '';
     // first real content (a '…' placeholder is not a token)
-    if (st.firstAt === null && /[\p{L}\p{N}]/u.test(t)) { st.firstAt = performance.now(); st.during = wc.buttons(); }
+    if (st.firstAt === null && /[\p{L}\p{N}]/u.test(t)) {
+      st.firstAt = performance.now(); st.during = wc.buttons();
+      st.earlyReply = wc.around(reply, echo); st.earlyUser = wc.around(echo, reply);   // selectors true DURING generation
+    }
     if (st.cancel) return finish('cancelled');
     const err = qa(cfg.error).find(e => vis(e) && !st.errBefore.has(e) && norm(text(e)));
     if (err) { st.error = norm(text(err)).slice(0, 200); return finish('error'); }
     if (!t) return;
-    if (cfg.busy && qa(cfg.busy).some(vis)) return;   // still generating (a broken busy selector never blocks)
-    const wait = (mode === 'recipe' && cfg.busy) ? cfg.settle_ms : cfg.quiet_ms;
+    if (cfg.busy && qa(cfg.busy).some(vis)) { st.busySeen = true; return; }   // still generating
+    // short settle only once the recipe's busy element was really seen this exchange; a busy selector
+    // the site no longer matches (update, other locale) falls back to quiescence instead of cutting the reply
+    const wait = (mode === 'recipe' && cfg.busy && st.busySeen) ? cfg.settle_ms : cfg.quiet_ms;
     clearTimeout(st.timer);
     st.timer = setTimeout(() => { if (performance.now() - st.lastMut >= wait - 5) finish('done'); else check(); }, Math.max(0, wait - (performance.now() - st.lastMut)));
   };
@@ -233,7 +251,7 @@ wc.arm = (id, cfg, msg, resume) => {    // install the observer BEFORE submit
     st.added = all.filter(e => e.children.length < 50).slice(-3000);
   }
   check();
-  return { armed: true, baseUsers: st.baseUsers };
+  return { armed: true, oldUsers: st.oldUsers.size };
 };
 wc.submitted = (id) => { const st = R[id]; if (st) st.submitAt = performance.now(); return true; };
 wc.wait = (id, ms) => {
@@ -244,26 +262,39 @@ wc.status = (id) => {
   const st = R[id]; if (!st) return { state: 'unknown' };
   const base = st.submitAt ?? st.t0;
   const busy = st.cfg.busy ? qa(st.cfg.busy).some(vis) : null;
-  return { state: st.state, mode: st.mode, echo: !!st.echo, busy, reply: st.reply ? text(st.reply).trim() : '', error: st.error,
+  return { state: st.state, mode: st.mode, echo: !!st.echo, busy, busy_seen: !!st.busySeen, reply: st.reply ? text(st.reply).trim() : '', error: st.error,
            first_token_ms: st.firstAt === null ? null : Math.round(st.firstAt - base),
            generation_ms: Math.round((st.doneAt ?? performance.now()) - base), href: location.href };
 };
+// Elements carrying exactly the same text as `el` (the message itself, not page chrome), outermost first.
+wc.same = (el, other) => {
+  const T = norm(text(el)), up = [];
+  for (let e = el; e && e !== document.body && !e.contains(other) && norm(text(e)) === T; e = e.parentElement) up.unshift(e);
+  const down = Array.from(el.querySelectorAll('*')).filter(e => norm(text(e)) === T).slice(0, 200);
+  return [...up, ...down];
+};
+wc.around = (el, other) => { const s = new Set(); if (el && other) for (const e of wc.same(el, other)) for (const c of cands(e)) s.add(c); return s; };
 wc.learn = (id) => {          // post-hoc selectors from the observed exchange (discovery / repair)
   const st = R[id]; if (!st || !st.echo || !st.reply) return null;
-  const pick = (start, other) => {
-    let el = start;
-    for (let depth = 0; el && el !== document.body && depth < 8; depth++, el = el.parentElement) {
-      if (el.contains(other)) break;
-      for (const s of cands(el)) {
+  const pick = (start, other, early, isReply) => {
+    const els = wc.same(start, other);
+    for (const pass of [s => s.includes('="'), s => s.includes('['), s => true]) {   // attribute=value first
+      for (const el of els) for (const s of cands(el)) {
+        if (!pass(s) || (early && early.size && !early.has(s))) continue;
         const m = qa(s);
-        if (m.includes(el) && !m.some(x => x.contains(other) || other.contains(x))) return s;
+        if (!m.includes(el) || m.some(x => x.contains(other) || other.contains(x))) continue;
+        if (isReply && m.find(r => follows(other, r)) !== el) continue;   // replay takes the first reply after the echo
+        return s;
       }
     }
     return null;
   };
-  const user = pick(st.echo, st.reply), reply = pick(st.reply, st.echo);
+  const user = pick(st.echo, st.reply, st.earlyUser, false), reply = pick(st.reply, st.echo, st.earlyReply, true);
   let busy = null;
-  if (st.during) { const after = wc.buttons(); for (const s of st.during) if (!st.before.has(s) && !after.has(s)) { busy = s; break; } }
+  if (st.during) {      // a button shown only while generating; one that says stop/cancel first
+    const after = wc.buttons(), only = [...st.during].filter(s => !st.before.has(s) && !after.has(s));
+    busy = only.find(s => /stop|cancel|abort|interrupt/i.test(s)) || only[0] || null;
+  }
   return { user, reply, busy };
 };
 wc.cancel = () => {
@@ -506,7 +537,8 @@ def send(
         if out is not None:
             status = out["status"]
             result.update(status=status["state"], reply=status["reply"], url=status.get("href"),
-                          resumed=resume, input_method=out.get("input_method"), match=status.get("mode"))
+                          resumed=resume, input_method=out.get("input_method"), match=status.get("mode"),
+                          busy_seen=status.get("busy_seen"))
             # On a resume the generation started in an earlier call: only its remaining part is measured.
             timings["first_token_ms"] = None if resume else status.get("first_token_ms")
             timings["generation_ms"] = status.get("generation_ms")
@@ -554,7 +586,7 @@ def send(
     timings["total_ms"] = total
     if timings.get("generation_ms") is not None:
         # External time = from submit to the end condition minus our own settle window.
-        settle = cfg["settle_ms"] if (cfg.get("busy") and result.get("match") == "recipe") else cfg["quiet_ms"]
+        settle = cfg["settle_ms"] if (result.get("busy_seen") and result.get("match") == "recipe") else cfg["quiet_ms"]
         timings["settle_ms"] = settle
         timings["external_ms"] = max(0.0, timings["generation_ms"] - settle)
         timings["walter_ms"] = round(total - timings["external_ms"], 1)
@@ -652,10 +684,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--session")
     ap.add_argument("--request-id")
     ap.add_argument("--start-url", help="discovery: page of a new conversation (no recipe yet)")
+    ap.add_argument("--site", help="discovery: browser_sites name whose owner login the tab needs")
     ap.add_argument("--timeout", type=float)
     a = ap.parse_args(argv)
     out = send(a.host, a.capability, a.message, conversation=a.conversation, request_id=a.request_id,
-               session=a.session, start_url=a.start_url, timeout_s=a.timeout)
+               session=a.session, start_url=a.start_url, site=a.site, timeout_s=a.timeout)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     return 0 if out["ok"] else 1
 

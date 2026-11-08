@@ -4,7 +4,8 @@ Started by the tests on a free loopback port, never as a service. Behaviour of a
 cookie login per user, conversations persisted server side at /c/<id> (only visible to their
 owner), replies streamed token by token over a chunked HTTP response after a "thinking" pause,
 a stop button visible while generating, Enter to send, error banner (role=alert) when the
-login expired. Admin endpoints switch the DOM variant (site update), expire logins, change pace.
+login expired. Admin endpoints switch the DOM variant (site update), expire logins, change pace;
+STATE["window"] keeps only the last N turns mounted (long conversations unmount old turns).
 """
 from __future__ import annotations
 
@@ -15,14 +16,14 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-STATE = {"variant": "a", "token_ms": 20, "think_ms": 600, "sids": {}, "convs": {}}
+STATE = {"variant": "a", "token_ms": 20, "think_ms": 600, "window": 0, "sids": {}, "convs": {}}
 LOCK = threading.Lock()
 
 PAGE = r"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Fixture chat</title>
 <style>body{font-family:sans-serif;max-width:720px;margin:auto} .bubble{padding:6px;margin:4px;border:1px solid #888}
 #composer,textarea{min-height:40px;border:2px solid #01B7FF;padding:6px;display:block;width:100%}</style></head>
 <body>__BODY__<script>
-const VARIANT = "__VARIANT__", HISTORY = __HISTORY__;
+const VARIANT = "__VARIANT__", HISTORY = __HISTORY__, WINDOW = __WINDOW__;
 let conv = __CONV__;
 const A = VARIANT === "a";
 const thread = document.querySelector(A ? '#thread' : 'section.log');
@@ -35,7 +36,9 @@ function turn(role, txt) {
            const b = document.createElement('div'); b.className = 'bubble'; b.textContent = txt; el.appendChild(b); el._b = b; }
   else { el = document.createElement('article'); el.dataset.msgRole = role === 'user' ? 'human' : 'bot';
          const p = document.createElement('p'); p.textContent = txt; el.appendChild(p); el._b = p; }
-  thread.appendChild(el); return el;
+  thread.appendChild(el);
+  while (WINDOW && thread.children.length > WINDOW) thread.firstElementChild.remove();   // old turns unmounted
+  return el;
 }
 for (const m of HISTORY) turn(m.role, m.text);
 let ctrl = null;
@@ -112,7 +115,7 @@ class Handler(BaseHTTPRequestHandler):
         hist = conv["messages"] if conv else []
         v = STATE["variant"]
         html = (PAGE.replace("__BODY__", BODY_A if v == "a" else BODY_B).replace("__VARIANT__", v)
-                .replace("__HISTORY__", json.dumps(hist)).replace("__CONV__", json.dumps(conv["id"] if conv else None)))
+                .replace("__HISTORY__", json.dumps(hist)).replace("__WINDOW__", str(int(STATE["window"]))).replace("__CONV__", json.dumps(conv["id"] if conv else None)))
         return html
 
     def do_GET(self):
@@ -192,7 +195,7 @@ def serve(port: int = 0) -> tuple[ThreadingHTTPServer, int]:
 
 def reset() -> None:
     with LOCK:
-        STATE.update(variant="a", token_ms=20, think_ms=600, sids={}, convs={})
+        STATE.update(variant="a", token_ms=20, think_ms=600, window=0, sids={}, convs={})
 
 
 if __name__ == "__main__":

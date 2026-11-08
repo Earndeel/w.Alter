@@ -117,6 +117,7 @@ class ConversationLiveTests(unittest.TestCase):
         self.assertEqual(a["url"], b["url"])
         self.assertEqual(self.sent_count(), before + 2)
         self.assertLess(b["timings"]["walter_ms"], 400)
+        self.assertTrue(b["busy_seen"])                     # short settle only after the stop element was seen
 
     # -- 3. idempotency: one request_id = one message, the retry returns the same reply ---
     def test_03_idempotent_request(self):
@@ -270,6 +271,36 @@ class ConversationLiveTests(unittest.TestCase):
         self.assertIsNone(res.error)
         self.assertIn("Via le moteur de capacités", res.records[0]["reply"])
         self.assertEqual(res.records[0]["mode"], "replay")
+
+    # -- 13. busy selector the site no longer matches: quiescence, never a truncated reply --
+    def test_13_stale_busy_selector(self):
+        cap = self.index.lookup_capability(self.host, "chat")
+        good = dict(cap["implementation"])
+        self.index.bump_capability_version(self.host, "chat", implementation=dict(good, busy="button[data-gone]"),
+                                           notes="test: stale busy")
+        chat_fixture.STATE["token_ms"] = 400                # pauses between tokens longer than settle_ms
+        try:
+            out = self.send("Court mais lent", label="stale busy")
+        finally:
+            chat_fixture.STATE["token_ms"] = 20
+            self.index.bump_capability_version(self.host, "chat", implementation=good, notes="test: restore")
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["match"], "recipe")
+        self.assertFalse(out["busy_seen"])
+        self.assertTrue(out["reply"].endswith("FIN"), out["reply"])
+
+    # -- 14. long conversation whose old turns are unmounted (count of user turns unchanged) --
+    def test_14_virtualized_turns(self):
+        chat_fixture.STATE["window"] = 4                    # 2 exchanges mounted, like ChatGPT's ~7 turns
+        self.conv.close(self.host, "chat", session=ALICE)
+        try:
+            outs = [self.send(f"Fenêtre {i}", label=f"virtualized #{i}") for i in range(3)]
+        finally:
+            chat_fixture.STATE["window"] = 0
+        for i, out in enumerate(outs):
+            self.assertTrue(out["ok"], out)
+            self.assertEqual(out["match"], "recipe", out)
+            self.assertIn(f"Réponse à : Fenêtre {i}", out["reply"])
 
 
 if __name__ == "__main__":

@@ -108,6 +108,7 @@ aucun cookie). Délai, annulation (clic sur l'élément « en cours »), répons
 Le routage (quel service, quelle recette, quelle session) appartient au Walter Router : passerelle walter-llm
 `POST /v1/web/converse` (table `web_services`), commande Telegram `/gpt` du plugin Router. Tests réels :
 `tests/test_conversation_live.py` (Camoufox réel, interface de chat locale `tests/fixtures/chat_fixture.py` à
-génération progressive) — ils valident le mécanisme, pas un service externe. ChatGPT : recette non apprise, service
-désactivé (conditions d'utilisation d'OpenAI, décision du propriétaire en attente).
+génération progressive) — ils valident le mécanisme, pas un service externe. ChatGPT : recette apprise et rejouée sur le
+vrai site (activé par le propriétaire malgré l'interdiction d'extraction des conditions d'OpenAI, DECISIONS 2026-11-08).
+L'écho est toujours un élément apparu après l'armement, jamais un comptage : les interfaces démontent les anciens tours.
 
