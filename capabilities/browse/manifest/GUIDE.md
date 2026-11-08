@@ -16,6 +16,9 @@ Camoufox, Webtop) selon la demande et le site ; l'agent décrit ce qu'il veut, p
    Si le site a besoin de Chromium : `browser_session(..., engine="chromium")` / `walter-browser -e chromium …` au
    premier appel de la session (CloakBrowser, même API, mêmes règles) ; la session garde ensuite son moteur.
 3. Rappeler `browser_session` dès que le site affiche une page de connexion.
+4. **Converser avec une interface de chat** (service web conversationnel) : via le Walter Router (passerelle
+   `POST /v1/web/converse`, commande Telegram `/gpt`), qui choisit la recette ; en code, `walter_browse.converse(host,
+   capability, message, conversation=…, request_id=…)`. Recette apprise au premier passage, rejouée ensuite sans LLM.
 
 ## Organisation
 
@@ -26,6 +29,7 @@ Camoufox, Webtop) selon la demande et le site ; l'agent décrit ce qu'il veut, p
 | Camoufox `:9377` (écran X `:101`) | Navigateur persistant de W.Alter ; {{owner.address}} le voit et le pilote via Selkies (Tailscale :3011) |
 | Chromium `:9378` (CloakBrowser, même écran) | Second moteur, à la demande d'un site qui exige Chromium ; même API et mêmes règles |
 | Sortie réseau `walter-exit-default` | Par défaut : la machine de {{owner.address}} tant que son VPN France est connecté, sinon la sortie WireGuard France, automatiquement ; `network/wg-exit` pour d'autres sorties |
+| `runtime/conversation.py`, `walter_browse/converse.py` | Capacités conversationnelles : recette `kind=conversation` du registre, onglet et conversation réutilisés, collage clavier réel, fin détectée par événements DOM |
 | `ports/hermes` | Adaptateur Hermes (outil `walter_browse`) |
 
 ## Interfaces
@@ -35,10 +39,14 @@ Camoufox, Webtop) selon la demande et le site ; l'agent décrit ce qu'il veut, p
 | Recherche / extraction | `walter_browse` | `walter_browse` | — |
 | Session connectée | `browser_session`, `browser_sites` | navigateur Hermes | `walter-browser login SITE` |
 | Pilotage | — | — | `walter-browser -s <session> …` |
+| Conversation web | — (Router : `/v1/web/converse`) | commande `/gpt` (plugin Router) | `runtime/conversation.py MESSAGE --host … --capability …` |
 
 ## Règles et limites
 
 - Ne jamais extraire de cookies soi-même ; un nouveau site se déclare dans `browser_sites.json` (sans secret).
 - Les cookies de {{owner.address}} ne sont acceptés que par une session qui sort par sa sortie réseau.
-- Frappe humaine (vraies touches), jamais de remplissage programmatique ; empreinte d'appareil figée.
+- Vraies touches, jamais de remplissage programmatique ; un message se colle par un vrai Ctrl+V (presse-papiers
+  verrouillé puis restauré) ; empreinte d'appareil figée.
+- Un service conversationnel n'est activé que par {{owner.address}} (table `web_services` du Router), dans le respect
+  de ses conditions d'utilisation ; aucun contournement de restriction d'accès.
 - Si aucune sortie France n'est disponible, les connexions sont refusées (jamais l'IP du serveur).

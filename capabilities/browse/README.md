@@ -82,3 +82,32 @@ explicitement (`WALTER_BROWSE_PROXY`, fixé à la création de sa session). Le r
 est désactivé sauf `WALTER_BROWSE_WEBTOP=on`. Contrôle : `walter-exit-local probe` (JSON, code 1 en cas d'écart) ;
 état : `walter-exit-local status`, journal `/var/log/walter-exit-local.log`. Fichiers : `network/exit-local/`,
 `ops/walter-exit-local.service`, `ops/camoufox-max-local-exit.conf`, `/etc/walter/browse-identity-camoufox.env`.
+
+## Capacités conversationnelles (2026-11-08)
+
+Une interface web de conversation (chat) utilisée comme un service : un message entre, la réponse de ce message sort.
+La recette est une capacité ordinaire du registre (`ProfileIndex`, `implementation.kind = "conversation"`) : page de
+départ, moteur, site de connexion éventuel (`browser_sites`), sélecteurs structurels de la saisie, des tours
+utilisateur, des réponses, de l'indicateur « en cours » et du signal d'erreur ; versionnée, notée (confiance),
+réparée par `bump_capability_version`. Code : `runtime/conversation.py` (stdlib), client public in-process
+`walter_browse.converse` / `cancel_conversation` / `close_conversation` ; `CapabilityEngine.execute` aiguille aussi
+une capacité conversationnelle vers lui.
+
+Chemin d'une recette validée, sans LLM ni processus (hors presse-papiers) : verrou de la conversation → idempotence
+par `request_id` (une réponse déjà obtenue est rendue telle quelle ; après un envoi, une relance reprend l'attente
+sans renvoyer) → onglet réutilisé (vérification 2 ms ; recréé à l'URL de la conversation si la session du moteur a
+expiré, avec la connexion du site) → collage clavier réel Ctrl+V sous verrou du presse-papiers (contenu précédent
+restauré ; secours : frappe clavier rapide, jamais au rythme humain) → `MutationObserver` armé avant l'envoi → envoi
+→ attente événementielle (fin = indicateur « en cours » disparu puis 150 ms sans mutation ; sans indicateur connu,
+2 s de calme) → réponse = premier tour du service qui suit l'écho exact du message. Sans recette, ou si elle ne
+correspond plus, la même observation apprend les sélecteurs (découverte → v1, réparation → version suivante).
+État des conversations : `state/browse/conversations/` (0600 ; URL de conversation, onglet, 20 dernières requêtes ;
+aucun cookie). Délai, annulation (clic sur l'élément « en cours »), réponse incomplète, erreur du service : statuts
+`done | incomplete | cancelled | error | failed`, jamais de renvoi sous le même `request_id`.
+
+Le routage (quel service, quelle recette, quelle session) appartient au Walter Router : passerelle walter-llm
+`POST /v1/web/converse` (table `web_services`), commande Telegram `/gpt` du plugin Router. Tests réels :
+`tests/test_conversation_live.py` (Camoufox réel, interface de chat locale `tests/fixtures/chat_fixture.py` à
+génération progressive) — ils valident le mécanisme, pas un service externe. ChatGPT : recette non apprise, service
+désactivé (conditions d'utilisation d'OpenAI, décision du propriétaire en attente).
+

@@ -114,6 +114,9 @@ class CapabilityEngine:
             cap = None
         if cap is None:
             return await self._generic(host, capability, inputs, spec=spec, url=url, mode=mode, session=session)
+        if (cap.get("implementation") or {}).get("kind") == "conversation":
+            # A conversation is never cached: each message is a new exchange (conversation.py).
+            return await self._conversation(host, capability, inputs or {})
 
         params = dict(inputs or {})
         if not force_fresh:
@@ -199,6 +202,21 @@ class CapabilityEngine:
         return gresult
 
     # -- helpers -----------------------------------------------------------
+
+    async def _conversation(self, host: str, capability: str, inputs: Mapping[str, Any]) -> CapabilityResult:
+        import asyncio
+
+        import conversation
+        out = await asyncio.to_thread(
+            conversation.send, host, capability, str(inputs.get("message") or ""),
+            conversation=str(inputs.get("conversation") or "default"), request_id=inputs.get("request_id"),
+            session=inputs.get("session"), index=self.index, timeout_s=inputs.get("timeout_s"))
+        record = {k: out.get(k) for k in ("reply", "status", "conversation", "request_id", "url", "mode",
+                                          "recipe_version", "timings")}
+        return CapabilityResult(capability=capability, host=host, route="conversation", fresh=True,
+                                records=[record], score=1.0 if out.get("ok") else 0.0,
+                                elapsed_s=round((out.get("timings") or {}).get("total_ms", 0) / 1000, 3),
+                                error=out.get("error"), url=out.get("url"))
 
     async def _generic(
         self,

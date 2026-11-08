@@ -24,7 +24,8 @@
   "data": [
     "shared session state",
     "learned route profiles",
-    "result cache"
+    "result cache",
+    "conversation state (tab, conversation URL, last requests)"
   ],
   "core_paths": [
     "walter_browse",
@@ -32,7 +33,9 @@
     "runtime/browse_session.py",
     "runtime/profile_index.py",
     "runtime/result_cache.py",
-    "runtime/search_lite.py"
+    "runtime/search_lite.py",
+    "runtime/conversation.py",
+    "walter_browse/converse.py"
   ],
   "backup_paths": [
     ".",
@@ -42,7 +45,8 @@
     "shared request contract",
     "CLI",
     "MCP",
-    "Hermes plugin"
+    "Hermes plugin",
+    "public client (walter_browse.converse)"
   ],
   "bindings": {
     "hermes": "native walter-browse adapter to shared facade",
@@ -52,7 +56,8 @@
   },
   "limitations": [
     "Authenticated HTTP uses managed server-side cookies and refuses cross-origin redirects or anonymous fallback.",
-    "Authenticated interactive browser routes are not qualified by the HTTP fixture."
+    "Authenticated interactive browser routes are not qualified by the HTTP fixture.",
+    "Conversational recipes are validated on the local fixture chat UI; a real service needs its own recipe run and its owner's authorization (web_services table of the Router)."
   ],
   "services": [
     "camoufox-max",
