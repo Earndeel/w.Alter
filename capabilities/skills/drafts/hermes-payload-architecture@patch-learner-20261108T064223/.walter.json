@@ -1,0 +1,11 @@
+{
+ "base_sha": "1565d4d830dc5cf0399248e440b0bacd6cc7ca66b24abd8ccfcbff5d54c279bd",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-08T06:42:23.090008+00:00",
+ "domain": "hermes",
+ "kind": "patch",
+ "reason": "La session a établi une procédure reproductible de profilage puis de suppression du coût fixe d'un preflight : passage de 2–2,5 s à environ 0,6–0,7 s via cache Router et service chaud, commits 895ac41 et 9fd48af. Elle a aussi révélé des pièges concrets : import impossible depuis /tmp sans PYTHONPATH, /usr/bin/time absent, rôle PostgreSQL postgres inexistant, code du service périmé sans redémarrage et échec de neutralité causé par PGPASSFILE=/root/.pgpass. Cela complète le skill d'architecture des payloads sans créer un doublon. [session claude_code/vm/4d829d31-7061-4031-a10e-2d65524a33cc]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/4d829d31-7061-4031-a10e-2d65524a33cc",
+ "target": "hermes-payload-architecture"
+}
