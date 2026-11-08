@@ -252,6 +252,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/run.py | `TOOLSET_TOOLS` | {"memory": ["memory_context", "memory_search", "memory_events"], "skills": ["skills_search", "skill_read"], "walter-web": ["walter_browse"], "web": ["walter_browse"]} |  |
 | serve/run.py | `TOOL_FAMILY_TOOLSETS` | {"research": ["walter-web", "skills"], "weather": ["walter-web"]} | mode "tool" tasks |
 | serve/run.py | `MEDIA` | ["image", "video", "music", "audio"] |  |
+| serve/web.py | `DEFAULT_CONVERSATION` | walter-router |  |
 | serve/web.py | `MAX_FILES` | 10 |  |
 | serve/web.py | `KEYS` | ["service", "message", "model", "files", "conversation", "request_id", "timeout_s"] |  |
 

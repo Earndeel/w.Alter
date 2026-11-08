@@ -8627,6 +8627,11 @@
             "signature": "rows: list[dict], interfaces: tuple[str, ...], only: tuple[str, ...]=(), skip: tuple[str, ...]=()"
           },
           {
+            "description": "The intents the owner's rule gives to a web chat service (knowledge.json web_services), as task keys.",
+            "name": "_web_quick",
+            "signature": ""
+          },
+          {
             "description": "Compact operational guidance, independent of current model names, prices and provider choices.",
             "name": "text",
             "signature": "conn, owner: str | None=None"
@@ -8957,7 +8962,7 @@
           {
             "description": "Free-text request -> intent by the decision model (task, video role, level, unrestricted) -> decision + routes.",
             "name": "route",
-            "signature": "conn, request: str, task: str | None=None, level: str | None=None, context: str | None=None"
+            "signature": "conn, request: str, task: str | None=None, level: str | None=None, context: str | None=None, web_rules: bool=True"
           }
         ]
       },
@@ -9001,9 +9006,19 @@
             "signature": "conn, d: dict, spec: dict"
           },
           {
+            "description": "The owner's rule gave this intent to a web chat service: the user's own words go there (the request, else the",
+            "name": "_web",
+            "signature": "conn, d: dict, spec: dict"
+          },
+          {
             "description": "",
             "name": "_run",
             "signature": "conn, spec: dict"
+          },
+          {
+            "description": "",
+            "name": "_dispatch",
+            "signature": "conn, d: dict, spec: dict"
           },
           {
             "description": "Versioned result; existing fields remain compatible with every current adapter.",
@@ -9056,6 +9071,16 @@
             "description": "",
             "name": "converse",
             "signature": "spec: dict"
+          },
+          {
+            "description": "Services the gateway has enabled (its own rule table, the owner's switch).",
+            "name": "_enabled",
+            "signature": ""
+          },
+          {
+            "description": "The web service the owner's rule gives this classified intent, or None.",
+            "name": "route_for",
+            "signature": "task: str | None, level: str | None"
           }
         ]
       },
@@ -16836,6 +16861,12 @@
       {
         "comment": "",
         "file": "serve/web.py",
+        "name": "DEFAULT_CONVERSATION",
+        "value": "walter-router"
+      },
+      {
+        "comment": "",
+        "file": "serve/web.py",
         "name": "MAX_FILES",
         "value": 10
       },
@@ -17101,8 +17132,8 @@
     ]
   },
   "note": {
-    "chars": 3755,
-    "content": "## Walter Router — choisir et exécuter un modèle pour une sous-tâche\nTu définis le travail, ses contraintes et le contexte ; le routeur choisit modèle et fournisseur selon les benchmarks, les coûts, les abonnements et les préférences de l’utilisateur. Tu contrôles le résultat et l’intègres.\nUtilise-le lorsqu’une spécialité ou une sous-tâche distincte justifie le coût et la latence du transfert. Les faits et contraintes indispensables doivent accompagner chaque appel.\n- `walter_run` exécute. Donne `request`, `task`, `goal` complet pour le texte, `context` utile. L’exécuteur ne voit pas cette conversation. Appelle-le directement si le besoin est clair.\n- `walter_route` examine le choix, les routes et les prix sans exécuter ; utile pour vérifier ou planifier, pas un préalable obligatoire à `walter_run`. Sans `task`, le routeur classe la demande ; `conversation` explique un lien avec les échanges précédents.\n- `walter_decide` traite un choix court ou répété : `question`, `options` (au moins deux noms → sens), `context`. Pour une analyse longue, utilise une tâche texte.\n- `walter_plans` lit les abonnements ; une modification doit être demandée par leur propriétaire.\n- `walter_web` converse avec un service web de chat activé par l’utilisateur (`message`, `files` chemins, `model` seulement s’il le demande) ; réponse verbatim, fichiers produits en chemins. Lent ; sur sa demande.\n`task=general` : L1 quotidien, résumé simple ; L2 analyse en plusieurs étapes ou rédaction soignée ; L3 raisonnement complexe ou fort enjeu. Les spécialités ont leur propre classement ; ne leur impose pas un niveau général.\nTexte : `3d` · `coding` · `cybersecurity` · `dataviz` · `engineering` · `finance` · `frontend` · `fullstack` · `gamedev` · `legal` · `medical` · `mobile_app` · `science` · `strategy` · `svg` · `ui_component` · `writing`\nAnalyse : `document` · `long_context` · `vision`\nImages : `graphic_design` · `image_edit` · `logo` · `text_to_image`\nVidéo : `image_to_video` · `text_to_video` · `video_edit`\nAudio : `music` · `speech_to_speech` · `tts`\nObjectif vidéo `role` : `default` · `premium` · `action` · `ugc` · `budget`\nContraintes `require` : `open_weights` poids ouverts ; `unrestricted` politique de contenu compatible ; `video_input` route capable de lire une vidéo (`task=vision`). Fournis les sources ; la sélection seule n’attache aucun média.\nSi l’utilisateur nomme un modèle, transmets `model` (éventuellement /variante) et `provider` s’il l’impose ; aucun substitut. Les favoris ne changent pas sans sa décision.\nPour le texte, limite `toolsets`, `max_turns`, `budget_seconds` au besoin. Outils natifs : terminal/code et fichiers ; autres capacités via leurs commandes si terminal autorisé. Les outils agissent sur l’hôte du routeur, avec ses droits ; les permissions d’un harness distant ne sont pas héritées automatiquement.\nNe transmets pas de secrets ou de données local_only à un modèle cloud ; le harness contrôle les classes d’accès.\nGénération média payante : uniquement sur demande de l’utilisateur ; `image_urls`, `role`, `aspect_ratio`, `duration`, `resolution` selon le média. `paid_fallback` autorise une voie payante prévue manuelle.\nTexte : fournisseur en échec → fournisseur suivant du même modèle, historique conservé. Tous échouent → échec explicite. Une restriction de fournisseur nommé reste stricte.\nLis `ok`, `routed`, `attempts`, `tools` et les erreurs. Si `user_notification_required`, transmets `user_notice` à l’utilisateur, même en cas d’échec. N’annonce jamais un succès sur la seule sélection.\nExemple texte : {\"request\":\"Corriger ce bug\",\"task\":\"coding\",\"goal\":\"…\",\"context\":\"…\"}. Transcription, embeddings, rerank et postes internes sont servis aux modules ; ne les propose pas comme tâches usuelles.",
+    "chars": 3967,
+    "content": "## Walter Router — choisir et exécuter un modèle pour une sous-tâche\nTu définis le travail, ses contraintes et le contexte ; le routeur choisit modèle et fournisseur selon les benchmarks, les coûts, les abonnements et les préférences de l’utilisateur. Tu contrôles le résultat et l’intègres.\nUtilise-le lorsqu’une spécialité ou une sous-tâche distincte justifie le coût et la latence du transfert. Les faits et contraintes indispensables doivent accompagner chaque appel.\n- `walter_run` exécute. Donne `request`, `task`, `goal` complet pour le texte, `context` utile. L’exécuteur ne voit pas cette conversation. Appelle-le directement si le besoin est clair.\n- `walter_route` examine le choix, les routes et les prix sans exécuter ; utile pour vérifier ou planifier, pas un préalable obligatoire à `walter_run`. Sans `task`, le routeur classe la demande ; `conversation` explique un lien avec les échanges précédents.\n- `walter_decide` traite un choix court ou répété : `question`, `options` (au moins deux noms → sens), `context`. Pour une analyse longue, utilise une tâche texte.\n- `walter_plans` lit les abonnements ; une modification doit être demandée par leur propriétaire.\n- `walter_web` converse avec un service web de chat activé par l’utilisateur (`message`, `files` chemins, `model` seulement s’il le demande) ; réponse verbatim, fichiers produits en chemins. Lent ; sur sa demande.\nQuestion rapide (`weather` · `calculation` · `research`) : `walter_run` avec `request` seul ; le modèle de décision la confie au service web de chat prévu par l’utilisateur (voie habituelle et avis s’il échoue).\n`task=general` : L1 quotidien, résumé simple ; L2 analyse en plusieurs étapes ou rédaction soignée ; L3 raisonnement complexe ou fort enjeu. Les spécialités ont leur propre classement ; ne leur impose pas un niveau général.\nTexte : `3d` · `coding` · `cybersecurity` · `dataviz` · `engineering` · `finance` · `frontend` · `fullstack` · `gamedev` · `legal` · `medical` · `mobile_app` · `science` · `strategy` · `svg` · `ui_component` · `writing`\nAnalyse : `document` · `long_context` · `vision`\nImages : `graphic_design` · `image_edit` · `logo` · `text_to_image`\nVidéo : `image_to_video` · `text_to_video` · `video_edit`\nAudio : `music` · `speech_to_speech` · `tts`\nObjectif vidéo `role` : `default` · `premium` · `action` · `ugc` · `budget`\nContraintes `require` : `open_weights` poids ouverts ; `unrestricted` politique de contenu compatible ; `video_input` route capable de lire une vidéo (`task=vision`). Fournis les sources ; la sélection seule n’attache aucun média.\nSi l’utilisateur nomme un modèle, transmets `model` (éventuellement /variante) et `provider` s’il l’impose ; aucun substitut. Les favoris ne changent pas sans sa décision.\nPour le texte, limite `toolsets`, `max_turns`, `budget_seconds` au besoin. Outils natifs : terminal/code et fichiers ; autres capacités via leurs commandes si terminal autorisé. Les outils agissent sur l’hôte du routeur, avec ses droits ; les permissions d’un harness distant ne sont pas héritées automatiquement.\nNe transmets pas de secrets ou de données local_only à un modèle cloud ; le harness contrôle les classes d’accès.\nGénération média payante : uniquement sur demande de l’utilisateur ; `image_urls`, `role`, `aspect_ratio`, `duration`, `resolution` selon le média. `paid_fallback` autorise une voie payante prévue manuelle.\nTexte : fournisseur en échec → fournisseur suivant du même modèle, historique conservé. Tous échouent → échec explicite. Une restriction de fournisseur nommé reste stricte.\nLis `ok`, `routed`, `attempts`, `tools` et les erreurs. Si `user_notification_required`, transmets `user_notice` à l’utilisateur, même en cas d’échec. N’annonce jamais un succès sur la seule sélection.\nExemple texte : {\"request\":\"Corriger ce bug\",\"task\":\"coding\",\"goal\":\"…\",\"context\":\"…\"}. Transcription, embeddings, rerank et postes internes sont servis aux modules ; ne les propose pas comme tâches usuelles.",
     "format": "text/markdown",
     "id": "walter-router.usage",
     "module": "router",
@@ -17116,7 +17147,7 @@
       "walter_plans"
     ],
     "schema_version": 1,
-    "sha256": "616a72b9956e66efbc8b5b01c566f0df110267ff2b7dc4de60a7ffc13b500482",
+    "sha256": "409316278836ea424d52adb698c1bdf6e8fd3bee5bc3e3388044a9a99a6342a0",
     "source": {
       "args": [
         "brief",
@@ -17249,9 +17280,9 @@
     "research/sources.py": "b872c4f0bc274c5c05612712b9bc04b756a52db9c837d4a5e63ec3097974cad0",
     "research/web.py": "71e3bf9073480552ab10f369cc69ca3f0e462027b2bf0829a7c02e13353276ca",
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
-    "serve/agent_view.py": "144454b28cfc6ba0cf8678aa072a38f9c0fe857eab59cd66fbd676414a461367",
+    "serve/agent_view.py": "dfde57589a82c4176da1ba752a4964a63dd416f7de3a842322d0234b06b2c0ba",
     "serve/api.py": "cd6428abc4ff933e6fda69cfd1259e538d5bda2ea88d9b4140f01d1bc002b9e5",
-    "serve/brief.py": "92c05ba73723f80ef9bc29a271be03764d4f176cd45f7401f17607df71fb527b",
+    "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
     "serve/execution.py": "cd2f898bcdd9120ebd1e3c4a1977cf7ed0aa7593373187c7914638887439f6a5",
     "serve/hermes_sync.py": "1dc99d9f119e45cc958e5954fac64ba29802505d04ccd2ef096c3aba3db633cc",
@@ -17259,10 +17290,10 @@
     "serve/media_exec.py": "8fe8e8d41e1141f6e96f6c6912b1fdac3ebacadde7ceacdf18ad2ef994db63cd",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "d6f582794d9d49314f54cfb13240d6062855dc7df48ca5d2121932e1fd4a02da",
-    "serve/routes.py": "492e8e75f102e42856bcd66f612dfe7b30cc21c14c8776aeb352d9d2e7e420fb",
-    "serve/run.py": "01f870b43d752fac173728d2a8a78e02d00294f22cc07f96f7b387d21b733d4f",
+    "serve/routes.py": "108b6fafa28d1b29e3de8bc38b88e9778a318a1f3d12b70836d87b5872a72857",
+    "serve/run.py": "629a02b3c2db03e6953d168a898a6e3c131fc5c120e07b90d7605ddedb2db401",
     "serve/text_agent.py": "4e910f3619c717895c9970d78178766d8b7c6f3c56a1c8313374a50d93e9a705",
-    "serve/web.py": "9a36fb81f594dc59f80a13535cde7ffb9c9abaed36ad1a3760a01492443cb428",
+    "serve/web.py": "20cf30a3f8dbd21e1f7de2d188b5f01d60f3a9111f3412e0169053a85061ec82",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
     "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",
     "store/migrations/001_models.sql": "dfdcb4be9930086cbdc935eb7cffe07f6705cb1562169c162f74f7b2205dcc37",

@@ -254,12 +254,58 @@ def _text(conn, d: dict, spec: dict) -> dict:
                        "seconds": round(time.monotonic() - started, 2)}}
 
 
+def _web(conn, d: dict, spec: dict) -> dict[str, Any]:
+    """The owner's rule gave this intent to a web chat service: the user's own words go there (the request, else the
+    goal), in the rule's conversation; the reply comes back verbatim. The result has the text run's shape."""
+    from walter_router.serve import web
+    w = d["web"]
+    message = (spec.get("request") or spec.get("goal") or "").strip()
+    if spec.get("conversation"):
+        message = f"{message}\n\n(Contexte : {str(spec['conversation'])[:600]})"
+    started = time.monotonic()
+    out = web.converse({"service": w["service"], "message": message, "conversation": w["conversation"],
+                        "timeout_s": min(int(spec.get("budget_seconds") or 300), 600)})
+    seconds = round(time.monotonic() - started, 2)
+    execution.log(conn, {"task": d.get("task"), "role": d.get("role"), "model_id": None, "provider": f"web:{w['service']}",
+                         "model": "web", "ok": bool(out.get("ok")), "seconds": seconds, "usage": None,
+                         "cost_usd": None, "cost_status": "unknown", "kind": "web"})
+    conn.commit()
+    return {"ok": bool(out.get("ok")), "output": out.get("reply") or "", "files": out.get("files") or [],
+            "error": out.get("error") or (None if out.get("ok") else out.get("status")), "kind": "web",
+            "runtime": "walter-router", "notices": [], "user_notification_required": False, "user_notice": "",
+            "routed": {"task": d.get("task"), "provider": f"web:{w['service']}", "service": w["service"],
+                       "conversation": out.get("conversation"), "request_id": out.get("request_id"),
+                       "why": w.get("why"), "level": (d.get("intent") or {}).get("level"), "seconds": seconds,
+                       "timings": out.get("timings")}}
+
+
 def _run(conn, spec: dict) -> dict[str, Any]:
     if not (spec.get("goal") or spec.get("request")):
         return {"ok": False, "error": "goal (text) or request (media) required"}
     d = decide(conn, spec)
     if d.get("mode") == "none" or d.get("error"):
         return {"ok": False, "error": d.get("error") or d.get("why") or "no model", "decision": d}
+    web_notice = None
+    if d.get("mode") == "web":
+        out = _web(conn, d, spec)
+        if out["ok"]:
+            return out
+        # the owner's fallback rule: the usual path for this intent, said to the user
+        web_notice = {"type": "web_fallback", "service": d["web"]["service"], "reason": out.get("error"),
+                      "message": f"Le service web {d['web']['service']} n'a pas pu répondre ({out.get('error')}). "
+                                 "Réponse par la voie habituelle du routeur."}
+        d = {**d, "mode": d["web"].get("fallback_mode")}
+        if not spec.get("goal"):
+            spec = {**spec, "goal": spec["request"]}
+    result = _dispatch(conn, d, spec)
+    if web_notice:
+        result["notices"] = [web_notice, *(result.get("notices") or [])]
+        result["user_notice"] = "\n".join(filter(None, (web_notice["message"], result.get("user_notice"))))
+        result["user_notification_required"] = True
+    return result
+
+
+def _dispatch(conn, d: dict, spec: dict) -> dict[str, Any]:
     if d.get("mode") == "tool" and spec.get("goal"):
         # A task answered by a tool (research, weather…): a sub-agent on the general tier holding that tool.
         family = d.get("tool") or d.get("task")

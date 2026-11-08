@@ -36,7 +36,8 @@ def with_execution(conn, out: dict) -> dict:
         out["openrouter_id"] = media_exec.openrouter_id(conn, out["model_id"])   # modules calling OpenRouter (stt)
     return out
 
-def route(conn, request: str, task: str | None = None, level: str | None = None, context: str | None = None) -> dict:
+def route(conn, request: str, task: str | None = None, level: str | None = None, context: str | None = None,
+          web_rules: bool = True) -> dict:
     """Free-text request -> intent by the decision model (task, video role, level, unrestricted) -> decision + routes.
 
     The decision model reads the request and, when given, `context` (one line on what earlier turns were about, so
@@ -56,4 +57,10 @@ def route(conn, request: str, task: str | None = None, level: str | None = None,
     if task == "general" and not level and found.get("level"):
         level = found["level"]
     out = with_execution(conn, knowledge.decide(conn, task, request, level, usable))
+    # the owner's rule may give this intent to a web chat service (questions lambda: weather, a price, a calculation);
+    # the usual decision stays underneath as its fallback
+    from walter_router.serve import web
+    target = web.route_for(task, found.get("level") or level) if web_rules else None
+    if target:
+        out = {**out, "mode": "web", "web": {**target, "fallback_mode": out.get("mode")}}
     return {**out, "intent": found}

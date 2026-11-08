@@ -40,6 +40,18 @@ def _tasks(rows: list[dict], interfaces: tuple[str, ...], only: tuple[str, ...] 
                       and (not only or r["task"] in only) and r["task"] not in skip)
 
 
+def _web_quick() -> str:
+    """The intents the owner's rule gives to a web chat service (knowledge.json web_services), as task keys."""
+    from walter_router.analysis import knowledge
+    try:
+        rules = knowledge.load().get("web_services") or {}
+    except (OSError, ValueError):
+        return ""
+    tasks = dict.fromkeys(t for k, r in rules.items() if not k.startswith("_") and isinstance(r, dict)
+                          for t in (r.get("tasks") or {}))
+    return " · ".join(f"`{t}`" for t in tasks)
+
+
 def text(conn, owner: str | None = None) -> str:
     """Compact operational guidance, independent of current model names, prices and provider choices."""
     owner = owner or instance.owner()
@@ -48,6 +60,7 @@ def text(conn, owner: str | None = None) -> str:
     roles = list(conn.execute("""select distinct on (role) role, label, description from models.preferences
                                  where task in ('text_to_video', 'image_to_video') order by role, priority"""))
     roles.sort(key=lambda r: {"default": 0, "premium": 1, "action": 2, "ugc": 3, "budget": 4}.get(r["role"], 9))
+    quick = _web_quick()
     keys = lambda interfaces, only=(), skip=(): " · ".join(
         f"`{r['task']}`" for r in rows if r["interface"] in interfaces
         and (not only or r["task"] in only) and r["task"] not in skip)
@@ -67,6 +80,8 @@ def text(conn, owner: str | None = None) -> str:
         "- `walter_plans` lit les abonnements ; une modification doit être demandée par leur propriétaire.",
         "- `walter_web` converse avec un service web de chat activé par " + owner + " (`message`, `files` chemins, "
         "`model` seulement s’il le demande) ; réponse verbatim, fichiers produits en chemins. Lent ; sur sa demande.",
+        *(["Question rapide (" + quick + ") : `walter_run` avec `request` seul ; le modèle de décision la confie au "
+           "service web de chat prévu par " + owner + " (voie habituelle et avis s’il échoue)."] if quick else []),
         "`task=general` : L1 quotidien, résumé simple ; L2 analyse en plusieurs étapes ou rédaction soignée ; "
         "L3 raisonnement complexe ou fort enjeu. Les spécialités ont leur propre classement ; ne leur impose pas un niveau général.",
         "Texte : " + keys(("chat",), skip=ANALYSIS + ("general",)),

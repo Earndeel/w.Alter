@@ -15,6 +15,10 @@ from pathlib import Path
 
 from walter_router import instance
 
+# The owner's rule (knowledge.json `web_services`): which classified intents a web chat service answers, e.g.
+# {"chatgpt": {"tasks": {"weather": null, "calculation": null, "research": ["L1"]}}} — null = any level. Only a
+# service the gateway has enabled is chosen; when it fails the request takes the usual path (with a notice).
+DEFAULT_CONVERSATION = "walter-router"
 MAX_FILES = 10
 MAX_FILE_BYTES = 50 * 1024 * 1024
 KEYS = ("service", "message", "model", "files", "conversation", "request_id", "timeout_s")
@@ -77,3 +81,37 @@ def converse(spec: dict) -> dict:
             target.chmod(0o600)
             f["path"] = str(target)
     return out
+
+
+def _enabled() -> set[str]:
+    """Services the gateway has enabled (its own rule table, the owner's switch)."""
+    path = instance._walter("config", "llm", "gateway.json")
+    try:
+        services = json.loads(Path(path).read_text()).get("web_services") or {} if path else {}
+    except (OSError, ValueError):
+        return set()
+    return {k for k, v in services.items() if isinstance(v, dict) and v.get("enabled") and not k.startswith("_")}
+
+
+def route_for(task: str | None, level: str | None) -> dict | None:
+    """The web service the owner's rule gives this classified intent, or None."""
+    from walter_router.analysis import knowledge   # late import (knowledge -> select -> …)
+    try:
+        rules = knowledge.load().get("web_services") or {}
+    except (OSError, ValueError):
+        return None
+    matches = []
+    for service, rule in rules.items():
+        if service.startswith("_") or not isinstance(rule, dict):
+            continue
+        tasks = rule.get("tasks") or {}
+        if task in tasks and (tasks[task] is None or level in tasks[task]):
+            matches.append((service, rule))
+    if not matches:
+        return None
+    enabled = _enabled()
+    for service, rule in matches:
+        if service in enabled:
+            return {"service": service, "conversation": rule.get("conversation") or DEFAULT_CONVERSATION,
+                    "why": rule.get("why") or f"règle web_services.{service} ({task}, {level})"}
+    return None

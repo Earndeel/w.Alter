@@ -18,6 +18,8 @@ def view(d: dict) -> dict:
         out["media_route"] = {k: route["paid"].get(k) for k in ("provider", "offer_key", "cost", "unit", "by_resolution")}
     if d.get("ui"):
         out["ui"] = d["ui"]
+    if d.get("web"):
+        out["web"] = {k: d["web"][k] for k in ("service", "why", "fallback_mode") if d["web"].get(k)}
     if isinstance(d.get("intent"), dict):
         out["intent"] = {k: d["intent"].get(k) for k in ("task", "task_confidence", "video_role", "level",
                                                           "unrestricted", "error") if d["intent"].get(k) is not None}

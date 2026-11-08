@@ -944,6 +944,7 @@ What an agent must know about Walter Router to use it: what it is for, how to ca
 
 - `_short(text: str | None)` — First sentence of a role description, without where it runs (« Via Flow… »: the router's business).
 - `_tasks(rows: list[dict], interfaces: tuple[str, ...], only: tuple[str, ...]=(), skip: tuple[str, ...]=())` — 
+- `_web_quick()` — The intents the owner's rule gives to a web chat service (knowledge.json web_services), as task keys.
 - `text(conn, owner: str | None=None)` — Compact operational guidance, independent of current model names, prices and provider choices.
 - `document(conn, owner: str | None=None)` — 
 - `write(conn)` — Publish both representations from the same producer; keep unchanged bytes stable.
@@ -1040,7 +1041,7 @@ One-shot answers from the owner's economic text tier (L1, read from the router �
 Ordered providers of the selected model, media provider routes, service poste ids and the free-text entry.
 
 - `with_execution(conn, out: dict)` — Add the selected model's ordered providers; availability never authorises another model.
-- `route(conn, request: str, task: str | None=None, level: str | None=None, context: str | None=None)` — Free-text request -> intent by the decision model (task, video role, level, unrestricted) -> decision + routes.
+- `route(conn, request: str, task: str | None=None, level: str | None=None, context: str | None=None, web_rules: bool=True)` — Free-text request -> intent by the decision model (task, video role, level, unrestricted) -> decision + routes.
 
 ## serve/run.py
 
@@ -1053,7 +1054,9 @@ Do the job on the chosen model — one entry for every runtime (Hermes plugin, w
 - `_events(goal: str, context: str, result: dict, model: str | None, pack: dict | None=None)` — The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write).
 - `decide(conn, spec: dict)` — 
 - `_text(conn, d: dict, spec: dict)` — The router alone owns failover. Preserve the conversation across providers of this model.
+- `_web(conn, d: dict, spec: dict)` — The owner's rule gave this intent to a web chat service: the user's own words go there (the request, else the
 - `_run(conn, spec: dict)` — 
+- `_dispatch(conn, d: dict, spec: dict)` — 
 - `run(conn, spec: dict)` — Versioned result; existing fields remain compatible with every current adapter.
 
 ## serve/text_agent.py
@@ -1072,6 +1075,8 @@ Conversational web services as a Router tool (walter_web): a message, optional f
 
 - `out_dir()` — Same place as the router's generated media (the agents already look there).
 - `converse(spec: dict)` — 
+- `_enabled()` — Services the gateway has enabled (its own rule table, the owner's switch).
+- `route_for(task: str | None, level: str | None)` — The web service the owner's rule gives this classified intent, or None.
 
 ## store/__init__.py
 

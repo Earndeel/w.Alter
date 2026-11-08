@@ -182,6 +182,14 @@ call` pour le texte) ; les fichiers produits reviennent en chemins locaux 0600 s
 (jamais de base64 dans le contexte d'un agent). Réponse = ce que le service affiche à la fin du tour (un message
 d'étape d'un tour avec outil, replié ensuite, n'en fait pas partie).
 
+Choix par le modèle de décision (2026-11-08) : la règle du propriétaire (`knowledge.json` → `web_services`, par
+service : tâches classées et niveaux, `null` = tout niveau) confie certaines intentions à un service web de chat activé.
+`walter_route` / `walter_run` sans tâche classent la demande comme d'habitude ; si (tâche, niveau) correspond, la
+décision porte `mode: "web"` (`web.service`, `web.fallback_mode`) et `walter_run` envoie les mots de la demande
+(`request`, sinon `goal`) dans la conversation `walter-router` du service : réponse verbatim, `kind: "web"`,
+`routed.provider = web:<service>`. Échec du service → voie habituelle de l'intention, avec un avis `web_fallback` à
+transmettre. Sans règle, rien ne change.
+
 ## Route d’abonnement Google AI Pro
 
 La route `antigravity` sert les modèles de l’abonnement Google AI Pro (Gemini 3.8 Flash, Claude Sonnet/Opus 4.6,
