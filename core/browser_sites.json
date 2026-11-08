@@ -154,6 +154,28 @@
         ],
         "settle_s": 5
       }
+    },
+    "chatgpt": {
+      "domains": [
+        "chatgpt.com",
+        "openai.com",
+        "auth.openai.com"
+      ],
+      "required_cookies": [],
+      "check": {
+        "url": "https://chatgpt.com/",
+        "signed_out_url": [
+          "/auth/login",
+          "auth.openai.com"
+        ],
+        "signed_out_text": [
+          "Log in",
+          "Se connecter",
+          "Sign up for free",
+          "Inscrivez-vous gratuitement"
+        ],
+        "settle_s": 6
+      }
     }
   }
 }
