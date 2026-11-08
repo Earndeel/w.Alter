@@ -28,7 +28,7 @@
   "interfaces": [
     "CLI",
     "walter-llm task routes",
-    "MCP walter_route / walter_run / walter_decide / walter_plans",
+    "MCP walter_route / walter_run / walter_decide / walter_plans / walter_web",
     "agents' brief (`walter-router brief`, @instance/state/router/brief.md)",
     "CLI walter-router schema (public tool contract v1)",
     "CLI walter-router docs --write/--check [--offline]",
@@ -113,6 +113,14 @@
         "access": "write",
         "timeout_seconds": 60,
         "timeout_status": "implemented"
+      },
+      {
+        "id": "web",
+        "transport": "mcp",
+        "interface": "walter_web",
+        "access": "write",
+        "timeout_seconds": 780,
+        "timeout_status": "implemented"
       }
     ],
     "resources": [
@@ -175,7 +183,8 @@
       "walter_route",
       "walter_run",
       "walter_decide",
-      "walter_plans"
+      "walter_plans",
+      "walter_web"
     ],
     "index": {
       "command": [

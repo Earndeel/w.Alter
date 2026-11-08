@@ -65,6 +65,8 @@ def text(conn, owner: str | None = None) -> str:
         "- `walter_decide` traite un choix court ou répété : `question`, `options` (au moins deux noms → sens), "
         "`context`. Pour une analyse longue, utilise une tâche texte.",
         "- `walter_plans` lit les abonnements ; une modification doit être demandée par leur propriétaire.",
+        "- `walter_web` converse avec un service web de chat activé par " + owner + " (`message`, `files` chemins, "
+        "`model` seulement s’il le demande) ; réponse verbatim, fichiers produits en chemins. Lent ; sur sa demande.",
         "`task=general` : L1 quotidien, résumé simple ; L2 analyse en plusieurs étapes ou rédaction soignée ; "
         "L3 raisonnement complexe ou fort enjeu. Les spécialités ont leur propre classement ; ne leur impose pas un niveau général.",
         "Texte : " + keys(("chat",), skip=ANALYSIS + ("general",)),

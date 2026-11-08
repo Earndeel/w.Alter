@@ -101,3 +101,49 @@ def test_bad_attachment_is_refused_before_browse(tmp_path):
     ns, _ = _ns(tmp_path, SERVICES, calls, logs)
     code, out = ns["web_converse"]("hermes", {"service": "fixture", "message": "x", "files": [{"name": "a", "data": "@@"}]})
     assert code == 400 and calls == []
+
+
+def test_default_service_is_the_only_enabled_one(tmp_path):
+    calls, logs = [], []
+    ns, _ = _ns(tmp_path, SERVICES, calls, logs)
+    code, out = ns["web_converse"]("router", {"message": "bonjour"})
+    assert code == 200 and out["service"] == "fixture" and calls[0][0] == "127.0.0.1:1"
+    two = {**SERVICES, "other": {"enabled": True, "host": "x"}}
+    ns, _ = _ns(tmp_path, two, calls, logs)
+    code, out = ns["web_converse"]("router", {"message": "bonjour"})
+    assert code == 400 and out["error"] == "service required" and sorted(out["services"]) == ["fixture", "other"]
+
+
+def test_router_tool_sends_local_files_and_returns_local_paths(tmp_path, monkeypatch):
+    """walter_web (walter-router web): paths in, base64 only between router and gateway, paths out (0600)."""
+    import base64
+    import subprocess
+    from walter_router.serve import web
+    sent = {}
+
+    def fake_run(cmd, input, **kw):
+        assert cmd == ["walter-llm", "web"]
+        sent.update(json.loads(input))
+        out = {"ok": True, "reply": "ok", "service": "chatgpt", "request_id": "r1",
+               "files": [{"kind": "image", "name": "../image 1.png", "mime": "image/png", "bytes": 4,
+                          "data": base64.b64encode(b"\x89PNG").decode()}]}
+        return subprocess.CompletedProcess(cmd, 0, json.dumps(out), "")
+    monkeypatch.setattr(web.subprocess, "run", fake_run)
+    monkeypatch.setattr(web, "out_dir", lambda: tmp_path / "out")
+    doc = tmp_path / "note.txt"
+    doc.write_text("ORANGE-42")
+    out = web.converse({"message": "lis", "files": [str(doc)], "model": "high", "conversation": "c1"})
+    assert sent["files"] == [{"name": "note.txt", "data": base64.b64encode(b"ORANGE-42").decode()}]
+    assert sent["model"] == "high" and sent["conversation"] == "c1" and "service" not in sent
+    path = Path(out["files"][0]["path"])
+    assert path.read_bytes() == b"\x89PNG" and path.parent.parent == tmp_path / "out" and path.name == "image 1.png"
+    assert oct(path.stat().st_mode & 0o777) == "0o600" and "data" not in out["files"][0]
+
+
+def test_router_tool_refuses_bad_input_before_the_gateway(tmp_path, monkeypatch):
+    from walter_router.serve import web
+    monkeypatch.setattr(web.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("called")))
+    assert web.converse({"message": ""})["error"] == "message required"
+    assert "file not found" in web.converse({"message": "x", "files": [str(tmp_path / "absent")]})["error"]
+    assert "unknown fields" in web.converse({"message": "x", "provider": "y"})["error"]
+    assert "at most 10" in web.converse({"message": "x", "files": ["a"] * 11})["error"]

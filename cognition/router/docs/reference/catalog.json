@@ -282,6 +282,65 @@
         "name": "walter_decide"
       },
       {
+        "description": "Converser avec un service web de chat activé par le propriétaire (navigateur, sans LLM de Walter) : message, fichiers joints et modèle facultatifs ; réponse verbatim, fichiers produits (images, documents) rendus en chemins locaux. Lent (secondes à minutes) ; seulement quand l'utilisateur demande ce service ou ce qu'il fait seul.",
+        "inputSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "conversation": {
+              "default": "default",
+              "description": "Nom de la conversation suivie ; même nom = même fil chez le service.",
+              "type": "string"
+            },
+            "files": {
+              "default": null,
+              "description": "Chemins locaux de fichiers joints (10 au plus, 50 Mo chacun).",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "message": {
+              "default": null,
+              "description": "Message envoyé tel quel au service (1 à 20 000 caractères) ; la réponse revient telle quelle.",
+              "type": "string"
+            },
+            "model": {
+              "default": "",
+              "description": "Seulement si l'utilisateur le demande : modèle et/ou niveau de réflexion du service, en mots de son interface. Omis = le modèle déjà choisi dans le service, rien n'est changé.",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "description": "Identifiant idempotent : une relance rend la réponse déjà obtenue, jamais un second envoi.",
+              "type": "string"
+            },
+            "service": {
+              "default": "",
+              "description": "Service web conversationnel activé par le propriétaire (table web_services) ; omis = le seul activé.",
+              "type": "string"
+            },
+            "timeout_s": {
+              "default": 0,
+              "description": "Délai maximal d'attente de la réponse, en secondes.",
+              "type": "integer",
+              "x-effective-default": "table web_services (300 pour chatgpt)",
+              "x-effective-range": [
+                1,
+                600
+              ]
+            }
+          },
+          "required": [
+            "message"
+          ],
+          "type": "object"
+        },
+        "name": "walter_web"
+      },
+      {
         "description": "Lire les abonnements, ou enregistrer une modification demandée par leur propriétaire.",
         "inputSchema": {
           "additionalProperties": false,
@@ -2581,6 +2640,31 @@
               "--role"
             ],
             "help": "with a short number covering several roles: only this one",
+            "nargs": null,
+            "required": false
+          }
+        ],
+        "web": [
+          {
+            "choices": null,
+            "default": "==SUPPRESS==",
+            "dest": "help",
+            "flags": [
+              "-h",
+              "--help"
+            ],
+            "help": "show this help message and exit",
+            "nargs": 0,
+            "required": false
+          },
+          {
+            "choices": null,
+            "default": null,
+            "dest": "message",
+            "flags": [
+              "--message"
+            ],
+            "help": "instead of a JSON spec: just this message, default service, default model",
             "nargs": null,
             "required": false
           }
@@ -6432,7 +6516,7 @@
         ]
       },
       {
-        "description": "walter-router CLI: migrate | refresh | pick | prefer | alerts | verdict | status.",
+        "description": "walter-router CLI: migrate | refresh | pick | prefer | alerts | verdict | status | route | run | web …",
         "file": "cli.py",
         "functions": [
           {
@@ -6869,14 +6953,24 @@
             "signature": "text: str, size: int=4000"
           },
           {
-            "description": "One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message).",
+            "description": "`[GPT-6 high] question` → (\"GPT-6 high\", \"question\"); without brackets the service keeps its own model.",
+            "name": "_split_model",
+            "signature": "text: str"
+          },
+          {
+            "description": "One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message,",
             "name": "web_exchange",
-            "signature": "service: str, text: str, chat_id: Any, message_id: Any, sent_at: float | None, reply: Any"
+            "signature": "service: str, text: str, chat_id: Any, message_id: Any, sent_at: float | None, reply: Any, *, model: str | None=None, files: list[tuple[str, bytes]] | None=None, send_file: Any=None"
           },
           {
             "description": "Owner-only Telegram commands of the web services. Group -1 + ApplicationHandlerStop: the message never",
             "name": "_wire_web_commands",
             "signature": "application: Any, adapter: Any"
+          },
+          {
+            "description": "POST /v1/web/converse through the router's own CLI (`walter-router web`); its JSON even on failure.",
+            "name": "_handle_web",
+            "signature": "args: Mapping[str, Any], **_: Any"
           },
           {
             "description": "",
@@ -8946,6 +9040,22 @@
             "description": "call(messages, tools, seconds_remaining) handles provider attempts, never tool execution.",
             "name": "run",
             "signature": "goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call, gateway: 'Gateway | None'=None"
+          }
+        ]
+      },
+      {
+        "description": "Conversational web services as a Router tool (walter_web): a message, optional files and model, the reply verbatim.",
+        "file": "serve/web.py",
+        "functions": [
+          {
+            "description": "Same place as the router's generated media (the agents already look there).",
+            "name": "out_dir",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "converse",
+            "signature": "spec: dict"
           }
         ]
       },
@@ -14573,6 +14683,54 @@
         "value": "Walter Router dans Hermes : pour générer une image, une vidéo, une musique ou une voix, appelle walter_run avec la demande mot pour mot (via tool_call si l'outil est différé). Ses favoris et objectifs priment sur tout skill propre à un modèle ; un skill sert ensuite à exécuter le modèle choisi. Quand l'utilisateur répond « adopter N » ou « ignorer N » à une alerte Walter Router, appelle walter_verdict ; quand il juge le résultat d'un modèle (« nul », « parfait »…), walter_feedback ; quand il parle d'un changement d'abonnement IA (nouveau forfait, prix, fin d'offre, résiliation), walter_plans."
       },
       {
+        "comment": "",
+        "file": "hermes-plugins/walter-router/__init__.py",
+        "name": "WEB_SCHEMA",
+        "value": {
+          "description": "Talk to a web chat service the owner enabled (Walter Router rule, his browser session, no Walter LLM): the message goes as is, the reply comes back verbatim. service omitted = the only enabled one. model ONLY when the owner asks (words of the service's own picker: a model name and/or a reasoning level); omitted = the model already selected there, nothing is changed. files = local paths attached; produced images/files come back as local paths in files[].path (send them with MEDIA:<path>). Slow (seconds to minutes): only when he asks for that service or what it alone does.",
+          "name": "walter_web",
+          "parameters": {
+            "properties": {
+              "conversation": {
+                "description": "named thread kept across calls (default: default)",
+                "type": "string"
+              },
+              "files": {
+                "description": "local paths, max 10, 50 MB each",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "message": {
+                "type": "string"
+              },
+              "model": {
+                "description": "only if the owner names one",
+                "type": "string"
+              },
+              "request_id": {
+                "description": "idempotent: a retry returns the same answer",
+                "type": "string"
+              },
+              "service": {
+                "description": "omit = the only enabled service",
+                "type": "string"
+              },
+              "timeout_s": {
+                "maximum": 600,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      {
         "comment": "only when no instance answers",
         "file": "instance.py",
         "name": "NEUTRAL_OWNER",
@@ -16674,6 +16832,26 @@
           "music",
           "audio"
         ]
+      },
+      {
+        "comment": "",
+        "file": "serve/web.py",
+        "name": "MAX_FILES",
+        "value": 10
+      },
+      {
+        "comment": "",
+        "file": "serve/web.py",
+        "name": "KEYS",
+        "value": [
+          "service",
+          "message",
+          "model",
+          "files",
+          "conversation",
+          "request_id",
+          "timeout_s"
+        ]
       }
     ],
     "environment": [
@@ -16923,8 +17101,8 @@
     ]
   },
   "note": {
-    "chars": 3541,
-    "content": "## Walter Router — choisir et exécuter un modèle pour une sous-tâche\nTu définis le travail, ses contraintes et le contexte ; le routeur choisit modèle et fournisseur selon les benchmarks, les coûts, les abonnements et les préférences de l’utilisateur. Tu contrôles le résultat et l’intègres.\nUtilise-le lorsqu’une spécialité ou une sous-tâche distincte justifie le coût et la latence du transfert. Les faits et contraintes indispensables doivent accompagner chaque appel.\n- `walter_run` exécute. Donne `request`, `task`, `goal` complet pour le texte, `context` utile. L’exécuteur ne voit pas cette conversation. Appelle-le directement si le besoin est clair.\n- `walter_route` examine le choix, les routes et les prix sans exécuter ; utile pour vérifier ou planifier, pas un préalable obligatoire à `walter_run`. Sans `task`, le routeur classe la demande ; `conversation` explique un lien avec les échanges précédents.\n- `walter_decide` traite un choix court ou répété : `question`, `options` (au moins deux noms → sens), `context`. Pour une analyse longue, utilise une tâche texte.\n- `walter_plans` lit les abonnements ; une modification doit être demandée par leur propriétaire.\n`task=general` : L1 quotidien, résumé simple ; L2 analyse en plusieurs étapes ou rédaction soignée ; L3 raisonnement complexe ou fort enjeu. Les spécialités ont leur propre classement ; ne leur impose pas un niveau général.\nTexte : `3d` · `coding` · `cybersecurity` · `dataviz` · `engineering` · `finance` · `frontend` · `fullstack` · `gamedev` · `legal` · `medical` · `mobile_app` · `science` · `strategy` · `svg` · `ui_component` · `writing`\nAnalyse : `document` · `long_context` · `vision`\nImages : `graphic_design` · `image_edit` · `logo` · `text_to_image`\nVidéo : `image_to_video` · `text_to_video` · `video_edit`\nAudio : `music` · `speech_to_speech` · `tts`\nObjectif vidéo `role` : `default` · `premium` · `action` · `ugc` · `budget`\nContraintes `require` : `open_weights` poids ouverts ; `unrestricted` politique de contenu compatible ; `video_input` route capable de lire une vidéo (`task=vision`). Fournis les sources ; la sélection seule n’attache aucun média.\nSi l’utilisateur nomme un modèle, transmets `model` (éventuellement /variante) et `provider` s’il l’impose ; aucun substitut. Les favoris ne changent pas sans sa décision.\nPour le texte, limite `toolsets`, `max_turns`, `budget_seconds` au besoin. Outils natifs : terminal/code et fichiers ; autres capacités via leurs commandes si terminal autorisé. Les outils agissent sur l’hôte du routeur, avec ses droits ; les permissions d’un harness distant ne sont pas héritées automatiquement.\nNe transmets pas de secrets ou de données local_only à un modèle cloud ; le harness contrôle les classes d’accès.\nGénération média payante : uniquement sur demande de l’utilisateur ; `image_urls`, `role`, `aspect_ratio`, `duration`, `resolution` selon le média. `paid_fallback` autorise une voie payante prévue manuelle.\nTexte : fournisseur en échec → fournisseur suivant du même modèle, historique conservé. Tous échouent → échec explicite. Une restriction de fournisseur nommé reste stricte.\nLis `ok`, `routed`, `attempts`, `tools` et les erreurs. Si `user_notification_required`, transmets `user_notice` à l’utilisateur, même en cas d’échec. N’annonce jamais un succès sur la seule sélection.\nExemple texte : {\"request\":\"Corriger ce bug\",\"task\":\"coding\",\"goal\":\"…\",\"context\":\"…\"}. Transcription, embeddings, rerank et postes internes sont servis aux modules ; ne les propose pas comme tâches usuelles.",
+    "chars": 3755,
+    "content": "## Walter Router — choisir et exécuter un modèle pour une sous-tâche\nTu définis le travail, ses contraintes et le contexte ; le routeur choisit modèle et fournisseur selon les benchmarks, les coûts, les abonnements et les préférences de l’utilisateur. Tu contrôles le résultat et l’intègres.\nUtilise-le lorsqu’une spécialité ou une sous-tâche distincte justifie le coût et la latence du transfert. Les faits et contraintes indispensables doivent accompagner chaque appel.\n- `walter_run` exécute. Donne `request`, `task`, `goal` complet pour le texte, `context` utile. L’exécuteur ne voit pas cette conversation. Appelle-le directement si le besoin est clair.\n- `walter_route` examine le choix, les routes et les prix sans exécuter ; utile pour vérifier ou planifier, pas un préalable obligatoire à `walter_run`. Sans `task`, le routeur classe la demande ; `conversation` explique un lien avec les échanges précédents.\n- `walter_decide` traite un choix court ou répété : `question`, `options` (au moins deux noms → sens), `context`. Pour une analyse longue, utilise une tâche texte.\n- `walter_plans` lit les abonnements ; une modification doit être demandée par leur propriétaire.\n- `walter_web` converse avec un service web de chat activé par l’utilisateur (`message`, `files` chemins, `model` seulement s’il le demande) ; réponse verbatim, fichiers produits en chemins. Lent ; sur sa demande.\n`task=general` : L1 quotidien, résumé simple ; L2 analyse en plusieurs étapes ou rédaction soignée ; L3 raisonnement complexe ou fort enjeu. Les spécialités ont leur propre classement ; ne leur impose pas un niveau général.\nTexte : `3d` · `coding` · `cybersecurity` · `dataviz` · `engineering` · `finance` · `frontend` · `fullstack` · `gamedev` · `legal` · `medical` · `mobile_app` · `science` · `strategy` · `svg` · `ui_component` · `writing`\nAnalyse : `document` · `long_context` · `vision`\nImages : `graphic_design` · `image_edit` · `logo` · `text_to_image`\nVidéo : `image_to_video` · `text_to_video` · `video_edit`\nAudio : `music` · `speech_to_speech` · `tts`\nObjectif vidéo `role` : `default` · `premium` · `action` · `ugc` · `budget`\nContraintes `require` : `open_weights` poids ouverts ; `unrestricted` politique de contenu compatible ; `video_input` route capable de lire une vidéo (`task=vision`). Fournis les sources ; la sélection seule n’attache aucun média.\nSi l’utilisateur nomme un modèle, transmets `model` (éventuellement /variante) et `provider` s’il l’impose ; aucun substitut. Les favoris ne changent pas sans sa décision.\nPour le texte, limite `toolsets`, `max_turns`, `budget_seconds` au besoin. Outils natifs : terminal/code et fichiers ; autres capacités via leurs commandes si terminal autorisé. Les outils agissent sur l’hôte du routeur, avec ses droits ; les permissions d’un harness distant ne sont pas héritées automatiquement.\nNe transmets pas de secrets ou de données local_only à un modèle cloud ; le harness contrôle les classes d’accès.\nGénération média payante : uniquement sur demande de l’utilisateur ; `image_urls`, `role`, `aspect_ratio`, `duration`, `resolution` selon le média. `paid_fallback` autorise une voie payante prévue manuelle.\nTexte : fournisseur en échec → fournisseur suivant du même modèle, historique conservé. Tous échouent → échec explicite. Une restriction de fournisseur nommé reste stricte.\nLis `ok`, `routed`, `attempts`, `tools` et les erreurs. Si `user_notification_required`, transmets `user_notice` à l’utilisateur, même en cas d’échec. N’annonce jamais un succès sur la seule sélection.\nExemple texte : {\"request\":\"Corriger ce bug\",\"task\":\"coding\",\"goal\":\"…\",\"context\":\"…\"}. Transcription, embeddings, rerank et postes internes sont servis aux modules ; ne les propose pas comme tâches usuelles.",
     "format": "text/markdown",
     "id": "walter-router.usage",
     "module": "router",
@@ -16938,7 +17116,7 @@
       "walter_plans"
     ],
     "schema_version": 1,
-    "sha256": "1ef0c1e68c657c33ba723998d19bd1fb0ed435e6387cf90828c4c8256614303c",
+    "sha256": "616a72b9956e66efbc8b5b01c566f0df110267ff2b7dc4de60a7ffc13b500482",
     "source": {
       "args": [
         "brief",
@@ -16991,7 +17169,7 @@
     "bin/walter-router-control": "3373221954bd9c6b4a6092a3be30d9c0a616fa34dbc4b5f034fa68b5b6493932",
     "bin/walter-router-cycle": "e308e52f2992c9bb02599595b11b52a9dab1350d602ffbc31be44691496fec3e",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "6786e04346d73fbefd9e7cafc9ddc724759223f1a313e242a4f6f46620c574f0",
+    "cli.py": "1b946cb148668622bec74503fe8967606e1a2649f878fd71feeea0bf4bc5f57a",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
@@ -17002,7 +17180,7 @@
     "config/subscriptions.json": "d2e56aa07e15344a1986746b1f8608842873639f5d37788e37e9896d6ba67017",
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "b8f0e3ee29e57454855286b6b80b182d5bf17c1c59f7dfc216cc9bcef631cd54",
-    "contracts/router.json": "ea6c3de46c6b48ddc120dcef459dd834802baf7a0190931b1e7851fa2386fdcb",
+    "contracts/router.json": "20bb4dd96ed8577fdaf13a8925c4209a05ef10f4e3ebd576c2e6af7cb01754c6",
     "documentation.py": "63a31ddfb49c254a4457c58745158567bdf57995d492eb1acf3c8968deac01f4",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
@@ -17011,7 +17189,7 @@
     "guardian/run.py": "3093f8e6b65fca4b8906a57617c02d07fd5db1e67d44339d7575ebee3e343932",
     "health.py": "ba5e621b77cc19022ef7b0bcc0822abb8b87360cad74dadbdf3389ce3d0f0f3c",
     "hermes-plugins/kie-compat/__init__.py": "aba770c340305899abfca6172a3774b0e56b400328e6f0f3350ab79a688daace",
-    "hermes-plugins/walter-router/__init__.py": "b8ca7b7886e830ff5ee8ce7c029625fd8ba49bd1786ad47699958aa64205d1f1",
+    "hermes-plugins/walter-router/__init__.py": "b27d39ca479bb27d6639a6bff8779f33cd419e1f9480ca34e85cecd90478c8db",
     "instance.py": "9de10d051b0cc3ec3d49c7554fa4aff3e72eaf8b25775b5dd439406035a7fa6b",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
     "interface/library.py": "649216011e2545152c4a2c7387a335fcd5a7c59bf49748283c98de725055a570",
@@ -17023,9 +17201,9 @@
     "interface/translate.py": "a1796785414cd3fac4908088dab4a23780bf67976bd5ce0677b0a3469ddd4171",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
-    "llm/config/gateway.json": "b43a8ac76b84bfb81d1e1eef68acc9bfa33a9a126207f779ba7c74d291abce25",
+    "llm/config/gateway.json": "b819d655a4314f3d91482b41ad73b3685983992c187284761edbc871c05ec835",
     "llm/contracts/llm.json": "17a51a635cfd54e506593c5be38b0aaa2a847f9646ee56f77e075df79dcd589d",
-    "llm/gateway.py": "36251f4df351597a81e7b4e1ddd46f2f2f937f4d30001a343cce3f2284c27c8f",
+    "llm/gateway.py": "0aea9510d918cf22bc17a0d21bbdbb9e43867c67dfa0abebc8c54bd3f3fbf1ad",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",
@@ -17072,8 +17250,8 @@
     "research/web.py": "71e3bf9073480552ab10f369cc69ca3f0e462027b2bf0829a7c02e13353276ca",
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
     "serve/agent_view.py": "144454b28cfc6ba0cf8678aa072a38f9c0fe857eab59cd66fbd676414a461367",
-    "serve/api.py": "9b04510dd95c3ffa62de95158326f921ca07ac2785cc4a04a8870324938ed1af",
-    "serve/brief.py": "33ca79121e190834adabe6fbc573b408ef84d4cf29a93736cf4f8de48275c3ab",
+    "serve/api.py": "cd6428abc4ff933e6fda69cfd1259e538d5bda2ea88d9b4140f01d1bc002b9e5",
+    "serve/brief.py": "92c05ba73723f80ef9bc29a271be03764d4f176cd45f7401f17607df71fb527b",
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
     "serve/execution.py": "cd2f898bcdd9120ebd1e3c4a1977cf7ed0aa7593373187c7914638887439f6a5",
     "serve/hermes_sync.py": "1dc99d9f119e45cc958e5954fac64ba29802505d04ccd2ef096c3aba3db633cc",
@@ -17084,6 +17262,7 @@
     "serve/routes.py": "492e8e75f102e42856bcd66f612dfe7b30cc21c14c8776aeb352d9d2e7e420fb",
     "serve/run.py": "01f870b43d752fac173728d2a8a78e02d00294f22cc07f96f7b387d21b733d4f",
     "serve/text_agent.py": "4e910f3619c717895c9970d78178766d8b7c6f3c56a1c8313374a50d93e9a705",
+    "serve/web.py": "9a36fb81f594dc59f80a13535cde7ffb9c9abaed36ad1a3760a01492443cb428",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
     "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",
     "store/migrations/001_models.sql": "dfdcb4be9930086cbdc935eb7cffe07f6705cb1562169c162f74f7b2205dcc37",

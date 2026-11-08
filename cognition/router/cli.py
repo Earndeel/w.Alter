@@ -1,4 +1,4 @@
-"""walter-router CLI: migrate | refresh | pick | prefer | alerts | verdict | status."""
+"""walter-router CLI: migrate | refresh | pick | prefer | alerts | verdict | status | route | run | web …"""
 from __future__ import annotations
 
 import argparse
@@ -184,6 +184,10 @@ def build_parser() -> argparse.ArgumentParser:
     bf.add_argument("--json", action="store_true", help="versioned stable note for walter-context and harnesses")
     bf.add_argument("--write", action="store_true", help="write it to the instance's state/router/brief.md and "
                                                         "re-render the agent profiles (walter-soul) when it changed")
+    wb = sub.add_parser("web", help="conversational web service (walter_web): JSON spec on stdin (service, message, "
+                                    "model, files = local paths, conversation, request_id, timeout_s) -> JSON reply, "
+                                    "produced files as local paths")
+    wb.add_argument("--message", help="instead of a JSON spec: just this message, default service, default model")
     sub.add_parser("instance-env", help="shell assignments of the instance bindings used by the cycle and the trigger")
     sub.add_parser("schema", help="versioned public tool parameter reference (JSON, no model call)")
     doc = sub.add_parser("docs", help="generate or check reference documentation against source and the models schema")
@@ -230,6 +234,11 @@ def main(argv: list[str] | None = None) -> int:
         return research_run.main(args)
     if args.cmd == "instance-env":
         return _instance_env()
+    if args.cmd == "web":
+        from walter_router.serve import web
+        out = web.converse({"message": args.message} if args.message else json.load(sys.stdin))
+        print(json.dumps(out, ensure_ascii=False, indent=1))
+        return 0 if out.get("ok") else 1
     if args.cmd == "brief":
         from walter_router.serve import brief
         with db.connect() as conn:

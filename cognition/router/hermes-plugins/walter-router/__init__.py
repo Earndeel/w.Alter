@@ -498,6 +498,39 @@ def _wire_web_commands(application: Any, adapter: Any) -> None:
     application.add_handler(MessageHandler((filters.PHOTO | filters.Document.ALL) & filters.CaptionRegex(caption),
                                            _on_command), group=-1)
 
+WEB_SCHEMA = {
+    "name": "walter_web",
+    "description": ("Talk to a web chat service the owner enabled (Walter Router rule, his browser session, no Walter "
+                    "LLM): the message goes as is, the reply comes back verbatim. service omitted = the only enabled "
+                    "one. model ONLY when the owner asks (words of the service's own picker: a model name and/or a "
+                    "reasoning level); omitted = the model already selected there, nothing is changed. files = local "
+                    "paths attached; produced images/files come back as local paths in files[].path (send them with "
+                    "MEDIA:<path>). Slow (seconds to minutes): only when he asks for that service or what it alone does."),
+    "parameters": {"type": "object", "properties": {
+        "message": {"type": "string"},
+        "service": {"type": "string", "description": "omit = the only enabled service"},
+        "model": {"type": "string", "description": "only if the owner names one"},
+        "files": {"type": "array", "items": {"type": "string"}, "description": "local paths, max 10, 50 MB each"},
+        "conversation": {"type": "string", "description": "named thread kept across calls (default: default)"},
+        "request_id": {"type": "string", "description": "idempotent: a retry returns the same answer"},
+        "timeout_s": {"type": "integer", "minimum": 1, "maximum": 600}},
+        "required": ["message"]},
+}
+
+
+async def _handle_web(args: Mapping[str, Any], **_: Any) -> str:
+    """POST /v1/web/converse through the router's own CLI (`walter-router web`); its JSON even on failure."""
+    spec = {k: args[k] for k in ("message", "service", "model", "files", "conversation", "request_id", "timeout_s")
+            if args.get(k) not in (None, "", [], 0)}
+    try:
+        proc = await asyncio.create_subprocess_exec(CLI, "web", stdin=asyncio.subprocess.PIPE,
+                                                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        out, err = await asyncio.wait_for(proc.communicate(json.dumps(spec).encode()),
+                                          timeout=min(int(spec.get("timeout_s") or 300), 600) + 180)
+        return json.dumps(json.loads(out), ensure_ascii=False, default=str)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": f"walter_web: {type(exc).__name__}: {exc}"[:400]}, ensure_ascii=False)
+
 
 def register(ctx: Any) -> None:
     if callable(getattr(ctx, "register_system_prompt_section", None)) and os.environ.get(CHILD_ENV) != "1":
@@ -517,7 +550,8 @@ def register(ctx: Any) -> None:
         return
     for schema, handler, emoji in ((ROUTE_SCHEMA, _handle_route, "🧭"), (RUN_SCHEMA, _handle_run, "🚦"),
                                    (DECIDE_SCHEMA, _handle_decide, "🎯"), (PLANS_SCHEMA, _handle_plans, "💳"),
-                                   (VERDICT_SCHEMA, _handle_verdict, "✅"), (FEEDBACK_SCHEMA, _handle_feedback, "⭐")):
+                                   (VERDICT_SCHEMA, _handle_verdict, "✅"), (FEEDBACK_SCHEMA, _handle_feedback, "⭐"),
+                                   (WEB_SCHEMA, _handle_web, "💬")):
         kwargs = {"name": schema["name"], "toolset": "walter-router", "schema": schema, "handler": handler,
                   "check_fn": _available, "is_async": True, "emoji": emoji}
         try:

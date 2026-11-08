@@ -15,6 +15,7 @@ the instance's log (config gateway.json) and to Walter Router's models.exec_log,
 A route that fails before its first token falls through to the next one.
 
 Run:   gateway.py serve                 (127.0.0.1:8894)
+       gateway.py web  < JSON           POST /v1/web/converse in process (local callers: walter-router web)
        gateway.py add-agent NAME FILE   new token for NAME, written into a dsh credentials YAML or env:FILE[:VAR] (never printed)
 """
 from __future__ import annotations
@@ -810,6 +811,11 @@ def _browse_converse():
 def web_converse(agent: str, body: dict) -> tuple[int, dict]:
     t0 = time.perf_counter()
     service = str(body.get("service") or "").strip()
+    if not service:     # no service named: the only enabled one, else the caller must choose
+        enabled = [k for k, v in web_services().items() if v.get("enabled")]
+        if len(enabled) != 1:
+            return 400, {"ok": False, "error": "service required", "services": enabled}
+        service = enabled[0]
     rule = web_services().get(service)
     if rule is None:
         return 404, {"ok": False, "error": "unknown_service", "services": sorted(web_services())}
@@ -1163,6 +1169,17 @@ if __name__ == "__main__":
                 answer = {"ok": False, "error": type(exc).__name__}
         print(json.dumps(answer))
         sys.exit(0 if answer.get("ok") else 1)
+    elif cmd == "web":   # the same exchange as POST /v1/web/converse, for local callers (walter-router web)
+        from contextlib import redirect_stdout
+        spec = json.load(sys.stdin)
+        with redirect_stdout(sys.stderr):
+            try:
+                code, answer = web_converse(str(spec.pop("agent", None) or "router"), spec)
+            except Exception as exc:
+                code, answer = 500, {"ok": False, "error": type(exc).__name__}
+        answer.setdefault("http_status", code)
+        print(json.dumps(answer))
+        sys.exit(0 if answer.get("ok") else 1)
     elif cmd == "add-agent":
         add_agent(sys.argv[2], sys.argv[3])
     elif cmd == "test-budget":   # status | approve EUR [note…] (only at the owner's explicit request)
@@ -1174,5 +1191,5 @@ if __name__ == "__main__":
         import uvicorn
         uvicorn.run(build_app(), host="127.0.0.1", port=int(os.environ.get("WALTER_LLM_PORT", "8894")), log_level="warning")
     else:
-        print("Usage: walter-llm serve | call | add-agent NAME FILE | test-budget [approve EUR [note]]", file=sys.stderr)
+        print("Usage: walter-llm serve | call | web | add-agent NAME FILE | test-budget [approve EUR [note]]", file=sys.stderr)
         sys.exit(2)

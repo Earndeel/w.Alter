@@ -17,6 +17,7 @@ La note d'usage du routeur est dans la couche stable du prompt (`walter-router b
 | `walter_route` | Examiner un choix, ses routes et ses prix sans rien exécuter |
 | `walter_decide` | Choix court ou répété parmi des options nommées |
 | `walter_plans` | Lire les abonnements ; enregistrer un changement que {{owner.address}} annonce |
+| `walter_web` | Converser avec un service web de chat activé par {{owner.address}} : message, fichiers joints, modèle facultatif ; réponse verbatim, fichiers produits en chemins |
 
 L'index (`module_index('router')`) liste les tâches disponibles (clé, libellé, interface). Guide complet :
 `docs/USAGE.md` ; parcours de la documentation : `docs/README.md`.
@@ -39,6 +40,7 @@ L'index (`module_index('router')`) liste les tâches disponibles (clé, libellé
 |---|---|---|
 | Exécuter / examiner / décider | `walter_run`, `walter_route`, `walter_decide` | `walter-router run|route|decide` |
 | Abonnements | `walter_plans` | `walter-router plans` |
+| Service web de chat | `walter_web` | `walter-router web` |
 | Tâches | `module_index('router')` | `walter-router tasks` |
 | Santé | `walter_health` | `walter-router health` |
 | Maintenance | — | `walter-router-guardian status` |

@@ -78,4 +78,4 @@ def test_api_and_cli_include_documentation_interfaces():
     names=next(a['subcommands'] for a in c['cli'] if 'subcommands' in a)
     assert {'schema','docs','brief'} <= names.keys()
     assert any('--json' in a['flags'] for a in names['brief'])
-    assert {t['name'] for t in api.schema()['tools']} == {'walter_route','walter_run','walter_decide','walter_plans'}
+    assert {t['name'] for t in api.schema()['tools']} == {'walter_route','walter_run','walter_decide','walter_plans','walter_web'}

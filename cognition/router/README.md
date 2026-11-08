@@ -67,7 +67,7 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 
 | Consumer | How |
 |---|---|
-| Hermes | plugin `walter-router` (tools `walter_route`, `walter_run`, `walter_decide`, `walter_plans`, plus `walter_verdict`, `walter_feedback` for the Telegram buttons and the owner's verdicts); the brief as a system-prompt section; `sync-hermes` writes its auxiliary jobs, cron postes and `provider_routing.models.<id>.order` |
+| Hermes | plugin `walter-router` (tools `walter_route`, `walter_run`, `walter_decide`, `walter_plans`, `walter_web`, plus `walter_verdict`, `walter_feedback` for the Telegram buttons and the owner's verdicts); the brief as a system-prompt section; `sync-hermes` writes its auxiliary jobs, cron postes and `provider_routing.models.<id>.order` |
 | Modules (walter-memory, Hindsight, voice, Kardex…) | walter-llm with `model` = a router task; `pick` for service postes (STT, rerank, embeddings) |
 | walter-memory triage | `decision-chain` (d1-ultra, then Mercury Decide, then Clef) |
 | Claude Code, Codex, DSH | the `walter` MCP: the same four tools under the same names, the same runs; the brief in the MCP server instructions (Claude Code) and in their W.Alter profile (Codex, DSH). Their own model stays theirs |
@@ -174,6 +174,13 @@ service reste en place ; `/gpt [GPT-6 high] question` le change (mots du nom + n
 le service). Fichiers joints : `files: [{name, data base64}]` (10 au plus, 50 Mo chacun ; sur Telegram, une photo ou un
 document avec la légende `/gpt …`). Fichiers produits (images, fichiers à télécharger) rendus en base64 dans `files`
 puis renvoyés sur Telegram (photo si image, document sinon).
+
+Outil des agents `walter_web` (MCP W.Alter, plugin Hermes, CLI `walter-router web`) : même échange, mêmes paramètres
+(`message`, `service` omis = le seul activé, `model` seulement si l'utilisateur le demande, `files` = chemins locaux,
+`conversation`, `request_id`, `timeout_s`). Il passe par la CLI de la passerelle (`walter-llm web`, comme `walter-llm
+call` pour le texte) ; les fichiers produits reviennent en chemins locaux 0600 sous `generated/walter-router/` de Hermes
+(jamais de base64 dans le contexte d'un agent). Réponse = ce que le service affiche à la fin du tour (un message
+d'étape d'un tour avec outil, replié ensuite, n'en fait pas partie).
 
 ## Route d’abonnement Google AI Pro
 

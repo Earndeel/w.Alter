@@ -60,6 +60,17 @@ PLANS = {
     "why": p("string", "Provenance ou raison de la déclaration, conservée dans l'historique.", ""),
 }
 
+WEB = {
+    "message": p("string", "Message envoyé tel quel au service (1 à 20 000 caractères) ; la réponse revient telle quelle."),
+    "service": p("string", "Service web conversationnel activé par le propriétaire (table web_services) ; omis = le seul activé.", ""),
+    "model": p("string", "Seulement si l'utilisateur le demande : modèle et/ou niveau de réflexion du service, en mots de son interface. Omis = le modèle déjà choisi dans le service, rien n'est changé.", ""),
+    "files": p(["array", "null"], "Chemins locaux de fichiers joints (10 au plus, 50 Mo chacun).", None, items={"type": "string"}),
+    "conversation": p("string", "Nom de la conversation suivie ; même nom = même fil chez le service.", "default"),
+    "request_id": p("string", "Identifiant idempotent : une relance rend la réponse déjà obtenue, jamais un second envoi.", ""),
+    "timeout_s": p("integer", "Délai maximal d'attente de la réponse, en secondes.", 0,
+                   **{"x-effective-default": "table web_services (300 pour chatgpt)", "x-effective-range": [1, 600]}),
+}
+
 
 def tools():
     definitions = {
@@ -70,6 +81,7 @@ def tools():
             "options": p("object", "Nom court → sens de chaque option ; au moins deux options dans MCP.", minProperties=2,
                          additionalProperties={"type": "string"}),
             "context": p("string", "Données sur lesquelles décider.", "")}, ["question", "options"]),
+        "walter_web": ("Converser avec un service web de chat activé par le propriétaire (navigateur, sans LLM de Walter) : message, fichiers joints et modèle facultatifs ; réponse verbatim, fichiers produits (images, documents) rendus en chemins locaux. Lent (secondes à minutes) ; seulement quand l'utilisateur demande ce service ou ce qu'il fait seul.", WEB, ["message"]),
         "walter_plans": ("Lire les abonnements, ou enregistrer une modification demandée par leur propriétaire.", PLANS, []),
     }
     return [{"name": name, "description": desc,

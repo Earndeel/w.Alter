@@ -270,7 +270,7 @@ The owner's method for the three functional text tiers (declared 2026-10-02).
 
 ## cli.py
 
-walter-router CLI: migrate | refresh | pick | prefer | alerts | verdict | status.
+walter-router CLI: migrate | refresh | pick | prefer | alerts | verdict | status | route | run | web …
 
 - `feedback(conn, model: str, rating: int, task: str | None, note: str | None)` — 
 - `_instance_env()` — HERMES_HOME, LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
@@ -393,8 +393,10 @@ Walter Router tools for Hermes (plugin; Hermes core is never patched). Thin: eve
 - `_web_commands()` — Telegram command → service, from the router gateway's own rule table (read once, at load).
 - `_post_web(body: dict, timeout: float)` — 
 - `_chunks(text: str, size: int=4000)` — 
-- `web_exchange(service: str, text: str, chat_id: Any, message_id: Any, sent_at: float | None, reply: Any)` — One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message).
+- `_split_model(text: str)` — `[GPT-6 high] question` → ("GPT-6 high", "question"); without brackets the service keeps its own model.
+- `web_exchange(service: str, text: str, chat_id: Any, message_id: Any, sent_at: float | None, reply: Any, *, model: str | None=None, files: list[tuple[str, bytes]] | None=None, send_file: Any=None)` — One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message,
 - `_wire_web_commands(application: Any, adapter: Any)` — Owner-only Telegram commands of the web services. Group -1 + ApplicationHandlerStop: the message never
+- `_handle_web(args: Mapping[str, Any], **_: Any)` — POST /v1/web/converse through the router's own CLI (`walter-router web`); its JSON even on failure.
 - `register(ctx: Any)` — 
 
 ## instance.py
@@ -1063,6 +1065,13 @@ Bounded native text execution. Provider choice belongs to run.py, transport to l
 - `tools_for(toolsets: list[str])` — 
 - `execute_tool(name: str, args: dict, remaining: float, workdir: Path | None=None)` — 
 - `run(goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call, gateway: 'Gateway | None'=None)` — call(messages, tools, seconds_remaining) handles provider attempts, never tool execution.
+
+## serve/web.py
+
+Conversational web services as a Router tool (walter_web): a message, optional files and model, the reply verbatim.
+
+- `out_dir()` — Same place as the router's generated media (the agents already look there).
+- `converse(spec: dict)` — 
 
 ## store/__init__.py
 

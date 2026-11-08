@@ -146,3 +146,16 @@ def test_web_exchange_sends_produced_files(monkeypatch):
     m = asyncio.run(plugin.web_exchange("chatgpt", "image", 1, 2, None, reply, send_file=send_file))
     assert sent == [("image-1.png", "image/png", b"PNG", "image")]
     assert texts == ["⚠️ non récupéré : x.csv"] and m["files_out"] == 1
+
+
+def test_web_tool_is_registered_and_returns_the_router_json_even_on_failure():
+    """walter_web: the real router CLI; an unknown service is refused before any browser action, JSON kept."""
+    names = []
+
+    class Ctx:
+        def register_tool(self, **kw):
+            names.append(kw["name"])
+    plugin.register(Ctx())
+    assert "walter_web" in names and "message" in plugin.WEB_SCHEMA["parameters"]["required"]
+    d = json.loads(asyncio.run(plugin._handle_web({"message": "x", "service": "nope", "model": ""})))
+    assert d["ok"] is False and d["error"] == "unknown_service" and d["services"]

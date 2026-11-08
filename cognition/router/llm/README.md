@@ -18,6 +18,8 @@ Le gateway transporte les messages et outils de l'appelant. Il ne crée pas une 
   `model` (absent = modèle déjà choisi dans le service, rien n'est cliqué), `files: [{name, data}]` (base64, 10 au
   plus, 50 Mo chacun, écrits dans un dossier temporaire supprimé après l'appel) ; fichiers produits rendus en base64
   dans `files` (budget 100 Mo). Le journal garde seulement `model_choice`, `files_in`, `files_out`.
+  `walter-llm web` (JSON sur stdin) fait le même échange dans le processus, pour les appelants locaux (`walter-router
+  web`, outil `walter_web`) ; sans `service`, le seul service activé est pris (sinon 400 avec la liste).
 - Router et Secrets requis ; Memory optionnel pour retrouver le run ouvert d'une session DSH via sa CLI publique.
 - Configuration et état personnels dans l'instance ; aucune clé fournisseur dans une requête du modèle.
 

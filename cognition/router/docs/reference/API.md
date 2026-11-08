@@ -55,6 +55,20 @@ Décision courte, avec options explicites et contexte utile.
 | `options` | object | — | True | Nom court → sens de chaque option ; au moins deux options dans MCP. minProperties: 2; additionalProperties: {"type": "string"} |
 | `context` | string |  | False | Données sur lesquelles décider.  |
 
+## walter_web
+
+Converser avec un service web de chat activé par le propriétaire (navigateur, sans LLM de Walter) : message, fichiers joints et modèle facultatifs ; réponse verbatim, fichiers produits (images, documents) rendus en chemins locaux. Lent (secondes à minutes) ; seulement quand l'utilisateur demande ce service ou ce qu'il fait seul.
+
+| Paramètre | Type | Défaut transport | Obligatoire | Sens et valeurs |
+|---|---|---|---|---|
+| `message` | string | — | True | Message envoyé tel quel au service (1 à 20 000 caractères) ; la réponse revient telle quelle.  |
+| `service` | string |  | False | Service web conversationnel activé par le propriétaire (table web_services) ; omis = le seul activé.  |
+| `model` | string |  | False | Seulement si l'utilisateur le demande : modèle et/ou niveau de réflexion du service, en mots de son interface. Omis = le modèle déjà choisi dans le service, rien n'est changé.  |
+| `files` | ["array", "null"] | — | False | Chemins locaux de fichiers joints (10 au plus, 50 Mo chacun). items: {"type": "string"} |
+| `conversation` | string | default | False | Nom de la conversation suivie ; même nom = même fil chez le service.  |
+| `request_id` | string |  | False | Identifiant idempotent : une relance rend la réponse déjà obtenue, jamais un second envoi.  |
+| `timeout_s` | integer | 0 | False | Délai maximal d'attente de la réponse, en secondes. x-effective-default: table web_services (300 pour chatgpt); x-effective-range: [1, 600] |
+
 ## walter_plans
 
 Lire les abonnements, ou enregistrer une modification demandée par leur propriétaire.
@@ -241,4 +255,7 @@ walter-router verdict
   decision :  ; défaut=— ; valeurs=["adopted", "dismissed"]
   --note :  ; défaut=—
   --role : with a short number covering several roles: only this one ; défaut=—
+walter-router web
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
+  --message : instead of a JSON spec: just this message, default service, default model ; défaut=—
 ```
