@@ -43,7 +43,40 @@ def mac_reachable(host_alias="mac", timeout=5):
         return False
 
 
+def engine_probe(unit, port, timeout=30):
+    """None when the engine opens a blank tab within `timeout`, else the error.
+
+    An engine at its cgroup MemoryHigh is throttled and swapped, not killed: systemd sees it active and its /health
+    answers (it never touches a page) while every real call times out (30/10 and 08/11/2026). So open a real tab in a
+    throwaway session, no navigation (no network, no exit), then drop that session."""
+    base, user = f"http://127.0.0.1:{port}", "guardian-probe"
+    def call(method, path, body=None, t=timeout):
+        req = urllib.request.Request(base + path, method=method, data=json.dumps(body).encode() if body else None,
+                                     headers={"content-type": "application/json"})
+        with urllib.request.urlopen(req, timeout=t) as r:
+            return json.loads(r.read() or b"{}")
+    t0 = time.time()
+    try:
+        ok = call("POST", "/tab/new", {"userId": user}).get("ok")
+        err = None if ok else "tab/new did not answer ok"
+    except Exception as exc:  # noqa: BLE001
+        err = f"{type(exc).__name__}: {str(exc)[:120]}"
+    try:
+        call("DELETE", f"/sessions/{user}", t=5)
+    except Exception:  # noqa: BLE001
+        pass
+    return None if err is None else {"error": err, "seconds": round(time.time() - t0, 1)}
+
+
 out = units_down("browse", ["camoufox-max", "cloakbrowser-max", "walter-exit-default", "walter-exit-local"])
+for unit, port in (("camoufox-max", 9377), ("cloakbrowser-max", 9378)):
+    if active(unit):
+        bad = engine_probe(unit, port)
+        if bad:
+            mem = sh("systemctl", "show", unit, "-p", "MemoryCurrent,MemoryHigh,MemorySwapCurrent").stdout.split()
+            out.append(inc("browse", f"engine:{unit}", "engine_unresponsive", "high",
+                           f"Le navigateur {unit} tourne mais n'ouvre plus d'onglet en 30 s (bloqué).",
+                           {"unit": unit, **bad, "memory": mem}, "G1"))
 # walter-exit-mac is an ssh tunnel to the owner's Mac. While the Mac sleeps or is offline, systemd restarts it every
 # ~25 s, so `is-active` alternates and the incident used to reopen (and re-notify) all night (2026-10-30). A Mac that
 # does not answer is expected and already fails closed (exit-local:closed): info, no Telegram. High only when the Mac
