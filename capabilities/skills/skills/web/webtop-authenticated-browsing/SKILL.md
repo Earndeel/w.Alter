@@ -69,3 +69,33 @@ These procedures were separate skills; their full original text is kept here, un
 
 - **webtop-authenticated-browsing** — Webtop container administration: Chromium + CDP startup script, stale Singleton locks, s6-overlay boot service, cron persistence, verifying browser access.
   Read `references/merged-webtop-chromium-cdp/webtop-authenticated-browsing.md`.
+
+## Vérifier la sortie France commune à Camoufox et Chromium
+
+Avant une navigation authentifiée, vérifier la route active : les deux moteurs utilisent le sélecteur SOCKS `127.0.0.1:1083`. Le sélecteur choisit le Mac uniquement lorsque son tunnel WireGuard « Lucas » est connecté ; sinon il démarre la sortie `freebox-fr`. Si aucune route ne fonctionne, les connexions doivent échouer, sans sortie directe par la VM.
+
+1. Contrôler les services et les journaux :
+   ```bash
+   systemctl status walter-exit-default camoufox-max --no-pager
+   journalctl -u walter-exit-default -n 30 --no-pager
+   ```
+2. Vérifier la sortie effective du sélecteur :
+   ```bash
+   curl --fail --silent --show-error --max-time 15 --proxy socks5h://127.0.0.1:1083 https://api.ipify.org
+   ```
+   Comparer avec la sortie France attendue dans la configuration courante ; ne pas conclure à partir du seul état « active » de systemd.
+3. Vérifier chaque moteur avec une session temporaire distincte :
+   ```bash
+   for engine in camoufox chromium; do
+     session="route-check-$engine"
+     /opt/walter-core/bin/walter-browser -e "$engine" -s "$session" new
+     /opt/walter-core/bin/walter-browser -e "$engine" -s "$session" nav https://api.ipify.org
+     /opt/walter-core/bin/walter-browser -e "$engine" -s "$session" eval "({ip:document.body.innerText,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,languages:navigator.languages})"
+     /opt/walter-core/bin/walter-browser -e "$engine" -s "$session" close
+   done
+   ```
+   Vérifier la sortie France, `Europe/Paris` et les langues françaises puis anglaises.
+
+Ne jamais activer simultanément le tunnel Lucas du Mac et le tunnel de secours utilisant la même clé WireGuard : laisser le sélecteur gérer leur exclusion. Ne pas modifier le VPN du Mac pour ce contrôle.
+
+Si les journaux signalent `walter-secret file failed` ou `bw list failed`, vérifier `systemctl is-active walter-secrets-sync`, puis `walter-secret search wireguard freebox` sans afficher de valeurs secrètes. Comparer l’utilisateur et l’environnement du service avec ceux de l’appel manuel ; l’unité installée pendant cette session a nécessité `User=root`. Ne pas contourner cet échec en inscrivant une clé dans l’unité systemd. Refermer les sessions temporaires même si une vérification échoue.
