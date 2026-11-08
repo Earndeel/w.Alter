@@ -14,10 +14,15 @@ def _ns(tmp_path, services, calls, logs):
     conf.write_text(json.dumps({"web_services": services}))
 
     def converse(host, capability, message, **kw):
-        calls.append((host, capability, message, kw))
+        files = [(Path(p).name, Path(p).read_bytes(), Path(p)) for p in kw.get("files") or []]
+        calls.append((host, capability, message, {**kw, "files": files}))
+        produced = tmp_path / "produced.png"
+        produced.write_bytes(b"\x89PNG fake")
         return {"ok": True, "status": "done", "reply": "réponse", "request_id": kw.get("request_id"),
-                "conversation": kw.get("conversation"), "mode": "replay", "timings": {"total_ms": 50.0}}
-    ns = {"json": json, "time": time, "sys": sys, "_CONF_PATH": conf, "_WEB": {"mtime": None, "services": {}},
+                "conversation": kw.get("conversation"), "mode": "replay", "timings": {"total_ms": 50.0},
+                "files": [{"kind": "image", "name": "image-1.png", "path": str(produced), "mime": "image/png", "bytes": 10}]
+                if "image" in message else []}
+    ns = {"json": json, "time": time, "sys": sys, "Path": Path, "_CONF_PATH": conf, "_WEB": {"mtime": None, "services": {}},
           "_browse_converse": lambda: converse, "log": logs.append}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), "exec"), ns)
     return ns, conf
@@ -71,3 +76,28 @@ def test_message_bounds(tmp_path):
     ns, _ = _ns(tmp_path, SERVICES, [], [])
     assert ns["web_converse"]("hermes", {"service": "fixture", "message": "  "})[0] == 400
     assert ns["web_converse"]("hermes", {"service": "fixture", "message": "x" * 20001})[0] == 400
+
+
+def test_model_and_files_in_and_out(tmp_path):
+    import base64
+    calls, logs = [], []
+    ns, _ = _ns(tmp_path, SERVICES, calls, logs)
+    code, out = ns["web_converse"]("hermes", {"service": "fixture", "message": "fais une image", "model": "GPT-6 high",
+                                              "files": [{"name": "../../etc/note.txt", "data": base64.b64encode(b"ORANGE").decode()}]})
+    assert code == 200
+    _, _, _, kw = calls[0]
+    assert kw["model"] == "GPT-6 high"
+    (name, data, path), = kw["files"]
+    assert (name, data) == ("note.txt", b"ORANGE") and not path.exists()     # temp copy removed after the exchange
+    f, = out["files"]
+    assert "path" not in f and base64.b64decode(f["data"]) == b"\x89PNG fake"
+    assert logs[0]["files_in"] == 1 and logs[0]["files_out"] == 1 and "ORANGE" not in json.dumps(logs[0])
+    code, out = ns["web_converse"]("hermes", {"service": "fixture", "message": "x"})
+    assert calls[-1][3]["model"] is None and calls[-1][3]["files"] == []      # default: the service's own model
+
+
+def test_bad_attachment_is_refused_before_browse(tmp_path):
+    calls, logs = [], []
+    ns, _ = _ns(tmp_path, SERVICES, calls, logs)
+    code, out = ns["web_converse"]("hermes", {"service": "fixture", "message": "x", "files": [{"name": "a", "data": "@@"}]})
+    assert code == 400 and calls == []

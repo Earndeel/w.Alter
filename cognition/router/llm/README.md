@@ -14,7 +14,10 @@ Le gateway transporte les messages et outils de l'appelant. Il ne crée pas une 
   sous-processus) ; réponse rendue telle quelle avec ses métadonnées (statut, mode `replay|discovery|repair|log`,
   version de recette, conversation, `request_id`, temps `external_ms` / `walter_ms` / `router_ms`). Un service
   désactivé est refusé (403) avant toute action navigateur. Journal : `kind=web`, `provider=web:<service>`, jamais le
-  message ni la réponse. Jeton d'agent `hermes` (commande Telegram `/gpt` du plugin Router).
+  message ni la réponse. Jeton d'agent `hermes` (commande Telegram `/gpt` du plugin Router). Champs facultatifs :
+  `model` (absent = modèle déjà choisi dans le service, rien n'est cliqué), `files: [{name, data}]` (base64, 10 au
+  plus, 50 Mo chacun, écrits dans un dossier temporaire supprimé après l'appel) ; fichiers produits rendus en base64
+  dans `files` (budget 100 Mo). Le journal garde seulement `model_choice`, `files_in`, `files_out`.
 - Router et Secrets requis ; Memory optionnel pour retrouver le run ouvert d'une session DSH via sa CLI publique.
 - Configuration et état personnels dans l'instance ; aucune clé fournisseur dans une requête du modèle.
 

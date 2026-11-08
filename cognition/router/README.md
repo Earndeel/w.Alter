@@ -169,6 +169,12 @@ active un service, dans la configuration de son instance ; `chatgpt` est désact
 d'utilisation d'OpenAI interdisent l'extraction programmée des sorties) et activable par le propriétaire sur son instance (DECISIONS
 2026-11-08).
 
+Modèle et fichiers (2026-11-08) : `model` est facultatif et jamais demandé — absent, le modèle déjà sélectionné dans le
+service reste en place ; `/gpt [GPT-6 high] question` le change (mots du nom + niveau de réflexion, choix conservé par
+le service). Fichiers joints : `files: [{name, data base64}]` (10 au plus, 50 Mo chacun ; sur Telegram, une photo ou un
+document avec la légende `/gpt …`). Fichiers produits (images, fichiers à télécharger) rendus en base64 dans `files`
+puis renvoyés sur Telegram (photo si image, document sinon).
+
 ## Route d’abonnement Google AI Pro
 
 La route `antigravity` sert les modèles de l’abonnement Google AI Pro (Gemini 3.8 Flash, Claude Sonnet/Opus 4.6,

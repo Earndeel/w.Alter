@@ -819,12 +819,45 @@ def web_converse(agent: str, body: dict) -> tuple[int, dict]:
     if not message or len(message) > 20000:
         return 400, {"ok": False, "error": "message must be 1..20000 characters"}
     capability = rule.get("capability", "chat")
-    out = _browse_converse()(
-        rule["host"], capability, message,
-        conversation=str(body.get("conversation") or "default")[:200],
-        request_id=(str(body["request_id"])[:200] if body.get("request_id") else None),
-        session=rule.get("session"), start_url=rule.get("start_url"), site=rule.get("site"),
-        timeout_s=min(float(body.get("timeout_s") or rule.get("timeout_s") or 180), 600))
+    model = str(body.get("model") or "").strip()[:100] or None    # None = keep the service's own selection
+    import base64
+    import re
+    import tempfile
+    files_in = body.get("files") or []
+    if not isinstance(files_in, list) or len(files_in) > 10:
+        return 400, {"ok": False, "error": "files must be a list of at most 10 {name, data(base64)}"}
+    with tempfile.TemporaryDirectory(prefix="walter-web-") as tmp:      # 0700, removed after the exchange
+        paths = []
+        for n, f in enumerate(files_in):
+            try:
+                data = base64.b64decode(f["data"], validate=True)
+            except (KeyError, TypeError, ValueError):
+                return 400, {"ok": False, "error": f"files[{n}]: name and base64 data required"}
+            if len(data) > 50 * 1024 * 1024:
+                return 413, {"ok": False, "error": f"files[{n}] larger than 50 MB"}
+            name = re.sub(r"[^\w.\- ]+", "_", Path(str(f.get("name") or f"file-{n + 1}")).name).strip() or f"file-{n + 1}"
+            path = Path(tmp) / f"{n}" / name
+            path.parent.mkdir()
+            path.write_bytes(data)
+            paths.append(str(path))
+        out = _browse_converse()(
+            rule["host"], capability, message,
+            conversation=str(body.get("conversation") or "default")[:200],
+            request_id=(str(body["request_id"])[:200] if body.get("request_id") else None),
+            session=rule.get("session"), start_url=rule.get("start_url"), site=rule.get("site"),
+            timeout_s=min(float(body.get("timeout_s") or rule.get("timeout_s") or 180), 600),
+            model=model, files=paths or None)
+    # produced files travel back in the response (the caller never reads Browse's state directory)
+    budget = 100 * 1024 * 1024
+    for f in out.get("files") or []:
+        path = f.pop("path", None)
+        if path and f.get("bytes", 0) <= budget:
+            try:
+                raw = Path(path).read_bytes()
+                f["data"] = base64.b64encode(raw).decode()
+                budget -= len(raw)
+            except OSError:
+                f["error"] = "unreadable"
     seconds = round(time.perf_counter() - t0, 3)
     timings = dict(out.get("timings") or {})
     timings["router_ms"] = round(seconds * 1000 - (timings.get("total_ms") or 0), 1)
@@ -834,6 +867,7 @@ def web_converse(agent: str, body: dict) -> tuple[int, dict]:
          "ok": bool(out.get("ok")), "seconds": seconds, "status": out.get("status"), "mode": out.get("mode"),
          "recipe_version": out.get("recipe_version"), "request_id": out.get("request_id"),
          "conversation": out.get("conversation"), "duplicate": out.get("duplicate"), "error": out.get("error"),
+         "model_choice": out.get("model"), "files_in": len(files_in), "files_out": len(out.get("files") or []),
          "timings": timings})                                  # metadata only, never the message or the reply
     return 200, out
 

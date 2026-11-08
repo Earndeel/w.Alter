@@ -11,6 +11,9 @@ walter_verdict, walter_feedback   the owner's answers to router notifications an
 /gpt …         Telegram commands of the router's conversational web services (gateway config `web_services`): the
                message goes to walter-llm /v1/web/converse (rule → Browse recipe), the reply comes back verbatim —
                no agent turn, no LLM; idempotent per Telegram message; end-to-end timings logged (WALTER_WEB).
+               `/gpt [GPT-6 high] …` picks a model/effort (without it, the one already selected in the service);
+               a photo or document with the command as caption is attached; produced images/files come back as
+               Telegram photos/documents.
 """
 from __future__ import annotations
 
@@ -371,28 +374,54 @@ def _chunks(text: str, size: int = 4000) -> list[str]:
     return [*out, text] if text else out
 
 
+_MODEL_PREFIX = re.compile(r"^\[([^\]\n]{1,60})\]\s*")
+
+
+def _split_model(text: str) -> tuple[str | None, str]:
+    """`[GPT-6 high] question` → ("GPT-6 high", "question"); without brackets the service keeps its own model."""
+    m = _MODEL_PREFIX.match(text)
+    return (m.group(1).strip() or None, text[m.end():]) if m else (None, text)
+
+
 async def web_exchange(service: str, text: str, chat_id: Any, message_id: Any, sent_at: float | None,
-                       reply: Any) -> dict:
-    """One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message)."""
+                       reply: Any, *, model: str | None = None, files: list[tuple[str, bytes]] | None = None,
+                       send_file: Any = None) -> dict:
+    """One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message,
+    `send_file(name, mime, data, kind)` one produced image/file)."""
+    import base64
     t_in = time.time()
-    out = await asyncio.to_thread(_post_web, {
-        "service": service, "message": text, "conversation": f"telegram:{chat_id}",
-        "request_id": f"telegram:{chat_id}:{message_id}"}, 660)
+    req = {"service": service, "message": text, "conversation": f"telegram:{chat_id}",
+           "request_id": f"telegram:{chat_id}:{message_id}"}
+    if model:
+        req["model"] = model
+    if files:
+        req["files"] = [{"name": n, "data": base64.b64encode(d).decode()} for n, d in files]
+    out = await asyncio.to_thread(_post_web, req, 660)
     t_back = time.time()
+    produced = out.get("files") or []
     if out.get("ok"):
         body = out.get("reply") or ""
+        lost = [f.get("name") or f.get("kind") for f in produced if not f.get("data")]
+        if lost:
+            body += ("\n\n" if body else "") + "⚠️ non récupéré : " + ", ".join(map(str, lost))
     elif out.get("error") == "service_disabled":
         body = f"⚠️ {service} est désactivé. {out.get('note') or ''}".strip()
     else:
         body = f"⚠️ {service} : {out.get('error') or out.get('status') or 'échec'}"
         if out.get("status") == "incomplete" and out.get("reply"):
             body = out["reply"] + "\n\n⚠️ réponse incomplète (délai dépassé)"
-    for part in _chunks(body) or ["(réponse vide)"]:
+    sendable = [f for f in produced if f.get("data")] if out.get("ok") else []
+    for part in _chunks(body) or ([] if sendable else ["(réponse vide)"]):
         await reply(part)
+    for f in sendable:
+        data = base64.b64decode(f["data"])
+        if send_file is not None:
+            await send_file(f.get("name") or "fichier", f.get("mime") or "", data, f.get("kind") or "file")
     t_sent = time.time()
     t = out.get("timings") or {}
     measure = {"service": service, "ok": bool(out.get("ok")), "status": out.get("status"), "mode": out.get("mode"),
-               "duplicate": bool(out.get("duplicate")),
+               "duplicate": bool(out.get("duplicate")), "model": bool(model), "files_in": len(files or []),
+               "files_out": len(sendable),
                "telegram_to_handler_s": round(t_in - sent_at, 2) if sent_at else None,     # Telegram date: 1 s steps
                "handler_to_reply_ms": round((t_back - t_in) * 1000, 1),
                "telegram_send_ms": round((t_sent - t_back) * 1000, 1),
@@ -407,7 +436,7 @@ async def web_exchange(service: str, text: str, chat_id: Any, message_id: Any, s
 def _wire_web_commands(application: Any, adapter: Any) -> None:
     """Owner-only Telegram commands of the web services. Group -1 + ApplicationHandlerStop: the message never
     reaches the agent loop; the exchange runs as a task so Telegram updates keep flowing while the service answers."""
-    from telegram.ext import ApplicationHandlerStop, CommandHandler
+    from telegram.ext import ApplicationHandlerStop, CommandHandler, MessageHandler, filters
 
     commands = _web_commands()
     if not commands:
@@ -418,14 +447,19 @@ def _wire_web_commands(application: Any, adapter: Any) -> None:
         home = _home_chat()
         if not msg or not home or str(getattr(update.effective_user, "id", "")) != home or str(msg.chat.id) != home:
             return                                            # not the owner: Hermes applies its own rules
-        word, _, text = (msg.text or "").partition(" ")
+        raw = msg.text if msg.text is not None else (getattr(msg, "caption", None) or "")
+        word, _, text = raw.partition(" ")
         if "\n" in word:
             word, _, rest = word.partition("\n")
             text = rest + (" " + text if text else "")
         service = commands.get(word[1:].split("@")[0].lower())
+        model, text = _split_model(text.strip())
         text = text.strip()
+        photo = getattr(msg, "photo", None)
+        attachment = getattr(msg, "document", None) or (photo[-1] if photo else None)
         if service and not text:
-            await msg.reply_text(f"Usage : {word} <message>")
+            await msg.reply_text(f"Usage : {word} [modèle] <message> — photo ou document joints possibles, "
+                                 "en légende ; sans [modèle], celui déjà choisi dans le service")
         elif service:
             sent_at = msg.date.timestamp() if getattr(msg, "date", None) else None
             try:
@@ -436,10 +470,33 @@ def _wire_web_commands(application: Any, adapter: Any) -> None:
             async def _send(part: str) -> None:
                 await msg.reply_text(part, disable_web_page_preview=True)
 
-            application.create_task(web_exchange(service, text, msg.chat.id, msg.message_id, sent_at, _send))
+            async def _send_file(name: str, mime: str, data: bytes, kind: str) -> None:
+                if kind == "image" and mime in ("image/png", "image/jpeg", "image/webp") and len(data) < 10_000_000:
+                    await msg.reply_photo(photo=data, filename=name)
+                else:
+                    await msg.reply_document(document=data, filename=name)
+
+            async def _run() -> None:
+                files = None
+                if attachment is not None:                    # Telegram bots receive files up to 20 MB
+                    try:
+                        tg_file = await attachment.get_file()
+                        data = bytes(await tg_file.download_as_bytearray())
+                    except Exception as exc:  # noqa: BLE001
+                        await msg.reply_text(f"⚠️ pièce jointe illisible : {type(exc).__name__}")
+                        return
+                    files = [(getattr(attachment, "file_name", None) or f"photo-{msg.message_id}.jpg", data)]
+                await web_exchange(service, text, msg.chat.id, msg.message_id, sent_at, _send,
+                                   model=model, files=files, send_file=_send_file)
+
+            application.create_task(_run())
         raise ApplicationHandlerStop
 
     application.add_handler(CommandHandler(list(commands), _on_command), group=-1)
+    # the same commands written as the caption of a photo or a document
+    caption = rf"^/({'|'.join(re.escape(c) for c in commands)})(@\w+)?(\s|$)"
+    application.add_handler(MessageHandler((filters.PHOTO | filters.Document.ALL) & filters.CaptionRegex(caption),
+                                           _on_command), group=-1)
 
 
 def register(ctx: Any) -> None:
