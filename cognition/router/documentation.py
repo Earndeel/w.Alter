@@ -158,6 +158,8 @@ ENV_MEANINGS = {
     "WALTER_TASK_ID": "Tâche de sous-agent (runs.tasks) servie par l'exécution walter_run ; inscrite dans models.exec_log.",
     "WALTER_ROUTER_CHILD": "Marqueur des enfants historiques ; empêche une récursion de routage.",
     "WALTER_LLM_PORT": "Port HTTP loopback de la passerelle (défaut logiciel 8894).",
+    "WALTER_LLM_URL": "URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894).",
+    "WALTER_LLM_TOKEN": "Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché).",
     "WALTER_FLARESOLVERR": "Adresse du service de lecture des sources qui le nécessitent.",
     "HERMES_HOME": "Emplacement du runtime historique pour les opérations/adaptateurs qui en dépendent encore.",
     "CLAUDE_PROJECTS": "Source locale de métriques des sessions Claude pour estimer un abonnement.",

@@ -258,7 +258,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 |---|---|---|---|---|
 | `TELEGRAM_HOME_CHANNEL` | analysis/telegram.py | env_value | aucun | Destination d'instance des avis/propositions ; ne pas exporter sa valeur. |
 | `WALTER_ROUTER_CLI` | hermes-plugins/walter-router/__init__.py | get | 'walter-router' | Commande publique appelée par l'adaptateur de tools. |
+| `WALTER_LLM_URL` | hermes-plugins/walter-router/__init__.py | get | 'http://127.0.0.1:8894' | URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894). |
 | `TELEGRAM_HOME_CHANNEL` | hermes-plugins/walter-router/__init__.py | get | aucun | Destination d'instance des avis/propositions ; ne pas exporter sa valeur. |
+| `WALTER_LLM_TOKEN` | hermes-plugins/walter-router/__init__.py | get | '' | Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché). |
 | `HERMES_HOME` | hermes-plugins/walter-router/__init__.py | get | aucun | Emplacement du runtime historique pour les opérations/adaptateurs qui en dépendent encore. |
 | `HERMES_HOME` | instance.py | get | aucun | Emplacement du runtime historique pour les opérations/adaptateurs qui en dépendent encore. |
 | `CHATGPT_TOKEN_DIR` | llm/gateway.py | setdefault | str(CHATGPT_DIR) | Réglage du transport de l'abonnement ; l'authentification reste fournie par son grant. |

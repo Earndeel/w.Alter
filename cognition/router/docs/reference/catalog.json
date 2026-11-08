@@ -6854,6 +6854,31 @@
             "signature": "application: Any, adapter: Any"
           },
           {
+            "description": "Telegram command → service, from the router gateway's own rule table (read once, at load).",
+            "name": "_web_commands",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "_post_web",
+            "signature": "body: dict, timeout: float"
+          },
+          {
+            "description": "",
+            "name": "_chunks",
+            "signature": "text: str, size: int=4000"
+          },
+          {
+            "description": "One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message).",
+            "name": "web_exchange",
+            "signature": "service: str, text: str, chat_id: Any, message_id: Any, sent_at: float | None, reply: Any"
+          },
+          {
+            "description": "Owner-only Telegram commands of the web services. Group -1 + ApplicationHandlerStop: the message never",
+            "name": "_wire_web_commands",
+            "signature": "application: Any, adapter: Any"
+          },
+          {
             "description": "",
             "name": "register",
             "signature": "ctx: Any"
@@ -7439,6 +7464,21 @@
             "description": "",
             "name": "log",
             "signature": "entry: dict"
+          },
+          {
+            "description": "",
+            "name": "web_services",
+            "signature": ""
+          },
+          {
+            "description": "Browse's public client (walter_browse.converse), in process: no subprocess on the fast path.",
+            "name": "_browse_converse",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "web_converse",
+            "signature": "agent: str, body: dict"
           },
           {
             "description": "The call's cost for the caller's own ledger (Walter Memory's system.model_calls): reported by the provider, or",
@@ -16652,10 +16692,24 @@
         "operation": "get"
       },
       {
+        "default_expression": "'http://127.0.0.1:8894'",
+        "description": "URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894).",
+        "file": "hermes-plugins/walter-router/__init__.py",
+        "name": "WALTER_LLM_URL",
+        "operation": "get"
+      },
+      {
         "default_expression": "aucun",
         "description": "Destination d'instance des avis/propositions ; ne pas exporter sa valeur.",
         "file": "hermes-plugins/walter-router/__init__.py",
         "name": "TELEGRAM_HOME_CHANNEL",
+        "operation": "get"
+      },
+      {
+        "default_expression": "''",
+        "description": "Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché).",
+        "file": "hermes-plugins/walter-router/__init__.py",
+        "name": "WALTER_LLM_TOKEN",
         "operation": "get"
       },
       {
@@ -16856,6 +16910,8 @@
       "TELEGRAM_HOME_CHANNEL",
       "WALTER_FLARESOLVERR",
       "WALTER_LLM_PORT",
+      "WALTER_LLM_TOKEN",
+      "WALTER_LLM_URL",
       "WALTER_ROUTER_CLI",
       "WALTER_ROUTER_DATABASE_URL",
       "WALTER_RUN_CHANNEL",
@@ -16947,7 +17003,7 @@
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "b8f0e3ee29e57454855286b6b80b182d5bf17c1c59f7dfc216cc9bcef631cd54",
     "contracts/router.json": "ea6c3de46c6b48ddc120dcef459dd834802baf7a0190931b1e7851fa2386fdcb",
-    "documentation.py": "03ecc8225957ad8eeaa003928eed8813163c3d1c959203db72987738804819ae",
+    "documentation.py": "63a31ddfb49c254a4457c58745158567bdf57995d492eb1acf3c8968deac01f4",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
@@ -16955,7 +17011,7 @@
     "guardian/run.py": "3093f8e6b65fca4b8906a57617c02d07fd5db1e67d44339d7575ebee3e343932",
     "health.py": "ba5e621b77cc19022ef7b0bcc0822abb8b87360cad74dadbdf3389ce3d0f0f3c",
     "hermes-plugins/kie-compat/__init__.py": "aba770c340305899abfca6172a3774b0e56b400328e6f0f3350ab79a688daace",
-    "hermes-plugins/walter-router/__init__.py": "0304d91d38ac0059f7665587f447fa8098bb4e7cb562a24cac4b4e92e3458f4d",
+    "hermes-plugins/walter-router/__init__.py": "b8ca7b7886e830ff5ee8ce7c029625fd8ba49bd1786ad47699958aa64205d1f1",
     "instance.py": "9de10d051b0cc3ec3d49c7554fa4aff3e72eaf8b25775b5dd439406035a7fa6b",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
     "interface/library.py": "649216011e2545152c4a2c7387a335fcd5a7c59bf49748283c98de725055a570",
@@ -16967,9 +17023,9 @@
     "interface/translate.py": "a1796785414cd3fac4908088dab4a23780bf67976bd5ce0677b0a3469ddd4171",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
-    "llm/config/gateway.json": "56bfc87cdffe86d4a3ab2ce49e9f643652e2cac1dfec8103c66e2773ea392a05",
+    "llm/config/gateway.json": "b43a8ac76b84bfb81d1e1eef68acc9bfa33a9a126207f779ba7c74d291abce25",
     "llm/contracts/llm.json": "17a51a635cfd54e506593c5be38b0aaa2a847f9646ee56f77e075df79dcd589d",
-    "llm/gateway.py": "468053f1ede2c3e8ac8fac0d29c79412e5339eed0190e179af08b6299b1aa3ca",
+    "llm/gateway.py": "36251f4df351597a81e7b4e1ddd46f2f2f937f4d30001a343cce3f2284c27c8f",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",

@@ -8,6 +8,9 @@ walter_decide  the router's decision model for a quick choice among options
 walter_plans   the owner's AI subscriptions
 walter_verdict, walter_feedback   the owner's answers to router notifications and opinions of a result (Hermes only:
                                   Telegram buttons arrive here)
+/gpt …         Telegram commands of the router's conversational web services (gateway config `web_services`): the
+               message goes to walter-llm /v1/web/converse (rule → Browse recipe), the reply comes back verbatim —
+               no agent turn, no LLM; idempotent per Telegram message; end-to-end timings logged (WALTER_WEB).
 """
 from __future__ import annotations
 
@@ -16,6 +19,7 @@ import json
 import re
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -321,6 +325,123 @@ def _wire_buttons(application: Any, adapter: Any) -> None:
     application.add_handler(CallbackQueryHandler(_on_button, pattern=r"^wr:[ad]:\d+"))
 
 
+# ───────────────────────── conversational web services on Telegram (2026-11-08) ─────────────────────────
+LLM_URL = os.environ.get("WALTER_LLM_URL", "http://127.0.0.1:8894")
+
+
+def _web_commands() -> dict[str, str]:
+    """Telegram command → service, from the router gateway's own rule table (read once, at load)."""
+    import subprocess
+    try:
+        path = subprocess.run(["walter", "instance", "config", "llm", "gateway.json"], capture_output=True,
+                              text=True, timeout=20).stdout.strip()
+        services = json.loads(Path(path).read_text()).get("web_services") or {}
+    except Exception as exc:  # noqa: BLE001 — no table = no command, Hermes still starts
+        logger.warning("WALTER_WEB services unavailable: %s", exc)
+        return {}
+    return {str(v.get("command") or ("gpt" if k == "chatgpt" else k)): k
+            for k, v in services.items() if not k.startswith("_") and isinstance(v, dict)}
+
+
+def _post_web(body: dict, timeout: float) -> dict:
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(LLM_URL + "/v1/web/converse", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json",
+                                          "Authorization": "Bearer " + os.environ.get("WALTER_LLM_TOKEN", "")})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        try:
+            return json.loads(exc.read())
+        except ValueError:
+            return {"ok": False, "error": f"HTTP {exc.code}"}
+    except OSError as exc:
+        return {"ok": False, "error": f"walter-llm unreachable ({type(exc).__name__})"}
+
+
+def _chunks(text: str, size: int = 4000) -> list[str]:
+    out = []
+    while len(text) > size:
+        cut = text.rfind("\n", 0, size)
+        cut = cut if cut > size // 2 else size
+        out.append(text[:cut])
+        text = text[cut:].lstrip("\n")
+    return [*out, text] if text else out
+
+
+async def web_exchange(service: str, text: str, chat_id: Any, message_id: Any, sent_at: float | None,
+                       reply: Any) -> dict:
+    """One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message)."""
+    t_in = time.time()
+    out = await asyncio.to_thread(_post_web, {
+        "service": service, "message": text, "conversation": f"telegram:{chat_id}",
+        "request_id": f"telegram:{chat_id}:{message_id}"}, 660)
+    t_back = time.time()
+    if out.get("ok"):
+        body = out.get("reply") or ""
+    elif out.get("error") == "service_disabled":
+        body = f"⚠️ {service} est désactivé. {out.get('note') or ''}".strip()
+    else:
+        body = f"⚠️ {service} : {out.get('error') or out.get('status') or 'échec'}"
+        if out.get("status") == "incomplete" and out.get("reply"):
+            body = out["reply"] + "\n\n⚠️ réponse incomplète (délai dépassé)"
+    for part in _chunks(body) or ["(réponse vide)"]:
+        await reply(part)
+    t_sent = time.time()
+    t = out.get("timings") or {}
+    measure = {"service": service, "ok": bool(out.get("ok")), "status": out.get("status"), "mode": out.get("mode"),
+               "duplicate": bool(out.get("duplicate")),
+               "telegram_to_handler_s": round(t_in - sent_at, 2) if sent_at else None,     # Telegram date: 1 s steps
+               "handler_to_reply_ms": round((t_back - t_in) * 1000, 1),
+               "telegram_send_ms": round((t_sent - t_back) * 1000, 1),
+               "end_to_end_s": round(t_sent - sent_at, 2) if sent_at else None,
+               "external_ms": t.get("external_ms"), "walter_browse_ms": t.get("walter_ms"),
+               "router_ms": t.get("router_ms"),
+               "http_hop_ms": round((t_back - t_in) * 1000 - (t.get("total_ms") or 0) - (t.get("router_ms") or 0), 1)}
+    logger.info("WALTER_WEB %s", json.dumps(measure))
+    return measure
+
+
+def _wire_web_commands(application: Any, adapter: Any) -> None:
+    """Owner-only Telegram commands of the web services. Group -1 + ApplicationHandlerStop: the message never
+    reaches the agent loop; the exchange runs as a task so Telegram updates keep flowing while the service answers."""
+    from telegram.ext import ApplicationHandlerStop, CommandHandler
+
+    commands = _web_commands()
+    if not commands:
+        return
+
+    async def _on_command(update: Any, context: Any) -> None:
+        msg = update.effective_message
+        home = _home_chat()
+        if not msg or not home or str(getattr(update.effective_user, "id", "")) != home or str(msg.chat.id) != home:
+            return                                            # not the owner: Hermes applies its own rules
+        word, _, text = (msg.text or "").partition(" ")
+        if "\n" in word:
+            word, _, rest = word.partition("\n")
+            text = rest + (" " + text if text else "")
+        service = commands.get(word[1:].split("@")[0].lower())
+        text = text.strip()
+        if service and not text:
+            await msg.reply_text(f"Usage : {word} <message>")
+        elif service:
+            sent_at = msg.date.timestamp() if getattr(msg, "date", None) else None
+            try:
+                await context.bot.send_chat_action(msg.chat.id, "typing")
+            except Exception:  # noqa: BLE001
+                pass
+
+            async def _send(part: str) -> None:
+                await msg.reply_text(part, disable_web_page_preview=True)
+
+            application.create_task(web_exchange(service, text, msg.chat.id, msg.message_id, sent_at, _send))
+        raise ApplicationHandlerStop
+
+    application.add_handler(CommandHandler(list(commands), _on_command), group=-1)
+
+
 def register(ctx: Any) -> None:
     if callable(getattr(ctx, "register_system_prompt_section", None)) and os.environ.get(CHILD_ENV) != "1":
         try:
@@ -331,6 +452,7 @@ def register(ctx: Any) -> None:
     if callable(getattr(ctx, "register_telegram_handler", None)) and os.environ.get(CHILD_ENV) != "1":
         try:
             ctx.register_telegram_handler(_wire_buttons)
+            ctx.register_telegram_handler(_wire_web_commands)
         except Exception as exc:  # noqa: BLE001
             logger.error("WALTER_ROUTER_DEGRADED telegram buttons: %s", exc)
     if not callable(getattr(ctx, "register_tool", None)):

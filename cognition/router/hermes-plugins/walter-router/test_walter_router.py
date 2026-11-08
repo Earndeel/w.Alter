@@ -42,3 +42,56 @@ def test_route_without_task_uses_the_classifier():
 def test_verdict_and_feedback_tools_report_errors_cleanly():
     assert "error" in json.loads(asyncio.run(plugin._handle_verdict({"alert_id": 999999999, "decision": "adopter"})))
     assert "error" in json.loads(asyncio.run(plugin._handle_feedback({"rating": 9})))
+
+
+def _telegram_wiring(monkeypatch, sent_by):
+    import pytest
+    pytest.importorskip("telegram.ext")                 # Hermes venv only
+    from types import SimpleNamespace
+    monkeypatch.setattr(plugin, "_web_commands", lambda: {"gpt": "chatgpt"})
+    monkeypatch.setattr(plugin, "_home_chat", lambda: "42")
+    exchanges, tasks, handlers = [], [], []
+
+    async def fake_exchange(service, text, chat_id, message_id, sent_at, reply):
+        exchanges.append((service, text, chat_id, message_id))
+    monkeypatch.setattr(plugin, "web_exchange", fake_exchange)
+    app = SimpleNamespace(add_handler=lambda h, group=0: handlers.append((h, group)),
+                          create_task=lambda coro: tasks.append(coro))
+    plugin._wire_web_commands(app, None)
+    handler, group = handlers[0]
+    replies = []
+
+    async def reply_text(text, **kw):
+        replies.append(text)
+
+    async def chat_action(*a):
+        pass
+    msg = SimpleNamespace(text="/gpt Bonjour\nligne 2", chat=SimpleNamespace(id=int(sent_by)), message_id=7,
+                          date=None, reply_text=reply_text)
+    update = SimpleNamespace(effective_message=msg, effective_user=SimpleNamespace(id=int(sent_by)))
+    context = SimpleNamespace(bot=SimpleNamespace(send_chat_action=chat_action))
+    return handler, group, update, context, tasks, exchanges
+
+
+def test_web_command_owner_message_bypasses_the_agent(monkeypatch):
+    handler, group, update, context, tasks, exchanges = _telegram_wiring(monkeypatch, "42")
+    assert group == -1 and "gpt" in handler.commands
+    from telegram.ext import ApplicationHandlerStop
+    try:
+        asyncio.run(handler.callback(update, context))
+        raise AssertionError("the agent loop would also get the message")
+    except ApplicationHandlerStop:
+        pass
+    asyncio.run(tasks[0])
+    assert exchanges == [("chatgpt", "Bonjour\nligne 2", 42, 7)]
+
+
+def test_web_command_ignores_anyone_but_the_owner(monkeypatch):
+    handler, group, update, context, tasks, exchanges = _telegram_wiring(monkeypatch, "99")
+    asyncio.run(handler.callback(update, context))      # returns: Hermes applies its own rules
+    assert tasks == [] and exchanges == []
+
+
+def test_reply_chunks_fit_telegram():
+    parts = plugin._chunks("a" * 9000)
+    assert [len(p) for p in parts] == [4000, 4000, 1000]

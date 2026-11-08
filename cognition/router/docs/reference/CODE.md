@@ -390,6 +390,11 @@ Walter Router tools for Hermes (plugin; Hermes core is never patched). Thin: eve
 - `_available()` — 
 - `_home_chat()` — The owner's Telegram chat (gateway home channel); only they may press the buttons.
 - `_wire_buttons(application: Any, adapter: Any)` — Buttons of the Walter Router notification (callback data 'wr:<a|d>:<ref>[:<role>]', sent by the
+- `_web_commands()` — Telegram command → service, from the router gateway's own rule table (read once, at load).
+- `_post_web(body: dict, timeout: float)` — 
+- `_chunks(text: str, size: int=4000)` — 
+- `web_exchange(service: str, text: str, chat_id: Any, message_id: Any, sent_at: float | None, reply: Any)` — One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message).
+- `_wire_web_commands(application: Any, adapter: Any)` — Owner-only Telegram commands of the web services. Group -1 + ApplicationHandlerStop: the message never
 - `register(ctx: Any)` — 
 
 ## instance.py
@@ -538,6 +543,9 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_rule_routing(run_id: str)` — 
 - `_record_attempt(row: dict, entry: dict)` — Persist through public ports. DSH routing becomes applied only after an observed response.
 - `log(entry: dict)` — 
+- `web_services()` — 
+- `_browse_converse()` — Browse's public client (walter_browse.converse), in process: no subprocess on the fast path.
+- `web_converse(agent: str, body: dict)` — 
 - `cost_headers(telemetry: dict)` — The call's cost for the caller's own ledger (Walter Memory's system.model_calls): reported by the provider, or
 - `route_state(route: dict)` — 
 - `selection_plan(d: dict)` — 

@@ -158,6 +158,15 @@ chain fails, `ok` is false. `routed.executed_model_id` names the model that answ
 
 La route `claude-pro` est exécutée dans la passerelle du Router, avec les messages, outils et paramètres du consommateur. Le transport natif ne conserve que l’attribution technique du fournisseur ; sa boucle d’agent et son contexte ne sont pas délégués. Configuration, renouvellement, quotas réels, streaming et limites : [docs/CLAUDE-SUBSCRIPTION.md](docs/CLAUDE-SUBSCRIPTION.md).
 
+## Services web conversationnels (2026-11-08)
+
+Une interface de chat sur le web (ChatGPT par exemple) peut servir de service : le Router décide par règle (table
+`web_services` de la configuration de walter-llm), Browse exécute sa recette (onglet et conversation réutilisés, aucun
+LLM sur une recette validée), la réponse revient telle quelle sur le canal d'origine. Entrées : `POST /v1/web/converse`
+de walter-llm, commande Telegram `/gpt` (plugin Hermes du Router : propriétaire seul, hors boucle d'agent, idempotente
+par message Telegram, temps de bout en bout journalisés `WALTER_WEB` dans le journal de Hermes). Seul le propriétaire
+active un service ; `chatgpt` est déclaré mais désactivé (conditions d'utilisation d'OpenAI).
+
 ## Route d’abonnement Google AI Pro
 
 La route `antigravity` sert les modèles de l’abonnement Google AI Pro (Gemini 3.8 Flash, Claude Sonnet/Opus 4.6,

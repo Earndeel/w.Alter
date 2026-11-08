@@ -23,5 +23,18 @@
     "usd_per_eur": 1.1,
     "window_hours": 24,
     "ledger": "@instance/state/llm/test-spend.jsonl"
+  },
+  "web_services": {
+    "_doc": "Conversational web interfaces used as services (Router rule → Browse recipe host/capability, engine session, owner login site from browser_sites). Browse learns/replays the recipe; no LLM on a validated recipe. Enabled only by the owner.",
+    "chatgpt": {
+      "enabled": false,
+      "host": "chatgpt.com",
+      "capability": "chat",
+      "start_url": "https://chatgpt.com/",
+      "site": "chatgpt",
+      "session": "chatgpt",
+      "timeout_s": 300,
+      "note": "Disabled: OpenAI's Terms of Use forbid automatically or programmatically extracting output from ChatGPT; owner decision pending (DECISIONS 2026-11-08)."
+    }
   }
 }

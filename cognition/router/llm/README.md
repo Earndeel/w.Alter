@@ -8,6 +8,13 @@ Le gateway transporte les messages et outils de l'appelant. Il ne crée pas une 
 
 - HTTP `/v1/chat/completions`, `/v1/models` ; `/health` ne certifie aucun fournisseur.
 - `walter-llm call` : une route exacte, JSON sur stdin/stdout, sans repli de modèle implicite.
+- HTTP `/v1/web/converse` (2026-11-08) : services web conversationnels. Règle déterministe de la table
+  `web_services` (config, relue à chaud : service → recette Browse hôte/capacité, session moteur, site de connexion,
+  `enabled`) ; exécution par le client public de Browse (`walter_browse.converse`, dans ce processus, sans
+  sous-processus) ; réponse rendue telle quelle avec ses métadonnées (statut, mode `replay|discovery|repair|log`,
+  version de recette, conversation, `request_id`, temps `external_ms` / `walter_ms` / `router_ms`). Un service
+  désactivé est refusé (403) avant toute action navigateur. Journal : `kind=web`, `provider=web:<service>`, jamais le
+  message ni la réponse. Jeton d'agent `hermes` (commande Telegram `/gpt` du plugin Router).
 - Router et Secrets requis ; Memory optionnel pour retrouver le run ouvert d'une session DSH via sa CLI publique.
 - Configuration et état personnels dans l'instance ; aucune clé fournisseur dans une requête du modèle.
 

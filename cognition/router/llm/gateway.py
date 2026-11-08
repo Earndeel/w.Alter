@@ -19,6 +19,7 @@ Run:   gateway.py serve                 (127.0.0.1:8894)
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import math
@@ -53,7 +54,8 @@ def _instance_path(value: str) -> Path:
 
 
 # Settings: the instance's config/llm/gateway.json, else the shipped default (log file, agent token hashes).
-_CONF = json.loads(Path(_walter("instance", "config", "llm", "gateway.json")).read_text())
+_CONF_PATH = Path(_walter("instance", "config", "llm", "gateway.json"))
+_CONF = json.loads(_CONF_PATH.read_text())
 AGENTS = _instance_path(_CONF["agents"])
 LOG = _instance_path(_CONF["log"])
 sys.path.insert(0, _walter("path", "secrets"))   # walter-secrets public library (vault, mapping)
@@ -770,10 +772,70 @@ def log(entry: dict) -> None:
         pass
     if entry.get("provider"):                                 # teach the router (background, best effort)
         row = {"task": entry.get("task"), "model_id": entry.get("model_id"), "provider": entry["provider"],
-               "model": entry.get("model"), "ok": entry.get("ok"), "seconds": entry.get("seconds"), "kind": "text",
+               "model": entry.get("model"), "ok": entry.get("ok"), "seconds": entry.get("seconds"),
+               "kind": entry.get("kind") or "text",
                "role": f"agent:{entry.get('agent')}",
                **{k: entry.get(k) for k in ("run_id", "task_id", "usage", "cost_usd", "cost_status", "skipped", "account")}}
         threading.Thread(target=_record_attempt, args=(row, entry), daemon=True).start()
+
+
+# ───────────────────────── conversational web services (2026-11-08) ─────────────────────────
+# A web chat interface used as a service: the Router decides by rule (config `web_services`: service → Browse
+# recipe host/capability, engine session, owner login site, enabled), Browse executes (its recipes, its engine
+# sessions, no LLM on a validated recipe), the reply comes back verbatim with its metadata. Re-read on change:
+# enabling a service needs no restart. A disabled service is refused here, before any browser action.
+_WEB: dict = {"mtime": None, "services": {}}
+
+
+def web_services() -> dict:
+    try:
+        mtime = _CONF_PATH.stat().st_mtime
+        if mtime != _WEB["mtime"]:
+            _WEB.update(mtime=mtime, services=json.loads(_CONF_PATH.read_text()).get("web_services") or {})
+    except (OSError, ValueError):
+        pass
+    return {k: v for k, v in _WEB["services"].items() if not k.startswith("_") and isinstance(v, dict)}
+
+
+@functools.lru_cache(maxsize=1)
+def _browse_converse():
+    """Browse's public client (walter_browse.converse), in process: no subprocess on the fast path."""
+    root = _walter("path", "browse")
+    if root not in sys.path:
+        sys.path.append(root)
+    from walter_browse import converse
+    return converse
+
+
+def web_converse(agent: str, body: dict) -> tuple[int, dict]:
+    t0 = time.perf_counter()
+    service = str(body.get("service") or "").strip()
+    rule = web_services().get(service)
+    if rule is None:
+        return 404, {"ok": False, "error": "unknown_service", "services": sorted(web_services())}
+    if not rule.get("enabled"):
+        return 403, {"ok": False, "error": "service_disabled", "service": service, "note": rule.get("note")}
+    message = str(body.get("message") or "").strip()
+    if not message or len(message) > 20000:
+        return 400, {"ok": False, "error": "message must be 1..20000 characters"}
+    capability = rule.get("capability", "chat")
+    out = _browse_converse()(
+        rule["host"], capability, message,
+        conversation=str(body.get("conversation") or "default")[:200],
+        request_id=(str(body["request_id"])[:200] if body.get("request_id") else None),
+        session=rule.get("session"), start_url=rule.get("start_url"), site=rule.get("site"),
+        timeout_s=min(float(body.get("timeout_s") or rule.get("timeout_s") or 180), 600))
+    seconds = round(time.perf_counter() - t0, 3)
+    timings = dict(out.get("timings") or {})
+    timings["router_ms"] = round(seconds * 1000 - (timings.get("total_ms") or 0), 1)
+    out.update(service=service, timings=timings, route={"rule": f"web_services.{service}", "transport": "browser",
+                                                        "recipe": f"{rule['host']}/{capability}"})
+    log({"agent": agent, "task": f"web:{service}", "provider": f"web:{service}", "model": capability, "kind": "web",
+         "ok": bool(out.get("ok")), "seconds": seconds, "status": out.get("status"), "mode": out.get("mode"),
+         "recipe_version": out.get("recipe_version"), "request_id": out.get("request_id"),
+         "conversation": out.get("conversation"), "duplicate": out.get("duplicate"), "error": out.get("error"),
+         "timings": timings})                                  # metadata only, never the message or the reply
+    return 200, out
 
 
 def cost_headers(telemetry: dict) -> dict:
@@ -871,6 +933,15 @@ def build_app():
     @app.get("/health")
     def health():
         return {"ok": True}
+
+    @app.post("/v1/web/converse")
+    async def web_converse_endpoint(request: Request, authorization: str = Header(default="")):
+        agent = agent_of(authorization)
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(400, "request must be a JSON object")
+        code, out = await asyncio.to_thread(web_converse, agent, body)
+        return JSONResponse(out, status_code=code)
 
     @app.post("/v1/chat/completions")
     async def completions(request: Request, authorization: str = Header(default="")):
