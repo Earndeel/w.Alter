@@ -6,6 +6,11 @@ owner), replies streamed token by token over a chunked HTTP response after a "th
 a stop button visible while generating, Enter to send, error banner (role=alert) when the
 login expired. Admin endpoints switch the DOM variant (site update), expire logins, change pace;
 STATE["window"] keeps only the last N turns mounted (long conversations unmount old turns).
+Like ChatGPT: a model picker (menu of radio options + an effort slider driven by arrow keys, the
+selection persists server side), file inputs (attachments upload ~700 ms with the send button
+disabled), and produced outputs: "image" in a message adds a generated image to the reply
+("image seule" = image without text), "fichier" adds a file tile whose download button builds a
+blob and clicks an <a download> (the page's own download).
 """
 from __future__ import annotations
 
@@ -16,7 +21,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-STATE = {"variant": "a", "token_ms": 20, "think_ms": 600, "window": 0, "sids": {}, "convs": {}}
+STATE = {"variant": "a", "token_ms": 20, "think_ms": 600, "window": 0, "model": "Alpha", "effort": "medium",
+         "sids": {}, "convs": {}}
 LOCK = threading.Lock()
 
 PAGE = r"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Fixture chat</title>
@@ -24,6 +30,7 @@ PAGE = r"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Fix
 #composer,textarea{min-height:40px;border:2px solid #01B7FF;padding:6px;display:block;width:100%}</style></head>
 <body>__BODY__<script>
 const VARIANT = "__VARIANT__", HISTORY = __HISTORY__, WINDOW = __WINDOW__;
+let MODEL = "__MODEL__", EFFORT = "__EFFORT__", pending = [], uploading = false;
 let conv = __CONV__;
 const A = VARIANT === "a";
 const thread = document.querySelector(A ? '#thread' : 'section.log');
@@ -45,7 +52,8 @@ let ctrl = null;
 function value() { return A ? input.innerText : input.value; }
 function clear() { if (A) input.textContent = ''; else input.value = ''; }
 async function send() {
-  const text = value().trim(); if (!text || ctrl) return;
+  const text = value().trim(); if (!text || ctrl || uploading) return;
+  const files = pending; pending = []; tiles.textContent = '';
   clear(); turn('user', text);
   if (!conv) { conv = crypto.randomUUID().slice(0, 8); history.pushState({}, '', '/c/' + conv); }
   const bot = turn('assistant', ''); const dots = document.createElement('span'); dots.textContent = '…'; bot._b.appendChild(dots);
@@ -53,7 +61,7 @@ async function send() {
   ctrl = new AbortController(); stopB.hidden = false; sendB.hidden = true;
   let first = true;
   try {
-    const r = await fetch('/api/chat', {method: 'POST', body: JSON.stringify({conv, text}), signal: ctrl.signal,
+    const r = await fetch('/api/chat', {method: 'POST', body: JSON.stringify({conv, text, model: MODEL, effort: EFFORT, files}), signal: ctrl.signal,
                                         headers: {'Content-Type': 'application/json'}});
     if (r.status === 401) { clearInterval(anim); bot.remove(); const al = document.createElement('div');
       al.setAttribute('role', 'alert'); al.textContent = 'Session expirée, reconnectez-vous.'; document.body.appendChild(al); return; }
@@ -61,14 +69,57 @@ async function send() {
     for (;;) { const {value: chunk, done} = await rd.read(); if (done) break;
       if (first) { first = false; clearInterval(anim); dots.remove(); }
       bot._b.appendChild(document.createTextNode(dec.decode(chunk, {stream: true}))); }
+    if (r.headers.get('X-Image')) {           // generated image, part of the generation (stop still visible)
+      const img = document.createElement('img'); img.alt = 'image générée'; img.src = '/media/rouge.png?' + Math.random();
+      await new Promise(ok => { img.onload = ok; img.onerror = ok; bot.appendChild(img); });
+    }
+    if (r.headers.get('X-File')) {
+      const tile = document.createElement('div'); tile.className = 'ftile';
+      const nm = document.createElement('span'); nm.textContent = 'resultat.csv';
+      const dl = document.createElement('button'); dl.type = 'button'; dl.dataset.dl = ''; dl.setAttribute('aria-label', 'Télécharger'); dl.textContent = '⬇';
+      dl.addEventListener('click', async () => {
+        const b = await (await fetch('/files/resultat.csv')).blob();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'resultat.csv'; a.click();
+      });
+      tile.append(nm, dl); bot.appendChild(tile);
+    }
   } catch (e) { /* aborted by the stop button */ }
   finally { clearInterval(anim); if (first) dots.remove(); ctrl = null; stopB.hidden = true; sendB.hidden = false; }
 }
+const picker = document.querySelector('[data-model-open]'), menu = document.querySelector('#picker [role=menu]');
+const LEVELS = ['low', 'medium', 'high'];
+function showEffort() { picker.dataset.effort = EFFORT; picker.textContent = EFFORT[0].toUpperCase() + EFFORT.slice(1); }
+function save() { fetch('/api/model', {method: 'POST', body: JSON.stringify({model: MODEL, effort: EFFORT})}); }
+showEffort();
+for (const o of menu.querySelectorAll('[role=menuitemradio]')) {
+  o.setAttribute('aria-checked', String(o.textContent === MODEL));
+  o.addEventListener('click', () => { MODEL = o.textContent; for (const x of menu.querySelectorAll('[role=menuitemradio]')) x.setAttribute('aria-checked', String(x === o)); menu.hidden = true; save(); });
+}
+picker.addEventListener('click', () => { menu.hidden = !menu.hidden; });
+menu.querySelector('[data-effort-slider]').addEventListener('keydown', e => {
+  const i = LEVELS.indexOf(EFFORT), j = e.key === 'ArrowRight' ? Math.min(2, i + 1) : e.key === 'ArrowLeft' ? Math.max(0, i - 1) : i;
+  if (j !== i) { EFFORT = LEVELS[j]; showEffort(); save(); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') menu.hidden = true; });
+const tiles = document.querySelector('#tiles');
+for (const fi of document.querySelectorAll('input[type=file]')) fi.addEventListener('change', async () => {
+  uploading = true; sendB.disabled = true;
+  for (const f of fi.files) {
+    const t = document.createElement('span'); t.textContent = f.name; tiles.appendChild(t);
+    const head = f.type.startsWith('text/') ? (await f.text()).slice(0, 60).trim() : '';
+    pending.push({name: f.name, size: f.size, type: f.type, head});
+  }
+  setTimeout(() => { uploading = false; sendB.disabled = false; }, 700);
+});
 input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
 sendB.addEventListener('click', send);
 stopB.addEventListener('click', () => ctrl && ctrl.abort());
 </script></body></html>"""
 
+CONTROLS = """<div id="picker"><button type="button" data-model-open data-effort="medium">Medium</button>
+<div role="menu" hidden><div role="menuitemradio" aria-checked="true">Alpha</div><div role="menuitemradio" aria-checked="false">Beta Pro</div>
+<div role="menuitem" data-effort-slider tabindex="0">effort</div></div></div>
+<input type="file" accept="image/*" capture="environment" hidden><input type="file" multiple hidden><div id="tiles"></div>"""
 BODY_A = """<main id="thread" data-thread></main>
 <div id="composer" contenteditable="true" role="textbox" aria-label="Message"></div>
 <button type="button" data-action="send">Envoyer</button><button type="button" data-action="stop" hidden>Arrêter</button>"""
@@ -76,6 +127,19 @@ BODY_B = """<section class="log"></section>
 <textarea name="prompt" placeholder="Écrire"></textarea>
 <button type="button" class="go">Envoyer</button><button type="button" data-testid="halt-generation" hidden>Stop</button>"""
 SIGNED_OUT = """<!doctype html><html><body><h1>Se connecter</h1><p>Session absente.</p></body></html>"""
+
+
+def _png(w: int, h: int, rgb: tuple[int, int, int]) -> bytes:
+    import struct
+    import zlib
+    raw = b"".join(b"\x00" + bytes(rgb) * w for _ in range(h))
+    chunk = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)  # noqa: E731
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
+
+PNG = _png(200, 200, (220, 20, 20))
+CSV = b"a,b,c\n1,2,3\n4,5,6\n"
 
 
 def reply_text(conv: dict, text: str) -> str:
@@ -114,7 +178,8 @@ class Handler(BaseHTTPRequestHandler):
     def _page(self, conv):
         hist = conv["messages"] if conv else []
         v = STATE["variant"]
-        html = (PAGE.replace("__BODY__", BODY_A if v == "a" else BODY_B).replace("__VARIANT__", v)
+        html = (PAGE.replace("__BODY__", (BODY_A if v == "a" else BODY_B) + CONTROLS)
+                .replace("__MODEL__", STATE["model"]).replace("__EFFORT__", STATE["effort"]).replace("__VARIANT__", v)
                 .replace("__HISTORY__", json.dumps(hist)).replace("__WINDOW__", str(int(STATE["window"]))).replace("__CONV__", json.dumps(conv["id"] if conv else None)))
         return html
 
@@ -131,6 +196,10 @@ class Handler(BaseHTTPRequestHandler):
             headers.append(("Set-Cookie", f"sid={sid}; Path=/; HttpOnly"))
         if url.path == "/health":
             return self._send(200, "ok", "text/plain")
+        if url.path.startswith("/media/") and user:
+            return self._send(200, PNG, "image/png")
+        if url.path == "/files/resultat.csv" and user:
+            return self._send(200, CSV, "text/csv")
         if not user:
             return self._send(200, SIGNED_OUT)
         if url.path == "/":
@@ -154,6 +223,10 @@ class Handler(BaseHTTPRequestHandler):
                 elif url.path == "/admin/pace":
                     STATE.update({k: body[k] for k in ("token_ms", "think_ms") if k in body})
             return self._send(200, "{}", "application/json")
+        if url.path == "/api/model" and self._user():
+            with LOCK:
+                STATE.update(model=body["model"], effort=body["effort"])
+            return self._send(200, "{}", "application/json")
         if url.path != "/api/chat":
             return self._send(404, "not found", "text/plain")
         user = self._user()
@@ -163,17 +236,30 @@ class Handler(BaseHTTPRequestHandler):
             conv = STATE["convs"].setdefault(body["conv"], {"id": body["conv"], "user": user, "messages": []})
             if conv["user"] != user:
                 return self._send(403, "{}", "application/json")
-            conv["messages"].append({"role": "user", "text": body["text"]})
+            conv["messages"].append({"role": "user", "text": body["text"], "model": body.get("model"),
+                                     "effort": body.get("effort"), "files": body.get("files") or []})
             full = reply_text(conv, body["text"])
+            if body.get("model"):
+                full = f"[{body['model']}/{body.get('effort')}] " + full
+            if body.get("files"):
+                full = "Fichiers : " + " ; ".join(f"{f['name']} {f['size']} o {f.get('head', '')}".strip()
+                                                  for f in body["files"]) + " — " + full
+            low = body["text"].lower()
+            if "image seule" in low:
+                full = ""
             conv["sent"] = conv.get("sent", 0) + 1
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.send_header("Transfer-Encoding", "chunked")
+        if "image" in body["text"].lower():
+            self.send_header("X-Image", "1")
+        if "fichier" in body["text"].lower():
+            self.send_header("X-File", "1")
         self.end_headers()
         time.sleep(STATE["think_ms"] / 1000)
         out = []
         try:
-            for i, tok in enumerate(full.split(" ")):
+            for i, tok in enumerate(full.split(" ") if full else []):
                 piece = (tok if i == 0 else " " + tok).encode()
                 self.wfile.write(b"%x\r\n%s\r\n" % (len(piece), piece))
                 self.wfile.flush()
@@ -195,7 +281,7 @@ def serve(port: int = 0) -> tuple[ThreadingHTTPServer, int]:
 
 def reset() -> None:
     with LOCK:
-        STATE.update(variant="a", token_ms=20, think_ms=600, window=0, sids={}, convs={})
+        STATE.update(variant="a", token_ms=20, think_ms=600, window=0, model="Alpha", effort="medium", sids={}, convs={})
 
 
 if __name__ == "__main__":

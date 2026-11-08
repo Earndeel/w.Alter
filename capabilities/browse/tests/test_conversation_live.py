@@ -302,6 +302,82 @@ class ConversationLiveTests(unittest.TestCase):
             self.assertEqual(out["match"], "recipe", out)
             self.assertIn(f"Réponse à : Fenêtre {i}", out["reply"])
 
+    # -- 15-18: model choice, attachments, produced files (controls declared in the recipe) --
+    CONTROLS = {"model": {"open": "[data-model-open]", "option": '[role="menuitemradio"]',
+                          "effort": "[data-effort-slider]", "effort_attr": "data-effort"},
+                "download": "[data-dl]"}
+
+    def _declare_controls(self):
+        cap = self.index.lookup_capability(self.host, "chat")
+        if not all(cap["implementation"].get(k) == v for k, v in self.CONTROLS.items()):
+            self.index.bump_capability_version(self.host, "chat", implementation={**cap["implementation"], **self.CONTROLS},
+                                               notes="test: declared controls")
+
+    def test_15_model_choice(self):
+        self._declare_controls()
+        before = self.sent_count()
+        bad = self.send("Modèle inconnu", model="Gamma")
+        self.assertFalse(bad["ok"])
+        self.assertIn("model_or_effort_unknown: gamma", bad["error"])
+        self.assertIn("Beta Pro", bad["error"])
+        self.assertEqual(self.sent_count(), before)                 # nothing sent
+        plain = self.send("Sans choix")                              # default: what is already selected
+        self.assertIn("[Alpha/medium]", plain["reply"])
+        self.assertNotIn("model_ms", plain["timings"])
+        out = self.send("Avec choix", model="beta high", label="model choice")
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["model"], {"model": "Beta Pro", "effort": "High"})
+        self.assertIn("[Beta Pro/high]", out["reply"])
+        kept = self.send("Choix conservé")
+        self.assertIn("[Beta Pro/high]", kept["reply"])
+        low = self.send("Effort seul", model="low")
+        self.assertIn("[Beta Pro/low]", low["reply"])
+        unknown = self.send("Effort inconnu", model="turbo")
+        self.assertIn("unknown: turbo", unknown["error"])
+        for level in ("Low", "Medium", "High"):
+            self.assertIn(level, unknown["error"].split("efforts:")[1])
+        self.assertEqual(chat_fixture.STATE["effort"], "low")        # the owner's level put back
+        back = self.send("Retour", model="Alpha medium")
+        self.assertIn("[Alpha/medium]", back["reply"])
+
+    def test_16_attachments(self):
+        d = Path(self.tmp.name)
+        (d / "note.txt").write_text("Le code secret est ORANGE-42.\n")
+        (d / "rouge.png").write_bytes(chat_fixture.PNG)
+        out = self.send("Lis les pièces jointes", files=[str(d / "note.txt"), str(d / "rouge.png")], label="attachments")
+        self.assertTrue(out["ok"], out)
+        self.assertIn("note.txt", out["reply"])
+        self.assertIn("ORANGE-42", out["reply"])
+        self.assertIn(f"rouge.png {len(chat_fixture.PNG)} o", out["reply"])
+        self.assertIn("Réponse à : Lis les pièces jointes", out["reply"])
+        self.assertGreater(out["timings"]["attach_ms"], 600)          # waited for the upload to finish
+        self.assertEqual(out["input_method"], "paste")
+
+    def test_17_outputs(self):
+        self._declare_controls()
+        out = self.send("Fais une image et un fichier", label="outputs")
+        self.assertTrue(out["ok"], out)
+        kinds = {f["kind"]: f for f in out["files"]}
+        self.assertEqual(set(kinds), {"image", "file"}, out["files"])
+        img, csv = Path(kinds["image"]["path"]), Path(kinds["file"]["path"])
+        self.assertEqual(img.read_bytes(), chat_fixture.PNG)
+        self.assertEqual(kinds["image"]["mime"], "image/png")
+        self.assertEqual(csv.name, "resultat.csv")
+        self.assertEqual(csv.read_bytes(), chat_fixture.CSV)
+        self.assertEqual(oct(csv.stat().st_mode & 0o777), "0o600")
+        again = self.send("Fais une image et un fichier", request_id=out["request_id"])
+        self.assertTrue(again.get("duplicate"))
+        self.assertEqual(again["files"], out["files"])
+        downloads = Path.home() / "Downloads"
+        self.assertFalse((downloads / "resultat.csv").exists() and (downloads / "resultat.csv").stat().st_mtime > time.time() - 60)
+
+    def test_18_image_only_reply(self):
+        out = self.send("Une image seule", label="image only")
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["reply"], "")
+        self.assertEqual(out["match"], "recipe")
+        self.assertEqual([f["kind"] for f in out["files"]], ["image"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

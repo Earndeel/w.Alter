@@ -12,6 +12,17 @@ structural selectors (never coordinates):
     busy        element visible while generating (null = end by quiescence)
     error       element whose appearance after submit means the service refused (default [role=alert])
     settle_ms / quiet_ms / timeout_s
+  optional controls (declared once per site, data like the rest):
+    model       {open, option, effort, effort_attr}: model picker. Used only when a call names a model;
+                otherwise the model already selected in the service is kept, nothing is clicked
+    attach      file input for attachments (default: the page's most general input[type=file])
+    download    control that downloads a file produced by the service, inside its reply
+
+Attachments: bytes passed to the page in chunks, set on the file input (DataTransfer + change),
+ready when the page's upload indicators (newly disabled buttons, progress bars) are gone.
+Outputs: images (>= 128 px) and downloads that appear in the reply turn are read by the page
+itself (blob/same-origin fetch, the page's own download intercepted, never saved by the browser)
+and written under state/browse/conversations/files/ (0600, kept 7 days).
 
 Nominal path of a validated recipe = no LLM, no subprocess besides the clipboard, direct
 HTTP to the engine:
@@ -60,6 +71,11 @@ CHUNK_S = 45          # one awaited evaluate stays well under the engine's HTTP 
 KEEP_REQUESTS = 20    # idempotency log per conversation
 DEFAULTS = {"engine": "camoufox", "submit": {"key": "Enter"}, "busy": None, "error": '[role="alert"]',
             "settle_ms": 150, "quiet_ms": 2000, "timeout_s": 180}
+RECIPE_KEYS = ("kind", "engine", "start_url", "submit", "error", "settle_ms", "quiet_ms", "timeout_s",
+               "model", "attach", "download")          # kept as they are by discovery/repair
+CHUNK_BYTES = 3 * 1024 * 1024    # per evaluate: base64 stays under the engine's 5 MB request body
+MAX_FILE = 50 * 1024 * 1024      # attachment / output (Telegram bots cannot send more)
+KEEP_FILES_S = 7 * 86400
 
 
 class ConversationError(RuntimeError):
@@ -116,7 +132,7 @@ class Engine:
 # the engine, so waiting is a MutationObserver resolving a promise: no polling from Python.
 _JS = r"""
 (() => {
-const V = 11;
+const V = 14;
 if (window.__wc && window.__wc.v === V) return window.__wc;
 const norm = s => (s || '').replace(/\s+/g, ' ').trim();
 const vis = el => { if (!el || !el.isConnected) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
@@ -147,6 +163,14 @@ function findInput(sel) {
   return list.sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom)[0];
 }
 function inputValue(el) { return el ? ('value' in el && el.tagName !== 'DIV' ? el.value : text(el)) : ''; }
+// Resolves with fn()'s first truthy value, re-evaluated on DOM mutations (no polling), or null after ms.
+const waitFor = (fn, ms) => new Promise(res => {
+  const v0 = fn(); if (v0) return res(v0);
+  const obs = new MutationObserver(() => { const v = fn(); if (v) { obs.disconnect(); clearTimeout(t); res(v); } });
+  obs.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  const t = setTimeout(() => { obs.disconnect(); res(fn() || null); }, ms);
+});
+const disabled = b => b.disabled || b.getAttribute('aria-disabled') === 'true';
 const R = {};                 // per-request state
 const wc = { v: V, R };
 wc.prepare = (cfg) => {       // find + focus + select the input so the paste replaces it
@@ -173,6 +197,7 @@ wc.arm = (id, cfg, msg, resume) => {    // install the observer BEFORE submit
   const st = R[id] = { id, cfg, msg: norm(msg), t0: performance.now(), submitAt: null, firstAt: null, doneAt: null,
     lastMut: performance.now(), added: [], echo: null, reply: null, mode: null, state: 'pending', resume: !!resume,
     oldUsers: new Set(qa(cfg.user)), before: wc.buttons(), during: null, input: findInput(cfg.input),
+    oldImgs: new Set(qa('img')), oldDl: new Set(wc.dlControls(cfg)),
     errBefore: new Set(qa(cfg.error).filter(vis)), error: null };
   // the echo is a user element that did not exist at arm time, never found by counting: chat UIs unmount
   // old turns of long conversations (ChatGPT keeps ~7 mounted), so the count can stay the same after a send
@@ -212,22 +237,24 @@ wc.arm = (id, cfg, msg, resume) => {    // install the observer BEFORE submit
   const check = () => {
     if (st.state !== 'pending') return;
     let echo = null, reply = null, mode = 'recipe';
+    let mediaOnly = false;    // a reply made only of produced images (no text element)
     if (cfg.user && cfg.reply) {
       echo = recipeEcho();
       if (echo) reply = qa(cfg.reply).find(r => follows(echo, r) && !r.contains(echo)) || null;
+      if (echo && (!reply || !norm(text(reply)))) mediaOnly = wc.media(st, echo).length > 0;
     }
-    if (!echo || !reply) { mode = 'generic'; echo = genericEcho(); reply = echo ? genericReply(echo) : null; }
+    if (!echo || (!reply && !mediaOnly)) { mode = 'generic'; echo = genericEcho(); reply = echo ? genericReply(echo) : null; }
     st.echo = echo; st.reply = reply; st.mode = mode;
     const t = reply ? norm(text(reply)) : '';
     // first real content (a '…' placeholder is not a token)
-    if (st.firstAt === null && /[\p{L}\p{N}]/u.test(t)) {
+    if (st.firstAt === null && (mediaOnly || /[\p{L}\p{N}]/u.test(t))) {
       st.firstAt = performance.now(); st.during = wc.buttons();
       st.earlyReply = wc.around(reply, echo); st.earlyUser = wc.around(echo, reply);   // selectors true DURING generation
     }
     if (st.cancel) return finish('cancelled');
     const err = qa(cfg.error).find(e => vis(e) && !st.errBefore.has(e) && norm(text(e)));
     if (err) { st.error = norm(text(err)).slice(0, 200); return finish('error'); }
-    if (!t) return;
+    if (!t && !mediaOnly) return;
     if (cfg.busy && qa(cfg.busy).some(vis)) { st.busySeen = true; return; }   // still generating
     // short settle only once the recipe's busy element was really seen this exchange; a busy selector
     // the site no longer matches (update, other locale) falls back to quiescence instead of cutting the reply
@@ -305,6 +332,133 @@ wc.cancel = () => {
   }
   return true;
 };
+// ---- produced files: images and downloads that appear in the reply turn (after the echo, before the composer)
+wc.inTurn = (st, echo, el) => {
+  if (!echo || !el.isConnected || echo.contains(el) || !follows(echo, el)) return false;
+  const inp = findInput(st.cfg.input);
+  return !(inp && follows(echo, inp) && (follows(inp, el) || inp.contains(el)));
+};
+const big = i => i.complete && i.naturalWidth ? (i.naturalWidth >= 128 && i.naturalHeight >= 128)
+  : (i.getBoundingClientRect().width >= 128 && i.getBoundingClientRect().height >= 128);
+wc.media = (st, echo) => qa('img').filter(i => !st.oldImgs.has(i) && big(i) && wc.inTurn(st, echo, i));
+wc.dlControls = (cfg) => [...qa(cfg.download), ...qa('a[download], a[href^="blob:"]')];
+wc.outputs = (id) => {
+  const st = R[id]; if (!st || !st.echo) return [];
+  const out = [], seen = new Set(); st.outEls = [];
+  for (const i of wc.media(st, st.echo)) {
+    const src = i.currentSrc || i.src; if (!src || seen.has(src)) continue; seen.add(src);
+    st.outEls.push(i); out.push({ i: st.outEls.length - 1, kind: 'image', w: i.naturalWidth, h: i.naturalHeight });
+  }
+  for (const d of wc.dlControls(st.cfg)) {
+    if (st.oldDl.has(d) || seen.has(d) || !wc.inTurn(st, st.echo, d)) continue; seen.add(d);
+    st.outEls.push(d); out.push({ i: st.outEls.length - 1, kind: 'file', name: d.getAttribute('download') || '' });
+  }
+  return out;
+};
+// The next download the page starts after act() (anchor click on a blob/download link, window.open):
+// captured, never handed to the browser's own download manager.
+wc.capture = (act, ms) => new Promise(res => {
+  const A = HTMLAnchorElement.prototype, oc = A.click, oo = window.open, co = URL.createObjectURL, blobs = new Map();
+  let t = null, over = false;
+  const restore = () => { A.click = oc; window.open = oo; URL.createObjectURL = co; clearTimeout(t); };
+  const got = async (url, name) => {
+    if (over) return; over = true; restore();
+    try { res({ blob: blobs.get(url) || await (await fetch(url, { credentials: 'include' })).blob(), name: name || '' }); }
+    catch (e) { res(null); }
+  };
+  URL.createObjectURL = function (o) { const u = co.call(URL, o); if (o instanceof Blob) blobs.set(u, o); return u; };
+  A.click = function () { if (this.href && (this.download || this.href.startsWith('blob:'))) { got(this.href, this.download); return; } return oc.call(this); };
+  window.open = function (u) { got(String(u), ''); return null; };
+  t = setTimeout(() => { over = true; restore(); res(null); }, ms);
+  try { act(); } catch (e) { over = true; restore(); res(null); }
+});
+wc.grab = async (id, i, ms) => {     // bytes of one output, kept in the page until read by chunks
+  const st = R[id], el = st && st.outEls && st.outEls[i]; if (!el) return { ok: false, reason: 'gone' };
+  let blob = null, name = '';
+  try {
+    if (el.tagName === 'IMG') blob = await (await fetch(el.currentSrc || el.src, { credentials: 'include' })).blob();
+    else if (el.tagName === 'A' && /^(https?:|blob:|data:)/.test(el.href || '')) {
+      name = el.getAttribute('download') || ''; blob = await (await fetch(el.href, { credentials: 'include' })).blob();
+    } else { const c = await wc.capture(() => el.click(), ms); if (!c) return { ok: false, reason: 'no_download' }; blob = c.blob; name = c.name; }
+  } catch (e) { return { ok: false, reason: String(e).slice(0, 160) }; }
+  (window.__wcOut = window.__wcOut || {})[id + '#' + i] = blob;
+  return { ok: true, size: blob.size, type: blob.type, name };
+};
+wc.chunk = async (key, off, n) => {
+  const b = (window.__wcOut || {})[key]; if (!b) return null;
+  const a = new Uint8Array(await b.slice(off, off + n).arrayBuffer());
+  let s = ''; for (let i = 0; i < a.length; i += 32768) s += String.fromCharCode.apply(null, a.subarray(i, i + 32768));
+  return btoa(s);
+};
+wc.dropOut = (id) => { for (const k of Object.keys(window.__wcOut || {})) if (k.startsWith(id + '#')) delete window.__wcOut[k]; return true; };
+// ---- attachments: bytes arrive in base64 chunks, then one File list set on the file input
+wc.upPush = (k, chunk) => { const u = window.__wcUp = window.__wcUp || {}; u[k] = (u[k] || '') + chunk; return u[k].length; };
+const accepts = (inp, f) => {
+  const a = (inp.getAttribute('accept') || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+  if (!a.length) return true;
+  const n = f.name.toLowerCase(), t = (f.type || '').toLowerCase();
+  return a.some(x => x.startsWith('.') ? n.endsWith(x) : x.endsWith('/*') ? t.startsWith(x.slice(0, -1)) : t === x);
+};
+wc.attach = (cfg, files, ms) => {
+  const up = window.__wcUp || {};
+  const fs = files.map(f => { const s = atob(up[f.k] || ''); delete up[f.k]; const b = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return new File([b], f.name, { type: f.mime }); });
+  // the most general file input (no accept filter first), never a camera capture input
+  const inputs = qa(cfg.attach || 'input[type="file"]').filter(i => !i.disabled && !i.hasAttribute('capture')
+    && fs.every(f => accepts(i, f)) && (fs.length < 2 || i.multiple))
+    .sort((a, b) => (a.getAttribute('accept') ? 1 : 0) - (b.getAttribute('accept') ? 1 : 0));
+  const inp = inputs[0];
+  if (!inp) return { ok: false, reason: 'attach_input_not_found' };
+  const before = new Set(qa('button, [role="button"]').filter(b => vis(b) && disabled(b)));
+  const busyNow = () => qa('button, [role="button"]').some(b => vis(b) && disabled(b) && !before.has(b)) || qa('[role="progressbar"]').some(vis);
+  const t0 = performance.now();
+  return new Promise(res => {
+    let timer = null, seenBusy = false, obs = null, cap = null;
+    const done = (ok, reason) => { if (obs) obs.disconnect(); clearTimeout(timer); clearTimeout(cap);
+      res({ ok, reason, ms: Math.round(performance.now() - t0), seen_busy: seenBusy, input: inp.getAttribute('accept') || '*' }); };
+    // ready = upload indicators gone (300 ms confirmation), or nothing ever showed one (1.5 s)
+    const evalState = () => {
+      if (busyNow()) { seenBusy = true; clearTimeout(timer); timer = null; return; }
+      clearTimeout(timer); timer = setTimeout(() => done(true), seenBusy ? 300 : 1500);
+    };
+    obs = new MutationObserver(evalState);
+    obs.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'role'] });
+    cap = setTimeout(() => done(false, 'attach_timeout'), ms);
+    const dt = new DataTransfer(); for (const f of fs) dt.items.add(f);
+    inp.files = dt.files;
+    inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true }));
+    evalState();
+  });
+};
+// ---- model picker (recipe.model); touched only when a call names a model
+const opts = m => qa(m.option || '[role="menuitemradio"]').filter(vis);
+wc.modelOpen = async (m) => {
+  if (!opts(m).length) { const b = qa(m.open).filter(vis).pop(); if (!b) return { ok: false, reason: 'model_picker_not_found' }; b.click(); }
+  const l = await waitFor(() => { const o = opts(m); return o.length ? o : null; }, 3000);
+  if (!l) return { ok: false, reason: 'model_menu_not_opened' };
+  return { ok: true, options: l.map(o => ({ text: norm(text(o)), checked: o.getAttribute('aria-checked') === 'true' })) };
+};
+wc.modelPick = (m, name) => {
+  const o = opts(m).find(x => norm(text(x)) === name); if (!o) return { ok: false };
+  const was = o.getAttribute('aria-checked') === 'true'; if (!was) o.click();
+  return { ok: true, clicked: !was };
+};
+wc.menuOpen = (m) => opts(m).length > 0;
+wc.effort = (m) => {
+  const b = qa(m.open).filter(vis).pop(); if (!b) return null;
+  const lines = text(b).split('\n').map(norm).filter(Boolean);
+  return { value: m.effort_attr ? b.getAttribute(m.effort_attr) : null, label: lines[lines.length - 1] || '' };
+};
+wc.effortFocus = async (m) => {
+  const r = await wc.modelOpen(m); if (!r.ok) return r;
+  const s = await waitFor(() => qa(m.effort).find(vis), 2000);
+  if (!s) return { ok: false, reason: 'effort_control_not_found' };
+  s.focus(); return { ok: true };
+};
+wc.labelAfter = (m, prev, ms) => waitFor(() => { const e = wc.effort(m); return e && prev && e.label !== prev.label ? e : null; }, ms).then(e => e || wc.effort(m));
+// after a key press: the value attribute often updates before the visible label, wait for both
+wc.effortAfter = (m, prev, ms) => waitFor(() => { const e = wc.effort(m); if (!e || !prev) return e;
+  return (prev.value == null || e.value !== prev.value) && e.label !== prev.label ? e : null; }, ms).then(e => e || wc.effort(m));
 wc.forget = (id) => { const st = R[id]; if (st) { try { st.obs.disconnect(); } catch (e) {} delete R[id]; } return true; };
 window.__wc = wc;
 return wc;
@@ -411,6 +565,162 @@ def _paste(engine: Engine, tab: str, cfg: Mapping[str, Any], message: str) -> st
     raise ConversationError("input_not_filled")
 
 
+# --------------------------------------------------------------------------- model, attachments, outputs
+
+def _choose_model(engine: Engine, tab: str, cfg: Mapping[str, Any], spec: str) -> dict[str, Any]:
+    """Select a model and/or effort named by ``spec`` ("GPT-6", "sol high", "instant").
+
+    Words found in a model option's name choose that model; the remaining words name the effort
+    level (matched against the effort control's value or label). Nothing is clicked for what is
+    already selected. Raises ConversationError before anything is sent if the spec cannot be met.
+    """
+    m = cfg.get("model")
+    if not m:
+        raise ConversationError("model_choice_unsupported")
+    ev = lambda call, timeout=15: engine.evaluate(tab, _js(call), timeout=timeout)  # noqa: E731
+    try:
+        opened = ev(f"wc.modelOpen({_j(m)})") or {}
+        if not opened.get("ok"):
+            raise ConversationError(opened.get("reason") or "model_menu")
+        names = [o["text"] for o in opened["options"]]
+        current = next((o["text"] for o in opened["options"] if o.get("checked")), None)
+        words = spec.lower().split()
+        model_words = [w for w in words if any(w in n.lower() for n in names)]
+        effort_words = [w for w in words if w not in model_words]
+        chosen = current
+        if model_words:
+            found = [n for n in names if all(w in n.lower() for w in model_words)]
+            exact = [n for n in found if n.lower() == " ".join(model_words)]
+            found = exact or found
+            if len(found) != 1:
+                raise ConversationError(("model_ambiguous: " if found else "model_unknown: ") + " | ".join(names))
+            chosen = found[0]
+            if chosen != current:
+                before = ev(f"wc.effort({_j(m)})")
+                ev(f"wc.modelPick({_j(m)}, {_j(chosen)})")
+                ev(f"wc.labelAfter({_j(m)}, {_j(before)}, 1000)")    # the picker shows the new model's level
+        effort = None
+        if effort_words:
+            want = " ".join(effort_words)
+            if not m.get("effort"):
+                raise ConversationError("effort_choice_unsupported")
+            focus = ev(f"wc.effortFocus({_j(m)})") or {}
+            if not focus.get("ok"):
+                raise ConversationError(focus.get("reason") or "effort_control")
+            def matches(e: Mapping[str, Any] | None) -> bool:
+                value, label = ((e or {}).get("value") or "").lower(), ((e or {}).get("label") or "").lower()
+                return bool(e) and (want == value or want == label or label.endswith(" " + want))
+            start = cur = ev(f"wc.effort({_j(m)})") or {}
+            seen = [cur.get("label") or cur.get("value")]
+            # step through the levels with real arrow keys until the named one is selected
+            for key in ("ArrowRight", "ArrowLeft"):
+                while not matches(cur):
+                    engine.press(tab, key)
+                    nxt = ev(f"wc.effortAfter({_j(m)}, {_j(cur)}, 600)") or {}
+                    if nxt == cur:
+                        break                          # end of the scale in this direction
+                    cur = nxt
+                    seen.append(cur.get("label") or cur.get("value"))
+                if matches(cur):
+                    break
+            if not matches(cur):
+                while cur != start:                    # put the owner's level back before failing
+                    engine.press(tab, "ArrowRight")
+                    nxt = ev(f"wc.effortAfter({_j(m)}, {_j(cur)}, 600)") or {}
+                    if nxt == cur:
+                        break
+                    cur = nxt
+                efforts = " | ".join(dict.fromkeys(x for x in seen if x))
+                if model_words:
+                    raise ConversationError(f"effort_unknown: {want} (efforts: {efforts})")
+                raise ConversationError(f"model_or_effort_unknown: {want} (models: {' | '.join(names)}; efforts: {efforts})")
+            effort = cur.get("label") or cur.get("value")
+        return {"model": chosen, "effort": effort or (ev(f"wc.effortAfter({_j(m)}, null, 0)") or {}).get("label")}
+    finally:
+        with contextlib.suppress(ConversationError):
+            if ev(f"wc.menuOpen({_j(m)})"):
+                engine.press(tab, "Escape")
+
+
+def _attach(engine: Engine, tab: str, cfg: Mapping[str, Any], files: list[str]) -> dict[str, Any]:
+    """Put local files on the page's file input; returns once the page finished uploading them."""
+    import base64
+    import mimetypes
+    specs = []
+    for n, path in enumerate(files):
+        data = Path(path).read_bytes()
+        if len(data) > MAX_FILE:
+            raise ConversationError(f"attachment_too_large: {Path(path).name}")
+        key = f"f{n}-{uuid.uuid4().hex[:8]}"
+        b64 = base64.b64encode(data).decode()
+        for off in range(0, len(b64), CHUNK_BYTES):
+            engine.evaluate(tab, _js(f"wc.upPush({_j(key)}, {_j(b64[off:off + CHUNK_BYTES])})"), timeout=60)
+        specs.append({"k": key, "name": Path(path).name,
+                      "mime": mimetypes.guess_type(path)[0] or "application/octet-stream"})
+    out = engine.evaluate(tab, _js(f"wc.attach({_j(dict(cfg))}, {_j(specs)}, 120000)"), timeout=140) or {}
+    if not out.get("ok"):
+        raise ConversationError(out.get("reason") or "attach_failed")
+    return out
+
+
+def _files_dir() -> Path:
+    return _state_dir() / "files"
+
+
+def _prune_files() -> None:
+    root = _files_dir()
+    if not root.is_dir():
+        return
+    limit = time.time() - KEEP_FILES_S
+    for conv in root.iterdir():
+        for req in (conv.iterdir() if conv.is_dir() else []):
+            with contextlib.suppress(OSError):
+                if req.stat().st_mtime < limit:
+                    for f in req.iterdir():
+                        f.unlink()
+                    req.rmdir()
+
+
+def _collect(engine: Engine, tab: str, request_id: str, key: str) -> list[dict[str, Any]]:
+    """Read the images and files produced in the reply turn; written 0600 under files/<conv>/<request>/."""
+    import base64
+    import mimetypes
+    items = engine.evaluate(tab, _js(f"wc.outputs({_j(request_id)})")) or []
+    saved: list[dict[str, Any]] = []
+    if not items:
+        return saved
+    folder = _files_dir() / key / re.sub(r"[^A-Za-z0-9._-]+", "_", request_id)[:120]
+    folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        for item in items:
+            got = engine.evaluate(tab, _js(f"wc.grab({_j(request_id)}, {item['i']}, 30000)"), timeout=60) or {}
+            if not got.get("ok"):
+                saved.append({"kind": item["kind"], "error": got.get("reason") or "unreadable"})
+                continue
+            size, mime = int(got.get("size") or 0), (got.get("type") or "application/octet-stream").split(";")[0]
+            if size > MAX_FILE:
+                saved.append({"kind": item["kind"], "error": "too_large", "bytes": size})
+                continue
+            data = bytearray()
+            for off in range(0, size, CHUNK_BYTES):
+                part = engine.evaluate(tab, _js(f"wc.chunk({_j(request_id + '#' + str(item['i']))}, {off}, {CHUNK_BYTES})"), timeout=60)
+                data += base64.b64decode(part or "")
+            ext = mimetypes.guess_extension(mime) or ""
+            name = Path(got.get("name") or item.get("name") or "").name or f"{item['kind']}-{len(saved) + 1}{ext}"
+            name = re.sub(r"[^\w.\- ]+", "_", name).strip() or f"file-{len(saved) + 1}{ext}"
+            path = folder / name
+            while path.exists():
+                path = folder / f"{path.stem}-{len(saved) + 1}{path.suffix}"
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+            saved.append({"kind": item["kind"], "name": path.name, "path": str(path), "mime": mime, "bytes": len(data)})
+    finally:
+        with contextlib.suppress(ConversationError):
+            engine.evaluate(tab, _js(f"wc.dropOut({_j(request_id)})"))
+    return saved
+
+
 # --------------------------------------------------------------------------- tab
 
 def _login(site: str, session: str, engine: str) -> None:
@@ -468,8 +778,15 @@ def send(
     site: str | None = None,
     index: ProfileIndex | None = None,
     timeout_s: float | None = None,
+    model: str | None = None,
+    files: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Send ``message`` in a conversation and return the normalized result (never raises)."""
+    """Send ``message`` in a conversation and return the normalized result (never raises).
+
+    ``model``: optional model/effort to select first; None keeps what the service has selected.
+    ``files``: optional local files attached to the message. Produced images/files come back in
+    ``result["files"]`` ([{kind, name, path, mime, bytes}]).
+    """
     t0 = time.perf_counter()
     timings: dict[str, float] = {}
     mark = lambda name, since: timings.__setitem__(name, round((time.perf_counter() - since) * 1000, 1))  # noqa: E731
@@ -479,7 +796,7 @@ def send(
     session = session or "conv-" + re.sub(r"[^a-z0-9.-]+", "-", host.lower())
     result: dict[str, Any] = {"ok": False, "status": "failed", "reply": "", "host": host, "capability": capability,
                               "conversation": conversation, "request_id": request_id, "transport": "browser",
-                              "session": session, "mode": None, "recipe_version": None, "error": None}
+                              "session": session, "mode": None, "recipe_version": None, "error": None, "files": []}
     cap = index.lookup_capability(host, capability) if host else None
     impl = (cap or {}).get("implementation") or {}
     if impl.get("kind") == "conversation":
@@ -507,6 +824,7 @@ def send(
         rec = next((r for r in state.get("requests", []) if r.get("id") == request_id), None)
         if rec and rec.get("status") == "done":   # idempotent: same request → same answer, nothing resent
             result.update(ok=True, status="done", reply=rec.get("reply", ""), duplicate=True, url=state.get("url"),
+                          files=[f for f in rec.get("files", []) if not f.get("path") or Path(f["path"]).exists()],
                           mode="log", timings={"total_ms": round((time.perf_counter() - t0) * 1000, 1)})
             return result
         if rec and rec.get("submitted") and rec.get("status") in ("error", "cancelled"):
@@ -514,6 +832,8 @@ def send(
             result.update(status=rec["status"], duplicate=True, error="already_" + rec["status"], mode="log")
             return result
         resume = bool(rec and rec.get("submitted"))
+        _prune_files()
+        extras = {"model": model, "files": list(files or []), "key": key}
         try:
             t = time.perf_counter()
             tab, fresh_tab = _ensure_tab(engine, state, cfg, session)
@@ -521,7 +841,7 @@ def send(
             result["tab_reused"] = not fresh_tab
             persist = lambda: _save(state_path, state)  # noqa: E731
             try:
-                out = _exchange(engine, tab, cfg, message, request_id, state, resume, timings, persist)
+                out = _exchange(engine, tab, cfg, message, request_id, state, resume, timings, persist, extras)
             except ConversationError as exc:
                 if fresh_tab or str(exc) != "input_not_found":
                     raise
@@ -530,7 +850,7 @@ def send(
                 tab, fresh_tab = _ensure_tab(engine, state, cfg, session)
                 mark("recovery_ms", t)
                 result["recovered"] = True
-                out = _exchange(engine, tab, cfg, message, request_id, state, resume, timings, persist)
+                out = _exchange(engine, tab, cfg, message, request_id, state, resume, timings, persist, extras)
         except ConversationError as exc:
             result["error"] = str(exc)[:300]
             out = None
@@ -538,15 +858,17 @@ def send(
             status = out["status"]
             result.update(status=status["state"], reply=status["reply"], url=status.get("href"),
                           resumed=resume, input_method=out.get("input_method"), match=status.get("mode"),
-                          busy_seen=status.get("busy_seen"))
+                          busy_seen=status.get("busy_seen"), files=out.get("files") or [])
+            if out.get("model"):
+                result["model"] = out["model"]
             # On a resume the generation started in an earlier call: only its remaining part is measured.
             timings["first_token_ms"] = None if resume else status.get("first_token_ms")
             timings["generation_ms"] = status.get("generation_ms")
-            result["ok"] = status["state"] == "done" and bool(status["reply"])
+            result["ok"] = status["state"] == "done" and bool(status["reply"] or result["files"])
             if status["state"] == "error":
                 result["error"] = "service_error: " + (status.get("error") or "")
                 _drop_tab(engine, state)        # next request re-establishes the page (login, conversation URL)
-            elif status["state"] == "done" and not status["reply"]:
+            elif status["state"] == "done" and not result["ok"]:
                 result["error"] = "empty_reply"
             elif status["state"] == "pending":
                 result["status"] = "incomplete"
@@ -554,7 +876,7 @@ def send(
             learned = out.get("learned")
             # Recipe bookkeeping: discovery registers, a recipe that missed is repaired (new version).
             if result["ok"] and (mode == "discovery" or status.get("mode") == "generic"):
-                new_impl = {k: cfg[k] for k in ("kind", "engine", "start_url", "submit", "error", "settle_ms", "quiet_ms", "timeout_s") if k in cfg}
+                new_impl = {k: cfg[k] for k in RECIPE_KEYS if k in cfg}
                 new_impl.update(site=cfg.get("site"), input=out.get("input") or cfg.get("input"),
                                 user=(learned or {}).get("user"), reply=(learned or {}).get("reply"),
                                 busy=(learned or {}).get("busy") or None)
@@ -577,6 +899,7 @@ def send(
             reqfields = {"status": result["status"], "submitted": True}
             if result["ok"]:
                 reqfields["reply"] = result["reply"]
+                reqfields["files"] = result["files"]
             _record(state, request_id, **reqfields)
         elif cap is not None and impl.get("kind") == "conversation":
             index.observe_capability(host, capability, success=False, latency_ms=0)
@@ -588,15 +911,17 @@ def send(
         # External time = from submit to the end condition minus our own settle window.
         settle = cfg["settle_ms"] if (result.get("busy_seen") and result.get("match") == "recipe") else cfg["quiet_ms"]
         timings["settle_ms"] = settle
-        timings["external_ms"] = max(0.0, timings["generation_ms"] - settle)
+        timings["external_ms"] = max(0.0, timings["generation_ms"] - settle) + (timings.get("upload_ms") or 0)
         timings["walter_ms"] = round(total - timings["external_ms"], 1)
     result["timings"] = timings
     return result
 
 
 def _exchange(engine: Engine, tab: str, cfg: dict[str, Any], message: str, request_id: str,
-              state: dict[str, Any], resume: bool, timings: dict[str, float], persist: Any) -> dict[str, Any]:
+              state: dict[str, Any], resume: bool, timings: dict[str, float], persist: Any,
+              extras: Mapping[str, Any] | None = None) -> dict[str, Any]:
     out: dict[str, Any] = {}
+    extras = extras or {}
     if resume:
         engine.evaluate(tab, _js(f"wc.arm({_j(request_id)}, {_j(cfg)}, {_j(message)}, true)"))
         engine.evaluate(tab, _js(f"wc.submitted({_j(request_id)})"))
@@ -608,6 +933,10 @@ def _exchange(engine: Engine, tab: str, cfg: dict[str, Any], message: str, reque
         else:
             out["status"] = first
     if not resume:
+        if extras.get("model"):
+            t = time.perf_counter()
+            out["model"] = _choose_model(engine, tab, cfg, extras["model"])
+            timings["model_ms"] = round((time.perf_counter() - t) * 1000, 1)
         t = time.perf_counter()
         prep = engine.evaluate(tab, _js(f"wc.prepare({_j(cfg)})"))
         if not (prep or {}).get("ok") and cfg.get("input"):
@@ -620,8 +949,16 @@ def _exchange(engine: Engine, tab: str, cfg: dict[str, Any], message: str, reque
             cfg["input"] = prep.get("input")
             out["input"] = prep.get("input")
         out["input_method"] = _paste(engine, tab, cfg, message)
+        timings["input_ms"] = round((time.perf_counter() - t) * 1000, 1)
+        if extras.get("files"):
+            t = time.perf_counter()
+            att = _attach(engine, tab, cfg, extras["files"])
+            timings["attach_ms"] = round((time.perf_counter() - t) * 1000, 1)
+            timings["upload_ms"] = att.get("ms")       # the service's own upload, counted as external time
+            out["attach"] = att
+            if engine.evaluate(tab, _js(f"wc.inputText({_j(dict(cfg))})")) != _norm(message):
+                raise ConversationError("input_changed_by_attach")
         mark_input = time.perf_counter()
-        timings["input_ms"] = round((mark_input - t) * 1000, 1)
         _record(state, request_id, status="prepared", submitted=False)
         engine.evaluate(tab, _js(f"wc.arm({_j(request_id)}, {_j(cfg)}, {_j(message)}, false)"))
         # Recorded as submitted BEFORE the key press: a crash after it can only resume, never resend.
@@ -642,9 +979,13 @@ def _exchange(engine: Engine, tab: str, cfg: dict[str, Any], message: str, reque
     t = time.perf_counter()
     if status.get("state") == "done" and (status.get("mode") == "generic" or not cfg.get("user")):
         out["learned"] = engine.evaluate(tab, _js(f"wc.learn({_j(request_id)})"))
+    timings["extract_ms"] = round((time.perf_counter() - t) * 1000, 1)
+    if status.get("state") == "done":
+        t = time.perf_counter()
+        out["files"] = _collect(engine, tab, request_id, extras.get("key") or "conv")
+        timings["outputs_ms"] = round((time.perf_counter() - t) * 1000, 1)
     if status.get("state") != "pending":
         engine.evaluate(tab, _js(f"wc.forget({_j(request_id)})"))
-    timings["extract_ms"] = round((time.perf_counter() - t) * 1000, 1)
     out["status"] = status
     return out
 
@@ -686,9 +1027,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--start-url", help="discovery: page of a new conversation (no recipe yet)")
     ap.add_argument("--site", help="discovery: browser_sites name whose owner login the tab needs")
     ap.add_argument("--timeout", type=float)
+    ap.add_argument("--model", help="model/effort to select first (default: keep the service's selection)")
+    ap.add_argument("--file", action="append", default=[], help="attach a local file (repeatable)")
     a = ap.parse_args(argv)
     out = send(a.host, a.capability, a.message, conversation=a.conversation, request_id=a.request_id,
-               session=a.session, start_url=a.start_url, site=a.site, timeout_s=a.timeout)
+               session=a.session, start_url=a.start_url, site=a.site, timeout_s=a.timeout,
+               model=a.model, files=a.file or None)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     return 0 if out["ok"] else 1
 

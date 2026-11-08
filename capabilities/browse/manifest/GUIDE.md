@@ -18,7 +18,9 @@ Camoufox, Webtop) selon la demande et le site ; l'agent décrit ce qu'il veut, p
 3. Rappeler `browser_session` dès que le site affiche une page de connexion.
 4. **Converser avec une interface de chat** (service web conversationnel) : via le Walter Router (passerelle
    `POST /v1/web/converse`, commande Telegram `/gpt`), qui choisit la recette ; en code, `walter_browse.converse(host,
-   capability, message, conversation=…, request_id=…)`. Recette apprise au premier passage, rejouée ensuite sans LLM.
+   capability, message, conversation=…, request_id=…, model=None, files=None)` : `model` facultatif (absent = modèle
+   déjà sélectionné, rien n'est cliqué), `files` = fichiers joints ; fichiers produits rendus dans `files`. Recette
+   apprise au premier passage, rejouée ensuite sans LLM.
 
 ## Organisation
 

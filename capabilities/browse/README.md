@@ -112,3 +112,22 @@ génération progressive) — ils valident le mécanisme, pas un service externe
 vrai site (activé par le propriétaire malgré l'interdiction d'extraction des conditions d'OpenAI, DECISIONS 2026-11-08).
 L'écho est toujours un élément apparu après l'armement, jamais un comptage : les interfaces démontent les anciens tours.
 
+Contrôles facultatifs déclarés dans la recette (une recette sans eux reste valide ; chaque champ est conservé par la
+découverte et la réparation) :
+- `model` = `{open, option, effort, effort_attr}` : choix du modèle et du niveau de réflexion. **Facultatif à l'appel** :
+  sans `model=`, rien n'est cliqué et le modèle déjà sélectionné dans le service est utilisé. Avec `model="<mots>"`,
+  les mots trouvés dans le nom d'une option choisissent le modèle, le reste nomme le niveau (atteint par de vraies
+  flèches clavier sur le curseur `effort`, confirmé quand valeur ET libellé ont changé). Nom inconnu ou ambigu :
+  erreur listant les modèles et niveaux, niveau de départ remis en place, aucun message envoyé. Le choix persiste
+  dans le compte du service.
+- `attach` : champ fichier général de la page (jamais une entrée caméra). `files=[chemins]` : octets transmis par
+  tranches base64 de 3 Mo (limite 50 Mo par fichier), posés par `DataTransfer` après le collage du texte ; envoi
+  quand les boutons désactivés et barres de progression nouvelles ont disparu. Le temps de téléversement du service
+  compte comme externe (`upload_ms`).
+- `download` : contrôle de téléchargement d'un fichier produit. La page télécharge elle-même (son propre
+  `a.click` / `window.open` / `URL.createObjectURL` interceptés le temps de l'appel) ; les images produites (≥ 128 px)
+  sont lues directement. Résultat `files = [{name, mime, size, path, kind}]`, écrits en 0600 sous
+  `state/browse/conversations/files/<conversation>/<request_id>/`, purgés après 7 jours ; une réponse faite d'une
+  image seule est une réponse valide. Limite : sur ChatGPT ce contrôle n'a pas d'attribut stable, la recette retient
+  son libellé `aria-label` dans la langue de l'empreinte (thaï) ; si elle change, déclarer le nouveau libellé.
+
