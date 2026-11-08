@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-08T04:13:26.144355+00:00",
- "description": "Use when customizing W.Alter’s DSH web interface, removing interface controls, or preserving UI changes through harness regeneration.",
- "domain": "walter/dsh",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session established a repeatable DSH-specific customization procedure beyond general frontend design: inspect Cordis composition and plugin dependencies, stage with a separate DSH home, move shared disables into the managed generator, and verify production after regeneration. Evidence includes the ten integrated plugin disables in core commit 5880a06, removal of duplicate unmanaged rows, and repeated browser checks on port 3080. None of the listed related skills specifically covers DSH web composition ownership and regeneration. [session claude_code/vm/5d9d9dd9-1ca1-4e7a-9391-31e71e7d6fb2]",
- "runtime": "learner",
- "session_id": "claude_code/vm/5d9d9dd9-1ca1-4e7a-9391-31e71e7d6fb2",
- "target": "dsh-web-ui-composition"
+ "store_sha": "1e5c8c6facdb2e5bf7b4b87087f83a560f051d85c855285f94ffa655da880003"
 }
