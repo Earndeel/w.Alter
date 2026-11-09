@@ -214,5 +214,139 @@
       "person_lookup",
       "memory_retain"
     ]
-  }
+  },
+  "components": [
+    {
+      "id": "events",
+      "path": "walter_memory/events.py",
+      "role": "Journal canonique core.events (append-only, idempotent)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:core"
+      ],
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "gateway",
+      "path": "walter_memory/gateway.py",
+      "role": "Seule porte d'écriture (127.0.0.1:8890)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:8890/v1"
+        }
+      ],
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "connectors",
+      "path": "connectors",
+      "role": "Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory/connectors"
+    },
+    {
+      "id": "organic",
+      "path": "walter_memory/organic.py",
+      "role": "Mémoire organique V1 (vues, épisodes, périodes, flux)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "assimilation",
+      "path": "walter_memory/assimilation.py",
+      "role": "Assimilation pilotée par le bus (memory.organic)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "runs",
+      "path": "walter_memory/runs.py",
+      "role": "Run Plane (runs, tâches, épisodes de run)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:runs"
+      ],
+      "vision_target": "core/orchestration"
+    },
+    {
+      "id": "kardex",
+      "path": "walter_memory/social.py",
+      "role": "Couche sociale Kardex (schéma kardex)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:kardex"
+      ],
+      "vision_target": "cognition/memory/kardex"
+    },
+    {
+      "id": "search",
+      "path": "walter_memory/search.py",
+      "role": "Index de recherche (search.chunks)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "privacy",
+      "path": "walter_memory/privacy.py",
+      "role": "Classes de confidentialité et règle de lecture",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "disclosure",
+      "path": "walter_memory/disclosure.py",
+      "role": "Contrôle de divulgation des messages sortants",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/security"
+    },
+    {
+      "id": "llm-client",
+      "path": "walter_memory/llm.py",
+      "role": "Appels de modèles de Memory (refuse local_only, budgets) — lit encore ~/.hermes/.env",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "migrations",
+      "path": "migrations",
+      "role": "Migrations Postgres",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory/migrations"
+    },
+    {
+      "id": "hermes-plugin",
+      "path": "hermes-plugins",
+      "role": "Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7)",
+      "status": "active",
+      "readme": "README.md"
+    },
+    {
+      "id": "overland",
+      "path": "walter_memory/overland.py",
+      "role": "Réception GPS (Overland, :3010)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:3010"
+        }
+      ],
+      "vision_target": "cognition/memory/connectors"
+    }
+  ]
 }

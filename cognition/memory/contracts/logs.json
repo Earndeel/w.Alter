@@ -140,5 +140,26 @@
       "logs_timeline",
       "logs_get"
     ]
-  }
+  },
+  "components": [
+    {
+      "id": "logs-store",
+      "path": "walter_memory/logs.py",
+      "role": "Journal canonique d'exécution walter_logs (masquage à l'écriture)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:walter_logs"
+      ],
+      "vision_target": "core/observability"
+    },
+    {
+      "id": "logs-watch",
+      "path": "connectors/walter_logs.py",
+      "role": "Synchronisation des journaux de tous les runtimes (inotify)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/observability"
+    }
+  ]
 }

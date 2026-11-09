@@ -108,5 +108,18 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
-  }
+  },
+  "components": [
+    {
+      "id": "bus",
+      "path": "walter_memory/bus.py",
+      "role": "Bus Walter (schéma bus, LISTEN/NOTIFY, curseurs, dead)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:bus"
+      ],
+      "vision_target": "core/bus"
+    }
+  ]
 }
