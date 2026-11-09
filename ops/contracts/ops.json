@@ -169,5 +169,35 @@
     "summary": "manifest/SUMMARY.md",
     "manifest": "manifest/MANIFEST.md",
     "tools": []
-  }
+  },
+  "components": [
+    {
+      "id": "backup",
+      "path": "backup",
+      "role": "Sauvegardes (pg, state.db, restic, publication git)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-ops backup"
+        }
+      ],
+      "vision_target": "ops/backup"
+    },
+    {
+      "id": "ops",
+      "path": "walter_ops",
+      "role": "Installation, déploiement, récupération",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-ops"
+        }
+      ],
+      "vision_target": "ops"
+    }
+  ]
 }
