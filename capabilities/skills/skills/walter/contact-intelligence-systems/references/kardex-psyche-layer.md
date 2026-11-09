@@ -56,17 +56,15 @@ Key negatives (polarity=negative):
 - Modifications silencieuses de ses processus
 - Substitution silencieuse de modèle LLM
 
-## Sync Pipeline
+## How Kardex is fed and read (current, 2026-11-09)
 
-```
-Kardex PG (insert) → kardex-hindsight-sync (5min timer)
-  → Hindsight API /memories retain
-  → Hindsight Worker (extract facts + embed)
-  → memory_facts + Qdrant
-  → Available via /recall/*
-```
+Kardex is the `kardex` schema of Walter Memory (same PostgreSQL database), fed **only** by walter-memory processors
+from `core.events` (timer `walter-memory-social`, bus consumers). Read it through `person_lookup` / `memory_context`
+(MCP) or `walter-memory social person "Nom"`; never write it from a script or an agent.
 
-Tracking table: `kardex.hindsight_sync_state` (table_name, last_synced_id, updated_at)
+History: until 2026-10-19 a `kardex-hindsight-sync` timer pushed Kardex rows to the Hindsight API (cursor table
+`kardex.hindsight_sync_state`). Hindsight was retired on 2026-10-19 and that table dropped on 2026-11-09 (Memory
+cleanup phase 1); neither exists any more.
 
 ## USER.md vs Kardex — Division of Responsibility
 
