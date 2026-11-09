@@ -143,5 +143,26 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
-  }
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Computer",
+    "order": 60,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "computer_use"
+    ]
+  },
+  "components": [
+    {
+      "id": "library",
+      "path": "walter_computer",
+      "role": "Contrôle des appareils (Mac, bureau)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "capabilities/computer"
+    }
+  ]
 }
