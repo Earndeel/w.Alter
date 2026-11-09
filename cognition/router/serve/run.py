@@ -21,10 +21,10 @@ from typing import Any
 from walter_router.serve import choose, execution, media_exec, named, routes
 
 ALLOWED_TOOLSETS = ("web", "walter-web", "file", "terminal", "vision", "skills", "code_execution", "memory")
-# P1 (2026-10-27): a sub-agent works with Walter's capabilities by default, through the Tool Gateway; the root
-# terminal and file writes are opt-in. WALTER_RUN_TOOLS=legacy restores the former default.
+# P1 (2026-10-27): a sub-agent works with Walter's capabilities through the Tool Gateway. Security 2026-11-09: the
+# unsandboxed terminal is gone ("terminal"/"code_execution" are refused, text_agent.DISABLED_TOOLSETS); "file" only
+# reaches the run's private workspace. The former WALTER_RUN_TOOLS=legacy default (which included the terminal) is removed.
 DEFAULT_TOOLSETS = ["walter-web", "skills", "memory"]
-LEGACY_TOOLSETS = ["web", "walter-web", "file", "terminal"]
 TOOLSET_TOOLS = {"web": ["walter_browse"], "walter-web": ["walter_browse"],
                  "memory": ["memory_context", "memory_search", "memory_events"],
                  "skills": ["skills_search", "skill_read"]}
@@ -33,7 +33,7 @@ MEDIA = ("image", "video", "music", "audio")
 
 
 def default_toolsets() -> list[str]:
-    return list(LEGACY_TOOLSETS if os.environ.get("WALTER_RUN_TOOLS") == "legacy" else DEFAULT_TOOLSETS)
+    return list(DEFAULT_TOOLSETS)
 
 
 def _memory(action: str, payload: dict) -> dict:
@@ -118,6 +118,10 @@ def _text(conn, d: dict, spec: dict) -> dict:
     unknown = set(toolsets) - set(ALLOWED_TOOLSETS)
     if unknown:
         return {"ok": False, "error": "unsupported_toolsets", "toolsets": sorted(unknown)}
+    disabled = sorted(set(toolsets) & set(text_agent.DISABLED_TOOLSETS))
+    if disabled:
+        return {"ok": False, "error": "toolset_disabled", "toolsets": disabled,
+                "reason": "shell execution needs the Walter engine sandbox; not available to walter_run"}
     if "vision" in toolsets:
         return {"ok": False, "error": "vision_toolset_requires_an_explicit_image_input"}
     max_turns = max(1, min(int(spec.get("max_turns") or 40), 120))

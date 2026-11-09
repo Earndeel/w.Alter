@@ -9047,6 +9047,11 @@
             "signature": "toolsets: list[str]"
           },
           {
+            "description": "A path inside the run's workspace, symlinks resolved; anything else is refused (fail closed).",
+            "name": "_confined",
+            "signature": "workdir: Path | None, raw: str"
+          },
+          {
             "description": "",
             "name": "execute_tool",
             "signature": "name: str, args: dict, remaining: float, workdir: Path | None=None"
@@ -16803,17 +16808,6 @@
       {
         "comment": "",
         "file": "serve/run.py",
-        "name": "LEGACY_TOOLSETS",
-        "value": [
-          "web",
-          "walter-web",
-          "file",
-          "terminal"
-        ]
-      },
-      {
-        "comment": "",
-        "file": "serve/run.py",
         "name": "TOOLSET_TOOLS",
         "value": {
           "memory": [
@@ -16857,6 +16851,15 @@
           "music",
           "audio"
         ]
+      },
+      {
+        "comment": "",
+        "file": "serve/text_agent.py",
+        "name": "DISABLED_TOOLSETS",
+        "value": {
+          "code_execution": "no_sandbox",
+          "terminal": "no_sandbox"
+        }
       },
       {
         "comment": "",
@@ -17084,13 +17087,6 @@
       },
       {
         "default_expression": "aucun",
-        "description": "legacy = anciens toolsets par défaut de walter_run (web, walter-web, file, terminal) ; sinon capacités Walter via le Tool Gateway.",
-        "file": "serve/run.py",
-        "name": "WALTER_RUN_TOOLS",
-        "operation": "get"
-      },
-      {
-        "default_expression": "aucun",
         "description": "Session walter_logs de l'appelant ; parent de la session du sous-agent walter_run.",
         "file": "serve/run.py",
         "name": "WALTER_SESSION_ID",
@@ -17126,7 +17122,6 @@
       "WALTER_RUN_CHANNEL",
       "WALTER_RUN_CONTEXT",
       "WALTER_RUN_ID",
-      "WALTER_RUN_TOOLS",
       "WALTER_SESSION_ID",
       "WALTER_TASK_ID"
     ]
@@ -17212,7 +17207,7 @@
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "b8f0e3ee29e57454855286b6b80b182d5bf17c1c59f7dfc216cc9bcef631cd54",
     "contracts/router.json": "20bb4dd96ed8577fdaf13a8925c4209a05ef10f4e3ebd576c2e6af7cb01754c6",
-    "documentation.py": "63a31ddfb49c254a4457c58745158567bdf57995d492eb1acf3c8968deac01f4",
+    "documentation.py": "4fc5bbd2d0f0849b840f2e969ee9ca01ab61673f269d83ed553d317dbed31ff8",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
@@ -17291,8 +17286,8 @@
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "d6f582794d9d49314f54cfb13240d6062855dc7df48ca5d2121932e1fd4a02da",
     "serve/routes.py": "108b6fafa28d1b29e3de8bc38b88e9778a318a1f3d12b70836d87b5872a72857",
-    "serve/run.py": "629a02b3c2db03e6953d168a898a6e3c131fc5c120e07b90d7605ddedb2db401",
-    "serve/text_agent.py": "4e910f3619c717895c9970d78178766d8b7c6f3c56a1c8313374a50d93e9a705",
+    "serve/run.py": "35ddfdab1616dde84a252f5ab22471f5abd075b0213dca9ce9a87a256be51ad7",
+    "serve/text_agent.py": "1bddd484363dc9f892b9acaf4e523fbeeaf99961d3354c1dd630dc32d39cb8b4",
     "serve/web.py": "20cf30a3f8dbd21e1f7de2d188b5f01d60f3a9111f3412e0169053a85061ec82",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
     "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",

@@ -1066,6 +1066,7 @@ Bounded native text execution. Provider choice belongs to run.py, transport to l
 - `complete(route: dict, messages: list, tools: list, timeout: float)` — One exact route through the module's own gateway CLI; provider keys stay there.
 - `_schema(name: str, description: str, properties: dict, required: list[str])` — 
 - `tools_for(toolsets: list[str])` — 
+- `_confined(workdir: Path | None, raw: str)` — A path inside the run's workspace, symlinks resolved; anything else is refused (fail closed).
 - `execute_tool(name: str, args: dict, remaining: float, workdir: Path | None=None)` — 
 - `run(goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call, gateway: 'Gateway | None'=None)` — call(messages, tools, seconds_remaining) handles provider attempts, never tool execution.
 

@@ -81,45 +81,44 @@ class Gateway:
             os.killpg(self.proc.pid, signal.SIGKILL)
 
 
+# Security (2026-11-09, owner decision): the former native `terminal` tool ran model-written shell commands as root with
+# no sandbox. It is removed, not switched off: there is no flag that brings it back. Shell work belongs to the Walter
+# engine's sandboxed tools (core/engine, lots E3/E5). File tools only reach this run's private workspace.
+DISABLED_TOOLSETS = {"terminal": "no_sandbox", "code_execution": "no_sandbox"}
+
+
 def tools_for(toolsets: list[str]) -> list[dict]:
+    if set(toolsets) & set(DISABLED_TOOLSETS):
+        raise ValueError("toolset_disabled")
     tools = []
-    # Walter's web, skills and memory commands are available through the terminal.
-    if set(toolsets) & {"terminal", "code_execution"}:
-        tools.append(_schema("terminal", "Run a bounded shell command. For Walter capabilities use their declared "
-                             "commands on PATH. Never read or print provider credentials.",
-                             {"command": {"type": "string"}, "workdir": {"type": "string"},
-                              "timeout": {"type": "number"}}, ["command"]))
     if "file" in toolsets:
-        tools += [_schema("read_file", "Read a UTF-8 text file.", {"path": {"type": "string"}}, ["path"]),
-                  _schema("write_file", "Write a UTF-8 text file; preserve existing work and follow the task scope.",
+        tools += [_schema("read_file", "Read a UTF-8 text file of this run's private workspace (relative path).",
+                          {"path": {"type": "string"}}, ["path"]),
+                  _schema("write_file", "Write a UTF-8 text file in this run's private workspace (relative path).",
                           {"path": {"type": "string"}, "content": {"type": "string"}}, ["path", "content"])]
     return tools
 
 
+def _confined(workdir: Path | None, raw: str) -> Path:
+    """A path inside the run's workspace, symlinks resolved; anything else is refused (fail closed)."""
+    if workdir is None:
+        raise RuntimeError("no_workspace")
+    root = workdir.resolve()
+    path = (root / raw).resolve()
+    if path != root and root not in path.parents:
+        raise RuntimeError("path_outside_workspace")
+    return path
+
+
 def execute_tool(name: str, args: dict, remaining: float, workdir: Path | None = None) -> dict:
-    if name == "terminal":
-        timeout = max(0.01, min(float(args.get("timeout") or 30), remaining))
-        proc = subprocess.Popen(args["command"], shell=True, executable="/bin/bash", cwd=args.get("workdir") or workdir,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
-        try:
-            output, _ = proc.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGKILL)
-            output, _ = proc.communicate()
-            return {"exit_code": proc.returncode, "output": output[-20000:], "error": "tool_timeout"}
-        return {"exit_code": proc.returncode, "output": output[-20000:]}
     if name == "read_file":
-        path = Path(args["path"]).expanduser()
-        if not path.is_absolute() and workdir:
-            path = workdir / path
-        with path.open(encoding="utf-8") as f:
+        with _confined(workdir, args["path"]).open(encoding="utf-8") as f:
             return {"content": f.read(20000)}
     if name == "write_file":
-        path = Path(args["path"]).expanduser()
-        if not path.is_absolute() and workdir:
-            path = workdir / path
+        path = _confined(workdir, args["path"])
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         path.write_text(args["content"], encoding="utf-8")
-        return {"ok": True, "path": str(path.resolve())}
+        return {"ok": True, "path": str(path)}
     raise ValueError("unknown_tool")
 
 

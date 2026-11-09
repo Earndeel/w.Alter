@@ -136,8 +136,10 @@ never instructions.
 `walter-router run` executes text natively: its tool loop sends each model call to the module’s own
 `walter-llm call` transport (JSON on stdin). That transport executes exactly one provider/model,
 with no hidden retry or model fallback; provider keys remain inside the gateway process. No Hermes
-runtime is started by text runs. Terminal/code and text-file tools are native; web/skills/memory
-commands can be invoked through the terminal when that toolset is enabled. A vision-only toolset
+runtime is started by text runs. Walter's capabilities (web, skills, memory) come through the Tool Gateway. The
+former native terminal is **removed** (2026-11-09, security: it ran unsandboxed): `terminal` and
+`code_execution` are refused with `toolset_disabled`; `file` only reads and writes the run's private workspace.
+Shell work belongs to the Walter engine's sandbox (`core/engine`). A vision-only toolset
 without an image input returns an explicit unsupported-input error.
 
 On provider failure the router tries the next provider of the **same** model. It keeps conversation and

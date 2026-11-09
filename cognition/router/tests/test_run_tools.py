@@ -5,19 +5,43 @@ import json
 from walter_router.serve import run, text_agent
 
 
-def test_default_toolsets_are_walter_capabilities_and_legacy_switch(monkeypatch):
-    monkeypatch.delenv("WALTER_RUN_TOOLS", raising=False)
+def test_default_toolsets_are_walter_capabilities_and_no_switch_restores_the_terminal(monkeypatch):
     assert run.default_toolsets() == ["walter-web", "skills", "memory"]
-    assert "terminal" not in run.default_toolsets()
-    monkeypatch.setenv("WALTER_RUN_TOOLS", "legacy")
-    assert run.default_toolsets() == ["web", "walter-web", "file", "terminal"]
+    monkeypatch.setenv("WALTER_RUN_TOOLS", "legacy")                  # the former switch has no effect any more
+    assert run.default_toolsets() == ["walter-web", "skills", "memory"]
+
+
+def test_unsandboxed_terminal_is_gone_and_refused(tmp_path):
+    """Security 2026-11-09: no native shell tool exists, whatever the toolsets or the environment."""
+    import inspect, pytest
+    assert "shell=True" not in inspect.getsource(text_agent) and "Popen(args" not in inspect.getsource(text_agent)
+    for ts in (["terminal"], ["code_execution"], ["file", "terminal"]):
+        with pytest.raises(ValueError):
+            text_agent.tools_for(ts)
+        assert run._text(None, {"execution": []}, {"goal": "g", "toolsets": ts})["error"] == "toolset_disabled"
+    with pytest.raises(ValueError):
+        text_agent.execute_tool("terminal", {"command": "id"}, 5, tmp_path)
+
+
+def test_file_tools_stay_inside_the_run_workspace(tmp_path):
+    ws = tmp_path / "ws"; ws.mkdir()
+    (tmp_path / "secret").write_text("x")
+    assert text_agent.execute_tool("write_file", {"path": "a/b.txt", "content": "ok"}, 5, ws)["ok"]
+    assert text_agent.execute_tool("read_file", {"path": "a/b.txt"}, 5, ws)["content"] == "ok"
+    for bad in ("../secret", str(tmp_path / "secret"), "/etc/passwd", "a/../../secret"):
+        for name, args in (("read_file", {"path": bad}), ("write_file", {"path": bad, "content": "x"})):
+            with __import__("pytest").raises(RuntimeError, match="path_outside_workspace"):
+                text_agent.execute_tool(name, args, 5, ws)
+    (ws / "link").symlink_to(tmp_path / "secret")
+    with __import__("pytest").raises(RuntimeError, match="path_outside_workspace"):
+        text_agent.execute_tool("read_file", {"path": "link"}, 5, ws)
 
 
 def test_toolsets_map_to_gateway_tools_only_for_walter_capabilities():
     walter = sorted({t for ts in ["walter-web", "skills", "memory"] for t in run.TOOLSET_TOOLS.get(ts, [])})
     assert walter == ["memory_context", "memory_events", "memory_search", "skill_read", "skills_search", "walter_browse"]
     assert not text_agent.tools_for(["walter-web", "skills", "memory"])      # no native shell or file tool
-    assert {t["function"]["name"] for t in text_agent.tools_for(["terminal", "file"])} == {"terminal", "read_file", "write_file"}
+    assert {t["function"]["name"] for t in text_agent.tools_for(["file"])} == {"read_file", "write_file"}
 
 
 def test_research_goes_to_a_general_sub_agent_with_the_web(monkeypatch):

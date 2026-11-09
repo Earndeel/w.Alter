@@ -85,22 +85,21 @@ def test_every_provider_is_tried_without_a_three_attempt_cutoff(monkeypatch, exe
 
 def test_tool_history_survives_failover_and_tools_are_not_repeated(monkeypatch, execution, tmp_path):
     calls = []
-    marker = tmp_path / "once.txt"
     def complete(route, messages, tools, timeout):
         calls.append(route["provider"])
         if len(calls) == 1:
             return answer(route, None, message={"role": "assistant", "tool_calls": [
-                {"id": "write-once", "type": "function", "function": {"name": "terminal",
-                 "arguments": __import__("json").dumps({"command": f"printf x >> '{marker}'"})}}]})
+                {"id": "write-once", "type": "function", "function": {"name": "write_file",
+                 "arguments": __import__("json").dumps({"path": "once.txt", "content": "x"})}}]})
         assert messages[-1]["role"] == "tool" and messages[-1]["tool_call_id"] == "write-once"
         if route["provider"] == "kie":
             raise RuntimeError("provider_timeout")
         return answer(route)
     monkeypatch.setattr(text_agent, "complete", complete)
-    out = run._text(execution.conn, decision(), {"goal": "test", "toolsets": ["terminal"]})
-    assert out["ok"] and marker.read_text() == "x" and calls == ["kie", "kie", "openrouter"]
-    assert len(out["tools"]) == 1 and out["tools"][0]["name"] == "terminal" and out["tools"][0]["ok"]
-    assert out["tools"][0]["result"]["exit_code"] == 0
+    out = run._text(execution.conn, decision(), {"goal": "test", "toolsets": ["file"]})
+    assert out["ok"] and calls == ["kie", "kie", "openrouter"]
+    assert len(out["tools"]) == 1 and out["tools"][0]["name"] == "write_file" and out["tools"][0]["ok"]
+    assert open(out["tools"][0]["result"]["path"]).read() == "x"
 
 
 def test_success_without_failover_does_not_emit_a_warning(monkeypatch, execution):
@@ -135,7 +134,6 @@ def test_unmeasured_and_failed_attempts_keep_unknown_telemetry(monkeypatch, exec
 
 
 def test_each_tool_turn_keeps_its_own_telemetry(monkeypatch, execution, tmp_path):
-    marker = tmp_path / "measured.txt"
     calls = []
     def complete(route, *args):
         calls.append(route["provider"])
@@ -143,12 +141,12 @@ def test_each_tool_turn_keeps_its_own_telemetry(monkeypatch, execution, tmp_path
                      "cost_usd": len(calls) / 100, "cost_status": "reported"}
         if len(calls) == 1:
             return answer(route, None, **telemetry, message={"role": "assistant", "tool_calls": [
-                {"id": "measured-tool", "type": "function", "function": {"name": "terminal",
-                 "arguments": __import__("json").dumps({"command": f"printf x > '{marker}'"})}}]})
+                {"id": "measured-tool", "type": "function", "function": {"name": "write_file",
+                 "arguments": __import__("json").dumps({"path": "measured.txt", "content": "x"})}}]})
         return answer(route, **telemetry)
     monkeypatch.setattr(text_agent, "complete", complete)
-    out = run._text(execution.conn, decision(), {"goal": "test", "toolsets": ["terminal"]})
-    assert out["ok"] and marker.read_text() == "x" and len(calls) == 2
+    out = run._text(execution.conn, decision(), {"goal": "test", "toolsets": ["file"]})
+    assert out["ok"] and open(out["tools"][0]["result"]["path"]).read() == "x" and len(calls) == 2
     for rows in (out["routed"]["attempts"], execution.logs):
         assert [(row["usage"]["total_tokens"], row["cost_usd"], row["cost_status"]) for row in rows] == [
             (10, 0.01, "reported"), (20, 0.02, "reported")]
@@ -239,13 +237,6 @@ def test_exact_transport_never_retries_or_accepts_a_substitute(monkeypatch, kind
     assert len(seen) == 1 and seen[0]["num_retries"] == 0 and seen[0]["fallbacks"] == []
     assert result["ok"] == (kind == "success")
     assert "credentials" not in str(result)
-
-
-def test_real_terminal_assertions_and_checksum():
-    out = text_agent.execute_tool("terminal", {"command": "python3 -c 'import hashlib; assert 1 + 1 == 2; "
-                                  "print(hashlib.sha256(b\"native-router\").hexdigest())'"}, 10)
-    import hashlib
-    assert out["exit_code"] == 0 and out["output"].strip() == hashlib.sha256(b"native-router").hexdigest()
 
 
 def unrestricted_decision():

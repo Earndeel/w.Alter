@@ -36,11 +36,15 @@ ce n'est pas un remplacement du contexte de travail.
   "task": "coding",
   "goal": "Implémenter la correction dans le fichier indiqué. Vérifier les listes paires, impaires et vides. Rapporter les vérifications réellement effectuées.",
   "context": "Chemin absolu sur l'hôte du routeur, contenu utile du fichier, règles locales et périmètre autorisé.",
-  "toolsets": ["file", "terminal"],
+  "toolsets": ["file"],
   "max_turns": 8,
   "budget_seconds": 120
 }
 ```
+
+`file` ne lit et n'écrit que dans l'espace de travail privé du run (chemins relatifs). `terminal` et
+`code_execution` sont refusés (`toolset_disabled`) depuis le 09/11/2026 : l'ancien terminal s'exécutait sans bac à
+sable ; l'exécution de commandes reviendra par le bac à sable du moteur Walter.
 
 Ne pas inventer les fichiers ou les faits manquants. Un chemin de l'ordinateur du harness n'existe pas nécessairement
 sur la VM du routeur. Préparer les entrées à l'aide des transferts autorisés par le harness ou fournir leurs extraits.
