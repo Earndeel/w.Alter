@@ -1,5 +1,13 @@
 # walter-lab
 
+| | |
+|---|---|
+| **Rôle** | Chercher, mesurer et proposer des améliorations de Walter, sans jamais les appliquer seul ; banc d'essai commun (`walter-scenario`, `walter matrix`). |
+| **Propriétaire** | walter-lab (`/walter/lab`). |
+| **État** | **experimental, en pause** depuis le 2026-10-29 (décision du propriétaire, constat du 09/11/2026) ; le banc reste disponible. |
+| **Ne fait pas** | Appliquer un changement. Surveiller l'exploitation (Guardians d'Ops) ; organiser les skills (curateur de walter-skills). |
+| **Contrats** | [contracts/lab.json](contracts/lab.json) ; CLI `walter-lab`, `walter-scenario`. |
+
 > **Paused until production (owner decision, 2026-10-29).** Lab starts nothing on its own initiative: no scouting,
 > no spontaneous experiment, no self-improvement loop, nothing ever applied. `walter-lab run` refuses unless the owner
 > asked for it (`--requested-by owner --reason "…"`, recorded in the report). `walter-lab status` shows the mode
