@@ -7,7 +7,7 @@
   "cordis.patch.yml": "c0b38c8a30f87e81912fbca4f4f134d882d495ffdf11631047aa84b5d2271dbf",
   "profiles/headless/cordis.patch.yml": "0c954d16fc9ae8f7beaa1c82d0a6467b026db91d14730f284ac6ddbabcff5c9c",
   "profiles/headless/cordis.yml": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
-  "profiles/web/cordis.patch.yml": "08d3dc8f14620c58b9f35601b30b40d8dd911f2282b304dca846c6d2c71ae1d0",
+  "profiles/web/cordis.patch.yml": "e5f6b16e3dbaea9eb7d3fdd9d8624f615cb65c1a052313a3858e4bd5000f83f0",
   "profiles/web/cordis.yml": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
   "walter-hooks.json": "a0260a2d01aab034184898b0338a0a858288afc4a058a987a81ee40b200526b6"
  },

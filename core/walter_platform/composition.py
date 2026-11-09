@@ -18,6 +18,7 @@ from .harness_transaction import file_change, link_change, commit, rollback
 
 ROOT=Path(__file__).resolve().parents[1]
 COMPOSITIONS=ROOT/'compositions'
+ENGINE_COMPOSITIONS=ROOT/'engine'/'compositions'   # engine composition sources (E1, 2026-11-09)
 SKILL_DIR=str(ROOT/'skills')
 DSH_LIB=Path('/opt/dsh/node_modules/@deepseek-ai')
 DSH_OWNER_TURN=ROOT/'hooks'/'dsh'/'owner-turn.mjs'
@@ -43,9 +44,48 @@ DSH_WEB_OFF=('preset-ptc','preset-minimal','preset-cordis','account-controller',
              'ui-model-selection','ui-agent-preset','ui-plugin-manager','ui-settings-plugin-inventory',
              'ui-settings-plugins','ui-settings-shell','ui-settings-agent-loop','ui-settings-subagent',
              'ui-settings-web-search')
-DSH_TASKS=('auto','coding','general','document','summarization')   # Walter Router tasks offered to DSH
+DSH_TASKS=('coding','general','document','summarization','auto')   # Walter Router tasks offered to DSH (live order)
 DSH_TITLE={'targetWords':5,'targetCjkCharacters':10,'maxInputBytes':4096,'maxOutputTokens':64,'timeoutMs':60000,
            'provider':'walter','model':'summarization'}
+
+
+def engine_values(*, instance=True):
+    """Engine composition values: the module's neutral config/engine.toml, overridden key by key by the instance's
+    (`walter instance config core engine.toml`). instance=False = neutral defaults only (tests, fresh homes)."""
+    from .paths import module_path
+    data=tomllib.loads(module_path('core','config','engine.toml').read_text())
+    if instance:
+        from . import instance as inst
+        override=inst.path('config','core','engine.toml')
+        if override.is_file():
+            for section,values in tomllib.loads(override.read_text()).items():
+                if isinstance(values,dict):
+                    for key,sub in values.items():
+                        if isinstance(sub,dict):data.setdefault(section,{}).setdefault(key,{}).update(sub)
+                        else:data.setdefault(section,{})[key]=sub
+                else:data[section]=values
+    return data
+
+
+def _dsh_face(values):
+    """Fenced `dsh-face` block of the web profile: the instance's face (name, greeting) and sign-in lifetime, from
+    the engine/compositions template. Before 2026-11-09 these rows were written by hand in the live home."""
+    from string import Template
+    from .paths import module_path
+    web=values.get('dsh',{}).get('web',{})
+    days=web.get('cookie_max_age_days')
+    if not isinstance(days,int) or isinstance(days,bool) or days<1:raise ValueError('engine.toml [dsh.web] cookie_max_age_days must be a positive integer')
+    text=Template((ENGINE_COMPOSITIONS/'dsh-face.patch.yml').read_text()).substitute(
+        cookie_max_age_days=days,ui_port=json.dumps(str(module_path('core','ports','dsh-web-ui','index.js'))),
+        name=json.dumps(str(web.get('name') or 'Walter'),ensure_ascii=False),
+        tagline=json.dumps(str(web.get('tagline') or ''),ensure_ascii=False))
+    return text
+
+
+def _unfenced_rows(text):
+    """Parsed rows of a DSH patch outside every Walter fence (hand-written or DSH's own)."""
+    rest=re.sub(r'# walter:([\w-]+) [^\n]*\n.*?\n# /walter:\1\n?','',text,flags=re.S)
+    return _dsh_yaml(rest)
 
 
 def _context_port():
@@ -117,7 +157,7 @@ def _rows_sha(rows):
     return hashlib.sha256(json.dumps(rows,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
 
 
-def _managed_yaml(original, content, name):
+def _managed_yaml(original, content, name, anchor=None):
     """`_managed_text` for YAML files: the Walter block is fenced by YAML comments, other bytes are preserved.
     The fence records a hash of the parsed Walter rows and their count, not of their bytes: DSH web re-serialises
     the file when it saves a UI setting and appends its own rows at the end of the document, inside the fence when
@@ -141,8 +181,11 @@ def _managed_yaml(original, content, name):
             if [r for r,_ in rows[:n]]!=walter:raise ValueError('managed DSH profile section was edited; refusing overwrite')
         foreign=''.join(raw for _,raw in rows[n:]).strip('\n')
         return original[:m.start()]+block+(foreign+'\n' if foreign else '')+original[m.end():]
-    if '# walter:'+name in original:raise ValueError('invalid managed DSH profile section')
+    if '# walter:'+name+' ' in original:raise ValueError('invalid managed DSH profile section')
     original=re.sub(r'(?m)^\[\]\s*$\n?','',original)   # DSH writes an empty profile patch as `[]`
+    at=original.find('# walter:'+anchor+' ') if anchor else -1
+    if at>=0:   # a new block goes just before the anchor block: the composed order stays the one DSH has always seen
+        return original[:at]+block+'\n'+original[at:]
     return original.rstrip('\n')+('\n\n' if original.strip() else '')+block
 
 
@@ -275,8 +318,13 @@ def _plan(host,home=None,profile_dir=None):
         add(_dsh_patch(data,'system-prompt',{'includeHarnessIdentity':False,'personaPrefix':'','personaSuffix':''}))
         add(_dsh_patch(data,'session-title-llm',DSH_TITLE))
         # Preserve unrelated providers; an existing Walter provider must agree on the transport.
+        values=engine_values();names=values.get('dsh',{}).get('model_names',{})
+        label=lambda name:str(names.get(name) or 'Walter '+name)   # display names: @instance/config/core/engine.toml
+        # Long prompt-cache retention: walter-llm forwards it to providers that support it (set by hand in the live
+        # home before 2026-11-09; now part of the source, so a fresh home composes the same).
+        cache={'cacheRetention':'long','compat':{'supportsLongCacheRetention':True}}
         provider={'displayName':'W.Alter (Walter Router)','api':'openai-completions','baseURL':spec['endpoint'],
-                  'apiKeyEnv':'WALTER_LLM_TOKEN','models':[{'id':name,'name':'Walter '+name,'contextWindow':200000} for name in DSH_TASKS]}
+                  'apiKeyEnv':'WALTER_LLM_TOKEN',**cache,'models':[{'id':name,'name':label(name),'contextWindow':200000} for name in DSH_TASKS]}
         llm=[x for x in data if x.get('id')=='llm-pi-ai']
         if llm:
             providers=llm[0].get('config',{}).get('providers',{})
@@ -285,9 +333,13 @@ def _plan(host,home=None,profile_dir=None):
                 llm[0].setdefault('config',{}).setdefault('providers',{})['walter']=provider;merged=True
             else:
                 if any(existing.get(k)!=provider[k] for k in ('api','baseURL','apiKeyEnv')):raise ValueError('custom Walter provider transport conflicts')
+                for k,v in cache.items():   # added when missing; a value set otherwise is kept
+                    if k not in existing:existing[k]=v;merged=True
                 for name in DSH_TASKS:
                     if name not in {m.get('id') for m in existing.get('models',[])}:
-                        existing.setdefault('models',[]).append({'id':name,'name':'Walter '+name,'contextWindow':200000});merged=True
+                        existing.setdefault('models',[]).append({'id':name,'name':label(name),'contextWindow':200000});merged=True
+                for m in existing.get('models',[]):   # a configured display name is the instance's: it wins
+                    if m.get('id') in names and m.get('name')!=label(m['id']):m['name']=label(m['id']);merged=True
                 if spec['model'] not in {m.get('id') for m in existing.get('models',[])}:raise ValueError('Walter task is missing from DSH provider')
         else:add({'id':'llm-pi-ai','config':{'providers':{'walter':provider}}})
         cp=p/'.credentials.yaml'
@@ -311,7 +363,15 @@ def _plan(host,home=None,profile_dir=None):
             for profile,block in (('web',_dsh_web_profile),('headless',_dsh_headless_profile)):
                 wp=p/'profiles'/profile/'cordis.patch.yml'
                 before=wp.read_text() if wp.exists() else ''
-                after=_managed_yaml(before,block(_context_port()),'dsh-'+profile)
+                after=before
+                if profile=='web':
+                    # The instance's face is rendered too (E1): rows written by hand for the same targets would
+                    # compose twice, so they are a conflict to remove explicitly, never silently replaced.
+                    hand=[r for r in _unfenced_rows(before) if r.get('id')=='connection'
+                          or any(e.get('id')=='walter-ui' for e in r.get('insert',[]))]
+                    if hand:raise ValueError('hand-written DSH web face rows (connection, walter-ui) duplicate the rendered dsh-face block; remove them first')
+                    after=_managed_yaml(after,_dsh_face(values),'dsh-face',anchor='dsh-web')
+                after=_managed_yaml(after,block(_context_port()),'dsh-'+profile)
                 _dsh_yaml(after)
                 if after!=before:file(wp,after,'identity,context,skills,browse')
     else:

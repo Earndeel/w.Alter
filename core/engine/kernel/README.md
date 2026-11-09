@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Fige le noyau du moteur (DSH/Cordis `@deepseek-ai/dsh`) : version exacte, verrou npm complet, empreintes de ce qui est réellement installé, installation reproductible hors ligne, vérification. |
 | **Propriétaire** | walter-core (`core/engine`) ; une mise à jour du noyau passe seulement par Lab (étude, banc, puis nouveau gel). |
-| **État** | **Lot E1 en cours depuis le 09/11/2026.** Gel fait et prouvé (ci-dessous) ; l'installation en service reste `/opt/dsh`, inchangée, sous `dsh-web.service`. Reste dans E1 : rendu des compositions depuis une source (aujourd'hui fichiers tenus à la main dans `/opt/dsh/home`), rattrapage documentaire, 48 h de service inchangé. |
+| **État** | **Lot E1 en cours depuis le 09/11/2026.** Gel fait et prouvé (ci-dessous) ; l'installation en service reste `/opt/dsh`, inchangée, sous `dsh-web.service`. Compositions rendues depuis une source depuis le 09/11 au soir (`../compositions/`, configuration composée identique) ; rattrapage documentaire fait. Reste : 48 h de service inchangé, puis adoption. |
 | **Ne fait pas** | Ne contient aucun artefact compilé ni `node_modules` (gel ≠ déplacement) ; ne modifie jamais une installation existante ; n'installe pas en production (le remplacement de `/opt/dsh` est le lot E9). |
 | **Contrats** | `installed.json` (manifeste) ; commande publique `walter engine kernel` (lecture seule, code de sortie 1 en cas d'écart) ; incident `engine_kernel_drift` de la vigie d'Ops. Cache hors ligne : `/services/dsh/npm-cache` (hors git, voir son README). |
 

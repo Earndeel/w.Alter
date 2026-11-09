@@ -1,0 +1,12 @@
+# Engine composition values (walter harness install dsh), neutral defaults. An instance overrides any of them in
+# @instance/config/core/engine.toml (merged key by key over this file).
+
+[dsh.web]
+# Rendered into the fenced `dsh-face` block of the web profile (template: core/engine/compositions/dsh-face.patch.yml).
+name = "Walter"
+tagline = "Que puis-je faire pour vous ?"
+cookie_max_age_days = 30          # DSH's own default
+
+[dsh.model_names]
+# Display names of the Walter Router tasks DSH offers (auto, coding, general, document, summarization).
+# A task without a name here is shown as "Walter <task>".

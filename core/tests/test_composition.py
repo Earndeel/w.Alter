@@ -15,6 +15,8 @@ def home(tmp_path,monkeypatch):
     def definition(host):
         d=copy.deepcopy(get(host));d.update(identity_source=str(identity),skill_source=str(skill),credential_source=str(credentials));return d
     monkeypatch.setattr(c,'definition',definition)
+    neutral=c.engine_values(instance=False)   # never the live instance's values in tests
+    monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(neutral))
     target=tmp_path/'home';target.mkdir();return target
 
 @pytest.mark.parametrize('host',['codex','claude-code','dsh','hermes'])
@@ -212,3 +214,48 @@ def test_matrix_does_not_infer_usage_or_qualification_from_configs(home,monkeypa
     matrix=m.matrix()
     assert len(matrix['bindings'])==36
     assert all(r['in_use'] is None and r['qualified'] is None for r in matrix['bindings'])
+
+
+def _web(home):
+    return (home/'profiles'/'web'/'cordis.patch.yml').read_text()
+
+
+def test_dsh_face_is_rendered_from_engine_values_before_the_web_block(home,monkeypatch):
+    c.install('dsh',home,apply=True,backup_root=home.parent/'backups')
+    text=_web(home)
+    assert 0<=text.index('# walter:dsh-face ')<text.index('# walter:dsh-web ')
+    rows=c._dsh_yaml(text)
+    assert rows[0]['config']['cookieMaxAgeDays']==30 and rows[0]['config']['trustedHosts']=={'__js__':'ctx.webRuntime.trustedHosts'}
+    assert rows[1]['insert'][0]['id']=='walter-ui' and rows[1]['insert'][0]['config']['name']=='Walter'
+    values=c.engine_values()
+    values['dsh']['web'].update(name='Instance « X »',tagline="L'accueil",cookie_max_age_days=365)
+    values['dsh']['model_names']={'coding':'Code · agent'}
+    monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(values))
+    assert c.install('dsh',home)['changed']
+    c.install('dsh',home,apply=True,backup_root=home.parent/'backups')
+    rows=c._dsh_yaml(_web(home))
+    assert rows[0]['config']['cookieMaxAgeDays']==365
+    assert rows[1]['insert'][0]['config']=={'name':'Instance « X »','tagline':"L'accueil"}
+    models=[r for r in c._dsh_yaml((home/'cordis.patch.yml').read_text()) if r.get('id')=='llm-pi-ai'][0]['config']['providers']['walter']['models']
+    assert {m['id']:m['name'] for m in models}['coding']=='Code · agent'
+    provider=[r for r in c._dsh_yaml((home/'cordis.patch.yml').read_text()) if r.get('id')=='llm-pi-ai'][0]['config']['providers']['walter']
+    assert provider['cacheRetention']=='long' and provider['compat']=={'supportsLongCacheRetention':True}
+    assert _web(home).count('# walter:dsh-face ')==1 and not c.install('dsh',home)['changed']
+
+
+def test_hand_written_face_rows_are_a_conflict_not_a_second_copy(home):
+    web=home/'profiles'/'web';web.mkdir(parents=True)
+    (web/'cordis.patch.yml').write_text('- id: connection\n  config:\n    cookieMaxAgeDays: 365\n')
+    with pytest.raises(ValueError,match='hand-written'):c.install('dsh',home)
+    (web/'cordis.patch.yml').write_text('- insert:\n  - id: walter-ui\n    name: /x/index.js\n')
+    with pytest.raises(ValueError,match='hand-written'):c.install('dsh',home)
+
+
+def test_dsh_face_edited_by_hand_is_refused_and_bad_values_fail(home,monkeypatch):
+    c.install('dsh',home,apply=True,backup_root=home.parent/'backups')
+    p=home/'profiles'/'web'/'cordis.patch.yml'
+    p.write_text(p.read_text().replace('cookieMaxAgeDays: 30','cookieMaxAgeDays: 9999'))
+    with pytest.raises(ValueError,match='edited'):c.install('dsh',home)
+    values=c.engine_values();values['dsh']['web']['cookie_max_age_days']='365'
+    monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(values))
+    with pytest.raises(ValueError,match='positive integer'):c._dsh_face(values)

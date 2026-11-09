@@ -31,6 +31,10 @@ unmet prerequisite rather than silently selecting legacy Hindsight. The installe
 preserves the configured provider; acceptance and live activation are separate.
 The public memory-provider loader selects memory.provider directly and respects
 plugins.disabled; it does not require the general plugins.enabled allowlist.
+DSH web profile: the instance's face (name, greeting, sign-in lifetime) is rendered from
+`engine/compositions/dsh-face.patch.yml` and `walter instance config core engine.toml` into the fenced `dsh-face`
+block, before `dsh-web`; hand-written rows for the same targets are refused (E1, 2026-11-09).
+
 DSH alternative homes reference the existing local credential source by symlink;
 no credential value is copied, serialized in a preview, or printed. This is a
 same-VM composition, not an export for another host.

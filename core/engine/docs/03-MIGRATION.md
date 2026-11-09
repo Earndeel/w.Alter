@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Ordonner la convergence de Walter vers `VISION.md`, lot par lot, avec tests, critères d'adoption et retour arrière essayé. Deux objectifs menés ensemble : **A** convergence fonctionnelle (un seul runtime de production) et **B** convergence architecturale (arborescence, conventions, interfaces, documentation). |
 | **Propriétaire** | walter-core (exécution : le builder ; validation : Monsieur, **lot par lot**). |
-| **État** | 09/11/2026 · direction validée par Monsieur. **S0 et E0 faits** (§ S0, § E0). **E1 autorisé le 09/11 et en cours** (§ E1 : gel fait et prouvé ; restent les compositions, le rattrapage documentaire et 48 h de service inchangé). Chaque lot suivant est autorisé séparément. Lots hors moteur ouverts le 09/11 : E9.2 PostgreSQL (préparé, § E9) et nettoyage de Memory (plan à valider, § M). |
+| **État** | 09/11/2026 · direction validée par Monsieur. **S0 et E0 faits** (§ S0, § E0). **E1 autorisé le 09/11 et en cours** (§ E1 : gel fait et prouvé, compositions rendues depuis une source, rattrapage documentaire fait ; restent 48 h de service inchangé, jusqu'au 11/11 au soir). Chaque lot suivant est autorisé séparément. Lots hors moteur ouverts le 09/11 : E9.2 PostgreSQL (préparé, § E9) et nettoyage de Memory (plan à valider, § M). |
 | **Ne fait pas** | Ne décrit pas l'organisation interne du moteur (`02-ARCHITECTURE.md`) ni l'inventaire des emplacements (`05-CARTOGRAPHIE.md`). |
 | **Contrats** | Schémas du moteur `core/engine/contracts/` ; registre des modules (`vision_target` des modules et des composants) ; règle documentaire `/walter/docs/DOCUMENTATION.md`. |
 
@@ -131,9 +131,25 @@ Le gel et le déplacement physique sont séparés : **E1 gèle, sans rien dépla
 - `walter engine kernel` (lecture seule, sortie 1 en cas d'écart) ; la vigie d'Ops lève `engine_kernel_drift` (G3,
   jamais d'action automatique) ; composant `engine-kernel` déclaré dans `contracts/core.json`.
 
-Reste à faire dans E1 : (1) source des compositions web et headless dans `core/engine/compositions/` et rendu par
-walter-core — aujourd'hui ces 6 fichiers sont tenus à la main dans `/opt/dsh/home` et contiennent des valeurs de
-l'instance, à séparer (gabarit neutre + valeurs de `@instance/config/core/`) ; (2) 48 h de service inchangé, avec `walter engine kernel` conforme, puis adoption.
+Fait le 09/11 (soir) — compositions rendues depuis une source (`core/engine/compositions/`, README) :
+
+- Tout était déjà rendu par walter-core sauf la « face » du profil web (ligne `connection` : connexion d'un an ;
+  `walter-ui` : nom et accueil de l'instance) et deux retouches de la racine (noms affichés des modèles, rétention
+  longue du cache de prompt). Gabarit neutre `dsh-face.patch.yml` + valeurs `@instance/config/core/engine.toml`
+  (défaut neutre `core/config/engine.toml`) → bloc géré `dsh-face`, placé avant `dsh-web` ; noms des modèles et
+  rétention du cache dans la définition du fournisseur. Une ligne écrite à la main pour les mêmes cibles est un
+  conflit explicite (jamais une seconde copie).
+- Adoption en service : les deux lignes tenues à la main retirées seulement après vérification qu'elles égalaient le
+  rendu, puis `walter harness install dsh --apply` (transaction sauvegardée). **`--dump-config` identique avant et
+  après** (web et headless, empreintes du manifeste), rendu idempotent, `dsh-web` non redémarré et toujours actif ;
+  répété d'abord sur une copie. Seule l'empreinte de `profiles/web/cordis.patch.yml` change dans `installed.json`.
+- Reproduction depuis un dossier vide : configuration composée identique à l'installation en service, sauf les
+  préférences d'interface que DSH enregistre lui-même (thème, langue, avis d'accueil) et un reste inerte dans une
+  ligne désactivée (`skill-filesystem`).
+- Retour arrière : `@instance/backups/changes/2026-11-09-engine-E1-compositions/` (fichiers d'avant + empreintes,
+  code d'avant, manifeste d'avant, transaction du rendu, script d'adoption).
+
+Reste à faire dans E1 : 48 h de service inchangé (jusqu'au 11/11 au soir), avec `walter engine kernel` conforme, puis adoption.
 
 Fait le 09/11 (fin d'après-midi) : rattrapage documentaire (13 en-têtes standard, README de colab et du Raw Vault ;
 `walter check` : 0 constat, contrôle documentaire passé en blocage) et environnement de test de core (`core/bin/walter-core-test` : pytest de
