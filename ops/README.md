@@ -1,5 +1,13 @@
 # walter/ops (formerly walter-backup)
 
+| | |
+|---|---|
+| **Rôle** | Installer, déployer, versionner, conserver et restaurer le logiciel Walter et ses instances (installer, deploy, git, backup, recovery, guardian). |
+| **Propriétaire** | walter/ops (`/walter/ops`). |
+| **État** | **active** (constat du 09/11/2026) : sauvegardes PG, state.db et restic, test de restauration mensuel, publication git, Guardians. |
+| **Ne fait pas** | Posséder le code, les contrats ou les migrations d'un autre module. Supprimer, committer ou déplacer un fichier de travail (le watchdog signale seulement). |
+| **Contrats** | [contracts/ops.json](contracts/ops.json), [contracts/maintenance.json](contracts/maintenance.json) ; CLI `walter-ops` (alias `walter-backup`), `walter-guardians`. |
+
 **Renamed on 2026-10-29 (owner decision).** Ops installs, deploys, versions, keeps and restores the Walter software
 and its instances. It coordinates the other modules through their public interfaces and owns none of their code,
 contracts or migrations.
