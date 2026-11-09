@@ -1,5 +1,13 @@
 # Walter shared capabilities
 
+| | |
+|---|---|
+| **Rôle** | Exposer les capacités Walter aux harnesses (serveur MCP `walter`, hooks, raccordements) et valider le registre des modules (`walter_platform`, `walter check`). Héberge le futur moteur unique ([engine/](engine/README.md)). |
+| **Propriétaire** | walter-core (`/walter/core`). |
+| **État** | **active** (constat du 09/11/2026) : serveur MCP (stdio), hooks des runtimes, `walter-standby.timer`. Moteur : lot E0 fait, lot E1 en cours. |
+| **Ne fait pas** | Posséder les données d'un autre module. La boucle d'exécution et les permissions des runtimes actuels (Hermes, DSH, Codex, Claude Code) restent les leurs. |
+| **Contrats** | [contracts/core.json](contracts/core.json), [contracts/schemas/](contracts/schemas/), [modules/registry.json](modules/registry.json) ; brouillons du moteur dans [engine/contracts/](engine/contracts/). |
+
 Walter owns reusable capabilities and their data; Hermes, DSH, Codex and Claude Code own their execution loops and permission gates. Optional modules load only when called, so one missing module does not prevent memory or skills from starting.
 
 `modules/registry.json` declares 17 logical modules: source boundaries, interfaces, owned data, dependencies, backup paths, per-harness bindings and explicit limits. `walter_platform` validates this registry without importing a harness. The encrypted backup reads the same declared paths and fails if required anchors disappear.
