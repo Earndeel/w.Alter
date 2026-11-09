@@ -206,5 +206,92 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
-  }
+  },
+  "components": [
+    {
+      "id": "preflight",
+      "path": "walter_context/preflight",
+      "role": "Décision unique par message : ContextPlan (intention, niveau, capacités, voie rapide)",
+      "status": "active",
+      "readme": "README.md",
+      "contracts": [
+        "contracts/schemas/context-plan.v2.json"
+      ],
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:8897/preflight"
+        }
+      ],
+      "vision_target": "cognition/context/preflight"
+    },
+    {
+      "id": "assembly",
+      "path": "walter_context/assembly.py",
+      "role": "Assemblage du contexte selon le plan (pack)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/context"
+    },
+    {
+      "id": "child",
+      "path": "walter_context/child.py",
+      "role": "ChildContextSpec : dossier de départ d'un sous-agent",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-context-child"
+        }
+      ],
+      "vision_target": "cognition/context"
+    },
+    {
+      "id": "compress",
+      "path": "walter_context/compress",
+      "role": "Moteur de compaction (projection head→record→compact→live)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/context/compress"
+    },
+    {
+      "id": "recover",
+      "path": "walter_context/recover.py",
+      "role": "Retrouver l'original d'une sortie compactée (walter_logs)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-context recover"
+        }
+      ],
+      "vision_target": "cognition/context"
+    },
+    {
+      "id": "dsh-port",
+      "path": "ports/dsh",
+      "role": "Prise DSH (injection et compaction) ; deviendra la stratégie context du moteur",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/engine/plugins"
+    },
+    {
+      "id": "bench",
+      "path": "bench",
+      "role": "Bancs (levels, replay, quality, acceptance)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/context/bench"
+    },
+    {
+      "id": "session-state",
+      "path": "contracts/schemas/session-state.v1.json",
+      "role": "État de travail par fil (SessionState v1)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/context/contracts"
+    }
+  ]
 }
