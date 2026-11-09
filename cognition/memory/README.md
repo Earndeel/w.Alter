@@ -1,8 +1,16 @@
 # walter-memory
 
-Walter Memory core (spec and decisions: `/root/.hermes/docs/walter-memory/`).
+| | |
+|---|---|
+| **Rôle** | Walter Memory : événements et objets canoniques, leur provenance, les connaissances dérivées, Kardex et l'index de recherche. Héberge aussi le bus Walter et walter-logs. |
+| **Propriétaire** | walter-memory (`/walter/memory`). |
+| **État** | **active** (constat du 09/11/2026) : `walter-memory-gateway` (:8890), `walter-logs-watch`, timers des connecteurs ; génération g0 active, g1 lue aussi. Nettoyage : phase 0 faite le 09/11/2026, phase 1 en cours ([docs/NETTOYAGE-2026-11.md](docs/NETTOYAGE-2026-11.md)). |
+| **Ne fait pas** | Garder les octets bruts (Raw Vault, [vault/](vault/README.md)) ; choisir un modèle (Router) ; décider ce qui entre dans le contexte (Context). |
+| **Contrats** | [contracts/memory.json](contracts/memory.json), [bus.json](contracts/bus.json), [logs.json](contracts/logs.json), [data-classes.json](contracts/data-classes.json), [maintenance.json](contracts/maintenance.json) ; [migrations/](migrations/) ; MCP `memory_*`, `logs_*`, `vault_*` ; passerelle 127.0.0.1:8890. |
 
-- `migrations/` — SQL, applied in order (`docker exec -i hindsight-pg psql -U hindsight -d hindsight < file`).
+Walter Memory core (spec and decisions: `/walter/docs/` — ARCHITECTURE, DECISIONS, PLAN, RUNBOOK).
+
+- `migrations/` — SQL, applied in order by `walter-memory migrate` (each file recorded in `core.schema_migrations`).
 - `event_types/v1.json` — seed of the extensible taxonomy (`walter-memory types sync`).
 - `walter_memory/` — library: `events` (append-only canonical store), `objects` (single Raw Vault registry,
   clear/secure zones), `privacy` (classes, detectors, redaction), `llm` (the only door to external models:
