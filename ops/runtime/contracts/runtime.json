@@ -101,5 +101,21 @@
         "scope": "integration"
       }
     ]
-  }
+  },
+  "components": [
+    {
+      "id": "python",
+      "path": "bin/walter-python",
+      "role": "Interpréteur Python partagé des modules",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-python"
+        }
+      ],
+      "vision_target": "ops/runtime"
+    }
+  ]
 }
