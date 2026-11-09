@@ -32,7 +32,7 @@ def units_down(module, units, severity="high"):
             for u in units if not active(u)]
 
 
-out = units_down("memory", ["walter-memory-gateway", "walter-logs-watch"])
+out = units_down("memory", ["walter-memory-gateway", "walter-logs-watch", "raw-vault-s3"])
 r = sh("walter-memory", "health", timeout=120)
 try:
     h = json.loads(r.stdout)
