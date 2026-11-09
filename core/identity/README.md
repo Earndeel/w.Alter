@@ -1,5 +1,13 @@
 # walter-soul
 
+| | |
+|---|---|
+| **Rôle** | Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance. |
+| **Propriétaire** | walter-soul (`/walter/soul`). |
+| **État** | **active** (constat du 09/11/2026) : sans service ; rendu au commit de l'identité de l'instance. |
+| **Ne fait pas** | Contenir l'identité d'une personne (elle est dans l'instance). Accepter une modification à la main des fichiers rendus (`walter-soul check` la détecte). |
+| **Contrats** | [contracts/soul.json](contracts/soul.json) ; CLI `walter-soul` ; MCP `walter_profile`. |
+
 Rend l'identité de l'agent de l'**instance active** pour chaque runtime (Hermes, Claude Code, Codex, DSH, MCP
 `walter_profile`). Logiciel identique pour toutes les instances : aucune identité de personne ici.
 
