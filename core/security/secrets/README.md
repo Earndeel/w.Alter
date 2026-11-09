@@ -1,5 +1,13 @@
 # Walter Secrets
 
+| | |
+|---|---|
+| **Rôle** | Accès partagé au coffre Bitwarden du propriétaire : références au coffre et injection locale des valeurs autorisées, sans qu'aucune valeur n'entre dans un modèle. |
+| **Propriétaire** | walter-secrets (`/walter/secrets`). |
+| **État** | **active** (constat du 09/11/2026) : service `walter-secrets-sync`. |
+| **Ne fait pas** | Donner une valeur secrète à un modèle, un journal, un prompt ou une URL ; exporter `Vault.value`. |
+| **Contrats** | [contracts/secrets.json](contracts/secrets.json), [contracts/maintenance.json](contracts/maintenance.json) ; MCP `secret_search`, `secret_reference` ; CLI `walter-secret`. |
+
 Shared vault access for Walter's clients. The core imports with Python 3.11+ alone;
 Hermes, DSH, Codex and Claude Code are **not** Python dependencies of the core.
 
@@ -102,3 +110,19 @@ secret : propriétaire, nature, droits, consommateurs, responsable du renouvelle
 seul le responsable déclaré renouvelle (OAuth ici, CLI du fournisseur pour Codex et rclone). Santé, sans valeur :
 `walter-secret grants`.
 
+
+## Abonnement Claude
+
+Une autorisation `subscription` de fournisseur `anthropic-claude`, responsable `walter-secrets`, peut conserver une session compatible CLI dans un fichier privé déclaré. L’accès est servi par `grants.access` comme les autres autorisations. Le jeton opaque utilise `claudeAiOauth.expiresAt` (millisecondes) ; le refresh PKCE public est effectué sous verrou interprocessus. Access token, refresh token et expiration sont remplacés atomiquement en 0600. Le CLI consommateur ne reçoit que l’access token en environnement et ne doit pas renouveler ce fichier. La santé expose uniquement l’expiration et la présence du refresh token. Aucun nouveau secret n’est exposé dans MCP.
+
+## Empreintes du coffre (masquage dans les journaux)
+
+`walter_secrets.fingerprints` tient un index **sans aucune valeur** des secrets du coffre : HMAC-SHA256 (clé locale
+aléatoire `@instance/state/secrets/fingerprint.key`, 0600) tronqué à 128 bits, plus les longueurs
+(`@instance/state/secrets/fingerprints.json`, 0600). Indexés : mot de passe et graine TOTP, champs personnalisés
+texte/masqués, numéro et code de carte, numéros d'identité ; ignorés : valeurs avec espaces, de moins de 8 caractères,
+courtes à une seule classe de caractères, e-mails, URL, booléens, notes. `fingerprints.scrub(text)` remplace toute
+valeur connue par `«secret:vault»` (rien sans index). Reconstruit par `secrets_sync watch` à chaque révision du
+coffre et toutes les 6 h ; à la main : `walter-secret fingerprints build|status`. Consommateurs : walter-logs
+(`walter_memory.logs.mask`) et la porte d'écriture de `core.events` (`events.record_events`). Origine : 2026-10-30,
+une clé Kie hexadécimale collée dans un chat était écrite en clair dans `walter_logs`.
