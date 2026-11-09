@@ -68,3 +68,39 @@ def test_decide_uses_router_chain(monkeypatch):
     monkeypatch.setattr(llm, "_decide_once", once)
     llm.decide({"text": "x"}, {"a": {}}, processor="t", privacy_class="cloud_allowed")
     assert seen == ["typesafe/jev-x"]
+
+
+def test_samples_are_averaged_and_a_failed_sample_is_dropped(monkeypatch):
+    """samples=3 (preflight 2026-11-09): one model asked 3 times in parallel, answers averaged; a sample that fails is
+    dropped, the decision stands on the others; only when all fail does the next model get asked."""
+    monkeypatch.setattr(llm, "_log", lambda **row: None)
+    draws = iter([{"m": {"type": "noul", "noul": 0.4},
+                   "p": {"type": "choice", "choice": "none", "confidence": 0.5,
+                         "probabilities": {"none": 0.55, "memory": 0.45}}},
+                  {"m": {"type": "noul", "noul": 0.7},
+                   "p": {"type": "choice", "choice": "memory", "confidence": 0.6,
+                         "probabilities": {"none": 0.3, "memory": 0.7}}},
+                  RuntimeError("HTTP 502")])
+    import threading
+    lock = threading.Lock()
+
+    def once(model, state, questions, timeout):
+        with lock:
+            d = next(draws)
+        if isinstance(d, Exception):
+            raise d
+        return {"answers": d, "cost_usd": 0, "input_tokens": 10}, "openrouter"
+
+    monkeypatch.setattr(llm, "_decide_once", once)
+    out = llm.decide({"text": "x"}, {}, processor="t", privacy_class="cloud_allowed", models=("a/b",), samples=3)
+    a = out["answers"]
+    assert out["samples"] == 2 and out["model"] == "a/b"
+    assert a["m"]["noul"] == pytest.approx(0.55)
+    assert a["p"]["choice"] == "memory" and a["p"]["probabilities"]["memory"] == pytest.approx(0.575)
+    assert a["p"]["confidence"] == pytest.approx(0.3) and a["p"]["agreement"] == 0.5
+
+
+def test_merge_is_deterministic_on_ties_and_one_sample_is_returned_as_is():
+    one = {"p": {"type": "choice", "choice": "a", "confidence": 0.9, "probabilities": {"a": 0.5, "b": 0.5}}}
+    assert llm.merge_answers([one, one])["p"]["choice"] == "a"
+    assert llm.merge_answers([one])["p"]["agreement"] == 1.0

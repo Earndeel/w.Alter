@@ -255,10 +255,36 @@ def _decide_once(model: str, state: dict, questions: dict, timeout: float) -> tu
         "openrouter"
 
 
+def merge_answers(samples: list[dict]) -> dict:
+    """The mean of several answers to the same questions. noul: mean probability. choice: mean probability per option,
+    the choice = the highest mean, its confidence = the sum of the confidences of the samples that chose it divided
+    by the number of samples (a sample that chose otherwise counts 0), `agreement` = the share that chose it."""
+    out: dict = {}
+    for k, first in samples[0].items():
+        got = [s[k] for s in samples if isinstance(s.get(k), dict)]
+        if first.get("type") == "noul":
+            out[k] = {**first, "noul": sum(g.get("noul") or 0 for g in got) / len(got)}
+            continue
+        options = list(dict.fromkeys(o for g in got for o in (g.get("probabilities") or {})))
+        if not options:
+            out[k] = first
+            continue
+        p = {o: sum((g.get("probabilities") or {}).get(o, 0) for g in got) / len(got) for o in options}
+        choice = max(options, key=lambda o: p[o])           # ties: the first sample's order, deterministic
+        agree = [g for g in got if g.get("choice") == choice]
+        out[k] = {**first, "choice": choice, "probabilities": p,
+                  "confidence": sum(g.get("confidence") or 0 for g in agree) / len(got),
+                  "agreement": len(agree) / len(got)}
+    return out
+
+
 def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, names: list[str] | None = None,
            model: str | None = None, models: tuple[str, ...] | None = None, purpose: str | None = None,
-           budget: str = "recurring", timeout: float = 30) -> dict:
+           budget: str = "recurring", timeout: float = 30, samples: int = 1) -> dict:
     """Typed decisions (System One contract: one call, a probability per option) from a decision model.
+    `samples` > 1 asks the same model that many times in parallel and averages the answers (merge_answers): the
+    decision APIs sample, so one call on the same inputs can land either side of a threshold (preflight 2026-11-09:
+    cap_memory 0.37–0.55 on one message); the mean of 3 cuts that spread by √3 for 3× a call of ~0.00007 USD.
     Tries `model` alone, else `models`, else Walter Router's decision chain (decide_chain()), in order ("vendor/model" = OpenRouter Decisions API,
     "cloudflare/clef" or "clef" = Workers AI). local_only state is refused; redacted_cloud state is pseudonymised
     (strings, recursively) before leaving the VM. Returns {"answers": {...}, "usage": {...}, "model": ...}."""
@@ -280,17 +306,33 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
                 _log(**base, status="refused_budget", error=f"OpenRouter balance {bal:.2f} USD below floor")
                 errors.append(f"{m}: balance below floor")
                 continue
-        t0 = time.perf_counter()
-        try:
-            res, provider = _decide_once(m, state, questions, timeout)
-        except Exception as e:  # noqa: BLE001 — next decision model
-            _log(**base, status="error", error=str(e)[:500], latency_ms=int((time.perf_counter() - t0) * 1000))
-            errors.append(f"{m}: {str(e)[:120]}")
+        def once(_=None, m=m, base=base):
+            t0 = time.perf_counter()
+            try:
+                res, provider = _decide_once(m, state, questions, timeout)
+            except Exception as e:  # noqa: BLE001 — next decision model
+                _log(**base, status="error", error=str(e)[:500], latency_ms=int((time.perf_counter() - t0) * 1000))
+                return e
+            _log(**base, status="ok", latency_ms=int((time.perf_counter() - t0) * 1000),
+                 input_tokens=res.get("input_tokens"), output_tokens=0, cost_usd=res.get("cost_usd"))
+            return res, provider
+        if samples > 1:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(samples) as ex:
+                got = list(ex.map(once, range(samples)))
+        else:
+            got = [once()]
+        ok = [g for g in got if not isinstance(g, Exception)]
+        if not ok:
+            errors.append(f"{m}: {str(got[0])[:120]}")
             continue
-        _log(**base, status="ok", latency_ms=int((time.perf_counter() - t0) * 1000), input_tokens=res.get("input_tokens"),
-             output_tokens=0, cost_usd=res.get("cost_usd"))
-        return {"answers": res["answers"], "usage": res.get("usage") or {},
-                "model": res.get("model") if provider == "openrouter" and res.get("model") else m}
+        res, provider = ok[0]
+        out = {"answers": res["answers"] if len(ok) == 1 else merge_answers([r["answers"] for r, _ in ok]),
+               "usage": res.get("usage") or {},
+               "model": res.get("model") if provider == "openrouter" and res.get("model") else m}
+        if samples > 1:
+            out["samples"] = len(ok)
+        return out
     raise RuntimeError("no decision model answered: " + "; ".join(errors))
 
 def retrieval(operation: str, *, model: str, processor: str, privacy_class: str,
