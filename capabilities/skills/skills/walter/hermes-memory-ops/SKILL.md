@@ -8,7 +8,7 @@ created: 2026-06-07
 
 # Walter Memory operations
 
-Current procedure, checked on the VM on 2026-11-01. The June–October Hindsight / Qdrant / write-worker / Jarvis
+Current procedure, checked on the VM on 2026-11-01 (retirements updated 2026-11-09). The June–October Hindsight / Qdrant / write-worker / Jarvis
 material is kept verbatim in `references/historical-2026-08-architecture.md` for provenance only.
 
 ## What is live (and what is not)
@@ -28,9 +28,14 @@ material is kept verbatim in `references/historical-2026-08-architecture.md` for
   agents' work. Do not mistake raw Vault exports for a walter_logs backup: the PG dumps contain both.
 - **Retired — never restart or reinstall**: Hindsight API (:8888, retired 2026-10-19), Qdrant, hybrid-search,
   write-worker / write-bridge, pg-qdrant-sync, dream-cycle, Jarvis (2026-10-01), the ephemeral sweeper and
-  kardex-hindsight-sync timers (2026-10-19). Do not install Qdrant clients to satisfy an old smoke test. Hindsight's
-  old tables (`public.*`) are still in PG, dumped to
-  `/instances/monsieur/backups/changes/hindsight-final-20261019.dump`.
+  kardex-hindsight-sync timers (2026-10-19); the Hermes cron jobs « Memory Health Check », « Memory Dreaming » and
+  « Memory Importance Decay » (removed 2026-11-09; the Walter Guardians cover their useful checks). Do not install
+  Qdrant clients to satisfy an old smoke test. **Hindsight's tables are gone** (Memory cleanup phase 1, 2026-11-09):
+  the Hindsight objects of `public`, schemas `walter_voice` and `walter_audit`, the sync tables of `legacy`. Schema
+  `public` now holds only the extensions (vector, pg_trgm, pgcrypto, unaccent): never `DROP SCHEMA public`. Their
+  content stays in the encrypted dumps of `@instance/backups/memory-archive/` and
+  `@instance/backups/changes/2026-11-09-memory-phase1/`; Hindsight's memories live on in `core.derived_items`
+  (`derived_by = 'hindsight'`, generation g0).
 - **Docs**: `/walter/docs/{ARCHITECTURE,DECISIONS,RUNBOOK,PLAN}.md` (moved from `~/.hermes/docs/walter-memory`
   on 2026-10-31; the old path is a link).
 
@@ -47,10 +52,8 @@ material is kept verbatim in `references/historical-2026-08-architecture.md` for
 
 ## Maintain
 
-- Recall noise: `/opt/walter-memory/venv/bin/python -m walter_memory.hygiene --kind ephemeral --limit 200` is DRY-RUN
-  by default; `--apply` snapshots prior tags, audits, and tags `quarantine:noise` on the legacy `public.memory_units`
-  rows (Hindsight PG tables). Never delete canonical events or raw logs to clean recall. Compatibility scripts are
-  links to `/opt/walter-memory/ops`.
+- Recall noise: never delete canonical events or raw logs to clean recall (the old `walter_memory.hygiene` quarantine
+  of Hindsight rows was removed with those tables on 2026-11-09).
 - Real deletion only with `walter-memory purge` (break-glass, dry-run unless `--execute`, rewrites backups).
 - Privacy classes can only be tightened (`walter-memory privacy-rescan`). L3 synthesis must exclude `local_only`
   before the call, carry the strictest included source class through `walter_memory.llm` into the derived item and
@@ -65,23 +68,20 @@ material is kept verbatim in `references/historical-2026-08-architecture.md` for
 
 ## Backups and restore
 
-`walter-pg-backup` (03:30 UTC, `pg_dump -Fc` → `/instances/monsieur/backups/pg/`), `walter-statedb-backup`
-(03:50 UTC), `walter-offsite-backup` (04:40 UTC, age-encrypted to Drive), monthly `walter-offsite-restore-test`
-(downloads/decrypts, restores PG into a disposable database, checks main SQLite, module manifest and Bitwarden item
-count). `backup_bundle` discovers all `/opt/walter-*` and integration configs, snapshots profile DBs, inventories
-Python packages, verifies SHA-256, links, modes and mandatory entry points; venvs and rebuildable model weights are
-excluded; Raw Vault bytes already reside on Drive. A verified bundle is not yet proof of a complete installation on
-a clean VM.
+`walter-pg-backup` (03:30 UTC, `pg_dump -Fc` → `@instance/backups/pg/`, 7 daily + 4 weekly), `walter-statedb-backup`
+(03:50 UTC), offsite = **restic** `walter-restic-backup` (05:10 UTC, encrypted deduplicated repository on Drive,
+snapshots tagged `keep` are never forgotten), monthly restore test `walter-offsite-restore-test.service` (the 3rd)
+which runs `walter-restic-restore-test` (restores PG into a disposable database and compares the tables listed in
+`@instance/config/backup/backup.toml` `restore_test.compare_tables`). State: `walter-ops backup status`. Restore a
+full dump by sections (pre-data, data, post-data), never one `pg_restore -j`: the trigger of the partitioned
+`core.events` fires while partitions load.
 
-Regression checks after touching backups, privacy, hygiene or logs:
+Regression checks after touching backups, privacy or logs:
 
 ```bash
-cd /opt/walter-memory &&
-venv/bin/python -m pytest -q tests/test_backup_bundle.py tests/test_extract_privacy.py tests/test_hygiene.py tests/test_logs.py
+cd /walter/memory && walter-python -m pytest -q tests/
+bash scripts/post_repair_smoke_test.sh   # from this skill's folder
 ```
-
-(18 tests passed on 2026-10-17, with a successful restore test that day: PG, main state.db, 12 modules, 9 profile
-SQLite snapshots, 9 Python environment inventories.)
 
 ## Related
 
@@ -103,5 +103,5 @@ Still current:
 Historical (Hindsight era, provenance only): `references/historical-2026-08-architecture.md` (the former body of this
 skill), `hindsight-ops.md`, `hindsight-audit.md`, `hindsight-memory-consistency.md`, `hindsight-temporal-graph.md`,
 `memory-vector-recall-architecture.md`, `port-service-map.md`, `auto-maintenance.md`, `dedup-and-dreaming-fixes.md`,
-`organic-lifecycle.md`, `system-operations.md`, `curator-configuration.md`; `scripts/post_repair_smoke_test.sh`
-tests the retired stack.
+`organic-lifecycle.md`, `system-operations.md`, `curator-configuration.md`. The tables, ports and scripts they name no
+longer exist. `scripts/post_repair_smoke_test.sh` checks the current stack (read-only).
