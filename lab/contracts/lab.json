@@ -163,5 +163,29 @@
     "summary": "manifest/SUMMARY.md",
     "manifest": "manifest/MANIFEST.md",
     "tools": []
-  }
+  },
+  "components": [
+    {
+      "id": "library",
+      "path": "walter_lab",
+      "role": "Lab : bancs, comparaisons, propositions (jamais de déploiement)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-lab"
+        }
+      ],
+      "vision_target": "lab"
+    },
+    {
+      "id": "experiments",
+      "path": "experiments",
+      "role": "Expériences et résultats",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "lab/experiments"
+    }
+  ]
 }
