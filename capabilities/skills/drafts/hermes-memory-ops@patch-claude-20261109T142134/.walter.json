@@ -1,0 +1,11 @@
+{
+ "base_sha": "011ac01a4a5eee4f6d8384d2194c06f7dff978a784545ec4a2d4cb685e73cdda",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-09T14:21:34.085256+00:00",
+ "domain": "walter",
+ "kind": "patch",
+ "reason": "Memory cleanup phase 1 (2026-11-09, Monsieur's go): Hindsight tables, walter_voice, walter_audit dropped; walter_memory.hygiene removed; Hermes cron Memory Health Check/Dreaming/Importance Decay removed (Guardians cover them); offsite is restic, not walter-offsite-backup; tests/test_hygiene.py and the memory venv no longer exist. Evidence: catalog checks and test run of the session.",
+ "runtime": "claude",
+ "session_id": "4bbc82a2-6d14-4af3-ba60-d71f1cb984bf",
+ "target": "hermes-memory-ops"
+}
