@@ -1,0 +1,356 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/core/engine/engine-api.v1.json",
+  "title": "Engine API v1",
+  "description": "Requests an interface (web, Telegram, API, MCP, command, schedule, webhook, Lab) sends to the Walter engine. Status: DRAFT (lot E0); implemented at lot E4. Transport: local HTTP + SSE with an agent token in a header; the same policy applies whatever the transport.",
+  "type": "object",
+  "required": [
+    "version",
+    "op"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "op": {
+      "enum": [
+        "session.open",
+        "turn.submit",
+        "turn.steer",
+        "turn.queue",
+        "turn.cancel",
+        "approval.answer",
+        "delegate",
+        "events.subscribe",
+        "health"
+      ]
+    }
+  },
+  "$defs": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^(web|telegram|api|mcp|command|schedule|webhook|lab)/[A-Za-z0-9._:@/-]{1,200}$",
+      "description": "Stable engine session id: <interface>/<account or caller>/<conversation>. Fixed by intake, never by the model."
+    },
+    "interface": {
+      "enum": [
+        "web",
+        "telegram",
+        "api",
+        "mcp",
+        "command",
+        "schedule",
+        "webhook",
+        "lab"
+      ]
+    },
+    "principal": {
+      "type": "object",
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "owner",
+            "machine",
+            "test"
+          ],
+          "description": "owner = the instance's person; machine = a Walter module or schedule; test = Lab/bench (never production data writes)"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Instance-relative identity (never a path, never a secret)"
+        }
+      }
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 200,
+      "description": "Idempotency key: same key = same effect, never applied twice"
+    },
+    "attachment": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "image",
+            "audio",
+            "video",
+            "document",
+            "file"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "description": "Raw Vault object id or a path inside the session workspace; never inline bytes"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "session.open"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "interface",
+          "conversation",
+          "principal",
+          "mode",
+          "permissions"
+        ],
+        "properties": {
+          "interface": {
+            "$ref": "#/$defs/interface"
+          },
+          "conversation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "principal": {
+            "$ref": "#/$defs/principal"
+          },
+          "mode": {
+            "enum": [
+              "interactive",
+              "command"
+            ]
+          },
+          "permissions": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$",
+            "description": "Named preset (core/security); a caller can only narrow it"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "turn.submit"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "session_id",
+          "message",
+          "channel",
+          "idempotency_key"
+        ],
+        "properties": {
+          "session_id": {
+            "$ref": "#/$defs/session_id"
+          },
+          "idempotency_key": {
+            "$ref": "#/$defs/idempotency_key"
+          },
+          "message": {
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/attachment"
+                }
+              }
+            }
+          },
+          "channel": {
+            "enum": [
+              "owner",
+              "machine",
+              "test"
+            ]
+          },
+          "overrides": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Explicit owner choices only; they are passed to Router/Context, never decided by the engine",
+            "properties": {
+              "task": {
+                "type": "string"
+              },
+              "level": {
+                "enum": [
+                  "L1",
+                  "L2",
+                  "L3"
+                ]
+              },
+              "model": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "enum": [
+              "turn.steer",
+              "turn.queue"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "session_id",
+          "message"
+        ],
+        "properties": {
+          "session_id": {
+            "$ref": "#/$defs/session_id"
+          },
+          "message": {
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "turn.cancel"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "session_id",
+          "reason"
+        ],
+        "properties": {
+          "session_id": {
+            "$ref": "#/$defs/session_id"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "approval.answer"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "request_id",
+          "decision",
+          "principal"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision": {
+            "enum": [
+              "allow_once",
+              "deny"
+            ]
+          },
+          "principal": {
+            "$ref": "#/$defs/principal"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "delegate"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "delegation"
+        ],
+        "properties": {
+          "delegation": {
+            "$ref": "delegation.v1.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "events.subscribe"
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "required": [
+              "session_id"
+            ]
+          },
+          {
+            "required": [
+              "run_id"
+            ]
+          }
+        ],
+        "properties": {
+          "session_id": {
+            "$ref": "#/$defs/session_id"
+          },
+          "run_id": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -95,7 +95,9 @@ def report(*, scan=False, live=False, path=None):
         from .neutrality import scan as neutrality
         out['interconnect']=interconnect()
         out['neutrality']=neutrality()
-        out['ok']=out['ok'] and out['interconnect']['ok'] and out['neutrality']['ok']
+        from .documentation import scan as documentation
+        out['documentation']=documentation()
+        out['ok']=out['ok'] and out['interconnect']['ok'] and out['neutrality']['ok'] and out['documentation']['ok']
     return out
 
 

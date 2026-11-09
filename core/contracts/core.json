@@ -154,5 +154,195 @@
       "module_guide",
       "module_index"
     ]
-  }
+  },
+  "components": [
+    {
+      "id": "engine",
+      "path": "engine",
+      "role": "Runtime agentique unique de Walter (conception ; la production reste DSH dans /opt/dsh)",
+      "status": "planned",
+      "readme": "engine/README.md",
+      "vision_target": "core/engine"
+    },
+    {
+      "id": "engine-contracts",
+      "path": "engine/contracts",
+      "role": "Schémas Engine API, accueil, délégation, politique, événements, stratégies (brouillons testés)",
+      "status": "implemented",
+      "readme": "engine/README.md",
+      "contracts": [
+        "engine/contracts/engine-api.v1.json"
+      ],
+      "vision_target": "core/engine/contracts"
+    },
+    {
+      "id": "mcp-server",
+      "path": "server.py",
+      "role": "Serveur MCP walter : expose les capacités aux agents (Claude Code, Codex, DSH, Hermes)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "mcp",
+          "interface": "walter"
+        }
+      ],
+      "vision_target": "core/interfaces/mcp"
+    },
+    {
+      "id": "capabilities-adapter",
+      "path": "walter_capabilities.py",
+      "role": "Adaptateur des outils MCP vers les commandes déclarées des modules",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/interfaces/mcp"
+    },
+    {
+      "id": "mcp-toolsets",
+      "path": "config/toolsets.toml",
+      "role": "Jeux d'outils MCP par client (WALTER_CLIENT_TAG)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/interfaces/mcp"
+    },
+    {
+      "id": "runtime-hook",
+      "path": "hooks/walter_hook.py",
+      "role": "Adaptateur de cycle de vie des runtimes (preflight, contexte, runs, bus) appelé à chaque message",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter_hook.py"
+        }
+      ],
+      "vision_target": "core/interfaces/hooks"
+    },
+    {
+      "id": "dsh-hooks",
+      "path": "hooks/dsh",
+      "role": "Greffons DSH (owner-turn) ; deviennent les greffons intake/events du moteur",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/engine/plugins"
+    },
+    {
+      "id": "platform",
+      "path": "walter_platform",
+      "role": "Registre, contrats, chemins, instances, raccordements, contrôles (walter …)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter"
+        }
+      ],
+      "vision_target": "core/contracts"
+    },
+    {
+      "id": "module-catalog",
+      "path": "modules/catalog.json",
+      "role": "Table unique des modules : emplacement actuel, ancien, cible de la vision",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/contracts"
+    },
+    {
+      "id": "module-registry",
+      "path": "modules/registry.json",
+      "role": "Registre compilé depuis les contrats (généré, jamais édité à la main)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/contracts"
+    },
+    {
+      "id": "computer-policy",
+      "path": "modules/computer-policy.json",
+      "role": "Périmètres Computer Use par interface",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/security"
+    },
+    {
+      "id": "compositions",
+      "path": "compositions",
+      "role": "Compositions de harnesses générées par walter-core (sections gérées)",
+      "status": "active",
+      "readme": "docs/HARNESS-COMPOSITION.md",
+      "vision_target": "core/engine/compositions"
+    },
+    {
+      "id": "dsh-web-ui",
+      "path": "ports/dsh-web-ui",
+      "role": "Personnalisation de l'interface web DSH (couleurs, porte web du propriétaire)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/interfaces/web"
+    },
+    {
+      "id": "tool-gateway",
+      "path": "bin/walter-tools",
+      "role": "Passerelle d'outils de walter_run (un processus par run) ; remplacée par le moteur au lot E5",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-tools serve"
+        }
+      ]
+    },
+    {
+      "id": "guardians",
+      "path": "bin/walter-guardians",
+      "role": "Lanceur des gardiens de modules (diagnostic, réparation, alerte)",
+      "status": "active",
+      "readme": "GUARDIANS.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-guardians"
+        }
+      ],
+      "vision_target": "ops/guardians"
+    },
+    {
+      "id": "scenarios",
+      "path": "scenarios",
+      "role": "Scénarios de bout en bout (walter-scenario)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-scenario"
+        }
+      ],
+      "vision_target": "lab/scenarios"
+    },
+    {
+      "id": "browser-session",
+      "path": "browser_auth.py",
+      "role": "Session navigateur du propriétaire côté serveur (MCP browser_session) — responsabilité de Browse mal placée",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "mcp",
+          "interface": "browser_session"
+        }
+      ],
+      "vision_target": "capabilities/browse"
+    },
+    {
+      "id": "standby",
+      "path": "walter_platform/standby.py",
+      "role": "Mise en veille des services à la demande",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "ops"
+    }
+  ]
 }

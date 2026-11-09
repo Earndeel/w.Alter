@@ -132,7 +132,8 @@ dont environ 2,3 s utiles, et 40 s pour la météo, dont environ 16 s utiles.
 - **C'est une seconde boucle de production**, contraire à la vision (§ 9, « un seul runtime »).
 - **Pas de session persistante, pas de reprise, pas d'interruption** autre que le budget, pas d'approbation.
 - **Le terminal n'a pas de bac à sable** (`subprocess.Popen(..., shell=True)`) : un sous-agent peut écrire partout
-  avec les droits root. C'est un écart de sécurité.
+  avec les droits root. C'est un écart de sécurité. **Corrigé le 09/11** (router `64b1b48`) : terminal retiré, fichiers confinés au
+  dossier du run (`03-MIGRATION.md` § S0).
 - **Les décisions sont refaites** : `intent.classify` au lieu du ContextPlan, recette de contexte au lieu du plan.
 - **Un processus neuf à chaque étape** (walter-router, walter-context-child, walter-tools, walter-llm call).
 
@@ -145,7 +146,7 @@ dont environ 2,3 s utiles, et 40 s pour la météo, dont environ 16 s utiles.
 | Préparation des invites médias | `router/serve/media_exec.py` → `hermes chat --oneshot` | Idem |
 | Alertes du Router qui modifient la config Hermes et redémarrent sa passerelle | `router/analysis/alerts.py`, `serve/hermes_sync.py` | Le branchement Hermes devient facultatif (Lab) ; le moteur lit la configuration du Router sans synchronisation |
 | Jeton Google le plus large (Drive, envoi de mails, agenda en écriture) | `~/.hermes/google_token.json` (colab, `ask_hermes`) | Autorisation dans `walter_secrets.grants` (déclarée le 19/10, pas reprise) |
-| Tâches planifiées | `~/.hermes/cron/jobs.json` : « Memory Health Check » (5 min), « Memory Dreaming » (04:00) | Le contrôle de santé passe aux guardians et à systemd (Ops fonctionne sans modèle) ; **Dreaming est mort** depuis le retrait de Hindsight (19/10) : échec complet le 09/11, un appel de modèle payé chaque nuit |
+| Tâches planifiées | `~/.hermes/cron/jobs.json` : « Memory Health Check » (5 min), « Memory Dreaming » (04:00) | Le contrôle de santé passe aux guardians et à systemd (Ops fonctionne sans modèle) ; **Dreaming est mort** depuis le retrait de Hindsight (19/10) : échec complet le 09/11, un appel de modèle payé chaque nuit ; **mise en pause le 09/11** |
 | Délégation `ask_hermes` (comptes Google, agenda, navigateur) | outil MCP walter-core | Outils du moteur adossés aux autorisations Walter ; `ask_hermes` reste comme voie d'étude, hors production |
 | Application Hermes Desktop sur le Mac (profil `wild`) | `hermes-desktop-backend` | Hors périmètre du moteur ; à décider avec Monsieur au lot de parité (H6) |
 

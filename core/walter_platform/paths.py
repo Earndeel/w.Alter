@@ -81,6 +81,12 @@ def entry(name, catalog=None):
     return found
 
 
+def vision_target(item):
+    """Where VISION.md (2026-11-09) places the module (core/, cognition/, capabilities/…); not used to resolve it."""
+    value = item.get('vision_target')
+    return walter_root() / relative(value) if value else None
+
+
 def target_root(item):
     """Where the module belongs in the target layout (whether or not it has moved yet)."""
     return walter_root() / relative(item['target'])
@@ -137,8 +143,14 @@ def layout(*, catalog=None, filesystem='/'):
         rows.append({'id': name, 'root': str(current), 'target': str(target),
                      'legacy': str(legacy) if legacy else None, 'moved': current == target, 'legacy_link': link,
                      **({'aliases': item['aliases']} if item.get('aliases') else {}),
-                     **({'compat_links': extra} if extra else {})})
+                     **({'compat_links': extra} if extra else {}),
+                     **({'vision_target': str(walter_root() / relative(item['vision_target'])),
+                         'vision_reached': str(target) == str(walter_root() / relative(item['vision_target']))}
+                        if item.get('vision_target') else {})})
+    vision = [r for r in rows if 'vision_target' in r]
     return {'walter_root': str(walter_root()), 'modules': rows,
+            'vision': {'declared': len(vision), 'reached': sum(r['vision_reached'] for r in vision),
+                       'note': 'vision_target = place in VISION.md (2026-11-09); moves happen at lot E9, one module at a time'},
             'ok': all(r['legacy_link'] in (None, 'compat-link', 'absent')
                       and all(v in ('compat-link', 'absent') for v in (r.get('compat_links') or {}).values())
                       for r in rows)}

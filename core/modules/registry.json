@@ -177,7 +177,51 @@
           "browser_session",
           "browser_sites"
         ]
-      }
+      },
+      "components": [
+        {
+          "id": "library",
+          "path": "/walter/browse/walter_browse",
+          "role": "Recherche web et lecture de pages",
+          "status": "active",
+          "readme": "/walter/browse/README.md",
+          "vision_target": "capabilities/browse"
+        },
+        {
+          "id": "engine",
+          "path": "/walter/browse/engine",
+          "role": "Moteurs Camoufox / CloakBrowser (ex ~/.hermes/camoufox-max)",
+          "status": "active",
+          "readme": "/walter/browse/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:9377"
+            },
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:9378"
+            }
+          ],
+          "vision_target": "capabilities/browse/engine"
+        },
+        {
+          "id": "network",
+          "path": "/walter/browse/network",
+          "role": "Sorties réseau (Freebox, Mac, défaut)",
+          "status": "active",
+          "readme": "/walter/browse/README.md",
+          "vision_target": "capabilities/browse/network"
+        },
+        {
+          "id": "runtime",
+          "path": "/walter/browse/runtime",
+          "role": "Exécution et extracteurs",
+          "status": "active",
+          "readme": "/walter/browse/runtime/README.md",
+          "vision_target": "capabilities/browse/runtime"
+        }
+      ]
     },
     {
       "id": "bus",
@@ -290,7 +334,20 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
-      }
+      },
+      "components": [
+        {
+          "id": "bus",
+          "path": "/walter/memory/walter_memory/bus.py",
+          "role": "Bus Walter (schéma bus, LISTEN/NOTIFY, curseurs, dead)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "data": [
+            "postgres:bus"
+          ],
+          "vision_target": "core/bus"
+        }
+      ]
     },
     {
       "id": "colab",
@@ -407,7 +464,25 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
-      }
+      },
+      "components": [
+        {
+          "id": "bridge",
+          "path": "/walter/colab/bridge.py",
+          "role": "Pont Colab (GPU à la demande)",
+          "status": "active",
+          "readme": "/walter/colab/RUNBOOK.md",
+          "vision_target": "capabilities/colab"
+        },
+        {
+          "id": "mcp",
+          "path": "/walter/colab/mcp",
+          "role": "Serveur MCP Colab",
+          "status": "active",
+          "readme": "/walter/colab/mcp/README.md",
+          "vision_target": "capabilities/colab"
+        }
+      ]
     },
     {
       "id": "computer",
@@ -566,7 +641,17 @@
         "tools": [
           "computer_use"
         ]
-      }
+      },
+      "components": [
+        {
+          "id": "library",
+          "path": "/walter/computer/walter_computer",
+          "role": "Contrôle des appareils (Mac, bureau)",
+          "status": "active",
+          "readme": "/walter/computer/README.md",
+          "vision_target": "capabilities/computer"
+        }
+      ]
     },
     {
       "id": "context",
@@ -777,7 +862,94 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
-      }
+      },
+      "components": [
+        {
+          "id": "preflight",
+          "path": "/walter/context/walter_context/preflight",
+          "role": "Décision unique par message : ContextPlan (intention, niveau, capacités, voie rapide)",
+          "status": "active",
+          "readme": "/walter/context/README.md",
+          "contracts": [
+            "/walter/context/contracts/schemas/context-plan.v2.json"
+          ],
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8897/preflight"
+            }
+          ],
+          "vision_target": "cognition/context/preflight"
+        },
+        {
+          "id": "assembly",
+          "path": "/walter/context/walter_context/assembly.py",
+          "role": "Assemblage du contexte selon le plan (pack)",
+          "status": "active",
+          "readme": "/walter/context/README.md",
+          "vision_target": "cognition/context"
+        },
+        {
+          "id": "child",
+          "path": "/walter/context/walter_context/child.py",
+          "role": "ChildContextSpec : dossier de départ d'un sous-agent",
+          "status": "active",
+          "readme": "/walter/context/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-context-child"
+            }
+          ],
+          "vision_target": "cognition/context"
+        },
+        {
+          "id": "compress",
+          "path": "/walter/context/walter_context/compress",
+          "role": "Moteur de compaction (projection head→record→compact→live)",
+          "status": "active",
+          "readme": "/walter/context/README.md",
+          "vision_target": "cognition/context/compress"
+        },
+        {
+          "id": "recover",
+          "path": "/walter/context/walter_context/recover.py",
+          "role": "Retrouver l'original d'une sortie compactée (walter_logs)",
+          "status": "active",
+          "readme": "/walter/context/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-context recover"
+            }
+          ],
+          "vision_target": "cognition/context"
+        },
+        {
+          "id": "dsh-port",
+          "path": "/walter/context/ports/dsh",
+          "role": "Prise DSH (injection et compaction) ; deviendra la stratégie context du moteur",
+          "status": "active",
+          "readme": "/walter/context/README.md",
+          "vision_target": "core/engine/plugins"
+        },
+        {
+          "id": "bench",
+          "path": "/walter/context/bench",
+          "role": "Bancs (levels, replay, quality, acceptance)",
+          "status": "active",
+          "readme": "/walter/context/README.md",
+          "vision_target": "cognition/context/bench"
+        },
+        {
+          "id": "session-state",
+          "path": "/walter/context/contracts/schemas/session-state.v1.json",
+          "role": "État de travail par fil (SessionState v1)",
+          "status": "active",
+          "readme": "/walter/context/README.md",
+          "vision_target": "cognition/context/contracts"
+        }
+      ]
     },
     {
       "id": "core",
@@ -936,7 +1108,197 @@
           "module_guide",
           "module_index"
         ]
-      }
+      },
+      "components": [
+        {
+          "id": "engine",
+          "path": "/walter/core/engine",
+          "role": "Runtime agentique unique de Walter (conception ; la production reste DSH dans /opt/dsh)",
+          "status": "planned",
+          "readme": "/walter/core/engine/README.md",
+          "vision_target": "core/engine"
+        },
+        {
+          "id": "engine-contracts",
+          "path": "/walter/core/engine/contracts",
+          "role": "Schémas Engine API, accueil, délégation, politique, événements, stratégies (brouillons testés)",
+          "status": "implemented",
+          "readme": "/walter/core/engine/README.md",
+          "contracts": [
+            "/walter/core/engine/contracts/engine-api.v1.json"
+          ],
+          "vision_target": "core/engine/contracts"
+        },
+        {
+          "id": "mcp-server",
+          "path": "/walter/core/server.py",
+          "role": "Serveur MCP walter : expose les capacités aux agents (Claude Code, Codex, DSH, Hermes)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "mcp",
+              "interface": "walter"
+            }
+          ],
+          "vision_target": "core/interfaces/mcp"
+        },
+        {
+          "id": "capabilities-adapter",
+          "path": "/walter/core/walter_capabilities.py",
+          "role": "Adaptateur des outils MCP vers les commandes déclarées des modules",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/interfaces/mcp"
+        },
+        {
+          "id": "mcp-toolsets",
+          "path": "/walter/core/config/toolsets.toml",
+          "role": "Jeux d'outils MCP par client (WALTER_CLIENT_TAG)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/interfaces/mcp"
+        },
+        {
+          "id": "runtime-hook",
+          "path": "/walter/core/hooks/walter_hook.py",
+          "role": "Adaptateur de cycle de vie des runtimes (preflight, contexte, runs, bus) appelé à chaque message",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter_hook.py"
+            }
+          ],
+          "vision_target": "core/interfaces/hooks"
+        },
+        {
+          "id": "dsh-hooks",
+          "path": "/walter/core/hooks/dsh",
+          "role": "Greffons DSH (owner-turn) ; deviennent les greffons intake/events du moteur",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/engine/plugins"
+        },
+        {
+          "id": "platform",
+          "path": "/walter/core/walter_platform",
+          "role": "Registre, contrats, chemins, instances, raccordements, contrôles (walter …)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter"
+            }
+          ],
+          "vision_target": "core/contracts"
+        },
+        {
+          "id": "module-catalog",
+          "path": "/walter/core/modules/catalog.json",
+          "role": "Table unique des modules : emplacement actuel, ancien, cible de la vision",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/contracts"
+        },
+        {
+          "id": "module-registry",
+          "path": "/walter/core/modules/registry.json",
+          "role": "Registre compilé depuis les contrats (généré, jamais édité à la main)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/contracts"
+        },
+        {
+          "id": "computer-policy",
+          "path": "/walter/core/modules/computer-policy.json",
+          "role": "Périmètres Computer Use par interface",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/security"
+        },
+        {
+          "id": "compositions",
+          "path": "/walter/core/compositions",
+          "role": "Compositions de harnesses générées par walter-core (sections gérées)",
+          "status": "active",
+          "readme": "/walter/core/docs/HARNESS-COMPOSITION.md",
+          "vision_target": "core/engine/compositions"
+        },
+        {
+          "id": "dsh-web-ui",
+          "path": "/walter/core/ports/dsh-web-ui",
+          "role": "Personnalisation de l'interface web DSH (couleurs, porte web du propriétaire)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "core/interfaces/web"
+        },
+        {
+          "id": "tool-gateway",
+          "path": "/walter/core/bin/walter-tools",
+          "role": "Passerelle d'outils de walter_run (un processus par run) ; remplacée par le moteur au lot E5",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-tools serve"
+            }
+          ]
+        },
+        {
+          "id": "guardians",
+          "path": "/walter/core/bin/walter-guardians",
+          "role": "Lanceur des gardiens de modules (diagnostic, réparation, alerte)",
+          "status": "active",
+          "readme": "/walter/core/GUARDIANS.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-guardians"
+            }
+          ],
+          "vision_target": "ops/guardians"
+        },
+        {
+          "id": "scenarios",
+          "path": "/walter/core/scenarios",
+          "role": "Scénarios de bout en bout (walter-scenario)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-scenario"
+            }
+          ],
+          "vision_target": "lab/scenarios"
+        },
+        {
+          "id": "browser-session",
+          "path": "/walter/core/browser_auth.py",
+          "role": "Session navigateur du propriétaire côté serveur (MCP browser_session) — responsabilité de Browse mal placée",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "interfaces": [
+            {
+              "transport": "mcp",
+              "interface": "browser_session"
+            }
+          ],
+          "vision_target": "capabilities/browse"
+        },
+        {
+          "id": "standby",
+          "path": "/walter/core/walter_platform/standby.py",
+          "role": "Mise en veille des services à la demande",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "vision_target": "ops"
+        }
+      ]
     },
     {
       "id": "lab",
@@ -1104,7 +1466,31 @@
         "summary": "/walter/lab/manifest/SUMMARY.md",
         "manifest": "/walter/lab/manifest/MANIFEST.md",
         "tools": []
-      }
+      },
+      "components": [
+        {
+          "id": "library",
+          "path": "/walter/lab/walter_lab",
+          "role": "Lab : bancs, comparaisons, propositions (jamais de déploiement)",
+          "status": "active",
+          "readme": "/walter/lab/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-lab"
+            }
+          ],
+          "vision_target": "lab"
+        },
+        {
+          "id": "experiments",
+          "path": "/walter/lab/experiments",
+          "role": "Expériences et résultats",
+          "status": "active",
+          "readme": "/walter/lab/README.md",
+          "vision_target": "lab/experiments"
+        }
+      ]
     },
     {
       "id": "llm",
@@ -1244,7 +1630,35 @@
           }
         ],
         "conventions_status": "required; enforced per port only after qualification evidence"
-      }
+      },
+      "components": [
+        {
+          "id": "gateway",
+          "path": "/walter/router/llm/gateway.py",
+          "role": "Passerelle de modèles OpenAI-compatible (:8894), clés depuis Bitwarden, model=auto suit le plan du run",
+          "status": "active",
+          "readme": "/walter/router/llm/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8894/v1"
+            },
+            {
+              "transport": "cli",
+              "interface": "walter-llm call"
+            }
+          ],
+          "vision_target": "cognition/router/llm"
+        },
+        {
+          "id": "subscriptions",
+          "path": "/walter/router/llm/claude_subscription.py",
+          "role": "Transports par abonnement (Claude, Antigravity, ChatGPT)",
+          "status": "active",
+          "readme": "/walter/router/llm/README.md",
+          "vision_target": "cognition/router/llm"
+        }
+      ]
     },
     {
       "id": "logs",
@@ -1389,7 +1803,28 @@
           "logs_timeline",
           "logs_get"
         ]
-      }
+      },
+      "components": [
+        {
+          "id": "logs-store",
+          "path": "/walter/memory/walter_memory/logs.py",
+          "role": "Journal canonique d'exécution walter_logs (masquage à l'écriture)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "data": [
+            "postgres:walter_logs"
+          ],
+          "vision_target": "core/observability"
+        },
+        {
+          "id": "logs-watch",
+          "path": "/walter/memory/connectors/walter_logs.py",
+          "role": "Synchronisation des journaux de tous les runtimes (inotify)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "vision_target": "core/observability"
+        }
+      ]
     },
     {
       "id": "memory",
@@ -1608,7 +2043,141 @@
           "person_lookup",
           "memory_retain"
         ]
-      }
+      },
+      "components": [
+        {
+          "id": "events",
+          "path": "/walter/memory/walter_memory/events.py",
+          "role": "Journal canonique core.events (append-only, idempotent)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "data": [
+            "postgres:core"
+          ],
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "gateway",
+          "path": "/walter/memory/walter_memory/gateway.py",
+          "role": "Seule porte d'écriture (127.0.0.1:8890)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8890/v1"
+            }
+          ],
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "connectors",
+          "path": "/walter/memory/connectors",
+          "role": "Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "vision_target": "cognition/memory/connectors"
+        },
+        {
+          "id": "organic",
+          "path": "/walter/memory/walter_memory/organic.py",
+          "role": "Mémoire organique V1 (vues, épisodes, périodes, flux)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "assimilation",
+          "path": "/walter/memory/walter_memory/assimilation.py",
+          "role": "Assimilation pilotée par le bus (memory.organic)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "runs",
+          "path": "/walter/memory/walter_memory/runs.py",
+          "role": "Run Plane (runs, tâches, épisodes de run)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "data": [
+            "postgres:runs"
+          ],
+          "vision_target": "core/orchestration"
+        },
+        {
+          "id": "kardex",
+          "path": "/walter/memory/walter_memory/social.py",
+          "role": "Couche sociale Kardex (schéma kardex)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "data": [
+            "postgres:kardex"
+          ],
+          "vision_target": "cognition/memory/kardex"
+        },
+        {
+          "id": "search",
+          "path": "/walter/memory/walter_memory/search.py",
+          "role": "Index de recherche (search.chunks)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "privacy",
+          "path": "/walter/memory/walter_memory/privacy.py",
+          "role": "Classes de confidentialité et règle de lecture",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "disclosure",
+          "path": "/walter/memory/walter_memory/disclosure.py",
+          "role": "Contrôle de divulgation des messages sortants",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "vision_target": "core/security"
+        },
+        {
+          "id": "llm-client",
+          "path": "/walter/memory/walter_memory/llm.py",
+          "role": "Appels de modèles de Memory (refuse local_only, budgets) — lit encore ~/.hermes/.env",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "vision_target": "cognition/memory"
+        },
+        {
+          "id": "migrations",
+          "path": "/walter/memory/migrations",
+          "role": "Migrations Postgres",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "vision_target": "cognition/memory/migrations"
+        },
+        {
+          "id": "hermes-plugin",
+          "path": "/walter/memory/hermes-plugins",
+          "role": "Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7)",
+          "status": "active",
+          "readme": "/walter/memory/README.md"
+        },
+        {
+          "id": "overland",
+          "path": "/walter/memory/walter_memory/overland.py",
+          "role": "Réception GPS (Overland, :3010)",
+          "status": "active",
+          "readme": "/walter/memory/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:3010"
+            }
+          ],
+          "vision_target": "cognition/memory/connectors"
+        }
+      ]
     },
     {
       "id": "ops",
@@ -1782,7 +2351,37 @@
         "summary": "/walter/ops/manifest/SUMMARY.md",
         "manifest": "/walter/ops/manifest/MANIFEST.md",
         "tools": []
-      }
+      },
+      "components": [
+        {
+          "id": "backup",
+          "path": "/walter/ops/backup",
+          "role": "Sauvegardes (pg, state.db, restic, publication git)",
+          "status": "active",
+          "readme": "/walter/ops/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-ops backup"
+            }
+          ],
+          "vision_target": "ops/backup"
+        },
+        {
+          "id": "ops",
+          "path": "/walter/ops/walter_ops",
+          "role": "Installation, déploiement, récupération",
+          "status": "active",
+          "readme": "/walter/ops/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-ops"
+            }
+          ],
+          "vision_target": "ops"
+        }
+      ]
     },
     {
       "id": "raw-vault",
@@ -1932,7 +2531,16 @@
           "vault_get",
           "vault_put"
         ]
-      }
+      },
+      "components": [
+        {
+          "id": "rawvault-shim",
+          "path": "/walter/memory/vault/rawvault.py",
+          "role": "Ancienne entrée du Raw Vault ; renvoie vers walter_memory.objects",
+          "status": "obsolete",
+          "readme": "/walter/memory/vault/manifest/MANIFEST.md"
+        }
+      ]
     },
     {
       "id": "router",
@@ -2130,7 +2738,103 @@
           ],
           "sections": "tâches (clé, libellé, interface)"
         }
-      }
+      },
+      "components": [
+        {
+          "id": "research",
+          "path": "/walter/router/research",
+          "role": "Collecte des classements et prix (AA, Arena, OpenRouter…)",
+          "status": "active",
+          "readme": "/walter/router/README.md",
+          "vision_target": "cognition/router/research"
+        },
+        {
+          "id": "analysis",
+          "path": "/walter/router/analysis",
+          "role": "Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6)",
+          "status": "active",
+          "readme": "/walter/router/README.md",
+          "vision_target": "cognition/router/analysis"
+        },
+        {
+          "id": "plan",
+          "path": "/walter/router/plan",
+          "role": "Forfaits du propriétaire et quotas",
+          "status": "active",
+          "readme": "/walter/router/README.md",
+          "vision_target": "cognition/router/plan"
+        },
+        {
+          "id": "serve",
+          "path": "/walter/router/serve",
+          "role": "Choix du modèle par tâche, exécution texte et médias",
+          "status": "active",
+          "readme": "/walter/router/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-router route|pick|run"
+            }
+          ],
+          "vision_target": "cognition/router/serve"
+        },
+        {
+          "id": "walter-run-loop",
+          "path": "/walter/router/serve/text_agent.py",
+          "role": "Boucle de sous-agent de walter_run — seconde boucle agentique, absorbée par le moteur au lot E5 ; terminal retiré le 09/11",
+          "status": "active",
+          "readme": "/walter/router/README.md"
+        },
+        {
+          "id": "oneshot",
+          "path": "/walter/router/serve/oneshot.py",
+          "role": "Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6)",
+          "status": "obsolete",
+          "readme": "/walter/router/README.md"
+        },
+        {
+          "id": "interface",
+          "path": "/walter/router/interface",
+          "role": "Page publique de la bibliothèque des modèles",
+          "status": "active",
+          "readme": "/walter/router/README.md",
+          "vision_target": "cognition/router/interface"
+        },
+        {
+          "id": "store",
+          "path": "/walter/router/store",
+          "role": "Schéma Postgres models (lecture/écriture)",
+          "status": "active",
+          "readme": "/walter/router/README.md",
+          "data": [
+            "postgres:models"
+          ],
+          "vision_target": "cognition/router/store"
+        },
+        {
+          "id": "hermes-plugin",
+          "path": "/walter/router/hermes-plugins",
+          "role": "Greffon Hermes walter-router — à retirer avec Hermes (E7)",
+          "status": "active",
+          "readme": "/walter/router/README.md"
+        },
+        {
+          "id": "guardian",
+          "path": "/walter/router/guardian",
+          "role": "Gardien du Router",
+          "status": "active",
+          "readme": "/walter/router/guardian/README.md",
+          "vision_target": "cognition/router/guardian"
+        },
+        {
+          "id": "documentation",
+          "path": "/walter/router/documentation.py",
+          "role": "Référence générée (CODE, CONFIGURATION, DATABASE…) contrôlée par les tests",
+          "status": "active",
+          "readme": "/walter/router/docs/README.md",
+          "vision_target": "cognition/router/docs"
+        }
+      ]
     },
     {
       "id": "runtime",
@@ -2236,7 +2940,23 @@
             "scope": "integration"
           }
         ]
-      }
+      },
+      "components": [
+        {
+          "id": "python",
+          "path": "/walter/runtime/bin/walter-python",
+          "role": "Interpréteur Python partagé des modules",
+          "status": "active",
+          "readme": "/walter/runtime/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-python"
+            }
+          ],
+          "vision_target": "ops/runtime"
+        }
+      ]
     },
     {
       "id": "secrets",
@@ -2404,7 +3124,30 @@
           "secret_search",
           "secret_reference"
         ]
-      }
+      },
+      "components": [
+        {
+          "id": "library",
+          "path": "/walter/secrets/walter_secrets",
+          "role": "Accès au coffre Bitwarden sans valeur exposée, autorisations (grants)",
+          "status": "active",
+          "readme": "/walter/secrets/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-secret"
+            }
+          ],
+          "vision_target": "core/security/secrets"
+        },
+        {
+          "id": "compat",
+          "path": "/walter/secrets/compat",
+          "role": "Anciennes entrées de compatibilité",
+          "status": "obsolete",
+          "readme": "/walter/secrets/README.md"
+        }
+      ]
     },
     {
       "id": "skills",
@@ -2600,7 +3343,55 @@
           "paged": true,
           "sections": "domaines (sans section : la liste des domaines)"
         }
-      }
+      },
+      "components": [
+        {
+          "id": "core",
+          "path": "/walter/skills/walter_skills",
+          "role": "Noyau des skills (store git, cartes Postgres, politique d'exposition, apprentissage)",
+          "status": "active",
+          "readme": "/walter/skills/README.md",
+          "vision_target": "capabilities/skills"
+        },
+        {
+          "id": "service",
+          "path": "/walter/skills/walter_skills/api.py",
+          "role": "Service :8891",
+          "status": "active",
+          "readme": "/walter/skills/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8891"
+            }
+          ],
+          "vision_target": "capabilities/skills"
+        },
+        {
+          "id": "consumer",
+          "path": "/walter/skills/walter_skills/consumer.py",
+          "role": "Consommateur du bus walter-skills-bus",
+          "status": "active",
+          "readme": "/walter/skills/README.md",
+          "vision_target": "capabilities/skills"
+        },
+        {
+          "id": "library",
+          "path": "/walter/skills/skills",
+          "role": "Bibliothèque de procédures (SKILL.md)",
+          "status": "active",
+          "readme": "/walter/skills/README.md",
+          "vision_target": "capabilities/skills/library"
+        },
+        {
+          "id": "archive",
+          "path": "/walter/skills/archive",
+          "role": "Skills retirés (réserve)",
+          "status": "obsolete",
+          "readme": "/walter/skills/README.md",
+          "vision_target": "capabilities/skills/archive"
+        }
+      ]
     },
     {
       "id": "soul",
@@ -2737,7 +3528,31 @@
         "tools": [
           "walter_profile"
         ]
-      }
+      },
+      "components": [
+        {
+          "id": "renderer",
+          "path": "/walter/soul/bin/walter-soul",
+          "role": "Rendu de l'identité vers chaque runtime (SOUL.md, profils)",
+          "status": "active",
+          "readme": "/walter/soul/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-soul"
+            }
+          ],
+          "vision_target": "core/identity"
+        },
+        {
+          "id": "runtimes",
+          "path": "/walter/soul/runtimes",
+          "role": "Adaptateurs neutres par runtime",
+          "status": "active",
+          "readme": "/walter/soul/README.md",
+          "vision_target": "core/identity/runtimes"
+        }
+      ]
     }
   ]
 }

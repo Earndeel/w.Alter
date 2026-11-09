@@ -1,167 +1,267 @@
-# Plan de migration incrémentale du runtime unique
+# Plan de convergence E0 → E9 : runtime unique et architecture de la vision
 
 | | |
 |---|---|
-| **Rôle** | Ordonner le passage des boucles actuelles (DSH tel quel, `walter_run`, rôles de Hermes) au moteur unique `core/engine`, lot par lot, avec tests, critères d'adoption et retour arrière. |
-| **Propriétaire** | walter-core (exécution : le builder ; validation : Monsieur). |
-| **Statut** | 09/11/2026 · **à valider par Monsieur. Aucun lot n'est lancé avant son accord.** |
-| **Sources** | `01-AUDIT.md`, `02-ARCHITECTURE.md`, `VISION.md` § 9 (« évolution mesurée »), plan du 08/11 (lots A–D de `walter_run`). |
+| **Rôle** | Ordonner la convergence de Walter vers `VISION.md`, lot par lot, avec tests, critères d'adoption et retour arrière essayé. Deux objectifs menés ensemble : **A** convergence fonctionnelle (un seul runtime de production) et **B** convergence architecturale (arborescence, conventions, interfaces, documentation). |
+| **Propriétaire** | walter-core (exécution : le builder ; validation : Monsieur, **lot par lot**). |
+| **État** | 09/11/2026 · direction validée par Monsieur. **S0 et E0 faits** (§ S0, § E0). E1 attend l'accord de Monsieur ; chaque lot suivant est autorisé séparément. |
+| **Ne fait pas** | Ne décrit pas l'organisation interne du moteur (`02-ARCHITECTURE.md`) ni l'inventaire des emplacements (`05-CARTOGRAPHIE.md`). |
+| **Contrats** | Schémas du moteur `core/engine/contracts/` ; registre des modules (`vision_target` des modules et des composants) ; règle documentaire `/walter/docs/DOCUMENTATION.md`. |
 
 ## Règles communes à tous les lots
 
-1. **Un lot = un changement réversible.** Avant chaque lot : étiquette git `engine-E<n>-avant` dans les dépôts
-   touchés, sauvegarde des fichiers d'état dans `/user/Lucas/backups/changes/<date>-engine-E<n>/`.
-2. **Ombre d'abord quand c'est possible** : le nouveau chemin calcule à côté de l'ancien et on compare, puis on
-   bascule par un interrupteur dans la configuration de la composition, pas par une réécriture.
-3. **Aucun module déplacé avant E9.** Les nouveaux fichiers naissent à leur place cible (`core/engine/…`), les
-   anciens restent en place jusqu'à leur mise en quarantaine.
-4. **Tests minimaux de chaque lot** (en plus des tests propres au lot) :
-   - tests de core, de context et du router (`pytest`) et tests des greffons ;
-   - `walter check` (contrats, frontières, neutralité) ;
-   - `walter-scenario` de bout en bout sur la composition web ;
-   - banc de contexte (`levels.py`, plancher actuel 17/18 en rappel) ;
-   - santé : `walter status`, `walter-memory health`, `memory-autopilot` si Memory est touchée.
-5. **Budget** : bancs sur fournisseurs payants plafonnés à 2 €/24 h ; au-delà, accord de Monsieur.
-6. **Retour arrière** documenté et essayé une fois avant l'adoption, pas seulement écrit.
-7. Chaque lot met à jour les README des composants touchés, le contrat de core et `DECISIONS.md`.
+1. **Un lot = un changement réversible, une responsabilité.** Aucun déplacement massif ni changement simultané de
+   plusieurs responsabilités sans nécessité démontrée. Avant chaque lot : étiquette git `engine-E<n>-avant` dans les
+   dépôts touchés, sauvegarde des fichiers d'état dans `@instance/backups/changes/<date>-engine-E<n>/`.
+2. **Chaque lot déclare** : composants et chemins ; changements de comportement ; interfaces et dépendances touchées ;
+   tests et scénarios ; impacts sur les données et la sécurité ; documentation modifiée ; conditions d'adoption ;
+   retour arrière **essayé une fois avant l'adoption**, pas seulement écrit.
+3. **Aucun nouveau chemin de production sans les garanties de sécurité** (§ Sécurité) : permissions et
+   approbations, bac à sable, contrôle de ce qui sort vers des tiers (fournisseurs de modèles compris), périmètres
+   par porte, utilisateur et sous-agent, isolation des sessions, échec fermé. Un retour arrière ne réactive jamais une
+   voie dangereuse.
+4. **Placement** : le code, les adaptations et les contrats Walter naissent à leur place définitive. Les modules
+   existants ne sont déplacés qu'au lot E9, module par module. Les artefacts compilés ou reconstruisibles (paquets
+   installés, caches) ne sont ni versionnés ni déplacés sans besoin ; ils sont décrits par un verrou et des
+   empreintes.
+5. **Une seule source de vérité** : Run Plane pour les runs et tâches, walter_logs pour l'observabilité, bus Walter
+   pour les événements, Memory pour la consolidation, registre pour les modules et composants. Aucun second bus,
+   journal, registre de sessions métier ou système de mémoire. Événements et opérations à effet idempotents.
+6. **Ombre sans effet** : un mode d'observation n'écrit jamais dans les données métier ni sur le bus de production
+   (événements `observation=true`, comparaison écrite par Lab).
+7. **Tests minimaux de chaque lot**, en plus des siens : tests des modules touchés ; `walter check` (contrats,
+   frontières, neutralité, documentation) ; `walter-scenario` sur la composition web ; banc `levels.py` (plancher
+   mesuré le 09/11 : rappel 16/18, 0 fuite) ; `walter status`, `walter-memory health`, `memory-autopilot` si Memory
+   est touchée ; comparaison avec `04-BASELINE.md`.
+8. **Budget** : bancs sur fournisseurs payants plafonnés à 2 €/24 h ; au-delà, accord de Monsieur.
+9. **Documentation** : un lot n'est fini que si les README, les contrats et `DECISIONS.md` décrivent le nouvel état.
+
+## Sécurité : où chaque garantie est livrée
+
+| Garantie demandée | Aujourd'hui (09/11) | Livrée et vérifiée au lot |
+|---|---|---|
+| Bac à sable des commandes et fichiers | Noyau DSH : bac à sable unique. `walter_run` : **terminal retiré, fichiers confinés au dossier du run** (S0) | E1 (gel du bac à sable du noyau), E3 (politique), E5 (commande des sous-agents seulement dans ce bac à sable) |
+| Permissions et approbations avant une action sensible | Approbation ponctuelle du noyau, web seulement | E3 (politique Walter, refus prioritaire), E7 (boutons Telegram) |
+| Contrôle de ce qui sort vers des tiers, fournisseurs de modèles compris | Garde de divulgation (Claude Code, Hermes) ; règle de confidentialité du 03/11 (identifiants masqués) appliquée par Memory | E3 : décision de politique pour `outgoing_message` **et** `model_call` (classe de données vs fournisseur), sans changer la règle de Monsieur |
+| Périmètres par porte, utilisateur et sous-agent | Périmètres Computer Use par interface | E3 (presets par porte et principal), E5 (enfant ≤ parent moins NEVER, profondeur ≤ 3) |
+| Isolation des sessions, propagation contrôlée des droits | Le banc d'essai DSH partage profils et sessions avec la production | E3 (test-home isolé), E5 (droits propagés explicitement) |
+| Échec fermé sans autorisation | Noyau : oui sur le web | E3 (sans répondant ⇒ refus, contrat `policy-decision.v1`) |
+
+E4, E5 et E7 ouvrent de nouveaux chemins de production : ils ne sont **activés** qu'après l'adoption de E3.
 
 ## Vue d'ensemble
 
-| Lot | Objet | Change la production ? | Dépend de |
-|---|---|---|---|
-| **E0** | Contrats en schémas, registre des composants, mesures de référence | Non | — |
-| **E1** | Geler le noyau DSH dans `core/engine/kernel` | Oui (même code, autre emplacement) | E0 |
-| **E2** | Accueil et événements natifs (fin du script shell par message) | Oui, après ombre | E1 |
-| **E3** | Politique : divulgation, approbations, budget de tour | Oui | E2 |
-| **E4** | Engine API v1 | Ajout seulement | E2 |
-| **E5** | `walter_run` → sous-agents du moteur | Oui, avec repli | E3, E4 |
-| **E6** | Fin des rôles de production de Hermes (hors Telegram) | Oui | E4 |
-| **E7** | Interface Telegram sur le moteur | Oui, après une semaine en parallèle | E3, E4 |
-| **E8** | Reprise après incident éprouvée ; étude Lab du stockage Postgres | Non (essais) puis peut-être | E2 |
-| **E9** | Migration des dossiers selon la vision | Oui (liens de compatibilité) | E7 |
+| Lot | Objet | A / B | Change la production ? | Dépend de |
+|---|---|---|---|---|
+| **S0** | Corrections urgentes : terminal de `walter_run`, Memory Dreaming | sécurité | Oui (fait le 09/11) | — |
+| **E0** | Contrats, registre enrichi, mesures, cartographie, règle documentaire | A + B | Non (fait) | — |
+| **E1** | Gel technique du noyau (sans déplacement) ; rattrapage documentaire | A + B | Non (même code, même place) | E0 |
+| **E2** | Accueil et événements natifs | A | Oui, après ombre | E1 |
+| **E3** | Politique, approbations, divulgation, budget | A (sécurité) | Oui | E2 |
+| **E4** | Engine API v1 | A + B (`core/interfaces`) | Ajout, activé après E3 | E2, E3 |
+| **E5** | `walter_run` devient une délégation du moteur | A | Oui, avec repli | E3, E4 |
+| **E6** | Fin des rôles de production de Hermes (hors Telegram) | A | Oui | E4 |
+| **E7** | Telegram sur le moteur ; Hermes passe à Lab | A + B | Oui, après une semaine en parallèle | E3, E4 |
+| **E8** | Reprise après incident éprouvée | A | Non (essais) puis peut-être | E2 |
+| **E9** | Migration physique de l'arborescence, module par module | B | Oui (liens de compatibilité) | E7 pour core ; avant pour les sous-lots indépendants |
 
-E4 et E8 peuvent avancer en parallèle de E3. E6 peut commencer dès E4.
+E4 et E8 peuvent être préparés en parallèle de E3. Les sous-lots E9 qui ne touchent pas au moteur (§ E9) peuvent être
+proposés plus tôt, chacun avec son propre accord. **Walter n'est pas terminé à E8** : la convergence s'achève quand
+E9 est fait et qu'aucun lien de compatibilité, wrapper ou système concurrent ne reste (§ Fin).
 
-## E0 — Contrats, registre, référence
+## S0 — Corrections urgentes (faites le 09/11)
 
-- **Fait** : schémas JSON (`core/engine/contracts/`) pour Engine API v1, accueil, Délégation v1, Décision de
-  politique v1, vocabulaire des événements, déclaration d'une stratégie. Liste `components` dans
-  `contracts/core.json`, compilée dans le registre. En-tête README standard et son contrôle par `walter check` (en
-  avertissement). Mesures de référence de la production actuelle : latence du premier jeton, coût par tour, rappel
-  `levels.py`, mémoire vive de `dsh-web`, délai walter_logs.
-- **Tests** : validation des schémas sur des exemples réels tirés de walter_logs et du Run Plane (agrégats, pas de
-  contenu personnel) ; `walter check` vert.
-- **Adoption** : registre régénéré, `walter present` montre le moteur comme composant de core.
-- **Retour arrière** : revert du commit (documentation et schémas seulement).
+| | Terminal non sandboxé de `walter_run` | Memory Dreaming (Hermes) |
+|---|---|---|
+| Composants | `router/serve/text_agent.py`, `router/serve/run.py` | tâche `13d0f88771cb` de `~/.hermes/cron/jobs.json` |
+| Comportement | Jeux `terminal` et `code_execution` refusés (`toolset_disabled`, avant tout lancement) ; `read_file`/`write_file` confinés au dossier privé du run (liens symboliques et chemins absolus refusés) ; jeux par défaut inchangés (`walter-web`, `skills`, `memory`) ; interrupteur `WALTER_RUN_TOOLS` supprimé | Tâche en pause, historique conservé ; Memory Health Check inchangé |
+| Preuve d'innocuité | 0 appel terminal ou fichier sur les 23 tâches du Run Plane | Cible (Hindsight) retirée le 19/10 ; échec chaque nuit, un appel de modèle payé |
+| Tests | router 343 réussis ; essai réel : `walter-router run` avec `terminal` ⇒ refus | état `paused` vérifié |
+| Retour arrière | **Aucun retour vers le terminal.** Une régression des outils fichiers se corrige en avant ; l'étiquette `security-walter-run-terminal-avant` sert à l'audit | Réactivation par Hermes ou copie `jobs.json.before` (sauvegarde du 09/11), seulement sur décision de Monsieur |
+| Commit | router `64b1b48` | — (fichier d'état de Hermes) |
 
-## E1 — Geler le noyau
+## E0 — Contrats, registre, référence (fait le 09/11)
 
-- **Fait** : versions exactes de DSH et de ses dépendances (`package-lock`, empreintes d'intégrité), cache hors
-  ligne, installation dans `core/engine/kernel` **par déplacement et lien** depuis `/opt/dsh` (disque à 94 %). Les
-  compositions web et headless sont générées depuis `core/engine/compositions/` par walter-core. `dsh-web.service`
-  devient `walter-engine.service` (même port :3080, même `DSH_HOME`, même stockage de sessions).
-- **Tests** : installation propre depuis le cache hors ligne dans un dossier d'essai ; `--dump-config` identique
-  avant et après, à l'ordre près ; scénario web, session existante reprise ; `levels.py`.
-- **Adoption** : 48 h de service sans régression ; une réinstallation depuis le cache réussie.
-- **Retour arrière** : surcharge systemd `ExecStart` qui repointe vers `/opt/dsh` (conservé jusqu'à E9), redémarrage.
-  Moins d'une minute.
+- **Composants et chemins** : `core/engine/contracts/` (6 schémas : Engine API v1, accueil, Délégation v1, Décision
+  de politique v1, événement du moteur, stratégie) ; `core/engine/tests/` ; `components` et `vision_target` dans les
+  17 contrats et le catalogue ; `walter_platform/documentation.py` ; `/walter/docs/DOCUMENTATION.md` ;
+  `04-BASELINE.md`, `05-CARTOGRAPHIE.md`.
+- **Comportement** : aucun. `walter layout` affiche la cible de la vision ; `walter check` ajoute le contrôle
+  documentaire en avertissement.
+- **Interfaces touchées** : schéma des contrats de modules (`components`, `vision_target`), registre compilé,
+  `docs/contracts.generated.md`.
+- **Tests** : 13 tests de schémas (exemples valides et invalides, ContextPlan v2 réutilisé par référence) ; tests du
+  registre, des composants et du contrôle documentaire ; `walter contracts check`, `walter check`.
+- **Données et sécurité** : aucune donnée touchée ; contrats sans valeur de l'instance (neutralité vérifiée).
+- **Retour arrière** : revert des commits (documentation, schémas, contrôles en lecture seule) ; étiquette
+  `engine-E0-avant` dans core.
+
+## E1 — Gel technique du noyau
+
+Le gel et le déplacement physique sont séparés : **E1 gèle, sans rien déplacer.**
+
+- **Composants et chemins** : `core/engine/kernel/` (source Walter : verrou de version exacte, `package-lock`,
+  empreintes d'intégrité, script d'installation reproductible, README). L'installation reste dans `/opt/dsh`. Le cache
+  hors ligne est rangé hors git, à un emplacement d'Ops déclaré dans le contrat. `core/engine/compositions/` : source
+  des compositions web et headless, rendues par walter-core comme aujourd'hui (`walter harness install dsh`).
+- **Comportement** : aucun. Même code, même place, même unité `dsh-web.service` (le nom de l'unité ne change qu'à E9).
+- **Interfaces et dépendances** : aucune interface publique ne change ; `walter-ops` gagne la vérification des
+  empreintes de l'installation.
+- **Tests** : réinstallation complète depuis le cache hors ligne dans un dossier d'essai, empreintes identiques ;
+  `--dump-config` identique avant et après le rendu des compositions ; scénario web ; session existante reprise.
+- **Données et sécurité** : sessions non touchées ; le bac à sable du noyau est gelé tel quel et sa configuration est
+  vérifiée par empreinte.
+- **Documentation** : README de `kernel/` et `compositions/` ; rattrapage du stock documentaire (13 en-têtes, README
+  de colab et raw-vault), puis contrôle documentaire en blocage.
+- **Adoption** : réinstallation depuis le cache réussie deux fois, 48 h de service inchangé, `walter check` en
+  blocage vert.
+- **Retour arrière indépendant** : une archive de l'installation actuelle, faite avant E1 et vérifiée par empreinte,
+  se restaure sans le cache ni le nouveau script ; essai de restauration dans un dossier d'essai avant l'adoption.
 
 ## E2 — Accueil et événements natifs
 
-- **Fait** : greffon intake (owner-turn + appel direct au preflight + `runs.start` par la passerelle) ; greffon
-  events (bus, Run Plane, `SessionEnd`). Ajout à la passerelle Memory de `/v1/runs/*` et `/v1/bus/emit`, la seule
-  porte d'écriture. Identifiant de session stable par porte. Le hook shell `walter_hook.py` reste pour Claude Code et
-  Codex, et n'est plus appelé par le moteur.
-- **Ombre** : une semaine où les deux chemins tournent. Le greffon écrit avec un marqueur `shadow`, on compare plans,
-  runs et événements, puis on bascule par l'interrupteur de la composition.
-- **Tests** : même ContextPlan pour un même message (écart toléré : 0 sur l'intention et le niveau) ; un run par tour,
-  jamais deux ; `session.ended` reçu ; voie sans modèle servie sans appel de modèle ; gain de latence mesuré (fin
-  d'un processus Python par message).
-- **Adoption** : zéro écart d'intention sur la semaine, latence égale ou meilleure.
-- **Retour arrière** : interrupteur `intake=hook` dans la composition, redémarrage.
+- **Composants** : `core/engine/plugins/intake`, `core/engine/plugins/events` ; routes `/v1/runs/*` et
+  `/v1/bus/emit` de la passerelle Memory (**lot Memory**, validé dans son principe, le Run Plane et le bus restent les
+  seules sources).
+- **Comportement** : le moteur n'appelle plus `walter_hook.py` par message ; le preflight est appelé directement ;
+  `session.ended` émis nativement. `walter_hook.py` reste pour Claude Code et Codex.
+- **Interfaces** : ContextPlan v2 inchangé ; identifiant de session stable par porte (`web/…`).
+- **Tests** : même ContextPlan pour un même message (0 écart d'intention et de niveau) ; un run par tour ; clés
+  d'idempotence (un même tour rejoué n'ouvre pas un second run) ; voie sans modèle sans appel de modèle ; latence.
+- **Données et sécurité** : ombre d'une semaine avec événements `observation=true`, jamais écrits sur le bus de
+  production ni dans `runs` ; la comparaison est écrite par Lab.
+- **Adoption** : zéro écart d'intention sur la semaine, latence égale ou meilleure (référence 04-BASELINE § 2).
+- **Retour arrière** : interrupteur `intake=hook` de la composition, redémarrage ; essayé pendant l'ombre.
 
-## E3 — Politique, approbations, budget
+## E3 — Politique, approbations, divulgation, budget
 
-- **Fait** : greffon policy (ordre § 4.4 de l'architecture, refus prioritaire, échec fermé sans répondant), presets
-  par porte, garde de divulgation dans le moteur, greffon budget alimenté par le contrat d'effort du ContextPlan.
-  Le test-home cesse de partager les profils et sessions de production.
-- **Tests** : jeu d'essais de politique (message sortant vers un tiers bloqué sans accord, Computer hors périmètre
-  refusé, secret jamais rendu, approbation absente ⇒ refus) ; tour coupé au budget avec réponse partielle propre ;
-  scénarios web inchangés pour les usages ordinaires.
-- **Adoption** : tous les cas de politique passent ; aucune demande d'approbation de trop sur une semaine d'usage web.
-- **Retour arrière** : retrait du greffon de la composition (le bac à sable et l'approbation du noyau restent).
+- **Composants** : `core/security` (politique, presets par porte et principal ; reprend `modules/computer-policy.json`
+  et la garde de divulgation, Memory restant fournisseur des classes de confidentialité) ;
+  `core/engine/plugins/policy`, `core/engine/plugins/budget`.
+- **Comportement** : décision `allow | ask | deny` avant chaque outil, chaque message sortant et chaque appel de
+  modèle ; refus prioritaire ; sans répondant ⇒ refus. Banc d'essai isolé des profils et sessions de production.
+- **Prérequis Context** : le ContextPlan v2 **n'a pas de champ d'effort**. Le budget de tour attend une extension
+  possédée par Context (lot Context séparé, accord de Monsieur) ; d'ici là, le greffon budget n'applique que les
+  plafonds fixes de la composition.
+- **Tests** : jeu d'essais de politique (message vers un tiers sans accord bloqué ; Computer hors périmètre refusé ;
+  secret jamais rendu ; appel de modèle d'une classe interdite au fournisseur refusé ; approbation absente ⇒ refus ;
+  enfant qui demande plus que son parent refusé) ; usages web ordinaires inchangés.
+- **Données et sécurité** : décisions écrites dans le Run Plane et walter_logs, arguments sensibles masqués.
+- **Adoption** : tous les cas passent ; aucune demande d'approbation superflue sur une semaine d'usage web.
+- **Retour arrière** : retrait du greffon de la composition ; le bac à sable et l'approbation du noyau restent (jamais
+  moins protégé qu'aujourd'hui).
 
 ## E4 — Engine API v1
 
-- **Fait** : greffon hôte qui sert l'Engine API en local (jeton d'agent 0600, flux SSE, port libre choisi et déclaré
-  dans le registre). Mode commande. Les essais Lab passent par elle.
-- **Tests** : tests de contrat de chaque opération ; ouverture, reprise, annulation, file, approbation ; 20 sessions
-  simultanées sans fuite de mémoire (plafond systemd) ; refus sans jeton.
-- **Adoption** : contrats verts, mémoire vive stable sur 72 h.
+- **Composants** : `core/interfaces/api` (greffon hôte : jeton d'agent 0600, flux SSE, port déclaré dans le registre) ;
+  mode commande.
+- **Comportement** : ajout seulement ; activé après E3, chaque appel passe la politique de sa porte.
+- **Tests** : tests de contrat de chaque opération (`engine-api.v1`) ; ouverture, reprise, annulation, file,
+  approbation ; 20 sessions simultanées sans fuite ; refus sans jeton.
+- **Adoption** : contrats verts, mémoire vive stable sur 72 h (référence `dsh-web` 209 Mo).
 - **Retour arrière** : retrait du greffon hôte ; rien n'en dépend encore.
 
 ## E5 — `walter_run` devient une délégation du moteur
 
 Ce lot reprend et remplace les lots A–D du plan du 08/11.
 
-- **Fait** : sous-agents du noyau réactivés sous la stratégie Walter (ChildContextSpec servi par le service context,
-  plan réutilisé ou demandé une fois, droits ≤ parent moins NEVER, profondeur et budget). Outil natif `walter_run`
-  dans le moteur ; l'outil MCP `walter_run` appelle l'opération `delegate`. La boucle `text_agent.py` reste derrière
-  un interrupteur de repli pendant environ deux semaines, puis part en quarantaine avec `walter-tools serve`. La
-  préparation d'invite des médias cesse d'appeler Hermes.
-- **Tests** : scénarios `walter_run` existants rejoués (sorties validées par leur contrat) ; aucun `shell=True` hors
-  bac à sable ; enfants annulés avec leur parent ; coûts et `task_id` présents dans le Run Plane ; observations
-  toujours persistées dans Memory.
-- **Adoption** : parité de réussite sur les scénarios et une semaine d'usage réel, coût par mission égal ou moindre.
-- **Retour arrière** : interrupteur `walter_run.engine=false` ⇒ ancienne boucle (tant qu'elle n'est pas en
-  quarantaine) ; ensuite, restauration depuis la quarantaine.
+- **Composants** : `core/orchestration` (stratégie de sous-agents) ; outil natif `walter_run` ; l'outil MCP
+  `walter_run` appelle l'opération `delegate` (`delegation.v1`).
+- **Comportement** : sous-agents du noyau sous stratégie Walter (ChildContextSpec, plan réutilisé ou demandé une
+  fois, droits ≤ parent moins NEVER, profondeur ≤ 3, budget). La commande n'existe que dans le bac à sable du noyau.
+  `text_agent.py` reste derrière un interrupteur de repli deux semaines (sans terminal), puis quarantaine avec
+  `walter-tools serve`. La préparation d'invite des médias cesse d'appeler Hermes.
+- **Tests** : scénarios `walter_run` existants rejoués ; aucun `shell=True` hors bac à sable ; enfants annulés avec
+  leur parent ; coûts et `task_id` dans le Run Plane ; observations persistées dans Memory.
+- **Adoption** : parité de réussite sur les scénarios et une semaine d'usage réel (peu d'usage depuis le 28/10 : un
+  jeu de scénarios est construit avant), coût par mission égal ou moindre.
+- **Retour arrière** : interrupteur `walter_run.engine=false` ⇒ ancienne boucle **sans terminal** ; ensuite
+  restauration depuis la quarantaine.
 
 ## E6 — Fin des rôles de production de Hermes (hors Telegram)
 
-- **Fait** : `oneshot.ask_l1`, `media_exec` et les alertes du Router passent par le mode commande de l'Engine API ;
-  les changements de configuration de Hermes disparaissent avec eux. L'autorisation Google passe par Secrets (grant)
-  pour le moteur. La tâche nocturne Memory Dreaming, morte et payante, est supprimée (elle peut l'être dès maintenant
-  si Monsieur le veut). La vérification de santé de Hermes passe aux guardians.
-- **Tests** : tests du Router verts ; une proposition Telegram du Router produite sans Hermes ; aucun appel
-  `hermes …` restant hors Lab (recherche dans le code).
+- **Composants** : `router/serve/oneshot.py`, `media_exec.py`, `router/analysis/alerts.py` → mode commande de
+  l'Engine API ; autorisation Google → grants de Secrets ; Memory Health Check → gardiens.
+- **Comportement** : plus aucun appel `hermes …` hors Lab ; la tâche Memory Dreaming (en pause) part en quarantaine.
+- **Tests** : tests du Router ; une proposition Telegram du Router produite sans Hermes ; recherche de tout appel
+  `hermes` restant.
 - **Adoption** : un cycle de 48 h du Router sans Hermes.
 - **Retour arrière** : par fonction, interrupteur qui revient à l'appel Hermes (Hermes reste installé jusqu'à E7).
 
 ## E7 — Telegram sur le moteur
 
-- **Fait** : `core/interfaces/telegram` parle l'Engine API (session `telegram/<chat>`, `/stop`, boutons
-  d'approbation, pièces jointes, voix via le STT du Router). Une semaine en parallèle sur un second bot ou une
-  conversation d'essai, puis bascule du bot principal. Hermes devient objet d'étude de Lab, sa passerelle est
-  arrêtée et non supprimée.
-- **Tests** : liste de parité (les usages réels de Telegram relevés par agrégats dans walter_logs) ; reprise de la
-  conversation après redémarrage ; approbation par bouton ; mémoire de la conversation retrouvée par Memory.
-- **Adoption** : liste de parité complète et accord explicite de Monsieur pour la bascule.
-- **Retour arrière** : `hermes gateway start` sur le bot principal (le jeton n'a pas changé), arrêt de l'interface.
+- **Composants** : `core/interfaces/telegram` (session `telegram/<chat>`, `/stop`, boutons d'approbation, pièces
+  jointes, voix par le STT du Router).
+- **Comportement** : une semaine en parallèle (second bot ou conversation d'essai), puis bascule. Hermes devient objet
+  d'étude de Lab ; sa passerelle est arrêtée, pas supprimée. Ses données restent (déjà dans walter_logs et
+  `core.events`).
+- **Tests** : liste de parité tirée des usages réels (agrégats walter_logs) ; reprise après redémarrage ; approbation
+  par bouton ; conversation retrouvée par Memory.
+- **Adoption** : liste de parité complète et accord explicite de Monsieur.
+- **Retour arrière** : `hermes gateway start` sur le bot principal (jeton inchangé), arrêt de l'interface.
 
 ## E8 — Reprise après incident
 
-- **Fait** : essais de panne (arrêt brutal pendant un appel de modèle, pendant un outil à effet, pendant un enfant ;
-  coupure de la passerelle Memory ; disque plein simulé) ; « issue inconnue » et `engine.recovered` vérifiés. En Lab
-  seulement : étude d'un stockage de sessions dans Postgres au vocabulaire walter_logs (une seule source au lieu de
-  JSONL + copie), adoptée seulement si mesurée meilleure.
-- **Tests** : chaque scénario de panne finit avec un run fermé, aucun outil rejoué en double, la session reprise.
+- **Fait** : essais de panne (arrêt pendant un appel de modèle, un outil à effet, un enfant ; passerelle Memory
+  coupée ; disque plein simulé) ; « issue inconnue » et `engine.recovered` vérifiés. En Lab seulement : stockage des
+  sessions dans Postgres au vocabulaire walter_logs, adopté seulement si mesuré meilleur.
+- **Tests** : chaque panne finit avec un run fermé, aucun outil rejoué en double, la session reprise.
 - **Adoption** : tous les scénarios passent deux fois de suite.
-- **Retour arrière** : sans objet pour les essais ; pour un éventuel stockage Postgres, retour au JSONL par la
-  composition.
+- **Retour arrière** : sans objet pour les essais ; retour au JSONL par la composition.
 
-## E9 — Dossiers selon la vision
+## E9 — Migration physique de l'arborescence
 
-- **Fait** : déplacements un module à la fois vers `core/`, `cognition/`, `capabilities/`, `ops/`, `lab/`, chacun
-  avec son lien de compatibilité, mis à jour par `walter layout`. Retrait de `/opt/dsh` quand plus rien n'y pointe.
-  L'instance reste `/user/Lucas` (système d'instances générique, aucune migration physique).
-- **Tests** : `walter check` et tous les tests après chaque déplacement ; services redémarrés verts.
-- **Adoption** : par module.
-- **Retour arrière** : par module, le lien de compatibilité inversé.
+Conçue dès E0 (`05-CARTOGRAPHIE.md`, `vision_target` dans le registre), exécutée **module par module**, chaque
+sous-lot autorisé séparément et déclaré avec les mêmes champs que les autres lots.
+
+**Pour chaque déplacement** : inventaire des références (code, imports, scripts, unités systemd, CLI, MCP,
+configurations, contrats, gardiens, sauvegardes, skills, `walter_logs` sur 30 jours) ; déplacement ; mise à jour de
+ces références ; lien de compatibilité vérifié ; tests du module et `walter check` ; services redémarrés verts ;
+sauvegarde restic puis **essai de restauration** ; documentation. Noms publics (commandes, ports, outils MCP,
+événements, conteneurs) conservés.
+
+| Ordre proposé | Sous-lot | Risque |
+|---|---|---|
+| E9.1 | Documents globaux propres à un module → leur module (aucun code) | faible |
+| E9.2 | `/services/<service>` : définitions de déploiement (PostgreSQL d'abord, données laissées dans leur volume Docker) | moyen |
+| E9.3 | `capabilities/` : skills, browse (avec la session navigateur de core), computer, colab | moyen |
+| E9.4 | `cognition/` : context ; router avec llm ; memory avec vault | élevé (Memory : sauvegarde PG et essai de restauration avant) |
+| E9.5 | Extraction de `core/bus` et du journal d'exécution hors de Memory (bibliothèques, schémas PG inchangés) | moyen |
+| E9.6 | Éclatement de core : `interfaces/mcp`, `interfaces/hooks`, `contracts`, `security` (avec secrets), `identity` (soul), gardiens vers ops, scénarios vers Lab | élevé (après E7) |
+| E9.7 | Instance : `logs`, `profile`, `harness`, profils de navigation ; dossiers en vrac de `/root` | moyen |
+| E9.8 | Restes de `~/.hermes` (scripts, wrappers, greffons) et doublons, après preuve de non-usage | faible |
+| E9.9 | Retrait des liens de compatibilité, quand plus aucun appel n'y passe | faible, en dernier |
+
+- **Retour arrière** : par sous-lot, lien inversé et restauration des unités et configurations sauvegardées ; essayé
+  sur le premier sous-lot de chaque famille.
+
+## Fin de la convergence
+
+Walter est conforme à la vision quand : un seul runtime de production (`walter layout` : 17/17 cibles atteintes) ;
+aucune référence à `/opt/walter-*`, `/srv/*`, `~/.hermes` hors Lab ; aucun wrapper ou doublon de la liste
+`05-CARTOGRAPHIE.md` § 10 ; `walter check` en blocage vert ; chaque module, composant et dossier annexe
+auto-descriptif.
+
+## Prérequis et risques résiduels avant E1
+
+| # | Sujet | État au 09/11 | Traitement proposé |
+|---|---|---|---|
+| 1 | Disque | 9,5 Go libres (94 %) ; l'archive de retour arrière et le cache hors ligne en demandent (installation 533 Mo) | Mesurer puis libérer de la place avec Ops (images Docker, caches) avant E1 ; aucun déplacement de `/opt/dsh` |
+| 2 | Stock documentaire | 13 en-têtes incomplets, README absents pour colab et raw-vault | Rattrapé dans E1, puis contrôle en blocage |
+| 3 | Tests MCP de core | 18 tests sans interpréteur commun (paquet `mcp` + pytest) | Environnement de test de core corrigé avant E1 |
+| 4 | Dépôt `secrets` | Travail non committé du 25/10 au 07/11, déjà compilé dans le registre ; non publié par `walter-git-publish` | Monsieur ou l'agent auteur le committe ; le contrat `secrets.json` modifié par E0 attend ce commit |
+| 5 | Tests de browse | 5 échecs antérieurs au 09/11 | À corriger dans un lot Browse séparé |
+| 6 | Coûts | 2 572 appels sur 2 588 au coût inconnu (abonnements) | Imputer le coût des abonnements au prix de revient du Router avant le budget de E3 |
+| 7 | Effort | Absent du ContextPlan v2 | Extension possédée par Context, lot séparé |
+| 8 | Jeton en clair | `miroshark-tunnel.service` (désactivée) lisible par tous | Fichier 0600 ou Bitwarden, et rotation du jeton : accord de Monsieur |
+| 9 | Service hors registre | `computer-use-v2-shadow` tourne depuis `/root/computer-use-v2-lot21` et lit `state.db` | Déclarer ou arrêter, décision Computer |
+| 10 | Rappel du contexte | 16/18 (17/18 le 07/11) ; preflight qui sous-estime le niveau dans 9 cas sur 29 | Sujet de Context ; plancher des lots fixé à 16/18 |
+| 11 | Noyau préliminaire | DSH 0.2.0-rc.2 | Gel exact (E1), mise à jour seulement par Lab |
+| 12 | Délai du journal Hermes | p95 de 135,7 s | Sans effet sur le moteur ; disparaît avec E7 |
 
 ## Ce que Monsieur valide maintenant
 
-1. Le principe : **noyau DSH/Cordis figé + greffons Walter**, pas de réécriture, pas de troisième boucle.
-2. L'ordre E0 → E9 et les critères d'adoption.
-3. Deux points qui touchent d'autres modules : les routes `/v1/runs/*` et `/v1/bus/emit` ajoutées à la passerelle
-   Memory (E2), et l'absorption des lots A–D du 08/11 par E5.
-4. Facultatif : supprimer dès maintenant la tâche nocturne Memory Dreaming de Hermes.
+1. E0 tel que livré, et l'autorisation de lancer **E1** (gel sans déplacement et rattrapage documentaire).
+2. Les points ouverts de `05-CARTOGRAPHIE.md` § 11 (nom du dossier du journal, place du runtime Python, `/root/archive`,
+   données PostgreSQL).
+3. La correction du jeton en clair de `miroshark-tunnel` (prérequis n° 8).

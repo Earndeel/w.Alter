@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Décrire l'organisation interne du runtime unique, ses contrats, ses stratégies interchangeables et son branchement aux autres modules. |
 | **Propriétaire** | walter-core. |
-| **Date / statut** | 09/11/2026 · **brouillon à valider par Monsieur**. Les contrats ci-dessous deviennent des schémas JSON au lot E0. |
+| **Date / statut** | 09/11/2026 · **direction validée par Monsieur le 09/11** (précisions intégrées ci-dessous). Contrats en schémas JSON depuis E0 (`core/engine/contracts/`, brouillons). Rien n'est implémenté. |
 | **Sources** | `VISION.md` (§ 4, 8, 9), arbitrages de Monsieur du 09/11 (`DECISIONS.md`), audit `01-AUDIT.md`. |
 
 ## 1. Principe
@@ -42,7 +42,12 @@ Trois couches :
   aujourd'hui (`walter harness install dsh`), avec sections gérées et empreintes. Une variante Lab n'est qu'une autre
   composition, pas un autre moteur.
 
-## 2. Un seul processus hôte, plusieurs portes
+## 2. Un runtime, plusieurs portes
+
+**Un runtime unique n'est pas un processus unique** (Monsieur, 09/11) : un seul moteur décide des tours, des outils,
+des sous-agents et des permissions, mais des processus techniques peuvent rester séparés quand cela améliore la
+sécurité, les performances ou la résilience (bac à sable, service context, passerelles). Le schéma ci-dessous est la
+cible de départ, pas une obligation de tout loger dans un processus.
 
 ```
  Monsieur (web)    Telegram        Claude Code / Codex      Router, Ops        événement (tri, webhook)
@@ -78,7 +83,7 @@ forme de compositions variantes, et ne sont adoptées qu'après banc, tests de n
 | **tools** | Outils de base et outils Walter | DSH : bash, fichiers, recherche de fichiers, tâches, question, présentation ; Walter : MCP walter, jeu `core` + `walter_call` | présentation progressive (lot 3) contre liste complète ; parallélisme des appels |
 | **orchestration** | Sous-agents et missions | sous-agents en processus du noyau, réactivés sous stratégie Walter (§ 5.3) | enfants ACP, enfants Codex ou Claude Code (développement seulement) |
 | **policy** | Décider avant chaque outil : autoriser, demander, refuser | bac à sable DSH + approbation DSH + greffon Walter (divulgation, périmètres Computer, liste NEVER, autorisations) | « auto review » expérimental de DSH, règles mémorisées |
-| **budget** | Arrêter un tour au bon moment | greffon sur `agent/turn-stopping`, alimenté par le **contrat d'effort** du ContextPlan (consultation / standard / approfondi) | budgets fixes, budgets appris |
+| **budget** | Arrêter un tour au bon moment | greffon sur `agent/turn-stopping` ; plafonds fixes de la composition tant que le ContextPlan v2 **n'a pas de champ d'effort** (extension possédée par Context, lot séparé) | budgets fixes, budgets appris |
 | **events** | Publier ce qui se passe | greffon natif → bus (`turn.ended`, `session.ended`, `run.*`, `approval.*`, `delegation.*`) + Run Plane | — |
 | **persistence** | Stocker les sessions pour la reprise | JSONL du noyau avec points de reprise ; walter_logs alimenté par `walter-logs-watch` | stockage direct dans Postgres en vocabulaire walter_logs (lot E8, si mesuré meilleur) |
 | **identity** | Instructions du moteur | rendu Soul (`/opt/walter-profiles/dsh/AGENTS.md`) | — |
@@ -89,8 +94,9 @@ le contenu du contexte à Context.
 
 ## 4. Contrats
 
-Ces contrats sont possédés par core et rangés dans `core/engine/contracts/` (schémas JSON au lot E0). Ils réutilisent
-les contrats existants au lieu de les recopier.
+Ces contrats sont possédés par core et rangés dans `core/engine/contracts/` (schémas JSON brouillons depuis E0 :
+`engine-api.v1`, `turn-intake.v1`, `delegation.v1`, `policy-decision.v1`, `engine-event.v1`, `strategy.v1`, testés
+par `core/engine/tests/`). Ils réutilisent les contrats existants (ContextPlan v2 par référence) au lieu de les recopier.
 
 ### 4.1 Engine API v1 (interfaces → moteur)
 
@@ -115,7 +121,7 @@ Entrée : le message du propriétaire, isolé des avis du runtime par `owner-tur
    écrit sur le run (`runs.routing.requested`, comme au lot 2 du 07/11) ;
 3. si le plan porte une réponse sans modèle (heure, date, calcul sûr), elle est rendue et le tour s'arrête ;
 4. sinon le plan fixe le contexte (prise context), le niveau et la tâche du modèle (walter-llm lit le plan du run),
-   les outils présentés et le contrat d'effort (budget).
+   les outils présentés et, quand Context l'aura ajouté, l'effort (budget).
 
 Un tour = un plan. Les étapes suivantes du même tour (appels d'outils) ne redemandent pas de plan.
 
@@ -133,7 +139,7 @@ Il reprend les champs actuels de `walter_run` pour que l'outil garde son nom et 
 - Résultat : sortie (validée par le contrat de sortie s'il y en a un), sources, coûts, `task_id` du Run Plane.
   Observations persistées dans Memory comme aujourd'hui.
 
-### 4.4 Décision de politique v1 (policy, avant chaque outil)
+### 4.4 Décision de politique v1 (policy, avant chaque outil, message sortant et appel de modèle)
 
 Entrée : `session_id`, `run_id`, `principal`, `interface`, outil, arguments (visibles par la politique, jamais
 journalisés en clair s'ils sont sensibles), mode de bac à sable courant.
@@ -147,6 +153,9 @@ Les sources sont ordonnées, et **le refus l'emporte** :
 5. bac à sable et approbation du noyau.
 
 Sans répondant disponible (Telegram hors ligne, mode commande), une demande échoue fermée.
+
+La même décision couvre les messages sortants (`outgoing_message`) et les appels de modèle (`model_call`, classe de
+données comparée au fournisseur), quelle que soit la porte ou le transport.
 
 ### 4.5 Vocabulaire des événements
 
@@ -192,7 +201,7 @@ d'extension sans stratégie, ou qui en met deux, est refusée par `walter check`
 ### 5.4 Interruptions
 - Nouveau message pendant un tour : orientation ou mise en file (mécanisme du noyau), selon la porte.
 - Arrêt : `turn.cancel` (bouton web, `/stop` Telegram, API). Les enfants s'arrêtent avec leur parent.
-- Budget : le greffon budget arrête le tour par `agent/turn-stopping` quand le contrat d'effort est atteint, puis
+- Budget : le greffon budget arrête le tour par `agent/turn-stopping` quand le plafond (puis l'effort du plan) est atteint, puis
   rend ce qui a été trouvé.
 
 ### 5.5 Permissions
@@ -221,7 +230,7 @@ d'extension sans stratégie, ou qui en met deux, est refusée par `walter check`
 
 ```
 1 Entrée        porte → Engine API → intake : owner-turn, session stable, runs.start
-2 Preflight     walter-context /preflight → ContextPlan v2 (intention, niveau, capacités, effort, voie sans modèle)
+2 Preflight     walter-context /preflight → ContextPlan v2 (intention, niveau, capacités, voie sans modèle)
                 ├─ voie sans modèle → réponse, fin du tour (0 modèle)
                 ├─ Context + Memory : contexte selon le plan (mémoire seulement si le plan la demande)
                 └─ Router : walter-llm lit le plan du run → modèle, fournisseur, effort ; abonnements d'abord
@@ -244,11 +253,17 @@ d'extension sans stratégie, ou qui en met deux, est refusée par `walter check`
 | Ops | installation, gel, déploiement, sauvegarde, restauration | `walter-ops`, `walter compose` | ops → moteur |
 | Lab | compositions variantes, banc | `walter-scenario`, `walter matrix` | lab → moteur (proposer, jamais déployer) |
 
+Choix des transports (règle du 09/11, `DOCUMENTATION.md` § 5) : bibliothèque dans un même processus, HTTP local
+entre processus, bus pour l'asynchrone, MCP pour les agents et clients d'agents (pas imposé aux appels internes), CLI
+pour l'exploitation. La politique s'applique quel que soit le transport.
+
 Ce que le moteur **ne** fait **jamais** : appeler un fournisseur de modèle sans passer par la passerelle, lire la
 mémoire sans passer par Memory ou Context, garder sa propre mémoire, ses propres skills ou son propre registre,
 lancer Hermes.
 
 ## 8. Documentation auto-descriptive (règle du 09/11)
+
+Règle commune et conventions : `/walter/docs/DOCUMENTATION.md` (en vigueur depuis E0). Résumé pour le moteur :
 
 On réutilise les mécanismes existants, sans seconde source :
 
@@ -267,7 +282,7 @@ On réutilise les mécanismes existants, sans seconde source :
 | Sujet | Risque | Réponse prévue |
 |---|---|---|
 | Noyau en version préliminaire (rc.2) | Défauts amont, changements d'interface | Gel exact, mise à jour seulement par Lab, une composition de repli |
-| Disque à 94 % (9,5 Go libres) | Le gel du noyau (524 Mo) et les essais de restauration manquent de place | Gel par déplacement plus lien (pas de copie), cache hors ligne dédoublonné ; nettoyage disque à prévoir avec Ops |
+| Disque à 94 % (9,5 Go libres) | L'archive de retour arrière, le cache hors ligne et les essais de restauration manquent de place | Gel **sans déplacement** (E1) : verrou et empreintes dans `kernel/`, installation laissée dans `/opt/dsh` ; place libérée avec Ops avant E1 |
 | Mémoire vive d'un hôte unique | Web, API et enfants dans un seul processus Node | Mesure au lot E4 ; plafond mémoire systemd ; enfants hors processus seulement si mesuré nécessaire |
 | Fidélité de la reprise | Pas d'« exactement une fois » | Clés d'idempotence, issue inconnue, décision du propriétaire |
 | Points d'extension manquants | Un besoin Walter sans point d'extension public | Consigné, étudié par Lab ; correctif amont proposé ou bifurcation documentée, jamais un correctif silencieux |

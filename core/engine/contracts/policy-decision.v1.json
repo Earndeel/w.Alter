@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/core/engine/policy-decision.v1.json",
+  "title": "PolicyDecision v1",
+  "description": "The policy seam's answer before any tool call or outgoing data (including data sent to a model provider). Status: DRAFT (E0), implemented at E3. Sources are ordered and a deny wins: NEVER list and delegation depth, disclosure guard, Computer scopes, account grants, kernel sandbox and approval. Without an available answerer the request fails closed.",
+  "type": "object",
+  "required": [
+    "version",
+    "request",
+    "decision"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "session_id",
+        "run_id",
+        "principal",
+        "interface",
+        "action"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "pattern": "^(web|telegram|api|mcp|command|schedule|webhook|lab)/[A-Za-z0-9._:@/-]{1,200}$",
+          "description": "Stable engine session id: <interface>/<account or caller>/<conversation>. Fixed by intake, never by the model."
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "principal": {
+          "type": "object",
+          "required": [
+            "kind",
+            "id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "owner",
+                "machine",
+                "test"
+              ],
+              "description": "owner = the instance's person; machine = a Walter module or schedule; test = Lab/bench (never production data writes)"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Instance-relative identity (never a path, never a secret)"
+            }
+          }
+        },
+        "interface": {
+          "enum": [
+            "web",
+            "telegram",
+            "api",
+            "mcp",
+            "command",
+            "schedule",
+            "webhook",
+            "lab"
+          ]
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "action": {
+          "type": "object",
+          "required": [
+            "kind",
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "tool",
+                "shell",
+                "file",
+                "outgoing_message",
+                "model_call",
+                "computer",
+                "account",
+                "delegation"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "target": {
+              "type": "string",
+              "description": "Recipient, path, host, provider or account concerned (no secret value)"
+            },
+            "data_class": {
+              "enum": [
+                "cloud_allowed",
+                "redacted_cloud",
+                "local_only",
+                "credential"
+              ],
+              "description": "Highest privacy class of the data leaving"
+            },
+            "arguments_digest": {
+              "type": "string",
+              "description": "Hash of the arguments; sensitive arguments are never logged in clear"
+            }
+          }
+        },
+        "sandbox": {
+          "type": "string",
+          "description": "Current sandbox preset of the session"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "source",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "enum": [
+            "allow",
+            "ask",
+            "deny"
+          ]
+        },
+        "source": {
+          "enum": [
+            "never_list",
+            "depth",
+            "disclosure",
+            "computer_scope",
+            "account_grant",
+            "sandbox",
+            "approval",
+            "preset"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answerer": {
+          "enum": [
+            "web",
+            "telegram",
+            "none"
+          ],
+          "description": "For ask: where the approval goes; none = fail closed (deny)"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "decided_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "properties": {
+              "outcome": {
+                "const": "ask"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "required": [
+              "answerer",
+              "request_id"
+            ],
+            "properties": {
+              "answerer": {
+                "enum": [
+                  "web",
+                  "telegram"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

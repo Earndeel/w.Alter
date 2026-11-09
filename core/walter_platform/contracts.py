@@ -145,6 +145,8 @@ def validate(module, *, source=False):
         _strings(recovery.get(key), 'recovery.' + key, nonempty=True)
     if 'presentation' in module:
         _presentation(module['presentation'], check)
+    if 'components' in module:
+        _components(module['components'], name, check)
     scenarios = c.get('acceptance')
     _require(isinstance(scenarios, list) and bool(scenarios), 'acceptance scenarios required')
     ids = set()
@@ -156,6 +158,40 @@ def validate(module, *, source=False):
         _require(isinstance(item.get('assertion'), str) and bool(item['assertion']), 'acceptance assertion required')
         _require(item.get('scope') in {'unit', 'integration', 'live', 'recovery'}, 'invalid acceptance scope')
     return module
+
+
+COMPONENT_KEYS = {'id', 'path', 'role', 'owner', 'status', 'readme', 'contracts', 'interfaces', 'data', 'vision_target'}
+COMPONENT_STATUS = {'planned', 'experimental', 'active', 'implemented', 'obsolete'}
+TRANSPORTS = {'library', 'cli', 'http', 'mcp', 'event', 'sip', 'renderer'}
+
+
+def _components(value, module, check):
+    """Significant components of a module (documentation rule, 2026-11-09): what each part is, who answers for it,
+    its real status, its README and contracts, how to talk to it and, during the folder migration, where the
+    vision places it. Same compiler, same registry as the module itself: no second source."""
+    _require(isinstance(value, list), 'components must be a list')
+    ids = set()
+    for item in value:
+        _require(isinstance(item, dict) and set(item) <= COMPONENT_KEYS, 'invalid component')
+        ident = item.get('id', '')
+        _require(isinstance(ident, str) and IDENTIFIER.fullmatch(ident) and ident not in ids, 'invalid component id')
+        ids.add(ident)
+        check(item.get('path'))
+        _require(isinstance(item.get('role'), str) and bool(item['role'].strip()), 'component role required')
+        _require(isinstance(item.get('owner', module), str) and IDENTIFIER.fullmatch(item.get('owner', module)),
+                 'invalid component owner')
+        _require(item.get('status') in COMPONENT_STATUS, 'invalid component status')
+        _require(item['status'] == 'planned' or isinstance(item.get('readme'), str), 'component readme required')
+        if 'readme' in item:
+            check(item['readme'])
+        for p in _strings(item.get('contracts', []), 'component.contracts'):
+            check(p)
+        _strings(item.get('data', []), 'component.data')
+        for op in item.get('interfaces', []):
+            _require(isinstance(op, dict) and op.get('transport') in TRANSPORTS and isinstance(op.get('interface'), str)
+                     and bool(op['interface']), 'invalid component interface')
+        if 'vision_target' in item:
+            layout.relative(item['vision_target'])
 
 
 PRESENTATION_KEYS = {'audience', 'title', 'order', 'summary', 'manifest', 'manifest_command', 'guide', 'tools', 'index'}
@@ -210,6 +246,14 @@ def expand(manifest, root, target_root):
         for key in ('summary', 'manifest', 'guide'):
             if isinstance(pres.get(key), str):
                 pres[key] = str(layout.join(base, pres[key]))
+    if isinstance(raw.get('components'), list):
+        for item in raw['components']:
+            if isinstance(item, dict):
+                for key in ('path', 'readme'):
+                    if isinstance(item.get(key), str):
+                        item[key] = str(layout.join(base, item[key]))
+                if isinstance(item.get('contracts'), list):
+                    item['contracts'] = [str(layout.join(base, v)) for v in item['contracts']]
     c = raw.get('contract')
     if isinstance(c, dict):
         if isinstance(c.get('config_paths'), list):
@@ -328,6 +372,10 @@ def render_markdown(value):
                  'Racine actuelle : `' + m['root'] + '`. Cible : `' + c['target_root'] + '`.', '',
                  'Interfaces : ' + ', '.join(m['interfaces']) + '.', '', '**Critères de validation :**', '']
         rows += ['- ' + x['assertion'] + ' (' + x['scope'] + ')' for x in c['acceptance']]
+        if m.get('components'):
+            rows += ['', '**Composants :**', '', '| Composant | État | Rôle | Chemin | Cible (vision) |', '|---|---|---|---|---|']
+            rows += ['| ' + ' | '.join(map(cell, (x['id'], x['status'], x['role'], '`' + x['path'] + '`',
+                                                   x.get('vision_target') or '—'))) + ' |' for x in m['components']]
         rows += ['', '**Limites déclarées :**', '']
         rows += ['- ' + text for text in (m['limitations'] or ['Aucune limite supplémentaire déclarée ; les preuves de qualification restent nécessaires.'])]
     return '\n'.join(rows) + '\n'
