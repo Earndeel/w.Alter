@@ -7,7 +7,7 @@
 #   statedb  newest agent-runtime state snapshot, decompressed for the same reason (walter-statedb-backup)
 #   config   config bundle of the modules and their integrations (Walter Memory's backup_bundle, fail closed)
 #   folders  the owner's folder, projects, apps and their data, vault exports (restic.folders minus restic.exclude)
-# Retention per tag: keep_daily + keep_weekly + keep_monthly; unreferenced chunks pruned on Sundays; repository
+# Retention per tag: keep_daily + keep_weekly + keep_monthly, snapshots tagged `keep` always kept; unreferenced chunks pruned on Sundays; repository
 # checked on Sundays (structure) and on the 1st (2 % of the data re-read).
 # Restore: restic -r <repository> restore latest --tag <tag> --target <dir>   (password: Bitwarden
 # « W.Alter restic repository (Drive) », copy in the user folder's bootstrap/restic).
@@ -80,8 +80,9 @@ else
     || { FAILED=1; echo "ERROR: folders not saved" >&2; }
 fi
 
-# Retention, pruning and checks
-"${R[@]}" forget --quiet --group-by host,tags --keep-daily "$WALTER_OFFSITE_KEEP_DAILY" --keep-weekly "$WALTER_OFFSITE_KEEP_WEEKLY" \
+# Retention, pruning and checks. Snapshots tagged `keep` (e.g. the Memory cleanup phase-0 archive, 2026-11-09) are
+# never forgotten by the rotation: removing one is a deliberate `restic forget <id>`.
+"${R[@]}" forget --quiet --keep-tag keep --group-by host,tags --keep-daily "$WALTER_OFFSITE_KEEP_DAILY" --keep-weekly "$WALTER_OFFSITE_KEEP_WEEKLY" \
   --keep-monthly "$WALTER_OFFSITE_KEEP_MONTHLY" >/dev/null
 if [ "$(date -u +%u)" = 7 ]; then "${R[@]}" prune --quiet >/dev/null && echo "pruned"; "${R[@]}" check --quiet >/dev/null && echo "check ok" || { FAILED=1; echo "ERROR: restic check" >&2; }; fi
 if [ "$(date -u +%d)" = 01 ]; then "${R[@]}" check --quiet --read-data-subset 2% >/dev/null && echo "data check ok" || { FAILED=1; echo "ERROR: restic data check" >&2; }; fi
