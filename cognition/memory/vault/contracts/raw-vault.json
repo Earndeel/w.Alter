@@ -132,5 +132,27 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
-  }
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "Raw Vault",
+    "order": 30,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "vault_search",
+      "vault_get",
+      "vault_put"
+    ]
+  },
+  "components": [
+    {
+      "id": "rawvault-shim",
+      "path": "rawvault.py",
+      "role": "Ancienne entrée du Raw Vault ; renvoie vers walter_memory.objects",
+      "status": "obsolete",
+      "readme": "manifest/MANIFEST.md"
+    }
+  ]
 }
