@@ -1,0 +1,22 @@
+{
+ "created_at": "2026-11-09T13:12:04+00:00",
+ "domain": "walter",
+ "evidence": {
+  "requests": [
+   "[IMPORTANT: Background process proc_710b2f4e5984 completed normally (exit code 0).\nCommand: timeout 700 /root/.hermes/scripts/bench_lot4_trigger.sh 2>&1 | tail -40\nOutput:\n 'actual_cost_usd', 'cost_status', 'cost_source', 'pricing_version', 'title', 'api_call_count', 'handoff_state', 'handoff_platform', 'handoff_error', 'cwd', 'rewind_count', 'archived', 'git_branch', 'git_repo_root', 'session_key', 'chat_id', 'chat_type', 'thread_id', 'compression_failure_cooldown_until', 'compression_failure_error', 'display_name', 'origin_json', 'expiry_finalized', 'compression_fallback_streak', 'profile_name', 'compression_ineffective_count', 'pinned', 'system_prompt_hash', 'last_activity_at', 'last_activity_description', 'last_activity_provenance', 'title_source', 'last_read_at']\n  messages: ['id', 's",
+   "[IMPORTANT: Background process proc_0bc848684ad5 completed normally (exit code 0).\nCommand: timeout 180 hermes chat -q \"ouvre la page https://books.toscrape.com/ et explique-moi ce qu'elle contient en 3 phrases max\" --source wb-trigger2 > /tmp/wb-trigger/web3b.out 2>&1; echo DONE\nOutput:\nDONE\n]",
+   "continue",
+   "Je veux faire une dernière vérification/correction d'intégration concernant le rôle exact de `walter_browse`.\n\nIl y avait une ambiguïté dans notre dernière revue :\n\n`walter_browse` ne doit PAS être réservé aux tâches Web complexes.\n\nJe veux que `walter_browse` soit le **point d'entrée universel de W.Alter vers le Web**, y compris pour les requêtes Web très simples.\n\nLe principe doit être :\n\n```text\nLLM\n ↓\nwalter_browse\n ↓\nroute la plus légère suffisante\n```\n\net non :\n\n```text\nLLM\n ├→ web_search\n ├→ web_extract\n ├→ browser_navigate\n └→ walter_browse\n```\n\noù le LLM doit choisir lui-même entre plusieurs stacks Web concurrentes.\n\n# 1. Walter Browse = routeur universel Web\n\nExemples :\n\nQuestion Web actuelle très simple :\n\n« Qui a gagné le GP hier ? »\n\ndoit pouvoir faire :\n\n```text\nwalter_browse"
+  ],
+  "session_id": "hermes/main/20260811_191006_0c9657"
+ },
+ "hermes": {
+  "path": "/root/.hermes/skills/walter-operating-mode",
+  "sha": "df4f2f3f1a257bf335aa8be10c3ed4b3eba4d0cbec937a0c848772ab8f37a47f",
+  "state": "active"
+ },
+ "kind": "hermes_update",
+ "reason": "Hermes changed a skill Walter also changed (manual merge)",
+ "runtime": "hermes",
+ "target": "walter-operating-mode"
+}
