@@ -1,5 +1,13 @@
 # Walter Router
 
+| | |
+|---|---|
+| **Rôle** | Choisir, pour chaque poste, le meilleur modèle que Walter peut réellement exécuter et la façon la moins chère de l'exécuter, avec décisions et coûts traçables. |
+| **Propriétaire** | Walter Router (`/walter/router`). |
+| **État** | **active** (constat du 09/11/2026) : `walter-router-refresh.timer` (48 h), `walter-router-guardian.timer`, page bibliothèque. |
+| **Ne fait pas** | Basculer seul sur un modèle (il propose au propriétaire). Exécuter les appels (`llm`). Garder des données du propriétaire dans le logiciel (elles sont dans l'instance). |
+| **Contrats** | [contracts/router.json](contracts/router.json), [contracts/data-classes.json](contracts/data-classes.json), [contracts/maintenance.json](contracts/maintenance.json) ; CLI `walter-router` ; schéma PostgreSQL `models` (`docs/DATA.md`). |
+
 The Walter module that chooses, for every task, the best model Walter can actually run — and the cheapest way to
 run it. It researches leaderboards, prices and plans on the web, understands and ranks them, keeps an active model
 library, proposes changes to the owner (never switches by itself), and serves the choice to every other module.
