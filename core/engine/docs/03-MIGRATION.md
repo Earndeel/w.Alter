@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Ordonner la convergence de Walter vers `VISION.md`, lot par lot, avec tests, critères d'adoption et retour arrière essayé. Deux objectifs menés ensemble : **A** convergence fonctionnelle (un seul runtime de production) et **B** convergence architecturale (arborescence, conventions, interfaces, documentation). |
 | **Propriétaire** | walter-core (exécution : le builder ; validation : Monsieur, **lot par lot**). |
-| **État** | 09/11/2026 · direction validée par Monsieur. **S0 et E0 faits** (§ S0, § E0). E1 attend l'accord de Monsieur ; chaque lot suivant est autorisé séparément. |
+| **État** | 09/11/2026 · direction validée par Monsieur. **S0 et E0 faits** (§ S0, § E0). **E1 autorisé le 09/11 et en cours** (§ E1 : gel fait et prouvé ; restent les compositions, le rattrapage documentaire et 48 h de service inchangé). Chaque lot suivant est autorisé séparément. Lots hors moteur ouverts le 09/11 : E9.2 PostgreSQL (préparé, § E9) et nettoyage de Memory (plan à valider, § M). |
 | **Ne fait pas** | Ne décrit pas l'organisation interne du moteur (`02-ARCHITECTURE.md`) ni l'inventaire des emplacements (`05-CARTOGRAPHIE.md`). |
 | **Contrats** | Schémas du moteur `core/engine/contracts/` ; registre des modules (`vision_target` des modules et des composants) ; règle documentaire `/walter/docs/DOCUMENTATION.md`. |
 
@@ -55,7 +55,7 @@ E4, E5 et E7 ouvrent de nouveaux chemins de production : ils ne sont **activés*
 |---|---|---|---|---|
 | **S0** | Corrections urgentes : terminal de `walter_run`, Memory Dreaming | sécurité | Oui (fait le 09/11) | — |
 | **E0** | Contrats, registre enrichi, mesures, cartographie, règle documentaire | A + B | Non (fait) | — |
-| **E1** | Gel technique du noyau (sans déplacement) ; rattrapage documentaire | A + B | Non (même code, même place) | E0 |
+| **E1** | Gel technique du noyau (sans déplacement) ; rattrapage documentaire | A + B | Non (même code, même place) — en cours | E0 |
 | **E2** | Accueil et événements natifs | A | Oui, après ombre | E1 |
 | **E3** | Politique, approbations, divulgation, budget | A (sécurité) | Oui | E2 |
 | **E4** | Engine API v1 | A + B (`core/interfaces`) | Ajout, activé après E3 | E2, E3 |
@@ -64,6 +64,7 @@ E4, E5 et E7 ouvrent de nouveaux chemins de production : ils ne sont **activés*
 | **E7** | Telegram sur le moteur ; Hermes passe à Lab | A + B | Oui, après une semaine en parallèle | E3, E4 |
 | **E8** | Reprise après incident éprouvée | A | Non (essais) puis peut-être | E2 |
 | **E9** | Migration physique de l'arborescence, module par module | B | Oui (liens de compatibilité) | E7 pour core ; avant pour les sous-lots indépendants |
+| **M** | Grand nettoyage de Walter Memory (hors moteur, phase par phase) | B (données) | Oui, données | sauvegarde complète et archive pérenne (phase 0) |
 
 E4 et E8 peuvent être préparés en parallèle de E3. Les sous-lots E9 qui ne touchent pas au moteur (§ E9) peuvent être
 proposés plus tôt, chacun avec son propre accord. **Walter n'est pas terminé à E8** : la convergence s'achève quand
@@ -117,6 +118,24 @@ Le gel et le déplacement physique sont séparés : **E1 gèle, sans rien dépla
   blocage vert.
 - **Retour arrière indépendant** : une archive de l'installation actuelle, faite avant E1 et vérifiée par empreinte,
   se restaure sans le cache ni le nouveau script ; essai de restauration dans un dossier d'essai avant l'adoption.
+
+**Avancement au 09/11 (soir)** — fait et prouvé :
+
+- `core/engine/kernel/` : version exacte (`0.2.0-rc.2`, sans plage), verrou complet régénéré sans changer un seul
+  paquet, `installed.json` (empreinte par paquet installé, des 6 fichiers de composition et de la configuration
+  composée `--dump-config` des profils web et headless, déterministe à deux exécutions), `verify.py`, `install.sh`.
+- Cache hors ligne dans `/services/dsh/npm-cache` (Ops, arbitrage `/services` du 09/11).
+- Réinstallation complète hors ligne **deux fois** dans un dossier d'essai : 0 paquet manquant, en trop ou différent.
+- Retour arrière : archive `tar.zst` de l'installation en service (`@instance/backups/changes/2026-11-09-engine-E1/`,
+  empreinte SHA-256), restaurée par `tar` seul dans un dossier d'essai : conforme.
+- `walter engine kernel` (lecture seule, sortie 1 en cas d'écart) ; la vigie d'Ops lève `engine_kernel_drift` (G3,
+  jamais d'action automatique) ; composant `engine-kernel` déclaré dans `contracts/core.json`.
+
+Reste à faire dans E1 : (1) source des compositions web et headless dans `core/engine/compositions/` et rendu par
+walter-core — aujourd'hui ces 6 fichiers sont tenus à la main dans `/opt/dsh/home` et contiennent des valeurs de
+l'instance, à séparer (gabarit neutre + valeurs de `@instance/config/core/`) ; (2) rattrapage documentaire (13
+en-têtes, README de colab et raw-vault) puis contrôle en blocage ; (3) environnement de test MCP de core
+(prérequis 3) ; (4) 48 h de service inchangé, avec `walter engine kernel` conforme, puis adoption.
 
 ## E2 — Accueil et événements natifs
 
@@ -223,7 +242,7 @@ sauvegarde restic puis **essai de restauration** ; documentation. Noms publics (
 | Ordre proposé | Sous-lot | Risque |
 |---|---|---|
 | E9.1 | Documents globaux propres à un module → leur module (aucun code) | faible |
-| E9.2 | `/services/<service>` : définitions de déploiement (PostgreSQL d'abord, données laissées dans leur volume Docker) | moyen |
+| E9.2 | `/services/<service>` : dépendances opérationnelles (arbitrage du 09/11). **PostgreSQL d'abord, données déplacées sous `/services/postgres/data/`** (le volume Docker historique n'est pas gardé). Préparé le 09/11 : définition, essai de restauration et de démarrage (voir ci-dessous) ; migration sur accord. Puis environnements Python partagés (`/services/python/`), Webtop, conteneurs de Browse | moyen |
 | E9.3 | `capabilities/` : skills, browse (avec la session navigateur de core), computer, colab | moyen |
 | E9.4 | `cognition/` : context ; router avec llm ; memory avec vault | élevé (Memory : sauvegarde PG et essai de restauration avant) |
 | E9.5 | Extraction de `core/bus` et du journal d'exécution hors de Memory (bibliothèques, schémas PG inchangés) | moyen |
@@ -235,6 +254,31 @@ sauvegarde restic puis **essai de restauration** ; documentation. Noms publics (
 - **Retour arrière** : par sous-lot, lien inversé et restauration des unités et configurations sauvegardées ; essayé
   sur le premier sous-lot de chaque famille.
 
+### E9.2 PostgreSQL — préparé le 09/11, données pas encore déplacées
+
+- **Composants** : `/services/postgres/{compose.yaml, config/, README.md}` (contrat d'Ops, composant `postgres`) ;
+  image verrouillée par empreinte ; configuration complète dans `config/` (y compris `hba_file` et `ident_file`).
+- **Essais faits** : restauration complète du dump de la nuit dans un PostgreSQL jetable (`pg_restore` sans erreur ;
+  562 958 événements = exactement ceux présents dans la base au moment du dump ; extensions identiques) ; démarrage de
+  la définition sur cette copie : `healthy`, configuration lue depuis `config/`, connexion TCP par le port publié
+  depuis la passerelle Docker comme les clients. L'essai a corrigé un défaut : sans `hba_file`, PostgreSQL lisait les
+  règles d'accès restées dans les données.
+- **Place disque** : déplacement dans le même système de fichiers (`mv`, instantané, sans copie) ; 26 Go libres le
+  09/11 au soir.
+- **Procédure, vérifications et retour arrière** : README du service. Interface publique inchangée (conteneur
+  `hindsight-pg`, `127.0.0.1:5433`). Coupure de 2 à 5 minutes.
+- **Limite relevée** : le dump nocturne ne contient pas les rôles du serveur (`pg_dump` d'une base) ; une
+  restauration sur un serveur neuf doit recréer le rôle `hindsight`. Ajout d'un export des rôles à la sauvegarde
+  nocturne proposé (phase 0 du lot M).
+
+## M — Grand nettoyage de Walter Memory (plan à valider)
+
+Demande de Monsieur du 09/11. Audit et plan : `/walter/memory/docs/NETTOYAGE-2026-11.md` (volumes par schéma,
+classement mémoire personnelle / connaissances du projet / observabilité / artefacts techniques, dépendances, phases
+0 à 6, gains estimés). **Rien n'est supprimé** : chaque phase est autorisée séparément ; la phase 0 (archive
+pérenne des connaissances et sauvegarde complète restaurable) précède toute suppression. Ordre recommandé : M avant
+la migration des données de E9.2 (moins de données à déplacer et à sauvegarder), mais les deux sont indépendants.
+
 ## Fin de la convergence
 
 Walter est conforme à la vision quand : un seul runtime de production (`walter layout` : 17/17 cibles atteintes) ;
@@ -242,26 +286,31 @@ aucune référence à `/opt/walter-*`, `/srv/*`, `~/.hermes` hors Lab ; aucun wr
 `05-CARTOGRAPHIE.md` § 10 ; `walter check` en blocage vert ; chaque module, composant et dossier annexe
 auto-descriptif.
 
-## Prérequis et risques résiduels avant E1
+## Prérequis et risques résiduels (relevés avant E1, mis à jour le 09/11 au soir)
 
 | # | Sujet | État au 09/11 | Traitement proposé |
 |---|---|---|---|
-| 1 | Disque | 9,5 Go libres (94 %) ; l'archive de retour arrière et le cache hors ligne en demandent (installation 533 Mo) | Mesurer puis libérer de la place avec Ops (images Docker, caches) avant E1 ; aucun déplacement de `/opt/dsh` |
+| 1 | Disque | 9,5 Go libres (94 %) le matin ; **26 Go libres le soir** (retrait de Miroshark et Neo4j, nettoyages) | Réglé pour E1 (archive 101 Mo, cache 141 Mo) ; le nettoyage de Memory (lot M) en rendra davantage |
 | 2 | Stock documentaire | 13 en-têtes incomplets, README absents pour colab et raw-vault | Rattrapé dans E1, puis contrôle en blocage |
 | 3 | Tests MCP de core | 18 tests sans interpréteur commun (paquet `mcp` + pytest) | Environnement de test de core corrigé avant E1 |
 | 4 | Dépôt `secrets` | Travail non committé du 25/10 au 07/11, déjà compilé dans le registre ; non publié par `walter-git-publish` | Monsieur ou l'agent auteur le committe ; le contrat `secrets.json` modifié par E0 attend ce commit |
 | 5 | Tests de browse | 5 échecs antérieurs au 09/11 | À corriger dans un lot Browse séparé |
 | 6 | Coûts | 2 572 appels sur 2 588 au coût inconnu (abonnements) | Imputer le coût des abonnements au prix de revient du Router avant le budget de E3 |
 | 7 | Effort | Absent du ContextPlan v2 | Extension possédée par Context, lot séparé |
-| 8 | Jeton en clair | `miroshark-tunnel.service` (désactivée) lisible par tous | Fichier 0600 ou Bitwarden, et rotation du jeton : accord de Monsieur |
-| 9 | Service hors registre | `computer-use-v2-shadow` tourne depuis `/root/computer-use-v2-lot21` et lit `state.db` | Déclarer ou arrêter, décision Computer |
+| 8 | Jeton en clair | `miroshark-tunnel.service` (désactivée) lisible par tous | **Réglé le 09/11** : Miroshark retiré, tunnel supprimé (jeton sans valeur) |
+| 9 | Service hors registre | `computer-use-v2-shadow` tournait depuis `/root/computer-use-v2-lot21` et lisait `state.db` | **Réglé le 09/11** : arrêté et retiré, étude conservée dans `lab/computer-use-v2` |
 | 10 | Rappel du contexte | 16/18 (17/18 le 07/11) ; preflight qui sous-estime le niveau dans 9 cas sur 29 | Sujet de Context ; plancher des lots fixé à 16/18 |
 | 11 | Noyau préliminaire | DSH 0.2.0-rc.2 | Gel exact (E1), mise à jour seulement par Lab |
 | 12 | Délai du journal Hermes | p95 de 135,7 s | Sans effet sur le moteur ; disparaît avec E7 |
 
 ## Ce que Monsieur valide maintenant
 
-1. E0 tel que livré, et l'autorisation de lancer **E1** (gel sans déplacement et rattrapage documentaire).
-2. Les points ouverts de `05-CARTOGRAPHIE.md` § 11 (nom du dossier du journal, place du runtime Python, `/root/archive`,
-   données PostgreSQL).
-3. La correction du jeton en clair de `miroshark-tunnel` (prérequis n° 8).
+Réglé le 09/11 : E0 accepté, E1 autorisé (en cours), données PostgreSQL sous `/services/postgres/data/`, runtime
+Python installé sous `/services/python/`, jeton de `miroshark-tunnel` (Miroshark retiré). Restent :
+
+1. Le plan de nettoyage de Memory (lot M), phase par phase, à commencer par la phase 0.
+2. La fenêtre de migration des données PostgreSQL (E9.2, coupure de 2 à 5 minutes), de préférence après les phases
+   1 à 4 du lot M.
+3. La suppression de la base vide `stremio_app` (base, rôle, règles d'accès ouvertes à toute adresse).
+4. Les points encore ouverts de `05-CARTOGRAPHIE.md` § 11 (nom du dossier du journal, emplacement du code de runtime,
+   `/root/archive`).

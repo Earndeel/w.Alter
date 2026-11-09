@@ -282,7 +282,7 @@ On réutilise les mécanismes existants, sans seconde source :
 | Sujet | Risque | Réponse prévue |
 |---|---|---|
 | Noyau en version préliminaire (rc.2) | Défauts amont, changements d'interface | Gel exact, mise à jour seulement par Lab, une composition de repli |
-| Disque à 94 % (9,5 Go libres) | L'archive de retour arrière, le cache hors ligne et les essais de restauration manquent de place | Gel **sans déplacement** (E1) : verrou et empreintes dans `kernel/`, installation laissée dans `/opt/dsh` ; place libérée avec Ops avant E1 |
+| Disque à 94 % (9,5 Go libres) au matin du 09/11 | L'archive de retour arrière, le cache hors ligne et les essais de restauration manquent de place | Gel **sans déplacement** (E1) : verrou et empreintes dans `kernel/`, installation laissée dans `/opt/dsh`, cache hors ligne dans `/services/dsh`. Réglé le soir même (26 Go libres) |
 | Mémoire vive d'un hôte unique | Web, API et enfants dans un seul processus Node | Mesure au lot E4 ; plafond mémoire systemd ; enfants hors processus seulement si mesuré nécessaire |
 | Fidélité de la reprise | Pas d'« exactement une fois » | Clés d'idempotence, issue inconnue, décision du propriétaire |
 | Points d'extension manquants | Un besoin Walter sans point d'extension public | Consigné, étudié par Lab ; correctif amont proposé ou bifurcation documentée, jamais un correctif silencieux |

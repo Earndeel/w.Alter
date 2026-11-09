@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Le seul moteur agentique de production de Walter : sessions persistantes, boucle d'agent, appels d'outils, sous-agents, interruptions, permissions appliquées, événements, reprise après incident. |
 | **Propriétaire** | walter-core (`/walter/core`, composante « core » de la vision). |
-| **État** | **Conception validée, lot E0 fait** (09/11/2026) : contrats en schémas brouillons (`contracts/`, `implemented`) et leurs tests ; le moteur lui-même est `planned`. Rien ne tourne depuis ce dossier, aucune boucle de production n'est remplacée. Le moteur en service est DSH 0.2.0-rc.2 installé tel quel dans `/opt/dsh` (`dsh-web.service`, interface :3080). |
+| **État** | **Conception validée, lot E0 fait, lot E1 en cours** (09/11/2026) : contrats en schémas brouillons (`contracts/`, `implemented`) et leurs tests ; noyau figé et vérifiable (`kernel/`, `walter engine kernel`) ; le moteur lui-même est `planned`. Rien ne tourne depuis ce dossier, aucune boucle de production n'est remplacée. Le moteur en service est DSH 0.2.0-rc.2 installé tel quel dans `/opt/dsh` (`dsh-web.service`, interface :3080). |
 | **Ne fait pas** | Choisir un modèle (Router), composer le contexte (Context), se souvenir (Memory), définir l'identité (Soul), décider l'intention d'un message (preflight de Context). Il les appelle par leurs interfaces déclarées et ne refait aucune de leurs décisions. |
 | **Contrats** | Schémas brouillons dans [contracts/](contracts/), expliqués dans [docs/02-ARCHITECTURE.md § 4](docs/02-ARCHITECTURE.md#4-contrats). Réutilisés tels quels : ContextPlan v2 et ChildContextSpec v1 (Context), passerelle de modèles OpenAI-compatible (Router), outils MCP walter (core), Run Plane (`runs.*`), bus Walter, vocabulaire walter_logs. |
 | **Référence** | `/walter/docs/VISION.md` (§ 4 Core, § 8 flux, § 9 principes) ; décisions : `DECISIONS.md` 2026-11-09. |
@@ -34,10 +34,10 @@
 - **Documentation auto-descriptive** (règle de Monsieur du 09/11, `/walter/docs/DOCUMENTATION.md`) : chaque
   sous-dossier significatif créé ici porte un README avec le même en-tête (Rôle, Propriétaire, État, Ne fait pas,
   Contrats) et est déclaré comme composant dans `contracts/core.json`.
-- **Gel ≠ déplacement** : `kernel/` contiendra le verrou, les empreintes et le script d'installation du noyau, pas
-  ses artefacts compilés, qui restent dans `/opt/dsh` (lot E1).
+- **Gel ≠ déplacement** : `kernel/` contient le verrou, les empreintes et le script d'installation du noyau, pas
+  ses artefacts compilés, qui restent dans `/opt/dsh` (lot E1) ; le cache hors ligne est dans `/services/dsh`.
 
-## Arborescence (existe : `docs/`, `contracts/`, `tests/` ; le reste est prévu)
+## Arborescence (existe : `docs/`, `contracts/`, `kernel/`, `tests/` ; le reste est prévu)
 
 ```
 core/engine/

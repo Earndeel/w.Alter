@@ -176,6 +176,20 @@
       "vision_target": "core/engine/contracts"
     },
     {
+      "id": "engine-kernel",
+      "path": "engine/kernel",
+      "role": "Gel du noyau DSH/Cordis (lot E1) : version exacte, verrou, empreintes de l'installation, installation hors ligne reproductible, vérification ; l'installation en service reste /opt/dsh",
+      "status": "implemented",
+      "readme": "engine/kernel/README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter engine kernel"
+        }
+      ],
+      "vision_target": "core/engine/kernel"
+    },
+    {
       "id": "mcp-server",
       "path": "server.py",
       "role": "Serveur MCP walter : expose les capacités aux agents (Claude Code, Codex, DSH, Hermes)",

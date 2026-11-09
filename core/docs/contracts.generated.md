@@ -191,6 +191,7 @@ Interfaces : MCP stdio, walter CLI, CLI contracts, matrix, doctor, Declarative h
 |---|---|---|---|---|
 | engine | planned | Runtime agentique unique de Walter (conception ; la production reste DSH dans /opt/dsh) | `/walter/core/engine` | core/engine |
 | engine-contracts | implemented | Schémas Engine API, accueil, délégation, politique, événements, stratégies (brouillons testés) | `/walter/core/engine/contracts` | core/engine/contracts |
+| engine-kernel | implemented | Gel du noyau DSH/Cordis (lot E1) : version exacte, verrou, empreintes de l'installation, installation hors ligne reproductible, vérification ; l'installation en service reste /opt/dsh | `/walter/core/engine/kernel` | core/engine/kernel |
 | mcp-server | active | Serveur MCP walter : expose les capacités aux agents (Claude Code, Codex, DSH, Hermes) | `/walter/core/server.py` | core/interfaces/mcp |
 | capabilities-adapter | active | Adaptateur des outils MCP vers les commandes déclarées des modules | `/walter/core/walter_capabilities.py` | core/interfaces/mcp |
 | mcp-toolsets | active | Jeux d'outils MCP par client (WALTER_CLIENT_TAG) | `/walter/core/config/toolsets.toml` | core/interfaces/mcp |
@@ -235,6 +236,7 @@ Interfaces : CLI walter-lab status|run|history|list, Experiment v1 (experiments/
 |---|---|---|---|---|
 | library | active | Lab : bancs, comparaisons, propositions (jamais de déploiement) | `/walter/lab/walter_lab` | lab |
 | experiments | active | Expériences et résultats | `/walter/lab/experiments` | lab/experiments |
+| computer-use-v2 | experimental | Étude Computer Use V2 (Adaptive Universal Operator) : architecture, prototype en observation, banc ; à l'arrêt | `/walter/lab/computer-use-v2` | lab/computer-use-v2 |
 
 **Limites déclarées :**
 
@@ -362,6 +364,9 @@ Interfaces : CLI walter-ops backup|git|check|recovery|deploy|status (install, on
 |---|---|---|---|---|
 | backup | active | Sauvegardes (pg, state.db, restic, publication git) | `/walter/ops/backup` | ops/backup |
 | ops | active | Installation, déploiement, récupération | `/walter/ops/walter_ops` | ops |
+| services | active | Dépendances opérationnelles de Walter (bases, bureaux distants, environnements Python partagés, passerelles) : installations, définitions de déploiement et données techniques ; jamais de code de Walter | `/services` | — |
+| postgres | implemented | Définition de déploiement de PostgreSQL (compose verrouillé par empreinte, configuration complète) préparée et essayée sur une copie restaurée ; pas en service : la production tourne encore dans le conteneur hindsight-pg sur le volume Docker historique | `/services/postgres` | — |
+| kernel-npm-cache | active | Cache npm hors ligne du noyau figé du moteur (lot E1), utilisé par core/engine/kernel/install.sh | `/services/dsh` | — |
 
 **Limites déclarées :**
 

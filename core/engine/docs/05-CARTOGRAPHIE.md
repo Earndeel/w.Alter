@@ -4,8 +4,8 @@
 |---|---|
 | **Rôle** | Établir, pour chaque emplacement actuel de Walter, son emplacement cible de la vision, ses dépendances et ce qui doit disparaître. Base de la convergence architecturale (objectif B) et du lot E9. |
 | **Propriétaire** | walter-core (exécution des déplacements : walter-ops, un module à la fois). |
-| **État** | Inventaire relevé le **09/11/2026** sur la VM. **Rien n'est déplacé.** Les cibles marquées *à valider* attendent une décision de Monsieur. |
-| **Ne fait pas** | Ne remplace pas le catalogue des modules : pour les 17 modules et leurs 78 composants, la source est `core/modules/catalog.json` (`vision_target`) et les contrats (`components[].vision_target`), visibles par `walter layout` et `docs/contracts.generated.md`. Ce document couvre ce que le registre ne décrit pas (hôte, services, instance, dossiers annexes) et explique les déplacements. |
+| **État** | Inventaire relevé le **09/11/2026** sur la VM, mis à jour le même jour après les arbitrages complémentaires de Monsieur (`/services`, PostgreSQL, Miroshark, ombre de Computer Use). **Aucun module n'est déplacé.** Faits : retrait de Miroshark et de `computer-use-v2-shadow`, création de `/services` (définition PostgreSQL préparée, pas en service ; cache du noyau). Les cibles marquées *à valider* attendent une décision de Monsieur. |
+| **Ne fait pas** | Ne remplace pas le catalogue des modules : pour les 17 modules et leurs 83 composants, la source est `core/modules/catalog.json` (`vision_target`) et les contrats (`components[].vision_target`), visibles par `walter layout` et `docs/contracts.generated.md`. Ce document couvre ce que le registre ne décrit pas (hôte, services, instance, dossiers annexes) et explique les déplacements. |
 | **Contrats** | Règles de déplacement : `03-MIGRATION.md` § E9 ; résolution des chemins : `walter path`, `walter instance` (jamais de chemin en dur). |
 
 ## 1. Règles de la cartographie
@@ -38,7 +38,7 @@
 | colab | `/walter/colab` | `/walter/capabilities/colab` | `/opt/walter-colab` | Pas de README de module (contrôle documentaire) |
 | soul | `/walter/soul` | `/walter/core/identity` | `/opt/walter-soul` | La vision : « identity : gestion de Soul » |
 | secrets | `/walter/secrets` | `/walter/core/security/secrets` | `/opt/walter-secrets` | La vision : « security : permissions, accès aux secrets » |
-| runtime (Python partagé) | `/walter/runtime` | `/walter/ops/runtime` *à valider* | — | Absent de la vision ; c'est de l'installation, donc Ops |
+| runtime (Python partagé) | `/walter/runtime` (code, verrous **et** environnement installé `venv/`) | code et verrous : `/walter/ops/runtime` *à valider* ; environnement installé : `/services/python/<environnement>` (arbitrage du 09/11) | — | Absent de la vision. Les venv propres de core, router, llm et raw-vault suivent la même règle |
 | ops | `/walter/ops` | `/walter/ops` | `/walter/backup`, `/opt/walter-backup`, `/opt/walter-ops` | — |
 | lab | `/walter/lab` | `/walter/lab` | `/opt/walter-lab` | — |
 | docs (global) | `/walter/docs` | `/walter/docs` (niveau 1 seulement, § 6) | `~/.hermes/docs/walter-memory` | — |
@@ -111,7 +111,7 @@ Ils sont déclarés dans le registre avec leur `vision_target` ; ils se déplace
 | `CLAUDE.md`, `.claude/`, `.codex/` | inchangés | Outils externes de développement (arbitrage du 09/11) |
 | `archive/` (6,1 Go) | *à valider* : quarantaine logicielle → `ops` ; fichiers personnels → `@instance/backups` | Mélange d'archives de logiciel et de travail |
 | `reports/`, `scratch/`, `sessions/`, `work/` | `@instance/workspace` | Règle existante : pas de fichier en vrac dans `/root` |
-| `computer-use-v2-lot21/` | `capabilities/computer` ou Lab | **Un service d'ombre tourne depuis ce dossier** (`computer-use-v2-shadow`) |
+| ~~`computer-use-v2-lot21/`~~ | — | **Retiré le 09/11** : aucune fonction de production n'en dépendait ; étude et banc conservés dans `lab/computer-use-v2` (à l'arrêt), unités archivées dans `/root/archive/2026/retired-computer-use-v2-shadow-20261109/` |
 | `walter-computer-use/` (39 Mo) | à comparer avec `/walter/computer`, puis archive | Doublon probable |
 | `webtop/` (1,7 Go de configuration) | `/services/webtop` | § 7 |
 | `.camoufox-max-data`, `.cloakbrowser-max-data` | `@instance/state/browse` | Profils de navigation = état de l'instance |
@@ -134,23 +134,30 @@ Ils sont déclarés dans le registre avec leur `vision_target` ; ils se déplace
 | `HARNESS-CONTRACT.md`, `MODULARITY-2026-10-18.md` | modèle « compositions » remplacé par la vision | historique (`docs/history/`), avec renvoi |
 | `SECRETS-HISTORY.md` | historique des expositions | `core/security/secrets/docs` |
 
-## 7. Services externes (`/services`, à créer)
+## 7. Services externes (`/services`, créé le 09/11)
 
-`/services/<service>/` = définition de déploiement (compose, unité), configuration, et données persistantes **quand
-c'est pertinent**. Les données ne sont jamais déplacées sans sauvegarde vérifiée et essai de restauration.
+Arbitrage de Monsieur du 09/11 : `/services/` est le dossier des **dépendances opérationnelles** (bases de données,
+bureaux distants, environnements Python partagés, passerelles). Leurs installations, définitions de déploiement et
+données techniques y vivent ; le code, les contrats et les verrous de dépendances restent versionnés dans `/walter/`.
+Un dossier par service, sans niveau intermédiaire : `/services/<service>/{compose.yaml|unité, config/, data/,
+README.md}`. Aucune donnée n'est déplacée sans sauvegarde vérifiée, restauration essayée et place disque mesurée.
+Composants déclarés dans le contrat d'Ops (`services`, `postgres`, `kernel-npm-cache`).
 
-| Service | Aujourd'hui | Cible | Données |
+| Service | Aujourd'hui | Cible | État |
 |---|---|---|---|
-| PostgreSQL (`hindsight-pg`, :5433) | conteneur lancé à la main, volume Docker `hindsight-pg` | `/services/postgres` (compose + config) ; nom du conteneur et port **conservés** (interface publique) | Volume Docker conservé ; déplacement des données seulement si mesuré utile, avec essai de restauration complet |
-| Base d'essai (`walter-memory-testpg`, :5440) | conteneur d'essai | `/services/postgres-test` ou outillage de tests de Memory *à valider* | jetable |
-| Webtop | conteneur ; config dans `/root/webtop` | `/services/webtop` | `config/` déplacée avec le service |
-| Bureau de navigation (`walter-browse-display`) | conteneur + unité | `/services/browse-display` (Browse consommateur) | volume Docker |
-| Sortie WireGuard Freebox (`walter-wg-freebox-fr`) | conteneur | `/services/wg-exit` (Browse consommateur) | — |
-| Proxy NordVPN, FlareSolverr | conteneurs | `/services/nordvpn-proxy`, `/services/flaresolverr` | — |
-| Raw Vault S3 (`rclone serve s3`, :8899) | unité système | `/services/raw-vault-s3` (Memory consommateur) | cache `/var/cache/raw-vault` |
-| Tunnel Cloudflare | unité + `~/.cloudflared` | `/services/cloudflared` | — |
+| PostgreSQL (`hindsight-pg`, :5433) | conteneur lancé à la main, volume Docker historique `hindsight-pg` (7,4 Go) | `/services/postgres/{compose.yaml,config/,data/,README.md}` ; nom du conteneur et port **conservés** (interface publique) ; **données sous `data/`**, le volume historique n'est pas gardé | **Définition préparée et essayée** sur une restauration complète du dump de la nuit (09/11) ; **données pas encore déplacées** : migration sur accord (procédure dans son README) |
+| Cache hors ligne du noyau du moteur | — | `/services/dsh/npm-cache` | **Fait** (lot E1) |
+| Environnements Python partagés | `/walter/runtime/venv`, venv de core, router, llm, raw-vault | `/services/python/<environnement>` | prévu (avec le déplacement de runtime) |
+| Base d'essai (`walter-memory-testpg`, :5440) | conteneur d'essai (tmpfs 2 Go) | outillage de tests de Memory *à valider* | jetable |
+| Webtop | conteneur ; config dans `/root/webtop` | `/services/webtop` | prévu |
+| Bureau de navigation (`walter-browse-display`) | conteneur + unité | `/services/browse-display` (Browse consommateur) | prévu |
+| Sortie WireGuard Freebox (`walter-wg-freebox-fr`) | conteneur | `/services/wg-exit` (Browse consommateur) | prévu |
+| Proxy NordVPN, FlareSolverr | conteneurs | `/services/nordvpn-proxy`, `/services/flaresolverr` | prévu |
+| Raw Vault S3 (`rclone serve s3`, :8899) | unité système | `/services/raw-vault-s3` (Memory consommateur) ; cache `/var/cache/raw-vault` | prévu |
+| Tunnel Cloudflare | unité + `~/.cloudflared` | `/services/cloudflared` | prévu |
 | Ollama | unité inactive | à retirer après preuve (décision « pas de modèle local » du 03/11) | — |
-| Applications (`aiostreams*`, excalidash, comfyui, miroshark) | déjà sous `/apps` | inchangé | l'étiquette compose d'excalidash désigne encore `/root/ExcaliDash`, dossier disparu |
+| Applications (`aiostreams*`, excalidash, comfyui) | sous `/apps` | inchangé | l'étiquette compose d'excalidash désigne encore `/root/ExcaliDash`, dossier disparu |
+| ~~Miroshark~~ et Neo4j | — | **retirés le 09/11** (arbitrage de Monsieur) : unités, application, Neo4j, tunnel Cloudflare et son DNS supprimés ; traces d'audit dans `@instance/backups/changes/2026-11-09-miroshark-retrait/` et `/root/archive/2026/retired-miroshark-20261109/` | — |
 
 ## 8. Instance (`/user/Lucas`)
 
@@ -168,11 +175,11 @@ c'est pertinent**. Les données ne sont jamais déplacées sans sauvegarde véri
 - **106 fichiers d'unités** (système et utilisateur). Les unités Walter sont copiées dans `/etc/systemd/system`. Cible :
   chaque module livre ses unités dans son dossier (`systemd/` ou `ops/`), installées par `walter-ops` ; la commande
   lancée passe par le nom public, jamais par `/opt/walter-*`.
-- **Unités historiques à classer** : `computer-use-v2-shadow` (dossier en vrac), `user-profile-compiler` et
+- **Unités historiques à classer** : `user-profile-compiler` (écrit `user_model` toutes les 5 min, voir le plan de
+  nettoyage de Memory) et
   `walter-health-watchdog` (scripts Hermes), `hermes-desktop-*`, `gateway-watchdog`.
-- **Secret dans un fichier d'unité** : `miroshark-tunnel.service` (désactivée) contient le jeton du tunnel en clair,
-  lisible par tous les comptes de la machine. Correction proposée : jeton dans un fichier 0600 ou dans Bitwarden,
-  jeton à faire tourner. **Hors du mandat du 09/11 : en attente de l'accord de Monsieur.**
+- **Secret dans un fichier d'unité** (relevé à E0) : `miroshark-tunnel.service` contenait le jeton du tunnel en
+  clair. **Réglé le 09/11** : Miroshark retiré, tunnel Cloudflare supprimé (le jeton ne vaut plus rien).
 - **Sauvegardes** : les chemins sauvegardés viennent des contrats (`backup_paths`), donc ils suivent les
   déplacements. restic, `walter-git-publish` et les essais de restauration doivent être relancés après chaque
   déplacement. `walter-git-publish` ne publie que ce qui est committé (voir le risque sur `secrets`).
@@ -192,8 +199,9 @@ c'est pertinent**. Les données ne sont jamais déplacées sans sauvegarde véri
 ## 11. Points à faire trancher par Monsieur
 
 1. Emplacement du journal d'exécution : `core/observability` (proposé) ou un autre nom.
-2. Runtime Python partagé : `ops/runtime` (proposé).
+2. Runtime Python partagé : environnements installés → `/services/python/` (**tranché le 09/11**) ; emplacement du
+   code et des verrous : `ops/runtime` (proposé).
 3. `/root/archive` : séparer quarantaine logicielle (`ops`) et archives personnelles (`@instance/backups`) ?
-4. PostgreSQL : définition sous `/services/postgres` avec données dans le volume Docker actuel (proposé), ou
-   déplacement des données.
-5. Jeton en clair de `miroshark-tunnel` : le corriger et le faire tourner.
+4. PostgreSQL : **tranché le 09/11** — données sous `/services/postgres/data/`, volume historique non gardé ;
+   reste l'accord pour la fenêtre de migration, et la suppression de la base vide `stremio_app`.
+5. Jeton en clair de `miroshark-tunnel` : **sans objet depuis le 09/11** (Miroshark retiré, tunnel supprimé).

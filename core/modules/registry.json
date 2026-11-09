@@ -1130,6 +1130,20 @@
           "vision_target": "core/engine/contracts"
         },
         {
+          "id": "engine-kernel",
+          "path": "/walter/core/engine/kernel",
+          "role": "Gel du noyau DSH/Cordis (lot E1) : version exacte, verrou, empreintes de l'installation, installation hors ligne reproductible, vérification ; l'installation en service reste /opt/dsh",
+          "status": "implemented",
+          "readme": "/walter/core/engine/kernel/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter engine kernel"
+            }
+          ],
+          "vision_target": "core/engine/kernel"
+        },
+        {
           "id": "mcp-server",
           "path": "/walter/core/server.py",
           "role": "Serveur MCP walter : expose les capacités aux agents (Claude Code, Codex, DSH, Hermes)",
@@ -1489,6 +1503,15 @@
           "status": "active",
           "readme": "/walter/lab/README.md",
           "vision_target": "lab/experiments"
+        },
+        {
+          "id": "computer-use-v2",
+          "path": "/walter/lab/computer-use-v2",
+          "role": "Étude Computer Use V2 (Adaptive Universal Operator) : architecture, prototype en observation, banc ; à l'arrêt",
+          "owner": "lab",
+          "status": "experimental",
+          "readme": "/walter/lab/computer-use-v2/README.md",
+          "vision_target": "lab/computer-use-v2"
         }
       ]
     },
@@ -2380,6 +2403,27 @@
             }
           ],
           "vision_target": "ops"
+        },
+        {
+          "id": "services",
+          "path": "/services",
+          "role": "Dépendances opérationnelles de Walter (bases, bureaux distants, environnements Python partagés, passerelles) : installations, définitions de déploiement et données techniques ; jamais de code de Walter",
+          "status": "active",
+          "readme": "/services/README.md"
+        },
+        {
+          "id": "postgres",
+          "path": "/services/postgres",
+          "role": "Définition de déploiement de PostgreSQL (compose verrouillé par empreinte, configuration complète) préparée et essayée sur une copie restaurée ; pas en service : la production tourne encore dans le conteneur hindsight-pg sur le volume Docker historique",
+          "status": "implemented",
+          "readme": "/services/postgres/README.md"
+        },
+        {
+          "id": "kernel-npm-cache",
+          "path": "/services/dsh",
+          "role": "Cache npm hors ligne du noyau figé du moteur (lot E1), utilisé par core/engine/kernel/install.sh",
+          "status": "active",
+          "readme": "/services/dsh/README.md"
         }
       ]
     },

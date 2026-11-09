@@ -16,6 +16,7 @@ def main(argv=None):
     q=sub.add_parser('instance');q.add_argument('instance_action',nargs='?',choices=('show','check','path','render','config','harness'),default='show');q.add_argument('parts',nargs='*')
     q=sub.add_parser('present');q.add_argument('level',choices=('notes','note','catalog','summary','manifest','guide','index'));q.add_argument('module',nargs='?');q.add_argument('--form',choices=('full','m0'),default='full');q.add_argument('--m1',action='append',default=[]);q.add_argument('--level',choices=('M0','M1'),default='M1');q.add_argument('--section',default='');q.add_argument('--offset',type=int,default=0);q.add_argument('--limit',type=int,default=20)
     sub.add_parser('matrix')
+    q=sub.add_parser('engine');q.add_argument('engine_action',choices=('kernel',));q.add_argument('--install');q.add_argument('--home')
     sub.add_parser('doctor')
     q=sub.add_parser('export');q.add_argument('destination');q.add_argument('--apply',action='store_true');q.add_argument('--wheelhouse')
     q=sub.add_parser('install');q.add_argument('bundle');q.add_argument('--root',required=True);q.add_argument('--apply',action='store_true');q.add_argument('--backup-root')
@@ -75,6 +76,9 @@ def main(argv=None):
             out=(presentation.notes(a.form,m1) if a.level=='notes' else presentation.catalog() if a.level=='catalog' else
                  presentation.note(a.module,a.level) if a.level=='note' else
                  presentation.index(a.module,a.section,a.offset,a.limit))
+        elif a.command=='engine':
+            from . import engine
+            out=engine.kernel(a.install,a.home)
         elif a.command=='matrix':
             from . import composition
             out=composition.matrix()
