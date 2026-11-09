@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-11-09T04:17:31+00:00",
+ "archived_reason": "not read for 30 days",
+ "domain": "research",
  "hermes": {
   "path": "/root/.hermes/skills/research/x-research-pipeline",
   "sha": "9fe08b5db572b333db572f15394141bfd5ab453d1030fe8e3dddaf8312c53880",
@@ -7,5 +10,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
+ "reserve": true,
  "store_sha": "9fe08b5db572b333db572f15394141bfd5ab453d1030fe8e3dddaf8312c53880"
 }
