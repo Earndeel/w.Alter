@@ -45,10 +45,22 @@ def test_check_turns_status_into_incident_v1(monkeypatch):
         "restorability": {"offsite_restore_test": {"ok": True}, "disk": {"drill_possible_now": False, "free_gib": 10,
                                                                          "needed_for_drill_gib": 16}}})
     monkeypatch.setattr(core, "git_inventory", lambda: [])
+    monkeypatch.setattr(core, "engine_kernel", lambda: None)
     inc = {i["key"]: i for i in core.check()}
     assert set(inc) == {"conformity", "backup:offsite", "restore:disk"}
     assert inc["backup:offsite"]["severity"] == "critical" and inc["backup:offsite"]["version"] == 1
     assert all({"module", "kind", "summary", "evidence", "suggested_level"} <= set(i) for i in inc.values())
+
+
+def test_engine_kernel_drift_is_an_owner_incident(monkeypatch):
+    monkeypatch.setattr(core, "status", lambda: {"conformity": {"ok": True}, "backup_health": {},
+                                                 "restorability": {"disk": {"drill_possible_now": True}}})
+    monkeypatch.setattr(core, "git_inventory", lambda: [])
+    monkeypatch.setattr(core, "engine_kernel", lambda: {"ok": True})
+    assert core.check() == []
+    monkeypatch.setattr(core, "engine_kernel", lambda: {"ok": False, "changed": ["@deepseek-ai/dsh"]})
+    inc = {i["key"]: i for i in core.check()}
+    assert inc["engine:kernel"]["kind"] == "engine_kernel_drift" and inc["engine:kernel"]["suggested_level"] == "G3"
 
 
 def test_offsite_reads_the_remote_and_flags_a_missing_off_vm_key(monkeypatch):

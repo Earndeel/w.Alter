@@ -520,6 +520,21 @@ def incident(key: str, kind: str, severity: str, summary: str, evidence: dict, l
             "summary": summary, "evidence": evidence, "suggested_level": level}
 
 
+def engine_kernel() -> dict | None:
+    """Fingerprints of the frozen engine kernel (lot E1), through core's public command `walter engine kernel`.
+    None when the command is absent (installation without the engine); a failed run is reported as a drift."""
+    exe = shutil.which("walter")
+    if not exe:
+        return None
+    try:
+        run = subprocess.run([exe, "engine", "kernel"], capture_output=True, text=True, timeout=180)
+        data = json.loads(run.stdout or "{}")
+    except (subprocess.TimeoutExpired, ValueError, OSError) as exc:
+        return {"ok": False, "error": type(exc).__name__}
+    keys = ("ok", "version", "integrity", "missing", "extra", "changed", "compositions_changed", "composed_changed")
+    return {k: data[k] for k in keys if k in data} or {"ok": False, "error": (run.stderr or "")[-300:]}
+
+
 def check() -> list[dict]:
     st, cfg = status(), config()
     out = []
@@ -562,6 +577,12 @@ def check() -> list[dict]:
         out.append(incident("restore:disk", "restore_blocked", "warning",
                             f"Pas assez de disque pour l'exercice de restauration ({r['disk']['free_gib']} Gio libres, "
                             f"{r['disk']['needed_for_drill_gib']} nécessaires).", r["disk"], "G3"))
+    kernel = engine_kernel()
+    if kernel is not None and not kernel.get("ok"):
+        out.append(incident("engine:kernel", "engine_kernel_drift", "high",
+                            "Le noyau du moteur installé n'est plus celui qui a été figé (paquets, compositions ou "
+                            "configuration composée différents) : une mise à jour du noyau passe seulement par Lab.",
+                            kernel, "G3"))
     warn = float((cfg.get("git") or {}).get("dirty_warn_hours", 48))
     untracked_warn = float((cfg.get("git") or {}).get("untracked_warn_hours", warn))
     for repo in git_inventory():

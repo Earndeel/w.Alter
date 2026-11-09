@@ -198,6 +198,27 @@
         }
       ],
       "vision_target": "ops"
+    },
+    {
+      "id": "services",
+      "path": "/services",
+      "role": "Dépendances opérationnelles de Walter (bases, bureaux distants, environnements Python partagés, passerelles) : installations, définitions de déploiement et données techniques ; jamais de code de Walter",
+      "status": "active",
+      "readme": "/services/README.md"
+    },
+    {
+      "id": "postgres",
+      "path": "/services/postgres",
+      "role": "Définition de déploiement de PostgreSQL (compose verrouillé par empreinte, configuration complète) préparée et essayée sur une copie restaurée ; pas en service : la production tourne encore dans le conteneur hindsight-pg sur le volume Docker historique",
+      "status": "implemented",
+      "readme": "/services/postgres/README.md"
+    },
+    {
+      "id": "kernel-npm-cache",
+      "path": "/services/dsh",
+      "role": "Cache npm hors ligne du noyau figé du moteur (lot E1), utilisé par core/engine/kernel/install.sh",
+      "status": "active",
+      "readme": "/services/dsh/README.md"
     }
   ]
 }
