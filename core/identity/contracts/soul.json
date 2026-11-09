@@ -132,5 +132,29 @@
     "tools": [
       "walter_profile"
     ]
-  }
+  },
+  "components": [
+    {
+      "id": "renderer",
+      "path": "bin/walter-soul",
+      "role": "Rendu de l'identité vers chaque runtime (SOUL.md, profils)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-soul"
+        }
+      ],
+      "vision_target": "core/identity"
+    },
+    {
+      "id": "runtimes",
+      "path": "runtimes",
+      "role": "Adaptateurs neutres par runtime",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/identity/runtimes"
+    }
+  ]
 }
