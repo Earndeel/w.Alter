@@ -193,5 +193,101 @@
       ],
       "sections": "tâches (clé, libellé, interface)"
     }
-  }
+  },
+  "components": [
+    {
+      "id": "research",
+      "path": "research",
+      "role": "Collecte des classements et prix (AA, Arena, OpenRouter…)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/router/research"
+    },
+    {
+      "id": "analysis",
+      "path": "analysis",
+      "role": "Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/router/analysis"
+    },
+    {
+      "id": "plan",
+      "path": "plan",
+      "role": "Forfaits du propriétaire et quotas",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/router/plan"
+    },
+    {
+      "id": "serve",
+      "path": "serve",
+      "role": "Choix du modèle par tâche, exécution texte et médias",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-router route|pick|run"
+        }
+      ],
+      "vision_target": "cognition/router/serve"
+    },
+    {
+      "id": "walter-run-loop",
+      "path": "serve/text_agent.py",
+      "role": "Boucle de sous-agent de walter_run — seconde boucle agentique, absorbée par le moteur au lot E5 ; terminal retiré le 09/11",
+      "status": "active",
+      "readme": "README.md"
+    },
+    {
+      "id": "oneshot",
+      "path": "serve/oneshot.py",
+      "role": "Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6)",
+      "status": "obsolete",
+      "readme": "README.md"
+    },
+    {
+      "id": "interface",
+      "path": "interface",
+      "role": "Page publique de la bibliothèque des modèles",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/router/interface"
+    },
+    {
+      "id": "store",
+      "path": "store",
+      "role": "Schéma Postgres models (lecture/écriture)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:models"
+      ],
+      "vision_target": "cognition/router/store"
+    },
+    {
+      "id": "hermes-plugin",
+      "path": "hermes-plugins",
+      "role": "Greffon Hermes walter-router — à retirer avec Hermes (E7)",
+      "status": "active",
+      "readme": "README.md"
+    },
+    {
+      "id": "guardian",
+      "path": "guardian",
+      "role": "Gardien du Router",
+      "status": "active",
+      "readme": "guardian/README.md",
+      "vision_target": "cognition/router/guardian"
+    },
+    {
+      "id": "documentation",
+      "path": "documentation.py",
+      "role": "Référence générée (CODE, CONFIGURATION, DATABASE…) contrôlée par les tests",
+      "status": "active",
+      "readme": "docs/README.md",
+      "vision_target": "cognition/router/docs"
+    }
+  ]
 }

@@ -135,5 +135,33 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
-  }
+  },
+  "components": [
+    {
+      "id": "gateway",
+      "path": "gateway.py",
+      "role": "Passerelle de modèles OpenAI-compatible (:8894), clés depuis Bitwarden, model=auto suit le plan du run",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:8894/v1"
+        },
+        {
+          "transport": "cli",
+          "interface": "walter-llm call"
+        }
+      ],
+      "vision_target": "cognition/router/llm"
+    },
+    {
+      "id": "subscriptions",
+      "path": "claude_subscription.py",
+      "role": "Transports par abonnement (Claude, Antigravity, ChatGPT)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/router/llm"
+    }
+  ]
 }
