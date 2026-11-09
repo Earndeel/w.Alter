@@ -191,5 +191,53 @@
       "paged": true,
       "sections": "domaines (sans section : la liste des domaines)"
     }
-  }
+  },
+  "components": [
+    {
+      "id": "core",
+      "path": "walter_skills",
+      "role": "Noyau des skills (store git, cartes Postgres, politique d'exposition, apprentissage)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "capabilities/skills"
+    },
+    {
+      "id": "service",
+      "path": "walter_skills/api.py",
+      "role": "Service :8891",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:8891"
+        }
+      ],
+      "vision_target": "capabilities/skills"
+    },
+    {
+      "id": "consumer",
+      "path": "walter_skills/consumer.py",
+      "role": "Consommateur du bus walter-skills-bus",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "capabilities/skills"
+    },
+    {
+      "id": "library",
+      "path": "skills",
+      "role": "Bibliothèque de procédures (SKILL.md)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "capabilities/skills/library"
+    },
+    {
+      "id": "archive",
+      "path": "archive",
+      "role": "Skills retirés (réserve)",
+      "status": "obsolete",
+      "readme": "README.md",
+      "vision_target": "capabilities/skills/archive"
+    }
+  ]
 }
