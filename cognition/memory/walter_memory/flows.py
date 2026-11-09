@@ -310,7 +310,7 @@ def conversations(since: datetime | None = None, until: datetime | None = None, 
                        coalesce(e.payload->'chat'->>'network', e.source) network, e.payload->'chat'->>'type' chat_type,
                        l.entity_id::text entity, coalesce(en.canonical_name, i.display_name) who
                 from core.events e
-                left join core.identity_links l on l.identity_id = e.actor_identity_id
+                left join core.identity_links l on l.identity_id = e.actor_identity_id and l.status = 'confirmed'
                 left join core.entities en on en.entity_id = l.entity_id
                 left join core.source_identities i on i.identity_id = e.actor_identity_id
                 where e.source = %s and e.thread_id = %s and e.event_type = any(%s)

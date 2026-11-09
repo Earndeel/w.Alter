@@ -65,11 +65,12 @@ def messages_with(conn, entity_id: str, days: int, limit: int) -> list[dict]:
     return conn.execute("""
         with threads as (
             select distinct e.thread_id from core.events e join core.identity_links l on l.identity_id = e.actor_identity_id
+                                                                                and l.status = 'confirmed'
             where l.entity_id = %s and e.source in ('beeper', 'gmail') and e.occurred_at > now() - make_interval(days => %s)
               and coalesce(e.payload->'chat'->>'type', 'single') <> 'group')
         select e.event_id::text, e.event_type, e.occurred_at, e.content, e.privacy_class,
                (l.entity_id = %s) as from_contact
-        from core.events e left join core.identity_links l on l.identity_id = e.actor_identity_id
+        from core.events e left join core.identity_links l on l.identity_id = e.actor_identity_id and l.status = 'confirmed'
         where e.thread_id in (select thread_id from threads) and e.occurred_at > now() - make_interval(days => %s)
           and e.event_type in ('message.sent', 'message.received', 'email.sent', 'email.received')
           and e.privacy_class = any(%s) and coalesce(e.content, '') <> ''

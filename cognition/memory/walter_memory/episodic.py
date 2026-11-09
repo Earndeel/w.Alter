@@ -81,6 +81,7 @@ def _burst_messages(b: dict) -> list[dict]:
                                       coalesce(en.canonical_name, i.display_name) who
                                from core.events e left join core.source_identities i on i.identity_id = e.actor_identity_id
                                left join core.identity_links l on l.identity_id = e.actor_identity_id
+                                                                and l.status = 'confirmed'
                                left join core.entities en on en.entity_id = l.entity_id
                                where e.event_id = any(%s::uuid[]) order by e.occurred_at, e.event_id""",
                             (b["source_event_ids"],)).fetchall()

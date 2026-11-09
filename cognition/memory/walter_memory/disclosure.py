@@ -50,7 +50,8 @@ def recipient(conn, to: str | None) -> dict:
                              or %s in (select lower(x) from unnest(s.emails) x)
                              or %s in (select regexp_replace(x, '[^0-9+]', '', 'g') from unnest(s.phones) x)
                              or lower(e.canonical_name) = %s
-                          order by s.is_self desc limit 1""", (t, t, t, re.sub(r"[^0-9+]", "", t), t)).fetchone()
+                          order by s.is_self desc, l.status = 'confirmed' desc, l.confidence desc nulls last
+                          limit 1""", (t, t, t, re.sub(r"[^0-9+]", "", t), t)).fetchone()
     if not row:
         return {"kind": "unknown", "to": to}
     return {"kind": "owner" if row["is_self"] else "person", "entity_id": row["entity_id"], "name": row["canonical_name"]}

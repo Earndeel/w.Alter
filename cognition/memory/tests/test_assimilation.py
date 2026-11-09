@@ -336,3 +336,27 @@ def test_a_long_stay_cut_by_the_window_edge_is_one_visit_from_its_true_start():
         rows = conn.execute("""select valid_from from core.derived_items where derived_by = 'flows.visits'
                                and status = 'derived' and (attributes->>'lat')::float = %s""", (round(lat, 6),)).fetchall()
     assert [r["valid_from"] for r in rows] == [t0]
+
+
+def test_a_proposed_name_match_is_neither_a_participant_nor_a_second_copy_of_the_message():
+    """2026-11-09 (g1 audit): a sender with a confirmed entity AND a proposed name match (a namesake) was joined to both:
+    each of its messages counted twice and the namesake listed as a participant (536 / 1 744 bursts in production)."""
+    th = "fanout-" + uuid.uuid4().hex[:8]
+    with connection() as conn:
+        ident = events.upsert_identity(conn, "beeper", {"external_id": th + "-paul", "display_name": "Paul"})
+        real, namesake = [conn.execute("""insert into core.entities (entity_type, canonical_name) values ('person', %s)
+                                          returning entity_id::text""", (n,)).fetchone()["entity_id"]
+                          for n in (f"Paul Vrai {th}", f"Paul Homonyme {th}")]
+        conn.execute("""insert into core.identity_links (identity_id, entity_id, status, confidence, method)
+                        values (%s, %s, 'confirmed', 1.0, 'test'), (%s, %s, 'proposed', 0.6, 'test')""",
+                     (ident, real, ident, namesake))
+    msg(th, at(10), "Salut, on se voit demain ?")
+    ev(event_type="message.received", source="beeper", thread_id=th, occurred_at=at(10, 5), content="Oui !",
+       actor_identity_id=ident, payload={"chat": {"title": f"Chat {th[:6]}", "network": "whatsapp"}})
+    flows.conversations(at(0), at(23, 59))
+    (b,) = [x for x in bursts(th) if x["status"] == "derived"]
+    assert b["attributes"]["messages"] == 2 and b["attributes"]["participants"] == [real]
+    with connection() as conn:
+        assert [r["who"] for r in episodic._burst_messages(conn.execute(
+            "select source_event_ids from core.derived_items where item_id = %s", (b["item_id"],)).fetchone())] \
+            == [None, f"Paul Vrai {th}"]
