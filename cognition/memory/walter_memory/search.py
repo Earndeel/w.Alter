@@ -222,6 +222,53 @@ def index_pending(limit: int = 20000) -> dict:
     return out
 
 
+READABLE_INDEXED = ("legacy_derived", "derived", "verified")
+OWN_CHUNKS = ("document", "signal_candidate")      # never indexed as derived (index_pending skips them too)
+
+
+def reindex_derived(item_ids: list[str]) -> dict:
+    """The index follows a knowledge item that changed (2026-11-09, g1 audit): index_pending only indexes items without
+    chunks, so an updated item kept its first text (unfindable as it now reads: the read check drops a stale fragment)
+    and a superseded / retracted one kept its chunks. Per item: chunks identical to its current text → nothing; else
+    its chunks are replaced, or removed when the item is no longer readable. The index is derived: rebuildable."""
+    out = {"unchanged": 0, "reindexed": 0, "removed": 0, "skipped": 0}
+    with connection() as conn:
+        rows = conn.execute("""select d.item_id as ref_id, coalesce(d.valid_from, d.created_at) as occurred_at,
+                                      d.derived_by as source, d.kind as label, d.content as text, d.privacy_class,
+                                      d.generation, d.status, d.kind,
+                                      coalesce((d.attributes->>'quarantined')::boolean, false) as hidden
+                               from core.derived_items d where d.item_id = any(%s::uuid[])""",
+                            ([str(i) for i in item_ids],)).fetchall()
+        for r in rows:
+            if r["kind"] in OWN_CHUNKS:
+                out["skipped"] += 1
+                continue
+            have = [c["text"] for c in conn.execute("""select text from search.chunks where kind = 'derived' and ref_id = %s
+                                                       order by chunk_no""", (r["ref_id"],))]
+            readable = r["status"] in READABLE_INDEXED
+            want = [p for p in chunks_of(r["text"] or "") if len(p) >= 2] if readable else []
+            if have == want:
+                out["unchanged"] += 1
+                continue
+            conn.execute("delete from search.chunks where kind = 'derived' and ref_id = %s", (r["ref_id"],))
+            if want:
+                _index_rows(conn, [r], "derived")
+                out["reindexed"] += 1
+            else:
+                out["removed"] += 1
+    return out
+
+
+def stale_derived(limit: int = 5000) -> list[str]:
+    """Derived items whose chunks no longer match them (reconciliation and the one-off catch-up of 2026-11-09)."""
+    with connection() as conn:
+        return [r["id"] for r in conn.execute("""
+            select distinct d.item_id::text id from search.chunks c join core.derived_items d on d.item_id = c.ref_id
+            where c.kind = 'derived' and d.kind <> all(%s)
+              and (d.status <> all(%s) or position(btrim(c.text) in btrim(d.content)) = 0)
+            limit %s""", (list(OWN_CHUNKS), list(READABLE_INDEXED), limit))]
+
+
 def hide_noise(batch: int = 5000) -> dict:
     """Recompute noise for every indexed event (after a NOISE rule change): hide new noise, un-hide what no longer
     matches. Reads the canonical content; never touches core.events, retractions or derived quarantine."""

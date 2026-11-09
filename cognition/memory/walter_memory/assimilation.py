@@ -51,7 +51,7 @@ SIGNALS = ("appointment", "plan", "visit")
 SETTLE = {"flows.visits": 300, "flows.conversations": 60, "flows.appointments": 30, "flows.work_sessions": 120,
           "episodic.episodes": 30}
 BURST_SETTLE = timedelta(minutes=15)      # plans are read once a burst has been calm this long (a deadline)
-ORDER = ["search.index", "triage", "flows.visits", "flows.conversations", "flows.appointments", "flows.work_sessions", "episodic.plans",
+ORDER = ["search.index", "search.reindex", "triage", "flows.visits", "flows.conversations", "flows.appointments", "flows.work_sessions", "episodic.plans",
          "episodic.episodes", "periods.day", "periods.week", "periods.month"]
 RECONCILE_S = 6 * 3600
 COMMITMENT_DAYS = 62
@@ -130,6 +130,8 @@ def _route_derived(conn, item_id: str, p: dict) -> int:
     kind, by, n = p.get("kind"), p.get("derived_by"), 0
     at, old_at = _ts(p.get("at")), _ts(p.get("old_at"))
     processing.mark(conn, "search.index", "pending", reason="knowledge", settle=10, max_wait=60)
+    if p.get("op") == "update":            # its chunks must follow its new text or status (index_pending adds only)
+        processing.mark(conn, "search.reindex", item_id, reason=p.get("status") or "update", settle=10, max_wait=120)
     if kind == "conversation" and by == "flows.conversations" and \
             (int(p.get("owner_messages") or 0) > 0 or p.get("status") != "derived"):
         if p.get("status") != "derived":     # the burst is gone: its plans go now
@@ -213,6 +215,10 @@ def _run_one(processor: str, row: dict) -> dict:
                             on conflict do nothing""")
         r = search.index_pending()
         return {"changed": sum(v for v in r.values() if isinstance(v, int))}
+    if processor == "search.reindex":
+        from . import search
+        r = search.reindex_derived([key])
+        return {"changed": r["reindexed"] + r["removed"]}
     if processor == "triage":
         from . import ingestion, triage
         r = triage.run()
@@ -291,13 +297,18 @@ def reconcile() -> dict:
     missed = sum(int(v.get("changed", 0)) + int(v.get("retracted", 0)) for v in r_f.values() if isinstance(v, dict))
     r_p = episodic.plans()
     r_e = episodic.build()
+    from . import search
+    stale = search.stale_derived()
     with connection() as conn:
         for k in periods.stale_keys(conn):
             periods.mark_key(conn, k, reason="reconcile")
+        for item_id in stale:                 # index chunks that no longer match their item
+            processing.mark(conn, "search.reindex", item_id, reason="reconcile", settle=0)
+    missed += len(stale)
     processing.count("assimilation.reconcile", keys=1, changed=missed)
     if missed:
         log.warning("reconciliation found %s changes the events had not produced", missed)
-    return {"flows": r_f, "missed": missed, "plans": r_p, "episodes": {k: v for k, v in r_e.items() if v}}
+    return {"flows": r_f, "missed": missed, "stale_index": len(stale), "plans": r_p, "episodes": {k: v for k, v in r_e.items() if v}}
 
 
 def run(stop: threading.Event | None = None) -> None:

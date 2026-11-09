@@ -360,3 +360,31 @@ def test_a_proposed_name_match_is_neither_a_participant_nor_a_second_copy_of_the
         assert [r["who"] for r in episodic._burst_messages(conn.execute(
             "select source_event_ids from core.derived_items where item_id = %s", (b["item_id"],)).fetchone())] \
             == [None, f"Paul Vrai {th}"]
+
+
+def test_the_index_follows_a_changed_burst_and_drops_a_retracted_one():
+    """2026-11-09 (g1 audit): index_pending only indexes items without chunks, so a burst that grew kept its first text
+    (unfindable as it now reads) and a retracted one stayed indexed. An update now re-indexes the item (event-driven);
+    the reconciliation finds whatever is still stale."""
+    from walter_memory import search
+    th = "reidx-" + uuid.uuid4().hex[:8]
+    msg(th, at(9), f"Premier message {th}")
+    step()
+    (b,) = [x for x in bursts(th) if x["status"] == "derived"]
+    def text():
+        with connection() as conn:
+            return [r["text"] for r in conn.execute(
+                "select text from search.chunks where kind = 'derived' and ref_id = %s", (b["item_id"],))]
+    assert text() and "1 messages" in text()[0]
+    msg(th, at(9, 10), f"Second message {th}")
+    step()
+    (b2,) = [x for x in bursts(th) if x["status"] == "derived"]
+    assert b2["item_id"] == b["item_id"] and b2["attributes"]["messages"] == 2
+    assert len(text()) == 1 and "2 messages" in text()[0]
+    assert b["item_id"] not in search.stale_derived()
+    with connection() as conn:          # retracted behind the bus's back: the reconciliation's sweep catches it
+        conn.execute("set local session_replication_role = replica")
+        conn.execute("update core.derived_items set status = 'retracted' where item_id = %s", (b["item_id"],))
+    assert b["item_id"] in search.stale_derived()
+    assert search.reindex_derived([b["item_id"]]) == {"unchanged": 0, "reindexed": 0, "removed": 1, "skipped": 0}
+    assert text() == [] and search.reindex_derived([b["item_id"]])["unchanged"] == 1
