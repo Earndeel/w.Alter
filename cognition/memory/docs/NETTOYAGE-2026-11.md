@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Audit de la volumétrie de la base `hindsight` et de ses dépendances, classement de son contenu, archive « avant nettoyage », et plan de nettoyage par phases avec risques et gains. Demande de Monsieur du 2026-11-09. |
 | **Propriétaire** | walter-memory. Exécution par des commandes de Memory, jamais par du SQL à la main. |
-| **État** | **Phase 0 faite et vérifiée le 2026-11-09** (§ 3). **Phase 1 faite et vérifiée le 2026-11-09** (§ 7) : objets de Hindsight, mécanique de l'ancien pipeline et schémas voix/audit supprimés, 1,76 Go rendus. **Phase 2 faite et vérifiée le 2026-11-09** (§ 8) : copies de l'exécution des agents retirées de `core.events` (255 565, 38 écarts réels gardés), connecteurs corrigés à la source, politique de purge, `walter_logs.duplicates` audité (nettoyage préparé, non appliqué). Aucune donnée personnelle, conversation ou connaissance utile touchée. Phases 3 à 5 : objectifs validés, **chaque exécution attend l'accord de Monsieur**. Phase 6 : décisions propres de Monsieur. |
+| **État** | **Phase 0 faite et vérifiée le 2026-11-09** (§ 3). **Phase 1 faite et vérifiée le 2026-11-09** (§ 7) : objets de Hindsight, mécanique de l'ancien pipeline et schémas voix/audit supprimés, 1,76 Go rendus. **Phase 2 faite et vérifiée le 2026-11-09** (§ 8) : copies de l'exécution des agents retirées de `core.events` (255 565, 38 écarts réels gardés), connecteurs corrigés à la source, politique de purge, `walter_logs.duplicates` supprimé après audit (aucun rôle). Aucune donnée personnelle, conversation ou connaissance utile touchée. Phases 3 à 5 : objectifs validés, **chaque exécution attend l'accord de Monsieur**. Phase 6 : décisions propres de Monsieur. |
 | **Ne fait pas** | Ne touche ni au Raw Vault (Drive), ni à `state.db` de Hermes. Ne change pas la règle de confidentialité. |
 | **Contrats** | `core.events` append-only (déclencheur `events_append_only`) ; suppression réelle seulement par une opération de Memory tracée dans `system.purges` ; RUNBOOK § Walter Memory. Outils : `ops/memory_archive.py` (archive, vérification, restauration isolée), `walter-memory observability proof|retire` (phase 2, `ops/obs_dedup_proof.py` = enveloppe), `walter-memory purge run|verify|reapply|exposure`. |
 
@@ -412,10 +412,12 @@ Quarantaine ponctuelle et réversible du 25/10 (choix de Monsieur, migration 016
 `connectors/walter_logs.py dedup`). 39 356 lignes (38 Mo), **toutes identiques** à l'original resté dans
 `walter_logs.events` (même `event_key`) ; **plus rien ne l'écrit** (l'écrivain du journal écarte une clé connue —
 c'est l'index unique de `walter_logs.events` qui porte l'idempotence) ; **personne ne la lit** (seule la purge y
-supprime). Aucun rôle de traçabilité, de détection ni d'idempotence. **Nettoyage préparé, non appliqué** : export
-chiffré vérifié et migration gardée (refuse si une copie a perdu son original) dans
-`@instance/backups/changes/2026-11-09-memory-phase2/duplicates/` ; à appliquer sur accord, avec le retrait de la
-commande `dedup`.
+supprime). Aucun rôle de traçabilité, de détection ni d'idempotence. **Supprimée le 09/11** (mandat de Monsieur du
+09/11 « finalise les nettoyages validés ») : migration gardée `035_drop_walter_logs_duplicates.sql` (refuse si une copie
+a perdu son original), commande `dedup` et `logs.quarantine_copies` retirées, branches de la purge retirées. Base
+5 689 → 5 653 Mo. Les lignes restent chiffrées dans `@instance/backups/changes/2026-11-09-memory-phase2/duplicates/`
+(copie restic `1c9900cb` relue à l'identique) ; retour arrière = migration 016 puis `copy … from stdin (format binary)`,
+répété sur la base de test (39 356 lignes rendues).
 
 ### 8.5 Sécurité
 
@@ -448,7 +450,7 @@ commande `dedup`.
 **Volumes** : 255 565 lignes (≈ 147 Mo de données brutes) et leurs clés (≈ 20 Mo) retirées. Place **réutilisable**
 dans les tables dès maintenant (le disque ne baisse pas sans compactage, comme demandé) ; rendue au disque par la
 phase 4 (`VACUUM FULL`) : estimée à ~0,25 à 0,3 Go. Dump quotidien 1 064 → 1 027 Mo. `walter_logs.duplicates` :
-38 Mo de plus si son nettoyage est accepté.
+38 Mo rendus le 09/11 (§ 8.4).
 
 ## 9. Qualité cognitive — analyse des cas non retrouvés (lecture seule, 09/11)
 

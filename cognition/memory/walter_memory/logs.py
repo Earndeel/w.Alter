@@ -268,33 +268,6 @@ def session_keys(conn, session_id: str) -> tuple[list[tuple[str, int]], list[tup
     return todo, dups
 
 
-_COLS = ("session_id, seq, type, occurred_at, turn, call_id, tool, model, status, text, data, chars, privacy_class, "
-         "source_ref, ingested_at")
-
-
-def quarantine_copies(conn, session_id: str, *, apply: bool = True) -> tuple[int, int]:
-    """Move the later copies of an event out of walter_logs.events into walter_logs.duplicates (migration 016,
-    Monsieur's choice 2026-10-25; reversible). A copy leaves only if it is the same event as the copy that stays.
-    Returns (copies found, copies moved)."""
-    todo, dups = session_keys(conn, session_id)
-    if todo:
-        raise RuntimeError(f"{session_id}: {len(todo)} rows without event_key (run `walter_logs.py keys` first)")
-    if not dups or not apply:
-        return len(dups), 0
-    moved = conn.execute(f"""
-        with d(seq, first) as (select * from unnest(%s::bigint[], %s::bigint[])),
-        gone as (
-          delete from walter_logs.events e using d, walter_logs.events f
-          where e.session_id = %s and e.seq = d.seq and e.event_key is null
-            and f.session_id = e.session_id and f.seq = d.first
-            and (f.type, f.occurred_at, f.text, f.data, f.call_id, f.tool)
-                is not distinct from (e.type, e.occurred_at, e.text, e.data, e.call_id, e.tool)
-          returning e.*, d.first, f.event_key as first_key)
-        insert into walter_logs.duplicates ({_COLS}, duplicate_of, event_key)
-        select {_COLS}, first, first_key from gone""",
-        ([s for s, _ in dups], [f for _, f in dups], session_id)).rowcount
-    return len(dups), moved
-
 
 # ───────────────────────── Hermes (state.db of every profile, read-only) ─────────────────────────
 def hermes_dbs() -> dict[str, Path]:

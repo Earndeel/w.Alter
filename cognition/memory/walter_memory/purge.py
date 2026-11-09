@@ -13,8 +13,7 @@ What one executed purge covers, in one transaction (policy of 2026-11-09, cleanu
     extraction.segments, triage.decisions, privacy.detections references;
   - Raw Vault objects: bytes deleted (Drive trash emptied), registry row marked purged;
   - walter_logs (pattern only): matching rows keep their event_key but text and data are replaced by a marker (the
-    journal's writer is idempotent on that key: re-reading a runtime's transcript cannot re-insert them); their
-    quarantined copies in walter_logs.duplicates are deleted.
+    journal's writer is idempotent on that key: re-reading a runtime's transcript cannot re-insert them).
 Ledger: what was removed, by identifier only (never content, never the pattern: only its sha256), in
   system.purge_ledger AND in the instance file @instance/state/memory/purge-ledger.jsonl (0600, backed up by restic),
   because a database restored from before the purge does not carry the table.
@@ -143,10 +142,7 @@ def present(conn, led: dict[str, set[str]]) -> dict:
         out["walter_logs"] = sorted({f"{r['session_id']}#{r['event_key']}" for r in conn.execute(
             """select e.session_id, e.event_key from walter_logs.events e
                join unnest(%s::text[], %s::text[]) k(s, key) on e.session_id = k.s and e.event_key = k.key
-               where e.text is distinct from %s
-               union select d.session_id, d.event_key from walter_logs.duplicates d
-               join unnest(%s::text[], %s::text[]) k(s, key) on d.session_id = k.s and d.event_key = k.key""",
-            (list(s), list(k), MARK, list(s), list(k)))})
+               where e.text is distinct from %s""", (list(s), list(k), MARK))})
     refs = [*ev, *dv, *ob]
     out["chunks"] = conn.execute("select count(*) n from search.chunks where ref_id = any(%s::uuid[])",
                                  (refs,)).fetchone()["n"] if refs else 0
@@ -214,9 +210,6 @@ def _remove(conn, t: dict) -> dict:
                from unnest(%s::text[], %s::text[]) x(s, key)
                where e.session_id = x.s and e.event_key = x.key and e.text is distinct from %s""",
             (MARK, MARK, s, k, MARK)).rowcount
-        n["walter_logs_duplicates"] = conn.execute(
-            """delete from walter_logs.duplicates d using unnest(%s::text[], %s::text[]) x(s, key)
-               where d.session_id = x.s and d.event_key = x.key""", (s, k)).rowcount
     t["derived"] = dv
     return dict(n)
 

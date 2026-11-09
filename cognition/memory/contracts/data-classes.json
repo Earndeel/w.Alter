@@ -274,10 +274,6 @@
     "views.view": {
       "class": "instance"
     },
-    "walter_logs.duplicates": {
-      "class": "instance",
-      "note": "frozen reversible quarantine of 2026-10-25 (39 356 identical copies); written by nothing since; drop prepared, pending Monsieur's go"
-    },
     "walter_logs.events": {
       "class": "instance",
       "note": "canonical journal of agent execution (tool calls with full arguments and results); not copied into core.events"
