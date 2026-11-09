@@ -38,7 +38,12 @@ Skills et la bibliothèque Memory sont importés à la demande ; cela ne les ren
 pour les opérations qui les consultent. Les modèles sont atteints par Memory/Router ; Context ne possède aucun
 modèle concret ni clé fournisseur.
 
-Le preflight propose des capacités et un niveau ; il ne retire pas les outils du modèle orchestrateur. Un message
+Le preflight propose des capacités et un niveau ; il ne retire pas les outils du modèle orchestrateur. Stabilité
+(09/11) : la décision est la moyenne de `DECISION_SAMPLES` = 3 appels parallèles au même modèle
+(`walter_memory.llm.decide(samples=…)`, `merge_answers` : moyenne des probabilités, confiance pondérée par l'accord),
+car l'API de décision échantillonne : sur les mêmes entrées, un appel unique faisait basculer la capacité mémoire
+(0,37–0,55 sur un message). Cohérence : capacité `memory` (modèle ≥ 0,5 ou nom connu de Memory) ⇒ niveau au moins
+L3. Mesures et coût dans `/walter/docs/CONTEXT-ENGINE.md` (étape B). Un message
 `local_only` n’est pas envoyé au modèle de décision et ne reçoit pas de pack cloud assemblé. Les lectures Memory
 appliquent leur politique propre ; la projection locale et le bridge n’effectuent pas implicitement de décision
 cloud. Une erreur d’une source ne constitue pas une preuve que les données correspondantes n’existent pas.

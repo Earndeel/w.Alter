@@ -28,6 +28,7 @@ from ..plan import (ACTS, CAPABILITIES, DOMAINS, HORIZONS, LEVELS, MODEL_LEVELS,
 
 REPLY_WINDOW_S = 2 * 3600       # past that, « ok, regarde X » opens a subject rather than answering one
 FLOOR_WINDOW_S = 30 * 60        # a message this close to the previous exchange needs at least that exchange
+DECISION_SAMPLES = 3            # parallel decisions averaged (2026-11-09): one call flipped memory on 2 messages in 7
 # The level is asked as the four plans measured in lot 1 (d1-ultra 61-67 % right on its own) plus a yes/no for the
 # extensive level: one five-way question left the decision model unsure on almost every message (25/10: 134
 # escalations out of 136, 4 s median).
@@ -248,7 +249,8 @@ def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPl
     try:
         from walter_memory import llm
         res = llm.decide(state, q, processor="walter-context-preflight", privacy_class=req.privacy_class,
-                         models=decision_chain(), purpose=purpose, budget="recurring", timeout=15)
+                         models=decision_chain(), purpose=purpose, budget="recurring", timeout=15,
+                         samples=DECISION_SAMPLES)
     except Exception as exc:  # noqa: BLE001 — fail-open
         return ContextPlan(turn_id=req.turn_id, thread=_default_thread(req), act="continue", level="L1",
                            decision={"error": f"{type(exc).__name__}: {str(exc)[:160]}",
@@ -275,6 +277,11 @@ def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPl
     named = _anchors(req.message)
     if named and "memory" not in caps:      # a project the owner's memory knows is named: memory, whatever the model said
         caps.insert(0, "memory")
+    if "memory" in caps and level in ("L0", "L1", "L2"):
+        # coherence (2026-11-09): the model answers « memory needed » and « nothing / the thread suffices » in the same
+        # call (77 of 203 draws, 13 of the 29 bench messages): the specific question wins, the plan
+        # takes the level that carries the owner's memory
+        level = "L3"
     task = pick("task") if pick("task") in router_tasks() else "general"
     plan = ContextPlan(
         turn_id=req.turn_id, thread=thread, act=pick("act") if pick("act") in ACTS else "continue", level=level,
@@ -282,6 +289,7 @@ def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPl
         capabilities=["tools", *caps],
         model_profile=ModelProfile(task=task, level=pick("model_level") if pick("model_level") in MODEL_LEVELS else "L1"),
         decision={"model": res.get("model"), "ms": round((time.perf_counter() - t0) * 1000),
+                  **({"samples": res["samples"]} if res.get("samples") else {}),
                   "confidence": {k: conf(k) for k in ("thread", "act", "plan", "domain", "horizon", "task")
                                  if conf(k) is not None}, **({"anchors": named} if named else {})})
     return plan.validate()

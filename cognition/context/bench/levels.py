@@ -49,7 +49,8 @@ def legacy(h, case: dict) -> dict:
 def pack(case: dict, port: str = "8897") -> dict:
     prev = case.get("previous")
     req = {"turn_id": f"bench-levels:{case['id']}:{int(time.time() * 1000)}", "message": case["message"],
-           "previous": ({"user": prev["user"], "assistant": prev["assistant"], "age_s": 60} if prev else None),
+           # the hook's format (walter_hook.previous_exchange): message / answer / age_s
+           "previous": ({"message": prev["user"], "answer": prev["assistant"], "age_s": 60} if prev else None),
            "runtime": "dsh", "session_id": "dsh/vm/bench-levels", "privacy_class": "cloud_allowed", "run_id": None,
            "exclude_blocks": ["capabilities"]}
     t0 = time.time()

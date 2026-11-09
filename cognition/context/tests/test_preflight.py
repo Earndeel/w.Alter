@@ -181,3 +181,18 @@ def test_named_project_forces_memory(monkeypatch):
     assert p.decision["anchors"] == ["edgewise"]
     q = pf.run(pf.Request(turn_id="t2", message="Quel est le prix du Bitcoin ?"))
     assert "memory" not in q.capabilities and "anchors" not in q.decision
+
+
+def test_memory_needed_lifts_the_plan_to_the_level_that_carries_memory(fake_llm):
+    """2026-11-09: the decision model answered « memory needed » with « nothing beyond the message » in the same call
+    on 13 of the 29 bench messages; the plan follows the specific question. Without memory the level is untouched."""
+    calls, answers = fake_llm
+    answers.update({"act": {"choice": "new"}, "plan": {"choice": "none", "confidence": 0.6},
+                    "cap_memory": {"noul": 0.8}})
+    p = run(Request(turn_id="t", message="Qui décide si un message que je reçois mérite une notification ?"))
+    assert p.level == "L3" and "memory" in p.capabilities
+    assert calls["decide"][0][2]["samples"] == preflight.DECISION_SAMPLES >= 3
+    answers["cap_memory"] = {"noul": 0.2}
+    assert run(Request(turn_id="t2", message="Traduis « bonjour » en espagnol")).level == "L0"
+    answers.update({"plan": {"choice": "thread_and_memory"}, "extensive": {"noul": 0.9}, "cap_memory": {"noul": 0.9}})
+    assert run(Request(turn_id="t3", message="Fais le point complet sur mes projets")).level == "L4"
