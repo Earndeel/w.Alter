@@ -1,5 +1,13 @@
 # Walter Browse
 
+| | |
+|---|---|
+| **Rôle** | Moteur commun de recherche, d'extraction et de navigation web pour tous les harnesses : sessions de navigateur, sorties réseau, validation des requêtes. Hermes et le MCP en sont des adaptateurs minces. |
+| **Propriétaire** | walter-browse (`/walter/browse`). |
+| **État** | **active** (constat du 09/11/2026) : services `camoufox-max`, `cloakbrowser-max`, `walter-browse-display`, sorties `walter-exit-*`. |
+| **Ne fait pas** | Montrer un secret : cookies et identifiants restent côté serveur, l'agent ne reçoit que des métadonnées. Décider de la tâche ou des permissions (le harness appelant). Conserver les pages (Memory, Raw Vault). |
+| **Contrats** | [contracts/browse.json](contracts/browse.json), [contracts/maintenance.json](contracts/maintenance.json) ; MCP `walter_browse`, `walter_web`, `browser_session` ; CLI `walter-browser`. |
+
 Shared extraction/search engine, session manager and request validation. Hermes is a thin adapter in ports/hermes; MCP calls walter_browse.browse from the same package. No core import from Hermes. The runtime uses its existing isolated Scrapling Python environment, declared as a dependency.
 
 State: WALTER_BROWSE_STATE_DIR (default: the active instance's `state/browse`, from `walter instance path`); shared across harnesses. Search credentials: WALTER_BROWSE_ENV_FILE (default: the instance's `bootstrap/browse-search.env`, mode 0600). Scrapling interpreter: WALTER_SCRAPLING_PYTHON (default `~/.venv/scrapling/bin/python`). Secrets stay server-side. Engines: plain HTTP, static HTML, Scrapling, Camoufox, Chromium (CloakBrowser) and Webtop; extraction must satisfy the same semantic contract on every path.
