@@ -4,14 +4,14 @@
 |---|---|
 | **Rôle** | Audit de la volumétrie de la base `hindsight` et de ses dépendances, classement de son contenu, archive « avant nettoyage », et plan de nettoyage par phases avec risques et gains. Demande de Monsieur du 2026-11-09. |
 | **Propriétaire** | walter-memory. Exécution par des commandes de Memory, jamais par du SQL à la main. |
-| **État** | **Phase 0 faite et vérifiée le 2026-11-09** (§ 3) : rien n'est supprimé de Memory. Phases 1 à 5 : objectifs validés par Monsieur, **exécution destructive non autorisée** ; préparation faite (§ 4). Phase 6 : décisions fonctionnelles séparées. |
+| **État** | **Phase 0 faite et vérifiée le 2026-11-09** (§ 3). **Phase 1 faite et vérifiée le 2026-11-09** (§ 7) : objets de Hindsight, mécanique de l'ancien pipeline et schémas voix/audit supprimés, 1,76 Go rendus ; aucune donnée personnelle, conversation ou connaissance utile touchée. Phases 2 à 5 : objectifs validés, **chaque exécution attend l'accord de Monsieur**. Phase 6 : décisions propres de Monsieur. |
 | **Ne fait pas** | Ne touche ni au Raw Vault (Drive), ni à `state.db` de Hermes. Ne change pas la règle de confidentialité. |
 | **Contrats** | `core.events` append-only (déclencheur `events_append_only`) ; suppression réelle seulement par une opération de Memory tracée dans `system.purges` ; RUNBOOK § Walter Memory. Outils : `ops/memory_archive.py` (archive, vérification, restauration isolée), `ops/obs_dedup_proof.py` (preuve de la phase 2). |
 
 **But** (Monsieur) : pas seulement libérer 2 à 3 Go, mais rebâtir une base de connaissances cohérente. La mémoire
 personnelle passe en premier, l'histoire du développement est structurée, et l'observabilité devient indépendante.
 
-## 1. Ce que contient la base (7,35 Go le 2026-11-09)
+## 1. Ce que contient la base (7,35 Go le 2026-11-09, avant la phase 1)
 
 | Schéma | Taille | Contenu | Catégorie |
 |---|---|---|---|
@@ -122,7 +122,7 @@ a refusé les lignes restaurées. L'outil restaure désormais par sections (`pre
 
 ## 4. Préparation des phases suivantes (rien d'exécuté)
 
-### 4.1 Phase 1 — lecteurs actifs des schémas historiques
+### 4.1 Phase 1 — lecteurs actifs des schémas historiques (exécutée : § 7)
 
 **Constat bloquant pour une suppression en bloc.** Les extensions `vector`, `pg_trgm`, `pgcrypto` et `unaccent` sont
 installées dans le schéma `public`. Six colonnes de `search`, `views`, `legacy` et `walter_voice` utilisent leurs
@@ -246,14 +246,14 @@ Les suppressions sont tracées dans `system.purges`.
 | Phase | Contenu | Gain | Risques et parades | Accord |
 |---|---|---|---|---|
 | **0** | Archive et sauvegarde | — (+1,4 Go local, +1,4 Go Drive) | — | **faite le 09/11** |
-| **1** | Objets de Hindsight dans `public` (liste explicite, **extensions gardées**), `walter_voice`, `walter_audit`, `legacy` (même transaction), `x_research`, `walter_logs.duplicates` | **~1,75 Go**, rendus immédiatement | Extensions dans `public` : jamais de `CASCADE` sur le schéma. Lecteurs du § 4.1 corrigés d'abord. Seconde mesure des compteurs d'accès. | à valider |
+| **1** | Objets de Hindsight dans `public` (liste explicite, **extensions gardées**), `walter_voice`, `walter_audit`, mécanique de `legacy` (même transaction) | **1,76 Go mesurés** | Voir § 7. `x_research` et `walter_logs.duplicates` reportés (§ 7.3) | **faite le 09/11** |
 | **2** | Connecteurs corrigés, puis retrait des `tool.called` / `skill.used` prouvés (§ 4.2) ; `conversation.*` gardés | ~0,2 Go (après la phase 4) | Les connecteurs réécriraient le stock : correction d'abord. Preuve relancée dans la transaction du retrait. Exception tracée à l'append-only. | à valider |
 | **3** | Index de recherche : morceaux masqués supprimés, réindexation | ~0,3 Go | Reconstructible depuis les sources ; banc de rappel avant et après | à valider |
 | **4** | `VACUUM FULL` des tables du § 4.3 | ~0,2 à 0,4 Go | Verrous de quelques secondes, `lock_timeout`, hors sauvegardes | à valider |
 | **5** | Classement des fils (personnel / projet Walter / autres projets), en partant des règles de l'archive, puis décision de modèle mémorisée (budget ≤ 2 €) ; **aucune suppression** | — | Erreur de classement sans perte (étiquette seulement) | à valider |
-| **6** | (a) bascule g0 → g1, puis retrait des dérivés hérités et des morceaux Hindsight (~0,1 Go) ; (b) `user_model` (compilateur **arrêté le 09/11**, table gardée ; 227 candidats et 192 profils postérieurs au 01/10 ne sont pas dans Memory) (~0,05 Go) ; (c) rétention de `walter_logs` (~0,7 Go) | ~0,85 Go | Décisions fonctionnelles | **décisions propres de Monsieur** |
+| **6** | (a) bascule g0 → g1, puis retrait des dérivés hérités et des morceaux Hindsight (~0,1 Go) ; (b) `user_model` (compilateur **arrêté le 09/11**, table gardée ; 227 signaux et 190 clés de profil postérieurs au 01/10 ne sont pas dans Memory, conservés chiffrés et examen préparé : `@instance/backups/changes/2026-11-09-user-model-review/`) (~0,05 Go) ; (c) rétention de `walter_logs` (~0,7 Go) | ~0,85 Go | Décisions fonctionnelles | **décisions propres de Monsieur** |
 
-**Total.** Phases 1 à 4 : ≈ **2,4 Go** (7,35 → ~4,9 Go), sans perte d'information ; avec la phase 6 : ≈ 3,25 Go.
+**Total.** Phases 1 à 4 : ≈ **2,4 Go** (7,35 → ~4,9 Go ; après la phase 1 : 5,96 Go mesurés), sans perte d'information ; avec la phase 6 : ≈ 3,25 Go.
 Chaque dump quotidien passerait d'environ 1,37 Go à environ 0,9 Go.
 
 ## 6. Ce que ce plan ne fait pas encore
@@ -262,3 +262,94 @@ Chaque dump quotidien passerait d'environ 1,37 Go à environ 0,9 Go.
 - La phase 5 classe des fils entiers, pas des messages.
 - Les gains des phases 2 à 4 sont des estimations (taille des lignes et part d'index) ; la place réelle se mesure
   après la phase 4.
+
+## 7. Phase 1 — exécutée et vérifiée le 2026-11-09
+
+Accord de Monsieur du 2026-11-09 (phase 1 seule). Migration `migrations/033_cleanup_phase1_drop_hindsight.sql`,
+appliquée par `walter-memory migrate` (inscrite dans `core.schema_migrations`), après une sous-étape A faite à la main
+avec les mêmes instructions (schémas voix et audit, curseur Kardex → Hindsight). Liste explicite, jamais de `CASCADE`,
+jamais `DROP SCHEMA public`.
+
+### 7.1 Ce qui a été supprimé
+
+| Où | Objets | Lignes |
+|---|---|---|
+| `public` | 22 tables de Hindsight (`memory_units`, `memory_links`, `documents`, `chunks`, `entities`, `banks`…), 4 vues, la vue matérialisée `memory_units_bm25`, 16 fonctions ; leurs 21 séquences et 153 index avec elles | `memory_units` 51 839 (banques `walter` et `walter-shadow`), `memory_links` 1 805 048… |
+| `legacy` (mécanique) | `memory_outbox`, `units_sync_state` (synchronisation Qdrant), `access_audit_log`, `action_requests` ; les 20 tables de routeur remplacées par le schéma `models` le 02/10 (11 `model_router__*`, 9 `walter_router__*`) ; les 2 déclencheurs de `legacy.memory_facts` | catalogue public de modèles, aucune donnée personnelle |
+| `kardex` | `hindsight_sync_state` (curseur de l'ancienne synchronisation, retirée le 19/10) | 3 |
+| `walter_voice`, `walter_audit` | schémas entiers (`unit_vectors` ; `memory_labels`, `memory_tags_before_quarantine`) | étiquettes déjà recopiées dans les éléments g0 (`usefulness`) |
+
+Soit 55 relations. Le contenu des souvenirs de Hindsight n'est pas perdu : la banque `walter` entière est dans
+`core.derived_items` (`derived_by = 'hindsight'`, g0, 34 493 lignes) ; la banque `walter-shadow` était un miroir de
+Walter Memory (chacun de ses 7 287 documents correspond à une ligne de `core`). Aucun code ne déréférence les
+anciennes références `hindsight_unit` / `hindsight_document`.
+
+### 7.2 Ce qui est gardé
+
+- **Extensions** `vector`, `pg_trgm`, `pgcrypto`, `unaccent` dans `public` (seul contenu restant du schéma).
+- **Connaissance de l'ère pré-octobre**, pour examen avant toute suppression future, **avec sa provenance** :
+  `legacy.memory_facts` 8 900 (dont 1 317 absents de `core` au texte exact), `current_beliefs` 6, `project_states` 5,
+  `preferences` 8, `decision_rules` 10, `hindsight_episodes` 289, `hindsight_fact_provenance` 1 196,
+  `hindsight_edges` 23 198, `hindsight_fact_entities` 11 171, `memory_events` 0. Les 294 entités qu'elle cite ont été
+  copiées dans **`legacy.hindsight_entities`** et la clé étrangère y pointe désormais (0 référence orpheline).
+- `user_model` (phase 6b), le rappel g0 (inchangé), Run Plane, bus, `walter_logs`, `core`, `search`, `kardex`.
+
+### 7.3 Reporté, avec la raison
+
+- **`x_research`** (162 publications, 3 recherches, 2 instantanés) : ce n'est pas Hindsight et aucun code actif ne le
+  lit, mais c'est un contenu de recherche ; décision à prendre (archiver puis supprimer, ou garder).
+- **`walter_logs.duplicates`** (39 356 copies mises en quarantaine, 38 Mo) : encore écrit par le connecteur
+  `walter_logs` ; il appartient au journal et se traite avec la phase 2.
+- **Volume Docker `qdrant-data`** (219 Mo, Qdrant retiré le 01/10) : hors base, à retirer avec un accord.
+
+### 7.4 Lecteurs corrigés avant la suppression
+
+- Tâches Hermes « Memory Health Check », « Memory Dreaming », « Memory Importance Decay » retirées (traces d'audit :
+  `@instance/backups/changes/2026-11-09-memory-phase1/hermes-memory-health-check/`). Ses contrôles utiles sont
+  couverts par les Guardians : services Memory (`walter-memory-gateway`, `walter-logs-watch`, `raw-vault-s3`),
+  `walter-memory health`, et désormais `walter-skills health`.
+- `restore_test.compare_tables` (sauvegardes) : tables de Hindsight remplacées par 8 tables vivantes.
+- `walter_memory` : `privacy`, `purge` (option `--hindsight` retirée), `legacy_import` (import Hindsight retiré) ;
+  `hygiene` et deux scripts de nettoyage Hindsight supprimés ; test qui interdit toute lecture des objets supprimés.
+- 18 scripts Hindsight/Qdrant de `~/.hermes/scripts` et 2 unités `.bak` mis en quarantaine
+  (`/root/archive/2026/retired-hindsight-scripts-20261109/`, avec SHA256SUMS) ; rotation des journaux Docker sans Qdrant.
+- Skill `hermes-memory-ops` réécrit (état réel, test rapide en lecture seule de la pile actuelle).
+
+### 7.5 Sécurité
+
+- **Point de restauration** : dump complet frais (`@instance/backups/pg/hindsight-20261109T142510Z.dump`) + dumps
+  ciblés chiffrés (age) des schémas touchés, empreintes vérifiées, dans
+  `@instance/backups/changes/2026-11-09-memory-phase1/rollback/` ; copie hors site restic `4fd19a68`
+  (étiquettes `keep`, `memory-phase1`).
+- **Aucune donnée nouvelle perdue par un retour arrière** : compteurs d'écriture des 61 relations concernées
+  identiques entre la phase 0 et la suppression (aucune insertion, mise à jour ni suppression).
+- **Répétition** dans un PostgreSQL jetable sans réseau (même image) : copie = production sur 61 relations
+  (empreinte du contenu) ; migration réussie puis rejouée sans effet ; retour arrière sélectif (400 entrées du dump
+  ciblé) = production à l'identique, déclencheurs et fonctions revenus. Script : `rollback/rehearse.sh`.
+  `memory_units_bm25` est hors comparaison : vide en service (jamais rafraîchie), toute restauration la recalcule.
+
+### 7.6 Vérifications après la suppression
+
+| Contrôle | Avant | Après |
+|---|---|---|
+| Tests Memory | 308 réussis, 1 ignoré | identique |
+| Tests core / ops / skills | 223 / 32 / 35 | identique |
+| Banc de rappel, chemin recall | 17/30 trouvés, 28/30 répondus, médiane 1,1 s | 17/30, 28/30, 0,3 s |
+| Banc de rappel, chemin context | 15/30, 28/30 | 15/30, 28/30 |
+| Niveaux de contexte (`levels.py`) | rappel 16/18 (legacy et pack), L3 9/9 | identique (le choix de niveau du preflight varie d'un passage à l'autre : 20 → 19/29) |
+| Recherche (8 requêtes, plein texte + vecteurs) | empreinte des résultats | **identique** pour les 8 ; `unaccent` correct |
+| Comptes (`core.events` par source, dérivés g0/g1, `search.chunks`, `walter_logs`, bus, vues, Kardex, `user_model`) | — | égaux ou en croissance naturelle ; rien en moins |
+| `walter-memory health`, Guardians, `memory-autopilot` | 1 problème ancien (3 médias Beeper) | identique ; aucun nouvel incident ; score 95 |
+| `walter check`, contrôle des classes de données | — | vert ; 2 tables non classées antérieures (`core.generations`, `views.evidence`) |
+
+**Place rendue** : base 7,72 → **5,96 Go** (−1,76 Go, −23 %), disque +1,78 Go ; `public` 1,69 Go → 0 (extensions
+seules), `legacy` 55 → 37 Mo.
+
+### 7.7 Comptages de la phase 0 éclaircis
+
+- **424 / 423 tables** : le premier contrôle de restauration comptait 424 relations, dont la vue matérialisée
+  `memory_units_bm25` ; le second compte les 423 tables et contrôle la vue à part (recalculée par la restauration).
+- **77 / 81 fichiers** : `MANIFEST.json` décrit 77 fichiers ; le dossier en contient 81 avec `MANIFEST.json`, le
+  README et les 2 rapports de restauration.
+- **192 / 190 profils** : 192 était un comptage par date de dernière vue ; les clés de profil réellement absentes de
+  Memory sont 190.
