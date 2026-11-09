@@ -112,5 +112,23 @@
       }
     ],
     "conventions_status": "required; enforced per port only after qualification evidence"
-  }
+  },
+  "components": [
+    {
+      "id": "bridge",
+      "path": "bridge.py",
+      "role": "Pont Colab (GPU à la demande)",
+      "status": "active",
+      "readme": "RUNBOOK.md",
+      "vision_target": "capabilities/colab"
+    },
+    {
+      "id": "mcp",
+      "path": "mcp",
+      "role": "Serveur MCP Colab",
+      "status": "active",
+      "readme": "mcp/README.md",
+      "vision_target": "capabilities/colab"
+    }
+  ]
 }
