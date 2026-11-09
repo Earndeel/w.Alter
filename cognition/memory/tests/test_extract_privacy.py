@@ -11,7 +11,7 @@ class Connection:
     def execute(self,sql,args=()):
         if 'insert into core.derived_items' in sql:self.inserts.append(args);self.current=[]
         elif 'select event_id' in sql:self.current=self.msgs
-        elif 'payload->>' in sql:self.current=[]
+        elif 'payload->>' in sql or 'walter_logs.events' in sql:self.current=[]  # tools: walter_logs since 2026-11-09
         elif 'conversation.started' in sql:self.current=[self.title] if self.title else []
         else:raise AssertionError(sql)
         return self

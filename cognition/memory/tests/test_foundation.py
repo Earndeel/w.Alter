@@ -28,6 +28,8 @@ def test_source():
         conn.execute("delete from core.source_identities where source = 'test'")
         conn.execute("delete from system.model_calls where processor = 'pytest'")
         conn.execute("delete from ingestion.jobs where queue = 'pytest'")
+        conn.execute("""delete from system.purge_ledger where purge_id in
+                        (select purge_id from system.purges where requested_by = 'pytest')""")
         conn.execute("delete from system.purges where requested_by = 'pytest'")
 
 
@@ -54,7 +56,17 @@ def test_unknown_type_and_invalid_payload():
     with pytest.raises(types.UnknownEventType):
         events.record_events([ev(4, event_type="message.teleported")])
     with pytest.raises(types.InvalidPayload):
-        events.record_events([ev(5, event_type="tool.called", payload={"status": "ok"})])  # 'tool' required
+        events.record_events([ev(5, event_type="message.edited", payload={})])  # 'target_source_id' required
+
+
+def test_retired_observability_types_are_refused():
+    """Cleanup phase 2 (2026-11-09): agent execution lives in walter_logs, never again in core.events."""
+    for t in ("tool.called", "skill.used"):
+        with pytest.raises(types.RetiredEventType, match="retired"):
+            events.record_events([ev(7, event_type=t, payload={"tool": "x", "skill": "x"})])
+    types.sync_seed()      # re-seeding never re-activates a retired type
+    with pytest.raises(types.RetiredEventType):
+        events.record_events([ev(8, event_type="tool.called", payload={"tool": "x"})])
 
 
 def test_extensible_taxonomy_without_migration():
@@ -104,8 +116,7 @@ def test_local_only_object_goes_to_encrypted_zone():
     assert row["storage_zone"] == "secure"
     back = objects.get_object(str(row["id"]), tempfile.gettempdir())
     assert back.read_bytes() == open(f.name, "rb").read()
-    res = purge.purge(reason="pytest cleanup", requested_by="pytest", object_refs=[str(row["id"])], execute=True,
-                      rewrite_backups=False)
+    res = purge.purge(reason="pytest cleanup", requested_by="pytest", object_refs=[str(row["id"])], execute=True)
     assert res["counts"]["objects"] == 1 and objects.find(str(row["id"])) is None
     with connection() as conn:
         conn.execute("delete from core.objects where id = %s", (row["id"],))
@@ -115,7 +126,7 @@ def test_local_only_object_goes_to_encrypted_zone():
 def test_break_glass_purge_events():
     dry = purge.purge(reason="pytest", requested_by="pytest", pattern="Tr0ub4dor", execute=False)
     assert dry["counts"]["events"] == 1
-    done = purge.purge(reason="pytest", requested_by="pytest", pattern="Tr0ub4dor", execute=True, rewrite_backups=False)
+    done = purge.purge(reason="pytest", requested_by="pytest", pattern="Tr0ub4dor", execute=True)
     assert done["status"] == "executed"
     assert not events.get_events(source="test", text="Tr0ub4dor")
 

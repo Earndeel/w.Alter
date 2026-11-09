@@ -65,9 +65,12 @@ def summarize_session(session_id: str, budget: str = "recurring") -> dict:
         msgs = conn.execute("""select event_id, event_type, occurred_at, content, privacy_class from core.events
                                where source = 'hermes' and thread_id = %s and event_type in ('message.sent','message.received')
                                order by occurred_at""", (session_id,)).fetchall()
-        tools = [r["tool"] for r in conn.execute("""select payload->>'tool' tool, count(*) from core.events
-                    where source = 'hermes' and thread_id = %s and event_type = 'tool.called' group by 1 order by 2 desc limit 12""",
-                                                 (session_id,)).fetchall()]
+        # the session's most used tools, from walter_logs (the journal of agent execution; core.events no longer
+        # carries tool calls since 2026-11-09)
+        tools = [r["tool"] for r in conn.execute("""select e.tool, count(*) from walter_logs.sessions s
+                    join walter_logs.events e on e.session_id = s.session_id and e.type = 'tool/call'
+                    where s.runtime = 'hermes' and s.native_id = %s and coalesce(s.profile, 'main') = 'main'
+                      and e.tool is not null group by 1 order by 2 desc limit 12""", (session_id,)).fetchall()]
         title = conn.execute("""select content, privacy_class from core.events where source = 'hermes' and thread_id = %s
                                 and event_type = 'conversation.started'""", (session_id,)).fetchone()
     usable = [m for m in msgs if m["privacy_class"] != "local_only"]

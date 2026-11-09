@@ -5,10 +5,10 @@ Every runtime that works for Monsieur writes into the same journal (DeepSeek-Har
 is the source of truth, whatever the agent loop). Reads the runtimes' own append-only JSONL transcripts:
   - Claude Code: ~/.claude/projects/<project>/<session>.jsonl
   - Codex:       ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
-and records conversation.started, message.sent (Monsieur, or the delegating agent for `codex exec`),
-message.received (the agent's visible answer) and tool.called metadata (name, summarised args, status, output
-size, reference) — never tool outputs, never hidden reasoning, never system-injected rows (reminders, slash-command
-echoes, compaction summaries).
+and records conversation.started, message.sent (Monsieur, or the delegating agent for `codex exec`) and
+message.received (the agent's visible answer) — never tool calls (what the agent executed is walter_logs' job, the
+canonical journal of agent execution: tool.called retired 2026-11-09, cleanup phase 2), never hidden reasoning,
+never system-injected rows (reminders, slash-command echoes, compaction summaries).
 
 Triggered by the runtimes' hooks (Claude Code Stop/PreCompact/SessionEnd, Codex `notify`) through
 walter-core's runtime hook (walter-memory agent-sessions) — no timer. Incremental per file (byte offset of the last complete line) and
@@ -47,19 +47,6 @@ INJECTED = ("<local-command-", "<command-name>", "<command-message>", "<task-not
 BATCH = 2000
 
 
-def summarise_args(args, limit: int = 300) -> str | None:
-    if args in (None, "", {}):
-        return None
-    if isinstance(args, str):
-        try:
-            args = json.loads(args)
-        except ValueError:
-            pass
-    raw = (", ".join(f"{k}={json.dumps(v, ensure_ascii=False)[:120]}" for k, v in args.items())
-           if isinstance(args, dict) else str(args))
-    return raw[:limit] + ("…" if len(raw) > limit else "")
-
-
 def _text(content) -> str:
     if isinstance(content, str):
         return content
@@ -68,13 +55,9 @@ def _text(content) -> str:
     return ""
 
 
-def _chars(content) -> int:
-    return len(content) if isinstance(content, str) else len(json.dumps(content, ensure_ascii=False))
-
-
 # ───────────────────────── parsers (pure: line dict + state → events) ─────────────────────────
 def parse_claude(d: dict, offset: int, st: dict) -> list[dict]:
-    """One Claude Code transcript line. st (persisted per file): sid, model, title, last_user, pending tool_uses."""
+    """One Claude Code transcript line. st (persisted per file): sid, model, title, last_user."""
     kind, sid = d.get("type"), d.get("sessionId") or st.get("sid")
     if kind == "custom-title" and d.get("customTitle"):
         st["title"] = d["customTitle"]
@@ -94,9 +77,6 @@ def parse_claude(d: dict, offset: int, st: dict) -> list[dict]:
     content = msg.get("content")
     if kind == "assistant":
         st["model"] = msg.get("model") or st.get("model")
-        for b in content if isinstance(content, list) else []:
-            if b.get("type") == "tool_use":
-                st.setdefault("pending", {})[b.get("id")] = [b.get("name"), summarise_args(b.get("input"))]
         text = _text(content).strip()
         if text and not d.get("isApiErrorMessage"):
             out.append({**base, "event_type": "message.received", "source_id": f"msg:{uid}", "content": text,
@@ -106,15 +86,6 @@ def parse_claude(d: dict, offset: int, st: dict) -> list[dict]:
         return out
     if d.get("isMeta") or d.get("isCompactSummary"):
         return out
-    for b in content if isinstance(content, list) else []:
-        if b.get("type") == "tool_result":
-            name, args = st.get("pending", {}).pop(b.get("tool_use_id"), [None, None])
-            out.append({**base, "event_type": "tool.called", "source_id": f"tool:{uid}:{b.get('tool_use_id')}",
-                        "actor": {**AGENTS["claude_code"], "account": "vm"},
-                        "payload": {"tool": name or "unknown", "args_summary": args,
-                                    "status": "error" if b.get("is_error") else "ok", "output_chars": _chars(b.get("content")),
-                                    "output_ref": f"claude_code:{sid}:{uid}", "session_id": sid,
-                                    "call_id": b.get("tool_use_id"), "automated": False}})
     origin = (d.get("origin") or {}).get("kind")
     text = REMINDER.sub("", _text(content)).strip()
     if not text or text.startswith(INJECTED) or (origin and origin != "human"):
@@ -192,17 +163,6 @@ def parse_codex(d: dict, offset: int, st: dict) -> list[dict]:
                  "reply_to": st.get("last_user"), "actor": agent,
                  "payload": {"chat": chat, "session_id": sid, "message_id": ref, "role": "assistant",
                              "model": st.get("model"), "attachments": []}}]
-    if kind == "response_item" and ptype in ("function_call", "custom_tool_call", "local_shell_call"):
-        st.setdefault("pending", {})[p.get("call_id") or p.get("id")] = [
-            p.get("name") or ptype, summarise_args(p.get("arguments") or p.get("input") or p.get("action"))]
-    if kind == "response_item" and ptype in ("function_call_output", "custom_tool_call_output"):
-        name, args = st.get("pending", {}).pop(p.get("call_id"), [None, None])
-        out = p.get("output")
-        failed = isinstance(out, dict) and out.get("success") is False
-        return [{**base, "event_type": "tool.called", "source_id": f"tool:{ref}", "actor": agent,
-                 "payload": {"tool": name or "unknown", "args_summary": args, "status": "error" if failed else "ok",
-                             "output_chars": _chars(out), "output_ref": f"codex:{ref}", "session_id": sid,
-                             "call_id": p.get("call_id"), "automated": not interactive}}]
     return []
 
 
@@ -227,8 +187,6 @@ def parse_dsh(d: dict, idx: int, st: dict) -> list[dict]:
                              "delegation_depth": d.get("delegationDepth")}}]
     if kind == "request/context":
         st["model"] = f"{data.get('provider')}/{data.get('model')}"
-    if kind == "tool/call":
-        st.setdefault("pending", {})[data.get("callId")] = [data.get("name"), summarise_args(data.get("arguments"))]
     msg = data.get("message") or {}
     if kind == "user/message" and (data.get("source") or {}).get("kind") == "user":
         text = _text(data.get("content")).strip()
@@ -246,13 +204,6 @@ def parse_dsh(d: dict, idx: int, st: dict) -> list[dict]:
                  "reply_to": st.get("last_user"), "actor": agent,
                  "payload": {"chat": chat, "session_id": sid, "message_id": ref, "role": "assistant",
                              "model": st.get("model"), "served_by": served, "attachments": []}}] if text else []
-    if kind == "tool/result":
-        call = msg.get("toolCallId")
-        name, args = st.get("pending", {}).pop(call, [None, None])
-        return [{**base, "event_type": "tool.called", "source_id": f"tool:{ref}", "actor": agent,
-                 "payload": {"tool": name or "unknown", "args_summary": args, "status": "error" if msg.get("isError") else "ok",
-                             "output_chars": _chars(msg.get("content")), "output_ref": f"dsh:{ref}", "session_id": sid,
-                             "call_id": call, "automated": False}}]
     return []
 
 
@@ -335,8 +286,7 @@ def sync_file(runtime: str, path: Path) -> tuple[int, int]:
             last_ts = next((e["occurred_at"] for e in reversed(evs) if e.get("occurred_at")), last_ts)
     except StopIteration as stop:
         new_offset = stop.value
-    if len(st.get("pending", {})) > 500:      # tool calls whose result never came (crash): keep the newest only
-        st["pending"] = dict(list(st["pending"].items())[-500:])
+    st.pop("pending", None)                   # tool-call state of the retired tool.called events (before 2026-11-09)
     inserted = 0
     with connection() as conn:
         for i in range(0, len(batch), BATCH):

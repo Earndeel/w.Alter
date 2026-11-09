@@ -114,11 +114,18 @@ def main(argv=None) -> None:
     sub.add_parser("health", help="supervision: connectors freshness, failures, queues, budgets, index lag")
     sub.add_parser("privacy-rescan", help="re-run detectors and tighten privacy classes (never loosen)")
     j = sub.add_parser("jobs"); j.add_argument("action", choices=["requeue-stale"])
-    g = sub.add_parser("purge", help="break-glass purge (dry-run unless --execute)")
-    g.add_argument("--reason", required=True); g.add_argument("--by", required=True)
+    g = sub.add_parser("purge", help="break-glass purge (dry-run unless --execute); reapply/verify after a restore; "
+                                     "exposure = backups that may still hold purged data")
+    g.add_argument("action", nargs="?", default="run", choices=["run", "reapply", "verify", "exposure"])
+    g.add_argument("--reason"); g.add_argument("--by")
     g.add_argument("--event", action="append"); g.add_argument("--object", action="append"); g.add_argument("--pattern")
     g.add_argument("--execute", action="store_true")
-    g.add_argument("--no-backup-rewrite", action="store_true")
+    g.add_argument("--rotate-local-dumps", action="store_true",
+                   help="after the purge: fresh dump, then shred the older rolling local dumps (never restic/keep)")
+    ob = sub.add_parser("observability", help="observability vs memory: proof against walter_logs, retire the copies")
+    ob.add_argument("action", choices=["proof", "retire"]); ob.add_argument("--execute", action="store_true")
+    ob.add_argument("--by"); ob.add_argument("--reason"); ob.add_argument("--expect-sha")
+    ob.add_argument("--out", help="also write the JSON report here")
     lg = sub.add_parser("logs", help="walter-logs: what the agents did (messages, reasoning, tool calls/results), all runtimes")
     lg.add_argument("action", choices=["search", "timeline", "get", "sessions", "stats"])
     lg.add_argument("query", nargs="?", default="", help="search: words / exact string; timeline/get: session id")
@@ -519,9 +526,27 @@ def main(argv=None) -> None:
             from . import periods
             _print(periods.build(a.kind, _d.fromisoformat(a.date) if a.date else _dt.now(_tz.utc).date(), force=True))
     elif a.cmd == "purge":
-        _print(purge.purge(reason=a.reason, requested_by=a.by, event_ids=a.event, object_refs=a.object,
-                           pattern=a.pattern, execute=a.execute,
-                           rewrite_backups=not a.no_backup_rewrite))
+        if a.action == "verify":
+            _print(purge.verify())
+        elif a.action == "exposure":
+            _print(purge.exposure())
+        elif not a.by or (a.action == "run" and not a.reason):
+            p.error("purge run needs --reason and --by; purge reapply needs --by")
+        elif a.action == "reapply":
+            _print(purge.reapply(requested_by=a.by, execute=a.execute))
+        else:
+            _print(purge.purge(reason=a.reason, requested_by=a.by, event_ids=a.event, object_refs=a.object,
+                               pattern=a.pattern, execute=a.execute, rotate_local_dumps=a.rotate_local_dumps))
+    elif a.cmd == "observability":
+        from . import observability
+        if a.action == "retire" and (not a.by or not a.reason):
+            p.error("observability retire needs --by and --reason")
+        r = observability.proof() if a.action == "proof" else observability.retire(
+            requested_by=a.by, reason=a.reason, execute=a.execute, expect_sha=a.expect_sha)
+        if a.out:
+            from pathlib import Path
+            Path(a.out).write_text(json.dumps(r, ensure_ascii=False, indent=1, default=str) + "\n")
+        _print(r)
 
 
 if __name__ == "__main__":

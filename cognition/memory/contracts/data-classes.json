@@ -19,14 +19,20 @@
       "class": "instance"
     },
     "core.event_keys": {
-      "class": "instance"
+      "class": "instance",
+      "note": "idempotence keys; kept as tombstones by a purge so ingestion cannot bring purged events back"
     },
     "core.event_types": {
       "class": "reference",
-      "note": "seed event_types/v1.json"
+      "note": "seed event_types/v1.json; status active|deprecated|retired (retired = refused by the write door)"
     },
     "core.events": {
-      "class": "instance"
+      "class": "instance",
+      "note": "memory-useful events only; agent execution (tool.called, skill.used: retired types, refused at the write door) lives in walter_logs (cleanup phase 2, 2026-11-09)"
+    },
+    "core.generations": {
+      "class": "instance",
+      "note": "memory generations (g0 pre-V1, g1 V1) of this instance and which ones are read"
     },
     "core.identity_links": {
       "class": "instance"
@@ -239,6 +245,10 @@
     "system.processors": {
       "class": "runtime"
     },
+    "system.purge_ledger": {
+      "class": "instance",
+      "note": "identifiers removed by each executed purge (never content); mirrored in @instance/state/memory/purge-ledger.jsonl; re-applied after a restore (purge reapply)"
+    },
     "system.purges": {
       "class": "instance"
     },
@@ -247,6 +257,10 @@
     },
     "views.cursor": {
       "class": "runtime"
+    },
+    "views.evidence": {
+      "class": "instance",
+      "note": "evidence rows of each view (derived items / views), rebuilt by consolidate"
     },
     "views.ledger": {
       "class": "instance"
@@ -261,10 +275,12 @@
       "class": "instance"
     },
     "walter_logs.duplicates": {
-      "class": "instance"
+      "class": "instance",
+      "note": "frozen reversible quarantine of 2026-10-25 (39 356 identical copies); written by nothing since; drop prepared, pending Monsieur's go"
     },
     "walter_logs.events": {
-      "class": "instance"
+      "class": "instance",
+      "note": "canonical journal of agent execution (tool calls with full arguments and results); not copied into core.events"
     },
     "walter_logs.sessions": {
       "class": "instance"

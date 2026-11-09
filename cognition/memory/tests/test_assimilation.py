@@ -324,8 +324,9 @@ def test_a_new_message_is_searchable_after_one_step_without_the_index_timer():
 
 
 def test_a_long_stay_cut_by_the_window_edge_is_one_visit_from_its_true_start():
-    lat = 13.70 + int(uuid.uuid4().hex[:4], 16) * 1e-7                    # a place of its own
-    t0 = at(1, day=DAY - timedelta(days=30 + int(lat * 1e7) % 300))        # a night no other test or run uses
+    n = int(uuid.uuid4().hex[:4], 16)
+    lat = 13.70 + n * 1e-6                                                   # a place of its own (distinct at 6 decimals)
+    t0 = at(1, day=DAY - timedelta(days=30 + n % 300))                       # a night no other test or run uses
     for k in range(60):                                                      # 10 h at the same place
         ev(event_type="location.sample", source="overland", occurred_at=t0 + timedelta(minutes=10 * k),
            privacy_class="local_only", payload={"lat": lat, "lng": 100.9, "accuracy_m": 10, "raw": {"properties": {}}})

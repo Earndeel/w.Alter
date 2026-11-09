@@ -66,6 +66,14 @@ def check() -> tuple[list[str], dict]:
                                      for r in processing.summary(24)}
     except Exception as e:
         problems.append(f"memory pipeline health unreadable: {type(e).__name__}")
+    try:        # purged data must stay purged, including after a restore (purge ledger, cleanup phase 2)
+        from . import purge
+        v = purge.verify()
+        m["purge_ledger"] = {"targets": sum(v["ledger"].values()), "present_again": v["present_again"]}
+        if not v["ok"]:
+            problems.append("purged data present again (restore?): walter-memory purge reapply --by … --execute")
+    except Exception as e:  # noqa: BLE001
+        problems.append(f"purge ledger unreadable: {type(e).__name__}")
     for b in ("recurring", "backfill"):
         s = budget_status(b)
         m[f"budget:{b}"] = f"{float(s['spent_usd']):.2f}/{float(s['limit_usd']):.0f}"

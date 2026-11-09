@@ -22,8 +22,7 @@ def test_claude_human_prompt_answer_and_tool():
     assert evs[0]["reply_to"] == "msg:u1"
     evs = A.parse_claude({"type": "user", "sessionId": "s1", "uuid": "r1", "timestamp": TS,
                           "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": "OUTPUT", "is_error": True}]}}, 2, st)
-    assert evs[0]["payload"]["tool"] == "Bash" and evs[0]["payload"]["status"] == "error"
-    assert "OUTPUT" not in str(evs[0])                       # outputs are never stored
+    assert evs == [] and "pending" not in st                 # tool calls are walter_logs' (cleanup phase 2)
 
 
 def test_claude_skips_injected_rows():
@@ -44,7 +43,30 @@ def test_codex_exec_is_attributed_to_delegator():
                                                                          "arguments": "{\"cmd\": \"ls\"}", "call_id": "k"}}, 20, st)
     evs = A.parse_codex({"type": "response_item", "timestamp": TS, "payload": {"type": "function_call_output", "call_id": "k",
                                                                                "output": "x" * 50}}, 30, st)
-    assert evs[0]["payload"]["tool"] == "shell" and evs[0]["payload"]["output_chars"] == 50
+    assert evs == []                                         # tool calls are walter_logs' (cleanup phase 2)
+
+
+def test_no_connector_writes_observability_events():
+    """Guard against reintroducing the copies: no parser emits tool.called / skill.used, whatever the line."""
+    lines = {
+        "claude": [{"type": "assistant", "sessionId": "s", "uuid": "a", "timestamp": TS, "message": {"content": [
+                       {"type": "tool_use", "id": "t", "name": "Bash", "input": {}}]}},
+                   {"type": "user", "sessionId": "s", "uuid": "r", "timestamp": TS, "message": {"content": [
+                       {"type": "tool_result", "tool_use_id": "t", "content": "x"}]}}],
+        "codex": [{"type": "session_meta", "payload": {"id": "c"}},
+                  {"type": "response_item", "timestamp": TS, "payload": {"type": "function_call", "name": "shell",
+                                                                         "arguments": "{}", "call_id": "k"}},
+                  {"type": "response_item", "timestamp": TS, "payload": {"type": "function_call_output",
+                                                                         "call_id": "k", "output": "x"}}],
+        "dsh": [{"type": "session", "id": "d", "time": 1}, {"type": "tool/call", "time": 2, "data": {"callId": "k", "name": "bash"}},
+                {"type": "tool/result", "time": 3, "data": {"message": {"toolCallId": "k", "content": "x"}}}],
+    }
+    for rt, ls in lines.items():
+        st = {}
+        out = [e for i, d in enumerate(ls) for e in A.PARSERS[rt](d, i, st)]
+        assert not [e for e in out if e["event_type"] in ("tool.called", "skill.used")], rt
+    src = (Path(__file__).resolve().parent.parent / "connectors").glob("*.py")
+    assert not [p.name for p in src if '"tool.called"' in p.read_text() or '"skill.used"' in p.read_text()]
 
 
 def test_codex_desktop_messages_reach_core_events():

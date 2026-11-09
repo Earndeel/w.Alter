@@ -4,9 +4,9 @@
 |---|---|
 | **Rôle** | Audit de la volumétrie de la base `hindsight` et de ses dépendances, classement de son contenu, archive « avant nettoyage », et plan de nettoyage par phases avec risques et gains. Demande de Monsieur du 2026-11-09. |
 | **Propriétaire** | walter-memory. Exécution par des commandes de Memory, jamais par du SQL à la main. |
-| **État** | **Phase 0 faite et vérifiée le 2026-11-09** (§ 3). **Phase 1 faite et vérifiée le 2026-11-09** (§ 7) : objets de Hindsight, mécanique de l'ancien pipeline et schémas voix/audit supprimés, 1,76 Go rendus ; aucune donnée personnelle, conversation ou connaissance utile touchée. Phases 2 à 5 : objectifs validés, **chaque exécution attend l'accord de Monsieur**. Phase 6 : décisions propres de Monsieur. |
+| **État** | **Phase 0 faite et vérifiée le 2026-11-09** (§ 3). **Phase 1 faite et vérifiée le 2026-11-09** (§ 7) : objets de Hindsight, mécanique de l'ancien pipeline et schémas voix/audit supprimés, 1,76 Go rendus. **Phase 2 faite et vérifiée le 2026-11-09** (§ 8) : copies de l'exécution des agents retirées de `core.events` (255 565, 38 écarts réels gardés), connecteurs corrigés à la source, politique de purge, `walter_logs.duplicates` audité (nettoyage préparé, non appliqué). Aucune donnée personnelle, conversation ou connaissance utile touchée. Phases 3 à 5 : objectifs validés, **chaque exécution attend l'accord de Monsieur**. Phase 6 : décisions propres de Monsieur. |
 | **Ne fait pas** | Ne touche ni au Raw Vault (Drive), ni à `state.db` de Hermes. Ne change pas la règle de confidentialité. |
-| **Contrats** | `core.events` append-only (déclencheur `events_append_only`) ; suppression réelle seulement par une opération de Memory tracée dans `system.purges` ; RUNBOOK § Walter Memory. Outils : `ops/memory_archive.py` (archive, vérification, restauration isolée), `ops/obs_dedup_proof.py` (preuve de la phase 2). |
+| **Contrats** | `core.events` append-only (déclencheur `events_append_only`) ; suppression réelle seulement par une opération de Memory tracée dans `system.purges` ; RUNBOOK § Walter Memory. Outils : `ops/memory_archive.py` (archive, vérification, restauration isolée), `walter-memory observability proof|retire` (phase 2, `ops/obs_dedup_proof.py` = enveloppe), `walter-memory purge run|verify|reapply|exposure`. |
 
 **But** (Monsieur) : pas seulement libérer 2 à 3 Go, mais rebâtir une base de connaissances cohérente. La mémoire
 personnelle passe en premier, l'histoire du développement est structurée, et l'observabilité devient indépendante.
@@ -247,7 +247,7 @@ Les suppressions sont tracées dans `system.purges`.
 |---|---|---|---|---|
 | **0** | Archive et sauvegarde | — (+1,4 Go local, +1,4 Go Drive) | — | **faite le 09/11** |
 | **1** | Objets de Hindsight dans `public` (liste explicite, **extensions gardées**), `walter_voice`, `walter_audit`, mécanique de `legacy` (même transaction) | **1,76 Go mesurés** | Voir § 7. `x_research` et `walter_logs.duplicates` reportés (§ 7.3) | **faite le 09/11** |
-| **2** | Connecteurs corrigés, puis retrait des `tool.called` / `skill.used` prouvés (§ 4.2) ; `conversation.*` gardés | ~0,2 Go (après la phase 4) | Les connecteurs réécriraient le stock : correction d'abord. Preuve relancée dans la transaction du retrait. Exception tracée à l'append-only. | à valider |
+| **2** | Connecteurs corrigés, puis retrait des `tool.called` / `skill.used` prouvés (§ 4.2) ; `conversation.*` gardés | 255 565 lignes, ≈ 0,17 Go de données ; ~0,25–0,3 Go rendus au disque par la phase 4 | Voir § 8 | **faite le 09/11** |
 | **3** | Index de recherche : morceaux masqués supprimés, réindexation | ~0,3 Go | Reconstructible depuis les sources ; banc de rappel avant et après | à valider |
 | **4** | `VACUUM FULL` des tables du § 4.3 | ~0,2 à 0,4 Go | Verrous de quelques secondes, `lock_timeout`, hors sauvegardes | à valider |
 | **5** | Classement des fils (personnel / projet Walter / autres projets), en partant des règles de l'archive, puis décision de modèle mémorisée (budget ≤ 2 €) ; **aucune suppression** | — | Erreur de classement sans perte (étiquette seulement) | à valider |
@@ -298,8 +298,9 @@ anciennes références `hindsight_unit` / `hindsight_document`.
 
 - **`x_research`** (162 publications, 3 recherches, 2 instantanés) : ce n'est pas Hindsight et aucun code actif ne le
   lit, mais c'est un contenu de recherche ; décision à prendre (archiver puis supprimer, ou garder).
-- **`walter_logs.duplicates`** (39 356 copies mises en quarantaine, 38 Mo) : encore écrit par le connecteur
-  `walter_logs` ; il appartient au journal et se traite avec la phase 2.
+- **`walter_logs.duplicates`** (39 356 copies mises en quarantaine, 38 Mo) : il appartient au journal et se traite
+  avec la phase 2. *Correction du 09/11 (audit de la phase 2, § 8.4)* : la table n'est **plus écrite** depuis la
+  quarantaine ponctuelle du 25/10 ; « encore écrit » était inexact.
 - **Volume Docker `qdrant-data`** (219 Mo, Qdrant retiré le 01/10) : hors base, à retirer avec un accord.
 
 ### 7.4 Lecteurs corrigés avant la suppression
@@ -353,3 +354,133 @@ seules), `legacy` 55 → 37 Mo.
   README et les 2 rapports de restauration.
 - **192 / 190 profils** : 192 était un comptage par date de dernière vue ; les clés de profil réellement absentes de
   Memory sont 190.
+
+## 8. Phase 2 — faite le 09/11 (accord de Monsieur du 09/11)
+
+### 8.1 Séparation observabilité / mémoire, corrigée à la source
+
+- **Doctrine** (`walter_memory/observability.py`, ARCHITECTURE § 5 amendement, RUNBOOK § Observabilité ≠ mémoire) :
+  `walter_logs` = journal canonique de l'exécution des agents ; `core.events` = événements et observations utiles à la
+  mémoire ; Memory = extraction, consolidation, connaissances, provenance. Une exécution peut produire une observation
+  mémorisable (par l'extraction), jamais une recopie de la trace.
+- **Connecteurs** : `connectors/hermes.py` et `connectors/agent_sessions.py` (Claude Code, Codex, DSH) n'écrivent plus
+  `tool.called` ni `skill.used`. L'indice d'outils de l'extraction (`walter_memory/extract.py`) lit `walter_logs`.
+- **Garde-fou** (migration `034_cleanup_phase2_observability.sql`) : statut `retired` dans `core.event_types` ; la
+  porte d'écriture refuse un type retiré (`RetiredEventType`) ; `types sync` ne le réactive jamais. Tests :
+  aucun connecteur n'émet ni ne contient ces types.
+- **`conversation.started` / `conversation.ended` gardés** (cycle de vie des fils, coût Hermes, version Codex…).
+
+### 8.2 Retrait des copies prouvées
+
+- **Preuve relancée** (`walter-memory observability proof`, même instantané que le retrait) : empreinte des
+  identifiants retirables `cc10deb0…` identique à la simulation du matin, à la répétition et à l'exécution.
+- **Opération Memory tracée** (`walter-memory observability retire --execute --expect-sha …`, `system.purges` n° 121,
+  registre `system.purge_ledger` + fichier de l'instance) : refuse si un seul événement n'a pas exactement un verdict
+  ou si l'empreinte diffère ; supprime dans la transaction, sous `walter.purge`, événements **et** leurs clés
+  d'idempotence (le type retiré empêche toute réécriture) ; **aucun événement bus** (vérifié) ; relancée : « nothing
+  to remove ».
+
+| Source et type | Retirés | Gardés (écarts réels) |
+|---|---|---|
+| Hermes `tool.called` | 216 253 | 3 |
+| Hermes `skill.used` | 16 130 | 6 |
+| Claude Code `tool.called` | 17 222 | 25 |
+| Codex `tool.called` | 5 950 | 4 |
+| DSH `tool.called` | 10 | 0 |
+| **Total** | **255 565** | **38** |
+
+- **Consommateurs vérifiés** avant (directs et indirects) : extraction (corrigée), épisodes, plans, vues
+  (`views.evidence` ne référence que des dérivés et des vues), bus (notifications sans contenu, gardées comme
+  historique), index (`search.chunks` n'indexait pas ces types), recherche, provenance (`core.derived_items` ne les
+  cite pas), Guardians, connecteurs.
+
+### 8.3 Purge de secours : politique couvrant base active, index, vues et restaurations
+
+`walter_memory/purge.py` réécrit (RUNBOOK § Purge) : une purge couvre la base active (événements, connaissances,
+preuves et versions de vues, index, décisions, extraction, triage, détections, objets du Raw Vault, `walter_logs`) ;
+les clés d'idempotence restent comme **pierres tombales** (une réingestion ne ramène rien) ; registre par identifiants
+dans la base **et** dans `@instance/state/memory/purge-ledger.jsonl` ; `purge verify` (aussi dans `walter-memory
+health`) détecte une donnée purgée revenue par une restauration, `purge reapply` la retire de nouveau.
+**Sauvegardes jamais modifiées automatiquement** ; `purge exposure` les liste avec leur rétention ; suppression
+définitive = procédure manuelle décrite par lieu (RUNBOOK). Testé sur données synthétiques uniquement
+(`tests/test_purge_policy.py` : purge, réingestion bloquée, restauration simulée détectée puis réappliquée,
+idempotence) ; **aucune purge personnelle réelle**.
+
+### 8.4 `walter_logs.duplicates` : audit
+
+Quarantaine ponctuelle et réversible du 25/10 (choix de Monsieur, migration 016, commande
+`connectors/walter_logs.py dedup`). 39 356 lignes (38 Mo), **toutes identiques** à l'original resté dans
+`walter_logs.events` (même `event_key`) ; **plus rien ne l'écrit** (l'écrivain du journal écarte une clé connue —
+c'est l'index unique de `walter_logs.events` qui porte l'idempotence) ; **personne ne la lit** (seule la purge y
+supprime). Aucun rôle de traçabilité, de détection ni d'idempotence. **Nettoyage préparé, non appliqué** : export
+chiffré vérifié et migration gardée (refuse si une copie a perdu son original) dans
+`@instance/backups/changes/2026-11-09-memory-phase2/duplicates/` ; à appliquer sur accord, avec le retrait de la
+commande `dedup`.
+
+### 8.5 Sécurité
+
+- **Point de restauration** : dump complet frais (`hindsight-20261109T154703Z.dump`), export chiffré (age) des
+  255 603 lignes et de leurs clés, empreintes vérifiées après déchiffrement, 0600 ; copie hors site restic `1c9900cb`
+  (`keep`, `memory-phase2`), relue depuis Drive à l'identique.
+- **Retour arrière** (`rollback/rollback.sh`) : réinsertion seule (rien d'écrasé ni de supprimé : les nouvelles
+  écritures restent), sans événement bus, statut des types et opération du registre annulés (base et fichier).
+- **Répétition** dans un PostgreSQL jetable sans réseau, restauré par sections : copie = production sur l'ensemble
+  visé ; 034 rejouée sans effet ; preuve identique ; retrait 255 565 / 38 en 73 s ; 0 événement bus ; empreintes hors
+  ensemble visé inchangées ; écriture neuve après le retrait conservée par le retour arrière ; retour arrière =
+  avant à l'identique (événements, clés, types). Journal : `rollback/rehearsal-20261109T160355Z.log`.
+
+### 8.6 Vérifications après
+
+| Contrôle | Avant | Après |
+|---|---|---|
+| Tests Memory / core / ops / skills | 314 (1 ignoré) / 223 / 32 / 35 | identiques |
+| Rappel, chemin recall | 16/30 trouvés, 28/30 répondus | 16/30, 28/30 (médiane 531 → 159 ms) |
+| Rappel, chemin context | 15/30, 28/30 | 15/30, 28/30 |
+| Niveaux de contexte | legacy 16/18, L3 9/9 | legacy identique ; pack 15/18 dû au pré-tri non déterministe (cas `p-triage` : mémoire demandée 1 fois sur 3 passages) |
+| Recherche (8 requêtes) | empreinte | **identique** |
+| Empreintes hors ensemble visé | — | égales ou en croissance naturelle (consolidation des vues en cours) |
+| health, purge verify, Guardians, autopilot | 1 problème ancien (3 médias Beeper) | identique ; verify `ok` ; aucun incident ouvert ; score 95 |
+| `walter check`, contrôle des classes | 2 tables non classées | vert ; 0 non classée |
+
+**Performances** (médiane de 5, ms) : comptage complet 86 → 55 ; 50 derniers Claude Code 24 → 13 ; types sur 30 j
+38 → 21 ; recherche de clé 3,4 → 0,3 ; fil complet 34 → 32 ; recherche plein texte `ilike` 702 → 702.
+
+**Volumes** : 255 565 lignes (≈ 147 Mo de données brutes) et leurs clés (≈ 20 Mo) retirées. Place **réutilisable**
+dans les tables dès maintenant (le disque ne baisse pas sans compactage, comme demandé) ; rendue au disque par la
+phase 4 (`VACUUM FULL`) : estimée à ~0,25 à 0,3 Go. Dump quotidien 1 064 → 1 027 Mo. `walter_logs.duplicates` :
+38 Mo de plus si son nettoyage est accepté.
+
+## 9. Qualité cognitive — analyse des cas non retrouvés (lecture seule, 09/11)
+
+Banc `bench/recall_bench.py` (30 questions, chemin recall). Le score « trouvé » (hit@3) exige qu'un des 3 premiers
+souvenirs reprenne ≥ 60 % des mots du **premier souvenir que Hindsight renvoyait** (référence figée avant son
+retrait) ; « répondu » (answer@3) vérifie la réponse attendue. Analyse étape par étape du chemin réel sur les 14 cas
+non trouvés du passage (16/30 ; 17/30 au passage précédent : le reclassement varie). Scripts et résultats (nombres
+seulement) : `@instance/backups/changes/2026-11-09-memory-phase2/recall-analysis/`.
+
+| Étape | Constat |
+|---|---|
+| Ingestion, extraction, indexation | **Aucune perte** : les 14 souvenirs de référence sont dans l'index (12 au texte exact, 2 quasi identiques), génération g0 lisible |
+| Classement personnel/projet, confidentialité | **Aucun filtrage** : les 14 sont `cloud_allowed`, aucun écarté par la politique de lecture |
+| Candidats de la question | 9 sur 14 n'entrent pas dans les candidats : mots de la question absents du souvenir (0/2, 1/2, 1/4 pour 3 d'entre eux), vecteurs locaux (potion) qui les classent au rang 44 à 61 pour 4 (coupure à 40 candidats, 20 reclassés) et au-delà de 240 pour 2 |
+| Reclassement | 5 sur 14 sont candidats mais finissent au rang ≥ 3 (dont 1 écarté par une fiche Kardex ajoutée en tête) |
+| Construction du résultat | 13 des 14 cas répondent **quand même** juste dans les 3 premiers (10 au premier rang) |
+
+**Cause principale : la redondance.** Dans 24 questions sur 30, 2 ou 3 des 3 premiers souvenirs portent **la même
+réponse** formulée différemment (souvenirs g0 hérités de Hindsight et dérivés qui se recoupent ; la déduplication ne
+retire que les quasi-copies ≥ 0,88). Les places vont à des reformulations, pas à la référence de Hindsight ni à des
+faits complémentaires. Le banc lui-même est biaisé : 3 références sur 30 ne contiennent même pas la réponse attendue.
+
+**Essai sans effet** (en mémoire seulement, rien changé en service) : élargir le bassin reclassé à 40/80 ou 60/120
+candidats → 16 puis 15/30 trouvés, 26 puis 29/30 répondus, latence ×4. Le levier n'est pas la taille du bassin.
+
+**Pistes, à valider avant toute modification** (aucune touche à g0/g1 ni phase 3 sans accord) :
+1. Mesurer ce qui compte : remplacer hit@3 (fidélité au libellé de Hindsight) par answer@k + « faits distincts utiles
+   dans le top k », avec un juge (`bench/recall_judge.py`) et une référence revue par Monsieur.
+2. Diversifier le résultat : regrouper les souvenirs qui portent la même réponse avant de remplir les places
+   (déduplication sémantique au moment de la lecture, sans rien supprimer).
+3. Consolider à la source : c'est l'objet de g1 (sujets, épisodes, périodes) ; la bascule g0 → g1 reste la décision
+   de Monsieur (phase 6a).
+4. Candidats : évaluer un modèle d'embeddings du Router en ombre sur la voie connaissances (budget de test ≤ 2 €).
+5. Contexte : la fiche Kardex prend une des 3 places ; la compter à part. Le pré-tri de walter-context est non
+   déterministe sur certains cas (`p-triage` : mémoire demandée 1 fois sur 3).

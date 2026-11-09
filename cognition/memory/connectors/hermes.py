@@ -5,8 +5,8 @@ Reads /root/.hermes/state.db read-only (state.db stays Hermes' operational store
   - conversation.started / conversation.ended for every session (platform, model, title, counts, cost);
   - for interactive sessions (Monsieur talking to W.Alter): one event per message — message.sent (Monsieur) /
     message.received (W.Alter) with session_id, message_id, role, timestamp, text, reply_to, attachments;
-  - tool.called / skill.used metadata (name, summarised args, status, duration, output size, reference) —
-    never the tool output itself;
+  - nothing about tool calls: what the agent executed (calls, arguments, results, skills) is walter_logs' job, the
+    canonical journal of agent execution (tool.called / skill.used retired 2026-11-09, cleanup phase 2);
   - attachments referenced in messages ("[Image attached at: …]") stored once in the Raw Vault.
 System-injected rows (compaction summaries, delegation/process notices, model switches) are not Monsieur's
 words and are skipped. `--export` writes the daily raw JSONL.zst copy of state.db rows into the Raw Vault (D1).
@@ -40,7 +40,6 @@ PROFILE_PRIVACY = {"wild": "local_only"}
 PROFILE = ""  # set by --profile; "" = main profile
 INTERACTIVE = {"desktop", "tui", "cli", "telegram", "api_server", "voice-router", "whatsapp", "discord", "signal",
                "slack", "email", "sms", "matrix", "web"}
-SKILL_TOOLS = {"skill_view", "skill_manage"}
 ATTACH_RE = re.compile(r"\[(?:Image|File|Audio|Voice|Document) attached at: ([^\]]+)\]")
 MONSIEUR = {"external_id": "monsieur", "display_name": "Monsieur", "is_self": True}
 WALTER = {"external_id": "walter", "display_name": "W.Alter"}
@@ -49,51 +48,6 @@ BATCH = 2000
 
 def ts(v) -> datetime:
     return datetime.fromtimestamp(float(v), tz=timezone.utc)
-
-
-def summarise_args(raw: str | None, limit: int = 300) -> str | None:
-    if not raw:
-        return None
-    try:
-        args = json.loads(raw)
-        if isinstance(args, dict):
-            raw = ", ".join(f"{k}={json.dumps(v, ensure_ascii=False)[:120]}" for k, v in args.items())
-    except ValueError:
-        pass
-    return raw[:limit] + ("…" if len(raw) > limit else "")
-
-
-def tool_status(content: str | None) -> str | None:
-    if not content:
-        return None
-    head = content[:400].lower()
-    if '"error"' in head or '"success": false' in head or '"status": "error"' in head:
-        return "error"
-    return "ok"
-
-
-class Calls:
-    """call_id → (tool name, raw args), from assistant rows; falls back to a state.db lookup across batches."""
-    def __init__(self, db):
-        self.db, self.map = db, {}
-
-    def add(self, tool_calls: str | None):
-        if not tool_calls:
-            return
-        try:
-            for call in json.loads(tool_calls):
-                fn = call.get("function") or {}
-                self.map[call.get("call_id") or call.get("id")] = (fn.get("name"), fn.get("arguments"))
-        except ValueError:
-            pass
-
-    def get(self, session_id: str, call_id: str | None):
-        if call_id and call_id not in self.map:
-            row = self.db.execute("select tool_calls from messages where session_id = ? and tool_calls like ?",
-                                  (session_id, f"%{call_id}%")).fetchone()
-            if row:
-                self.add(row[0])
-        return self.map.get(call_id, (None, None))
 
 
 def attachments(text: str, session_id: str, conn) -> tuple[list[str], list[dict]]:
@@ -163,34 +117,14 @@ def sync_messages(db, conn, max_rows: int) -> tuple[int, int]:
     cur = ingestion.get_checkpoint(CONNECTOR, "messages")
     last_id = int(cur.get("last_id", 0))
     sessions = {r["id"]: r["source"] for r in db.execute("select id, source from sessions")}
-    rows = db.execute("""select id, session_id, role, content, tool_call_id, tool_calls, tool_name, timestamp,
-                                display_kind, _compressed_summary, finish_reason
+    rows = db.execute("""select id, session_id, role, content, timestamp, display_kind, _compressed_summary, finish_reason
                          from messages where id > ? order by id limit ?""", (last_id, max_rows)).fetchall()
-    calls, batch, seen, last_user = Calls(db), [], 0, {}
+    batch, seen, last_user = [], 0, {}
     for m in rows:
         seen += 1
         sid, platform = m["session_id"], sessions.get(m["session_id"]) or "unknown"
         interactive = platform in INTERACTIVE
         base = {"source": "hermes", "source_account": _acct(platform), "thread_id": sid, "occurred_at": ts(m["timestamp"])}
-        calls.add(m["tool_calls"])
-        if m["role"] == "tool":
-            name, raw_args = calls.get(sid, m["tool_call_id"])
-            name = m["tool_name"] or name or "unknown"
-            batch.append({**base, "event_type": "tool.called", "source_id": _sid(f"tool:{m['id']}"),
-                          "actor": {**WALTER, "account": platform}, "reply_to": None,
-                          "payload": {"tool": name, "args_summary": summarise_args(raw_args), "status": tool_status(m["content"]),
-                                      "output_chars": len(m["content"] or ""), "output_ref": f"state.db:messages:{m['id']}",
-                                      "session_id": sid, "call_id": m["tool_call_id"], "automated": not interactive}})
-            if name in SKILL_TOOLS and raw_args:
-                try:
-                    skill = (json.loads(raw_args) or {}).get("name")
-                except ValueError:
-                    skill = None
-                if skill:
-                    batch.append({**base, "event_type": "skill.used", "source_id": _sid(f"skill:{m['id']}"),
-                                  "actor": {**WALTER, "account": platform},
-                                  "payload": {"skill": skill, "session_id": sid, "action": name}})
-            continue
         if not interactive or m["role"] not in ("user", "assistant"):
             continue
         text = m["content"] or ""
