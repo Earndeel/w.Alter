@@ -173,5 +173,49 @@
       "browser_session",
       "browser_sites"
     ]
-  }
+  },
+  "components": [
+    {
+      "id": "library",
+      "path": "walter_browse",
+      "role": "Recherche web et lecture de pages",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "capabilities/browse"
+    },
+    {
+      "id": "engine",
+      "path": "engine",
+      "role": "Moteurs Camoufox / CloakBrowser (ex ~/.hermes/camoufox-max)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:9377"
+        },
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:9378"
+        }
+      ],
+      "vision_target": "capabilities/browse/engine"
+    },
+    {
+      "id": "network",
+      "path": "network",
+      "role": "Sorties réseau (Freebox, Mac, défaut)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "capabilities/browse/network"
+    },
+    {
+      "id": "runtime",
+      "path": "runtime",
+      "role": "Exécution et extracteurs",
+      "status": "active",
+      "readme": "runtime/README.md",
+      "vision_target": "capabilities/browse/runtime"
+    }
+  ]
 }
