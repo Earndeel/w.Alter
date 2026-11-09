@@ -97,8 +97,8 @@ Ils sont déclarés dans le registre avec leur `vision_target` ; ils se déplace
 |---|---|---|
 | `hermes-agent/` (9,7 Go), `state.db` (5,3 Go), `profiles/`, `sessions/`, `checkpoints/` | Runtime Hermes et ses données | Hermes = objet d'étude de Lab après E7. **Données conservées** : déjà ingérées dans `walter_logs` et `core.events`, export brut dans le coffre chiffré |
 | `plugins/walter-*` (7 copies installées) | ports Walter pour Hermes | retirés avec Hermes (E7) ; les sources restent dans les modules |
-| `scripts/` (≈ 60 fichiers) | anciens scripts mémoire, Hindsight, bancs | classement par références (méthode de la skill d'audit), puis archive ; `memory_autopilot.py` est un **doublon** identique de `memory/ops/memory_autopilot.py` |
-| `cron/` | 2 tâches actives avant le 09/11 ; **Memory Dreaming en pause depuis le 09/11** ; Memory Health Check (5 min) | Health Check → gardiens (E6) |
+| `scripts/` (≈ 55 fichiers) | anciens scripts mémoire, bancs ; 18 scripts Hindsight/Qdrant mis en quarantaine le 09/11 (`/root/archive/2026/retired-hindsight-scripts-20261109/`) | classement par références (méthode de la skill d'audit), puis archive ; `memory_autopilot.py` est un **doublon** identique de `memory/ops/memory_autopilot.py` |
+| `cron/` | 2 tâches restantes, en pause (AA Pareto, Kardex Semantic Extract) ; Memory Health Check, Memory Dreaming et Memory Importance Decay **retirées le 09/11** (Guardians) | — |
 | `logs/` (848 Mo) | journaux de tous les services Walter (CLAUDE.md) | `@instance/logs` (vide aujourd'hui) | 
 | `.env`, `google_token.json` | clés et jeton Google | Bitwarden et autorisations Secrets (E6) |
 | `integrations/` (camoufox, codex, cloudflared, wrangler…) | outils tiers installés | `/apps` ou outils de l'hôte, selon l'usage |
@@ -145,7 +145,7 @@ Composants déclarés dans le contrat d'Ops (`services`, `postgres`, `kernel-npm
 
 | Service | Aujourd'hui | Cible | État |
 |---|---|---|---|
-| PostgreSQL (`hindsight-pg`, :5433) | conteneur lancé à la main, volume Docker historique `hindsight-pg` (7,4 Go) | `/services/postgres/{compose.yaml,config/,data/,README.md}` ; nom du conteneur et port **conservés** (interface publique) ; **données sous `data/`**, le volume historique n'est pas gardé | **Définition préparée et essayée** sur une restauration complète du dump de la nuit (09/11) ; **données pas encore déplacées** : migration sur accord (procédure dans son README) |
+| PostgreSQL (`hindsight-pg`, :5433) | conteneur lancé à la main, volume Docker historique `hindsight-pg` (6,1 Go après le nettoyage phase 1 du 09/11 : objets Hindsight supprimés, `public` = extensions seules) | `/services/postgres/{compose.yaml,config/,data/,README.md}` ; nom du conteneur et port **conservés** (interface publique) ; **données sous `data/`**, le volume historique n'est pas gardé | **Définition préparée et essayée** sur une restauration complète du dump de la nuit (09/11) ; **données pas encore déplacées** : migration sur accord (procédure dans son README) |
 | Cache hors ligne du noyau du moteur | — | `/services/dsh/npm-cache` | **Fait** (lot E1) |
 | Environnements Python partagés | `/walter/runtime/venv`, venv de core, router, llm, raw-vault | `/services/python/<environnement>` | prévu (avec le déplacement de runtime) |
 | Base d'essai (`walter-memory-testpg`, :5440) | conteneur d'essai (tmpfs 2 Go) | outillage de tests de Memory *à valider* | jetable |
@@ -189,7 +189,7 @@ Composants déclarés dans le contrat d'Ops (`services`, `postgres`, `kernel-npm
 
 1. Seconde boucle agentique `walter_run` (E5) et passerelle d'outils `walter-tools` (E5).
 2. Rôles de production de Hermes et ses 7 copies de greffons Walter (E6, E7).
-3. `~/.hermes/scripts/memory_autopilot.py` (doublon), scripts Hindsight et Qdrant retirés (archive).
+3. `~/.hermes/scripts/memory_autopilot.py` (doublon). Scripts Hindsight et Qdrant : **en quarantaine depuis le 09/11** ; tables de Hindsight **supprimées le 09/11** (nettoyage phase 1).
 4. Wrappers `~/.hermes/bin` (kardex, vault, vault-sync, walter-browse-doctor, bw-unlock).
 5. `rawvault.py` (shim vers `walter_memory.objects`) et `secrets/compat`.
 6. Liens `/opt/walter-*`, `/srv/*`, `/root/projects/*`, `/walter/backup`, `/walter/user` après la migration.
