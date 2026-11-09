@@ -133,9 +133,6 @@
     "kardex.health_notes": {
       "class": "instance"
     },
-    "kardex.hindsight_sync_state": {
-      "class": "instance"
-    },
     "kardex.identity_clusters": {
       "class": "instance"
     },
