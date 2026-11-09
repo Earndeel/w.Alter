@@ -1,69 +1,31 @@
 #!/usr/bin/env bash
-# Post-repair smoke test for the W.Alter/Hermes memory stack.
-# Validated live on 2026-08-21 after the qdrant-client venv incident.
-#
-# Usage: bash post_repair_smoke_test.sh [--write-test]
-#   --write-test  also performs a write->recall round-trip (inserts ONE test fact)
-# Default: read-only. Exit 0 = all pass, 1 = at least one failure.
+# Post-repair smoke test of Walter Memory (rewritten 2026-11-09: the former version tested the retired Hindsight /
+# Qdrant / write-worker stack). Read-only. Exit 0 = all pass, 1 = at least one failure. Prints counts, never content.
 set -u
 FAIL=0
 ok()  { echo "PASS  $1"; }
 bad() { echo "FAIL  $1"; FAIL=1; }
 
-check_health() {
-  local port name body
-  for spec in "8888:hindsight-api" "8889:hybrid-search" "8890:write-worker" "8891:gateway"; do
-    port="${spec%%:*}"; name="${spec##*:}"
-    body=$(curl -s -m 5 "http://127.0.0.1:${port}/health" || true)
-    if echo "$body" | grep -qE '"status":"(healthy|ok)"'; then
-      ok "$name :$port healthy"
-    else
-      bad "$name :$port -> ${body:-no response}"
-    fi
-  done
-}
+for u in walter-memory-gateway walter-logs-watch raw-vault-s3; do
+  systemctl is-active --quiet "$u" && ok "$u active" || bad "$u not active"
+done
 
-check_qdrant() {
-  local n
-  n=$(curl -s -m 5 http://127.0.0.1:6333/collections/memories \
-    | python3 -c "import json,sys;print(json.load(sys.stdin)['result'].get('points_count',-1))" 2>/dev/null || echo -1)
-  if [ "$n" -gt 0 ]; then ok "qdrant memories points=$n"; else bad "qdrant memories points=$n"; fi
-}
+h=$(timeout 120 walter-memory health 2>/dev/null)
+if echo "$h" | python3 -c 'import json,sys; sys.exit(0 if isinstance(json.load(sys.stdin).get("problems"), list) else 1)' 2>/dev/null; then
+  ok "walter-memory health answers ($(echo "$h" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["problems"]))') problem(s))"
+else
+  bad "walter-memory health does not answer"
+fi
 
-check_pg_activity() {
-  local rows
-  rows=$(docker exec hindsight-pg psql -U hindsight -d hindsight -t -A -c \
-    "SELECT COUNT(*) FROM memory_units WHERE created_at > NOW() - INTERVAL '7 days';" 2>/dev/null || echo 0)
-  if [ "$rows" -gt 0 ]; then
-    ok "pg memory_units created last 7d = $rows"
-  else
-    bad "pg memory_units inactive 7d = $rows (write path dead?)"
-  fi
-}
+n=$(timeout 60 walter-memory search "sauvegarde" --limit 5 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)
+[ "${n:-0}" -gt 0 ] && ok "unified search (FTS + vectors) returns $n" || bad "unified search returns nothing"
 
-roundtrip() {
-  # Real contracts (verified 2026-08-21):
-  #   write:  POST /v1/default/banks/{bank}/memories   {"items":[{"content": "..."}]}
-  #   recall: POST /v1/default/banks/{bank}/memories/recall {"query":..., "max_tokens":N}
-  local ts hit
-  ts=$(date +%s)
-  curl -s -m 15 -X POST http://127.0.0.1:8888/v1/default/banks/walter/memories \
-    -H 'Content-Type: application/json' \
-    -d "{\"items\":[{\"content\":\"SMOKE TEST $ts: round-trip probe written by post_repair_smoke_test.sh.\"}]}" \
-    | grep -q '"success":true' && ok "write accepted" || { bad "write rejected"; return; }
-  sleep 40   # extraction is async (worker polls ~30s)
-  hit=$(curl -s -m 25 -X POST http://127.0.0.1:8888/v1/default/banks/walter/memories/recall \
-    -H 'Content-Type: application/json' \
-    -d "{\"query\":\"SMOKE TEST $ts round-trip probe\",\"max_tokens\":300}" \
-    | grep -c "SMOKE TEST $ts" || true)
-  if [ "${hit:-0}" -ge 1 ]; then ok "recall round-trip (8888)"; else bad "recall round-trip: test fact not retrieved"; fi
-}
+ext=$(docker exec hindsight-pg psql -U hindsight -d hindsight -Atc \
+  "select count(*) from pg_extension where extname in ('vector','pg_trgm','pgcrypto','unaccent')" 2>/dev/null || echo 0)
+[ "$ext" = 4 ] && ok "extensions vector, pg_trgm, pgcrypto, unaccent present" || bad "extensions missing ($ext/4)"
 
-check_health
-check_qdrant
-check_pg_activity
-[ "${1:-}" = "--write-test" ] && roundtrip
+recent=$(docker exec hindsight-pg psql -U hindsight -d hindsight -Atc \
+  "select count(*) from core.events where ingested_at > now() - interval '1 day'" 2>/dev/null || echo 0)
+[ "${recent:-0}" -gt 0 ] && ok "core.events ingested in the last 24 h = $recent" || bad "no core.events in the last 24 h"
 
-echo "---"
-if [ "$FAIL" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES PRESENT"; fi
 exit $FAIL
