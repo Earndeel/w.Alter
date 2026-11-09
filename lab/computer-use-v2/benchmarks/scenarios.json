@@ -1,0 +1,94 @@
+[
+  {
+    "scenario_id": "A_launch_safari",
+    "title": "Ouvre Safari",
+    "goal": "ouvre Safari sur le device de test",
+    "expected_route": ["computer_use", "native.launch_app", "verify"],
+    "postcondition": {"app_running": "Safari"},
+    "expected_walter_browse_max": 0,
+    "expected_screenshots_max": 0,
+    "expected_vision_calls_max": 0,
+    "expected_interruption_warnings_min": 1,
+    "max_interruption": "L1"
+  },
+  {
+    "scenario_id": "B_launch_finder",
+    "title": "Ouvre Finder",
+    "goal": "ouvre Finder sur le device de test",
+    "expected_route": ["computer_use", "native.launch_app", "verify"],
+    "postcondition": {"app_running": "Finder"},
+    "expected_walter_browse_max": 0,
+    "expected_screenshots_max": 0,
+    "expected_vision_calls_max": 0,
+    "expected_interruption_warnings_min": 1,
+    "max_interruption": "L1"
+  },
+  {
+    "scenario_id": "C_finder_downloads",
+    "title": "Ouvre Finder et Downloads",
+    "goal": "ouvre Finder puis le dossier Downloads",
+    "expected_route": ["computer_use", "observe", "invoke", "verify"],
+    "postcondition": {"window_location": "Downloads"},
+    "expected_walter_browse_max": 0,
+    "expected_interruption_warnings_min": 1,
+    "max_interruption": "L1"
+  },
+  {
+    "scenario_id": "D_ax_click",
+    "title": "Clique un élément AX identifiable",
+    "goal": "active le contrôle AX de la fixture",
+    "expected_route": ["computer_use", "observe.ax", "invoke", "verify"],
+    "postcondition": {"fixture_state": "ax_clicked"},
+    "expected_walter_browse_max": 0,
+    "expected_screenshots_max": 0,
+    "expected_vision_calls_max": 0,
+    "max_interruption": "L1"
+  },
+  {
+    "scenario_id": "E_visual_click",
+    "title": "Clique un élément uniquement visuel",
+    "goal": "active la cible visuelle non exposée en AX",
+    "expected_route": ["computer_use", "capture.crop", "visual_locate", "visual_click", "verify"],
+    "postcondition": {"fixture_state": "visual_clicked"},
+    "expected_walter_browse_max": 0,
+    "expected_screenshots_min": 1,
+    "expected_screenshots_max": 1,
+    "expected_vision_calls_min": 1,
+    "expected_vision_calls_max": 1,
+    "expected_interruption_warnings_min": 1,
+    "max_interruption": "L1"
+  },
+  {
+    "scenario_id": "F_unknown_app_observe",
+    "title": "Tâche dans une app inconnue",
+    "goal": "observe la fixture inconnue et accomplis son objectif",
+    "expected_route": ["computer_use", "observe", "llm_reason", "invoke", "verify"],
+    "postcondition": {"fixture_state": "unknown_task_done"},
+    "expected_walter_browse_max": 0,
+    "expected_interruption_warnings_min": 1,
+    "max_interruption": "L1"
+  },
+  {
+    "scenario_id": "G_web_docs_then_computer_use",
+    "title": "Documentation Web puis Computer Use",
+    "goal": "trouve la procédure de la fixture puis applique-la",
+    "expected_route": ["computer_use.observe", "walter_browse", "computer_use", "verify"],
+    "postcondition": {"fixture_state": "documented_task_done"},
+    "expected_walter_browse_min": 1,
+    "expected_walter_browse_max": 1,
+    "expected_interruption_warnings_min": 1,
+    "max_interruption": "L1"
+  },
+  {
+    "scenario_id": "H_active_user_same_task",
+    "title": "Même tâche avec utilisateur actif",
+    "goal": "accomplis la tâche documentée pendant activité utilisateur simulée",
+    "expected_route": ["device_activity", "walter_browse_or_background", "computer_use", "verify"],
+    "postcondition": {"fixture_state": "done_without_unwarned_disruption"},
+    "expected_walter_browse_min": 0,
+    "expected_walter_browse_max": 1,
+    "expected_interruption_warnings_min": 0,
+    "user_active": true,
+    "max_interruption": "L1"
+  }
+]

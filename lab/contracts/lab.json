@@ -186,6 +186,15 @@
       "status": "active",
       "readme": "README.md",
       "vision_target": "lab/experiments"
+    },
+    {
+      "id": "computer-use-v2",
+      "path": "computer-use-v2",
+      "role": "Étude Computer Use V2 (Adaptive Universal Operator) : architecture, prototype en observation, banc ; à l'arrêt",
+      "owner": "lab",
+      "status": "experimental",
+      "readme": "computer-use-v2/README.md",
+      "vision_target": "lab/computer-use-v2"
     }
   ]
 }
