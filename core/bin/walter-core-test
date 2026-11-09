@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Run walter-core's tests with one command (E1 prerequisite 3, 2026-11-09).
+# The tests need two things that live in two environments: pytest (shared runtime, `walter-python`) and the `mcp`
+# package of the MCP server (this module's own venv). This runner uses `walter-python` and appends core's venv
+# site-packages to the path; nothing is installed or modified. Same Python minor version is checked first.
+# Usage: walter-core-test [pytest args…]   (default: the whole tests/ folder, quiet)
+set -euo pipefail
+ROOT=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+SITE=$(ls -d "$ROOT"/venv/lib/python3*/site-packages 2>/dev/null | head -1)
+[ -n "$SITE" ] || { echo "walter-core-test: core venv not found under $ROOT/venv" >&2; exit 2; }
+want=$(basename "$(dirname "$SITE")")
+have=$(walter-python -c 'import sys; print(f"python{sys.version_info[0]}.{sys.version_info[1]}")')
+[ "$want" = "$have" ] || { echo "walter-core-test: core venv is $want, walter-python is $have" >&2; exit 2; }
+cd "$ROOT"
+[ $# -gt 0 ] || set -- -q tests/
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$ROOT:$SITE${PYTHONPATH:+:$PYTHONPATH}" \
+  exec walter-python -m pytest -p no:cacheprovider "$@"

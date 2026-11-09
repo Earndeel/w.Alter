@@ -96,7 +96,7 @@ def report(*, scan=False, live=False, path=None):
         out['interconnect']=interconnect()
         out['neutrality']=neutrality()
         from .documentation import scan as documentation
-        out['documentation']=documentation()
+        out['documentation']=documentation(enforce=True)   # blocking since 2026-11-09 (stock caught up in E1)
         out['ok']=out['ok'] and out['interconnect']['ok'] and out['neutrality']['ok'] and out['documentation']['ok']
     return out
 

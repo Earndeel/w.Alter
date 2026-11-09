@@ -1,7 +1,7 @@
 """Documentation invariants (owner rule 2026-11-09: every module, significant component and annex folder is
 self-describing). Read-only, built on the registry only (no second source): declared component paths, READMEs and
-contracts exist; the module README carries the standard header. Findings are warnings until the existing stock is
-caught up (before E1, see /walter/docs/DOCUMENTATION.md § 7); `enforce=True` turns them into failures.
+contracts exist; the module README carries the standard header. `walter check` calls it with `enforce=True` since
+2026-11-09 (stock caught up in E1, /walter/docs/DOCUMENTATION.md § 7): any finding fails the check.
 """
 from __future__ import annotations
 

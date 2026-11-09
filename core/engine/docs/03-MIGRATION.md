@@ -133,9 +133,11 @@ Le gel et le déplacement physique sont séparés : **E1 gèle, sans rien dépla
 
 Reste à faire dans E1 : (1) source des compositions web et headless dans `core/engine/compositions/` et rendu par
 walter-core — aujourd'hui ces 6 fichiers sont tenus à la main dans `/opt/dsh/home` et contiennent des valeurs de
-l'instance, à séparer (gabarit neutre + valeurs de `@instance/config/core/`) ; (2) rattrapage documentaire (13
-en-têtes, README de colab et raw-vault) puis contrôle en blocage ; (3) environnement de test MCP de core
-(prérequis 3) ; (4) 48 h de service inchangé, avec `walter engine kernel` conforme, puis adoption.
+l'instance, à séparer (gabarit neutre + valeurs de `@instance/config/core/`) ; (2) 48 h de service inchangé, avec `walter engine kernel` conforme, puis adoption.
+
+Fait le 09/11 (fin d'après-midi) : rattrapage documentaire (13 en-têtes standard, README de colab et du Raw Vault ;
+`walter check` : 0 constat, contrôle documentaire passé en blocage) et environnement de test de core (`core/bin/walter-core-test` : pytest de
+`walter-python` + paquet `mcp` du venv de core, rien d'installé ; 223 tests verts).
 
 ## E2 — Accueil et événements natifs
 
@@ -291,8 +293,8 @@ auto-descriptif.
 | # | Sujet | État au 09/11 | Traitement proposé |
 |---|---|---|---|
 | 1 | Disque | 9,5 Go libres (94 %) le matin ; **26 Go libres le soir** (retrait de Miroshark et Neo4j, nettoyages) | Réglé pour E1 (archive 101 Mo, cache 141 Mo) ; le nettoyage de Memory (lot M) en rendra davantage |
-| 2 | Stock documentaire | 13 en-têtes incomplets, README absents pour colab et raw-vault | Rattrapé dans E1, puis contrôle en blocage |
-| 3 | Tests MCP de core | 18 tests sans interpréteur commun (paquet `mcp` + pytest) | Environnement de test de core corrigé avant E1 |
+| 2 | Stock documentaire | 13 en-têtes incomplets, README absents pour colab et raw-vault | **Réglé le 09/11** : en-têtes et README faits, 0 constat ; `walter check` en blocage |
+| 3 | Tests MCP de core | 18 tests sans interpréteur commun (paquet `mcp` + pytest) | **Réglé le 09/11** : `core/bin/walter-core-test`, 223 tests verts |
 | 4 | Dépôt `secrets` | Travail non committé du 25/10 au 07/11, déjà compilé dans le registre ; non publié par `walter-git-publish` | Monsieur ou l'agent auteur le committe ; le contrat `secrets.json` modifié par E0 attend ce commit |
 | 5 | Tests de browse | 5 échecs antérieurs au 09/11 | À corriger dans un lot Browse séparé |
 | 6 | Coûts | 2 572 appels sur 2 588 au coût inconnu (abonnements) | Imputer le coût des abonnements au prix de revient du Router avant le budget de E3 |

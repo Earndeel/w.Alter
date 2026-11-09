@@ -62,6 +62,9 @@ rechecks the fingerprint when read. Old qualifications remain in history but are
 attestation; they must be replayed. This attests the declared local source inventory and bindings, not external
 provider state or the loaded revision of an already running process.
 
+Whole suite in one command (pytest from `walter-python` + the `mcp` package of core's venv, nothing installed):
+`bin/walter-core-test` (extra arguments go to pytest). 223 tests on 2026-11-09.
+
 Isolated regression checks (fixtures only; no models, database or real Telegram):
 
 ```sh
