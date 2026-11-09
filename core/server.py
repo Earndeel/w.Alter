@@ -101,16 +101,14 @@ def memory_recall(query: str, budget: str = "mid", max_tokens: int = 2048) -> st
 @mcp.tool()
 def memory_retain(content: str, context: str = "", tags: list[str] | None = None) -> str:
     """Record a durable fact once in Walter Memory's canonical event store, with module-owned privacy.
-    Search indexing is asynchronous. No direct copy is sent to the legacy Hindsight bank;
-    the result explicitly reports the projection state. Never submit credentials."""
+    Search indexing is asynchronous; the result explicitly reports the projection state. Never submit credentials."""
     return _agent_memory("retain", {"content": content, "context": context, "tags": tags or []})
 
 
 @mcp.tool()
 def memory_reflect(question: str, budget: str = "mid") -> str:
     """Synthesize an answer from permitted canonical memory with source references, using Walter Router.
-    This is Walter Memory reflection, not legacy Hindsight reflect. Local-only questions are
-    refused; redacted questions are pseudonymised. Empty evidence makes no model call."""
+    Local-only questions are refused; redacted questions are pseudonymised. Empty evidence makes no model call."""
     return _agent_memory("reflect", {"question": question, "budget": budget}, timeout=240)
 
 
