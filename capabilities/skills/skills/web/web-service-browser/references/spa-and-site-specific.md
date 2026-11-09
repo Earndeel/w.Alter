@@ -77,20 +77,18 @@ Container inherits host routing automatically. Tested: Grok.com passes Turnstile
 When deploying HTML/CSS/JS artifacts for user preview via Tailscale:
 
 ```bash
-# Find an open port (8888 may be taken by hindsight-api)
-ss -tlnp | grep -E ':(8888|8899|9000)'
+# Walter services already hold 8787-8799 and 8890-8899 (e.g. raw-vault-s3 on 8899): pick a free port outside them
+ss -tlnp | grep -E ':8950 ' || echo "8950 free"
 
-# Serve from the artifact directory
-cd /tmp && python3 -m http.server 8899 &
+# Serve from the artifact directory (temporary preview only; anything that must stay up is a systemd unit)
+cd /tmp && timeout 3600 python3 -m http.server 8950 --bind 100.91.35.121 &
 
-# Open firewall if needed
-iptables -I INPUT -p tcp --dport 8899 -j ACCEPT
-
-# Access via Tailscale IP
-# http://100.91.35.121:8899/index.html
+# Access via Tailscale IP (the public firewall only opens 22/tcp; do not open ports with iptables)
+# http://100.91.35.121:8950/index.html
 ```
 
-**Pitfall**: Always check `ss -tlnp` before choosing a port. Port 8888 is frequently used by hindsight-api.
+**Pitfall**: Always check `ss -tlnp` before choosing a port. (Port 8888 belonged to the Hindsight API, retired on
+2026-10-19.)
 
 ## Scroll Workaround: JS evaluate (PREFERRED)
 
