@@ -49,6 +49,8 @@ PERSONAL_KINDS = ['profile', 'preference', 'psych_hypothesis', 'bias_hypothesis'
 # Paths and names that only occur when the work is on Walter itself (tool arguments of agent conversations).
 WALTER_RE = r'(/walter\M|/walter/|/opt/walter|/opt/dsh|\.hermes|/user/[A-Za-z]|walter[-_]|CLAUDE\.md|hindsight|kardex)'
 OTHER_RE = r'(/projects/|/apps/|/srv/projects)'
+# Historical schemas inventoried apart. Cleanup phase 1 (2026-11-09) dropped walter_voice, walter_audit and the
+# Hindsight objects of `public` (which keeps only the extensions); a schema that no longer exists inventories empty.
 ARTIFACT_SCHEMAS = ['public', 'legacy', 'walter_voice', 'walter_audit', 'user_model', 'x_research']
 
 

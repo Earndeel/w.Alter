@@ -25,3 +25,26 @@ def test_shipped_units_do_not_run_retired_components():
         assert "hindsight" not in text.lower(), unit.name
         assert "--kind ephemeral" not in text, unit.name
     assert not (ROOT / "systemd" / "ephemeral-sweeper.service").exists()
+
+
+# Cleanup phase 1 (2026-11-09): the Hindsight tables of `public`, `walter_voice`, `walter_audit`, the Hindsight sync
+# mechanics of `legacy` and `kardex.hindsight_sync_state` were dropped. No code may read or write them again
+# (migrations are history and stay as they were).
+DROPPED = ("public.memory_units", "public.documents", "walter_voice.", "walter_audit.", "memory_outbox",
+           "units_sync_state", "hindsight_sync_state", "public.entities", "memory_units_bm25")
+
+
+def test_no_code_reads_dropped_hindsight_objects():
+    offenders = []
+    for folder in ("walter_memory", "connectors", "ops", "guardian"):
+        for f in (ROOT / folder).rglob("*"):
+            if f.is_file() and f.suffix in ("", ".py", ".sh", ".sql") and "__pycache__" not in f.parts:
+                text = f.read_text(errors="ignore")
+                offenders += [f"{f.relative_to(ROOT)}: {d}" for d in DROPPED if d in text]
+    assert not offenders, offenders
+
+
+def test_purge_has_no_hindsight_option(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["purge", "--reason", "x", "--by", "test", "--hindsight"])
+    assert "unrecognized arguments: --hindsight" in capsys.readouterr().err

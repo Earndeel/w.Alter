@@ -117,7 +117,7 @@ def main(argv=None) -> None:
     g = sub.add_parser("purge", help="break-glass purge (dry-run unless --execute)")
     g.add_argument("--reason", required=True); g.add_argument("--by", required=True)
     g.add_argument("--event", action="append"); g.add_argument("--object", action="append"); g.add_argument("--pattern")
-    g.add_argument("--hindsight", action="store_true"); g.add_argument("--execute", action="store_true")
+    g.add_argument("--execute", action="store_true")
     g.add_argument("--no-backup-rewrite", action="store_true")
     lg = sub.add_parser("logs", help="walter-logs: what the agents did (messages, reasoning, tool calls/results), all runtimes")
     lg.add_argument("action", choices=["search", "timeline", "get", "sessions", "stats"])
@@ -520,7 +520,7 @@ def main(argv=None) -> None:
             _print(periods.build(a.kind, _d.fromisoformat(a.date) if a.date else _dt.now(_tz.utc).date(), force=True))
     elif a.cmd == "purge":
         _print(purge.purge(reason=a.reason, requested_by=a.by, event_ids=a.event, object_refs=a.object,
-                           pattern=a.pattern, include_hindsight=a.hindsight, execute=a.execute,
+                           pattern=a.pattern, execute=a.execute,
                            rewrite_backups=not a.no_backup_rewrite))
 
 

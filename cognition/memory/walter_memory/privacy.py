@@ -21,11 +21,10 @@ def strictest(*classes: str | None) -> str:
 
 
 def tighten_derived_sources(processor='l3.conversation_summary', *, dry_run=True, backup_dir=None):
-    """Tighten derivative/index classes; quarantine legacy cognitive projections.
+    """Tighten the class of derived items (and their search chunks) to the strictest class of their sources.
 
-    No source content is modified or printed. Hindsight has no canonical privacy
-    column, so its existing recall exclusion tag provides a conservative quarantine.
-    The additional privacy tag and audit log distinguish this from corpus noise.
+    No source content is modified or printed. (Until 2026-11-09 it also tagged the Hindsight copies; the Hindsight
+    tables were dropped in cleanup phase 1.)
     """
     from .db import connection
     from datetime import datetime, timezone
@@ -39,24 +38,18 @@ def tighten_derived_sources(processor='l3.conversation_summary', *, dry_run=True
                 group by d.item_id having max(case e.privacy_class when 'local_only' then 2 when 'redacted_cloud' then 1 else 0 end)
                   > case d.privacy_class when 'local_only' then 2 when 'redacted_cloud' then 1 else 0 end""",(processor,)).fetchall()
         ids=[r['item_id'] for r in rows]
-        docids=['wm:'+str(r['source_refs'].get('ref') or r['item_id']) for r in rows]
-        docs=conn.execute('select id,bank_id,tags from public.documents where id=any(%s)',(docids,)).fetchall() if ids else []
-        units=conn.execute('select id,bank_id,tags from public.memory_units where document_id=any(%s)',(docids,)).fetchall() if ids else []
         chunks=conn.execute("select chunk_id,privacy_class from search.chunks where kind='derived' and ref_id=any(%s)",(ids,)).fetchall() if ids else []
-        out={'dry_run':dry_run,'items':len(ids),'search_chunks':len(chunks),'hindsight_documents':len(docs),'hindsight_units':len(units)}
+        out={'dry_run':dry_run,'items':len(ids),'search_chunks':len(chunks)}
         if dry_run or not ids:return out
         if backup_dir is None:raise ValueError('backup_dir required before privacy changes')
         folder=Path(backup_dir);folder.mkdir(parents=True,exist_ok=True,mode=0o700)
         path=folder/('privacy-before-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')+'.json')
         fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
-        with os.fdopen(fd,'w') as f:json.dump({'derived':rows,'chunks':chunks,'documents':docs,'units':units},f,default=str)
+        with os.fdopen(fd,'w') as f:json.dump({'derived':rows,'chunks':chunks},f,default=str)
         for r in rows:
             cls=ORDER[r['source_rank']];looser=ORDER[:r['source_rank']]
             conn.execute('update core.derived_items set privacy_class=%s where item_id=%s and privacy_class=any(%s)',(cls,r['item_id'],looser))
             conn.execute("update search.chunks set privacy_class=%s where kind='derived' and ref_id=%s and privacy_class=any(%s)",(cls,r['item_id'],looser))
-        for table,key in [('public.documents','id'),('public.memory_units','document_id')]:
-            conn.execute(f"""update {table} set tags=array(select distinct unnest(coalesce(tags,array[]::text[]) ||
-                            array['quarantine:noise','quarantine:privacy']::text[])) where {key}=any(%s)""",(docids,))
         conn.execute("""insert into system.audit_log(actor,action,target,details)
                         values ('walter-memory','privacy.tighten_derived_sources',%s,%s::jsonb)""",
                      (processor,json.dumps({**out,'items_changed':[str(i) for i in ids],'backup':str(path)})))

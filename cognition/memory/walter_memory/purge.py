@@ -2,7 +2,7 @@
 
 Normal history is append-only; this is the explicit exception. Dry-run by default. On --execute it:
   1. deletes matching core.events (+ idempotence keys), derived items citing them, objects (bytes + registry row
-     marked purged), privacy detections refs, and Hindsight memories/documents whose text matches (optional);
+     marked purged), privacy detections refs (the Hindsight tables were dropped on 2026-11-09);
   2. takes a fresh PG dump and offsite backup, then deletes every OLDER PG dump (local + Drive), since those
      still contain the purged data; state.db backups too when --statedb is given (the matching messages are
      redacted in state.db first, with the gateway stopped by the operator);
@@ -25,8 +25,8 @@ def _fp(values) -> list[str]:
     return [hashlib.sha256(str(v).encode()).hexdigest() for v in values]
 
 
-def select_targets(conn, *, event_ids=None, object_refs=None, pattern=None, include_hindsight=False) -> dict:
-    t = {"events": [], "objects": [], "derived": [], "hindsight_units": [], "hindsight_documents": []}
+def select_targets(conn, *, event_ids=None, object_refs=None, pattern=None) -> dict:
+    t = {"events": [], "objects": [], "derived": []}
     if event_ids:
         t["events"] += [r["event_id"] for r in conn.execute(
             "select event_id from core.events where event_id = any(%s::uuid[])", (event_ids,)).fetchall()]
@@ -38,11 +38,6 @@ def select_targets(conn, *, event_ids=None, object_refs=None, pattern=None, incl
             (pattern, pattern)).fetchall()]
         t["derived"] += [r["item_id"] for r in conn.execute(
             "select item_id from core.derived_items where content ~* %s", (pattern,)).fetchall()]
-        if include_hindsight:
-            t["hindsight_units"] = [r["id"] for r in conn.execute(
-                "select id from public.memory_units where text ~* %s", (pattern,)).fetchall()]
-            t["hindsight_documents"] = [r["id"] for r in conn.execute(
-                "select id from public.documents where original_text ~* %s", (pattern,)).fetchall()]
     if object_refs:
         t["objects"] += [r["id"] for r in conn.execute(
             "select id from core.objects where id::text = any(%s) or sha256 = any(%s)", (object_refs, object_refs)).fetchall()]
@@ -53,15 +48,13 @@ def select_targets(conn, *, event_ids=None, object_refs=None, pattern=None, incl
 
 
 def purge(*, reason: str, requested_by: str, event_ids=None, object_refs=None, pattern=None,
-          include_hindsight=False, execute=False, rewrite_backups=True) -> dict:
+          execute=False, rewrite_backups=True) -> dict:
     with connection() as conn:
-        targets = select_targets(conn, event_ids=event_ids, object_refs=object_refs, pattern=pattern,
-                                 include_hindsight=include_hindsight)
+        targets = select_targets(conn, event_ids=event_ids, object_refs=object_refs, pattern=pattern)
         counts = {k: len(v) for k, v in targets.items()}
         selector = {"event_ids": len(event_ids or []), "object_refs": len(object_refs or []),
-                    "pattern_sha256": hashlib.sha256(pattern.encode()).hexdigest() if pattern else None,
-                    "include_hindsight": include_hindsight}
-        fps = _fp([*targets["events"], *targets["objects"], *targets["derived"], *targets["hindsight_units"]])
+                    "pattern_sha256": hashlib.sha256(pattern.encode()).hexdigest() if pattern else None}
+        fps = _fp([*targets["events"], *targets["objects"], *targets["derived"]])
         if not execute:
             conn.execute("""insert into system.purges (requested_by, reason, selector, fingerprints, counts, status)
                             values (%s,%s,%s,%s,%s,'dry_run')""",
@@ -88,11 +81,6 @@ def purge(*, reason: str, requested_by: str, event_ids=None, object_refs=None, p
             s3().delete_object(Bucket=BUCKETS[row["storage_zone"]], Key=row["storage_key"])
             conn.execute("""update core.objects set purged_at = now(), derived_text = null, original_name = null,
                                 meta = '{}', source_ref = '{}' where id = %s""", (oid,))
-        for doc in targets["hindsight_documents"]:
-            conn.execute("delete from public.documents where id = %s", (doc,))   # cascades to chunks
-        if targets["hindsight_units"]:
-            conn.execute("delete from public.memory_units where id = any(%s::uuid[])", (targets["hindsight_units"],))
-            conn.execute("delete from walter_voice.unit_vectors where unit_id = any(%s::uuid[])", (targets["hindsight_units"],))
         conn.execute("""insert into system.purges (requested_by, reason, selector, fingerprints, counts, status,
                             backups_rewritten) values (%s,%s,%s,%s,%s,'executed',%s)""",
                      (requested_by, reason, json.dumps(selector), fps, json.dumps(counts), rewrite_backups))
