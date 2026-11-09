@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""walter-skills watchdog in Incident v1 (2026-10-28): service and bus consumer health only — never the skills' content (the Curator owns it)."""
+"""walter-skills watchdog in Incident v1 (2026-10-28): service, bus consumer and library health only — never the skills' content (the Curator owns it)."""
 import json, subprocess, sys, time, urllib.request
 
 
@@ -38,4 +38,14 @@ if h.get("_error") or not h.get("ok"):
     out.append(inc("skills", "service:health", "service_unhealthy", "high", "walter-skills :8891 ne répond pas sainement.", h, "G1"))
 elif h.get("degraded"):
     out.append(inc("skills", "service:degraded", "service_degraded", "warning", "walter-skills répond en mode dégradé.", h, "G1"))
+# Library health beyond the service (nightly freshness, bus consumers, stale cards): taken over on 2026-11-09 from the
+# retired Hermes cron "Memory Health Check", which ran `walter-skills health` every 5 min.
+r = sh("walter-skills", "health", timeout=60)
+try:
+    for p in json.loads(r.stdout).get("problems") or []:
+        out.append(inc("skills", "health:" + str(p).split(":")[0][:60], "health_problem", "warning",
+                       f"walter-skills : {p}.", {"problem": p}))
+except ValueError:
+    out.append(inc("skills", "health:unavailable", "check_failed", "warning", "walter-skills health ne répond pas.",
+                   {"rc": r.returncode}))
 print(json.dumps(out, ensure_ascii=False))
