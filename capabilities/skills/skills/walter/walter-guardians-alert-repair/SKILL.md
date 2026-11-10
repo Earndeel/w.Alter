@@ -32,8 +32,8 @@ Read `/walter/<module>/contracts/maintenance.json`, its declared check command, 
 cat /walter/memory/contracts/maintenance.json
 cat /walter/memory/guardian/check
 walter-memory health
-cat /walter/browse/contracts/maintenance.json
-cat /walter/browse/guardian/check
+cat /walter/capabilities/browse/contracts/maintenance.json
+cat /walter/capabilities/browse/guardian/check
 systemctl cat walter-exit-mac
 journalctl -u walter-exit-mac --since '-8h' --no-pager
 ```
@@ -86,7 +86,7 @@ When an interruption is appropriate and authorized, use a recoverable service to
 
 ## Commit only the intended module files
 
-Guardian changes can span `/walter/core`, `/walter/memory`, `/walter/browse`, `/walter/secrets`, `/walter/skills`, `/walter/context`, `/walter/ops`, and `/walter/router`, each a separate Git repository. Inspect staged and unstaged changes before staging explicit paths; preserve unrelated session work.
+Guardian changes can span `/walter/core`, `/walter/memory`, `/walter/capabilities/browse`, `/walter/secrets`, `/walter/skills`, `/walter/context`, `/walter/ops`, and `/walter/router`, each a separate Git repository. Inspect staged and unstaged changes before staging explicit paths; preserve unrelated session work.
 
 If Git reports a missing identity, inspect recent authors first:
 
