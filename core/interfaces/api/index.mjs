@@ -5,6 +5,7 @@
 // create / prompt / cancel / follow, idempotent prompts by requestId), the Run Plane and the bus (opened by the
 // intake/events plugins for every turn whatever its door) and Walter's execution policy (door published to it).
 import { rootIdOf } from '../../engine/plugins/lineage.mjs';
+import { execFile } from 'node:child_process';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -39,6 +40,21 @@ const walterKey = (kernel) => `dsh/vm/${kernel}`;
 
 
 /** The child's instructions: the caller's goal, its facts, and the shape its answer must take. */
+const MODEL_ID = /^[A-Za-z0-9._:\/-]{1,120}$/;
+
+/** Walter Router validates a model named for a delegation (its declared CLI: `walter-router route - --model …`).
+ *  Resolves {ok, error}; a router that cannot be asked is an explicit refusal, never a guess. */
+export function routerValidate(model, { bin = 'walter-router', timeoutMs = 20_000 } = {}) {
+  const args = ['route', '-', '--model', model.id, ...(model.provider ? ['--provider', model.provider] : [])];
+  return new Promise((resolve) => execFile(bin, args, { timeout: timeoutMs, maxBuffer: 1 << 20 }, (err, stdout) => {
+    let d = null;
+    try { d = JSON.parse(stdout || 'null'); } catch { /* below */ }
+    if (!d) return resolve({ ok: false, error: `router_unavailable: ${String(err?.code || err?.message || 'no answer').slice(0, 80)}` });
+    if (d.mode === 'none' || d.error || !(d.execution || []).length) return resolve({ ok: false, error: String(d.error || 'no route for this model').slice(0, 200) });
+    resolve({ ok: true, model_id: d.model_id });
+  }));
+}
+
 export function mission(d) {
   const parts = ['[Délégation Walter] Tu exécutes une sous-tâche pour un autre agent. Tu ne vois pas sa conversation : '
     + 'tout ce qu\'il faut est ci-dessous. Réponds par le résultat lui-même, vérifiable, sans préambule.', '', `Objectif : ${d.goal.trim()}`];
@@ -51,7 +67,8 @@ export function mission(d) {
 /** The engine side of the API, independent of HTTP (tests drive it with a stand-in sessionController). */
 export class EngineApi {
   constructor({ sessions, bindings, workspace, approvalTimeoutMs = 10 * 60_000, log = () => {}, maxDepth = 3,
-    provider = 'walter', tasks = ['coding', 'general', 'document', 'summarization', 'auto'] }) {
+    provider = 'walter', tasks = ['coding', 'general', 'document', 'summarization', 'auto'], validateModel = null }) {
+    this.validateModel = validateModel;   // async (model) → {ok, error}: Walter Router's word on a named model
     this.sessions = sessions; this.bindings = bindings; this.workspace = workspace;
     this.approvalTimeoutMs = approvalTimeoutMs; this.log = log;
     this.maxDepth = maxDepth; this.provider = provider; this.tasks = tasks;
@@ -190,6 +207,18 @@ export class EngineApi {
     if (!d || d.version !== 1 || typeof d.goal !== 'string' || !d.goal.trim()) throw new ApiError(400, 'invalid_delegation', 'delegation.v1 with a goal');
     const key = String(d.idempotency_key || '');
     if (key.length < 8 || key.length > 200) throw new ApiError(400, 'idempotency_key_required');
+    // a model the owner named: validated by Walter Router before the call, executed exactly by walter-llm (never
+    // another model, never a second loop); the engine keeps permissions, privacy, costs, children and interruption
+    let model = null;
+    if (d.model != null) {
+      const id = typeof d.model === 'string' ? d.model : d.model?.id;
+      const provider = typeof d.model === 'object' ? d.model?.provider ?? null : null;
+      if (!MODEL_ID.test(String(id || '')) || (provider !== null && !MODEL_ID.test(String(provider)))) throw new ApiError(400, 'invalid_model', 'model {id, provider?}');
+      model = { id, ...(provider ? { provider } : {}) };
+      if (!this.validateModel) throw new ApiError(501, 'model_validation_unavailable', 'no Router to validate a named model');
+      const v = await this.validateModel(model);
+      if (!v?.ok) throw new ApiError(422, 'model_unavailable', v?.error || 'refused by Walter Router');
+    }
     const depth = Number(d.parent?.depth ?? 0);
     if (!Number.isInteger(depth) || depth < 0) throw new ApiError(400, 'invalid_depth');
     if (depth >= this.maxDepth) throw new ApiError(403, 'max_depth', `delegation depth ${depth} reaches the limit ${this.maxDepth}`);
@@ -198,9 +227,10 @@ export class EngineApi {
     const row = this.bindings.get(opened.session_id);
     if (!row.unattended) {
       this.bindings.set({ ...row, unattended: true, parent: { run_id: d.parent?.run_id || null, session_id: d.parent?.session_id || null,
-        task_id: d.parent?.task_id || null, depth }, goal_sha: createHash('sha256').update(d.goal).digest('hex').slice(0, 16) });
+        task_id: d.parent?.task_id || null, depth }, goal_sha: createHash('sha256').update(d.goal).digest('hex').slice(0, 16),
+        ...(model ? { model } : {}) });
     }
-    if (!opened.resumed && d.task && d.task !== 'auto' && this.tasks.includes(d.task)) {
+    if (!opened.resumed && !model && d.task && d.task !== 'auto' && this.tasks.includes(d.task)) {
       await this.sessions.selectModel({ sessionId: row.kernel, provider: this.provider, model: d.task })
         .catch((e) => this.log('delegate.model', { session_id: opened.session_id, error: String(e?.code || e).slice(0, 80) }));
     }
@@ -214,8 +244,8 @@ export class EngineApi {
     }
     this.log('delegate', { session_id: opened.session_id, caller, depth, status: res.status, tools: res.tools.length });
     return { ok: res.status === 'ok' && Boolean(res.text), output: res.text, status: res.status, reason: res.reason,
-      tools: res.tools, session_id: opened.session_id, walter_session: opened.walter_session, request_id: key,
-      resumed: opened.resumed };
+      ...(res.error ? { error: res.error } : {}), tools: res.tools, session_id: opened.session_id, walter_session: opened.walter_session, request_id: key,
+      resumed: opened.resumed, ...(model ? { model } : {}) };
   }
 
   /** Answerer for sessions this API opened (the web keeps its own dialog): the client decides, no answer = refused. */
@@ -339,7 +369,7 @@ export function apply(ctx, config = {}) {
     catch { /* journal is best effort */ }
   };
   const api = new EngineApi({ sessions: ctx.sessionController, bindings, workspace: config.workspace,
-    approvalTimeoutMs: config.approvalTimeoutMs, log: journal });
+    approvalTimeoutMs: config.approvalTimeoutMs, log: journal, validateModel: (m) => routerValidate(m) });
   ctx.on('approval/request', (req, next) => api.approval(req, next), { prepend: true });
   const server = createServer(handler(api, ensureToken(config.tokenFile)));
   server.listen(Number(config.port || 8895), host);

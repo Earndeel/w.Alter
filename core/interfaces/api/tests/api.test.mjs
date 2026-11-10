@@ -1,13 +1,13 @@
 // Engine API (lot E4): addresses, idempotent submit, result of a turn, cancel, approvals, door published to the
 // policy, HTTP token. Kernel stand-in: a sessionController with the same five methods the plugin uses.
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { Bindings, doors, engineSessionId, sessionMeta } from '../bindings.mjs';
 import { TurnWatch, toClientEvent } from '../events.mjs';
-import { EngineApi, ensureToken, handler } from '../index.mjs';
+import { EngineApi, ensureToken, handler, routerValidate } from '../index.mjs';
 import { interfaceOf } from '../../../engine/plugins/policy/index.mjs';
 
 class FakeSessions {
@@ -122,19 +122,44 @@ test('turn.submit waits for the result; same idempotency key = one prompt; resul
 });
 
 test('delegate: one engine session per task, parent run published, task model, depth limit, never asks', async () => {
-  const { api, sessions } = make();
+  const asked = [];
+  const { api, sessions } = make({ validateModel: async (m) => (asked.push(m), m.id === 'claude-opus-5-5' ? { ok: true } : { ok: false, error: `modèle inconnu du router : ${m.id}` }) });
   const d = { version: 1, goal: 'Trouve la date du jour', task: 'general', budget_seconds: 60, idempotency_key: 'walter-run-0001',
     parent: { run_id: 'run-parent', session_id: 'mcp/claude/s1', depth: 0 } };
   const r = await api.op({ version: 1, op: 'delegate', caller: 'claude', delegation: d });
   assert.equal(r.ok, true); assert.match(r.output, /^ok:\[Délégation Walter\]/); assert.match(r.session_id, /^mcp\/claude\/task-/);
   const kernel = r.walter_session.replace('dsh/vm/', '');
-  assert.deepEqual(sessionMeta().get(kernel), { channel: 'machine', parent_run_id: 'run-parent' });
+  assert.deepEqual(sessionMeta().get(kernel), { channel: 'machine', parent_run_id: 'run-parent', model: null });
   assert.deepEqual(sessions.selected, [{ sessionId: kernel, provider: 'walter', model: 'general' }]);
   const again = await api.op({ version: 1, op: 'delegate', caller: 'claude', delegation: d });
   assert.equal(again.resumed, true); assert.equal(sessions.prompts.length, 1, 'a replayed delegation runs once');
   await assert.rejects(api.op({ version: 1, op: 'delegate', delegation: { ...d, idempotency_key: 'walter-run-0002', parent: { ...d.parent, depth: 3 } } }), { code: 'max_depth' });
   await assert.rejects(api.op({ version: 1, op: 'delegate', delegation: { ...d, idempotency_key: undefined } }), { code: 'idempotency_key_required' });
   assert.equal(await api.approval({ agent: { session: { header: { id: kernel } } }, toolName: 'bash' }, async () => 'next'), 'rejected', 'nobody to ask');
+  // a model named by the owner (validated by Walter Router): published for the run plan, no poste selected
+  const named = await api.op({ version: 1, op: 'delegate', caller: 'claude', delegation: { ...d, idempotency_key: 'walter-run-0003', model: { id: 'claude-opus-5-5', provider: 'venice' } } });
+  const nk = named.walter_session.replace('dsh/vm/', '');
+  assert.deepEqual(sessionMeta().get(nk).model, { id: 'claude-opus-5-5', provider: 'venice' });
+  assert.equal(sessions.selected.length, 1, 'no poste chosen when a model is named');
+  assert.deepEqual(named.model, { id: 'claude-opus-5-5', provider: 'venice' });
+  await assert.rejects(api.op({ version: 1, op: 'delegate', delegation: { ...d, idempotency_key: 'walter-run-0004', model: { id: 'x; rm -rf' } } }), { code: 'invalid_model' });
+  // a model Walter Router refuses: explicit error before any session opens, never the former loop
+  const before = sessions.prompts.length;
+  await assert.rejects(api.op({ version: 1, op: 'delegate', delegation: { ...d, idempotency_key: 'walter-run-0005', model: 'nope-model' } }), { code: 'model_unavailable', message: /inconnu/ });
+  assert.equal(sessions.prompts.length, before); assert.deepEqual(asked.map((m) => m.id), ['claude-opus-5-5', 'nope-model']);
+  // without a Router to ask, a named model is refused too
+  const bare = make().api;
+  await assert.rejects(bare.op({ version: 1, op: 'delegate', delegation: { ...d, idempotency_key: 'walter-run-0006', model: 'claude-opus-5-5' } }), { code: 'model_validation_unavailable' });
+});
+
+test('routerValidate asks the walter-router CLI and refuses when it cannot answer', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'walter-rv-'));
+  const bin = join(dir, 'walter-router');
+  writeFileSync(bin, '#!/bin/sh\ncase "$4" in good) echo \'{"mode":"delegate","model_id":"good","execution":[{"provider":"p"}]}\';; '
+    + 'bad) echo \'{"mode":"none","error":"modèle inconnu du router : bad"}\';; *) exit 3;; esac\n', { mode: 0o755 });
+  assert.deepEqual(await routerValidate({ id: 'good' }, { bin }), { ok: true, model_id: 'good' });
+  assert.deepEqual(await routerValidate({ id: 'bad' }, { bin }), { ok: false, error: 'modèle inconnu du router : bad' });
+  assert.match((await routerValidate({ id: 'other' }, { bin })).error, /^router_unavailable/);
 });
 
 test('turn.cancel reaches the kernel', async () => {

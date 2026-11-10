@@ -92,7 +92,9 @@ export async function nativeTurn(cfg, { session, turn, step, message, parent = n
       ...(parentRunId ? { parent_run_id: parentRunId } : {}),
       // the previous turn never got its end: interrupted. A replay of this same turn is not a new turn.
       cancel_run_id: previous && previous.key !== key ? previous.run_id : null,
-      routing: { applied: false, configured: true, via: 'walter-llm poste (DSH provider walter)' },
+      routing: { applied: false, configured: true, via: 'walter-llm poste (DSH provider walter)',
+        // a model the owner named for this conversation (Engine API delegation): the plan walter-llm reads per call
+        ...(meta.model?.id ? { requested: { model: meta.model.id, ...(meta.model.provider ? { provider: meta.model.provider } : {}) } } : {}) },
     }, { auth, timeoutMs: 5000 });
     currentRuns.set(session, { run_id: run.run_id, turn, key });
     run.ms = Math.round(performance.now() - t0);

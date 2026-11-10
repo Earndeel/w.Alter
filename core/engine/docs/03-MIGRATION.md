@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Ordonner la convergence de Walter vers `VISION.md`, lot par lot, avec tests, critères d'adoption et retour arrière essayé. Deux objectifs menés ensemble : **A** convergence fonctionnelle (un seul runtime de production) et **B** convergence architecturale (arborescence, conventions, interfaces, documentation). |
 | **Propriétaire** | walter-core (exécution : le builder ; validation : Monsieur, **lot par lot**). |
-| **État** | 09/11/2026 · direction validée par Monsieur. **S0 et E0 faits** (§ S0, § E0). **E1 autorisé le 09/11 et en cours** (§ E1 : gel fait et prouvé, compositions rendues depuis une source, rattrapage documentaire fait ; restent 48 h de service inchangé, jusqu'au 11/11 au soir). Chaque lot suivant est autorisé séparément. Lots hors moteur ouverts le 09/11 : E9.2 PostgreSQL (préparé, § E9) et nettoyage de Memory (plan à valider, § M). |
+| **État** | 10/11/2026 · **E2–E5 activés sur Walter** (`dsh-web`, consigne de Monsieur du 10/11 : instance de développement, attente E1 de 48 h abandonnée ; vérifiés de bout en bout, point de retour `@instance/backups/changes/2026-11-10-engine-activation/`). En cours : E6, E7 (priorité), E8. Tableau : `/walter/docs/V1.md`. Historique : S0, E0, E1 faits le 09/11. |
 | **Ne fait pas** | Ne décrit pas l'organisation interne du moteur (`02-ARCHITECTURE.md`) ni l'inventaire des emplacements (`05-CARTOGRAPHIE.md`). |
 | **Contrats** | Schémas du moteur `core/engine/contracts/` ; registre des modules (`vision_target` des modules et des composants) ; règle documentaire `/walter/docs/DOCUMENTATION.md`. |
 
@@ -281,7 +281,7 @@ Ce lot reprend et remplace les lots A–D du plan du 08/11.
 - **Retour arrière** : interrupteur `walter_run.engine=false` ⇒ ancienne boucle **sans terminal** ; ensuite
   restauration depuis la quarantaine.
 
-### État (10/11/2026) — construit et prouvé sur un hôte de test, pas encore en service
+### État (10/11/2026) — activé sur Walter et vérifié de bout en bout (modèle nommé compris)
 
 Réalisé sans `core/orchestration` ni outil natif séparé : le noyau sait déjà déléguer, Walter le gouverne.
 

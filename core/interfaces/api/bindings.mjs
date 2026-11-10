@@ -20,7 +20,8 @@ export function doors() {
 }
 
 /** In-process map kernel session id → what the engine's intake needs to file its runs: channel (owner | machine |
- *  test: a test conversation is capped by walter-llm's test budget) and the parent run of a delegation. */
+ *  test: a test conversation is capped by walter-llm's test budget), the parent run of a delegation and the model
+ *  the owner named for it ({id, provider?}: written on each run's plan, executed exactly by walter-llm). */
 export function sessionMeta() {
   if (!(globalThis[META_KEY] instanceof Map)) globalThis[META_KEY] = new Map();
   return globalThis[META_KEY];
@@ -30,7 +31,8 @@ export const channelOf = (principal) => ({ machine: 'machine', test: 'test' }[pr
 
 function publish(row) {
   doors().set(row.kernel, row.door);
-  sessionMeta().set(row.kernel, { channel: channelOf(row.principal), parent_run_id: row.parent?.run_id || null });
+  sessionMeta().set(row.kernel, { channel: channelOf(row.principal), parent_run_id: row.parent?.run_id || null,
+    model: row.model || null });   // a model named by the owner and validated by Walter Router (delegation, E5)
 }
 
 /** `<door>/<account>/<conversation>`, validated against engine-api.v1 `session_id`. */

@@ -40,6 +40,9 @@ export function turnStatus(reason) {
 /** Why, in a few words a client can show (never the provider's raw error body). */
 export const reasonOf = (reason) => (typeof reason === 'string' ? reason : reason?.kind ?? null);
 
+/** The error code of a failed turn (e.g. INVALID_REQUEST), never its message: provider bodies may echo inputs. */
+export const errorOf = (reason) => (reason?.kind === 'error' && reason.error?.code ? String(reason.error.code).slice(0, 60) : null);
+
 /**
  * Follows one request through the log: the turn that received the owner message carrying `requestId`
  * (the kernel echoes the prompt's requestId as the user source's rpcId), its last answer, its tools, its end.
@@ -49,7 +52,7 @@ export class TurnWatch {
   constructor(requestId) {
     this.requestId = requestId;
     this.turn = null; this.current = null; this.pendingStart = false;
-    this.text = ''; this.tools = []; this.done = false; this.reason = null; this.endSeq = null;
+    this.text = ''; this.tools = []; this.done = false; this.reason = null; this.endSeq = null; this.error = null;
   }
 
   feed(ev) {
@@ -59,7 +62,10 @@ export class TurnWatch {
       this.current = d.turn;
       if (this.pendingStart) { this.turn = d.turn; this.pendingStart = false; }
     } else if (ev.type === 'turn/end' && this.current === d.turn) {
-      if (this.turn === d.turn) { this.done = true; this.reason = reasonOf(d.reason); this.endSeq = ev.seq; }
+      if (this.turn === d.turn) {
+        this.done = true; this.reason = reasonOf(d.reason); this.endSeq = ev.seq;
+        this.error = errorOf(d.reason);
+      }
       this.current = null;
     } else if (ev.type === 'user/message' && this.turn === null && d.source?.rpcId === this.requestId) {
       if (this.current !== null) this.turn = this.current;  // inside a turn (new turn or steering)
@@ -73,6 +79,6 @@ export class TurnWatch {
 
   result() {
     return { done: this.done, turn: this.turn, status: this.done ? turnStatus(this.reason) : 'running',
-      reason: this.reason, text: this.text, tools: this.tools, seq: this.endSeq };
+      reason: this.reason, ...(this.error ? { error: this.error } : {}), text: this.text, tools: this.tools, seq: this.endSeq };
   }
 }
