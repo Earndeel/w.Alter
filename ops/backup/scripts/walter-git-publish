@@ -45,13 +45,29 @@ def settings():
             'deny_paths': json.loads(env.get('WALTER_GIT_PUBLISH_DENY') or '{}')}
 
 
-def modules(cfg):
+SKIP = {'.git', 'node_modules', 'venv', '.venv', '.worktrees', '__pycache__', 'state', 'data'}
+
+
+def modules(cfg, depth=3):
+    """Module repositories under the Walter root, at any depth of the vision tree (E9, 2026-11-10:
+    `capabilities/skills`, `cognition/router`, `core/identity`…). Compatibility links are never followed; a
+    repository nested in another one (raw-vault in memory) is published on its own. Names stay unique."""
     root = Path(run('walter', 'path', 'core')).parent
-    out = []
-    for d in sorted(root.iterdir()):
-        if d.is_symlink() or not (d / '.git').is_dir() or d.name in cfg.get('exclude', []):
-            continue
-        out.append(d)
+    out, names = [], {}
+
+    def walk(d, level):
+        for c in sorted(d.iterdir()):
+            if c.is_symlink() or not c.is_dir() or c.name in SKIP:
+                continue
+            if (c / '.git').is_dir() and c.name not in cfg.get('exclude', []):
+                if c.name in names:
+                    raise SystemExit(f'two module repositories named {c.name}: {names[c.name]} and {c}')
+                names[c.name] = c
+                out.append(c)
+            if level < depth:
+                walk(c, level + 1)
+
+    walk(root, 1)
     return out
 
 
