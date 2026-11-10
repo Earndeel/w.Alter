@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Rôle** | Choisir, pour chaque poste, le meilleur modèle que Walter peut réellement exécuter et la façon la moins chère de l'exécuter, avec décisions et coûts traçables. |
-| **Propriétaire** | Walter Router (`/walter/router`). |
+| **Propriétaire** | Walter Router (`/walter/cognition/router`). |
 | **État** | **active** (constat du 09/11/2026) : `walter-router-refresh.timer` (48 h), `walter-router-guardian.timer`, page bibliothèque. |
 | **Ne fait pas** | Basculer seul sur un modèle (il propose au propriétaire). Exécuter les appels (`llm`). Garder des données du propriétaire dans le logiciel (elles sont dans l'instance). |
 | **Contrats** | [contracts/router.json](contracts/router.json), [contracts/data-classes.json](contracts/data-classes.json), [contracts/maintenance.json](contracts/maintenance.json) ; CLI `walter-router` ; schéma PostgreSQL `models` (`docs/DATA.md`). |

@@ -3,8 +3,8 @@ Description=walter-llm — W.Alter model gateway (Walter Router choice + Bitward
 After=network-online.target walter-memory-gateway.service
 
 [Service]
-ExecStart=/opt/walter-llm/venv/bin/python3 /opt/walter-llm/gateway.py serve
-WorkingDirectory=/opt/walter-llm
+ExecStart=/walter/cognition/router/llm/venv/bin/python3 /walter/cognition/router/llm/gateway.py serve
+WorkingDirectory=/walter/cognition/router/llm
 Restart=on-failure
 RestartSec=5
 User=root

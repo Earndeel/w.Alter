@@ -3,7 +3,7 @@
   "module": "router",
   "check": [
     "python3",
-    "/walter/router/guardian/check-v1"
+    "/walter/cognition/router/guardian/check-v1"
   ],
   "max_level": "G2",
   "levels": {

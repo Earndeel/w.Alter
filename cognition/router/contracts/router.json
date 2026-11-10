@@ -60,7 +60,7 @@
     "owner": "router",
     "kind": "capability",
     "purpose": "Choisir les modèles par poste avec décisions et coûts traçables.",
-    "target_root": "router",
+    "target_root": "cognition/router",
     "config_paths": [],
     "permissions": [
       "accord propriétaire pour changer un choix"

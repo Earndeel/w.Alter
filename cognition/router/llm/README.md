@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Rôle** | Passerelle de modèles compatible OpenAI sur loopback (127.0.0.1:8894) pour les consommateurs autorisés : transporte les messages et outils de l'appelant vers le poste choisi par le Router. |
-| **Propriétaire** | Walter Router (module `llm`, `/walter/router/llm`). |
+| **Propriétaire** | Walter Router (module `llm`, `/walter/cognition/router/llm`). |
 | **État** | **active** (constat du 09/11/2026) : service `walter-llm`. |
 | **Ne fait pas** | Choisir le modèle (Router) ; garder les clés fournisseur (Secrets) ; créer une autre boucle d'agent. |
 | **Contrats** | [contracts/llm.json](contracts/llm.json) ; API `/v1` compatible OpenAI, `model` = un poste du Router, jeton local révocable par consommateur. |

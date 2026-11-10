@@ -6,13 +6,13 @@ commande validée `alias-add`. Tu ne modifies rien d'autre : ni la base directem
 fichiers du projet. Pas de délégation, pas de génération de média, pas d'appel à d'autres modèles.
 
 ## Données (lecture seule)
-- Résumé du cycle : `/opt/walter-router/bin/walter-router review` (JSON) — sources, alertes créées, état des
+- Résumé du cycle : `/walter/cognition/router/bin/walter-router review` (JSON) — sources, alertes créées, état des
   providers, niveaux texte calculés vs déclarés, meilleur modèle par tâche, candidats de rapprochement de noms,
   variations de prix des modèles de la short list.
-- Santé : `/opt/walter-router/bin/walter-router health`
-- Dossier d'une tâche si besoin : `/opt/walter-router/bin/walter-router dossier <tâche>`
-- Méthode des 3 niveaux : `/opt/walter-router/docs/TIERS.md` ; préférences : `/opt/walter-router/config/knowledge.json`
-- Alias de noms existants : `/opt/walter-router/walter_router/aliases.json`
+- Santé : `/walter/cognition/router/bin/walter-router health`
+- Dossier d'une tâche si besoin : `/walter/cognition/router/bin/walter-router dossier <tâche>`
+- Méthode des 3 niveaux : `/walter/cognition/router/docs/TIERS.md` ; préférences : `/walter/cognition/router/config/knowledge.json`
+- Alias de noms existants : `/walter/cognition/router/walter_router/aliases.json`
 Tu peux faire des recherches web ciblées pour vérifier qu'un nom de modèle désigne bien le même modèle qu'un
 autre (page officielle, page provider). Maximum 8 recherches.
 
@@ -22,7 +22,7 @@ autre (page officielle, page provider). Maximum 8 recherches.
 2. Rapprochements de noms (`unmatched_candidates`, et tout modèle récent des providers de {{owner.address}} resté sans
    score alors qu'un nom de marque différent existe — ex. Hailuo 3 = MiniMax H3) : décide MÊME modèle / AUTRE
    modèle / incertain, avec la preuve. Pour chaque « même modèle » certain, APPLIQUE-le :
-   `/opt/walter-router/bin/walter-router alias-add <id_non_classé> <id_classé> --reason "<preuve>"`
+   `/walter/cognition/router/bin/walter-router alias-add <id_non_classé> <id_classé> --reason "<preuve>"`
    (la commande refuse les liens absurdes ; pour deux noms très différents, mets l'URL de la source dans la
    preuve). Jamais sur une simple ressemblance (7b ≠ 72b, 3.1 ≠ 3.5, Hermes 3 ≠ Hermes 4, flash ≠ flash-lite).
    Liste des liens déjà ajoutés : `walter-router alias-list` ; retrait : `walter-router alias-remove <id>`.
