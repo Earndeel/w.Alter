@@ -457,6 +457,11 @@ _LAYER = "\n\n".join(x for x in (_LAYER, toolset_note(_HIDDEN)) if x)
 if _LAYER:
     mcp._mcp_server.instructions = BASE_INSTRUCTIONS + "\n\n" + _LAYER
 
+# Walter's one execution policy (core/security, lot E3): a call it refuses never reaches a tool, whatever the client.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "security"))
+from walter_security import mcp_guard  # noqa: E402
+mcp_guard.install(mcp, CLIENT_TAG)
+
 
 if __name__ == "__main__":
     if "--http" in sys.argv:

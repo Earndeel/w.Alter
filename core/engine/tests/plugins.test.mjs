@@ -201,3 +201,25 @@ test('delivery: an unanswered gateway is a transport defect, not a refusal', asy
   assert.equal(row.steps.emit.outcome, 'transport');
   assert.equal(row.steps.emit.retried, true);
 });
+
+test('native: a turn interrupted (idle without its stop boundary) closes its run cancelled; after an error, failed', async () => {
+  const cfg = config('native');
+  const ctx = fakeCtx();
+  events.apply(ctx, cfg);
+  currentRuns.set('dsh/vm/session-1', { run_id: 'run-c', turn: 4 });
+  ctx.handlers['agent/status'][0]({ agent: agent(), status: 'idle' });
+  await new Promise((r) => setTimeout(r, 30));
+  const end = calls.find((c) => c.path === '/v1/runs/end');
+  assert.equal(end.body.status, 'cancelled');
+  assert.equal(calls.find((c) => c.path === '/v1/bus/emit').body.payload.status, 'cancelled');
+  calls.length = 0;
+  currentRuns.set('dsh/vm/session-1', { run_id: 'run-f', turn: 5 });
+  ctx.handlers['agent/error'][0]({ agent: agent() });
+  ctx.handlers['agent/status'][0]({ agent: agent(), status: 'idle' });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(calls.find((c) => c.path === '/v1/runs/end').body.status, 'failed');
+  calls.length = 0;
+  ctx.handlers['agent/status'][0]({ agent: agent(), status: 'idle' });          // nothing open: nothing sent
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(paths(), []);
+});

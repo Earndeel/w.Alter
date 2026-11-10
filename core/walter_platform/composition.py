@@ -28,7 +28,8 @@ DSH_OWNER_TURN=ROOT/'hooks'/'dsh'/'owner-turn.mjs'
 # SessionStart and PostToolUse. Switch: [dsh.engine] intake in @instance/config/core/engine.toml.
 ENGINE_PLUGINS=ROOT/'engine'/'plugins'
 ENGINE_INTAKE=('hook','shadow','native')
-ENGINE_ROWS=('walter-intake','walter-events')
+ENGINE_ROWS=('walter-intake','walter-events','walter-policy','walter-budget')
+ENGINE_POLICY=('off','enforce')                     # lot E3: Walter's one execution policy in the engine
 NATIVE_HOOKS=('UserPromptSubmit','Stop')            # what the native plugins take over from walter_hook.py
 # Lot 1 (2026-11-07, /walter/docs/DECISIONS.md): DSH is only the agent loop and technical tool execution. Every DSH
 # row that competes with a Walter module is off: identity → soul, skills → walter-skills, web → walter_browse,
@@ -82,20 +83,35 @@ def engine_intake(values):
     return mode
 
 
-def _engine_rows(mode):
-    """The engine's intake and events plugins for this mode (none for `hook`). Locations come from the instance and
-    from Walter Memory's public client (its gateway credential file), never written here by hand."""
-    if mode=='hook':return []
+def engine_policy(values):
+    # WALTER_ENGINE_POLICY: a test or Lab home composed otherwise (`--home`), never set for the live service
+    mode=str(os.environ.get('WALTER_ENGINE_POLICY') or values.get('dsh',{}).get('engine',{}).get('policy','off'))
+    if mode not in ENGINE_POLICY:raise ValueError('unknown [dsh.engine] policy (off or enforce)')
+    return mode
+
+
+def _engine_rows(mode,policy='off'):
+    """The engine's intake and events plugins for this mode (none for `hook`), and its policy plugin when enforced.
+    Locations come from the instance and from Walter Memory's public client (its gateway credential file), never
+    written here by hand."""
+    if mode=='hook' and policy=='off':return []
     import subprocess
     from . import instance as inst
     # Walter Memory's public client names its credential file (the shared runtime has it; this CLI may not)
     out=subprocess.run(['walter-python','-c','from walter_memory import client; print(client.ENV_FILE)'],
                        capture_output=True,text=True,timeout=60)
     if out.returncode or not out.stdout.strip():raise ValueError('Walter Memory client unavailable: no gateway credential for the engine plugins')
+    rows=[]
+    if policy=='enforce':   # first: the door every tool call of every agent goes through
+        rows.append({'id':'walter-policy','name':str(ENGINE_PLUGINS/'policy'/'index.mjs'),
+                     'config':{'interface':'web','stateDir':str(inst.path('state','core','security')),'tokenFile':out.stdout.strip()}})
+        rows.append({'id':'walter-budget','name':str(ENGINE_PLUGINS/'budget'/'index.mjs'),
+                     'config':{'stateDir':str(inst.path('state','core','security'))}})
+    if mode=='hook':return rows
     cfg={'mode':mode,'runtime':'dsh','stateDir':str(inst.path('state','core','engine','intake')),
          'runsDir':str(inst.path('state','runs','current')),'tokenFile':out.stdout.strip()}
-    return [{'id':'walter-intake','name':str(ENGINE_PLUGINS/'intake'/'index.mjs'),'config':cfg},
-            {'id':'walter-events','name':str(ENGINE_PLUGINS/'events'/'index.mjs'),'config':dict(cfg)}]
+    return rows+[{'id':'walter-intake','name':str(ENGINE_PLUGINS/'intake'/'index.mjs'),'config':cfg},
+                 {'id':'walter-events','name':str(ENGINE_PLUGINS/'events'/'index.mjs'),'config':dict(cfg)}]
 
 
 def _dsh_face(values):
@@ -325,7 +341,7 @@ def _plan(host,home=None,profile_dir=None):
     elif host=='dsh':
         import yaml
         _,text,_=harness.prepare(host,p);data=yaml.safe_load(text) or []
-        mode=engine_intake(engine_values())
+        values=engine_values();mode=engine_intake(values);policy=engine_policy(values)
         hp=p/'walter-hooks.json';hd=json.loads(hp.read_text()) if hp.exists() else {}
         hd=_hook_data(hd,spec,host)
         if mode=='native':      # the engine's plugins accept turns and publish their end: no second adapter
@@ -341,7 +357,7 @@ def _plan(host,home=None,profile_dir=None):
             if item:additions.append(item);data.append(item)
         add(_dsh_addition(data,{'id':'hooks-walter','name':'@deepseek-ai/dsh-hooks-claude-code','config':{'configPath':str(hp)}}))
         # Engine plugins (lot E2): replaced as a whole when the mode or a location changes, removed for `hook`.
-        wanted=_engine_rows(mode);have=[e for r in data for e in r.get('insert',[]) if e.get('id') in ENGINE_ROWS]
+        wanted=_engine_rows(mode,policy);have=[e for r in data for e in r.get('insert',[]) if e.get('id') in ENGINE_ROWS]
         if have!=wanted:
             for row in [r for r in data if any(e.get('id') in ENGINE_ROWS for e in r.get('insert',[]))]:
                 row['insert']=[e for e in row['insert'] if e.get('id') not in ENGINE_ROWS]

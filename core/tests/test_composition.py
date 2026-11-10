@@ -296,3 +296,29 @@ def test_engine_intake_switch_hook_shadow_native_and_back(home,monkeypatch):
     assert e1[1]==(home/'walter-hooks.json').read_bytes()
     norm=lambda text:sorted(json.dumps(r,sort_keys=True) for r in c._dsh_yaml(text))   # same rows (order may move)
     assert norm(e1[0].decode())==norm((home/'cordis.patch.yml').read_text())
+
+
+def test_engine_policy_switch_enforce_first_and_off_restores(home,monkeypatch):
+    """Lot E3 (2026-11-10): `policy = "enforce"` puts Walter's policy plugin first among the engine rows, with or
+    without the native intake; `off` (the neutral default) gives back the composition byte for byte."""
+    c.install('dsh',home,apply=True,backup_root=home.parent/'b')
+    before=(home/'cordis.patch.yml').read_text()
+    values=c.engine_values()
+    def compose(engine):
+        v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']=engine
+        monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
+        c.install('dsh',home,apply=True,backup_root=home.parent/'b')
+        assert not c.install('dsh',home)['changed']
+        d=c._dsh_yaml((home/'cordis.patch.yml').read_text())
+        return [e['id'] for r in d for e in r.get('insert',[]) if e['id'] in c.ENGINE_ROWS],{e['id']:e for r in d for e in r.get('insert',[])}
+    ids,rows=compose({'intake':'hook','policy':'enforce'})
+    assert ids==['walter-policy','walter-budget'] and rows['walter-policy']['name'].endswith('engine/plugins/policy/index.mjs')
+    assert rows['walter-policy']['config']['interface']=='web' and 'state/core/security' in rows['walter-policy']['config']['stateDir']
+    ids,_=compose({'intake':'native','policy':'enforce'})
+    assert ids==['walter-policy','walter-budget','walter-intake','walter-events']
+    compose({'intake':'hook','policy':'off'})
+    norm=lambda text:sorted(json.dumps(r,sort_keys=True) for r in c._dsh_yaml(text))
+    assert norm(before)==norm((home/'cordis.patch.yml').read_text())
+    v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']={'policy':'maybe'}
+    monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
+    with pytest.raises(ValueError,match='policy'):c.install('dsh',home)

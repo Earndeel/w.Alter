@@ -206,12 +206,13 @@
     {
       "id": "engine-plugins",
       "path": "engine/plugins",
-      "role": "Stratégies intake et events du moteur (lot E2) : accueil d'un tour (run, ContextPlan, pack, skills) et événements (fin du run, turn.ended, session.ended) par les portes Memory/Context/Skills ; interrupteur [dsh.engine] intake hook|shadow|native",
+      "role": "Stratégies du moteur : intake et events (lot E2 : accueil d'un tour — run, ContextPlan, pack, skills — et fin du run, turn.ended, session.ended) ; policy et budget (lot E3 : politique unique avant chaque outil de chaque agent, plafonds du tour) ; interrupteurs [dsh.engine] intake hook|shadow|native et policy off|enforce",
       "status": "implemented",
       "readme": "engine/plugins/README.md",
       "contracts": [
-        "engine/contracts/turn-intake.v1.json",
-        "engine/contracts/engine-event.v1.json"
+        "engine/contracts/engine-event.v1.json",
+        "engine/contracts/policy-decision.v1.json",
+        "engine/contracts/turn-intake.v1.json"
       ],
       "interfaces": [
         {
@@ -220,6 +221,23 @@
         }
       ],
       "vision_target": "core/engine/plugins"
+    },
+    {
+      "id": "security",
+      "path": "security",
+      "role": "Politique d'exécution unique de Walter (lot E3) : policy.json (jamais, classes d'outils, presets par porte, enfant ≤ parent) lue par le greffon policy du moteur (policy.mjs) et par le filet du serveur MCP pour tout client (walter_security) ; mêmes vecteurs d'essai des deux côtés",
+      "status": "implemented",
+      "readme": "security/README.md",
+      "contracts": [
+        "engine/contracts/policy-decision.v1.json"
+      ],
+      "interfaces": [
+        {
+          "transport": "library",
+          "interface": "walter_security.decide / security/policy.mjs decide"
+        }
+      ],
+      "vision_target": "core/security"
     },
     {
       "id": "mcp-server",

@@ -12,7 +12,7 @@ import { currentRuns, deliver, observe, sessionKey, settings, token } from '../s
 
 export const name = 'walter-events';
 
-export async function turnEnded(cfg, session, turn) {
+export async function turnEnded(cfg, session, turn, status = 'ended') {
   const run = currentRuns.get(session);
   if (cfg.mode === 'shadow') {
     observe(cfg, { kind: 'event', type: 'turn.ended', session, turn });
@@ -20,11 +20,11 @@ export async function turnEnded(cfg, session, turn) {
   }
   const auth = token(cfg);
   currentRuns.delete(session);
-  const ended = await deliver(`${cfg.gateway}/v1/runs/end`, { run_id: run?.run_id || null, session_id: session },
+  const ended = await deliver(`${cfg.gateway}/v1/runs/end`, { run_id: run?.run_id || null, session_id: session, status },
     { auth, timeoutMs: 5000 });
   const runId = ended.result?.run_id || run?.run_id || null;
   const sent = await deliver(`${cfg.gateway}/v1/bus/emit`, {
-    type: 'turn.ended', source: cfg.runtime, subject: session, payload: { run_id: runId, turn: turn ?? null },
+    type: 'turn.ended', source: cfg.runtime, subject: session, payload: { run_id: runId, turn: turn ?? null, status },
     dedupe_key: runId ? `turn.ended/${runId}` : null,
   }, { auth, timeoutMs: 5000 });
   record(cfg, 'turn.ended', session, { run_end: ended, emit: sent });
@@ -60,7 +60,18 @@ export function apply(ctx, config) {
   const warn = (what) => (e) => ctx.logger.warn(`walter-events ${what}: ${String(e)}`);
   ctx.on('agent/turn-stopping', async ({ agent, turn }) => {
     const session = sessionKey(cfg.runtime, agent);
-    if (session) await turnEnded(cfg, session, turn).catch(warn('turn.ended'));
+    if (session) { failed.delete(session); await turnEnded(cfg, session, turn).catch(warn('turn.ended')); }
+  });
+  // A turn that closes without its stop boundary was interrupted (owner's stop, cancel) or failed: its run is closed
+  // as such when the agent goes idle, instead of waiting for the next turn to cancel it.
+  const failed = new Set();
+  ctx.on('agent/error', ({ agent }) => { const s = sessionKey(cfg.runtime, agent); if (s) failed.add(s); });
+  ctx.on('agent/status', ({ agent, status }) => {
+    const session = sessionKey(cfg.runtime, agent);
+    if (status !== 'idle' || !session) return;
+    const status_ = failed.delete(session) ? 'failed' : 'cancelled';
+    if (cfg.mode !== 'native' || !currentRuns.has(session)) return;
+    turnEnded(cfg, session, currentRuns.get(session)?.turn, status_).catch(warn('turn.ended'));
   });
   ctx.on('agent/disposed', ({ agent }) => {
     const session = sessionKey(cfg.runtime, agent);

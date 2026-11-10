@@ -57,7 +57,7 @@ E4, E5 et E7 ouvrent de nouveaux chemins de production : ils ne sont **activés*
 | **E0** | Contrats, registre enrichi, mesures, cartographie, règle documentaire | A + B | Non (fait) | — |
 | **E1** | Gel technique du noyau (sans déplacement) ; rattrapage documentaire | A + B | Non (même code, même place) — en cours | E0 |
 | **E2** | Accueil et événements natifs | A | Oui, après ombre — construit et essayé hors service (10/11), ombre après adoption d'E1 | E1 |
-| **E3** | Politique, approbations, divulgation, budget | A (sécurité) | Oui | E2 |
+| **E3** | Politique, approbations, divulgation, budget | A (sécurité) | Oui — construit (10/11), filet MCP en service, moteur avec E2 | E2 |
 | **E4** | Engine API v1 | A + B (`core/interfaces`) | Ajout, activé après E3 | E2, E3 |
 | **E5** | `walter_run` devient une délégation du moteur | A | Oui, avec repli | E3, E4 |
 | **E6** | Fin des rôles de production de Hermes (hors Telegram) | A | Oui | E4 |
@@ -219,6 +219,27 @@ moins égale ; `endOnDispose` décidé d'après ce que l'ombre montre des décha
 - **Adoption** : tous les cas passent ; aucune demande d'approbation superflue sur une semaine d'usage web.
 - **Retour arrière** : retrait du greffon de la composition ; le bac à sable et l'approbation du noyau restent (jamais
   moins protégé qu'aujourd'hui).
+
+**État (10/11/2026) : construit, filet MCP en service, greffons du moteur prêts (activés avec E2 sur `dsh-web`).**
+- `core/security` (README) : `policy.json` unique, lue en Python (`walter_security`) et en JS (`policy.mjs`), 25 cas
+  partagés joués des deux côtés ; ordre jamais → classe sous le preset de la porte → enfant ≤ parent → divulgation →
+  noyau. Réutilise le mécanisme d'approbation du noyau (`ask` ⇒ répondant de la porte, sans répondant ⇒ refus), la
+  garde de divulgation de Memory (nouvelle route `/v1/disclosure/check`), et le bac à sable du noyau.
+- Greffon `policy` : garde monotone (`ctx.tools.guard`) pour les refus « jamais », `tools/pre-execute` pour les
+  demandes et la divulgation ; s'applique à chaque appel de chaque agent du moteur, sous-agents et appels imbriqués de
+  `run_code` compris (un enfant est jugé sous la porte de sa racine). Greffon `budget` : plafonds du tour (80 pas, 45
+  min ; consigne de conclure, puis refus du pas suivant) en attendant l'effort du ContextPlan. Le greffon `events` ferme
+  désormais un tour interrompu ou en échec (`cancelled`, `failed`) dès que l'agent est au repos.
+- **Filet du serveur MCP walter** (tout client) : un appel refusé n'atteint jamais l'outil ; `walter_call` est jugé
+  comme l'outil qu'il ouvre. Actif pour chaque nouveau processus `server.py`.
+- Trou fermé : le bac à sable du noyau ne restreint que l'écriture ; un agent du moteur pouvait lire `.pgpass`, les
+  `.env` ou les clés de l'instance par `read` ou `bash`. Essai réel (DSH headless, foyer de test, politique active) :
+  `cat /root/.pgpass` et `read /walter/memory/.env` refusés avec la raison, `ls` inchangé ; aucun des 37 outils MCP
+  n'est sans classe (usage web ordinaire sans demande nouvelle).
+- Interrupteur `[dsh.engine] policy = "off" | "enforce"` (policy + budget), aller-retour testé à l'octet.
+- Reste : activation sur `dsh-web` avec E2 ; plafond de dépense du propriétaire dans walter-llm (aujourd'hui seul le
+  canal `test` est plafonné) — lot E8 (budgets) ; décisions recopiées dans le Run Plane (aujourd'hui : journal de session
+  → walter_logs, et journal privé de la politique).
 
 ## E4 — Engine API v1
 
