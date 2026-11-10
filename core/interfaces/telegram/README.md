@@ -24,6 +24,11 @@
   qui les lit avec ses outils.
 - Commandes : `/stop` (interrompt le tour, `turn.cancel`), `/nouveau`, `/etat` (tâche en cours, autorisations en
   attente), `/aide`.
+- Services web de Router (`/gpt [modèle] …`, lot E6) : servis par la porte sans tour du moteur — `[web] list`
+  (`walter-router web-commands`) donne les commandes, `[web] run` (`walter-router web`) l'échange ; réponse telle
+  quelle, photo ou document en légende transmis, images et fichiers produits renvoyés (envoi multipart).
+- Boutons des modules (`[callbacks]`, ex. alertes Router `wr:`) : la porte lance la commande du module, qui décide.
+- `walter-telegram send` : un message au propriétaire par ce bot (avis des modules, à la place du bot Hermes).
 
 ## Fichiers
 
@@ -31,7 +36,7 @@
 |---|---|
 | `bot.py` | le service (Bot API, client Engine API, état durable, porte) ; `--check` vérifie bot, propriétaire, moteur |
 | `tgformat.py` | Markdown → HTML Telegram, découpage, libellés d'outils |
-| `tests/test_bot.py` | 11 essais (Telegram et moteur simulés) : `walter-python -m pytest core/interfaces/telegram/tests` |
+| `tests/test_bot.py` | 17 essais (Telegram et moteur simulés) : `walter-python -m pytest core/interfaces/telegram/tests` |
 
 Réglages : `core/config/telegram.toml` (défauts neutres), surchargés par `@instance/config/core/telegram.toml`
 (grant du bot, `owner_ids`, compte). État : `@instance/state/core/telegram/state.json` (offset Telegram, numéros de

@@ -8,6 +8,8 @@ own conversations, never the owner's.
                   (one owner message in the log), the same conversation answers the next message with its memory
   tool_failure    a tool fails (missing file): the turn ends normally and says what happened
   model           a model the Router cannot run → explicit refusal (422) before any session, never another loop
+  budget          a delegated task over its time budget is interrupted and said so (cancelled, budget_seconds)
+  delegate_replay the same delegated task sent twice (same idempotency key) runs once
 Restarting dsh-web interrupts whatever runs on it: run this on the development instance only, at a quiet moment.
 
     walter-python core/scenarios/v1/engine_e8.py [--only door_restart,tool_failure]
@@ -145,8 +147,37 @@ def main() -> int:
         except B.EngineError as e:
             return e.status == 422 and e.code == "model_unavailable", f"{e.status} {e.code} {e.detail}"
 
+    def delegate(goal, key, budget):
+        api = B.Engine("http://127.0.0.1:8895", token)
+        return api.op({"op": "delegate", "caller": "e2e", "delegation": {
+            "version": 1, "goal": goal, "idempotency_key": key, "budget_seconds": budget, "parent": {"depth": 0}}},
+            timeout=budget + 90)
+
+    def c_budget():
+        t = time.time()
+        # a long answer, no tool (an unattended delegation gets no shell): cut at 60 s, a few thousand tokens at most
+        r = delegate("Sans aucun outil, écris en toutes lettres les nombres de un à trois mille, un par ligne, "
+                     "sans rien omettre ni abréger.", f"e8-{run}-budget", 60)
+        r = r.get("result") or r
+        took = time.time() - t
+        return r.get("status") == "cancelled" and r.get("reason") == "budget_seconds" and took < 120, \
+            f"{r.get('status')} {r.get('reason')} en {took:.0f}s"
+
+    def c_delegate_replay():
+        key, word = f"e8-{run}-replay", f"double-{run}"
+        a_ = delegate(f"Réponds seulement « {word} ».", key, 120)
+        b_ = delegate(f"Réponds seulement « {word} ».", key, 120)        # the caller retries the same task
+        a_, b_ = a_.get("result") or a_, b_.get("result") or b_
+        from walter_memory import db
+        bind = json.loads((root / "state/core/engine/api/bindings.json").read_text())["sessions"][a_["session_id"]]
+        with db.connect() as c:
+            n = c.execute("""select count(*) n from walter_logs.events where session_id = %s and type = 'user/message'
+                             and text like %s""", (f"dsh/vm/{bind['kernel']}", f"%{word}%")).fetchone()["n"]
+        return word in (a_.get("output") or "") and a_.get("session_id") == b_.get("session_id") and n == 1, \
+            f"first={a_.get('status')} again={b_.get('status')} « {(b_.get('output') or '')[:30]} » executed={n}"
+
     for name, fn in (("model", c_model), ("tool_failure", c_tool_failure), ("door_restart", c_door_restart),
-                     ("engine_restart", c_engine_restart)):
+                     ("engine_restart", c_engine_restart), ("budget", c_budget), ("delegate_replay", c_delegate_replay)):
         check(name, fn)
     failed = [n for n, ok in results if not ok]
     print(json.dumps({"run": run, "passed": len(results) - len(failed), "failed": failed}))
