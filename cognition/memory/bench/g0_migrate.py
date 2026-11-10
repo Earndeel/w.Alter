@@ -153,9 +153,13 @@ def run(a) -> None:
 
 
 def codex_meter() -> float | None:
-    """Weekly Codex quota used (%), as Walter Router last read it (models.latest_subscription_usage, read-only)."""
+    """Weekly Codex quota used (%). Walter Router re-reads its meters after agent turns and every 30 min; extraction
+    calls are not turns, so the reading is refreshed first through the router's CLI (its declared interface), then
+    read from models.latest_subscription_usage (read-only)."""
+    import subprocess
     from walter_memory.db import connection
     try:
+        subprocess.run(["walter-router", "subscriptions", "refresh", "openai-plus"], capture_output=True, timeout=60)
         with connection() as conn:
             r = conn.execute("""select max(used_percent) p from models.latest_subscription_usage
                                 where source = 'codex_usage_api' and window_name = 'weekly'""").fetchone()
