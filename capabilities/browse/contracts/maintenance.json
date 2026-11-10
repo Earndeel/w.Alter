@@ -3,7 +3,7 @@
   "module": "browse",
   "check": [
     "python3",
-    "/walter/browse/guardian/check"
+    "/walter/capabilities/browse/guardian/check"
   ],
   "max_level": "G1",
   "levels": {

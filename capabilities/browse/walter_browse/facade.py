@@ -265,7 +265,7 @@ def _validate_request(args: Any) -> dict[str, Any]:
 def _resolve_router_command() -> list[str]:
     """Walter-owned entrypoint, independent of the calling harness and PATH."""
     import os
-    executable = Path(os.environ.get("WALTER_BROWSE_COMMAND", "/opt/walter-browse/bin/universal-scraper"))
+    executable = Path(os.environ.get("WALTER_BROWSE_COMMAND", "/walter/capabilities/browse/bin/universal-scraper"))
     if not executable.is_file():
         raise FileNotFoundError("Walter Browse executable is unavailable")
     return [str(executable)]

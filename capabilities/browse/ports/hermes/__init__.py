@@ -2,7 +2,7 @@
 import inspect
 import logging
 import sys
-sys.path.insert(0, "/opt/walter-browse")
+sys.path.insert(0, "/walter/capabilities/browse")
 from walter_browse.facade import browse, WALTER_BROWSE_SCHEMA
 
 log = logging.getLogger("walter_browse.hermes")

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Rôle** | Moteur commun de recherche, d'extraction et de navigation web pour tous les harnesses : sessions de navigateur, sorties réseau, validation des requêtes. Hermes et le MCP en sont des adaptateurs minces. |
-| **Propriétaire** | walter-browse (`/walter/browse`). |
+| **Propriétaire** | walter-browse (`/walter/capabilities/browse`). |
 | **État** | **active** (constat du 09/11/2026) : services `camoufox-max`, `cloakbrowser-max`, `walter-browse-display`, sorties `walter-exit-*`. |
 | **Ne fait pas** | Montrer un secret : cookies et identifiants restent côté serveur, l'agent ne reçoit que des métadonnées. Décider de la tâche ou des permissions (le harness appelant). Conserver les pages (Memory, Raw Vault). |
 | **Contrats** | [contracts/browse.json](contracts/browse.json), [contracts/maintenance.json](contracts/maintenance.json) ; MCP `walter_browse`, `walter_web`, `browser_session` ; CLI `walter-browser`. |
