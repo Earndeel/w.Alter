@@ -54,3 +54,14 @@ def test_web_failure_takes_the_usual_path_and_says_so(monkeypatch):
     assert seen == {"mode": "tool", "goal": "prix du bitcoin"}
     assert out["ok"] and out["output"] == "réponse habituelle" and out["user_notification_required"]
     assert out["notices"][0]["type"] == "web_fallback" and "tab_gone" in out["user_notice"]
+
+
+def test_chat_commands_come_from_the_gateways_rule_table(monkeypatch, tmp_path):
+    import json
+    cfg = tmp_path / "gateway.json"
+    cfg.write_text(json.dumps({"web_services": {"_doc": "x", "chatgpt": {"enabled": True},
+                                                "claude": {"command": "cl", "enabled": False}}}))
+    monkeypatch.setattr(web.instance, "_walter", lambda *a: str(cfg))
+    assert web.commands() == {"gpt": "chatgpt", "cl": "claude"}
+    monkeypatch.setattr(web.instance, "_walter", lambda *a: str(tmp_path / "absent.json"))
+    assert web.commands() == {}

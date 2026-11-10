@@ -191,6 +191,7 @@ def build_parser() -> argparse.ArgumentParser:
                                     "model, files = local paths, conversation, request_id, timeout_s) -> JSON reply, "
                                     "produced files as local paths")
     wb.add_argument("--message", help="instead of a JSON spec: just this message, default service, default model")
+    sub.add_parser("web-commands", help="chat commands of the web services ({command: service}), for the Telegram door")
     sub.add_parser("instance-env", help="shell assignments of the instance bindings used by the cycle and the trigger")
     sub.add_parser("schema", help="versioned public tool parameter reference (JSON, no model call)")
     doc = sub.add_parser("docs", help="generate or check reference documentation against source and the models schema")
@@ -242,6 +243,10 @@ def main(argv: list[str] | None = None) -> int:
         out = web.converse({"message": args.message} if args.message else json.load(sys.stdin))
         print(json.dumps(out, ensure_ascii=False, indent=1))
         return 0 if out.get("ok") else 1
+    if args.cmd == "web-commands":
+        from walter_router.serve import web
+        print(json.dumps(web.commands(), ensure_ascii=False))
+        return 0
     if args.cmd == "brief":
         from walter_router.serve import brief
         with db.connect() as conn:

@@ -93,6 +93,17 @@ def _enabled() -> set[str]:
     return {k for k, v in services.items() if isinstance(v, dict) and v.get("enabled") and not k.startswith("_")}
 
 
+def commands() -> dict[str, str]:
+    """Chat command → web service, from the gateway's rule table (`/gpt` → chatgpt…), for the Telegram door."""
+    path = instance._walter("config", "llm", "gateway.json")
+    try:
+        services = json.loads(Path(path).read_text()).get("web_services") or {} if path else {}
+    except (OSError, ValueError):
+        return {}
+    return {str(v.get("command") or ("gpt" if k == "chatgpt" else k)): k
+            for k, v in services.items() if not k.startswith("_") and isinstance(v, dict)}
+
+
 def route_for(task: str | None, level: str | None) -> dict | None:
     """The web service the owner's rule gives this classified intent, or None."""
     from walter_router.analysis import knowledge   # late import (knowledge -> select -> …)
