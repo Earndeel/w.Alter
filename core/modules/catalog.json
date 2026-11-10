@@ -28,11 +28,14 @@
     },
     {
       "id": "computer",
-      "target": "computer",
+      "target": "capabilities/computer",
       "legacy": "/opt/walter-computer",
       "manifest": "contracts/computer.json",
       "neutral": true,
-      "vision_target": "capabilities/computer"
+      "vision_target": "capabilities/computer",
+      "compat_links": [
+        "/walter/computer"
+      ]
     },
     {
       "id": "context",
