@@ -453,10 +453,11 @@ def main(argv=None) -> None:
                                               task_id=spec.get("task_id"))}
         elif a.action == "task-end":        # its trace (walter_logs session), routing and outcome
             spec = json.load(sys.stdin)
-            n = runs.trace(spec["session_id"], spec.get("events") or [], runtime=spec.get("runtime", "walter-router"),
+            # no events = the executor keeps its own trace (Walter Engine: its session is in walter_logs already)
+            n = runs.trace(spec["session_id"], spec["events"], runtime=spec.get("runtime", "walter-router"),
                            native_id=spec.get("task_id"), model=spec.get("model"), title=(spec.get("goal") or "")[:80],
                            parent_session_id=spec.get("parent_session_id"),
-                           meta={"run_id": spec.get("run_id"), "task_id": spec.get("task_id")})
+                           meta={"run_id": spec.get("run_id"), "task_id": spec.get("task_id")}) if spec.get("events") else 0
             if spec.get("routing"):
                 runs.routing(spec["run_id"], spec["routing"], task_id=spec["task_id"])
             runs.task_end(spec["task_id"], status=spec.get("status", "ended"), result=spec.get("result"))

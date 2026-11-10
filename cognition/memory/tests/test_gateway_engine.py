@@ -121,3 +121,18 @@ def test_disclosure_check_for_the_engine_blocks_a_secret_and_never_echoes_it(cli
     plain = client.post("/v1/disclosure/check", json={"tool": "mcp__beeper__send_message", "args": {"to": "x", "text": ""}})
     assert plain.json()["action"] == "allow"
     assert client.post("/v1/disclosure/check", json={"tool": "x", "args": {}}, headers={"Authorization": "Bearer nope"}).status_code == 401
+
+
+def test_a_delegation_run_is_filed_under_its_parent_run_and_an_unknown_parent_is_ignored(client):
+    """Lot E5: a sub-agent the engine runs for another run is that run's child in the Run Plane."""
+    parent = client.post("/v1/runs/start", json={"origin": origin(f"{RUNTIME}/vm/{uuid.uuid4()}"), "goal": "parent"}).json()["run_id"]
+    child = client.post("/v1/runs/start", json={"origin": {**origin(f"{RUNTIME}/vm/{uuid.uuid4()}"), "channel": "machine"},
+                                                "goal": "sous-tâche", "parent_run_id": parent}).json()["run_id"]
+    orphan = client.post("/v1/runs/start", json={"origin": origin(f"{RUNTIME}/vm/{uuid.uuid4()}"), "goal": "x",
+                                                 "parent_run_id": str(uuid.uuid4())}).json()["run_id"]
+    with connect() as conn:
+        rows = {str(r["run_id"]): r for r in conn.execute(
+            "select run_id, parent_run_id::text p, origin->>'channel' ch from runs.runs where run_id::text = any(%s)",
+            ([child, orphan],))}
+    assert rows[child]["p"] == parent and rows[child]["ch"] == "machine"
+    assert rows[orphan]["p"] is None

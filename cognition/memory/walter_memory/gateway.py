@@ -170,6 +170,7 @@ class RunStartIn(BaseModel):
     dedupe_key: str | None = None      # one run per turn: a replayed turn returns the same run
     cancel_run_id: str | None = None   # this session's previous run that never got its end
     routing: dict | None = None
+    parent_run_id: str | None = None   # a delegation's run (lot E5): the run that delegated it, when it exists
 
 
 class RunEndIn(BaseModel):
@@ -224,7 +225,9 @@ def post_runs_start(body: RunStartIn):
             runs.safe(runs.end, body.cancel_run_id, "cancelled")
     secret = any(cat == "secret" for cat, _ in privacy.detect(body.goal or ""))
     privacy_class = "local_only" if secret else "cloud_allowed"
-    run_id = runs.start(origin=origin, goal=body.goal, privacy_class=privacy_class, dedupe_key=body.dedupe_key)
+    parent = body.parent_run_id if body.parent_run_id and _run_of(body.parent_run_id) else None
+    run_id = runs.start(origin=origin, goal=body.goal, privacy_class=privacy_class, dedupe_key=body.dedupe_key,
+                        parent_run_id=parent)
     if body.routing:
         runs.safe(runs.routing, run_id, body.routing)
     return {"run_id": run_id, "privacy_class": privacy_class}
