@@ -318,7 +318,8 @@ def status(**kw) -> None:
 def watch() -> None:
     """One watcher for the whole vault: on every revision change, (1) apply W.Alter's keys to the VM, (2) file new
     entries into their folder, (3) announce `vault.changed` on the Walter bus, then (4) once the vault has been calm
-    for BACKUP_SETTLE seconds, take one encrypted backup (a burst of edits → one backup). See vault_react.py."""
+    for BACKUP_SETTLE seconds, take one encrypted backup (a burst of edits → one backup). See vault_react.py.
+    Each pass also rebuilds the value-free fingerprints other modules mask vault values with (fingerprints.py)."""
     from . import vault_react
     from walter_memory import bus
     last_rev, last_full, changed_at = None, 0.0, None
@@ -341,6 +342,11 @@ def watch() -> None:
                 status(last_filing=filed)
             except Exception as e:
                 log(f"ERROR filing failed: {type(e).__name__}")
+            try:                                  # logs mask every vault value they can recognise (fingerprints.py)
+                from . import fingerprints
+                status(last_fingerprints=fingerprints.build())
+            except Exception as e:
+                log(f"ERROR fingerprints failed: {type(e).__name__}")
             if rev != last_rev and last_rev is not None:
                 bus.emit("vault.changed", "walter-secrets-sync", "bitwarden", {"revision": rev}, dedupe_key=f"vault:{rev}")
             last_rev, last_full = rev, now

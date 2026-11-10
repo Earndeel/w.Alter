@@ -120,3 +120,40 @@ def test_check_reports_metadata_only(home):
     assert "fake-key-not-live" not in json.dumps(out)
     with pytest.raises(grants.GrantError):
         grants.access("x")
+
+
+def claude_card(home):
+    card(home, "claude", f'owner = "owner"\nkind = "subscription"\nprovider = "anthropic-claude"\n'
+         f'renewer = "walter-secrets"\n[secret]\ntoken = "file:{home}/claude.json#claudeAiOauth.accessToken"\n')
+
+
+def test_claude_opaque_tokens_refresh_atomically_without_cli_or_secret_disclosure(home):
+    claude_card(home)
+    private(home / "claude.json", json.dumps({"claudeAiOauth": {
+        "accessToken": "fake-old", "refreshToken": "fake-refresh", "expiresAt": 0,
+        "scopes": ["user:inference", "user:profile"], "subscriptionType": "pro"}}))
+    class Response:
+        status_code = 200
+        def json(self):
+            return {"access_token": "fake-new", "refresh_token": "fake-rotated", "expires_in": 7200}
+    with patch("httpx.post", return_value=Response()) as post, patch("subprocess.run") as cli:
+        assert grants.access("claude") == "fake-new"
+        assert grants.access("claude") == "fake-new"
+        assert post.call_count == 1 and not cli.called
+    saved = json.loads((home / "claude.json").read_text())["claudeAiOauth"]
+    assert saved["refreshToken"] == "fake-rotated" and saved["subscriptionType"] == "pro"
+    assert (home / "claude.json").stat().st_mode & 0o777 == 0o600
+    health = grants.check("claude")
+    assert health["ok"] and health["grants"][0]["refreshable"]
+    assert "fake-" not in json.dumps(health)
+
+
+def test_claude_refresh_failure_preserves_the_existing_file(home):
+    claude_card(home)
+    private(home / "claude.json", json.dumps({"claudeAiOauth": {
+        "accessToken": "fake-old", "refreshToken": "fake-refresh", "expiresAt": 0}}))
+    before = (home / "claude.json").read_bytes()
+    with patch("httpx.post", return_value=type("R", (), {"status_code": 401})()):
+        with pytest.raises(grants.GrantError, match="HTTP 401"):
+            grants.access("claude")
+    assert (home / "claude.json").read_bytes() == before

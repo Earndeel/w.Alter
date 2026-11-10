@@ -15,6 +15,7 @@ file, while the grant still lives at its historical place), "external:<where>" (
 from __future__ import annotations
 
 import base64
+import fcntl
 import json
 import os
 import stat
@@ -22,6 +23,7 @@ import subprocess
 import threading
 import time
 import tomllib
+import tempfile
 from pathlib import Path
 
 from . import settings
@@ -154,6 +156,8 @@ def _oauth_access(c: dict) -> str:
 
 def _subscription_access(c: dict) -> str:
     """A vendor CLI session (e.g. Codex): the CLI stays the single writer; we make it refresh, then re-read."""
+    if c.get("provider") == "anthropic-claude":
+        return _claude_subscription_access(c)
     storage = c["secret"]["token"]
     tok = str(_read(storage) or "")
     if tok and _jwt_exp(tok) - time.time() > REFRESH_MARGIN["subscription"]:
@@ -168,6 +172,54 @@ def _subscription_access(c: dict) -> str:
     if not tok or _jwt_exp(tok) <= time.time():
         raise GrantError(f"grant {c['id']}: no valid session (log in again with the vendor CLI)")
     return tok
+
+
+def _claude_subscription_access(c: dict) -> str:
+    """Refresh an opaque Claude OAuth token once across all processes; only this grant is a writer.
+
+    Token shape remains CLI-compatible, but the CLI receives only the current access token in memory.
+    It never reads or rotates this private file. The OAuth client is public (PKCE), with no client secret.
+    """
+    import httpx
+    scheme, where, _ = _split(c["secret"]["token"])
+    if scheme != "file" or c.get("renewer") != "walter-secrets":
+        raise GrantError("Claude subscription requires a private file and walter-secrets as renewer")
+    path = _file(where)
+    descriptor = os.open(str(path) + ".lock", os.O_RDWR | os.O_CREAT, 0o600)
+    os.fchmod(descriptor, 0o600)
+    with os.fdopen(descriptor, "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        document = json.loads(path.read_text())
+        token = document.get("claudeAiOauth") or {}
+        if token.get("accessToken") and token.get("expiresAt", 0) / 1000 - time.time() > 300:
+            return token["accessToken"]
+        if not token.get("refreshToken"):
+            raise GrantError("Claude subscription needs a new owner login")
+        response = httpx.post("https://platform.claude.com/v1/oauth/token", timeout=30, json={
+            "grant_type": "refresh_token", "refresh_token": token["refreshToken"],
+            "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+            "scope": " ".join(token.get("scopes") or ["user:profile", "user:inference"])})
+        if response.status_code != 200:
+            raise GrantError(f"Claude subscription refresh refused (HTTP {response.status_code})")
+        fresh = response.json()
+        if not fresh.get("access_token") or float(fresh.get("expires_in", 0)) <= 0:
+            raise GrantError("Claude subscription refresh response invalid")
+        token.update(accessToken=fresh["access_token"], refreshToken=fresh.get("refresh_token") or token["refreshToken"],
+                     expiresAt=int((time.time() + float(fresh["expires_in"])) * 1000))
+        if fresh.get("scope"):
+            token["scopes"] = fresh["scope"].split()
+        document["claudeAiOauth"] = token
+        fd, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+        try:
+            with os.fdopen(fd, "w") as output:
+                json.dump(document, output)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        return token["accessToken"]
 
 
 def access(ident: str, part: str = "token") -> str:
@@ -230,6 +282,11 @@ def _expiry(c: dict) -> dict:
             tok = json.loads(_file(_split(c["secret"]["token"])[1]).read_text())
             return {"refreshable": bool(tok.get("refresh_token")), "access_expires_in_s": int(tok.get("expires_at", 0) - time.time())}
         if c["kind"] == "subscription":
+            if c.get("provider") == "anthropic-claude":
+                path = _file(_split(c["secret"]["token"])[1])
+                tok = json.loads(path.read_text()).get("claudeAiOauth") or {}
+                return {"access_expires_in_s": int(tok.get("expiresAt", 0) / 1000 - time.time()),
+                        "refreshable": bool(tok.get("refreshToken"))}
             tok = str(_read(c["secret"]["token"]) or "")
             return {"access_expires_in_s": int(_jwt_exp(tok) - time.time()) if tok else None}
     except Exception as exc:  # noqa: BLE001

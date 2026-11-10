@@ -9,6 +9,7 @@
   walter-secret otp <site> [minutes] [timeout]  wait for the code <site> sent by e-mail / message, print it
   walter-secret grants [ID]                     Walter's authorizations: cards and health (metadata only)
   walter-secret grant access <id> [part]        usable secret of a grant (fresh token for OAuth / subscriptions)
+  walter-secret fingerprints [status|build]     value-free index of the vault's secret values (log masking)
 """
 import json
 import os
@@ -32,6 +33,17 @@ def main(argv: list[str]) -> int:
             print(json.dumps(vault_react.prune_local(), ensure_ascii=False))
             return 0
         print("usage: walter-secret vault-export <dest.json.age> | vault-prune", file=sys.stderr)
+        return 2
+    if argv and argv[0] == "fingerprints":
+        # value-free index of the vault's secret values, used to mask them in logs (fingerprints.py)
+        from . import fingerprints
+        if len(argv) == 2 and argv[1] == "build":
+            print(json.dumps(fingerprints.build(), ensure_ascii=False, indent=1))
+            return 0
+        if len(argv) == 1 or argv[1:] == ["status"]:
+            print(json.dumps(fingerprints.status(), ensure_ascii=False, indent=1))
+            return 0
+        print("usage: walter-secret fingerprints [status|build]", file=sys.stderr)
         return 2
     if argv and argv[0] in ("grants", "grant"):
         from . import grants
@@ -117,7 +129,7 @@ def store_main(argv: list[str]) -> int:
         value = ""
     out["generated"] = bool(a.generate)
     audit("store", {"name": out["name"], "id": out["id"]}, out["field"], via="cli", kind=a.kind,
-          action="updated" if out.get("updated") else "created", generated=bool(a.generate))
+          result="updated" if out.get("updated") else "created", generated=bool(a.generate))
     print(json.dumps(out, ensure_ascii=False, indent=1))
     return 0
 
