@@ -420,7 +420,11 @@ class Bot:
             threading.Thread(target=self._typing, args=(chat, turn), daemon=True).start()
         elif kind == "message.assistant":
             turn = self.turns.setdefault(sid, Turn())
-            turn.text = ev.get("text") or turn.text
+            text = (ev.get("text") or "").strip()
+            if text:
+                if turn.text:     # an earlier message of the same turn: shown now, quietly (never lost)
+                    self.send(chat, turn.text, disable_notification=True)
+                turn.text = text  # the latest one is kept for the end of the turn, with its notification
         elif kind == "tool.called":
             turn = self.turns.setdefault(sid, Turn())
             label = tgformat.tool_label(ev.get("name", ""))

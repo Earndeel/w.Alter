@@ -269,3 +269,18 @@ def test_upload_is_a_multipart_form_with_the_file(tmp_path, monkeypatch):
     body = got["body"]
     assert b'name="chat_id"\r\n\r\n7\r\n' in body and b'filename="image _1_.png"' in body
     assert b"Content-Type: image/png\r\n\r\n\x89PNGDATA\r\n--" in body
+
+
+def test_every_message_of_a_long_turn_reaches_telegram_the_last_one_notified(door):
+    sid = "s-long"
+    door.on_event(CHAT, sid, {"type": "turn.started"})
+    door.on_event(CHAT, sid, {"type": "message.assistant", "text": "Je lance trois sous-agents."})
+    door.on_event(CHAT, sid, {"type": "tool.called", "name": "subagent"})
+    door.on_event(CHAT, sid, {"type": "message.assistant", "text": "Choix : option C."})
+    door.on_event(CHAT, sid, {"type": "message.assistant", "text": ""})
+    door.on_event(CHAT, sid, {"type": "message.assistant", "text": "Le comparatif est dans le fichier."})
+    door.on_event(CHAT, sid, {"type": "turn.ended", "status": "ok"})
+    msgs = [(p["text"], bool(p.get("disable_notification"))) for m, p in door.tg.calls
+            if m == "sendMessage" and not p["text"].startswith("⏳")]
+    assert msgs == [("Je lance trois sous-agents.", True), ("Choix : option C.", True),
+                    ("Le comparatif est dans le fichier.", False)]
