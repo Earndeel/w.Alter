@@ -86,7 +86,7 @@ When an interruption is appropriate and authorized, use a recoverable service to
 
 ## Commit only the intended module files
 
-Guardian changes can span `/walter/core`, `/walter/memory`, `/walter/capabilities/browse`, `/walter/secrets`, `/walter/capabilities/skills`, `/walter/context`, `/walter/ops`, and `/walter/router`, each a separate Git repository. Inspect staged and unstaged changes before staging explicit paths; preserve unrelated session work.
+Guardian changes can span `/walter/core`, `/walter/memory`, `/walter/capabilities/browse`, `/walter/secrets`, `/walter/capabilities/skills`, `/walter/cognition/context`, `/walter/ops`, and `/walter/router`, each a separate Git repository. Inspect staged and unstaged changes before staging explicit paths; preserve unrelated session work.
 
 If Git reports a missing identity, inspect recent authors first:
 
