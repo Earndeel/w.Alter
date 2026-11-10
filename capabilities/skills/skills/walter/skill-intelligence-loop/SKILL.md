@@ -328,7 +328,7 @@ Trace consolidation destinations through `evidence.absorbed_into`; verify that t
 5. Submit shared-library improvements through `skill_propose` or `skill_patch`, which create drafts. Use this draft-review preview for walter-skills:
 ```bash
 cd /walter/capabilities/skills
-/opt/walter-memory/venv/bin/python - <<'PY'
+/walter/cognition/memory/venv/bin/python - <<'PY'
 import json
 from walter_skills import curator
 r = curator.run(apply=False, only={'drafts'})

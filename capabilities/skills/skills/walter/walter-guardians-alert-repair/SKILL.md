@@ -29,8 +29,8 @@ Inspect actual JSON field names before writing an incident-history parser. Repea
 Read `/walter/<module>/contracts/maintenance.json`, its declared check command, and `/walter/<module>/guardian/playbook.json`. Common check implementations live at `/walter/<module>/guardian/check`.
 
 ```bash
-cat /walter/memory/contracts/maintenance.json
-cat /walter/memory/guardian/check
+cat /walter/cognition/memory/contracts/maintenance.json
+cat /walter/cognition/memory/guardian/check
 walter-memory health
 cat /walter/capabilities/browse/contracts/maintenance.json
 cat /walter/capabilities/browse/guardian/check
@@ -38,7 +38,7 @@ systemctl cat walter-exit-mac
 journalctl -u walter-exit-mac --since '-8h' --no-pager
 ```
 
-For memory health message formats, inspect `/opt/walter-memory/walter_memory/health.py`. Inspect the supervisor's incident validation before attributing an unreachable-watchdog incident to a service failure: malformed or duplicate incidents can fail validation. Preserve unique, stable incident keys and validate the emitted incident list against the current implementation.
+For memory health message formats, inspect `/walter/cognition/memory/walter_memory/health.py`. Inspect the supervisor's incident validation before attributing an unreachable-watchdog incident to a service failure: malformed or duplicate incidents can fail validation. Preserve unique, stable incident keys and validate the emitted incident list against the current implementation.
 
 ## Treat Mac sleep as expected behavior
 
@@ -86,7 +86,7 @@ When an interruption is appropriate and authorized, use a recoverable service to
 
 ## Commit only the intended module files
 
-Guardian changes can span `/walter/core`, `/walter/memory`, `/walter/capabilities/browse`, `/walter/secrets`, `/walter/capabilities/skills`, `/walter/cognition/context`, `/walter/ops`, and `/walter/cognition/router`, each a separate Git repository. Inspect staged and unstaged changes before staging explicit paths; preserve unrelated session work.
+Guardian changes can span `/walter/core`, `/walter/cognition/memory`, `/walter/capabilities/browse`, `/walter/secrets`, `/walter/capabilities/skills`, `/walter/cognition/context`, `/walter/ops`, and `/walter/cognition/router`, each a separate Git repository. Inspect staged and unstaged changes before staging explicit paths; preserve unrelated session work.
 
 If Git reports a missing identity, inspect recent authors first:
 

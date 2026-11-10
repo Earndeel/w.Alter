@@ -23,10 +23,10 @@ Do not restart them or install Qdrant clients to satisfy an old smoke test.
 3. Raw journal = walter_logs, across all runtimes including Hermes state.db/profiles and Codex.
    core.events describes Monsieur's life. Do not mistake raw Vault exports for walter_logs backup.
    PG dumps include both. Use the walter-logs-ingestion skill for coverage/checkpoint diagnosis.
-4. Maintenance: /opt/walter-memory/venv/bin/python -m walter_memory.hygiene --kind ephemeral --limit 200
+4. Maintenance: /walter/cognition/memory/venv/bin/python -m walter_memory.hygiene --kind ephemeral --limit 200
    is DRY-RUN by default; --apply snapshots prior tags, audits and adds quarantine:noise in Hindsight PG.
    Never delete canonical/raw logs to clean recall noise. ephemeral-sweeper.service is versioned under
-   /opt/walter-memory/systemd; compatibility scripts are links to /opt/walter-memory/ops.
+   /walter/cognition/memory/systemd; compatibility scripts are links to /walter/cognition/memory/ops.
 5. After a memory repair run systemctl start memory-autopilot and inspect
    /root/.hermes/logs/memory-autopilot/latest.json. Autopilot now incorporates walter-memory health
    and cleanup failures; warning score90 was real on Oct17 (Beeper failed media, low provider balance).
@@ -46,7 +46,7 @@ Do not restart them or install Qdrant clients to satisfy an old smoke test.
    Hermes loopback8787. See hermes-desktop-recovery. Auth env must stay0600 and never be printed.
 
 Regression checks for this repair:
-cd /opt/walter-memory &&
+cd /walter/cognition/memory &&
 venv/bin/python -m pytest -q tests/test_backup_bundle.py tests/test_extract_privacy.py tests/test_hygiene.py tests/test_logs.py
 18 tests passed on 2026-10-17. Restore test succeeded that day: PG, main state.db, 12 modules,
 9 profile SQLite snapshots and 9 Python environment inventories.

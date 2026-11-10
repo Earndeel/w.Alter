@@ -23,7 +23,7 @@ export PGPASSFILE=/root/.pgpass
 psql -h 127.0.0.1 -p 5433 -U hindsight -d hindsight -Atc "select id::text, kind, mime, original_name, captured_at, size_bytes, storage_zone, storage_key, source_ref::text, meta::text from core.objects where source='beeper' and kind='audio' order by captured_at desc"
 ```
 
-Utiliser `/opt/walter-memory` et le module `walter_memory.objects.get_object` pour récupérer les fichiers par identifiant, au lieu d'exposer ou de copier des identifiants d'accès au stockage. Vérifier que `source_ref` relie bien l'objet au `chat_id` et au `message_id` de l'événement.
+Utiliser `/walter/cognition/memory` et le module `walter_memory.objects.get_object` pour récupérer les fichiers par identifiant, au lieu d'exposer ou de copier des identifiants d'accès au stockage. Vérifier que `source_ref` relie bien l'objet au `chat_id` et au `message_id` de l'événement.
 
 4. Extraire les vocaux dans un sous-répertoire temporaire, puis les convertir avec `ffmpeg` si nécessaire. Utiliser le fournisseur STT installé dans `/root/.hermes/plugins/gemini-stt/__init__.py` via l'environnement `/root/.hermes/hermes-agent`. Vérifier la disponibilité de `ffmpeg` et de `ffprobe` avant la transcription. Enregistrer pour chaque vocal le statut, le texte, le message source et l'éventuelle erreur.
 

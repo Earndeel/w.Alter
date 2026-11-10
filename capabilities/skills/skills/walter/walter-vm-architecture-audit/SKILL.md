@@ -147,7 +147,7 @@ Use the Walter memory object store for files that should be retained in the Raw 
 ```bash
 walter-memory objects --help
 walter-memory objects put --help
-grep -n -E 'def put|sha256|dedup|existing' /walter/memory/walter_memory/objects.py
+grep -n -E 'def put|sha256|dedup|existing' /walter/cognition/memory/walter_memory/objects.py
 ```
 
 Ingest one file first and verify the returned object identifier and storage key before processing a batch:

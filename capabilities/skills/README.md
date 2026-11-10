@@ -9,7 +9,7 @@
 | **Contrats** | [contracts/skills.json](contracts/skills.json), [contracts/data-classes.json](contracts/data-classes.json), [contracts/maintenance.json](contracts/maintenance.json) ; MCP `skills_search`, `skill_read`, `skill_propose`, `skill_patch` ; schéma PostgreSQL `skills`. |
 
 W.Alter's procedural memory: skills and workflows, owned by Walter, independent of any agent runtime. Hermes, Claude
-Code, Codex and DSH are adapters. Plan: `/walter/memory/docs/PLAN.md` (P10). Decisions and measurements:
+Code, Codex and DSH are adapters. Plan: `/walter/cognition/memory/docs/PLAN.md` (P10). Decisions and measurements:
 `DECISIONS.md` (2026-10-09/10). Operations: `RUNBOOK.md` § walter-skills.
 
 ## Manifest and discovery index
@@ -114,7 +114,7 @@ walter-skills search "message"          walter-skills expose "message" --runtime
 walter-skills read <name> [--file f] [--peek]    walter-skills nightly [--only step,…]
 walter-skills train [--force]           walter-skills curate [--shadow|--apply] [--only op,…]
 walter-skills health                    python bench/run.py --hermes
-/opt/walter-memory/venv/bin/python -m pytest -q tests
+/walter/cognition/memory/venv/bin/python -m pytest -q tests
 ```
 
 Configuration: `config/walter-skills.toml` (the only tunables). Python path: `walter.pth` in the walter-memory venv

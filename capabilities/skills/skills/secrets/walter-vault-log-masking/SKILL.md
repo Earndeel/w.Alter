@@ -15,7 +15,7 @@ walter path memory
 walter instance path
 ```
 
-On Monsieur's VM, the implementation worked on in this session was under `/walter/secrets/walter_secrets/` and `/walter/memory/walter_memory/`. Inspect `fingerprints.py`, `secrets_sync.py`, and `cli.py` in secrets, and `logs.py` and `events.py` in memory. The memory append entry point must scrub content as well as structured payloads; masking only the journal writer leaves `core.events` exposed.
+On Monsieur's VM, the implementation worked on in this session was under `/walter/secrets/walter_secrets/` and `/walter/cognition/memory/walter_memory/`. Inspect `fingerprints.py`, `secrets_sync.py`, and `cli.py` in secrets, and `logs.py` and `events.py` in memory. The memory append entry point must scrub content as well as structured payloads; masking only the journal writer leaves `core.events` exposed.
 
 ## Rebuild and verify the fingerprint index
 
@@ -48,7 +48,7 @@ Run the existing suites using the shared runtime:
 ```sh
 cd /walter/secrets
 walter-python -m pytest -q -p no:cacheprovider tests
-cd /walter/memory
+cd /walter/cognition/memory
 walter-python -m pytest -q -p no:cacheprovider tests -k 'log or event or mask or runs'
 ```
 
@@ -66,7 +66,7 @@ docker exec -i hindsight-pg psql -U hindsight -d hindsight -P pager=off -c '\d c
 docker exec -i hindsight-pg psql -U hindsight -d hindsight -P pager=off -c '\d system.purges'
 ```
 
-Check both `walter_logs.events.text` and `.data`, and both `core.events.content` and `.payload`. Verify the current schema and inspect `/walter/memory/walter_memory/purge.py` before planning historical remediation.
+Check both `walter_logs.events.text` and `.data`, and both `core.events.content` and `.payload`. Verify the current schema and inspect `/walter/cognition/memory/walter_memory/purge.py` before planning historical remediation.
 
 ## Respect append-only data and remediation controls
 

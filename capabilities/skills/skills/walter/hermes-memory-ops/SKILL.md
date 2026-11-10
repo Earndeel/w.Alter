@@ -17,7 +17,7 @@ material is kept verbatim in `references/historical-2026-08-architecture.md` for
   in Postgres `hindsight-pg` (127.0.0.1:5433, db `hindsight`; the container keeps its historical name; password
   only in `/root/.pgpass`, never printed). Kardex = schema `kardex` of the same database, fed only by walter-memory
   processors. Search = `search.chunks` (FTS + local embeddings, pgvector).
-- **Code**: `/walter/memory` (link `/opt/walter-memory`), lib `walter_memory`, CLI `walter-memory`
+- **Code**: `/walter/cognition/memory` (link `/walter/cognition/memory`), lib `walter_memory`, CLI `walter-memory`
   (`health`, `search`, `context`, `events`, `objects`, `social`, `logs`, `extract`, `purge`…).
 - **Writes** only through the lib or `walter-memory-gateway` (127.0.0.1:8890). Never patch the upstream Hermes
   checkout; Hermes and its profiles use the memory provider `walter-memory`.
@@ -79,7 +79,7 @@ full dump by sections (pre-data, data, post-data), never one `pg_restore -j`: th
 Regression checks after touching backups, privacy or logs:
 
 ```bash
-cd /walter/memory && walter-python -m pytest -q tests/
+cd /walter/cognition/memory && walter-python -m pytest -q tests/
 bash scripts/post_repair_smoke_test.sh   # from this skill's folder
 ```
 
