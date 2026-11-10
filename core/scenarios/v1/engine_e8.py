@@ -156,8 +156,10 @@ def main() -> int:
     def c_budget():
         t = time.time()
         # a long answer, no tool (an unattended delegation gets no shell): cut at 60 s, a few thousand tokens at most
-        r = delegate("Sans aucun outil, écris en toutes lettres les nombres de un à trois mille, un par ligne, "
-                     "sans rien omettre ni abréger.", f"e8-{run}-budget", 60)
+        # a legitimate long task: an absurd one (3 000 numbers in letters) is now declined in one sentence
+        # (soul rule « Effort proportionné », 2026-11-10), which never reaches the budget
+        r = delegate("Sans aucun outil, rédige en une seule réponse un essai complet d'environ 5 000 mots sur "
+                     "l'histoire de l'imprimerie, en dix sections détaillées.", f"e8-{run}-budget", 60)
         r = r.get("result") or r
         took = time.time() - t
         return r.get("status") == "cancelled" and r.get("reason") == "budget_seconds" and took < 120, \
