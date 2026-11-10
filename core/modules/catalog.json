@@ -42,11 +42,14 @@
     },
     {
       "id": "context",
-      "target": "context",
+      "target": "cognition/context",
       "legacy": "/opt/walter-context",
       "manifest": "contracts/context.json",
       "neutral": true,
-      "vision_target": "cognition/context"
+      "vision_target": "cognition/context",
+      "compat_links": [
+        "/walter/context"
+      ]
     },
     {
       "id": "core",

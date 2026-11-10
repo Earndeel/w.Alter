@@ -655,12 +655,12 @@
     },
     {
       "id": "context",
-      "root": "/walter/context",
+      "root": "/walter/cognition/context",
       "anchors": [
-        "/walter/context/contracts/context.json",
-        "/walter/context/ports/dsh/index.mjs",
-        "/walter/context/ports/hermes/__init__.py",
-        "/walter/context/walter_context/compress/session.py"
+        "/walter/cognition/context/contracts/context.json",
+        "/walter/cognition/context/ports/dsh/index.mjs",
+        "/walter/cognition/context/ports/hermes/__init__.py",
+        "/walter/cognition/context/walter_context/compress/session.py"
       ],
       "requires": [],
       "external": [
@@ -672,10 +672,10 @@
         "preflight plans/pack observations and published module notes in instance state; canonical sources stay owned by Memory/Logs/Skills"
       ],
       "core_paths": [
-        "/walter/context/walter_context"
+        "/walter/cognition/context/walter_context"
       ],
       "backup_paths": [
-        "/walter/context"
+        "/walter/cognition/context"
       ],
       "interfaces": [
         "Python Session (walter_context.compress)",
@@ -728,9 +728,9 @@
         "owner": "context",
         "kind": "capability",
         "purpose": "Préparer et ordonner le contexte par message et par sous-agent, et compresser l’historique selon le contrat du harness ; les données canoniques restent dans leurs modules propriétaires.",
-        "target_root": "/walter/context",
+        "target_root": "/walter/cognition/context",
         "config_paths": [
-          "/walter/context/config/walter-context.toml"
+          "/walter/cognition/context/config/walter-context.toml"
         ],
         "permissions": [
           "limites du modèle et du harness",
@@ -866,12 +866,12 @@
       "components": [
         {
           "id": "preflight",
-          "path": "/walter/context/walter_context/preflight",
+          "path": "/walter/cognition/context/walter_context/preflight",
           "role": "Décision unique par message : ContextPlan (intention, niveau, capacités, voie rapide)",
           "status": "active",
-          "readme": "/walter/context/README.md",
+          "readme": "/walter/cognition/context/README.md",
           "contracts": [
-            "/walter/context/contracts/schemas/context-plan.v2.json"
+            "/walter/cognition/context/contracts/schemas/context-plan.v2.json"
           ],
           "interfaces": [
             {
@@ -883,18 +883,18 @@
         },
         {
           "id": "assembly",
-          "path": "/walter/context/walter_context/assembly.py",
+          "path": "/walter/cognition/context/walter_context/assembly.py",
           "role": "Assemblage du contexte selon le plan (pack)",
           "status": "active",
-          "readme": "/walter/context/README.md",
+          "readme": "/walter/cognition/context/README.md",
           "vision_target": "cognition/context"
         },
         {
           "id": "child",
-          "path": "/walter/context/walter_context/child.py",
+          "path": "/walter/cognition/context/walter_context/child.py",
           "role": "ChildContextSpec : dossier de départ d'un sous-agent",
           "status": "active",
-          "readme": "/walter/context/README.md",
+          "readme": "/walter/cognition/context/README.md",
           "interfaces": [
             {
               "transport": "cli",
@@ -905,18 +905,18 @@
         },
         {
           "id": "compress",
-          "path": "/walter/context/walter_context/compress",
+          "path": "/walter/cognition/context/walter_context/compress",
           "role": "Moteur de compaction (projection head→record→compact→live)",
           "status": "active",
-          "readme": "/walter/context/README.md",
+          "readme": "/walter/cognition/context/README.md",
           "vision_target": "cognition/context/compress"
         },
         {
           "id": "recover",
-          "path": "/walter/context/walter_context/recover.py",
+          "path": "/walter/cognition/context/walter_context/recover.py",
           "role": "Retrouver l'original d'une sortie compactée (walter_logs)",
           "status": "active",
-          "readme": "/walter/context/README.md",
+          "readme": "/walter/cognition/context/README.md",
           "interfaces": [
             {
               "transport": "cli",
@@ -927,26 +927,26 @@
         },
         {
           "id": "dsh-port",
-          "path": "/walter/context/ports/dsh",
+          "path": "/walter/cognition/context/ports/dsh",
           "role": "Prise DSH (injection et compaction) ; deviendra la stratégie context du moteur",
           "status": "active",
-          "readme": "/walter/context/README.md",
+          "readme": "/walter/cognition/context/README.md",
           "vision_target": "core/engine/plugins"
         },
         {
           "id": "bench",
-          "path": "/walter/context/bench",
+          "path": "/walter/cognition/context/bench",
           "role": "Bancs (levels, replay, quality, acceptance)",
           "status": "active",
-          "readme": "/walter/context/README.md",
+          "readme": "/walter/cognition/context/README.md",
           "vision_target": "cognition/context/bench"
         },
         {
           "id": "session-state",
-          "path": "/walter/context/contracts/schemas/session-state.v1.json",
+          "path": "/walter/cognition/context/contracts/schemas/session-state.v1.json",
           "role": "État de travail par fil (SessionState v1)",
           "status": "active",
-          "readme": "/walter/context/README.md",
+          "readme": "/walter/cognition/context/README.md",
           "vision_target": "cognition/context/contracts"
         }
       ]

@@ -135,7 +135,7 @@ Interfaces : OperatorSessions, MCP computer_use, Hermes plugin.
 Préparer et ordonner le contexte par message et par sous-agent, et compresser l’historique selon le contrat du harness ; les données canoniques restent dans leurs modules propriétaires.
 
 Contrat 1.3.0; propriétaire : context.
-Racine actuelle : `/walter/context`. Cible : `/walter/context`.
+Racine actuelle : `/walter/cognition/context`. Cible : `/walter/cognition/context`.
 
 Interfaces : Python Session (walter_context.compress), Hermes ContextEngine adapter, DSH CompactionEngine adapter, CLI walter-context, CLI walter-context capability router (versioned stable note), Python walter_context.capabilities.TurnNotes, JSON bridge op=capability for trusted module notes, CLI walter-context capability all [--write] (Modules W.Alter layer from walter present notes), HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it), Python walter_context.retrieval.gather and walter_context.assembly.pack, Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON), POST /preflight?inject=1 -> plan/text/pack/error; POST /preflight?shadow=1 -> private instance record without injection, CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow.
 
@@ -149,14 +149,14 @@ Interfaces : Python Session (walter_context.compress), Hermes ContextEngine adap
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| preflight | active | Décision unique par message : ContextPlan (intention, niveau, capacités, voie rapide) | `/walter/context/walter_context/preflight` | cognition/context/preflight |
-| assembly | active | Assemblage du contexte selon le plan (pack) | `/walter/context/walter_context/assembly.py` | cognition/context |
-| child | active | ChildContextSpec : dossier de départ d'un sous-agent | `/walter/context/walter_context/child.py` | cognition/context |
-| compress | active | Moteur de compaction (projection head→record→compact→live) | `/walter/context/walter_context/compress` | cognition/context/compress |
-| recover | active | Retrouver l'original d'une sortie compactée (walter_logs) | `/walter/context/walter_context/recover.py` | cognition/context |
-| dsh-port | active | Prise DSH (injection et compaction) ; deviendra la stratégie context du moteur | `/walter/context/ports/dsh` | core/engine/plugins |
-| bench | active | Bancs (levels, replay, quality, acceptance) | `/walter/context/bench` | cognition/context/bench |
-| session-state | active | État de travail par fil (SessionState v1) | `/walter/context/contracts/schemas/session-state.v1.json` | cognition/context/contracts |
+| preflight | active | Décision unique par message : ContextPlan (intention, niveau, capacités, voie rapide) | `/walter/cognition/context/walter_context/preflight` | cognition/context/preflight |
+| assembly | active | Assemblage du contexte selon le plan (pack) | `/walter/cognition/context/walter_context/assembly.py` | cognition/context |
+| child | active | ChildContextSpec : dossier de départ d'un sous-agent | `/walter/cognition/context/walter_context/child.py` | cognition/context |
+| compress | active | Moteur de compaction (projection head→record→compact→live) | `/walter/cognition/context/walter_context/compress` | cognition/context/compress |
+| recover | active | Retrouver l'original d'une sortie compactée (walter_logs) | `/walter/cognition/context/walter_context/recover.py` | cognition/context |
+| dsh-port | active | Prise DSH (injection et compaction) ; deviendra la stratégie context du moteur | `/walter/cognition/context/ports/dsh` | core/engine/plugins |
+| bench | active | Bancs (levels, replay, quality, acceptance) | `/walter/cognition/context/bench` | cognition/context/bench |
+| session-state | active | État de travail par fil (SessionState v1) | `/walter/cognition/context/contracts/schemas/session-state.v1.json` | cognition/context/contracts |
 
 **Limites déclarées :**
 
