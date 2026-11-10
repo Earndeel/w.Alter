@@ -89,7 +89,7 @@ def watch_main() -> int:
     threading.Thread(target=_watch, args=(hermes_dirs, False, q, stop), daemon=True).start()
     threading.Thread(target=_watch, args=(tree_dirs, True, q, stop), daemon=True).start()
     profiles_at_start = set(logs.hermes_dbs())
-    last_sweep = last_core = last_profile_check = 0.0
+    last_sweep = last_core = last_dsh = last_profile_check = 0.0
     print(f"walter-logs watch: {len(hermes_dirs)} Hermes dirs, {tree_dirs}", flush=True)
     while True:
         changed: set[str] = set()
@@ -117,6 +117,13 @@ def watch_main() -> int:
             if hermes and now - last_core > CORE_EVENTS_S:      # core.events (Monsieur's journal) follows
                 subprocess.run(["systemctl", "start", "--no-block", "walter-memory-hermes.service"], check=False)
                 last_core = now
+            # Engine lot E2 (2026-11-10): the engine's sessions reach core.events because their files changed, not
+            # because a hook ran at the end of a turn (the engine's native events no longer call walter_hook.py).
+            # agent-sessions is incremental and locked: a run that overlaps the hook's own journal steps aside.
+            if any(rt == "dsh" for rt, _ in files) and now - last_dsh > CORE_EVENTS_S:
+                subprocess.Popen(["walter-memory", "agent-sessions", "--dsh"], stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                last_dsh = now
             ins = sum(v.get("inserted", 0) for v in res.values() if isinstance(v, dict))
             if ins and (len(res) > 2 or ins >= 200):     # sweeps and big catch-ups only (journal stays quiet)
                 print(f"{datetime.now(timezone.utc):%H:%M:%S}Z +{ins} {res}", flush=True)

@@ -87,6 +87,7 @@ class ContextIn(BaseModel):
     caller: str = "unknown"
     mode: str = "on"
     session_id: str | None = None
+    cloud_safe: bool = False     # E2: drop any line that looks like a secret (the engine's context goes to the cloud)
 
 
 class AgentMemoryIn(BaseModel):
@@ -147,4 +148,124 @@ def post_context(body: ContextIn):
                       res["trace"].get("total_tokens"),
                       _json.dumps({k: {kk: vv for kk, vv in v.items() if kk != "refs"} for k, v in res["trace"]["sections"].items()}),
                       res["trace"].get("latency_ms")))
+    if body.cloud_safe and res.get("text"):
+        from . import privacy
+        res["text"] = "\n".join(l for l in res["text"].splitlines()
+                                 if not any(cat == "secret" for cat, _ in privacy.detect(l)))
     return res
+
+
+# ── Engine lot E2 (2026-11-10): the engine's intake and events speak HTTP to Walter's single sources ──────────────
+# The Run Plane stays the only source of runs and the bus the only source of events; these routes only transport the
+# same writes the hook makes through the library (walter_hook.run_start / run_end / emit), so a native engine plugin
+# needs no Python. Never a second registry.
+
+ENGINE_BUS_TYPES = {"turn.started", "turn.ended", "session.ended"}
+RUN_CHANNELS = {"owner", "machine", "test"}
+
+
+class RunStartIn(BaseModel):
+    origin: dict                       # {"channel", "runtime", "session_id"}
+    goal: str | None = None
+    dedupe_key: str | None = None      # one run per turn: a replayed turn returns the same run
+    cancel_run_id: str | None = None   # this session's previous run that never got its end
+    routing: dict | None = None
+
+
+class RunEndIn(BaseModel):
+    run_id: str | None = None
+    session_id: str | None = None
+    status: str = "ended"
+
+
+class BusEmitIn(BaseModel):
+    type: str
+    source: str
+    subject: str | None = None
+    payload: dict | None = None
+    dedupe_key: str | None = None
+
+
+def _run_of(run_id: str) -> dict | None:
+    """The session that opened a run and its idempotency key (None for an unknown or malformed id)."""
+    try:
+        with connection() as conn:
+            return conn.execute("select origin->>'session_id' session, dedupe_key from runs.runs where run_id::text = %s",
+                                (run_id,)).fetchone()
+    except Exception:  # noqa: BLE001 — a malformed id is simply unknown
+        return None
+
+
+def _run_session(run_id: str) -> str | None:
+    row = _run_of(run_id)
+    return row["session"] if row else None
+
+
+def _episode_later(run_id: str) -> None:
+    """The run's episode once its transcript is journaled (detached, as the hook does; `episodes pending` repairs)."""
+    import shutil
+    import subprocess
+    if os.environ.get("WALTER_EPISODES", "on") == "off" or not shutil.which("walter-memory"):
+        return
+    subprocess.Popen(["sh", "-c", f"sleep 30; exec walter-memory episodes build {run_id}"], stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+@app.post("/v1/runs/start", dependencies=[Depends(auth)])
+def post_runs_start(body: RunStartIn):
+    from . import privacy, runs
+    o = body.origin or {}
+    if not o.get("runtime") or not o.get("session_id") or o.get("channel", "owner") not in RUN_CHANNELS:
+        raise HTTPException(422, "origin needs runtime, session_id and a known channel")
+    origin = {"channel": o.get("channel", "owner"), "runtime": str(o["runtime"]), "session_id": str(o["session_id"])}
+    if body.cancel_run_id:              # only a run of the same session is ever interrupted
+        prev = _run_of(body.cancel_run_id)       # a replay of the same turn never cancels the run it gets back
+        if prev and prev["session"] == origin["session_id"] and (not body.dedupe_key or prev["dedupe_key"] != body.dedupe_key):
+            runs.safe(runs.end, body.cancel_run_id, "cancelled")
+    secret = any(cat == "secret" for cat, _ in privacy.detect(body.goal or ""))
+    privacy_class = "local_only" if secret else "cloud_allowed"
+    run_id = runs.start(origin=origin, goal=body.goal, privacy_class=privacy_class, dedupe_key=body.dedupe_key)
+    if body.routing:
+        runs.safe(runs.routing, run_id, body.routing)
+    return {"run_id": run_id, "privacy_class": privacy_class}
+
+
+@app.post("/v1/runs/end", dependencies=[Depends(auth)])
+def post_runs_end(body: RunEndIn):
+    from . import runs
+    if body.status not in ("ended", "cancelled", "failed"):
+        raise HTTPException(422, "unknown status")
+    run_id = None
+    if body.run_id:
+        owner = _run_session(body.run_id)
+        if owner is not None and (not body.session_id or owner == body.session_id):
+            runs.end(body.run_id, body.status)
+            run_id = body.run_id
+    if run_id is None and body.session_id:
+        run_id = runs.end_open(body.session_id, body.status)
+    if run_id:
+        _episode_later(run_id)
+    return {"run_id": run_id}
+
+
+@app.post("/v1/bus/emit", dependencies=[Depends(auth)])
+def post_bus_emit(body: BusEmitIn):
+    """Lifecycle events of an agent runtime (turn.started, turn.ended, session.ended). An observation (shadow) never
+    reaches the production bus: `payload.observation` is refused here, whatever the caller believes."""
+    from . import bus
+    if body.type not in ENGINE_BUS_TYPES:
+        raise HTTPException(422, "event type not open to runtimes")
+    if (body.payload or {}).get("observation"):
+        raise HTTPException(422, "observations never go to the production bus")
+    with connection() as conn:
+        event_id = bus.emit(body.type, body.source, body.subject, body.payload, body.dedupe_key, conn=conn)
+    return {"id": event_id, "duplicate": event_id is None}
+
+
+@app.post("/v1/privacy/classify", dependencies=[Depends(auth)])
+def post_privacy_classify(body: dict):
+    """The privacy class a text would get (no write): a runtime that cannot run the detectors asks before any cloud
+    call. Returns the categories found, never the matched text."""
+    from . import privacy
+    found = sorted({cat for cat, _ in privacy.detect(str(body.get("text") or "")[:20000])})
+    return {"privacy_class": "local_only" if "secret" in found else "cloud_allowed", "categories": found}

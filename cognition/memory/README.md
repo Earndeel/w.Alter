@@ -16,7 +16,7 @@ Walter Memory core (spec and decisions: `/walter/docs/` — ARCHITECTURE, DECISI
   clear/secure zones), `privacy` (classes, detectors, redaction), `llm` (the only door to external models:
   privacy + budget guard + accounting), `ingestion` (connectors, checkpoints, SKIP LOCKED queue), `purge`
   (break-glass : base active + registre hors base, `reapply`/`verify` après restauration, sauvegardes jamais modifiées
-  automatiquement), `observability` (preuve contre `walter_logs` et retrait tracé des copies), `gateway` (HTTP 127.0.0.1:8890), `cli` (`walter-memory`).
+  automatiquement), `observability` (preuve contre `walter_logs` et retrait tracé des copies), `gateway` (HTTP 127.0.0.1:8890 ; pour le moteur, lot E2 : `POST /v1/runs/start|end`, `/v1/bus/emit` limité à `turn.started|turn.ended|session.ended` sans observation, `/v1/privacy/classify`, `cloud_safe` sur `/v1/context`), `cli` (`walter-memory`).
 - `connectors/` — source connectors (P2).
 - `tests/` — `venv/bin/python -m pytest -q tests/`.
 
