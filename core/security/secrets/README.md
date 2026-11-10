@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Rôle** | Accès partagé au coffre Bitwarden du propriétaire : références au coffre et injection locale des valeurs autorisées, sans qu'aucune valeur n'entre dans un modèle. |
-| **Propriétaire** | walter-secrets (`/walter/secrets`). |
+| **Propriétaire** | walter-secrets (`/walter/core/security/secrets`). |
 | **État** | **active** (constat du 09/11/2026) : service `walter-secrets-sync`. |
 | **Ne fait pas** | Donner une valeur secrète à un modèle, un journal, un prompt ou une URL ; exporter `Vault.value`. |
 | **Contrats** | [contracts/secrets.json](contracts/secrets.json), [contracts/maintenance.json](contracts/maintenance.json) ; MCP `secret_search`, `secret_reference` ; CLI `walter-secret`. |

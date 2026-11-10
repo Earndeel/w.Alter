@@ -2,7 +2,7 @@
 import importlib
 import runpy
 import sys
-sys.path.insert(0, "/opt/walter-secrets")
+sys.path.insert(0, "/walter/core/security/secrets")
 if __name__ == "__main__":
     runpy.run_module("walter_secrets.secrets_sync", run_name="__main__")
 else:
