@@ -90,6 +90,21 @@ def engine_policy(values):
     return mode
 
 
+ENGINE_SUBAGENTS=('off','on')                       # lot E5: the kernel's in-process sub-agents under Walter's policy
+# Kept when sub-agents are on: the in-process runtime, the delegation tool (spawn) and its control/list tools. Fork,
+# workflows, Ralph, Codex/Claude Code children stay off: one way to delegate, the engine's own.
+SUBAGENT_KEEP=('subagent','subagent-spawn-in-process','tool-subagent','tool-subagent-control','tool-subagent-list-agents')
+SUBAGENT_DROP=('tool-subagent-codex','tool-subagent-claude-code')
+SUBAGENT_MAX_DEPTH=3                               # = core/security policy never.max_depth (children ≤ 3 levels)
+
+
+def engine_subagents(values):
+    # WALTER_ENGINE_SUBAGENTS: a test or Lab home composed otherwise (`--home`), never set for the live service
+    mode=str(os.environ.get('WALTER_ENGINE_SUBAGENTS') or values.get('dsh',{}).get('engine',{}).get('subagents','off'))
+    if mode not in ENGINE_SUBAGENTS:raise ValueError('unknown [dsh.engine] subagents (off or on)')
+    return mode
+
+
 ENGINE_API=('off','on')                             # lot E4: the engine's own API door (core/interfaces/api)
 ENGINE_API_PLUGIN=ROOT/'interfaces'/'api'/'index.mjs'
 
@@ -282,16 +297,23 @@ def _dsh_yaml(text):
     return yaml.load(text,Loader) or []
 
 
-def _dsh_preset(port):
+def _dsh_preset(port,subagents=False):
     """Walter's `standard` agent preset: the one shipped with dsh-web-app minus the rows a Walter module owns;
-    compaction-basic → walter-context (single compaction owner). Same preset id, so saved sessions keep resolving."""
+    compaction-basic → walter-context (single compaction owner). Same preset id, so saved sessions keep resolving.
+    With sub-agents (lot E5) the `delegation` group keeps only the spawn tool (depth ≤ SUBAGENT_MAX_DEPTH) and its
+    control/list tools."""
     rows=_dsh_yaml((DSH_LIB/'dsh-web-app'/'presets'/'standard.patch.yml').read_text())
     row=next(e for r in rows for e in r.get('insert',[]) if e.get('id')=='preset-standard')
+    keep=SUBAGENT_KEEP if subagents else ()
     def walk(entries):
         out=[]
         for e in entries:
-            if e.get('id') in DSH_PRESET_OWNED or e.get('id') in DSH_ORCHESTRATION:continue
-            if e.get('group') and e.get('id') in DSH_PRESET_GROUPS_OFF:continue
+            if e.get('id') in DSH_PRESET_OWNED or (e.get('id') in DSH_ORCHESTRATION and e.get('id') not in keep):continue
+            if subagents and e.get('id') in SUBAGENT_DROP:continue
+            if e.get('group') and e.get('id') in DSH_PRESET_GROUPS_OFF and not (subagents and e.get('id')=='delegation'):continue
+            # one-shot: the call waits for the child's answer (parallel calls in one step run together), so a turn's
+            # result holds what its children found; a long child can still run as a job (run_in_background)
+            if e.get('id')=='tool-subagent' and subagents:e={**e,'config':{**(e.get('config') or {}),'maxDepth':SUBAGENT_MAX_DEPTH,'backgroundMode':'one-shot'}}
             gate=e.get('disabled')
             if isinstance(gate,dict):   # bash/pwsh platform switch; Walter hosts are Linux
                 if gate['__js__'].replace('"',"'") not in ("process.platform === 'win32'","process.platform !== 'win32'"):
@@ -307,7 +329,7 @@ def _dsh_preset(port):
     return {'id':'preset-standard','config':config}
 
 
-def _dsh_web_profile(port):
+def _dsh_web_profile(port,subagents=False):
     """Managed section of the DSH web profile patch (rows that exist only in the web composition)."""
     import yaml
     head=('# DSH web GUI: no developer surface text (HMR, pnpm, harness source) in the prompt.\n'
@@ -318,8 +340,8 @@ def _dsh_web_profile(port):
     head+=''.join(f'- id: {x}\n  disabled: true\n' for x in DSH_WEB_OFF)
     # dsh-web-app re-enables some orchestration rows after the global patch: the profile layer is applied last.
     head+='# DSH orchestration (goals, plan mode, sub-agents, workflows, todo, MCP resources): Walter owns it.\n'
-    head+=''.join(f'- id: {x}\n  disabled: true\n' for x in DSH_ORCHESTRATION)
-    return head+'# Walter "standard" preset (generated from the shipped one by walter-core composition).\n'+yaml.safe_dump([_dsh_preset(port)],sort_keys=False,allow_unicode=True,width=120)
+    head+=''.join(f'- id: {x}\n  disabled: true\n' for x in DSH_ORCHESTRATION if not (subagents and x in SUBAGENT_KEEP))
+    return head+'# Walter "standard" preset (generated from the shipped one by walter-core composition).\n'+yaml.safe_dump([_dsh_preset(port,subagents)],sort_keys=False,allow_unicode=True,width=120)
 
 
 def _dsh_headless_profile(port):
@@ -410,8 +432,13 @@ def _plan(host,home=None,profile_dir=None):
         else:add(_dsh_addition(data,{'id':'walter-owner-turn','name':str(DSH_OWNER_TURN)}))
         if wanted and have!=wanted:add({'insert':wanted})
         # Rows a Walter module replaces: turned off, any local config kept (lot 1, 2026-11-07).
+        subagents=engine_subagents(values)=='on'
         for ident in DSH_OFF:
             rows=[x for x in data if x.get('id')==ident]
+            if subagents and ident in SUBAGENT_KEEP:   # back to the shipped composition for these rows (E5)
+                for x in rows:
+                    if x=={'id':ident,'disabled':True}:data.remove(x);merged=True
+                continue
             if len(rows)>1:raise ValueError('duplicate DSH patch target requires manual reconciliation')
             if not rows:add({'id':ident,'disabled':True})
             elif rows[0].get('disabled') is not True:rows[0]['disabled']=True;merged=True
@@ -467,7 +494,7 @@ def _plan(host,home=None,profile_dir=None):
         elif additions:text=text.rstrip()+'\n'+yaml.safe_dump(additions,sort_keys=False,allow_unicode=True,width=120)
         yaml.safe_load(text);file(path,text,'mcp,lifecycle,skills,model,context')
         if require(DSH_LIB/'dsh-web-app'/'presets'/'standard.patch.yml','dsh_runtime'):
-            for profile,block in (('web',_dsh_web_profile),('headless',_dsh_headless_profile)):
+            for profile,block in (('web',lambda port:_dsh_web_profile(port,subagents)),('headless',_dsh_headless_profile)):
                 wp=p/'profiles'/profile/'cordis.patch.yml'
                 before=wp.read_text() if wp.exists() else ''
                 after=before

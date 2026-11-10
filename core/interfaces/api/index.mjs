@@ -4,7 +4,8 @@
 // answer approvals through it. It owns no session, run or bus of its own: kernel sessions (sessionController:
 // create / prompt / cancel / follow, idempotent prompts by requestId), the Run Plane and the bus (opened by the
 // intake/events plugins for every turn whatever its door) and Walter's execution policy (door published to it).
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { rootIdOf } from '../../engine/plugins/lineage.mjs';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
@@ -35,13 +36,25 @@ const same = (a, b) => { const x = Buffer.from(String(a)); const y = Buffer.from
 
 const kernelOf = (row) => row.kernel;
 const walterKey = (kernel) => `dsh/vm/${kernel}`;
-const rootOf = (agent) => { let a = agent; while (a?.parentAgent) a = a.parentAgent; return a; };
+
+
+/** The child's instructions: the caller's goal, its facts, and the shape its answer must take. */
+export function mission(d) {
+  const parts = ['[Délégation Walter] Tu exécutes une sous-tâche pour un autre agent. Tu ne vois pas sa conversation : '
+    + 'tout ce qu\'il faut est ci-dessous. Réponds par le résultat lui-même, vérifiable, sans préambule.', '', `Objectif : ${d.goal.trim()}`];
+  if (d.context) parts.push('', `Contexte fourni : ${String(d.context).trim()}`);
+  if (d.constraints && Object.keys(d.constraints).length) parts.push('', `Contraintes : ${JSON.stringify(d.constraints)}`);
+  if (d.output_contract) parts.push('', `Forme de la réponse (JSON conforme à ce schéma) : ${JSON.stringify(d.output_contract)}`);
+  return parts.join('\n');
+}
 
 /** The engine side of the API, independent of HTTP (tests drive it with a stand-in sessionController). */
 export class EngineApi {
-  constructor({ sessions, bindings, workspace, approvalTimeoutMs = 10 * 60_000, log = () => {} }) {
+  constructor({ sessions, bindings, workspace, approvalTimeoutMs = 10 * 60_000, log = () => {}, maxDepth = 3,
+    provider = 'walter', tasks = ['coding', 'general', 'document', 'summarization', 'auto'] }) {
     this.sessions = sessions; this.bindings = bindings; this.workspace = workspace;
     this.approvalTimeoutMs = approvalTimeoutMs; this.log = log;
+    this.maxDepth = maxDepth; this.provider = provider; this.tasks = tasks;
     this.pending = new Map();             // approval id → { row, resolve, timer }
     this.listeners = new Set();           // live approval notices for SSE subscribers
   }
@@ -66,7 +79,7 @@ export class EngineApi {
       case 'turn.cancel': return this.cancel(body);
       case 'approval.list': return { approvals: [...this.pending.values()].map((p) => p.row).filter((r) => !body.session_id || r.session_id === body.session_id) };
       case 'approval.answer': return this.answer(body);
-      case 'delegate': throw new ApiError(501, 'not_yet', 'delegation through the API arrives with lot E5');
+      case 'delegate': return this.delegate(body);
       default: throw new ApiError(400, 'unknown_op');
     }
   }
@@ -167,15 +180,53 @@ export class EngineApi {
     return { accepted: true, session_id: sid };
   }
 
+  /**
+   * A sub-agent run by the engine for a caller outside it (walter_run from Claude Code, Codex, Hermes, a module):
+   * one `mcp/<caller>/task-…` session under the `api` preset, never asking anyone (an `ask` is refused), filed in the
+   * Run Plane under the caller's run, on the Router task it names (else `auto`), within its time budget.
+   * The engine's own model delegates with the kernel's subagent tool instead (same policy, child ≤ parent).
+   */
+  async delegate({ delegation: d, caller = 'mcp' }) {
+    if (!d || d.version !== 1 || typeof d.goal !== 'string' || !d.goal.trim()) throw new ApiError(400, 'invalid_delegation', 'delegation.v1 with a goal');
+    const key = String(d.idempotency_key || '');
+    if (key.length < 8 || key.length > 200) throw new ApiError(400, 'idempotency_key_required');
+    const depth = Number(d.parent?.depth ?? 0);
+    if (!Number.isInteger(depth) || depth < 0) throw new ApiError(400, 'invalid_depth');
+    if (depth >= this.maxDepth) throw new ApiError(403, 'max_depth', `delegation depth ${depth} reaches the limit ${this.maxDepth}`);
+    const conversation = `task-${createHash('sha256').update(key).digest('hex').slice(0, 24)}`;
+    const opened = await this.open({ interface: 'mcp', conversation, principal: { kind: 'machine', id: caller }, mode: 'interactive' });
+    const row = this.bindings.get(opened.session_id);
+    if (!row.unattended) {
+      this.bindings.set({ ...row, unattended: true, parent: { run_id: d.parent?.run_id || null, session_id: d.parent?.session_id || null,
+        task_id: d.parent?.task_id || null, depth }, goal_sha: createHash('sha256').update(d.goal).digest('hex').slice(0, 16) });
+    }
+    if (!opened.resumed && d.task && d.task !== 'auto' && this.tasks.includes(d.task)) {
+      await this.sessions.selectModel({ sessionId: row.kernel, provider: this.provider, model: d.task })
+        .catch((e) => this.log('delegate.model', { session_id: opened.session_id, error: String(e?.code || e).slice(0, 80) }));
+    }
+    const budgetMs = Math.max(60, Math.min(Number(d.budget_seconds) || 900, 3600)) * 1000;
+    const r = await this.submit({ session_id: opened.session_id, message: { text: mission(d) }, channel: 'machine',
+      idempotency_key: key, wait_ms: budgetMs }, 'queue', true);
+    let res = r.result;
+    if (!res.done) {   // over budget: interrupted, what it had said so far is returned
+      try { this.sessions.cancel({ sessionId: row.kernel }); } catch { /* already idle */ }
+      res = { ...res, status: 'cancelled', reason: 'budget_seconds' };
+    }
+    this.log('delegate', { session_id: opened.session_id, caller, depth, status: res.status, tools: res.tools.length });
+    return { ok: res.status === 'ok' && Boolean(res.text), output: res.text, status: res.status, reason: res.reason,
+      tools: res.tools, session_id: opened.session_id, walter_session: opened.walter_session, request_id: key,
+      resumed: opened.resumed };
+  }
+
   /** Answerer for sessions this API opened (the web keeps its own dialog): the client decides, no answer = refused. */
   async approval(req, next) {
-    const root = rootOf(req.agent);
-    const row = this.bindings.byKernel(root?.session?.header?.id);
+    const rootId = rootIdOf(req.agent);                 // a sub-agent's request goes to its root's client (E5)
+    const row = this.bindings.byKernel(rootId);
     if (!row || row.door === 'web') return next();
-    if (row.door === 'command') return 'rejected';          // a command never asks: it is refused
+    if (row.door === 'command' || row.unattended) return 'rejected';   // nobody to ask: refused
     const id = randomUUID();
     const view = { request_id: id, session_id: row.session_id, tool: req.toolName, reason: req.reason ?? null,
-      child: root !== req.agent, at: new Date().toISOString() };
+      child: rootId !== req.agent?.session?.header?.id, at: new Date().toISOString() };
     return new Promise((resolve) => {
       const settle = (outcome) => {
         const p = this.pending.get(id); if (!p) return;

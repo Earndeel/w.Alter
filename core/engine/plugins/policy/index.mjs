@@ -9,6 +9,7 @@
 //     its parent → allow | ask | deny;
 //   then the kernel's own listeners (sandbox, approval). `ask` goes to the kernel's approval seam: the door's answerer
 //   (web dialog, Telegram buttons) or, without one, a refusal (fail closed).
+import { rootIdOf } from '../lineage.mjs';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { decide, load, strictest } from '../../../security/policy.mjs';
@@ -29,8 +30,8 @@ export function depthOf(agent) {
 // The door a session came through: set by the interface that opened it (Engine API, Telegram), else the profile's.
 export function interfaceOf(agent, fallback) {
   let a = agent;
-  while (a?.parentAgent) a = a.parentAgent;                     // a child is judged under its root's door
-  const id = a?.session?.header?.id;
+  while (a?.parentAgent) a = a.parentAgent;
+  const id = rootIdOf(agent);                                   // a child is judged under its root's door (E5)
   const doors = globalThis[Symbol.for('walter.engine.doors')];  // published by the Engine API (core/interfaces/api)
   return (id && doors instanceof Map && doors.get(id)) || a?.session?.header?.walter?.interface || fallback;
 }

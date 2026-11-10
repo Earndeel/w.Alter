@@ -134,6 +134,37 @@ test('native: the same step replayed carries the same idempotency key; a new tur
   assert.ok(third.body.cancel_run_id);
 });
 
+test('native: a session opened by the Engine API files its runs under its channel and its parent run (E5)', async () => {
+  const cfg = config('native');
+  const meta = (globalThis[Symbol.for('walter.engine.sessionMeta')] ||= new Map());
+  meta.set('s-deleg', { channel: 'machine', parent_run_id: 'run-parent-1' });
+  await intake.nativeTurn(cfg, { session: 'dsh/vm/s-deleg', turn: 1, step: 0, message: '[Délégation Walter] Objectif : trouver la date' });
+  const start = calls.filter((c) => c.path === '/v1/runs/start').at(-1);
+  assert.equal(start.body.origin.channel, 'machine');
+  assert.equal(start.body.parent_run_id, 'run-parent-1');
+  await intake.nativeTurn(cfg, { session: 'dsh/vm/s-plain', turn: 1, step: 0, message: 'une question ordinaire du propriétaire' });
+  const plain = calls.filter((c) => c.path === '/v1/runs/start').at(-1);
+  assert.equal(plain.body.origin.channel, 'owner'); assert.equal(plain.body.parent_run_id, undefined);
+  meta.delete('s-deleg');
+});
+
+test('native: an in-process sub-agent turn is a machine run filed under its parent\'s current run (E5)', async () => {
+  const cfg = config('native');
+  const ctx = fakeCtx();
+  intake.apply(ctx, cfg);
+  const parent = agent();
+  await ctx.handlers['agent/pre-step'][0]({ agent: parent, messages: [msg('user', 'lance deux sous-agents pour vérifier')], turn: 1, step: 0 },
+    async () => ({ kind: 'enter', messages: [] }));
+  const parentRun = currentRuns.get('dsh/vm/session-1').run_id;
+  const child = { session: { header: { id: 'child-7', parentSession: 'session-1', origin: 'subagent', delegationDepth: 1 } } };   // as the kernel writes it
+  await ctx.handlers['agent/pre-step'][0]({ agent: child, messages: [msg('user', 'Calcule 17*23 et réponds le nombre.')], turn: 1, step: 0 },
+    async () => ({ kind: 'enter', messages: [] }));
+  const start = calls.filter((c) => c.path === '/v1/runs/start').at(-1);
+  assert.equal(start.body.origin.session_id, 'dsh/vm/child-7');
+  assert.equal(start.body.origin.channel, 'machine');
+  assert.equal(start.body.parent_run_id, parentRun);
+});
+
 test('native: no pack (failure or secret) → the legacy memory block, cloud-safe, with its header', async () => {
   const cfg = config('native');
   behaviour['/preflight?inject=1'] = (d, reply) => reply(500, {});

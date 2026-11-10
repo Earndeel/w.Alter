@@ -1,4 +1,5 @@
-import copy,json,os,sys
+import copy
+import json,os,sys
 from pathlib import Path
 import pytest
 import yaml
@@ -356,3 +357,40 @@ def test_engine_api_switch_web_profile_only_and_off_removes(home,monkeypatch):
     v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']={'api':'maybe'}
     monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
     with pytest.raises(ValueError,match='api'):c.install('dsh',home)
+
+
+def test_engine_subagents_switch_keeps_spawn_only_with_depth_and_off_restores(home,monkeypatch):
+    """Lot E5 (2026-11-10): `subagents = "on"` gives back the kernel's in-process sub-agents (runtime + spawn tool +
+    control/list), depth ≤ SUBAGENT_MAX_DEPTH; fork, workflows, Ralph and Codex/Claude Code children stay off.
+    `off` (default) gives the composition back exactly."""
+    c.install('dsh',home,apply=True,backup_root=home.parent/'b')
+    root=home/'cordis.patch.yml';web=home/'profiles'/'web'/'cordis.patch.yml'
+    before=(root.read_text(),web.read_text() if web.exists() else '')
+    values=c.engine_values()
+    def compose(engine):
+        v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']=engine
+        monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
+        c.install('dsh',home,apply=True,backup_root=home.parent/'b')
+        assert not c.install('dsh',home)['changed']
+        return root.read_text(),web.read_text() if web.exists() else ''
+    r,w=compose({'subagents':'on'})
+    if not before[1]:pytest.skip('no web profile composed in this environment')
+    off={e['id'] for e in c._dsh_yaml(r) if isinstance(e,dict) and e.get('disabled')}
+    assert not off & set(c.SUBAGENT_KEEP) and {'subagent-fork-in-process','tool-subagent-fork','tool-workflow','goal'}<=off
+    wrows=c._dsh_yaml(w)
+    woff={e['id'] for e in wrows if isinstance(e,dict) and e.get('disabled')}
+    assert not woff & set(c.SUBAGENT_KEEP) and 'tool-ralph' in woff
+    preset=[e for e in wrows if isinstance(e,dict) and e.get('id')=='preset-standard'][0]
+    def flat(es):
+        for e in es:
+            yield e
+            if e.get('group'):yield from flat(e.get('config') or [])
+    ids={e['id']:e for e in flat(preset['config']['plugins'])}
+    assert ids['tool-subagent']['config']['maxDepth']==c.SUBAGENT_MAX_DEPTH and ids['tool-subagent']['config']['provider']=='spawn' and ids['tool-subagent']['config']['backgroundMode']=='one-shot'
+    assert not {'tool-subagent-fork','tool-subagent-codex','tool-subagent-claude-code','workflow-ptc','tool-workflow','tool-ralph'}&set(ids)
+    r,w=compose({'subagents':'off'})   # root re-dumped: same rows (disabled rows re-appended, order irrelevant)
+    rows=lambda t:sorted(json.dumps(e,sort_keys=True,default=str) for e in c._dsh_yaml(t))
+    assert w==before[1] and rows(r)==rows(before[0])
+    v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']={'subagents':'all'}
+    monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
+    with pytest.raises(ValueError,match='subagents'):c.install('dsh',home)

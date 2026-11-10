@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Bindings, doors, engineSessionId } from '../bindings.mjs';
+import { Bindings, doors, engineSessionId, sessionMeta } from '../bindings.mjs';
 import { TurnWatch, toClientEvent } from '../events.mjs';
 import { EngineApi, ensureToken, handler } from '../index.mjs';
 import { interfaceOf } from '../../../engine/plugins/policy/index.mjs';
@@ -33,6 +33,7 @@ class FakeSessions {
     return { accepted: true };
   }
   cancel({ sessionId }) { this.cancelled.push(sessionId); return { accepted: true }; }
+  async selectModel(sel) { (this.selected ||= []).push(sel); return { selected: sel }; }
   async *follow({ address }, signal) {
     const id = address.sessionId; const q = []; let wake;
     const sub = (ev) => { q.push(ev); wake?.(); };
@@ -79,6 +80,9 @@ test('session.open creates once, resumes after a restart, publishes the door for
   assert.equal(interfaceOf({ session: { header: { id: 'k1' } } }, 'web'), 'telegram');
   assert.equal(interfaceOf({ parentAgent: { session: { header: { id: 'k1' } } } }, 'web'), 'telegram', 'a child is judged under its root door');
   assert.equal(interfaceOf({ session: { header: { id: 'other' } } }, 'web'), 'web');
+  // the real kernel: no parentAgent on a child, its header names its parent session (E5)
+  assert.equal(interfaceOf({ session: { header: { id: 'c-1', parentSession: 'k1', origin: 'subagent', delegationDepth: 1 } } }, 'web'), 'telegram');
+  assert.equal(interfaceOf({ session: { header: { id: 'c-2', parentSession: 'c-1', origin: 'subagent', delegationDepth: 2 } } }, 'web'), 'telegram', 'a grandchild too');
   assert.equal(statSync(join(dir, 'bindings.json')).mode & 0o777, 0o600);
 });
 
@@ -117,13 +121,29 @@ test('turn.submit waits for the result; same idempotency key = one prompt; resul
   await assert.rejects(api.op({ version: 1, op: 'turn.submit', session_id: 'telegram/lucas/chat-1', message: { text: '  ' }, idempotency_key: 'k-00000002' }), { code: 'empty_message' });
 });
 
-test('turn.cancel reaches the kernel; delegate waits for E5', async () => {
+test('delegate: one engine session per task, parent run published, task model, depth limit, never asks', async () => {
+  const { api, sessions } = make();
+  const d = { version: 1, goal: 'Trouve la date du jour', task: 'general', budget_seconds: 60, idempotency_key: 'walter-run-0001',
+    parent: { run_id: 'run-parent', session_id: 'mcp/claude/s1', depth: 0 } };
+  const r = await api.op({ version: 1, op: 'delegate', caller: 'claude', delegation: d });
+  assert.equal(r.ok, true); assert.match(r.output, /^ok:\[Délégation Walter\]/); assert.match(r.session_id, /^mcp\/claude\/task-/);
+  const kernel = r.walter_session.replace('dsh/vm/', '');
+  assert.deepEqual(sessionMeta().get(kernel), { channel: 'machine', parent_run_id: 'run-parent' });
+  assert.deepEqual(sessions.selected, [{ sessionId: kernel, provider: 'walter', model: 'general' }]);
+  const again = await api.op({ version: 1, op: 'delegate', caller: 'claude', delegation: d });
+  assert.equal(again.resumed, true); assert.equal(sessions.prompts.length, 1, 'a replayed delegation runs once');
+  await assert.rejects(api.op({ version: 1, op: 'delegate', delegation: { ...d, idempotency_key: 'walter-run-0002', parent: { ...d.parent, depth: 3 } } }), { code: 'max_depth' });
+  await assert.rejects(api.op({ version: 1, op: 'delegate', delegation: { ...d, idempotency_key: undefined } }), { code: 'idempotency_key_required' });
+  assert.equal(await api.approval({ agent: { session: { header: { id: kernel } } }, toolName: 'bash' }, async () => 'next'), 'rejected', 'nobody to ask');
+});
+
+test('turn.cancel reaches the kernel', async () => {
   const { api, sessions } = make();
   await open(api);
   await assert.rejects(api.op({ version: 1, op: 'turn.cancel', session_id: 'telegram/lucas/chat-1' }), { code: 'reason_required' });
   await api.op({ version: 1, op: 'turn.cancel', session_id: 'telegram/lucas/chat-1', reason: '/stop' });
   assert.deepEqual(sessions.cancelled, ['k1']);
-  await assert.rejects(api.op({ version: 1, op: 'delegate', delegation: {} }), { status: 501 });
+  await assert.rejects(api.op({ version: 1, op: 'delegate', delegation: {} }), { code: 'invalid_delegation' });
 });
 
 test('approvals: API sessions are answered by their owner, web sessions keep their dialog, commands never ask', async () => {
@@ -137,6 +157,12 @@ test('approvals: API sessions are answered by their owner, web sessions keep the
   await assert.rejects(api.op({ version: 1, op: 'approval.answer', request_id: p.request_id, decision: 'allow_once', principal: { kind: 'owner', id: 'someone' } }), { code: 'not_the_owner' });
   await api.op({ version: 1, op: 'approval.answer', request_id: p.request_id, decision: 'allow_once', principal: owner });
   assert.equal(await asked, 'allowed-once');
+  // a real kernel child (header names its parent): its request reaches the root's client too (E5)
+  const real = api.approval({ agent: { session: { header: { id: 'kc', parentSession: 'k1', origin: 'subagent' } } }, toolName: 'browser_session' }, async () => 'next');
+  const [q] = (await api.op({ version: 1, op: 'approval.list', session_id: 'telegram/lucas/chat-1' })).approvals;
+  assert.equal(q.child, true);
+  await api.op({ version: 1, op: 'approval.answer', request_id: q.request_id, decision: 'deny', principal: owner });
+  assert.equal(await real, 'rejected');
   // unanswered = refused
   assert.equal(await api.approval({ agent, toolName: 'x' }, async () => 'unavailable'), 'rejected');
   // web session (not bound) goes on to the web dialog

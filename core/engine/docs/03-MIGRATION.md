@@ -281,6 +281,37 @@ Ce lot reprend et remplace les lots A–D du plan du 08/11.
 - **Retour arrière** : interrupteur `walter_run.engine=false` ⇒ ancienne boucle **sans terminal** ; ensuite
   restauration depuis la quarantaine.
 
+### État (10/11/2026) — construit et prouvé sur un hôte de test, pas encore en service
+
+Réalisé sans `core/orchestration` ni outil natif séparé : le noyau sait déjà déléguer, Walter le gouverne.
+
+- **Sous-agents du moteur** : interrupteur `[dsh.engine] subagents = "off" | "on"` (composition). `on` rend au noyau
+  ses sous-agents en processus : outil `subagent` (mode `one-shot` : l'appel attend la réponse de l'enfant ; deux
+  appels dans un même pas tournent en parallèle ; un enfant long peut partir en tâche de fond), `send_message` /
+  `list_agents`, profondeur ≤ 3 (`maxDepth` de l'outil = `never.max_depth` de la politique). Restent coupés : fork,
+  workflows, Ralph, enfants Codex / Claude Code — une seule façon de déléguer.
+- **Lignée** (`plugins/lineage.mjs`) : le noyau garde le parent d'un enfant dans son registre, pas sur l'agent ; l'en-tête
+  de la session enfant porte `parentSession` et `delegationDepth`. La politique juge un enfant sous la porte de sa
+  racine (avant : la porte du profil, `web`, plus large que Telegram — corrigé) ; ses demandes d'accord vont au client
+  de la racine (boutons Telegram) ; l'accueil classe son tour `machine`, rangé sous le run courant du parent.
+- **`walter_run` texte** : le Router décide (tâche, modèle), puis délègue au moteur par l'Engine API `delegate`
+  (`router/serve/engine.py`) : session `mcp/walter_run/task-…` sans surveillance sous le preset `api` (lectures
+  permises, tout ce qui demanderait Monsieur refusé — donc pas de délégation en cascade par l'ancien chemin), run
+  rangé sous le run de l'appelant, tâche Router (`runs.tasks`) et observations persistées gardées. Liaison de
+  l'instance : `host.json` → `engine_api {url, token_file, walter_run: engine|legacy}` ; absente = `legacy` (ancienne
+  boucle sans terminal). Un modèle **nommé** par Monsieur reste sur le chemin exact du Router (les modèles du moteur
+  sont des postes, pas des identifiants de modèle) ; médias et services web restent au Router.
+- **Coûts** : chaque appel de modèle du moteur est dans `models.exec_log` avec son `run_id` (corrélation walter-llm par
+  session) ; le coût d'une mission = la somme sur l'arbre `parent_run_id`.
+- **Preuves** (`core/scenarios/v1/engine_e5.py`, hôte de test) : deux enfants en parallèle (démarrés à la même
+  seconde) et leurs résultats fusionnés ; un enfant qui tente de lire `/root/.pgpass` refusé par la règle `never`,
+  jugé sous la porte `telegram` ; `/stop` pendant le travail d'un enfant → tour et run enfant `cancelled`, processus
+  arrêté ; `delegate` → résultat, run enfant `machine` sous le run parent, rejeu sans second run ; profondeur 3 refusée
+  (403) ; `walter-router run` → exécution `walter-engine`, tâche Router `ended`. Coût total des essais du jour ≈ 0,04 $.
+- **Activation** : avec E2/E3/E4 sur `dsh-web` (après la fenêtre E1), puis `walter_run: engine` dans `host.json`.
+- **Retour arrière** : `subagents = "off"` + `walter harness install dsh --apply` + redémarrage ; `walter_run: legacy`
+  (sans redémarrage, lu à chaque appel).
+
 ## E6 — Fin des rôles de production de Hermes (hors Telegram)
 
 - **Composants** : `router/serve/oneshot.py`, `media_exec.py`, `router/analysis/alerts.py` → mode commande de

@@ -11,11 +11,26 @@ export const DOORS = ['web', 'telegram', 'api', 'mcp', 'command', 'schedule', 'w
 export const SESSION_ID = /^(web|telegram|api|mcp|command|schedule|webhook|lab)\/[A-Za-z0-9._:@/-]{1,200}$/;
 const PART = /^[A-Za-z0-9._:@-]{1,100}$/;
 const DOORS_KEY = Symbol.for('walter.engine.doors');
+const META_KEY = Symbol.for('walter.engine.sessionMeta');
 
 /** The in-process map kernel session id → door, read by the policy plugin (`interfaceOf`). */
 export function doors() {
   if (!(globalThis[DOORS_KEY] instanceof Map)) globalThis[DOORS_KEY] = new Map();
   return globalThis[DOORS_KEY];
+}
+
+/** In-process map kernel session id → what the engine's intake needs to file its runs: channel (owner | machine |
+ *  test: a test conversation is capped by walter-llm's test budget) and the parent run of a delegation. */
+export function sessionMeta() {
+  if (!(globalThis[META_KEY] instanceof Map)) globalThis[META_KEY] = new Map();
+  return globalThis[META_KEY];
+}
+
+export const channelOf = (principal) => ({ machine: 'machine', test: 'test' }[principal?.kind] || 'owner');
+
+function publish(row) {
+  doors().set(row.kernel, row.door);
+  sessionMeta().set(row.kernel, { channel: channelOf(row.principal), parent_run_id: row.parent?.run_id || null });
 }
 
 /** `<door>/<account>/<conversation>`, validated against engine-api.v1 `session_id`. */
@@ -37,7 +52,7 @@ export class Bindings {
   load() {
     try { this.rows = JSON.parse(readFileSync(this.file, 'utf8')).sessions || {}; }
     catch (e) { if (e.code !== 'ENOENT') throw e; this.rows = {}; }
-    for (const row of Object.values(this.rows)) doors().set(row.kernel, row.door);
+    for (const row of Object.values(this.rows)) publish(row);
     return this;
   }
 
@@ -51,7 +66,7 @@ export class Bindings {
 
   set(row) {
     this.rows[row.session_id] = row;
-    doors().set(row.kernel, row.door);
+    publish(row);
     this.save();
     return row;
   }

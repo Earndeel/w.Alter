@@ -179,7 +179,9 @@ def register(mcp,client='unknown',*,local_control=True):
                    duration: int=0,resolution: str='',paid_fallback: bool=False,constraints: dict|None=None,
                    output_schema: dict|None=None,persist: str='') -> str:
         """Do the job on the model Walter Router picks (or the one the user named, never replaced). TEXT: a sub-agent
-        with Walter's tools (web through walter_browse, skills, memory) on that model — goal = complete instructions;
+        with Walter's tools (web through walter_browse, skills, memory) — executed by Walter Engine (a delegated
+        session: reads allowed, anything needing the owner refused) once the instance binds walter_run to it, else on
+        the Router's own loop; a model named by the owner always runs exactly — goal = complete instructions;
         it does not see this conversation but gets a context built for its task (mission, Walter modules, matching
         skills, memory); context = anything more it needs. constraints = {"geo": {"zone", "pays", "devise", "langue"},
         …} for local research; output_schema = the JSON its answer must follow; persist="observations" stores each

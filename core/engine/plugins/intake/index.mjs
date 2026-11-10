@@ -9,6 +9,7 @@
 //                so the preflight writes nothing. A message that holds a secret is never sent to the preflight.
 // mode native  — the engine's own intake: run, plan + context pack, skills, injected as one tagged user message.
 import { createRequire } from 'node:module';
+import { parentIdOf } from '../lineage.mjs';
 import { currentRuns, machinePrompt, observe, outcome, ownerText, post, recordRun, sessionKey, settings, sha16, token } from '../shared.mjs';
 
 export const name = 'walter-intake';
@@ -64,11 +65,18 @@ export async function shadowTurn(cfg, { session, turn, step, message }, now = ()
 }
 
 /** Native intake: run, then context (pack or legacy block) and skills in parallel; every source fails open. */
-export async function nativeTurn(cfg, { session, turn, step, message }) {
+export async function nativeTurn(cfg, { session, turn, step, message, parent = null }) {
   const t0 = performance.now();
   const auth = token(cfg);
   // a bench or Lab run (walter-scenario sets WALTER_RUN_CHANNEL=test): walter-llm caps its paid spend, as with the hook
-  const channel = process.env.WALTER_RUN_CHANNEL || (machinePrompt(message) ? 'machine' : 'owner');
+  // a session opened through the Engine API says who speaks (machine, test) and, for a delegation, its parent run
+  const meta = globalThis[Symbol.for('walter.engine.sessionMeta')]?.get?.(session.replace(/^[^/]+\/vm\//, '')) || {};
+  // an in-process sub-agent (lot E5): its "user" message is its parent's mission, never the owner's words; its run is
+  // filed under the parent's current run (correlation, costs, cancellation follow the tree)
+  const parentRun = parent ? currentRuns.get(parent)?.run_id || null : null;
+  const channel = process.env.WALTER_RUN_CHANNEL || (parent ? 'machine' : null)
+    || (meta.channel && meta.channel !== 'owner' ? meta.channel : null) || (machinePrompt(message) ? 'machine' : 'owner');
+  const parentRunId = meta.parent_run_id || parentRun;
   // skills need no run: asked at once, beside the run and then the context (as the hook's thread pool does)
   const skills = post(`${cfg.skills}/v1/expose`, {
     kind: 'message', message, context: '', session_id: session, runtime: cfg.runtime, first_turn: false,
@@ -81,6 +89,7 @@ export async function nativeTurn(cfg, { session, turn, step, message }) {
   try {
     run = await post(`${cfg.gateway}/v1/runs/start`, {
       origin: { channel, runtime: cfg.runtime, session_id: session }, goal: message, dedupe_key: key,
+      ...(parentRunId ? { parent_run_id: parentRunId } : {}),
       // the previous turn never got its end: interrupted. A replay of this same turn is not a new turn.
       cancel_run_id: previous && previous.key !== key ? previous.run_id : null,
       routing: { applied: false, configured: true, via: 'walter-llm poste (DSH provider walter)' },
@@ -130,7 +139,8 @@ export function apply(ctx, config) {
     const session = sessionKey(cfg.runtime, agent);
     const message = ownerText(messages);
     if (!session || !message) return next();
-    const input = { session, turn, step, message };
+    const parentId = parentIdOf(agent);         // an in-process sub-agent: its parent's session (E5)
+    const input = { session, turn, step, message, parent: parentId ? `${cfg.runtime}/vm/${parentId}` : null };
     if (cfg.mode === 'shadow') {                 // never on the step's path: the observation runs beside it
       const p = shadowTurn(cfg, input).catch((e) => ctx.logger.warn(`walter-intake shadow: ${String(e)}`))
         .finally(() => pending.delete(p));
