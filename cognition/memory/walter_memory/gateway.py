@@ -264,6 +264,19 @@ def post_bus_emit(body: BusEmitIn):
     return {"id": event_id, "duplicate": event_id is None}
 
 
+class DisclosureIn(BaseModel):
+    tool: str
+    args: dict = {}
+
+
+@app.post("/v1/disclosure/check", dependencies=[Depends(auth)])
+def post_disclosure_check(body: DisclosureIn):
+    """Memory's disclosure check where a message leaves, for a runtime's policy (lot E3): allow | ask | block with
+    the reason to show. A failure of the check is the caller's to fail closed (ask)."""
+    from . import disclosure
+    return disclosure.outgoing_check(body.tool, body.args)
+
+
 @app.post("/v1/privacy/classify", dependencies=[Depends(auth)])
 def post_privacy_classify(body: dict):
     """The privacy class a text would get (no write): a runtime that cannot run the detectors asks before any cloud

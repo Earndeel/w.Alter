@@ -111,3 +111,13 @@ def test_a_replayed_turn_never_cancels_the_run_it_gets_back(client):
     again = client.post("/v1/runs/start", json={"origin": origin(sid), "goal": "un", "dedupe_key": key,
                                                 "cancel_run_id": r}).json()["run_id"]
     assert again == r and status(r) == "open"
+
+
+def test_disclosure_check_for_the_engine_blocks_a_secret_and_never_echoes_it(client):
+    leak = client.post("/v1/disclosure/check", json={"tool": "mcp__beeper__send_message",
+                                                      "args": {"to": "inconnu@example.com", "text": "voici la clé sk-ant-api03-" + "x" * 40}})
+    assert leak.status_code == 200 and leak.json()["action"] == "block"
+    assert "sk-ant" not in leak.text
+    plain = client.post("/v1/disclosure/check", json={"tool": "mcp__beeper__send_message", "args": {"to": "x", "text": ""}})
+    assert plain.json()["action"] == "allow"
+    assert client.post("/v1/disclosure/check", json={"tool": "x", "args": {}}, headers={"Authorization": "Bearer nope"}).status_code == 401

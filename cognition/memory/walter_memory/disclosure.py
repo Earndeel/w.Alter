@@ -183,6 +183,17 @@ def _fields(args: dict) -> tuple[str, list[str]]:
     return text, tos
 
 
+def outgoing_check(tool: str, args: dict) -> dict:
+    """Host-neutral check of one outgoing tool call (the engine's policy plugin, through the gateway): the worst
+    decision over its recipients, with the reason to show; never the matched text."""
+    text, tos = _fields(args or {})
+    if not text:
+        return {"action": "allow", "reason": ""}
+    results = [check(text, to=t, channel=tool) for t in (tos or [None])]
+    worst = max(results, key=lambda r: {"allow": 0, "ask": 1, "block": 2}[r["action"]])
+    return {"action": worst["action"], "reason": explain(worst), "rules": sorted({r["rule"] for r in worst["reasons"]})}
+
+
 def claude_code_hook(ev: dict) -> dict | None:
     """PreToolUse on the sending tools: ask / deny through Claude Code's own permission prompt."""
     args = ev.get("tool_input") or {}
