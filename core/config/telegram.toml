@@ -13,3 +13,8 @@ state = "@instance/state/core/telegram"
 [engine]
 url = "http://127.0.0.1:8895"
 token_file = "@instance/bootstrap/engine/api.token"
+
+[callbacks]
+# callback_data prefix (before the first « : ») → command; the door runs `<command> <data>`, which prints
+# {"ok": bool, "toast": "…", "drop": ["prefixes of the buttons to remove"]}
+wr = ["walter-router", "button"]

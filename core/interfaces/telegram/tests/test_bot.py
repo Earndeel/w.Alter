@@ -163,3 +163,33 @@ def test_long_answers_are_chunked_with_balanced_fences():
     parts = tgformat.chunks("```\n" + "\n".join("ligne %d" % i for i in range(900)) + "\n```", limit=1000)
     assert len(parts) > 3 and all(len(p) <= 1010 for p in parts) and all(p.count("```") % 2 == 0 for p in parts)
     assert tgformat.tool_label("mcp__walter__walter_browse") == "web" and tgformat.tool_label("subagent") == "sous-agent"
+
+
+def test_a_module_button_runs_its_command_and_drops_the_answered_row(door, monkeypatch):
+    door.s["callbacks"] = {"wr": ["walter-router", "button"]}
+    ran = []
+
+    class R:
+        returncode, stderr = 0, ""
+        stdout = '{"ok": true, "toast": "Enregistré : adopté", "drop": ["wr:a:3", "wr:d:3"]}'
+    monkeypatch.setattr(B.subprocess, "run", lambda argv, **k: ran.append(argv) or R())
+    monkeypatch.setattr(B.threading, "Thread", lambda target, args, daemon: type("T", (), {"start": lambda s: target(*args)})())
+    kb = [[{"text": "Adopter 3", "callback_data": "wr:a:3"}, {"text": "Ignorer 3", "callback_data": "wr:d:3"}],
+          [{"text": "Adopter 4", "callback_data": "wr:a:4"}]]
+    q = {"id": "q", "from": {"id": OWNER}, "data": "wr:a:3",
+         "message": {"chat": {"id": CHAT}, "message_id": 9, "text": "Alerte", "reply_markup": {"inline_keyboard": kb}}}
+    door.on_callback(q)
+    assert ran == [["walter-router", "button", "wr:a:3"]]
+    edit = [p for m, p in door.tg.calls if m == "editMessageText"][-1]
+    assert edit["text"] == "Alerte\n\n→ Adopter 3" and edit["reply_markup"]["inline_keyboard"] == [[kb[1][0]]]
+    assert door.tg.calls[-1] == ("answerCallbackQuery", {"callback_query_id": "q", "text": "Enregistré : adopté"})
+    door.on_callback({**q, "from": {"id": 999}})                       # a stranger's click runs nothing
+    assert len(ran) == 1
+
+
+def test_send_reaches_each_owner_with_buttons_on_the_last_chunk():
+    tg = FakeTg()
+    out = B.notify(tg, [1, 2], "a\n\n" + "x" * 5000, plain=True, silent=False, buttons=[[{"text": "ok", "callback_data": "wr:a:1"}]])
+    sends = [p for m, p in tg.calls if m == "sendMessage"]
+    assert out == {"ok": True, "messages": len(sends)} and {p["chat_id"] for p in sends} == {1, 2}
+    assert [bool(p.get("reply_markup")) for p in sends if p["chat_id"] == 1] == [False, False, True]

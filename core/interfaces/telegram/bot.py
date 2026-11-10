@@ -6,8 +6,12 @@ Messages are submitted with the Telegram message id as idempotency key (a replay
 session's events (SSE) drive what the owner sees: « écrit… », the tools at work, the answer, approval buttons, the end
 of an interrupted or failed turn. Only the owner's Telegram accounts are served; anything else is ignored and logged.
 
-    walter-python /walter/core/interfaces/telegram/bot.py            (service walter-telegram)
-    walter-python /walter/core/interfaces/telegram/bot.py --check    (configuration, bot and engine reachable)
+    walter-telegram [serve]                     the door (service walter-telegram)
+    walter-telegram check                       configuration, bot and engine reachable
+    walter-telegram send [--plain] [--silent] [--buttons JSON] TEXT|-
+                                                one message to the owner through Walter's bot (modules' notices)
+Buttons of other modules: `[callbacks]` maps a callback-data prefix to a command; the door runs `<command> <data>`,
+which prints {ok, toast, drop}.
 
 Settings: `walter instance config core telegram.toml` (instance override of `core/config/telegram.toml`).
 State: `@instance/state/core/telegram/state.json` (0600: Telegram offset, conversation numbers, last event seen).
@@ -160,13 +164,19 @@ def _walter(*args: str) -> str:
 
 
 def load_settings() -> dict:
-    cfg = tomllib.loads(Path(_walter("instance", "config", "core", "telegram.toml")).read_text())
+    shipped = Path(__file__).resolve().parents[2] / "config" / "telegram.toml"     # this module's defaults
+    chosen = Path(_walter("instance", "config", "core", "telegram.toml"))
+    cfg = tomllib.loads(shipped.read_text()) if shipped.is_file() else {}
+    if chosen.resolve() != shipped.resolve():                                       # the instance overrides per key
+        for section, values in tomllib.loads(chosen.read_text()).items():
+            cfg[section] = {**cfg.get(section, {}), **values} if isinstance(values, dict) else values
     root = Path(_walter("instance", "path"))
     expand = lambda v: str(root / v[len("@instance/"):]) if isinstance(v, str) and v.startswith("@instance/") else v  # noqa: E731
     t = cfg.get("telegram", {})
     e = cfg.get("engine", {})
     return {"grant": t.get("grant", "telegram-walter-bot"), "owner_ids": [int(x) for x in t.get("owner_ids", [])],
             "account": str(t.get("account") or "owner"), "state": expand(t.get("state", "@instance/state/core/telegram")),
+            "callbacks": {str(k): list(v) for k, v in (cfg.get("callbacks") or {}).items() if isinstance(v, list) and v},
             "engine_url": e.get("url", "http://127.0.0.1:8895"),
             "engine_token_file": expand(e.get("token_file", "@instance/bootstrap/engine/api.token"))}
 
@@ -501,6 +511,10 @@ class Bot:
             return
         data = q.get("data") or ""
         answer = "?"
+        command = self.s.get("callbacks", {}).get(data.split(":", 1)[0]) if ":" in data else None
+        if command:      # a module's button (e.g. a Router alert): its own command decides, off the polling thread
+            threading.Thread(target=self.module_button, args=(q, command, data), daemon=True).start()
+            return
         if data.startswith("ap|"):
             _, rid, choice = (data.split("|") + ["", ""])[:3]
             decision = "allow_once" if choice == "a" else "deny"
@@ -514,6 +528,29 @@ class Bot:
                     self.edit(q["message"]["chat"]["id"], q["message"]["message_id"], "🔐 Demande expirée ou déjà traitée.")
         try:
             self.tg.call("answerCallbackQuery", {"callback_query_id": q["id"], "text": answer})
+        except TelegramError:
+            pass
+
+    def module_button(self, q: dict, command: list[str], data: str) -> None:
+        """Run `<command> <data>`; it prints {ok, toast, drop: [callback prefixes whose buttons go]}."""
+        try:
+            r = subprocess.run([*command, data], capture_output=True, text=True, timeout=120)
+            out = json.loads((r.stdout or "").strip() or "{}")
+        except (OSError, subprocess.SubprocessError, ValueError) as e:
+            out = {"ok": False, "toast": f"Échec : {type(e).__name__}"}
+        toast = str(out.get("toast") or ("Enregistré" if out.get("ok") else "Échec"))[:190]
+        m = q.get("message") or {}
+        if out.get("ok") and m:
+            rows = (m.get("reply_markup") or {}).get("inline_keyboard") or []
+            clicked = next((b.get("text") for row in rows for b in row if b.get("callback_data") == data), data)
+            drop = [str(x) for x in out.get("drop") or [data]]
+            keep = [r for r in ([b for b in row if not any(str(b.get("callback_data", "")).startswith(d) for d in drop)]
+                                for row in rows) if r]
+            self.edit(m["chat"]["id"], m["message_id"], f"{m.get('text') or ''}\n\n→ {clicked}",
+                      disable_web_page_preview=True, **({"reply_markup": {"inline_keyboard": keep}} if keep else {}))
+        try:
+            self.tg.call("answerCallbackQuery", {"callback_query_id": q["id"], "text": toast,
+                                                 **({} if out.get("ok") else {"show_alert": True})})
         except TelegramError:
             pass
 
@@ -578,17 +615,51 @@ def token_from_grant(grant: str) -> str:
     return r.stdout.strip()
 
 
+def notify(tg: Telegram, owners: list[int], text: str, *, plain: bool, silent: bool, buttons: list | None) -> dict:
+    """One message (chunked) to each owner account through Walter's bot; buttons on the last chunk."""
+    parts = tgformat.chunks(text) or ["(vide)"]
+    sent = 0
+    for chat in owners:
+        for i, part in enumerate(parts):
+            payload = {"chat_id": chat, "disable_web_page_preview": True, "disable_notification": silent,
+                       **({"reply_markup": {"inline_keyboard": buttons}} if buttons and i == len(parts) - 1 else {})}
+            try:
+                tg.call("sendMessage", {**payload, "text": part} if plain else
+                        {**payload, "text": tgformat.to_html(part), "parse_mode": "HTML"})
+            except TelegramError as e:
+                if plain or e.code != 400:
+                    raise
+                tg.call("sendMessage", {**payload, "text": part})
+            sent += 1
+    return {"ok": True, "messages": sent}
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--check", action="store_true")
+    ap = argparse.ArgumentParser(prog="walter-telegram")
+    ap.add_argument("command", nargs="?", default="serve", choices=("serve", "check", "send"))
+    ap.add_argument("text", nargs="?", help="send: the message (« - » or absent = stdin)")
+    ap.add_argument("--check", action="store_true", help="same as the check command")
+    ap.add_argument("--plain", action="store_true", help="send: no Markdown conversion")
+    ap.add_argument("--silent", action="store_true", help="send: no notification sound")
+    ap.add_argument("--buttons", help="send: inline keyboard as JSON rows [[{text, callback_data}]]")
     a = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     s = load_settings()
     if not s["owner_ids"]:
         raise SystemExit("walter-telegram: no owner_ids in telegram.toml — nobody to serve")
     tg = Telegram(token_from_grant(s["grant"]))
+    if a.command == "send":
+        text = a.text if a.text not in (None, "-") else sys.stdin.read()
+        try:
+            out = notify(tg, s["owner_ids"], text, plain=a.plain, silent=a.silent,
+                         buttons=json.loads(a.buttons) if a.buttons else None)
+        except (TelegramError, ValueError) as e:
+            print(json.dumps({"ok": False, "error": str(e)[:200]}))
+            return 1
+        print(json.dumps(out))
+        return 0
     engine = Engine(s["engine_url"], Path(s["engine_token_file"]).read_text().strip())
-    if a.check:
+    if a.check or a.command == "check":
         me = tg.call("getMe")
         h = engine.op({"op": "health"})
         print(json.dumps({"bot": me.get("username"), "owners": len(s["owner_ids"]), "engine": h.get("ok"),
