@@ -11,7 +11,7 @@ def main(argv=None):
         q=cs.add_parser(name);q.add_argument('--catalog');q.add_argument('--root',default='/')
         if name=='render':q.add_argument('--format',choices=('json','markdown'),default='json')
     q=sub.add_parser('path');q.add_argument('module');q.add_argument('parts',nargs='*')
-    sub.add_parser('layout')
+    q=sub.add_parser('layout');q.add_argument('layout_action',nargs='?',choices=('show','move','verify','rollback','env'),default='show');q.add_argument('target',nargs='?',help='module (move) or backup folder (verify, rollback)');q.add_argument('--to');q.add_argument('--apply',action='store_true');q.add_argument('--backup');q.add_argument('--allow-dirty',action='store_true');q.add_argument('--no-systemd',action='store_true')
     q=sub.add_parser('standby');q.add_argument('standby_action',nargs='?',choices=('status','start','stop','ensure','sweep'),default='status');q.add_argument('group',nargs='?');q.add_argument('--by',default='agent')
     q=sub.add_parser('instance');q.add_argument('instance_action',nargs='?',choices=('show','check','path','render','config','harness'),default='show');q.add_argument('parts',nargs='*')
     q=sub.add_parser('present');q.add_argument('level',choices=('notes','note','catalog','summary','manifest','guide','index'));q.add_argument('module',nargs='?');q.add_argument('--form',choices=('full','m0'),default='full');q.add_argument('--m1',action='append',default=[]);q.add_argument('--level',choices=('M0','M1'),default='M1');q.add_argument('--section',default='');q.add_argument('--offset',type=int,default=0);q.add_argument('--limit',type=int,default=20)
@@ -46,7 +46,30 @@ def main(argv=None):
             print(paths.module_path(a.module,*a.parts));return 0
         elif a.command=='layout':
             from . import paths
-            out=paths.layout()
+            if a.layout_action=='show':out=paths.layout()
+            else:
+                from . import move
+                if not a.target:raise ValueError('usage: walter layout '+a.layout_action+' <'+('module' if a.layout_action=='move' else 'backup')+'>')
+                if a.layout_action=='move':
+                    m=move.Move(a.target,a.to)
+                    if not a.apply:out=m.plan()
+                    else:
+                        if not a.backup:raise ValueError('--apply needs --backup <folder> (instance backups/changes)')
+                        out=m.apply(a.backup,systemd=not a.no_systemd,allow_dirty=a.allow_dirty)
+                elif a.layout_action=='env':
+                    if not a.to:raise ValueError('usage: walter layout env <environment> --to <dest> [--apply --backup <folder>]')
+                    if not a.apply:out=move.env_plan(a.target,a.to)
+                    else:
+                        if not a.backup:raise ValueError('--apply needs --backup <folder>')
+                        man=move.env_apply(a.target,a.to,a.backup);out={**man,'verify':move.env_verify(man)}
+                elif a.layout_action=='verify':
+                    import pathlib
+                    man=json.loads((pathlib.Path(a.target)/'manifest.json').read_text())
+                    out=move.Move.from_manifest(man).verify(man)
+                else:
+                    import pathlib
+                    kind=json.loads((pathlib.Path(a.target)/'manifest.json').read_text()).get('kind')
+                    out=move.env_rollback(a.target) if kind=='env' else move.rollback(a.target,systemd=not a.no_systemd)
         elif a.command=='standby':
             from . import standby
             act=a.standby_action
