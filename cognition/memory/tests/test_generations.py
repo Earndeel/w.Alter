@@ -147,3 +147,41 @@ def test_views_follow_the_readable_generations():
     generations.switch("g1", confirm=True)
     assert "error" in views.read({"depth": "overview", "key": key})
     assert views.read({"depth": "overview", "key": key, "history": True}).get("content") == "carte pré-V1"
+
+
+def _mode(read="g1_first", gate=6, slots=3):
+    return {"read": read, "g0_gate": gate, "g0_slots": slots, "g0_candidates": 60}
+
+
+def test_g1_first_consults_g0_only_when_it_wins_and_never_as_a_paraphrase(monkeypatch):
+    """Read mode g1_first (2026-11-10): g1 is the memory; a g0 row enters only when it ranks among the best g0_gate
+    knowledge candidates of the single rerank (here: rows about this run's cat first, then the pool order, so g1 rows
+    rank first among them — the test database outlives a run: other rows must rank as a reranker would rank them)."""
+    me = f"Roquefort{TAG}"
+    monkeypatch.setattr(search, "_rerank", lambda q, results, limit, timeout=8:
+                        sorted(results, key=lambda r: me not in (r.get("content") or r.get("text") or ""))[:limit])
+    eid = event(f"Le chat Roquefort{TAG} aime le saumon")
+    legacy_item(f"Le chat Roquefort{TAG} de Monsieur aime le saumon (souvenir pré-V1)", eid)
+    q = f"Qu'aime manger le chat Roquefort{TAG} ?"
+    monkeypatch.setattr(generations, "_mode_override", _mode())
+    thin = _knowledge(q)
+    mine = f"Roquefort{TAG} de Monsieur aime le saumon (souvenir pré-V1)"
+    assert mine in thin["text"]                                    # g1 knows nothing: the old knowledge is consulted
+    assert thin["trace"]["g0_fallback"]["kept"] >= 1
+    facts = ["mange des croquettes au poulet le matin", "boit uniquement de l'eau filtrée", "refuse le thon en boîte",
+             "adore les crevettes grises le dimanche", "a un vétérinaire à Lyon", "dort sur le canapé du salon",
+             "ne supporte pas le lait"]
+    for k, f in enumerate(facts):                                  # g1 now holds better-ranked knowledge on it
+        v1_item(f"Le chat Roquefort{TAG} {f}", f"cat-{TAG}-{k}")
+    full = _knowledge(q)
+    assert mine not in full["text"] and f"Roquefort{TAG} ne supporte pas le lait" in full["text"]
+    monkeypatch.setattr(generations, "_mode_override", _mode("all"))
+    assert mine in _knowledge(q)["text"]                           # read = all: today's behaviour, unchanged
+
+
+def test_g1_first_never_applies_to_history_requests(monkeypatch):
+    eid = event(f"La barque Turbot{TAG} est bleue")
+    legacy_item(f"La barque Turbot{TAG} est bleue (souvenir pré-V1)", eid)
+    monkeypatch.setattr(generations, "_mode_override", _mode(gate=1, slots=1))
+    res = _knowledge(f"couleur de la barque Turbot{TAG}", history=True)
+    assert "g0_fallback" not in res["trace"] and "souvenir pré-V1" in res["text"]

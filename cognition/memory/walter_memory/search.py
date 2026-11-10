@@ -400,12 +400,16 @@ def _fts(conn, where: str, args: list, kws: list[tuple[str, float]], limit: int)
 def search(query: str, *, limit: int = 10, sources: list[str] | None = None, labels: list[str] | None = None,
            since: Any = None, until: Any = None, thread_id: str | None = None, include_derived: bool = True,
            max_privacy: str = "local_only", rerank: bool = False, candidates: int = 60,
-           lanes: tuple[str, ...] | None = None, history: bool = False) -> list[dict]:
+           lanes: tuple[str, ...] | None = None, history: bool = False,
+           generations: list[str] | None = None) -> list[dict]:
     """Both lanes fused by score (or the given lanes), optionally reranked. Derived knowledge comes from the readable
-    memory generations; history=True reads every generation (pre-V1 interpretations included, labelled)."""
+    memory generations; history=True reads every generation (pre-V1 interpretations included, labelled);
+    `generations` narrows the read set (Context's g1_first read: one pool per generation)."""
     from .generations import read_set
     t0 = time.perf_counter()
     gens = read_set(history)
+    if generations is not None:
+        gens = [g for g in generations if gens is None or g in gens]
     lanes = lanes or (("knowledge", "evidence") if include_derived else ("evidence",))
     per_lane = search_lanes(query, lanes=lanes, limit=max(limit, candidates if rerank else limit), sources=sources,
                             labels=labels, since=since, until=until, thread_id=thread_id, max_privacy=max_privacy,
@@ -457,6 +461,8 @@ def rerank_pools(query: str, pools: dict[str, tuple[list[dict], int]], timeout: 
                 seen.add(k); union.append(r)
     ranked = _rerank(query, union, len(union), timeout) if union else []
     pos = {(r.get("ref_id"), r.get("text")): i for i, r in enumerate(ranked)}
+    for r in union:                    # the row's place in the whole union (g1_first compares generations with it)
+        r["union_rank"] = pos.get((r.get("ref_id"), r.get("text")), len(pos))
     return {name: sorted(rows, key=lambda r: pos.get((r.get("ref_id"), r.get("text")), len(pos)))[:limit]
             for name, (rows, limit) in pools.items()}
 

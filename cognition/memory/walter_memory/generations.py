@@ -11,6 +11,13 @@ are the evidence of every generation and stay searchable.
   switch(to, confirm)      to becomes active and the only readable generation; the others archived (history only)
   rollback(confirm)        the previous active generation back, every generation readable again (today's state)
 The switch is an owner decision: both refuse without confirm=True.
+
+Read mode (organic.toml [generations] read, 2026-11-10): how Context reads the readable generations.
+  "all"       every readable generation in one candidate pool (the behaviour before)
+  "g1_first"  g1 is the memory; g0 only as a targeted fallback: its candidates enter the same single rerank, and a g0
+              row reaches the context only when it ranks among the best `g0_gate` knowledge candidates of the union,
+              at most `g0_slots` of them, never as a paraphrase of a g1 row already there
+read_mode() returns the mode and its parameters; history requests always read everything.
 """
 from __future__ import annotations
 
@@ -35,6 +42,17 @@ def read_set(history: bool = False) -> list[str] | None:
                 "select generation from core.generations where readable order by 1")]
         _cache = (time.monotonic(), gens)
     return _cache[1]
+
+
+_mode_override: dict | None = None      # benches: simulate a read mode for one call
+
+
+def read_mode() -> dict:
+    if _mode_override is not None:
+        return _mode_override
+    g = organic.settings().get("generations", {})
+    return {"read": g.get("read", "all"), "g0_gate": int(g.get("g0_gate", 6)), "g0_slots": int(g.get("g0_slots", 3)),
+            "g0_candidates": int(g.get("g0_candidates", 60))}
 
 
 def forget_cache() -> None:

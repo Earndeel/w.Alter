@@ -399,8 +399,11 @@ def _line(i: int, m: dict, prefix: str = "") -> str:
     return f"{prefix}{i}. [{who} · {m['occurred_at']:%Y-%m-%d %H:%M}] {text}"
 
 
-def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, budget: str = "recurring") -> dict:
-    """One model call for a segment of cloud-readable, non-noise messages; writes items + coverage atomically."""
+def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, budget: str = "recurring",
+                    backfill: str | None = None) -> dict:
+    """One model call for a segment of cloud-readable, non-noise messages; writes items + coverage atomically.
+    backfill: the tag of a selective catch-up of pre-V1 messages (backfill()): the segment's summary is not stored
+    (fragments of an old conversation, not a summary of it) and the items carry attributes.backfill = tag."""
     chat = chat or llm.chat
     with connection() as conn:
         context = _context(conn, source, thread_id, seg[0]["occurred_at"])
@@ -434,7 +437,7 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
         sid = _segment_row(conn, source=source, thread_id=thread_id, status=status, msgs=seg, rejected=rejected,
                            model=res.get("model"), cost=res.get("cost_usd"), usage=res.get("usage"), latency_ms=latency)
         base_refs = {"segment": sid, "thread": thread_id, "source": source}
-        if data.get("summary"):
+        if data.get("summary") and not backfill:
             conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by,
                                 processor_version, model, prompt_hash, source_event_ids, source_refs, valid_from, privacy_class,
                                 generation)
@@ -458,6 +461,8 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
             cls = privacy.strictest(*(m["privacy_class"] for m in it["cited"]))
             attrs = {"subject": it["subject"], "state": it["state"], "epistemic": it["epistemic"], "quote": it["quote"],
                      "projects": data.get("projects") or [], "pipeline": "v1"}
+            if backfill:
+                attrs["backfill"] = backfill
             if it["kind"] == "commitment":
                 attrs["holder"] = "owner" if it["by_owner"] else "walter"
             if it["contradicts"]:
@@ -501,6 +506,14 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                     conn.execute("""insert into core.provenance (target_table, target_id, source_type, source_id, role)
                                     values ('derived_items', %s, 'derived', %s, 'supersedes') on conflict do nothing""",
                                  (new_id, old))
+            older_than = [ref for ref in it["contradicts"] if known[ref].get("at") and known[ref]["at"] > stated_at]
+            if older_than:   # an older statement replayed now is the past of newer knowledge, never a doubt on it
+                ref = older_than[0]
+                conn.execute("""update core.derived_items set status = 'superseded', valid_to = %s,
+                                  attributes = attributes || jsonb_build_object('superseded_by', %s::text,
+                                                                               'replayed_older', true)
+                                where item_id = %s""", (known[ref]["at"], known[ref]["item_id"], new_id))
+                it["contradicts"] = [r for r in it["contradicts"] if r not in older_than]
             for ref in it["contradicts"]:
                 old = known[ref]["item_id"]
                 out.setdefault("changed", []).append(old)
@@ -703,6 +716,179 @@ def enqueue(*, since: str | None = None, thread: str | None = None, source: str 
                             where processor = %s and source = %s and thread_id = %s""",
                          (since or "1970-01-01T00:00:00+00:00", PROCESSOR, r["source"], r["thread_id"]))
     return len(rows)
+
+
+def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfill", window: int = 1,
+             max_threads: int | None = None, workers: int = 4, dry: bool = False) -> dict:
+    """Selective catch-up of pre-V1 history (g0 → g1 migration, 2026-11-10): only the given messages, each with
+    `window` neighbours on either side in its thread (the assistant turn an approval answers), go through the same
+    extraction as live messages (same prompt, validation, supersession, privacy, entity links, view invalidation).
+    Idempotent: covered events are never redone (extraction.covered). Reversible: every segment is listed under
+    extraction.state['backfill:<tag>'] and backfill_revert(tag) retracts what it produced. Pre-V1 messages are never
+    swept: only an explicit call reaches them."""
+    from collections import defaultdict
+    with connection() as conn:
+        seeds = conn.execute("""select source, thread_id, occurred_at, event_id from core.events
+                                where event_id = any(%s::uuid[]) and source = any(%s) and event_type = any(%s)
+                                  and thread_id is not null""",
+                             ([str(e) for e in event_ids], list(RUNTIMES), list(MESSAGE_TYPES))).fetchall()
+    by_thread = defaultdict(set)
+    for r in seeds:
+        by_thread[(r["source"], r["thread_id"])].add(str(r["event_id"]))
+    threads = sorted(by_thread)[:max_threads] if max_threads else sorted(by_thread)
+    out = {"tag": tag, "seed_events": len(seeds), "threads": len(threads), "segments": 0, "items": 0, "reused": 0,
+           "superseded": 0, "rejected": 0, "filtered": 0, "skipped_covered": 0, "events": 0, "cost_usd": 0.0,
+           "errors": 0, "busy": 0}
+
+    def one(key):
+        source, thread_id = key
+        res = {k: 0 for k in ("segments", "items", "reused", "superseded", "rejected", "filtered", "events",
+                              "skipped_covered", "errors", "busy")}
+        res["cost_usd"], res["segment_ids"] = 0.0, []
+        if dry:
+            return _one(key, res)
+        # the live worker's lease (extraction.threads): a thread is never read by two extractions at once (live
+        # worker, another backfill run). A busy thread is skipped: a later run takes it (its events stay uncovered).
+        with connection() as conn:
+            got = conn.execute("""insert into extraction.threads (processor, source, thread_id, status, claimed_at)
+                                  values (%s, %s, %s, 'working', now())
+                                  on conflict (processor, source, thread_id) do update
+                                    set status = 'working', claimed_at = now(), updated_at = now()
+                                  where extraction.threads.status <> 'working' or extraction.threads.claimed_at < now() - %s
+                                  returning 1""", (PROCESSOR, source, thread_id, LEASE)).fetchone()
+        if not got:
+            res["busy"] = 1
+            return res
+        try:
+            return _one(key, res)
+        finally:
+            with connection() as conn:   # back to what the live path expects: dirty if it marked new work meanwhile
+                conn.execute("""update extraction.threads set claimed_at = null, updated_at = now(),
+                                  status = case when dirty_since is not null then 'dirty' else 'idle' end
+                                where processor = %s and source = %s and thread_id = %s""",
+                             (PROCESSOR, source, thread_id))
+
+    def _one(key, res):
+        source, thread_id = key
+        with connection() as conn:
+            msgs = pending_events(conn, source, thread_id, None)        # uncovered messages of the thread
+            allm = conn.execute("""select event_id::text from core.events where source = %s and thread_id = %s
+                                   and event_type = any(%s) order by occurred_at, event_id""",
+                                (source, thread_id, list(MESSAGE_TYPES))).fetchall()
+        order = [r["event_id"] for r in allm]
+        want = set()
+        for e in by_thread[key]:
+            if e in order:
+                i = order.index(e)
+                want |= set(order[max(0, i - window):i + window + 1])
+        sel = [m for m in msgs if str(m["event_id"]) in want]
+        res["skipped_covered"] = len(want) - len(sel)
+        res["events"] = len(sel)
+        if dry or not sel:
+            return res
+        usable = [m for m in sel if privacy.cloud_readable(m["privacy_class"]) and not _noise(m)]
+        noise = [m for m in sel if privacy.cloud_readable(m["privacy_class"]) and _noise(m)]
+        if noise:
+            with connection() as conn:
+                sid = _segment_row(conn, source=source, thread_id=thread_id, status="filtered", msgs=noise,
+                                   rejected=[{"event_id": str(m["event_id"]), "reason": _noise(m)} for m in noise[:50]])
+            res["filtered"] += len(noise)
+            res["segment_ids"].append(str(sid))
+        segs, cur, size = [], [], 0
+        for m in usable:
+            if cur and size + _size(m) > SEGMENT_CHARS:
+                segs.append(cur); cur, size = [], 0
+            cur.append(m); size += _size(m)
+        if cur:
+            segs.append(cur)
+        for seg in segs:
+            if not any(m["event_type"] == "message.sent" for m in seg):
+                with connection() as conn:
+                    sid = _segment_row(conn, source=source, thread_id=thread_id, status="filtered", msgs=seg,
+                                       rejected=[{"reason": "no_owner_message"}])
+                res["filtered"] += len(seg)
+                res["segment_ids"].append(str(sid))
+                continue
+            with connection() as conn:   # keep the lease while this thread's segments go through
+                conn.execute("""update extraction.threads set claimed_at = now() where processor = %s and source = %s
+                                and thread_id = %s and status = 'working'""", (PROCESSOR, source, thread_id))
+            try:
+                r = extract_segment(source, thread_id, seg, chat=chat, budget=budget, backfill=tag)
+            except Exception as e:  # noqa: BLE001 — this thread is retried by a later run (nothing covered)
+                log.warning("backfill %s %s: %s", source, thread_id, e)
+                res["errors"] += 1
+                continue
+            res["segments"] += 1
+            res["segment_ids"].append(str(r["segment_id"]))
+            for k in ("items", "reused", "superseded", "rejected"):
+                res[k] += r[k]
+            res["cost_usd"] += r["cost_usd"]
+        return res
+
+    from concurrent.futures import ThreadPoolExecutor
+    seg_ids: list[str] = []
+    with ThreadPoolExecutor(max(1, workers)) as ex:
+        for res in ex.map(one, threads):
+            seg_ids += res.pop("segment_ids")
+            for k, v in res.items():
+                out[k] += v
+            if seg_ids and not dry:     # the ledger is written as it goes: an interrupted run stays revertible
+                with connection() as conn:
+                    conn.execute("""insert into extraction.state (key, value) values (%s, %s)
+                                    on conflict (key) do update set value = jsonb_set(extraction.state.value,
+                                      '{segments}', (select coalesce(jsonb_agg(distinct x), '[]'::jsonb) from
+                                        jsonb_array_elements_text(coalesce(extraction.state.value->'segments', '[]'::jsonb)
+                                                                  || (excluded.value->'segments')) x)),
+                                      updated_at = now()""",
+                                 (f"backfill:{tag}", json.dumps({"tag": tag, "segments": seg_ids})))
+    out["cost_usd"] = round(out["cost_usd"], 4)
+    return out
+
+
+def backfill_revert(tag: str, *, confirm: bool = False) -> dict:
+    """Undo backfill(tag): its items are retracted (and their chunks hidden), what they had superseded is current
+    again, its events are uncovered (a later backfill may redo them). Dry run unless confirm."""
+    with connection() as conn:
+        st = conn.execute("select value from extraction.state where key = %s", (f"backfill:{tag}",)).fetchone()
+        segs = (st["value"].get("segments") if st else None) or []
+        items = [r["item_id"] for r in conn.execute(
+            """select item_id::text from core.derived_items where derived_by = %s and attributes->>'backfill' = %s
+               and status <> 'retracted'""", (PROCESSOR, tag))]
+        revived = [r["item_id"] for r in conn.execute(
+            """select item_id::text from core.derived_items where status = 'superseded'
+               and attributes->>'superseded_by' = any(%s)
+               and coalesce(attributes->>'backfill', '') <> %s""", (items, tag))]   # never one of its own
+        contested = [r["source_id"] for r in conn.execute(
+            """select distinct p.source_id::text from core.provenance p where p.target_table = 'derived_items'
+               and p.role = 'contradicts' and p.target_id::text = any(%s)
+               and not exists (select 1 from core.provenance q where q.target_table = 'derived_items'
+                               and q.role = 'contradicts' and q.source_id = p.source_id
+                               and not (q.target_id::text = any(%s)))""", (items, items))]
+        out = {"tag": tag, "segments": len(segs), "items": len(items), "revived": len(revived),
+               "uncontested": len(contested), "executed": confirm,
+               "kept": "evidence added to existing items by same_as (true evidence) is kept"}
+        if not confirm:
+            return out
+        conn.execute("""update core.derived_items set status = 'retracted', valid_to = coalesce(valid_to, now()),
+                          attributes = attributes || jsonb_build_object('retracted_by', 'backfill_revert')
+                        where item_id = any(%s::uuid[])""", (items,))
+        conn.execute("""update core.derived_items set status = 'derived', valid_to = null,
+                          attributes = attributes - 'superseded_by' - 'replayed_older'
+                        where item_id = any(%s::uuid[])""", (revived,))
+        conn.execute("""update core.derived_items set attributes = attributes - 'contested'
+                        where item_id = any(%s::uuid[])""", (contested,))
+        conn.execute("""update search.chunks set hidden = true, hidden_reason = 'backfill_revert'
+                        where kind = 'derived' and ref_id::text = any(%s)""", (items,))
+        conn.execute("delete from extraction.covered where processor = %s and segment_id::text = any(%s)",
+                     (PROCESSOR, segs))
+        conn.execute("""update extraction.state set value = value || jsonb_build_object('reverted_at', now()::text)
+                        where key = %s""", (f"backfill:{tag}",))
+    try:
+        from . import search
+        search.reindex_derived(revived)
+    except Exception as e:  # noqa: BLE001
+        log.warning("reindex after revert failed: %s", e)
+    return out
 
 
 def replay(*, status: str = "failed", thread: str | None = None) -> int:

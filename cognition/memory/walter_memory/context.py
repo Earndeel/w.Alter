@@ -168,9 +168,11 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
                 session: tuple[str, str] | None = None) -> dict:
     """Returns {"text": assembled block, "sections": {...}, "trace": {...}}. Knowledge comes from the readable memory
     generations; history=True also reads archived ones, each such line marked « pré-V1 »."""
-    from .generations import read_set
+    from .generations import read_mode, read_set
     b = {**DEFAULT_BUDGET, **(budget or {})}
     readable = read_set() or []
+    mode = read_mode()
+    g1_first = (mode["read"] == "g1_first" and not history and {"g0", "g1"} <= set(readable))
 
     def mark(r):   # a line from a generation that is not read by default (history request only)
         return " — pré-V1" if history and r.get("generation") and r["generation"] not in readable else ""
@@ -186,7 +188,11 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     if b.get("records", 0) > 0:
         want["records"] = (dict(labels=["doc_section"]), CANDIDATES["records"], 4)
     if b["knowledge"] > 0:
-        want["knowledge"] = (dict(lanes=("knowledge",)), CANDIDATES["knowledge"], 12)
+        if g1_first:   # g1 is the memory; g0 candidates compete in the same rerank, admitted below only if they win
+            want["knowledge"] = (dict(lanes=("knowledge",), generations=["g1"]), CANDIDATES["knowledge"], 12)
+            want["g0"] = (dict(lanes=("knowledge",), generations=["g0"]), mode["g0_candidates"], mode["g0_slots"])
+        else:
+            want["knowledge"] = (dict(lanes=("knowledge",)), CANDIDATES["knowledge"], 12)
     if b["evidence"] > 0 and EVIDENCE_HINT.search(query):
         want["evidence"] = (dict(include_derived=False), CANDIDATES["evidence"], 8)
     cand = {k: pool.submit(lambda kw=kw, n=n: search.search(query, limit=n, max_privacy=max_privacy, history=history,
@@ -259,6 +265,19 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
         t = time.perf_counter()
         # derived knowledge only (evidence has its own section); both lanes when knowledge is thin
         res = fut["knowledge"].result()
+        g0_in = 0
+        if g1_first:
+            # a g0 row is consulted only when it beats the knowledge candidates: among the best g0_gate of the union
+            g0 = rank.result().get("g0", [])
+            ranks = sorted(r.get("union_rank", 10**6) for r in res + g0)
+            gate = ranks[mode["g0_gate"] - 1] if len(ranks) >= mode["g0_gate"] else 10**6
+            won = [r for r in g0 if r.get("union_rank", 10**6) <= gate]
+            if won:
+                # g1 first in the dedupe: a g0 paraphrase of a g1 row already there is dropped, then rank order
+                merged = sorted(search.dedupe(res + won), key=lambda r: r.get("union_rank", 10**6))
+                g0_in = sum(1 for r in merged if r.get("generation") == "g0")
+                res = merged[:12]
+            trace["g0_fallback"] = {"candidates": len(g0), "won": len(won), "kept": g0_in}
         if len(res) < 3:
             res = search.dedupe(res + rank.result().get("both", []))
         lines = [f"- {r['text'].strip()} ({str(r['occurred_at'] or '')[:10]}{mark(r)})" for r in res

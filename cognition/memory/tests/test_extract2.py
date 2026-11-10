@@ -304,3 +304,103 @@ def test_many_telemetry_events_make_no_model_call():
     with connection() as conn:   # not a runtime conversation: no thread to extract, so no model call can follow
         assert conn.execute("select count(*) n from extraction.threads where source not in "
                             "('hermes','claude_code','codex','dsh')").fetchone()["n"] == 0
+
+
+# ─── selective catch-up of pre-V1 history (g0 → g1 migration, 2026-11-10) ───
+def test_backfill_reads_only_the_selected_messages_and_their_neighbours_once_and_reverts():
+    t = thread()
+    old = NOW - timedelta(days=40)
+    far = say("hermes", t, "owner", "on garde Mongo pour le projet", at=old)[0]          # not selected, far away
+    for k in range(4):
+        say("hermes", t, "agent", f"remplissage {k}", at=old + timedelta(minutes=1 + k))
+    ask = say("hermes", t, "agent", "Je propose de garder Valkey ?", at=old + timedelta(minutes=10))[0]
+    seed = say("hermes", t, "owner", "on garde Valkey pour le projet", at=old + timedelta(minutes=11))[0]
+    extract2.set_v1_start(NOW - timedelta(days=1))
+    model = Model(decision)
+    r = extract2.backfill([seed], tag="pytest-bf", chat=model, workers=1)
+    assert r["segments"] == 1 and r["items"] == 1 and len(model.calls) == 1
+    part = model.calls[0]["prompt"].split("seuls citables")[1]
+    assert "Valkey ?" in part and "Mongo" not in part                    # the seed and its neighbour, not the thread
+    got = items(t)
+    assert len(got) == 1 and got[0]["attributes"]["backfill"] == "pytest-bf"
+    with connection() as conn:                                            # a backfill writes no segment summary
+        assert conn.execute("""select count(*) n from core.derived_items where kind = 'summary'
+                               and source_refs->>'thread' = %s""", (t,)).fetchone()["n"] == 0
+    again = extract2.backfill([seed], tag="pytest-bf", chat=model, workers=1)
+    assert again["segments"] == 0 and len(model.calls) == 1               # idempotent: covered events are not redone
+    assert extract2.backfill_revert("pytest-bf")["executed"] is False     # dry run by default
+    rv = extract2.backfill_revert("pytest-bf", confirm=True)
+    assert rv["items"] == 1 and not items(t)
+    with connection() as conn:
+        assert conn.execute("select count(*) n from extraction.covered where event_id = %s",
+                            (seed,)).fetchone()["n"] == 0                  # uncovered: a later backfill may redo it
+    assert far and ask
+
+
+def test_backfill_keeps_every_segment_in_its_ledger_and_never_reads_a_thread_another_extraction_holds():
+    old = NOW - timedelta(days=40)
+    extract2.set_v1_start(NOW - timedelta(days=1))
+    seeds, threads = [], []
+    for k in range(3):
+        t = thread()
+        threads.append(t)
+        seeds.append(say("hermes", t, "owner", f"on garde Valkey{k} pour le projet", at=old + timedelta(minutes=k))[0])
+    with connection() as conn:   # the live worker (or another run) holds the third thread
+        conn.execute("""insert into extraction.threads (processor, source, thread_id, status, claimed_at, dirty_since)
+                        values (%s, 'hermes', %s, 'working', now(), now())""", (extract2.PROCESSOR, threads[2]))
+    model, tag = Model(decision), f"pytest-ledger-{uuid.uuid4().hex[:6]}"
+    r = extract2.backfill(seeds, tag=tag, chat=model, workers=2)
+    assert r["segments"] == 2 and r["busy"] == 1 and not items(threads[2])
+    with connection() as conn:
+        st = conn.execute("select value from extraction.state where key = %s", (f"backfill:{tag}",)).fetchone()["value"]
+        assert len(st["segments"]) == 2                                   # every thread's segment, not the last one
+        rows = {r["thread_id"]: r["status"] for r in conn.execute(
+            "select thread_id, status from extraction.threads where thread_id = any(%s)", (threads,))}
+    assert rows[threads[0]] == rows[threads[1]] == "idle" and rows[threads[2]] == "working"
+    rv = extract2.backfill_revert(tag, confirm=True)
+    assert rv["segments"] == 2 and rv["items"] == 2
+    with connection() as conn:
+        assert conn.execute("select count(*) n from extraction.covered where event_id = any(%s::uuid[])",
+                            (seeds[:2],)).fetchone()["n"] == 0
+
+
+def test_reverting_a_backfill_never_revives_knowledge_it_produced_itself():
+    t = thread()
+    old = NOW - timedelta(days=40)
+    extract2.set_v1_start(NOW - timedelta(days=1))
+    a = say("hermes", t, "owner", "on garde Valkey pour le projet", at=old)[0]
+    for k in range(4):
+        say("hermes", t, "agent", f"remplissage {k}", at=old + timedelta(minutes=1 + k))
+    b = say("hermes", t, "owner", "on garde Redis pour le projet", at=old + timedelta(minutes=10))[0]
+
+    def switch(lines, known):
+        out = decision(lines, known)
+        for it in out["items"]:
+            it["supersedes"] = [k for k, txt in known.items() if "Valkey" in txt]
+        return out
+    extract2.backfill([a], tag="pytest-self", chat=Model(decision), workers=1, window=0)
+    extract2.backfill([b], tag="pytest-self", chat=Model(switch), workers=1, window=0)
+    assert [i["content"] for i in items(t)] == ["Monsieur a décidé de garder Redis pour le projet"]
+    extract2.backfill_revert("pytest-self", confirm=True)
+    assert not items(t)                                                   # Valkey stays retracted, not revived
+
+
+def test_a_replayed_older_contradiction_never_contests_newer_knowledge():
+    t = thread()
+    say("hermes", t, "owner", "on garde Rust pour le projet", at=NOW - timedelta(hours=2))
+    extract2.process_thread("hermes", t, chat=Model(decision))
+    newer = items(t)[0]
+    seed = say("hermes", t, "owner", "on garde Go pour le projet, pas Rust", at=NOW - timedelta(days=30))[0]
+
+    def contra(lines, known):
+        k = next(k for k, v in known.items() if "Rust" in v)
+        return {"items": [{"kind": "decision", "text": "Monsieur garde Go pour le projet", "state": "decided",
+                           "msgs": [1], "quote": "on garde Go pour le projet", "contradicts": [k]}]}
+    extract2.backfill([seed], tag="pytest-old", chat=Model(contra), workers=1, window=0)
+    with connection() as conn:
+        n = conn.execute("select status, attributes from core.derived_items where item_id = %s",
+                         (newer["item_id"],)).fetchone()
+        o = conn.execute("""select status, attributes from core.derived_items where attributes->>'backfill' = 'pytest-old'
+                            and source_refs->>'thread' = %s""", (t,)).fetchone()
+    assert n["status"] == "derived" and "contested" not in n["attributes"]   # the newer knowledge stays current
+    assert o["status"] == "superseded" and o["attributes"]["replayed_older"] is True

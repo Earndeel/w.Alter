@@ -16,8 +16,12 @@ def check() -> tuple[list[str], dict]:
                 problems.append(f"{c['connector']}: no successful run for {c['age']} (target {c['freshness_target']})")
             if c["last_error_at"] and (not c["last_success_at"] or c["last_error_at"] > c["last_success_at"]):
                 problems.append(f"{c['connector']}: last run failed — {(c['last_error'] or '')[:120]}")
-        dead = conn.execute("select queue, count(*) n from ingestion.jobs where status = 'dead' group by 1").fetchall()
-        problems += [f"queue {d['queue']}: {d['n']} dead jobs" for d in dead]
+        # a dead job is a problem while it is recent (a week of alerts); older ones are known source-side losses
+        # (asset deleted on the phone, transfer refused): kept as a metric, they never age into a permanent alarm
+        dead = conn.execute("""select queue, count(*) filter (where finished_at > now() - interval '7 days') recent,
+                                      count(*) n from ingestion.jobs where status = 'dead' group by 1""").fetchall()
+        problems += [f"queue {d['queue']}: {d['recent']} dead jobs this week" for d in dead if d["recent"]]
+        m["dead_jobs_old"] = sum(d["n"] - d["recent"] for d in dead)
         stuck = conn.execute("""select count(*) n from ingestion.jobs where status = 'running' and locked_at < now() - interval '1 hour'""").fetchone()["n"]
         if stuck:
             problems.append(f"{stuck} jobs stuck in running")
