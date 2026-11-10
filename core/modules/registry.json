@@ -1158,6 +1158,24 @@
           "vision_target": "core/engine/compositions"
         },
         {
+          "id": "engine-plugins",
+          "path": "/walter/core/engine/plugins",
+          "role": "Stratégies intake et events du moteur (lot E2) : accueil d'un tour (run, ContextPlan, pack, skills) et événements (fin du run, turn.ended, session.ended) par les portes Memory/Context/Skills ; interrupteur [dsh.engine] intake hook|shadow|native",
+          "status": "implemented",
+          "readme": "/walter/core/engine/plugins/README.md",
+          "contracts": [
+            "/walter/core/engine/contracts/turn-intake.v1.json",
+            "/walter/core/engine/contracts/engine-event.v1.json"
+          ],
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter harness install dsh"
+            }
+          ],
+          "vision_target": "core/engine/plugins"
+        },
+        {
           "id": "mcp-server",
           "path": "/walter/core/server.py",
           "role": "Serveur MCP walter : expose les capacités aux agents (Claude Code, Codex, DSH, Hermes)",
@@ -1204,7 +1222,7 @@
         {
           "id": "dsh-hooks",
           "path": "/walter/core/hooks/dsh",
-          "role": "Greffons DSH (owner-turn) ; deviennent les greffons intake/events du moteur",
+          "role": "Greffon DSH owner-turn (texte du propriétaire pour walter_hook.py) ; remplacé par engine/plugins/intake en mode native",
           "status": "active",
           "readme": "/walter/core/README.md",
           "vision_target": "core/engine/plugins"

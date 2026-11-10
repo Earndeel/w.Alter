@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 import tomllib
@@ -22,6 +23,13 @@ ENGINE_COMPOSITIONS=ROOT/'engine'/'compositions'   # engine composition sources 
 SKILL_DIR=str(ROOT/'skills')
 DSH_LIB=Path('/opt/dsh/node_modules/@deepseek-ai')
 DSH_OWNER_TURN=ROOT/'hooks'/'dsh'/'owner-turn.mjs'
+# Lot E2 (2026-11-10): who accepts a turn and publishes its events. hook = walter_hook.py (UserPromptSubmit/Stop, the
+# E1 state); shadow = the engine plugins only observe beside the hook; native = the plugins do it, the hook keeps
+# SessionStart and PostToolUse. Switch: [dsh.engine] intake in @instance/config/core/engine.toml.
+ENGINE_PLUGINS=ROOT/'engine'/'plugins'
+ENGINE_INTAKE=('hook','shadow','native')
+ENGINE_ROWS=('walter-intake','walter-events')
+NATIVE_HOOKS=('UserPromptSubmit','Stop')            # what the native plugins take over from walter_hook.py
 # Lot 1 (2026-11-07, /walter/docs/DECISIONS.md): DSH is only the agent loop and technical tool execution. Every DSH
 # row that competes with a Walter module is off: identity → soul, skills → walter-skills, web → walter_browse,
 # context/compaction → walter-context, models/titles → Walter Router; DeepSeek telemetry, accounts and providers.
@@ -65,6 +73,29 @@ def engine_values(*, instance=True):
                         else:data.setdefault(section,{})[key]=sub
                 else:data[section]=values
     return data
+
+
+def engine_intake(values):
+    # WALTER_ENGINE_INTAKE: a test or Lab home composed in another mode (`--home`), never set for the live service
+    mode=str(os.environ.get('WALTER_ENGINE_INTAKE') or values.get('dsh',{}).get('engine',{}).get('intake','hook'))
+    if mode not in ENGINE_INTAKE:raise ValueError('unknown [dsh.engine] intake (hook, shadow or native)')
+    return mode
+
+
+def _engine_rows(mode):
+    """The engine's intake and events plugins for this mode (none for `hook`). Locations come from the instance and
+    from Walter Memory's public client (its gateway credential file), never written here by hand."""
+    if mode=='hook':return []
+    import subprocess
+    from . import instance as inst
+    # Walter Memory's public client names its credential file (the shared runtime has it; this CLI may not)
+    out=subprocess.run(['walter-python','-c','from walter_memory import client; print(client.ENV_FILE)'],
+                       capture_output=True,text=True,timeout=60)
+    if out.returncode or not out.stdout.strip():raise ValueError('Walter Memory client unavailable: no gateway credential for the engine plugins')
+    cfg={'mode':mode,'runtime':'dsh','stateDir':str(inst.path('state','core','engine','intake')),
+         'runsDir':str(inst.path('state','runs','current')),'tokenFile':out.stdout.strip()}
+    return [{'id':'walter-intake','name':str(ENGINE_PLUGINS/'intake'/'index.mjs'),'config':cfg},
+            {'id':'walter-events','name':str(ENGINE_PLUGINS/'events'/'index.mjs'),'config':dict(cfg)}]
 
 
 def _dsh_face(values):
@@ -294,14 +325,36 @@ def _plan(host,home=None,profile_dir=None):
     elif host=='dsh':
         import yaml
         _,text,_=harness.prepare(host,p);data=yaml.safe_load(text) or []
+        mode=engine_intake(engine_values())
         hp=p/'walter-hooks.json';hd=json.loads(hp.read_text()) if hp.exists() else {}
-        file(hp,json.dumps(_hook_data(hd,spec,host),ensure_ascii=False,indent=2)+'\n','lifecycle')
+        hd=_hook_data(hd,spec,host)
+        if mode=='native':      # the engine's plugins accept turns and publish their end: no second adapter
+            for event in NATIVE_HOOKS:
+                kept=[e for e in hd.get('hooks',{}).get(event,[]) if not any(h.get('command')==harness.HOOK for h in e.get('hooks',[]))]
+                if kept:hd['hooks'][event]=kept
+                else:hd.get('hooks',{}).pop(event,None)
+        if 'hooks' in hd:      # the definition's order, whatever came and went (a rollback to `hook` is byte-identical)
+            hd['hooks']={k:hd['hooks'][k] for k in [*[e for e in spec['hooks'] if e in hd['hooks']],*[e for e in hd['hooks'] if e not in spec['hooks']]]}
+        file(hp,json.dumps(hd,ensure_ascii=False,indent=2)+'\n','lifecycle')
         additions=[];merged=False
         def add(item):
             if item:additions.append(item);data.append(item)
         add(_dsh_addition(data,{'id':'hooks-walter','name':'@deepseek-ai/dsh-hooks-claude-code','config':{'configPath':str(hp)}}))
-        # Records which part of each step the owner wrote, so the hook ignores DSH runtime notices (lot 1).
-        add(_dsh_addition(data,{'id':'walter-owner-turn','name':str(DSH_OWNER_TURN)}))
+        # Engine plugins (lot E2): replaced as a whole when the mode or a location changes, removed for `hook`.
+        wanted=_engine_rows(mode);have=[e for r in data for e in r.get('insert',[]) if e.get('id') in ENGINE_ROWS]
+        if have!=wanted:
+            for row in [r for r in data if any(e.get('id') in ENGINE_ROWS for e in r.get('insert',[]))]:
+                row['insert']=[e for e in row['insert'] if e.get('id') not in ENGINE_ROWS]
+                if not row['insert']:data.remove(row)
+            merged=True
+        # Records which part of each step the owner wrote, so the hook ignores DSH runtime notices (lot 1); in native
+        # mode the intake plugin reads the owner's text itself.
+        if mode=='native':
+            for row in [r for r in data if any(e.get('id')=='walter-owner-turn' for e in r.get('insert',[]))]:
+                row['insert']=[e for e in row['insert'] if e.get('id')!='walter-owner-turn'];merged=True
+                if not row['insert']:data.remove(row)
+        else:add(_dsh_addition(data,{'id':'walter-owner-turn','name':str(DSH_OWNER_TURN)}))
+        if wanted and have!=wanted:add({'insert':wanted})
         # Rows a Walter module replaces: turned off, any local config kept (lot 1, 2026-11-07).
         for ident in DSH_OFF:
             rows=[x for x in data if x.get('id')==ident]

@@ -56,7 +56,7 @@ E4, E5 et E7 ouvrent de nouveaux chemins de production : ils ne sont **activés*
 | **S0** | Corrections urgentes : terminal de `walter_run`, Memory Dreaming | sécurité | Oui (fait le 09/11) | — |
 | **E0** | Contrats, registre enrichi, mesures, cartographie, règle documentaire | A + B | Non (fait) | — |
 | **E1** | Gel technique du noyau (sans déplacement) ; rattrapage documentaire | A + B | Non (même code, même place) — en cours | E0 |
-| **E2** | Accueil et événements natifs | A | Oui, après ombre | E1 |
+| **E2** | Accueil et événements natifs | A | Oui, après ombre — construit et essayé hors service (10/11), ombre après adoption d'E1 | E1 |
 | **E3** | Politique, approbations, divulgation, budget | A (sécurité) | Oui | E2 |
 | **E4** | Engine API v1 | A + B (`core/interfaces`) | Ajout, activé après E3 | E2, E3 |
 | **E5** | `walter_run` devient une délégation du moteur | A | Oui, avec repli | E3, E4 |
@@ -169,6 +169,38 @@ Fait le 09/11 (fin d'après-midi) : rattrapage documentaire (13 en-têtes standa
   production ni dans `runs` ; la comparaison est écrite par Lab.
 - **Adoption** : zéro écart d'intention sur la semaine, latence égale ou meilleure (référence 04-BASELINE § 2).
 - **Retour arrière** : interrupteur `intake=hook` de la composition, redémarrage ; essayé pendant l'ombre.
+
+**État (10/11/2026) : construit et essayé hors service ; l'ombre démarre après l'adoption d'E1.** Fait :
+- greffons `core/engine/plugins/intake` et `events` (README du dossier) ; interrupteur `[dsh.engine] intake =
+  "hook" | "shadow" | "native"` rendu par `walter harness install dsh` (en service : `hook`, composition identique à
+  l'octet) ; en `native`, `walter-hooks.json` perd `UserPromptSubmit` et `Stop` (gardés : `SessionStart`,
+  `PostToolUse`) et le greffon `walter-owner-turn` part (l'accueil lit lui-même le texte du propriétaire) ;
+- lot Memory : routes `POST /v1/runs/start`, `/v1/runs/end`, `/v1/bus/emit` (types `turn.started`, `turn.ended`,
+  `session.ended` seulement ; toute charge `observation` refusée), `/v1/privacy/classify`, et `cloud_safe` sur
+  `/v1/context` ; le guetteur `walter-logs-watch` lance l'ingestion `agent-sessions --dsh` quand les fichiers du moteur
+  changent (avant : seulement le crochet `Stop`) ;
+- tests : 9 tests Node des greffons, bascule hook → shadow → native → hook de la composition, 8 tests des routes ;
+  suites complètes core 244 et Memory 332 vertes ;
+- essai réel (`bench/e2_intake.py`, DSH headless, foyers de test `/opt/dsh/e2-home` natif et `/opt/dsh/e2-hook-home`
+  crochet, mêmes messages en alternance, canal `test`) : voir le tableau ci-dessous.
+
+| 15 tours par mode (3 passages × 5 messages) | `native` (greffons) | `hook` (`walter_hook.py`) |
+|---|---|---|
+| Accueil du tour, p50 / p90 / max | 1,68 s / 2,68 s / 4,2 s | 2,16 s / 2,80 s / 3,6 s |
+| Fin de tour (crochet `Stop`), p50 | 0 (asynchrone, hors du tour) | 0,80 s |
+| Durée totale du tour, p50 / moyenne | 9,2 s / 8,8 s | 10,4 s / 9,9 s |
+| Réponses obtenues | 15/15 | 15/15 |
+| Runs par tour / `turn.ended` par tour | 1 / 1 partout | 1 / 1 partout |
+| Plan (niveau, acte, tâche) | mêmes valeurs ; les deux seuls écarts (tâche `coding`/`general` sur un message, acte `continue`/`new` sur un autre) apparaissent **dans les deux modes** pour le même texte : échantillonnage du modèle de décision, pas l'accueil | idem |
+
+Écarts assumés (DECISIONS 2026-11-10, lot E2) : la clé de session reste `dsh/vm/<id>` (continuité de walter_logs,
+core.events, runs et skills) — l'identifiant par porte (`web/…`) arrive avec l'Engine API (E4) ; un écart d'intention
+ne compte contre l'accueil que si le texte du propriétaire diffère, le preflight échantillonnant son modèle de décision
+(même texte, plans parfois différents : bruit mesuré à part, à traiter dans Context).
+
+Reste : adoption d'E1 (11/11 au soir) → `intake = "shadow"` sur le service (une semaine, `bench/e2_shadow.py`), essai
+du retour arrière pendant l'ombre → `native` si zéro écart imputable à l'accueil, couverture complète et latence au
+moins égale ; `endOnDispose` décidé d'après ce que l'ombre montre des déchargements d'agents.
 
 ## E3 — Politique, approbations, divulgation, budget
 

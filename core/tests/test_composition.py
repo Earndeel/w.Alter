@@ -259,3 +259,40 @@ def test_dsh_face_edited_by_hand_is_refused_and_bad_values_fail(home,monkeypatch
     values=c.engine_values();values['dsh']['web']['cookie_max_age_days']='365'
     monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(values))
     with pytest.raises(ValueError,match='positive integer'):c._dsh_face(values)
+
+
+def _engine(home):
+    d=c._dsh_yaml((home/'cordis.patch.yml').read_text())
+    rows={e['id']:e for r in d for e in r.get('insert',[])}
+    hooks=json.loads((home/'walter-hooks.json').read_text())['hooks']
+    return rows,hooks
+
+def test_engine_intake_switch_hook_shadow_native_and_back(home,monkeypatch):
+    """Lot E2 (2026-11-10): `hook` = the E1 composition untouched; `shadow` adds the observing plugins beside the hook;
+    `native` gives UserPromptSubmit/Stop to the plugins and drops the owner-turn adapter; back to `hook` restores it."""
+    c.install('dsh',home,apply=True,backup_root=home.parent/'b')
+    e1=(home/'cordis.patch.yml').read_bytes(),(home/'walter-hooks.json').read_bytes()
+    values=c.engine_values()
+    def mode(m):
+        v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']={'intake':m}
+        monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
+        c.install('dsh',home,apply=True,backup_root=home.parent/'b')
+        assert not c.install('dsh',home)['changed']           # idempotent in every mode
+        return _engine(home)
+    rows,hooks=mode('shadow')
+    assert rows['walter-intake']['config']['mode']=='shadow' and rows['walter-events']['config']['mode']=='shadow'
+    assert rows['walter-intake']['name'].endswith('engine/plugins/intake/index.mjs') and 'walter-owner-turn' in rows
+    assert {'UserPromptSubmit','Stop','SessionStart','PostToolUse'}<=set(hooks)
+    assert rows['walter-intake']['config']['tokenFile'].endswith('.env') and 'state/runs/current' in rows['walter-intake']['config']['runsDir']
+    rows,hooks=mode('native')
+    assert rows['walter-intake']['config']['mode']=='native' and 'walter-owner-turn' not in rows
+    assert 'UserPromptSubmit' not in hooks and 'Stop' not in hooks and {'SessionStart','PostToolUse'}<=set(hooks)
+    rows,hooks=mode('hook')
+    assert 'walter-intake' not in rows and 'walter-events' not in rows and 'walter-owner-turn' in rows
+    assert {'UserPromptSubmit','Stop'}<=set(hooks)
+    v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']={'intake':'both'}
+    monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
+    with pytest.raises(ValueError,match='intake'):c.install('dsh',home)
+    assert e1[1]==(home/'walter-hooks.json').read_bytes()
+    norm=lambda text:sorted(json.dumps(r,sort_keys=True) for r in c._dsh_yaml(text))   # same rows (order may move)
+    assert norm(e1[0].decode())==norm((home/'cordis.patch.yml').read_text())

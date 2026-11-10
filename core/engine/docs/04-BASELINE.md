@@ -48,6 +48,18 @@ Le rappel a perdu un cas depuis le 07/11, et le preflight sous-estime le niveau 
 attendu mais L0 planifié. Ce sont des sujets de Context (continuité Context/Memory, priorité 2 de la vision), pas du
 moteur. Le moteur doit seulement ne rien dégrader : même plan pour un même message (lot E2).
 
+### 3 bis. Coût de l'accueil d'un tour (lot E2, relevé du 10/11)
+
+| Mesure | Valeur |
+|---|---|
+| Crochet `UserPromptSubmit` sur les sessions DSH réelles depuis le 03/11 (journaux de session) | 63 tours : médiane **1,00 s**, 90ᵉ centile 2,5 s, max 5,5 s |
+| Crochet `Stop` sur les mêmes sessions | 55 tours : médiane **0,77 s**, 90ᵉ centile 0,9 s |
+| Banc `bench/e2_intake.py`, 15 tours par mode, mêmes messages en alternance | crochet : accueil médiane 2,16 s + `Stop` 0,80 s ; natif : accueil médiane **1,68 s**, fin de tour hors du tour ; durée totale médiane 10,4 s → **9,2 s** |
+
+Les tours du banc demandent tous le pack complet (questions de mémoire, et une question d'heure servie sans modèle de
+réponse), d'où un accueil plus long qu'en usage réel. Même texte, même plan dans les deux modes à l'échantillonnage
+du modèle de décision près : c'est ce bruit que `bench/e2_shadow.py` sépare des écarts imputables à l'accueil.
+
 ## 4. Journal et bus
 
 | Mesure (7 jours) | p50 | p95 |
