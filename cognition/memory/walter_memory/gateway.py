@@ -253,10 +253,12 @@ def post_bus_emit(body: BusEmitIn):
     """Lifecycle events of an agent runtime (turn.started, turn.ended, session.ended). An observation (shadow) never
     reaches the production bus: `payload.observation` is refused here, whatever the caller believes."""
     from . import bus
+    # Refusals are authorisation decisions (403, a stable `refused` code), never confused with a malformed request
+    # (422) or a transmission failure (5xx / no answer): the caller counts them apart.
     if body.type not in ENGINE_BUS_TYPES:
-        raise HTTPException(422, "event type not open to runtimes")
+        raise HTTPException(403, {"refused": "type_not_open", "type": body.type})
     if (body.payload or {}).get("observation"):
-        raise HTTPException(422, "observations never go to the production bus")
+        raise HTTPException(403, {"refused": "observation_not_on_production_bus"})
     with connection() as conn:
         event_id = bus.emit(body.type, body.source, body.subject, body.payload, body.dedupe_key, conn=conn)
     return {"id": event_id, "duplicate": event_id is None}

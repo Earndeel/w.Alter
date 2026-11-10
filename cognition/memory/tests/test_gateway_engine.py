@@ -88,8 +88,11 @@ def test_bus_takes_lifecycle_events_once_and_refuses_observations_and_other_type
     first, again = client.post("/v1/bus/emit", json=body).json(), client.post("/v1/bus/emit", json=body).json()
     assert first["id"] and not first["duplicate"] and again["duplicate"]
     shadow = {**body, "dedupe_key": None, "payload": {"observation": True}}
-    assert client.post("/v1/bus/emit", json=shadow).status_code == 422
-    assert client.post("/v1/bus/emit", json={**body, "type": "memory.derived"}).status_code == 422
+    refused = client.post("/v1/bus/emit", json=shadow)
+    assert refused.status_code == 403 and refused.json()["detail"]["refused"] == "observation_not_on_production_bus"
+    other = client.post("/v1/bus/emit", json={**body, "type": "memory.derived"})
+    assert other.status_code == 403 and other.json()["detail"]["refused"] == "type_not_open"
+    assert client.post("/v1/bus/emit", json={"source": "dsh"}).status_code == 422   # malformed ≠ refused
     with connect() as conn:
         n = conn.execute("select count(*) n from bus.events where source = %s and subject = %s",
                          (RUNTIME, sid)).fetchone()["n"]
