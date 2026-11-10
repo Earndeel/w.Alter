@@ -43,7 +43,7 @@
     "owner": "soul",
     "kind": "foundation",
     "purpose": "Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance.",
-    "target_root": "soul",
+    "target_root": "core/identity",
     "config_paths": [
       "config/targets.toml"
     ],
