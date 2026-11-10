@@ -15,7 +15,7 @@ walter path memory
 walter instance path
 ```
 
-On Monsieur's VM, the implementation worked on in this session was under `/walter/secrets/walter_secrets/` and `/walter/cognition/memory/walter_memory/`. Inspect `fingerprints.py`, `secrets_sync.py`, and `cli.py` in secrets, and `logs.py` and `events.py` in memory. The memory append entry point must scrub content as well as structured payloads; masking only the journal writer leaves `core.events` exposed.
+On Monsieur's VM, the implementation worked on in this session was under `/walter/core/security/secrets/walter_secrets/` and `/walter/cognition/memory/walter_memory/`. Inspect `fingerprints.py`, `secrets_sync.py`, and `cli.py` in secrets, and `logs.py` and `events.py` in memory. The memory append entry point must scrub content as well as structured payloads; masking only the journal writer leaves `core.events` exposed.
 
 ## Rebuild and verify the fingerprint index
 
@@ -46,7 +46,7 @@ Use synthetic values and a temporary fingerprint index. Cover a bare 32-characte
 Run the existing suites using the shared runtime:
 
 ```sh
-cd /walter/secrets
+cd /walter/core/security/secrets
 walter-python -m pytest -q -p no:cacheprovider tests
 cd /walter/cognition/memory
 walter-python -m pytest -q -p no:cacheprovider tests -k 'log or event or mask or runs'

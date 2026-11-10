@@ -13,12 +13,12 @@ Checked on the VM on 2026-11-01 (`walter-soul check`: hermes, claude-code, codex
   `/instances/monsieur/soul/rules.md` (its rules), optional per-runtime additions in
   `/instances/monsieur/soul/runtimes/` (today `agent-cli.md`). That folder is its own git repository: its
   post-commit hook runs `walter-soul sync`.
-- **The software is neutral**: `/walter/soul` (renderer `bin/walter-soul`, neutral runtime adapters
+- **The software is neutral**: `/walter/core/identity` (renderer `bin/walter-soul`, neutral runtime adapters
   `runtimes/*.md` with `{{owner.address}}`-style placeholders, defaults for a new instance). Never put Monsieur's
-  identity in `/walter/soul`.
+  identity in `/walter/core/identity`.
 - **Generated targets** (one-way, never edit by hand): Hermes `/root/.hermes/SOUL.md`, Claude Code
   `/opt/walter-profiles/claude-code/CLAUDE.md`, Codex `/opt/walter-profiles/codex/AGENTS.md`, DSH
-  `/opt/walter-profiles/dsh/AGENTS.md`, plus the MCP `walter_profile`. Locations: `/walter/soul/config/targets.toml`
+  `/opt/walter-profiles/dsh/AGENTS.md`, plus the MCP `walter_profile`. Locations: `/walter/core/identity/config/targets.toml`
   overridden by `/instances/monsieur/config/soul/targets.toml`. The curated user profile included by
   `{{include profile}}` is `/root/.hermes/memories/USER.md`.
 - Opening a session in `/opt/walter-profiles/{claude-code,codex,dsh}` = W.Alter mode; `/root` = technician mode.

@@ -35,7 +35,7 @@ Inspect the existing provider and secret mechanisms first:
 cd /walter/cognition/router
 sed -n '240,330p' llm/gateway.py
 cat config/providers.json
-cd /walter/secrets
+cd /walter/core/security/secrets
 sed -n '96,150p' walter_secrets/vault.py
 walter-secret --help
 ```
