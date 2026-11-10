@@ -272,6 +272,7 @@ class Move:
             if moved:
                 _run('git', '-C', after(repo), 'worktree', 'repair', *moved)
         self._update_catalog()
+        self._render_registry()
         manifest['step'] = 'applied'
         mpath.write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
         if systemd:
@@ -290,6 +291,16 @@ class Move:
                     links = [l for l in e.get('compat_links') or [] if l != old]
                     e['compat_links'] = links + [old]
         self.catalog_file.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n')
+
+    def _render_registry(self):
+        """The generated registry and its markdown follow the catalog (real catalog only)."""
+        if self.catalog_file != paths.CATALOG:
+            return
+        core = paths.CATALOG.parent.parent
+        for fmt, out in (('json', core / 'modules' / 'registry.json'), ('markdown', core / 'docs' / 'contracts.generated.md')):
+            r = _run('walter', 'contracts', 'render', '--format', fmt)
+            if r.returncode == 0 and r.stdout.strip():
+                out.write_text(r.stdout)
 
     # ---- verify / rollback ---------------------------------------------------------------------------------
     @classmethod
@@ -364,6 +375,8 @@ def rollback(backup_dir, *, systemd=True):
         if trees:
             _run('git', '-C', repo, 'worktree', 'repair', *trees)
     shutil.copy2(bdir / 'catalog.json', m['catalog'])
+    if Path(m['catalog']) == paths.CATALOG:
+        Move._render_registry(type('M', (), {'catalog_file': paths.CATALOG})())
     if systemd:
         _systemd(m['units'])
     m['step'] = 'rolled-back'

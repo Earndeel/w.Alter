@@ -18,10 +18,13 @@
     },
     {
       "id": "colab",
-      "target": "colab",
+      "target": "capabilities/colab",
       "legacy": "/opt/walter-colab",
       "manifest": "contracts/colab.json",
-      "vision_target": "capabilities/colab"
+      "vision_target": "capabilities/colab",
+      "compat_links": [
+        "/walter/colab"
+      ]
     },
     {
       "id": "computer",
