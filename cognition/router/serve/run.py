@@ -2,8 +2,9 @@
 
     spec ──▶ decision: the model named by the owner (named.py: exactly that, or why not) / a hard constraint / the
              request classified by the decision model (routes.route)
-         ├─ text  ──▶ a native tool loop on the chosen model, through the model gateway's exact-route transport,
-         │           providers in order, every attempt in models.exec_log
+         ├─ text  ──▶ Walter Engine (engine.py, Engine API `delegate`) when the instance binds walter_run to it;
+         │           otherwise (legacy, or a model named by the owner) a native tool loop on the chosen model,
+         │           through the model gateway's exact-route transport, providers in order, every attempt in models.exec_log
          └─ media ──▶ media_exec.generate (image, video, music, voice): costs money, on request only
 
 Text execution is native to the router. Only providers of the selected model are tried; every switch is reported.
@@ -334,6 +335,9 @@ def _dispatch(conn, d: dict, spec: dict) -> dict[str, Any]:
         return {"ok": False, "error": f"no execution route for task {d.get('task')}", "decision": d}
     if not spec.get("goal"):
         return {"ok": False, "error": "goal required: complete instructions for the sub-agent (it does not see the conversation)"}
+    from walter_router.serve import engine
+    if engine.enabled(d):   # lot E5: the loop is Walter Engine's; the Router decided and keeps the task record
+        return engine.run_text(d, spec, memory=_memory, persist=_persist_observations)
     return _text(conn, d, spec)
 
 
