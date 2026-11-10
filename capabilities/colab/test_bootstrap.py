@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import subprocess
 def main():
-    root=Path('/opt/walter-colab')
+    root=Path('/walter/capabilities/colab')
     p=subprocess.run([str(root/'mcp/.venv/bin/python'),str(root/'run.py'),'bootstrap'],capture_output=True,text=True,timeout=300)
     assert p.returncode==0,p.stderr
     r=json.loads(p.stdout.strip().splitlines()[-1])

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline store-mode fixtures; no live Colab, Google auth, or network access.
 
-Run local tests: python3 -B /opt/walter-colab/test_cache_local.py -v
+Run local tests: python3 -B /walter/capabilities/colab/test_cache_local.py -v
 Run untouched legacy suite against copied runtime: same command with --legacy.
 Only fixture temp directories under TMPDIR are written by tests.
 """

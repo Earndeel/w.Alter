@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 import sys
-sys.path.insert(0,'/opt/walter-colab')
+sys.path.insert(0,'/walter/capabilities/colab')
 import transfer
 assert hasattr(transfer,'DriveStore'), 'Drive-side transport missing'
 ROOT=Path('/root/.hermes/cache/scratch/colab-no-mount')

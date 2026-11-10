@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import sys
 import time
-sys.path.insert(0,'/opt/walter-colab')
+sys.path.insert(0,'/walter/capabilities/colab')
 import transfer
 ROOT=Path('/root/.hermes/cache/scratch/colab-no-mount')
 ROOT.mkdir(parents=True,exist_ok=True)

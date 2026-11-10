@@ -11,7 +11,7 @@ from drive_store import DriveStore
 from run import bootstrap_code,report_from_output,runtime_hash_code
 from transfer import Browser
 
-ROOT=Path('/opt/walter-colab')
+ROOT=Path('/walter/capabilities/colab')
 CONFIG=json.loads((ROOT/'config.json').read_text())
 NOTE='''# W.Alter — cache privé sans montage Drive
 
@@ -19,7 +19,7 @@ Transfert réel : Drive privé → VM W.Alter → interface Fichiers Colab → `
 L'authentification Drive reste sur la VM W.Alter : aucun refresh token transmis au notebook et aucun `drive.mount()`.
 Le disque local disparaît à la suppression du runtime ; les objets privés Drive persistent.
 
-L'agent utilise `/opt/walter-colab/run.py` avec `stage`, `bootstrap` et `persist` ; les cellules sont pilotées par le MCP officiel Google Colab.
+L'agent utilise `/walter/capabilities/colab/run.py` avec `stage`, `bootstrap` et `persist` ; les cellules sont pilotées par le MCP officiel Google Colab.
 Ce notebook est configuré sur CPU pour vérifier les transferts. La cellule de contrôle GPU est réservée à une future exécution GPU explicitement demandée.
 
 Validé : transport binaire et rechargement des scripts dans un runtime neuf, sans dialogue de montage Drive.

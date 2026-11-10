@@ -1,4 +1,4 @@
-#!/opt/walter-colab/mcp/.venv/bin/python
+#!/walter/capabilities/colab/mcp/.venv/bin/python
 """Low-level bound notebook cache transport without Drive mounts.
 
 status       read runtime toolbar/resources only; never initializes or allocates

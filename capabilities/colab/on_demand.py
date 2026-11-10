@@ -1,4 +1,4 @@
-#!/opt/walter-colab/mcp/.venv/bin/python -B
+#!/walter/capabilities/colab/mcp/.venv/bin/python -B
 """One-shot notebook jobs; no purchases, credentials, keepalive or server.
 
 --timeout-seconds bounds the Python subprocess, NOT allocation/transport time.

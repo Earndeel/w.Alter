@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 def main():
-    ROOT=Path('/opt/walter-colab')
+    ROOT=Path('/walter/capabilities/colab')
     script=ROOT/'run.py'
     assert script.exists(), 'Mount-free public command missing'
     p=subprocess.run([str(ROOT/'mcp/.venv/bin/python'),str(script),'status'],capture_output=True,text=True,timeout=300)

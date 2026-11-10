@@ -36,14 +36,14 @@ Conditions avant déverrouillage d'un pipeline précis :
 
 ## Commande de calcul à la demande
 
-Entrée canonique : `/opt/walter-colab/on_demand.py job SCRIPT`. Ne pas remplacer ce cycle par `run.py bootstrap`, `stage` ou `persist`, qui ne gèrent pas la suppression de bout en bout.
+Entrée canonique : `/walter/capabilities/colab/on_demand.py job SCRIPT`. Ne pas remplacer ce cycle par `run.py bootstrap`, `stage` ou `persist`, qui ne gèrent pas la suppression de bout en bout.
 
 Exemple CPU réellement éprouvé (la fixture requiert `walter-probe.json`) :
 
 ```bash
-/opt/walter-colab/mcp/.venv/bin/python -B /opt/walter-colab/on_demand.py job \
-  /opt/walter-colab/fixtures/on-demand-cpu-smoke.py \
-  --input /opt/walter-colab/evidence/20261011-cpu/cli-input/walter-probe.json \
+/walter/capabilities/colab/mcp/.venv/bin/python -B /walter/capabilities/colab/on_demand.py job \
+  /walter/capabilities/colab/fixtures/on-demand-cpu-smoke.py \
+  --input /walter/capabilities/colab/evidence/20261011-cpu/cli-input/walter-probe.json \
   --output result.json --device cpu --timeout-seconds 10 \
   --result-dir /root/.hermes/cache/scratch/colab-cpu-result
 ```
@@ -51,7 +51,7 @@ Exemple CPU réellement éprouvé (la fixture requiert `walter-probe.json`) :
 Exemple de syntaxe GPU, **bloqué par l'interverrouillage actuel, pas un benchmark exécuté** :
 
 ```bash
-/opt/walter-colab/mcp/.venv/bin/python -B /opt/walter-colab/on_demand.py job \
+/walter/capabilities/colab/mcp/.venv/bin/python -B /walter/capabilities/colab/on_demand.py job \
   /chemin/job.py --input /chemin/input.json --output output.json \
   --device T4 --allow-included-units --timeout-seconds 300 \
   --result-dir /chemin/resultats
@@ -111,7 +111,7 @@ Le dernier calcul lui-même a pris environ 0,067 s : l'essentiel du délai vient
 - Suite locale actuelle sans réseau/Colab :
 
 ```bash
-/opt/walter-colab/mcp/.venv/bin/python -B -m unittest \
+/walter/capabilities/colab/mcp/.venv/bin/python -B -m unittest \
   test_import_safety test_transfer test_cache_local test_bridge_local \
   test_bridge_safety test_transport_safety test_on_demand test_controller_lock \
   test_gpu_preparation_gate -v
