@@ -228,6 +228,9 @@ def post_runs_start(body: RunStartIn):
     parent = body.parent_run_id if body.parent_run_id and _run_of(body.parent_run_id) else None
     run_id = runs.start(origin=origin, goal=body.goal, privacy_class=privacy_class, dedupe_key=body.dedupe_key,
                         parent_run_id=parent)
+    # cancel_run_id is the engine's memory of its last run, lost when the engine restarts mid-turn: the session's
+    # older open run is closed here too, or the new run's model calls are refused as ambiguous (lot E8)
+    runs.safe(runs.supersede, origin["session_id"], run_id)
     if body.routing:
         runs.safe(runs.routing, run_id, body.routing)
     return {"run_id": run_id, "privacy_class": privacy_class}

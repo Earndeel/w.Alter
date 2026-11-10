@@ -89,6 +89,22 @@ def end_open(session_id: str, status: str = "ended") -> str | None:
     return None
 
 
+def supersede(session_id: str, run_id: str, status: str = "cancelled") -> list[str]:
+    """A harness session serves one owner message at a time: when a new run starts there, an older run of the same
+    session that is still open never got its end (the harness restarted mid-turn and its process record went with it)
+    → it is closed now. Without this the session has two open runs and every model call of the new one is refused
+    as ambiguous (lot E8, 2026-11-10)."""
+    with connect() as conn:
+        rows = conn.execute("""select run_id from runs.runs where status = 'open' and origin->>'session_id' = %s
+                               and run_id <> %s
+                               and started_at < (select started_at from runs.runs where run_id = %s)""",
+                            (session_id, run_id, run_id)).fetchall()
+    old = [str(r["run_id"]) for r in rows]
+    for rid in old:
+        end(rid, status)
+    return old
+
+
 # model / provider: a model named by the owner for this run (Engine API delegation, lot E5), set at the start; the
 # preflight's plan is merged into it, never erases it
 REQUESTED_KEYS = ("task", "level", "require", "fast_path", "answer", "message_sha", "model", "provider")

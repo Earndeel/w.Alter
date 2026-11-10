@@ -149,3 +149,11 @@ def test_a_model_named_at_the_start_survives_the_preflight_plan(client):
     with connect() as conn:
         req = conn.execute("select routing->'requested' r from runs.runs where run_id = %s", (run,)).fetchone()["r"]
     assert req == {"model": "claude-opus-5-5", "provider": "venice", "task": "general", "level": "L1"}
+
+
+def test_after_an_engine_restart_the_sessions_unfinished_run_is_closed_without_cancel_run_id(client):
+    sid, other = f"{RUNTIME}/vm/{uuid.uuid4()}", f"{RUNTIME}/vm/{uuid.uuid4()}"
+    lost = client.post("/v1/runs/start", json={"origin": origin(sid), "goal": "tour interrompu"}).json()["run_id"]
+    kept = client.post("/v1/runs/start", json={"origin": origin(other), "goal": "autre"}).json()["run_id"]
+    new = client.post("/v1/runs/start", json={"origin": origin(sid), "goal": "après redémarrage"}).json()["run_id"]
+    assert status(lost) == "cancelled" and status(new) == "open" and status(kept) == "open"
