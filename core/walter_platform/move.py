@@ -476,6 +476,14 @@ def env_rollback(backup_dir):
         os.rename(dest, src)
     for r in m['rewritten']:
         shutil.copy2(r['copy'], r['before'])
+    if m.get('gitignore_added'):                     # the ignore line the apply added, and only it
+        top = _run('git', '-C', str(src.parent), 'rev-parse', '--show-toplevel').stdout.strip()
+        gi = Path(top) / '.gitignore'
+        lines = gi.read_text().splitlines(keepends=True)
+        line = f"/{m['gitignore_added']}\n"
+        if line in lines:
+            lines.reverse(); lines.remove(line); lines.reverse()
+            gi.write_text(''.join(lines))
     m['step'] = 'rolled-back'
     (bdir / 'manifest.json').write_text(json.dumps(m, indent=1, ensure_ascii=False))
     return {'env': str(src), 'ok': src.is_dir() and not src.is_symlink()}

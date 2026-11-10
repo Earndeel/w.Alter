@@ -113,4 +113,5 @@ def test_env_relocation_and_rollback(tmp_path, monkeypatch):
     assert move.env_verify(man)['ok']
     assert move.env_rollback(tmp_path / 'backup')['ok']
     assert env.is_dir() and not env.is_symlink() and not dest.exists()
+    assert (mod / '.gitignore').read_text() == 'venv/\n'
     assert (env / 'bin' / 'tool').read_text().startswith(f'#!{env}/bin/python3')
