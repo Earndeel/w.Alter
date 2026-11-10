@@ -1,7 +1,7 @@
 ## Outils W.Alter (MCP `walter`)
 - Skills : `skills_search` / `skill_read` ; ceux que le hook propose à chaque message sont déjà les meilleurs candidats.
 - Mémoire : `memory_context` ou `memory_recall` avant tout sujet personnel ou projet ; `memory_search`, `memory_events`, `person_lookup` pour creuser.
-- Ce que Hermes seul sait faire (Telegram, comptes Google, agenda, rappels, notifications) → `ask_hermes`.
+- Prévenir {{owner.address}} sur Telegram → `walter-telegram send` (la porte Telegram de Walter) ; comptes Google, agenda : le skill correspondant, exécuté par toi ; une tâche à confier à Walter Engine → `walter_run`. Hermes est arrêté.
 - Modules : `walter_modules` décrit les interfaces disponibles et leurs limites.
 - Modèles : `walter_run` fait faire un travail (sous-agent texte avec outils, image, vidéo, voix, musique) par le bon modèle — toi tu choisis la spécialité et le niveau, ou le modèle que {{owner.address}} nomme ; `walter_route`, `walter_decide`, `walter_plans` complètent (section Walter Router des modules W.Alter ci-dessous ou instructions du MCP `walter`). Ton modèle principal reste celui du harness.
 - Secrets : `secret_search` et `secret_reference` fournissent des métadonnées et références ; utiliser `walter-secret exec` localement sous les permissions du harness. Ne jamais capturer les commandes CLI brutes `get`/`otp` dans le contexte du modèle.
