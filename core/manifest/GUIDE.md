@@ -11,10 +11,10 @@ remplace ni le runtime ni ses permissions.
 - **Découvrir un module** : son niveau 1 est déjà dans la couche « Modules W.Alter » des instructions ;
   `module_index(module, section)` liste ce qu'il contient quand il publie un index ; `module_guide(module)` donne
   son guide détaillé. Sans argument, `module_guide()` dit où vit la présentation de chaque module.
-- **État** : `walter_health` (services, Hermes, score mémoire, routeur, disque).
+- **État** : `walter_health` (services, moteur, score mémoire, routeur, disque).
 - **Déclarations techniques** : `walter_modules(module)` (contrats, dépendances, limites par harness).
-- **Déléguer à l'agent vivant** : `ask_hermes(prompt)` pour ce qui passe par les intégrations de Hermes
-  (Telegram, comptes Google, agenda, navigateur…). Bloquant ; repasser `session_id` pour continuer.
+- **Déléguer à Walter Engine** : `walter_run(request, goal)` (session déléguée du moteur, lectures permises, rien de ce
+  qui demande le propriétaire). Prévenir le propriétaire : `walter-telegram send`. Hermes est arrêté (10/11/2026).
 
 ## Présentation des modules
 

@@ -4,8 +4,8 @@
 It runs every module's declared watchdog (`<module root>/contracts/maintenance.json`), follows incidents by
 module:key, and delivers new or escalated high/critical incidents with bounded retries. It holds no diagnosis of its own:
 each module's guardian owns that. It must work with Router, Memory, Hermes and every model provider down, so it is
-standard-library Python run by the system interpreter, and it reaches Telegram's Bot API directly (token from the
-walter-secrets grant `telegram-bot`).
+standard-library Python run by the system interpreter, and it reaches Telegram's Bot API directly with Walter's own
+bot (the door's grant and owner chat from its telegram.toml; never Hermes' bot since 2026-11-10).
 
   walter-guardians check [--no-notify] [--no-act] [--json]   one pass (timer walter-guardians.timer); new
                                                   high/critical incidents go to the module's guardian first
@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -146,17 +145,26 @@ def run_check(decl: dict) -> tuple[dict, list[dict], dict]:
                                     **({"declaration_error": decl["_error"]} if decl.get("_error") else {})}, "suggested_level": "G0"}], meta
 
 
+def _telegram_target() -> tuple[str, str | None]:
+    """(grant, owner chat) of Walter's own Telegram door: its instance settings (telegram.toml), read here directly so
+    an alert still leaves when the door, the engine or Hermes is down (2026-11-10: no longer Hermes' bot)."""
+    import tomllib
+    grant, chat = "telegram-walter-bot", os.environ.get("WALTER_GUARDIANS_CHAT")
+    try:
+        path = sh("walter", "instance", "config", "core", "telegram.toml", timeout=20).stdout.strip()
+        t = tomllib.loads(Path(path).read_text()).get("telegram", {})
+        grant = t.get("grant") or grant
+        owners = t.get("owner_ids") or []
+        chat = chat or (str(owners[0]) if owners else None)
+    except (OSError, ValueError, AttributeError):
+        pass
+    return grant, chat
+
+
 def _telegram(text: str) -> bool:
-    tok = sh("walter-secret", "grant", "access", "telegram-bot", timeout=60)
+    grant, chat = _telegram_target()
+    tok = sh("walter-secret", "grant", "access", grant, timeout=60)
     token = tok.stdout.strip()
-    chat = os.environ.get("TELEGRAM_HOME_CHANNEL")
-    if not chat:
-        for cfg in (Path.home() / ".hermes" / "config.yaml",):
-            try:
-                m = re.search(r"^TELEGRAM_HOME_CHANNEL:\s*'?(-?\d+)'?\s*$", cfg.read_text(), re.M)
-                chat = m.group(1) if m else None
-            except OSError:
-                pass
     if tok.returncode or not token or not chat:
         return False
     try:

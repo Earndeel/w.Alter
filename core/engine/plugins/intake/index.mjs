@@ -25,10 +25,11 @@ const HEADER = "Mémoire W.Alter (injectée automatiquement pour ce message ; so
   + 'avec memory_search / person_lookup) :';
 
 /** The preflight request walter_hook.context_pack sends for the same message (DSH has no transcript path). */
-export function planRequest(cfg, session, message, runId = null, at = Date.now()) {
+export function planRequest(cfg, session, message, runId = null, at = Date.now(), channel = null) {
   return {
     turn_id: `${session}:${at}`, message: message.slice(0, 6000), previous: null, runtime: cfg.runtime,
     session_id: session, privacy_class: 'cloud_allowed', run_id: runId, exclude_blocks: ['capabilities'],
+    ...(channel === 'machine' ? { channel } : {}),   // a sub-agent's mission: the preflight asks one tier lower
   };
 }
 
@@ -115,7 +116,7 @@ export async function nativeTurn(cfg, { session, turn, step, message, parent = n
   const memory = (async () => {
     if (cfg.inject === 'pack' && !local) {
       try {
-        const out = await post(`${cfg.preflight}/preflight?inject=1`, planRequest(cfg, session, message, run?.run_id || null),
+        const out = await post(`${cfg.preflight}/preflight?inject=1`, planRequest(cfg, session, message, run?.run_id || null, Date.now(), channel),
           { timeoutMs: 7000 });
         if (out?.error || !out?.plan) throw new Error(out?.error || 'no plan');
         source = 'pack';

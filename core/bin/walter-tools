@@ -23,7 +23,7 @@ from pathlib import Path
 CORE = Path(__file__).resolve().parent.parent
 # Never through the gateway: recursion, secret material, writes to skills/vault, desktop control, owner settings.
 NEVER = {"walter_run", "secret_search", "secret_reference", "vault_put", "skill_patch", "skill_propose",
-         "computer_use", "walter_plans", "ask_hermes", "memory_retain"}
+         "computer_use", "walter_plans", "memory_retain"}
 
 
 def _parse(text: str):

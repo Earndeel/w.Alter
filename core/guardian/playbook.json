@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "module": "core",
+ "notes": ["dsh-web = Walter Engine (the single production runtime, Engine API :8895); walter-telegram = its Telegram door (owner's bot); cloudflared-tunnel and tailscaled = ingress. Restarting dsh-web interrupts a running turn: only when it is down or its API does not answer. Hermes is retired (2026-11-10): never restart it."],
+ "evidence": {
+  "service_down": [["systemctl","status","--no-pager","-n","0","{unit}"], ["journalctl","-u","{unit}","-n","40","--no-pager","-o","short-iso"]],
+  "service_unhealthy": [["systemctl","status","--no-pager","-n","0","dsh-web"], ["journalctl","-u","dsh-web","-n","40","--no-pager","-o","short-iso"], ["journalctl","-u","walter-telegram","-n","40","--no-pager","-o","short-iso"]],
+  "failed_units": [["systemctl","--failed","--no-legend","--plain","--no-pager"]]
+ },
+ "actions": {
+  "restart_unit": {"level": "G1", "describe": "restart an engine, door or ingress service",
+                   "command": ["systemctl", "restart", "{unit}"],
+                   "params": {"unit": ["dsh-web", "walter-telegram", "cloudflared-tunnel", "tailscaled"]}}
+ },
+ "fallback": {"service_down": {"action": "restart_unit", "params": {"unit": "unit"}}},
+ "settle_seconds": 30
+}

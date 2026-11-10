@@ -103,8 +103,7 @@
       "send_message",
       "wait_agent",
       "interrupt_agent",
-      "mcp__walter__walter_run",
-      "mcp__walter__ask_hermes"
+      "mcp__walter__walter_run"
     ]
   },
   "presets": {

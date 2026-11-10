@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "module": "core",
+  "check": ["python3", "/walter/core/guardian/check"],
+  "max_level": "G1",
+  "levels": {"G0": "moteur, porte Telegram, accès réseau, hôte", "G1": "relancer le moteur, la porte ou un accès réseau arrêté"},
+  "note": "Remplace le watchdog de l'ère Hermes (10/11/2026) : surveille Walter Engine et sa porte Telegram, plus jamais Hermes.",
+  "format": "incident-v1",
+  "timeout_seconds": 240,
+  "guardian": ["walter-guardian", "run", "--module", "core"]
+}

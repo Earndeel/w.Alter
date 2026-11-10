@@ -284,3 +284,32 @@ def test_every_message_of_a_long_turn_reaches_telegram_the_last_one_notified(doo
             if m == "sendMessage" and not p["text"].startswith("⏳")]
     assert msgs == [("Je lance trois sous-agents.", True), ("Choix : option C.", True),
                     ("Le comparatif est dans le fichier.", False)]
+
+
+def test_voice_note_is_transcribed_echoed_silently_and_submitted(door, tmp_path, monkeypatch):
+    """Lot E7 (no longer Hermes' STT): a voice note becomes one owner turn holding its transcript."""
+    real_call = door.tg.call
+    door.tg.call = lambda m, p=None, timeout=30: {"file_path": "voice/f.oga"} if m == "getFile" else real_call(m, p, timeout)
+    door.tg.download = lambda fp, dest, limit=0: (dest.write_bytes(b"OggS"), dest)[1]
+    door.s["stt"] = {"url": "http://llm", "task": "stt", "token_file": str(tmp_path / "t.env")}
+    seen = []
+    monkeypatch.setattr(B, "transcribe", lambda stt, path: seen.append(path.suffix) or "rappelle-moi demain")
+    door.handle(msg("", 51, voice={"file_id": "F", "duration": 3}))
+    turn = [o for o in door.engine.ops if o["op"] == "turn.submit"][-1]
+    assert seen == [".oga"] and "rappelle-moi demain" in turn["message"]["text"]
+    echo = [p for m, p in door.tg.calls if m == "sendMessage"][-1]
+    assert "rappelle-moi demain" in echo["text"] and echo["disable_notification"] is True
+
+
+def test_voice_note_that_cannot_be_transcribed_is_said_and_never_submitted(door, tmp_path, monkeypatch):
+    real_call = door.tg.call
+    door.tg.call = lambda m, p=None, timeout=30: {"file_path": "voice/f.oga"} if m == "getFile" else real_call(m, p, timeout)
+    door.tg.download = lambda fp, dest, limit=0: (dest.write_bytes(b"OggS"), dest)[1]
+    door.s["stt"] = {"url": "http://llm", "task": "stt", "token_file": str(tmp_path / "t.env")}
+
+    def fail(stt, path):
+        raise ValueError("no speech")
+    monkeypatch.setattr(B, "transcribe", fail)
+    door.handle(msg("", 52, voice={"file_id": "F", "duration": 3}))
+    assert [o for o in door.engine.ops if o["op"] == "turn.submit"] == []
+    assert "pas pu transcrire" in door.tg.sent()[-1]

@@ -1105,7 +1105,6 @@
         "guide": "/walter/core/manifest/GUIDE.md",
         "tools": [
           "walter_health",
-          "ask_hermes",
           "module_guide",
           "module_index"
         ]

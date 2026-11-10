@@ -192,6 +192,37 @@ def _walter(*args: str) -> str:
     return subprocess.run(["walter", *args], capture_output=True, text=True, timeout=60, check=True).stdout.strip()
 
 
+STT_PROMPT = ("Transcris exactement cette note vocale, dans sa langue, sans rien ajouter ni résumer. "
+              "S'il n'y a aucune parole, réponds seulement [silence].")
+AUDIO_FORMATS = {".oga": "ogg", ".ogg": "ogg", ".opus": "ogg", ".mp3": "mp3", ".m4a": "m4a", ".wav": "wav",
+                 ".mp4": "mp4", ".webm": "webm", ".flac": "flac", ".aac": "aac"}
+
+
+def transcribe(stt: dict, path: Path, timeout: int = 180) -> str:
+    """One transcription by walter-llm (Router poste `stt`; the door's own agent token, never printed)."""
+    import base64
+    token = next((l.split("=", 1)[1].strip() for l in Path(stt["token_file"]).read_text().splitlines()
+                  if l.startswith("WALTER_LLM_TOKEN=")), "")
+    if not token:
+        raise ValueError("no walter-llm token")
+    body = {"model": stt.get("task", "stt"), "max_tokens": 4000, "user": "walter-telegram", "messages": [{"role": "user", "content": [
+        {"type": "input_audio", "input_audio": {"data": base64.b64encode(path.read_bytes()).decode("ascii"),
+                                                "format": AUDIO_FORMATS.get(path.suffix.lower(), "ogg")}},
+        {"type": "text", "text": STT_PROMPT}]}]}
+    req = urllib.request.Request(stt["url"].rstrip("/") + "/v1/chat/completions", data=json.dumps(body).encode(),
+                                 headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:   # noqa: S310 (local gateway)
+            text = (json.loads(r.read())["choices"][0]["message"]["content"] or "").strip()
+    except urllib.error.HTTPError as e:
+        raise ValueError(f"stt HTTP {e.code}") from None
+    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as e:
+        raise OSError(f"stt {type(e).__name__}") from None
+    if not text or text == "[silence]":
+        raise ValueError("no speech")
+    return text
+
+
 def load_settings() -> dict:
     shipped = Path(__file__).resolve().parents[2] / "config" / "telegram.toml"     # this module's defaults
     chosen = Path(_walter("instance", "config", "core", "telegram.toml"))
@@ -207,6 +238,9 @@ def load_settings() -> dict:
             "account": str(t.get("account") or "owner"), "state": expand(t.get("state", "@instance/state/core/telegram")),
             "callbacks": {str(k): list(v) for k, v in (cfg.get("callbacks") or {}).items() if isinstance(v, list) and v},
             "web": {k: list(v) for k, v in (cfg.get("web") or {}).items() if k in ("list", "run") and isinstance(v, list) and v},
+            "stt": {"url": (cfg.get("stt") or {}).get("url", "http://127.0.0.1:8894"),
+                    "task": (cfg.get("stt") or {}).get("task", "stt"),
+                    "token_file": expand((cfg.get("stt") or {}).get("token_file", "@instance/bootstrap/llm/walter-telegram.env"))},
             "engine_url": e.get("url", "http://127.0.0.1:8895"),
             "engine_token_file": expand(e.get("token_file", "@instance/bootstrap/engine/api.token"))}
 
@@ -517,11 +551,17 @@ class Bot:
             service = self.web_commands().get(cmd[1:]) if cmd else None
             if service:       # a web service's own conversation: never an engine turn
                 return self.web_command(chat, m, service, text)
-            attachment = self.attachment(chat, m)
-            if attachment:
-                text = f"{attachment}\n\n{text}".strip()
+            if m.get("voice") or m.get("audio") or m.get("video_note"):
+                heard = self.voice_text(chat, m)
+                if heard is None:
+                    return       # said to the owner by voice_text: nothing reaches the engine
+                text = f"{heard}\n\n{text}".strip()
+            else:
+                attachment = self.attachment(chat, m)
+                if attachment:
+                    text = f"{attachment}\n\n{text}".strip()
             if not text:
-                self.send(chat, "Je ne sais pas encore lire ce type de message (notes vocales : bientôt).")
+                self.send(chat, "Je ne sais pas encore lire ce type de message.")
                 return
             sid = self.session(chat)
             self.engine.op({"op": "turn.submit", "session_id": sid, "message": {"text": text}, "channel": "owner",
@@ -540,6 +580,32 @@ class Bot:
         if note:
             return note
         return f"[{kind} reçu de Monsieur sur Telegram, enregistré ici : {dest}]" if dest else None
+
+    def voice_text(self, chat: int, m: dict) -> str | None:
+        """A voice note (or audio, video note) → its transcript by the Router's `stt` poste through walter-llm (lot E7,
+        2026-11-10: no longer Hermes' STT plugin). Echoed silently so the owner sees what was understood; a failure
+        is said and nothing is sent to the engine (never a guess)."""
+        f = m.get("voice") or m.get("audio") or m.get("video_note")
+        if (f.get("file_size") or 0) > 20 << 20:
+            self.send(chat, "⚠️ Note vocale trop lourde pour le bot Telegram (> 20 Mo) : non transcrite.")
+            return None
+        t0 = time.time()
+        try:
+            self.tg.call("sendChatAction", {"chat_id": chat, "action": "typing"})
+            info = self.tg.call("getFile", {"file_id": f["file_id"]})
+            inbox = self.state.dir / "inbox" / str(chat)
+            inbox.mkdir(parents=True, exist_ok=True, mode=0o700)
+            ext = Path(info.get("file_path") or "").suffix or ".ogg"
+            path = self.tg.download(info["file_path"], inbox / f"{m['message_id']}-voice{ext}")
+            heard = transcribe(self.s["stt"], path)
+        except (TelegramError, OSError, ValueError, KeyError) as e:
+            log.warning("voice note not transcribed: %s", type(e).__name__)
+            self.send(chat, f"⚠️ Je n'ai pas pu transcrire ta note vocale ({type(e).__name__}). Réessaie ou écris-moi.")
+            return None
+        log.info("WALTER_VOICE %s", json.dumps({"seconds": f.get("duration"), "chars": len(heard),
+                                                  "ms": int((time.time() - t0) * 1000)}))
+        self.send(chat, f"🎤 « {heard} »", disable_notification=True)
+        return f"[note vocale de Telegram, transcrite] {heard}"
 
     def save_attachment(self, chat: int, m: dict) -> tuple[str | None, Path | None, str | None]:
         """(kind, saved path, note when it could not be kept) of the message's photo or document."""

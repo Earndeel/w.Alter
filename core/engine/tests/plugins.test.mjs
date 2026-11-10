@@ -258,3 +258,9 @@ test('native: a turn interrupted (idle without its stop boundary) closes its run
   await new Promise((r) => setTimeout(r, 20));
   assert.deepEqual(paths(), []);
 });
+
+test('planRequest: a sub-agent mission says so (one tier lower), an owner message does not', () => {
+  const cfg = { runtime: 'dsh' };
+  assert.equal(intake.planRequest(cfg, 's', 'm', 'r', 1, 'machine').channel, 'machine');
+  assert.equal('channel' in intake.planRequest(cfg, 's', 'm', 'r', 1, 'owner'), false);
+});

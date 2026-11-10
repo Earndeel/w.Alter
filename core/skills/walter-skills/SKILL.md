@@ -11,8 +11,8 @@ It is not loaded into your context; fetch only what the task needs.
 1. A compact domain overview may be shown at session start. `skills_manifest()` explains the module; `skills_index()` lists domains, and `skills_index(domain=…, offset=…)` gives bounded pages of workflow/skill purposes and dependencies. Browse only useful domains, or call `skills_search(query, context=…)` directly with the need in plain French or English. If navigation tools are unavailable in an already-open MCP connection, search/read still work; reconnect to discover the new tools.
 2. `skill_read(name)` — read the chosen procedure fully before acting; `skill_read(name, file_path="references/…")` for linked files.
 3. Follow it, adapting tool names: skills are written for Hermes (`terminal`, `read_file`, `browser_*`…);
-   use your own equivalents. Steps that need Monsieur's live integrations (Telegram, Google accounts,
-   calendar, his browser sessions, Bitwarden) → delegate with `ask_hermes`.
+   use your own equivalents. Steps that need Monsieur's integrations: Telegram → `walter-telegram send`;
+   Google accounts, calendar → the skill's own scripts; browser → `browser_session`; Bitwarden → `walter-secret`.
 4. Memory first for anything personal: `memory_context` / `memory_search` / `person_lookup`.
 
 5. Keep the library alive: when a skill proved wrong, outdated or incomplete while you used it, call

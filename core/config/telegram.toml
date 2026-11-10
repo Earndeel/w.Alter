@@ -24,3 +24,9 @@ wr = ["walter-router", "button"]
 # {service, message, model?, files?: [paths], conversation, request_id} and prints {ok, reply, files: [{path, kind, mime}]}
 list = ["walter-router", "web-commands"]
 run = ["walter-router", "web"]
+
+[stt]
+# voice notes → text by Walter Router's `stt` poste through walter-llm, with the door's own agent token (0600)
+url = "http://127.0.0.1:8894"
+task = "stt"
+token_file = "@instance/bootstrap/llm/walter-telegram.env"

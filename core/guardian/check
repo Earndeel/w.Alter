@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Walter Core watchdog in Incident v1 (2026-11-10): the engine, its Telegram door and the host they need.
+
+Replaces the Hermes-era health watchdog (~/.hermes/scripts/walter-health-watchdog.py, which restarted Hermes' gateway):
+  engine     dsh-web (Walter Engine) active and its Engine API answering `health`
+  door       walter-telegram active and its bot + engine reachable (`walter-telegram check`)
+  ingress    cloudflared-tunnel, tailscaled
+  host       failed system units, load, available memory, root disk
+Standard library, system python3; numbers only in the evidence, never a token.
+"""
+import json, os, shutil, subprocess, urllib.request
+
+MODULE = "core"
+UNITS = {"dsh-web": "critical", "walter-telegram": "high", "cloudflared-tunnel": "high", "tailscaled": "high"}
+LOAD_PER_CORE, MIN_AVAILABLE_MIB, MAX_DISK_PCT = 2.0, 1000, 90
+
+
+def sh(*cmd, timeout=60):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(cmd, 124, "", str(exc))
+
+
+def inc(key, kind, severity, summary, evidence=None, level="G0"):
+    return {"version": 1, "module": MODULE, "key": key, "kind": kind, "severity": severity, "summary": summary,
+            "evidence": evidence or {}, "suggested_level": level}
+
+
+def active(unit):
+    return sh("systemctl", "is-active", unit).stdout.strip() == "active"
+
+
+def instance():
+    return open("/etc/walter/instance").read().strip() if os.path.exists("/etc/walter/instance") else ""
+
+
+def engine_health():
+    try:
+        token = open(f"{instance()}/bootstrap/engine/api.token").read().strip()
+        req = urllib.request.Request("http://127.0.0.1:8895/v1", data=json.dumps({"version": 1, "op": "health"}).encode(),
+                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read())
+    except Exception as exc:  # noqa: BLE001 — the error class only (no URL with a secret here, no token)
+        return {"_error": type(exc).__name__}
+
+
+out = []
+for unit, severity in UNITS.items():
+    if not active(unit):
+        out.append(inc(f"service:{unit}", "service_down", severity, f"Le service {unit} n'est pas actif.", {"unit": unit}, "G1"))
+if active("dsh-web"):
+    h = engine_health()
+    if h.get("_error") or h.get("ok") is False:
+        out.append(inc("engine:api", "service_unhealthy", "critical", "Walter Engine ne répond pas sur son API (:8895).", h, "G1"))
+if active("walter-telegram"):
+    r = sh("walter-telegram", "check", timeout=90)
+    try:
+        door = json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        door = {}
+    if r.returncode or not door.get("bot") or not door.get("engine"):
+        out.append(inc("door:telegram", "service_unhealthy", "high", "La porte Telegram ne joint pas son bot ou le moteur.",
+                       {"rc": r.returncode, "bot": bool(door.get("bot")), "engine": door.get("engine")}, "G1"))
+
+failed = [l.split()[0] for l in sh("systemctl", "--failed", "--no-legend", "--plain", "--no-pager").stdout.splitlines()
+          if l.split() and l.split()[0].endswith(".service")]
+if failed:
+    out.append(inc("host:failed-units", "failed_units", "warning", f"{len(failed)} unité(s) systemd en échec.", {"units": failed[:10]}))
+load, cores = os.getloadavg()[0], os.cpu_count() or 1
+if load > max(4, cores * LOAD_PER_CORE):
+    out.append(inc("host:load", "resource", "warning", f"Charge élevée : {load:.1f} pour {cores} cœurs.", {"load1": round(load, 2)}))
+try:
+    avail = int(next(l for l in open("/proc/meminfo") if l.startswith("MemAvailable")).split()[1]) // 1024
+    if avail < MIN_AVAILABLE_MIB:
+        out.append(inc("host:memory", "resource", "high", f"Mémoire disponible basse : {avail} Mio.", {"available_mib": avail}))
+except (OSError, StopIteration, ValueError):
+    pass
+d = shutil.disk_usage("/")
+pct = int(d.used * 100 / d.total)
+if pct >= MAX_DISK_PCT:
+    out.append(inc("host:disk", "resource", "high", f"Disque / plein à {pct} %.", {"used_pct": pct}))
+print(json.dumps(out, ensure_ascii=False))

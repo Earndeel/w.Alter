@@ -5,4 +5,4 @@ Branche les modules de W.Alter dans chaque runtime sous les mêmes noms d'outils
 **Utilisation**
 - Chaque module se présente ici (niveau 1). Pour aller plus loin : `module_index(module, section)` liste ce qu'il contient ; `module_guide(module)` donne son guide détaillé.
 - `walter_health` : état de la pile ; `walter_modules` : déclarations techniques des modules.
-- `ask_hermes(prompt)` : déléguer à l'agent Hermes vivant (Telegram, comptes Google, agenda, navigateur…).
+- `walter_run(request, goal)` : déléguer un travail à Walter Engine (session déléguée, sous sa politique). Prévenir le propriétaire : `walter-telegram send`.

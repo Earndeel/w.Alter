@@ -7,7 +7,6 @@ capabilities without importing Hermes internals:
   memory_recall / memory_retain / memory_reflect  → Walter Memory canonical facade (privacy + Router synthesis)
   walter_profile                                  → USER.md / SOUL.md / MEMORY.md
   skills_search / skill_read                      → W.Alter skills (walter-skills service :8891)
-  ask_hermes                                      → delegate a task to the live Hermes agent (all its tools)
   memory_search / memory_events                   → unified search (knowledge + evidence) / canonical event history
   person_lookup                                   → Kardex social card (relationship metrics, accounts, groups)
   memory_context                                  → budgeted context block for a request (P6 context engine)
@@ -34,7 +33,6 @@ import httpx
 from mcp.server.fastmcp import FastMCP
 
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/root/.hermes"))
-HERMES_API_URL = os.environ.get("WALTER_HERMES_API_URL", "http://127.0.0.1:8642")
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
 # Machine services Walter relies on without owning them; module services come from the registry.
 HOST_UNITS = ["cloudflared-tunnel", "docker"]
@@ -50,19 +48,6 @@ def _stack_units() -> list[str]:
 # Walter Memory (events, Raw Vault objects) runs in its own venv; called as a CLI so this server stays light.
 WALTER_MEMORY = ["/usr/local/bin/walter-memory"]
 BUDGETS = {"low", "mid", "high"}
-
-
-def _env_value(name: str) -> str:
-    """Read one key from Hermes' .env at call time (rotations apply without restart)."""
-    if os.environ.get(name):
-        return os.environ[name]
-    try:
-        for line in (HERMES_HOME / ".env").read_text().splitlines():
-            if line.startswith(name + "="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    except OSError:
-        pass
-    return ""
 
 
 from walter_capabilities import router_brief  # noqa: E402 — the router's own brief joins the server instructions
@@ -206,25 +191,6 @@ def skill_patch(name: str, reason: str, skill_md: str = "", file_path: str = "",
     return _skills_door("patch", {"name": name, "reason": reason, "skill_md": skill_md or None,
                                   "file_path": file_path or None, "content": content or None,
                                   "session_id": session_id or None})
-
-
-@mcp.tool()
-def ask_hermes(prompt: str, session_id: str = "", timeout_s: int = 600) -> str:
-    """Delegate a task to the live W.Alter/Hermes agent, which has the user's integrations (Telegram,
-    Google accounts, calendar, browser, voice, cron...). Blocks until Hermes answers.
-    Pass the returned session_id back to continue the same conversation."""
-    key = _env_value("API_SERVER_KEY")
-    headers = {"Authorization": f"Bearer {key}"} if key else {}
-    if session_id:
-        headers["X-Hermes-Session-Id"] = session_id
-    r = httpx.post(f"{HERMES_API_URL}/v1/chat/completions", headers=headers,
-                   json={"model": "hermes-agent", "stream": False,
-                         "messages": [{"role": "user", "content": prompt}]},
-                   timeout=max(30, min(int(timeout_s), 1800)))
-    if r.status_code >= 400:
-        return f"Hermes API error HTTP {r.status_code}: {r.text[:500]}"
-    answer = r.json()["choices"][0]["message"]["content"]
-    return f"{answer}\n\n[session_id: {r.headers.get('X-Hermes-Session-Id', '')}]"
 
 
 def _walter_memory(*args: str, timeout: float = 600) -> str:
