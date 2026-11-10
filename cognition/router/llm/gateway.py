@@ -212,11 +212,11 @@ def _charge(route: dict, entry: dict, telemetry: dict, body: dict) -> None:
 
 
 def _telegram(text: str) -> None:
-    """One message to the owner through Hermes' gateway (best effort)."""
+    """One message to the owner through Walter's Telegram door (`walter-telegram send`, lot E6; best effort)."""
     try:
-        hermes = Path(_walter("instance", "harness", "hermes")) / "hermes-agent" / "venv" / "bin" / "hermes"
-        subprocess.run([str(hermes), "send", "-t", "telegram", text], capture_output=True, timeout=120)
-    except (OSError, RuntimeError, subprocess.SubprocessError):
+        subprocess.run(["walter-telegram", "send", "--plain", "-"], input=text, capture_output=True, text=True,
+                       timeout=120)
+    except (OSError, subprocess.SubprocessError):
         pass
 
 

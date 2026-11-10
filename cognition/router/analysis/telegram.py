@@ -1,7 +1,8 @@
 """Telegram side of the alerts: one message per piece of news with its buttons (2026-10-16 owner's format: header
 « W.Alter Router — dd/mm », the router's category named, short readable lines, OpenRouter price, decision models on
-three axes with a recommendation for his stack, plan news), sent through Walter's own bot (walter-secrets grant
-telegram-bot); the clicks come back through the Hermes plugin as `walter-router verdict`."""
+three axes with a recommendation for his stack, plan news), sent through Walter's Telegram door
+(`walter-telegram send`, core/interfaces/telegram, since 2026-11-10); the clicks come back through it as
+`walter-router button` (alerts already sent by Hermes' bot keep their Hermes plugin handler)."""
 from __future__ import annotations
 
 import json
@@ -390,18 +391,16 @@ def home_chat() -> str:
 
 
 def send_with_buttons(text: str, rows: list[list[dict]]) -> None:
-    chunks, cur = [], ""
-    for block in text.split("\n\n"):                 # Telegram: 4096 chars per message; buttons on the last one
-        if cur and len(cur) + len(block) + 2 > 3900:
-            chunks.append(cur); cur = ""
-        cur = f"{cur}\n\n{block}" if cur else block
-    chunks.append(cur)
-    chat = home_chat()
-    for i, c in enumerate(chunks):
-        payload = {"chat_id": chat, "text": c, "disable_web_page_preview": True}
-        if i == len(chunks) - 1 and rows:
-            payload["reply_markup"] = {"inline_keyboard": rows}
-        telegram("sendMessage", payload)
+    """Through Walter's own Telegram door (lot E6, 2026-11-10: `walter-telegram send`, no longer Hermes' bot): it
+    chunks at Telegram's limit, buttons on the last message; their clicks come back as `walter-router button`."""
+    r = subprocess.run(["walter-telegram", "send", "--plain", "--buttons", json.dumps(rows or []), "-"], input=text,
+                       capture_output=True, text=True, timeout=180)
+    try:
+        out = json.loads((r.stdout or "").strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        out = {"ok": False, "error": (r.stderr or "no answer").strip()[-200:]}
+    if r.returncode or not out.get("ok"):
+        raise RuntimeError(f"telegram: {out.get('error')}")
 
 
 def _assign_refs(conn, alerts: list[dict]) -> list[dict]:

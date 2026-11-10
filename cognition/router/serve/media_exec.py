@@ -15,7 +15,6 @@ from __future__ import annotations
 import base64
 import json
 import re
-import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,7 +33,6 @@ KIE = "https://api.kie.ai"
 OPENROUTER = "https://openrouter.ai/api/v1"
 KIE_USD_PER_CREDIT = 0.005          # 6 credits = 0.03 $ (Sunburst 1K, 2026-10-02)
 TIMEOUTS = {"image": 360, "video": 1200, "music": 600, "audio": 300}
-HERMES = instance.hermes_bin()
 
 
 def _models() -> dict:
@@ -104,29 +102,15 @@ def coerce(path: str, params: dict) -> dict:
 # --- prompt crafting (economic tier) --------------------------------------------------------------------
 
 def craft_prompt(conn, request: str, style: str | None) -> str:
-    """Rewrite the owner's request in the model's prompt style with the economic text tier (L1, via Hermes).
-    Falls back to the request itself."""
+    """Rewrite the owner's request in the model's prompt style with the economic text tier (L1, walter-llm direct
+    path — lot E6, no longer through Hermes). Falls back to the request itself."""
     if not style:
         return request
-    from walter_router.serve import choose
-    try:
-        d = choose.pick(conn, "general", "L1")
-        route = next((r for r in execution.routes(conn, d["model_id"], d.get("variant") or "")
-                      if r.get("probe_ok") is not False and r.get("hermes_provider")), None)
-        if not route:
-            return request
-        q = (f"Réécris cette demande de {instance.owner()} en prompt pour un modèle génératif. Consigne de style : {style}\n"
-             f"Réponds UNIQUEMENT par le prompt final, sans guillemets ni commentaire.\n\nDemande : {request}")
-        cmd = [str(HERMES), "chat", "-q", q, "--oneshot", "-Q", "--provider", route["hermes_provider"], "-m",
-               route["model"], "-t", "memory", "--max-turns", "1", "--source", "walter-router-prompt"]
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=180,
-                             env=instance.child_env(WALTER_ROUTER_CHILD="1"))
-        lines = [ln for ln in re.sub(r"\x1b\[[0-9;]*m", "", out.stdout).splitlines()
-                 if ln.strip() and not ln.startswith(("session_id:", "⚠", "Warning:")) and "hermes doctor" not in ln]
-        text = "\n".join(lines).strip().strip('"')
-        return text if len(text) > 15 else request
-    except Exception:  # noqa: BLE001 — a raw prompt is better than no generation
-        return request
+    from walter_router.serve import oneshot
+    q = (f"Réécris cette demande de {instance.owner()} en prompt pour un modèle génératif. Consigne de style : {style}\n"
+         f"Réponds UNIQUEMENT par le prompt final, sans guillemets ni commentaire.\n\nDemande : {request}")
+    text = oneshot.complete(q, "walter-router-prompt", timeout=180) or ""
+    return text if len(text) > 15 else request
 
 
 # --- providers ------------------------------------------------------------------------------------------

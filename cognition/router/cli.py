@@ -88,6 +88,9 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("decision", choices=("adopted", "dismissed"))
     v.add_argument("--note")
     v.add_argument("--role", help="with a short number covering several roles: only this one")
+    bt = sub.add_parser("button", help="a pressed Telegram button of a Router alert (data wr:<a|d>:<ref>[:<role>]), "
+                                       "for the Telegram door: records the verdict, prints {ok, toast, drop}")
+    bt.add_argument("data")
     lb = sub.add_parser("library", help="the model library: per task/category model, chooser, providers, fallback")
     lb.add_argument("--json", action="store_true")
     hs = sub.add_parser("sync-hermes", help="Hermes follows the router: auxiliary jobs, OpenRouter host order per model, cron postes")
@@ -349,7 +352,16 @@ def main(argv: list[str] | None = None) -> int:
                 rows = conn.execute("select * from models.alerts order by alert_id").fetchall() if args.all else alerts.pending(conn)
                 out = rows
             else:
+                if args.cmd == "button":
+                    parts = args.data.split(":", 3)
+                    if len(parts) < 3 or parts[0] != "wr" or parts[1] not in ("a", "d") or not parts[2].isdigit():
+                        raise SystemExit(json.dumps({"ok": False, "toast": "Bouton inconnu"}))
+                    args.alert_id, args.decision = int(parts[2]), "adopted" if parts[1] == "a" else "dismissed"
+                    args.note, args.role = None, (parts[3] if len(parts) > 3 else None)
                 out = alerts.verdict(conn, args.alert_id, args.decision, args.note, args.role)
+                if args.cmd == "button":
+                    out = {"ok": True, "toast": "Enregistré : " + ("adopté" if args.decision == "adopted" else "ignoré"),
+                           "drop": [f"wr:a:{args.alert_id}", f"wr:d:{args.alert_id}"], "verdict": out}
                 import subprocess   # the library page follows the owner's answer (background, non-blocking)
                 wr = paths.ROOT / "bin" / "walter-router"   # after this command's commit
                 subprocess.Popen(["sh", "-c", f'sleep 5; "{wr}" sync-hermes --apply; "{wr}" publish-library'],
