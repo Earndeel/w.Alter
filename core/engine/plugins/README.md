@@ -39,7 +39,7 @@ l'accueil note `run_outcome` et `context_source` (pack | legacy | none). `bench/
 
 `node --test core/engine/tests/plugins.test.mjs` (aussi par `walter-core-test`) ; composition :
 `tests/test_composition.py::test_engine_intake_switch_hook_shadow_native_and_back` ; routes :
-`/walter/memory/tests/test_gateway_engine.py`.
+`/walter/cognition/memory/tests/test_gateway_engine.py`.
 
 ## Retour arrière
 

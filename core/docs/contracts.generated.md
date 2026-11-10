@@ -57,7 +57,7 @@ Interfaces : shared request contract, CLI, MCP, Hermes plugin, public client (wa
 Livrer les événements entre modules et conserver les curseurs de traitement.
 
 Contrat 1.1.0; propriétaire : bus.
-Racine actuelle : `/walter/memory`. Cible : `/walter/memory`.
+Racine actuelle : `/walter/cognition/memory`. Cible : `/walter/cognition/memory`.
 
 Interfaces : Python emit/Consumer, Postgres LISTEN/NOTIFY.
 
@@ -70,7 +70,7 @@ Interfaces : Python emit/Consumer, Postgres LISTEN/NOTIFY.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| bus | active | Bus Walter (schéma bus, LISTEN/NOTIFY, curseurs, dead) | `/walter/memory/walter_memory/bus.py` | core/bus |
+| bus | active | Bus Walter (schéma bus, LISTEN/NOTIFY, curseurs, dead) | `/walter/cognition/memory/walter_memory/bus.py` | core/bus |
 
 **Limites déclarées :**
 
@@ -288,7 +288,7 @@ Interfaces : OpenAI-compatible :8894, CLI walter-llm call: one exact model/provi
 Conserver les traces accessibles de tous les harnesses dans un journal commun.
 
 Contrat 1.0.0; propriétaire : logs.
-Racine actuelle : `/walter/memory`. Cible : `/walter/memory`.
+Racine actuelle : `/walter/cognition/memory`. Cible : `/walter/cognition/memory`.
 
 Interfaces : Writer, CLI, MCP.
 
@@ -301,8 +301,8 @@ Interfaces : Writer, CLI, MCP.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| logs-store | active | Journal canonique d'exécution walter_logs (masquage à l'écriture) | `/walter/memory/walter_memory/logs.py` | core/observability |
-| logs-watch | active | Synchronisation des journaux de tous les runtimes (inotify) | `/walter/memory/connectors/walter_logs.py` | core/observability |
+| logs-store | active | Journal canonique d'exécution walter_logs (masquage à l'écriture) | `/walter/cognition/memory/walter_memory/logs.py` | core/observability |
+| logs-watch | active | Synchronisation des journaux de tous les runtimes (inotify) | `/walter/cognition/memory/connectors/walter_logs.py` | core/observability |
 
 **Limites déclarées :**
 
@@ -313,7 +313,7 @@ Interfaces : Writer, CLI, MCP.
 Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.
 
 Contrat 1.2.0; propriétaire : memory.
-Racine actuelle : `/walter/memory`. Cible : `/walter/memory`.
+Racine actuelle : `/walter/cognition/memory`. Cible : `/walter/cognition/memory`.
 
 Interfaces : Python library, HTTP :8890, CLI, MCP, Overland authenticated HTTP :3010, CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer.
 
@@ -327,20 +327,20 @@ Interfaces : Python library, HTTP :8890, CLI, MCP, Overland authenticated HTTP :
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| events | active | Journal canonique core.events (append-only, idempotent) | `/walter/memory/walter_memory/events.py` | cognition/memory |
-| gateway | active | Seule porte d'écriture (127.0.0.1:8890) | `/walter/memory/walter_memory/gateway.py` | cognition/memory |
-| connectors | active | Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…) | `/walter/memory/connectors` | cognition/memory/connectors |
-| organic | active | Mémoire organique V1 (vues, épisodes, périodes, flux) | `/walter/memory/walter_memory/organic.py` | cognition/memory |
-| assimilation | active | Assimilation pilotée par le bus (memory.organic) | `/walter/memory/walter_memory/assimilation.py` | cognition/memory |
-| runs | active | Run Plane (runs, tâches, épisodes de run) | `/walter/memory/walter_memory/runs.py` | core/orchestration |
-| kardex | active | Couche sociale Kardex (schéma kardex) | `/walter/memory/walter_memory/social.py` | cognition/memory/kardex |
-| search | active | Index de recherche (search.chunks) | `/walter/memory/walter_memory/search.py` | cognition/memory |
-| privacy | active | Classes de confidentialité et règle de lecture | `/walter/memory/walter_memory/privacy.py` | cognition/memory |
-| disclosure | active | Contrôle de divulgation des messages sortants | `/walter/memory/walter_memory/disclosure.py` | core/security |
-| llm-client | active | Appels de modèles de Memory (refuse local_only, budgets) — lit encore ~/.hermes/.env | `/walter/memory/walter_memory/llm.py` | cognition/memory |
-| migrations | active | Migrations Postgres | `/walter/memory/migrations` | cognition/memory/migrations |
-| hermes-plugin | active | Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7) | `/walter/memory/hermes-plugins` | — |
-| overland | active | Réception GPS (Overland, :3010) | `/walter/memory/walter_memory/overland.py` | cognition/memory/connectors |
+| events | active | Journal canonique core.events (append-only, idempotent) | `/walter/cognition/memory/walter_memory/events.py` | cognition/memory |
+| gateway | active | Seule porte d'écriture (127.0.0.1:8890) | `/walter/cognition/memory/walter_memory/gateway.py` | cognition/memory |
+| connectors | active | Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…) | `/walter/cognition/memory/connectors` | cognition/memory/connectors |
+| organic | active | Mémoire organique V1 (vues, épisodes, périodes, flux) | `/walter/cognition/memory/walter_memory/organic.py` | cognition/memory |
+| assimilation | active | Assimilation pilotée par le bus (memory.organic) | `/walter/cognition/memory/walter_memory/assimilation.py` | cognition/memory |
+| runs | active | Run Plane (runs, tâches, épisodes de run) | `/walter/cognition/memory/walter_memory/runs.py` | core/orchestration |
+| kardex | active | Couche sociale Kardex (schéma kardex) | `/walter/cognition/memory/walter_memory/social.py` | cognition/memory/kardex |
+| search | active | Index de recherche (search.chunks) | `/walter/cognition/memory/walter_memory/search.py` | cognition/memory |
+| privacy | active | Classes de confidentialité et règle de lecture | `/walter/cognition/memory/walter_memory/privacy.py` | cognition/memory |
+| disclosure | active | Contrôle de divulgation des messages sortants | `/walter/cognition/memory/walter_memory/disclosure.py` | core/security |
+| llm-client | active | Appels de modèles de Memory (refuse local_only, budgets) — lit encore ~/.hermes/.env | `/walter/cognition/memory/walter_memory/llm.py` | cognition/memory |
+| migrations | active | Migrations Postgres | `/walter/cognition/memory/migrations` | cognition/memory/migrations |
+| hermes-plugin | active | Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7) | `/walter/cognition/memory/hermes-plugins` | — |
+| overland | active | Réception GPS (Overland, :3010) | `/walter/cognition/memory/walter_memory/overland.py` | cognition/memory/connectors |
 
 **Limites déclarées :**
 
@@ -392,7 +392,7 @@ Interfaces : CLI walter-ops backup|git|check|recovery|deploy|status (install, on
 Conserver les octets originaux et les relier au catalogue canonique.
 
 Contrat 1.0.0; propriétaire : raw-vault.
-Racine actuelle : `/walter/memory/vault`. Cible : `/walter/memory/vault`.
+Racine actuelle : `/walter/cognition/memory/vault`. Cible : `/walter/cognition/memory/vault`.
 
 Interfaces : memory objects library, S3, MCP.
 
@@ -405,7 +405,7 @@ Interfaces : memory objects library, S3, MCP.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| rawvault-shim | obsolete | Ancienne entrée du Raw Vault ; renvoie vers walter_memory.objects | `/walter/memory/vault/rawvault.py` | — |
+| rawvault-shim | obsolete | Ancienne entrée du Raw Vault ; renvoie vers walter_memory.objects | `/walter/cognition/memory/vault/rawvault.py` | — |
 
 **Limites déclarées :**
 

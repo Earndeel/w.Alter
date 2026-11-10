@@ -14,7 +14,7 @@
     },
     {
       "id": "bus",
-      "target": "memory",
+      "target": "cognition/memory",
       "legacy": "/opt/walter-memory",
       "manifest": "contracts/bus.json",
       "vision_target": "core/bus"
@@ -76,17 +76,20 @@
     },
     {
       "id": "logs",
-      "target": "memory",
+      "target": "cognition/memory",
       "legacy": "/opt/walter-memory",
       "manifest": "contracts/logs.json",
       "vision_target": "core/observability"
     },
     {
       "id": "memory",
-      "target": "memory",
+      "target": "cognition/memory",
       "legacy": "/opt/walter-memory",
       "manifest": "contracts/memory.json",
-      "vision_target": "cognition/memory"
+      "vision_target": "cognition/memory",
+      "compat_links": [
+        "/walter/memory"
+      ]
     },
     {
       "id": "ops",
@@ -105,7 +108,7 @@
     },
     {
       "id": "raw-vault",
-      "target": "memory/vault",
+      "target": "cognition/memory/vault",
       "legacy": "/opt/walter-raw-vault",
       "manifest": "contracts/raw-vault.json",
       "vision_target": "cognition/memory/vault"

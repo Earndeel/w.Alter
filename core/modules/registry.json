@@ -225,10 +225,10 @@
     },
     {
       "id": "bus",
-      "root": "/walter/memory",
+      "root": "/walter/cognition/memory",
       "anchors": [
-        "/walter/memory/contracts/bus.json",
-        "/walter/memory/walter_memory/bus.py"
+        "/walter/cognition/memory/contracts/bus.json",
+        "/walter/cognition/memory/walter_memory/bus.py"
       ],
       "requires": [
         "memory"
@@ -238,10 +238,10 @@
         "bus.*"
       ],
       "core_paths": [
-        "/walter/memory/walter_memory/bus.py"
+        "/walter/cognition/memory/walter_memory/bus.py"
       ],
       "backup_paths": [
-        "/walter/memory"
+        "/walter/cognition/memory"
       ],
       "interfaces": [
         "Python emit/Consumer",
@@ -264,7 +264,7 @@
         "owner": "bus",
         "kind": "foundation",
         "purpose": "Livrer les événements entre modules et conserver les curseurs de traitement.",
-        "target_root": "/walter/memory",
+        "target_root": "/walter/cognition/memory",
         "config_paths": [],
         "permissions": [
           "droits PostgreSQL du consommateur"
@@ -338,10 +338,10 @@
       "components": [
         {
           "id": "bus",
-          "path": "/walter/memory/walter_memory/bus.py",
+          "path": "/walter/cognition/memory/walter_memory/bus.py",
           "role": "Bus Walter (schéma bus, LISTEN/NOTIFY, curseurs, dead)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "data": [
             "postgres:bus"
           ],
@@ -1770,11 +1770,11 @@
     },
     {
       "id": "logs",
-      "root": "/walter/memory",
+      "root": "/walter/cognition/memory",
       "anchors": [
-        "/walter/memory/connectors/walter_logs.py",
-        "/walter/memory/contracts/logs.json",
-        "/walter/memory/walter_memory/logs.py"
+        "/walter/cognition/memory/connectors/walter_logs.py",
+        "/walter/cognition/memory/contracts/logs.json",
+        "/walter/cognition/memory/walter_memory/logs.py"
       ],
       "requires": [
         "memory"
@@ -1784,10 +1784,10 @@
         "walter_logs.*"
       ],
       "core_paths": [
-        "/walter/memory/walter_memory/logs.py"
+        "/walter/cognition/memory/walter_memory/logs.py"
       ],
       "backup_paths": [
-        "/walter/memory"
+        "/walter/cognition/memory"
       ],
       "interfaces": [
         "Writer",
@@ -1813,7 +1813,7 @@
         "owner": "logs",
         "kind": "foundation",
         "purpose": "Conserver les traces accessibles de tous les harnesses dans un journal commun.",
-        "target_root": "/walter/memory",
+        "target_root": "/walter/cognition/memory",
         "config_paths": [],
         "permissions": [
           "lecture cloud-safe",
@@ -1903,9 +1903,9 @@
         "audience": "agent",
         "title": "walter-logs",
         "order": 20,
-        "summary": "/walter/memory/manifest/logs/SUMMARY.md",
-        "manifest": "/walter/memory/manifest/logs/MANIFEST.md",
-        "guide": "/walter/memory/manifest/logs/GUIDE.md",
+        "summary": "/walter/cognition/memory/manifest/logs/SUMMARY.md",
+        "manifest": "/walter/cognition/memory/manifest/logs/MANIFEST.md",
+        "guide": "/walter/cognition/memory/manifest/logs/GUIDE.md",
         "tools": [
           "logs_search",
           "logs_timeline",
@@ -1915,10 +1915,10 @@
       "components": [
         {
           "id": "logs-store",
-          "path": "/walter/memory/walter_memory/logs.py",
+          "path": "/walter/cognition/memory/walter_memory/logs.py",
           "role": "Journal canonique d'exécution walter_logs (masquage à l'écriture)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "data": [
             "postgres:walter_logs"
           ],
@@ -1926,25 +1926,25 @@
         },
         {
           "id": "logs-watch",
-          "path": "/walter/memory/connectors/walter_logs.py",
+          "path": "/walter/cognition/memory/connectors/walter_logs.py",
           "role": "Synchronisation des journaux de tous les runtimes (inotify)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "vision_target": "core/observability"
         }
       ]
     },
     {
       "id": "memory",
-      "root": "/walter/memory",
+      "root": "/walter/cognition/memory",
       "anchors": [
-        "/walter/memory/contracts/memory.json",
-        "/walter/memory/walter_memory/events.py",
-        "/walter/memory/walter_memory/objects.py",
-        "/walter/memory/walter_memory/client.py",
-        "/walter/memory/walter_memory/read_policy.py",
-        "/walter/memory/ports/hermes/__init__.py",
-        "/walter/memory/walter_memory/overland.py"
+        "/walter/cognition/memory/contracts/memory.json",
+        "/walter/cognition/memory/walter_memory/events.py",
+        "/walter/cognition/memory/walter_memory/objects.py",
+        "/walter/cognition/memory/walter_memory/client.py",
+        "/walter/cognition/memory/walter_memory/read_policy.py",
+        "/walter/cognition/memory/ports/hermes/__init__.py",
+        "/walter/cognition/memory/walter_memory/overland.py"
       ],
       "requires": [],
       "external": [
@@ -1963,11 +1963,11 @@
         "processing.*"
       ],
       "core_paths": [
-        "/walter/memory/walter_memory/events.py",
-        "/walter/memory/walter_memory/objects.py"
+        "/walter/cognition/memory/walter_memory/events.py",
+        "/walter/cognition/memory/walter_memory/objects.py"
       ],
       "backup_paths": [
-        "/walter/memory",
+        "/walter/cognition/memory",
         "/root/.pgpass",
         "/root/.hermes/plugins/walter-memory",
         "/user/Lucas/bootstrap/overland.env"
@@ -2006,9 +2006,9 @@
         "owner": "memory",
         "kind": "capability",
         "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
-        "target_root": "/walter/memory",
+        "target_root": "/walter/cognition/memory",
         "config_paths": [
-          "/walter/memory/.env"
+          "/walter/cognition/memory/.env"
         ],
         "permissions": [
           "classification de confidentialité",
@@ -2141,9 +2141,9 @@
         "audience": "agent",
         "title": "Walter Memory",
         "order": 10,
-        "summary": "/walter/memory/manifest/SUMMARY.md",
-        "manifest": "/walter/memory/manifest/MANIFEST.md",
-        "guide": "/walter/memory/manifest/GUIDE.md",
+        "summary": "/walter/cognition/memory/manifest/SUMMARY.md",
+        "manifest": "/walter/cognition/memory/manifest/MANIFEST.md",
+        "guide": "/walter/cognition/memory/manifest/GUIDE.md",
         "tools": [
           "memory_context",
           "memory_search",
@@ -2155,10 +2155,10 @@
       "components": [
         {
           "id": "events",
-          "path": "/walter/memory/walter_memory/events.py",
+          "path": "/walter/cognition/memory/walter_memory/events.py",
           "role": "Journal canonique core.events (append-only, idempotent)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "data": [
             "postgres:core"
           ],
@@ -2166,10 +2166,10 @@
         },
         {
           "id": "gateway",
-          "path": "/walter/memory/walter_memory/gateway.py",
+          "path": "/walter/cognition/memory/walter_memory/gateway.py",
           "role": "Seule porte d'écriture (127.0.0.1:8890)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "interfaces": [
             {
               "transport": "http",
@@ -2180,34 +2180,34 @@
         },
         {
           "id": "connectors",
-          "path": "/walter/memory/connectors",
+          "path": "/walter/cognition/memory/connectors",
           "role": "Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory/connectors"
         },
         {
           "id": "organic",
-          "path": "/walter/memory/walter_memory/organic.py",
+          "path": "/walter/cognition/memory/walter_memory/organic.py",
           "role": "Mémoire organique V1 (vues, épisodes, périodes, flux)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory"
         },
         {
           "id": "assimilation",
-          "path": "/walter/memory/walter_memory/assimilation.py",
+          "path": "/walter/cognition/memory/walter_memory/assimilation.py",
           "role": "Assimilation pilotée par le bus (memory.organic)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory"
         },
         {
           "id": "runs",
-          "path": "/walter/memory/walter_memory/runs.py",
+          "path": "/walter/cognition/memory/walter_memory/runs.py",
           "role": "Run Plane (runs, tâches, épisodes de run)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "data": [
             "postgres:runs"
           ],
@@ -2215,10 +2215,10 @@
         },
         {
           "id": "kardex",
-          "path": "/walter/memory/walter_memory/social.py",
+          "path": "/walter/cognition/memory/walter_memory/social.py",
           "role": "Couche sociale Kardex (schéma kardex)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "data": [
             "postgres:kardex"
           ],
@@ -2226,57 +2226,57 @@
         },
         {
           "id": "search",
-          "path": "/walter/memory/walter_memory/search.py",
+          "path": "/walter/cognition/memory/walter_memory/search.py",
           "role": "Index de recherche (search.chunks)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory"
         },
         {
           "id": "privacy",
-          "path": "/walter/memory/walter_memory/privacy.py",
+          "path": "/walter/cognition/memory/walter_memory/privacy.py",
           "role": "Classes de confidentialité et règle de lecture",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory"
         },
         {
           "id": "disclosure",
-          "path": "/walter/memory/walter_memory/disclosure.py",
+          "path": "/walter/cognition/memory/walter_memory/disclosure.py",
           "role": "Contrôle de divulgation des messages sortants",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "vision_target": "core/security"
         },
         {
           "id": "llm-client",
-          "path": "/walter/memory/walter_memory/llm.py",
+          "path": "/walter/cognition/memory/walter_memory/llm.py",
           "role": "Appels de modèles de Memory (refuse local_only, budgets) — lit encore ~/.hermes/.env",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory"
         },
         {
           "id": "migrations",
-          "path": "/walter/memory/migrations",
+          "path": "/walter/cognition/memory/migrations",
           "role": "Migrations Postgres",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory/migrations"
         },
         {
           "id": "hermes-plugin",
-          "path": "/walter/memory/hermes-plugins",
+          "path": "/walter/cognition/memory/hermes-plugins",
           "role": "Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7)",
           "status": "active",
-          "readme": "/walter/memory/README.md"
+          "readme": "/walter/cognition/memory/README.md"
         },
         {
           "id": "overland",
-          "path": "/walter/memory/walter_memory/overland.py",
+          "path": "/walter/cognition/memory/walter_memory/overland.py",
           "role": "Réception GPS (Overland, :3010)",
           "status": "active",
-          "readme": "/walter/memory/README.md",
+          "readme": "/walter/cognition/memory/README.md",
           "interfaces": [
             {
               "transport": "http",
@@ -2521,10 +2521,10 @@
     },
     {
       "id": "raw-vault",
-      "root": "/walter/memory/vault",
+      "root": "/walter/cognition/memory/vault",
       "anchors": [
-        "/walter/memory/vault/contracts/raw-vault.json",
-        "/walter/memory/vault/rawvault.py"
+        "/walter/cognition/memory/vault/contracts/raw-vault.json",
+        "/walter/cognition/memory/vault/rawvault.py"
       ],
       "requires": [
         "memory"
@@ -2540,7 +2540,7 @@
       ],
       "core_paths": [],
       "backup_paths": [
-        "/walter/memory/vault",
+        "/walter/cognition/memory/vault",
         "/root/.config/rclone/rclone.conf",
         "/root/.hermes/raw-vault"
       ],
@@ -2566,7 +2566,7 @@
         "owner": "raw-vault",
         "kind": "capability",
         "purpose": "Conserver les octets originaux et les relier au catalogue canonique.",
-        "target_root": "/walter/memory/vault",
+        "target_root": "/walter/cognition/memory/vault",
         "config_paths": [
           "/root/.config/rclone/rclone.conf",
           "/root/.hermes/raw-vault/s3.env"
@@ -2659,9 +2659,9 @@
         "audience": "agent",
         "title": "Raw Vault",
         "order": 30,
-        "summary": "/walter/memory/vault/manifest/SUMMARY.md",
-        "manifest": "/walter/memory/vault/manifest/MANIFEST.md",
-        "guide": "/walter/memory/vault/manifest/GUIDE.md",
+        "summary": "/walter/cognition/memory/vault/manifest/SUMMARY.md",
+        "manifest": "/walter/cognition/memory/vault/manifest/MANIFEST.md",
+        "guide": "/walter/cognition/memory/vault/manifest/GUIDE.md",
         "tools": [
           "vault_search",
           "vault_get",
@@ -2671,10 +2671,10 @@
       "components": [
         {
           "id": "rawvault-shim",
-          "path": "/walter/memory/vault/rawvault.py",
+          "path": "/walter/cognition/memory/vault/rawvault.py",
           "role": "Ancienne entrée du Raw Vault ; renvoie vers walter_memory.objects",
           "status": "obsolete",
-          "readme": "/walter/memory/vault/manifest/MANIFEST.md"
+          "readme": "/walter/cognition/memory/vault/manifest/MANIFEST.md"
         }
       ]
     },
