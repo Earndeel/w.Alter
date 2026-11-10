@@ -3,7 +3,7 @@
   "module": "context",
   "check": [
     "python3",
-    "/walter/context/guardian/check"
+    "/walter/cognition/context/guardian/check"
   ],
   "max_level": "G1",
   "levels": {

@@ -321,7 +321,7 @@ Fait au lot 2 (21/10, context e4b4f1a) :
 ## 8. Plan
 | Lot | Contenu | Critère de réussite | Accord de le propriétaire |
 |---|---|---|---|
-| **0. Fondations** ✅ 21/10 | `/walter/context`, sous-module `compress`, `recover`, banc des fils, contrat 1.1.0, module neutre, CLI sur le PATH | Tests verts (27 Python + 9 DSH), acceptation identique, `walter check` vert | — |
+| **0. Fondations** ✅ 21/10 | `/walter/cognition/context`, sous-module `compress`, `recover`, banc des fils, contrat 1.1.0, module neutre, CLI sur le PATH | Tests verts (27 Python + 9 DSH), acceptation identique, `walter check` vert | — |
 | **1. Comprendre l'intention : mesures** ✅ 21/10 (reranker : au lot 4) | Fil, acte, plan, niveau et tâche en un appel, 4 modèles, sur la référence T0 annotée | d1-ultra recommandé, Clef en repli ; voir §7 | fait, 0,21 $ |
 | **2. Moteur de compression unifié** ✅ 21/10 | Un seul calcul, l'échelle, l'ordre de sacrifice, le refus explicite, les marqueurs de cache par fournisseur, `recover` visible du modèle | Rejeu au moins aussi bon qu'aujourd'hui, 14 cas d'acceptation verts, DSH dessus | non |
 | **3. Fils et carnets** (Walter Memory) | Tables des fils, membres (renvois vers walter-logs) et carnets (ajout seul). Rattachement après chaque tour (bus). Carnet : faits sans modèle, consignes et décisions par le petit modèle. Rattrapage depuis le 14/10, fusion et scission la nuit | ≥ 85 % de rattachements justes sur T0. « Qu'a fait le propriétaire via Codex le 17-18/10 ? » retrouve les deux chantiers | oui (structure mémoire, à faire avec le chantier mémoire) |

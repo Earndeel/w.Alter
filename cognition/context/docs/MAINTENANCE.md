@@ -43,7 +43,7 @@ Le preflight propose des capacités et un niveau ; il ne retire pas les outils d
 (`walter_memory.llm.decide(samples=…)`, `merge_answers` : moyenne des probabilités, confiance pondérée par l'accord),
 car l'API de décision échantillonne : sur les mêmes entrées, un appel unique faisait basculer la capacité mémoire
 (0,37–0,55 sur un message). Cohérence : capacité `memory` (modèle ≥ 0,5 ou nom connu de Memory) ⇒ niveau au moins
-L3. Mesures et coût dans `/walter/context/docs/CONTEXT-ENGINE.md` (étape B). Un message
+L3. Mesures et coût dans `/walter/cognition/context/docs/CONTEXT-ENGINE.md` (étape B). Un message
 `local_only` n’est pas envoyé au modèle de décision et ne reçoit pas de pack cloud assemblé. Les lectures Memory
 appliquent leur politique propre ; la projection locale et le bridge n’effectuent pas implicitement de décision
 cloud. Une erreur d’une source ne constitue pas une preuve que les données correspondantes n’existent pas.

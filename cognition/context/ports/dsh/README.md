@@ -12,7 +12,7 @@ The VM's `cordis.patch.yml` disables the stock entry and inserts this port:
   disabled: true
 - insert:
     - id: walter-context
-      name: /opt/walter-context/ports/dsh/index.mjs
+      name: /walter/cognition/context/ports/dsh/index.mjs
 ```
 
 Changing only the name on an existing entry does not replace it in this DSH
@@ -75,7 +75,7 @@ paths. Peer dependencies resolve normally when installed as a package; this VM
 can resolve the host through `WALTER_DSH_PACKAGE` (default
 `/opt/dsh/package.json`). The supported and tested host is DSH 0.2.0-rc.2.
 
-`node /opt/walter-context/tests/test_dsh.mjs` runs nine tests with actual DSH
+`node /walter/cognition/context/tests/test_dsh.mjs` runs nine tests with actual DSH
 Session, CompactionEngine, ToolRuntime and replay. They cover a successful
 checkpoint, source recovery, intact raw events, Python failure, system/developer
 instruction refusal (including leading roles and manual compaction), abort and

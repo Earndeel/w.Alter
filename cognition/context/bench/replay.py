@@ -8,7 +8,7 @@ model profile (input = 1). Policies:
   hermes (real)   what Hermes actually sent, from system.agent_calls (A8) for the same sessions
 
 Run (walter-memory venv, read-only on Postgres):
-  /opt/walter-context/bin/walter-context bench [--days 14] [--sessions 50] [--min-calls 15] [--json out.json]
+  /walter/cognition/context/bin/walter-context bench [--days 14] [--sessions 50] [--min-calls 15] [--json out.json]
 """
 from __future__ import annotations
 

@@ -15,7 +15,7 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
-ROOT = os.environ.get("WALTER_CONTEXT_HOME", "/opt/walter-context")
+ROOT = os.environ.get("WALTER_CONTEXT_HOME", "/walter/cognition/context")
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 

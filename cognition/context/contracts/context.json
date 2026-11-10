@@ -72,7 +72,7 @@
     "owner": "context",
     "kind": "capability",
     "purpose": "Préparer et ordonner le contexte par message et par sous-agent, et compresser l’historique selon le contrat du harness ; les données canoniques restent dans leurs modules propriétaires.",
-    "target_root": "context",
+    "target_root": "cognition/context",
     "config_paths": [
       "config/walter-context.toml"
     ],

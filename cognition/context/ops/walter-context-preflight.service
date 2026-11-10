@@ -3,7 +3,7 @@ Description=walter-context preflight service (127.0.0.1:8897) — the ContextPla
 After=network-online.target docker.service
 
 [Service]
-ExecStart=/walter/context/bin/walter-context-preflight --serve
+ExecStart=/walter/cognition/context/bin/walter-context-preflight --serve
 User=root
 Restart=on-failure
 RestartSec=5
