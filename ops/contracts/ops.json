@@ -219,6 +219,13 @@
       "role": "Cache npm hors ligne du noyau figé du moteur (lot E1), utilisé par core/engine/kernel/install.sh",
       "status": "active",
       "readme": "/services/dsh/README.md"
+    },
+    {
+      "id": "python",
+      "path": "/services/python",
+      "role": "Environnements Python installés des modules (runtime de walter-python, core, router, llm, raw-vault), déplacés le 2026-11-10 (E9.2a) ; chaque module garde un lien venv ; exclus de restic, reconstruits depuis les verrous des modules",
+      "status": "active",
+      "readme": "/services/python/README.md"
     }
   ]
 }
