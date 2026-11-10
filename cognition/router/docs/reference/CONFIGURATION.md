@@ -51,7 +51,6 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/telegram.py | `SHORT_TASK` | {"decision": "Routage d’intention", "decision_vision": "Décision avec image"} |  |
 | analysis/telegram.py | `BOARD_TASKS` | {"3d": "3D", "decision": "", "embeddings": "embeddings (ELO)", "embeddings_speed": "embeddings latence", "frontend": "front-end", "image_edit": "retouche d'image", "image_to_video": "animation d'image", "intelligence": "intelligence", "music": "musique", "rerank": "rerank (ELO)", "rerank_speed": "rerank latence", "retrieval_fr": "recherche en français", "speed": "vitesse", "text": "texte", "text_coding": "code", "text_to_image": "image", "text_to_video": "vidéo depuis texte", "tts": "voix", "webdev": "web", "wer": "fidélité (100 − WER)"} |  |
 | analysis/telegram.py | `BUTTONS` | {"board_down": [["👁️ Vu", "d"]], "challenger": [["✅ Changer", "a"], ["✖️ Garder l'actuel", "d"]], "nerf": [["👁️ Masquer", "d"]], "new_best": [["✅ Passer au nouveau", "a"], ["✖️ Garder l'actuel", "d"]], "pareto": [["👍 Noté", "a"], ["✖️ Ignorer", "d"]], "plan_change": [["✅ Mettre à jour", "a"], ["✖️ Ignorer", "d"]], "tier": [["✅ Changer", "a"], ["✖️ Garder l'actuel", "d"]]} |  |
-| analysis/telegram.py | `TELEGRAM_API` | https://api.telegram.org/bot{token}/{method} |  |
 | analysis/tiers.py | `QUALITY_FLOOR` | 35.0 |  |
 | analysis/tiers.py | `CEILING_BAND` | 5.0 |  |
 | analysis/tiers.py | `KNEE_DROP` | 2.0 |  |
@@ -118,8 +117,14 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/gateway.py | `KIE_GPT` | ["gpt-"] |  |
 | llm/gateway.py | `PAID` | ["arnict", "kie", "openrouter", "venice"] | providers billed per call (subscriptions are not) |
 | llm/gateway.py | `RATE_LIMIT_WAITS` | [4, 12] |  |
+| llm/gateway.py | `EXACT` | exact: | a model named by the owner, validated by Walter Router (lot E5) |
 | llm/gateway.py | `ANTHROPIC_CACHE_POINTS` | [{"location": "message", "role": "system"}, {"index": -1, "location": "message"}] |  |
 | llm/gateway.py | `QUOTA_SWITCH` | 90.0 | same threshold as the Router's execution.routes (weekly %), mirrored for the trace only |
+| plan/codex_account.py | `BASE` | https://chatgpt.com/backend-api |  |
+| plan/codex_account.py | `GRANT` | codex-subscription |  |
+| plan/codex_account.py | `CLIENT_VERSIONS` | ["99.0.0", "0.0.0"] |  |
+| plan/codex_account.py | `WINDOW_BY_SECONDS` | {"18000": "session", "604800": "weekly"} |  |
+| plan/codex_account.py | `WINDOW_BY_POSITION` | [["primary_window", "session"], ["secondary_window", "weekly"]] |  |
 | plan/mail.py | `API` | https://gmail.googleapis.com/gmail/v1/users/me |  |
 | plan/mail.py | `GRANT` | google-memory |  |
 | plan/mail.py | `VENDORS` | {"anthropic.com": "Anthropic", "cursor.com": "Cursor", "elevenlabs.io": "ElevenLabs", "google.com": "Google", "kie.ai": "Kie", "midjourney.com": "Midjourney", "mistral.ai": "Mistral", "openai.com": "OpenAI", "openrouter.ai": "OpenRouter", "perplexity.ai": "Perplexity", "runwayml.com": "Runway", "suno.com": "Suno", "x.ai": "xAI"} |  |
@@ -213,6 +218,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/choose.py | `LEVELS` | ["L1", "L2", "L3"] |  |
 | serve/choose.py | `POLICY` | coalesce(pr.content_policy, c.content_policy) |  |
 | serve/choose.py | `INPUTS` | {"video_input": ["video"]} | requirement -> inputs every route of the choice must read |
+| serve/engine.py | `ENGINE_TASKS` | ["coding", "general", "document", "summarization"] | engine models = walter-llm postes |
+| serve/engine.py | `TASK_OF` | {"code": "coding", "front": "coding"} | router task → engine poste when names differ |
 | serve/execution.py | `HERMES_PROVIDERS` | {"arnict": "arnict", "codex": "openai-codex", "kie": "kie", "openrouter": "openrouter"} |  |
 | serve/execution.py | `NATIVE_ONLY` | ["antigravity", "venice"] | providers walter-llm runs itself (2026-10-30), with no Hermes provider |
 | serve/execution.py | `KIE_CODEX_MODELS` | ["gpt-5-5", "gpt-5-6-luna", "gpt-5-6-sol", "gpt-5-6-terra", "gpt-6-1-sol", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol"] |  |
@@ -246,6 +253,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/media_exec.py | `FALLBACK_COST_X` | 2.0 |  |
 | serve/named.py | `PROVIDERS` | {"arnict": "arnict", "chatgpt": "codex", "codex": "codex", "flow": "google-flow", "google-flow": "google-flow", "kie": "kie", "kie-codex": "kie", "kie.ai": "kie", "openai-codex": "codex", "openrouter": "openrouter", "venice": "venice"} |  |
 | serve/named.py | `DEFAULT_TASK` | {"audio": "tts", "chat": "general", "image": "text_to_image", "music": "music", "video": "text_to_video"} |  |
+| serve/oneshot.py | `TOKEN_FILE` | @instance/bootstrap/llm/walter-router.env |  |
+| serve/oneshot.py | `ECONOMIC` | general/L1 |  |
 | serve/run.py | `ALLOWED_TOOLSETS` | ["web", "walter-web", "file", "terminal", "vision", "skills", "code_execution", "memory"] |  |
 | serve/run.py | `DEFAULT_TOOLSETS` | ["walter-web", "skills", "memory"] |  |
 | serve/run.py | `TOOLSET_TOOLS` | {"memory": ["memory_context", "memory_search", "memory_events"], "skills": ["skills_search", "skill_read"], "walter-web": ["walter_browse"], "web": ["walter_browse"]} |  |
@@ -260,7 +269,6 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 
 | Variable | Source | Accès | Défaut (expression de code) | Effet |
 |---|---|---|---|---|
-| `TELEGRAM_HOME_CHANNEL` | analysis/telegram.py | env_value | aucun | Destination d'instance des avis/propositions ; ne pas exporter sa valeur. |
 | `WALTER_ROUTER_CLI` | hermes-plugins/walter-router/__init__.py | get | 'walter-router' | Commande publique appelée par l'adaptateur de tools. |
 | `WALTER_LLM_URL` | hermes-plugins/walter-router/__init__.py | get | 'http://127.0.0.1:8894' | URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894). |
 | `TELEGRAM_HOME_CHANNEL` | hermes-plugins/walter-router/__init__.py | get | aucun | Destination d'instance des avis/propositions ; ne pas exporter sa valeur. |
@@ -274,6 +282,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `CLAUDE_PROJECTS` | plan/subscriptions.py | get | aucun | Source locale de métriques des sessions Claude pour estimer un abonnement. |
 | `CODEX_SESSIONS` | plan/subscriptions.py | get | aucun | Source locale de métriques des sessions Codex pour estimer un abonnement. |
 | `WALTER_FLARESOLVERR` | research/web.py | get | 'http://127.0.0.1:8191/v1' | Adresse du service de lecture des sources qui le nécessitent. |
+| `WALTER_RUN_ID` | serve/engine.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
+| `WALTER_SESSION_ID` | serve/engine.py | get | aucun | Session walter_logs de l'appelant ; parent de la session du sous-agent walter_run. |
+| `WALTER_DELEGATION_DEPTH` | serve/engine.py | get | aucun | Profondeur de délégation de l'appelant (0 = le propriétaire) transmise au moteur par une délégation Engine API ; posée par le moteur pour ses sous-tâches. |
 | `WALTER_RUN_ID` | serve/execution.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
 | `WALTER_TASK_ID` | serve/execution.py | get | aucun | Tâche de sous-agent (runs.tasks) servie par l'exécution walter_run ; inscrite dans models.exec_log. |
 | `CLOUDFLARE_ACCOUNT_ID` | serve/intent.py | env_value | aucun | Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation. |
@@ -286,6 +297,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `KIE_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets, pas une clé transmise au modèle. |
 | `OPENROUTER_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
 | `OPENROUTER_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
+| `WALTER_LLM_URL` | serve/oneshot.py | get | 'http://127.0.0.1:8894' | URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894). |
+| `WALTER_LLM_TOKEN` | serve/oneshot.py | get | aucun | Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché). |
+| `WALTER_RUN_ID` | serve/oneshot.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
 | `WALTER_RUN_ID` | serve/run.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
 | `WALTER_RUN_CONTEXT` | serve/run.py | get | 'walter' | caller = le sous-agent walter_run reçoit seulement le contexte de l'appelant ; sinon le paquet walter-context (context.build scope=child). |
 | `WALTER_SESSION_ID` | serve/run.py | get | aucun | Session walter_logs de l'appelant ; parent de la session du sous-agent walter_run. |

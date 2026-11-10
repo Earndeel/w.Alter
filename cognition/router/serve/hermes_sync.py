@@ -63,6 +63,8 @@ def _aux(home: Path) -> dict:
 
 
 def plan(conn) -> list[dict]:
+    if not instance.hermes_active():
+        return []                       # Hermes retired on this instance: nothing to make it follow
     out = []
     wanted = {poste: _wanted(conn, poste) for poste in set(AUX_POSTES.values())}
     for home in HOMES:
@@ -147,6 +149,8 @@ def _plan_crons(conn) -> list[dict]:
 
 
 def apply(conn, restart: bool = True) -> dict:
+    if not instance.hermes_active():
+        return {"changed": False, "skipped": "hermes retired"}
     steps = plan(conn)
     todo = [s for s in steps if s.get("changes")]
     if not todo:

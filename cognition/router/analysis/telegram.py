@@ -10,10 +10,9 @@ import re
 import subprocess
 from datetime import datetime, timezone
 
-from walter_router import instance
 from walter_router.analysis import catalog
 from walter_router.analysis import media
-from walter_router.analysis.alerts import HERMES, pending
+from walter_router.analysis.alerts import pending
 
 ROLE_LABELS = {"value": "ratio", "budget": "budget", "action": "action", "default": "défaut", "premium": "premium",
                "ugc": "UGC"}
@@ -350,46 +349,6 @@ def _button_text(conn, a: dict, label: str, code: str) -> str:
     return f"{label} · {_name(conn, (a.get('subject') or '').partition('/')[0])}".rstrip(" ·")[:48]
 
 
-TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
-
-
-_BOT_TOKEN: list[str] = []
-
-
-def _bot_token() -> str:
-    """Walter's Telegram bot (grant `telegram-bot` of walter-secrets), read once per process, never logged."""
-    if not _BOT_TOKEN:
-        r = subprocess.run(["walter-secret", "grant", "access", "telegram-bot"], capture_output=True, text=True,
-                           timeout=120)
-        if r.returncode or not r.stdout.strip():
-            raise RuntimeError("Telegram bot grant unavailable (walter-secret grants telegram-bot)")
-        _BOT_TOKEN.append(r.stdout.strip())
-    return _BOT_TOKEN[0]
-
-
-def telegram(method: str, payload: dict) -> dict:
-    """Bot API call with Walter's own bot (the one the Hermes gateway also serves)."""
-    from urllib.request import Request, urlopen
-    token = _bot_token()
-    req = Request(TELEGRAM_API.format(token=token, method=method), data=json.dumps(payload).encode(),
-                  headers={"Content-Type": "application/json"})
-    with urlopen(req, timeout=30) as resp:  # noqa: S310 (fixed host)
-        out = json.loads(resp.read())
-    if not out.get("ok"):
-        raise RuntimeError(f"telegram {method}: {out.get('description')}")
-    return out["result"]
-
-
-def home_chat() -> str:
-    """The owner's Telegram chat = the gateway's home channel (top-level TELEGRAM_HOME_CHANNEL in config.yaml)."""
-    import re
-    m = re.search(r"^TELEGRAM_HOME_CHANNEL:\s*'?(-?\d+)'?\s*$", (HERMES.parents[3] / "config.yaml").read_text(), re.M)
-    chat = m.group(1) if m else instance.env_value("TELEGRAM_HOME_CHANNEL")
-    if not chat:
-        raise RuntimeError("no Telegram home channel")
-    return chat
-
-
 def send_with_buttons(text: str, rows: list[list[dict]]) -> None:
     """Through Walter's own Telegram door (lot E6, 2026-11-10: `walter-telegram send`, no longer Hermes' bot): it
     chunks at Telegram's limit, buttons on the last message; their clicks come back as `walter-router button`."""
@@ -435,11 +394,11 @@ def notify(conn, dry_run: bool = False) -> dict:
     for g in groups.values():   # one Telegram message (and its buttons) per piece of news
         try:
             send_with_buttons(render_each(g, conn)[0], keyboard(conn, g))
-        except Exception as exc:  # noqa: BLE001 — text-only fallback (typed answers still work)
-            out = subprocess.run([str(HERMES), "send", "-t", "telegram", render_each(g, conn, typed=True)[0]],
-                                 capture_output=True, text=True, timeout=120)
-            if out.returncode != 0:
-                errors.append(f"buttons: {exc}; text: {(out.stderr or out.stdout)[-200:]}")
+        except Exception as exc:  # noqa: BLE001 — the same door, text only (typed answers still work)
+            try:
+                send_with_buttons(render_each(g, conn, typed=True)[0], [])
+            except Exception as again:  # noqa: BLE001
+                errors.append(f"buttons: {exc}; text: {again}")
     if errors and len(errors) == len(groups):
         return {"sent": 0, "error": "; ".join(errors)}
     ids = [a["alert_id"] for a in alerts]

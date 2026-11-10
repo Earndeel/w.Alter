@@ -330,6 +330,8 @@ def adopt_orchestrator(conn, model_id: str) -> dict:
     import shutil
     from datetime import datetime, timezone
     from walter_router.serve import execution
+    if not instance.hermes_active():   # the engine's orchestrator is a Router poste: walter-llm follows the adoption
+        return {"orchestrator": model_id, "applied": "walter-llm (Hermes retired)"}
     route = next((r for r in execution.routes(conn, model_id)
                   if r.get("probe_ok") is not False and r.get("hermes_provider")), None)
     if not route:
@@ -349,7 +351,7 @@ def postes(conn) -> list[str]:
     from walter_router.analysis import knowledge
     from walter_router.analysis import postes as postes_mod
     cfg = knowledge.load().get("postes", {}).get("orchestrator")
-    if not cfg:
+    if not cfg or not instance.hermes_active():   # the orchestrator poste = the model Hermes runs: none when retired
         return []
     ranking = postes_mod.rank(conn, "orchestrator", 20)
     cur = postes_mod.current_orchestrator()

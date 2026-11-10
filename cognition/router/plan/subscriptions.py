@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -27,7 +26,6 @@ from walter_router import instance
 
 CONFIG = instance.config_path("subscriptions.json")
 HERMES_HOME = instance.hermes_home()
-HERMES_PY = HERMES_HOME / "hermes-agent" / "venv" / "bin" / "python"
 CLAUDE_PROJECTS = Path(os.environ.get("CLAUDE_PROJECTS") or Path.home() / ".claude" / "projects")
 CODEX_SESSIONS = Path(os.environ.get("CODEX_SESSIONS") or Path.home() / ".codex" / "sessions")
 WEEK = timedelta(days=7)
@@ -211,19 +209,10 @@ def priced(acc: dict, prices: dict) -> dict:
 # --- meters ---------------------------------------------------------------------------------------------------------
 
 def read_codex() -> list[dict]:
-    """Live Codex windows of the owner's ChatGPT account, through Hermes' own usage fetcher (read-only)."""
-    code = ("import json; from agent.account_usage import fetch_account_usage; s = fetch_account_usage('openai-codex'); "
-            "print(json.dumps(None if s is None else {'plan': s.plan, 'windows': [{'label': w.label, "
-            "'used_percent': w.used_percent, 'reset_at': w.reset_at.isoformat() if w.reset_at else None} "
-            "for w in s.windows]}))")
-    out = subprocess.run([str(HERMES_PY), "-c", code], cwd=str(HERMES_HOME / "hermes-agent"), capture_output=True,
-                         text=True, timeout=60, env={**os.environ, "HERMES_HOME": str(HERMES_HOME)})
-    data = json.loads(out.stdout.strip().splitlines()[-1]) if out.returncode == 0 and out.stdout.strip() else None
-    if not data or not data.get("windows"):
-        raise ValueError(f"codex usage unavailable (exit {out.returncode})")
-    return [{"window": {"Session": "session", "Weekly": "weekly"}.get(w["label"], w["label"].lower()),
-             "used_percent": float(w["used_percent"]), "resets_at": w["reset_at"], "detail": {"plan": data.get("plan")}}
-            for w in data["windows"]]
+    """Live Codex windows of the owner's ChatGPT account, read with W.Alter's own Codex session (read-only;
+    2026-11-10: no longer through Hermes' usage fetcher)."""
+    from walter_router.plan import codex_account
+    return codex_account.usage()
 
 
 def units(row: dict, weights: dict) -> float:

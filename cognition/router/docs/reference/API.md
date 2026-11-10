@@ -112,6 +112,9 @@ walter-router brief
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   --json : versioned stable note for walter-context and harnesses ; défaut=false
   --write : write it to the instance's state/router/brief.md and re-render the agent profiles (walter-soul) when it changed ; défaut=false
+walter-router button
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
+  data :  ; défaut=—
 walter-router classify
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   request :  ; défaut=—
@@ -258,4 +261,6 @@ walter-router verdict
 walter-router web
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   --message : instead of a JSON spec: just this message, default service, default model ; défaut=—
+walter-router web-commands
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
 ```

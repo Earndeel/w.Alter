@@ -79,6 +79,6 @@ def notify_failure() -> dict:
     if last != ["failed", "failed"]:
         return {"sent": False, "reason": "single failure: health only"}
     text = f"⚠️ Walter Router : deux cycles de suite ont échoué — {why}. Les derniers choix restent utilisés."
-    out = subprocess.run([str(alerts.HERMES), "send", "-t", "telegram", text], capture_output=True, text=True,
-                         timeout=120)
+    out = subprocess.run(["walter-telegram", "send", "--plain", "-"], input=text, capture_output=True, text=True,
+                         timeout=120)                      # Walter's own Telegram door (2026-11-10)
     return {"sent": out.returncode == 0, "text": text}

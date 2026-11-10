@@ -51,6 +51,12 @@ def host() -> dict:
     return json.loads(config_path("host.json").read_text())
 
 
+def hermes_active() -> bool:
+    """Whether the instance still runs Hermes as a runtime the Router configures (host.json `hermes`; default active).
+    Retired: nothing is applied to Hermes any more (sync-hermes, orchestrator) — walter-llm reads the Router itself."""
+    return str(host().get("hermes", "active")) != "retired"
+
+
 def _expand(value: str) -> Path:
     if value == "@instance" or value.startswith("@instance/"):
         root = _walter("path")

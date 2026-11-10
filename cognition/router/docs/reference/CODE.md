@@ -253,10 +253,7 @@ Telegram side of the alerts: one message per piece of news with its buttons (202
 - `keyboard(conn, alerts: list[dict])` — 
 - `_name(conn, model_id: str | None)` — 
 - `_button_text(conn, a: dict, label: str, code: str)` — '✅ Passer à Grok Imagine Video 1.5' / '✖️ Garder MiniMax H3' (names, not numbers: several news per message).
-- `_bot_token()` — Walter's Telegram bot (grant `telegram-bot` of walter-secrets), read once per process, never logged.
-- `telegram(method: str, payload: dict)` — Bot API call with Walter's own bot (the one the Hermes gateway also serves).
-- `home_chat()` — The owner's Telegram chat = the gateway's home channel (top-level TELEGRAM_HOME_CHANNEL in config.yaml).
-- `send_with_buttons(text: str, rows: list[list[dict]])` — 
+- `send_with_buttons(text: str, rows: list[list[dict]])` — Through Walter's own Telegram door (lot E6, 2026-11-10: `walter-telegram send`, no longer Hermes' bot): it
 - `_assign_refs(conn, alerts: list[dict])` — Short numbers the owner can answer with (1, 2, 3…), unique among alerts still awaiting their answer.
 - `notify(conn, dry_run: bool=False)` — 
 
@@ -408,6 +405,7 @@ What the Router needs from the active Walter instance, asked through its public 
 - `owner()` — How messages, notes and prompts name the person this instance serves (its declared address form).
 - `config_path(name: str)` — An instance's own Router file (config/router/<name>) when it has one, else the shipped default.
 - `host()` — Host bindings of the instance (config host.json): runtime profiles, cron jobs, publishing helpers.
+- `hermes_active()` — Whether the instance still runs Hermes as a runtime the Router configures (host.json `hermes`; default active).
 - `_expand(value: str)` — 
 - `host_path(key: str)` — A path binding of host.json (absolute, ~/ or @instance/); None when the instance has none.
 - `own_file(name: str)` — Where the instance keeps its own copy of a Router file it writes (config/router/<name>).
@@ -507,10 +505,11 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_priced(route: dict, telemetry: dict, body: dict)` — A paid call the provider reports no cost for (Venice, Kie…) gets its cost at the router's price for this
 - `test_gate(route: dict, body: dict)` — None when this paid call of a test fits the budget, else the refusal (and one Telegram notice per window).
 - `_charge(route: dict, entry: dict, telemetry: dict, body: dict)` — Record the paid spend of a test call (provider cost, else estimated from its usage or size).
-- `_telegram(text: str)` — One message to the owner through Hermes' gateway (best effort).
+- `_telegram(text: str)` — One message to the owner through Walter's Telegram door (`walter-telegram send`, lot E6; best effort).
 - `approve_tests(eur: float, note: str='')` — The owner's approval of EUR more paid spend for tests, valid for the window.
 - `_router(*args: str)` — 
-- `_refresh(task: str)` — task = a router task, or task/LEVEL for one of the instance's text tiers ("general/L2").
+- `exact_task(requested: dict)` — `exact:<model_id>[@<provider>]` for a run whose plan names a model, else None (malformed = None too).
+- `_refresh(task: str)` — task = a router task, task/LEVEL for one of the instance's text tiers ("general/L2"), or exact:<model>[@<provider>]
 - `decision(task: str)` — The router's routes for a task. A stale entry is served at once and refreshed in the background (a phone call
 - `warm()` — Fill the route cache at start-up for every chat task (background).
 - `chat_tasks()` — 
@@ -565,6 +564,18 @@ Folders of the Walter Router module (software side; instance data comes from wal
 
 Plan: the owner's subscriptions, a part of Walter Router on its own (owner, 2026-10-22).
 
+
+## plan/codex_account.py
+
+The owner's ChatGPT/Codex account read with W.Alter's OWN Codex session (2026-11-10: no longer through Hermes).
+
+- `_token()` — 
+- `headers(token: str)` — Bearer + the workspace headers the backend derives from the OAuth JWT (account id, data residency).
+- `_get(path: str, timeout: int=30)` — 
+- `ranked(entries: list)` — Visible slugs by (priority, slug): `visibility: hide` entries are not offered to the account.
+- `catalog()` — Model slugs the account may run (first client version that answers a non-empty list).
+- `windows(payload: dict)` — Quota windows of a /wham/usage answer, named by their published duration (position only as fallback).
+- `usage()` — 
 
 ## plan/declared.py
 
@@ -623,7 +634,7 @@ The owner's subscriptions — information only, no routing effect (2026-10-14).
 - `usage(sub: dict, since: datetime | None)` — 
 - `list_prices(conn)` — $ per million tokens at list API rates (OpenRouter's first-party pricing) per model.
 - `priced(acc: dict, prices: dict)` — Totals of a usage dict + its API value; models without a list price are counted but not valued.
-- `read_codex()` — Live Codex windows of the owner's ChatGPT account, through Hermes' own usage fetcher (read-only).
+- `read_codex()` — Live Codex windows of the owner's ChatGPT account, read with W.Alter's own Codex session (read-only;
 - `units(row: dict, weights: dict)` — Meter units of a token row: what moves the Claude meter, cache reads ~free.
 - `claude_week_units(sub: dict, now: datetime | None=None)` — 
 - `estimate_claude(sub: dict)` — 
@@ -850,9 +861,9 @@ Read the subscription catalogue/quota through Walter Secrets' declared grant int
 
 ## research/prices/codex.py
 
-Models of the owner's ChatGPT/Codex subscription (read through Hermes).
+Models of the owner's ChatGPT/Codex subscription, read with W.Alter's own Codex session (2026-11-10: no longer
 
-- `source_codex()` — Live Codex catalogue of the owner's ChatGPT account, read through Hermes (read-only; token never printed).
+- `source_codex()` — Live Codex catalogue of the owner's ChatGPT account (read-only; token never printed).
 
 ## research/prices/declared.py
 
@@ -962,6 +973,17 @@ What the router (and the orchestrator) calls: pick the model for a task, the own
 - `_level_answer(conn, t: dict, level: str | None=None)` — A background text poste (compression, extraction…) follows one of the owner's text tiers — their declared pin for
 - `set_preference(conn, task: str, objective: str | None=None, pin: str | None=None, provider: str | None=None, note: str | None=None, role: str='default', watch: str | None=None)` — Record the owner's declaration. Pinning records every current challenger as 'baseline' (no alert for those).
 
+## serve/engine.py
+
+walter_run text jobs executed by Walter Engine (lot E5, 2026-11-10) — no second agent loop in the Router.
+
+- `binding()` — 
+- `enabled(d: dict)` — Text jobs go to the engine when the instance says so — a model NAMED by the owner too: the Router validated it
+- `_token(b: dict)` — 
+- `_post(b: dict, body: dict, timeout: float)` — 
+- `engine_task(d: dict, spec: dict)` — 
+- `run_text(d: dict, spec: dict, *, memory, persist, caller: str='walter_run')` — One delegation to the engine; the result has the shape of the former text path (ok, output, tools…).
+
 ## serve/execution.py
 
 Ordered provider routes and execution metadata for Walter consumers.
@@ -1013,7 +1035,7 @@ Direct media generation (image, video, music, voice) on the model the router pic
 - `_http(method: str, url: str, headers: dict, body: dict | None=None, timeout: int=60)` — 
 - `_nearest(value: Any, allowed: list)` — Closest allowed value (case-insensitive for strings, numeric distance for numbers/durations).
 - `coerce(path: str, params: dict)` — Keep only the fields the Kie model accepts, mapped to its allowed values (duration, resolution, ratio).
-- `craft_prompt(conn, request: str, style: str | None)` — Rewrite the owner's request in the model's prompt style with the economic text tier (L1, via Hermes).
+- `craft_prompt(conn, request: str, style: str | None)` — Rewrite the owner's request in the model's prompt style with the economic text tier (L1, walter-llm direct
 - `openrouter_id(conn, model_id: str)` — 
 - `choose_provider(conn, model_id: str, interface: str, resolution: str | None, has_kie_path: bool, or_id: str | None)` — The owner's order for paid media: Kie if it has the model and is not > 25 % dearer than OpenRouter at this
 - `fallback_models(conn, task: str, role: str | None, model_id: str, mode: str | None=None, n: int=2, declared_only: bool=True)` — Other models to try when every provider of `model_id` failed. Since 2026-10-22 (owner: « le secours, c'est pas
@@ -1032,9 +1054,12 @@ A model named by the owner (« avec Opus 5.5 chez Kie ») runs as named, or the 
 
 ## serve/oneshot.py
 
-One-shot answers from the owner's economic text tier (L1, read from the router — GPT-6 Luna max via Codex today),
+One-shot answers for the Router's own needs (lot E6, 2026-11-10: no longer through Hermes).
 
-- `ask_l1(conn, prompt: str, source: str, timeout: int=240, tools: str='memory', max_turns: int=1)` — One-shot answer from the economic tier (L1) through Hermes, as craft_prompt does (tools: Hermes toolsets).
+- `_llm_token()` — 
+- `complete(prompt: str, source: str, *, task: str=ECONOMIC, timeout: int=240, max_tokens: int=2000)` — One completion from walter-llm (task = a Router poste; `general/L1` = economic tier). None on any failure.
+- `delegate(prompt: str, source: str, *, timeout: int=900, task: str='general')` — One task for Walter Engine (Engine API `delegate`): tools, policy and run are the engine's.
+- `ask_l1(conn, prompt: str, source: str, timeout: int=240, tools: str='memory', max_turns: int=1)` — Former Hermes one-shot, same signature: no tool use → economical direct path; tools (web…) → the engine.
 
 ## serve/routes.py
 
@@ -1077,6 +1102,7 @@ Conversational web services as a Router tool (walter_web): a message, optional f
 - `out_dir()` — Same place as the router's generated media (the agents already look there).
 - `converse(spec: dict)` — 
 - `_enabled()` — Services the gateway has enabled (its own rule table, the owner's switch).
+- `commands()` — Chat command → web service, from the gateway's rule table (`/gpt` → chatgpt…), for the Telegram door.
 - `route_for(task: str | None, level: str | None)` — The web service the owner's rule gives this classified intent, or None.
 
 ## store/__init__.py

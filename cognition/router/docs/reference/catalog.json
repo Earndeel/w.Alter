@@ -1279,6 +1279,31 @@
             "required": false
           }
         ],
+        "button": [
+          {
+            "choices": null,
+            "default": "==SUPPRESS==",
+            "dest": "help",
+            "flags": [
+              "-h",
+              "--help"
+            ],
+            "help": "show this help message and exit",
+            "nargs": 0,
+            "required": false
+          },
+          {
+            "choices": null,
+            "default": null,
+            "dest": "data",
+            "flags": [
+              "data"
+            ],
+            "help": "",
+            "nargs": null,
+            "required": true
+          }
+        ],
         "classify": [
           {
             "choices": null,
@@ -2666,6 +2691,20 @@
             ],
             "help": "instead of a JSON spec: just this message, default service, default model",
             "nargs": null,
+            "required": false
+          }
+        ],
+        "web-commands": [
+          {
+            "choices": null,
+            "default": "==SUPPRESS==",
+            "dest": "help",
+            "flags": [
+              "-h",
+              "--help"
+            ],
+            "help": "show this help message and exit",
+            "nargs": 0,
             "required": false
           }
         ]
@@ -6463,22 +6502,7 @@
             "signature": "conn, a: dict, label: str, code: str"
           },
           {
-            "description": "Walter's Telegram bot (grant `telegram-bot` of walter-secrets), read once per process, never logged.",
-            "name": "_bot_token",
-            "signature": ""
-          },
-          {
-            "description": "Bot API call with Walter's own bot (the one the Hermes gateway also serves).",
-            "name": "telegram",
-            "signature": "method: str, payload: dict"
-          },
-          {
-            "description": "The owner's Telegram chat = the gateway's home channel (top-level TELEGRAM_HOME_CHANNEL in config.yaml).",
-            "name": "home_chat",
-            "signature": ""
-          },
-          {
-            "description": "",
+            "description": "Through Walter's own Telegram door (lot E6, 2026-11-10: `walter-telegram send`, no longer Hermes' bot): it",
             "name": "send_with_buttons",
             "signature": "text: str, rows: list[list[dict]]"
           },
@@ -7009,6 +7033,11 @@
             "signature": ""
           },
           {
+            "description": "Whether the instance still runs Hermes as a runtime the Router configures (host.json `hermes`; default active).",
+            "name": "hermes_active",
+            "signature": ""
+          },
+          {
             "description": "",
             "name": "_expand",
             "signature": "value: str"
@@ -7370,7 +7399,7 @@
             "signature": "route: dict, entry: dict, telemetry: dict, body: dict"
           },
           {
-            "description": "One message to the owner through Hermes' gateway (best effort).",
+            "description": "One message to the owner through Walter's Telegram door (`walter-telegram send`, lot E6; best effort).",
             "name": "_telegram",
             "signature": "text: str"
           },
@@ -7385,7 +7414,12 @@
             "signature": "*args: str"
           },
           {
-            "description": "task = a router task, or task/LEVEL for one of the instance's text tiers (\"general/L2\").",
+            "description": "`exact:<model_id>[@<provider>]` for a run whose plan names a model, else None (malformed = None too).",
+            "name": "exact_task",
+            "signature": "requested: dict"
+          },
+          {
+            "description": "task = a router task, task/LEVEL for one of the instance's text tiers (\"general/L2\"), or exact:<model>[@<provider>]",
             "name": "_refresh",
             "signature": "task: str"
           },
@@ -7622,6 +7656,47 @@
         "functions": []
       },
       {
+        "description": "The owner's ChatGPT/Codex account read with W.Alter's OWN Codex session (2026-11-10: no longer through Hermes).",
+        "file": "plan/codex_account.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_token",
+            "signature": ""
+          },
+          {
+            "description": "Bearer + the workspace headers the backend derives from the OAuth JWT (account id, data residency).",
+            "name": "headers",
+            "signature": "token: str"
+          },
+          {
+            "description": "",
+            "name": "_get",
+            "signature": "path: str, timeout: int=30"
+          },
+          {
+            "description": "Visible slugs by (priority, slug): `visibility: hide` entries are not offered to the account.",
+            "name": "ranked",
+            "signature": "entries: list"
+          },
+          {
+            "description": "Model slugs the account may run (first client version that answers a non-empty list).",
+            "name": "catalog",
+            "signature": ""
+          },
+          {
+            "description": "Quota windows of a /wham/usage answer, named by their published duration (position only as fallback).",
+            "name": "windows",
+            "signature": "payload: dict"
+          },
+          {
+            "description": "",
+            "name": "usage",
+            "signature": ""
+          }
+        ]
+      },
+      {
         "description": "The owner's plans (subscriptions), editable from anywhere (owner, 2026-10-22: « les plans peuvent être ajoutés dans",
         "file": "plan/declared.py",
         "functions": [
@@ -7815,7 +7890,7 @@
             "signature": "acc: dict, prices: dict"
           },
           {
-            "description": "Live Codex windows of the owner's ChatGPT account, through Hermes' own usage fetcher (read-only).",
+            "description": "Live Codex windows of the owner's ChatGPT account, read with W.Alter's own Codex session (read-only;",
             "name": "read_codex",
             "signature": ""
           },
@@ -8392,11 +8467,11 @@
         ]
       },
       {
-        "description": "Models of the owner's ChatGPT/Codex subscription (read through Hermes).",
+        "description": "Models of the owner's ChatGPT/Codex subscription, read with W.Alter's own Codex session (2026-11-10: no longer",
         "file": "research/prices/codex.py",
         "functions": [
           {
-            "description": "Live Codex catalogue of the owner's ChatGPT account, read through Hermes (read-only; token never printed).",
+            "description": "Live Codex catalogue of the owner's ChatGPT account (read-only; token never printed).",
             "name": "source_codex",
             "signature": ""
           }
@@ -8695,6 +8770,42 @@
         ]
       },
       {
+        "description": "walter_run text jobs executed by Walter Engine (lot E5, 2026-11-10) — no second agent loop in the Router.",
+        "file": "serve/engine.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "binding",
+            "signature": ""
+          },
+          {
+            "description": "Text jobs go to the engine when the instance says so — a model NAMED by the owner too: the Router validated it",
+            "name": "enabled",
+            "signature": "d: dict"
+          },
+          {
+            "description": "",
+            "name": "_token",
+            "signature": "b: dict"
+          },
+          {
+            "description": "",
+            "name": "_post",
+            "signature": "b: dict, body: dict, timeout: float"
+          },
+          {
+            "description": "",
+            "name": "engine_task",
+            "signature": "d: dict, spec: dict"
+          },
+          {
+            "description": "One delegation to the engine; the result has the shape of the former text path (ok, output, tools…).",
+            "name": "run_text",
+            "signature": "d: dict, spec: dict, *, memory, persist, caller: str='walter_run'"
+          }
+        ]
+      },
+      {
         "description": "Ordered provider routes and execution metadata for Walter consumers.",
         "file": "serve/execution.py",
         "functions": [
@@ -8877,7 +8988,7 @@
             "signature": "path: str, params: dict"
           },
           {
-            "description": "Rewrite the owner's request in the model's prompt style with the economic text tier (L1, via Hermes).",
+            "description": "Rewrite the owner's request in the model's prompt style with the economic text tier (L1, walter-llm direct",
             "name": "craft_prompt",
             "signature": "conn, request: str, style: str | None"
           },
@@ -8940,11 +9051,26 @@
         ]
       },
       {
-        "description": "One-shot answers from the owner's economic text tier (L1, read from the router — GPT-6 Luna max via Codex today),",
+        "description": "One-shot answers for the Router's own needs (lot E6, 2026-11-10: no longer through Hermes).",
         "file": "serve/oneshot.py",
         "functions": [
           {
-            "description": "One-shot answer from the economic tier (L1) through Hermes, as craft_prompt does (tools: Hermes toolsets).",
+            "description": "",
+            "name": "_llm_token",
+            "signature": ""
+          },
+          {
+            "description": "One completion from walter-llm (task = a Router poste; `general/L1` = economic tier). None on any failure.",
+            "name": "complete",
+            "signature": "prompt: str, source: str, *, task: str=ECONOMIC, timeout: int=240, max_tokens: int=2000"
+          },
+          {
+            "description": "One task for Walter Engine (Engine API `delegate`): tools, policy and run are the engine's.",
+            "name": "delegate",
+            "signature": "prompt: str, source: str, *, timeout: int=900, task: str='general'"
+          },
+          {
+            "description": "Former Hermes one-shot, same signature: no tool use → economical direct path; tools (web…) → the engine.",
             "name": "ask_l1",
             "signature": "conn, prompt: str, source: str, timeout: int=240, tools: str='memory', max_turns: int=1"
           }
@@ -9080,6 +9206,11 @@
           {
             "description": "Services the gateway has enabled (its own rule table, the owner's switch).",
             "name": "_enabled",
+            "signature": ""
+          },
+          {
+            "description": "Chat command → web service, from the gateway's rule table (`/gpt` → chatgpt…), for the Telegram door.",
+            "name": "commands",
             "signature": ""
           },
           {
@@ -14382,12 +14513,6 @@
       },
       {
         "comment": "",
-        "file": "analysis/telegram.py",
-        "name": "TELEGRAM_API",
-        "value": "https://api.telegram.org/bot{token}/{method}"
-      },
-      {
-        "comment": "",
         "file": "analysis/tiers.py",
         "name": "QUALITY_FLOOR",
         "value": 35.0
@@ -15597,6 +15722,12 @@
         ]
       },
       {
+        "comment": "a model named by the owner, validated by Walter Router (lot E5)",
+        "file": "llm/gateway.py",
+        "name": "EXACT",
+        "value": "exact:"
+      },
+      {
         "comment": "",
         "file": "llm/gateway.py",
         "name": "ANTHROPIC_CACHE_POINTS",
@@ -15616,6 +15747,51 @@
         "file": "llm/gateway.py",
         "name": "QUOTA_SWITCH",
         "value": 90.0
+      },
+      {
+        "comment": "",
+        "file": "plan/codex_account.py",
+        "name": "BASE",
+        "value": "https://chatgpt.com/backend-api"
+      },
+      {
+        "comment": "",
+        "file": "plan/codex_account.py",
+        "name": "GRANT",
+        "value": "codex-subscription"
+      },
+      {
+        "comment": "",
+        "file": "plan/codex_account.py",
+        "name": "CLIENT_VERSIONS",
+        "value": [
+          "99.0.0",
+          "0.0.0"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "plan/codex_account.py",
+        "name": "WINDOW_BY_SECONDS",
+        "value": {
+          "18000": "session",
+          "604800": "weekly"
+        }
+      },
+      {
+        "comment": "",
+        "file": "plan/codex_account.py",
+        "name": "WINDOW_BY_POSITION",
+        "value": [
+          [
+            "primary_window",
+            "session"
+          ],
+          [
+            "secondary_window",
+            "weekly"
+          ]
+        ]
       },
       {
         "comment": "",
@@ -16508,6 +16684,26 @@
         }
       },
       {
+        "comment": "engine models = walter-llm postes",
+        "file": "serve/engine.py",
+        "name": "ENGINE_TASKS",
+        "value": [
+          "coding",
+          "general",
+          "document",
+          "summarization"
+        ]
+      },
+      {
+        "comment": "router task → engine poste when names differ",
+        "file": "serve/engine.py",
+        "name": "TASK_OF",
+        "value": {
+          "code": "coding",
+          "front": "coding"
+        }
+      },
+      {
         "comment": "",
         "file": "serve/execution.py",
         "name": "HERMES_PROVIDERS",
@@ -16782,6 +16978,18 @@
       },
       {
         "comment": "",
+        "file": "serve/oneshot.py",
+        "name": "TOKEN_FILE",
+        "value": "@instance/bootstrap/llm/walter-router.env"
+      },
+      {
+        "comment": "",
+        "file": "serve/oneshot.py",
+        "name": "ECONOMIC",
+        "value": "general/L1"
+      },
+      {
+        "comment": "",
         "file": "serve/run.py",
         "name": "ALLOWED_TOOLSETS",
         "value": [
@@ -16890,13 +17098,6 @@
     ],
     "environment": [
       {
-        "default_expression": "aucun",
-        "description": "Destination d'instance des avis/propositions ; ne pas exporter sa valeur.",
-        "file": "analysis/telegram.py",
-        "name": "TELEGRAM_HOME_CHANNEL",
-        "operation": "env_value"
-      },
-      {
         "default_expression": "'walter-router'",
         "description": "Commande publique appelée par l'adaptateur de tools.",
         "file": "hermes-plugins/walter-router/__init__.py",
@@ -16990,6 +17191,27 @@
       {
         "default_expression": "aucun",
         "description": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
+        "file": "serve/engine.py",
+        "name": "WALTER_RUN_ID",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "Session walter_logs de l'appelant ; parent de la session du sous-agent walter_run.",
+        "file": "serve/engine.py",
+        "name": "WALTER_SESSION_ID",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "Profondeur de délégation de l'appelant (0 = le propriétaire) transmise au moteur par une délégation Engine API ; posée par le moteur pour ses sous-tâches.",
+        "file": "serve/engine.py",
+        "name": "WALTER_DELEGATION_DEPTH",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
         "file": "serve/execution.py",
         "name": "WALTER_RUN_ID",
         "operation": "get"
@@ -17072,6 +17294,27 @@
         "operation": "env_value"
       },
       {
+        "default_expression": "'http://127.0.0.1:8894'",
+        "description": "URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894).",
+        "file": "serve/oneshot.py",
+        "name": "WALTER_LLM_URL",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché).",
+        "file": "serve/oneshot.py",
+        "name": "WALTER_LLM_TOKEN",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
+        "file": "serve/oneshot.py",
+        "name": "WALTER_RUN_ID",
+        "operation": "get"
+      },
+      {
         "default_expression": "aucun",
         "description": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
         "file": "serve/run.py",
@@ -17113,6 +17356,7 @@
       "KIE_API_KEY",
       "OPENROUTER_API_KEY",
       "TELEGRAM_HOME_CHANNEL",
+      "WALTER_DELEGATION_DEPTH",
       "WALTER_FLARESOLVERR",
       "WALTER_LLM_PORT",
       "WALTER_LLM_TOKEN",
@@ -17171,7 +17415,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "192d7772a83b3f8374dc441b4ad44872535905cdec65d650dba709e5dd25e97a",
+    "analysis/alerts.py": "74c2edf2d03b1967c2eafc045dc45578f09ee6cd6e1283eaaf63b79c359d896c",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -17189,13 +17433,13 @@
     "analysis/refresh.py": "17a00934a816292587e26c292795177ce6e3199ce05b3612fd5a580a5487822a",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
     "analysis/select.py": "e1eebbb5abc3b2bb455e4bbd9e4f96199cd09ce2539e7401455686e9beac5870",
-    "analysis/telegram.py": "1dce6bfbc7de00722d6964559c0d3cb4ba1bc5e8e799c1beb28ff73ce45c9312",
+    "analysis/telegram.py": "08128546ad28d87ed6ec6c1686b841356e5bf1fdba837a2db5a386d59b9bc11a",
     "analysis/tiers.py": "36d9bcdf24aa8f688431dc901e8305cbccfbb33b94f57532f9050518fe2563eb",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
     "bin/walter-router-control": "3373221954bd9c6b4a6092a3be30d9c0a616fa34dbc4b5f034fa68b5b6493932",
     "bin/walter-router-cycle": "e308e52f2992c9bb02599595b11b52a9dab1350d602ffbc31be44691496fec3e",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "1b946cb148668622bec74503fe8967606e1a2649f878fd71feeea0bf4bc5f57a",
+    "cli.py": "237cbcbca016be613cb178653612b4daca0bfc09ff136d0e8d24b44a470306d4",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
@@ -17207,16 +17451,16 @@
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "b8f0e3ee29e57454855286b6b80b182d5bf17c1c59f7dfc216cc9bcef631cd54",
     "contracts/router.json": "0d490f2ff0b433840b6d191c392b46290b1d9aae22c625837fcea52f7c1e66a0",
-    "documentation.py": "4fc5bbd2d0f0849b840f2e969ee9ca01ab61673f269d83ed553d317dbed31ff8",
+    "documentation.py": "7b6db9eb4552b73d611b99b732002fdcef14e6db6d492583f8091d3aff5f511c",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
     "guardian/repair.py": "9b81285d70fe2a6052b1eab9d72166d28ee225e46752afc477432f6ad3d90bf7",
     "guardian/run.py": "3093f8e6b65fca4b8906a57617c02d07fd5db1e67d44339d7575ebee3e343932",
-    "health.py": "ba5e621b77cc19022ef7b0bcc0822abb8b87360cad74dadbdf3389ce3d0f0f3c",
+    "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "hermes-plugins/kie-compat/__init__.py": "aba770c340305899abfca6172a3774b0e56b400328e6f0f3350ab79a688daace",
     "hermes-plugins/walter-router/__init__.py": "b27d39ca479bb27d6639a6bff8779f33cd419e1f9480ca34e85cecd90478c8db",
-    "instance.py": "9de10d051b0cc3ec3d49c7554fa4aff3e72eaf8b25775b5dd439406035a7fa6b",
+    "instance.py": "f7f1bcdb96c31f849178bd1df3f26520a7ed3e2377408b379bb7bda570fb20a9",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
     "interface/library.py": "649216011e2545152c4a2c7387a335fcd5a7c59bf49748283c98de725055a570",
     "interface/page.py": "e52afc7458a85fceb867a2ad52c803eddf735ff403849434e407470d9a4d0fa0",
@@ -17229,14 +17473,15 @@
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "b819d655a4314f3d91482b41ad73b3685983992c187284761edbc871c05ec835",
     "llm/contracts/llm.json": "cc3a2e585a8e3b233e5edf0bcc87918b625b63d069f330cf10932c955fccd5ab",
-    "llm/gateway.py": "0aea9510d918cf22bc17a0d21bbdbb9e43867c67dfa0abebc8c54bd3f3fbf1ad",
+    "llm/gateway.py": "99b432da54eb4ed41d333efd8b51e008499a59b43f234da1542ee0fc7e4e2b7e",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
+    "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
     "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",
     "plan/mail.py": "541e27d036223253091b2349aa5ca4844fd72f478582b465d83abb22cc1da534",
     "plan/news.py": "cb79f91afd5eb20ceb83399d9281c9efa2eaa81997cc5df35c07541311972a22",
     "plan/quota_watch.py": "1af365d976fa20bec06c3c2277de5753255a805ead05f4cdff4310ae4912de2f",
-    "plan/subscriptions.py": "998dae4ce195008cb98e84d27b35665c5cc546285c70614525ab86dbcd627384",
+    "plan/subscriptions.py": "3d1b19bf87b485f44d19ab62400e88a055d61675f9363196482fbeda2c8e1f9c",
     "plan/watch.py": "9721d7f8f85084b42536b9e4c206b4845576fc5bf3325d035ab0a148b8c2dd04",
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",
@@ -17265,7 +17510,7 @@
     "research/prices/__init__.py": "1198eb22372b5ec637affeb36abf7bb4f262f4a44452910ee4ace979bbfe2eda",
     "research/prices/antigravity.py": "b2b484892d4758791d3cda87f5137ecbfca892952f0f3dfd863d671a8ef13bfb",
     "research/prices/claude_pro.py": "4bb165ba806f3ef3219c584c5343f45f397ed3cfb220a3b3f211ed4361ec9463",
-    "research/prices/codex.py": "73542f7a34e12efa89245fe0c1e33e8c4f2bd052fd857e323deaea721a44eaba",
+    "research/prices/codex.py": "8c36d600f8b2c06244ac14937e73f0396f5e3edfcaab1c1f3f5baaa527defbd5",
     "research/prices/declared.py": "37756c77c42d4740aaf33f20532eba9676babb4d263b0f07e52f48070408a0b7",
     "research/prices/kie.py": "c5f72a270421f475faba4a15b1c70e63f07fddc6ccb41ef9210f1ebfb0dba018",
     "research/prices/openrouter.py": "1301d99d11624c50a619146c67ef4a0af7c6a4f0b983f178966b3a4389df3f0b",
@@ -17279,16 +17524,17 @@
     "serve/api.py": "cd6428abc4ff933e6fda69cfd1259e538d5bda2ea88d9b4140f01d1bc002b9e5",
     "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
+    "serve/engine.py": "dad90cf6e8d6542406cefca7a428e06c3b55847d6b03afc92cde242d51c4042f",
     "serve/execution.py": "cd2f898bcdd9120ebd1e3c4a1977cf7ed0aa7593373187c7914638887439f6a5",
-    "serve/hermes_sync.py": "1dc99d9f119e45cc958e5954fac64ba29802505d04ccd2ef096c3aba3db633cc",
+    "serve/hermes_sync.py": "c1df622e2bab7c3d597788b60b82896f2d911c836c2dfabccf7ec276ab511bee",
     "serve/intent.py": "8f8c1adcbc776fce3e38d1aa751bcea89b1a71b00c1918c0b6ab9dd71b2c75cf",
-    "serve/media_exec.py": "8fe8e8d41e1141f6e96f6c6912b1fdac3ebacadde7ceacdf18ad2ef994db63cd",
+    "serve/media_exec.py": "e78cecb90123127b8308ab682632f0a6211c7e8c56a0cc8de1fffdef8a07381b",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
-    "serve/oneshot.py": "d6f582794d9d49314f54cfb13240d6062855dc7df48ca5d2121932e1fd4a02da",
+    "serve/oneshot.py": "95ad121f0e69949c4b7e1b045fabc29d52e0c5d011f392c51455f9f77df2c96a",
     "serve/routes.py": "108b6fafa28d1b29e3de8bc38b88e9778a318a1f3d12b70836d87b5872a72857",
-    "serve/run.py": "35ddfdab1616dde84a252f5ab22471f5abd075b0213dca9ce9a87a256be51ad7",
+    "serve/run.py": "52915fe61176cdd911ad603b35b3bf04e56bf29cc7ba78d38daac80705f99f74",
     "serve/text_agent.py": "1bddd484363dc9f892b9acaf4e523fbeeaf99961d3354c1dd630dc32d39cb8b4",
-    "serve/web.py": "20cf30a3f8dbd21e1f7de2d188b5f01d60f3a9111f3412e0169053a85061ec82",
+    "serve/web.py": "6c3abfdda219864f12930005e14db97cb0988df814ce7b1a2d072def5404b80a",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
     "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",
     "store/migrations/001_models.sql": "dfdcb4be9930086cbdc935eb7cffe07f6705cb1562169c162f74f7b2205dcc37",
