@@ -3,6 +3,7 @@ import ast
 import asyncio
 import hashlib
 import json
+import re
 import math
 import os
 from pathlib import Path
@@ -25,7 +26,7 @@ def gateway(tmp_path, monkeypatch):
     tree=ast.parse(source.read_text())
     names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_session_run','_run_metadata','_record_attempt','exact_call','log','build_app',
            'start_completion','_rate_limited','_charge','_price_usd','_priced','test_budget','test_gate','_ledger','_ledger_add','approve_tests',
-           'planned_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing',
+           'planned_task','exact_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing',
            'route_state','selection_plan','selection_check','log_selection','cost_headers'}
     nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in names]
     agents=tmp_path/'agents.json'
@@ -34,7 +35,7 @@ def gateway(tmp_path, monkeypatch):
         def __init__(self,target,**kw):self.target,self.kw=target,kw
         def start(self):
             if self.target.__name__=='<lambda>':self.target()
-    ns={'json':json,'hashlib':hashlib,'uuid':uuid,'math':math,'datetime':datetime,'timezone':timezone,
+    ns={'re':re,'EXACT':'exact:','_MODEL_ID':re.compile(r'^[A-Za-z0-9._:/-]{1,120}$'),'json':json,'hashlib':hashlib,'uuid':uuid,'math':math,'datetime':datetime,'timezone':timezone,
         'time':time,'Request':Request,'subprocess':subprocess,'AGENTS':agents,'LOG':tmp_path/'log.jsonl',
         'ROUTER':'walter-router','DEFAULT_TASK':'coding','threading':SimpleNamespace(Thread=Thread),
         'warm':lambda:None,'_install_codex_auth':lambda:None,'chat_tasks':lambda:['coding'],
@@ -442,7 +443,7 @@ def test_claude_account_secret_comes_from_the_gateway_setting_never_from_the_rou
 
 def plan_gateway(tmp_path, monkeypatch, requested):
     ns=gateway(tmp_path,monkeypatch);logs=[];asked=[]
-    extra=['planned_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing']
+    extra=['planned_task','exact_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing']
     source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
     tree=ast.parse(source.read_text())
     nodes=[n for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name in extra]
@@ -514,3 +515,13 @@ def test_every_request_leaves_one_selection_line_with_its_plan_reasons_and_passe
     assert line['plan'][0]['account']=='anthropic-pro-2' and line['plan'][0]['quota']==29.0
     assert ns['selection_check']([{'position':0,'provider':'openrouter','state':'paid'},
                                   {'position':1,'provider':'codex','state':'subscription_available'}]) is False
+
+
+def test_a_model_named_for_the_run_is_executed_exactly_and_an_unknown_one_is_refused(tmp_path, monkeypatch):
+    """Lot E5 (2026-11-10): an Engine API delegation names a model the Router validated; walter-llm runs exactly that
+    one (Router `route --model`), whatever the poste asked, and says so when it cannot — never another model."""
+    ns,logs,asked=plan_gateway(tmp_path,monkeypatch,{'model':'claude-opus-5-5','provider':'venice','task':'general'})
+    assert ns['planned_task']('auto',{'model':'claude-opus-5-5','provider':'venice'})==('exact:claude-opus-5-5@venice','model')
+    assert ns['planned_task']('coding',{'model':'claude-opus-5-5'})==('exact:claude-opus-5-5','model')
+    assert ns['planned_task']('auto',{'model':'bad model; rm'})[0]!='exact:bad model; rm'
+    assert ns['exact_task']({'model':'m','provider':'a b'}) is None

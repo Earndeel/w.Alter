@@ -23,6 +23,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
+import re
 import math
 import os
 import secrets
@@ -240,9 +241,31 @@ def _router(*args: str) -> dict | list:
 _refreshing: set[str] = set()
 
 
+EXACT = "exact:"                          # a model named by the owner, validated by Walter Router (lot E5)
+_MODEL_ID = re.compile(r"^[A-Za-z0-9._:/-]{1,120}$")
+
+
+def exact_task(requested: dict) -> str | None:
+    """`exact:<model_id>[@<provider>]` for a run whose plan names a model, else None (malformed = None too)."""
+    model, provider = requested.get("model"), requested.get("provider")
+    if not isinstance(model, str) or not _MODEL_ID.match(model):
+        return None
+    if provider is not None and (not isinstance(provider, str) or not _MODEL_ID.match(provider)):
+        return None
+    return f"{EXACT}{model}" + (f"@{provider}" if provider else "")
+
+
 def _refresh(task: str) -> dict:
-    """task = a router task, or task/LEVEL for one of the instance's text tiers ("general/L2")."""
+    """task = a router task, task/LEVEL for one of the instance's text tiers ("general/L2"), or exact:<model>[@<provider>]
+    (the Router's own validation of a named model: exactly that model on its providers, never another one)."""
     try:
+        if task.startswith(EXACT):
+            model, _, provider = task[len(EXACT):].partition("@")
+            d = _router("route", "-", "--model", model, *(["--provider", provider] if provider else []))
+            if not isinstance(d, dict) or d.get("mode") == "none" or d.get("error") or not d.get("execution"):
+                raise RuntimeError((d or {}).get("error") or f"no route for model {model}")
+            _routes[task] = (time.time(), d)
+            return d
         name, _, level = task.partition("/")
         d = _router("pick", name, *(["--level", level] if level else []))
         _routes[task] = (time.time(), d)
@@ -683,6 +706,9 @@ def planned_task(asked: str, requested: dict | None) -> tuple[str, str | None]:
     preflight asked for this owner message (written on the run); an explicitly chosen task keeps its task and gets
     the plan's tier only. Without a plan nothing changes (auto = DEFAULT_TASK). One plan per owner message, so every
     model call of the turn gets the same answer (and the same model)."""
+    exact = exact_task(requested) if isinstance(requested, dict) else None
+    if exact:   # the owner named a model for this run (Engine API delegation, lot E5): exactly that one
+        return exact, "model"
     task = DEFAULT_TASK if asked in ("auto", "walter") and not requested else asked
     if not requested:
         return task, None
@@ -1007,7 +1033,9 @@ def build_app():
             return JSONResponse(_rule_completion(ruled), headers={"X-Walter-Route": "walter-context/rule"})
         try:
             d = decision(task)
-        except Exception:
+        except Exception as exc:
+            if task.startswith(EXACT):   # said, never replaced by another model
+                raise HTTPException(400, f"named model unavailable: {str(exc)[:200]}") from None
             raise HTTPException(400, "no route for requested task") from None
         errors, passed = [], []
         plan = d.get("execution") or []

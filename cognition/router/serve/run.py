@@ -2,12 +2,13 @@
 
     spec ──▶ decision: the model named by the owner (named.py: exactly that, or why not) / a hard constraint / the
              request classified by the decision model (routes.route)
-         ├─ text  ──▶ Walter Engine (engine.py, Engine API `delegate`) when the instance binds walter_run to it;
-         │           otherwise (legacy, or a model named by the owner) a native tool loop on the chosen model,
+         ├─ text  ──▶ Walter Engine (engine.py, Engine API `delegate`) when the instance binds walter_run to it — a model
+         │           named by the owner included (executed exactly, or an explicit error); otherwise (binding `legacy`)
+         │           a native tool loop on the chosen model,
          │           through the model gateway's exact-route transport, providers in order, every attempt in models.exec_log
          └─ media ──▶ media_exec.generate (image, video, music, voice): costs money, on request only
 
-Text execution is native to the router. Only providers of the selected model are tried; every switch is reported.
+With the `legacy` binding, text execution is native to the router. Only providers of the selected model are tried; every switch is reported.
 """
 from __future__ import annotations
 

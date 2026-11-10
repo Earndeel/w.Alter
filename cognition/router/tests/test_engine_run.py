@@ -82,8 +82,14 @@ def test_router_task_names_map_to_engine_postes_and_unknown_ones_are_auto(api):
     assert engine.engine_task({"task": "research"}, {}) == "auto"
 
 
-def test_a_named_model_stays_on_the_exact_model_path(api, monkeypatch):
-    assert not engine.enabled(decision(source="named"))
+def test_a_named_model_is_executed_by_the_engine_exactly(api, monkeypatch):
+    assert engine.enabled(decision(source="named"))
+    out = run._dispatch(Conn(), decision(source="named", model_id="claude-opus-5-5"), {"goal": "x", "provider": "venice"})
+    assert out["ok"] and api.seen[-1]["body"]["delegation"]["model"] == {"id": "claude-opus-5-5", "provider": "venice"}
+    run._dispatch(Conn(), decision(source="named", model_id="claude-opus-5-5"), {"goal": "x"})
+    assert api.seen[-1]["body"]["delegation"]["model"] == {"id": "claude-opus-5-5"}
+    run._dispatch(Conn(), decision(), {"goal": "x"})
+    assert "model" not in api.seen[-1]["body"]["delegation"]
     assert engine.enabled(decision())
     monkeypatch.setenv("WALTER_RUN_ENGINE", "legacy")
     assert not engine.enabled(decision())

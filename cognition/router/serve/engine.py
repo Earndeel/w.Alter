@@ -9,7 +9,8 @@ caller's run. The binding is the instance's (`host.json` → `engine_api`):
     "engine_api": {"url": "http://127.0.0.1:8895", "token_file": "@instance/bootstrap/engine/api.token",
                    "walter_run": "engine" | "legacy"}
 
-`legacy` (default while E2/E3 are not active on the live engine) keeps the former text loop (text_agent).
+A model named by the owner goes to the engine too (validated here by named.py, executed exactly by walter-llm through
+the run's plan); a model the engine cannot run is an explicit error, never the former loop. `legacy` (default while E2/E3 are not active on the live engine) keeps the former text loop (text_agent).
 WALTER_RUN_ENGINE / WALTER_ENGINE_API_URL / WALTER_ENGINE_API_TOKEN_FILE override it for a test engine.
 """
 from __future__ import annotations
@@ -39,9 +40,9 @@ def binding() -> dict:
 
 
 def enabled(d: dict) -> bool:
-    """Text jobs go to the engine when the instance says so. A model NAMED by the owner stays on the Router's
-    exact-model path: the engine's models are postes, not model ids (known gap, DECISIONS 2026-11-10 E5)."""
-    return binding().get("walter_run") == "engine" and d.get("source") != "named"
+    """Text jobs go to the engine when the instance says so — a model NAMED by the owner too: the Router validated it
+    (named.py), the engine runs it exactly (the run's plan names it, walter-llm executes only that model)."""
+    return binding().get("walter_run") == "engine"
 
 
 def _token(b: dict) -> str:
@@ -83,7 +84,10 @@ def run_text(d: dict, spec: dict, *, memory, persist, caller: str = "walter_run"
                                                                 "output_schema", "persist")}
                               | {"executor": "walter-engine", "engine_task": task,
                                  "requested_task": d.get("requested_task")}})
+    named = {"id": d["model_id"], **({"provider": spec["provider"]} if spec.get("provider") else {})} \
+        if d.get("source") == "named" and d.get("model_id") else None
     delegation = {"version": 1, "goal": spec["goal"], "context": spec.get("context") or "", "task": task,
+                  **({"model": named} if named else {}),
                   "budget_seconds": budget, "idempotency_key": key,
                   "output_contract": spec.get("output_schema"), "constraints": spec.get("constraints"),
                   "parent": {"run_id": run_id, "session_id": os.environ.get("WALTER_SESSION_ID"), "task_id": task_id,
@@ -113,7 +117,8 @@ def run_text(d: dict, spec: dict, *, memory, persist, caller: str = "walter_run"
                             "goal": spec["goal"], "events": [],
                             "status": "ended" if result.get("ok") else ("cancelled" if (result.get("engine") or {}).get("status") == "cancelled" else "failed"),
                             "routing": {"task": d.get("requested_task") or d.get("task"), "executed_as": task,
-                                        "model_id": None, "provider": "walter-engine", "applied": True},
+                                        "model_id": named["id"] if named else None, "provider": "walter-engine",
+                                        "applied": True},
                             "result": {"ok": result.get("ok"), "error": result.get("error"),
                                        "persisted": {k: (persisted or {}).get(k) for k in ("stored", "skipped", "errors")}
                                        if persisted else None,
