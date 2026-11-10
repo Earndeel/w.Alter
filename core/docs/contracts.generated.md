@@ -370,7 +370,7 @@ Interfaces : CLI walter-ops backup|git|check|recovery|deploy|status (install, on
 | backup | active | Sauvegardes (pg, state.db, restic, publication git) | `/walter/ops/backup` | ops/backup |
 | ops | active | Installation, déploiement, récupération | `/walter/ops/walter_ops` | ops |
 | services | active | Dépendances opérationnelles de Walter (bases, bureaux distants, environnements Python partagés, passerelles) : installations, définitions de déploiement et données techniques ; jamais de code de Walter | `/services` | — |
-| postgres | implemented | Définition de déploiement de PostgreSQL (compose verrouillé par empreinte, configuration complète) préparée et essayée sur une copie restaurée ; pas en service : la production tourne encore dans le conteneur hindsight-pg sur le volume Docker historique | `/services/postgres` | — |
+| postgres | active | PostgreSQL de Walter en service depuis le 2026-11-10 (E9.2b) : données dans /services/postgres/data, configuration dans config/, compose verrouillé par empreinte ; conteneur hindsight-pg, 127.0.0.1:5433 inchangés. Déplacement et retour arrière : walter-pg-relocate (ops/backup/scripts) | `/services/postgres` | — |
 | kernel-npm-cache | active | Cache npm hors ligne du noyau figé du moteur (lot E1), utilisé par core/engine/kernel/install.sh | `/services/dsh` | — |
 | python | active | Environnements Python installés des modules (runtime de walter-python, core, router, llm, raw-vault), déplacés le 2026-11-10 (E9.2a) ; chaque module garde un lien venv ; exclus de restic, reconstruits depuis les verrous des modules | `/services/python` | — |
 

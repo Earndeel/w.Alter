@@ -2499,8 +2499,8 @@
         {
           "id": "postgres",
           "path": "/services/postgres",
-          "role": "Définition de déploiement de PostgreSQL (compose verrouillé par empreinte, configuration complète) préparée et essayée sur une copie restaurée ; pas en service : la production tourne encore dans le conteneur hindsight-pg sur le volume Docker historique",
-          "status": "implemented",
+          "role": "PostgreSQL de Walter en service depuis le 2026-11-10 (E9.2b) : données dans /services/postgres/data, configuration dans config/, compose verrouillé par empreinte ; conteneur hindsight-pg, 127.0.0.1:5433 inchangés. Déplacement et retour arrière : walter-pg-relocate (ops/backup/scripts)",
+          "status": "active",
           "readme": "/services/postgres/README.md"
         },
         {
