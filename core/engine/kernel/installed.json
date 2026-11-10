@@ -1,15 +1,15 @@
 {
  "composed": {
-  "headless": "d02dcbb777270792e4c6f4e73f553dcf5d1fed6e1bdfbfe7c73701b73e1f0e04",
-  "web": "0199ab5c4a39b11cd7975f088563c7f91ef8393130e54b277152ebca2489cdeb"
+  "headless": "5aeb34b589a666c8f7b6696f3aae092a00bca22f8acfc46f959e0adce0f38c57",
+  "web": "e6139c8a15258d1c53f367e6ffc33da0a518d10933cdb0fda71d89d45e04d6be"
  },
  "compositions": {
-  "cordis.patch.yml": "c0b38c8a30f87e81912fbca4f4f134d882d495ffdf11631047aa84b5d2271dbf",
-  "profiles/headless/cordis.patch.yml": "0c954d16fc9ae8f7beaa1c82d0a6467b026db91d14730f284ac6ddbabcff5c9c",
+  "cordis.patch.yml": "9e98aa753025364f049558ccfe2ab322d609333da8f1e90fd598e84e93a05487",
+  "profiles/headless/cordis.patch.yml": "c8f9d14ffe4674caf003b2b261327eac354270822de4fe225776cd6400eba46a",
   "profiles/headless/cordis.yml": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
-  "profiles/web/cordis.patch.yml": "e5f6b16e3dbaea9eb7d3fdd9d8624f615cb65c1a052313a3858e4bd5000f83f0",
+  "profiles/web/cordis.patch.yml": "66e42959bda227d8596c2c8186980a9349e4dd7b7ee0e37550eca59b04aa3de8",
   "profiles/web/cordis.yml": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
-  "walter-hooks.json": "a0260a2d01aab034184898b0338a0a858288afc4a058a987a81ee40b200526b6"
+  "walter-hooks.json": "ac109735cdaeaf8a3c27aa92f4f2f677ddd6377e638cd7b591af1d10683a6b68"
  },
  "integrity": "sha512-EAJ3gPNcVt/uv8X19PMm9NkVhWgT7xXNMk0UKCVm+IQ5rpSQOcsMUa0HWlnYYVybKMsccjcRB21vVVsaXQ6IdA==",
  "kernel": "@deepseek-ai/dsh",

@@ -27,7 +27,7 @@ from . import paths
 # Where references live, besides /walter itself ('~/' = service user's home, '@instance' = active instance).
 REFERENCE_ROOTS = ('/etc/systemd/system', '~/.config/systemd/user', '/usr/local/bin', '/usr/local/sbin',
                    '/etc/walter', '/etc/logrotate.d', '/etc/cron.d', '/services', '@instance/config',
-                   '~/.claude/settings.json', '~/.codex/config.toml', '~/CLAUDE.md', '/opt/dsh/home/cordis.patch.yml',
+                   '~/.claude/settings.json', '~/.codex/config.toml', '~/CLAUDE.md', '/opt/dsh/home/cordis.patch.yml', '/opt/dsh/home/profiles', '/opt/dsh/home/walter-hooks.json',
                    '/opt/dsh/home/config.toml', '/opt/dsh/home/AGENTS.md')
 LINK_ROOTS = (('/usr/local/bin', 1), ('/usr/local/sbin', 1), ('/opt', 1), ('/walter', 3), ('~/.hermes', 1),
               ('/etc/systemd/system', 2), ('@instance', 2))
