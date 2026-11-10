@@ -76,7 +76,7 @@
     "owner": "browse",
     "kind": "capability",
     "purpose": "Rechercher, extraire et gérer les parcours web avec un moteur commun.",
-    "target_root": "browse",
+    "target_root": "capabilities/browse",
     "config_paths": [
       "@instance/bootstrap/browse-search.env"
     ],
