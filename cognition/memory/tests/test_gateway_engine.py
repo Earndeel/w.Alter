@@ -136,3 +136,16 @@ def test_a_delegation_run_is_filed_under_its_parent_run_and_an_unknown_parent_is
             ([child, orphan],))}
     assert rows[child]["p"] == parent and rows[child]["ch"] == "machine"
     assert rows[orphan]["p"] is None
+
+
+def test_a_model_named_at_the_start_survives_the_preflight_plan(client):
+    """Lot E5 (2026-11-10): the Engine API names the owner's model when it opens the run; the preflight's plan is merged
+    into routing.requested without erasing it, and the model gateway reads both."""
+    from walter_memory import runs
+    sid = f"{RUNTIME}/vm/{uuid.uuid4()}"
+    run = client.post("/v1/runs/start", json={"origin": {**origin(sid), "channel": "machine"}, "goal": "x",
+                                              "routing": {"applied": False, "requested": {"model": "claude-opus-5-5", "provider": "venice"}}}).json()["run_id"]
+    runs.update(run, requested={"task": "general", "level": "L1", "model": None})
+    with connect() as conn:
+        req = conn.execute("select routing->'requested' r from runs.runs where run_id = %s", (run,)).fetchone()["r"]
+    assert req == {"model": "claude-opus-5-5", "provider": "venice", "task": "general", "level": "L1"}

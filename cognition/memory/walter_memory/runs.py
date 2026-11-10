@@ -89,7 +89,9 @@ def end_open(session_id: str, status: str = "ended") -> str | None:
     return None
 
 
-REQUESTED_KEYS = ("task", "level", "require", "fast_path", "answer", "message_sha")
+# model / provider: a model named by the owner for this run (Engine API delegation, lot E5), set at the start; the
+# preflight's plan is merged into it, never erases it
+REQUESTED_KEYS = ("task", "level", "require", "fast_path", "answer", "message_sha", "model", "provider")
 
 
 def update(run_id: str, *, thread_id: str | None = None, level: str | None = None, act: str | None = None,
@@ -105,7 +107,8 @@ def update(run_id: str, *, thread_id: str | None = None, level: str | None = Non
         conn.execute("""update runs.runs set thread_id = coalesce(%s, thread_id), level = coalesce(%s, level),
                         act = coalesce(%s, act), updated_at = now(),
                         routing = case when %s::jsonb is null then routing
-                                       else coalesce(routing, '{}'::jsonb) || jsonb_build_object('requested', %s::jsonb) end
+                                       else coalesce(routing, '{}'::jsonb) || jsonb_build_object('requested',
+                                            coalesce(routing->'requested', '{}'::jsonb) || %s::jsonb) end
                         where run_id = %s""",
                      (thread_id, level, act, json.dumps(req) if req else None, json.dumps(req) if req else None, run_id))
         if act in ("correct", "continue"):
