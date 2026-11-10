@@ -6,7 +6,7 @@
 | **Propriétaire** | walter-context (`/walter/context`). |
 | **État** | **active** (constat du 09/11/2026) : service `walter-context-preflight` ; DSH l'utilise ; Hermes garde son compresseur natif jusqu'au lot 6. |
 | **Ne fait pas** | Posséder les sujets, vues et originaux (Walter Memory, walter-logs) ; choisir un modèle (Router). |
-| **Contrats** | [contracts/context.json](contracts/context.json), [contracts/maintenance.json](contracts/maintenance.json), [contracts/schemas/](contracts/schemas/) (ContextPlan v2, ChildContextSpec v1) ; CLI `walter-context`. Spécification : `/walter/docs/CONTEXT-ENGINE.md`. |
+| **Contrats** | [contracts/context.json](contracts/context.json), [contracts/maintenance.json](contracts/maintenance.json), [contracts/schemas/](contracts/schemas/) (ContextPlan v2, ChildContextSpec v1) ; CLI `walter-context`. Spécification : `/walter/context/docs/CONTEXT-ENGINE.md`. |
 
 walter-context prépare ce qui entre dans la fenêtre d’un modèle et compresse l’historique selon le contrat du
 harness. La compression locale, la préparation d’un contexte par message et le contexte d’un sous-agent sont des
