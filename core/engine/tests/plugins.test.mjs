@@ -171,3 +171,33 @@ test('native: a turn end closes its run and emits turn.ended once per run; archi
   await new Promise((r) => setTimeout(r, 30));
   assert.deepEqual(calls.map((c) => [c.path, c.body.type, c.body.payload.reason]), [['/v1/bus/emit', 'session.ended', 'archived']]);
 });
+
+test('delivery: a refusal by design is recorded as refused, never retried; a transmission defect is retried once', async () => {
+  const cfg = config('native');
+  let emits = 0;
+  behaviour['/v1/bus/emit'] = (data, reply) => { emits += 1; reply(403, { detail: { refused: 'observation_not_on_production_bus' } }); };
+  currentRuns.set('dsh/vm/r1', { run_id: 'run-r1', turn: 1 });
+  await assert.rejects(events.turnEnded(cfg, 'dsh/vm/r1', 1));
+  assert.equal(emits, 1);                                       // refused: no retry
+  let [row] = observations(cfg).filter((r) => r.kind === 'delivery');
+  assert.deepEqual(row.steps.emit, { outcome: 'refused', status: 403, refused: 'observation_not_on_production_bus', retried: false });
+
+  const cfg2 = config('native');
+  emits = 0;
+  behaviour['/v1/bus/emit'] = (data, reply) => { emits += 1; return emits === 1 ? reply(503, {}) : reply(200, { id: 7, duplicate: false }); };
+  currentRuns.set('dsh/vm/r2', { run_id: 'run-r2', turn: 1 });
+  assert.equal(await events.turnEnded(cfg2, 'dsh/vm/r2', 1), 'run-r2');
+  assert.equal(emits, 2);                                       // transport: one retry, same dedupe key
+  [row] = observations(cfg2).filter((r) => r.kind === 'delivery');
+  assert.deepEqual(row.steps.emit, { outcome: 'delivered', status: null, refused: null, retried: true });
+  const keys = calls.filter((c) => c.path === '/v1/bus/emit' && c.body.subject === 'dsh/vm/r2').map((c) => c.body.dedupe_key);
+  assert.deepEqual(keys, ['turn.ended/run-r2', 'turn.ended/run-r2']);
+});
+
+test('delivery: an unanswered gateway is a transport defect, not a refusal', async () => {
+  const cfg = config('native', { gateway: 'http://127.0.0.1:9' });
+  await assert.rejects(events.sessionEnded(cfg, 'dsh/vm/r3', 'archived'));
+  const [row] = observations(cfg).filter((r) => r.kind === 'delivery');
+  assert.equal(row.steps.emit.outcome, 'transport');
+  assert.equal(row.steps.emit.retried, true);
+});

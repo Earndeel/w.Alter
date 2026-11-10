@@ -19,6 +19,13 @@
 Mesures : `@instance/state/core/engine/intake/observations-<jour>.jsonl` (0600 ; empreintes et nombres, jamais le
 texte). Ombre : lignes `observation: true`. Natif : temps par source (`run_ms`, `memory_ms`, `skills_ms`, `native_ms`).
 
+**Refus ou défaut de transmission** (10/11) : la passerelle répond **403** avec un code stable quand elle refuse par
+principe (`observation_not_on_production_bus`, `type_not_open`) — un refus d'autorisation attendu, jamais réessayé ;
+422 = requête malformée (un défaut du greffon) ; pas de réponse, délai dépassé ou 5xx = **défaut de transmission**,
+réessayé une fois (corps idempotents : `turn.ended/<run>`, `session.ended/<session>/<raison>`). Chaque livraison qui
+n'a pas simplement réussi laisse une ligne `kind: delivery` (`outcome` refused | invalid | transport, `retried`) ;
+l'accueil note `run_outcome` et `context_source` (pack | legacy | none). `bench/e2_shadow.py` les compte à part.
+
 ## Bancs
 
 - `../bench/e2_intake.py` : mêmes messages, foyers de test `hook` et `native` en alternance, DSH réel, canal `test`.

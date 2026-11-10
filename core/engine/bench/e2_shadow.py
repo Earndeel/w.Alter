@@ -88,6 +88,15 @@ def report(since: datetime) -> dict:
                                     and at >= %s""", (since,)).fetchone()["n"]
     except Exception as e:  # noqa: BLE001 — the report still says what it can
         bus_ends = f"unavailable: {type(e).__name__}"
+    deliveries: dict[str, int] = {}
+    for r in _rows(root / "state/core/engine/intake", "observations-*.jsonl", since):
+        steps = r.get("steps", {}).values() if r.get("kind") == "delivery" else (
+            [{"outcome": r["outcome"]}] if r.get("outcome") else [])
+        for st in steps:                      # refused = by design (403); transport = a defect; invalid = a bug
+            k = st["outcome"] + ("+retried" if st.get("retried") else "")
+            deliveries[k] = deliveries.get(k, 0) + 1
+        if r.get("kind") == "intake" and r.get("run_outcome") not in (None, "delivered"):
+            deliveries["run_start:" + r["run_outcome"]] = deliveries.get("run_start:" + r["run_outcome"], 0) + 1
     ms = sorted(r["native_ms"] for r in shadow_turns if isinstance(r.get("native_ms"), int))
     pct = lambda q: ms[min(len(ms) - 1, int(q * len(ms)))] if ms else None  # noqa: E731
     return {
@@ -95,7 +104,7 @@ def report(since: datetime) -> dict:
         "owner_text_identical": same_text, "intent_gaps": gaps, "model_noise": noise,
         "shadow_without_hook_plan": len(unmatched_shadow), "hook_plan_without_shadow": len(unseen_by_shadow),
         "skipped_local_only": sum(1 for r in shadow_turns if r.get("skipped") == "local_only"),
-        "errors": sum(1 for r in shadow_turns if r.get("error")),
+        "errors": sum(1 for r in shadow_turns if r.get("error")), "deliveries": deliveries,
         "preflight_path_ms": {"p50": pct(0.5), "p90": pct(0.9), "n": len(ms)},
         "events": {"shadow_turn_ended": shadow_ends, "bus_turn_ended_dsh": bus_ends,
                    "shadow_session_ended": {k: sum(1 for r in events if r.get("type") == "session.ended" and r.get("reason") == k)

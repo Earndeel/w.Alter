@@ -9,9 +9,7 @@
 //                so the preflight writes nothing. A message that holds a secret is never sent to the preflight.
 // mode native  — the engine's own intake: run, plan + context pack, skills, injected as one tagged user message.
 import { createRequire } from 'node:module';
-import {
-  currentRuns, machinePrompt, observe, ownerText, post, recordRun, sessionKey, settings, sha16, token,
-} from '../shared.mjs';
+import { currentRuns, machinePrompt, observe, outcome, ownerText, post, recordRun, sessionKey, settings, sha16, token } from '../shared.mjs';
 
 export const name = 'walter-intake';
 
@@ -58,6 +56,7 @@ export async function shadowTurn(cfg, { session, turn, step, message }, now = ()
     }
   } catch (error) {
     row.error = String(error?.message || error).slice(0, 160);
+    row.outcome = outcome(error);                 // refused (by design) | invalid | transport (a defect)
   }
   row.native_ms = Math.round(now() - t0);
   observe(cfg, row);
@@ -75,6 +74,8 @@ export async function nativeTurn(cfg, { session, turn, step, message }) {
     kind: 'message', message, context: '', session_id: session, runtime: cfg.runtime, first_turn: false,
   }, { timeoutMs: 4000 }).then((r) => [r?.text || '', Math.round(performance.now() - t0)]).catch(() => ['', null]);
   let run = null;
+  let runOutcome = 'delivered';
+  let source = 'none';
   const key = dedupeKey(session, turn, step, message);
   const previous = currentRuns.get(session);
   try {
@@ -87,7 +88,7 @@ export async function nativeTurn(cfg, { session, turn, step, message }) {
     currentRuns.set(session, { run_id: run.run_id, turn, key });
     run.ms = Math.round(performance.now() - t0);
     recordRun(cfg, run.run_id, session);
-  } catch { run = null; }
+  } catch (e) { run = null; runOutcome = outcome(e); }
   const local = run?.privacy_class === 'local_only';
   const legacy = async () => {
     if (channel === 'machine' || message.split(/\s+/).length < 4 || message.startsWith('/')) return '';
@@ -106,16 +107,18 @@ export async function nativeTurn(cfg, { session, turn, step, message }) {
         const out = await post(`${cfg.preflight}/preflight?inject=1`, planRequest(cfg, session, message, run?.run_id || null),
           { timeoutMs: 7000 });
         if (out?.error || !out?.plan) throw new Error(out?.error || 'no plan');
+        source = 'pack';
         return out.text || '';                   // empty = the plan's own decision (L0: nothing beyond the message)
       } catch { /* never lose the context: legacy block instead */ }
     }
+    source = 'legacy';
     return legacy();
   })().catch(() => '');
   const [[mem, memoryMs], [sk, skillsMs]] = await Promise.all([timed(memory), skills]);
   const parts = [mem, sk].filter(Boolean);
   // a measurement, not an observation: numbers only (latency against 04-BASELINE, what was injected)
   try { observe(cfg, { kind: 'intake', session, turn, step, message_sha: sha16(message.slice(0, 6000)), run_id: run?.run_id || null,
-    privacy_class: run?.privacy_class || null, memory_chars: mem.length, skills_chars: sk.length,
+    privacy_class: run?.privacy_class || null, run_outcome: runOutcome, context_source: source, memory_chars: mem.length, skills_chars: sk.length,
     run_ms: run?.ms ?? null, memory_ms: memoryMs, skills_ms: skillsMs, native_ms: Math.round(performance.now() - t0) }); } catch { /* never on the turn's path */ }
   return { run_id: run?.run_id || null, text: parts.length ? `<walter-context>\n${parts.join('\n\n')}\n</walter-context>` : '' };
 }

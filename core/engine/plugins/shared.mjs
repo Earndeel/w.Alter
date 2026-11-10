@@ -61,8 +61,38 @@ export async function post(url, body, { timeoutMs = 7000, auth = null } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (auth) headers.Authorization = `Bearer ${auth}`;
   const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
-  if (!res.ok) throw new Error(`${new URL(url).pathname} ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(`${new URL(url).pathname} ${res.status}`);
+    err.status = res.status;
+    err.refused = res.status === 401 || res.status === 403
+      ? (await res.json().catch(() => ({})))?.detail?.refused || 'unauthorised' : null;
+    throw err;
+  }
   return res.status === 204 ? null : res.json();
+}
+
+// What became of a call: an authorisation refusal (expected, by design: 401/403) is never a transmission defect
+// (no answer, timeout, 5xx), nor a malformed request (other 4xx). Only a transmission defect is worth a retry.
+export function outcome(err) {
+  if (!err) return 'delivered';
+  if (err.refused) return 'refused';
+  if (err.status && err.status < 500) return 'invalid';
+  return 'transport';
+}
+
+// POST that retries once after a transmission defect only (callers send idempotent bodies: dedupe keys, run ids).
+export async function deliver(url, body, opts = {}) {
+  try {
+    return { result: await post(url, body, opts), outcome: 'delivered' };
+  } catch (e) {
+    if (outcome(e) !== 'transport') return { error: e, outcome: outcome(e) };
+    await new Promise((r) => setTimeout(r, opts.retryDelayMs ?? 500));
+    try {
+      return { result: await post(url, body, opts), outcome: 'delivered', retried: true };
+    } catch (e2) {
+      return { error: e2, outcome: outcome(e2), retried: true };
+    }
+  }
 }
 
 /** Shadow observations: one private JSONL per day. Hashes and numbers, never the owner's text. */

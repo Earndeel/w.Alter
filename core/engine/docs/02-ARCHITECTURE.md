@@ -24,8 +24,8 @@ Trois couches :
 │   intake · context · model · tools · orchestration · policy · budget ·         │  interchangeables
 │   events · recovery · identity                                                  │
 ├───────────────────────────────────────────────────────────────────────────────┤
-│ core/engine/kernel    DSH/Cordis figé : boucle, sessions + points de reprise,   │  noyau, code amont
-│   sous-agents, tâches, approbations, bac à sable, rappels, webhook, portes     │  non modifié
+│ core/engine/kernel    DSH/Cordis figé : boucle, sessions + points de reprise,   │  noyau (base DSH,
+│   sous-agents, tâches, approbations, bac à sable, rappels, webhook, portes     │  adaptable par Walter)
 └───────────────────────────────────────────────────────────────────────────────┘
         │ appelle par interfaces déclarées, ne refait aucune décision
         ▼
@@ -36,6 +36,11 @@ Trois couches :
 
 - **Noyau** : les paquets DSH aux versions exactes de la production (0.2.0-rc.2), avec leurs empreintes et un cache
   hors ligne. Toute mise à jour passe par Lab (banc, comparaison, accord de Monsieur) puis par un nouveau gel.
+- **Appropriation (Monsieur, 10/11)** : Walter Engine est notre runtime, pas un moteur externe branché. Le noyau est
+  le point de départ figé ; quand un mécanisme doit changer pour Walter, on adapte le code issu de DSH (MIT) dans
+  `core/engine` — d'abord par greffon Cordis, puis, si un greffon ne suffit pas, par une copie adaptée du paquet
+  concerné, versionnée, testée et vérifiée par `walter engine kernel` comme le reste. On ne réécrit jamais un mécanisme
+  seulement pour changer son origine ; on n'attend jamais l'amont pour un besoin de Walter.
 - **Greffons Walter** : chacun remplace ou complète un greffon du noyau par son identifiant Cordis. Le comportement
   vient de Walter, la mécanique du noyau.
 - **Compositions** : une composition par usage (web, API, commande, essai Lab), générée par walter-core comme
