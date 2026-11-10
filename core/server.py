@@ -380,13 +380,14 @@ def browser_sites() -> str:
 
 @mcp.tool()
 def walter_health() -> str:
-    """Status of the W.Alter stack: core services, Hermes gateway, memory health score, model router, disk."""
+    """Status of the W.Alter stack: core services, Walter Engine and its Telegram door, memory health score, model
+    router, disk. (Hermes retired 2026-11-10: no longer checked.)"""
     out = []
     units = _stack_units()
     states = subprocess.run(["systemctl", "is-active", *units], capture_output=True, text=True).stdout.split()
     out += [f"{u}: {s}" for u, s in zip(units, states)]
-    gw = subprocess.run(["systemctl", "--user", "is-active", "hermes-gateway"], capture_output=True, text=True)
-    out.append(f"hermes-gateway (user): {gw.stdout.strip() or gw.stderr.strip()}")
+    eng = subprocess.run(["systemctl", "is-active", "dsh-web", "walter-telegram"], capture_output=True, text=True)
+    out.append("walter engine (dsh-web) / telegram door: " + " / ".join(eng.stdout.split()))
     try:
         summary = json.loads((HERMES_HOME / "logs/memory-autopilot/latest.json").read_text())["summary"]
         out.append(f"memory autopilot: {summary.get('severity')} score={summary.get('score')} "
