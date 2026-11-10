@@ -1,7 +1,7 @@
 {
  "hermes": {
   "path": "/root/.hermes/skills/devops/cloudflare-pages-deploy",
-  "pending_sha": "feea50f429743a5d63f5d9c0915ddb29339dd128e26927ea2acead5653993a14",
+  "pending_sha": "3b119df73f624a142df58d83df23b84f8fe61265066db8680bbd6936e7e079f0",
   "sha": "f9754cd98ed46e47477de967e240deca81e637227e6d081f7bc0184c3414aa1b",
   "state": "active"
  },
