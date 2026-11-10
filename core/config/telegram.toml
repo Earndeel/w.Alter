@@ -18,3 +18,9 @@ token_file = "@instance/bootstrap/engine/api.token"
 # callback_data prefix (before the first « : ») → command; the door runs `<command> <data>`, which prints
 # {"ok": bool, "toast": "…", "drop": ["prefixes of the buttons to remove"]}
 wr = ["walter-router", "button"]
+
+[web]
+# conversational web services (« /gpt … »): `list` prints {"command": "service"}; `run` takes a JSON spec on stdin
+# {service, message, model?, files?: [paths], conversation, request_id} and prints {ok, reply, files: [{path, kind, mime}]}
+list = ["walter-router", "web-commands"]
+run = ["walter-router", "web"]

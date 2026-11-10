@@ -12,6 +12,9 @@ of an interrupted or failed turn. Only the owner's Telegram accounts are served;
                                                 one message to the owner through Walter's bot (modules' notices)
 Buttons of other modules: `[callbacks]` maps a callback-data prefix to a command; the door runs `<command> <data>`,
 which prints {ok, toast, drop}.
+Conversational web services (`/gpt …`, lot E6): `[web] list` prints {command: service}; such a command goes to
+`[web] run` (JSON spec on stdin: service, message, model from a `[model]` prefix, files, conversation, request_id),
+never to an engine turn; the reply comes back as is, produced images/files as Telegram photos/documents.
 
 Settings: `walter instance config core telegram.toml` (instance override of `core/config/telegram.toml`).
 State: `@instance/state/core/telegram/state.json` (0600: Telegram offset, conversation numbers, last event seen).
@@ -74,6 +77,32 @@ class Telegram:
         if not out.get("ok"):
             raise TelegramError(str(out.get("description"))[:200], out.get("error_code") or 0,
                                 (out.get("parameters") or {}).get("retry_after"))
+        return out["result"]
+
+    def upload(self, method: str, fields: dict, field: str, path: Path, mime: str = "") -> dict:
+        """multipart/form-data upload (sendPhoto, sendDocument): one file from disk."""
+        boundary = "walter" + os.urandom(12).hex()
+        parts = []
+        for k, v in fields.items():
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+        name = re.sub(r'["\r\n\\]', "_", path.name)
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="{name}"\r\n'
+                     f'Content-Type: {mime or "application/octet-stream"}\r\n\r\n'.encode())
+        body = b"".join(parts) + path.read_bytes() + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(TG_URL.format(token=self._token, method=method), data=body,
+                                     headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+        try:
+            with urllib.request.urlopen(req, timeout=300) as r:  # noqa: S310 (fixed host)
+                out = json.load(r)
+        except urllib.error.HTTPError as e:
+            try:
+                out = json.load(e)
+            except ValueError:
+                raise TelegramError(f"http {e.code}", e.code) from None
+        except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as e:
+            raise TelegramError(f"network: {type(e).__name__}") from None
+        if not out.get("ok"):
+            raise TelegramError(str(out.get("description"))[:200], out.get("error_code") or 0)
         return out["result"]
 
     def download(self, file_path: str, dest: Path, limit: int = 20 << 20) -> Path:
@@ -177,6 +206,7 @@ def load_settings() -> dict:
     return {"grant": t.get("grant", "telegram-walter-bot"), "owner_ids": [int(x) for x in t.get("owner_ids", [])],
             "account": str(t.get("account") or "owner"), "state": expand(t.get("state", "@instance/state/core/telegram")),
             "callbacks": {str(k): list(v) for k, v in (cfg.get("callbacks") or {}).items() if isinstance(v, list) and v},
+            "web": {k: list(v) for k, v in (cfg.get("web") or {}).items() if k in ("list", "run") and isinstance(v, list) and v},
             "engine_url": e.get("url", "http://127.0.0.1:8895"),
             "engine_token_file": expand(e.get("token_file", "@instance/bootstrap/engine/api.token"))}
 
@@ -232,6 +262,15 @@ HELP = ("Je suis Walter, sur mon propre moteur.\n\n"
         "/nouveau — commencer une nouvelle conversation\n"
         "/etat — où j'en suis (tâche en cours, autorisations en attente)")
 
+_MODEL_PREFIX = re.compile(r"^\[([^\]\n]{1,60})\]\s*")
+
+
+def split_model(text: str) -> tuple[str | None, str]:
+    """`[GPT-6 high] question` → ("GPT-6 high", "question"); without brackets the service keeps its own model."""
+    m = _MODEL_PREFIX.match(text)
+    return (m.group(1).strip() or None, text[m.end():]) if m else (None, text)
+
+
 END_NOTICE = {
     "cancelled": "⏹ Interrompu.",
     "budget_exhausted": "⚠️ Budget de ce tour atteint : je me suis arrêté.",
@@ -271,6 +310,7 @@ class Bot:
         self.approvals: dict[str, tuple[int, int, str]] = {}   # request id → (chat, message id, tool)
         self.lock = threading.Lock()
         self.polling = False                         # blocked in getUpdates: a stop may cut it short
+        self._web: dict[str, str] | None = None      # web command → service (asked once, `[web] list`)
 
     # Telegram side ------------------------------------------------------------------------------------------------
     def send(self, chat: int, text: str, **extra) -> int | None:
@@ -457,7 +497,8 @@ class Bot:
         try:
             if cmd in ("/start", "/aide", "/help"):
                 self.session(chat)
-                self.send(chat, HELP)
+                self.send(chat, HELP + "".join(f"\n/{c} — écrire directement à {v} (service web, sans tour du moteur)"
+                                               for c, v in sorted(self.web_commands().items())))
                 return
             if cmd == "/stop":
                 return self.cmd_stop(chat)
@@ -469,6 +510,9 @@ class Bot:
                 return
             if cmd in ("/etat", "/status"):
                 return self.cmd_status(chat)
+            service = self.web_commands().get(cmd[1:]) if cmd else None
+            if service:       # a web service's own conversation: never an engine turn
+                return self.web_command(chat, m, service, text)
             attachment = self.attachment(chat, m)
             if attachment:
                 text = f"{attachment}\n\n{text}".strip()
@@ -488,23 +532,108 @@ class Bot:
 
     def attachment(self, chat: int, m: dict) -> str | None:
         """A photo or a document: kept in the instance (0600) and named to the engine, which reads it with its tools."""
+        kind, dest, note = self.save_attachment(chat, m)
+        if note:
+            return note
+        return f"[{kind} reçu de Monsieur sur Telegram, enregistré ici : {dest}]" if dest else None
+
+    def save_attachment(self, chat: int, m: dict) -> tuple[str | None, Path | None, str | None]:
+        """(kind, saved path, note when it could not be kept) of the message's photo or document."""
         if m.get("photo"):
             f, kind, name = m["photo"][-1], "photo", f"photo-{m['message_id']}.jpg"
         elif m.get("document"):
             d = m["document"]
             f, kind = d, "document"
             name = re.sub(r"[^A-Za-z0-9._-]", "_", d.get("file_name") or f"document-{m['message_id']}")[:120]
-        elif m.get("voice") or m.get("audio") or m.get("video") or m.get("video_note"):
-            return None
         else:
-            return None
+            return None, None, None
         if (f.get("file_size") or 0) > 20 << 20:
-            return f"[{kind} reçu mais trop lourd pour le bot Telegram (> 20 Mo)]"
+            return kind, None, f"[{kind} reçu mais trop lourd pour le bot Telegram (> 20 Mo)]"
         info = self.tg.call("getFile", {"file_id": f["file_id"]})
         inbox = self.state.dir / "inbox" / str(chat)
         inbox.mkdir(parents=True, exist_ok=True, mode=0o700)
-        dest = self.tg.download(info["file_path"], inbox / f"{m['message_id']}-{name}")
-        return f"[{kind} reçu de Monsieur sur Telegram, enregistré ici : {dest}]"
+        return kind, self.tg.download(info["file_path"], inbox / f"{m['message_id']}-{name}"), None
+
+    # web services (lot E6: /gpt … no longer through Hermes) -----------------------------------------------------
+    def web_commands(self) -> dict[str, str]:
+        if self._web is None:
+            self._web = {}
+            lister = (self.s.get("web") or {}).get("list")
+            if lister:
+                try:
+                    r = subprocess.run(lister, capture_output=True, text=True, timeout=60)
+                    out = json.loads((r.stdout or "").strip() or "{}")
+                    self._web = {str(k).lower(): str(v) for k, v in out.items()} if isinstance(out, dict) else {}
+                except (OSError, subprocess.SubprocessError, ValueError) as e:
+                    log.warning("web commands unavailable: %s", type(e).__name__)
+        return self._web
+
+    def web_command(self, chat: int, m: dict, service: str, text: str) -> None:
+        word, rest = (re.match(r"^(\S+)\s*(.*)$", text, re.S) or re.match(r"(.*)()", text)).groups()
+        model, rest = split_model(rest.strip())
+        if not rest.strip():
+            self.send(chat, f"Usage : {word} [modèle] <message> — photo ou document joints possibles, en légende ; "
+                            "sans [modèle], celui déjà choisi dans le service")
+            return
+        threading.Thread(target=self.web_exchange, args=(chat, m, service, model, rest.strip()), daemon=True).start()
+
+    def web_exchange(self, chat: int, m: dict, service: str, model: str | None, message: str) -> dict:
+        """One owner message to a web service (`[web] run`) and its reply as is; produced files sent back."""
+        t0 = time.time()
+        try:
+            self.tg.call("sendChatAction", {"chat_id": chat, "action": "typing"})
+        except TelegramError:
+            pass
+        spec = {"service": service, "message": message, "conversation": f"telegram:{chat}",
+                "request_id": f"telegram-walter:{chat}:{m['message_id']}"}
+        if model:
+            spec["model"] = model
+        try:
+            kind, path, note = self.save_attachment(chat, m)
+        except TelegramError as e:
+            kind, path, note = None, None, f"pièce jointe illisible ({e})"
+        if note:
+            self.send(chat, f"⚠️ {note.strip('[]')}")
+            return {"ok": False}
+        if path:
+            spec["files"] = [str(path)]
+        try:
+            r = subprocess.run(self.s["web"]["run"], input=json.dumps(spec), capture_output=True, text=True,
+                               timeout=900)
+            out = json.loads((r.stdout or "").strip() or "{}")
+        except subprocess.TimeoutExpired:
+            out = {"ok": False, "error": "délai dépassé"}
+        except (OSError, ValueError, KeyError) as e:
+            out = {"ok": False, "error": type(e).__name__}
+        produced = out.get("files") or []
+        if out.get("ok"):
+            body = out.get("reply") or ""
+            lost = [f.get("name") or f.get("kind") for f in produced if not f.get("path")]
+            if lost:
+                body += ("\n\n" if body else "") + "⚠️ non récupéré : " + ", ".join(map(str, lost))
+        elif out.get("error") == "service_disabled":
+            body = f"⚠️ {service} est désactivé. {out.get('note') or ''}".strip()
+        else:
+            body = f"⚠️ {service} : {out.get('error') or out.get('status') or 'échec'}"
+            if out.get("status") == "incomplete" and out.get("reply"):
+                body = out["reply"] + "\n\n⚠️ réponse incomplète (délai dépassé)"
+        sendable = [f for f in produced if f.get("path")] if out.get("ok") else []
+        if body or not sendable:
+            self.send(chat, body or "(réponse vide)")
+        for f in sendable:
+            p = Path(f["path"])
+            photo = f.get("kind") == "image" and f.get("mime") in ("image/png", "image/jpeg", "image/webp") \
+                and p.stat().st_size < 10_000_000
+            try:
+                self.tg.upload("sendPhoto" if photo else "sendDocument", {"chat_id": chat},
+                               "photo" if photo else "document", p, f.get("mime") or "")
+            except (TelegramError, OSError) as e:
+                self.send(chat, f"⚠️ fichier non envoyé : {p.name} ({e})")
+        measure = {"service": service, "ok": bool(out.get("ok")), "status": out.get("status"),
+                   "duplicate": bool(out.get("duplicate")), "model": bool(model), "files_in": int(bool(path)),
+                   "files_out": len(sendable), "seconds": round(time.time() - t0, 1)}
+        log.info("WALTER_WEB %s", json.dumps(measure))
+        return measure
 
     def on_callback(self, q: dict) -> None:
         if not self.owner(q.get("from")):

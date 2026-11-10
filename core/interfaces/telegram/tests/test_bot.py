@@ -193,3 +193,79 @@ def test_send_reaches_each_owner_with_buttons_on_the_last_chunk():
     sends = [p for m, p in tg.calls if m == "sendMessage"]
     assert out == {"ok": True, "messages": len(sends)} and {p["chat_id"] for p in sends} == {1, 2}
     assert [bool(p.get("reply_markup")) for p in sends if p["chat_id"] == 1] == [False, False, True]
+
+
+def test_web_service_command_goes_to_the_service_not_to_an_engine_turn(door, tmp_path, monkeypatch):
+    """Lot E6: `/gpt [modèle] …` → `[web] run` with the spec; reply as is; a produced image comes back as a photo."""
+    import json as _json
+    import threading as _threading
+    image = tmp_path / "out.png"
+    image.write_bytes(b"\x89PNG fake")
+    seen = tmp_path / "spec.json"
+    runner = tmp_path / "run.py"
+    runner.write_text("import json, sys\n"
+                      f"open({str(seen)!r}, 'w').write(sys.stdin.read())\n"
+                      f"print(json.dumps({{'ok': True, 'reply': 'Bonjour de ChatGPT', 'files': "
+                      f"[{{'path': {str(image)!r}, 'kind': 'image', 'mime': 'image/png'}}, {{'name': 'perdu.pdf'}}]}}))\n")
+    door.s["web"] = {"list": [sys.executable, "-c", "print('{\"gpt\": \"chatgpt\"}')"], "run": [sys.executable, str(runner)]}
+
+    class Now(_threading.Thread):           # the exchange runs off the polling thread: here, at once
+        def start(self):
+            self.run()
+    monkeypatch.setattr(B.threading, "Thread", Now)
+    uploads = []
+    door.tg.upload = lambda method, fields, field, path, mime="": uploads.append((method, field, path.name, mime)) or {}
+    door.handle(msg("/gpt [GPT-6 high] Que vois-tu ?\nligne 2", 41))
+    assert [o for o in door.engine.ops if o["op"] == "turn.submit"] == []
+    spec = _json.loads(seen.read_text())
+    assert spec == {"service": "chatgpt", "message": "Que vois-tu ?\nligne 2", "model": "GPT-6 high",
+                    "conversation": f"telegram:{CHAT}", "request_id": f"telegram-walter:{CHAT}:41"}
+    assert door.tg.sent()[-1].startswith("Bonjour de ChatGPT") and "perdu.pdf" in door.tg.sent()[-1]
+    assert uploads == [("sendPhoto", "photo", "out.png", "image/png")]
+    door.handle(msg("/gpt", 42))
+    assert door.tg.sent()[-1].startswith("Usage : /gpt")
+    door.handle(msg("/aide", 43))
+    assert "/gpt — écrire directement à chatgpt" in door.tg.sent()[-1]
+
+
+def test_without_web_services_an_unknown_command_is_an_ordinary_message(door):
+    door.handle(msg("/gpt bonjour", 44))
+    assert door.engine.ops[-1]["op"] == "turn.submit"
+
+
+def test_split_model_prefix():
+    assert B.split_model("[GPT-6 high] q") == ("GPT-6 high", "q")
+    assert B.split_model("q [x]") == (None, "q [x]")
+
+
+def test_upload_is_a_multipart_form_with_the_file(tmp_path, monkeypatch):
+    import http.server
+    import json as _json
+    import threading as _threading
+    got = {}
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            got["type"] = self.headers["Content-Type"]
+            got["body"] = self.rfile.read(int(self.headers["Content-Length"]))
+            got["path"] = self.path
+            out = _json.dumps({"ok": True, "result": {"message_id": 5}}).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(out)))
+            self.end_headers()
+            self.wfile.write(out)
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    _threading.Thread(target=srv.handle_request, daemon=True).start()
+    monkeypatch.setattr(B, "TG_URL", f"http://127.0.0.1:{srv.server_port}/bot{{token}}/{{method}}")
+    f = tmp_path / 'image "1".png'
+    f.write_bytes(b"\x89PNGDATA")
+    assert B.Telegram("T").upload("sendPhoto", {"chat_id": 7}, "photo", f, "image/png") == {"message_id": 5}
+    srv.server_close()
+    assert got["path"] == "/botT/sendPhoto" and got["type"].startswith("multipart/form-data; boundary=")
+    body = got["body"]
+    assert b'name="chat_id"\r\n\r\n7\r\n' in body and b'filename="image _1_.png"' in body
+    assert b"Content-Type: image/png\r\n\r\n\x89PNGDATA\r\n--" in body
