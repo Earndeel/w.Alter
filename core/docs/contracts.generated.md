@@ -453,7 +453,7 @@ Interfaces : CLI, walter-llm task routes, MCP walter_route / walter_run / walter
 Fournir l’environnement Python partagé des modules Walter.
 
 Contrat 1.0.0; propriétaire : runtime.
-Racine actuelle : `/walter/runtime`. Cible : `/walter/runtime`.
+Racine actuelle : `/walter/ops/runtime`. Cible : `/walter/ops/runtime`.
 
 Interfaces : command walter-python.
 
@@ -466,7 +466,7 @@ Interfaces : command walter-python.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| python | active | Interpréteur Python partagé des modules | `/walter/runtime/bin/walter-python` | ops/runtime |
+| python | active | Interpréteur Python partagé des modules | `/walter/ops/runtime/bin/walter-python` | ops/runtime |
 
 **Limites déclarées :**
 
@@ -477,7 +477,7 @@ Interfaces : command walter-python.
 Gérer les références au coffre et injecter localement les valeurs autorisées.
 
 Contrat 1.1.0; propriétaire : secrets.
-Racine actuelle : `/walter/secrets`. Cible : `/walter/secrets`.
+Racine actuelle : `/walter/core/security/secrets`. Cible : `/walter/core/security/secrets`.
 
 Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks, walter-secret grants / grant access, walter_secrets.grants.
 
@@ -490,8 +490,8 @@ Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks, walt
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| library | active | Accès au coffre Bitwarden sans valeur exposée, autorisations (grants) | `/walter/secrets/walter_secrets` | core/security/secrets |
-| compat | obsolete | Anciennes entrées de compatibilité | `/walter/secrets/compat` | — |
+| library | active | Accès au coffre Bitwarden sans valeur exposée, autorisations (grants) | `/walter/core/security/secrets/walter_secrets` | core/security/secrets |
+| compat | obsolete | Anciennes entrées de compatibilité | `/walter/core/security/secrets/compat` | — |
 
 **Limites déclarées :**
 
@@ -532,7 +532,7 @@ Interfaces : HTTP :8891, stdlib client, MCP, Hermes plugin.
 Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance.
 
 Contrat 1.0.0; propriétaire : soul.
-Racine actuelle : `/walter/soul`. Cible : `/walter/soul`.
+Racine actuelle : `/walter/core/identity`. Cible : `/walter/core/identity`.
 
 Interfaces : renderer, walter-soul render/path/sync/check/init, walter_profile MCP.
 
@@ -545,8 +545,8 @@ Interfaces : renderer, walter-soul render/path/sync/check/init, walter_profile M
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| renderer | active | Rendu de l'identité vers chaque runtime (SOUL.md, profils) | `/walter/soul/bin/walter-soul` | core/identity |
-| runtimes | active | Adaptateurs neutres par runtime | `/walter/soul/runtimes` | core/identity/runtimes |
+| renderer | active | Rendu de l'identité vers chaque runtime (SOUL.md, profils) | `/walter/core/identity/bin/walter-soul` | core/identity |
+| runtimes | active | Adaptateurs neutres par runtime | `/walter/core/identity/runtimes` | core/identity/runtimes |
 
 **Limites déclarées :**
 

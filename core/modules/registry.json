@@ -2974,18 +2974,18 @@
     },
     {
       "id": "runtime",
-      "root": "/walter/runtime",
+      "root": "/walter/ops/runtime",
       "anchors": [
-        "/walter/runtime/contracts/runtime.json",
-        "/walter/runtime/requirements.lock",
-        "/walter/runtime/bin/walter-python"
+        "/walter/ops/runtime/contracts/runtime.json",
+        "/walter/ops/runtime/requirements.lock",
+        "/walter/ops/runtime/bin/walter-python"
       ],
       "backup_paths": [
-        "/walter/runtime/README.md",
-        "/walter/runtime/requirements.lock",
-        "/walter/runtime/requirements-dev.lock",
-        "/walter/runtime/bin",
-        "/walter/runtime/contracts",
+        "/walter/ops/runtime/README.md",
+        "/walter/ops/runtime/requirements.lock",
+        "/walter/ops/runtime/requirements-dev.lock",
+        "/walter/ops/runtime/bin",
+        "/walter/ops/runtime/contracts",
         "/usr/local/bin/walter-python"
       ],
       "core_paths": [],
@@ -3017,7 +3017,7 @@
         "owner": "runtime",
         "kind": "foundation",
         "purpose": "Fournir l’environnement Python partagé des modules Walter.",
-        "target_root": "/walter/runtime",
+        "target_root": "/walter/ops/runtime",
         "config_paths": [],
         "permissions": [
           "aucune permission propre ; exécute le code du module appelant avec ses droits"
@@ -3080,10 +3080,10 @@
       "components": [
         {
           "id": "python",
-          "path": "/walter/runtime/bin/walter-python",
+          "path": "/walter/ops/runtime/bin/walter-python",
           "role": "Interpréteur Python partagé des modules",
           "status": "active",
-          "readme": "/walter/runtime/README.md",
+          "readme": "/walter/ops/runtime/README.md",
           "interfaces": [
             {
               "transport": "cli",
@@ -3096,11 +3096,11 @@
     },
     {
       "id": "secrets",
-      "root": "/walter/secrets",
+      "root": "/walter/core/security/secrets",
       "anchors": [
-        "/walter/secrets/contracts/secrets.json",
-        "/walter/secrets/walter_secrets/service.py",
-        "/walter/secrets/walter_secrets/vault.py"
+        "/walter/core/security/secrets/contracts/secrets.json",
+        "/walter/core/security/secrets/walter_secrets/service.py",
+        "/walter/core/security/secrets/walter_secrets/vault.py"
       ],
       "requires": [],
       "external": [
@@ -3113,17 +3113,17 @@
         "sync configuration"
       ],
       "core_paths": [
-        "/walter/secrets/walter_secrets/vault.py",
-        "/walter/secrets/walter_secrets/service.py",
-        "/walter/secrets/walter_secrets/masking.py",
-        "/walter/secrets/walter_secrets/settings.py",
-        "/walter/secrets/walter_secrets/unlock.py",
-        "/walter/secrets/walter_secrets/otp.py",
-        "/walter/secrets/walter_secrets/secrets_sync.py",
-        "/walter/secrets/walter_secrets/vault_react.py"
+        "/walter/core/security/secrets/walter_secrets/vault.py",
+        "/walter/core/security/secrets/walter_secrets/service.py",
+        "/walter/core/security/secrets/walter_secrets/masking.py",
+        "/walter/core/security/secrets/walter_secrets/settings.py",
+        "/walter/core/security/secrets/walter_secrets/unlock.py",
+        "/walter/core/security/secrets/walter_secrets/otp.py",
+        "/walter/core/security/secrets/walter_secrets/secrets_sync.py",
+        "/walter/core/security/secrets/walter_secrets/vault_react.py"
       ],
       "backup_paths": [
-        "/walter/secrets",
+        "/walter/core/security/secrets",
         "/root/.config/Bitwarden CLI/data.json",
         "/user/Lucas/config/secrets",
         "/user/Lucas/state/secrets",
@@ -3160,9 +3160,9 @@
         "owner": "secrets",
         "kind": "capability",
         "purpose": "Gérer les références au coffre et injecter localement les valeurs autorisées.",
-        "target_root": "/walter/secrets",
+        "target_root": "/walter/core/security/secrets",
         "config_paths": [
-          "/walter/secrets/config/walter-secrets.toml",
+          "/walter/core/security/secrets/config/walter-secrets.toml",
           "/user/Lucas/config/secrets/walter-secrets.toml"
         ],
         "permissions": [
@@ -3253,9 +3253,9 @@
         "audience": "agent",
         "title": "Walter Secrets",
         "order": 40,
-        "summary": "/walter/secrets/manifest/SUMMARY.md",
-        "manifest": "/walter/secrets/manifest/MANIFEST.md",
-        "guide": "/walter/secrets/manifest/GUIDE.md",
+        "summary": "/walter/core/security/secrets/manifest/SUMMARY.md",
+        "manifest": "/walter/core/security/secrets/manifest/MANIFEST.md",
+        "guide": "/walter/core/security/secrets/manifest/GUIDE.md",
         "tools": [
           "secret_search",
           "secret_reference"
@@ -3264,10 +3264,10 @@
       "components": [
         {
           "id": "library",
-          "path": "/walter/secrets/walter_secrets",
+          "path": "/walter/core/security/secrets/walter_secrets",
           "role": "Accès au coffre Bitwarden sans valeur exposée, autorisations (grants)",
           "status": "active",
-          "readme": "/walter/secrets/README.md",
+          "readme": "/walter/core/security/secrets/README.md",
           "interfaces": [
             {
               "transport": "cli",
@@ -3278,10 +3278,10 @@
         },
         {
           "id": "compat",
-          "path": "/walter/secrets/compat",
+          "path": "/walter/core/security/secrets/compat",
           "role": "Anciennes entrées de compatibilité",
           "status": "obsolete",
-          "readme": "/walter/secrets/README.md"
+          "readme": "/walter/core/security/secrets/README.md"
         }
       ]
     },
@@ -3531,13 +3531,13 @@
     },
     {
       "id": "soul",
-      "root": "/walter/soul",
+      "root": "/walter/core/identity",
       "anchors": [
-        "/walter/soul/bin/walter-soul",
-        "/walter/soul/contracts/soul.json",
-        "/walter/soul/config/targets.toml",
-        "/walter/soul/defaults/identity.md",
-        "/walter/soul/defaults/rules.md"
+        "/walter/core/identity/bin/walter-soul",
+        "/walter/core/identity/contracts/soul.json",
+        "/walter/core/identity/config/targets.toml",
+        "/walter/core/identity/defaults/identity.md",
+        "/walter/core/identity/defaults/rules.md"
       ],
       "requires": [],
       "external": [],
@@ -3547,7 +3547,7 @@
       ],
       "core_paths": [],
       "backup_paths": [
-        "/walter/soul",
+        "/walter/core/identity",
         "/user/Lucas/soul",
         "/user/Lucas/config/soul",
         "/user/Lucas/state/soul",
@@ -3575,9 +3575,9 @@
         "owner": "soul",
         "kind": "foundation",
         "purpose": "Rendre l'identité de l'instance active pour chaque runtime ; livrer l'identité et les règles par défaut d'une nouvelle instance.",
-        "target_root": "/walter/soul",
+        "target_root": "/walter/core/identity",
         "config_paths": [
-          "/walter/soul/config/targets.toml"
+          "/walter/core/identity/config/targets.toml"
         ],
         "permissions": [
           "écriture des profils générés"
@@ -3658,9 +3658,9 @@
         "audience": "agent",
         "title": "walter-soul",
         "order": 90,
-        "summary": "/walter/soul/manifest/SUMMARY.md",
-        "manifest": "/walter/soul/manifest/MANIFEST.md",
-        "guide": "/walter/soul/manifest/GUIDE.md",
+        "summary": "/walter/core/identity/manifest/SUMMARY.md",
+        "manifest": "/walter/core/identity/manifest/MANIFEST.md",
+        "guide": "/walter/core/identity/manifest/GUIDE.md",
         "tools": [
           "walter_profile"
         ]
@@ -3668,10 +3668,10 @@
       "components": [
         {
           "id": "renderer",
-          "path": "/walter/soul/bin/walter-soul",
+          "path": "/walter/core/identity/bin/walter-soul",
           "role": "Rendu de l'identité vers chaque runtime (SOUL.md, profils)",
           "status": "active",
-          "readme": "/walter/soul/README.md",
+          "readme": "/walter/core/identity/README.md",
           "interfaces": [
             {
               "transport": "cli",
@@ -3682,10 +3682,10 @@
         },
         {
           "id": "runtimes",
-          "path": "/walter/soul/runtimes",
+          "path": "/walter/core/identity/runtimes",
           "role": "Adaptateurs neutres par runtime",
           "status": "active",
-          "readme": "/walter/soul/README.md",
+          "readme": "/walter/core/identity/README.md",
           "vision_target": "core/identity/runtimes"
         }
       ]

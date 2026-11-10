@@ -1,3 +1,6 @@
 venv/
 __pycache__/
 /venv
+# nested module repositories (E9.6): each has its own git
+/identity/
+/security/secrets/

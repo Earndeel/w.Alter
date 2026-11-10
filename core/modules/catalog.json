@@ -126,19 +126,25 @@
     },
     {
       "id": "runtime",
-      "target": "runtime",
+      "target": "ops/runtime",
       "legacy": null,
       "manifest": "contracts/runtime.json",
       "neutral": true,
-      "vision_target": "ops/runtime"
+      "vision_target": "ops/runtime",
+      "compat_links": [
+        "/walter/runtime"
+      ]
     },
     {
       "id": "secrets",
-      "target": "secrets",
+      "target": "core/security/secrets",
       "legacy": "/opt/walter-secrets",
       "manifest": "contracts/secrets.json",
       "neutral": true,
-      "vision_target": "core/security/secrets"
+      "vision_target": "core/security/secrets",
+      "compat_links": [
+        "/walter/secrets"
+      ]
     },
     {
       "id": "skills",
@@ -152,11 +158,14 @@
     },
     {
       "id": "soul",
-      "target": "soul",
+      "target": "core/identity",
       "legacy": "/opt/walter-soul",
       "manifest": "contracts/soul.json",
       "neutral": true,
-      "vision_target": "core/identity"
+      "vision_target": "core/identity",
+      "compat_links": [
+        "/walter/soul"
+      ]
     }
   ]
 }
