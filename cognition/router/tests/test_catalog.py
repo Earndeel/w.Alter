@@ -145,8 +145,9 @@ def test_new_best_for_a_specialised_task_is_the_only_kind_of_news(conn):
     news = {"new": {"zz-newcomer": ["nouveau sur arena:text_coding"]}, "nerf": {}, "price_drop": {}}
     assert alerts.new_best(conn, new_run, news) == ["coding:zz-newcomer"]
     pend = alerts.pending(conn)
-    assert {a["kind"] for a in pend} - {"board_down"} <= {"challenger", "tier", "new_best"}   # + outages (2026-10-14)
-    a = next(a for a in pend if a["kind"] == "new_best")
+    # live alerts of the other kinds may be pending in the real catalog (pareto, nerf, plan changes, outages)
+    assert {a["kind"] for a in pend} - {"board_down", "pareto", "nerf", "plan_change"} <= {"challenger", "tier", "new_best"}
+    a = next(a for a in pend if a["kind"] == "new_best" and a.get("subject") == "zz-newcomer")   # not a live one
     assert "proposé" in telegram.render([a], conn)
     assert conn.execute("select pinned_model_id from models.preferences where task = 'coding'").fetchone()[
         "pinned_model_id"] == old                       # proposed, not switched
