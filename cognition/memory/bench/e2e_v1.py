@@ -40,7 +40,7 @@ class Gateway:
     """walter-memory-gateway on the test database (the real app, another port)."""
     def __enter__(self):
         env = {**os.environ, "WALTER_MEMORY_DATABASE_URL": DSN, "PGPASSFILE": "/root/.pgpass"}
-        for line in Path("/opt/walter-memory/.env").read_text().splitlines():   # the gateway token, as the unit loads it
+        for line in Path("/walter/cognition/memory/.env").read_text().splitlines():   # the gateway token, as the unit loads it
             if "=" in line and not line.startswith("#"):
                 k, v = line.split("=", 1)
                 env.setdefault(k.strip(), v.strip())

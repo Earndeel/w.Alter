@@ -11,7 +11,7 @@ Verified 2026-10-18. These are three separate contracts.
 `walter-memory-hermes-export.timer` runs daily at 02:10 UTC, persistent. The service invokes:
 
 ```
-/opt/walter-memory/venv/bin/python /opt/walter-memory/connectors/hermes.py \
+/walter/cognition/memory/venv/bin/python /walter/cognition/memory/connectors/hermes.py \
   --export-only --all-profiles --export-days 31 --export-seconds 900
 ```
 
@@ -30,7 +30,7 @@ Checkpoints: `ingestion.checkpoints`, stream `export`, connector `hermes` for de
 ## Isolated reconstruction command
 
 ```
-PYTHONPATH=/opt/walter-memory /opt/walter-memory/venv/bin/python \
+PYTHONPATH=/walter/cognition/memory /walter/cognition/memory/venv/bin/python \
   -m walter_memory.restore_drill \
   --report /root/.hermes/logs/walter-restore-isolated/latest.json
 ```

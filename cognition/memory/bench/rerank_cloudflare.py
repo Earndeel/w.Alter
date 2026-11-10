@@ -29,7 +29,7 @@ def env(name):
 
 def candidates():
     import httpx
-    sys.path.insert(0, "/opt/walter-memory")
+    sys.path.insert(0, "/walter/cognition/memory")
     from walter_memory import search
     acct, tok = env("CLOUDFLARE_ACCOUNT_ID"), env("CLOUDFLARE_AI_TOKEN")
     url = f"https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/@cf/baai/bge-reranker-base"

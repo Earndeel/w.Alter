@@ -122,5 +122,5 @@ confidentialité actuelle, provenance lisible, pas de rétractation, contenu tou
 
 `walter-memory health` (fraîcheur, files, budgets) ; `walter-memory stats` ; volumes : requêtes SQL sur les schémas
 ci-dessus (lecture seule, `docker exec hindsight-pg psql -U hindsight -d hindsight`). Qualité du rappel :
-`walter-python /opt/walter-memory/bench/recall_bench.py --bench-dir <dossier du banc> --path recall|context`
+`walter-python /walter/cognition/memory/bench/recall_bench.py --bench-dir <dossier du banc> --path recall|context`
 puis `bench/recall_judge.py` (le banc utilise le réordonnancement payant : ~0,06 USD par passage).

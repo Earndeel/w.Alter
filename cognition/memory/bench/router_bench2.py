@@ -2,12 +2,12 @@
 metrics + macro-F1 for L2, Jev and the hybrid (L2 decides, abstentions escalate to Jev)."""
 import concurrent.futures as cf, json, random, sys
 from pathlib import Path
-sys.path.insert(0, "/opt/walter-memory"); sys.path.insert(0, "/opt/walter-memory/bench")
+sys.path.insert(0, "/walter/cognition/memory"); sys.path.insert(0, "/walter/cognition/memory/bench")
 import numpy as np
 from router_bench import label, OUT
 from walter_memory import router
 from walter_memory.db import connection
-TRAIN = Path("/opt/walter-memory/bench/router_train_labels.jsonl")
+TRAIN = Path("/walter/cognition/memory/bench/router_train_labels.jsonl")
 bench = [json.loads(l) for l in OUT.open()]
 if not TRAIN.exists():
     used = {b["event_id"] for b in bench}

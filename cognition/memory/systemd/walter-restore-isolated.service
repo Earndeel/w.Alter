@@ -6,7 +6,7 @@ Wants=docker.service
 [Service]
 Type=oneshot
 UMask=0077
-WorkingDirectory=/opt/walter-memory
+WorkingDirectory=/walter/cognition/memory
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/local/bin/walter-python -m walter_memory.restore_drill --report /root/.hermes/logs/walter-restore-isolated/latest.json
 Nice=10

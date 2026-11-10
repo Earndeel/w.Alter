@@ -5,7 +5,7 @@ After=network-online.target raw-vault-s3.service
 [Service]
 Type=oneshot
 UMask=0077
-WorkingDirectory=/opt/walter-memory
+WorkingDirectory=/walter/cognition/memory
 Environment=PGPASSFILE=/root/.pgpass
 Nice=10
 IOSchedulingClass=idle

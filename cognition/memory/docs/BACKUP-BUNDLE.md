@@ -8,8 +8,8 @@ remote objects before declaring success.
 
 After the Core, Memory and Vault moves on 2026-10-28 UTC, their `/opt/walter-*`
 paths are compatibility symlinks. A service can still require
-`/opt/walter-memory/.env`, while the archive stores its single physical copy at
-`/walter/memory/.env`. Checking only exact tar member names incorrectly rejected
+`/walter/cognition/memory/.env`, while the archive stores its single physical copy at
+`/walter/cognition/memory/.env`. Checking only exact tar member names incorrectly rejected
 that complete payload. The first final offsite invocation failed closed at this
 check after uploading PG; it did not establish a new configuration backup.
 

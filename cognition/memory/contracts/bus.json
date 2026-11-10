@@ -38,7 +38,7 @@
     "owner": "bus",
     "kind": "foundation",
     "purpose": "Livrer les événements entre modules et conserver les curseurs de traitement.",
-    "target_root": "memory",
+    "target_root": "cognition/memory",
     "config_paths": [],
     "permissions": [
       "droits PostgreSQL du consommateur"

@@ -112,7 +112,7 @@ def postgres() -> dict[str, Any]:
 
 
 def recall_probe(probe: dict[str, Any]) -> dict[str, Any]:
-    sys.path.insert(0, "/opt/walter-memory")
+    sys.path.insert(0, "/walter/cognition/memory")
     from walter_memory import client
 
     start = time.perf_counter()

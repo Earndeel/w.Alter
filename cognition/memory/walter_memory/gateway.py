@@ -1,7 +1,7 @@
 """Ingestion Gateway (HTTP, 127.0.0.1:8890): the single write door for remote/agent connectors.
 
 Local connectors may import the library directly; anything outside this process tree (Mac agents, phone
-shortcuts, other harnesses) goes through here. Bearer token from /opt/walter-memory/.env (0600).
+shortcuts, other harnesses) goes through here. Bearer token from /walter/cognition/memory/.env (0600).
 """
 from __future__ import annotations
 

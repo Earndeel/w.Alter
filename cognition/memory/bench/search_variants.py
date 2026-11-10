@@ -1,5 +1,5 @@
 import concurrent.futures as cf, json, sys
-sys.path.insert(0, "/opt/walter-memory"); sys.path.insert(0, "/opt/walter-memory/bench")
+sys.path.insert(0, "/walter/cognition/memory"); sys.path.insert(0, "/walter/cognition/memory/bench")
 from search_vs_hindsight import judge, Q
 from walter_memory import search
 def fmt(r): return [f"[{x['source']}/{x['label']} {str(x['occurred_at'])[:10]}] {x['text'][:400]}" for x in r]

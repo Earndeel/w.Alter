@@ -1,7 +1,7 @@
 """walter-logs tools for Hermes (plugin; Hermes core is never patched).
 
 The raw session log of every agent that works for Monsieur (Hermes and all its profiles, Claude Code, Codex, DSH)
-lives in Postgres `walter_logs` (/opt/walter-memory, walter_memory/logs.py). These tools read it through the
+lives in Postgres `walter_logs` (/walter/cognition/memory, walter_memory/logs.py). These tools read it through the
 walter-memory CLI in cloud-safe mode: secrets are masked at write, local-only content is hidden, redacted content is
 pseudonymised. Hermes' own `session_search` only sees this profile's state.db; these see every runtime.
 """

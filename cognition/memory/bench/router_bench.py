@@ -6,12 +6,12 @@
 """
 import concurrent.futures as cf, json, random, sys, time
 from pathlib import Path
-sys.path.insert(0, "/opt/walter-memory")
+sys.path.insert(0, "/walter/cognition/memory")
 import numpy as np
 from walter_memory import llm, router
 from walter_memory.db import connection
 
-OUT = Path("/opt/walter-memory/bench/router_labels.jsonl")
+OUT = Path("/walter/cognition/memory/bench/router_labels.jsonl")
 DEFS = """Destinations possibles pour un message d'une conversation entre Monsieur (l'utilisateur) et son assistant W.Alter :
 - memory : contient un fait durable sur Monsieur (identité, lieu, santé, goûts, habitudes), ses projets/entreprises (objectif, statut, décisions et raisons) ou une règle/préférence sur la façon dont W.Alter doit agir.
 - social : contient une information substantielle sur une autre personne (qui elle est, relation avec Monsieur, événement marquant).

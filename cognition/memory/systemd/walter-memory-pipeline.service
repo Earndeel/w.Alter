@@ -3,7 +3,7 @@ Description=Walter Memory pipeline (V1): core.events → bus memory.event → ex
 After=network-online.target docker.service walter-llm.service
 
 [Service]
-WorkingDirectory=/opt/walter-memory
+WorkingDirectory=/walter/cognition/memory
 Environment=PGPASSFILE=/root/.pgpass
 ExecStart=/usr/local/bin/walter-memory pipeline run
 Restart=always

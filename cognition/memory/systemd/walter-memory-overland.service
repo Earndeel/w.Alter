@@ -3,7 +3,7 @@ Description=Walter Memory Overland GPS ingress
 After=network-online.target docker.service
 
 [Service]
-WorkingDirectory=/opt/walter-memory
+WorkingDirectory=/walter/cognition/memory
 EnvironmentFile=/instances/monsieur/bootstrap/overland.env
 Environment=PGPASSFILE=/root/.pgpass
 Environment=WALTER_MEMORY_POOL_MAX=2

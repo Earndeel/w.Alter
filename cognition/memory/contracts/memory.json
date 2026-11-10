@@ -69,7 +69,7 @@
     "owner": "memory",
     "kind": "capability",
     "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
-    "target_root": "memory",
+    "target_root": "cognition/memory",
     "config_paths": [
       ".env"
     ],

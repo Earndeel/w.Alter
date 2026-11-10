@@ -15,7 +15,7 @@ import numpy as np
 
 from . import search
 
-MODEL_PATH = Path("/opt/walter-memory/models/router_l2.pkl")
+MODEL_PATH = Path("/walter/cognition/memory/models/router_l2.pkl")
 DESTS = ["memory", "social", "index_only", "ignore"]
 LUNA_TO_DEST = {"user_profile": "memory", "project": "memory", "agent_rules": "memory", "people": "social",
                 "infra_internal": "index_only", "task_log": "index_only", "vacuous": "ignore", "test_junk": "ignore"}

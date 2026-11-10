@@ -1,7 +1,7 @@
 """P3 exit criterion: unified search vs Hindsight recall on the 30 real questions (LLM judge, top-5)."""
 import concurrent.futures as cf, json, sys, time
 import httpx
-sys.path.insert(0, "/opt/walter-memory")
+sys.path.insert(0, "/walter/cognition/memory")
 from walter_memory import llm, search
 Q = json.load(open("/opt/walter-voice-memory/bench/queries.json"))
 EXCL = [{"not": {"tags": ["quarantine:noise"], "match": "any_strict"}}]
@@ -36,7 +36,7 @@ if __name__ == "__main__":
   for name in ("hindsight", "unified", "unified+rerank"):
     ms = sorted(r[1][name]["ms"] for r in res)
     print(f"{name:15} répondables {sum(r[1][name]['answerable'] for r in res)}/30  utiles {sum(r[1][name]['useful'] for r in res)}/150  p50 {ms[15]:.0f} ms")
-  json.dump(res, open("/opt/walter-memory/bench/search_vs_hindsight.json", "w"), ensure_ascii=False, indent=1, default=str)
+  json.dump(res, open("/walter/cognition/memory/bench/search_vs_hindsight.json", "w"), ensure_ascii=False, indent=1, default=str)
   for q, o in res:
     if o["hindsight"]["answerable"] != o["unified+rerank"]["answerable"]:
         print("  diff:", q, "H", o["hindsight"]["answerable"], "U+R", o["unified+rerank"]["answerable"])

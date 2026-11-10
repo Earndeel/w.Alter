@@ -42,7 +42,7 @@
     "owner": "logs",
     "kind": "foundation",
     "purpose": "Conserver les traces accessibles de tous les harnesses dans un journal commun.",
-    "target_root": "memory",
+    "target_root": "cognition/memory",
     "config_paths": [],
     "permissions": [
       "lecture cloud-safe",
