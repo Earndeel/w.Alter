@@ -189,14 +189,19 @@ Interfaces : MCP stdio, walter CLI, CLI contracts, matrix, doctor, Declarative h
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| engine | planned | Runtime agentique unique de Walter (conception ; la production reste DSH dans /opt/dsh) | `/walter/core/engine` | core/engine |
+| engine | implemented | Runtime agentique unique de Walter : noyau DSH/Cordis approprié (base adaptable) + greffons et portes Walter ; en service dans /opt/dsh (dsh-web) | `/walter/core/engine` | core/engine |
 | engine-contracts | implemented | Schémas Engine API, accueil, délégation, politique, événements, stratégies (brouillons testés) | `/walter/core/engine/contracts` | core/engine/contracts |
 | engine-kernel | implemented | Gel du noyau DSH/Cordis (lot E1) : version exacte, verrou, empreintes de l'installation, installation hors ligne reproductible, vérification ; l'installation en service reste /opt/dsh | `/walter/core/engine/kernel` | core/engine/kernel |
+| engine-compositions | active | Source de la face du profil web DSH (nom, accueil, durée de connexion), rendue par walter-core dans le bloc géré dsh-face ; valeurs dans la configuration de l'instance (lot E1) | `/walter/core/engine/compositions` | core/engine/compositions |
+| engine-plugins | implemented | Stratégies du moteur : intake et events (lot E2 : accueil d'un tour — run, ContextPlan, pack, skills — et fin du run, turn.ended, session.ended) ; policy et budget (lot E3 : politique unique avant chaque outil de chaque agent, plafonds du tour) ; interrupteurs [dsh.engine] intake hook\|shadow\|native et policy off\|enforce | `/walter/core/engine/plugins` | core/engine/plugins |
+| security | implemented | Politique d'exécution unique de Walter (lot E3) : policy.json (jamais, classes d'outils, presets par porte, enfant ≤ parent) lue par le greffon policy du moteur (policy.mjs) et par le filet du serveur MCP pour tout client (walter_security) ; mêmes vecteurs d'essai des deux côtés | `/walter/core/security` | core/security |
+| engine-api | active | Engine API (lot E4) : porte canonique du moteur pour Telegram, le web, les modules et les tests — ouvrir ou retrouver une conversation (<porte>/<compte>/<conversation> → session du noyau), soumettre (idempotent), suivre (SSE), résultat d'un tour, interrompre, répondre aux approbations ; greffon hôte du profil web, interrupteur [dsh.engine] api off\|on | `/walter/core/interfaces/api` | core/interfaces/api |
+| interface-telegram | active | Porte Telegram du moteur (lot E7) : bot propre à Walter, client de l'Engine API uniquement — conversations telegram/<compte>/chat-<id> persistantes, messages idempotents (id Telegram), suivi SSE (écrit…, outils, réponse), /stop, /nouveau, /etat, boutons d'approbation, propriétaire seul ; service walter-telegram | `/walter/core/interfaces/telegram` | core/interfaces/telegram |
 | mcp-server | active | Serveur MCP walter : expose les capacités aux agents (Claude Code, Codex, DSH, Hermes) | `/walter/core/server.py` | core/interfaces/mcp |
 | capabilities-adapter | active | Adaptateur des outils MCP vers les commandes déclarées des modules | `/walter/core/walter_capabilities.py` | core/interfaces/mcp |
 | mcp-toolsets | active | Jeux d'outils MCP par client (WALTER_CLIENT_TAG) | `/walter/core/config/toolsets.toml` | core/interfaces/mcp |
 | runtime-hook | active | Adaptateur de cycle de vie des runtimes (preflight, contexte, runs, bus) appelé à chaque message | `/walter/core/hooks/walter_hook.py` | core/interfaces/hooks |
-| dsh-hooks | active | Greffons DSH (owner-turn) ; deviennent les greffons intake/events du moteur | `/walter/core/hooks/dsh` | core/engine/plugins |
+| dsh-hooks | active | Greffon DSH owner-turn (texte du propriétaire pour walter_hook.py) ; remplacé par engine/plugins/intake en mode native | `/walter/core/hooks/dsh` | core/engine/plugins |
 | platform | active | Registre, contrats, chemins, instances, raccordements, contrôles (walter …) | `/walter/core/walter_platform` | core/contracts |
 | module-catalog | active | Table unique des modules : emplacement actuel, ancien, cible de la vision | `/walter/core/modules/catalog.json` | core/contracts |
 | module-registry | active | Registre compilé depuis les contrats (généré, jamais édité à la main) | `/walter/core/modules/registry.json` | core/contracts |
@@ -367,6 +372,7 @@ Interfaces : CLI walter-ops backup|git|check|recovery|deploy|status (install, on
 | services | active | Dépendances opérationnelles de Walter (bases, bureaux distants, environnements Python partagés, passerelles) : installations, définitions de déploiement et données techniques ; jamais de code de Walter | `/services` | — |
 | postgres | implemented | Définition de déploiement de PostgreSQL (compose verrouillé par empreinte, configuration complète) préparée et essayée sur une copie restaurée ; pas en service : la production tourne encore dans le conteneur hindsight-pg sur le volume Docker historique | `/services/postgres` | — |
 | kernel-npm-cache | active | Cache npm hors ligne du noyau figé du moteur (lot E1), utilisé par core/engine/kernel/install.sh | `/services/dsh` | — |
+| python | active | Environnements Python installés des modules (runtime de walter-python, core, router, llm, raw-vault), déplacés le 2026-11-10 (E9.2a) ; chaque module garde un lien venv ; exclus de restic, reconstruits depuis les verrous des modules | `/services/python` | — |
 
 **Limites déclarées :**
 
