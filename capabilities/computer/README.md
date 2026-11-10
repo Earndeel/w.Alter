@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Rôle** | Opérations de bureau atomiques partagées par les harnesses : choix de la cible, présence et interruption, garde-fous de capture et de référence visuelle, reprise bornée, port CuaDriver. |
-| **Propriétaire** | walter-computer (`/walter/computer`). |
+| **Propriétaire** | walter-computer (`/walter/capabilities/computer`). |
 | **État** | **implemented** (constat du 09/11/2026) : pas de service dédié, appelé à la demande par le MCP `computer_use`. |
 | **Ne fait pas** | Porter le but, la boucle de planification ou la décision de permission (le harness appelant). Rejouer une action après un échec de transport. |
 | **Contrats** | [contracts/computer.json](contracts/computer.json) ; MCP `computer_use` ; plafonds dans `/walter/core/modules/computer-policy.json`. |
