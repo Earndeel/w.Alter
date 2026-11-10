@@ -3,11 +3,14 @@
   "modules": [
     {
       "id": "browse",
-      "target": "browse",
+      "target": "capabilities/browse",
       "legacy": "/opt/walter-browse",
       "manifest": "contracts/browse.json",
       "neutral": true,
-      "vision_target": "capabilities/browse"
+      "vision_target": "capabilities/browse",
+      "compat_links": [
+        "/walter/browse"
+      ]
     },
     {
       "id": "bus",

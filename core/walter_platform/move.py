@@ -5,7 +5,7 @@ Moving is not rewriting: the module keeps its code, public names and data; only 
             configuration, harness settings), git state, worktrees, containers mounting it
   apply     backup (catalog, every file and link it will touch) → mv (same filesystem) → compatibility link at
             the old place → command / legacy links repointed → references rewritten → catalog updated →
-            systemd reloaded, active units of the module restarted
+            systemd reloaded, active units whose unit files were rewritten restarted (others keep running via the compat link)
   verify    catalog and links in place, no live reference left to the old folder, restarted units active
   rollback  the manifest of an apply, undone in reverse order
 
@@ -167,6 +167,10 @@ class Move:
 
     def units(self, files):
         names = list(self.services()) if _on(self.fs, self.old).is_dir() else []
+        return sorted(set(names) | set(self.file_units(files)))
+
+    def file_units(self, files):
+        names = []
         for f in files:
             if '/systemd/' in f and f.endswith(('.service', '.timer', '.conf')):
                 name = Path(f).name if f.endswith(('.service', '.timer')) else Path(f).parent.name.removesuffix('.d')
@@ -205,6 +209,9 @@ class Move:
                 'catalog_entries': [e['id'] for e in self._entries_under()],
                 'rewrite': [f for f in rewrite if f not in dirty], 'rewrite_dirty': dirty, 'report_only': keep,
                 'links': self.links(), 'units': [{'unit': u, 'user': user} for u, user in self.units(rewrite)],
+                # restarted after the move: only units whose own files are rewritten (the others keep running
+                # through the compatibility link; a browser or engine is never cut for a folder move)
+                'restart': [{'unit': u, 'user': user} for u, user in self.file_units(rewrite)],
                 'repositories': {r: {'dirty': bool(_run('git', '-C', r, 'status', '--porcelain').stdout.strip()),
                                      'worktrees': self.worktrees(r)} for r in repos},
                 'containers': self.containers(),
@@ -245,7 +252,7 @@ class Move:
             rewritten.append({'before': f, 'after': after(f), 'sha_before': _sha(f), 'copy': str(copy)})
         manifest = {'module': self.id, 'old': str(self.old), 'new': str(self.new), 'fs': self.fs,
                     'at': datetime.now(timezone.utc).isoformat(timespec='seconds'), 'catalog': str(self.catalog_file),
-                    'rewritten': rewritten, 'links': plan['links'], 'units': plan['units'],
+                    'rewritten': rewritten, 'links': plan['links'], 'units': plan['restart'],
                     'worktrees': {r: plan['repositories'][r]['worktrees'] for r in plan['repositories']},
                     'mapping': self.mapping,
                     'step': 'backed-up'}
@@ -276,7 +283,7 @@ class Move:
         manifest['step'] = 'applied'
         mpath.write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
         if systemd:
-            manifest['restarted'] = _systemd(plan['units'])
+            manifest['restarted'] = _systemd(plan['restart'])
             mpath.write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
         return manifest
 
