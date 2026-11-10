@@ -162,6 +162,25 @@ test('routerValidate asks the walter-router CLI and refuses when it cannot answe
   assert.match((await routerValidate({ id: 'other' }, { bin })).error, /^router_unavailable/);
 });
 
+test('a key replayed before the kernel logged it is still one turn', async () => {
+  const { api, sessions } = make();
+  await open(api);
+  let calls = 0;                                   // the real kernel only dedupes what it has already logged
+  const prompt = sessions.prompt.bind(sessions);
+  sessions.prompt = async (...a) => { calls += 1; return prompt(...a); };
+  const body = { version: 1, op: 'turn.submit', session_id: 'telegram/lucas/chat-1', message: { text: 'un' }, idempotency_key: 'tg-1-990001' };
+  const [a, b] = await Promise.all([api.op(body), api.op(body)]);
+  assert.equal(calls, 1, 'one prompt reaches the kernel for one key');
+  assert.equal(a.request_id, b.request_id); assert.equal(Boolean(a.replayed) !== Boolean(b.replayed), true);
+  await api.op({ ...body, idempotency_key: 'tg-1-990002' });
+  assert.equal(calls, 2);
+});
+
+test('the kernel approval audit pair is not a client event (only the API id can be answered)', () => {
+  assert.equal(toClientEvent({ seq: 3, time: 1, type: 'approval/asked', data: { id: 'kernel-id', toolName: 'bash' } }), null);
+  assert.equal(toClientEvent({ seq: 4, time: 1, type: 'approval/decided', data: { id: 'kernel-id', outcome: 'rejected' } }), null);
+});
+
 test('turn.cancel reaches the kernel', async () => {
   const { api, sessions } = make();
   await open(api);

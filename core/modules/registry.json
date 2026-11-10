@@ -1004,7 +1004,8 @@
         "CLI attachment installs common MCP; context/model/lifecycle bindings are checked independently."
       ],
       "services": [
-        "walter-standby.timer"
+        "walter-standby.timer",
+        "walter-telegram.service"
       ],
       "optional": [],
       "contract": {
@@ -1197,7 +1198,7 @@
           "id": "engine-api",
           "path": "/walter/core/interfaces/api",
           "role": "Engine API (lot E4) : porte canonique du moteur pour Telegram, le web, les modules et les tests — ouvrir ou retrouver une conversation (<porte>/<compte>/<conversation> → session du noyau), soumettre (idempotent), suivre (SSE), résultat d'un tour, interrompre, répondre aux approbations ; greffon hôte du profil web, interrupteur [dsh.engine] api off|on",
-          "status": "implemented",
+          "status": "active",
           "readme": "/walter/core/interfaces/api/README.md",
           "contracts": [
             "/walter/core/engine/contracts/engine-api.v1.json"
@@ -1209,6 +1210,24 @@
             }
           ],
           "vision_target": "core/interfaces/api"
+        },
+        {
+          "id": "interface-telegram",
+          "path": "/walter/core/interfaces/telegram",
+          "role": "Porte Telegram du moteur (lot E7) : bot propre à Walter, client de l'Engine API uniquement — conversations telegram/<compte>/chat-<id> persistantes, messages idempotents (id Telegram), suivi SSE (écrit…, outils, réponse), /stop, /nouveau, /etat, boutons d'approbation, propriétaire seul ; service walter-telegram",
+          "status": "active",
+          "readme": "/walter/core/interfaces/telegram/README.md",
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "Telegram Bot API, long polling (bot du grant de @instance/config/core/telegram.toml)"
+            },
+            {
+              "transport": "cli",
+              "interface": "walter-python core/interfaces/telegram/bot.py --check"
+            }
+          ],
+          "vision_target": "core/interfaces/telegram"
         },
         {
           "id": "mcp-server",

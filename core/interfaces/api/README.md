@@ -32,7 +32,9 @@
 `interrupted` (processus arrêté), `unknown_outcome`.
 
 **Événements client** (SSE) : `turn.started`, `message.user` (avec `request_id`), `message.assistant`,
-`tool.called`, `tool.result`, `approval.requested`, `approval.answered`, `turn.ended` (avec `status`).
+`tool.called`, `tool.result`, `approval.requested`, `approval.answered`, `turn.ended` (avec `status`). Les
+approbations sont celles de l'API (son identifiant, le seul que `approval.answer` connaît ; redonnées à chaque
+abonnement tant qu'elles attendent) : la paire d'audit du noyau (`approval/asked|decided`) n'est pas transmise.
 
 ## Portes et permissions
 

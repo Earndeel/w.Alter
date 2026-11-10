@@ -1,0 +1,15 @@
+# Walter Telegram door (core/interfaces/telegram) — shipped defaults, neutral.
+# The instance overrides this file in @instance/config/core/telegram.toml (owner accounts at least).
+
+[telegram]
+# walter-secrets grant holding the bot token (never the token itself)
+grant = "telegram-walter-bot"
+# Telegram user ids served; anyone else is ignored. Empty = the door refuses to start.
+owner_ids = []
+# engine account of the owner: sessions are telegram/<account>/chat-<id>
+account = "owner"
+state = "@instance/state/core/telegram"
+
+[engine]
+url = "http://127.0.0.1:8895"
+token_file = "@instance/bootstrap/engine/api.token"

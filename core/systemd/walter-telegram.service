@@ -1,0 +1,21 @@
+[Unit]
+Description=W.Alter Telegram door (core/interfaces/telegram): @«secret:vault», a client of the Engine API
+Documentation=file:///walter/core/interfaces/telegram/README.md
+After=network-online.target dsh-web.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root
+# Bot token from walter-secrets (grant in @instance/config/core/telegram.toml), engine token from the instance:
+# no secret in this file.
+ExecStart=/usr/local/bin/walter-python /walter/core/interfaces/telegram/bot.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+MemoryHigh=300M
+MemoryMax=600M
+
+[Install]
+WantedBy=multi-user.target

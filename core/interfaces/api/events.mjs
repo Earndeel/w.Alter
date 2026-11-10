@@ -23,8 +23,9 @@ export function toClientEvent(ev) {
     }
     case 'tool/call': return { ...base, type: 'tool.called', turn: d.turn, name: d.name, call_id: d.callId };
     case 'tool/result': return { ...base, type: 'tool.result', turn: d.turn, ok: !d.error };
-    case 'approval/asked': return { ...base, type: 'approval.requested', request_id: d.id, tool: d.toolName, reason: d.reason ?? null };
-    case 'approval/decided': return { ...base, type: 'approval.answered', request_id: d.id, outcome: d.outcome };
+    // The kernel's approval/asked|decided pair is its audit trail, under ITS id; a client answers the API's own
+    // approval.requested (emitted live, and again for every pending request at subscription) — never both.
+    case 'approval/asked': case 'approval/decided': return null;
     default: return null;
   }
 }

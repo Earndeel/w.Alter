@@ -73,6 +73,7 @@ export class EngineApi {
     this.approvalTimeoutMs = approvalTimeoutMs; this.log = log;
     this.maxDepth = maxDepth; this.provider = provider; this.tasks = tasks;
     this.pending = new Map();             // approval id → { row, resolve, timer }
+    this.accepted = new Map();            // `${kernel} ${requestId}` → time: a key replayed before the kernel logged it
     this.listeners = new Set();           // live approval notices for SSE subscribers
   }
 
@@ -149,13 +150,23 @@ export class EngineApi {
     if (requestId.length < 8 || requestId.length > 200) throw new ApiError(400, 'invalid_idempotency_key');
     const kernel = kernelOf(row);
     const watch = waitMs ? this.watch(kernel, requestId, Math.min(Number(waitMs) || 0, 30 * 60_000)) : null;
-    try {
-      await this.sessions.prompt({ requestId, sessionId: kernel, mode, content: [{ type: 'text', text }] }, AbortSignal.timeout(60_000));
-    } catch (e) {
-      watch?.abort();
-      throw new ApiError(e?.code === 'session/writer-held' ? 409 : 502, e?.code || 'prompt_failed', String(e?.message || e).slice(0, 200));
+    // The kernel deduplicates a requestId it has logged; a replay arriving before that (a door redelivering an
+    // update within milliseconds) is caught here, so one key is one turn, always.
+    const seen = `${kernel} ${requestId}`;
+    const now = Date.now();
+    for (const [k, t] of this.accepted) if (now - t > 3_600_000) this.accepted.delete(k); else break;
+    const replay = key && this.accepted.has(seen);
+    if (!replay) {
+      if (key) this.accepted.set(seen, now);
+      try {
+        await this.sessions.prompt({ requestId, sessionId: kernel, mode, content: [{ type: 'text', text }] }, AbortSignal.timeout(60_000));
+      } catch (e) {
+        if (key) this.accepted.delete(seen);
+        watch?.abort();
+        throw new ApiError(e?.code === 'session/writer-held' ? 409 : 502, e?.code || 'prompt_failed', String(e?.message || e).slice(0, 200));
+      }
     }
-    const out = { accepted: true, session_id: sid, request_id: requestId, walter_session: walterKey(kernel), mode };
+    const out = { accepted: true, session_id: sid, request_id: requestId, walter_session: walterKey(kernel), mode, ...(replay ? { replayed: true } : {}) };
     if (!watch) return out;
     return { ...out, result: await watch.promise };
   }
@@ -338,13 +349,14 @@ export function handler(api, token) {
         const ctrl = new AbortController();
         req.on('close', () => ctrl.abort());
         const since = url.searchParams.get('since_seq');
+        api.row(url.searchParams.get('session_id'));      // unknown session: answered as JSON, before the stream
         const it = api.events(url.searchParams.get('session_id'), since == null ? null : Number(since), ctrl.signal);
-        const first = await it.next();                     // errors (unknown session) still answer as JSON
+        // headers at once: an idle client knows it is subscribed (nothing it submits afterwards can be missed)
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
         res.write(': walter engine events\n\n');
         const ping = setInterval(() => res.write(': ping\n\n'), 15_000);
         try {
-          for (let r = first; !r.done; r = await it.next()) res.write(`event: ${r.value.type}\ndata: ${JSON.stringify(r.value)}\n\n`);
+          for await (const e of it) res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
         } finally { clearInterval(ping); ctrl.abort(); res.end(); }
         return undefined;
       }
