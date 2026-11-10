@@ -503,7 +503,7 @@ Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks, walt
 Gérer le contenu, la recherche, les propositions et la curation des procédures.
 
 Contrat 1.1.0; propriétaire : skills.
-Racine actuelle : `/walter/skills`. Cible : `/walter/skills`.
+Racine actuelle : `/walter/capabilities/skills`. Cible : `/walter/capabilities/skills`.
 
 Interfaces : HTTP :8891, stdlib client, MCP, Hermes plugin.
 
@@ -517,11 +517,11 @@ Interfaces : HTTP :8891, stdlib client, MCP, Hermes plugin.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| core | active | Noyau des skills (store git, cartes Postgres, politique d'exposition, apprentissage) | `/walter/skills/walter_skills` | capabilities/skills |
-| service | active | Service :8891 | `/walter/skills/walter_skills/api.py` | capabilities/skills |
-| consumer | active | Consommateur du bus walter-skills-bus | `/walter/skills/walter_skills/consumer.py` | capabilities/skills |
-| library | active | Bibliothèque de procédures (SKILL.md) | `/walter/skills/skills` | capabilities/skills/library |
-| archive | obsolete | Skills retirés (réserve) | `/walter/skills/archive` | capabilities/skills/archive |
+| core | active | Noyau des skills (store git, cartes Postgres, politique d'exposition, apprentissage) | `/walter/capabilities/skills/walter_skills` | capabilities/skills |
+| service | active | Service :8891 | `/walter/capabilities/skills/walter_skills/api.py` | capabilities/skills |
+| consumer | active | Consommateur du bus walter-skills-bus | `/walter/capabilities/skills/walter_skills/consumer.py` | capabilities/skills |
+| library | active | Bibliothèque de procédures (SKILL.md) | `/walter/capabilities/skills/skills` | capabilities/skills/library |
+| archive | obsolete | Skills retirés (réserve) | `/walter/capabilities/skills/archive` | capabilities/skills/archive |
 
 **Limites déclarées :**
 

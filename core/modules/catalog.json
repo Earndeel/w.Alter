@@ -133,10 +133,13 @@
     },
     {
       "id": "skills",
-      "target": "skills",
+      "target": "capabilities/skills",
       "legacy": "/opt/walter-skills",
       "manifest": "contracts/skills.json",
-      "vision_target": "capabilities/skills"
+      "vision_target": "capabilities/skills",
+      "compat_links": [
+        "/walter/skills"
+      ]
     },
     {
       "id": "soul",

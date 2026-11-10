@@ -3287,12 +3287,12 @@
     },
     {
       "id": "skills",
-      "root": "/walter/skills",
+      "root": "/walter/capabilities/skills",
       "anchors": [
-        "/walter/skills/config/walter-skills.toml",
-        "/walter/skills/contracts/skills.json",
-        "/walter/skills/walter_skills/api.py",
-        "/walter/skills/manifest/GUIDE.md"
+        "/walter/capabilities/skills/config/walter-skills.toml",
+        "/walter/capabilities/skills/contracts/skills.json",
+        "/walter/capabilities/skills/walter_skills/api.py",
+        "/walter/capabilities/skills/manifest/GUIDE.md"
       ],
       "requires": [
         "bus"
@@ -3306,12 +3306,12 @@
         "skills.*"
       ],
       "core_paths": [
-        "/walter/skills/walter_skills/client.py",
-        "/walter/skills/walter_skills/policy.py",
-        "/walter/skills/walter_skills/domains.py"
+        "/walter/capabilities/skills/walter_skills/client.py",
+        "/walter/capabilities/skills/walter_skills/policy.py",
+        "/walter/capabilities/skills/walter_skills/domains.py"
       ],
       "backup_paths": [
-        "/walter/skills"
+        "/walter/capabilities/skills"
       ],
       "interfaces": [
         "HTTP :8891",
@@ -3339,9 +3339,9 @@
         "owner": "skills",
         "kind": "capability",
         "purpose": "Gérer le contenu, la recherche, les propositions et la curation des procédures.",
-        "target_root": "/walter/skills",
+        "target_root": "/walter/capabilities/skills",
         "config_paths": [
-          "/walter/skills/config/walter-skills.toml"
+          "/walter/capabilities/skills/config/walter-skills.toml"
         ],
         "permissions": [
           "propositions en brouillon",
@@ -3457,9 +3457,9 @@
         "audience": "agent",
         "title": "W.Alter Skills",
         "order": 80,
-        "summary": "/walter/skills/manifest/SUMMARY.md",
-        "manifest": "/walter/skills/manifest/MANIFEST.md",
-        "guide": "/walter/skills/manifest/GUIDE.md",
+        "summary": "/walter/capabilities/skills/manifest/SUMMARY.md",
+        "manifest": "/walter/capabilities/skills/manifest/MANIFEST.md",
+        "guide": "/walter/capabilities/skills/manifest/GUIDE.md",
         "manifest_command": [
           "walter-skills",
           "brief",
@@ -3483,18 +3483,18 @@
       "components": [
         {
           "id": "core",
-          "path": "/walter/skills/walter_skills",
+          "path": "/walter/capabilities/skills/walter_skills",
           "role": "Noyau des skills (store git, cartes Postgres, politique d'exposition, apprentissage)",
           "status": "active",
-          "readme": "/walter/skills/README.md",
+          "readme": "/walter/capabilities/skills/README.md",
           "vision_target": "capabilities/skills"
         },
         {
           "id": "service",
-          "path": "/walter/skills/walter_skills/api.py",
+          "path": "/walter/capabilities/skills/walter_skills/api.py",
           "role": "Service :8891",
           "status": "active",
-          "readme": "/walter/skills/README.md",
+          "readme": "/walter/capabilities/skills/README.md",
           "interfaces": [
             {
               "transport": "http",
@@ -3505,26 +3505,26 @@
         },
         {
           "id": "consumer",
-          "path": "/walter/skills/walter_skills/consumer.py",
+          "path": "/walter/capabilities/skills/walter_skills/consumer.py",
           "role": "Consommateur du bus walter-skills-bus",
           "status": "active",
-          "readme": "/walter/skills/README.md",
+          "readme": "/walter/capabilities/skills/README.md",
           "vision_target": "capabilities/skills"
         },
         {
           "id": "library",
-          "path": "/walter/skills/skills",
+          "path": "/walter/capabilities/skills/skills",
           "role": "Bibliothèque de procédures (SKILL.md)",
           "status": "active",
-          "readme": "/walter/skills/README.md",
+          "readme": "/walter/capabilities/skills/README.md",
           "vision_target": "capabilities/skills/library"
         },
         {
           "id": "archive",
-          "path": "/walter/skills/archive",
+          "path": "/walter/capabilities/skills/archive",
           "role": "Skills retirés (réserve)",
           "status": "obsolete",
-          "readme": "/walter/skills/README.md",
+          "readme": "/walter/capabilities/skills/README.md",
           "vision_target": "capabilities/skills/archive"
         }
       ]
