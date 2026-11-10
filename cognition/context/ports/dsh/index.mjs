@@ -106,7 +106,7 @@ export class WalterContextEngine extends BasicCompactionEngine {
     const capacity = (info.context?.contextWindow || 0) - (config.maxTokens || info.defaultMaxTokens || 0);
     if (info.context && capacity <= 0) throw new Error('walter-context: no checkpoint budget');
     const result = await bridge({ op: 'summarize', messages: normalize(input.messages),
-      model: config.model, budget_tokens: Math.max(0, capacity) }, signal);
+      model: profileModel(config), budget_tokens: Math.max(0, capacity) }, signal);
     signal?.throwIfAborted();
     this.ctx.logger.info(`walter-context: ${JSON.stringify({ mode: 'checkpoint', session: agent.session.id,
       input_messages: result.input_messages, input_tokens: result.input_tokens, output_tokens: result.output_tokens })}`);
@@ -124,7 +124,7 @@ export class WalterContextEngine extends BasicCompactionEngine {
     const info = await this.ctx.llm.resolveModelInfo(header.config.provider, header.config.model, signal);
     const capacity = (info.context?.contextWindow || 0) - (header.config.maxTokens || info.defaultMaxTokens || 0);
     if (info.context && capacity <= 0) throw new Error('walter-context: no request budget after output reservation');
-    const result = await bridge({ op: 'plan', messages: normalize(messages), model: header.config.model,
+    const result = await bridge({ op: 'plan', messages: normalize(messages), model: profileModel(header.config),
       measured_tokens: this.ctx.tokenMeter.measure(session).totalTokens, budget_tokens: Math.max(0, capacity),
       force: trigger === 'context-overflow' }, signal);
     signal.throwIfAborted();
@@ -146,6 +146,13 @@ export class WalterContextEngine extends BasicCompactionEngine {
       throw new Error('walter-context: checkpoint would split tool pairing');
     return this.compactRegion(start, end, agent, signal);
   }
+}
+
+/** The model name walter-context profiles: a Walter Router alias (provider `walter`, model `auto`, a task…) is
+ * qualified as `walter/<alias>` so it gets the engine's own profile, not the unknown-model default. */
+export function profileModel(config) {
+  const model = String(config?.model || '');
+  return config?.provider === 'walter' && !model.startsWith('walter/') ? `walter/${model}` : model;
 }
 
 /** The current session's raw log is the immediate source before PG catch-up. */

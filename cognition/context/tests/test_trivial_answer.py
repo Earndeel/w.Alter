@@ -37,3 +37,11 @@ def test_only_a_trivial_plan_may_carry_an_answer_and_it_is_bound_to_the_message(
         ContextPlan(turn_id="t", thread=ThreadChoice(id=None, new=True), act="new", level="L1", answer="x").validate()
     assert "answer" not in requested(ContextPlan(turn_id="t", thread=ThreadChoice(id=None, new=True), act="new",
                                                  level="L1").to_dict(), "test")
+
+
+def test_machine_turn_gets_one_tier_below():
+    from walter_context.preflight.__main__ import requested
+    plan = {"model_profile": {"task": "document", "level": "L2"}}
+    assert requested(plan, "x")["level"] == "L2"
+    assert requested(plan, "x", "machine")["level"] == "L1"
+    assert requested({"model_profile": {"task": "general", "level": "L1"}}, "x", "machine")["level"] == "L1"

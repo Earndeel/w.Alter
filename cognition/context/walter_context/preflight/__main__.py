@@ -68,18 +68,26 @@ def subjects(d: dict) -> tuple[list[dict], str | None, float | None]:
         return [], None, None
 
 
-def requested(plan: dict, message: str) -> dict:
+# A machine turn (a sub-agent's mission, a delegated sub-task) is bounded work: one text tier below what the same
+# words would get from the owner, never under L1 (2026-11-10: three L2 sub-agents of one V1 turn made 84 Opus calls).
+SUBTASK_TIER = {"L3": "L2", "L2": "L1"}
+
+
+def requested(plan: dict, message: str, channel: str | None = None) -> dict:
     """What this turn asks of Walter Router (lot 2, 2026-11-07): read by the model gateway from the run. A rule's
     answer travels with the hash of the owner's message it answers, so it is only ever returned for that message."""
     profile = plan.get("model_profile") or {}
-    out = {"task": profile.get("task"), "level": profile.get("level"), "require": profile.get("require") or None,
+    level = profile.get("level")
+    if channel == "machine":
+        level = SUBTASK_TIER.get(level, level)
+    out = {"task": profile.get("task"), "level": level, "require": profile.get("require") or None,
            "fast_path": plan.get("fast_path")}
     if plan.get("answer"):
         out.update(answer=plan["answer"], message_sha=hashlib.sha256(message.strip().encode()).hexdigest())
     return out
 
 
-def _attach_run(run_id: str, plan: dict, message: str = "") -> None:
+def _attach_run(run_id: str, plan: dict, message: str = "", channel: str | None = None) -> None:
     """Walter Memory's Run Plane through its command (declared interface); never blocks the preflight."""
     import subprocess
     thread = (plan.get("thread") or {}).get("id")
@@ -87,7 +95,7 @@ def _attach_run(run_id: str, plan: dict, message: str = "") -> None:
         subprocess.run(["walter-memory", "runs", "update"], input=json.dumps(
             {"run_id": run_id, "level": plan.get("level"), "act": plan.get("act"),
              "thread_id": thread if thread and thread != "new" else None,
-             "requested": requested(plan, message)}),
+             "requested": requested(plan, message, channel)}),
             capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.TimeoutExpired):
         pass
@@ -119,7 +127,7 @@ def handle(d: dict, shadow: bool, want_pack: bool = False) -> tuple[dict | None,
                             "waiting_age_s": waiting_age}, "plan_ms": round((time.time() - t0) * 1000)}
         if d.get("run_id"):                 # Walter Run Plane: the plan's level and thread belong to the run
             row["run_id"] = d["run_id"]
-            _attach_run(d["run_id"], plan, req.message)
+            _attach_run(d["run_id"], plan, req.message, d.get("channel"))
         if (shadow or want_pack) and req.privacy_class != "local_only":
             from ..assembly import pack
             from ..retrieval import gather

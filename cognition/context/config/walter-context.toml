@@ -23,6 +23,18 @@ emergency_share = 0.92       # host-side compression only above this share of th
 # Model profiles: first `match` (fnmatch on the lower-cased model id) wins; the last one is the default.
 # effective_budget = where quality starts to suffer (not the advertised window); hard_budget = never exceed.
 # cache: prefix (automatic prefix cache) | breakpoints (explicit markers) | none.  Costs are relative to input = 1.
+# Walter Engine: the model is a Router alias (`walter/auto`, `walter/<task>`), resolved per call by walter-llm among the
+# engine tiers (GPT-6 / Claude today). Budgets = the smallest of those profiles; without this entry the engine fell to
+# the 64k default and compacted (and lost its cache) every few calls on a 40-60k conversation (2026-11-10).
+[[model]]
+match = "walter/*"
+effective_budget = 96000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.10
+write_cost = 1.0
+
 [[model]]
 match = "gpt-6*"
 effective_budget = 96000
