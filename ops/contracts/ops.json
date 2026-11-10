@@ -14,7 +14,7 @@
   ],
   "requires": [],
   "external": [
-    "systemd units walter-pg-backup, walter-statedb-backup, walter-offsite-backup, walter-offsite-restore-test (unit files on the host; their scripts are backup/scripts/* since 2026-10-29), walter-restore-isolated (Walter Memory's restore drill, started by Ops)",
+    "systemd units walter-pg-backup, walter-statedb-backup, walter-offsite-backup, walter-offsite-restore-test (unit files on the host; their scripts are backup/scripts/* since 2026-10-29), walter-restore-isolated (Walter Memory's restore drill, started by Ops), walter-docker-log-rotate (host/, from Hermes' scripts on 2026-11-10)",
     "git",
     "docker (PostgreSQL container: dumps, db checkpoints, scratch restore)",
     "zstd, tar, age, rclone",

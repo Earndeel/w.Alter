@@ -1,0 +1,8 @@
+[Unit]
+Description=W.Alter ops: rotate the Docker json log of the PostgreSQL container (copytruncate, gzip, keep 5)
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /walter/ops/host/rotate_docker_logs.py --containers hindsight-pg --max-mb 50 --keep 5
