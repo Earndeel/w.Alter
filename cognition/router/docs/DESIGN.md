@@ -177,7 +177,7 @@ heure / lieu / agenda seulement si la dimension le demande.
 ## 10. Événements environnementaux 🟡 (mode observation depuis le 2026-10-04)
 
 Implémenté dans walter-memory : `walter_memory/triage.py`, table `triage.decisions`, règles
-`/opt/walter-memory/config/triage_rules.json`, timer `walter-memory-triage` (10 min). Reste : livraison (résumé
+`/walter/cognition/memory/config/triage_rules.json`, timer `walter-memory-triage` (10 min). Reste : livraison (résumé
 Telegram, brouillons de réponse) une fois les règles validées par le propriétaire.
 
 
