@@ -57,7 +57,7 @@
     "owner": "computer",
     "kind": "capability",
     "purpose": "Observer et manipuler un appareil avec des permissions et cibles explicites.",
-    "target_root": "computer",
+    "target_root": "capabilities/computer",
     "config_paths": [
       "~/.config/walter-device-node",
       "config/config.json",
