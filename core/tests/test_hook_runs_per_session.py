@@ -18,10 +18,11 @@ def hook(monkeypatch, tmp_path):
     sys.path.insert(0, str(ROOT / "hooks"))
     import runctx
     monkeypatch.setattr(runctx, "FALLBACK", tmp_path / "fallback")
-    ended, ids = [], iter(f"run-{i}" for i in range(100))
+    ended, superseded, ids = [], [], iter(f"run-{i}" for i in range(100))
     runs = types.SimpleNamespace(
         start=lambda **k: next(ids), routing=lambda *a, **k: None, sweep=lambda: None,
         safe=lambda fn, *a, **k: fn(*a, **k),
+        supersede=lambda session, run_id, status="cancelled": superseded.append((session, run_id)) or [],
         end=lambda run_id, status="ended", costs=None: ended.append((run_id, status)),
         end_open=lambda session, status="ended": ended.append((f"open:{session}", status)) or f"open:{session}")
     pkg = types.ModuleType("walter_memory"); pkg.runs = runs
@@ -31,6 +32,7 @@ def hook(monkeypatch, tmp_path):
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
     monkeypatch.setattr(mod, "_privacy", lambda: types.SimpleNamespace(detect=lambda text: []))
     mod.ended = ended
+    mod.superseded = superseded
     yield mod
     sys.path.remove(str(ROOT / "hooks"))
 
@@ -49,3 +51,9 @@ def test_a_new_message_in_the_same_session_interrupts_its_own_run(hook):
     a = hook.run_start("dsh", "dsh/vm/session-a", "premier", record_pid=4243)
     hook.run_start("dsh", "dsh/vm/session-a", "second", record_pid=4243)
     assert (a, "cancelled") in hook.ended
+
+
+def test_after_a_harness_restart_the_sessions_older_open_run_is_superseded(hook):
+    # the engine restarted mid-turn: the new process has no record of the old run, Memory closes it by session
+    b = hook.run_start("dsh", "dsh/vm/session-a", "après redémarrage", record_pid=5555)
+    assert ("dsh/vm/session-a", b) in hook.superseded

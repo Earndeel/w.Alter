@@ -325,6 +325,8 @@ def run_start(runtime: str, session_key: str, prompt: str, *, channel: str = "ow
         channel = os.environ.get("WALTER_RUN_CHANNEL") or channel
         run_id = runs.start(origin={"channel": channel, "runtime": runtime, "session_id": session_key},
                             goal=prompt, privacy_class="local_only" if secret else "cloud_allowed", dedupe_key=dedupe)
+        # the same session's older run still open (its harness restarted mid-turn, so no process record): interrupted
+        runs.safe(runs.supersede, session_key, run_id)
         runs.safe(runs.routing, run_id, {"applied": False, "configured": True, "via": "walter-llm poste (DSH provider walter)"} if runtime == "dsh"
                   else {"applied": False, "constraint": "harness_imposed", "runtime": runtime})
         if record_pid:
