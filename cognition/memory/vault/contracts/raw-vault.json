@@ -44,7 +44,7 @@
     "owner": "raw-vault",
     "kind": "capability",
     "purpose": "Conserver les octets originaux et les relier au catalogue canonique.",
-    "target_root": "memory/vault",
+    "target_root": "cognition/memory/vault",
     "config_paths": [
       "/root/.config/rclone/rclone.conf",
       "/root/.hermes/raw-vault/s3.env"
