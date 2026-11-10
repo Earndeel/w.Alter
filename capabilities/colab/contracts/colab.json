@@ -41,7 +41,7 @@
     "owner": "colab",
     "kind": "capability",
     "purpose": "Préparer et exécuter des travaux de calcul distant qualifiés.",
-    "target_root": "colab",
+    "target_root": "capabilities/colab",
     "config_paths": [],
     "permissions": [
       "validation de l’artefact avant allocation GPU",
