@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# walter-pg-relocate — move the PostgreSQL cluster of a hand-started container from its Docker volume to a plain
+# folder served by a compose definition (E9.2b, 2026-11-10), and back.
+#
+#   walter-pg-relocate check              preconditions only (nothing changes)
+#   walter-pg-relocate migrate            stop consumers, stop the server, move the data, start from compose,
+#                                         settings from config/ only, compare every table, restart consumers;
+#                                         any failure after the server stopped rolls back automatically
+#   walter-pg-relocate rollback           compose down, data back into the volume, old container, old settings
+#
+# Parameters (environment; defaults = Walter's production server, see /services/postgres/README.md):
+#   PG_CONTAINER (hindsight-pg)  PG_VOLUME (hindsight-pg)  PG_TARGET (/services/postgres)  PG_DB / PG_USER (hindsight)
+#   PG_UNITS ("" = the consumer list below; "none" = touch no unit, for a rehearsal)  PG_STATE (state + reports folder)
+#
+# No password is read, written or printed: psql runs inside the container over its local socket (trust there).
+set -Eeuo pipefail
+
+CONTAINER=${PG_CONTAINER:-hindsight-pg}
+VOLUME=${PG_VOLUME:-hindsight-pg}
+TARGET=${PG_TARGET:-/services/postgres}
+DB=${PG_DB:-hindsight}
+DBUSER=${PG_USER:-hindsight}
+STATE=${PG_STATE:-$TARGET/relocation}
+OLD=${CONTAINER}-volume
+DEFAULT_UNITS="walter-memory-gateway walter-memory-pipeline walter-memory-overland walter-logs-watch walter-skills
+walter-skills-bus walter-secrets-sync walter-router-quota walter-context-preflight walter-llm walter-router-control"
+UNITS=${PG_UNITS:-$DEFAULT_UNITS}
+[ "$UNITS" = none ] && UNITS=""
+
+log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" | tee -a "$STATE/relocate.log" >&2; }
+MIGRATING=0; STOPPED=0
+die() {
+  log "ERROR: $*"; trap - ERR
+  if [ "$MIGRATING" = 1 ]; then MIGRATING=0; log "rolling back"; rollback      # rollback restarts the units too
+  elif [ "$STOPPED" = 1 ]; then STOPPED=0; units_start; fi
+  exit 1
+}
+psql_in() { docker exec -i "$1" psql -X -v ON_ERROR_STOP=1 -U "$DBUSER" -d "$DB" -Atq "${@:2}"; }
+volume_dir() { docker volume inspect "$VOLUME" --format '{{.Mountpoint}}'; }
+wait_ready() {
+  for _ in $(seq 1 90); do
+    docker exec "$1" pg_isready -U "$DBUSER" -d "$DB" -q 2>/dev/null && return 0; sleep 2
+  done
+  return 1
+}
+counts() {   # exact row count of every table, sorted (schema.table|rows)
+  psql_in "$1" -c "select table_schema||'.'||table_name||'|'||(xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text
+                   from information_schema.tables where table_type='BASE TABLE'
+                   and table_schema not in ('pg_catalog','information_schema') order by 1"
+}
+compose() { docker compose -f "$TARGET/compose.yaml" "$@"; }
+units_stop() {
+  : > "$STATE/units-were-active"
+  for u in $UNITS; do
+    if systemctl is-active -q "$u"; then echo "$u" >> "$STATE/units-were-active"; fi
+  done
+  # timers first (no new run), then the services that hold connections
+  systemctl list-units --plain --no-legend 'walter-memory-*.timer' 'walter-router-*.timer' walter-guardians.timer memory-autopilot.timer walter-pg-backup.timer walter-restic-backup.timer \
+    | awk '$3=="active"{print $1}' > "$STATE/timers-were-active" || true
+  if [ -n "$UNITS" ]; then
+    xargs -r systemctl stop < "$STATE/timers-were-active"
+    sed 's/\.timer$/.service/' "$STATE/timers-were-active" | xargs -r systemctl stop   # a run in progress (idempotent jobs)
+    xargs -r systemctl stop < "$STATE/units-were-active"
+  fi
+  log "stopped: $(wc -l < "$STATE/units-were-active") services, $(wc -l < "$STATE/timers-were-active") timers"
+}
+units_start() {
+  [ -n "$UNITS" ] || return 0
+  [ -f "$STATE/units-were-active" ] && xargs -r systemctl start < "$STATE/units-were-active"
+  [ -f "$STATE/timers-were-active" ] && xargs -r systemctl start < "$STATE/timers-were-active"
+  log "restarted the services and timers that were active"
+}
+
+check() {
+  mkdir -p "$STATE"; chmod 700 "$STATE"
+  local src; src=$(volume_dir)
+  docker inspect "$CONTAINER" >/dev/null 2>&1 || die "container $CONTAINER not found"
+  [ "$(docker inspect "$CONTAINER" --format '{{range .Mounts}}{{.Name}}{{end}}')" = "$VOLUME" ] || die "$CONTAINER does not run on volume $VOLUME"
+  [ -f "$TARGET/compose.yaml" ] && [ -f "$TARGET/config/postgresql.conf" ] || die "no compose definition in $TARGET"
+  [ ! -e "$TARGET/data" ] || die "$TARGET/data already exists"
+  [ "$(stat -c %d "$src")" = "$(stat -c %d "$TARGET")" ] || die "volume and $TARGET are on different filesystems (mv would copy)"
+  [ "$(stat -c '%u %a' "$src")" = "999 700" ] || die "unexpected owner/mode $(stat -c '%u:%g %a' "$src")"
+  local free; free=$(df -Pk "$TARGET" | awk 'NR==2{print int($4/1048576)}')
+  [ "$free" -ge 5 ] || die "only ${free} GiB free"
+  local image want; image=$(docker inspect "$CONTAINER" --format '{{.Image}}')
+  want=$(awk '/image:/{print $2; exit}' "$TARGET/compose.yaml")
+  docker image inspect "$want" >/dev/null 2>&1 || die "image $want not present locally"
+  [ "$(docker image inspect "$want" --format '{{.Id}}')" = "$image" ] || die "compose image differs from the running one"
+  log "check ok: volume $src, PG_VERSION $(cat "$src/PG_VERSION"), ${free} GiB free, same filesystem, same image"
+}
+
+migrate() {
+  check
+  local src; src=$(volume_dir)
+  units_stop; STOPPED=1
+  trap 'die "unexpected failure at line $LINENO"' ERR
+  local others
+  for _ in $(seq 1 30); do
+    others=$(psql_in "$CONTAINER" -c "select count(*) from pg_stat_activity where backend_type='client backend' and pid<>pg_backend_pid()")
+    [ "$others" = 0 ] && break; sleep 2
+  done
+  [ "$others" = 0 ] || die "$others client sessions still open"
+  counts "$CONTAINER" > "$STATE/counts-before.txt"
+  log "counted $(wc -l < "$STATE/counts-before.txt") tables before"
+  MIGRATING=1
+  docker stop -t 120 "$CONTAINER" >/dev/null
+  cp -a "$src/postgresql.auto.conf" "$STATE/postgresql.auto.conf.before"
+  docker rename "$CONTAINER" "$OLD"
+  log "server stopped cleanly; old container kept as $OLD"
+  mv "$src" "$TARGET/data"
+  [ "$(cat "$TARGET/data/PG_VERSION")" = 16 ] && [ "$(stat -c %a "$TARGET/data")" = 700 ] || die "moved data: wrong version or mode"
+  log "data moved to $TARGET/data ($(stat -c '%u:%g %a' "$TARGET/data"))"
+  compose up -d >/dev/null 2>&1
+  wait_ready "$CONTAINER" || die "server from compose not ready"
+  psql_in "$CONTAINER" -c "ALTER SYSTEM RESET ALL" -c "select pg_reload_conf()" >/dev/null
+  local dd cf hf sb errs
+  dd=$(psql_in "$CONTAINER" -c "show data_directory"); cf=$(psql_in "$CONTAINER" -c "show config_file")
+  hf=$(psql_in "$CONTAINER" -c "show hba_file"); sb=$(psql_in "$CONTAINER" -c "show shared_buffers")
+  errs=$(psql_in "$CONTAINER" -c "select count(*) from pg_hba_file_rules where error is not null")
+  log "running from compose: data_directory=$dd config_file=$cf hba_file=$hf shared_buffers=$sb hba_errors=$errs"
+  [ "$cf" = /etc/postgresql/postgresql.conf ] && [ "$hf" = /etc/postgresql/pg_hba.conf ] && [ "$sb" = 1GB ] && [ "$errs" = 0 ] \
+    || die "settings not read from $TARGET/config"
+  counts "$CONTAINER" > "$STATE/counts-after.txt"
+  diff -q "$STATE/counts-before.txt" "$STATE/counts-after.txt" >/dev/null || die "row counts differ (see $STATE)"
+  log "every table identical ($(wc -l < "$STATE/counts-after.txt") tables, row counts equal)"
+  MIGRATING=0; STOPPED=0; trap - ERR
+  units_start
+  log "migrate done"
+}
+
+rollback() {
+  set +e
+  local src; src=$(volume_dir)
+  if docker inspect "$OLD" >/dev/null 2>&1; then
+    compose down >/dev/null 2>&1
+    if [ -d "$TARGET/data" ] && [ ! -e "$src" ]; then mv "$TARGET/data" "$src"; fi
+    [ -f "$STATE/postgresql.auto.conf.before" ] && cp -a "$STATE/postgresql.auto.conf.before" "$src/postgresql.auto.conf"
+    docker rename "$OLD" "$CONTAINER" && docker start "$CONTAINER" >/dev/null
+    wait_ready "$CONTAINER" || { log "rollback: server not ready"; return 1; }
+    if [ -f "$STATE/counts-before.txt" ]; then
+      counts "$CONTAINER" > "$STATE/counts-rollback.txt"
+      diff -q "$STATE/counts-before.txt" "$STATE/counts-rollback.txt" >/dev/null && log "rollback: every table identical"
+    fi
+    log "rollback: back on volume $VOLUME, container $CONTAINER, shared_buffers=$(psql_in "$CONTAINER" -c 'show shared_buffers')"
+  else
+    if docker inspect "$CONTAINER" >/dev/null 2>&1 && [ "$(docker inspect "$CONTAINER" --format '{{.State.Running}}')" != true ]; then
+      docker start "$CONTAINER" >/dev/null && wait_ready "$CONTAINER" && log "rollback: $CONTAINER restarted on its volume"
+    else
+      log "rollback: no $OLD container, nothing to undo"
+    fi
+  fi
+  units_start
+  set -e
+}
+
+mkdir -p "$STATE"; chmod 700 "$STATE"
+case "${1:-}" in
+  check) check ;;
+  migrate) migrate ;;
+  rollback) rollback ;;
+  *) sed -n '2,15p' "$0"; exit 2 ;;
+esac
