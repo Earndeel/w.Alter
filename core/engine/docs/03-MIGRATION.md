@@ -58,7 +58,7 @@ E4, E5 et E7 ouvrent de nouveaux chemins de production : ils ne sont **activés*
 | **E1** | Gel technique du noyau (sans déplacement) ; rattrapage documentaire | A + B | Non (même code, même place) — en cours | E0 |
 | **E2** | Accueil et événements natifs | A | Oui, après ombre — construit et essayé hors service (10/11), ombre après adoption d'E1 | E1 |
 | **E3** | Politique, approbations, divulgation, budget | A (sécurité) | Oui — construit (10/11), filet MCP en service, moteur avec E2 | E2 |
-| **E4** | Engine API v1 | A + B (`core/interfaces`) | Ajout, activé après E3 | E2, E3 |
+| **E4** | Engine API v1 | A + B (`core/interfaces`) | Ajout — construit et prouvé sur hôte de test (10/11), activé avec E2/E3 | E2, E3 |
 | **E5** | `walter_run` devient une délégation du moteur | A | Oui, avec repli | E3, E4 |
 | **E6** | Fin des rôles de production de Hermes (hors Telegram) | A | Oui | E4 |
 | **E7** | Telegram sur le moteur ; Hermes passe à Lab | A + B | Oui, après une semaine en parallèle | E3, E4 |
@@ -250,6 +250,19 @@ moins égale ; `endOnDispose` décidé d'après ce que l'ombre montre des décha
   approbation ; 20 sessions simultanées sans fuite ; refus sans jeton.
 - **Adoption** : contrats verts, mémoire vive stable sur 72 h (référence `dsh-web` 209 Mo).
 - **Retour arrière** : retrait du greffon hôte ; rien n'en dépend encore.
+- **État (10/11/2026)** : construit dans `core/interfaces/api` (README) : greffon hôte du profil web (jamais headless),
+  `127.0.0.1:8895`, jeton 0600 dans `@instance/bootstrap/engine/api.token`, enveloppe `engine-api.v1` (passé
+  IMPLEMENTED ; `session.list`, `turn.result`, `approval.list` ajoutés ; clé d'idempotence obligatoire pour
+  `turn.submit`). Aucun système parallèle : sessions du noyau (`sessionController`), table d'adresses
+  `<porte>/<compte>/<conversation>` → session du noyau (continuité `dsh/vm/<id>`, rattachement d'une session web par
+  le propriétaire), porte publiée à la politique E3 (enfants sous la porte de leur racine), répondant d'approbation
+  pour les sessions de l'API (sans réponse = refus ; `command` = refus). Interrupteur `[dsh.engine] api = off|on`.
+  Essais : 10 essais unitaires (noyau simulé), composition (web seulement, retrait propre) ; **sur un vrai moteur**
+  (hôte de test, `scenarios/v1/engine_api_e2e.py`) 7/7 : ouverture, tour simple + rejeu sans seconde exécution,
+  continuité, lecture de secret refusée, approbation demandée puis refusée par le propriétaire, interruption
+  (`cancelled`), conversation retrouvée après redémarrage ; Run Plane : un run par tour (5 `ended`, 1 `cancelled`) et
+  un `turn.ended` chacun. 20 sessions simultanées : 20/20, 37 s au plus, mémoire 199 → 187 Mo. Reste pour l'adoption :
+  activation avec E2/E3 sur `dsh-web`, suivi mémoire 72 h.
 
 ## E5 — `walter_run` devient une délégation du moteur
 

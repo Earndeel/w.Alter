@@ -30,7 +30,9 @@ export function depthOf(agent) {
 export function interfaceOf(agent, fallback) {
   let a = agent;
   while (a?.parentAgent) a = a.parentAgent;                     // a child is judged under its root's door
-  return a?.session?.header?.walter?.interface || fallback;
+  const id = a?.session?.header?.id;
+  const doors = globalThis[Symbol.for('walter.engine.doors')];  // published by the Engine API (core/interfaces/api)
+  return (id && doors instanceof Map && doors.get(id)) || a?.session?.header?.walter?.interface || fallback;
 }
 
 function record(cfg, row) {

@@ -322,3 +322,37 @@ def test_engine_policy_switch_enforce_first_and_off_restores(home,monkeypatch):
     v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']={'policy':'maybe'}
     monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
     with pytest.raises(ValueError,match='policy'):c.install('dsh',home)
+
+
+def test_engine_api_switch_web_profile_only_and_off_removes(home,monkeypatch):
+    """Lot E4 (2026-11-10): `api = "on"` adds the Engine API plugin to the web profile only (never a headless run),
+    before the dsh-web block, with instance locations; `off` (default) removes it and gives the profile back."""
+    c.install('dsh',home,apply=True,backup_root=home.parent/'b')
+    web=home/'profiles'/'web'/'cordis.patch.yml'
+    before=web.read_text() if web.exists() else ''
+    values=c.engine_values()
+    def compose(engine):
+        v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']=engine
+        monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
+        c.install('dsh',home,apply=True,backup_root=home.parent/'b')
+        assert not c.install('dsh',home)['changed']
+        return web.read_text() if web.exists() else ''
+    text=compose({'api':'on','api_port':8899})
+    if not before:pytest.skip('no web profile composed in this environment')
+    rows={e['id']:e for r in c._dsh_yaml(text) for e in r.get('insert',[])}
+    api=rows['walter-engine-api']
+    assert api['name'].endswith('interfaces/api/index.mjs') and api['config']['port']==8899
+    assert 'state/core/engine/api' in api['config']['stateDir'] and api['config']['tokenFile'].endswith('bootstrap/engine/api.token')
+    assert text.index('# walter:dsh-api ')<text.index('# walter:dsh-web ')
+    assert 'walter-engine-api' not in (home/'cordis.patch.yml').read_text()
+    hl=home/'profiles'/'headless'/'cordis.patch.yml'
+    assert not hl.exists() or 'walter-engine-api' not in hl.read_text()
+    monkeypatch.setenv('WALTER_ENGINE_API_STATE',str(home.parent/'api-state'))
+    text=compose({'api':'on'})
+    api={e['id']:e for r in c._dsh_yaml(text) for e in r.get('insert',[])}['walter-engine-api']
+    assert api['config']['stateDir']==str(home.parent/'api-state') and api['config']['port']==8895
+    monkeypatch.delenv('WALTER_ENGINE_API_STATE')
+    assert compose({'api':'off'})==before
+    v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']={'api':'maybe'}
+    monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
+    with pytest.raises(ValueError,match='api'):c.install('dsh',home)

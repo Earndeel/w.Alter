@@ -37,7 +37,7 @@ def test_every_schema_is_declared_and_has_examples():
     assert names == set(EXAMPLES["valid"]) == set(EXAMPLES["invalid"])
     for name in names:
         doc = json.loads((CONTRACTS / name).read_text())
-        assert doc["$id"].endswith("/core/engine/" + name) and "DRAFT" in doc["description"]
+        assert doc["$id"].endswith("/core/engine/" + name) and ("DRAFT" in doc["description"] or "IMPLEMENTED" in doc["description"])
 
 
 @pytest.mark.parametrize("name", sorted(EXAMPLES["valid"]))

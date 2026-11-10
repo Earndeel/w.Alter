@@ -90,6 +90,44 @@ def engine_policy(values):
     return mode
 
 
+ENGINE_API=('off','on')                             # lot E4: the engine's own API door (core/interfaces/api)
+ENGINE_API_PLUGIN=ROOT/'interfaces'/'api'/'index.mjs'
+
+
+def engine_api(values):
+    # WALTER_ENGINE_API: a test or Lab home composed otherwise (`--home`), never set for the live service
+    mode=str(os.environ.get('WALTER_ENGINE_API') or values.get('dsh',{}).get('engine',{}).get('api','off'))
+    if mode not in ENGINE_API:raise ValueError('unknown [dsh.engine] api (off or on)')
+    return mode
+
+
+def _dsh_api(values):
+    """Fenced `dsh-api` block of the web profile (lot E4): the Engine API lives in the long-running web host only,
+    never in a headless run. Port, state and token file come from the instance; a test home overrides them with
+    WALTER_ENGINE_API_PORT / WALTER_ENGINE_API_STATE so it never shares the live address table."""
+    from . import instance as inst
+    eng=values.get('dsh',{}).get('engine',{})
+    port=int(os.environ.get('WALTER_ENGINE_API_PORT') or eng.get('api_port') or 8895)
+    state=os.environ.get('WALTER_ENGINE_API_STATE')
+    cfg={'port':port,'stateDir':state or str(inst.path('state','core','engine','api')),
+         'tokenFile':str(Path(state)/'api.token') if state else str(inst.path('bootstrap','engine','api.token')),
+         'workspace':str(inst.path('workspace'))}
+    import yaml
+    return ('# Engine API (lot E4): one door for Telegram, the web and Walter modules; loopback, token in a header.\n'
+            +yaml.safe_dump([{'insert':[{'id':'walter-engine-api','name':str(ENGINE_API_PLUGIN),'config':cfg}]}],sort_keys=False,allow_unicode=True,width=120))
+
+
+def _drop_managed(original,name):
+    """Removes a fenced Walter block that is no longer wanted (switch turned off), refusing a hand-edited one."""
+    pattern=re.compile(r'# walter:'+re.escape(name)+r' json-sha256=([a-f0-9]{64}) rows=(\d+)\n(.*?)\n# /walter:'+re.escape(name)+r'\n?\n?',re.S)
+    m=pattern.search(original)
+    if not m:return original
+    rows=_yaml_rows(m[3]);n=int(m[2])
+    if _rows_sha([r for r,_ in rows[:n]])!=m[1]:raise ValueError('managed DSH profile section was edited; refusing removal')
+    foreign=''.join(raw for _,raw in rows[n:]).strip('\n')
+    return original[:m.start()]+(foreign+'\n' if foreign else '')+original[m.end():]
+
+
 def _engine_rows(mode,policy='off'):
     """The engine's intake and events plugins for this mode (none for `hook`), and its policy plugin when enforced.
     Locations come from the instance and from Walter Memory's public client (its gateway credential file), never
@@ -440,6 +478,8 @@ def _plan(host,home=None,profile_dir=None):
                           or any(e.get('id')=='walter-ui' for e in r.get('insert',[]))]
                     if hand:raise ValueError('hand-written DSH web face rows (connection, walter-ui) duplicate the rendered dsh-face block; remove them first')
                     after=_managed_yaml(after,_dsh_face(values),'dsh-face',anchor='dsh-web')
+                    after=(_managed_yaml(after,_dsh_api(values),'dsh-api',anchor='dsh-web') if engine_api(values)=='on'
+                           else _drop_managed(after,'dsh-api'))
                 after=_managed_yaml(after,block(_context_port()),'dsh-'+profile)
                 _dsh_yaml(after)
                 if after!=before:file(wp,after,'identity,context,skills,browse')

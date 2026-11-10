@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://walter.local/contracts/core/engine/engine-api.v1.json",
   "title": "Engine API v1",
-  "description": "Requests an interface (web, Telegram, API, MCP, command, schedule, webhook, Lab) sends to the Walter engine. Status: DRAFT (lot E0); implemented at lot E4. Transport: local HTTP + SSE with an agent token in a header; the same policy applies whatever the transport.",
+  "description": "Requests an interface (web, Telegram, API, MCP, command, schedule, webhook, Lab) sends to the Walter engine. Status: IMPLEMENTED (lot E4, 2026-11-10) by core/interfaces/api (host plugin of the engine). Transport: POST /v1 with this envelope, GET /v1/health, GET /v1/events?session_id=&since_seq= (SSE), loopback only, agent token in the Authorization header; the same execution policy applies whatever the door. Kernel sessions, the Run Plane and the bus are reused, never duplicated.",
   "type": "object",
   "required": [
     "version",
@@ -15,10 +15,13 @@
     "op": {
       "enum": [
         "session.open",
+        "session.list",
         "turn.submit",
         "turn.steer",
         "turn.queue",
+        "turn.result",
         "turn.cancel",
+        "approval.list",
         "approval.answer",
         "delegate",
         "events.subscribe",
@@ -113,9 +116,7 @@
         "required": [
           "interface",
           "conversation",
-          "principal",
-          "mode",
-          "permissions"
+          "principal"
         ],
         "properties": {
           "interface": {
@@ -139,6 +140,10 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]{0,63}$",
             "description": "Named preset (core/security); a caller can only narrow it"
+          },
+          "continue_session": {
+            "type": "string",
+            "description": "Owner only: carry an existing Walter session (dsh/vm/<id>) into this conversation"
           }
         }
       }
@@ -209,6 +214,12 @@
                 "type": "string"
               }
             }
+          },
+          "wait_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1800000,
+            "description": "Wait for the end of the turn and return its result"
           }
         }
       }
@@ -348,6 +359,69 @@
           },
           "run_id": {
             "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "turn.result"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "session_id",
+          "request_id"
+        ],
+        "properties": {
+          "session_id": {
+            "$ref": "#/$defs/session_id"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "wait_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1800000
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "session.list"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "interface": {
+            "$ref": "#/$defs/interface"
+          },
+          "account": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "approval.list"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "session_id": {
+            "$ref": "#/$defs/session_id"
           }
         }
       }

@@ -1113,8 +1113,8 @@
         {
           "id": "engine",
           "path": "/walter/core/engine",
-          "role": "Runtime agentique unique de Walter (conception ; la production reste DSH dans /opt/dsh)",
-          "status": "planned",
+          "role": "Runtime agentique unique de Walter : noyau DSH/Cordis approprié (base adaptable) + greffons et portes Walter ; en service dans /opt/dsh (dsh-web)",
+          "status": "implemented",
           "readme": "/walter/core/engine/README.md",
           "vision_target": "core/engine"
         },
@@ -1192,6 +1192,23 @@
             }
           ],
           "vision_target": "core/security"
+        },
+        {
+          "id": "engine-api",
+          "path": "/walter/core/interfaces/api",
+          "role": "Engine API (lot E4) : porte canonique du moteur pour Telegram, le web, les modules et les tests — ouvrir ou retrouver une conversation (<porte>/<compte>/<conversation> → session du noyau), soumettre (idempotent), suivre (SSE), résultat d'un tour, interrompre, répondre aux approbations ; greffon hôte du profil web, interrupteur [dsh.engine] api off|on",
+          "status": "implemented",
+          "readme": "/walter/core/interfaces/api/README.md",
+          "contracts": [
+            "/walter/core/engine/contracts/engine-api.v1.json"
+          ],
+          "interfaces": [
+            {
+              "transport": "http",
+              "interface": "127.0.0.1:8895/v1"
+            }
+          ],
+          "vision_target": "core/interfaces/api"
         },
         {
           "id": "mcp-server",
