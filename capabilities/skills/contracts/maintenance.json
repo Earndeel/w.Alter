@@ -3,7 +3,7 @@
   "module": "skills",
   "check": [
     "python3",
-    "/walter/skills/guardian/check"
+    "/walter/capabilities/skills/guardian/check"
   ],
   "max_level": "G1",
   "levels": {

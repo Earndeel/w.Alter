@@ -176,7 +176,7 @@ cd /root/.hermes/scripts
 ls -1 | grep -v __pycache__ > /tmp/hermes-script-names.txt
 grep -rhoFw -f /tmp/hermes-script-names.txt \
   /etc/systemd/system /root/.config/systemd /usr/local/bin \
-  /instances/monsieur/config /root/.hermes /walter/skills 2>/dev/null \
+  /instances/monsieur/config /root/.hermes /walter/capabilities/skills 2>/dev/null \
   | sort -u > /tmp/hermes-live-references.txt
 ```
 

@@ -286,7 +286,7 @@ After each loop run:
 
 ## Diagnose a shrinking library before changing Curator policy
 
-1. Separate the two Curators: Hermes owns `~/.hermes/skills`; walter-skills owns `/opt/walter-skills`. Do not interpret one library's managed count as the total number of available skills.
+1. Separate the two Curators: Hermes owns `~/.hermes/skills`; walter-skills owns `/walter/capabilities/skills`. Do not interpret one library's managed count as the total number of available skills.
 
 2. Inspect Hermes lifecycle reports and provenance before running a mutation:
 ```bash
@@ -327,7 +327,7 @@ Trace consolidation destinations through `evidence.absorbed_into`; verify that t
 
 5. Submit shared-library improvements through `skill_propose` or `skill_patch`, which create drafts. Use this draft-review preview for walter-skills:
 ```bash
-cd /opt/walter-skills
+cd /walter/capabilities/skills
 /opt/walter-memory/venv/bin/python - <<'PY'
 import json
 from walter_skills import curator

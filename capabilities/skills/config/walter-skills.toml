@@ -3,13 +3,13 @@
 
 [service]
 url = "http://127.0.0.1:8891"
-snapshot_dir = "/walter/skills/.cache/snapshot"   # last-good registry snapshot: the service starts even if Postgres is down
+snapshot_dir = "/walter/capabilities/skills/.cache/snapshot"   # last-good registry snapshot: the service starts even if Postgres is down
 
 [retrieval]
 encoder = "minishlab/potion-multilingual-128M"        # chosen on the bench (MiniLM: same quality, 4x slower)
 learner = "hgb"                                         # fusion trained on judged + implicit labels
 # model_dir: unset = the shared embedding models of Walter Memory (walter_memory.search.MODEL_DIR)
-cache_dir = "/walter/skills/.cache/embeddings"
+cache_dir = "/walter/capabilities/skills/.cache/embeddings"
 
 [policy]
 discovery = "on_demand"   # session overview → index/search on demand → selected procedure; shortlist = legacy

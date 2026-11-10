@@ -51,7 +51,7 @@
     "owner": "skills",
     "kind": "capability",
     "purpose": "Gérer le contenu, la recherche, les propositions et la curation des procédures.",
-    "target_root": "skills",
+    "target_root": "capabilities/skills",
     "config_paths": [
       "config/walter-skills.toml"
     ],

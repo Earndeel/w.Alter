@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Rôle** | Mémoire procédurale de W.Alter : contenu, recherche, propositions et curation des procédures, indépendamment de tout runtime. |
-| **Propriétaire** | walter-skills (`/walter/skills`). |
+| **Propriétaire** | walter-skills (`/walter/capabilities/skills`). |
 | **État** | **active** (constat du 09/11/2026) : services `walter-skills` (:8891) et `walter-skills-bus`, tâche nocturne 04:10 UTC. |
 | **Ne fait pas** | Dépendre d'un runtime (Hermes, Claude Code, Codex, DSH sont des adaptateurs). Garder un secret dans le texte d'un skill. |
 | **Contrats** | [contracts/skills.json](contracts/skills.json), [contracts/data-classes.json](contracts/data-classes.json), [contracts/maintenance.json](contracts/maintenance.json) ; MCP `skills_search`, `skill_read`, `skill_propose`, `skill_patch` ; schéma PostgreSQL `skills`. |
