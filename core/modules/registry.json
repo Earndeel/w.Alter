@@ -3,19 +3,19 @@
   "modules": [
     {
       "id": "browse",
-      "root": "/walter/browse",
+      "root": "/walter/capabilities/browse",
       "anchors": [
-        "/walter/browse/contracts/browse.json",
-        "/walter/browse/runtime/universal_router.py",
-        "/walter/browse/walter_browse/facade.py",
-        "/walter/browse/ops/walter-browse-display.service",
-        "/walter/browse/ops/browse-display-container.sh",
-        "/walter/browse/ops/camoufox-max-display.conf",
-        "/walter/browse/ops/walter-exit-mac.service",
-        "/walter/browse/ops/camoufox-max-identity.conf",
-        "/walter/browse/ops/cloakbrowser-max.service",
-        "/walter/browse/ops/walter-exit-default.service",
-        "/walter/browse/network/exit-default/bin/walter-exit-default"
+        "/walter/capabilities/browse/contracts/browse.json",
+        "/walter/capabilities/browse/runtime/universal_router.py",
+        "/walter/capabilities/browse/walter_browse/facade.py",
+        "/walter/capabilities/browse/ops/walter-browse-display.service",
+        "/walter/capabilities/browse/ops/browse-display-container.sh",
+        "/walter/capabilities/browse/ops/camoufox-max-display.conf",
+        "/walter/capabilities/browse/ops/walter-exit-mac.service",
+        "/walter/capabilities/browse/ops/camoufox-max-identity.conf",
+        "/walter/capabilities/browse/ops/cloakbrowser-max.service",
+        "/walter/capabilities/browse/ops/walter-exit-default.service",
+        "/walter/capabilities/browse/network/exit-default/bin/walter-exit-default"
       ],
       "requires": [],
       "external": [
@@ -32,17 +32,17 @@
         "conversation state (tab, conversation URL, last requests)"
       ],
       "core_paths": [
-        "/walter/browse/walter_browse",
-        "/walter/browse/runtime/universal_router.py",
-        "/walter/browse/runtime/browse_session.py",
-        "/walter/browse/runtime/profile_index.py",
-        "/walter/browse/runtime/result_cache.py",
-        "/walter/browse/runtime/search_lite.py",
-        "/walter/browse/runtime/conversation.py",
-        "/walter/browse/walter_browse/converse.py"
+        "/walter/capabilities/browse/walter_browse",
+        "/walter/capabilities/browse/runtime/universal_router.py",
+        "/walter/capabilities/browse/runtime/browse_session.py",
+        "/walter/capabilities/browse/runtime/profile_index.py",
+        "/walter/capabilities/browse/runtime/result_cache.py",
+        "/walter/capabilities/browse/runtime/search_lite.py",
+        "/walter/capabilities/browse/runtime/conversation.py",
+        "/walter/capabilities/browse/walter_browse/converse.py"
       ],
       "backup_paths": [
-        "/walter/browse",
+        "/walter/capabilities/browse",
         "/user/Lucas/state/browse"
       ],
       "interfaces": [
@@ -80,7 +80,7 @@
         "owner": "browse",
         "kind": "capability",
         "purpose": "Rechercher, extraire et gérer les parcours web avec un moteur commun.",
-        "target_root": "/walter/browse",
+        "target_root": "/walter/capabilities/browse",
         "config_paths": [
           "/user/Lucas/bootstrap/browse-search.env"
         ],
@@ -169,9 +169,9 @@
         "audience": "agent",
         "title": "Walter Browse",
         "order": 50,
-        "summary": "/walter/browse/manifest/SUMMARY.md",
-        "manifest": "/walter/browse/manifest/MANIFEST.md",
-        "guide": "/walter/browse/manifest/GUIDE.md",
+        "summary": "/walter/capabilities/browse/manifest/SUMMARY.md",
+        "manifest": "/walter/capabilities/browse/manifest/MANIFEST.md",
+        "guide": "/walter/capabilities/browse/manifest/GUIDE.md",
         "tools": [
           "walter_browse",
           "browser_session",
@@ -181,18 +181,18 @@
       "components": [
         {
           "id": "library",
-          "path": "/walter/browse/walter_browse",
+          "path": "/walter/capabilities/browse/walter_browse",
           "role": "Recherche web et lecture de pages",
           "status": "active",
-          "readme": "/walter/browse/README.md",
+          "readme": "/walter/capabilities/browse/README.md",
           "vision_target": "capabilities/browse"
         },
         {
           "id": "engine",
-          "path": "/walter/browse/engine",
+          "path": "/walter/capabilities/browse/engine",
           "role": "Moteurs Camoufox / CloakBrowser (ex ~/.hermes/camoufox-max)",
           "status": "active",
-          "readme": "/walter/browse/README.md",
+          "readme": "/walter/capabilities/browse/README.md",
           "interfaces": [
             {
               "transport": "http",
@@ -207,18 +207,18 @@
         },
         {
           "id": "network",
-          "path": "/walter/browse/network",
+          "path": "/walter/capabilities/browse/network",
           "role": "Sorties réseau (Freebox, Mac, défaut)",
           "status": "active",
-          "readme": "/walter/browse/README.md",
+          "readme": "/walter/capabilities/browse/README.md",
           "vision_target": "capabilities/browse/network"
         },
         {
           "id": "runtime",
-          "path": "/walter/browse/runtime",
+          "path": "/walter/capabilities/browse/runtime",
           "role": "Exécution et extracteurs",
           "status": "active",
-          "readme": "/walter/browse/runtime/README.md",
+          "readme": "/walter/capabilities/browse/runtime/README.md",
           "vision_target": "capabilities/browse/runtime"
         }
       ]
@@ -351,11 +351,11 @@
     },
     {
       "id": "colab",
-      "root": "/walter/colab",
+      "root": "/walter/capabilities/colab",
       "anchors": [
-        "/walter/colab/RUNBOOK.md",
-        "/walter/colab/contracts/colab.json",
-        "/walter/colab/on_demand.py"
+        "/walter/capabilities/colab/RUNBOOK.md",
+        "/walter/capabilities/colab/contracts/colab.json",
+        "/walter/capabilities/colab/on_demand.py"
       ],
       "requires": [],
       "external": [
@@ -368,7 +368,7 @@
       ],
       "core_paths": [],
       "backup_paths": [
-        "/walter/colab"
+        "/walter/capabilities/colab"
       ],
       "interfaces": [
         "on_demand.py CLI"
@@ -393,7 +393,7 @@
         "owner": "colab",
         "kind": "capability",
         "purpose": "Préparer et exécuter des travaux de calcul distant qualifiés.",
-        "target_root": "/walter/colab",
+        "target_root": "/walter/capabilities/colab",
         "config_paths": [],
         "permissions": [
           "validation de l’artefact avant allocation GPU",
@@ -468,28 +468,28 @@
       "components": [
         {
           "id": "bridge",
-          "path": "/walter/colab/bridge.py",
+          "path": "/walter/capabilities/colab/bridge.py",
           "role": "Pont Colab (GPU à la demande)",
           "status": "active",
-          "readme": "/walter/colab/RUNBOOK.md",
+          "readme": "/walter/capabilities/colab/RUNBOOK.md",
           "vision_target": "capabilities/colab"
         },
         {
           "id": "mcp",
-          "path": "/walter/colab/mcp",
+          "path": "/walter/capabilities/colab/mcp",
           "role": "Serveur MCP Colab",
           "status": "active",
-          "readme": "/walter/colab/mcp/README.md",
+          "readme": "/walter/capabilities/colab/mcp/README.md",
           "vision_target": "capabilities/colab"
         }
       ]
     },
     {
       "id": "computer",
-      "root": "/walter/computer",
+      "root": "/walter/capabilities/computer",
       "anchors": [
-        "/walter/computer/contracts/computer.json",
-        "/walter/computer/walter_computer/__init__.py"
+        "/walter/capabilities/computer/contracts/computer.json",
+        "/walter/capabilities/computer/walter_computer/__init__.py"
       ],
       "requires": [],
       "external": [
@@ -501,17 +501,17 @@
         "isolated ephemeral operator sessions"
       ],
       "core_paths": [
-        "/walter/computer/walter_computer/operator.py",
-        "/walter/computer/walter_computer/policy.py",
-        "/walter/computer/walter_computer/config.py",
-        "/walter/computer/walter_computer/driver.py",
-        "/walter/computer/walter_computer/transport.py",
-        "/walter/computer/walter_computer/types.py",
-        "/walter/computer/walter_computer/runtime.py",
-        "/walter/computer/walter_computer/observer.py"
+        "/walter/capabilities/computer/walter_computer/operator.py",
+        "/walter/capabilities/computer/walter_computer/policy.py",
+        "/walter/capabilities/computer/walter_computer/config.py",
+        "/walter/capabilities/computer/walter_computer/driver.py",
+        "/walter/capabilities/computer/walter_computer/transport.py",
+        "/walter/capabilities/computer/walter_computer/types.py",
+        "/walter/capabilities/computer/walter_computer/runtime.py",
+        "/walter/capabilities/computer/walter_computer/observer.py"
       ],
       "backup_paths": [
-        "/walter/computer",
+        "/walter/capabilities/computer",
         "/root/walter-computer-use",
         "/root/.config/walter-device-node",
         "/etc/tmpfiles.d/walter-computer.conf",
@@ -544,10 +544,10 @@
         "owner": "computer",
         "kind": "capability",
         "purpose": "Observer et manipuler un appareil avec des permissions et cibles explicites.",
-        "target_root": "/walter/computer",
+        "target_root": "/walter/capabilities/computer",
         "config_paths": [
           "/root/.config/walter-device-node",
-          "/walter/computer/config/config.json",
+          "/walter/capabilities/computer/config/config.json",
           "/user/Lucas/config/computer/config.json"
         ],
         "permissions": [
@@ -635,9 +635,9 @@
         "audience": "agent",
         "title": "Walter Computer",
         "order": 60,
-        "summary": "/walter/computer/manifest/SUMMARY.md",
-        "manifest": "/walter/computer/manifest/MANIFEST.md",
-        "guide": "/walter/computer/manifest/GUIDE.md",
+        "summary": "/walter/capabilities/computer/manifest/SUMMARY.md",
+        "manifest": "/walter/capabilities/computer/manifest/MANIFEST.md",
+        "guide": "/walter/capabilities/computer/manifest/GUIDE.md",
         "tools": [
           "computer_use"
         ]
@@ -645,10 +645,10 @@
       "components": [
         {
           "id": "library",
-          "path": "/walter/computer/walter_computer",
+          "path": "/walter/capabilities/computer/walter_computer",
           "role": "Contrôle des appareils (Mac, bureau)",
           "status": "active",
-          "readme": "/walter/computer/README.md",
+          "readme": "/walter/capabilities/computer/README.md",
           "vision_target": "capabilities/computer"
         }
       ]

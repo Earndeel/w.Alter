@@ -17,7 +17,8 @@ def tree(tmp_path, monkeypatch):
     mod = root / 'colab'
     (mod / 'bin').mkdir(parents=True)
     (mod / 'contracts').mkdir()
-    (mod / 'contracts' / 'colab.json').write_text(json.dumps({'id': 'colab', 'services': []}))
+    (mod / 'contracts' / 'colab.json').write_text(json.dumps({'id': 'colab', 'services': [],
+                                                             'contract': {'target_root': 'colab'}}))
     (mod / 'README.md').write_text(f'Lives in {mod}; legacy {tmp_path}/opt/walter-colab/run.py; not {mod}-old\n')
     (mod / 'tests').mkdir()
     (mod / 'tests' / 'test_x.py').write_text(f'P = "{mod}"\n')
@@ -71,6 +72,7 @@ def test_move_apply_verify_rollback(tree):
     entry = json.loads(catalog.read_text())['modules'][0]
     assert entry['target'] == 'capabilities/colab' and entry['compat_links'] == [str(root / 'colab')]
     assert (new / '.git').is_dir()
+    assert json.loads((new / 'contracts' / 'colab.json').read_text())['contract']['target_root'] == 'capabilities/colab'
 
     check = move.Move.from_manifest(man, reference_roots=(str(tmp_path / 'units'),)).verify(man)
     assert check['ok'], check
@@ -81,6 +83,7 @@ def test_move_apply_verify_rollback(tree):
     assert os.readlink(tmp_path / 'opt' / 'walter-colab') == str(root / 'colab')
     assert (root / 'skills' / 'SKILL.md').read_text() == f'run {root}/colab/bin/go\n'
     assert json.loads(catalog.read_text())['modules'][0]['target'] == 'colab'
+    assert json.loads((root / 'colab' / 'contracts' / 'colab.json').read_text())['contract']['target_root'] == 'colab'
 
 
 def test_move_refuses_twice(tree):

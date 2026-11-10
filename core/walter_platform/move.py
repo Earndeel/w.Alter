@@ -245,7 +245,8 @@ class Move:
             return str(new) + f[len(str(old)):] if f == str(old) or f.startswith(str(old) + '/') else f
 
         rewritten = []
-        for f in plan['rewrite'] + (plan['rewrite_dirty'] if allow_dirty else []):
+        retarget = self._contract_targets()
+        for f in sorted(set(plan['rewrite'] + (plan['rewrite_dirty'] if allow_dirty else []) + list(retarget))):
             copy = bdir / 'files' / f.lstrip('/')
             copy.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(f, copy)
@@ -272,7 +273,11 @@ class Move:
             os.replace(tmp, p)
         for r in rewritten:
             p = Path(r['after'])
-            p.write_text(self._rewrite(p.read_text(errors='replace')))
+            text = p.read_text(errors='replace')
+            if r['before'] in retarget:              # the contract states where its module belongs in the layout
+                old_rel, new_rel = retarget[r['before']]
+                text = text.replace(f'"target_root": "{old_rel}"', f'"target_root": "{new_rel}"')
+            p.write_text(self._rewrite(text))
             r['sha_after'] = _sha(p)
         for repo, trees in manifest['worktrees'].items():
             moved = [after(t) for t in trees]
@@ -286,6 +291,21 @@ class Move:
             manifest['restarted'] = _systemd(plan['restart'])
             mpath.write_text(json.dumps(manifest, indent=1, ensure_ascii=False))
         return manifest
+
+    def _contract_targets(self):
+        """Contracts of the moved module(s) whose target_root names the old layout place: file -> (old, new)."""
+        out, old, new = {}, str(self.old), str(self.new)
+        for e in self._entries_under():
+            here = str(self.root / str(paths.relative(e['target'])))
+            new_rel = str(Path(new + here[len(old):]).relative_to(self.root))
+            for f in sorted(_on(self.fs, here).glob('contracts/*.json')):
+                try:
+                    raw = json.loads(f.read_text())
+                except (OSError, ValueError):
+                    continue
+                if isinstance(raw, dict) and (raw.get('contract') or {}).get('target_root') == e['target']:
+                    out[str(f)] = (e['target'], new_rel)
+        return out
 
     def _update_catalog(self):
         data = json.loads(self.catalog_file.read_text())

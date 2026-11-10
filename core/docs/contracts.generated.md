@@ -27,7 +27,7 @@ Généré depuis les manifestes propriétaires. Les scénarios décrivent les cr
 Rechercher, extraire et gérer les parcours web avec un moteur commun.
 
 Contrat 1.0.0; propriétaire : browse.
-Racine actuelle : `/walter/browse`. Cible : `/walter/browse`.
+Racine actuelle : `/walter/capabilities/browse`. Cible : `/walter/capabilities/browse`.
 
 Interfaces : shared request contract, CLI, MCP, Hermes plugin, public client (walter_browse.converse).
 
@@ -41,10 +41,10 @@ Interfaces : shared request contract, CLI, MCP, Hermes plugin, public client (wa
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| library | active | Recherche web et lecture de pages | `/walter/browse/walter_browse` | capabilities/browse |
-| engine | active | Moteurs Camoufox / CloakBrowser (ex ~/.hermes/camoufox-max) | `/walter/browse/engine` | capabilities/browse/engine |
-| network | active | Sorties réseau (Freebox, Mac, défaut) | `/walter/browse/network` | capabilities/browse/network |
-| runtime | active | Exécution et extracteurs | `/walter/browse/runtime` | capabilities/browse/runtime |
+| library | active | Recherche web et lecture de pages | `/walter/capabilities/browse/walter_browse` | capabilities/browse |
+| engine | active | Moteurs Camoufox / CloakBrowser (ex ~/.hermes/camoufox-max) | `/walter/capabilities/browse/engine` | capabilities/browse/engine |
+| network | active | Sorties réseau (Freebox, Mac, défaut) | `/walter/capabilities/browse/network` | capabilities/browse/network |
+| runtime | active | Exécution et extracteurs | `/walter/capabilities/browse/runtime` | capabilities/browse/runtime |
 
 **Limites déclarées :**
 
@@ -81,7 +81,7 @@ Interfaces : Python emit/Consumer, Postgres LISTEN/NOTIFY.
 Préparer et exécuter des travaux de calcul distant qualifiés.
 
 Contrat 1.0.0; propriétaire : colab.
-Racine actuelle : `/walter/colab`. Cible : `/walter/colab`.
+Racine actuelle : `/walter/capabilities/colab`. Cible : `/walter/capabilities/colab`.
 
 Interfaces : on_demand.py CLI.
 
@@ -94,8 +94,8 @@ Interfaces : on_demand.py CLI.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| bridge | active | Pont Colab (GPU à la demande) | `/walter/colab/bridge.py` | capabilities/colab |
-| mcp | active | Serveur MCP Colab | `/walter/colab/mcp` | capabilities/colab |
+| bridge | active | Pont Colab (GPU à la demande) | `/walter/capabilities/colab/bridge.py` | capabilities/colab |
+| mcp | active | Serveur MCP Colab | `/walter/capabilities/colab/mcp` | capabilities/colab |
 
 **Limites déclarées :**
 
@@ -107,7 +107,7 @@ Interfaces : on_demand.py CLI.
 Observer et manipuler un appareil avec des permissions et cibles explicites.
 
 Contrat 1.0.0; propriétaire : computer.
-Racine actuelle : `/walter/computer`. Cible : `/walter/computer`.
+Racine actuelle : `/walter/capabilities/computer`. Cible : `/walter/capabilities/computer`.
 
 Interfaces : OperatorSessions, MCP computer_use, Hermes plugin.
 
@@ -121,7 +121,7 @@ Interfaces : OperatorSessions, MCP computer_use, Hermes plugin.
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| library | active | Contrôle des appareils (Mac, bureau) | `/walter/computer/walter_computer` | capabilities/computer |
+| library | active | Contrôle des appareils (Mac, bureau) | `/walter/capabilities/computer/walter_computer` | capabilities/computer |
 
 **Limites déclarées :**
 
