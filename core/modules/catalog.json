@@ -68,7 +68,7 @@
     },
     {
       "id": "llm",
-      "target": "router/llm",
+      "target": "cognition/router/llm",
       "legacy": "/opt/walter-llm",
       "manifest": "contracts/llm.json",
       "neutral": true,
@@ -112,11 +112,14 @@
     },
     {
       "id": "router",
-      "target": "router",
+      "target": "cognition/router",
       "legacy": "/opt/walter-router",
       "manifest": "contracts/router.json",
       "neutral": true,
-      "vision_target": "cognition/router"
+      "vision_target": "cognition/router",
+      "compat_links": [
+        "/walter/router"
+      ]
     },
     {
       "id": "runtime",

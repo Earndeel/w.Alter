@@ -262,7 +262,7 @@ Interfaces : CLI walter-lab status|run|history|list, Experiment v1 (experiments/
 Exécuter les appels modèles des consommateurs autorisés via les postes du Router.
 
 Contrat 1.2.0; propriétaire : llm.
-Racine actuelle : `/walter/router/llm`. Cible : `/walter/router/llm`.
+Racine actuelle : `/walter/cognition/router/llm`. Cible : `/walter/cognition/router/llm`.
 
 Interfaces : OpenAI-compatible :8894, CLI walter-llm call: one exact model/provider, JSON stdin/stdout, no implicit retry or fallback.
 
@@ -275,8 +275,8 @@ Interfaces : OpenAI-compatible :8894, CLI walter-llm call: one exact model/provi
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| gateway | active | Passerelle de modèles OpenAI-compatible (:8894), clés depuis Bitwarden, model=auto suit le plan du run | `/walter/router/llm/gateway.py` | cognition/router/llm |
-| subscriptions | active | Transports par abonnement (Claude, Antigravity, ChatGPT) | `/walter/router/llm/claude_subscription.py` | cognition/router/llm |
+| gateway | active | Passerelle de modèles OpenAI-compatible (:8894), clés depuis Bitwarden, model=auto suit le plan du run | `/walter/cognition/router/llm/gateway.py` | cognition/router/llm |
+| subscriptions | active | Transports par abonnement (Claude, Antigravity, ChatGPT) | `/walter/cognition/router/llm/claude_subscription.py` | cognition/router/llm |
 
 **Limites déclarées :**
 
@@ -416,7 +416,7 @@ Interfaces : memory objects library, S3, MCP.
 Choisir les modèles par poste avec décisions et coûts traçables.
 
 Contrat 1.2.0; propriétaire : router.
-Racine actuelle : `/walter/router`. Cible : `/walter/router`.
+Racine actuelle : `/walter/cognition/router`. Cible : `/walter/cognition/router`.
 
 Interfaces : CLI, walter-llm task routes, MCP walter_route / walter_run / walter_decide / walter_plans / walter_web, agents' brief (`walter-router brief`, @instance/state/router/brief.md), CLI walter-router schema (public tool contract v1), CLI walter-router docs --write/--check [--offline], CLI walter-router brief --json (versioned orchestrator note v1), CLI walter-router-guardian check | run | status (the module's own maintenance).
 
@@ -429,17 +429,17 @@ Interfaces : CLI, walter-llm task routes, MCP walter_route / walter_run / walter
 
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
-| research | active | Collecte des classements et prix (AA, Arena, OpenRouter…) | `/walter/router/research` | cognition/router/research |
-| analysis | active | Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6) | `/walter/router/analysis` | cognition/router/analysis |
-| plan | active | Forfaits du propriétaire et quotas | `/walter/router/plan` | cognition/router/plan |
-| serve | active | Choix du modèle par tâche, exécution texte et médias | `/walter/router/serve` | cognition/router/serve |
-| walter-run-loop | active | Boucle de sous-agent de walter_run — seconde boucle agentique, absorbée par le moteur au lot E5 ; terminal retiré le 09/11 | `/walter/router/serve/text_agent.py` | — |
-| oneshot | obsolete | Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6) | `/walter/router/serve/oneshot.py` | — |
-| interface | active | Page publique de la bibliothèque des modèles | `/walter/router/interface` | cognition/router/interface |
-| store | active | Schéma Postgres models (lecture/écriture) | `/walter/router/store` | cognition/router/store |
-| hermes-plugin | active | Greffon Hermes walter-router — à retirer avec Hermes (E7) | `/walter/router/hermes-plugins` | — |
-| guardian | active | Gardien du Router | `/walter/router/guardian` | cognition/router/guardian |
-| documentation | active | Référence générée (CODE, CONFIGURATION, DATABASE…) contrôlée par les tests | `/walter/router/documentation.py` | cognition/router/docs |
+| research | active | Collecte des classements et prix (AA, Arena, OpenRouter…) | `/walter/cognition/router/research` | cognition/router/research |
+| analysis | active | Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6) | `/walter/cognition/router/analysis` | cognition/router/analysis |
+| plan | active | Forfaits du propriétaire et quotas | `/walter/cognition/router/plan` | cognition/router/plan |
+| serve | active | Choix du modèle par tâche, exécution texte et médias | `/walter/cognition/router/serve` | cognition/router/serve |
+| walter-run-loop | active | Boucle de sous-agent de walter_run — seconde boucle agentique, absorbée par le moteur au lot E5 ; terminal retiré le 09/11 | `/walter/cognition/router/serve/text_agent.py` | — |
+| oneshot | obsolete | Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6) | `/walter/cognition/router/serve/oneshot.py` | — |
+| interface | active | Page publique de la bibliothèque des modèles | `/walter/cognition/router/interface` | cognition/router/interface |
+| store | active | Schéma Postgres models (lecture/écriture) | `/walter/cognition/router/store` | cognition/router/store |
+| hermes-plugin | active | Greffon Hermes walter-router — à retirer avec Hermes (E7) | `/walter/cognition/router/hermes-plugins` | — |
+| guardian | active | Gardien du Router | `/walter/cognition/router/guardian` | cognition/router/guardian |
+| documentation | active | Référence générée (CODE, CONFIGURATION, DATABASE…) contrôlée par les tests | `/walter/cognition/router/documentation.py` | cognition/router/docs |
 
 **Limites déclarées :**
 

@@ -1602,10 +1602,10 @@
     },
     {
       "id": "llm",
-      "root": "/walter/router/llm",
+      "root": "/walter/cognition/router/llm",
       "anchors": [
-        "/walter/router/llm/contracts/llm.json",
-        "/walter/router/llm/gateway.py"
+        "/walter/cognition/router/llm/contracts/llm.json",
+        "/walter/cognition/router/llm/gateway.py"
       ],
       "requires": [
         "router",
@@ -1620,7 +1620,7 @@
       ],
       "core_paths": [],
       "backup_paths": [
-        "/walter/router/llm",
+        "/walter/cognition/router/llm",
         "/user/Lucas/config/llm",
         "/user/Lucas/state/llm",
         "/user/Lucas/bootstrap/walter-llm"
@@ -1651,9 +1651,9 @@
         "owner": "llm",
         "kind": "capability",
         "purpose": "Exécuter les appels modèles des consommateurs autorisés via les postes du Router.",
-        "target_root": "/walter/router/llm",
+        "target_root": "/walter/cognition/router/llm",
         "config_paths": [
-          "/walter/router/llm/config/gateway.json",
+          "/walter/cognition/router/llm/config/gateway.json",
           "/user/Lucas/config/llm/gateway.json"
         ],
         "permissions": [
@@ -1742,10 +1742,10 @@
       "components": [
         {
           "id": "gateway",
-          "path": "/walter/router/llm/gateway.py",
+          "path": "/walter/cognition/router/llm/gateway.py",
           "role": "Passerelle de modèles OpenAI-compatible (:8894), clés depuis Bitwarden, model=auto suit le plan du run",
           "status": "active",
-          "readme": "/walter/router/llm/README.md",
+          "readme": "/walter/cognition/router/llm/README.md",
           "interfaces": [
             {
               "transport": "http",
@@ -1760,10 +1760,10 @@
         },
         {
           "id": "subscriptions",
-          "path": "/walter/router/llm/claude_subscription.py",
+          "path": "/walter/cognition/router/llm/claude_subscription.py",
           "role": "Transports par abonnement (Claude, Antigravity, ChatGPT)",
           "status": "active",
-          "readme": "/walter/router/llm/README.md",
+          "readme": "/walter/cognition/router/llm/README.md",
           "vision_target": "cognition/router/llm"
         }
       ]
@@ -2680,13 +2680,13 @@
     },
     {
       "id": "router",
-      "root": "/walter/router",
+      "root": "/walter/cognition/router",
       "anchors": [
-        "/walter/router/contracts/router.json",
-        "/walter/router/cli.py",
-        "/walter/router/docs/README.md",
-        "/walter/router/serve/api.py",
-        "/walter/router/documentation.py"
+        "/walter/cognition/router/contracts/router.json",
+        "/walter/cognition/router/cli.py",
+        "/walter/cognition/router/docs/README.md",
+        "/walter/cognition/router/serve/api.py",
+        "/walter/cognition/router/documentation.py"
       ],
       "requires": [],
       "external": [
@@ -2699,10 +2699,10 @@
         "models.guardian_incidents"
       ],
       "core_paths": [
-        "/walter/router/store/db.py"
+        "/walter/cognition/router/store/db.py"
       ],
       "backup_paths": [
-        "/walter/router",
+        "/walter/cognition/router",
         "/user/Lucas/config/router",
         "/user/Lucas/state/router"
       ],
@@ -2741,7 +2741,7 @@
         "owner": "router",
         "kind": "capability",
         "purpose": "Choisir les modèles par poste avec décisions et coûts traçables.",
-        "target_root": "/walter/router",
+        "target_root": "/walter/cognition/router",
         "config_paths": [],
         "permissions": [
           "accord propriétaire pour changer un choix"
@@ -2852,9 +2852,9 @@
         "audience": "agent",
         "title": "Walter Router",
         "order": 70,
-        "summary": "/walter/router/manifest/SUMMARY.md",
-        "manifest": "/walter/router/manifest/MANIFEST.md",
-        "guide": "/walter/router/manifest/GUIDE.md",
+        "summary": "/walter/cognition/router/manifest/SUMMARY.md",
+        "manifest": "/walter/cognition/router/manifest/MANIFEST.md",
+        "guide": "/walter/cognition/router/manifest/GUIDE.md",
         "manifest_command": [
           "walter-router",
           "brief",
@@ -2878,34 +2878,34 @@
       "components": [
         {
           "id": "research",
-          "path": "/walter/router/research",
+          "path": "/walter/cognition/router/research",
           "role": "Collecte des classements et prix (AA, Arena, OpenRouter…)",
           "status": "active",
-          "readme": "/walter/router/README.md",
+          "readme": "/walter/cognition/router/README.md",
           "vision_target": "cognition/router/research"
         },
         {
           "id": "analysis",
-          "path": "/walter/router/analysis",
+          "path": "/walter/cognition/router/analysis",
           "role": "Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6)",
           "status": "active",
-          "readme": "/walter/router/README.md",
+          "readme": "/walter/cognition/router/README.md",
           "vision_target": "cognition/router/analysis"
         },
         {
           "id": "plan",
-          "path": "/walter/router/plan",
+          "path": "/walter/cognition/router/plan",
           "role": "Forfaits du propriétaire et quotas",
           "status": "active",
-          "readme": "/walter/router/README.md",
+          "readme": "/walter/cognition/router/README.md",
           "vision_target": "cognition/router/plan"
         },
         {
           "id": "serve",
-          "path": "/walter/router/serve",
+          "path": "/walter/cognition/router/serve",
           "role": "Choix du modèle par tâche, exécution texte et médias",
           "status": "active",
-          "readme": "/walter/router/README.md",
+          "readme": "/walter/cognition/router/README.md",
           "interfaces": [
             {
               "transport": "cli",
@@ -2916,32 +2916,32 @@
         },
         {
           "id": "walter-run-loop",
-          "path": "/walter/router/serve/text_agent.py",
+          "path": "/walter/cognition/router/serve/text_agent.py",
           "role": "Boucle de sous-agent de walter_run — seconde boucle agentique, absorbée par le moteur au lot E5 ; terminal retiré le 09/11",
           "status": "active",
-          "readme": "/walter/router/README.md"
+          "readme": "/walter/cognition/router/README.md"
         },
         {
           "id": "oneshot",
-          "path": "/walter/router/serve/oneshot.py",
+          "path": "/walter/cognition/router/serve/oneshot.py",
           "role": "Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6)",
           "status": "obsolete",
-          "readme": "/walter/router/README.md"
+          "readme": "/walter/cognition/router/README.md"
         },
         {
           "id": "interface",
-          "path": "/walter/router/interface",
+          "path": "/walter/cognition/router/interface",
           "role": "Page publique de la bibliothèque des modèles",
           "status": "active",
-          "readme": "/walter/router/README.md",
+          "readme": "/walter/cognition/router/README.md",
           "vision_target": "cognition/router/interface"
         },
         {
           "id": "store",
-          "path": "/walter/router/store",
+          "path": "/walter/cognition/router/store",
           "role": "Schéma Postgres models (lecture/écriture)",
           "status": "active",
-          "readme": "/walter/router/README.md",
+          "readme": "/walter/cognition/router/README.md",
           "data": [
             "postgres:models"
           ],
@@ -2949,25 +2949,25 @@
         },
         {
           "id": "hermes-plugin",
-          "path": "/walter/router/hermes-plugins",
+          "path": "/walter/cognition/router/hermes-plugins",
           "role": "Greffon Hermes walter-router — à retirer avec Hermes (E7)",
           "status": "active",
-          "readme": "/walter/router/README.md"
+          "readme": "/walter/cognition/router/README.md"
         },
         {
           "id": "guardian",
-          "path": "/walter/router/guardian",
+          "path": "/walter/cognition/router/guardian",
           "role": "Gardien du Router",
           "status": "active",
-          "readme": "/walter/router/guardian/README.md",
+          "readme": "/walter/cognition/router/guardian/README.md",
           "vision_target": "cognition/router/guardian"
         },
         {
           "id": "documentation",
-          "path": "/walter/router/documentation.py",
+          "path": "/walter/cognition/router/documentation.py",
           "role": "Référence générée (CODE, CONFIGURATION, DATABASE…) contrôlée par les tests",
           "status": "active",
-          "readme": "/walter/router/docs/README.md",
+          "readme": "/walter/cognition/router/docs/README.md",
           "vision_target": "cognition/router/docs"
         }
       ]

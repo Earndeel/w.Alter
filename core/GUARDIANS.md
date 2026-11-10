@@ -2,7 +2,7 @@
 
 Owner decisions (2026-10-27): every Walter module has its own guardian; Curator ≠ Guardian ≠ Lab; a minimal
 supervisor checks that modules and guardians answer, without becoming a central agent; critical watchdogs work
-without Router or Memory. Reference implementation: `/walter/router/guardian` (detection without a model, incident
+without Router or Memory. Reference implementation: `/walter/cognition/router/guardian` (detection without a model, incident
 follow-up, repair on a copy behind deterministic gates, sparse Telegram).
 
 ## Declaration — `<module>/contracts/maintenance.json`
