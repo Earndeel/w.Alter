@@ -268,6 +268,10 @@ def _refresh(task: str) -> dict:
             return d
         name, _, level = task.partition("/")
         d = _router("pick", name, *(["--level", level] if level else []))
+        if isinstance(d, dict) and not d.get("execution") and d.get("openrouter_id"):
+            # a service poste (stt): the Router names the model and its OpenRouter id, no chat route list — the one
+            # route is that id on OpenRouter (2026-11-10: the Telegram door's voice notes, no longer Hermes' plugin)
+            d = {**d, "execution": [{"provider": "openrouter", "model": d["openrouter_id"]}]}
         _routes[task] = (time.time(), d)
         return d
     finally:
