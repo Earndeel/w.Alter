@@ -42,7 +42,7 @@
     "owner": "runtime",
     "kind": "foundation",
     "purpose": "Fournir l’environnement Python partagé des modules Walter.",
-    "target_root": "runtime",
+    "target_root": "ops/runtime",
     "config_paths": [],
     "permissions": [
       "aucune permission propre ; exécute le code du module appelant avec ses droits"

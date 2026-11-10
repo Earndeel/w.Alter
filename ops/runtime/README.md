@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Rôle** | Fournir l'environnement Python partagé des modules Walter. |
-| **Propriétaire** | walter-runtime (`/walter/runtime`). |
+| **Propriétaire** | walter-runtime (`/walter/ops/runtime`). |
 | **État** | **active** (constat du 09/11/2026) : fondation sans service. |
 | **Ne fait pas** | Contenir le code d'un module. Être appelé par le chemin de l'interpréteur (toujours `walter-python`). |
 | **Contrats** | [contracts/runtime.json](contracts/runtime.json) ; commande `walter-python` ; `requirements.lock`, `requirements-dev.lock`. |
