@@ -39,19 +39,19 @@ Moved verbatim from SKILL.md on 2026-11-01.
 
 - When collection and calculation have already completed, inspect their results without rerunning refresh or changing routing decisions. Start with:
   ```sh
-  /opt/walter-router/bin/walter-router review
-  /opt/walter-router/bin/walter-router health
-  /opt/walter-router/bin/walter-router alias-list
+  /walter/cognition/router/bin/walter-router review
+  /walter/cognition/router/bin/walter-router health
+  /walter/cognition/router/bin/walter-router alias-list
   ```
-- Read `/opt/walter-router/docs/TIERS.md` and `/opt/walter-router/config/knowledge.json` to interpret calculated versus declared tiers. Inspect a relevant task with `/opt/walter-router/bin/walter-router dossier <task>`; examples are `general` and `image_to_video`.
+- Read `/walter/cognition/router/docs/TIERS.md` and `/walter/cognition/router/config/knowledge.json` to interpret calculated versus declared tiers. Inspect a relevant task with `/walter/cognition/router/bin/walter-router dossier <task>`; examples are `general` and `image_to_video`.
 - Treat successful cycle execution and source health separately. Check individual source errors and snapshot ages even when the run status is `ok`. Report failed or stale sources as limits on the analysis; do not repair collectors under alias-only authorization.
-- Use `alias-list` as the operational check for existing mappings. If a supplied alias-file path fails, do not create or edit a replacement. This session encountered a failed read of the advertised `/opt/walter-router/walter_router/aliases.json` path.
+- Use `alias-list` as the operational check for existing mappings. If a supplied alias-file path fails, do not create or edit a replacement. This session encountered a failed read of the advertised `/walter/cognition/router/walter_router/aliases.json` path.
 - Verify each proposed name match using targeted evidence, preferably official model or provider documentation. Similar names, an omitted instruction-tuning suffix, or a speed-oriented variant name do not alone establish identity. Preserve distinctions between checkpoints, releases, and variants unless evidence explicitly establishes that the names refer to the same model. Do not treat an alias accepted by the CLI as proof of semantic correctness.
 - Inspect the supported mutation syntax before adding a verified match:
   ```sh
-  /opt/walter-router/bin/walter-router alias-add --help
-  /opt/walter-router/bin/walter-router alias-add <source-name> <canonical-model-id> --reason "<identity evidence and source URL>"
-  /opt/walter-router/bin/walter-router alias-list
+  /walter/cognition/router/bin/walter-router alias-add --help
+  /walter/cognition/router/bin/walter-router alias-add <source-name> <canonical-model-id> --reason "<identity evidence and source URL>"
+  /walter/cognition/router/bin/walter-router alias-list
   ```
   Confirm the resulting mapping in the final listing. In this session the tool wrapper labeled successful additions as errors despite process exit code `0` and JSON containing `added` and `model_id`; inspect the payload and verify persisted state before retrying.
 - Keep all writes within the user's stated scope. If only `alias-add` is authorized, do not edit the database, configuration, project files, or create a report file without separate authorization. Return findings in the response, including verified additions, unresolved candidates, and source-health limitations.

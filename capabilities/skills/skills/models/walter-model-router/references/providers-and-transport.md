@@ -17,11 +17,11 @@ After changing the instance's gateway configuration, restart `walter-llm`; do no
 
 ## Diagnostiquer une panne Kie sans déclasser ses médias
 
-- Avant toute modification, lire `git -C /walter/router status --short` et identifier les fichiers travaillés par les autres sessions. Ne pas les modifier ni les commiter sans autorisation explicite. Le guardian attend lorsque des changements non commités empêchent son intervention.
+- Avant toute modification, lire `git -C /walter/cognition/router status --short` et identifier les fichiers travaillés par les autres sessions. Ne pas les modifier ni les commiter sans autorisation explicite. Le guardian attend lorsque des changements non commités empêchent son intervention.
 - Lancer `timeout 90 walter-router health` et distinguer les services Kie : Claude, Codex et médias. Une panne de l’API Claude ne prouve pas une panne des médias.
 - Inspecter `serve/execution.py` pour les sondes et `serve/media_exec.py` pour leur effet sur le choix du fournisseur. Conserver `kie` pour Claude et `kie-media` pour les médias ; ne pas utiliser l’état Claude pour déclasser les images ou vidéos.
 - Pour les médias, vérifier le compte et le crédit sans lancer de génération payante. Pour les réponses textuelles en streaming, HTTP 200 et un corps non vide ne suffisent pas : vérifier la présence du contenu attendu et afficher l’erreur du fournisseur lorsqu’elle est disponible. Une réponse SSE peut se terminer sans message utile.
-- Vérifier le comportement avec `cd /walter/router` puis `venv/bin/python -m pytest -q -p no:cacheprovider tests/test_media_exec.py`. Contrôler aussi le fournisseur réellement choisi : une sonde médias saine rend Kie éligible, mais le prix peut toujours favoriser OpenRouter.
+- Vérifier le comportement avec `cd /walter/cognition/router` puis `venv/bin/python -m pytest -q -p no:cacheprovider tests/test_media_exec.py`. Contrôler aussi le fournisseur réellement choisi : une sonde médias saine rend Kie éligible, mais le prix peut toujours favoriser OpenRouter.
 - Après les corrections et leurs commits, lancer `walter-router-guardian run --no-agent --no-notify`, puis `walter-router-guardian status` pour vérifier les incidents sans déclencher de réparation par agent ni de notification.
 - Si le guardian analyse les sorties pytest, préserver les identifiants paramétrés contenant des espaces : utiliser une capture de l’identifiant complet, pas `\S+`.
 
@@ -32,7 +32,7 @@ When adding a provider to Walter Router, store the API key in Bitwarden through 
 Inspect the existing provider and secret mechanisms first:
 
 ```bash
-cd /walter/router
+cd /walter/cognition/router
 sed -n '240,330p' llm/gateway.py
 cat config/providers.json
 cd /walter/secrets
@@ -56,7 +56,7 @@ python3 -c 'from walter_secrets import mapping; print(mapping.entry("VENICE_API_
 Add Venice using the same provider configuration and gateway adapter conventions as the existing OpenAI-compatible providers. Validate the JSON and run the router checks:
 
 ```bash
-cd /walter/router
+cd /walter/cognition/router
 python3 -I -c 'import json; json.load(open("config/providers.json")); print("json ok")'
 timeout 300 walter check
 ```
@@ -73,7 +73,7 @@ Test the exact model through the native Walter path and run the provider probe:
 
 ```bash
 printf '%s\n' '{"route":{"provider":"venice","model":"deepseek-v4-1-flash-1017-uncensored"},"messages":[{"role":"user","content":"Réponds seulement: OK"}],"timeout":60}' | timeout 120 walter-llm call
-cd /walter/router
+cd /walter/cognition/router
 timeout 300 walter-router probe --provider venice
 ```
 

@@ -233,20 +233,20 @@ Quand la collecte et le calcul sont déjà terminés et que seules les correctio
 
 1. Lire l’état avec les chemins absolus :
    ```bash
-   /opt/walter-router/bin/walter-router review
-   /opt/walter-router/bin/walter-router health
-   /opt/walter-router/bin/walter-router alias-list
+   /walter/cognition/router/bin/walter-router review
+   /walter/cognition/router/bin/walter-router health
+   /walter/cognition/router/bin/walter-router alias-list
    ```
    Le binaire peut être absent du PATH. Juger le succès d’après le code de sortie et le contenu : une enveloppe d’outil marquée « error » peut contenir une commande réussie avec `exit_code: 0`.
-2. Lire `/opt/walter-router/docs/TIERS.md`, `/opt/walter-router/config/knowledge.json` et `/opt/walter-router/walter_router/aliases.json`. Examiner au besoin une tâche avec `/opt/walter-router/bin/walter-router dossier <tâche>`.
+2. Lire `/walter/cognition/router/docs/TIERS.md`, `/walter/cognition/router/config/knowledge.json` et `/walter/cognition/router/walter_router/aliases.json`. Examiner au besoin une tâche avec `/walter/cognition/router/bin/walter-router dossier <tâche>`.
 3. Vérifier chaque rapprochement sur une source officielle accessible. Exiger la même génération, variante et modalité ; une ressemblance de nom ne suffit pas. Une recherche vide ou un échec d’extraction ne prouve aucune équivalence. Si le backend indique qu’il ne prend pas en charge l’extraction, ne pas répéter cette opération ; utiliser une méthode de lecture autorisée ou laisser le candidat non résolu.
 4. Consulter la syntaxe avant toute correction :
    ```bash
-   /opt/walter-router/bin/walter-router alias-add --help
+   /walter/cognition/router/bin/walter-router alias-add --help
    ```
    Ajouter seulement les équivalences étayées :
    ```bash
-   /opt/walter-router/bin/walter-router alias-add <clé-source> <model_id-canonique> --reason '<preuve de même identité et URL officielle>'
+   /walter/cognition/router/bin/walter-router alias-add <clé-source> <model_id-canonique> --reason '<preuve de même identité et URL officielle>'
    ```
 5. Relire `alias-list` pour confirmer la paire enregistrée. Cette vérification confirme l’écriture, pas l’identité des modèles.
 6. Respecter strictement le périmètre de mutation : ne pas modifier directement la base, la configuration ou les fichiers du projet, ni lancer une collecte ou un recalcul. Sans autorisation distincte de produire un fichier de rapport, rendre l’analyse dans la réponse. Distinguer les constats du cycle, les alias effectivement corrigés et les candidats encore incertains.
@@ -260,7 +260,7 @@ When a model is absent, renamed, newly paid, or no longer offered, trace it thro
 ```sh
 curl -fsS --max-time 30 https://openrouter.ai/api/v1/models -o /tmp/walter-openrouter-default.json
 curl -fsS --max-time 30 'https://openrouter.ai/api/v1/models?output_modalities=all' -o /tmp/walter-openrouter-all.json
-/walter/router/venv/bin/python -I - <<'PY'
+/walter/cognition/router/venv/bin/python -I - <<'PY'
 import json
 for path in ['/tmp/walter-openrouter-default.json', '/tmp/walter-openrouter-all.json']:
     with open(path) as f:
@@ -277,9 +277,9 @@ Adapt the model filter to the incident. Record retrieval time and exact IDs. Tre
 2. Inspect database schema before querying guessed columns. Use the router's connection helper rather than reconstructing credentials:
 
 ```sh
-/walter/router/venv/bin/python -I - <<'PY'
+/walter/cognition/router/venv/bin/python -I - <<'PY'
 import sys
-sys.path.insert(0, '/walter/router')
+sys.path.insert(0, '/walter/cognition/router')
 from store.db import connect
 with connect() as c:
     rows = c.execute("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'models' ORDER BY table_name, ordinal_position").fetchall()
@@ -290,8 +290,8 @@ PY
 
 The connection returns mapping rows; numeric indexing caused `KeyError: 0`. `models.endpoints` did not have the guessed `provider` column. Follow the discovered schema to compare `snapshots`, `offers`, `canonical`, scores, and endpoints. Presence in raw snapshots does not establish an ingested or routable offer.
 
-3. Read `/walter/router/analysis/parse.py`, `/walter/router/analysis/ingest.py`, `/walter/router/analysis/identity.py`, and `/walter/router/analysis/aliases_admin.py`. Inspect filtering before blaming identity matching. In this session, the parser discarded IDs containing `:free`; the research agent therefore could not investigate those offers through its normal input. Normalization also produced `elephant-1` and `d1-1`, which does not by itself establish correspondence to benchmark names.
+3. Read `/walter/cognition/router/analysis/parse.py`, `/walter/cognition/router/analysis/ingest.py`, `/walter/cognition/router/analysis/identity.py`, and `/walter/cognition/router/analysis/aliases_admin.py`. Inspect filtering before blaming identity matching. In this session, the parser discarded IDs containing `:free`; the research agent therefore could not investigate those offers through its normal input. Normalization also produced `elephant-1` and `d1-1`, which does not by itself establish correspondence to benchmark names.
 
-4. Inspect `/opt/walter-router/bin/walter-router-cycle`, `/walter/router/research/agent/prompt.md`, and `/walter/router/research/agent/review.py`. Verify the actual model and actions from the latest run under `/root/.hermes/logs/walter-router/`; do not assume the configured L1 executed successfully. The observed cycle collected and analyzed data, ran a research agent capable of evidence-backed aliases, then analyzed again. Agent availability does not prove that missing offers reached its input.
+4. Inspect `/walter/cognition/router/bin/walter-router-cycle`, `/walter/cognition/router/research/agent/prompt.md`, and `/walter/cognition/router/research/agent/review.py`. Verify the actual model and actions from the latest run under `/root/.hermes/logs/walter-router/`; do not assume the configured L1 executed successfully. The observed cycle collected and analyzed data, ran a research agent capable of evidence-backed aliases, then analyzed again. Agent availability does not prove that missing offers reached its input.
 
 5. Separate identity from offer lifecycle. Establish model equivalence with provider descriptions and supporting web evidence; check `walter-router alias-add --help` before applying a justified alias. Independently compare successive complete snapshots for removed IDs, replacement IDs, prices, modalities, and access. An alias alone does not retire an obsolete free endpoint or activate its paid replacement. Verify each resulting database and routing state before claiming resolution. Do not promise that the next refresh will fix a case without checking collection, parsing, and identity prerequisites.

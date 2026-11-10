@@ -193,15 +193,15 @@ Class-level rules:
 
 ## Verify module routing through walter-llm
 
-1. Distinguish Hermes routing from module routing: `walter-router sync-hermes` configures Hermes; modules calling `127.0.0.1:8894` depend on `/opt/walter-llm/gateway.py`. A correct router choice does not prove the gateway executes that provider.
+1. Distinguish Hermes routing from module routing: `walter-router sync-hermes` configures Hermes; modules calling `127.0.0.1:8894` depend on `/walter/cognition/router/llm/gateway.py`. A correct router choice does not prove the gateway executes that provider.
 2. Inspect the selected task and gateway implementation before changing routing:
    ```bash
-   /opt/walter-router/bin/walter-router pick memory_extraction
-   rg -n 'codex|reasoning_effort|response_format|CHATGPT_DEFAULT_INSTRUCTIONS' /opt/walter-llm/gateway.py
+   /walter/cognition/router/bin/walter-router pick memory_extraction
+   rg -n 'codex|reasoning_effort|response_format|CHATGPT_DEFAULT_INSTRUCTIONS' /walter/cognition/router/llm/gateway.py
    ```
 3. Exercise the actual consuming module, then inspect recent successful gateway calls. Print only routing metadata:
    ```bash
-   /opt/walter-llm/venv/bin/python - <<'PY'
+   /walter/cognition/router/llm/venv/bin/python - <<'PY'
    import json
    from collections import deque
    with open('/root/.hermes/logs/walter-llm.jsonl') as f:

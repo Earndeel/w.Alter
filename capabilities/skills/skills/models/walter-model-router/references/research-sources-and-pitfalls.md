@@ -5,7 +5,7 @@ Moved verbatim from SKILL.md on 2026-11-01.
 ## Research reference — sources and pitfalls (still valid)
 
 Kept from the August collectors: how each source must be read and checked. The live readers are in
-`/walter/router/research/` (AA through the Next.js data of its pages, no API key needed for the router's own sources).
+`/walter/cognition/router/research/` (AA through the Next.js data of its pages, no API key needed for the router's own sources).
 
 ### AA API v2
 - `GET https://artificialanalysis.ai/api/v2/data/llms/models` with `x-api-key` header

@@ -23,7 +23,7 @@ the router, not this cache:
 - `walter-router route "<request>"`: routing from a task description (replaces `router.py` for routing), and
   `walter-router pick <task> [--level L1|L2|L3]` for a known task;
 - `walter-router dossier <task>`: every candidate with its per-board evidence;
-- SQL on `models.benchmarks` / `models.offers` (see `/walter/router/docs/DATA.md`).
+- SQL on `models.benchmarks` / `models.offers` (see `/walter/cognition/router/docs/DATA.md`).
 
 `~/.hermes/cache/aa-pareto/` is no longer refreshed by any timer (the cycle stopped calling
 `aa_pareto_daily_refresh.py`; its Hermes cron 096741a21a32 stays paused). Use the scripts below only for an ad-hoc

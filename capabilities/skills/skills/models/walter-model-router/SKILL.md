@@ -11,9 +11,9 @@ metadata:
 
 # Walter Router
 
-Module `/walter/router` (also reachable as `/opt/walter-router`), command `walter-router` on the PATH. Data: schema
+Module `/walter/cognition/router` (also reachable as `/walter/cognition/router`), command `walter-router` on the PATH. Data: schema
 `models` in PostgreSQL 127.0.0.1:5433 db `hindsight` (password only in ~/.pgpass; every table and view is commented).
-Read first: `/walter/router/README.md` (current state: layout, how a choice is made, consumers, access, rules), then
+Read first: `/walter/cognition/router/README.md` (current state: layout, how a choice is made, consumers, access, rules), then
 `docs/README.md` (documentation index), `docs/reference/DATABASE.md` (all SQL fields), `docs/DATA.md` (provenance), `docs/TIERS.md` (text tiers), `docs/HISTORY.md` (dated decisions).
 The old store (schema `walter_router`, fixed weight vectors, router_matrix.json) is retired: never use it.
 
@@ -52,7 +52,7 @@ The old store (schema `walter_router`, fixed weight vectors, router_matrix.json)
   mails become proposals; plan news become notices).
 
 ## Checks
-- `walter-router health`, `status`, `review`, `alerts --all`; tests `cd /walter/router && venv/bin/python -m pytest -q`.
+- `walter-router health`, `status`, `review`, `alerts --all`; tests `cd /walter/cognition/router && venv/bin/python -m pytest -q`.
 - Before calling a provider "cheapest", compare every provider and host at equal settings (`models.offers`,
   `models.best_endpoints`, subscription cost price in `models.latest_subscription_costs`).
 
@@ -76,7 +76,7 @@ The old store (schema `walter_router`, fixed weight vectors, router_matrix.json)
 
 - Read `walter-router review` and `walter-router health`; correlate the run ID, source errors and snapshot ages before interpreting rankings. Report stale or failed sources as limits on the analysis; do not repair collectors during an alias-only review.
 - Read `walter-router docs` and `walter-router --help` to discover current documentation and commands. Use `walter-router dossier <task>` for task-specific evidence and `walter-router alias-list` for existing mappings.
-- Treat `/opt/walter-router/walter_router/aliases.json` as a legacy location: it was absent in this session; the file was found at `/opt/walter-router/analysis/aliases.json`. Resolve the module root with `walter path router` and verify the current layout before reading implementation files. Never edit the alias file directly.
+- Treat `/walter/cognition/router/walter_router/aliases.json` as a legacy location: it was absent in this session; the file was found at `/walter/cognition/router/analysis/aliases.json`. Resolve the module root with `walter path router` and verify the current layout before reading implementation files. Never edit the alias file directly.
 - Treat unmatched-name candidates as investigation leads, not established equivalences. Verify identity using primary provider documentation; similar names, shared parameter counts, date suffixes, experimental variants and specialist suffixes do not establish equivalence.
 - Before an authorized correction, inspect `walter-router alias-add --help` for the exact current syntax. Apply only verified equivalences through `alias-add`, then check `alias-list` and rerun `review` to verify the result. If evidence is insufficient, leave the candidate unresolved.
 - Keep the authorization boundary explicit: an alias-only analysis permits no direct database writes, configuration changes, collector repairs, model switches or report-file creation unless separately authorized. Return the analysis in the response when file writes are excluded.

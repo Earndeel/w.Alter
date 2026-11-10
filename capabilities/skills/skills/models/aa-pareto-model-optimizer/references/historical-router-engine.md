@@ -4,7 +4,7 @@ Moved verbatim from SKILL.md on 2026-11-01.
 
 ## Router engine (historical: superseded by Walter Router)
 
-Walter Router now owns routing (tiers L1/L2/L3 by the owner's method in `/walter/router/docs/TIERS.md`, specialised
+Walter Router now owns routing (tiers L1/L2/L3 by the owner's method in `/walter/cognition/router/docs/TIERS.md`, specialised
 tasks by weighted leaderboards): do not route from `router_matrix.json`; use `walter-router route "<request>"` or
 `walter-router pick <task>`. `router.py` stays for comparison only, after a fresh collection. It implemented the
 owner's original routing philosophy:
