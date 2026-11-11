@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-11-11T04:16:54+00:00",
+ "archived_reason": "not read for 30 days",
+ "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/devops/ondemand-services",
   "sha": "7f84131500718187bcfeb60e42b56d5ce74d7912fd44701ca8db59836ce3f857",
@@ -7,5 +10,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
+ "reserve": true,
  "store_sha": "7f84131500718187bcfeb60e42b56d5ce74d7912fd44701ca8db59836ce3f857"
 }
