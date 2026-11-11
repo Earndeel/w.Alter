@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-11-11T04:16:37.335704+00:00",
+ "description": "Use when converting Markdown or HTML to PDF on Monsieur's Ubuntu ARM VM with existing Chromium binaries, especially without installing dependencies or inside a restricted workspace.",
+ "domain": "documents",
+ "kind": "new",
+ "reason": "The session established a reusable document conversion workflow absent from the listed skills: detect the Ubuntu chromium-browser stub, reject wrong-architecture cached binaries, use an existing ARM headless-shell, accommodate restricted HOME and /dev/shm, suppress local-path print headers, and validate PDF contents and pagination. Evidence includes a successful end-to-end conversion, seven reported content checks, and twelve code blocks preserved across six pages. [session dsh/vm/cbcae133-657f-42dd-8bc0-6415dff0e551]",
+ "runtime": "learner",
+ "session_id": "dsh/vm/cbcae133-657f-42dd-8bc0-6415dff0e551",
+ "target": "markdown-pdf-headless"
+}
