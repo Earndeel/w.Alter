@@ -5,14 +5,14 @@ description: Deploy Cloudflare Workers via curl when wrangler's Node.js fetch fa
 
 # Cloudflare Worker Deploy via curl
 
-> **Credentials — read this first (fixed 2026-10-04).** Never type or guess Cloudflare credentials. Run every
-> Cloudflare command through `/root/.hermes/scripts/walter-cloudflare -- <command>`, which injects
+> **Credentials — read this first (updated 2026-11-11).** Never type or guess Cloudflare credentials. Run every
+> Cloudflare command through `walter-cloudflare -- <command>` (on the PATH, Walter Secrets' tool), which injects
 > `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_EMAIL`, `CLOUDFLARE_API_KEY` (global key), `CLOUDFLARE_API_TOKEN` and
-> `CLOUDFLARE_AI_TOKEN` without printing them; `walter-cloudflare check` verifies them all.
-> Pitfall that cost a debugging round: the vault item « W.Alter · cloudflare » has **no e-mail field**; the account
-> e-mail lives in `~/.hermes/.env` as `CLOUDFLARE_EMAIL`. The `user@example.com` below is only an example — a global
+> `CLOUDFLARE_AI_TOKEN` without printing them; `walter-cloudflare check` verifies them all (fails closed).
+> Source: Bitwarden only, through the grants `cloudflare-api` / `cloudflare-workers-ai`; `~/.hermes/.env` and
+> `/root/.hermes/scripts/walter-cloudflare` are retired. The `user@example.com` below is only an example — a global
 > key used with it answers « Unknown X-Auth-Key or X-Auth-Email » (403) / « Authentication error » (401).
-> The vault `api_token` has no Workers AI permission; Workers AI uses `CLOUDFLARE_AI_TOKEN` (scoped « Workers AI Read »).
+> The `api_token` has no Workers AI permission; Workers AI uses `CLOUDFLARE_AI_TOKEN` (scoped « Workers AI Read »).
 
 ## When to use
 - `wrangler deploy` fails with `fetch failed` (Node.js networking issues in sandbox/container)
@@ -24,7 +24,7 @@ description: Deploy Cloudflare Workers via curl when wrangler's Node.js fetch fa
 ### 1. Bundle with wrangler dry-run
 ```bash
 # credentials injected by the helper (example only: never write an e-mail or key here)
-/root/.hermes/scripts/walter-cloudflare -- wrangler deploy --dry-run --outfile=/tmp/worker-bundle.js
+walter-cloudflare -- wrangler deploy --dry-run --outfile=/tmp/worker-bundle.js
 ```
 This produces a pre-built multipart form body (not plain JS).
 
@@ -63,9 +63,9 @@ curl -s https://your-worker.your-domain.com/health
 
 ## Authentication
 
-Resolve Cloudflare credentials at runtime with `/root/.hermes/scripts/walter-cloudflare` (vault for the global key and
-the vault token, `~/.hermes/.env` for the account id, the account e-mail and the Workers AI token); never embed
-account e-mails, API keys or tokens in this skill. In Python, read them from the environment of a process started by
+Resolve Cloudflare credentials at runtime with `walter-cloudflare` (Bitwarden through the Walter Secrets grants, for
+the global key, the token, the account id, the account e-mail and the Workers AI token); never embed account e-mails,
+API keys or tokens in this skill. In Python, read them from the environment of a process started by
 `walter-cloudflare -- python3 script.py`.
 
 **Global API Key** (direct curl or Wrangler legacy authentication):
