@@ -1,0 +1,11 @@
+{
+ "base_sha": "cab32ec8a35730840bd7e4c6097e902d45a4bb6f21b79760b9c32d7fbac02044",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-11T06:28:44.629988+00:00",
+ "domain": "cloudflare",
+ "kind": "patch",
+ "reason": "La skill présentait ~/.hermes/.env comme config active (2026-11-11 : fichier retiré, Walter Secrets seul accès) ; nom du frontmatter aligné sur le dossier",
+ "runtime": "claude_code",
+ "session_id": null,
+ "target": "cloudflare-mcp-workers"
+}
