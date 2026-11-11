@@ -32,7 +32,7 @@ failing source keeps its last good one (view `latest_snapshots`). Freshness: `wa
 | `openrouter` | Every OpenRouter model, all modalities, prices (media prices from each model page's `displayPricing`) | openrouter.ai/api/v1/models |
 | `kie` | Kie.ai market prices (credits → $) | api.kie.ai/client/v1/model-pricing |
 | `codex` | Models of W.Alter's ChatGPT/Codex subscription | read through Hermes (no price: subscription) |
-| `hermes_providers` | Live `/models` of OpenAI-compatible providers configured in Hermes (`config/providers.json`, today Arnict) | provider API, key from `~/.hermes/.env` sent as a header |
+| `hermes_providers` | Live `/models` of OpenAI-compatible providers configured in Hermes (`config/providers.json`, today Arnict) | provider API, key through Walter Secrets (card `[env]` of the provider's grant, reader `router`) sent as a header |
 | `declared` | Offers no API lists (web UIs, direct keys), declared by the owner | `config/declared_offers.json` |
 
 ## 2. Identity

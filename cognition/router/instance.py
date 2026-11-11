@@ -104,28 +104,12 @@ def child_env(**extra: str) -> dict:
 
 
 
-HERMES_ENV = hermes_home() / ".env"
-
-
-def env_value(name: str) -> str | None:
-    """A key from Hermes' 0600 .env (or the process environment), read at run time (never logged / put in a URL)."""
+def secret_value(name: str) -> str | None:
+    """A key the Router component is granted under NAME (Walter Secrets: instance accounts/<id>.toml, `allow` + [env],
+    Bitwarden only), or the process environment when a caller injected it explicitly (tests, evaluation). None when
+    no grant gives it: there is no fallback to a file (Hermes' .env was retired 2026-11-11). Never logged, never in a URL."""
     if os.environ.get(name):
         return os.environ[name]
-    try:
-        for line in HERMES_ENV.read_text().splitlines():
-            if line.startswith(name + "="):
-                return line.split("=", 1)[1].strip().strip("'\"") or None
-    except OSError:
-        pass
-    return os.environ.get(name)
-
-
-def secret_value(name: str) -> str | None:
-    """A key from the environment, else from the instance's vault (walter-secrets map or its declared keys). Keys
-    that are not in Hermes' .env live only in Bitwarden (2026-10-30); the value is never logged or put in a URL."""
-    value = env_value(name)
-    if value:
-        return value
     try:   # the walter-secrets module root (`walter path secrets`, not an instance path)
         secrets = subprocess.run(["walter", "path", "secrets"], capture_output=True, text=True, timeout=30).stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
@@ -136,11 +120,9 @@ def secret_value(name: str) -> str | None:
     if secrets not in sys.path:
         sys.path.insert(0, secrets)
     try:
-        from walter_secrets.mapping import entry
-        from walter_secrets.vault import VAULT
-        e = entry(name)
-        return VAULT.value(e["item_id"], e["field"])
-    except Exception:  # noqa: BLE001 — unknown key or no vault session: the caller reports the key as missing
+        from walter_secrets import grants
+        return grants.env_value(name, "router")
+    except Exception:  # noqa: BLE001 — not granted or no vault session: the caller reports the key as missing
         return None
 
 

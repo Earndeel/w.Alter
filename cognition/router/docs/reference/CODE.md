@@ -413,8 +413,7 @@ What the Router needs from the active Walter instance, asked through its public 
 - `hermes_bin()` — 
 - `hermes_python()` — 
 - `child_env(**extra: str)` — Environment of a Hermes child process run on behalf of the Router.
-- `env_value(name: str)` — A key from Hermes' 0600 .env (or the process environment), read at run time (never logged / put in a URL).
-- `secret_value(name: str)` — A key from the environment, else from the instance's vault (walter-secrets map or its declared keys). Keys
+- `secret_value(name: str)` — A key the Router component is granted under NAME (Walter Secrets: instance accounts/<id>.toml, `allow` + [env],
 - `state_file(name: str)` — A file the Router generates for the instance (state/router/<name>), e.g. the agents' brief.
 
 ## interface/__init__.py
@@ -496,7 +495,7 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 
 - `_walter(*args: str)` — Walter's public interface (`walter` on the PATH): module roots and the active instance.
 - `_instance_path(value: str)` — 
-- `provider_key(env_name: str)` — Value of the vault item mapped to `env_name` (walter_secrets.mapping), cached in this process only. A stale
+- `provider_key(env_name: str)` — The provider key the walter-llm component is granted under `env_name` (walter_secrets.grants: the instance's
 - `_read_key(env_name: str)` — 
 - `_ledger()` — 
 - `_ledger_add(entry: dict)` — 

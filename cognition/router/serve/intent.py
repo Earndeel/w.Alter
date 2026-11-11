@@ -51,12 +51,12 @@ CF_RUN = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/{mo
 def _cloudflare(model: str, payload: dict, timeout: float) -> dict:
     """Cloudflare Workers AI (Clef family, free daily allocation). Scoped token preferred; the global key only when
     passed explicitly through the environment (evaluation)."""
-    account = instance.env_value("CLOUDFLARE_ACCOUNT_ID")
-    token = instance.env_value("CLOUDFLARE_AI_TOKEN")
+    account = instance.secret_value("CLOUDFLARE_ACCOUNT_ID")
+    token = instance.secret_value("CLOUDFLARE_AI_TOKEN")
     if token:
         auth = {"Authorization": f"Bearer {token}"}
-    elif instance.env_value("CLOUDFLARE_API_KEY") and instance.env_value("CLOUDFLARE_EMAIL"):
-        auth = {"X-Auth-Email": instance.env_value("CLOUDFLARE_EMAIL"), "X-Auth-Key": instance.env_value("CLOUDFLARE_API_KEY")}
+    elif instance.secret_value("CLOUDFLARE_API_KEY") and instance.secret_value("CLOUDFLARE_EMAIL"):
+        auth = {"X-Auth-Email": instance.secret_value("CLOUDFLARE_EMAIL"), "X-Auth-Key": instance.secret_value("CLOUDFLARE_API_KEY")}
     else:
         raise RuntimeError("no Cloudflare Workers AI credentials")
     short = model.split("/", 1)[1]
@@ -88,7 +88,7 @@ def _criteria(conn) -> tuple[dict, dict]:
 def _decisions(conn, state: dict, questions: dict, timeout: float, models: tuple | None = None):
     """One Decisions call along the chain (first model that answers) -> (answers, raw answer, ms, errors). Every
     choice is checked against its criteria; a model outside the chain (or the forwarding router) is refused."""
-    key = instance.env_value("OPENROUTER_API_KEY") or ""
+    key = instance.secret_value("OPENROUTER_API_KEY") or ""
     t0 = time.monotonic()
     errors = []
     data = None

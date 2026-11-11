@@ -268,7 +268,7 @@ def probe(conn, only: str | None = None, timeout: int = 90) -> dict:
     Hermes itself uses all day: not probed here (the Hermes run falls back if it fails). Kie has three services
     probed apart: `kie` = its Claude chat API, `kie-codex` = its Codex responses API, `kie-media` = its media
     tasks (account and credit, no generation)."""
-    key = instance.env_value
+    key = instance.secret_value
     kie = key("KIE_API_KEY") or ""
     checks = {
         "kie": lambda: _post("https://api.kie.ai/claude/v1/messages",

@@ -159,7 +159,7 @@ ENV_MEANINGS = {
     "WALTER_ROUTER_CHILD": "Marqueur des enfants historiques ; empêche une récursion de routage.",
     "WALTER_LLM_PORT": "Port HTTP loopback de la passerelle (défaut logiciel 8894).",
     "WALTER_LLM_URL": "URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894).",
-    "WALTER_LLM_TOKEN": "Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché).",
+    "WALTER_LLM_TOKEN": "Jeton local d'agent pour la passerelle walter-llm, propre à chaque runtime (@instance/bootstrap/llm/<agent>.env 0600 ; jamais affiché).",
     "WALTER_FLARESOLVERR": "Adresse du service de lecture des sources qui le nécessitent.",
     "HERMES_HOME": "Emplacement du runtime historique pour les opérations/adaptateurs qui en dépendent encore.",
     "CLAUDE_PROJECTS": "Source locale de métriques des sessions Claude pour estimer un abonnement.",
@@ -171,6 +171,7 @@ ENV_MEANINGS = {
     "CLOUDFLARE_EMAIL": "Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance.",
     "KIE_API_KEY": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets, pas une clé transmise au modèle.",
     "OPENROUTER_API_KEY": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets.",
+    "VENICE_API_KEY": "Nom d'accès fournisseur (autorisation venice, lecteurs llm et router) ; jamais affiché.",
     "CHATGPT_TOKEN_DIR": "Réglage du transport de l'abonnement ; l'authentification reste fournie par son grant.",
     "CHATGPT_DEFAULT_INSTRUCTIONS": "Instructions de base du transport d'abonnement, indépendantes du goal de la sous-tâche.",
 }
@@ -233,9 +234,9 @@ def inventory():
                                         'description': (ast.get_docstring(n) or '').split('\n')[0]}
                                        for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))]})
             for node in ast.walk(tree):
-                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in ('get','getenv','env_value','setdefault'):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in ('get','getenv','secret_value','setdefault'):
                     src = ast.unparse(node.func)
-                    if 'environ' in src or 'getenv' in src or 'env_value' in src:
+                    if 'environ' in src or 'getenv' in src or 'secret_value' in src:
                         if node.args and isinstance(node.args[0],ast.Constant) and isinstance(node.args[0].value,str):
                             name = node.args[0].value
                             environments.add(name)

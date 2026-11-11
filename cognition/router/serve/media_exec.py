@@ -198,7 +198,7 @@ FALLBACK_COST_X = 2.0
 # --- submit / poll --------------------------------------------------------------------------------------
 
 def _kie_key() -> str:
-    return instance.env_value("KIE_API_KEY") or ""
+    return instance.secret_value("KIE_API_KEY") or ""
 
 
 def run_kie(path: str, params: dict, kind: str) -> dict:
@@ -222,7 +222,7 @@ def run_kie(path: str, params: dict, kind: str) -> dict:
 
 
 def run_openrouter(or_id: str, kind: str, params: dict) -> dict:
-    h = {"Authorization": f'Bearer {instance.env_value("OPENROUTER_API_KEY")}'}
+    h = {"Authorization": f'Bearer {instance.secret_value("OPENROUTER_API_KEY")}'}
     if kind == "image":
         body = {"model": or_id, "prompt": params["prompt"], **{k: params[k] for k in ("aspect_ratio", "resolution")
                                                               if params.get(k)}}
@@ -340,7 +340,7 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
                                                    "duration": duration, "resolution": resolution,
                                                    "first_frame": image_urls[0] if image_urls else None,
                                                    "references": references})
-                auth = {"Authorization": f'Bearer {instance.env_value("OPENROUTER_API_KEY")}'} \
+                auth = {"Authorization": f'Bearer {instance.secret_value("OPENROUTER_API_KEY")}'} \
                     if res.get("auth_download") else None
                 files = _download(res.get("urls") or [], res.get("b64") or [], folder, model_id, auth)
             execution.log(conn, {"task": task, "role": d.get("role"), "model_id": model_id, "provider": provider,

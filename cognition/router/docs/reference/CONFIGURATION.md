@@ -272,7 +272,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `WALTER_ROUTER_CLI` | hermes-plugins/walter-router/__init__.py | get | 'walter-router' | Commande publique appelée par l'adaptateur de tools. |
 | `WALTER_LLM_URL` | hermes-plugins/walter-router/__init__.py | get | 'http://127.0.0.1:8894' | URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894). |
 | `TELEGRAM_HOME_CHANNEL` | hermes-plugins/walter-router/__init__.py | get | aucun | Destination d'instance des avis/propositions ; ne pas exporter sa valeur. |
-| `WALTER_LLM_TOKEN` | hermes-plugins/walter-router/__init__.py | get | '' | Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché). |
+| `WALTER_LLM_TOKEN` | hermes-plugins/walter-router/__init__.py | get | '' | Jeton local d'agent pour la passerelle walter-llm, propre à chaque runtime (@instance/bootstrap/llm/<agent>.env 0600 ; jamais affiché). |
 | `HERMES_HOME` | hermes-plugins/walter-router/__init__.py | get | aucun | Emplacement du runtime historique pour les opérations/adaptateurs qui en dépendent encore. |
 | `HERMES_HOME` | instance.py | get | aucun | Emplacement du runtime historique pour les opérations/adaptateurs qui en dépendent encore. |
 | `CHATGPT_TOKEN_DIR` | llm/gateway.py | setdefault | str(CHATGPT_DIR) | Réglage du transport de l'abonnement ; l'authentification reste fournie par son grant. |
@@ -287,18 +287,19 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `WALTER_DELEGATION_DEPTH` | serve/engine.py | get | aucun | Profondeur de délégation de l'appelant (0 = le propriétaire) transmise au moteur par une délégation Engine API ; posée par le moteur pour ses sous-tâches. |
 | `WALTER_RUN_ID` | serve/execution.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
 | `WALTER_TASK_ID` | serve/execution.py | get | aucun | Tâche de sous-agent (runs.tasks) servie par l'exécution walter_run ; inscrite dans models.exec_log. |
-| `CLOUDFLARE_ACCOUNT_ID` | serve/intent.py | env_value | aucun | Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation. |
-| `CLOUDFLARE_AI_TOKEN` | serve/intent.py | env_value | aucun | Nom d'un accès secret pour la voie de décision ; ne pas afficher sa valeur. |
-| `OPENROUTER_API_KEY` | serve/intent.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
-| `CLOUDFLARE_API_KEY` | serve/intent.py | env_value | aucun | Nom d'un accès secret utilisé par un adaptateur ; ne pas afficher sa valeur. |
-| `CLOUDFLARE_EMAIL` | serve/intent.py | env_value | aucun | Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance. |
-| `CLOUDFLARE_EMAIL` | serve/intent.py | env_value | aucun | Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance. |
-| `CLOUDFLARE_API_KEY` | serve/intent.py | env_value | aucun | Nom d'un accès secret utilisé par un adaptateur ; ne pas afficher sa valeur. |
-| `KIE_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets, pas une clé transmise au modèle. |
-| `OPENROUTER_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
-| `OPENROUTER_API_KEY` | serve/media_exec.py | env_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
+| `VENICE_API_KEY` | serve/execution.py | secret_value | aucun | Nom d'accès fournisseur (autorisation venice, lecteurs llm et router) ; jamais affiché. |
+| `CLOUDFLARE_ACCOUNT_ID` | serve/intent.py | secret_value | aucun | Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation. |
+| `CLOUDFLARE_AI_TOKEN` | serve/intent.py | secret_value | aucun | Nom d'un accès secret pour la voie de décision ; ne pas afficher sa valeur. |
+| `OPENROUTER_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
+| `CLOUDFLARE_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'un accès secret utilisé par un adaptateur ; ne pas afficher sa valeur. |
+| `CLOUDFLARE_EMAIL` | serve/intent.py | secret_value | aucun | Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance. |
+| `CLOUDFLARE_EMAIL` | serve/intent.py | secret_value | aucun | Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance. |
+| `CLOUDFLARE_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'un accès secret utilisé par un adaptateur ; ne pas afficher sa valeur. |
+| `KIE_API_KEY` | serve/media_exec.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets, pas une clé transmise au modèle. |
+| `OPENROUTER_API_KEY` | serve/media_exec.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
+| `OPENROUTER_API_KEY` | serve/media_exec.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
 | `WALTER_LLM_URL` | serve/oneshot.py | get | 'http://127.0.0.1:8894' | URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894). |
-| `WALTER_LLM_TOKEN` | serve/oneshot.py | get | aucun | Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché). |
+| `WALTER_LLM_TOKEN` | serve/oneshot.py | get | aucun | Jeton local d'agent pour la passerelle walter-llm, propre à chaque runtime (@instance/bootstrap/llm/<agent>.env 0600 ; jamais affiché). |
 | `WALTER_RUN_ID` | serve/oneshot.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
 | `WALTER_RUN_ID` | serve/run.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
 | `WALTER_RUN_CONTEXT` | serve/run.py | get | 'walter' | caller = le sous-agent walter_run reçoit seulement le contexte de l'appelant ; sinon le paquet walter-context (context.build scope=child). |

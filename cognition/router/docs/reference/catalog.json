@@ -7073,12 +7073,7 @@
             "signature": "**extra: str"
           },
           {
-            "description": "A key from Hermes' 0600 .env (or the process environment), read at run time (never logged / put in a URL).",
-            "name": "env_value",
-            "signature": "name: str"
-          },
-          {
-            "description": "A key from the environment, else from the instance's vault (walter-secrets map or its declared keys). Keys",
+            "description": "A key the Router component is granted under NAME (Walter Secrets: instance accounts/<id>.toml, `allow` + [env],",
             "name": "secret_value",
             "signature": "name: str"
           },
@@ -7354,7 +7349,7 @@
             "signature": "value: str"
           },
           {
-            "description": "Value of the vault item mapped to `env_name` (walter_secrets.mapping), cached in this process only. A stale",
+            "description": "The provider key the walter-llm component is granted under `env_name` (walter_secrets.grants: the instance's",
             "name": "provider_key",
             "signature": "env_name: str"
           },
@@ -17120,7 +17115,7 @@
       },
       {
         "default_expression": "''",
-        "description": "Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché).",
+        "description": "Jeton local d'agent pour la passerelle walter-llm, propre à chaque runtime (@instance/bootstrap/llm/<agent>.env 0600 ; jamais affiché).",
         "file": "hermes-plugins/walter-router/__init__.py",
         "name": "WALTER_LLM_TOKEN",
         "operation": "get"
@@ -17225,73 +17220,80 @@
       },
       {
         "default_expression": "aucun",
+        "description": "Nom d'accès fournisseur (autorisation venice, lecteurs llm et router) ; jamais affiché.",
+        "file": "serve/execution.py",
+        "name": "VENICE_API_KEY",
+        "operation": "secret_value"
+      },
+      {
+        "default_expression": "aucun",
         "description": "Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation.",
         "file": "serve/intent.py",
         "name": "CLOUDFLARE_ACCOUNT_ID",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "aucun",
         "description": "Nom d'un accès secret pour la voie de décision ; ne pas afficher sa valeur.",
         "file": "serve/intent.py",
         "name": "CLOUDFLARE_AI_TOKEN",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "aucun",
         "description": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets.",
         "file": "serve/intent.py",
         "name": "OPENROUTER_API_KEY",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "aucun",
         "description": "Nom d'un accès secret utilisé par un adaptateur ; ne pas afficher sa valeur.",
         "file": "serve/intent.py",
         "name": "CLOUDFLARE_API_KEY",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "aucun",
         "description": "Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance.",
         "file": "serve/intent.py",
         "name": "CLOUDFLARE_EMAIL",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "aucun",
         "description": "Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance.",
         "file": "serve/intent.py",
         "name": "CLOUDFLARE_EMAIL",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "aucun",
         "description": "Nom d'un accès secret utilisé par un adaptateur ; ne pas afficher sa valeur.",
         "file": "serve/intent.py",
         "name": "CLOUDFLARE_API_KEY",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "aucun",
         "description": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets, pas une clé transmise au modèle.",
         "file": "serve/media_exec.py",
         "name": "KIE_API_KEY",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "aucun",
         "description": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets.",
         "file": "serve/media_exec.py",
         "name": "OPENROUTER_API_KEY",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "aucun",
         "description": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets.",
         "file": "serve/media_exec.py",
         "name": "OPENROUTER_API_KEY",
-        "operation": "env_value"
+        "operation": "secret_value"
       },
       {
         "default_expression": "'http://127.0.0.1:8894'",
@@ -17302,7 +17304,7 @@
       },
       {
         "default_expression": "aucun",
-        "description": "Jeton local d'agent de Hermes pour la passerelle walter-llm (~/.hermes/.env, jamais affiché).",
+        "description": "Jeton local d'agent pour la passerelle walter-llm, propre à chaque runtime (@instance/bootstrap/llm/<agent>.env 0600 ; jamais affiché).",
         "file": "serve/oneshot.py",
         "name": "WALTER_LLM_TOKEN",
         "operation": "get"
@@ -17356,6 +17358,7 @@
       "KIE_API_KEY",
       "OPENROUTER_API_KEY",
       "TELEGRAM_HOME_CHANNEL",
+      "VENICE_API_KEY",
       "WALTER_DELEGATION_DEPTH",
       "WALTER_FLARESOLVERR",
       "WALTER_LLM_PORT",
@@ -17451,7 +17454,7 @@
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "39778c3ef58539ea14a375ca36c762d0d628de2c02440d7372095191affda842",
     "contracts/router.json": "cd45eabfb4dba07335d29b797012e43625e61f17f7f41f8c79c7ab64e5aed17e",
-    "documentation.py": "7b6db9eb4552b73d611b99b732002fdcef14e6db6d492583f8091d3aff5f511c",
+    "documentation.py": "85cd5342dc32dc5efcf379e25423def07d4e6c318fc89e4741b53576ffce8c7d",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
@@ -17460,7 +17463,7 @@
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "hermes-plugins/kie-compat/__init__.py": "aba770c340305899abfca6172a3774b0e56b400328e6f0f3350ab79a688daace",
     "hermes-plugins/walter-router/__init__.py": "b27d39ca479bb27d6639a6bff8779f33cd419e1f9480ca34e85cecd90478c8db",
-    "instance.py": "f7f1bcdb96c31f849178bd1df3f26520a7ed3e2377408b379bb7bda570fb20a9",
+    "instance.py": "59951f30cc91100f7bb12b60da02b9bf34c04341a9c4b6dfa1a9c7cae5c792a9",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
     "interface/library.py": "649216011e2545152c4a2c7387a335fcd5a7c59bf49748283c98de725055a570",
     "interface/page.py": "e52afc7458a85fceb867a2ad52c803eddf735ff403849434e407470d9a4d0fa0",
@@ -17473,7 +17476,7 @@
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "b819d655a4314f3d91482b41ad73b3685983992c187284761edbc871c05ec835",
     "llm/contracts/llm.json": "6fea645034c683571b4b2cef3423cd70306554ee8834327cf1c074fe166fc5e5",
-    "llm/gateway.py": "cfc578059143f4e6d969806631a1373a8971798c4f43b3565f04057bd35d9f93",
+    "llm/gateway.py": "dcef14dceab990ed64321056bdee16f0f809b0ad6a989fe9fac82325768d03ae",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
@@ -17518,17 +17521,17 @@
     "research/prices/providers.py": "65f3d4d680016a9162b935356adb09f49a9cca0a48569402945b47fd112a811a",
     "research/run.py": "8dac1620e046f83923397e86c92d95318c9c703b4ca9187f4f4efca0b7dcf774",
     "research/sources.py": "b872c4f0bc274c5c05612712b9bc04b756a52db9c837d4a5e63ec3097974cad0",
-    "research/web.py": "71e3bf9073480552ab10f369cc69ca3f0e462027b2bf0829a7c02e13353276ca",
+    "research/web.py": "975a4b60b130ad9396f0e3eec5f926966dff8f621cd06c04fae151ff805f6bef",
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
     "serve/agent_view.py": "dfde57589a82c4176da1ba752a4964a63dd416f7de3a842322d0234b06b2c0ba",
     "serve/api.py": "cd6428abc4ff933e6fda69cfd1259e538d5bda2ea88d9b4140f01d1bc002b9e5",
     "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
     "serve/engine.py": "dad90cf6e8d6542406cefca7a428e06c3b55847d6b03afc92cde242d51c4042f",
-    "serve/execution.py": "cd2f898bcdd9120ebd1e3c4a1977cf7ed0aa7593373187c7914638887439f6a5",
+    "serve/execution.py": "5ec59ae8ed7895ce42e763e2ffa3556404e0eb9664c3d45dbb8ca8a4c1435856",
     "serve/hermes_sync.py": "c1df622e2bab7c3d597788b60b82896f2d911c836c2dfabccf7ec276ab511bee",
-    "serve/intent.py": "8f8c1adcbc776fce3e38d1aa751bcea89b1a71b00c1918c0b6ab9dd71b2c75cf",
-    "serve/media_exec.py": "e78cecb90123127b8308ab682632f0a6211c7e8c56a0cc8de1fffdef8a07381b",
+    "serve/intent.py": "5c5dca9360e59c2756ef9fef6edbf46fef09590ac07f05d2a37e872ac333a9a7",
+    "serve/media_exec.py": "58f2a5f4250edb309ee6b0d75cc519d80f8cb8b2714ea1b153783720b1b5f345",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "95ad121f0e69949c4b7e1b045fabc29d52e0c5d011f392c51455f9f77df2c96a",
     "serve/routes.py": "108b6fafa28d1b29e3de8bc38b88e9778a318a1f3d12b70836d87b5872a72857",

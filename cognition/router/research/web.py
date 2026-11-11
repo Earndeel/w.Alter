@@ -10,7 +10,7 @@ from html.parser import HTMLParser
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from walter_router.instance import env_value
+from walter_router.instance import secret_value
 
 MAX_BYTES = 64 * 1024 * 1024
 
@@ -114,7 +114,7 @@ def rsc_text(page: str) -> str:
 
 def _github_json(url: str) -> Any:
     headers = {"User-Agent": "Walter-Router/1.0", "Accept": "application/vnd.github+json"}
-    token = env_value("GITHUB_TOKEN")
+    token = secret_value("GITHUB_TOKEN")
     if token:   # optional: lifts the 60 calls/h anonymous limit (header only, never logged)
         headers["Authorization"] = f"Bearer {token}"
     with urlopen(Request(url, headers=headers), timeout=60) as resp:  # noqa: S310 (fixed https host)

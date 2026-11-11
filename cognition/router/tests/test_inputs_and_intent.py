@@ -73,7 +73,7 @@ def test_classify_sends_the_context_in_the_state(monkeypatch):
                           "probabilities": {next(iter(q["criteria"])): 0.9}} for name, q in sent["questions"].items()}
         return _Resp(json.dumps({"model": "typesafe/jev-1.13-x", "answers": answers}).encode())
     monkeypatch.setattr(intent, "urlopen", fake_urlopen)
-    monkeypatch.setattr(intent.instance, "env_value", lambda name: "k")
+    monkeypatch.setattr(intent.instance, "secret_value", lambda name: "k")
     with db.connect() as conn:
         intent.classify(conn, "pareil en mieux", models=(intent.MODEL,), context="logo d'une boulangerie")
         conn.rollback()
@@ -139,7 +139,7 @@ def test_ask_offers_the_decision_model_for_any_choice(monkeypatch):
         return _Resp(json.dumps({"model": "typesafe/jev-1.13-x", "answers": {"answer": {
             "choice": "non", "confidence": 0.9, "probabilities": {"oui": 0.1, "non": 0.9}}}}).encode())
     monkeypatch.setattr(intent, "urlopen", fake_urlopen)
-    monkeypatch.setattr(intent.instance, "env_value", lambda name: "k")
+    monkeypatch.setattr(intent.instance, "secret_value", lambda name: "k")
     with db.connect() as conn:
         out = intent.ask(conn, "Faut-il répondre ?", {"oui": "attend une réponse", "non": "information"},
                          context="La réunion est confirmée.", models=(intent.MODEL,))

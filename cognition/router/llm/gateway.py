@@ -91,8 +91,9 @@ _keys_lock = threading.Lock()
 
 
 def provider_key(env_name: str) -> str:
-    """Value of the vault item mapped to `env_name` (walter_secrets.mapping), cached in this process only. A stale
-    value is served while it is re-read in the background (a Bitwarden read takes seconds; a phone call cannot wait)."""
+    """The provider key the walter-llm component is granted under `env_name` (walter_secrets.grants: the instance's
+    accounts/<id>.toml, Bitwarden only, no file fallback), cached in this process only. A stale value is served while
+    it is re-read in the background (a Bitwarden read takes seconds; a phone call cannot wait)."""
     with _keys_lock:
         hit = _keys.get(env_name)
         if hit and time.time() - hit[0] < KEY_TTL:
@@ -105,11 +106,8 @@ def provider_key(env_name: str) -> str:
 
 
 def _read_key(env_name: str) -> str:
-    from walter_secrets.mapping import entry
-    from walter_secrets.vault import VAULT, audit
-    e = entry(env_name)
-    value = VAULT.value(e["item_id"], e["field"])
-    audit("use", {"id": e["item_id"], "name": e["item"]}, e["field"], tool="walter-llm")
+    from walter_secrets import grants   # audits grant, field and reader (llm), never the value
+    value = grants.env_value(env_name, "llm")
     with _keys_lock:
         _keys[env_name] = (time.time(), value)
     return value
