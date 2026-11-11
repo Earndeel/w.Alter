@@ -252,6 +252,10 @@ walter-router sync-hermes
   --no-restart :  ; défaut=false
 walter-router tasks
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
+walter-router transcribe
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
+  files :  ; défaut=—
+  --source : caller name recorded by walter-llm ; défaut=walter-router
 walter-router verdict
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   alert_id :  ; défaut=—

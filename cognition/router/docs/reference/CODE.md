@@ -1057,6 +1057,7 @@ One-shot answers for the Router's own needs (lot E6, 2026-11-10: no longer throu
 
 - `_llm_token()` — 
 - `complete(prompt: str, source: str, *, task: str=ECONOMIC, timeout: int=240, max_tokens: int=2000)` — One completion from walter-llm (task = a Router poste; `general/L1` = economic tier). None on any failure.
+- `transcribe(path: str, source: str='walter-router', *, task: str='stt', timeout: int=180)` — One audio file → its transcript by the Router's `stt` poste through walter-llm (2026-11-11: the capability
 - `delegate(prompt: str, source: str, *, timeout: int=900, task: str='general')` — One task for Walter Engine (Engine API `delegate`): tools, policy and run are the engine's.
 - `ask_l1(conn, prompt: str, source: str, timeout: int=240, tools: str='memory', max_turns: int=1)` — Former Hermes one-shot, same signature: no tool use → economical direct path; tools (web…) → the engine.
 

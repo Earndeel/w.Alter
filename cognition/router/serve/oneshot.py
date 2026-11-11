@@ -54,6 +54,50 @@ def complete(prompt: str, source: str, *, task: str = ECONOMIC, timeout: int = 2
     return text.strip().strip('"') or None
 
 
+STT_PROMPT = ("Transcris exactement cette note vocale, dans sa langue, sans rien ajouter ni résumer. "
+              "S'il n'y a aucune parole, réponds seulement [silence].")
+AUDIO_FORMATS = {".oga": "ogg", ".ogg": "ogg", ".opus": "ogg", ".mp3": "mp3", ".m4a": "m4a", ".wav": "wav",
+                 ".mp4": "mp4", ".webm": "webm", ".flac": "flac", ".aac": "aac"}
+STT_MAX_BYTES = 25 * 1024 * 1024
+
+
+def transcribe(path: str, source: str = "walter-router", *, task: str = "stt", timeout: int = 180) -> dict:
+    """One audio file → its transcript by the Router's `stt` poste through walter-llm (2026-11-11: the capability
+    every runtime reaches through MCP `audio_transcribe`; before, the engine had no door to it and tried provider keys
+    under `walter-secret exec`, whose output is discarded by design). Returns {file, ok, text|error}; never raises."""
+    import base64
+    from pathlib import Path as _P
+    f = _P(path)
+    out = {"file": str(f)}
+    fmt = AUDIO_FORMATS.get(f.suffix.lower())
+    if fmt is None:
+        return {**out, "ok": False, "error": f"unsupported audio format {f.suffix or '(none)'}"}
+    try:
+        size = f.stat().st_size
+    except OSError:
+        return {**out, "ok": False, "error": "file not found"}
+    if size > STT_MAX_BYTES:
+        return {**out, "ok": False, "error": "file larger than 25 MB"}
+    token = _llm_token()
+    if not token:
+        return {**out, "ok": False, "error": "no walter-llm token for the Router"}
+    body = {"model": task, "max_tokens": 4000, "user": source, "messages": [{"role": "user", "content": [
+        {"type": "input_audio", "input_audio": {"data": base64.b64encode(f.read_bytes()).decode("ascii"), "format": fmt}},
+        {"type": "text", "text": STT_PROMPT}]}]}
+    req = urllib.request.Request(LLM_URL.rstrip("/") + "/v1/chat/completions", data=json.dumps(body).encode(),
+                                 headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:   # noqa: S310 (local gateway)
+            text = (json.load(r)["choices"][0]["message"]["content"] or "").strip()
+    except urllib.error.HTTPError as e:
+        return {**out, "ok": False, "error": f"stt HTTP {e.code}"}
+    except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError, TypeError) as e:
+        return {**out, "ok": False, "error": f"stt {type(e).__name__}"}
+    if not text or text == "[silence]":
+        return {**out, "ok": True, "text": "", "note": "no speech"}
+    return {**out, "ok": True, "text": text}
+
+
 def delegate(prompt: str, source: str, *, timeout: int = 900, task: str = "general") -> str | None:
     """One task for Walter Engine (Engine API `delegate`): tools, policy and run are the engine's."""
     from walter_router.serve import engine

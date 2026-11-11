@@ -255,6 +255,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/named.py | `DEFAULT_TASK` | {"audio": "tts", "chat": "general", "image": "text_to_image", "music": "music", "video": "text_to_video"} |  |
 | serve/oneshot.py | `TOKEN_FILE` | @instance/bootstrap/llm/walter-router.env |  |
 | serve/oneshot.py | `ECONOMIC` | general/L1 |  |
+| serve/oneshot.py | `STT_PROMPT` | Transcris exactement cette note vocale, dans sa langue, sans rien ajouter ni résumer. S'il n'y a aucune parole, réponds seulement [silence]. |  |
+| serve/oneshot.py | `AUDIO_FORMATS` | {".aac": "aac", ".flac": "flac", ".m4a": "m4a", ".mp3": "mp3", ".mp4": "mp4", ".oga": "ogg", ".ogg": "ogg", ".opus": "ogg", ".wav": "wav", ".webm": "webm"} |  |
 | serve/run.py | `ALLOWED_TOOLSETS` | ["web", "walter-web", "file", "terminal", "vision", "skills", "code_execution", "memory"] |  |
 | serve/run.py | `DEFAULT_TOOLSETS` | ["walter-web", "skills", "memory"] |  |
 | serve/run.py | `TOOLSET_TOOLS` | {"memory": ["memory_context", "memory_search", "memory_events"], "skills": ["skills_search", "skill_read"], "walter-web": ["walter_browse"], "web": ["walter_browse"]} |  |

@@ -156,6 +156,9 @@ def build_parser() -> argparse.ArgumentParser:
     rn = sub.add_parser("run", help="do the job on the chosen model: JSON spec on stdin (goal, request, task, level, "
                                     "model, provider, context, toolsets…; media: role, image_urls…) -> JSON result")
     rn.add_argument("--dry-run", action="store_true", help="the decision only")
+    tr = sub.add_parser("transcribe", help="audio files (voice notes…) -> transcripts by the stt poste via walter-llm")
+    tr.add_argument("files", nargs="+")
+    tr.add_argument("--source", default="walter-router", help="caller name recorded by walter-llm")
     ak = sub.add_parser("ask", help="the decision model for a quick choice: question + options -> choice, confidence")
     ak.add_argument("question")
     ak.add_argument("--option", action="append", required=True, metavar="NAME=MEANING")
@@ -283,6 +286,9 @@ def main(argv: list[str] | None = None) -> int:
             conn.commit()
     elif args.cmd == "notify-failure":
         out = notify_failure()
+    elif args.cmd == "transcribe":
+        from walter_router.serve import oneshot
+        out = {"results": [oneshot.transcribe(f, args.source) for f in args.files]}
     else:
         with db.connect() as conn:
             if args.cmd == "pick":

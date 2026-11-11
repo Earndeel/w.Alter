@@ -28,7 +28,8 @@
   "interfaces": [
     "CLI",
     "walter-llm task routes",
-    "MCP walter_route / walter_run / walter_decide / walter_plans / walter_web",
+    "MCP walter_route / walter_run / walter_decide / walter_plans / walter_web / audio_transcribe",
+    "CLI walter-router transcribe FILE… (stt poste via walter-llm)",
     "agents' brief (`walter-router brief`, @instance/state/router/brief.md)",
     "CLI walter-router schema (public tool contract v1)",
     "CLI walter-router docs --write/--check [--offline]",
@@ -104,6 +105,14 @@
         "interface": "walter_decide",
         "access": "read",
         "timeout_seconds": 40,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "transcribe",
+        "transport": "mcp",
+        "interface": "audio_transcribe",
+        "access": "read",
+        "timeout_seconds": 200,
         "timeout_status": "implemented"
       },
       {
@@ -184,7 +193,8 @@
       "walter_run",
       "walter_decide",
       "walter_plans",
-      "walter_web"
+      "walter_web",
+      "audio_transcribe"
     ],
     "index": {
       "command": [

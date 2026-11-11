@@ -16,6 +16,7 @@ La note d'usage du routeur est dans la couche stable du prompt (`walter-router b
 | `walter_run` | Faire une sous-tâche texte (sous-agent avec outils) ou une génération média demandée par {{owner.address}} |
 | `walter_route` | Examiner un choix, ses routes et ses prix sans rien exécuter |
 | `walter_decide` | Choix court ou répété parmi des options nommées |
+| `audio_transcribe` | Transcrire des fichiers audio de la VM (notes vocales Beeper/WhatsApp/Telegram) par le poste `stt` ; jamais une clé de fournisseur sous `walter-secret exec` (sa sortie est jetée) |
 | `walter_plans` | Lire les abonnements ; enregistrer un changement que {{owner.address}} annonce |
 | `walter_web` | Converser avec un service web de chat activé par {{owner.address}} : message, fichiers joints, modèle facultatif ; réponse verbatim, fichiers produits en chemins |
 
