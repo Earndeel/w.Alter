@@ -49,6 +49,15 @@ Configuration: `config/backup.toml` (neutral defaults), instance overrides in `@
 (which units, where their outputs land, freshness limits). State: `@instance/state/backup/` (checkpoints.jsonl).
 Maintenance: `contracts/maintenance.json` (guardian convention, read by `walter-guardians`).
 
+## Publication git (`walter-git-publish`, hourly)
+
+One private repository `Earndeel/walter` with **the same tree as `/walter`** (vision: `core/`, `cognition/`,
+`capabilities/`, `ops/`, `lab/`; nested modules such as `core/identity`, `core/security/secrets`,
+`cognition/memory/vault`, `ops/runtime` inside their parent's folder). Each module keeps its full history under its
+path (`git log -- cognition/memory`). Secrets scrubbed, fail-closed gate, only committed work.
+`walter-git-publish --dry-run` builds everything, prints the top two levels and pushes nothing. Settings:
+`[git_publish]` of the instance's `backup.toml` (the `docs` repository is excluded).
+
 ## Repository hygiene
 
 `walter-backup git` inventories tracked changes and non-ignored untracked files separately. Git NUL records preserve
