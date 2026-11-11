@@ -137,6 +137,9 @@ Fiches de l'instance au 11/11 : `openrouter` (llm, router, memory), `kie`, `arni
 `walter-secrets-sync` ne génère plus aucun fichier de clés global : elle tient le coffre de démarrage chiffré (age) et
 les seuls fichiers d'environnement déclarés par l'instance (`[sync] env_files`, aujourd'hui le canari de contrôle).
 `mapping.entry()` (carte par valeur) ne sert plus aux clés d'API des composants.
+Toutes les valeurs Cloudflare sont dans l'item « W.Alter · cloudflare » (champs `ai_token`, `email` ajoutés le 11/11).
+Prévue, non installée : `nordvpn` (jeton d'accès du compte Nord, lecteur `browse`, champ `access_token` de l'item
+« nordaccount.com ») — la carte attend que le jeton existe, pour que `walter-secret grants` reste entièrement vert.
 
 
 ## Abonnement Claude
