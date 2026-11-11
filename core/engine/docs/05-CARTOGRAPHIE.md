@@ -113,7 +113,7 @@ Ils sont déclarés dans le registre avec leur `vision_target` ; ils se déplace
 | `reports/`, `scratch/`, `sessions/`, `work/` | `@instance/workspace` | Règle existante : pas de fichier en vrac dans `/root` |
 | ~~`computer-use-v2-lot21/`~~ | — | **Retiré le 09/11** : aucune fonction de production n'en dépendait ; étude et banc conservés dans `lab/computer-use-v2` (à l'arrêt), unités archivées dans `/root/archive/2026/retired-computer-use-v2-shadow-20261109/` |
 | `walter-computer-use/` (39 Mo) | à comparer avec `/walter/computer`, puis archive | Doublon probable |
-| `webtop/` (1,7 Go de configuration) | `/services/webtop` | § 7 |
+| `webtop/` (1,7 Go de configuration) | `/services/webtop` | **Fait le 11/11** (lien laissé) |
 | `.camoufox-max-data`, `.cloakbrowser-max-data` | `@instance/state/browse` | Profils de navigation = état de l'instance |
 | `.agent-browser`, `.cua-driver`, `.copilot_shots`, `.cli-hub`, `.pxpipe`, `.hyperframes`, `.taste-skill`, `.grok`, `.fal`, `.tor`, `.claude-code-router`, `.dsh` | à classer un par un (outil, état d'un module, ou obsolète) | Aucun n'est déclaré dans un contrat |
 
@@ -149,12 +149,12 @@ Composants déclarés dans le contrat d'Ops (`services`, `postgres`, `kernel-npm
 | Cache hors ligne du noyau du moteur | — | `/services/dsh/npm-cache` | **Fait** (lot E1) |
 | Environnements Python partagés | `/walter/runtime/venv`, venv de core, router, llm, raw-vault | `/services/python/<environnement>` | prévu (avec le déplacement de runtime) |
 | Base d'essai (`walter-memory-testpg`, :5440) | conteneur d'essai (tmpfs 2 Go) | outillage de tests de Memory *à valider* | jetable |
-| Webtop | conteneur ; config dans `/root/webtop` | `/services/webtop` | prévu |
-| Bureau de navigation (`walter-browse-display`) | conteneur + unité | `/services/browse-display` (Browse consommateur) | prévu |
-| Sortie WireGuard Freebox (`walter-wg-freebox-fr`) | conteneur | `/services/wg-exit` (Browse consommateur) | prévu |
-| Proxy NordVPN, FlareSolverr | conteneurs | `/services/nordvpn-proxy`, `/services/flaresolverr` | prévu |
-| Raw Vault S3 (`rclone serve s3`, :8899) | unité système | `/services/raw-vault-s3` (Memory consommateur) ; cache `/var/cache/raw-vault` | prévu |
-| Tunnel Cloudflare | unité + `~/.cloudflared` | `/services/cloudflared` | prévu |
+| Webtop | conteneur ; config dans `/root/webtop` | `/services/webtop` | **Fait le 11/11** (compose + données ; `/root/webtop` = lien) |
+| Bureau de navigation (`walter-browse-display`) | conteneur + unité | `/services/browse-display` (Browse consommateur) | **Fait le 11/11** (compose + `config/` ; volume anonyme remplacé) |
+| Sortie WireGuard Freebox (`walter-wg-freebox-fr`) | conteneur lancé à la demande par `walter-wg-exit` (code et Dockerfile dans Browse) | **reste dans Browse** (11/11) : composant sans état construit depuis le code du module, pas une dépendance externe | — |
+| Proxy NordVPN, FlareSolverr | conteneurs | `/services/nordvpn-proxy`, `/services/flaresolverr` | **Fait le 11/11** ; le proxy NordVPN est **cassé** (`sleep infinity`) : réparer ou retirer |
+| Raw Vault S3 (`rclone serve s3`, :8899) | unité système | `/services/raw-vault-s3` (Memory consommateur) ; cache `/var/cache/raw-vault` | **Fait le 11/11** (source de l'unité ; clés lues dans l'instance) |
+| Tunnel Cloudflare | unité + `~/.cloudflared` | `/services/cloudflared` | **Fait le 11/11** (`config/` ; `~/.cloudflared` = lien ; restes en quarantaine) |
 | Ollama | unité inactive | à retirer après preuve (décision « pas de modèle local » du 03/11) | — |
 | Applications (`aiostreams*`, excalidash, comfyui) | sous `/apps` | inchangé | l'étiquette compose d'excalidash désigne encore `/root/ExcaliDash`, dossier disparu |
 | ~~Miroshark~~ et Neo4j | — | **retirés le 09/11** (arbitrage de Monsieur) : unités, application, Neo4j, tunnel Cloudflare et son DNS supprimés ; traces d'audit dans `@instance/backups/changes/2026-11-09-miroshark-retrait/` et `/root/archive/2026/retired-miroshark-20261109/` | — |
