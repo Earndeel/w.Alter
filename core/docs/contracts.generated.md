@@ -373,6 +373,12 @@ Interfaces : CLI walter-ops backup|git|check|recovery|deploy|status (install, on
 | postgres | active | PostgreSQL de Walter en service depuis le 2026-11-10 (E9.2b) : données dans /services/postgres/data, configuration dans config/, compose verrouillé par empreinte ; conteneur hindsight-pg, 127.0.0.1:5433 inchangés. Déplacement et retour arrière : walter-pg-relocate (ops/backup/scripts) | `/services/postgres` | — |
 | kernel-npm-cache | active | Cache npm hors ligne du noyau figé du moteur (lot E1), utilisé par core/engine/kernel/install.sh | `/services/dsh` | — |
 | python | active | Environnements Python installés des modules (runtime de walter-python, core, router, llm, raw-vault), déplacés le 2026-11-10 (E9.2a) ; chaque module garde un lien venv ; exclus de restic, reconstruits depuis les verrous des modules | `/services/python` | — |
+| webtop | active | Bureau XFCE en conteneur (Browse, Computer), rangé le 2026-11-11 (ancien dossier = lien de compatibilité) ; compose verrouillé par empreinte ; config/.cache exclu de restic | `/services/webtop` | — |
+| browse-display | active | Écran Selkies (X :101) du navigateur de Walter, rangé le 2026-11-11 ; compose + config/, démarré par walter-browse-display.service | `/services/browse-display` | — |
+| flaresolverr | active | FlareSolverr (127.0.0.1:8191) pour la recherche web, rangé le 2026-11-11 ; sans données | `/services/flaresolverr` | — |
+| nordvpn-proxy | active | Proxy NordVPN de Browse, rangé le 2026-11-11 ; CASSÉ (sleep infinity, rien ne sert :1080) : à réparer ou retirer | `/services/nordvpn-proxy` | — |
+| raw-vault-s3 | active | Raw Vault en S3 (127.0.0.1:8899, rclone) ; source de l'unité, clés lues dans @instance/bootstrap/raw-vault | `/services/raw-vault-s3` | — |
+| cloudflared | active | Tunnel Cloudflare (entrée publique de l'instance) ; réglages et identifiants (0600) dans config/, rangés le 2026-11-11 depuis le dossier d'intégrations de Hermes | `/services/cloudflared` | — |
 
 **Limites déclarées :**
 
