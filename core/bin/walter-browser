@@ -7,7 +7,9 @@ session's first command (login/exit/new); the session remembers it, later comman
 
   walter-browser [-s SESSION] login SITE          log the session in with Monsieur's cookies (browser_auth; metadata only)
   walter-browser [-s SESSION] exit EXIT           route this NEW session through a scoped network exit (walter-wg-exit list),
-                                                  before its first `new`/`login`; other sessions stay local
+                                                  before its first `new`/`login`; other sessions stay local.
+                                                  nordvpn-<country> (nordvpn-us, nordvpn-jp…) opens on demand; such a
+                                                  session runs in its own browser, without the owner's cookies
   walter-browser [-s SESSION] new [NAME]          open a tab (becomes the current tab of the session)
   walter-browser [-s SESSION] nav URL             navigate the current tab
   walter-browser [-s SESSION] url                 current URL
@@ -80,7 +82,8 @@ def main() -> None:
         print(json.dumps(browser_auth.login(args[0], s, client="walter-browser", engine=engine), ensure_ascii=False, indent=2))
     elif cmd == "exit":
         import subprocess
-        r = subprocess.run(["walter-wg-exit", "url", args[0]], capture_output=True, text=True, timeout=60)
+        # nordvpn-<country> opens on demand (IP and country checked); declared exits must already be up
+        r = subprocess.run(["walter-wg-exit", "use", args[0]], capture_output=True, text=True, timeout=240)
         if r.returncode:
             sys.exit((r.stderr or r.stdout).strip())
         print(json.dumps(post(s, "/session/new", {"proxy": {"server": r.stdout.strip()}}).json()))
