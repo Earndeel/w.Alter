@@ -512,7 +512,6 @@
       ],
       "backup_paths": [
         "/walter/capabilities/computer",
-        "/root/walter-computer-use",
         "/root/.config/walter-device-node",
         "/etc/tmpfiles.d/walter-computer.conf",
         "/user/Lucas/config/computer"
