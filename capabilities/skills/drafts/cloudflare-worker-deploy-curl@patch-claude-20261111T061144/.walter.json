@@ -1,0 +1,11 @@
+{
+ "base_sha": "1cb728f6f996abe5e327506550aeee60b28c87cf74359b4055759908b1fed7fb",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-11T06:11:44.382652+00:00",
+ "domain": "cloudflare",
+ "kind": "patch",
+ "reason": "The skill told the reader to use /root/.hermes/scripts/walter-cloudflare and said the e-mail and Workers AI token live in ~/.hermes/.env. Monsieur retired that file on 2026-11-11: Walter Secrets' walter-cloudflare (on the PATH) now injects every Cloudflare credential from Bitwarden through grants, and fails closed.",
+ "runtime": "claude",
+ "session_id": "750c3c7e-f4d9-4579-bc55-2a48bff706b7",
+ "target": "cloudflare-worker-deploy-curl"
+}
