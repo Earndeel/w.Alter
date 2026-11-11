@@ -177,7 +177,7 @@ Fiches de poste: which model fits a JOB (orchestrator, agent worker), not only a
 - `_board(conn, snaps: dict, benchmark: str, task: str)` — 
 - `_access(conn, snaps: dict)` — 
 - `rank(conn, poste: str, limit: int=8)` — 
-- `current_orchestrator()` — model.default / model.provider of the live Hermes config (read-only text parse).
+- `current_orchestrator()` — model.default / model.provider of the live Hermes config (read-only text parse); nothing once Hermes is
 
 ## analysis/recommend.py
 

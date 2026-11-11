@@ -6217,7 +6217,7 @@
             "signature": "conn, poste: str, limit: int=8"
           },
           {
-            "description": "model.default / model.provider of the live Hermes config (read-only text parse).",
+            "description": "model.default / model.provider of the live Hermes config (read-only text parse); nothing once Hermes is",
             "name": "current_orchestrator",
             "signature": ""
           }
@@ -17431,7 +17431,7 @@
     "analysis/media.py": "c61030754e36087f9b9b4caf86641ec786e97eccf3b33345d04b5f2d7eb1b267",
     "analysis/pareto.py": "00621f7e0584567022991ee1bd154dfe15b64b9443dd0c89a6faf26f11d23f0f",
     "analysis/parse.py": "d908edffc0fcdce9f5bf629f959f8391dff6af3402ed74161f880776d2c3c9ea",
-    "analysis/postes.py": "afa1053ad1f28e64ba1763abce019c9844571cdee8e19796dc4909b2f95baa42",
+    "analysis/postes.py": "8bb913efa9bc2ba553acc0dc81b8ec69e014bda4aa8dfba887e19d50c39556d0",
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
     "analysis/refresh.py": "17a00934a816292587e26c292795177ce6e3199ce05b3612fd5a580a5487822a",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",

@@ -65,7 +65,10 @@ def rank(conn, poste: str, limit: int = 8) -> list[dict]:
 
 
 def current_orchestrator() -> dict:
-    """model.default / model.provider of the live Hermes config (read-only text parse)."""
+    """model.default / model.provider of the live Hermes config (read-only text parse); nothing once Hermes is
+    retired (host.json `hermes`): Walter never reads a Hermes configuration file then."""
+    if not instance.hermes_active():
+        return {"model": None, "provider": None, "note": "Hermes retired: no orchestrator configured in Hermes"}
     text = HERMES_CONFIG.read_text()
     block = re.search(r"^model:\n((?:[ \t]+.*\n)+)", text, re.M)
     vals = dict(re.findall(r"^[ \t]+(default|provider):[ \t]*(\S+)", block.group(1), re.M)) if block else {}
