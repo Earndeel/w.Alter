@@ -91,12 +91,20 @@ class CapabilityTests(unittest.TestCase):
         self.assertNotIn('fake-token', failure)
         self.assertTrue(json.loads(success)['success'])
 
+    def test_audio_transcribe_refuses_bad_lists_before_the_router(self):
+        with patch.object(capabilities, '_router', side_effect=AssertionError):
+            for bad in ([], ['relative.ogg'], ['/a.ogg'] * 21):
+                self.assertFalse(json.loads(self.mcp.tools['audio_transcribe'](bad))['ok'])
+        with patch.object(capabilities, '_router', return_value={'results': []}) as r:
+            self.mcp.tools['audio_transcribe'](['/x/a.ogg'])
+        self.assertEqual(r.call_args.args[:2], ('transcribe', '/x/a.ogg'))
+
     def test_no_generic_execute_or_raw_secret_tool_and_router_tools_are_honest(self):
         """2026-10-22 (owner): the router's tools are the same in every runtime (walter_route / walter_run /
         walter_generate / walter_plans); the harness keeps its own model, generation is flagged as costly."""
         self.assertEqual(set(self.mcp.tools), {'walter_modules', 'secret_search', 'secret_reference', 'walter_browse',
                                              'walter_route', 'walter_run', 'walter_decide', 'walter_plans', 'walter_web',
-                                             'computer_use', 'module_guide', 'module_index'})
+                                             'audio_transcribe', 'computer_use', 'module_guide', 'module_index'})
         self.assertNotIn('grants', inspect.signature(self.mcp.tools['computer_use']).parameters)
         self.assertNotIn('permissions', inspect.signature(self.mcp.tools['computer_use']).parameters)
         self.assertNotIn('command', inspect.signature(self.mcp.tools['secret_reference']).parameters)

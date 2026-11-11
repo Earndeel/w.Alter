@@ -214,6 +214,17 @@ def register(mcp,client='unknown',*,local_control=True):
         try:return json.dumps(_router(*args,timeout=40),ensure_ascii=False)
         except Exception as exc:return _router_error(exc)
 
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True,openWorldHint=True))
+    def audio_transcribe(paths: list[str]) -> str:
+        """Transcribe audio files on the VM (voice notes from Beeper/WhatsApp/Telegram, .ogg .opus .m4a .mp3 .wav…)
+        by the Router's `stt` poste: the way to read a voice note, never a provider key under walter-secret exec
+        (its output is discarded). Up to 20 files, 25 MB each. Returns per file {ok, text|error}."""
+        files=[str(x) for x in (paths or []) if str(x).strip()]
+        if not files or len(files)>20 or any(not x.startswith('/') for x in files):
+            return json.dumps({'ok':False,'error':'1 to 20 absolute file paths'})
+        try:return json.dumps(_router('transcribe',*files,'--source',f'mcp-{client}',timeout=200*len(files)+30),ensure_ascii=False)
+        except Exception as exc:return _router_error(exc)
+
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False))
     def walter_plans(action: str='list',plan_id: str='',vendor: str='',plan: str='',price_usd_month: float|None=None,
                      models: list[str]|None=None,since: str='',until: str='',note: str='',why: str='') -> str:

@@ -43,7 +43,7 @@ Interfaces : shared request contract, CLI, MCP, Hermes plugin, public client (wa
 |---|---|---|---|---|
 | library | active | Recherche web et lecture de pages | `/walter/capabilities/browse/walter_browse` | capabilities/browse |
 | engine | active | Moteurs Camoufox / CloakBrowser (ex ~/.hermes/camoufox-max) | `/walter/capabilities/browse/engine` | capabilities/browse/engine |
-| network | active | Sorties réseau (Freebox, Mac, défaut) | `/walter/capabilities/browse/network` | capabilities/browse/network |
+| network | active | Sorties réseau (Freebox, Mac, défaut, NordVPN par pays à la demande) | `/walter/capabilities/browse/network` | capabilities/browse/network |
 | runtime | active | Exécution et extracteurs | `/walter/capabilities/browse/runtime` | capabilities/browse/runtime |
 
 **Limites déclarées :**
@@ -51,6 +51,7 @@ Interfaces : shared request contract, CLI, MCP, Hermes plugin, public client (wa
 - Authenticated HTTP uses managed server-side cookies and refuses cross-origin redirects or anonymous fallback.
 - Authenticated interactive browser routes are not qualified by the HTTP fixture.
 - Conversational recipes are validated on the local fixture chat UI; a real service needs its own recipe run and its owner's authorization (web_services table of the Router).
+- NordVPN exits use the Walter Secrets grant `nordvpn`; Chromium refuses third-party exits; a NordVPN session never receives owner cookies.
 
 ## bus
 
@@ -424,7 +425,7 @@ Choisir les modèles par poste avec décisions et coûts traçables.
 Contrat 1.2.0; propriétaire : router.
 Racine actuelle : `/walter/cognition/router`. Cible : `/walter/cognition/router`.
 
-Interfaces : CLI, walter-llm task routes, MCP walter_route / walter_run / walter_decide / walter_plans / walter_web, agents' brief (`walter-router brief`, @instance/state/router/brief.md), CLI walter-router schema (public tool contract v1), CLI walter-router docs --write/--check [--offline], CLI walter-router brief --json (versioned orchestrator note v1), CLI walter-router-guardian check | run | status (the module's own maintenance).
+Interfaces : CLI, walter-llm task routes, MCP walter_route / walter_run / walter_decide / walter_plans / walter_web / audio_transcribe, CLI walter-router transcribe FILE… (stt poste via walter-llm), agents' brief (`walter-router brief`, @instance/state/router/brief.md), CLI walter-router schema (public tool contract v1), CLI walter-router docs --write/--check [--offline], CLI walter-router brief --json (versioned orchestrator note v1), CLI walter-router-guardian check | run | status (the module's own maintenance).
 
 **Critères de validation :**
 

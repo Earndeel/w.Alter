@@ -12,6 +12,7 @@ core = [
   "walter_browse", "browser_session",
   "computer_use",
   "walter_run",
+  "audio_transcribe",
   "skills_search", "skill_read",
   "walter_profile", "walter_health",
   "module_index", "module_guide",
