@@ -6,6 +6,16 @@
   walter-wg-exit down NAME            stop it
   walter-wg-exit status [NAME]        state, proxy URL and exit IP
   walter-wg-exit url NAME             proxy URL if the exit is up (exit code 1 if down)
+  walter-wg-exit use NAME             proxy URL, starting an on-demand exit (nordvpn-<country>) if needed
+  walter-wg-exit countries            countries the NordVPN provider can exit from (live list)
+
+On-demand NordVPN exits (2026-11-11): `nordvpn-<ISO country>` (nordvpn-fr, nordvpn-us, nordvpn-jp…) when the
+instance declares `[provider.nordvpn]`. NordLynx (WireGuard) in the same container and kill switch as the declared
+exits; the private key is derived at start from the NordVPN access token (Walter Secrets grant, reader `browse`),
+held in tmpfs until the tunnel is up, never stored. One fixed port per country (port_base + NordVPN country id), so a
+session bound to a country can never silently move to another one. After start, the exit IP and its country are
+checked through the tunnel (NordVPN « protected », country = the one asked); any mismatch stops the exit. Never a
+fallback to another exit.
 
 Each exit is a container holding the WireGuard tunnel in its own network namespace and serving an
 HTTP proxy on 127.0.0.1:<port>. Only clients pointed at that proxy use it; host routing is untouched.
@@ -26,18 +36,111 @@ def sh(*cmd, timeout=60, check=False):
     return r
 
 
-def exits() -> dict:
+def network() -> dict:
     path = sh("walter", "instance", "config", "browse", "network.toml", check=True).stdout.strip()
-    if not Path(path).is_file():
+    return tomllib.loads(Path(path).read_text()) if Path(path).is_file() else {}
+
+
+def exits() -> dict:
+    return network().get("exit", {})
+
+
+# ── NordVPN provider: on-demand exits nordvpn-<country> ───────────────────────────────────────────────────────────
+def nord() -> dict:
+    """[provider.nordvpn] of the instance merged over the service settings it points to (/services/…/service.toml)."""
+    cfg = dict(network().get("provider", {}).get("nordvpn") or {})
+    if cfg.get("settings"):
+        cfg = {**tomllib.loads(Path(cfg["settings"]).read_text()), **cfg}
+    return cfg
+
+
+def nord_api(path: str, auth: str | None = None, timeout: int = 20):
+    import base64, urllib.request
+    req = urllib.request.Request(nord()["api"].rstrip("/") + path, headers={"User-Agent": "walter-wg-exit/1"})
+    if auth:
+        req.add_header("Authorization", "Basic " + base64.b64encode(f"token:{auth}".encode()).decode())
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # control plane: never a browsing proxy
+    with opener.open(req, timeout=timeout) as r:  # noqa: S310 (fixed https API)
+        return json.loads(r.read())
+
+
+def nord_countries() -> dict:
+    return {c["code"].upper(): c for c in nord_api("/servers/countries")}
+
+
+def nord_exit(name: str) -> dict | None:
+    """Synthesised exit for nordvpn-<country>, None when `name` is not a NordVPN exit name."""
+    if not name.startswith("nordvpn-"):
+        return None
+    cfg = nord()
+    if not cfg:
+        sys.exit(f"{name}: no NordVPN provider declared by the instance ([provider.nordvpn] in network.toml)")
+    code = name.split("-", 1)[1].upper()
+    try:
+        country = nord_countries().get(code)
+    except Exception as exc:  # noqa: BLE001
+        sys.exit(f"{name}: NordVPN country list unavailable ({type(exc).__name__}); refusing")
+    if not country:
+        sys.exit(f"{name}: NordVPN has no servers in {code!r} (`walter-wg-exit countries`)")
+    return {"provider": "nordvpn", "country": code, "country_id": country["id"], "country_name": country["name"],
+            "port": int(cfg["port_base"]) + int(country["id"]), "description": f"NordVPN {country['name']}"}
+
+
+def nord_conf(cfg: dict) -> tuple[str, str]:
+    """WireGuard file for one recommended NordLynx server of the country (kept in memory) and that server's name."""
+    p = nord()
+    r = subprocess.run(["walter-secret", "grant", "access", p["grant"], "token", "--as", p.get("reader", "browse")],
+                       capture_output=True, text=True, timeout=120)
+    if r.returncode or not r.stdout.strip():
+        sys.exit(f"nordvpn: access token unavailable through Walter Secrets (grant {p['grant']!r}): "
+                 f"{(r.stderr or 'empty').strip()[:200]}")
+    token = r.stdout.strip()
+    try:
+        key = nord_api("/users/services/credentials", auth=token).get("nordlynx_private_key")
+    except Exception as exc:  # noqa: BLE001 — never echo the request (it carries the token)
+        sys.exit(f"nordvpn: NordLynx credentials refused ({type(exc).__name__}: {getattr(exc, 'code', '')})")
+    finally:
+        token = ""
+    if not key:
+        sys.exit("nordvpn: the account returned no NordLynx key")
+    servers = nord_api(f"/servers/recommendations?filters[country_id]={cfg['country_id']}"
+                       f"&filters[servers_technologies][identifier]=wireguard_udp&limit=5")
+    for s in servers:
+        tech = next((t for t in s.get("technologies", []) if t.get("identifier") == "wireguard_udp"), None)
+        pub = next((m["value"] for m in (tech or {}).get("metadata", []) if m.get("name") == "public_key"), None)
+        codes = {loc["country"]["code"].upper() for loc in s.get("locations", [])}
+        if pub and cfg["country"] in codes:
+            conf = (f"[Interface]\nPrivateKey = {key}\nAddress = {p['address']}\nDNS = {p['dns']}\n\n"
+                    f"[Peer]\nPublicKey = {pub}\nAllowedIPs = 0.0.0.0/0\nEndpoint = {s['station']}:{p['wg_port']}\n"
+                    f"PersistentKeepalive = 25\n")
+            return conf, s["hostname"]
+    sys.exit(f"nordvpn-{cfg['country'].lower()}: no NordLynx server recommended in {cfg['country']}")
+
+
+def nord_running() -> list[str]:
+    r = sh("docker", "ps", "--filter", "label=walter.provider=nordvpn", "--format", '{{.Label "walter.exit"}}')
+    return [n for n in r.stdout.split() if n]
+
+
+def insights(port: int) -> dict:
+    """What NordVPN sees of a request sent through the exit: ip, country_code, protected (never the host route)."""
+    r = sh("curl", "-s", "--max-time", "15", "-x", f"http://127.0.0.1:{port}",
+           nord().get("api", "https://api.nordvpn.com/v1").rstrip("/") + "/helpers/ips/insights", timeout=25)
+    try:
+        return json.loads(r.stdout) if r.returncode == 0 else {}
+    except ValueError:
         return {}
-    return tomllib.loads(Path(path).read_text()).get("exit", {})
 
 
 def get(name: str) -> dict:
     e = exits()
-    if name not in e:
-        sys.exit(f"unknown exit {name!r}; declared: {', '.join(e) or 'none'}")
-    return e[name]
+    if name in e:
+        return e[name]
+    synth = nord_exit(name)
+    if synth:
+        return synth
+    sys.exit(f"unknown exit {name!r}; declared: {', '.join(e) or 'none'}"
+             + ("; on demand: nordvpn-<country>" if nord() else ""))
 
 
 def container(name: str) -> str:
@@ -80,15 +183,29 @@ def up(name: str, force: bool) -> None:
         sh("docker", "build", "-q", "-t", IMAGE, str(HERE), timeout=600, check=True)
     if sh("lsmod").stdout.find("wireguard") < 0:
         sh("modprobe", "wireguard", check=True)
-    src = sh("walter-secret", "file", cfg["secret"], cfg["attachment"], timeout=300, check=True).stdout.strip().splitlines()[-1]
+    labels, server = [], ""
+    if cfg.get("provider") == "nordvpn":
+        if len(nord_running()) >= int(nord().get("max_exits", 3)):
+            sys.exit(f"{name}: refused — {len(nord_running())} NordVPN exits already up (max_exits); "
+                     f"stop one first: {', '.join(nord_running())}")
+        conf, server = nord_conf(cfg)
+        labels = ["--label", "walter.provider=nordvpn", "--label", f"walter.country={cfg['country']}",
+                  "--label", f"walter.server={server}"]
     run = Path(tempfile.mkdtemp(prefix="walter-wg-", dir="/dev/shm"))
     try:
         os.chmod(run, 0o700)
-        shutil.copyfile(src, run / "wg0.conf"); os.chmod(run / "wg0.conf", 0o600)
-        Path(src).unlink(missing_ok=True)
+        if cfg.get("provider") == "nordvpn":
+            fd = os.open(run / "wg0.conf", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w") as f:
+                f.write(conf)
+            conf = ""
+        else:
+            src = sh("walter-secret", "file", cfg["secret"], cfg["attachment"], timeout=300, check=True).stdout.strip().splitlines()[-1]
+            shutil.copyfile(src, run / "wg0.conf"); os.chmod(run / "wg0.conf", 0o600)
+            Path(src).unlink(missing_ok=True)
         sh("docker", "rm", "-f", container(name))
         sh("docker", "run", "-d", "--name", container(name), "--restart", "no",
-           "--label", f"walter.exit={name}", "--cap-add", "NET_ADMIN",
+           "--label", f"walter.exit={name}", *labels, "--cap-add", "NET_ADMIN",
            "--sysctl", "net.ipv4.conf.all.src_valid_mark=1", "--sysctl", "net.ipv6.conf.all.disable_ipv6=1",
            "-p", f"127.0.0.1:{cfg['port']}:8888", "-v", f"{run}:/run/wg:ro", IMAGE, check=True)
         for _ in range(30):
@@ -99,6 +216,20 @@ def up(name: str, force: bool) -> None:
             time.sleep(1)
     finally:
         shutil.rmtree(run, ignore_errors=True)
+    if cfg.get("provider") == "nordvpn":
+        seen = {}
+        for _ in range(10):
+            seen = insights(cfg["port"])
+            if seen:
+                break
+            time.sleep(2)
+        if not seen.get("protected") or str(seen.get("country_code", "")).upper() != cfg["country"]:
+            sh("docker", "rm", "-f", container(name))
+            sys.exit(f"{name}: stopped — exit check failed (asked {cfg['country']}, got "
+                     f"{seen.get('country_code') or 'no answer'}, protected={seen.get('protected')})")
+        print(f"{name}: up on http://127.0.0.1:{cfg['port']} — exit IP {seen.get('ip')}, "
+              f"{seen.get('country_code')} ({seen.get('city') or '?'}), NordVPN protected, server {server}")
+        return
     ip = exit_ip(cfg["port"])
     print(f"{name}: up on http://127.0.0.1:{cfg['port']} — exit IP {ip or 'not reachable yet'}")
 
@@ -111,9 +242,13 @@ def down(name: str) -> None:
 
 def status(names: list[str]) -> None:
     e = exits()
-    for n in names or list(e):
+    for n in names or [*e, *nord_running()]:
         cfg = e.get(n) or get(n)
-        if running(n):
+        if running(n) and cfg.get("provider") == "nordvpn":
+            seen = insights(cfg["port"])
+            print(f"{n}: up  http://127.0.0.1:{cfg['port']}  exit {seen.get('ip') or '?'} {seen.get('country_code') or '?'}"
+                  f"  protected={seen.get('protected')}")
+        elif running(n):
             print(f"{n}: up  http://127.0.0.1:{cfg['port']}  exit {exit_ip(cfg['port']) or '?'}  ({cfg.get('country', '')})")
         else:
             print(f"{n}: down  ({cfg.get('country', '')}, port {cfg['port']})")
@@ -126,6 +261,8 @@ def main(argv: list[str]) -> None:
     if cmd == "list":
         for n, c in exits().items():
             print(f"{n}\t{c.get('country', '')}\thttp://127.0.0.1:{c['port']}\t{c.get('description', '')}")
+        if nord():
+            print(f"nordvpn-<country>\t*\thttp://127.0.0.1:{nord()['port_base']}+id\tNordVPN on demand (`countries`)")
     elif cmd == "up" and rest:
         up(rest[0], "--force" in argv)
     elif cmd == "down" and rest:
@@ -135,6 +272,18 @@ def main(argv: list[str]) -> None:
         if not running(rest[0]):
             sys.exit(f"{rest[0]}: down — start it with `walter-wg-exit up {rest[0]}`")
         print(f"http://127.0.0.1:{cfg['port']}")
+    elif cmd == "use" and rest:
+        cfg = get(rest[0])
+        if not running(rest[0]):
+            if cfg.get("provider") != "nordvpn":
+                sys.exit(f"{rest[0]}: down — start it with `walter-wg-exit up {rest[0]}`")
+            import contextlib
+            with contextlib.redirect_stdout(sys.stderr):   # stdout carries only the proxy URL
+                up(rest[0], False)
+        print(f"http://127.0.0.1:{cfg['port']}")
+    elif cmd == "countries":
+        for code, c in sorted(nord_countries().items()):
+            print(f"nordvpn-{code.lower()}\t{c['name']}\t{c.get('serverCount', '')}")
     elif cmd == "status":
         status(rest)
     else:

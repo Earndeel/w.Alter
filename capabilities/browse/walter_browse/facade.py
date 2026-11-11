@@ -108,6 +108,12 @@ WALTER_BROWSE_SCHEMA: dict[str, Any] = {
                 "maximum": 1000,
                 "description": "Optional semantic candidate score threshold used by the router.",
             },
+            "exit_country": {
+                "type": "string",
+                "description": "Only when the task needs to browse FROM a given country: two-letter ISO code (fr, us, gb, jp, de…). "
+                               "Opens a NordVPN exit of that country for this request (own browser, no owner cookies); refused "
+                               "if unavailable, never replaced by another exit. Omit for normal browsing.",
+            },
             "mode": {
                 "type": "string",
                 "enum": ["auto", "scrapling", "camoufox", "webtop"],
@@ -237,6 +243,12 @@ def _validate_request(args: Any) -> dict[str, Any]:
     if not 0 <= float(score_threshold) <= 1000:
         raise ValueError("score_threshold must be between 0 and 1000")
 
+    exit_country = str(args.get("exit_country") or "").strip().lower()
+    if exit_country and not re.fullmatch(r"[a-z]{2}", exit_country):
+        raise ValueError("exit_country must be a two-letter ISO country code (e.g. fr, us, jp)")
+    if exit_country and query:
+        raise ValueError("exit_country applies to url reads; search uses its own route")
+
     mode = str(args.get("mode", "auto")).strip().lower()
     if mode not in {"auto", "scrapling", "camoufox", "webtop"}:
         raise ValueError("mode must be auto, scrapling, camoufox, or webtop")
@@ -259,6 +271,7 @@ def _validate_request(args: Any) -> dict[str, Any]:
         "min_records": min_records,
         "score_threshold": float(score_threshold),
         "mode": mode,
+        "exit_country": exit_country or None,
     }
 
 
@@ -315,6 +328,8 @@ def _build_router_command(request: Mapping[str, Any]) -> list[str]:
         command.extend(["--required-field", field])
     if request.get("session_id"):
         command.extend(["--session-id", str(request["session_id"])])
+    if request.get("exit_country"):
+        command.extend(["--network", "vpn", "--country", str(request["exit_country"])])
     command.extend(
         [
             "--min-records",

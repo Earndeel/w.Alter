@@ -28,3 +28,33 @@ def test_a_search_returns_several_sources_by_default():
     assert cmd[cmd.index("--search-count") + 1] == "5"
     cmd = facade._build_router_command({"query": "prix bitcoin", "min_records": 8})
     assert cmd[cmd.index("--search-count") + 1] == "8"
+
+
+# ── NordVPN exits by country (owner decision, 2026-11-11): explicit, one session = one exit, never a fallback ─────────────
+import pytest
+
+
+def _req(**kw):
+    return facade._validate_request({"url": "https://example.com", "content_only": True, **kw})
+
+
+def test_an_exit_country_becomes_a_vpn_session_for_that_country():
+    r = _req(exit_country="JP")
+    assert r["exit_country"] == "jp"
+    cmd = facade._build_router_command(r)
+    assert cmd[cmd.index("--network") + 1] == "vpn" and cmd[cmd.index("--country") + 1] == "jp"
+
+
+def test_no_exit_country_keeps_the_normal_route():
+    assert "--network" not in facade._build_router_command(_req())
+
+
+@pytest.mark.parametrize("bad", ["france", "j", "1x", "fr;rm"])
+def test_an_exit_country_must_be_a_two_letter_code(bad):
+    with pytest.raises(ValueError):
+        _req(exit_country=bad)
+
+
+def test_search_never_takes_an_exit_country():
+    with pytest.raises(ValueError):
+        facade._validate_request({"query": "météo", "exit_country": "us"})

@@ -20,6 +20,16 @@ Test: python -m pytest runtime/test_*.py tests -q. Set WALTER_BROWSE_STATE_DIR t
 
 `network/wg-exit/`: scoped WireGuard exits (container + loopback HTTP proxy) for browser sessions, `walter-wg-exit` on the PATH. See its README.
 
+Since 2026-11-11 the same tool also opens **NordVPN exits per country** (`nordvpn-<cc>`, connectivity from
+`/services/nordvpn-proxy`, token through the Walter Secrets grant `nordvpn`, reader `browse`). Browse alone chooses the
+route: `walter-browser -s S exit nordvpn-jp`, `walter_browse(exit_country="jp")`, `universal-scraper --network vpn
+--country jp`. Never a default, never a fallback: an exit that cannot open (no token, unknown country, tunnel not
+protected, tunnel down) is a clear refusal. A NordVPN session gets its own Camoufox process (identity from the exit
+IP, fresh fingerprint, no owner cookies — `/session/cookies` answers 409 —, WebRTC proxy-only, no DNS outside the
+proxy), stays bound to its exit (a change is refused, even after expiry), and its page reads leave by the same exit.
+Owner exits are declared to the browsers (`CAMOFOX_OWNER_EXITS`, `ops/camoufox-max-owner-exits.conf`); Chromium
+refuses third-party exits; `network=proxy` and `vpn` without a country are refused.
+
 ## Écran du navigateur de Walter (Selkies)
 
 camoufox-max dessine ses fenêtres sur l'écran X :101 fourni par le conteneur `walter-browse-display` (image
@@ -77,7 +87,7 @@ Version la plus récente (Chromium 155, 87 patchs) : gratuite avec une connexion
 
 ## Sorties réseau par type de trafic (décision du propriétaire, 28/10/2026)
 
-Aucune sortie Browse par l'IP nue du serveur. Trois sorties, chacune fermée par défaut :
+Aucune sortie Browse par l'IP nue du serveur. Trois sorties, chacune fermée par défaut (plus, sur demande explicite seulement, une sortie NordVPN par pays : voir « Network exits ») :
 
 | Trafic | Sortie | Port |
 |---|---|---|

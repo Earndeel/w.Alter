@@ -1442,6 +1442,26 @@ def _enforce_exit(args: argparse.Namespace) -> None:
         os.environ.pop(k, None)
 
 
+def _session_exit(session: BrowseSession) -> str:
+    """Proxy URL of the exit a managed session asked for: network=vpn = the NordVPN exit of session.country
+    (`walter-wg-exit use nordvpn-<cc>`, started on demand, its IP and country checked through the tunnel).
+    Anything else, or an exit that cannot be opened, refuses the request: no fallback to another route."""
+    import subprocess
+    if session.network != "vpn":
+        raise SessionError(f"network={session.network!r} has no exit: use network=vpn with a country")
+    cc = (session.country or "").strip().lower()
+    if not re.fullmatch(r"[a-z]{2}", cc):
+        raise SessionError("network=vpn needs a two-letter exit country (ISO code, e.g. fr, us, jp)")
+    env = {k: v for k, v in os.environ.items() if k.lower() not in
+           ("http_proxy", "https_proxy", "all_proxy", "no_proxy", "walter_browse_proxy")}   # exit control plane
+    r = subprocess.run(["walter-wg-exit", "use", f"nordvpn-{cc}"], capture_output=True, text=True, timeout=240, env=env)
+    url = (r.stdout.strip().splitlines() or [""])[-1]
+    if r.returncode or not re.fullmatch(r"http://127\.0\.0\.1:\d+", url):
+        raise SessionError(f"NordVPN exit {cc.upper()} unavailable, request refused (no fallback): "
+                           f"{(r.stderr or r.stdout).strip()[-300:]}")
+    return url
+
+
 def _local_exit_state() -> dict[str, Any]:
     try:
         state = json.loads(Path(os.environ.get("WALTER_EXIT_LOCAL_STATE", "/run/walter-exit-local.json")).read_text())
@@ -1508,6 +1528,10 @@ async def _run_cli(args: argparse.Namespace) -> int:
                 session = sctx.load(args.session_id)
             except SessionError:
                 raise SessionError('requested managed session unavailable; anonymous fallback refused') from None
+            if args.network != "local" and (session.network, (session.country or "").lower()) != \
+                    (args.network, (args.country or "").lower()):
+                raise SessionError(f"session {session.id} leaves through network={session.network} "
+                                   f"country={session.country}; one session = one exit, open a new session")
         if session is None:
             session = sctx.create(
                 session_id=args.session_id,
@@ -1518,15 +1542,20 @@ async def _run_cli(args: argparse.Namespace) -> int:
             )
         session_trace = session.summary()
         camoufox_user_id = f"session-{session.id}"
-        # Session-scoped network: only when explicitly requested (network=vpn|proxy).
-        if session.network in ("vpn", "proxy") and session.country:
+        # Session-scoped network: only when explicitly requested (network=vpn + country = NordVPN exit of that
+        # country). The browser AND the page reads of this session use that exit; unavailable = refused, never
+        # another exit (2026-11-11).
+        if session.network != "local":
+            proxy_url = await asyncio.to_thread(_session_exit, session)
+            os.environ.update(WALTER_BROWSE_PROXY=proxy_url, HTTP_PROXY=proxy_url, HTTPS_PROXY=proxy_url,
+                              http_proxy=proxy_url, https_proxy=proxy_url)
             client = CamoufoxMaxClient(base_url=args.camoufox_url, user_id=camoufox_user_id)
-            proxy = {"server": "http://127.0.0.1:1080"}  # nordvpn-proxy FR container (session-scoped)
             await asyncio.to_thread(
                 client._request_sync, "POST", "/session/new",
-                {"userId": camoufox_user_id, "proxy": proxy},
+                {"userId": camoufox_user_id, "proxy": {"server": proxy_url}},
             )
-            sctx.log_event(session, "NETWORK_ROUTE", mode=session.network, country=session.country)
+            sctx.log_event(session, "NETWORK_ROUTE", mode=session.network, country=session.country,
+                           exit=f"nordvpn-{session.country.lower()}")
 
     router = UniversalRouter(
         fallback_to_webtop=os.environ.get("WALTER_BROWSE_WEBTOP", "off") == "on",   # Webtop leaves from the server's IP (2026-10-28)
@@ -1596,7 +1625,12 @@ async def _run_cli(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    return asyncio.run(_run_cli(_parser().parse_args()))
+    args = _parser().parse_args()
+    try:
+        return asyncio.run(_run_cli(args))
+    except SessionError as exc:   # a refused route or session is an answer for the caller, not a crash (2026-11-11)
+        print(json.dumps({"success": False, "refused": True, "error": f"refused: {exc}"[:600]}, ensure_ascii=False))
+        return 3
 
 
 if __name__ == "__main__":

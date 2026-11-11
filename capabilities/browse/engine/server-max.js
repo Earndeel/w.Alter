@@ -135,6 +135,70 @@ function normalizeUserId(userId) { return String(userId); }
 // Per-session proxy routes (session-specific network, never global).
 const sessionProxies = new Map(); // userId -> {server, username?, password?}
 
+// Third-party exits (NordVPN, 2026-11-11). A session routed through an exit that is NOT the owner's network runs in
+// its own browser process launched through that exit (browser-wide proxy: no request of that browser can leave
+// another way): identity (timezone, languages, position, WebRTC IP) from that exit's IP, a fresh device fingerprint
+// (never the owner's fixed device), no stored state, owner cookies refused, WebRTC kept inside the proxy, no DNS
+// prefetch or DoH outside it. Owner exits = the default exit + CAMOFOX_OWNER_EXITS (comma list of proxy URLs, e.g. the
+// France WireGuard exit). The exit unreachable = the session is refused (no fallback). Camoufox engine only.
+let ownerExits = null;   // built on first use (DEFAULT_PROXY is declared further down)
+const exitBrowsers = new Map();   // proxy server -> { promise, ip }
+function isOwnerExit(server) {
+  if (!ownerExits) {
+    ownerExits = new Set([DEFAULT_PROXY, ...(process.env.CAMOFOX_OWNER_EXITS || '').split(',')]
+      .map((x) => x.trim()).filter(Boolean));
+  }
+  return ownerExits.has(String(server || '').trim());
+}
+
+async function ensureExitBrowser(server) {
+  if (ENGINE === 'chromium') throw new Error('third-party exits are served by the Camoufox engine (camoufox-max) only');
+  const known = exitBrowsers.get(server);
+  if (known) {
+    const b = await known.promise.catch(() => null);
+    if (b && b.isConnected()) return b;
+    exitBrowsers.delete(server);
+  }
+  const entry = { ip: null };
+  entry.promise = (async () => {
+    const identity = await exitIdentity(server);   // through the exit: throws when it is down
+    entry.ip = identity.ip;
+    const options = await launchOptions({
+      headless: CAMOUFOX_HEADLESS,
+      humanize: 2.0,
+      geoip: false,
+      config: identity.config,
+      proxy: { server },
+      firefox_user_prefs: {
+        'network.dns.disableIPv6': true, 'network.dns.disablePrefetch': true, 'network.dns.disablePrefetchFromHTTPS': true,
+        'network.predictor.enabled': false, 'network.prefetch-next': false, 'network.trr.mode': 5,
+        'media.peerconnection.ice.proxy_only': true, 'media.peerconnection.ice.default_address_only': true,
+        'network.proxy.failover_direct': false, 'network.proxy.allow_bypass': false,
+      },
+    });
+    const b = await firefox.launch(options);
+    b.on('disconnected', () => { if (exitBrowsers.get(server) === entry) exitBrowsers.delete(server); });
+    console.log(`🦊 MAX third-party exit browser through ${server}: exit IP ${identity.ip}, ${identity.config.timezone}`);
+    return b;
+  })();
+  exitBrowsers.set(server, entry);
+  try {
+    return await entry.promise;
+  } catch (e) {
+    exitBrowsers.delete(server);
+    throw new Error(`exit ${server} unreachable, session refused (no fallback): ${e.message}`);
+  }
+}
+
+async function releaseExitBrowser(server) {
+  if (!server || isOwnerExit(server)) return;
+  for (const s of sessions.values()) if (s.exitServer === server) return;   // still used by another session
+  const entry = exitBrowsers.get(server);
+  exitBrowsers.delete(server);
+  const b = entry ? await entry.promise.catch(() => null) : null;
+  if (b) { await b.close().catch(() => {}); console.log(`🦊 MAX third-party exit browser through ${server} closed`); }
+}
+
 // Default exit and identity (2026-10-20): a session without its own route leaves through the owner's machine
 // (CAMOFOX_DEFAULT_PROXY, e.g. socks5://127.0.0.1:1082 = walter-exit-mac) and presents that machine's timezone and
 // language, so the owner's cookies are always used from the owner's own IP. When the default exit is down, the
@@ -224,8 +288,9 @@ async function launchChromium(identity) {
   return b;
 }
 
-async function exitIdentity() {
-  const ip = await publicIP(DEFAULT_PROXY);
+async function exitIdentity(server = DEFAULT_PROXY) {
+  if (!server) throw new Error('no exit to derive an identity from');   // never a lookup from this server's own IP
+  const ip = await publicIP(server);
   const geo = (await getGeolocation(ip)).asConfig();
   const region = geo['locale:region'];
   // Camoufox draws the language at random by speaker share; use the region's main language instead (CLDR likely subtags).
@@ -253,6 +318,16 @@ async function getSession(userId) {
   const key = normalizeUserId(userId);
   let session = sessions.get(key);
   if (!session) {
+    const proxy = sessionProxies.get(key);
+    if (proxy && proxy.server && !isOwnerExit(proxy.server)) {
+      const b = await ensureExitBrowser(proxy.server);
+      const context = await b.newContext({ viewport: { width: 1280, height: 720 } });   // no owner state, ever
+      session = { context, tabGroups: new Map(), lastAccess: Date.now(), route: 'third-party-exit', exitServer: proxy.server };
+      sessions.set(key, session);
+      console.log(`🦊 MAX Session ${key} created on the third-party exit ${proxy.server} (own browser, no owner state)`);
+      session.lastAccess = Date.now();
+      return session;
+    }
     const b = await ensureBrowser();
     const contextOptions = {
       viewport: { width: 1280, height: 720 },
@@ -260,7 +335,6 @@ async function getSession(userId) {
       ...(DEFAULT_PROXY ? {} : { locale: IDENTITY.locale, timezoneId: IDENTITY.timezoneId }),
       storageState: path.join(CONTEXT_DIR, 'storage-state.json'),
     };
-    const proxy = sessionProxies.get(key);
     let route = 'direct';   // how this session reaches the web: session-proxy | default-exit | direct
     if (proxy && proxy.server) {
       route = 'session-proxy';
@@ -542,8 +616,14 @@ app.post('/session/new', async (req, res) => {
   try {
     const { userId, proxy } = req.body;
     const key = normalizeUserId(userId || 'default');
-    if (proxy && proxy.server) {
-      sessionProxies.set(key, { server: proxy.server, username: proxy.username, password: proxy.password });
+    const want = proxy && proxy.server ? String(proxy.server) : null;
+    const had = sessionProxies.has(key) ? sessionProxies.get(key).server : null;
+    if (want && (had || sessions.has(key)) && want !== had) {
+      // one session = one exit (2026-11-11): never move a session (cookies, history) to another network
+      return res.status(409).json({ error: `session ${key} is bound to ${had || 'its default exit'}; open a new session for ${want}` });
+    }
+    if (want) {
+      sessionProxies.set(key, { server: want, username: proxy.username, password: proxy.password });
     }
     await getSession(key);
     res.json({ ok: true, userId: key, proxy: proxy && proxy.server ? proxy.server : null });
@@ -771,7 +851,8 @@ app.delete('/sessions/:userId', async (req, res) => {
     const session = sessions.get(key);
     if (session) {
       await session.context.close().catch(() => {});
-      sessions.delete(key);
+      sessions.delete(key);   // its exit stays bound to the id: reopening it never lands on another exit
+      await releaseExitBrowser(session.exitServer);   // a third-party exit browser closes with its last session
     }
     res.json({ ok: true });
   } catch (e) {
@@ -1046,6 +1127,10 @@ app.post('/session/cookies', async (req, res) => {
     const session = await getSession(userId || 'default');
     // The owner's cookies are only used from the owner's network: never in a session that left through this server
     // because the default exit was down.
+    if (session.route === 'third-party-exit') {
+      console.log(`🦊 MAX cookies refused for session ${userId}: it leaves through a third-party exit (${session.exitServer})`);
+      return res.status(409).json({ error: 'owner cookies refused: this session leaves through a third-party exit' });
+    }
     if (DEFAULT_PROXY && session.route === 'direct') {
       console.log(`🦊 MAX cookies refused for session ${userId}: default exit down, session leaves from this server's IP`);
       return res.status(409).json({ error: 'owner cookies refused: the default exit (owner network) is unreachable' });
@@ -1106,6 +1191,7 @@ setInterval(() => {
     if (now - session.lastAccess > SESSION_TIMEOUT_MS) {
       session.context.close().catch(() => {});
       sessions.delete(key);
+      releaseExitBrowser(session.exitServer).catch(() => {});
       console.log(`🦊 MAX Expired session: ${key}`);
     }
   }
