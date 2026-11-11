@@ -6,7 +6,7 @@ import json
 
 from . import settings
 
-MAP = settings.DATA_ROOT / "vault/secrets-map.json"
+MAP = settings.MAP
 
 
 def entry(env_name: str) -> dict:

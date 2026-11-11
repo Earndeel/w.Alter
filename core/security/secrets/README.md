@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Accès partagé au coffre Bitwarden du propriétaire : références au coffre et injection locale des valeurs autorisées, sans qu'aucune valeur n'entre dans un modèle. |
 | **Propriétaire** | walter-secrets (`/walter/core/security/secrets`). |
-| **État** | **active** (constat du 09/11/2026) : service `walter-secrets-sync`. |
+| **État** | **active** (constat du 11/11/2026) : service `walter-secrets-sync` ; clés d'API des composants par autorisation (`allow` + `[env]`), plus aucun fichier de clés global. |
 | **Ne fait pas** | Donner une valeur secrète à un modèle, un journal, un prompt ou une URL ; exporter `Vault.value`. |
 | **Contrats** | [contracts/secrets.json](contracts/secrets.json), [contracts/maintenance.json](contracts/maintenance.json) ; MCP `secret_search`, `secret_reference` ; CLI `walter-secret`. |
 
@@ -82,8 +82,9 @@ suitable for errors involving secret-bearing subprocesses and HTTP requests.
 
 ## Operation and validation
 
-`walter-secrets-sync` retains its existing service and graceful-restart behavior. Its
-Hermes restart command is now a declared consumer binding, not hardcoded in shared logic.
+`walter-secrets-sync` retains its existing service and graceful-restart behavior. Consumer
+restarts are declared bindings (`[[env_consumers]]` of the instance), not hardcoded in shared logic; the Hermes
+binding was removed with `~/.hermes/.env` on 2026-11-11.
 No key or account rotation, vault item edit, login or signup is part of this extraction.
 
 Tests use fake vault entries and credentials only. They verify import without any host,
@@ -109,6 +110,33 @@ secret : propriétaire, nature, droits, consommateurs, responsable du renouvelle
 (`file:<chemin>[#clé.json]`). Les modules demandent `grants.access(id)` ou `walter-secret grant access <id>` ;
 seul le responsable déclaré renouvelle (OAuth ici, CLI du fournisseur pour Codex et rclone). Santé, sans valeur :
 `walter-secret grants`.
+
+### Clés d'API par autorisation — source unique (2026-11-11)
+
+Depuis le retrait de `~/.hermes/.env` (décision du propriétaire, 2026-11-11), **chaque clé d'API qu'un composant
+utilise a une fiche** et une seule source : son champ Bitwarden. La fiche déclare :
+
+- `allow = ["llm", "router", …]` : les composants autorisés. Dès qu'une fiche a `allow`, toute lecture nomme son
+  lecteur (`grants.access(id, consumer=…)`, `walter-secret grant access <id> --as <composant>`) ; les autres sont
+  refusés, et chaque lecture est journalisée (fiche, champ, lecteur ; jamais la valeur). Tous les processus tournent
+  sous le même utilisateur : c'est un contrat appliqué et tracé, pas une barrière du système.
+- `[env] NOM = "<partie>" | "attribute:<clé>"` : le nom sous lequel un composant connaît le secret (configuration
+  de fournisseurs, outil tiers). `grants.env_value(NOM, consumer)` le résout ; **aucun repli** vers un fichier,
+  l'environnement global ou Hermes : sans fiche ou sans droit, l'appel échoue.
+- `[attributes]` : valeurs non secrètes rangées avec l'autorisation (identifiant de compte, e-mail de connexion).
+
+Les lectures statiques (clés, attributs) restent en mémoire du processus 15 min (`CACHE_S`), jamais sur disque ; le
+CLI `bw` sert son cache local chiffré quand Vaultwarden ne répond pas. Pour un outil tiers qui ne lit que son
+environnement, l'injection est ciblée : `walter-secret grant exec <id>[,<id>…] --as <composant> -- commande…` ajoute
+uniquement les variables `[env]` de ces fiches, puis remplace le processus (aucun fichier écrit). L'aide
+`bin/walter-cloudflare` (sur le PATH) en est l'exemple : fiches `cloudflare-api` et `cloudflare-workers-ai`, lecteur
+`walter-cloudflare`, `walter-cloudflare check` échoue si une valeur manque.
+
+Fiches de l'instance au 11/11 : `openrouter` (llm, router, memory), `kie`, `arnict`, `venice` (llm, router),
+`cloudflare-api` (walter-cloudflare), `cloudflare-workers-ai` (memory, router, walter-cloudflare). La synchro
+`walter-secrets-sync` ne génère plus aucun fichier de clés global : elle tient le coffre de démarrage chiffré (age) et
+les seuls fichiers d'environnement déclarés par l'instance (`[sync] env_files`, aujourd'hui le canari de contrôle).
+`mapping.entry()` (carte par valeur) ne sert plus aux clés d'API des composants.
 
 
 ## Abonnement Claude

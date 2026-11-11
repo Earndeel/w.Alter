@@ -16,7 +16,7 @@ Decision 2026-10-16: the vault must stay organised and backed up without the own
   vault_react.py file [--dry]     file new entries now
   vault_react.py export PATH      encrypted export to PATH
   vault_react.py backup           export + Drive + retention
-Logs: ~/.hermes/logs/walter-secrets-sync.log (entry names and folders only, never a value).
+Logs: paths.sync_log (@instance/logs/walter-secrets-sync.log) (entry names and folders only, never a value).
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ REC = settings.path("recovery_recipient", H / "vault/walter-recovery.pub")
 SESSION = settings.SESSION
 BACKUP_DIR = settings.path("backup_dir", H / "backups/bitwarden")
 REMOTE = settings.setting("react", "remote", "")              # rclone destination of exports; empty = local only
-LOG = H / "logs/walter-secrets-sync.log"
+LOG = settings.SYNC_LOG
 KEYS_FOLDER = "W.Alter – Clés API"
 INBOX_FOLDERS = {None, "W.Alter – Comptes créés"}
 IDENTITY_FOLDER = "01 · Identité, documents & clés"

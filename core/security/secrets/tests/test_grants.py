@@ -157,3 +157,45 @@ def test_claude_refresh_failure_preserves_the_existing_file(home):
         with pytest.raises(grants.GrantError, match="HTTP 401"):
             grants.access("claude")
     assert (home / "claude.json").read_bytes() == before
+
+
+def _api_card(home, ident="provider", allow='["llm", "router"]'):
+    private(home / "key", "k-123")
+    private(home / "acct", "acct-1")
+    card(home, ident, f'owner = "walter"\nkind = "api_key"\nallow = {allow}\n'
+                      f'[secret]\ntoken = "file:{home / "key"}"\n[attributes]\naccount = "file:{home / "acct"}"\n'
+                      '[env]\nPROVIDER_KEY = "token"\nPROVIDER_ACCOUNT = "attribute:account"\n')
+    grants._values.clear()
+
+
+def test_allow_names_the_reader_and_refuses_others(home):
+    _api_card(home)
+    assert grants.access("provider", consumer="llm") == "k-123"
+    for reader in (None, "memory"):
+        with pytest.raises(grants.GrantError):
+            grants.access("provider", consumer=reader)
+
+
+def test_env_value_resolves_declared_names_without_fallback(home, monkeypatch):
+    _api_card(home)
+    monkeypatch.setenv("UNDECLARED_KEY", "from-env")
+    assert grants.env_value("PROVIDER_KEY", "router") == "k-123"
+    assert grants.env_value("PROVIDER_ACCOUNT", "router") == "acct-1"
+    with pytest.raises(grants.GrantError):
+        grants.env_value("PROVIDER_KEY", "telegram")
+    with pytest.raises(grants.GrantError):          # the environment is never a fallback
+        grants.env_value("UNDECLARED_KEY", "router")
+
+
+def test_environment_injects_only_the_named_grants(home):
+    _api_card(home)
+    _api_card(home, "other", '["llm"]')
+    assert grants.environment(["provider"], "router") == {"PROVIDER_KEY": "k-123", "PROVIDER_ACCOUNT": "acct-1"}
+    with pytest.raises(grants.GrantError):
+        grants.environment(["other"], "router")
+
+
+def test_env_must_point_to_a_declared_part(home):
+    card(home, "broken", 'owner = "walter"\nkind = "api_key"\n[secret]\ntoken = "file:/x"\n[env]\nX = "missing"\n')
+    with pytest.raises(grants.GrantError):
+        grants.card("broken")

@@ -8,7 +8,11 @@
   walter-secret file <item> [attachment]       decrypt an attachment to /dev/shm, print the path
   walter-secret otp <site> [minutes] [timeout]  wait for the code <site> sent by e-mail / message, print it
   walter-secret grants [ID]                     Walter's authorizations: cards and health (metadata only)
-  walter-secret grant access <id> [part]        usable secret of a grant (fresh token for OAuth / subscriptions)
+  walter-secret grant access <id> [part] [--as C]  usable secret of a grant (fresh token for OAuth / subscriptions);
+                                                --as names the reader, required when the card has `allow`
+  walter-secret grant env NAME --as C           the secret component C knows as NAME (card [env]), no fallback
+  walter-secret grant exec <id>[,<id>…] --as C -- command…   run a third-party command with only those grants'
+                                                [env] variables injected (targeted injection, never a file)
   walter-secret fingerprints [status|build]     value-free index of the vault's secret values (log masking)
 """
 import json
@@ -52,13 +56,26 @@ def main(argv: list[str]) -> int:
                 out = grants.check(argv[1] if len(argv) == 2 else None)
                 print(json.dumps(out, ensure_ascii=False, indent=1))
                 return 0 if out["ok"] else 1
-            if argv[:2] == ["grant", "access"] and len(argv) in (3, 4):
-                print(grants.access(argv[2], argv[3] if len(argv) == 4 else "token"), end="")
+            rest, consumer = list(argv), None
+            if "--as" in rest[:-1]:
+                k = rest.index("--as")
+                consumer = rest[k + 1]
+                del rest[k:k + 2]
+            if rest[:2] == ["grant", "access"] and len(rest) in (3, 4):
+                print(grants.access(rest[2], rest[3] if len(rest) == 4 else "token", consumer=consumer), end="")
                 return 0
+            if rest[:2] == ["grant", "env"] and len(rest) == 3 and consumer:
+                print(grants.env_value(rest[2], consumer), end="")
+                return 0
+            if rest[:2] == ["grant", "exec"] and len(rest) >= 5 and rest[3] == "--" and consumer:
+                # targeted injection: only these grants' [env] variables, then exec (no Walter process in between)
+                env = {**os.environ, **grants.environment(rest[2].split(","), consumer)}
+                os.execvpe(rest[4], rest[4:], env)
         except (grants.GrantError, SecretError, OSError, ValueError, KeyError) as exc:
             print(f"walter-secret: {type(exc).__name__}: {exc}"[:300], file=sys.stderr)
             return 1
-        print("usage: walter-secret grants [ID] | grant access <id> [part]", file=sys.stderr)
+        print("usage: walter-secret grants [ID] | grant access <id> [part] [--as C] | grant env NAME --as C"
+              " | grant exec <id>[,<id>…] --as C -- command…", file=sys.stderr)
         return 2
     if argv and argv[0] == "store":
         return store_main(argv[1:])

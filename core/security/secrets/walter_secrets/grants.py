@@ -8,9 +8,17 @@ a token file themselves, and only the grant's renewer refreshes it.
 Cards (no secret): the active instance's accounts/<id>.toml —
     title, owner = "walter" | "owner", kind = api_key | bot | oauth | subscription | tunnel | storage | cookies,
     provider, scopes, consumers, renewer = "walter-secrets" | "vendor:<cli>" | "none", notes
-    [secret]   token = "<storage>", client = "<storage>" (OAuth client, optional)
+    [secret]   token = "<storage>", client = "<storage>" (OAuth client, optional), any other named secret part
+    [attributes] non-secret values kept next to the grant (account id, login e-mail…), same storage forms
+    allow = ["<component>", …]  components allowed to read it; when present, every read names its reader
+               (`access(id, consumer=…)`, `walter-secret grant access <id> --as <component>`) and others are refused
+    [env]      NAME = "<part>" | "attribute:<key>": the variable name a component knows the secret by (provider
+               configs, third-party CLIs). `env_value(NAME, consumer)` and `environment(ids, consumer)` resolve them;
+               the only source is the grant's storage — there is no env-file or Hermes fallback (2026-11-11).
 Storage: "vault:<item>#<field>" (Bitwarden), "file:<path>" or "file:<path>#<dotted.json.key>" (a declared private
 file, while the grant still lives at its historical place), "external:<where>" (not readable from here).
+All processes run as the same system user: `allow` is an enforced contract plus an audit trail (every read records
+grant, part and reader, never a value), not an operating-system barrier.
 """
 from __future__ import annotations
 
@@ -58,6 +66,14 @@ def _validate(card: dict, ident: str) -> dict:
     for v in card["secret"].values():
         if not isinstance(v, str) or v.split(":", 1)[0] not in ("vault", "file", "external"):
             raise GrantError(f"grant {ident}: storage must be vault:, file: or external:")
+    allow = card.get("allow")
+    if allow is not None and (not isinstance(allow, list) or not all(isinstance(a, str) and a for a in allow)):
+        raise GrantError(f"grant {ident}: allow must be a list of component names")
+    for name, part in (card.get("env") or {}).items():
+        attr = part.split(":", 1)[1] if isinstance(part, str) and part.startswith("attribute:") else None
+        if not isinstance(part, str) or (attr is None and part not in card["secret"]) or \
+                (attr is not None and attr not in (card.get("attributes") or {})):
+            raise GrantError(f"grant {ident}: env {name} points to an undeclared part {part!r}")
     return {"id": ident, "title": "", "provider": "", "scopes": [], "consumers": [], "renewer": "none",
             "notes": "", **card}
 
@@ -94,7 +110,7 @@ def _dig(doc, key: str | None):
     return doc
 
 
-def _read(storage: str, audit_as: str | None = None):
+def _read(storage: str, audit_as: str | None = None, consumer: str | None = None):
     scheme, where, key = _split(storage)
     if scheme == "vault":
         from .vault import VAULT, audit
@@ -102,7 +118,7 @@ def _read(storage: str, audit_as: str | None = None):
             raise GrantError("vault storage needs #field")
         value = VAULT.value(where, key)
         if audit_as:
-            audit("grant", VAULT.find(where), key, grant=audit_as)
+            audit("grant", VAULT.find(where), key, grant=audit_as, **({"consumer": consumer} if consumer else {}))
         return value
     if scheme == "file":
         p = _file(where)
@@ -222,17 +238,76 @@ def _claude_subscription_access(c: dict) -> str:
         return token["accessToken"]
 
 
-def access(ident: str, part: str = "token") -> str:
+def _allowed(c: dict, consumer: str | None) -> None:
+    allow = c.get("allow")
+    if allow is None:
+        return
+    if not consumer or consumer not in allow:
+        raise GrantError(f"grant {c['id']}: {consumer or 'an unnamed reader'} is not allowed (allow = {', '.join(allow)})")
+
+
+# Static secrets (API keys, attributes) read from Bitwarden are kept in this process only, for CACHE_S: a Bitwarden
+# read takes seconds. Nothing is ever written to disk.
+CACHE_S = 900
+_values: dict[tuple[str, str], tuple[float, str]] = {}
+
+
+def _static(c: dict, part: str, storage: str, consumer: str | None) -> str:
+    key = (c["id"], part)
+    hit = _values.get(key)
+    if hit and time.time() - hit[0] < CACHE_S:
+        return hit[1]
+    value = _read(storage, audit_as=c["id"], consumer=consumer)
+    value = json.dumps(value) if isinstance(value, (dict, list)) else str(value)
+    if c["kind"] not in ("oauth", "subscription"):
+        _values[key] = (time.time(), value)
+    return value
+
+
+def access(ident: str, part: str = "token", consumer: str | None = None) -> str:
     """The usable secret of a grant (a fresh access token for OAuth and subscriptions). Never log it."""
     c = card(ident)
+    _allowed(c, consumer)
     if part != "token":
-        value = _read(c["secret"][part], audit_as=ident)
-        return json.dumps(value) if isinstance(value, (dict, list)) else str(value)
+        if part not in c["secret"]:
+            raise GrantError(f"grant {ident}: no secret part {part!r}")
+        return _static(c, part, c["secret"][part], consumer)
     if c["kind"] == "oauth":
         return _oauth_access(c)
     if c["kind"] == "subscription":
         return _subscription_access(c)
-    return str(_read(c["secret"]["token"], audit_as=ident))
+    return _static(c, "token", c["secret"]["token"], consumer)
+
+
+def _part(c: dict, part: str, consumer: str | None) -> str:
+    if part.startswith("attribute:"):
+        return attribute(c["id"], part.split(":", 1)[1], consumer=consumer)
+    return access(c["id"], part, consumer=consumer)
+
+
+def env_value(name: str, consumer: str) -> str:
+    """The secret a component knows as NAME (provider configs, third-party tools), from the first grant that
+    declares NAME in [env] and allows `consumer`. Raises GrantError when none does — never falls back elsewhere."""
+    declaring = [c for c in cards() if name in (c.get("env") or {})]
+    if not declaring:
+        raise GrantError(f"{name}: no grant declares it")
+    usable = [c for c in declaring if consumer in (c.get("allow") or [])]
+    if not usable:
+        raise GrantError(f"{name}: {consumer} is not allowed by {', '.join(c['id'] for c in declaring)}")
+    c = usable[0]
+    return _part(c, c["env"][name], consumer)
+
+
+def environment(idents: list[str], consumer: str) -> dict[str, str]:
+    """Every [env] variable of these grants, for one targeted injection (a third-party CLI that only reads its
+    environment). Only the named grants' variables, only for an allowed consumer."""
+    out: dict[str, str] = {}
+    for ident in idents:
+        c = card(ident)
+        _allowed(c, consumer)
+        for name, part in (c.get("env") or {}).items():
+            out[name] = _part(c, part, consumer)
+    return out
 
 
 def location(ident: str, part: str = "token") -> Path:
@@ -243,13 +318,14 @@ def location(ident: str, part: str = "token") -> Path:
     return _file(where)
 
 
-def attribute(ident: str, storage_key: str) -> str:
+def attribute(ident: str, storage_key: str, consumer: str | None = None) -> str:
     """A non-secret attribute stored next to a grant (e.g. a subscription's account id): declared in [attributes]."""
     c = card(ident)
+    _allowed(c, consumer)
     storage = (c.get("attributes") or {}).get(storage_key)
     if not isinstance(storage, str):
         raise GrantError(f"grant {ident}: no attribute {storage_key!r}")
-    return str(_read(storage))
+    return _static(c, "attribute:" + storage_key, storage, consumer)
 
 
 # ── health (metadata only) ─────────────────────────────────────────────────────────────────────────────────
@@ -298,7 +374,12 @@ def check(ident: str | None = None) -> dict:
     rows = []
     for c in ([card(ident)] if ident else cards()):
         storages = {k: _storage_health(v) for k, v in c["secret"].items()}
+        storages.update({"attribute:" + k: _storage_health(v) for k, v in (c.get("attributes") or {}).items()})
         row = {k: c[k] for k in ("id", "title", "owner", "kind", "provider", "renewer", "consumers")}
+        if c.get("allow") is not None:
+            row["allow"] = c["allow"]
+        if c.get("env"):
+            row["env"] = sorted(c["env"])
         row["storage"] = storages
         row.update(_expiry(c))
         problems = [f"{k}: {s['problem']}" for k, s in storages.items() if not s["ok"]]

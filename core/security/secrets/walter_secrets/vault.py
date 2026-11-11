@@ -5,8 +5,8 @@ Values are meant to be USED, not read: tools and commands reference them with pl
 resolved locally right before execution and masked again in every tool result. The model (and therefore its provider)
 only ever sees the placeholder, unless W.Alter explicitly calls secret_reveal.
 
-Unlock: ~/.hermes/bin/bw-unlock (master password from the age-encrypted W.Alter vault, session cached 0600).
-Audit: ~/.hermes/logs/walter-secrets.jsonl — item, field, action, tool; never a value.
+Unlock: bin/bw-unlock (master password from the age-encrypted W.Alter vault, session cached 0600).
+Audit: @instance/logs/walter-secrets.jsonl (paths.audit) — item, field, action, tool; never a value.
 """
 from __future__ import annotations
 
@@ -152,6 +152,32 @@ class Vault:
             field = "notes" if kind == "note" else "password"
             return {"ok": True, action: True, "id": out["id"], "name": out["name"], "kind": kind, "field": field,
                     "reference": f"{{{{bw:{out['id']}:{field}}}}}"}
+
+    def add_fields(self, ref: str, fields: dict[str, str], *, hidden: set[str] | frozenset = frozenset()) -> dict:
+        """Add custom fields to an existing item (its other content untouched). A field that already exists is left
+        as is when its value is the same and refused when it differs: this never overwrites a secret. Returns
+        metadata only ({id, name, added, unchanged})."""
+        import base64
+        with self._lock:
+            i = self.find(ref)
+            item = json.loads(self._bw("get", "item", i["id"]))
+            current = {f.get("name"): f.get("value") for f in item.get("fields") or []}
+            added, unchanged = [], []
+            for name, value in fields.items():
+                if not name or not value:
+                    raise SecretError("field name and a non-empty value are required")
+                if name in current:
+                    if current[name] != value:
+                        raise SecretError(f"item {i['name']!r} already has a different field {name!r}: refuse to overwrite")
+                    unchanged.append(name)
+                    continue
+                item.setdefault("fields", []).append({"name": name, "value": value, "type": 1 if name in hidden else 0})
+                added.append(name)
+            if added:
+                payload = base64.b64encode(json.dumps(item).encode()).decode()
+                self._bw_stdin(payload, "edit", "item", i["id"])
+                self._listed = 0.0
+            return {"id": i["id"], "name": i["name"], "added": added, "unchanged": unchanged}
 
     def items(self) -> list[dict]:
         with self._lock:

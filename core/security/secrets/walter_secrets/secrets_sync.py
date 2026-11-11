@@ -2,8 +2,9 @@
 """walter-secrets-sync — Bitwarden is the source of truth for W.Alter's keys; the VM keeps a generated local copy.
 
 Decision 2026-10-02: keys are managed in Bitwarden (folder "W.Alter – Clés API"); every change is applied
-to the VM automatically. The VM never reads Bitwarden at runtime: services keep reading their env files / the age
-vault, which this daemon rewrites — so W.Alter keeps working when Vaultwarden is down.
+to the VM automatically. Since 2026-11-11 components read their API keys through their grant (grants.py, instance
+accounts/*.toml; the bw CLI serves its local encrypted cache when Vaultwarden is down) and this daemon keeps only the
+age bootstrap vault and the instance's declared env files (sync.env_files; ~/.hermes/.env is no longer one of them).
 
   secrets_sync.py build-map     match every local secret to its Bitwarden field (by value) → secrets-map.json
   secrets_sync.py check         dry run: which local targets differ from Bitwarden
@@ -32,10 +33,10 @@ from . import settings
 H = settings.DATA_ROOT
 FOLDER = "W.Alter – Clés API"
 SERVER = settings.setting("bitwarden", "server", "")
-MAP = H / "vault/secrets-map.json"
-STATUS = H / "logs/walter-secrets-sync.status.json"
-LOG = H / "logs/walter-secrets-sync.log"
-BACKUPS = H / "backups/secrets-sync"
+MAP = settings.MAP
+STATUS = settings.SYNC_STATUS
+LOG = settings.SYNC_LOG
+BACKUPS = settings.SYNC_BACKUPS
 BW_DATA = settings.path("bitwarden_data", Path.home() / ".config/Bitwarden CLI/data.json")
 VAULT_ENC, VAULT_KEY = settings.VAULT_ENC, settings.VAULT_KEY
 ENV_FILES = [Path(p) for p in settings.setting("sync", "env_files", [])]
