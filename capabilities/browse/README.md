@@ -26,7 +26,9 @@ route: `walter-browser -s S exit nordvpn-jp`, `walter_browse(exit_country="jp")`
 --country jp`. Never a default, never a fallback: an exit that cannot open (no token, unknown country, tunnel not
 protected, tunnel down) is a clear refusal. A NordVPN session gets its own Camoufox process (identity from the exit
 IP, fresh fingerprint, no owner cookies — `/session/cookies` answers 409 —, WebRTC proxy-only, no DNS outside the
-proxy), stays bound to its exit (a change is refused, even after expiry), and its page reads leave by the same exit.
+proxy), stays bound to its exit (a change is refused, even after expiry), and its page reads leave by the same exit. Closing or
+reopening an exit (`walter-wg-exit`) first closes the sessions on that port (`POST /exits/reset`): they report it on
+their next call and never continue with the previous tunnel's identity (exit IP also rechecked at most every 60 s).
 Owner exits are declared to the browsers (`CAMOFOX_OWNER_EXITS`, `ops/camoufox-max-owner-exits.conf`); Chromium
 refuses third-party exits; `network=proxy` and `vpn` without a country are refused.
 

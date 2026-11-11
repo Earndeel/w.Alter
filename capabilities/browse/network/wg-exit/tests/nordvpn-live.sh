@@ -5,7 +5,8 @@
 #   2. second country B in another session; A's session unchanged (no mixing)
 #   3. no bypass: exit change refused on a bound session, owner cookies refused, network=proxy refused
 #   4. DNS: no plaintext DNS query of the session's hostnames on the host
-#   5. tunnel cut: nothing leaves, the session does not move to another exit; exit down = refused
+#   5. tunnel cut: nothing leaves, the session does not move to another exit; exit down = refused;
+#      reopened on another server: the browser identity follows the new IP (no stale WebRTC IP)
 #   6. other exits (default, local, freebox-fr) unchanged; resources released at the end
 # Usage: nordvpn-live.sh [A] [B]   (defaults jp us)
 set -u
@@ -18,13 +19,16 @@ webrtc_js="(async()=>{try{const pc=new RTCPeerConnection({iceServers:[{urls:'stu
 ident_js="Intl.DateTimeFormat().resolvedOptions().timeZone+'|'+navigator.language"
 VM_IP=$(curl -s -m 10 https://api.ipify.org)            # the server's own IP: must never be seen by a site
 FR_IP=$(walter instance config browse network.toml | xargs sed -n 's/^public_ip *= *"\([0-9.]*\)".*/\1/p' | head -1)
-snap_exits() { { walter-exit-default status 2>&1 | head -3; walter-exit-local status 2>&1 | head -3; walter-wg-exit status freebox-fr 2>&1; } | sed -E 's/[0-9]+(\.[0-9]+)? ?(s|ms)\b//g'; }
+# route-relevant fields only: walter-exit-local rewrites `since` every ~20 s by itself (its own probe loop)
+snap_exits() { { walter-exit-default status 2>&1 | head -3; walter-exit-local status 2>&1 | head -3; walter-wg-exit status freebox-fr 2>&1; } \
+  | sed -E 's/"(since|checked_ip_at)": [0-9.]+,? ?//g; s/[0-9]+(\.[0-9]+)? ?(s|ms)\b//g'; }
 snap_exits > $T/exits.before
 
 ev() { walter-browser -s "$1" eval "$2" 2>/dev/null | python3 -c "import json,sys; print(json.loads(sys.stdin.read() or '{}').get('result') or '')" 2>/dev/null; }
 jsonfield() { python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); print(d.get('$1'))" 2>/dev/null; }
 browse_insights() {   # session -> JSON text of what NordVPN sees from that browser session
-  walter-browser -s "$1" nav https://api.nordvpn.com/v1/helpers/ips/insights >/dev/null 2>&1 || return 1
+  # fresh URL each time: the same URL may be answered from the browser's HTTP cache without any network request
+  walter-browser -s "$1" nav "https://api.nordvpn.com/v1/helpers/ips/insights?nc=$RANDOM$RANDOM" >/dev/null 2>&1 || return 1
   ev "$1" "$insights_js"
 }
 
@@ -39,7 +43,7 @@ J=$(browse_insights nvt-$A); IP_A=$(echo "$J" | jsonfield ip)
 [ -n "$IP_A" ] && [ "$IP_A" != "$VM_IP" ] && [ "$IP_A" != "$FR_IP" ] && ok "exit IP is neither the server's nor the owner's" || bad "exit IP $IP_A"
 I=$(ev nvt-$A "$ident_js"); ok "browser identity: $I"
 W=$(ev nvt-$A "$webrtc_js")
-case ",$W," in *",$VM_IP,"*|*",$FR_IP,"*) bad "WebRTC shows $W";; *) ok "WebRTC: $W (no server or owner IP)";; esac
+case ",$W," in *",$VM_IP,"*|*",$FR_IP,"*) bad "WebRTC shows $W";; ",$IP_A,") ok "WebRTC: only the exit IP $W";; *) bad "WebRTC $W is not the exit IP $IP_A";; esac
 R=$(PYTHONPATH=/walter/capabilities/browse walter-python -c "
 import json; from walter_browse import facade
 out = facade._run_router(facade._validate_request({'url': 'https://api.nordvpn.com/v1/helpers/ips/insights', 'content_only': True, 'exit_country': '$A'}))
@@ -74,7 +78,16 @@ b=$(curl -s -m 12 -x "$(walter-wg-exit url nordvpn-$A)" https://api.ipify.org)
 J=$(browse_insights nvt-$A)
 [ -z "$(echo "$J" | jsonfield ip | grep -v None)" ] && ok "tunnel cut: browser session gets no answer (no other route)" || bad "tunnel cut: browser saw $(echo "$J" | jsonfield ip)"
 walter-wg-exit down nordvpn-$A >/dev/null
-walter-browser -s nvt-$A nav https://api.ipify.org >/dev/null 2>&1 && bad "exit down: session still browses" || ok "exit down: the session is refused, nothing replaces it"
+e=$(walter-browser -s nvt-$A nav https://api.ipify.org 2>&1) && bad "exit down: session still browses" || { echo "$e" | grep -q "was closed" && ok "exit down: the session is closed and says so, nothing replaces it" || bad "exit down: unexpected answer $(echo "$e" | cut -c1-160)"; }
+out=$(walter-wg-exit up nordvpn-$A 2>/dev/null); echo "   reopened: $out"
+e=$(walter-browser -s nvt-$A nav "https://api.nordvpn.com/v1/helpers/ips/insights?nc=$RANDOM" 2>&1)
+echo "$e" | grep -qE "Tab not found|was closed" && ok "reopened exit: the old session's tab is gone, nothing continued on the new tunnel" || bad "old session after reopen: $(echo "$e" | cut -c1-160)"
+walter-browser -s nvt-$A exit nordvpn-$A >/dev/null && walter-browser -s nvt-$A new >/dev/null || bad "explicit reopen of nvt-$A failed"
+J=$(browse_insights nvt-$A); IP_R=$(echo "$J" | jsonfield ip)
+[ "$(echo "$J" | jsonfield country_code)" = "$AU" ] && ok "reopened exit: the session's binding lands on $AU again ($IP_R)" || bad "after reopen: $(echo "$J" | jsonfield country_code)"
+W=$(ev nvt-$A "$webrtc_js")
+[ -n "$IP_R" ] && [ "$W" = "$IP_R" ] && ok "reopened exit: browser identity follows the new exit IP (WebRTC $W)" || bad "reopened exit: WebRTC $W, exit IP $IP_R (stale identity)"
+walter-wg-exit down nordvpn-$A >/dev/null
 
 echo "== 6. other exits and release"
 for s in nvt-$A nvt-$B; do curl -s -X DELETE $CAM/sessions/$s >/dev/null; done

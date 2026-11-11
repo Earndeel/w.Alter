@@ -156,10 +156,12 @@ async function ensureExitBrowser(server) {
   const known = exitBrowsers.get(server);
   if (known) {
     const b = await known.promise.catch(() => null);
-    if (b && b.isConnected()) return b;
-    exitBrowsers.delete(server);
+    if (b && b.isConnected()) {
+      await verifyExit(server, 0);   // a new session never inherits the identity of a replaced tunnel
+      if (exitBrowsers.get(server) === known) return b;
+    } else exitBrowsers.delete(server);
   }
-  const entry = { ip: null };
+  const entry = { ip: null, checkedAt: Date.now() };
   entry.promise = (async () => {
     const identity = await exitIdentity(server);   // through the exit: throws when it is down
     entry.ip = identity.ip;
@@ -188,6 +190,38 @@ async function ensureExitBrowser(server) {
     exitBrowsers.delete(server);
     throw new Error(`exit ${server} unreachable, session refused (no fallback): ${e.message}`);
   }
+}
+
+// The exit on a port may be closed and reopened on another server while its browser lives on (identity — WebRTC IP,
+// timezone — drawn from the old IP). verifyExit re-reads the exit IP (at most every maxAgeMs); when it changed or the
+// exit is down, the browser and every session on it are closed: their next use is refused or starts afresh, never on
+// a stale identity. Returns true when the exit is unchanged.
+// A session closed this way is reported once to its next caller (exitChanged), then reopens fresh on its bound exit.
+const exitChanged = new Map();   // session key -> reason
+async function resetExit(server, reason) {
+  let closed = 0;
+  for (const [key, s] of sessions) if (s.exitServer === server) {
+    sessions.delete(key);
+    s.context.close().catch(() => {});
+    exitChanged.set(key, reason);
+    closed += 1;
+    console.log(`🦊 MAX Session ${key} closed: ${reason}`);
+  }
+  const entry = exitBrowsers.get(server);
+  exitBrowsers.delete(server);
+  const b = entry ? await entry.promise.catch(() => null) : null;
+  if (b) { await b.close().catch(() => {}); console.log(`🦊 MAX third-party exit browser through ${server} closed (${reason})`); }
+  return closed;
+}
+
+async function verifyExit(server, maxAgeMs = 60000) {
+  const entry = exitBrowsers.get(server);
+  if (!entry || !entry.ip) return true;
+  if (Date.now() - (entry.checkedAt || 0) < maxAgeMs) return true;
+  const ip = await publicIP(server).catch(() => null);
+  if (ip && ip === entry.ip) { entry.checkedAt = Date.now(); return true; }
+  await resetExit(server, `exit ${server} changed (${entry.ip} -> ${ip || 'down'})`);
+  return false;
 }
 
 async function releaseExitBrowser(server) {
@@ -317,6 +351,13 @@ function proxyReachable(server, timeoutMs = 1500) {
 async function getSession(userId) {
   const key = normalizeUserId(userId);
   let session = sessions.get(key);
+  if (session && session.exitServer && !(await verifyExit(session.exitServer))) session = null;
+  if (!session && exitChanged.has(key)) {
+    const why = exitChanged.get(key);
+    exitChanged.delete(key);
+    throw new Error(`session ${key} was closed: ${why}; nothing replaced it (no fallback). Open it again to start ` +
+                    'fresh on its exit.');
+  }
   if (!session) {
     const proxy = sessionProxies.get(key);
     if (proxy && proxy.server && !isOwnerExit(proxy.server)) {
@@ -625,10 +666,26 @@ app.post('/session/new', async (req, res) => {
     if (want) {
       sessionProxies.set(key, { server: want, username: proxy.username, password: proxy.password });
     }
+    exitChanged.delete(key);   // an explicit open after an exit change starts fresh on the bound exit
     await getSession(key);
     res.json({ ok: true, userId: key, proxy: proxy && proxy.server ? proxy.server : null });
   } catch (e) {
     console.error('Error creating session:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// walter-wg-exit calls this before it replaces or closes a third-party exit (2026-11-11): the browser and the sessions
+// on that port close at once, so none keeps the previous tunnel's identity. Owner exits are never reset here.
+app.post('/exits/reset', async (req, res) => {
+  try {
+    const server = String((req.body && req.body.server) || '');
+    if (!/^(http|socks5):\/\/127\.0\.0\.1:\d+$/.test(server) || isOwnerExit(server)) {
+      return res.status(400).json({ error: 'a third-party exit on 127.0.0.1 is required' });
+    }
+    const closed = await resetExit(server, `exit ${server} replaced or closed by walter-wg-exit`);
+    res.json({ ok: true, server, closed });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -849,6 +906,7 @@ app.delete('/sessions/:userId', async (req, res) => {
   try {
     const key = normalizeUserId(req.params.userId);
     const session = sessions.get(key);
+    exitChanged.delete(key);
     if (session) {
       await session.context.close().catch(() => {});
       sessions.delete(key);   // its exit stays bound to the id: reopening it never lands on another exit

@@ -164,6 +164,25 @@ def shared_holder(cfg: dict) -> str | None:
     return s["ssh"] if r.stdout.splitlines()[:1] == ["Connected"] else ""
 
 
+def browsers_reset(cfg: dict) -> None:
+    """Tell the browser engine that this third-party exit is being replaced or closed: it closes the browser and the
+    sessions bound to its port at once, so none keeps the identity (WebRTC IP, timezone) of the previous tunnel.
+    Owner exits are not concerned. Engine down = nothing to reset."""
+    if cfg.get("provider") != "nordvpn":
+        return
+    import urllib.request
+    url = os.environ.get("CAMOFOX_URL", "http://127.0.0.1:9377").rstrip("/") + "/exits/reset"
+    body = json.dumps({"server": f"http://127.0.0.1:{cfg['port']}"}).encode()
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=20) as r:  # noqa: S310
+            n = json.loads(r.read()).get("closed", 0)
+        if n:
+            print(f"browser sessions on the previous tunnel closed: {n}", file=sys.stderr)
+    except Exception:  # noqa: BLE001 — engine not running: no session to protect
+        pass
+
+
 def exit_ip(port: int) -> str:
     r = sh("curl", "-s", "--max-time", "12", "-x", f"http://127.0.0.1:{port}", "https://api.ipify.org", timeout=20)
     return r.stdout.strip() if r.returncode == 0 else ""
@@ -203,6 +222,7 @@ def up(name: str, force: bool) -> None:
             src = sh("walter-secret", "file", cfg["secret"], cfg["attachment"], timeout=300, check=True).stdout.strip().splitlines()[-1]
             shutil.copyfile(src, run / "wg0.conf"); os.chmod(run / "wg0.conf", 0o600)
             Path(src).unlink(missing_ok=True)
+        browsers_reset(cfg)
         sh("docker", "rm", "-f", container(name))
         sh("docker", "run", "-d", "--name", container(name), "--restart", "no",
            "--label", f"walter.exit={name}", *labels, "--cap-add", "NET_ADMIN",
@@ -235,7 +255,8 @@ def up(name: str, force: bool) -> None:
 
 
 def down(name: str) -> None:
-    get(name)
+    cfg = get(name)
+    browsers_reset(cfg)
     sh("docker", "rm", "-f", container(name))
     print(f"{name}: down")
 

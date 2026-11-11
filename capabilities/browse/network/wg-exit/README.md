@@ -30,6 +30,8 @@ Tailscale and every other session stay local (rule: a VPN is never W.Alter's glo
   tmpfs (O_EXCL, 0600) → container `walter-wg-nordvpn-<cc>` (labels `walter.provider/country/server`), same kill switch.
   Then the tunnel is checked from inside (insights: `protected`, country); otherwise the container is removed.
   API calls ignore any proxy variables of the caller.
+- `up` (when it replaces a container) and `down` call the engine's `POST /exits/reset` first: browser and sessions on
+  that port are closed, so no session keeps the identity of the previous NordVPN server.
 - Tests: `tests/killswitch-dead-tunnel.sh <country-id>` (no token needed: a random key against a real server, the
   tunnel never comes up, nothing may leave — proxy, DNS, direct TCP, even with wg0 deleted) ;
   `tests/nordvpn-live.sh [A] [B]` (real: browser on A, IP/country/protected, WebRTC, MCP read, second country B,
