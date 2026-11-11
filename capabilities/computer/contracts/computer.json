@@ -25,7 +25,6 @@
   ],
   "backup_paths": [
     ".",
-    "~/walter-computer-use",
     "~/.config/walter-device-node",
     "/etc/tmpfiles.d/walter-computer.conf",
     "@instance/config/computer"
