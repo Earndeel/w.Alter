@@ -4,37 +4,18 @@ Moved verbatim from SKILL.md on 2026-11-01.
 
 ## Audio Transcription Pipeline
 
-**Primary:** Groq Whisper (whisper-large-v3-turbo) — ~0.9s, gratuit, propre mais sans ponctuation riche.
-**Fallback 1:** Gemini 3.1 Flash Lite (gemini-3.1-flash-lite-preview) — ~3s, gratuit, ponctuation complète + hésitations.
-**Fallback 2:** Local faster-whisper (base model, CPU) — ~8s/file, zero API keys needed. Use when Groq/Gemini keys are expired or invalid.
+**One door: MCP `audio_transcribe(paths=[...])`** (2026-11-11) — the Walter Router's `stt` poste through walter-llm;
+the Router picks the model, no key in the agent. Up to 20 absolute paths per call, 25 MB each, ~10 s for 6 notes.
+Returns per file `{ok, text}` or `{ok: false, error}`. CLI equivalent: `walter-router transcribe FILE…`.
 
-```bash
-# Groq (primary)
-GROQ_KEY=$(vault get groq/api_key)
-curl -s -X POST "https://api.groq.com/openai/v1/audio/transcriptions" \
-  -H "Authorization: Bearer $GROQ_KEY" \
-  -F "file=@audio.ogg" -F "model=whisper-large-v3-turbo" -F "language=fr"
+1. Copy the voice notes from the Mac to a work folder on the VM (`/user/Lucas/workspace/<task>/`), name them by time
+   (`1711.ogg`); Beeper media have no extension: give them `.ogg` (WhatsApp) — the format is read from the suffix.
+2. `audio_transcribe(paths=[...])` on the whole batch at once.
+3. A note that fails: say which one and why; never answer as if it had been heard.
 
-# Gemini (fallback 1 — if Groq fails or returns empty)
-GEMINI_KEY=$(vault get gemini/api_key)
-AUDIO_B64=$(base64 -w0 audio.ogg)
-curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=$GEMINI_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"contents\":[{\"parts\":[{\"text\":\"Transcrits cet audio en français.\"},{\"inline_data\":{\"mime_type\":\"audio/ogg\",\"data\":\"$AUDIO_B64\"}}]}]}"
-
-# Local faster-whisper (fallback 2 — zero API keys)
-# Requires: uv venv /tmp/whisper_venv --python 3.11 && uv pip install --python /tmp/whisper_venv/bin/python faster-whisper
-/tmp/whisper_venv/bin/python -c "
-from faster_whisper import WhisperModel
-model = WhisperModel('base', device='cpu', compute_type='int8')
-segments, info = model.transcribe('audio.ogg', language='fr')
-print(' '.join(s.text for s in segments))
-"
-```
-
-**Logic:** Try Groq first. If HTTP error, empty text, invalid key, or timeout → fall back to Gemini. If Gemini key also invalid → fall back to local faster-whisper. The local fallback is ~8s per file on CPU but works with zero external dependencies once installed.
-
-**Pitfall**: Vault may return masked keys (`***` or `sk-or-...5f43` with len=13) when accessed from `execute_code`. This happens for OpenRouter, Groq, and Gemini keys. If all API transcription fails with "Invalid API Key", switch to local faster-whisper immediately — don't waste time debugging vault masking.
+**Never**: Groq / Gemini / OpenRouter keys under `walter-secret exec` — `exec` discards the command's output by
+design (status only), so no transcript can come back (failed this way on 2026-11-11, Telegram, Elie's notes).
+No local whisper is installed on the VM or the Mac.
 
 ## Image Analysis
 
