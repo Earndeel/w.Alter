@@ -510,6 +510,9 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `exact_task(requested: dict)` — `exact:<model_id>[@<provider>]` for a run whose plan names a model, else None (malformed = None too).
 - `_refresh(task: str)` — task = a router task, task/LEVEL for one of the instance's text tiers ("general/L2"), or exact:<model>[@<provider>]
 - `decision(task: str)` — The router's routes for a task. A stale entry is served at once and refreshed in the background (a phone call
+- `_refresh_chain()` — 
+- `decision_chain()` — The Router's decision models in order (`walter-router decision-chain`: the owner's pinned / the cycle's best
+- `structured_key(env_name: str)` — provider_key for the decision / rerank adapters, with a refusal that names what to provision (the variable and
 - `warm()` — Fill the route cache at start-up for every chat task (background).
 - `chat_tasks()` — 
 - `owner_tasks()` — Chat tasks an owner message can ask for: the internal postes (memory extraction, compression, voice…) are
@@ -553,6 +556,25 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `log_selection(agent: str, task: str, d: dict, chosen: int | None, passed: list[dict], correlation: dict)` — 
 - `build_app()` — 
 - `add_agent(name: str, cred_file: str, ref: str='WALTER_LLM_TOKEN')` — New token for NAME (one per agent: rotates). cred_file = a DSH credentials YAML, or `env:FILE[:VAR]` = a
+
+## llm/structured.py
+
+Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and rerank.
+
+- `merge_answers(samples: list[dict])` — The mean of several answers to the same questions. noul: mean probability. choice: mean probability per option,
+- `provider_of(model: str)` — 
+- `is_free(model: str)` — 
+- `reason(exc: BaseException)` — A short, safe reason for one failed attempt.
+- `_error_code(data)` — 
+- `_json(resp)` — 
+- `_float(value)` — 
+- `decide_once(client, key, model: str, state: dict, questions: dict, timeout: float)` — One decision call on its provider → {answers, usage, model, cost_usd, cost_status, input_tokens}.
+- `_requested(body: dict, offered: list[str])` — The models to try: the Router's list, or the caller's narrowing of it (each must be offered).
+- `_floor(body: dict)` — 
+- `_timeout(body: dict)` — 
+- `decisions(body: dict, *, chain: list[str], key, client, log, balance=None)` — Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
+- `rerank_once(client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float)` — 
+- `rerank(body: dict, *, routes: list[dict], key, client, log, balance=None)` — Execute a rerank request on the Router's `rerank` poste routes, in order.
 
 ## paths.py
 
@@ -978,6 +1000,7 @@ walter_run text jobs executed by Walter Engine (lot E5, 2026-11-10) — no secon
 
 - `binding()` — 
 - `enabled(d: dict)` — Text jobs go to the engine when the instance says so — a model NAMED by the owner too: the Router validated it
+- `unavailable(d: dict, reason: str, detail: str | None=None)` — The structured refusal of a text job the engine cannot take (no binding, engine down): said, never retried by a
 - `_token(b: dict)` — 
 - `_post(b: dict, body: dict, timeout: float)` — 
 - `engine_task(d: dict, spec: dict)` — 
@@ -1075,25 +1098,11 @@ Do the job on the chosen model — one entry for every runtime (Hermes plugin, w
 - `default_toolsets()` — 
 - `_memory(action: str, payload: dict)` — Walter Memory's Run Plane through its command (declared interface); never blocks the sub-agent.
 - `_persist_observations(output: str, run_id: str | None, task_id: str | None, geo: dict | None)` — persist="observations": the answer's "observations" list becomes sourced observations of the run (Walter
-- `_child_context(spec: dict)` — walter-context's pack for a sub-agent, through its command (declared interface); {} when unavailable.
-- `_events(goal: str, context: str, result: dict, model: str | None, pack: dict | None=None)` — The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write).
 - `decide(conn, spec: dict)` — 
-- `_text(conn, d: dict, spec: dict)` — The router alone owns failover. Preserve the conversation across providers of this model.
 - `_web(conn, d: dict, spec: dict)` — The owner's rule gave this intent to a web chat service: the user's own words go there (the request, else the
 - `_run(conn, spec: dict)` — 
 - `_dispatch(conn, d: dict, spec: dict)` — 
 - `run(conn, spec: dict)` — Versioned result; existing fields remain compatible with every current adapter.
-
-## serve/text_agent.py
-
-Bounded native text execution. Provider choice belongs to run.py, transport to llm.
-
-- `complete(route: dict, messages: list, tools: list, timeout: float)` — One exact route through the module's own gateway CLI; provider keys stay there.
-- `_schema(name: str, description: str, properties: dict, required: list[str])` — 
-- `tools_for(toolsets: list[str])` — 
-- `_confined(workdir: Path | None, raw: str)` — A path inside the run's workspace, symlinks resolved; anything else is refused (fail closed).
-- `execute_tool(name: str, args: dict, remaining: float, workdir: Path | None=None)` — 
-- `run(goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call, gateway: 'Gateway | None'=None)` — call(messages, tools, seconds_remaining) handles provider attempts, never tool execution.
 
 ## serve/web.py
 

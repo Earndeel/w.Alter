@@ -1,9 +1,9 @@
 {
   "api": {
     "execution": {
-      "fallback": "same-model providers only",
+      "fallback": "none: engine_unavailable when the engine cannot take the job",
       "notification": "relay user_notice whenever user_notification_required is true",
-      "text": "native"
+      "text": "walter-engine"
     },
     "module": "router",
     "schema_version": 1,
@@ -7460,6 +7460,21 @@
             "signature": "task: str"
           },
           {
+            "description": "",
+            "name": "_refresh_chain",
+            "signature": ""
+          },
+          {
+            "description": "The Router's decision models in order (`walter-router decision-chain`: the owner's pinned / the cycle's best",
+            "name": "decision_chain",
+            "signature": ""
+          },
+          {
+            "description": "provider_key for the decision / rerank adapters, with a refusal that names what to provision (the variable and",
+            "name": "structured_key",
+            "signature": "env_name: str"
+          },
+          {
             "description": "Fill the route cache at start-up for every chat task (background).",
             "name": "warm",
             "signature": ""
@@ -7673,6 +7688,82 @@
             "description": "New token for NAME (one per agent: rotates). cred_file = a DSH credentials YAML, or `env:FILE[:VAR]` = a",
             "name": "add_agent",
             "signature": "name: str, cred_file: str, ref: str='WALTER_LLM_TOKEN'"
+          }
+        ]
+      },
+      {
+        "description": "Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and rerank.",
+        "file": "llm/structured.py",
+        "functions": [
+          {
+            "description": "The mean of several answers to the same questions. noul: mean probability. choice: mean probability per option,",
+            "name": "merge_answers",
+            "signature": "samples: list[dict]"
+          },
+          {
+            "description": "",
+            "name": "provider_of",
+            "signature": "model: str"
+          },
+          {
+            "description": "",
+            "name": "is_free",
+            "signature": "model: str"
+          },
+          {
+            "description": "A short, safe reason for one failed attempt.",
+            "name": "reason",
+            "signature": "exc: BaseException"
+          },
+          {
+            "description": "",
+            "name": "_error_code",
+            "signature": "data"
+          },
+          {
+            "description": "",
+            "name": "_json",
+            "signature": "resp"
+          },
+          {
+            "description": "",
+            "name": "_float",
+            "signature": "value"
+          },
+          {
+            "description": "One decision call on its provider → {answers, usage, model, cost_usd, cost_status, input_tokens}.",
+            "name": "decide_once",
+            "signature": "client, key, model: str, state: dict, questions: dict, timeout: float"
+          },
+          {
+            "description": "The models to try: the Router's list, or the caller's narrowing of it (each must be offered).",
+            "name": "_requested",
+            "signature": "body: dict, offered: list[str]"
+          },
+          {
+            "description": "",
+            "name": "_floor",
+            "signature": "body: dict"
+          },
+          {
+            "description": "",
+            "name": "_timeout",
+            "signature": "body: dict"
+          },
+          {
+            "description": "Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.",
+            "name": "decisions",
+            "signature": "body: dict, *, chain: list[str], key, client, log, balance=None"
+          },
+          {
+            "description": "",
+            "name": "rerank_once",
+            "signature": "client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float"
+          },
+          {
+            "description": "Execute a rerank request on the Router's `rerank` poste routes, in order.",
+            "name": "rerank",
+            "signature": "body: dict, *, routes: list[dict], key, client, log, balance=None"
           }
         ]
       },
@@ -8815,6 +8906,11 @@
             "signature": "d: dict"
           },
           {
+            "description": "The structured refusal of a text job the engine cannot take (no binding, engine down): said, never retried by a",
+            "name": "unavailable",
+            "signature": "d: dict, reason: str, detail: str | None=None"
+          },
+          {
             "description": "",
             "name": "_token",
             "signature": "b: dict"
@@ -9148,24 +9244,9 @@
             "signature": "output: str, run_id: str | None, task_id: str | None, geo: dict | None"
           },
           {
-            "description": "walter-context's pack for a sub-agent, through its command (declared interface); {} when unavailable.",
-            "name": "_child_context",
-            "signature": "spec: dict"
-          },
-          {
-            "description": "The sub-agent's own trace in walter_logs' vocabulary (masked by Walter Memory at write).",
-            "name": "_events",
-            "signature": "goal: str, context: str, result: dict, model: str | None, pack: dict | None=None"
-          },
-          {
             "description": "",
             "name": "decide",
             "signature": "conn, spec: dict"
-          },
-          {
-            "description": "The router alone owns failover. Preserve the conversation across providers of this model.",
-            "name": "_text",
-            "signature": "conn, d: dict, spec: dict"
           },
           {
             "description": "The owner's rule gave this intent to a web chat service: the user's own words go there (the request, else the",
@@ -9186,42 +9267,6 @@
             "description": "Versioned result; existing fields remain compatible with every current adapter.",
             "name": "run",
             "signature": "conn, spec: dict"
-          }
-        ]
-      },
-      {
-        "description": "Bounded native text execution. Provider choice belongs to run.py, transport to llm.",
-        "file": "serve/text_agent.py",
-        "functions": [
-          {
-            "description": "One exact route through the module's own gateway CLI; provider keys stay there.",
-            "name": "complete",
-            "signature": "route: dict, messages: list, tools: list, timeout: float"
-          },
-          {
-            "description": "",
-            "name": "_schema",
-            "signature": "name: str, description: str, properties: dict, required: list[str]"
-          },
-          {
-            "description": "",
-            "name": "tools_for",
-            "signature": "toolsets: list[str]"
-          },
-          {
-            "description": "A path inside the run's workspace, symlinks resolved; anything else is refused (fail closed).",
-            "name": "_confined",
-            "signature": "workdir: Path | None, raw: str"
-          },
-          {
-            "description": "",
-            "name": "execute_tool",
-            "signature": "name: str, args: dict, remaining: float, workdir: Path | None=None"
-          },
-          {
-            "description": "call(messages, tools, seconds_remaining) handles provider attempts, never tool execution.",
-            "name": "run",
-            "signature": "goal: str, context: str, toolsets: list[str], max_turns: int, deadline: float, call, gateway: 'Gateway | None'=None"
           }
         ]
       },
@@ -15766,6 +15811,12 @@
       {
         "comment": "",
         "file": "llm/gateway.py",
+        "name": "_DECISION_CHAIN",
+        "value": "__decision_chain__"
+      },
+      {
+        "comment": "",
+        "file": "llm/gateway.py",
         "name": "ANTHROPIC_CACHE_POINTS",
         "value": [
           {
@@ -15783,6 +15834,57 @@
         "file": "llm/gateway.py",
         "name": "QUOTA_SWITCH",
         "value": 90.0
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "OPENROUTER_DECISIONS",
+        "value": "https://openrouter.ai/api/alpha/decisions"
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "OPENROUTER_RERANK",
+        "value": "https://openrouter.ai/api/v1/rerank"
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "OPENROUTER_CREDITS",
+        "value": "https://openrouter.ai/api/v1/credits"
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "CF_RUN",
+        "value": "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/cloudflare/{model}"
+      },
+      {
+        "comment": "USD per M input tokens (Workers AI catalogue, 2026-10-03)",
+        "file": "llm/structured.py",
+        "name": "CF_PRICE",
+        "value": {
+          "clef": 0.24,
+          "clef-flash": 0.09
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "MAX_SAMPLES",
+        "value": 5
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "MAX_DOCUMENTS",
+        "value": 1000
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "DEFAULT_TIMEOUT",
+        "value": 30.0
       },
       {
         "comment": "",
@@ -17073,28 +17175,6 @@
         ]
       },
       {
-        "comment": "",
-        "file": "serve/run.py",
-        "name": "TOOLSET_TOOLS",
-        "value": {
-          "memory": [
-            "memory_context",
-            "memory_search",
-            "memory_events"
-          ],
-          "skills": [
-            "skills_search",
-            "skill_read"
-          ],
-          "walter-web": [
-            "walter_browse"
-          ],
-          "web": [
-            "walter_browse"
-          ]
-        }
-      },
-      {
         "comment": "mode \"tool\" tasks",
         "file": "serve/run.py",
         "name": "TOOL_FAMILY_TOOLSETS",
@@ -17118,15 +17198,6 @@
           "music",
           "audio"
         ]
-      },
-      {
-        "comment": "",
-        "file": "serve/text_agent.py",
-        "name": "DISABLED_TOOLSETS",
-        "value": {
-          "code_execution": "no_sandbox",
-          "terminal": "no_sandbox"
-        }
       },
       {
         "comment": "",
@@ -17245,6 +17316,13 @@
         "description": "Adresse du service de lecture des sources qui le nécessitent.",
         "file": "research/web.py",
         "name": "WALTER_FLARESOLVERR",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
+        "file": "serve/engine.py",
+        "name": "WALTER_RUN_ID",
         "operation": "get"
       },
       {
@@ -17381,27 +17459,6 @@
         "operation": "get"
       },
       {
-        "default_expression": "aucun",
-        "description": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
-        "file": "serve/run.py",
-        "name": "WALTER_RUN_ID",
-        "operation": "get"
-      },
-      {
-        "default_expression": "'walter'",
-        "description": "caller = le sous-agent walter_run reçoit seulement le contexte de l'appelant ; sinon le paquet walter-context (context.build scope=child).",
-        "file": "serve/run.py",
-        "name": "WALTER_RUN_CONTEXT",
-        "operation": "get"
-      },
-      {
-        "default_expression": "aucun",
-        "description": "Session walter_logs de l'appelant ; parent de la session du sous-agent walter_run.",
-        "file": "serve/run.py",
-        "name": "WALTER_SESSION_ID",
-        "operation": "get"
-      },
-      {
         "default_expression": "'postgresql://hindsight@127.0.0.1:5433/hindsight'",
         "description": "DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée.",
         "file": "store/db.py",
@@ -17431,7 +17488,6 @@
       "WALTER_ROUTER_CLI",
       "WALTER_ROUTER_DATABASE_URL",
       "WALTER_RUN_CHANNEL",
-      "WALTER_RUN_CONTEXT",
       "WALTER_RUN_ID",
       "WALTER_SESSION_ID",
       "WALTER_TASK_ID"
@@ -17517,7 +17573,7 @@
     "config/subscriptions.json": "d2e56aa07e15344a1986746b1f8608842873639f5d37788e37e9896d6ba67017",
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "39778c3ef58539ea14a375ca36c762d0d628de2c02440d7372095191affda842",
-    "contracts/router.json": "c67b38d95f47c7cd9c71912c1a6bf3a577b318324cfbc4da361e5f4b4630cc50",
+    "contracts/router.json": "fd5d100976c5ea66fe1bd0da3ff2631ac78fcf5efd6459354ec090130b36a9f3",
     "documentation.py": "85cd5342dc32dc5efcf379e25423def07d4e6c318fc89e4741b53576ffce8c7d",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
@@ -17540,7 +17596,8 @@
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "b819d655a4314f3d91482b41ad73b3685983992c187284761edbc871c05ec835",
     "llm/contracts/llm.json": "6fea645034c683571b4b2cef3423cd70306554ee8834327cf1c074fe166fc5e5",
-    "llm/gateway.py": "dcef14dceab990ed64321056bdee16f0f809b0ad6a989fe9fac82325768d03ae",
+    "llm/gateway.py": "1241405137e0d6c7527affb3761b40180bb53247fdef560391e2fda325ab5a42",
+    "llm/structured.py": "d7e7f72b969d8306a878615a0ded14a085b1002e8b00a4c3cd4d593df4690b51",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
@@ -17588,10 +17645,10 @@
     "research/web.py": "975a4b60b130ad9396f0e3eec5f926966dff8f621cd06c04fae151ff805f6bef",
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
     "serve/agent_view.py": "dfde57589a82c4176da1ba752a4964a63dd416f7de3a842322d0234b06b2c0ba",
-    "serve/api.py": "cd6428abc4ff933e6fda69cfd1259e538d5bda2ea88d9b4140f01d1bc002b9e5",
+    "serve/api.py": "ca15f8aecd1b00dd6cc546263694a0de92b1e2b1d54f34373d60bae61621cb9e",
     "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
-    "serve/engine.py": "dad90cf6e8d6542406cefca7a428e06c3b55847d6b03afc92cde242d51c4042f",
+    "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "5ec59ae8ed7895ce42e763e2ffa3556404e0eb9664c3d45dbb8ca8a4c1435856",
     "serve/hermes_sync.py": "c1df622e2bab7c3d597788b60b82896f2d911c836c2dfabccf7ec276ab511bee",
     "serve/intent.py": "5c5dca9360e59c2756ef9fef6edbf46fef09590ac07f05d2a37e872ac333a9a7",
@@ -17599,8 +17656,7 @@
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",
     "serve/routes.py": "108b6fafa28d1b29e3de8bc38b88e9778a318a1f3d12b70836d87b5872a72857",
-    "serve/run.py": "52915fe61176cdd911ad603b35b3bf04e56bf29cc7ba78d38daac80705f99f74",
-    "serve/text_agent.py": "1bddd484363dc9f892b9acaf4e523fbeeaf99961d3354c1dd630dc32d39cb8b4",
+    "serve/run.py": "ed428ba8c3dda62ccca7450aa54560841acc2c998349ee5ecb7df21f4551403f",
     "serve/web.py": "6c3abfdda219864f12930005e14db97cb0988df814ce7b1a2d072def5404b80a",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
     "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",
