@@ -107,7 +107,7 @@ This works because Beeper Desktop's API uses `sortKey` as an internal sequence n
 See **`references/media-access-pipeline.md`** for the full pipeline:
 - Copy files from Mac via SCP (`~/Library/Application Support/BeeperTexts/media/local.beeper.com/` — WhatsApp/Instagram voice notes and images live under `local.beeper.com/`, NOT the parent `media/` directory. The parent contains `beeper.com/`, `gitter.im/`, and `local.beeper.com/` subdirectories.)
 - **Images**: Gemini 2.5 Flash via OpenRouter (free, ~2s)
-- **Audio**: Groq Whisper large-v3-turbo (free, ~1s)
+- **Audio / voice notes**: MCP `audio_transcribe(paths=[...])` (Router `stt` poste, ~2 s per note, up to 20 files) after copying them to the VM — never a provider key under `walter-secret exec` (its output is discarded by design, so a transcript can never come back)
 - ~5000 media files on disk, no extensions — use `file -b --mime-type` to detect type
 - **Batch retrieval** for a specific chat: see `references/batch-media-retrieval.md`
 
@@ -160,4 +160,3 @@ Pattern: the user will often know someone by a different name than their handle.
 - `references/pitfalls.md` — All known pitfalls (pagination, IDs, media, contacts, API quirks) — read before any long analysis.
 - `references/multi-source-export.md` — Exporting a multi-source conversation with chronological merge and voice-note transcription.
 - `references/analysis-workflows.md` — Full conversation analysis, batch media retrieval for one chat, the audio transcription pipeline, image analysis.
-
