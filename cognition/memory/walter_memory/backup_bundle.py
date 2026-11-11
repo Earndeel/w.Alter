@@ -112,7 +112,7 @@ def inventory(root):
               'root/.hermes/scripts','root/.hermes/services','root/.hermes/raw-vault',
               'root/.hermes/kardex','root/.hermes/bin','root/.hermes/hooks',
               'root/.hermes/google-accounts','root/.hermes/profiles','root/.hermes/hermes-agent',
-              'root/.hermes/desktop-backend.env','root/.config/systemd/user','root/.cloudflared',
+              'root/.hermes/desktop-backend.env','root/.config/systemd/user','root/.cloudflared','services/cloudflared',
               'root/.ssh/config','root/.ssh/known_hosts','root/.codex/config.toml','root/.codex/auth.json',
               'root/.codex/AGENTS.md','root/.claude/settings.json','root/.claude.json','root/CLAUDE.md',
               'etc/systemd/system','etc/asterisk','etc/logrotate.d/walter-hermes',
