@@ -8,7 +8,7 @@ Type=oneshot
 UMask=0077
 WorkingDirectory=/walter/cognition/memory
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/local/bin/walter-python -m walter_memory.restore_drill --report /root/.hermes/logs/walter-restore-isolated/latest.json
+ExecStart=/usr/local/bin/walter-python -m walter_memory.restore_drill --report /user/Lucas/logs/walter-restore-isolated/latest.json
 Nice=10
 IOSchedulingClass=idle
 TimeoutStartSec=1h
