@@ -22,14 +22,16 @@ from . import privacy
 from .db import connection
 
 BUCKETS = {"clear": "raw", "secure": "secure"}
-_ENV_FILE = Path("/root/.hermes/raw-vault/s3.env")
+_ENV_PARTS = ("bootstrap", "raw-vault", "s3.env")   # @instance/… (0600), no ~/.hermes path since 2026-11-11
 _s3 = None
 
 
 def _env() -> dict:
+    from .purge import _instance
     env = {}
-    if _ENV_FILE.exists():
-        for line in _ENV_FILE.read_text().splitlines():
+    env_file = _instance(*_ENV_PARTS)
+    if env_file is not None and env_file.exists():
+        for line in env_file.read_text().splitlines():
             if "=" in line and not line.startswith("#"):
                 k, v = line.split("=", 1)
                 env[k.strip()] = v.strip()

@@ -28,6 +28,15 @@ class DrillError(RuntimeError):
     pass
 
 
+
+def _recovery_key():
+    """The instance's private recovery key (@instance/bootstrap/vault/walter-recovery.agekey), never a ~/.hermes path."""
+    from .purge import _instance
+    path = _instance('bootstrap', 'vault', 'walter-recovery.agekey')
+    if path is None:
+        raise RuntimeError('no active Walter instance for the recovery key')
+    return path
+
 def command(argv, *, timeout=600, stdin=None):
     result = subprocess.run(argv, stdin=stdin, capture_output=True, timeout=timeout)
     if result.returncode:
@@ -140,7 +149,7 @@ def drill(report_path: Path, *, remote='gdrive:W.Alter Backups', image=None, scr
           'margin':'2x PG size + 4 GiB for downloads, config, SQLite and index/WAL work; floor 12 GiB'}
       if free < minimum:raise DrillError('insufficient scratch space for current PG size and reconstruction margin')
       scratch=tempfile.mkdtemp(prefix='walter-restore-isolated-',dir=scratch_parent)
-      work=Path(scratch);key='/root/.hermes/vault/walter-recovery.agekey'
+      work=Path(scratch);key=str(_recovery_key())
       stage_start=time.monotonic()
       payloads={}
       for kind in ('pg','statedb','config'):

@@ -97,16 +97,17 @@ def inventory(root):
     else:
         required={f'opt/walter-{m}' for m in CORE_MODULES}
         required.update(f'opt/walter-{m}/{entry}' for m,entry in MODULE_ANCHORS.items())
-    required.update(('root/.hermes/config.yaml','root/.hermes/.env','root/.pgpass',
-                     'root/.hermes/walter-llm','root/.config/rclone/rclone.conf',
-                     'root/.config/systemd/user/hermes-gateway.service'))
+    # 2026-11-11: nothing Hermes is required any more (Hermes retired 2026-11-10, its .env no longer generated):
+    # the instance's bootstrap keys come with the module/instance paths; Hermes files are optional history.
+    required.update(('root/.pgpass','root/.config/rclone/rclone.conf'))
     if _core(root) is None or not (_core(root)/'modules/catalog.json').exists():   # pre-catalog archives only
         required.add('opt/openclaw/hermes_voice_bridge.py')
     required.update(module_backup_paths(root))
     sources=set(required)
     for p in [*(root/'opt').glob('walter-*'),*(root/'walter').glob('*')]:
         if p.is_dir():sources.add(str(p.relative_to(root)))
-    optional=['root/.hermes/SOUL.md','root/.hermes/memories','root/.hermes/skills',
+    optional=['root/.hermes/config.yaml','root/.hermes/.env','root/.hermes/walter-llm',
+              'root/.config/systemd/user/hermes-gateway.service','root/.hermes/SOUL.md','root/.hermes/memories','root/.hermes/skills',
               'root/.hermes/plugins','root/.hermes/cron/jobs.json','root/.hermes/docs',
               'root/.hermes/vault','root/.hermes/hindsight','root/.hermes/webhook_subscriptions.json',
               'root/.hermes/scripts','root/.hermes/services','root/.hermes/raw-vault',

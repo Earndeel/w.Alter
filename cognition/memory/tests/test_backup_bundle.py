@@ -47,6 +47,7 @@ def test_inventory_discovers_new_modules_and_external_service_credentials(tmp_pa
     unit.write_text('[Service]\nEnvironmentFile=/etc/walter-auth/gateway.env\n')
     sources,required,absent=B.inventory(root)
     assert 'opt/walter-new-module' in sources
+    assert not any(r.startswith('root/.hermes') for r in required)   # Walter needs no Hermes file (2026-11-11)
     assert 'etc/walter-auth/gateway.env' in sources and 'etc/walter-auth/gateway.env' in required
     (root/'etc/walter-auth/gateway.env').unlink()
     with pytest.raises(RuntimeError,match='EnvironmentFile missing'):B.inventory(root)

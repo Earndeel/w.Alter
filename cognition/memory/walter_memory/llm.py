@@ -19,7 +19,9 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Walter Router postes (2026-10-16): chat(poste=...) sends the call to the walter-llm gateway with model = the router
 # task; the router picks the model and its routes (Codex subscription, Kie, OpenRouter), the gateway holds the keys.
 GATEWAY_URL = "http://127.0.0.1:8894/v1/chat/completions"
-GATEWAY_TOKEN_FILE = Path("/root/.hermes/walter-llm/walter-memory.env")
+# Memory's own walter-llm agent token: @instance/bootstrap/walter-llm/walter-memory.env (0600), resolved through the
+# instance interface (2026-11-11: no ~/.hermes path any more).
+GATEWAY_TOKEN_PARTS = ("bootstrap", "walter-llm", "walter-memory.env")
 
 
 class PrivacyRefused(PermissionError):
@@ -30,13 +32,21 @@ class BudgetExceeded(RuntimeError):
     pass
 
 
+def _secret(name: str) -> str:
+    """A key Memory is granted under NAME by Walter Secrets (instance accounts/<id>.toml, `allow` + [env], Bitwarden
+    only), or the process environment when a caller injected it explicitly (tests, evaluation). There is no file
+    fallback (Hermes' .env was retired 2026-11-11): without the grant the call fails closed."""
+    if os.environ.get(name):
+        return os.environ[name]
+    try:
+        from walter_secrets import grants   # walter-secrets public library, via the shared runtime
+        return grants.env_value(name, "memory")
+    except Exception as exc:  # noqa: BLE001 — never echo a storage detail; the name is enough to act
+        raise RuntimeError(f"{name} not granted to memory ({type(exc).__name__})") from None
+
+
 def _key() -> str:
-    if os.environ.get("OPENROUTER_API_KEY"):
-        return os.environ["OPENROUTER_API_KEY"]
-    for line in Path("/root/.hermes/.env").read_text().splitlines():
-        if line.startswith("OPENROUTER_API_KEY="):
-            return line.split("=", 1)[1].strip().strip("'\"")
-    raise RuntimeError("OPENROUTER_API_KEY not configured")
+    return _secret("OPENROUTER_API_KEY")
 
 
 # Real OpenRouter balance floors (2026-10-02: a backfill under a 50 $ internal envelope drained an ~8 $ account).
@@ -102,10 +112,14 @@ def router_model(task: str, default: str) -> str:
 
 
 def _gateway_token() -> str:
-    for line in GATEWAY_TOKEN_FILE.read_text().splitlines():
+    from .purge import _instance
+    path = _instance(*GATEWAY_TOKEN_PARTS)
+    if path is None:
+        raise RuntimeError("no active Walter instance for the walter-llm token")
+    for line in path.read_text().splitlines():
         if line.startswith("WALTER_LLM_TOKEN="):
             return line.split("=", 1)[1].strip()
-    raise RuntimeError(f"no WALTER_LLM_TOKEN in {GATEWAY_TOKEN_FILE}")
+    raise RuntimeError(f"no WALTER_LLM_TOKEN in {path}")
 
 
 def chat(messages: list[dict], *, model: str | None = None, poste: str | None = None, processor: str,
@@ -178,17 +192,6 @@ def chat(messages: list[dict], *, model: str | None = None, poste: str | None = 
 
 CF_RUN = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/cloudflare/{model}"
 CF_PRICE = {"clef": 0.24, "clef-flash": 0.09}  # USD per M input tokens (Workers AI catalogue, 2026-10-03)
-HERMES_ENV = "/root/.hermes/.env"
-
-
-def _hermes_env(name: str) -> str | None:
-    try:
-        for line in open(HERMES_ENV).read().splitlines():
-            if line.startswith(name + "="):
-                return line.split("=", 1)[1].strip().strip("'\"") or None
-    except OSError:
-        return None
-    return None
 
 
 def _redact_tree(value, names, mapping):
@@ -234,9 +237,7 @@ def decide_chain() -> tuple[str, ...]:
 def _decide_once(model: str, state: dict, questions: dict, timeout: float) -> tuple[dict, str]:
     if model.startswith("cloudflare/") or "/" not in model:
         short = model.split("/", 1)[-1]
-        account, token = _hermes_env("CLOUDFLARE_ACCOUNT_ID"), _hermes_env("CLOUDFLARE_AI_TOKEN")
-        if not (account and token):
-            raise RuntimeError("Cloudflare Workers AI credentials missing (CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_AI_TOKEN)")
+        account, token = _secret("CLOUDFLARE_ACCOUNT_ID"), _secret("CLOUDFLARE_AI_TOKEN")
         r = httpx.post(CF_RUN.format(account=account, model=short), headers={"Authorization": f"Bearer {token}"},
                        json={"model": short, "state": state, "questions": questions}, timeout=timeout)
         data = r.json()

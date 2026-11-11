@@ -22,9 +22,9 @@ Q = json.load(open("/opt/walter-voice-memory/bench/queries.json"))
 
 
 def env(name):
-    for line in open("/root/.hermes/.env"):
-        if line.startswith(name + "="):
-            return line.split("=", 1)[1].strip().strip('"')
+    # Walter Secrets grant (cloudflare-workers-ai, reader memory); no file, no fallback (2026-11-11)
+    from walter_secrets import grants
+    return grants.env_value(name, "memory")
 
 
 def candidates():

@@ -32,7 +32,6 @@
   "backup_paths": [
     ".",
     "/root/.pgpass",
-    "/root/.hermes/plugins/walter-memory",
     "@instance/bootstrap/overland.env"
   ],
   "interfaces": [
@@ -314,7 +313,7 @@
     {
       "id": "llm-client",
       "path": "walter_memory/llm.py",
-      "role": "Appels de modèles de Memory (refuse local_only, budgets) — lit encore ~/.hermes/.env",
+      "role": "Appels de modèles de Memory (refuse local_only, budgets) ; clés par autorisation Walter Secrets (allow memory), sans repli fichier",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory"
