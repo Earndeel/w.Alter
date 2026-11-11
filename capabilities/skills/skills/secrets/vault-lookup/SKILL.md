@@ -212,19 +212,15 @@ NE PAS confondre avec un service vault — le Kardex vit dans PostgreSQL, pas da
 
 ---
 
-## 4. Fichier .env (runtime)
+## 4. Clés d'API des composants (plus de fichier .env)
 
-Emplacement : ~/.hermes/.env
-Usage : variables d'environnement chargées au démarrage d'Hermes
-Ne pas éditer manuellement — utiliser vault add puis vault export
+`~/.hermes/.env` est retiré (2026-11-11) : ne jamais le lire, le recréer ni y exporter de clé.
+Chaque composant lit ses clés par son autorisation Walter Secrets (`/user/Lucas/accounts/<id>.toml` : `allow` = lecteurs,
+`[env]` = nom de variable) — Bitwarden seul, aucun repli.
 
 ```bash
-# Exporter le vault vers .env
-vault export > ~/.hermes/.env.new
-# Fusionner prudemment avec .env existant
-
-# Importer des clés depuis .env vers le vault
-vault import-env
+walter-secret grants                         # cartes et santé (métadonnées seulement)
+walter-secret grant exec <id> --as <lecteur> -- <commande>   # injection ciblée pour un outil tiers
 ```
 
 ---
@@ -298,8 +294,8 @@ vault list --secrets
 source ~/.hermes/vault/.bw_session_key 2>/dev/null
 walter-secret search "<item>"   # métadonnées seulement ; valeur via {{bw:<id>:<champ>}}
 
-# 5. Variables d'environnement
-grep -ri "<keyword>" ~/.hermes/.env 2>/dev/null
+# 5. Autorisations Walter Secrets (métadonnées)
+walter-secret grants
 
 # 6. Fichiers projet (fallback)
 grep -ri "<keyword>" ~/projects/ 2>/dev/null | grep -v node_modules | head -10
@@ -319,8 +315,7 @@ vault add mon_service secret "whsec_..."
 # Vérifier
 vault get mon_service/api_key
 
-# Exporter si besoin runtime
-vault export >> ~/.hermes/.env
+# Besoin runtime : une carte d'autorisation /user/Lucas/accounts/<id>.toml ([env] + allow), jamais un fichier .env
 ```
 
 ---
