@@ -1968,7 +1968,6 @@
       "backup_paths": [
         "/walter/cognition/memory",
         "/root/.pgpass",
-        "/root/.hermes/plugins/walter-memory",
         "/user/Lucas/bootstrap/overland.env"
       ],
       "interfaces": [
@@ -2250,7 +2249,7 @@
         {
           "id": "llm-client",
           "path": "/walter/cognition/memory/walter_memory/llm.py",
-          "role": "Appels de modèles de Memory (refuse local_only, budgets) — lit encore ~/.hermes/.env",
+          "role": "Appels de modèles de Memory (refuse local_only, budgets) ; clés par autorisation Walter Secrets (allow memory), sans repli fichier",
           "status": "active",
           "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory"
@@ -2583,7 +2582,7 @@
       "backup_paths": [
         "/walter/cognition/memory/vault",
         "/root/.config/rclone/rclone.conf",
-        "/root/.hermes/raw-vault"
+        "/user/Lucas/bootstrap/raw-vault"
       ],
       "interfaces": [
         "memory objects library",
@@ -2610,7 +2609,7 @@
         "target_root": "/walter/cognition/memory/vault",
         "config_paths": [
           "/root/.config/rclone/rclone.conf",
-          "/root/.hermes/raw-vault/s3.env"
+          "/user/Lucas/bootstrap/raw-vault/s3.env"
         ],
         "permissions": [
           "classification des objets",
@@ -3169,9 +3168,9 @@
         "/user/Lucas/config/secrets",
         "/user/Lucas/state/secrets",
         "/user/Lucas/bootstrap/vault",
-        "/root/.hermes/logs/walter-secrets.jsonl",
-        "/root/.hermes/logs/walter-secrets-sync.status.json",
-        "/root/.hermes/logs/walter-secrets-sync.log",
+        "/user/Lucas/logs/walter-secrets.jsonl",
+        "/user/Lucas/logs/walter-secrets-sync.status.json",
+        "/user/Lucas/logs/walter-secrets-sync.log",
         "/user/Lucas/accounts"
       ],
       "interfaces": [
@@ -3179,6 +3178,7 @@
         "local CLI exec/get",
         "Hermes hooks",
         "walter-secret grants / grant access",
+        "walter-secret grant env / grant exec (injection ciblée)",
         "walter_secrets.grants"
       ],
       "bindings": {
@@ -3313,6 +3313,20 @@
             {
               "transport": "cli",
               "interface": "walter-secret"
+            }
+          ],
+          "vision_target": "core/security/secrets"
+        },
+        {
+          "id": "walter-cloudflare",
+          "path": "/walter/core/security/secrets/bin/walter-cloudflare",
+          "role": "Injection ciblée des identifiants Cloudflare (autorisations cloudflare-api, cloudflare-workers-ai) dans une commande tierce ; échoue fermé",
+          "status": "active",
+          "readme": "/walter/core/security/secrets/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-cloudflare"
             }
           ],
           "vision_target": "core/security/secrets"

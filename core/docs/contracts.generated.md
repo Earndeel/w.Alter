@@ -337,7 +337,7 @@ Interfaces : Python library, HTTP :8890, CLI, MCP, Overland authenticated HTTP :
 | search | active | Index de recherche (search.chunks) | `/walter/cognition/memory/walter_memory/search.py` | cognition/memory |
 | privacy | active | Classes de confidentialité et règle de lecture | `/walter/cognition/memory/walter_memory/privacy.py` | cognition/memory |
 | disclosure | active | Contrôle de divulgation des messages sortants | `/walter/cognition/memory/walter_memory/disclosure.py` | core/security |
-| llm-client | active | Appels de modèles de Memory (refuse local_only, budgets) — lit encore ~/.hermes/.env | `/walter/cognition/memory/walter_memory/llm.py` | cognition/memory |
+| llm-client | active | Appels de modèles de Memory (refuse local_only, budgets) ; clés par autorisation Walter Secrets (allow memory), sans repli fichier | `/walter/cognition/memory/walter_memory/llm.py` | cognition/memory |
 | migrations | active | Migrations Postgres | `/walter/cognition/memory/migrations` | cognition/memory/migrations |
 | hermes-plugin | active | Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7) | `/walter/cognition/memory/hermes-plugins` | — |
 | overland | active | Réception GPS (Overland, :3010) | `/walter/cognition/memory/walter_memory/overland.py` | cognition/memory/connectors |
@@ -485,7 +485,7 @@ Gérer les références au coffre et injecter localement les valeurs autorisées
 Contrat 1.1.0; propriétaire : secrets.
 Racine actuelle : `/walter/core/security/secrets`. Cible : `/walter/core/security/secrets`.
 
-Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks, walter-secret grants / grant access, walter_secrets.grants.
+Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks, walter-secret grants / grant access, walter-secret grant env / grant exec (injection ciblée), walter_secrets.grants.
 
 **Critères de validation :**
 
@@ -497,6 +497,7 @@ Interfaces : safe MCP metadata/reference, local CLI exec/get, Hermes hooks, walt
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
 | library | active | Accès au coffre Bitwarden sans valeur exposée, autorisations (grants) | `/walter/core/security/secrets/walter_secrets` | core/security/secrets |
+| walter-cloudflare | active | Injection ciblée des identifiants Cloudflare (autorisations cloudflare-api, cloudflare-workers-ai) dans une commande tierce ; échoue fermé | `/walter/core/security/secrets/bin/walter-cloudflare` | core/security/secrets |
 | compat | obsolete | Anciennes entrées de compatibilité | `/walter/core/security/secrets/compat` | — |
 
 **Limites déclarées :**
