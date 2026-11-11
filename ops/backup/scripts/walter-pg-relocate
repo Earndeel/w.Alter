@@ -135,7 +135,7 @@ rollback() {
     compose down >/dev/null 2>&1
     if [ -d "$TARGET/data" ] && [ ! -e "$src" ]; then mv "$TARGET/data" "$src"; fi
     [ -f "$STATE/postgresql.auto.conf.before" ] && cp -a "$STATE/postgresql.auto.conf.before" "$src/postgresql.auto.conf"
-    docker rename "$OLD" "$CONTAINER" && docker start "$CONTAINER" >/dev/null
+    docker rename "$OLD" "$CONTAINER" && docker update --restart=unless-stopped "$CONTAINER" >/dev/null && docker start "$CONTAINER" >/dev/null   # kept restart=no while parked (2026-11-11)
     wait_ready "$CONTAINER" || { log "rollback: server not ready"; return 1; }
     if [ -f "$STATE/counts-before.txt" ]; then
       counts "$CONTAINER" > "$STATE/counts-rollback.txt"
