@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-11-11T04:16:54+00:00",
+ "archived_reason": "not read for 30 days",
+ "domain": "gpu",
  "hermes": {
   "path": "/root/.hermes/skills/cloud/free-gpu-stack",
   "sha": "f19bc7d83d6f87d79d8ff195068589d6778d5d1084f134bbd872be2a801f24a5",
@@ -7,5 +10,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
+ "reserve": true,
  "store_sha": "f19bc7d83d6f87d79d8ff195068589d6778d5d1084f134bbd872be2a801f24a5"
 }
