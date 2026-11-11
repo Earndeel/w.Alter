@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-11-11T04:15:59.148333+00:00",
+ "description": "Use when converting Markdown notes to PDF on Ubuntu with already installed Python tools, or evaluating PDF dependencies without installing anything.",
+ "domain": "documents",
+ "kind": "new",
+ "reason": "La session fournit une procédure distincte des skills existants : conversion Markdown → PDF sans installation, validation du contenu extrait et consultation des dépendances. Preuves concrètes : chaîne exécutée avec PyMuPDF, perte silencieuse de longues lignes dans <pre> découverte puis corrigée par repli préalable, float/flex ignorés, et différences de PDF isolées au trailer /ID. Les scripts exacts étant partiellement absents du transcript, le skill impose de vérifier leurs fichiers et les signatures plutôt que de reconstruire une implémentation non attestée. [session dsh/vm/11f604ba-d85d-4571-88f9-c0b22f6ddfba]",
+ "runtime": "learner",
+ "session_id": "dsh/vm/11f604ba-d85d-4571-88f9-c0b22f6ddfba",
+ "target": "markdown-pdf-python"
+}
