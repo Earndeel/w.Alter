@@ -1,5 +1,5 @@
 ---
-name: cloudflare-mcp-mastery
+name: cloudflare-mcp-workers
 category: cloud
 description: Complete mastery of Cloudflare via MCP/mcporter -- 89 tools across Workers, KV, R2, D1, AI, Queues, Workflows, Zones, Routes, Cron, Secrets, Analytics, and more. Includes working patterns, auth resolution, and deployment pipelines.
 ---
@@ -21,7 +21,7 @@ description: Complete mastery of Cloudflare via MCP/mcporter -- 89 tools across 
 TOUJOURS copier le fichier dans `/root/.mcporter/mcporter.json` apres l'avoir ecrit.
 
 ### mcporter.json --- Ecriture manuelle obligatoire
-Le fichier `.env` de Hermes et le mcporter.json sont deux configs distinctes. Hermes lit `~/.hermes/.env`, mcporter lit `~/.mcporter/mcporter.json`.
+Le fichier `.env` de Hermes et le mcporter.json sont deux configs distinctes. Hermes (retiré) lisait `~/.hermes/.env` — fichier retiré, clés Cloudflare via `walter-cloudflare -- <commande>` ; mcporter lit `~/.mcporter/mcporter.json`.
 
 TOUJOURS ecrire le JSON a la main. `mcporter config add` masque le token (`***`) dans le fichier.
 
