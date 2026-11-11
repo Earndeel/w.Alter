@@ -99,9 +99,9 @@ Ils sont déclarés dans le registre avec leur `vision_target` ; ils se déplace
 | `plugins/walter-*` (7 copies installées) | ports Walter pour Hermes | retirés avec Hermes (E7) ; les sources restent dans les modules |
 | `scripts/` (≈ 55 fichiers) | anciens scripts mémoire, bancs ; 18 scripts Hindsight/Qdrant mis en quarantaine le 09/11 (`/root/archive/2026/retired-hindsight-scripts-20261109/`) | classement par références (méthode de la skill d'audit), puis archive ; `memory_autopilot.py` est un **doublon** identique de `memory/ops/memory_autopilot.py` |
 | `cron/` | 2 tâches restantes, en pause (AA Pareto, Kardex Semantic Extract) ; Memory Health Check, Memory Dreaming et Memory Importance Decay **retirées le 09/11** (Guardians) | — |
-| `logs/` (848 Mo) | journaux de tous les services Walter (CLAUDE.md) | `@instance/logs` (vide aujourd'hui) | 
-| `.env`, `google_token.json` | clés et jeton Google | Bitwarden et autorisations Secrets (E6) |
-| `integrations/` (camoufox, codex, cloudflared, wrangler…) | outils tiers installés | `/apps` ou outils de l'hôte, selon l'usage |
+| `logs/` (858 Mo) | journaux de tous les services Walter (CLAUDE.md) | `@instance/logs` | **Fait le 11/11** (lien laissé) |
+| `.env`, `google_token.json` | clés et jeton Google | Bitwarden et autorisations Secrets (E6) ; `camoufox-max` ne charge plus `.env` (11/11) ; restent : `walter-secrets-sync` (cible), `walter_memory/llm.py`, `walter-cloudflare` |
+| `integrations/` (camoufox, codex, cloudflared, wrangler…) | outils tiers installés | **Fait le 11/11** : `/root/.codex`, `.gemini`, `.wrangler`, `.mcporter` (dossiers réels, liens inversés), cloudflared → `/services/cloudflared`, claude-code-router (vieille copie) en quarantaine |
 | `camoufox-max`, `vault`, `raw-vault`, `walter-llm` | liens déjà repointés vers Browse et l'instance | retirés avec Hermes |
 
 ### 5.3 `/root` (hors outils de développement)
@@ -166,7 +166,7 @@ Composants déclarés dans le contrat d'Ops (`services`, `postgres`, `kernel-npm
 | `soul/`, `config/`, `accounts/`, `state/`, `workspace/`, `backups/`, `bootstrap/` | présents et utilisés | — |
 | `profile/` | vide ; un `profiles/agent.md` existe à côté | doublon à résoudre (`profiles/` → `profile/`) |
 | `skills/` | vide | skills propres à l'instance à définir avec Skills |
-| `logs/` | vide ; les journaux sont dans `~/.hermes/logs` | migration des journaux (rotation `logrotate` incluse) |
+| `logs/` | journaux des services (depuis le 11/11, venus de `~/.hermes/logs`) | code qui écrit encore par le lien → E9.9 |
 | `cache/` | vide | caches de modules à y rattacher quand ils sont propres à l'instance |
 | — | `harness/` (vide), `instance.toml`, `README.md` | `harness/` recevra les profils rendus de Soul ; `instance.toml` est le manifeste de l'instance |
 
