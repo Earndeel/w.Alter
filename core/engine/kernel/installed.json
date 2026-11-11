@@ -1,13 +1,13 @@
 {
  "composed": {
   "headless": "5aeb34b589a666c8f7b6696f3aae092a00bca22f8acfc46f959e0adce0f38c57",
-  "web": "e6139c8a15258d1c53f367e6ffc33da0a518d10933cdb0fda71d89d45e04d6be"
+  "web": "b06c5c579887e6e988aa40c758713cb3d940f5649b66eaaa6e9cd272a19d75f2"
  },
  "compositions": {
   "cordis.patch.yml": "9e98aa753025364f049558ccfe2ab322d609333da8f1e90fd598e84e93a05487",
   "profiles/headless/cordis.patch.yml": "c8f9d14ffe4674caf003b2b261327eac354270822de4fe225776cd6400eba46a",
   "profiles/headless/cordis.yml": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
-  "profiles/web/cordis.patch.yml": "66e42959bda227d8596c2c8186980a9349e4dd7b7ee0e37550eca59b04aa3de8",
+  "profiles/web/cordis.patch.yml": "949fa65368011cc2a16ae7456ddc943ccb49ea5bfb11179934d9151897a55af9",
   "profiles/web/cordis.yml": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
   "walter-hooks.json": "ac109735cdaeaf8a3c27aa92f4f2f677ddd6377e638cd7b591af1d10683a6b68"
  },

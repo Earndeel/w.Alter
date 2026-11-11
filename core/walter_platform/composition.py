@@ -107,6 +107,13 @@ def engine_subagents(values):
 
 ENGINE_API=('off','on')                             # lot E4: the engine's own API door (core/interfaces/api)
 ENGINE_API_PLUGIN=ROOT/'interfaces'/'api'/'index.mjs'
+WEB_LOGIN_PLUGIN=ROOT/'interfaces'/'web'/'login-link.mjs'
+
+
+def _web_login_file():
+    # a test home overrides it (WALTER_ENGINE_WEB_LOGIN) so it never replaces the live link
+    from . import instance as inst
+    return os.environ.get('WALTER_ENGINE_WEB_LOGIN') or inst.path('state','core','engine','web','login-url')
 
 
 def engine_api(values):
@@ -333,9 +340,13 @@ def _dsh_web_profile(port,subagents=False):
     """Managed section of the DSH web profile patch (rows that exist only in the web composition)."""
     import yaml
     head=('# DSH web GUI: no developer surface text (HMR, pnpm, harness source) in the prompt.\n'
-          '- id: web-runtime\n  config:\n    openBrowser: !!js ctx.webStartup.openBrowser\n    printUrl: true\n'
+          '- id: web-runtime\n  config:\n    openBrowser: !!js ctx.webStartup.openBrowser\n    printUrl: false\n'
           '    surfaceContext: false\n    trustedHosts: !!js ctx.webStartup.trustedHosts\n'
-          '# Presets that carry the DSH "coding agent" persona and DSH skills/web/compaction; DeepSeek account UI;\n'
+          # sign-in link (launch token) never in the journal: a root-only file of the instance (owner, 2026-11-11)
+          +'# Web sign-in link: written to a root-only file of the instance, never printed to the journal.\n'
+          +yaml.safe_dump([{'insert':[{'id':'walter-web-login','name':str(WEB_LOGIN_PLUGIN),
+                                       'config':{'file':str(_web_login_file())}}]}],sort_keys=False,allow_unicode=True,width=120)
+          +'# Presets that carry the DSH "coding agent" persona and DSH skills/web/compaction; DeepSeek account UI;\n'
           '# web controls Walter owns (model, agent profile, packages) and the DeepSeek brand.\n')
     head+=''.join(f'- id: {x}\n  disabled: true\n' for x in DSH_WEB_OFF)
     # dsh-web-app re-enables some orchestration rows after the global patch: the profile layer is applied last.

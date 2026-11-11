@@ -394,3 +394,13 @@ def test_engine_subagents_switch_keeps_spawn_only_with_depth_and_off_restores(ho
     v=copy.deepcopy(values);v.setdefault('dsh',{})['engine']={'subagents':'all'}
     monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(v))
     with pytest.raises(ValueError,match='subagents'):c.install('dsh',home)
+
+
+def test_web_sign_in_link_never_printed(monkeypatch,tmp_path):
+    # owner, 2026-11-11: the launch token must not reach the journal; the link goes to a root-only instance file
+    monkeypatch.setenv('WALTER_ENGINE_WEB_LOGIN',str(tmp_path/'login-url'))
+    rows=yaml.load(c._dsh_web_profile(4000).replace('!!js ','js:'),Loader=yaml.SafeLoader)
+    web=[r for r in rows if r.get('id')=='web-runtime'][0]
+    assert web['config']['printUrl'] is False
+    login=[e for r in rows for e in r.get('insert',[]) if e.get('id')=='walter-web-login'][0]
+    assert login['name'].endswith('interfaces/web/login-link.mjs') and login['config']['file']==str(tmp_path/'login-url')
