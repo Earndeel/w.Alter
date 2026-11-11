@@ -20,7 +20,7 @@
   "backup_paths": [
     ".",
     "/root/.config/rclone/rclone.conf",
-    "/root/.hermes/raw-vault"
+    "@instance/bootstrap/raw-vault"
   ],
   "interfaces": [
     "memory objects library",
@@ -47,7 +47,7 @@
     "target_root": "cognition/memory/vault",
     "config_paths": [
       "/root/.config/rclone/rclone.conf",
-      "/root/.hermes/raw-vault/s3.env"
+      "@instance/bootstrap/raw-vault/s3.env"
     ],
     "permissions": [
       "classification des objets",
