@@ -13,7 +13,7 @@ StartLimitBurst=5
 [Service]
 Type=simple
 User=root
-WorkingDirectory=%h/.hermes/camoufox-max
+WorkingDirectory=/walter/capabilities/browse/engine
 EnvironmentFile=-/etc/walter/browse-identity.env
 Environment=CAMOFOX_ENGINE=chromium
 Environment=CAMOFOX_MAX_PORT=9378
@@ -25,7 +25,7 @@ Environment=DISPLAY=:101
 Environment=CAMOUFOX_HEADLESS=false
 Environment=NODE_ENV=production
 ExecStartPre=/usr/bin/test -x %h/.cloakbrowser/chromium-146.0.7680.177.3/chrome
-ExecStart=/usr/bin/node %h/.hermes/camoufox-max/server-max.js
+ExecStart=/usr/bin/node /walter/capabilities/browse/engine/server-max.js
 Restart=always
 RestartSec=10
 TimeoutStartSec=120
