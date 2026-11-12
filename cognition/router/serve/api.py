@@ -98,5 +98,5 @@ def schema():
     route_request["default"] = ""
     route_request["description"] = "Demande à classer ; fournir au moins request, task ou model. La sélection n'exécute pas la tâche."
     return {"schema_version": VERSION, "module": "router", "tools": definitions,
-            "execution": {"text": "native", "fallback": "same-model providers only",
+            "execution": {"text": "walter-engine", "fallback": "none: engine_unavailable when the engine cannot take the job",
                           "notification": "relay user_notice whenever user_notification_required is true"}}

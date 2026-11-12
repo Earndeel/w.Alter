@@ -24,6 +24,7 @@
   ],
   "interfaces": [
     "OpenAI-compatible :8894",
+    "POST /v1/decisions {state, questions, samples?, model?|models?, paid_floor_usd?} on the Router's decision chain; POST /v1/rerank {query, documents, top_n?, model?} on the rerank poste; GET /v1/balance (SOCLE A6)",
     "CLI walter-llm call: one exact model/provider, JSON stdin/stdout, no implicit retry or fallback"
   ],
   "bindings": {

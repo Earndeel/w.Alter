@@ -15,6 +15,16 @@ Le gateway transporte les messages et outils de l'appelant. Il ne crée pas une 
 ## Interfaces et dépendances
 
 - HTTP `/v1/chat/completions`, `/v1/models` ; `/health` ne certifie aucun fournisseur.
+- HTTP `/v1/decisions` et `/v1/rerank` (SOCLE A6, 2026-11-11 ; code `structured.py`) : décisions typées sur la chaîne
+  de décision du Router (`walter-router decision-chain`, en cache comme les routes), `samples` > 1 = appels parallèles
+  moyennés (`structured.merge_answers`, seule implémentation) ; rerank sur le poste `rerank` du Router. Un `model`
+  demandé doit être proposé par le Router (sinon 400). Adaptateurs : API Decisions d'OpenRouter, Workers AI de
+  Cloudflare (Clef ; `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_AI_TOKEN` lues sous le lecteur `llm`), rerank OpenRouter.
+  Chaque appel physique va dans `models.exec_log` (tâche `decision` / `rerank`, run de l'appelant par
+  `X-Walter-Run-Id`). Échec de toute la chaîne = 502 (503 si le Router ne répond pas) avec la liste des tentatives
+  (fournisseur/modèle + raison courte), jamais de repli codé en dur. `paid_floor_usd` (corps) ou l'en-tête
+  `X-Walter-Paid-Floor-USD` (chat) : une route OpenRouter payante est sautée quand le crédit est sous ce plancher.
+  `GET /v1/balance` : crédit OpenRouter restant (cache 5 min), pour la santé de Memory.
 - `walter-llm call` : une route exacte, JSON sur stdin/stdout, sans repli de modèle implicite.
 - HTTP `/v1/web/converse` (2026-11-08) : services web conversationnels. Règle déterministe de la table
   `web_services` (config, relue à chaud : service → recette Browse hôte/capacité, session moteur, site de connexion,

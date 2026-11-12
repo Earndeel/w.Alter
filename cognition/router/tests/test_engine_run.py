@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from walter_router.serve import engine, run, text_agent
+from walter_router.serve import engine, run
 
 
 @pytest.fixture
@@ -40,7 +40,6 @@ def api(tmp_path, monkeypatch):
     monkeypatch.delenv("WALTER_DELEGATION_DEPTH", raising=False)
     memory: list = []
     monkeypatch.setattr(run, "_memory", lambda action, payload: memory.append((action, payload)) or {})
-    monkeypatch.setattr(text_agent, "run", lambda *a, **k: pytest.fail("the Router's own loop must not run"))
     yield SimpleNamespace(seen=seen, reply=reply, memory=memory)
     srv.shutdown()
 

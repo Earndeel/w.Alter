@@ -291,6 +291,50 @@ def decision(task: str) -> dict:
     return _refresh(task)
 
 
+_DECISION_CHAIN = "__decision_chain__"
+
+
+def _refresh_chain() -> list[str]:
+    try:
+        d = _router("decision-chain")
+        chain = [m for m in (d.get("chain") if isinstance(d, dict) else None) or [] if isinstance(m, str) and m]
+        if not chain:
+            raise RuntimeError("empty decision chain")
+        _routes[_DECISION_CHAIN] = (time.time(), chain)
+        return chain
+    finally:
+        _refreshing.discard(_DECISION_CHAIN)
+
+
+def decision_chain() -> list[str]:
+    """The Router's decision models in order (`walter-router decision-chain`: the owner's pinned / the cycle's best
+    decision model and the free fallbacks, knowledge.json decision.order). Same cache as the routes: a stale chain is
+    served at once and refreshed in the background, so the preflight never waits for the Router's CLI; only the very
+    first call blocks. No built-in chain: when the Router cannot answer, the call fails and says so."""
+    hit = _routes.get(_DECISION_CHAIN)
+    if hit and time.time() - hit[0] < ROUTE_TTL:
+        return hit[1]
+    if hit:
+        if _DECISION_CHAIN not in _refreshing:
+            _refreshing.add(_DECISION_CHAIN)
+            threading.Thread(target=_refresh_chain, daemon=True).start()
+        return hit[1]
+    _refreshing.add(_DECISION_CHAIN)
+    return _refresh_chain()
+
+
+def structured_key(env_name: str) -> str:
+    """provider_key for the decision / rerank adapters, with a refusal that names what to provision (the variable and
+    the grant cards, from walter_secrets' own message), never a value or a storage path."""
+    try:
+        return provider_key(env_name)
+    except Exception as exc:  # noqa: BLE001
+        from structured import MissingGrant
+        if type(exc).__name__ == "GrantError":
+            raise MissingGrant(f"missing_grant: {str(exc)[:160]}") from None
+        raise MissingGrant(f"key_unavailable: {env_name} ({type(exc).__name__})") from None
+
+
 def warm() -> None:
     """Fill the route cache at start-up for every chat task (background)."""
     from concurrent.futures import ThreadPoolExecutor
@@ -302,7 +346,12 @@ def warm() -> None:
             pass
     with ThreadPoolExecutor(4) as pool:   # the phone's poste first
         list(pool.map(one, sorted(chat_tasks(), key=lambda t: t != "voice_assist")))
-    for name in ("OPENROUTER_API_KEY", "KIE_API_KEY"):   # Bitwarden reads, before the first call needs them
+    try:   # the decision chain and the rerank poste (preflight: 3 decision samples per owner message)
+        decision_chain()
+        decision("rerank")
+    except Exception:   # noqa: BLE001 — said by the endpoint when asked
+        pass
+    for name in ("OPENROUTER_API_KEY", "KIE_API_KEY", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_AI_TOKEN"):   # Bitwarden reads
         try:
             provider_key(name)
         except Exception:   # noqa: BLE001
@@ -1011,6 +1060,77 @@ def build_app():
         code, out = await asyncio.to_thread(web_converse, agent, body)
         return JSONResponse(out, status_code=code)
 
+    _http: dict = {}
+
+    def http():
+        """One pooled client for the structured calls (keep-alive: the preflight's 3 parallel samples per message)."""
+        if "client" not in _http:
+            import httpx
+            import structured
+            _http["client"] = httpx.AsyncClient(timeout=60, limits=httpx.Limits(max_connections=32,
+                                                                                 max_keepalive_connections=16))
+            _http["balance"] = structured.Balance(_http["client"], structured_key)
+        return _http["client"]
+
+    def balance():
+        http()
+        return _http["balance"]()
+
+    async def structured_call(request: Request, authorization: str, task: str, run) -> JSONResponse:
+        agent = agent_of(authorization)
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(400, "request must be a JSON object")
+        correlation = await _correlation(request, body, agent)
+        correlation.pop("requested", None)
+        base = {"agent": agent, "task": task, "kind": task, **correlation}
+
+        def attempt(entry: dict) -> None:
+            log({**base, "model_id": entry.get("model"), **entry})
+        t0 = time.perf_counter()
+        code, out = await run(body, attempt)
+        out["gateway_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+        if code != 200:
+            log({**base, "ok": False, "error": out.get("error"), "attempts": len(out.get("attempts") or [])})
+            out = {"error": {"message": out.get("error"), "task": task, **{k: v for k, v in out.items() if k != "error"}}}
+        headers = {"X-Walter-Route": out["route"]} if code == 200 and out.get("route") else {}
+        return JSONResponse(out, status_code=code, headers=headers)
+
+    @app.post("/v1/decisions")
+    async def decisions_endpoint(request: Request, authorization: str = Header(default="")):
+        """Typed decisions on the Router's decision chain (SOCLE A6): samples > 1 = that many parallel calls of the
+        model that answers, averaged (structured.merge_answers)."""
+        import structured
+
+        async def run(body, attempt):
+            try:
+                chain = await asyncio.to_thread(decision_chain)
+            except Exception as exc:  # noqa: BLE001 — the Router could not say: explicit, no built-in chain
+                return 503, {"error": "decision chain unavailable", "attempts": [{"reason": type(exc).__name__}]}
+            return await structured.decisions(body, chain=chain, key=structured_key, client=http(), log=attempt,
+                                              balance=balance)
+        return await structured_call(request, authorization, "decision", run)
+
+    @app.post("/v1/rerank")
+    async def rerank_endpoint(request: Request, authorization: str = Header(default="")):
+        """Rerank on the Router's `rerank` poste (its routes in order)."""
+        import structured
+
+        async def run(body, attempt):
+            try:
+                d = await asyncio.to_thread(decision, "rerank")
+            except Exception as exc:  # noqa: BLE001
+                return 503, {"error": "rerank poste unavailable", "attempts": [{"reason": type(exc).__name__}]}
+            return await structured.rerank(body, routes=list(d.get("execution") or []), key=structured_key,
+                                           client=http(), log=attempt, balance=balance)
+        return await structured_call(request, authorization, "rerank", run)
+
+    @app.get("/v1/balance")
+    async def balance_endpoint(authorization: str = Header(default="")):
+        """Remaining OpenRouter credit (cached 5 min), for the callers' health checks; null when unknown."""
+        agent_of(authorization)
+        return {"openrouter": {"remaining_usd": await balance()}}
+
     @app.post("/v1/chat/completions")
     async def completions(request: Request, authorization: str = Header(default="")):
         agent = agent_of(authorization)
@@ -1041,6 +1161,12 @@ def build_app():
             raise HTTPException(400, "no route for requested task") from None
         errors, passed = [], []
         plan = d.get("execution") or []
+        # The caller's paid-balance floor (Walter Memory's budgets): a paid OpenRouter route is skipped when the account
+        # is below it (2026-10-02: a backfill drained the account). Header only, never forwarded to a provider.
+        try:
+            floor = float(request.headers["X-Walter-Paid-Floor-USD"]) if request.headers.get("X-Walter-Paid-Floor-USD") else None
+        except ValueError:
+            raise HTTPException(400, "invalid X-Walter-Paid-Floor-USD") from None
         for index, route in enumerate(plan):
             t0 = time.perf_counter()
             following = plan[index + 1] if index + 1 < len(plan) else {}
@@ -1049,6 +1175,13 @@ def build_app():
             base = {"agent": agent, "task": task, "model_id": d.get("model_id"), "provider": route["provider"],
                     "model": route["model"], **({"account": route["account"]} if route.get("account") else {}),
                     **correlation}
+            if (floor is not None and route["provider"] == "openrouter" and not str(route["model"]).endswith(":free")):
+                remaining = await balance()
+                if remaining is not None and remaining < floor:
+                    errors.append(f"{route['provider']}/{route['model']}: balance_below_floor")
+                    log({**base, "ok": False, "seconds": 0, "skipped": "balance_below_floor"})
+                    passed.append({"position": index, "reason": "balance_below_floor"})
+                    continue
             if correlation.get("channel") == "test" and route["provider"] in PAID:
                 refused = test_gate(route, body)
                 if refused:

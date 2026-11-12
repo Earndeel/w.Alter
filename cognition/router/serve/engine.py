@@ -10,7 +10,9 @@ caller's run. The binding is the instance's (`host.json` → `engine_api`):
                    "walter_run": "engine" | "legacy"}
 
 A model named by the owner goes to the engine too (validated here by named.py, executed exactly by walter-llm through
-the run's plan); a model the engine cannot run is an explicit error, never the former loop. `legacy` (default while E2/E3 are not active on the live engine) keeps the former text loop (text_agent).
+the run's plan); a model the engine cannot run is an explicit error, never the former loop. Any other binding (absent,
+`legacy`) or an unreachable Engine API = the job fails with `engine_unavailable` (SOCLE A6, 2026-11-11: the Router's
+former `text_agent` loop is removed; there is one agent loop, the engine's).
 WALTER_RUN_ENGINE / WALTER_ENGINE_API_URL / WALTER_ENGINE_API_TOKEN_FILE override it for a test engine.
 """
 from __future__ import annotations
@@ -43,6 +45,17 @@ def enabled(d: dict) -> bool:
     """Text jobs go to the engine when the instance says so — a model NAMED by the owner too: the Router validated it
     (named.py), the engine runs it exactly (the run's plan names it, walter-llm executes only that model)."""
     return binding().get("walter_run") == "engine"
+
+
+def unavailable(d: dict, reason: str, detail: str | None = None) -> dict:
+    """The structured refusal of a text job the engine cannot take (no binding, engine down): said, never retried by a
+    second loop. Shape of a text result, so every adapter reports it as it reports a failed run."""
+    notice = "Le moteur Walter est indisponible ; la tâche n'a pas été exécutée."
+    return {"ok": False, "error": "engine_unavailable", "reason": reason, "detail": detail, "kind": "text",
+            "runtime": "walter-engine", "notices": [], "run_id": os.environ.get("WALTER_RUN_ID"), "task_id": None,
+            "trace_session": None, "user_notification_required": True, "user_notice": notice,
+            "routed": {"task": d.get("task"), "engine_task": None, "executor": "walter-engine", "named": d.get("named"),
+                       "seconds": 0}}
 
 
 def _token(b: dict) -> str:

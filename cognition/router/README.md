@@ -43,7 +43,7 @@ et les limites actuelles des outils natifs sont explicités dans [docs/EXECUTION
 | `analysis/` | **Analysis** — understands the data and keeps the active library | `parse`, `ingest` (snapshots → benchmarks / offers with identities) · `identity`, `aliases`, `media`, `catalog` · `knowledge` (owner's declarations) · `scoring`, `select`, `pareto`, `tiers`, `decision_pareto`, `postes`, `dossier` · `changes`, `alerts` (detection, verdicts), `telegram` (messages, buttons, sending), `recommend` · `refresh` (the cycle) |
 | `plan/` | **Plan** — the owner's subscriptions | `declared` (his plans: one writer) · `subscriptions` (meters, real usage, cost price of a token) · `quota_watch` (service) · `mail` (subscription mails) · `watch` (web research per plan) · `news` (new benefits or changes → notices) |
 | `interface/` | **Interface** — the library page | `library` (rows, publishing) · `page` (HTML) · `translate` (English) · `site/` (Cloudflare Pages functions) |
-| `serve/` | What Walter calls at run time | `api` (schémas) · `brief` (note) · `run` / `engine` (texte exécuté par Walter Engine, lot E5) / `text_agent` (ancienne boucle, repli `legacy`) · `choose` (pick) · `routes` (execution routes, free-text entry) · `intent` (decision model) · `execution` (provider order, hosts, probes, reliability) · `media_exec` (image / video / music / voice) · `oneshot` (economic-tier answers) · `hermes_sync` |
+| `serve/` | What Walter calls at run time | `api` (schémas) · `brief` (note) · `run` / `engine` (texte exécuté par Walter Engine, lot E5 ; l'ancienne boucle `text_agent` a été retirée le 11/11/2026) · `choose` (pick) · `routes` (execution routes, free-text entry) · `intent` (decision model) · `execution` (provider order, hosts, probes, reliability) · `media_exec` (image / video / music / voice) · `oneshot` (economic-tier answers) · `hermes_sync` |
 | `guardian/` | **Guardian** — the module's own maintenance (2026-10-26) | `checks` (detection, no model) · `run` (incidents, decisions, Telegram) · `repair` (the L2 agent on a copy of the module, deterministic gates, landing) · `prompt.md` · README |
 | `store/` | The database | `db`, `migrations/` (each table and view commented) |
 | `llm/` | walter-llm, the model gateway (own venv, 127.0.0.1:8894) | |
@@ -216,6 +216,7 @@ Le Router décide (tâche, niveau, modèle) puis, si l'instance le lie au moteur
 run rangé sous celui de l'appelant ; la tâche `runs.tasks`, le lien vers la session du moteur et les observations
 persistées restent au Router. Liaison dans `@instance/config/router/host.json` :
 `"engine_api": {"url": "http://127.0.0.1:8895", "token_file": "@instance/bootstrap/engine/api.token", "walter_run": "engine"}`
-(absente ou `legacy` = ancienne boucle `text_agent`, sans terminal). Un modèle nommé par le propriétaire, les médias et les
+(absente ou `legacy` = le travail texte échoue avec `engine_unavailable` : l'ancienne boucle `text_agent` a été retirée le
+11/11/2026, le moteur est la seule boucle). Un modèle nommé par le propriétaire, les médias et les
 services web restent sur leurs chemins du Router. Moteur indisponible = erreur dite (`engine_unavailable`), jamais
 une seconde boucle en silence. Essais : `tests/test_engine_run.py`.
