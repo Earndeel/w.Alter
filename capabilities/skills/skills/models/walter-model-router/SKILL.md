@@ -159,3 +159,18 @@ PY
 - Exécuter la suite `walter-python -m pytest -q tests`. Si `tests/test_documentation.py` signale une référence générée périmée, lancer `walter-router docs --write`, examiner le diff et relancer les tests. Contrôler aussi `walter-router health` ; distinguer les sources anciennes sans rapport avec le rerank des erreurs introduites.
 - Après un changement de modèle autorisé par Monsieur, vérifier le consommateur réel avec `walter_memory.search.search("Walter Router choix du modèle de reranking", limit=8, rerank=True, max_privacy="redacted_cloud")`. Ne sortir que le nombre de résultats et la durée. Vérifier ensuite les métadonnées de l'appel dans `system.model_calls` avec `SELECT model, status, cost_usd, at FROM system.model_calls WHERE processor='search.rerank' ORDER BY at DESC LIMIT 4`. La connexion mémoire renvoie des lignes dictionnaires ; la colonne temporelle s'appelle `at`, pas `created_at`. Relier la vérification à l'heure du test sans afficher les résultats personnels.
 - Ne pas transformer un petit test de pertinence ou une baisse de coût en preuve de supériorité générale. Consigner séparément l'autorisation du changement, les benchmarks disponibles et les observations du test réel.
+
+## Vérifier un cycle de 48 h sans modifier le routeur
+
+- Si la collecte et le calcul sont déjà faits, ne les relancez pas. Commencez par les commandes de lecture :
+  ```sh
+  date -u +%Y%m%d
+  /walter/cognition/router/bin/walter-router review
+  /walter/cognition/router/bin/walter-router health
+  /walter/cognition/router/bin/walter-router alias-list
+  ```
+- Consultez la méthode dans `/walter/cognition/router/docs/TIERS.md` et les préférences dans `/walter/cognition/router/config/knowledge.json`. Pour approfondir une tâche, utilisez `/walter/cognition/router/bin/walter-router dossier <tâche>` ; ne recalculez pas arbitrairement les niveaux.
+- Pour les alias, privilégiez `alias-list`. Le chemin `/walter/cognition/router/walter_router/aliases.json` peut être absent : dans la session observée, le fichier était situé à `/walter/cognition/router/analysis/aliases.json`. Lisez ce fichier si nécessaire, sans le modifier.
+- Avant toute correction de nom, consultez `/walter/cognition/router/bin/walter-router --help`, puis l'aide d'`alias-add` pour obtenir la syntaxe effective. Vérifiez que les deux noms désignent bien le même modèle et la même variante ; un rapprochement proposé n'est pas une preuve. Utilisez uniquement la commande validée `alias-add`, jamais une écriture directe dans la base, les alias ou la configuration. Relisez ensuite `alias-list` et `review` pour vérifier le résultat.
+- Distinguez la réussite globale du cycle de la fraîcheur de chaque source : un cycle `ok` peut coexister avec une erreur de collecte et des scores périmés. Signalez l'âge, le périmètre touché et l'erreur exacte ; présentez une cause supposée comme une hypothèse. Ne réparez pas le collecteur pendant une mission limitée à l'analyse et aux alias.
+- Ne déléguez pas et n'appelez pas d'autres modèles lorsque le mandat l'interdit. Ne modifiez aucun autre fichier du projet.
