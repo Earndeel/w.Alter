@@ -140,6 +140,29 @@ def to_events(chat: dict, msgs: list[dict], people: dict) -> tuple[list[dict], l
     return out, media
 
 
+def attach_known_objects(conn, evs: list[dict]) -> int:
+    """Best-effort object_refs (A5): files of these messages already in the Raw Vault (stored by an earlier run, e.g.
+    for an edit of an older message) are referenced on the new events. A brand-new message's media are fetched after
+    its event is written (append-only: never updated), so its files are found at read time through core.object_links
+    (beeper_message → source_id), like the whole history. Never fails the sync."""
+    keys = {e.get("payload", {}).get("target_source_id") or e["source_id"] for e in evs}
+    try:
+        with conn.transaction():         # a savepoint: a failed lookup never aborts the events' transaction
+            rows = conn.execute("""select target_id, array_agg(object_id::text order by object_id) ids
+                                   from core.object_links where target_type = 'beeper_message' and target_id = any(%s)
+                                   group by 1""", (list(keys),)).fetchall()
+    except Exception:  # noqa: BLE001
+        return 0
+    found = {r["target_id"]: r["ids"] for r in rows}
+    n = 0
+    for e in evs:
+        ids = found.get(e.get("payload", {}).get("target_source_id") or e["source_id"])
+        if ids and e["event_type"] in ("message.sent", "message.received", "message.edited"):
+            e["object_refs"] = ids
+            n += 1
+    return n
+
+
 def sync_chat(bp: Beeper, chat: dict, backfill_pages: int) -> tuple[int, int]:
     cp = ingestion.get_checkpoint(CONNECTOR, chat["id"])
     people = {p["id"]: p for p in ((chat.get("participants") or {}).get("items") or [])}
@@ -151,6 +174,7 @@ def sync_chat(bp: Beeper, chat: dict, backfill_pages: int) -> tuple[int, int]:
         evs, media = to_events(chat, msgs, people)
         with connection() as conn:
             if evs:
+                attach_known_objects(conn, evs)
                 inserted += events.record_events(evs, conn=conn)["inserted"]
             ingestion.set_checkpoint(CONNECTOR, chat["id"], {**cp, **cursor_update},
                                      last_item_at=max((m["timestamp"] for m in msgs), default=None), conn=conn)

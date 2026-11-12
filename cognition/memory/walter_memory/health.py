@@ -1,9 +1,80 @@
 """Walter Memory health (P7 supervision, §8.1): freshness per connector, failures, queues, budgets, index lag,
-privacy flags. Returns problems as short strings (empty = healthy) plus a metrics dict."""
+privacy flags, model-call error rate per processor and decisions taken by fallback (SOCLE A8, 2026-11-11: 409 failed
+model calls in 4 h had stayed invisible). Returns problems as short strings (empty = healthy) plus a metrics dict;
+`metrics["errors"]` lists the problems of severity error (prefix `model_calls:`), the others are warnings."""
 from __future__ import annotations
+
+import re
+import subprocess
+import tomllib
+from functools import lru_cache
+from pathlib import Path
 
 from .db import connection
 from .llm import ACCOUNT_FLOOR_USD, account_balance, budget_status
+
+ERROR_PREFIXES = ("model_calls:",)
+DEFAULTS = {"model_calls": {"window_min": 30, "min_calls": 5, "error_ratio": 0.5},
+            "triage": {"window_h": 24, "min_errors": 5}}
+_MASKS = [
+    (re.compile(r"(?i)(bearer\s+)\S+"), r"\1***"),
+    (re.compile(r"(?i)((?:password|passwd|secret|token|api[_-]?key|authorization|session)[\"']?\s*[:=]\s*)\S+"), r"\1***"),
+    (re.compile(r"https?://\S+"), "<url>"),
+    (re.compile(r"(?:~|\.{0,2})?/[\w.@+-]+(?:/[\w.@+-]+)+"), "<path>"),
+    (re.compile(r"\b[A-Za-z0-9_+/=-]{24,}\b"), "***"),
+]
+
+
+@lru_cache(maxsize=1)
+def settings() -> dict:
+    """config/health.toml, the instance override first; defaults when absent or unreadable."""
+    path = None
+    try:
+        path = subprocess.run(["walter", "instance", "config", "memory", "health.toml"], capture_output=True,
+                              text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    p = Path(path) if path else Path(__file__).resolve().parent.parent / "config" / "health.toml"
+    try:
+        data = tomllib.loads(p.read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        data = {}
+    return {k: {**v, **(data.get(k) or {})} for k, v in DEFAULTS.items()}
+
+
+def mask_error(text: str | None, limit: int = 80) -> str:
+    """Error class for a health line: no URL, no path, no token; first `limit` characters."""
+    t = " ".join(str(text or "").split())
+    for pat, rep in _MASKS:
+        t = pat.sub(rep, t)
+    return t[:limit]
+
+
+def severity(problem: str) -> str:
+    return "error" if problem.startswith(ERROR_PREFIXES) else "warning"
+
+
+def model_call_problems(rows: list[dict], cfg: dict | None = None) -> list[str]:
+    """rows: {processor, calls, failed, dominant} over the window. A processor with at least `min_calls` calls and a
+    failed ratio above `error_ratio` is a problem `model_calls:<processor>:<ratio> — …` (severity error)."""
+    cfg = cfg or DEFAULTS["model_calls"]
+    out = []
+    for r in rows:
+        calls, failed = int(r.get("calls") or 0), int(r.get("failed") or 0)
+        if calls < int(cfg["min_calls"]) or not calls:
+            continue
+        ratio = failed / calls
+        if ratio > float(cfg["error_ratio"]):
+            out.append(f"model_calls:{r['processor']}:{ratio:.2f} — {failed}/{calls} model calls failed in "
+                       f"{cfg['window_min']} min: {mask_error(r.get('dominant'))}")
+    return out
+
+
+def triage_problems(errors: int, total: int, cfg: dict | None = None) -> list[str]:
+    cfg = cfg or DEFAULTS["triage"]
+    if errors >= int(cfg["min_errors"]):
+        return [f"triage: {errors}/{total} decisions in {cfg['window_h']} h taken without the model (payload.error, rule fallback)"]
+    return []
 
 
 def check() -> tuple[list[str], dict]:
@@ -36,6 +107,23 @@ def check() -> tuple[list[str], dict]:
         secrets = conn.execute("""select count(*) n from privacy.detections where category = 'secret' and reviewed_at is null
                                   and at > now() - interval '1 day'""").fetchone()["n"]
         m["new_secret_flags_24h"] = secrets
+        cfg = settings()
+        mc = conn.execute("""select processor, count(*) calls, count(*) filter (where status <> 'ok') failed,
+                                    mode() within group (order by left(error, 200)) filter (where status <> 'ok') dominant
+                             from system.model_calls where at > now() - make_interval(mins => %s)
+                             group by 1""", (int(cfg["model_calls"]["window_min"]),)).fetchall()
+        m["model_calls_window"] = {r["processor"]: {"calls": r["calls"], "failed": r["failed"]} for r in mc}
+        problems += model_call_problems(mc, {**cfg["model_calls"]})
+    try:   # triage decisions recorded with payload.error: the model failed and a rule decided instead
+        with connection() as conn:
+            t = conn.execute("""select count(*) filter (where nullif(payload->>'error', '') is not null) errors,
+                                       count(*) total from triage.decisions
+                                where decided_at > now() - make_interval(hours => %s)""",
+                             (int(cfg["triage"]["window_h"]),)).fetchone()
+        m["triage_errors"] = {"errors": t["errors"], "total": t["total"]}
+        problems += triage_problems(t["errors"], t["total"], cfg["triage"])
+    except Exception as e:  # noqa: BLE001 — schema absent on a fresh database
+        m["triage_errors"] = f"unreadable: {type(e).__name__}"
     try:   # Memory V1 pipeline: bus delivery and extraction freshness (a notification is not proof of memory)
         from . import bus, extract2
         lg = bus.lag("memory.extract", ["memory.event"])
@@ -68,6 +156,9 @@ def check() -> tuple[list[str], dict]:
                     problems.append(f"assimilation {b['processor']}: {b['failing']} keys failing (walter-memory assimilation status)")
             m["assimilation_24h"] = {r["processor"]: {k: int(v or 0) for k, v in r.items() if k != "processor"}
                                      for r in processing.summary(24)}
+            for proc, st24 in m["assimilation_24h"].items():   # errors counted, not hidden behind a fallback
+                if st24.get("errors"):
+                    problems.append(f"assimilation {proc}: {st24['errors']} processing errors in 24 h")
     except Exception as e:
         problems.append(f"memory pipeline health unreadable: {type(e).__name__}")
     try:        # purged data must stay purged, including after a restore (purge ledger, cleanup phase 2)
@@ -88,4 +179,5 @@ def check() -> tuple[list[str], dict]:
         m["openrouter_balance_usd"] = round(bal, 2)
         if bal < ACCOUNT_FLOOR_USD["recurring"] * 2:
             problems.append(f"OpenRouter balance low: {bal:.2f} USD (synthesis stops below {ACCOUNT_FLOOR_USD['recurring']} USD)")
+    m["errors"] = [p for p in problems if severity(p) == "error"]
     return problems, m

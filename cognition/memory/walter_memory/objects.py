@@ -166,9 +166,31 @@ def get_object(ref: str, dest: str | Path | None = None, *, max_privacy: str = "
     return out
 
 
+def _scope_sql(thread_id: str | None, event_id: str | None) -> tuple[str, list]:
+    """Object ids attached to the messages of a thread, or to one event: per-message links (core.object_links),
+    the events' object_refs, and files linked to a whole thread (e.g. a Hermes session). Resolved at read time, so
+    the whole history is covered without rewriting append-only events (A5)."""
+    from .events import EVENT_LINKS, THREAD_LINKS, link_sql
+    if event_id:
+        ev, ev_args = "e.event_id = %s::uuid", [event_id]
+    else:   # the source list lets the (source, thread_id, occurred_at) index serve the thread
+        ev, ev_args = "e.source = any(%s) and e.thread_id = %s", [list(EVENT_LINKS) + list(THREAD_LINKS), thread_id]
+    sql = (f"id in (select l.object_id from core.events e join core.object_links l on {link_sql('e')} where {ev}"
+           f" union select unnest(e.object_refs) from core.events e where {ev}")
+    args = ev_args + ev_args
+    if thread_id and not event_id:
+        sql += " union select l.object_id from core.object_links l where l.target_type = any(%s) and l.target_id = %s"
+        args += [list(THREAD_LINKS.values()), thread_id]
+    return sql + ")", args
+
+
 def search(text: str = "", kind: str | None = None, source: str | None = None, limit: int = 20,
-           *, max_privacy: str = "local_only") -> list[dict]:
-    """Filter metadata and derived snippets before any object row leaves the library."""
+           *, max_privacy: str = "local_only", thread_id: str | None = None, event_id: str | None = None,
+           since=None, until=None, derived: bool | None = None, text_chars: int = 300) -> list[dict]:
+    """Filter metadata and derived snippets before any object row leaves the library.
+    thread_id / event_id: the files of one conversation or one message (« the voice notes of conversation X » = one
+    call with kind="audio", oldest first); since/until on captured_at; derived: only objects with (True) / without
+    (False) a derived text."""
     where, args = ["purged_at is null", "privacy_class = any(%s)"], [privacy.allowed_classes(max_privacy)]
     if text:
         where.append("(to_tsvector('french', coalesce(derived_text,'') || ' ' || coalesce(original_name,''))"
@@ -178,12 +200,57 @@ def search(text: str = "", kind: str | None = None, source: str | None = None, l
         where.append("kind = %s"); args.append(kind)
     if source:
         where.append("source = %s"); args.append(source)
+    if thread_id or event_id:
+        s, a = _scope_sql(thread_id, event_id)
+        where.append(s); args += a
+    if since:
+        where.append("captured_at >= %s::timestamptz"); args.append(str(since))
+    if until:
+        where.append("captured_at < %s::timestamptz"); args.append(str(until))
+    if derived is not None:
+        where.append("derived_at is not null" if derived else "derived_at is null")
+    order = "captured_at asc nulls last" if thread_id or event_id else "captured_at desc nulls last"
     with connection() as conn:
         return conn.execute(
-            f"""select id::text, kind, source, original_name, captured_at, size_bytes, privacy_class, storage_zone,
-                       left(derived_text, 300) as derived_text
-                from core.objects where {' and '.join(where)} order by captured_at desc nulls last limit %s""",
+            f"""select id::text, kind, source, mime, original_name, captured_at, size_bytes, privacy_class, storage_zone,
+                       derived_kind, left(derived_text, {max(0, int(text_chars))}) as derived_text
+                from core.objects where {' and '.join(where)} order by {order} limit %s""",
             (*args, limit)).fetchall()
+
+
+DERIVED_KINDS = ("transcript", "extract", "ocr", "caption")   # core.objects.derived_kind check (001)
+
+
+def set_derived(object_id: str, text: str, derived_kind: str, *, model: str | None, processor: str,
+                meta: dict | None = None, conn=None) -> dict:
+    """The write path of an object's derived text (A5): text, kind, model, processor, time, status 'derived', and
+    `meta.media` (result notes such as no speech). Credentials are masked before storage; the object's privacy class
+    is only ever tightened by what the text reveals. The objects_publish trigger publishes the change (memory.object)
+    in the same transaction, so the search index follows within seconds."""
+    if derived_kind not in DERIVED_KINDS:
+        raise ValueError(f"derived_kind must be one of {DERIVED_KINDS}")
+    if conn is None:
+        with connection() as c:
+            return set_derived(object_id, text, derived_kind, model=model, processor=processor, meta=meta, conn=c)
+    text = privacy.mask_secrets(text or "") or ""
+    if "\x00" in text:
+        text = text.replace("\x00", "\ufffd")
+    row = conn.execute("select source, privacy_class from core.objects where id = %s::uuid", (str(object_id),)).fetchone()
+    if row is None:
+        raise FileNotFoundError(f"no vault object {object_id}")
+    cats = {c for c, _ in privacy.detect(text)}
+    cls = row["privacy_class"]
+    if cats:
+        cls = privacy.strictest(cls, privacy.classify(conn, {"source": row["source"], "categories": cats})[0])
+    return conn.execute(
+        """update core.objects set derived_text = %s, derived_kind = %s, derived_model = %s, derived_processor = %s,
+                  derived_at = now(), status = 'derived', privacy_class = %s,
+                  meta = meta || jsonb_build_object('media', %s::jsonb)
+           where id = %s::uuid
+           returning id::text, kind, derived_kind, derived_model, derived_processor, derived_at, privacy_class,
+                     length(derived_text) as chars""",
+        (text, derived_kind, model, processor, cls, json.dumps(meta or {}, ensure_ascii=False, default=str),
+         str(object_id))).fetchone()
 
 
 def stats() -> list[dict]:

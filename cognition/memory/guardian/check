@@ -37,13 +37,23 @@ r = sh("walter-memory", "health", timeout=120)
 try:
     h = json.loads(r.stdout)
     for p in h.get("problems") or []:
+        if p.startswith("model_calls:"):
+            # SOCLE A8: a processor whose model calls mostly fail (severity error in walter-memory health). Often a
+            # service still running old library code: the core guardian's deploy:stale covers the restart.
+            proc = p.split(":")[1]
+            out.append(inc("memory", f"health:model_calls:{proc}", "model_calls_failing", "high",
+                           f"Walter Memory : les appels modèle du processeur {proc} échouent ({p.split(' — ', 1)[-1][:200]}).",
+                           {"problem": p[:300], "processor": proc}, "G1"))
+            continue
         sev = "info" if "dead jobs" in p else "warning"
         out.append(inc("memory", "health:" + p.split(":")[0], "health_problem", sev, f"Walter Memory : {p}.", {"problem": p}, "G1"))
 except ValueError:
     out.append(inc("memory", "health:unavailable", "check_failed", "high", "walter-memory health ne répond pas.", {"rc": r.returncode}))
 try:
     import os
-    ap = "/root/.hermes/logs/memory-autopilot/latest.json"
+    # the instance's logs (/root/.hermes/logs is only a compatibility link to them since 2026-11-11)
+    ap = (sh("walter", "instance", "path", "logs", "memory-autopilot", "latest.json", timeout=20).stdout.strip()
+          or "/root/.hermes/logs/memory-autopilot/latest.json")
     age = (time.time() - os.stat(ap).st_mtime) / 3600
     s = json.load(open(ap))["summary"]
     if age > 30:

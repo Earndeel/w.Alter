@@ -15,6 +15,13 @@ with urgency (now / today / later), category and needs_reply.
    before any model call (2026-11-05).
 One decision per thread per run (the latest incoming message); every other incoming event of the burst is
 'remember'. SHADOW by default: decisions are recorded in triage.decisions, nothing is sent.
+
+A failed decision is never final (socle M2, 2026-11-11: during the 11-11 outage 135 decisions were stored with
+payload.error and the fallback 'remember', and `on conflict do nothing` made them final). When the decision model
+fails, nothing is stored for that event: the next pass re-selects it (events without a decision ingested within
+RETRY_WINDOW are taken again even behind the checkpoint). Only once the window is over is the fallback stored, error
+kept, so an event is never lost. `redecide_errors()` (`walter-memory tasks triage-redecide`) re-decides rows already
+stored with payload.error; the new decision replaces the row and keeps the old one in payload.previous.
 """
 from __future__ import annotations
 
@@ -31,6 +38,7 @@ CONNECTOR = "triage"
 KINDS = {("beeper", "message.received"), ("gmail", "email.received"), ("calendar", "calendar.event")}
 THREAD_WINDOW = 6
 TEXT_CAP = 400
+RETRY_WINDOW = timedelta(hours=48)     # a failed decision is retried this long, then the fallback is stored
 
 QUESTIONS = {
     "action": {"type": "choice", "instructions": (
@@ -123,34 +131,59 @@ def _apply_rules(r: dict, ev: dict, ctx: dict, d: dict, now_local: datetime, sen
     return action, rule
 
 
-def run(limit: int = 200, dry: bool = False) -> dict:
-    r = rules()
+def _self_names() -> list[str]:
     from_bench = Path(__file__).resolve().parent.parent / "bench" / "media_triage_jev.py"
-    self_names: list[str] = []
     if from_bench.exists():  # Monsieur's names (single list already used by the media triage bench)
         import re
         m = re.search(r"SELF_NAMES = (\[.*?\])", from_bench.read_text())
-        self_names = json.loads(m.group(1)) if m else []
+        return json.loads(m.group(1)) if m else []
+    return []
+
+
+EVENT_COLUMNS = """e.event_id, e.event_type, e.source, e.thread_id, e.occurred_at, e.ingested_at, e.content, e.payload,
+                   e.privacy_class"""
+
+
+def run(limit: int = 200, dry: bool = False) -> dict:
     cur = ingestion.get_checkpoint(CONNECTOR, "events")
     since = cur.get("ingested_at") or (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
     with connection() as conn:
-        evs = list(conn.execute("""select e.event_id, e.event_type, e.source, e.thread_id, e.occurred_at, e.ingested_at,
-                                          e.content, e.payload, e.privacy_class
+        # new events after the checkpoint, and events behind it still without a decision (a failed decision is
+        # stored nowhere, so it is taken again here until RETRY_WINDOW is over)
+        evs = list(conn.execute(f"""select {EVENT_COLUMNS}
                                    from core.events e
-                                   where e.ingested_at > %s and (e.source, e.event_type) in
+                                   where e.ingested_at > least(%s::timestamptz, now() - %s)
+                                     and (e.source, e.event_type) in
                                          (('beeper','message.received'), ('gmail','email.received'),
                                           ('calendar','calendar.event'))
                                      and not exists (select 1 from triage.decisions d where d.event_id = e.event_id)
-                                   order by e.ingested_at limit %s""", (since, limit)))
+                                   order by e.ingested_at limit %s""", (since, RETRY_WINDOW, limit)))
     if not evs:
         return {"decided": 0}
+    out = _decide(evs, dry=dry)
+    if not dry:
+        last = max(evs, key=lambda e: e["ingested_at"])
+        if last["ingested_at"] > datetime.fromisoformat(since):
+            with connection() as conn:
+                ingestion.set_checkpoint(CONNECTOR, "events", {"ingested_at": last["ingested_at"].isoformat()},
+                                         last_item_at=last["occurred_at"], conn=conn)
+    return out
+
+
+def _decide(evs: list[dict], *, dry: bool = False, replace_errors: bool = False) -> dict:
+    """One decision per event (the latest of each thread decided, the rest of the burst 'remember'). A failed model
+    call stores nothing (retried by the next pass) unless the event is past RETRY_WINDOW. replace_errors: rows already
+    stored with payload.error are overwritten (previous row kept in payload.previous); other rows never change."""
+    r = rules()
+    self_names = _self_names()
     latest: dict[tuple, dict] = {}
     for ev in evs:  # one decision per thread per run: the latest incoming event
         key = (ev["source"], ev["thread_id"] or str(ev["event_id"]))
         if key not in latest or ev["occurred_at"] > latest[key]["occurred_at"]:
             latest[key] = ev
     tz = ZoneInfo(r["timezone"])
-    out = {"decided": 0, "by_action": {}, "errors": 0}
+    out = {"decided": 0, "by_action": {}, "errors": 0, "retry_later": 0}
+    now = datetime.now(timezone.utc)
     with connection() as conn:
         sent_last_hour = conn.execute("""select count(*) as n from triage.decisions where delivered_at > now() - interval '1 hour'
                                          """).fetchone()["n"]
@@ -175,8 +208,12 @@ def run(limit: int = 200, dry: bool = False) -> dict:
                              "category": a["category"]["choice"],
                              "needs_reply": (a["needs_reply"].get("noul") or 0) >= 0.5,  # noul = probability of yes
                              "confidence": a["action"]["confidence"], "model": res["model"]}
-                    except Exception as exc:  # noqa: BLE001 — never lose an event: remember it
+                    except Exception as exc:  # noqa: BLE001
                         out["errors"] += 1
+                        if now - ev["ingested_at"] < RETRY_WINDOW:
+                            out["retry_later"] += 1          # not stored: the next pass decides it again
+                            continue
+                        # past the retry window: never lose the event — remembered, the error kept
                         d = {"action": "remember", "urgency": "later", "category": None, "needs_reply": None,
                              "confidence": None, "model": None, "error": f"{type(exc).__name__}: {exc}"[:200]}
                     action, rule = _apply_rules(r, ev, ctx, d, datetime.now(tz), sent_last_hour)
@@ -186,16 +223,43 @@ def run(limit: int = 200, dry: bool = False) -> dict:
                                                    "their_messages_30d", "attachments", "content_withheld")}}
             d = rec["d"]
             if not dry:
-                conn.execute("""insert into triage.decisions (event_id, occurred_at, source, thread_id, model_action,
+                conflict = ("""on conflict (event_id) do update set decided_at = now(), model_action = excluded.model_action,
+                                   action = excluded.action, urgency = excluded.urgency, category = excluded.category,
+                                   needs_reply = excluded.needs_reply, confidence = excluded.confidence,
+                                   model = excluded.model, rule = excluded.rule,
+                                   payload = excluded.payload || jsonb_build_object('previous', jsonb_build_object(
+                                       'decided_at', triage.decisions.decided_at, 'action', triage.decisions.action,
+                                       'error', triage.decisions.payload->>'error'))
+                                where triage.decisions.payload->>'error' is not null
+                                  and triage.decisions.delivered_at is null""" if replace_errors
+                            else "on conflict (event_id) do nothing")
+                conn.execute(f"""insert into triage.decisions (event_id, occurred_at, source, thread_id, model_action,
                                     action, urgency, category, needs_reply, confidence, model, rule, shadow, payload)
-                                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb) on conflict (event_id) do nothing""",
+                                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb) {conflict}""",
                              (ev["event_id"], ev["occurred_at"], ev["source"], ev["thread_id"], d.get("action"),
                               rec["action"], d.get("urgency"), d.get("category"), d.get("needs_reply"),
                               d.get("confidence"), d.get("model"), rec["rule"] or None, r["shadow"],
                               json.dumps({"context": rec.get("ctx"), "error": d.get("error")}, default=str)))
             out["decided"] += 1
             out["by_action"][rec["action"]] = out["by_action"].get(rec["action"], 0) + 1
-        if not dry:
-            ingestion.set_checkpoint(CONNECTOR, "events", {"ingested_at": evs[-1]["ingested_at"].isoformat()},
-                                     last_item_at=evs[-1]["occurred_at"], conn=conn)
     return out
+
+
+def redecide_errors(since: str | None = None, limit: int = 200, dry: bool = True) -> dict:
+    """Re-decide events whose stored decision failed (payload.error, never delivered). Dry by default: reports the
+    rows and what would be decided without writing. A new failure leaves the row as it was."""
+    with connection() as conn:
+        evs = list(conn.execute(f"""select {EVENT_COLUMNS} from triage.decisions d
+                                   join core.events e on e.event_id = d.event_id and e.occurred_at = d.occurred_at
+                                   where d.payload->>'error' is not null and d.delivered_at is null
+                                     and (%s::timestamptz is null or d.decided_at >= %s::timestamptz)
+                                   order by e.ingested_at limit %s""", (since, since, limit)))
+        stored = conn.execute("""select count(*) n from triage.decisions where payload->>'error' is not null
+                                 and delivered_at is null""").fetchone()["n"]
+    if not evs:
+        return {"stored_with_error": stored, "selected": 0}
+    # a re-decision must not fall back to a final 'remember' again: past-window failures are skipped, not stored
+    for ev in evs:
+        ev["ingested_at"] = datetime.now(timezone.utc)
+    res = _decide(evs, dry=dry, replace_errors=True)
+    return {"stored_with_error": stored, "selected": len(evs), "dry": dry, **res}

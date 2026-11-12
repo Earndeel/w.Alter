@@ -424,8 +424,9 @@ def read(q: dict) -> dict:
 # ── candidates for a new message (walter-context preflight, step D) ─────────────────────────────────────────────────
 def subject_candidates(message: str, session_id: str | None = None, at: datetime | None = None,
                        limit: int = SHORTLIST, embed=None) -> dict:
-    """The subjects a new owner message may belong to, as cards, closest first, plus the subject the session's last
-    attached exchange went to ('waiting'). Local embeddings only: nothing leaves the VM here."""
+    """The threads a new owner message may belong to, as cards: subjects closest first, then the owner's active
+    objectives (`runs.objective_candidates`), plus the thread the session's last exchange went to ('waiting').
+    Local embeddings only: nothing leaves the VM here."""
     from .db import connection
     if embed is None:
         from .search import embed
@@ -443,5 +444,14 @@ def subject_candidates(message: str, session_id: str | None = None, at: datetime
         cards = [{"id": r["view_key"], **_card(conn, r["view_key"]),
                   "hours_since_last": round((at - r["last_at"]).total_seconds() / 3600, 1),
                   "similarity": round(float(r["sim"]), 3) if r.get("sim") is not None else None} for r in rows]
-    return {"candidates": cards, "waiting": waiting["view_key"] if waiting else None,
-            "waiting_age_s": (at - waiting["occurred_at"]).total_seconds() if waiting else None}
+    out = {"candidates": cards, "waiting": waiting["view_key"] if waiting else None,
+           "waiting_age_s": (at - waiting["occurred_at"]).total_seconds() if waiting else None}
+    try:        # the owner's active objectives are threads too (Run Plane, A3): a task is found from any session
+        from . import runs
+        tasks = runs.objective_candidates(message, session_id, at, embed, exclude={c["id"] for c in cards})
+    except Exception:  # noqa: BLE001 — the subjects alone
+        tasks = {"candidates": [], "waiting": None, "waiting_age_s": None}
+    out["candidates"] = [*cards, *tasks["candidates"]]
+    if tasks["waiting"] and (out["waiting"] is None or (tasks["waiting_age_s"] or 0) < (out["waiting_age_s"] or 0)):
+        out["waiting"], out["waiting_age_s"] = tasks["waiting"], tasks["waiting_age_s"]
+    return out

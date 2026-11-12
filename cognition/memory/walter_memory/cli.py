@@ -50,6 +50,9 @@ def main(argv=None) -> None:
     argv = sys.argv[1:] if argv is None else list(argv)
     if argv[:1] == ["agent-sessions"]:   # the connector parses its own options
         _agent_sessions(argv[1:])
+    if argv[:1] == ["media"]:            # A5 media derivation: status | derive | backfill | search (own options)
+        from . import media
+        raise SystemExit(media.main(argv[1:]))
     p = argparse.ArgumentParser(prog="walter-memory", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("stats")
@@ -169,6 +172,16 @@ def main(argv=None) -> None:
     rn.add_argument("--session", default="", help="find: the latest run of this harness session key"); rn.add_argument("run_id", nargs="?", default="")
     rn.add_argument("--open-only", action="store_true", help="find: unique open session run or exact run_id; metadata only")
     rn.add_argument("--limit", type=int, default=20)
+    tk = sub.add_parser("tasks", help="socle A3: the owner's objectives (list, show, update JSON stdin, sweep) and the "
+                                      "triage re-decision of failed decisions (triage-redecide, dry unless --execute)")
+    tk.add_argument("action", choices=["list", "show", "update", "sweep", "triage-redecide"])
+    tk.add_argument("task_id", nargs="?", default="")
+    tk.add_argument("--thread"); tk.add_argument("--session"); tk.add_argument("--status")
+    tk.add_argument("--limit", type=int, default=10); tk.add_argument("--since")
+    tk.add_argument("--execute", action="store_true", help="triage-redecide: write the new decisions")
+    xp = sub.add_parser("experience", help="socle A4: what was already tried (thread first, then other threads by query)")
+    xp.add_argument("--thread"); xp.add_argument("--query"); xp.add_argument("--limit", type=int, default=5)
+    xp.add_argument("--local", action="store_true", help="owner on the VM: local_only runs included")
     a = p.parse_args(argv)
 
     if a.cmd == "agent-memory":
@@ -464,6 +477,28 @@ def main(argv=None) -> None:
             res = {"events": n}
         else:
             res = {"abandoned": runs.sweep()}
+        print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
+    elif a.cmd == "tasks":
+        from . import runs
+        if a.action == "list":
+            res = runs.tasks_list(thread_id=a.thread, session_id=a.session, status=a.status, limit=a.limit)
+        elif a.action == "show":
+            res = runs.task_get(a.task_id) or {"error": "unknown task"}
+        elif a.action == "update":          # {"task_id"?, "status", "progress", "result", "note"} on stdin
+            spec = json.load(sys.stdin)
+            res = runs.task_update(spec.get("task_id") or a.task_id, status=spec.get("status"),
+                                   progress=spec.get("progress"), result=spec.get("result"), note=spec.get("note"),
+                                   by="cli")
+        elif a.action == "sweep":
+            res = {"abandoned_runs": runs.sweep(), "suspended": runs.suspend_idle()}
+        else:
+            from . import triage
+            res = triage.redecide_errors(since=a.since, limit=a.limit if a.limit != 10 else 200, dry=not a.execute)
+        print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
+    elif a.cmd == "experience":
+        from . import episodes
+        res = episodes.experience(thread_id=a.thread, query=a.query, limit=a.limit,
+                                  max_privacy="local_only" if a.local else "cloud_allowed")
         print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
     elif a.cmd == "views":
         from . import views

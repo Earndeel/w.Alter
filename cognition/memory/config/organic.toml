@@ -61,3 +61,25 @@ pseudonymise = false
 # "full" = the cloud model reasons with everything Kardex knows about people (each claim tagged when it must never be
 # repeated to someone else); "policy" = the filtered view used before.
 kardex_cloud = "full"
+
+[media]
+# A5 (SOCLE, 2026-11-11): every Raw Vault object gets a derived text found from its message (walter_memory/media.py).
+# A new object is derived by the event-driven assimilation (bus memory.object → processing key media.derive); the
+# history by `walter-memory media backfill --kind K` (dry run unless --apply). "on" | "off" per kind group.
+# audio → transcript (Router poste `stt`); document → local extraction, no model; image/screenshot → OCR / caption
+# (Router poste `vision`, off until Monsieur fixes the catch-up budget); video → not derived (out of scope).
+audio = "on"
+document = "on"
+image = "off"
+video = "off"
+# above these sizes an object is recorded as derived with empty text, meta.media.reason = "too_large"
+max_audio_mb = 25
+max_document_mb = 50
+max_image_mb = 15
+# extracted / transcribed text kept on core.objects (characters)
+max_text_chars = 20000
+# default number of objects per backfill run (CLI --limit overrides)
+per_run = 200
+# cost estimate per model call when system.model_calls has no observed cost yet (USD)
+est_usd_audio = 0.0003
+est_usd_image = 0.002

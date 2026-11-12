@@ -8,7 +8,12 @@ from any runtime:
   - pending: every owner message not interpreted yet, VERBATIM (uncovered by extract2, or covered without
     interpretation: local_only for a local audience, failed) — nothing the owner said waits silently for a model;
   - plan: the agent's own plan, read without a model from its plan tool calls in walter_logs;
-  - question: the agent's last message when it ends on a question.
+  - question: the agent's last message when it ends on a question;
+  - objectives (A3, socle 2026-11-11): the owner's objectives this session works on, READ from the Run Plane
+    (runs.tasks kind objective) — never copied here. They reconcile the projection: while an objective is open the
+    SessionState objective is its goal; once every objective of the session is closed (done / failed / cancelled),
+    task-scoped goals and commitments stated before that close are no longer shown as still under way. The Context
+    `tasks` layer renders them; render() does not repeat them.
 Deterministic and model-free (a few SQL queries). Audience rules as everywhere: a cloud audience only gets
 cloud_allowed evidence; the state's class is the strictest of what it contains.
 
@@ -253,6 +258,7 @@ def state(source: str, thread_id: str, *, audience: str = "cloud_model", at: dat
               "interpreted": _interpreted(conn, threads, allowed, at),
               "pending": _pending(conn, threads, allowed, at),
               "plan": _plan(conn, threads, at), "question": _question(conn, threads, allowed, at)}
+    st["objectives"] = _reconcile_objectives(st, thread_id, at)
     classes = [i["privacy_class"] for v in st["interpreted"].values() for i in v] + \
               [p["privacy_class"] for p in st["pending"]]
     last = _last_owner(source, thread_id, allowed, at)
@@ -267,6 +273,28 @@ def state(source: str, thread_id: str, *, audience: str = "cloud_model", at: dat
     st["tokens"] = len(st["text"]) // 4
     st["build_ms"] = round((time.perf_counter() - t0) * 1000)
     return st
+
+
+CLOSED_OBJECTIVE = ("done", "failed", "cancelled")
+
+
+def _reconcile_objectives(st: dict, thread_id: str, at) -> list[dict]:
+    """The session's objectives (Run Plane), and task-scoped goals / commitments that a closed objective ended."""
+    if at is not None:                      # a replay: the Run Plane has no history of statuses, leave it out
+        return []
+    try:
+        from . import runs
+        objs = runs.tasks_list(session_id=thread_id, status="all", limit=5)
+    except Exception:  # noqa: BLE001 — the working state never depends on the Run Plane being readable
+        return []
+    active = [o for o in objs if o["status"] in ("open", "suspended")]
+    closed = [o for o in objs if o["status"] in CLOSED_OBJECTIVE]
+    if closed and not active:
+        cutoff = max(datetime.fromisoformat(o["updated_at"]) for o in closed)
+        for kind in ("goal", "commitment"):
+            st["interpreted"][kind] = [i for i in st["interpreted"][kind]
+                                       if not (i.get("scope") == "task" and i["at"] and i["at"] < cutoff)]
+    return active
 
 
 # Token budget per category (P1.2 densification). Rules (constraints, preferences, corrections) and the owner's
@@ -467,7 +495,9 @@ def session_state(st: dict) -> dict:
     it = st["interpreted"]
     plan = next((i["content"] for i in st.get("plan") or [] if i["status"] == "in_progress"), "")
     return {"thread_id": f"{st['source']}:{st['thread_id']}",
-            "objective": (it["goal"][-1]["text"] if it["goal"] else ""),
+            "objective": (st["objectives"][0]["goal"] if st.get("objectives") and st["objectives"][0].get("goal")
+                          else it["goal"][-1]["text"] if it["goal"] else ""),
+            "tasks": [{"task_id": o["task_id"], "goal": o["goal"], "status": o["status"]} for o in st.get("objectives") or []],
             "constraints": [i["text"] for i in it["constraint"] + it["preference"]],
             "decisions": [i["text"] for i in it["decision"] + it["correction"]],
             "refs": [p["event_id"] for p in st["pending"]], "open_capabilities": [], "plan": plan,

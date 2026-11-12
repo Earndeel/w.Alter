@@ -40,7 +40,9 @@
     "CLI",
     "MCP",
     "Overland authenticated HTTP :3010",
-    "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer"
+    "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer",
+    "HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience)",
+    "CLI tasks list|show|update|sweep|triage-redecide [--execute]; CLI experience [--thread] [--query]"
   ],
   "bindings": {
     "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
@@ -227,6 +229,18 @@
       "vision_target": "cognition/memory"
     },
     {
+      "id": "media",
+      "path": "walter_memory/media.py",
+      "role": "Dérivation des médias du Raw Vault (A5) : audio → transcription (poste stt), document → extraction locale, image → OCR/légende (poste vision, désactivé) ; pilotée par le bus (memory.object), texte sur core.objects.derived_*",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:core",
+        "postgres:processing"
+      ],
+      "vision_target": "cognition/memory"
+    },
+    {
       "id": "gateway",
       "path": "walter_memory/gateway.py",
       "role": "Seule porte d'écriture (127.0.0.1:8890)",
@@ -267,7 +281,7 @@
     {
       "id": "runs",
       "path": "walter_memory/runs.py",
-      "role": "Run Plane (runs, tâches, épisodes de run)",
+      "role": "Run Plane (runs, tâches déléguées et objectifs durables du propriétaire A3, épisodes de run et expérience A4)",
       "status": "active",
       "readme": "README.md",
       "data": [

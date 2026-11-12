@@ -152,22 +152,138 @@ def get_events(*, source: str | None = None, event_types: list[str] | None = Non
               {'where ' + ' and '.join(where) if where else ''}
               order by e.occurred_at {order}, e.event_id {order} limit %s"""
     with connection() as conn:
-        return conn.execute(sql, (*args, int(limit))).fetchall()
+        rows = conn.execute(sql, (*args, int(limit))).fetchall()
+        if event_id and rows:     # one event in full: its files and their derived text too (A5)
+            atts = attachments(rows, max_privacy=max_privacy, chars=4000, conn=conn)
+            for r in rows:
+                r["attachments"] = atts.get(r["event_id"], [])
+        return rows
 
 
-def compact(rows: list[dict], text: str | None = None, width: int = 500, budget: int = 16000) -> dict:
+# ───────────────────────────── attachments (A5, 2026-11-11) ─────────────────────────────
+# A message's files are resolved at read time through core.object_links (the connectors link each stored file to its
+# message) and core.events.object_refs, so the whole history shows its attachments without rewriting append-only rows.
+EVENT_LINKS = {"beeper": ("beeper_message", ""), "gmail": ("email", "gmail:")}   # source → (link type, id prefix)
+THREAD_LINKS = {"hermes": "hermes_session"}                                       # files linked to a whole thread
+ATTACHMENT_CHARS = 300
+_KIND_LABEL = {"transcript": "transcript", "extract": "text", "ocr": "ocr", "caption": "caption"}
+
+
+def link_target(source: str | None, source_id: str | None) -> tuple[str, str] | None:
+    """The core.object_links target of a message event, or None when its source links no files per message."""
+    if source not in EVENT_LINKS or not source_id:
+        return None
+    kind, prefix = EVENT_LINKS[source]
+    return kind, prefix + str(source_id)
+
+
+def link_sql(alias: str = "e") -> str:
+    """SQL condition joining core.object_links `l` to the events `alias` (per-message links)."""
+    return " or ".join(f"({alias}.source = '{s}' and l.target_type = '{t}' and l.target_id = '{p}' || {alias}.source_id)"
+                       for s, (t, p) in EVENT_LINKS.items())
+
+
+def _attachment(o: dict, chars: int, allowed: list[str]) -> dict:
+    if o["privacy_class"] not in allowed:
+        return {"object_id": o["id"], "kind": o["kind"], "withheld": "privacy"}
+    text = o.get("derived_text")
+    media = (o.get("meta") or {}).get("media") or {}
+    return {"object_id": o["id"], "kind": o["kind"], "mime": o.get("mime"), "name": o.get("original_name"),
+            "derived_kind": o.get("derived_kind"),
+            "text": None if text is None else (text[:chars] + ("…" if len(text) > chars else "")),
+            **({"note": media.get("reason") or media.get("result")} if text == "" and media else {})}
+
+
+def attachments(rows: list[dict], *, max_privacy: str = "cloud_allowed", chars: int = ATTACHMENT_CHARS,
+                conn=None) -> dict[str, list[dict]]:
+    """event_id → [{object_id, kind, mime, name, derived_kind, text (bounded)}] for these event rows (they need
+    event_id, source, source_id and optionally object_refs). Objects the reader may not see keep only id and kind.
+    No query when no row can carry files."""
+    keys: dict[tuple[str, str], list[str]] = {}
+    refs: dict[str, list[str]] = {}
+    for r in rows:
+        t = link_target(r.get("source"), r.get("source_id"))
+        if t:
+            keys.setdefault(t, []).append(str(r["event_id"]))
+        for o in r.get("object_refs") or []:
+            refs.setdefault(str(o), []).append(str(r["event_id"]))
+    if not keys and not refs:
+        return {}
+    if conn is None:
+        with connection() as c:
+            return attachments(rows, max_privacy=max_privacy, chars=chars, conn=c)
+    found = conn.execute(
+        """select l.target_type, l.target_id, null::text as ref, o.id::text as id, o.kind, o.mime, o.original_name,
+                  o.derived_kind, o.derived_text, o.privacy_class, o.meta, o.captured_at
+           from core.object_links l join core.objects o on o.id = l.object_id
+           where (l.target_type, l.target_id) in (select * from unnest(%s::text[], %s::text[])) and o.purged_at is null
+           union all
+           select null, null, o.id::text, o.id::text, o.kind, o.mime, o.original_name, o.derived_kind, o.derived_text,
+                  o.privacy_class, o.meta, o.captured_at
+           from core.objects o where o.id = any(%s::uuid[]) and o.purged_at is null
+           order by captured_at nulls last, id""",
+        ([k[0] for k in keys], [k[1] for k in keys], list(refs))).fetchall()
+    allowed = privacy.allowed_classes(max_privacy)
+    out: dict[str, list[dict]] = {}
+    for o in found:
+        owners = keys.get((o["target_type"], o["target_id"]), []) if o["ref"] is None else refs.get(o["ref"], [])
+        for eid in owners:
+            lst = out.setdefault(eid, [])
+            if all(a["object_id"] != o["id"] for a in lst):
+                lst.append(_attachment(o, chars, allowed))
+    return out
+
+
+def attachment_line(a: dict) -> str:
+    """One attachment as a model reads it: [audio · object <id> · transcript: "…"]."""
+    head = f"[{a.get('kind') or 'file'} · object {a['object_id']}"
+    if a.get("withheld"):
+        return head + " · not readable here]"
+    if a.get("text") is None:
+        return head + (f" · {a['name']}" if a.get("name") else "") + " · no text yet]"
+    if a["text"] == "":
+        return head + f" · {a.get('note') or 'no text'}]"
+    label = _KIND_LABEL.get(a.get("derived_kind") or "", "text")
+    return head + f' · {label}: "' + a["text"].replace("\n", " ") + '"]'
+
+
+def render_message(row: dict, atts: list[dict] | None = None) -> str:
+    """A message's text followed by one line per attachment (for any renderer of a conversation): pass the row and
+    `attachments([rows])[event_id]`, or use render_messages."""
+    parts = [row.get("content") or ""] + [attachment_line(a) for a in atts or []]
+    return "\n".join(p for p in parts if p)
+
+
+def render_messages(rows: list[dict], *, max_privacy: str = "cloud_allowed", chars: int = ATTACHMENT_CHARS) -> list[str]:
+    """Each row's text with its attachment lines (one query for all rows); never raises (text only on error)."""
+    try:
+        atts = attachments(rows, max_privacy=max_privacy, chars=chars)
+    except Exception:  # noqa: BLE001
+        atts = {}
+    return [render_message(r, atts.get(str(r.get("event_id")))) for r in rows]
+
+
+def compact(rows: list[dict], text: str | None = None, width: int = 500, budget: int = 16000, *,
+            max_privacy: str = "cloud_allowed") -> dict:
     """Events as an agent reads them: no payload, the content cut to a window around the searched text, the whole
     answer bounded. One full event = get_events(event_id=…). A 50-event answer used to be ~56K chars: spilled to a
-    file, then grepped, then searched again (11 steps for « the first event about Sagora », 07/11)."""
+    file, then grepped, then searched again (11 steps for « the first event about Sagora », 07/11).
+    Each message carries its files (`attachments`, with their derived text, bounded) — A5."""
     out, used, low = [], 0, (text or "").lower()
+    try:
+        atts = attachments(rows, max_privacy=max_privacy)
+    except Exception:  # noqa: BLE001 — attachments enrich the answer, never break it
+        atts = {}
     for r in rows:
         content = r.get("content") or ""
         i = content.lower().find(low) if low else -1
         start = max(0, i - width // 3) if i > 0 else 0
         snippet = ("…" if start else "") + content[start:start + width] + ("…" if start + width < len(content) else "")
         item = {"event_id": r["event_id"], "occurred_at": str(r["occurred_at"]), "source": r["source"],
-                "event_type": r["event_type"], "thread_id": r.get("thread_id"), "actor": r.get("actor_name"),
-                "chars": len(content), "content": snippet}
+                "event_type": r["event_type"], "thread_id": r.get("thread_id"), "source_id": r.get("source_id"),
+                "actor": r.get("actor_name"), "chars": len(content), "content": snippet}
+        if atts.get(str(r["event_id"])):
+            item["attachments"] = atts[str(r["event_id"])]
         size = len(json.dumps(item, ensure_ascii=False, default=str))
         if out and used + size > budget:
             break

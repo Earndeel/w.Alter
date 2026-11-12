@@ -88,6 +88,7 @@ class ContextIn(BaseModel):
     mode: str = "on"
     session_id: str | None = None
     cloud_safe: bool = False     # E2: drop any line that looks like a secret (the engine's context goes to the cloud)
+    thread_id: str | None = None  # socle A3/A4: the preflight's thread, for the tasks / experience layers
 
 
 class AgentMemoryIn(BaseModel):
@@ -140,7 +141,8 @@ def post_context(body: ContextIn):
     from . import context
     source = RUNTIME_OF_CALLER.get(body.caller)
     session = (source, body.session_id.rsplit("/", 1)[-1]) if source and body.session_id else None
-    res = context.get_context(body.query, budget=body.budget, include_profile=body.include_profile, session=session)
+    res = context.get_context(body.query, budget=body.budget, include_profile=body.include_profile, session=session,
+                              thread_id=body.thread_id)
     with connection() as conn:
         conn.execute("""insert into system.context_requests (caller, mode, session_id, query_sha, total_tokens, sections, latency_ms)
                         values (%s,%s,%s,%s,%s,%s,%s)""",
@@ -160,8 +162,12 @@ def post_context(body: ContextIn):
 # same writes the hook makes through the library (walter_hook.run_start / run_end / emit), so a native engine plugin
 # needs no Python. Never a second registry.
 
-ENGINE_BUS_TYPES = {"turn.started", "turn.ended", "session.ended"}
+ENGINE_BUS_TYPES = {"turn.started", "turn.ended", "session.ended", "context.degraded"}
+# context.degraded (socle A2): the engine's intake when the preflight did not answer — metadata only, never the
+# owner's text: any other payload key is refused
+BUS_PAYLOAD_KEYS = {"context.degraded": {"run_id", "stage", "reason"}}
 RUN_CHANNELS = {"owner", "machine", "test"}
+ORIGIN_EXTRA = ("interface", "engine_session", "request_id")
 
 
 class RunStartIn(BaseModel):
@@ -177,6 +183,7 @@ class RunEndIn(BaseModel):
     run_id: str | None = None
     session_id: str | None = None
     status: str = "ended"
+    outcome: dict | None = None        # A4: {status, error: {kind, message}, steps, tool_calls, tool_errors}
 
 
 class BusEmitIn(BaseModel):
@@ -219,6 +226,11 @@ def post_runs_start(body: RunStartIn):
     if not o.get("runtime") or not o.get("session_id") or o.get("channel", "owner") not in RUN_CHANNELS:
         raise HTTPException(422, "origin needs runtime, session_id and a known channel")
     origin = {"channel": o.get("channel", "owner"), "runtime": str(o["runtime"]), "session_id": str(o["session_id"])}
+    for key in ORIGIN_EXTRA:            # A8 traceability: which interface, engine session and request opened the run
+        if o.get(key) not in (None, ""):
+            if not isinstance(o[key], (str, int)):
+                raise HTTPException(422, f"origin.{key} must be a string")
+            origin[key] = str(o[key])[:200]
     if body.cancel_run_id:              # only a run of the same session is ever interrupted
         prev = _run_of(body.cancel_run_id)       # a replay of the same turn never cancels the run it gets back
         if prev and prev["session"] == origin["session_id"] and (not body.dedupe_key or prev["dedupe_key"] != body.dedupe_key):
@@ -245,13 +257,60 @@ def post_runs_end(body: RunEndIn):
     if body.run_id:
         owner = _run_session(body.run_id)
         if owner is not None and (not body.session_id or owner == body.session_id):
-            runs.end(body.run_id, body.status)
+            runs.end(body.run_id, body.status, outcome=body.outcome)
             run_id = body.run_id
     if run_id is None and body.session_id:
-        run_id = runs.end_open(body.session_id, body.status)
+        run_id = runs.end_open(body.session_id, body.status, outcome=body.outcome)
     if run_id:
         _episode_later(run_id)
     return {"run_id": run_id}
+
+
+# ── Socle A3 / A4 (2026-11-11): the owner's durable tasks and the execution experience (contracts between lots) ──
+
+class TasksListIn(BaseModel):
+    thread_id: str | None = None
+    session_id: str | None = None
+    status: str | list[str] | None = None     # one status, a list, "all"; default the active ones (open, suspended)
+    limit: int = 10
+
+
+class TaskUpdateIn(BaseModel):
+    task_id: str
+    status: str | None = None
+    progress: dict | None = None
+    result: dict | None = None
+    note: str | None = None
+
+
+class ExperienceIn(BaseModel):
+    thread_id: str | None = None
+    query: str | None = None
+    limit: int = 5
+
+
+@app.post("/v1/tasks/list", dependencies=[Depends(auth)])
+def post_tasks_list(body: TasksListIn):
+    from . import runs
+    return {"tasks": runs.tasks_list(thread_id=body.thread_id, session_id=body.session_id, status=body.status,
+                                     limit=max(1, min(body.limit, 50)))}
+
+
+@app.post("/v1/tasks/update", dependencies=[Depends(auth)])
+def post_tasks_update(body: TaskUpdateIn):
+    from . import runs
+    res = runs.task_update(body.task_id, status=body.status, progress=body.progress, result=body.result,
+                           note=body.note, by="gateway")
+    if res.get("error"):
+        raise HTTPException(404 if res["error"] == "unknown task" else 422, res["error"])
+    return res
+
+
+@app.post("/v1/experience", dependencies=[Depends(auth)])
+def post_experience(body: ExperienceIn):
+    from . import episodes
+    return {"items": episodes.experience(thread_id=body.thread_id, query=(body.query or "")[:2000] or None,
+                                         limit=max(1, min(body.limit, 20)))}
 
 
 @app.post("/v1/bus/emit", dependencies=[Depends(auth)])
@@ -265,6 +324,11 @@ def post_bus_emit(body: BusEmitIn):
         raise HTTPException(403, {"refused": "type_not_open", "type": body.type})
     if (body.payload or {}).get("observation"):
         raise HTTPException(403, {"refused": "observation_not_on_production_bus"})
+    allowed = BUS_PAYLOAD_KEYS.get(body.type)
+    if allowed is not None and (set(body.payload or {}) - allowed
+                                or any(not isinstance(v, (str, int, float, bool, type(None))) or len(str(v)) > 200
+                                       for v in (body.payload or {}).values())):
+        raise HTTPException(422, f"{body.type} payload: only {sorted(allowed)}, short scalar values")
     with connection() as conn:
         event_id = bus.emit(body.type, body.source, body.subject, body.payload, body.dedupe_key, conn=conn)
     return {"id": event_id, "duplicate": event_id is None}

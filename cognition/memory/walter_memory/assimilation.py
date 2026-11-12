@@ -6,6 +6,7 @@
         └── trigger: every meaningful change of a V1 item is published (memory.derived), same transaction ──▶ bus
 
 What an event marks (one key per processor, coalesced; settle = calm before computing, a deadline for plans):
+  new Raw Vault object (text = false)    media.derive        the object id, when its kind is on ([media], A5)
   any text event / V1 item / object text  search.index        'pending' (the index's own cursor), within ~10 s
   incoming message, e-mail, calendar      triage              'incoming', after 2 min of calm (≤ 10 min while busy)
   location.sample (overland)              flows.visits        'gps', the samples' time range
@@ -52,7 +53,8 @@ SETTLE = {"flows.visits": 300, "flows.conversations": 60, "flows.appointments": 
           "episodic.episodes": 30}
 BURST_SETTLE = timedelta(minutes=15)      # plans are read once a burst has been calm this long (a deadline)
 ORDER = ["search.index", "search.reindex", "triage", "flows.visits", "flows.conversations", "flows.appointments", "flows.work_sessions", "episodic.plans",
-         "episodic.episodes", "periods.day", "periods.week", "periods.month"]
+         "episodic.episodes", "periods.day", "periods.week", "periods.month",
+         "media.derive"]   # last: model calls of a media burst never delay the index, triage or flows
 RECONCILE_S = 6 * 3600
 COMMITMENT_DAYS = 62
 
@@ -197,6 +199,9 @@ def route(evs: list[dict]) -> int:
                 n += _route_derived(conn, ev["subject"], p)
             elif ev["type"] == "memory.view":
                 n += _route_view(conn, ev["subject"], p)
+            elif ev["type"] == "memory.object" and p.get("text") is False:   # a new file → its derived text (A5)
+                from . import media
+                n += media.route(conn, ev["subject"], p)
             elif ev["type"] == "memory.object":     # a file's derived text (OCR, transcript…) → the search index
                 processing.mark(conn, "search.index", "pending", reason="object", settle=10, max_wait=60)
                 n += 1
@@ -207,6 +212,9 @@ def route(evs: list[dict]) -> int:
 def _run_one(processor: str, row: dict) -> dict:
     from . import episodic, flows, periods
     key, lo, hi = row["key"], row["range_from"], row["range_to"]
+    if processor == "media.derive":       # A5: a Raw Vault object's derived text (raises → retried with backoff)
+        from . import media
+        return media.run_key(key)
     if processor == "search.index":
         from . import search
         with connection() as conn:   # the indexer's checkpoint row needs its connector (as registered in production)
@@ -308,7 +316,25 @@ def reconcile() -> dict:
     processing.count("assimilation.reconcile", keys=1, changed=missed)
     if missed:
         log.warning("reconciliation found %s changes the events had not produced", missed)
-    return {"flows": r_f, "missed": missed, "stale_index": len(stale), "plans": r_p, "episodes": {k: v for k, v in r_e.items() if v}}
+    return {"flows": r_f, "missed": missed, "stale_index": len(stale), "plans": r_p, "episodes": {k: v for k, v in r_e.items() if v},
+            "runs": reconcile_runs()}
+
+
+def reconcile_runs() -> dict:
+    """The Run Plane's deadlines (socle A3/A4): runs that never received an end are closed as abandoned, objectives idle
+    too long are suspended (never lost), and the episodes a detached builder missed are built (bounded per pass). Each
+    step stands alone: a failure is logged and counted, the others still run."""
+    from . import episodes, runs
+    out: dict = {}
+    for name, fn in (("abandoned", runs.sweep), ("episodes", lambda: len(episodes.pending()))):
+        try:
+            out[name] = fn()
+        except Exception as exc:
+            log.exception("run plane reconciliation: %s failed", name)
+            out[name] = f"error: {type(exc).__name__}"
+    processing.count("assimilation.reconcile_runs", keys=1,
+                     changed=sum(v for v in out.values() if isinstance(v, int)))
+    return out
 
 
 def run(stop: threading.Event | None = None) -> None:

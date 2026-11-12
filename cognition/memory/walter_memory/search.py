@@ -445,7 +445,7 @@ def search_norm(text: str) -> str:
         return conn.execute("select search.f_unaccent(lower(%s)) as t", (text,)).fetchone()["t"]
 
 
-RERANK_VERSION = "1"
+RERANK_VERSION = "2"
 
 
 def rerank_pools(query: str, pools: dict[str, tuple[list[dict], int]], timeout: float = 8) -> dict[str, list[dict]]:
@@ -480,7 +480,6 @@ def _rerank(query: str, results: list[dict], limit: int, timeout: float = 8) -> 
         return results
     if query_class == 'redacted_cloud' and privacy.pseudonymise():
         query = privacy.redact(query)[0]
-    from .llm import _key
     docs = []
     for r in cloud:
         text = r["text"]
@@ -489,23 +488,19 @@ def _rerank(query: str, results: list[dict], limit: int, timeout: float = 8) -> 
         docs.append(text[:2000])
     if len(cloud) < 2:
         return results
-    from .llm import router_model
-    from . import processing
-    model = router_model("rerank", "cohere/rerank-4-fast")   # Walter Router poste (2026-10-16)
+    from . import llm, processing
     top_n = min(limit, len(docs))
 
     def call():
-        resp = httpx.post("https://openrouter.ai/api/v1/rerank", headers={"Authorization": f"Bearer {_key()}"},
-                          json={"model": model, "query": query, "documents": docs, "top_n": top_n}, timeout=timeout)
-        resp.raise_for_status()
-        data = resp.json()
-        from .llm import _log
-        _log(processor="search.rerank", model=model, purpose="rerank", budget="recurring",
-             privacy_class="redacted_cloud", cost_usd=(data.get("usage") or {}).get("cost"), status="ok")
-        return [int(x["index"]) for x in data["results"]], model
+        # Walter Router's `rerank` poste, executed by the walter-llm gateway (SOCLE A6): the model and its fallbacks
+        # are the Router's; llm.rerank books the call in system.model_calls.
+        out = llm.rerank(query, docs, top_n=top_n, processor="search.rerank", privacy_class="redacted_cloud",
+                         timeout=timeout)
+        return [int(x["index"]) for x in out["results"]], out.get("model")
     # The same query over the same documents is never sent twice (a hook and a pack for one message, a bench rerun):
-    # the ledger keeps the order only (indices), keyed by a hash of model, query and documents.
-    inputs = {"model": model, "query": query, "top_n": top_n,
+    # the ledger keeps the order only (indices), keyed by a hash of the poste, query and documents (version 2: the
+    # model is the Router's choice, known after the call; a poste change is a new RERANK_VERSION).
+    inputs = {"poste": "rerank", "query": query, "top_n": top_n,
               "docs": [hashlib.sha256(d.encode()).hexdigest()[:24] for d in docs]}
     try:
         idx, _ = processing.decide_once("search.rerank", RERANK_VERSION, inputs, call,

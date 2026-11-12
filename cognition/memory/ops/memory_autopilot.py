@@ -22,12 +22,26 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-LOG_DIR = Path("/root/.hermes/logs/memory-autopilot")
+def _log_dir() -> Path:
+    """@instance/logs/memory-autopilot (the instance's logs; /root/.hermes/logs is only a compat link to it)."""
+    try:
+        out = subprocess.run(["walter", "instance", "path", "logs", "memory-autopilot"], capture_output=True,
+                             text=True, timeout=10).stdout.strip()
+        if out.startswith("/"):
+            return Path(out)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return Path("/root/.hermes/logs/memory-autopilot")
+
+
+LOG_DIR = _log_dir()
 DEFAULT_OUTPUT = LOG_DIR / "latest.json"
 ALERT_REPORT = LOG_DIR / "alert-latest.json"
 ROTATE_DOCKER_LOGS = Path("/root/.hermes/scripts/rotate_docker_logs.py")
 PG_CONTAINER = "hindsight-pg"          # historical name: it hosts every Walter schema
 MEMORY_MODULES = ("memory", "logs", "bus", "raw-vault")
+MODEL_CALL_PREFIX = "model_calls:"                         # walter_memory.health: severity error
+FALLBACK_PREFIXES = ("triage:", "assimilation ")            # decisions by fallback, processing errors
 
 SECRET_RE = re.compile(
     r"(?i)("
@@ -167,8 +181,15 @@ def evaluate(report: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(health, dict):
         errors.append("walter-memory health command failed"); score -= 40
     elif health.get("status") != "ok":
-        problems = health.get("problems") or ["Walter Memory reports problems"]
-        warnings.extend("Walter Memory: " + str(p) for p in problems); score -= min(20, 5 * len(problems))
+        problems = [str(p) for p in (health.get("problems") or ["Walter Memory reports problems"])]
+        # SOCLE A8 (2026-11-11): failing model calls are an outage, not a warning; decisions taken by fallback and
+        # processing errors weigh more than a stale connector. The outage of 2026-11-11 scored 100 twice.
+        failing = [p for p in problems if p.startswith(MODEL_CALL_PREFIX)]
+        fallback = [p for p in problems if p.startswith(FALLBACK_PREFIXES) and p not in failing]
+        other = [p for p in problems if p not in failing and p not in fallback]
+        errors.extend("Walter Memory: " + p for p in failing); score -= min(60, 25 * len(failing))
+        warnings.extend("Walter Memory: " + p for p in fallback); score -= min(20, 10 * len(fallback))
+        warnings.extend("Walter Memory: " + p for p in other); score -= min(20, 5 * len(other))
 
     recall = checks["recall_probes"]
     if not recall["ok"]:
@@ -180,7 +201,7 @@ def evaluate(report: dict[str, Any]) -> dict[str, Any]:
             errors.append(f"secret-like string in recalled memory for query: {probe['query']}"); score -= 50
 
     severity = "error" if errors else ("warning" if warnings or score < 92 else "ok")
-    actions = (["Inspect /root/.hermes/logs/memory-autopilot/latest.json and the services' journals."] if errors
+    actions = ([f"Inspect {LOG_DIR / 'latest.json'} and the services' journals."] if errors
                else ["No urgent action; keep observing."] if warnings else [])
     return {"ok": not errors, "severity": severity, "score": max(0, min(100, score)),
             "errors": errors, "warnings": warnings, "recommended_actions": actions}

@@ -2,7 +2,7 @@
 # Throwaway PostgreSQL for the tests (2026-11-02): never the production database. In memory (tmpfs), same image as
 # hindsight-pg, built from this module's migrations. Usage: tests/testdb.sh up | down | reset
 set -eu
-NAME=walter-memory-testpg PORT=${WALTER_MEMORY_TEST_PORT:-5440}
+NAME=${WALTER_MEMORY_TEST_NAME:-walter-memory-testpg} PORT=${WALTER_MEMORY_TEST_PORT:-5440}
 DSN="postgresql://hindsight:walter-test-only@127.0.0.1:$PORT/hindsight"   # test-only credentials, no data
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 case "${1:-up}" in
