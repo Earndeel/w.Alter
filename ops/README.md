@@ -51,7 +51,7 @@ Maintenance: `contracts/maintenance.json` (guardian convention, read by `walter-
 
 ## Publication git (`walter-git-publish`, hourly)
 
-One private repository `Earndeel/walter` with **the same tree as `/walter`** (vision: `core/`, `cognition/`,
+One private repository (the instance's `[git_publish] remote` in `@instance/config/backup/backup.toml`) with **the same tree as `/walter`** (vision: `core/`, `cognition/`,
 `capabilities/`, `ops/`, `lab/`; nested modules such as `core/identity`, `core/security/secrets`,
 `cognition/memory/vault`, `ops/runtime` inside their parent's folder). Each module keeps its full history under its
 path (`git log -- cognition/memory`). Secrets scrubbed, fail-closed gate, only committed work.
