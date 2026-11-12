@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-12T04:14:40.595175+00:00",
- "description": "Use when W.Alter services fail after Python library or secrets migrations, especially when logs reference retired files despite corrected code on disk, or context silently falls back to a weaker plan.",
- "domain": "walterserviceoperationsandmigrationverification",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session established a reusable cross-service migration failure: corrected Secrets code on disk coexisted with stale preflight and memory processes still reading the retired Hermes environment file. Three service restarts and a real preflight replay restored the expected memory-aware decision; a 100/100 health report had not detected the outage. This operational procedure is distinct from configuring Hermes or its voice module. [session claude_code/vm/dd4566f0-79b6-4dce-ad42-ed5a2f6d28ba]",
- "runtime": "learner",
- "session_id": "claude_code/vm/dd4566f0-79b6-4dce-ad42-ed5a2f6d28ba",
- "target": "walter-stale-service-recovery"
+ "store_sha": "1b39dd37a0083115e62af3ae2cba5abb9df9ecdc73272d80a9d6f3babe68c399"
 }
