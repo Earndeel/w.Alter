@@ -65,8 +65,18 @@ la qualité sémantique générale des réponses, le cache réel d’un fourniss
 | Hermes | `ContextEngine`, projection | Adaptateur disponible ; configuration observée : compresseur natif, port Context non activé |
 | Codex et Claude Code | Compaction native ; contexte additionnel via hook/MCP | Notes de modules et preflight disponibles ; aucune substitution du compresseur natif |
 | Claude Code, entrée des sorties | Hook PostToolUse → `walter-context-entrance` (`updatedToolOutput` à terme) | **Fantôme** depuis le 6 novembre 2026 : enregistre ce qu’il aurait coupé (chiffres seulement) ; la sortie reste entière pour le modèle |
-| Hook DSH | Pack par message via le service de preflight | Mode `legacy` par défaut ; mode `pack` uniquement par interrupteur d’instance ou variable d’expérience |
+| Walter Engine (`dsh-web`) | Pack par message : greffon d’entrée natif du moteur (`core/engine/plugins/intake`, `mode: native`) → `POST /preflight?inject=1` | **En service** (vérifié le 11/11/2026 dans `/opt/dsh/home/cordis.patch.yml`) : `pack` par défaut ; bloc Memory `legacy` seulement si le preflight échoue ou dépasse 7 s. Le hook DSH (`walter-hooks.json`) ne fait plus que SessionStart/PostToolUse |
 | Router, sous-agent texte | `walter-context-child` | Construction du pack appelée par Router ; le mode et le comportement en échec sont définis côté consommateur |
+
+Plan dégradé (SOCLE A2, 11/11/2026) : si la décision échoue, le plan le dit (`decision.degraded`, `decision.error`),
+reste prudent (L3, `tools` + `memory`, sujet le plus proche par embeddings locaux, profil du tour précédent de la
+session s’il a moins de 30 min sinon `general/L2`), ouvre le pack par une phrase qui le signale au modèle, émet
+`context.degraded` sur le bus et est compté à part par `--report`. Le pack a un budget total par niveau et des blocs
+Tâches / Expérience (routes Memory `/v1/tasks/list`, `/v1/experience`) : section `[pack]` de la configuration ; les
+tâches du fil et un échec récent entrent dans le pack à tous les niveaux, L0 compris (12/11/2026). Le preflight juge
+aussi si le message est un travail à suivre (`decision.work`) : c'est ce qui ouvre une tâche durable au Run Plane.
+Une approbation ou une correction (`act` = `approve` / `correct`) envoyée moins de 30 min après un échange reste dans
+le fil de cet échange (`decision.thread_by = previous_exchange`, le choix du modèle en `thread.alternates`).
 
 L’état d’un port de compression ne détermine pas le mode d’injection par message. Les essais `pack` ne constituent
 pas une décision de migration globale. Voir la maintenance pour les commandes et les modes dégradés.

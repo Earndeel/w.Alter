@@ -7,8 +7,12 @@ API. The checkpoint policy and rendering still belong here, not in the host.
 from __future__ import annotations
 
 from ..config import Config, load
-from .layers import body_start, record
-from .wire import Message, tokens, turn_starts, text_of
+from .layers import RECORD_HEADER, body_start, entry_sizes, record
+from .wire import Message, clip, tokens, turn_starts, text_of
+
+# Source kinds a host may set on user-role messages (`src`): only the owner's words are dialogue.
+OWNER_KINDS = ("user", None, "")
+CHECKPOINT_KIND = "compact-checkpoint"
 
 
 def _record(body: list[Message], cfg: Config) -> str:
@@ -50,10 +54,15 @@ def plan(messages: list[Message], *, model: str = "", measured_tokens: int = 0,
 
 
 def summarize(messages: list[Message], *, cfg: Config | None = None, model: str = "", budget_tokens: int = 0) -> dict:
-    """Return a deterministic inert record of an already selected, balanced span.
+    """Return a deterministic inert record of an already selected, balanced span (a host's manual range: the
+    automatic path is window.decide, which renders from the session's original turns).
 
-    The host retains originals in its journal and checks that the result saves
-    tokens before replacing the span. This operation never mutates the input.
+    The host retains originals in its journal and checks that the result saves tokens before replacing the span.
+    This operation never mutates the input. Since 2026-11-11 a record that outgrows its share is bounded instead of
+    refused (a long session could no longer be compacted at all): oldest turns go to one line with the owner's
+    request whole, then leave with an explicit note; an earlier record inside the span is carried, clipped with a
+    marker past half the share. Machine-injected user messages (context packs, agent instructions, runtime notices;
+    `src` set by the host) never enter the record: the host re-injects what it owns.
     """
     cfg = cfg or load()
     body = messages[body_start(messages):]
@@ -66,14 +75,24 @@ def summarize(messages: list[Message], *, cfg: Config | None = None, model: str 
     profile = cfg.profile(model)
     budget = min(profile.effective_budget, budget_tokens) if budget_tokens > 0 else profile.effective_budget
     limit = int(budget * cfg.policy.record_share)
-    dialogue = [m for m in body if m.get('role') in ('user','assistant')]
-    # Includes previous checkpoints (DSH persists those as user messages). No heuristic
-    # can reliably identify which sentence is a constraint: preserve the whole text.
-    if tokens([{'role':m['role'],'content':text_of(m.get('content'))} for m in dialogue]) > limit:
-        raise ValueError('checkpoint cannot preserve user constraints and assistant text within its budget')
-    out = {'role':'user','content':_record(body,cfg)}
-    if tokens([out]) > limit:
-        raise ValueError('checkpoint exceeds record budget; originals remain in the host journal')
+    earlier = [text_of(m.get("content")) for m in body if m.get("role") == "user" and m.get("src") == CHECKPOINT_KIND]
+    kept = [m for m in body if not (m.get("role") == "user" and m.get("src") not in OWNER_KINDS)]
+    carried = clip("\n\n".join(earlier), limit * 2, " from the earlier record") if earlier else ""
+    content, omitted, brief = carried, 0, 0
+    if kept:
+        _record(kept, cfg)                               # validates roles and recoverable refs
+        full_sizes, brief_sizes = entry_sizes(kept, cfg.projection)
+        n, room = len(full_sizes), limit - len(carried) // 4 - len(RECORD_HEADER) // 4
+        size = lambda om, nb: sum(brief_sizes[om:om + nb]) + sum(full_sizes[om + nb:])   # noqa: E731
+        while brief < n and size(0, brief) > room:
+            brief += 1
+        while omitted < n - 1 and size(omitted, brief - omitted) > room:
+            omitted += 1
+        rendered = record(kept, cfg.projection, None, omitted, brief - omitted)["content"]
+        content = f"{carried}\n\n{rendered}" if carried else rendered
+    if not content:
+        raise ValueError("checkpoint span holds no dialogue")
+    out = {"role": "user", "content": content}
     return {"version": 1, "engine": "walter-context", "mode": "checkpoint",
-            "content": out["content"], "input_messages": len(body),
-            "input_tokens": tokens(body), "output_tokens": tokens([out])}
+            "content": out["content"], "input_messages": len(body), "brief_turns": brief - omitted,
+            "omitted_turns": omitted, "input_tokens": tokens(body), "output_tokens": tokens([out])}

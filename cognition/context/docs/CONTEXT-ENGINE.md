@@ -1,6 +1,22 @@
 # walter-context — spécification et plan
 
-Statut (2026-10-25) : **architecture v2 validée par le propriétaire** (moteur de contexte agentique, voir §0). Lots 0-2
+## État au 11/11/2026
+
+Le statut daté du 25/10 ci-dessous est **historique**. État courant : ce paragraphe, `README.md` (Ports et
+activation), `docs/MAINTENANCE.md` et `/walter/docs/SOCLE.md` § 3 (arbitrages A1–A8). Le corps de la spécification
+n'est pas réécrit.
+
+| Lot | État réel |
+|---|---|
+| 0 | ✅ fait |
+| 1 | ✅ fait (preflight, ContextPlan v2) |
+| 2 | ✅ fait — les marqueurs de cache explicites (fournisseurs à `breakpoints`) ne sont **pas** implémentés |
+| 3 | partiel : vues de sujets servies (cartes, aperçu, synthèse) ; carnets de fil et `ThreadHint` non branchés |
+| 4 | en service sur le Walter Engine : pack par message (`?inject=1`) via le greffon d'entrée natif ; depuis le 11/11 plan dégradé explicite (A2), budget total par niveau (`[pack]`), blocs Tâches / Expérience, horizon et fraîcheur des vues |
+| 5 | non fait |
+| 6 | remplacé : Hermes est arrêté ; la maîtrise de la fenêtre passe par le moteur (décision A1 de SOCLE.md) |
+
+Statut (2026-10-25, historique) : **architecture v2 validée par le propriétaire** (moteur de contexte agentique, voir §0). Lots 0-2
 faits ; **étapes A (contrats v1), B (preflight en fantôme) et C (vues v0 : les sujets) faites le 25/10, D (retrieval + assemblage en fantôme) le 26/10**. Analyse et plan d'intégration :
 `~/reports/2026-10-25-walter-context-v2-integration.md`.
 

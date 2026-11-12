@@ -4,7 +4,9 @@ walter-context-preflight). A one-shot process pays ~0.4 s per message before the
 
     POST /preflight            JSON request (same as the CLI's stdin) → 200 ContextPlan, 422 error row
     POST /preflight?shadow=1   plan recorded in the instance (lot 4 shadow), 204
-    POST /preflight?inject=1   real injection trials: {plan, text (the pack to inject), pack (its summary)}, recorded too
+    POST /preflight?inject=1   {plan, text (the pack to inject), pack (its summary), degraded}, recorded too; production
+                               path of the engine's native intake. degraded = the decision failed and the plan is the
+                               prudent default (SOCLE A2): the engine records it on its run
     GET  /health               {"ok": true, "router_cached": bool}
 
 Loopback only, no token. Since step D (26/10) it reads Walter Memory's subject views (candidates, cards) and, in
@@ -63,7 +65,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(204, None)
         if inject:
             return self._send(200, {"plan": plan, "text": row.get("pack_text"), "pack": row.get("pack"),
-                                    "error": row.get("error")})
+                                    "degraded": bool(row.get("degraded")), "error": row.get("error")})
         self._send(200, plan) if plan is not None else self._send(422, row)
 
     def log_message(self, *args) -> None:       # message text never reaches the journal
@@ -77,5 +79,19 @@ def serve() -> int:
         llm.account_balance()                   # warm the 5-minute balance cache and the imports
     except Exception:  # noqa: BLE001 — checked again on the first call
         pass
+    import threading
+    threading.Thread(target=_warm, name="preflight-warm", daemon=True).start()
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
     return 0
+
+
+def _warm() -> None:
+    """One plan and one pack at start, so the first owner message does not pay for what a fresh process loads
+    (embeddings, Memory views, retrieval, connections): measured 7.0 s cold against 1.5 s warm on 12/11/2026, the
+    host's whole preflight budget — the first turn after every restart was answered on a degraded context.
+    Nothing is recorded or signalled; a failure here changes nothing (the first message pays, as before)."""
+    try:
+        handle({"message": "Démarrage du service : où en sont les sujets en cours et que reste-t-il à faire ?",
+                "runtime": "warmup", "privacy_class": "cloud_allowed"}, shadow=False, want_pack=True, warm=True)
+    except Exception:  # noqa: BLE001
+        pass

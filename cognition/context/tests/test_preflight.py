@@ -1,4 +1,5 @@
 """Preflight: rules without a call, the decision mapped onto a valid ContextPlan, floor, privacy, fail-open."""
+import json
 import sys
 import types
 
@@ -88,11 +89,147 @@ def test_local_only_never_calls_a_cloud_model_and_failures_stay_open(fake_llm, m
                     default_thread="session:x"))
     assert p.decision == {"skipped": "local_only"} and p.thread.id == "session:x" and not calls["decide"]
 
-    def boom(*a, **k):
-        raise TimeoutError("decisions api")
-    monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", boom)
-    p = run(Request("t", "une vraie question qui demande une décision du modèle"))
-    assert p.level == "L1" and "TimeoutError" in p.decision["error"] and p.thread.new
+
+
+def _boom(*a, **k):
+    raise TimeoutError("decisions api https://openrouter.ai/x failed, see /walter/cognition/memory/.env sk-abcdefghijklmnop")
+
+
+def test_a_failed_decision_gives_an_explicit_prudent_plan(fake_llm, monkeypatch):
+    """SOCLE A2 (11/11: 9 owner turns silently served as L1 / general L1): the plan says it is degraded, is L3 with
+    tools + memory, keeps a close subject found locally, and asks general/L2 when no recent profile is known."""
+    monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", _boom)
+    cands = [{"id": "subject:a", "similarity": 0.81}, {"id": "subject:b", "similarity": 0.4}]
+    p = run(Request("t", "une vraie question qui demande une décision du modèle", candidates=cands))
+    d = p.decision
+    assert d["degraded"] is True and d["error"].startswith("TimeoutError: ")
+    assert "openrouter" not in d["error"] and "/walter" not in d["error"] and "sk-abc" not in d["error"]
+    assert len(d["error"]) <= 120
+    assert p.level == "L3" and p.capabilities == ["tools", "memory"] and not p.escalated and p.fast_path is None
+    assert (p.model_profile.task, p.model_profile.level) == ("general", "L2") and d["profile_from"] == "default"
+    assert p.thread.id == "subject:a" and d["thread_by"] == "similarity"
+    # no candidate close enough: no thread claim (a new one), the session's recent profile is reused
+    p = run(Request("t", "une autre question", candidates=[{"id": "subject:b", "similarity": 0.3}],
+                    previous_profile={"task": "coding", "level": "L3"}))
+    assert p.thread.new and p.decision["thread_by"] == "none"
+    assert (p.model_profile.task, p.model_profile.level) == ("coding", "L3") and p.decision["profile_from"] == "previous_run"
+    # an empty or malformed decision is a failure too, never a KeyError out of the preflight
+    monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", lambda *a, **k: {"model": "x"})
+    assert run(Request("t", "encore une question longue")).decision["degraded"] is True
+
+
+def test_degraded_plan_is_recorded_signalled_and_announced_in_the_pack(fake_llm, monkeypatch, tmp_path):
+    from walter_context.preflight import __main__ as cli
+    from walter_context import retrieval
+    monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", _boom)
+    monkeypatch.setattr(cli, "_STATE", [tmp_path])
+    monkeypatch.setattr(cli, "subjects", lambda d: ([], None, None))
+    monkeypatch.setattr(cli, "last_exchange", lambda key, message: None)
+    emitted, updates = [], []
+    bus = types.ModuleType("walter_memory.bus")
+    bus.emit = lambda *a, **k: emitted.append((a, k))
+    sys.modules["walter_memory"].bus = bus
+    monkeypatch.setitem(sys.modules, "walter_memory.bus", bus)
+    monkeypatch.setattr(cli.subprocess, "run", lambda args, **kw: updates.append(json.loads(kw["input"])))
+    monkeypatch.setattr(retrieval, "gather", lambda plan, msg, **kw: (
+        [retrieval.Block("memory", 4, "souvenirs"), retrieval.Block("now", 5, "Maintenant : x")], []))
+    d = {"message": "une vraie question qui demande une décision", "runtime": "dsh", "session_id": "dsh/vm/s1",
+         "run_id": "r1", "turn_id": "dsh/vm/s1:1"}
+    plan, row = cli.handle(d, shadow=False, want_pack=True)
+    assert plan["decision"]["degraded"] and row["degraded"] and plan["level"] == "L3"
+    assert row["pack_text"].startswith("Attention : l'intention de ce message n'a pas pu être évaluée")
+    assert row["pack"]["degraded"] is True
+    assert updates[0]["requested"]["degraded"] is True and updates[0]["level"] == "L3"
+    (typ, source, subject, payload), kw = emitted[0]
+    assert typ == "context.degraded" and source == "walter-context" and subject == "dsh/vm/s1"
+    assert payload["run_id"] == "r1" and "message" not in payload and kw["dedupe_key"] == "context.degraded:dsh/vm/s1:1"
+    rows = [json.loads(x) for f in tmp_path.glob("preflight-*.jsonl") for x in f.read_text().splitlines()]
+    assert rows[-1]["plan"]["decision"]["degraded"] is True
+    # a second consecutive failure, with the bus down too, neither raises nor blocks the turn
+    bus.emit = lambda *a, **k: (_ for _ in ()).throw(ConnectionError("bus down"))
+    plan, row = cli.handle({**d, "turn_id": "dsh/vm/s1:2"}, shadow=False, want_pack=True)
+    assert plan["decision"]["degraded"] and row["pack_text"]
+    from walter_context.shadow import report
+    r = report(tmp_path)
+    assert r["degraded"] == 2 and r["fast_paths"] == {"degraded": 2} and r["degraded_errors"] == {"TimeoutError": 2}
+
+
+def test_degraded_profile_is_the_sessions_previous_one_when_recent(monkeypatch, tmp_path):
+    import time as _t
+    from walter_context.preflight import __main__ as cli
+    monkeypatch.setattr(cli, "_STATE", [tmp_path])
+    monkeypatch.setattr(cli, "_PROFILES", {"dsh/vm/s1": (_t.time() - 60, {"task": "coding", "level": "L3"})})
+    assert cli.previous_profile("dsh/vm/s1") == {"task": "coding", "level": "L3"}
+    monkeypatch.setattr(cli, "_PROFILES", {"dsh/vm/s1": (_t.time() - 7200, {"task": "coding", "level": "L3"})})
+    assert cli.previous_profile("dsh/vm/s1") is None
+    # a restarted service reads its own journal
+    from datetime import datetime, timezone
+    monkeypatch.setattr(cli, "_PROFILES", {})
+    (tmp_path / f"preflight-{datetime.now(timezone.utc):%Y-%m-%d}.jsonl").write_text(json.dumps(
+        {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "runtime": "dsh", "session_id": "dsh/vm/s2",
+         "plan": {"model_profile": {"task": "general", "level": "L1"}, "decision": {"model": "m"}}}) + "\n")
+    assert cli.previous_profile("dsh/vm/s2") == {"task": "general", "level": "L1"}
+    assert cli.previous_profile("dsh/vm/other") is None
+
+
+def test_previous_exchange_is_read_from_the_session_when_the_caller_sends_none(fake_llm, monkeypatch, tmp_path):
+    """The engine sends previous: null; the preflight reads the last exchange itself so short replies and the plan
+    floor work on the production path. The new message, if already journaled, is not its own previous exchange."""
+    from datetime import datetime, timedelta, timezone
+    from walter_context.preflight import __main__ as cli
+    now = datetime.now(timezone.utc)
+    evs = {"events": [{"type": "user/message", "text": "Je lance le lot B ?", "occurred_at": now - timedelta(minutes=6)},
+                      {"type": "assistant/message", "text": "Oui, prêt." + "x" * 3000, "occurred_at": now - timedelta(minutes=5)},
+                      {"type": "user/message", "text": "oui vas y", "occurred_at": now}]}
+    ex = cli.last_exchange("dsh/vm/s1", "oui vas y", reader=lambda: evs)
+    assert ex["message"] == "Je lance le lot B ?" and len(ex["answer"]) == 1200 and 250 < ex["age_s"] < 350
+    assert cli.last_exchange("k", "x", reader=lambda: {"events": []}) is None
+    calls, _ = fake_llm
+    monkeypatch.setattr(cli, "_STATE", [tmp_path])
+    monkeypatch.setattr(cli, "subjects", lambda d: ([], "subject:a", 300.0))
+    monkeypatch.setattr(cli, "last_exchange", lambda key, message: {"message": "Je lance le lot B ?", "answer": "Oui",
+                                                                     "age_s": 300.0})
+    plan, row = cli.handle({"message": "oui vas y", "runtime": "dsh", "session_id": "dsh/vm/s1", "previous": None},
+                           shadow=True)
+    assert plan["fast_path"] == "short_reply" and plan["thread"]["id"] == "subject:a" and row["previous"] == "fetched"
+    assert not calls["decide"]
+
+    def slow(key, message):
+        import time as _t
+        _t.sleep(0.5)
+    monkeypatch.setattr(cli, "last_exchange", slow)
+    monkeypatch.setitem(cli.SETTINGS, "previous_timeout_s", 0.05)
+    plan, row = cli.handle({"message": "oui vas y", "runtime": "dsh", "session_id": "dsh/vm/s1"}, shadow=True)
+    assert row["previous"] == "failed: TimeoutError" and plan is not None
+
+
+def test_an_approval_or_a_correction_stays_in_the_thread_of_the_exchange_it_answers(fake_llm):
+    """12/11: « ok vas-y pour la première seulement » was sent to another subject by an unsure thread pick."""
+    calls, answers = fake_llm
+    cands = [{"id": "th-1", "title": "Lot B"}, {"id": "th-9", "title": "Autre sujet"}]
+    _full(answers, act={"choice": "approve"}, thread={"choice": "th-9", "confidence": 0.29})
+    p = run(Request("t", "ok vas-y pour la première seulement, décris-la en une phrase", previous=prev(), candidates=cands))
+    assert p.thread.id == "th-1" and p.thread.alternates == ["th-9"] and p.decision["thread_by"] == "previous_exchange"
+    _full(answers, act={"choice": "continue"}, thread={"choice": "th-9", "confidence": 0.9})
+    p = run(Request("t", "et pour l'autre sujet, où en est-on exactement ce matin ?", previous=prev(), candidates=cands))
+    assert p.thread.id == "th-9" and "thread_by" not in p.decision          # a continuation may change subject
+    _full(answers, act={"choice": "approve"}, thread={"choice": "th-9", "confidence": 0.9})
+    p = run(Request("t", "ok vas-y pour la première seulement, décris-la en une phrase", previous=prev(age=86400), candidates=cands))
+    assert p.thread.id == "th-9"                                            # an old exchange is not « the previous »
+
+
+def test_the_decision_says_whether_the_message_is_work_to_keep_as_a_task(fake_llm):
+    """SOCLE A3: the Run Plane opens a durable task on the preflight's own judgement, not on the Router tier."""
+    from walter_context.preflight.__main__ import requested
+    calls, answers = fake_llm
+    _full(answers, work={"noul": 0.9}, task={"choice": "general"}, model_level={"choice": "L1"})
+    p = run(Request("t", "Range mes notes en trois étapes et écris le résultat dans un fichier", previous=prev()))
+    assert "work" in calls["decide"][-1][1] and p.decision["work"] == 0.9
+    assert requested(p.to_dict(), "x")["work"] is True            # a general / L1 request can still be a task
+    _full(answers, work={"noul": 0.1}, task={"choice": "coding"})
+    assert requested(run(Request("t", "Tu en penses quoi de ce code, en deux mots ?", previous=prev())).to_dict(), "x")["work"] is False
+    answers.pop("work")
+    assert "work" not in requested(run(Request("t", "Une question sans jugement de travail ici", previous=prev())).to_dict(), "x")
 
 
 def test_extensive_search_lifts_a_thread_plan_to_l4(fake_llm):

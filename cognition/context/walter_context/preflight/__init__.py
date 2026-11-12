@@ -10,7 +10,11 @@ plans right 48-51 % instead of 71-74 % (fewer plans with too little context, 2-3
 too much), so it was removed. A plan floor keeps at least the last exchange when the message follows it closely.
 
 The preflight proposes; it never removes a tool or a capability from the orchestrating model.
-Fail-open: any failure gives a plan with fast_path None, level L1 and decision.error, never an exception.
+Fail-open, never silent (SOCLE A2, 2026-11-11): when the decision fails after the Router chain's own fallbacks, the
+plan says so (`decision.degraded = true`, `decision.error` = exception class + a short scrubbed reason) and is prudent,
+not downgraded: level L3 with local means only (the closest subject by local embeddings if close enough), capabilities
+`tools` + `memory`, the session's previous model profile when recent, else general/L2. Before that date a failure
+silently became L1 / general L1 (9 owner turns on 11/11). Tunables: [preflight] in config/walter-context.toml.
 """
 from __future__ import annotations
 
@@ -23,12 +27,15 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..config import preflight_settings
 from ..plan import (ACTS, CAPABILITIES, DOMAINS, HORIZONS, LEVELS, MODEL_LEVELS, ContextPlan, ModelProfile,
                     ThreadChoice)
 
-REPLY_WINDOW_S = 2 * 3600       # past that, « ok, regarde X » opens a subject rather than answering one
-FLOOR_WINDOW_S = 30 * 60        # a message this close to the previous exchange needs at least that exchange
-DECISION_SAMPLES = 3            # parallel decisions averaged (2026-11-09): one call flipped memory on 2 messages in 7
+SETTINGS = preflight_settings()
+REPLY_WINDOW_S = SETTINGS["reply_window_s"]      # past that, « ok, regarde X » opens a subject rather than answering one
+FLOOR_WINDOW_S = SETTINGS["floor_window_s"]      # a message this close to the previous exchange needs that exchange
+DECISION_SAMPLES = SETTINGS["decision_samples"]  # parallel decisions averaged (2026-11-09)
+DEGRADED_PROFILE = {"task": "general", "level": "L2"}
 # The level is asked as the four plans measured in lot 1 (d1-ultra 61-67 % right on its own) plus a yes/no for the
 # extensive level: one five-way question left the decision model unsure on almost every message (25/10: 134
 # escalations out of 136, 4 s median).
@@ -55,6 +62,7 @@ ACT_CRITERIA = {"new": "opens a request or subject none of the threads covers",
                 "approve": "agrees, says go, launch or continue",
                 "correct": "rejects or amends the previous result",
                 "inform": "gives a fact, a link, a file or a status, without asking"}
+ANSWERS_PREVIOUS = ("approve", "correct")       # acts that, by their definition, answer the previous exchange
 DOMAIN_CRITERIA = {"projects": "a project or piece of work the owner pursues", "profile": "the owner themselves: tastes,"
                    " habits, health, identity", "activities": "what they did or do: trips, sport, purchases, events",
                    "relations": "people and their relationships with them", "agenda": "appointments, schedule, dates",
@@ -72,6 +80,14 @@ CAPABILITY_QUESTIONS = {
                 "use their account), not just read public information?"),
     "delegation": "Would part of the work best be done by another model or a sub-agent (e.g. image, video, long job)?",
     "secrets": "Does the work need an account, a password, an API key or a login?"}
+
+
+# Socle A3 (2026-11-12): does the message open or carry on a piece of work the Run Plane must keep as a durable task?
+# Asked explicitly: the Router task and tier are a poor proxy (a three-step task with files to write was judged
+# general / L1 and opened no task; « Try again » in a coding session opened one).
+WORK_QUESTION = ("Does the new message ask the assistant to carry out work that leaves a result — do, write, build, fix, "
+                 "prepare, send, organise, look something up and report, possibly in several steps or over time — "
+                 "rather than only to answer a question, give an opinion, acknowledge or chat?")
 
 
 @dataclass
@@ -92,6 +108,8 @@ class Request:
     candidates: list[dict] = field(default_factory=list)   # {"id", "title", "objective", "state", "last_message", ...}
     privacy_class: str = "cloud_allowed"
     default_thread: str | None = None                      # e.g. "session:<id>" while threads do not exist yet
+    waiting_age_s: float | None = None                     # age of the session's last attached exchange (its subject)
+    previous_profile: dict | None = None                   # the session's previous model profile, if recent (degraded)
 
 
 def _words(text: str) -> list[str]:
@@ -115,7 +133,7 @@ def fast_path(req: Request) -> ContextPlan | None:
     return None
 
 
-ROUTER_TTL_S = 600               # Walter Router's chat tasks and decision chain, refreshed in the background past that
+ROUTER_TTL_S = SETTINGS["router_ttl_s"]   # Walter Router's chat tasks and decision chain, refreshed in the background past that
 
 
 def _router_cache() -> Path:
@@ -232,6 +250,7 @@ def questions(req: Request) -> tuple[dict, dict]:
                      "instructions": "Which task family is the work this message asks for?" + NOTE}
     for cap, text in CAPABILITY_QUESTIONS.items():
         q["cap_" + cap] = {"type": "noul", "instructions": text + NOTE}
+    q["work"] = {"type": "noul", "instructions": WORK_QUESTION + NOTE}
     return state, q
 
 
@@ -249,13 +268,13 @@ def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPl
     try:
         from walter_memory import llm
         res = llm.decide(state, q, processor="walter-context-preflight", privacy_class=req.privacy_class,
-                         models=decision_chain(), purpose=purpose, budget="recurring", timeout=15,
-                         samples=DECISION_SAMPLES)
-    except Exception as exc:  # noqa: BLE001 — fail-open
-        return ContextPlan(turn_id=req.turn_id, thread=_default_thread(req), act="continue", level="L1",
-                           decision={"error": f"{type(exc).__name__}: {str(exc)[:160]}",
-                                     "ms": round((time.perf_counter() - t0) * 1000)}).validate()
-    a = res["answers"]
+                         models=decision_chain(), purpose=purpose, budget="recurring",
+                         timeout=SETTINGS["decision_timeout_s"], samples=DECISION_SAMPLES)
+        a = res.get("answers") if isinstance(res, dict) else None
+        if not isinstance(a, dict) or not a:
+            raise ValueError("the decision returned no answers")
+    except Exception as exc:  # noqa: BLE001 — fail-open, explicitly (A2)
+        return degraded_plan(req, exc, t0)
     pick = lambda k: (a.get(k) or {}).get("choice")                      # noqa: E731
     conf = lambda k: (a.get(k) or {}).get("confidence")                  # noqa: E731
     thread_choice = pick("thread")
@@ -283,16 +302,65 @@ def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPl
         # takes the level that carries the owner's memory
         level = "L3"
     task = pick("task") if pick("task") in router_tasks() else "general"
+    act = pick("act") if pick("act") in ACTS else "continue"
+    by = None
+    prev = req.previous
+    if (act in ANSWERS_PREVIOUS and prev and prev.thread_id and prev.age_s is not None
+            and prev.age_s <= FLOOR_WINDOW_S and thread.id != prev.thread_id):
+        # coherence (2026-11-12): « agrees, says go » and « amends the previous result » are about the previous
+        # exchange by definition; the model's own thread pick (0.29 sure on « ok vas-y pour la première seulement »)
+        # sent the approval to another subject and cut the task from its follow-up. Its pick stays as an alternate.
+        thread = ThreadChoice(id=prev.thread_id, confidence=conf("thread"), alternates=[thread.id] if thread.id else [])
+        by = "previous_exchange"
     plan = ContextPlan(
-        turn_id=req.turn_id, thread=thread, act=pick("act") if pick("act") in ACTS else "continue", level=level,
+        turn_id=req.turn_id, thread=thread, act=act, level=level,
         domains=[domain] if domain in DOMAINS else [], horizons=[horizon] if horizon in HORIZONS else [],
         capabilities=["tools", *caps],
         model_profile=ModelProfile(task=task, level=pick("model_level") if pick("model_level") in MODEL_LEVELS else "L1"),
         decision={"model": res.get("model"), "ms": round((time.perf_counter() - t0) * 1000),
+                  **({"work": round(float(a["work"]["noul"]), 2)} if isinstance((a.get("work") or {}).get("noul"), (int, float)) else {}),
                   **({"samples": res["samples"]} if res.get("samples") else {}),
+                  **({"thread_by": by} if by else {}),
                   "confidence": {k: conf(k) for k in ("thread", "act", "plan", "domain", "horizon", "task")
                                  if conf(k) is not None}, **({"anchors": named} if named else {})})
     return plan.validate()
+
+
+_SCRUB = ((re.compile(r"https?://\S+"), "<url>"), (re.compile(r"(?:~|\.{0,2})?(?:/[\w.@:+-]+){2,}/?"), "<path>"),
+          (re.compile(r"\b(?:sk|pk|rk|ghp|xox[a-z])[-_][\w-]{8,}|\b[A-Za-z0-9_\-]{32,}\b"), "<redacted>"))
+
+
+def error_text(exc: BaseException, limit: int = 120) -> str:
+    """The exception class and a short reason, without URLs, paths or anything that looks like a key."""
+    reason = re.sub(r"\s+", " ", str(exc) or "").strip()
+    for pattern, repl in _SCRUB:
+        reason = pattern.sub(repl, reason)
+    return f"{type(exc).__name__}: {reason}"[:limit].rstrip(": ")
+
+
+def degraded_plan(req: Request, exc: BaseException, t0: float | None = None) -> ContextPlan:
+    """The decision failed: a prudent plan made with local means only, marked as such (SOCLE A2). Never raises."""
+    best = max((c for c in req.candidates if c.get("id") and isinstance(c.get("similarity"), (int, float))),
+               key=lambda c: c["similarity"], default=None)
+    if best is not None and best["similarity"] >= SETTINGS["degraded_min_similarity"]:
+        thread, how = ThreadChoice(id=best["id"], confidence=None), "similarity"
+    elif req.default_thread and (req.waiting_age_s is None or req.waiting_age_s < FLOOR_WINDOW_S
+                                 or req.default_thread.startswith("session:")):
+        thread, how = ThreadChoice(id=req.default_thread), "session"
+    else:
+        thread, how = ThreadChoice(id=None, new=True), "none"
+    prof = req.previous_profile or {}
+    if prof.get("level") in MODEL_LEVELS and prof.get("task"):
+        profile, source = ModelProfile(task=str(prof["task"]), level=prof["level"],
+                                       require=list(prof.get("require") or [])), "previous_run"
+    else:
+        profile, source = ModelProfile(**DEGRADED_PROFILE), "default"
+    decision = {"degraded": True, "error": error_text(exc), "thread_by": how, "profile_from": source}
+    if t0 is not None:
+        decision["ms"] = round((time.perf_counter() - t0) * 1000)
+    return ContextPlan(turn_id=req.turn_id, thread=thread, act="continue", level="L3",
+                       capabilities=["tools", "memory"], model_profile=profile, escalated=False,
+                       decision=decision).validate()
 
 
 def _anchors(message: str) -> list[str]:

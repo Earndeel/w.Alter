@@ -90,3 +90,42 @@ def capability_settings(path: str | Path | None = None) -> dict:
             or out["layer_max_chars"] <= 0):
         raise ValueError("invalid capability-note settings")
     return out
+
+
+# --- preflight and per-message pack (lot C2, 2026-11-11) -----------------------------------------------------------
+PREFLIGHT_KEYS = {"decision_samples": int, "decision_timeout_s": (int, float), "reply_window_s": (int, float),
+                  "floor_window_s": (int, float), "router_ttl_s": (int, float), "degraded_min_similarity": (int, float),
+                  "degraded_profile_max_age_s": (int, float), "previous_chars": int, "previous_timeout_s": (int, float)}
+PACK_KEYS = {"budget": dict, "cut_order": list, "min_block_tokens": int, "board_tokens": int, "board_max_lines": int,
+             "board_recent_hours": (int, float), "board_states": list, "subject_tokens": int,
+             "horizon_max_age_s": dict, "recent_exchanges": int, "unsure_plan": (int, float), "tasks_tokens": int,
+             "tasks_others": int, "experience_tokens": int, "experience_items": int,
+             "experience_recent_days": (int, float), "gateway_timeout_s": (int, float), "memory_budget": dict,
+             "records_budget": dict, "state_budget": dict}
+
+
+def _section(name: str, keys: dict, path: str | Path | None) -> dict:
+    raw = tomllib.loads(Path(path or DEFAULT_PATH).read_text()).get(name)
+    if not isinstance(raw, dict):
+        raise ValueError(f"[{name}] missing from the walter-context configuration")
+    missing = sorted(set(keys) - raw.keys())
+    if missing:
+        raise ValueError(f"[{name}]: missing {missing}")
+    for k, t in keys.items():
+        if not isinstance(raw[k], t) or isinstance(raw[k], bool) or (isinstance(raw[k], (int, float)) and raw[k] < 0):
+            raise ValueError(f"[{name}].{k}: invalid value")
+    return {k: raw[k] for k in keys}
+
+
+def preflight_settings(path: str | Path | None = None) -> dict:
+    """[preflight]: decision samples, timeouts, windows and the degraded plan's thresholds."""
+    return _section("preflight", PREFLIGHT_KEYS, path)
+
+
+def pack_settings(path: str | Path | None = None) -> dict:
+    """[pack]: total budget per context level, cut order, per-block budgets and the board/tasks/experience bounds."""
+    out = _section("pack", PACK_KEYS, path)
+    if set(out["budget"]) != {"L0", "L1", "L2", "L3", "L4"} or not all(
+            isinstance(v, int) and v > 0 for v in out["budget"].values()):
+        raise ValueError("[pack].budget: a positive token budget for each of L0..L4")
+    return out

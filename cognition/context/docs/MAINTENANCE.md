@@ -58,9 +58,27 @@ cloud. Une erreur d’une source ne constitue pas une preuve que les données co
 - Preflight par message : le service local reçoit `POST /preflight`, `?shadow=1` enregistre seulement et
   `?inject=1` retourne le pack. `WALTER_HOOK_PREFLIGHT=off` désactive le travail fantôme côté hook ; le hook
   distingue ce mode de la sélection d’injection DSH.
-- Injection DSH : `WALTER_HOOK_INJECT_DSH=legacy|pack` a priorité sur l’interrupteur d’instance ; à défaut, `legacy`.
-  Aucun fichier d’interrupteur n’était présent lors de la vérification du 29 octobre. Une expérience peut modifier
-  son environnement sans modifier l’instance. Si le pack échoue, le hook conserve le comportement mémoire précédent.
+- Injection du moteur (production, vérifié le 11/11/2026) : le greffon d’entrée natif du Walter Engine
+  (`/opt/dsh/home/cordis.patch.yml`, `walter-intake`, `mode: native`, `inject` = `pack` par défaut) appelle
+  `POST /preflight?inject=1` à chaque message du propriétaire ; en cas d’erreur ou au-delà de 7 s il injecte le bloc
+  Memory `legacy`. L’ancien interrupteur `WALTER_HOOK_INJECT_DSH` ne concerne plus que le hook, qui n’injecte plus
+  pour DSH.
+- Échange précédent : si la requête arrive sans `previous` mais avec une session, le preflight lit le dernier échange
+  propriétaire/assistant de cette session dans walter_logs (API logs de Memory, cloud-safe, `[preflight]
+  previous_chars`, `previous_timeout_s`) ; échec ou délai : plan sans lui, `previous: failed: …` dans le journal.
+- **Plan dégradé (A2)** : décision en échec après les replis de la chaîne du Router → `decision.degraded = true`,
+  `decision.error` (classe + raison courte, sans URL, chemin ni clé) ; niveau L3, capacités `tools` + `memory`,
+  sujet le plus proche par embeddings locaux si `similarity ≥ degraded_min_similarity`, profil modèle du dernier
+  plan décidé de la session s’il a moins de `degraded_profile_max_age_s`, sinon `general/L2`. Le pack commence par
+  une phrase qui le dit au modèle ; la réponse `?inject=1` porte `degraded: true` ; `requested.degraded` est envoyé
+  au Run Plane (gardé seulement quand Memory l’ajoute à `runs.REQUESTED_KEYS`) ; événement bus `context.degraded`
+  (bibliothèque bus de Memory, jamais en mode fantôme) ; ligne du journal `degraded: true`. Contrôle :
+  `walter-context-preflight --report` → `degraded`, `degraded_errors`. Un taux non nul = la chaîne de décision du
+  Router est en panne (solde OpenRouter, fournisseur) : voir `walter-router health`, pas le preflight.
+- Budget du pack (`[pack]`) : budget total par niveau (L0…L4) ; au-delà, blocs raccourcis puis retirés selon
+  `cut_order` (le moins pertinent d’abord ; `now` et la ligne de plan dégradé jamais), chaque coupe dans
+  `pack.cuts` (`--report` → `cuts`). Les blocs `tasks` / `experience` viennent des routes Memory `POST
+  /v1/tasks/list` et `/v1/experience` ; route absente ou lente → bloc retiré, note `tasks: route absent`.
 - Sous-agents Router : `WALTER_RUN_CONTEXT=caller` demande uniquement le contexte de l’appelant. Sinon Router
   appelle `walter-context-child` ; s’il est indisponible, Router conserve le contexte de l’appelant.
 

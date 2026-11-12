@@ -25,6 +25,10 @@ def rows(folder: Path, days: int = 1) -> list[dict]:
     return out
 
 
+def _degraded(r: dict) -> bool:
+    return bool((r.get("plan", {}).get("decision") or {}).get("degraded"))
+
+
 def report(folder: Path, days: int = 1) -> dict:
     rs = [r for r in rows(folder, days) if r.get("plan")]
     packed = [r for r in rs if r.get("pack")]
@@ -34,7 +38,14 @@ def report(folder: Path, days: int = 1) -> dict:
     return {
         "messages": len(rs), "errors": sum(1 for r in rows(folder, days) if r.get("error")),
         "levels": dict(Counter(r["plan"]["level"] for r in rs)),
-        "fast_paths": dict(Counter(r["plan"].get("fast_path") or "decision" for r in rs)),
+        "fast_paths": dict(Counter(r["plan"].get("fast_path") or ("degraded" if _degraded(r) else "decision")
+                                   for r in rs)),
+        # SOCLE A2: a failed decision gives an explicit prudent plan; counted apart (and in `levels` as their L3)
+        "degraded": sum(1 for r in rs if _degraded(r)),
+        "degraded_errors": dict(Counter(str((r["plan"].get("decision") or {}).get("error") or "?").split(":")[0]
+                                        for r in rs if _degraded(r))),
+        "previous_fetched": dict(Counter(str(r["previous"]).split(":")[0] for r in rs if r.get("previous"))),
+        "cuts": dict(Counter(f"{c['block'].split(':')[0]}:{c['action']}" for r in packed for c in r["pack"].get("cuts") or [])),
         "subjects": dict(Counter((r["plan"]["thread"]["id"] or "new") for r in rs).most_common(8)),
         "plan_ms_median": med([r.get("plan_ms") for r in rs if r.get("plan_ms") is not None]),
         "retrieval_ms_median": med([r["pack"]["retrieval_ms"] for r in packed]),

@@ -86,7 +86,7 @@ class ContextPlan:
     model_profile: ModelProfile = field(default_factory=ModelProfile)
     fast_path: str | None = None         # the plan came from a rule, without a model call
     escalated: bool = False              # a stronger model settled part of it
-    decision: dict = field(default_factory=dict)          # model, latency_ms, confidences: for the trace only
+    decision: dict = field(default_factory=dict)          # model, ms, confidences; degraded + error (A2): trace
     answer: str | None = None            # fast_path trivial only: the exact answer, no model needed (lot 2, 07/11)
     version: int = PLAN_VERSION
 
@@ -238,7 +238,13 @@ def schemas() -> dict[str, dict]:
                     "task": {"type": "string"}, "level": _enum(MODEL_LEVELS), "require": _STRS},
                     "description": "Asked of Walter Router; the Router alone picks the concrete model."},
                 "fast_path": {"enum": [*FAST_PATHS, None]}, "escalated": {"type": "boolean"},
-                "decision": {"type": "object", "description": "trace only"}}},
+                "decision": {"type": "object", "description": (
+                    "trace only; degraded = true with error (exception class + short scrubbed reason) when the "
+                    "decision failed and the plan is the prudent default (SOCLE A2, 2026-11-11)"),
+                    "properties": {"degraded": {"type": "boolean"}, "error": {"type": "string", "maxLength": 120},
+                                   "work": {"type": "number", "minimum": 0, "maximum": 1, "description": (
+                                       "the decision model's judgement that the message asks for work to carry out and "
+                                       "follow (>= 0.5: the Run Plane keeps it as a durable task, SOCLE A3, 2026-11-12)")}}}}},
         "session-state.v1.json": {
             "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": base + "session-state.v1.json",
             "title": "SessionState v1", "type": "object", "required": ["version", "thread_id"],

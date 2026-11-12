@@ -147,7 +147,22 @@
     },
     "decision": {
       "type": "object",
-      "description": "trace only"
+      "description": "trace only; degraded = true with error (exception class + short scrubbed reason) when the decision failed and the plan is the prudent default (SOCLE A2, 2026-11-11)",
+      "properties": {
+        "degraded": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "work": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "the decision model's judgement that the message asks for work to carry out and follow (>= 0.5: the Run Plane keeps it as a durable task, SOCLE A3, 2026-11-12)"
+        }
+      }
     }
   }
 }

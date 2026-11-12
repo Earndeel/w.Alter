@@ -33,12 +33,13 @@
     "HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it)",
     "Python walter_context.retrieval.gather and walter_context.assembly.pack",
     "Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON)",
-    "POST /preflight?inject=1 -> plan/text/pack/error; POST /preflight?shadow=1 -> private instance record without injection",
-    "CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow"
+    "POST /preflight?inject=1 -> plan/text/pack/degraded/error (degraded = decision failed, prudent L3 plan, SOCLE A2; pack.cuts = blocks cut to the level budget); POST /preflight?shadow=1 -> private instance record without injection",
+    "CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow",
+    "In-process walter.context.window: globalThis[Symbol.for('walter.context.window')](agent, {plan}, signal) published by the DSH port -> window decision report {applied, reason, warm, turns, tokens, measured_tokens} (SOCLE A1; the kernel isolates its compaction service, the engine's intake plugin calls this entry at each owner turn)"
   ],
   "bindings": {
     "hermes": "native compressor until walter-context replaces it (plan lot 6)",
-    "dsh": "Public checkpoint adapter selected by composition; per-message injection legacy by default, pack opt-in",
+    "dsh": "Walter Engine (dsh-web): public checkpoint adapter selected by composition; per-message context through the engine's native intake plugin (core/engine/plugins/intake, mode native, inject pack by default) calling POST /preflight?inject=1; the legacy Memory block only when the preflight fails or times out (verified 2026-11-11 in /opt/dsh/home/cordis.patch.yml)",
     "codex": "Native compaction; additive module notes and hook preflight",
     "claude-code": "Native compaction; additive module notes and hook preflight; entrance reduction of large tool outputs in SHADOW (hook PostToolUse, records numbers only)",
     "router": "Text sub-agents request ChildContextSpec v1 through walter-context-child; caller-only mode remains available"
@@ -58,6 +59,13 @@
   "services": [
     "walter-context-preflight"
   ],
+  "service_code": {
+    "dsh-web": {
+      "code_roots": [
+        "ports/dsh"
+      ]
+    }
+  },
   "optional": [
     "core",
     "logs",
@@ -272,10 +280,16 @@
     {
       "id": "dsh-port",
       "path": "ports/dsh",
-      "role": "Prise DSH (injection et compaction) ; deviendra la stratégie context du moteur",
+      "role": "Prise DSH : fenêtre du tour du propriétaire (frontière par pertinence, A1), point de contrôle sous pression, context_recover",
       "status": "active",
       "readme": "README.md",
-      "vision_target": "core/engine/plugins"
+      "vision_target": "core/engine/plugins",
+      "interfaces": [
+        {
+          "transport": "library",
+          "interface": "walter.context.window"
+        }
+      ]
     },
     {
       "id": "bench",

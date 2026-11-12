@@ -19,6 +19,23 @@ Changing only the name on an existing entry does not replace it in this DSH
 version. The resolved composition was checked with `dsh --dump-config`; this
 configuration takes effect on new launches.
 
+## Window of an owner turn (A1, 2026-11-12)
+
+Besides the pressure checkpoint, the port owns the **relevance boundary**: at the start of each owner turn the
+engine's intake plugin calls `window(agent, {plan}, signal)` and walter-context decides, from the ORIGINAL turns
+of the session journal, what the model receives (`walter_context/compress/window.py`: last recent small turn
+verbatim, turns of the message's thread and recent ones as full entries, the others in one line, a bounded
+record; tool payloads stay behind `context_recover`). The replacement goes through the kernel's own compaction
+transaction; nothing is deleted from the journal.
+
+The kernel composition isolates the `compaction` service inside a Cordis group (`isolate: {compaction: true}`),
+so a plugin outside that group cannot resolve it. The port therefore publishes one in-process entry,
+`globalThis[Symbol.for('walter.context.window')]` (exported as `WINDOW_ENTRY`, removed on dispose, declared as
+interface `walter.context.window` in `contracts/context.json`). The caller records every decision (applied or
+not, reason, tokens before/after) in the engine's intake observations (`kind: window`); without the entry it
+records `no_entry` — the window is then not managed, and that is visible. Tunables: `[relevance]` in
+`config/walter-context.toml`. Proof on the live engine: `core/scenarios/socle/socle_e2e.py --only window`.
+
 ## Ownership
 
 The port extends `BasicCompactionEngine.summarize()` and its dynamically called
@@ -75,7 +92,7 @@ paths. Peer dependencies resolve normally when installed as a package; this VM
 can resolve the host through `WALTER_DSH_PACKAGE` (default
 `/opt/dsh/package.json`). The supported and tested host is DSH 0.2.0-rc.2.
 
-`node /walter/cognition/context/tests/test_dsh.mjs` runs nine tests with actual DSH
+`node --test /walter/cognition/context/tests/test_dsh.mjs` runs fifteen tests with actual DSH
 Session, CompactionEngine, ToolRuntime and replay. They cover a successful
 checkpoint, source recovery, intact raw events, Python failure, system/developer
 instruction refusal (including leading roles and manual compaction), abort and

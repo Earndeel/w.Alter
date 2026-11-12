@@ -29,6 +29,17 @@ def dispatch(request: dict) -> dict:
     if op == "summarize":
         return checkpoint.summarize(messages, model=str(request.get("model") or ""),
                                     budget_tokens=int(request.get("budget_tokens") or 0))
+    if op == "window":
+        from .compress import window
+        plan = request.get("plan")
+        live = request.get("live_turn")
+        return window.decide(messages, model=str(request.get("model") or ""),
+                             budget_tokens=int(request.get("budget_tokens") or 0),
+                             measured_tokens=int(request.get("measured_tokens") or 0),
+                             now_ms=int(request.get("now_ms") or 0), plan=plan if isinstance(plan, dict) else None,
+                             live_turn=int(live) if live is not None else None,
+                             checkpoint_tokens=int(request.get("checkpoint_tokens") or 0),
+                             force=bool(request.get("force")))
     if op == "plan":
         return checkpoint.plan(messages, model=str(request.get("model") or ""),
                                measured_tokens=int(request.get("measured_tokens") or 0),

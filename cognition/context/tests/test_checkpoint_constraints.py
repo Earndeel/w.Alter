@@ -25,10 +25,32 @@ def test_entire_user_constraint_survives_repeated_checkpoint():
                    {'role':'tool','tool_call_id':'ref-2','content':'more '*4000}])['content']
  assert text in second and 'ref-1' in second and 'ref-2' in second
 
-def test_over_budget_preservation_is_refused_not_truncated():
+def test_over_budget_owner_text_is_kept_whole_never_refused_or_truncated():
+ # 2026-11-11: a record past its share is bounded, not refused (a long session could no longer compact at all).
+ # The owner's words are never clipped; the host still checks that the replacement is smaller than the span.
  text='must preserve this sentence '*500
- with pytest.raises(ValueError,match='preserve user constraints'):
-  summarize([{'role':'user','content':text}],budget_tokens=1000)
+ result=summarize([{'role':'user','content':text}],budget_tokens=1000)
+ assert ' '.join(text.split()) in result['content'] and result['brief_turns']==1 and result['omitted_turns']==0
+
+def test_long_history_is_bounded_oldest_turns_first_with_an_explicit_note():
+ messages=[]
+ for i in range(60):
+  messages += [{'role':'user','content':f'request {i} '+'detail '*200},{'role':'assistant','content':f'answer {i} '+'text '*400}]
+ result=summarize(messages,budget_tokens=20000)
+ assert result['output_tokens'] <= 20000*load().policy.record_share+50   # the estimate of entry sizes is approximate
+ assert result['omitted_turns']>0 and 'earlier turns omitted' in result['content']
+ assert 'request 59' in result['content'] and 'request 0 ' not in result['content']
+
+def test_injected_user_messages_and_earlier_record_do_not_pose_as_owner_text():
+ messages=[{'role':'user','src':'compact-checkpoint','content':'[Session record: earlier] - old request'},
+           {'role':'user','src':'agent-instructions','content':'AGENTS_FILE_BODY'},
+           {'role':'user','src':'user','content':'real request'},
+           {'role':'user','src':'walter-intake','content':'<walter-context>\nPACK_BODY\n</walter-context>'},
+           {'role':'assistant','content':'real answer'}]
+ content=summarize(messages)['content']
+ assert 'AGENTS_FILE_BODY' not in content and 'PACK_BODY' not in content
+ assert content.index('old request') < content.index('real request') < content.index('real answer')
+ assert '## User\n[Session record' not in content
 
 def test_all_tool_references_survive_action_summary_limit():
  messages=[{'role':'user','content':'do the analysis'}]
@@ -53,10 +75,10 @@ def test_all_visible_assistant_explanations_survive_in_order_and_repeat():
  second=summarize([{'role':'user','content':first},{'role':'assistant','content':'Followup.'}])['content']
  assert explanation in second and intermediate in second
 
-def test_oversized_assistant_text_refuses_instead_of_clipping():
- with pytest.raises(ValueError,match='assistant text within its budget'):
-  summarize([{'role':'user','content':'explain'},
-             {'role':'assistant','content':'mandatory explanation '*1000}],budget_tokens=1000)
+def test_oversized_assistant_text_goes_to_one_line_with_the_request_whole():
+ result=summarize([{'role':'user','content':'explain'},
+                   {'role':'assistant','content':'mandatory explanation '*1000}],budget_tokens=1000)
+ assert '- explain → mandatory explanation' in result['content'] and result['brief_turns']==1
 
 def test_tool_without_recoverable_reference_refused():
  with pytest.raises(ValueError,match='lacks a recoverable reference'):
