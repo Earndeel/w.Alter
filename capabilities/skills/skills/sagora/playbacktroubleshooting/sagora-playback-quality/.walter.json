@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-12T04:15:18.343507+00:00",
- "description": "Use when Sagora starts playback in the wrong audio language or selects a poor-quality source despite a high advertised resolution.",
- "domain": "sagora/playbacktroubleshooting",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session established a reusable Sagora-specific diagnosis and validation workflow absent from the listed skills: default-track limitations required capability-aware source selection, resolution-first sorting still selected low-bitrate files, multiple playback entry points needed consistent preferences, and real Mac Brave playback exposed checks that API state alone could not establish. It also identified full-replacement configuration writes and a self-matching cleanup command as concrete pitfalls. Account-specific and third-party details are omitted. [session claude_code/vm/e3d0b73f-ce83-493e-b6ce-5b2972dc3d0d]",
- "runtime": "learner",
- "session_id": "claude_code/vm/e3d0b73f-ce83-493e-b6ce-5b2972dc3d0d",
- "target": "sagora-playback-quality"
+ "store_sha": "f0558ededdfd5b4e07f665cda7a77ea033133180ee7e1a5864d8043f2f884f26"
 }
