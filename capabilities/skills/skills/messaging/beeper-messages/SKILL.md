@@ -1,7 +1,7 @@
 ---
 name: beeper-messages
-description: Read and interact with Beeper messages via the Beeper Desktop local REST API. Use when the user asks to check Beeper messages, read chats, or send messages on Beeper.
-version: 1.2.0
+description: Read, search, analyze or send Beeper chats. Reading and analysis start from Walter Memory (messages already ingested, voice notes already transcribed); the Beeper Desktop local REST API is for sending and for what Memory does not hold yet.
+version: 1.3.0
 author: W.Alter
 license: MIT
 metadata:
@@ -11,7 +11,25 @@ metadata:
 
 # Beeper Messages
 
-Access Beeper chats and messages via the Beeper Desktop local REST API.
+Read Beeper chats from Walter Memory first; use the Beeper Desktop local REST API to send, or for what Memory does
+not hold yet.
+
+## Start here: reading or analysing an exchange (since 2026-11-12)
+
+Every Beeper message is already in Walter Memory (connector every 3 min), and **voice notes and documents are
+already transcribed there**: a message with files carries `attachments` with the transcription. For « lis-moi les
+derniers échanges avec X », « résume la conversation », « propose une réponse » :
+
+1. `person_lookup(name)` — the person, their networks and conversations.
+2. `memory_events(source="beeper", text=…, since=…, until=…, order="oldest")` — the messages of the period, in order,
+   voice-note transcriptions included (`attachments`). `memory_context(query)` when the subject is wider than one chat.
+3. Answer from that. Do **not** page the live API, copy media from the Mac or transcribe audio yourself for messages
+   Memory already holds: on 2026-11-11 that path cost 24 tool calls and 13 model calls for one request and still
+   missed the voice notes.
+
+Use the live API below only to **send**, for a message of the last few minutes that Memory has not ingested yet, or
+when `memory_events` clearly lacks something (say so). A voice note whose transcription is missing (`attachments`
+without text): `vault_search` / `vault_get` the object, then `audio_transcribe(paths=[…])`.
 
 ## Prerequisites
 
@@ -156,6 +174,11 @@ Pattern: the user will often know someone by a different name than their handle.
 5. **Never assume temporal proximity** — a chat with `lastActivity` of 2 hours ago does NOT mean the last TEXT MESSAGE was 2 hours ago. The lastActivity may reflect a reaction, a read receipt, or an outgoing message not returned by the API.
 
 ## Further reading (moved out of this file on 2026-11-01, unchanged)
+
+These files predate November 2026. What no longer exists in them: `vault get <provider>/api_key`, `~/.hermes/.env`,
+`execute_code`, and direct calls to a model provider (OpenRouter, Groq, Gemini URLs). Keys are reached only through
+Walter Secrets grants and models only through Walter's own tools (`audio_transcribe` for audio); read these files
+for the Beeper API behaviour they describe, not for those commands.
 
 - `references/pitfalls.md` — All known pitfalls (pagination, IDs, media, contacts, API quirks) — read before any long analysis.
 - `references/multi-source-export.md` — Exporting a multi-source conversation with chronological merge and voice-note transcription.
