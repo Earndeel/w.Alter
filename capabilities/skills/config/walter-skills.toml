@@ -54,18 +54,14 @@ always_active = ["secrets", "drafts"]   # never destructive: applied on master a
 max_moves = 400            # organise: folder moves per run (names never change)
 max_domain_size = 30       # organise: a domain larger than this (or 'misc') triggers a re-organisation
 
-# Model postes: ordered routes, first that answers wins. via = router (2026-10-16, Monsieur: every module goes through
-# Walter Router): `level` = one of Monsieur's text tiers, so the model follows the tier he adopts; Codex routes run in
-# W.Alter's own Codex session (no per-token cost), paid ones through the walter-llm gateway. The static codex /
-# openrouter routes after it only answer when the router is unreachable.
+# Model postes: ordered routes, first that answers wins. A route names a Walter Router task and one of Monsieur's text
+# tiers only (SOCLE A6, 2026-11-11): the Router picks the model and its routes (Codex subscription, Kie, OpenRouter…),
+# the walter-llm gateway executes them with its own keys and fallbacks. No model, no provider here.
 # The judge's independence from the editor comes from the scripted checks (lossless, retrieval) it complements, and
-# from a different tier (L1, Luna today) than the editor (L2, Sol today).
+# from a different tier (L1) than the editor (L2).
 [postes.editor]
-routes = [{ via = "router", level = "L2", budget = "recurring" },
-          { via = "codex", model = "gpt-6.1-sol", effort = "medium" }]
+routes = [{ task = "general", level = "L2", budget = "recurring" }]
 [postes.indexer]
-routes = [{ via = "router", level = "L1", budget = "backfill" },
-          { via = "codex", model = "gpt-6-luna", effort = "low" }]
+routes = [{ task = "general", level = "L1", budget = "backfill" }]
 [postes.judge]
-routes = [{ via = "router", level = "L1", budget = "recurring" },
-          { via = "codex", model = "gpt-6-luna", effort = "medium" }]
+routes = [{ task = "general", level = "L1", budget = "recurring" }]
