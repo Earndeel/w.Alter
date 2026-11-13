@@ -346,8 +346,10 @@ def parse_offers(kind: str, doc: dict) -> list[dict]:
     elif kind == "declared":
         for d in doc["offers"]:
             mid, _ = identity.normalize("declared", d["model"])
+            # a direct API key bills per token: its declared price (e.g. Nace decisions, 2026-11-13); UIs have none
             rows.append(dict(provider=d["provider"], offer_key=d["offer_key"], model_id=mid, interface=d["interface"],
-                             access=d["access"], price_in_1m=None, price_out_1m=None, unit_price=None, unit=None,
+                             access=d["access"], price_in_1m=d.get("price_in_1m"), price_out_1m=d.get("price_out_1m"),
+                             unit_price=None, unit=None,
                              provider_created=None, pricing={"declared": d.get("declared"), "note": d.get("note")},
                              offer_kind="generation", modes=d.get("modes") or [], resolution=None, audio=None,
                              norm_price=None, norm_unit=None))

@@ -164,6 +164,29 @@ def test_cloudflare_adapter_prices_input_tokens_and_keeps_the_model():
     assert client.calls[0]["json"]["model"] == "clef"
 
 
+def test_nace_adapter_calls_systemone_with_its_own_key_and_prices_input_tokens():
+    """2026-11-13: Drex Max 1.1 (Monsieur's default decision model) on Nace's own API, same contract."""
+    client = Client({"console.nace.ai/v1/systemone": (200, {"model": "drex-max-v1.1", "usage": {
+        "input_tokens": 1000, "output_tokens": 125}, "answers": {"task": {"choice": "b", "confidence": 0.9}}})})
+    code, out = run(structured.decisions({"state": {}, "questions": Q}, client=client, key=key, log=lambda e: None,
+                                         chain=["nace/drex-max-v1.1", "cloudflare/clef"]))
+    assert code == 200 and out["model"] == "nace/drex-max-v1.1" and out["provider"] == "nace"
+    assert out["answers"]["task"]["choice"] == "b"
+    assert out["calls"][0]["cost_usd"] == pytest.approx(0.03 * 1000 / 1e6)
+    assert client.calls[0]["json"]["model"] == "drex-max-v1.1"
+    assert client.calls[0]["headers"]["Authorization"] == "Bearer fixture-nace_api_key"
+
+
+def test_the_openrouter_floor_never_holds_back_a_model_billed_elsewhere():
+    async def low():
+        return 0.5
+    client = Client({"console.nace.ai": (200, {"model": "drex-max-v1.1", "usage": {"input_tokens": 10},
+                                               "answers": {"task": {"choice": "a"}}})})
+    code, out = run(structured.decisions({"state": {}, "questions": Q, "paid_floor_usd": 1.0}, client=client, key=key,
+                                         log=lambda e: None, balance=low, chain=["nace/drex-max-v1.1"]))
+    assert code == 200 and out["provider"] == "nace" and not out["attempts"]
+
+
 def test_a_named_model_narrows_the_chain_and_an_unknown_one_is_refused():
     client = Client({"alpha/decisions": answer()})
     chain = ["liquid/d1-ultra", "inception/mercury-decide:free"]

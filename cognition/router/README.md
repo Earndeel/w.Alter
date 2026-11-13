@@ -77,7 +77,7 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 |---|---|
 | Hermes | plugin `walter-router` (tools `walter_route`, `walter_run`, `walter_decide`, `walter_plans`, `walter_web`, plus `walter_verdict`, `walter_feedback` for the Telegram buttons and the owner's verdicts); the brief as a system-prompt section; `sync-hermes` writes its auxiliary jobs, cron postes and `provider_routing.models.<id>.order` |
 | Modules (walter-memory, Hindsight, voice, Kardex…) | walter-llm with `model` = a router task; `pick` for service postes (STT, rerank, embeddings) |
-| walter-memory triage | `decision-chain` (d1-ultra, then Clef on Workers AI; Mercury Decide withdrawn 2026-11-13) |
+| walter-memory triage | `decision-chain` (Drex Max 1.1 on Nace's own API — pinned by Monsieur 2026-11-13, declared offer `nace/drex-max-v1.1`, grant `nace` —, then Clef on Workers AI; Mercury Decide withdrawn 2026-11-13) |
 | Claude Code, Codex, DSH | the `walter` MCP: the same four tools under the same names, the same runs; the brief in the MCP server instructions (Claude Code) and in their W.Alter profile (Codex, DSH). Their own model stays theirs |
 | walter-context (planned) | the decision model (`classify` / `ask`) to set the agentic level of a turn |
 | walter-core | `walter-router health` in `walter_health` |

@@ -16,7 +16,8 @@ secret, a payload or a path).
 Provider adapters (the only ones in Walter for these interfaces):
   OpenRouter Decisions API  "vendor/model[:free]"      key OPENROUTER_API_KEY
   Cloudflare Workers AI     "cloudflare/clef" | "clef"  keys CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_AI_TOKEN
-  OpenRouter rerank         "vendor/model"             key OPENROUTER_API_KEY
+  Nace systemone            "nace/drex-max-v1.1"        key NACE_API_KEY (same contract as OpenRouter Decisions)
+  OpenRouter rerank        "vendor/model"             key OPENROUTER_API_KEY
 
 `merge_answers` here is THE implementation of the samples mean (moved from walter_memory.llm, same semantics).
 No import of the gateway: its dependencies (key reader, http client, logger) are passed in, so tests run offline.
@@ -31,6 +32,8 @@ OPENROUTER_RERANK = "https://openrouter.ai/api/v1/rerank"
 OPENROUTER_CREDITS = "https://openrouter.ai/api/v1/credits"
 CF_RUN = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/cloudflare/{model}"
 CF_PRICE = {"clef": 0.24, "clef-flash": 0.09}   # USD per M input tokens (Workers AI catalogue, 2026-10-03)
+NACE_SYSTEMONE = "https://console.nace.ai/v1/systemone"
+NACE_PRICE = {"drex-max-v1.1": 0.03}  # USD per M input tokens, output not billed (Nace docs, launch price, 2026-11-13)
 MAX_SAMPLES = 5
 MAX_DOCUMENTS = 1000
 DEFAULT_TIMEOUT = 30.0
@@ -65,6 +68,8 @@ def merge_answers(samples: list[dict]) -> dict:
 
 
 def provider_of(model: str) -> str:
+    if model.startswith("nace/"):
+        return "nace"
     return "cloudflare" if model.startswith("cloudflare/") or "/" not in model else "openrouter"
 
 
@@ -129,6 +134,19 @@ async def decide_once(client, key, model: str, state: dict, questions: dict, tim
         tok = (res.get("usage") or {}).get("input_tokens") or 0
         return {"answers": res["answers"], "usage": res.get("usage") or {}, "model": model,
                 "cost_usd": tok * CF_PRICE.get(short, 0.24) / 1e6, "cost_status": "estimated", "input_tokens": tok}
+    if provider_of(model) == "nace":
+        short = model.split("/", 1)[1]
+        r = await client.post(NACE_SYSTEMONE, headers={"Authorization": f"Bearer {key('NACE_API_KEY')}"},
+                              json={"model": short, "state": state, "questions": questions}, timeout=timeout)
+        data = _json(r)
+        if r.status_code >= 400 or not isinstance(data, dict) or not isinstance(data.get("answers"), dict):
+            raise ProviderError(r.status_code, _error_code(data))
+        usage = data.get("usage") or {}
+        tok = usage.get("input_tokens") or 0
+        price = NACE_PRICE.get(short)
+        return {"answers": data["answers"], "usage": usage, "model": model,
+                "cost_usd": tok * price / 1e6 if price is not None else None,
+                "cost_status": "estimated" if price is not None else "unknown", "input_tokens": tok}
     r = await client.post(OPENROUTER_DECISIONS, headers={"Authorization": f"Bearer {key('OPENROUTER_API_KEY')}"},
                           json={"model": model, "state": state, "questions": questions}, timeout=timeout)
     data = _json(r)
@@ -231,7 +249,8 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
             calls.append(call)
             log({**call})
             continue
-        if floor is not None and balance is not None and not is_free(model):
+        # the floor is the OpenRouter credit's: a model billed elsewhere (Nace, Workers AI) is never held back by it
+        if floor is not None and balance is not None and provider == "openrouter" and not is_free(model):
             bal = await balance()
             if bal is not None and bal < floor:
                 attempts.append({"provider": provider, "model": model, "reason": "balance_below_floor"})

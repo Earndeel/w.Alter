@@ -1057,6 +1057,7 @@ Intent classification by the decision model (OpenRouter's Decisions API, or Clou
 
 - `chain(conn)` — Decision models to try, in order. The best one comes from the 48 h cycle (task 'decision', AA Decision Index,
 - `_cloudflare(model: str, payload: dict, timeout: float)` — Cloudflare Workers AI (Clef family, free daily allocation). Scoped token preferred; the global key only when
+- `_nace(model: str, payload: dict, timeout: float)` — Nace systemone (Drex Max): the OpenRouter Decisions contract on Nace's own API (2026-11-13).
 - `_criteria(conn)` — 
 - `_decisions(conn, state: dict, questions: dict, timeout: float, models: tuple | None=None)` — One Decisions call along the chain (first model that answers) -> (answers, raw answer, ms, errors). Every
 - `ask(conn, question: str, options: dict[str, str], context: str | None=None, timeout: float=8.0, models: tuple | None=None)` — The decision model for an agent's own quick choice (sort, yes/no, pick one of several options):

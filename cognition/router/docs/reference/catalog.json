@@ -9129,6 +9129,11 @@
             "signature": "model: str, payload: dict, timeout: float"
           },
           {
+            "description": "Nace systemone (Drex Max): the OpenRouter Decisions contract on Nace's own API (2026-11-13).",
+            "name": "_nace",
+            "signature": "model: str, payload: dict, timeout: float"
+          },
+          {
             "description": "",
             "name": "_criteria",
             "signature": "conn"
@@ -15936,6 +15941,20 @@
       {
         "comment": "",
         "file": "llm/structured.py",
+        "name": "NACE_SYSTEMONE",
+        "value": "https://console.nace.ai/v1/systemone"
+      },
+      {
+        "comment": "USD per M input tokens, output not billed (Nace docs, launch price, 2026-11-13)",
+        "file": "llm/structured.py",
+        "name": "NACE_PRICE",
+        "value": {
+          "drex-max-v1.1": 0.03
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
         "name": "MAX_SAMPLES",
         "value": 5
       },
@@ -17094,8 +17113,15 @@
         "value": [
           "typesafe/jev-",
           "inception/mercury-decide",
-          "cloudflare/clef"
+          "cloudflare/clef",
+          "nace/"
         ]
+      },
+      {
+        "comment": "Nace's own Decisions API (Drex Max), key NACE_API_KEY",
+        "file": "serve/intent.py",
+        "name": "NACE_SYSTEMONE",
+        "value": "https://console.nace.ai/v1/systemone"
       },
       {
         "comment": "",
@@ -17471,6 +17497,13 @@
       },
       {
         "default_expression": "aucun",
+        "description": "Nom d'accès fournisseur (autorisation nace, lecteurs llm et router : décisions Drex Max) ; jamais affiché.",
+        "file": "serve/intent.py",
+        "name": "NACE_API_KEY",
+        "operation": "secret_value"
+      },
+      {
+        "default_expression": "aucun",
         "description": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets.",
         "file": "serve/intent.py",
         "name": "OPENROUTER_API_KEY",
@@ -17565,6 +17598,7 @@
       "CODEX_SESSIONS",
       "HERMES_HOME",
       "KIE_API_KEY",
+      "NACE_API_KEY",
       "OPENROUTER_API_KEY",
       "TELEGRAM_HOME_CHANNEL",
       "VENICE_API_KEY",
@@ -17638,7 +17672,7 @@
     "analysis/knowledge.py": "193ee45063f29a805e08eece0d2988d503c38571f13c4a476e5068556ceae768",
     "analysis/media.py": "c61030754e36087f9b9b4caf86641ec786e97eccf3b33345d04b5f2d7eb1b267",
     "analysis/pareto.py": "00621f7e0584567022991ee1bd154dfe15b64b9443dd0c89a6faf26f11d23f0f",
-    "analysis/parse.py": "d908edffc0fcdce9f5bf629f959f8391dff6af3402ed74161f880776d2c3c9ea",
+    "analysis/parse.py": "cf82c94b379e607f9793738b1e770374b3e96c6da328062ecb16292d43b59317",
     "analysis/postes.py": "8bb913efa9bc2ba553acc0dc81b8ec69e014bda4aa8dfba887e19d50c39556d0",
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
     "analysis/refresh.py": "17a00934a816292587e26c292795177ce6e3199ce05b3612fd5a580a5487822a",
@@ -17662,7 +17696,7 @@
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "39778c3ef58539ea14a375ca36c762d0d628de2c02440d7372095191affda842",
     "contracts/router.json": "b82b49dac123d08e73e84e9ef81c7a317a4de5dd3deb15fb716461e0cbf0269a",
-    "documentation.py": "85cd5342dc32dc5efcf379e25423def07d4e6c318fc89e4741b53576ffce8c7d",
+    "documentation.py": "a6fc37f0fa84473b8b2f936c1909f3247e678ac8105b2932f68e6e04bf1c3208",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
@@ -17685,7 +17719,7 @@
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
     "llm/gateway.py": "f95463295dfaa2d1f816914f5cac3afcde1c95ff4ce4b00547cb5f29a8eb4b46",
-    "llm/structured.py": "cb1a22fdb08a653d33c3674f0e38ebc7e7843b4532fa89e848fcea4837932b1b",
+    "llm/structured.py": "555403466fe28fb08e099f7637a6a8f9079822350394c1baf8987708d5476952",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
@@ -17740,7 +17774,7 @@
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "5ec59ae8ed7895ce42e763e2ffa3556404e0eb9664c3d45dbb8ca8a4c1435856",
     "serve/hermes_sync.py": "c1df622e2bab7c3d597788b60b82896f2d911c836c2dfabccf7ec276ab511bee",
-    "serve/intent.py": "279a99ef0be9af31392cab95e7aa91d5d8329242925e117a27409aa9d711debd",
+    "serve/intent.py": "d72b71b23b81dad0ccc62531f4f2ef66b3a888fd72655db866fc6136b17193b5",
     "serve/media_exec.py": "58f2a5f4250edb309ee6b0d75cc519d80f8cb8b2714ea1b153783720b1b5f345",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",

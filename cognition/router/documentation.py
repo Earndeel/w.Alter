@@ -172,6 +172,7 @@ ENV_MEANINGS = {
     "KIE_API_KEY": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets, pas une clé transmise au modèle.",
     "OPENROUTER_API_KEY": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets.",
     "VENICE_API_KEY": "Nom d'accès fournisseur (autorisation venice, lecteurs llm et router) ; jamais affiché.",
+    "NACE_API_KEY": "Nom d'accès fournisseur (autorisation nace, lecteurs llm et router : décisions Drex Max) ; jamais affiché.",
     "CHATGPT_TOKEN_DIR": "Réglage du transport de l'abonnement ; l'authentification reste fournie par son grant.",
     "CHATGPT_DEFAULT_INSTRUCTIONS": "Instructions de base du transport d'abonnement, indépendantes du goal de la sous-tâche.",
 }

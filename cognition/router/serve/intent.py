@@ -26,7 +26,8 @@ MODEL = "~typesafe/jev-latest"
 # Mercury Decide free left the chain on 2026-11-13: OpenRouter withdrew it (HTTP 404 on every call since).
 MODELS = ("cloudflare/clef", MODEL)  # eval 2026-10-04: Clef 30/30 (Flash 29/30)
 FREE_FALLBACKS = ("cloudflare/clef",)  # free, off OpenRouter: survives an exhausted OpenRouter credit
-ACCEPTED_PREFIXES = ("typesafe/jev-", "inception/mercury-decide", "cloudflare/clef")
+ACCEPTED_PREFIXES = ("typesafe/jev-", "inception/mercury-decide", "cloudflare/clef", "nace/")
+NACE_SYSTEMONE = "https://console.nace.ai/v1/systemone"  # Nace's own Decisions API (Drex Max), key NACE_API_KEY
 KNOWLEDGE = instance.config_path("knowledge.json")
 
 
@@ -40,6 +41,7 @@ def chain(conn) -> tuple[str, ...]:
     row = conn.execute("""select o.offer_key from models.preferences p join models.offers o on o.model_id = p.pinned_model_id
                           join models.latest_snapshots s using (snapshot_id)
                           where p.task = 'decision' and p.role = 'default' and o.interface = 'decisions'
+                            and coalesce(p.pinned_provider, '') in ('', o.provider)
                           order by o.price_in_1m nulls last limit 1""").fetchone() or \
         conn.execute("""select offer_key from models.selection where run_id = (select run_id from models.latest_run)
                         and task = 'decision' and rank = 1""").fetchone()
@@ -68,6 +70,18 @@ def _cloudflare(model: str, payload: dict, timeout: float) -> dict:
     if not out.get("success"):
         raise RuntimeError(f"workers ai: {out.get('errors')}")
     return {**out["result"], "model": model}
+
+
+def _nace(model: str, payload: dict, timeout: float) -> dict:
+    """Nace systemone (Drex Max): the OpenRouter Decisions contract on Nace's own API (2026-11-13)."""
+    token = instance.secret_value("NACE_API_KEY")
+    if not token:
+        raise RuntimeError("no Nace grant")
+    body = json.dumps({**payload, "model": model.split("/", 1)[1]}).encode()
+    with urlopen(Request(NACE_SYSTEMONE, data=body, headers={"Authorization": f"Bearer {token}",  # noqa: S310
+                                                             "Content-Type": "application/json"}), timeout=timeout) as resp:
+        out = json.loads(resp.read(200000))
+    return {**out, "model": model}
 MIN_CONFIDENCE = 0.35  # eval 2026-10-02: a correct task came back at 0.48
 LEVELS = {"L1": "Everyday: short answer, simple summary, quick fact, small rewrite",
           "L2": "Harder: multi-step analysis, comparison, careful writing, planning",
@@ -102,6 +116,9 @@ def _decisions(conn, state: dict, questions: dict, timeout: float, models: tuple
         try:
             if model.startswith("cloudflare/"):
                 data = _cloudflare(model, payload, timeout)
+                break
+            if model.startswith("nace/"):
+                data = _nace(model, payload, timeout)
                 break
             body = json.dumps(payload).encode()
             with urlopen(Request(URL, data=body, headers={"Authorization": f"Bearer {key}",  # noqa: S310

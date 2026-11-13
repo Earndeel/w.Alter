@@ -126,6 +126,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/structured.py | `OPENROUTER_CREDITS` | https://openrouter.ai/api/v1/credits |  |
 | llm/structured.py | `CF_RUN` | https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/cloudflare/{model} |  |
 | llm/structured.py | `CF_PRICE` | {"clef": 0.24, "clef-flash": 0.09} | USD per M input tokens (Workers AI catalogue, 2026-10-03) |
+| llm/structured.py | `NACE_SYSTEMONE` | https://console.nace.ai/v1/systemone |  |
+| llm/structured.py | `NACE_PRICE` | {"drex-max-v1.1": 0.03} | USD per M input tokens, output not billed (Nace docs, launch price, 2026-11-13) |
 | llm/structured.py | `MAX_SAMPLES` | 5 |  |
 | llm/structured.py | `MAX_DOCUMENTS` | 1000 |  |
 | llm/structured.py | `DEFAULT_TIMEOUT` | 30.0 |  |
@@ -253,7 +255,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/intent.py | `URL` | https://openrouter.ai/api/alpha/decisions |  |
 | serve/intent.py | `MODEL` | ~typesafe/jev-latest |  |
 | serve/intent.py | `FREE_FALLBACKS` | ["cloudflare/clef"] | free, off OpenRouter: survives an exhausted OpenRouter credit |
-| serve/intent.py | `ACCEPTED_PREFIXES` | ["typesafe/jev-", "inception/mercury-decide", "cloudflare/clef"] |  |
+| serve/intent.py | `ACCEPTED_PREFIXES` | ["typesafe/jev-", "inception/mercury-decide", "cloudflare/clef", "nace/"] |  |
+| serve/intent.py | `NACE_SYSTEMONE` | https://console.nace.ai/v1/systemone | Nace's own Decisions API (Drex Max), key NACE_API_KEY |
 | serve/intent.py | `CF_RUN` | https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/{model} |  |
 | serve/intent.py | `MIN_CONFIDENCE` | 0.35 | eval 2026-10-02: a correct task came back at 0.48 |
 | serve/intent.py | `LEVELS` | {"L1": "Everyday: short answer, simple summary, quick fact, small rewrite", "L2": "Harder: multi-step analysis, comparison, careful writing, planning", "L3": "Hardest or high stakes: deep research synthesis, complex reasoning, important decision"} |  |
@@ -304,6 +307,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `VENICE_API_KEY` | serve/execution.py | secret_value | aucun | Nom d'accès fournisseur (autorisation venice, lecteurs llm et router) ; jamais affiché. |
 | `CLOUDFLARE_ACCOUNT_ID` | serve/intent.py | secret_value | aucun | Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation. |
 | `CLOUDFLARE_AI_TOKEN` | serve/intent.py | secret_value | aucun | Nom d'un accès secret pour la voie de décision ; ne pas afficher sa valeur. |
+| `NACE_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'accès fournisseur (autorisation nace, lecteurs llm et router : décisions Drex Max) ; jamais affiché. |
 | `OPENROUTER_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
 | `CLOUDFLARE_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'un accès secret utilisé par un adaptateur ; ne pas afficher sa valeur. |
 | `CLOUDFLARE_EMAIL` | serve/intent.py | secret_value | aucun | Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance. |
