@@ -92,8 +92,10 @@ def build_parser() -> argparse.ArgumentParser:
                                        "for the Telegram door: records the verdict, prints {ok, toast, drop}")
     bt.add_argument("data")
     dbn = sub.add_parser("decision-bench", help="decision models judged against the owner's blind answers, use by use "
-                         "(build cases | run models | label on Telegram | status | report)")
-    dbn.add_argument("action", choices=("build", "run", "label", "status", "report"))
+                         "(build cases | run models | label on Telegram | serve the labelling page | status | report)")
+    dbn.add_argument("action", choices=("build", "run", "label", "serve", "status", "report"))
+    dbn.add_argument("--host", help="serve: address to listen on (the tailnet address, never a public one)")
+    dbn.add_argument("--port", type=int, default=3090)
     dbn.add_argument("--models", help="run: comma-separated decision offers (default: the bench's list)")
     dbn.add_argument("--samples", type=int, default=3)
     lb = sub.add_parser("library", help="the model library: per task/category model, chooser, providers, fallback")
@@ -249,6 +251,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.cmd == "decision-bench":
         from walter_router.eval import decision_bench as bench
+        if args.action == "serve":
+            from walter_router.eval import decision_bench_web
+            if not args.host:
+                raise SystemExit("--host required (the tailnet address)")
+            decision_bench_web.serve(args.host, args.port)
+            return 0
         if args.action in ("label", "status", "report"):
             out = {"label": bench.send_next, "status": bench.status, "report": bench.report}[args.action]()
         else:

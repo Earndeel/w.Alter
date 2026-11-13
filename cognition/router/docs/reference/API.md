@@ -128,7 +128,9 @@ walter-router decide
   --level :  ; défaut=— ; valeurs=["L1", "L2", "L3"]
 walter-router decision-bench
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
-  action :  ; défaut=— ; valeurs=["build", "run", "label", "status", "report"]
+  action :  ; défaut=— ; valeurs=["build", "run", "label", "serve", "status", "report"]
+  --host : serve: address to listen on (the tailnet address, never a public one) ; défaut=—
+  --port :  ; défaut=3090
   --models : run: comma-separated decision offers (default: the bench's list) ; défaut=—
   --samples :  ; défaut=3
 walter-router decision-chain

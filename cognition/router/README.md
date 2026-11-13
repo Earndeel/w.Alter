@@ -137,6 +137,9 @@ answers, not only on public leaderboards. `walter-router decision-bench build | 
   `@instance/state/router/decision-bench/answers.jsonl` and never shown; the owner labels on Telegram (`label`: one
   case per message, buttons `wr:b:…` through the door's existing `wr` prefix; « ? » = no answer, « Passer »);
   `report` compares per use and question: agreement with the owner, confidence when right / wrong, latency, cost.
+- **Web page** (temporary, asked by the owner): `decision-bench serve --host <tailnet address> [--port 3090]`
+  (`eval/decision_bench_web.py`), the same cases and the same labels file as Telegram, answers can be changed; run
+  as a transient unit `walter-decision-bench-web` (tailnet only, no request log), stopped once the labels are in.
 
 ## Access from outside
 

@@ -88,3 +88,20 @@ def test_owner_messages_that_look_like_a_secret_or_a_system_text_are_not_drawn()
     assert not bench._usable("voici la clé sk-abcdefghijklmnopqrstuv")
     assert not bench._usable("<command-name>/clear</command-name>")
     assert not bench._usable("ok")
+
+
+def test_the_web_page_shows_cases_and_questions_never_a_models_answer_and_shares_the_labels(home):
+    from walter_router.eval import decision_bench_web as web
+    tmp, sent = home
+    (tmp / "answers.jsonl").write_text(json.dumps({"case": "c1", "model": "m", "ok": True,
+                                                   "answers": {"act": {"choice": "SECRET-ANSWER"}}}) + "\n")
+    view = web.cases_view()
+    assert "SECRET-ANSWER" not in json.dumps(view) + web.PAGE
+    c1 = view["cases"][0]
+    assert "Planifie mon voyage" in c1["context"] and [q["key"] for q in c1["questions"]][:2] == ["act", "thread"]
+    for qi in range(len(c1["questions"])):
+        out = web.label({"no": 0, "qi": qi, "oi": None if qi == 1 else 0})
+    assert out["done"] and out["labels"]["thread"] is None and not sent      # the web page never sends Telegram
+    assert web.label({"no": 0, "qi": 0, "oi": 1})["labels"]["act"] == "continue"   # an answer can be changed
+    assert web.label({"no": 1, "skip": True})["labels"]["_skipped"]
+    assert bench.status()["labelled"] == 1 and bench.status()["skipped"] == 1

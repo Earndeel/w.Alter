@@ -1423,6 +1423,7 @@
               "build",
               "run",
               "label",
+              "serve",
               "status",
               "report"
             ],
@@ -1434,6 +1435,28 @@
             "help": "",
             "nargs": null,
             "required": true
+          },
+          {
+            "choices": null,
+            "default": null,
+            "dest": "host",
+            "flags": [
+              "--host"
+            ],
+            "help": "serve: address to listen on (the tailnet address, never a public one)",
+            "nargs": null,
+            "required": false
+          },
+          {
+            "choices": null,
+            "default": 3090,
+            "dest": "port",
+            "flags": [
+              "--port"
+            ],
+            "help": "",
+            "nargs": null,
+            "required": false
           },
           {
             "choices": null,
@@ -17742,7 +17765,7 @@
     "bin/walter-router-control": "3373221954bd9c6b4a6092a3be30d9c0a616fa34dbc4b5f034fa68b5b6493932",
     "bin/walter-router-cycle": "f67a9221b33e8da97dcdf5e4180d19b29383421fa82bd26be33b4e53181dfdb5",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "7ddeeafad8e62569736336c6e99662900331ded411e54171ef03a38b612eeb7a",
+    "cli.py": "7a5e9c2ee7ed51fe7493ca733978960035ef49b4b76eab07bc7805f6256d6d46",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",

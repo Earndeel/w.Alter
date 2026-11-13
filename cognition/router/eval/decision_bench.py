@@ -262,8 +262,9 @@ def labelled_questions(case: dict) -> list[tuple[str, str, list[tuple[str, str]]
             if k in case["questions"]]
 
 
-def case_text(case: dict, n: int, total: int) -> str:
-    c, lines = case["case"], [f"🧪 Banc décision · cas {n}/{total} · {LEVEL_NAMES[case['level']]}", ""]
+def context_lines(case: dict) -> list[str]:
+    """What the owner sees of a case (never a model's answer)."""
+    c, lines = case["case"], []
     if case["level"] == "comprehension":
         p = c.get("previous")
         if p:
@@ -283,6 +284,11 @@ def case_text(case: dict, n: int, total: int) -> str:
             lines += [f"  {who} (il y a {m['minutes_ago']} min) : « {_short(m['text'], 400)} »"]
     else:
         lines += [f"Demande : « {_short(c['request'], 800)} »"]
+    return lines
+
+
+def case_text(case: dict, n: int, total: int) -> str:
+    lines = [f"🧪 Banc décision · cas {n}/{total} · {LEVEL_NAMES[case['level']]}", ""] + context_lines(case)
     lines += [""] + [f"{i + 1}. {text}" for i, (_, text, _) in enumerate(labelled_questions(case))]
     lines += ["", "Répondez à chaque question (« ? » = je ne sais pas)."]
     return "\n".join(lines)
@@ -327,35 +333,50 @@ def _send(text: str, rows) -> None:
         raise RuntimeError(f"walter-telegram send: exit {r.returncode}")
 
 
+def record(case_no: int, qi: int | None, oi: int | None, skip: bool = False) -> dict:
+    """One owner answer (oi None = « ? », no gold for it) or a skipped case; shared by Telegram and the web page.
+    Returns {case, labels, done}. A file lock: every Telegram press is its own process."""
+    cases = _read("cases.json", {}).get("cases") or []
+    case = cases[case_no]
+    with (home() / ".labels.lock").open("w") as lockf:
+        fcntl.flock(lockf, fcntl.LOCK_EX)
+        labels = _read("labels.json", {})
+        lab = labels.setdefault(case["id"], {})
+        qs = labelled_questions(case)
+        if skip:
+            lab.update(_done=True, _skipped=True, _at=datetime.now(timezone.utc).isoformat())
+        else:
+            key, _, opts = qs[qi]
+            lab[key] = None if oi is None else opts[oi][0]
+            lab.pop("_skipped", None)
+            if all(k in lab for k, _, _ in qs):
+                lab.update(_done=True, _at=datetime.now(timezone.utc).isoformat())
+            else:
+                lab.pop("_done", None)
+        labels[case["id"]] = lab
+        _write("labels.json", labels)
+    return {"case": case["id"], "labels": lab, "done": bool(lab.get("_done"))}
+
+
 def button(data: str) -> dict:
     """wr:b:<case_no>:<qi>:<oi|x> or wr:b:<case_no>:s → {ok, toast, drop}; the next case follows a finished one."""
     parts = data.split(":")
     cases = _read("cases.json", {}).get("cases") or []
     try:
         case_no = int(parts[2])
-        case = cases[case_no]
+        cases[case_no]
     except (IndexError, ValueError):
         return {"ok": False, "toast": "Cas inconnu"}
-    with (home() / ".labels.lock").open("w") as lockf:   # each press is its own process: a file lock
-        fcntl.flock(lockf, fcntl.LOCK_EX)
-        labels = _read("labels.json", {})
-        lab = labels.setdefault(case["id"], {})
-        qs = labelled_questions(case)
-        if parts[3] == "s":
-            lab.update(_done=True, _skipped=True, _at=datetime.now(timezone.utc).isoformat())
-            toast, drop = "Cas passé", [f"wr:b:{case_no}:"]
-        else:
-            qi = int(parts[3])
-            key, _, opts = qs[qi]
-            lab[key] = None if parts[4] == "x" else opts[int(parts[4])][0]
-            toast, drop = "Noté", [f"wr:b:{case_no}:{qi}:"]
-            if all(k in lab for k, _, _ in qs):
-                lab.update(_done=True, _at=datetime.now(timezone.utc).isoformat())
-                drop = [f"wr:b:{case_no}:"]
-        labels[case["id"]] = lab
-        _write("labels.json", labels)
-        finished = lab.get("_done")
-    if finished:
+    if parts[3] == "s":
+        out = record(case_no, None, None, skip=True)
+        toast, drop = "Cas passé", [f"wr:b:{case_no}:"]
+    else:
+        qi = int(parts[3])
+        out = record(case_no, qi, None if parts[4] == "x" else int(parts[4]))
+        toast, drop = "Noté", [f"wr:b:{case_no}:{qi}:"]
+        if out["done"]:
+            drop = [f"wr:b:{case_no}:"]
+    if out["done"]:
         try:
             send_next()
         except Exception:  # noqa: BLE001 — the owner can ask for the next one again
