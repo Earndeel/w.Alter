@@ -1062,6 +1062,7 @@ Intent classification by the decision model (OpenRouter's Decisions API, or Clou
 - `_decisions(conn, state: dict, questions: dict, timeout: float, models: tuple | None=None)` — One Decisions call along the chain (first model that answers) -> (answers, raw answer, ms, errors). Every
 - `ask(conn, question: str, options: dict[str, str], context: str | None=None, timeout: float=8.0, models: tuple | None=None)` — The decision model for an agent's own quick choice (sort, yes/no, pick one of several options):
 - `classify(conn, request: str, timeout: float=8.0, models: tuple | None=None, context: str | None=None)` — {'task', 'task_confidence', 'video_role', 'role_confidence', 'level', 'unrestricted', 'model', 'cost', 'ms'}.
+- `classify_questions(conn, request: str, context: str | None=None)` — The routing decision's payload (state, questions): what `classify` asks, also asked by the decision bench.
 
 ## serve/media_exec.py
 

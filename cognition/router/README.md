@@ -122,6 +122,22 @@ walter-router-guardian check [--no-tests] | run [--no-agent] [--no-tests] [--no-
 Tests: `venv/bin/python -m pytest -q` (database tests run in a rolled-back transaction; instance files are never
 written by tests).
 
+## Decision bench (2026-11-13)
+
+The decision model settles, at each use, what W.Alter does; it is judged use by use against the owner's own blind
+answers, not only on public leaderboards. `walter-router decision-bench build | run | label | status | report`
+(`eval/decision_bench.py`):
+- **Uses and their questions**, always taken from the use's own code: comprehension of each owner message
+  (`walter-context preflight-questions`), triage of incoming messages (`walter-memory decision-questions triage`),
+  request routing (`intent.classify_questions`). Cases the production rules settle without a model are left out.
+- **Cases**: the instance's fictitious set (`@instance/config/router/decision-bench-cases.json`) plus, for
+  comprehension, a seeded draw of the owner's own recent messages to W.Alter (cloud-safe, sources claude_code and
+  dsh; never Beeper or third parties).
+- **Blind**: every model answers every case several times (`run`, spending cap), stored in
+  `@instance/state/router/decision-bench/answers.jsonl` and never shown; the owner labels on Telegram (`label`: one
+  case per message, buttons `wr:b:…` through the door's existing `wr` prefix; « ? » = no answer, « Passer »);
+  `report` compares per use and question: agreement with the owner, confidence when right / wrong, latency, cost.
+
 ## Access from outside
 
 | Door | Protection |

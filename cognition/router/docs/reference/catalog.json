@@ -1405,6 +1405,59 @@
             "required": false
           }
         ],
+        "decision-bench": [
+          {
+            "choices": null,
+            "default": "==SUPPRESS==",
+            "dest": "help",
+            "flags": [
+              "-h",
+              "--help"
+            ],
+            "help": "show this help message and exit",
+            "nargs": 0,
+            "required": false
+          },
+          {
+            "choices": [
+              "build",
+              "run",
+              "label",
+              "status",
+              "report"
+            ],
+            "default": null,
+            "dest": "action",
+            "flags": [
+              "action"
+            ],
+            "help": "",
+            "nargs": null,
+            "required": true
+          },
+          {
+            "choices": null,
+            "default": null,
+            "dest": "models",
+            "flags": [
+              "--models"
+            ],
+            "help": "run: comma-separated decision offers (default: the bench's list)",
+            "nargs": null,
+            "required": false
+          },
+          {
+            "choices": null,
+            "default": 3,
+            "dest": "samples",
+            "flags": [
+              "--samples"
+            ],
+            "help": "",
+            "nargs": null,
+            "required": false
+          }
+        ],
         "decision-chain": [
           {
             "choices": null,
@@ -9152,6 +9205,11 @@
             "description": "{'task', 'task_confidence', 'video_role', 'role_confidence', 'level', 'unrestricted', 'model', 'cost', 'ms'}.",
             "name": "classify",
             "signature": "conn, request: str, timeout: float=8.0, models: tuple | None=None, context: str | None=None"
+          },
+          {
+            "description": "The routing decision's payload (state, questions): what `classify` asks, also asked by the decision bench.",
+            "name": "classify_questions",
+            "signature": "conn, request: str, context: str | None=None"
           }
         ]
       },
@@ -17684,7 +17742,7 @@
     "bin/walter-router-control": "3373221954bd9c6b4a6092a3be30d9c0a616fa34dbc4b5f034fa68b5b6493932",
     "bin/walter-router-cycle": "f67a9221b33e8da97dcdf5e4180d19b29383421fa82bd26be33b4e53181dfdb5",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "c60f834336e0bef95cd84161ad3732d07cdda111f1e7ed880afd9edb3bcd0ce9",
+    "cli.py": "7ddeeafad8e62569736336c6e99662900331ded411e54171ef03a38b612eeb7a",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
@@ -17774,7 +17832,7 @@
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "5ec59ae8ed7895ce42e763e2ffa3556404e0eb9664c3d45dbb8ca8a4c1435856",
     "serve/hermes_sync.py": "c1df622e2bab7c3d597788b60b82896f2d911c836c2dfabccf7ec276ab511bee",
-    "serve/intent.py": "d72b71b23b81dad0ccc62531f4f2ef66b3a888fd72655db866fc6136b17193b5",
+    "serve/intent.py": "8ae5e3b089657d766ea1e61f6e9ab982fa0ae68d1bc5ed83b21d32d9269834d1",
     "serve/media_exec.py": "58f2a5f4250edb309ee6b0d75cc519d80f8cb8b2714ea1b153783720b1b5f345",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",

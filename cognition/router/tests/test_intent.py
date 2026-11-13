@@ -93,3 +93,15 @@ def test_chain_falls_back_to_the_next_decision_model(conn, monkeypatch):
     assert calls[-1] == "cloudflare/clef" and out["model"] == "cloudflare/clef"
     if chain[0] != "cloudflare/clef":
         assert out["fallback_errors"]
+
+
+def test_a_yes_no_question_is_checked_as_a_probability_not_as_a_choice(conn, monkeypatch):
+    """2026-11-13: every noul answer raised KeyError 'choice' here (found by the decision bench)."""
+    def fake_urlopen(req, timeout):
+        return _Resp(json.dumps({"model": "liquid/d1-ultra-x", "answers": {
+            "pick": {"choice": "a", "confidence": 0.9}, "yes": {"type": "noul", "noul": 0.7}}}).encode())
+    monkeypatch.setattr(intent, "urlopen", fake_urlopen)
+    monkeypatch.setattr(intent.instance, "secret_value", lambda name: "k")
+    q = {"pick": {"type": "choice", "criteria": {"a": "A", "b": "B"}}, "yes": {"type": "noul", "instructions": "?"}}
+    a, *_ = intent._decisions(conn, {}, q, 5, models=("liquid/d1-ultra",))
+    assert a["yes"]["noul"] == 0.7

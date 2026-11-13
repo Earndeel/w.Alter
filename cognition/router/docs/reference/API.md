@@ -126,6 +126,11 @@ walter-router decide
   task :  ; défaut=—
   intent :  ; défaut=—
   --level :  ; défaut=— ; valeurs=["L1", "L2", "L3"]
+walter-router decision-bench
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
+  action :  ; défaut=— ; valeurs=["build", "run", "label", "status", "report"]
+  --models : run: comma-separated decision offers (default: the bench's list) ; défaut=—
+  --samples :  ; défaut=3
 walter-router decision-chain
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
 walter-router declare

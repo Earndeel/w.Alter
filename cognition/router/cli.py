@@ -91,6 +91,11 @@ def build_parser() -> argparse.ArgumentParser:
     bt = sub.add_parser("button", help="a pressed Telegram button of a Router alert (data wr:<a|d>:<ref>[:<role>]), "
                                        "for the Telegram door: records the verdict, prints {ok, toast, drop}")
     bt.add_argument("data")
+    dbn = sub.add_parser("decision-bench", help="decision models judged against the owner's blind answers, use by use "
+                         "(build cases | run models | label on Telegram | status | report)")
+    dbn.add_argument("action", choices=("build", "run", "label", "status", "report"))
+    dbn.add_argument("--models", help="run: comma-separated decision offers (default: the bench's list)")
+    dbn.add_argument("--samples", type=int, default=3)
     lb = sub.add_parser("library", help="the model library: per task/category model, chooser, providers, fallback")
     lb.add_argument("--json", action="store_true")
     hs = sub.add_parser("sync-hermes", help="Hermes follows the router: auxiliary jobs, OpenRouter host order per model, cron postes")
@@ -236,6 +241,20 @@ def main(argv: list[str] | None = None) -> int:
             if args.models:
                 fields["models"] = [m.strip() for m in args.models.split(",") if m.strip()]
             out = declared.upsert(args.sub_id, fields, args.why)
+        print(json.dumps(out, ensure_ascii=False, indent=1))
+        return 0
+    if args.cmd == "button" and args.data.startswith("wr:b:"):   # a decision-bench label (owner's blind answer)
+        from walter_router.eval import decision_bench
+        print(json.dumps(decision_bench.button(args.data), ensure_ascii=False))
+        return 0
+    if args.cmd == "decision-bench":
+        from walter_router.eval import decision_bench as bench
+        if args.action in ("label", "status", "report"):
+            out = {"label": bench.send_next, "status": bench.status, "report": bench.report}[args.action]()
+        else:
+            with db.connect() as conn:
+                out = bench.build(conn) if args.action == "build" else bench.run(
+                    conn, tuple(args.models.split(",")) if args.models else bench.MODELS, args.samples)
         print(json.dumps(out, ensure_ascii=False, indent=1))
         return 0
     if args.cmd == "research":
