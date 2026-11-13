@@ -112,9 +112,13 @@ def classify(p: dict, tool: str) -> str:
 
 def decide(p: dict, *, tool: str, args=None, interface: str = "api", depth: int = 0, home: str = "/root") -> dict:
     args = args if isinstance(args, dict) else {}
-    if tool == "mcp__walter__walter_call" and args.get("tool"):        # the generic door is judged as what it opens
-        tool, args = f"mcp__walter__{args['tool']}", (args.get("arguments") or {})
-    cls = classify(p, tool)
+    looking = False
+    if tool == "mcp__walter__walter_call":
+        # the generic door is judged as what it opens; listing what it holds or reading a tool's description opens nothing
+        looking = not args.get("tool") or args.get("describe") is True
+        if not looking:
+            tool, args = f"mcp__walter__{args['tool']}", (args.get("arguments") or {})
+    cls = "read" if looking else classify(p, tool)
     base = {"class": cls, "tool": tool}
     if cls == "delegate" and depth >= int(p["never"].get("max_depth", 3)):
         return {**base, "decision": "deny", "rule": "never.max_depth",

@@ -200,6 +200,45 @@ def _walter_memory(*args: str, timeout: float = 600) -> str:
     return r.stdout.strip()
 
 
+TASK_STATUSES = ("open", "suspended", "done", "failed", "cancelled")
+
+
+@mcp.tool()
+def tasks_list(status: str = "", thread_id: str = "", limit: int = 10) -> str:
+    """The owner's durable tasks (objectives that outlive a turn, a session, an interface or a restart): what is in
+    progress or suspended, with its progress, the number of attempts and how the last one ended. Use it to resume
+    work or to answer "où en est… ?". status: open | suspended | done | failed | cancelled | all (default: the active
+    ones); thread_id narrows to one conversation thread."""
+    if status and status != "all" and status not in TASK_STATUSES:
+        return json.dumps({"ok": False, "error": "status: open, suspended, done, failed, cancelled or all"})
+    args = ["tasks", "list", "--limit", str(max(1, min(int(limit), 50)))]
+    if status:
+        args += ["--status", status]
+    if thread_id:
+        args += ["--thread", thread_id[:200]]
+    return _walter_memory(*args, timeout=60)
+
+
+@mcp.tool()
+def task_update(task_id: str, status: str = "", progress: dict | None = None, result: dict | None = None,
+                note: str = "") -> str:
+    """Record where a durable task stands, so it can be resumed later from any conversation: `progress` (what is done,
+    what remains, the next step — merged key by key), a short `note` (a finding, a failure and its cause), `result`
+    when it is finished, and its status: open (being worked on), suspended (waiting: say for what in the note), done,
+    failed, cancelled. Task ids come from tasks_list or from the Tasks block of your context. Never a secret."""
+    if not task_id or (status and status not in TASK_STATUSES):
+        return json.dumps({"ok": False, "error": "task_id required; status: open, suspended, done, failed or cancelled"})
+    spec = {"task_id": task_id[:80], "status": status or None, "progress": progress if isinstance(progress, dict) else None,
+            "result": result if isinstance(result, dict) else None, "note": (note or "")[:300] or None}
+    if len(json.dumps(spec, ensure_ascii=False, default=str)) > 20000:
+        return json.dumps({"ok": False, "error": "too large: keep progress and result to what is needed to resume"})
+    r = subprocess.run([*WALTER_MEMORY, "tasks", "update"], input=json.dumps(spec, ensure_ascii=False, default=str),
+                       capture_output=True, text=True, timeout=60)
+    if r.returncode != 0:
+        return f"Walter Memory error: {(r.stderr or r.stdout).strip()[-800:]}"
+    return r.stdout.strip()
+
+
 @mcp.tool()
 def memory_search(query: str, limit: int = 10, source: str = "", since: str = "", until: str = "",
                   evidence_only: bool = False, history: bool = False) -> str:
@@ -262,8 +301,10 @@ def memory_events(text: str = "", source: str = "", event_type: str = "", thread
     calendar, vault, claude_code, codex, dsh…), event_type (message.received, message.sent…), thread_id,
     since/until (ISO). order="oldest" for the first events (« le tout premier message sur X »), "newest" by default.
     Answer = compact list (event_id, date, source, a window of the content around `text`); event_id="…" returns
-    that one event in full. Use memory_search for synthesised knowledge, this for the original record. Only
-    cloud_allowed rows are exposed."""
+    that one event in full. A message with files carries `attachments` [{object_id, kind, mime, name, derived_kind,
+    text}] — e.g. a voice note's transcript, a PDF's text (vault_get for the bytes, vault_search(thread=…) for all the
+    files of a conversation). Use memory_search for synthesised knowledge, this for the original record. Rows follow
+    Walter Memory's privacy policy for cloud readers (the owner's cloud ceiling); credentials are never exposed."""
     if order not in ("newest", "oldest"):
         return json.dumps({"error": "order must be newest or oldest"})
     args = ["events", "--limit", str(max(1, min(int(limit), 200))), "--cloud-safe",
@@ -319,17 +360,21 @@ def logs_get(session: str, seq: int) -> str:
 
 
 @mcp.tool()
-def vault_search(text: str = "", kind: str = "", source: str = "", limit: int = 20) -> str:
+def vault_search(text: str = "", kind: str = "", source: str = "", thread: str = "", event_id: str = "",
+                 since: str = "", until: str = "", limit: int = 20) -> str:
     """Search the Raw Vault: every raw file of the user's life that is not text (photos, screenshots, videos,
     voice notes, documents). Matches file names and derived text (OCR/transcripts/captions); empty text lists
-    the newest permitted metadata. kind: image|screenshot|video|audio|document|archive.
-    Only cloud_allowed objects are exposed. Returns ids for vault_get."""
-    args = ["objects", "search", text, "--limit", str(max(1, min(int(limit), 100))), "--cloud-safe"]
-    if kind:
-        args += ["--kind", kind]
-    if source:
-        args += ["--source", source]
-    return _walter_memory(*args, timeout=60)
+    the newest permitted metadata. kind: image|screenshot|video|audio|document|archive. thread: the files of one
+    conversation (a thread_id from memory_events), oldest first — « the voice notes of conversation X » =
+    vault_search(kind="audio", thread=X); event_id: the files of one message. since/until: ISO dates (capture time).
+    Each result carries its derived text (derived_kind transcript|extract|ocr|caption). Objects follow Walter
+    Memory's privacy policy for cloud readers (same rule as memory_events). Returns ids for vault_get."""
+    args = ["media", "search", "--limit", str(max(1, min(int(limit), 100))), "--cloud-safe"]
+    for flag, value in (("--kind", kind), ("--source", source), ("--thread", thread), ("--event", event_id),
+                        ("--since", since), ("--until", until)):
+        if value:
+            args += [flag, value]
+    return _walter_memory(*args, "--", text, timeout=60)
 
 
 @mcp.tool()
@@ -380,19 +425,65 @@ def browser_sites() -> str:
 
 @mcp.tool()
 def walter_health() -> str:
-    """Status of the W.Alter stack: core services, Walter Engine and its Telegram door, memory health score, model
-    router, disk. (Hermes retired 2026-11-10: no longer checked.)"""
+    """Status of the W.Alter stack: core services, Walter Engine and its Telegram door, deploy freshness (services
+    running code older than the code on disk), context preflight (health, plans decided without their model in the
+    last 30 min), Walter Memory model-call failures per processor, memory health score, model router, disk.
+    (Hermes retired 2026-11-10: no longer checked.)"""
     out = []
     units = _stack_units()
     states = subprocess.run(["systemctl", "is-active", *units], capture_output=True, text=True).stdout.split()
     out += [f"{u}: {s}" for u, s in zip(units, states)]
     eng = subprocess.run(["systemctl", "is-active", "dsh-web", "walter-telegram"], capture_output=True, text=True)
     out.append("walter engine (dsh-web) / telegram door: " + " / ".join(eng.stdout.split()))
+    try:  # SOCLE A8: a service running old code looked healthy for 4 h on 2026-11-11
+        r = subprocess.run(["walter", "deploy", "check", "--json"], capture_output=True, text=True, timeout=120)
+        d = json.loads(r.stdout)
+        out.append("deploy: all services run the code on disk" if not d["stale"] else
+                   f"deploy: STALE {len(d['stale'])} — " + ", ".join(
+                       f"{u} ({(d.get('repair_plan') or {}).get(u, '?')})" for u in d["stale"])
+                   + ("" if d.get("repair_enabled") else " | auto-restart off (core config deploy.toml)"))
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
+        out.append("deploy: no report")
+    try:  # context preflight: answering, and the share of plans decided without their model (30 min)
+        from datetime import datetime, timedelta, timezone
+        from walter_platform import instance
+        try:
+            ok = httpx.get("http://127.0.0.1:8897/health", timeout=5).json().get("ok")
+        except Exception:  # noqa: BLE001
+            ok = False
+        now = datetime.now(timezone.utc)
+        rows = []
+        for day in sorted({(now - timedelta(minutes=30)).date(), now.date()}):
+            p = Path(instance.root()) / "state" / "context" / "shadow" / f"preflight-{day.isoformat()}.jsonl"
+            if p.exists():
+                rows += [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
+        recent, bad = 0, 0
+        for row in rows:
+            at = datetime.fromisoformat(str(row.get("at")).replace("Z", "+00:00"))
+            at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+            if now - at <= timedelta(minutes=30):
+                recent += 1
+                dec = ((row.get("plan") or {}).get("decision") or {})
+                bad += bool(dec.get("degraded") or dec.get("error"))
+        out.append(f"context preflight: {'ok' if ok else 'NOT ANSWERING'}, degraded plans 30 min: {bad}/{recent}"
+                   + (" — DEGRADED" if bad >= 2 and bad >= 0.3 * recent else ""))
+    except (OSError, ValueError, TypeError):
+        out.append("context preflight: no report")
+    try:  # Walter Memory: model calls failing per processor (severity error), decisions taken by fallback
+        r = subprocess.run(["/usr/local/bin/walter-memory", "health"], capture_output=True, text=True, timeout=120)
+        h = json.loads(r.stdout)
+        mc = [p for p in h.get("problems", []) if p.startswith("model_calls:")]
+        tr = [p for p in h.get("problems", []) if p.startswith("triage:")]
+        out.append(("memory model calls: ok (30 min)" if not mc else "memory model calls: FAILING — " + "; ".join(p[:160] for p in mc[:4]))
+                   + (" | " + tr[0][:120] if tr else ""))
+    except (OSError, ValueError, TypeError, subprocess.TimeoutExpired):
+        out.append("memory model calls: no report")
     try:
-        summary = json.loads((HERMES_HOME / "logs/memory-autopilot/latest.json").read_text())["summary"]
+        from walter_platform import instance
+        summary = json.loads((Path(instance.root()) / "logs/memory-autopilot/latest.json").read_text())["summary"]
         out.append(f"memory autopilot: {summary.get('severity')} score={summary.get('score')} "
                    f"errors={summary.get('errors')} warnings={summary.get('warnings')}")
-    except (OSError, KeyError, ValueError):
+    except (OSError, KeyError, ValueError, ImportError):
         out.append("memory autopilot: no report")
     try:  # Walter Router (model choice per task): fed, fresh, providers reachable
         r = subprocess.run(["walter-router", "health"], capture_output=True, text=True, timeout=30)

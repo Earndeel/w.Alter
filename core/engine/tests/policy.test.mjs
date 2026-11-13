@@ -105,3 +105,39 @@ test('budget: go, then conclude once at the ceiling, then stop after the grace',
   assert.equal((await handlers[0]({ agent: a, turn: 1, step: 2 }, enter)).kind, 'reject');
   assert.equal((await handlers[0]({ agent: a, turn: 2, step: 0 }, enter)).messages.length, 0);   // a new turn starts afresh
 });
+
+test('budget: an understood owner request sets the turn\'s ceilings and one checkpoint; an unread one keeps the general ceilings', async () => {
+  const { turnPlans } = await import('../plugins/shared.mjs');
+  const cfg = { maxSteps: 80, graceSteps: 3, maxTurnMs: 2_700_000, graceMs: 300_000,
+    levels: { L1: { checkpoint: 6, maxSteps: 16, maxTurnMs: 480_000 } } };
+  const owner = { level: 'L1', channel: 'owner' };
+  assert.equal(budget.verdict(cfg, { step: 5, startedAt: 0, now: 1, plan: owner }), 'go');
+  assert.equal(budget.verdict(cfg, { step: 6, startedAt: 0, now: 1, plan: owner }), 'checkpoint');
+  assert.equal(budget.verdict(cfg, { step: 16, startedAt: 0, now: 1, plan: owner }), 'conclude');
+  assert.equal(budget.verdict(cfg, { step: 19, startedAt: 0, now: 1, plan: owner }), 'stop');
+  assert.equal(budget.verdict(cfg, { step: 2, startedAt: 0, now: 481_000, plan: owner }), 'conclude');
+  for (const plan of [null, { level: 'L1', channel: 'owner', degraded: true }, { level: 'L1', channel: 'machine' }, { level: 'L9', channel: 'owner' }])
+    assert.equal(budget.verdict(cfg, { step: 40, startedAt: 0, now: 1, plan }), 'go');     // never cut short on a guess
+  // the ceilings follow the EFFORT Context states, not the context level: a self-contained request (L0) that is work
+  // to carry out is not cut at the light ceilings
+  const levels = { L0: { checkpoint: 4, maxSteps: 12, maxTurnMs: 300_000 }, L4: { checkpoint: 36, maxSteps: 80, maxTurnMs: 2_700_000 } };
+  const work = { level: 'L0', effort: 'L4', channel: 'owner' }, light = { level: 'L0', effort: 'L0', channel: 'owner' };
+  assert.equal(budget.ceilings({ ...cfg, levels }, work).level, 'L4');
+  assert.equal(budget.verdict({ ...cfg, levels }, { step: 14, startedAt: 0, now: 640_000, plan: work }), 'go');
+  assert.equal(budget.verdict({ ...cfg, levels }, { step: 14, startedAt: 0, now: 640_000, plan: light }), 'stop');
+  assert.equal(budget.ceilings({ ...cfg, levels }, { level: 'L0', channel: 'owner' }).level, 'L0');   // rule-made plan: its level
+  const handlers = [];
+  budget.apply({ on: (n, fn) => handlers.push(fn) }, cfg);
+  const a = { session: { header: { id: 'b1' } } };
+  const enter = async () => ({ kind: 'enter', messages: [] });
+  turnPlans.set('dsh/vm/b1', { ...owner, turn: 1 });
+  assert.equal((await handlers[0]({ agent: a, turn: 1, step: 5 }, enter)).messages.length, 0);
+  const checked = await handlers[0]({ agent: a, turn: 1, step: 6 }, enter);
+  assert.match(checked.messages.at(-1).content[0].text, /^Point d'étape/);
+  assert.equal((await handlers[0]({ agent: a, turn: 1, step: 7 }, enter)).messages.length, 0);     // said once
+  assert.match((await handlers[0]({ agent: a, turn: 1, step: 16 }, enter)).messages.at(-1).content[0].text, /^Budget de ce tour atteint/);
+  assert.equal((await handlers[0]({ agent: a, turn: 1, step: 19 }, enter)).kind, 'reject');
+  assert.equal(turnPlans.get('dsh/vm/b1').stopped, 'budget');
+  assert.equal((await handlers[0]({ agent: a, turn: 2, step: 30 }, enter)).messages.length, 0);    // the plan of another turn does not apply
+  turnPlans.delete('dsh/vm/b1');
+});

@@ -208,6 +208,9 @@ def inject_mode(runtime: str) -> str:
         return "legacy"
 
 
+PREFLIGHT_WAIT_S = 7        # how long the hook waits for the pack; sent with the request, the preflight answers inside it
+
+
 def context_pack(prompt: str, runtime: str, session_id: str, transcript: str | None, run_id: str | None) -> str:
     """walter-context's pack for this message (plan → retrieval → assembly), through the warm preflight service.
     Raises on any failure: the caller falls back to the legacy memory block."""
@@ -217,12 +220,12 @@ def context_pack(prompt: str, runtime: str, session_id: str, transcript: str | N
         raise RuntimeError("local_only message: no cloud pack")
     req = {"turn_id": f"{session_id}:{int(time.time() * 1000)}", "message": prompt[:6000],
            "previous": previous_exchange(transcript), "runtime": runtime, "session_id": session_id,
-           "privacy_class": "cloud_allowed", "run_id": run_id,
+           "privacy_class": "cloud_allowed", "run_id": run_id, "answer_within_ms": PREFLIGHT_WAIT_S * 1000,
            "exclude_blocks": ["capabilities"]}           # DSH's profile already carries the modules' presentation
     port = os.environ.get("WALTER_CONTEXT_PREFLIGHT_PORT", "8897")
     r = urllib.request.Request(f"http://127.0.0.1:{port}/preflight?inject=1", data=json.dumps(req).encode(),
                                headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(r, timeout=7) as resp:
+    with urllib.request.urlopen(r, timeout=PREFLIGHT_WAIT_S) as resp:
         out = json.loads(resp.read())
     if out.get("error") or not out.get("plan"):
         raise RuntimeError(out.get("error") or "no plan")

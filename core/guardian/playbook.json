@@ -1,17 +1,23 @@
 {
  "version": 1,
  "module": "core",
- "notes": ["dsh-web = Walter Engine (the single production runtime, Engine API :8895); walter-telegram = its Telegram door (owner's bot); cloudflared-tunnel and tailscaled = ingress. Restarting dsh-web interrupts a running turn: only when it is down or its API does not answer. Hermes is retired (2026-11-10): never restart it."],
+ "notes": ["dsh-web = Walter Engine (the single production runtime, Engine API :8895); walter-telegram = its Telegram door (owner's bot); cloudflared-tunnel and tailscaled = ingress. Restarting dsh-web interrupts a running turn: only when it is down or its API does not answer. Hermes is retired (2026-11-10): never restart it.",
+  "deploy:stale:<unit> = the service started before the code it loads last changed on disk (shared library fixed, credentials changed): it still runs the old code in RAM. The repair is restart_stale (walter deploy restart <unit>): it re-checks staleness itself, defers dsh-web and walter-telegram while an engine turn is in flight, restarts a unit at most once per hour, then checks again (rc 0 = restarted and fresh, nothing to do, or deferred to a later pass; rc 1 = still stale or down after the restart). Restarting a stale service is routine and reversible; tell Monsieur only if it stays stale after two restarts."],
  "evidence": {
   "service_down": [["systemctl","status","--no-pager","-n","0","{unit}"], ["journalctl","-u","{unit}","-n","40","--no-pager","-o","short-iso"]],
   "service_unhealthy": [["systemctl","status","--no-pager","-n","0","dsh-web"], ["journalctl","-u","dsh-web","-n","40","--no-pager","-o","short-iso"], ["journalctl","-u","walter-telegram","-n","40","--no-pager","-o","short-iso"]],
-  "failed_units": [["systemctl","--failed","--no-legend","--plain","--no-pager"]]
+  "failed_units": [["systemctl","--failed","--no-legend","--plain","--no-pager"]],
+  "deploy_stale": [["walter","deploy","restart","{unit}","--dry-run"], ["systemctl","status","--no-pager","-n","0","{unit}"]]
  },
  "actions": {
   "restart_unit": {"level": "G1", "describe": "restart an engine, door or ingress service",
                    "command": ["systemctl", "restart", "{unit}"],
-                   "params": {"unit": ["dsh-web", "walter-telegram", "cloudflared-tunnel", "tailscaled"]}}
+                   "params": {"unit": ["dsh-web", "walter-telegram", "cloudflared-tunnel", "tailscaled"]}},
+  "restart_stale": {"level": "G1", "describe": "restart a service running code older than the code on disk (gated in code: re-checked, deferred while an engine turn is in flight, once per hour per service)",
+                    "command": ["walter", "deploy", "restart", "{unit}"], "async": true, "timeout_seconds": 180,
+                    "params": {"unit": ["camoufox-max", "cloakbrowser-max", "dsh-web", "raw-vault-s3", "walter-browse-display", "walter-context-preflight", "walter-exit-default", "walter-exit-mac", "walter-llm", "walter-logs-watch", "walter-memory-gateway", "walter-memory-overland", "walter-memory-pipeline", "walter-router-control", "walter-router-quota", "walter-secrets-sync", "walter-skills", "walter-skills-bus", "walter-telegram"]}}
  },
- "fallback": {"service_down": {"action": "restart_unit", "params": {"unit": "unit"}}},
+ "fallback": {"service_down": {"action": "restart_unit", "params": {"unit": "unit"}},
+              "deploy_stale": {"action": "restart_stale", "params": {"unit": "unit"}}},
  "settle_seconds": 30
 }

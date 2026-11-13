@@ -9,7 +9,7 @@ import { join } from 'node:path';
 
 import * as intake from '../plugins/intake/index.mjs';
 import * as events from '../plugins/events/index.mjs';
-import { currentRuns, ownerText } from '../plugins/shared.mjs';
+import { currentRuns, lastExchange, ownerText, trackRun, turnPlans, turnStats } from '../plugins/shared.mjs';
 
 const calls = [];
 let behaviour = {};
@@ -49,10 +49,10 @@ function fakeCtx() {
   const handlers = {};
   return { handlers, logger: { warn: () => {} }, on(name, fn) { (handlers[name] ||= []).push(fn); } };
 }
-const observations = (cfg) => readdirSync(cfg.stateDir).flatMap((f) =>
+const observations = (cfg) => readdirSync(cfg.stateDir).filter((f) => f.endsWith('.jsonl')).flatMap((f) =>
   readFileSync(join(cfg.stateDir, f), 'utf8').trim().split('\n').map((l) => JSON.parse(l)));
 
-beforeEach(() => { calls.length = 0; behaviour = {}; currentRuns.clear(); });
+beforeEach(() => { calls.length = 0; behaviour = {}; currentRuns.clear(); turnPlans.clear(); });
 
 test('owner text is what the owner wrote, as the hook keeps it', () => {
   assert.equal(ownerText([msg('user-approval', 'policy changed'), msg('user', '  bonjour  '), msg('user', ' '), msg('user', 'ça va ?')]),
@@ -180,14 +180,150 @@ test('native: no pack (failure or secret) → the legacy memory block, cloud-saf
   assert.ok(!paths().includes('/preflight?inject=1'));
 });
 
-test('native: every Walter source down → the step goes on with nothing injected', async () => {
+test('native: every Walter source down → the step goes on, and the model is told its context is degraded', async () => {
   const cfg = config('native', { gateway: 'http://127.0.0.1:9', preflight: 'http://127.0.0.1:9', skills: 'http://127.0.0.1:9' });
   const ctx = fakeCtx();
   intake.apply(ctx, cfg);
-  const downstream = { kind: 'enter', messages: [] };
   const out = await ctx.handlers['agent/pre-step'][0]({ agent: agent(), messages: [msg('user', 'bonjour, tu es là ?')], turn: 1, step: 0 },
-    async () => downstream);
-  assert.equal(out, downstream);
+    async () => ({ kind: 'enter', messages: [] }));
+  assert.equal(out.kind, 'enter');
+  assert.equal(out.messages.length, 1);                          // never a silent fallback (decision A2)
+  assert.match(out.messages[0].content[0].text, /^<walter-context>\nContexte dégradé/);
+  assert.equal(out.messages[0].source.degraded, true);
+  assert.equal(observations(cfg).find((r) => r.kind === 'intake').context_source, 'legacy_degraded');
+});
+
+test('native: preflight down, Memory up → the default memory block, announced as degraded, and context.degraded on the bus', async () => {
+  const { settings } = await import('../plugins/shared.mjs');
+  const cfg = settings(config('native', { preflight: 'http://127.0.0.1:9' }));
+  const out = await intake.nativeTurn(cfg, { session: 'dsh/vm/d1', turn: 1, step: 0, message: 'où en est le dossier ?' });
+  assert.match(out.text, /^<walter-context>\nContexte dégradé[^\n]+\n\n/);
+  assert.ok(out.text.includes('souvenir daté'));
+  assert.deepEqual({ degraded: out.plan.degraded, level: out.plan.level }, { degraded: true, level: null });
+  await new Promise((r) => setTimeout(r, 30));
+  const emit = calls.find((c) => c.path === '/v1/bus/emit');
+  assert.equal(emit.body.type, 'context.degraded');
+  assert.equal(emit.body.payload.stage, 'preflight_unreachable');
+  assert.ok(!JSON.stringify(emit.body).includes('dossier'));     // a signal, never the owner's words
+});
+
+test('native: the preflight\'s own degraded plan is carried as such (source, plan, pack message)', async () => {
+  behaviour['/preflight?inject=1'] = (data, reply) => reply(200, { degraded: true, text: 'PACK',
+    plan: { level: 'L3', act: 'question', thread: { id: 'th-9' }, decision: { degraded: true } } });
+  const cfg = config('native');
+  const ctx = fakeCtx();
+  intake.apply(ctx, cfg);
+  const out = await ctx.handlers['agent/pre-step'][0]({ agent: agent(), messages: [msg('user', 'et pour demain ?')], turn: 2, step: 0 },
+    async () => ({ kind: 'enter', messages: [] }));
+  assert.deepEqual(out.messages[0].source, { kind: 'walter-intake', thread: 'th-9', act: 'question', level: 'L3', degraded: true });
+  assert.equal(observations(cfg).find((r) => r.kind === 'intake').context_source, 'pack_degraded');
+  assert.equal(turnPlans.get('dsh/vm/session-1').degraded, true);
+});
+
+// A session journal as the kernel exposes it (eventAt, seq), numbers and structure only.
+function journal(events) {
+  return { header: { id: 'session-1' }, seq: events.length, eventAt: (i) => events[i] };
+}
+const ev = (type, data = {}, extra = {}) => ({ type, data, time: 1_000, surfaceOp: null, ...extra });
+const said = (kind, text, source = {}) => ev('user/message', { role: 'user', source: { kind, ...source }, content: [{ type: 'text', text }] },
+  { surfaceOp: 'append' });
+const answered = (text) => ev('assistant/message', { message: { role: 'assistant', content: [{ type: 'text', text }] } }, { surfaceOp: 'append' });
+
+test('previous exchange: read from the journal of the last completed turn, with the thread its pack carried', () => {
+  const session = journal([
+    ev('turn/start', { turn: 1 }), said('user', 'premier sujet'), answered('réponse 1'), ev('turn/end', { turn: 1 }, { time: 2_000 }),
+    ev('turn/start', { turn: 2 }), said('user', 'peux-tu vérifier le devis ?'), said('walter-intake', '<walter-context>…', { thread: 'th-2' }),
+    answered('je regarde'), ev('tool/call', { name: 'x' }), answered('Le devis est conforme.'), ev('turn/end', { turn: 2 }, { time: 60_000 }),
+    ev('turn/start', { turn: 3 }),
+  ]);
+  assert.deepEqual(lastExchange(session, 90_000), { message: 'peux-tu vérifier le devis ?', answer: 'Le devis est conforme.', age_s: 30, thread_id: 'th-2' });
+  assert.equal(lastExchange(journal([ev('turn/start', { turn: 1 })])), null);     // nothing completed yet
+});
+
+test('native: the previous exchange, the door and the request id reach the preflight and the run', async () => {
+  const { sessionMeta } = await import('../../interfaces/api/bindings.mjs');
+  sessionMeta().set('session-1', { channel: 'owner', parent_run_id: null, model: null, interface: 'telegram', engine_session: 'telegram/test/42' });
+  const cfg = config('native');
+  const ctx = fakeCtx();
+  intake.apply(ctx, cfg);
+  const a = { session: journal([ev('turn/start', { turn: 1 }), said('user', 'bonjour'), answered('Bonjour.'), ev('turn/end', { turn: 1 }, { time: Date.now() - 5_000 }),
+    ev('turn/start', { turn: 2 })]) };
+  const owner = { ...msg('user', 'et ensuite ?'), source: { kind: 'user', rpcId: 'req-77' } };
+  await ctx.handlers['agent/pre-step'][0]({ agent: a, messages: [owner], turn: 2, step: 0 }, async () => ({ kind: 'enter', messages: [] }));
+  sessionMeta().delete('session-1');
+  const start = calls.find((c) => c.path === '/v1/runs/start');
+  assert.deepEqual(start.body.origin, { channel: 'owner', runtime: 'dsh', session_id: 'dsh/vm/session-1', interface: 'telegram',
+    engine_session: 'telegram/test/42', request_id: 'req-77' });
+  const pack = calls.find((c) => c.path === '/preflight?inject=1');
+  assert.equal(pack.body.previous.message, 'bonjour');
+  assert.equal(pack.body.previous.answer, 'Bonjour.');
+  assert.ok(pack.body.previous.age_s >= 5 && pack.body.previous.age_s < 60);
+});
+
+test('native: Context decides the window before the message enters, with the thread the preflight found; a failure is measured, never fatal', async () => {
+  behaviour['/preflight?inject=1'] = (data, reply) => reply(200, { text: 'PACK', plan: { level: 'L2', act: 'question', thread: { id: 'th-5' } } });
+  const cfg = config('native');
+  const order = [];
+  const engine = { window: async (a, opts) => { order.push(['window', opts.plan]); return { applied: true, reason: 'cold_cache', warm: false,
+    turns: { verbatim: 0, full: 1, brief: 2, omitted: 0, leaving: 3 }, tokens: { before: 45000, after: 600, gain: 44400, threshold: 1000 }, measured_tokens: 52000 }; } };
+  const ctx = fakeCtx();
+  globalThis[Symbol.for('walter.context.window')] = (a, opts, signal) => engine.window(a, opts, signal);
+  intake.apply(ctx, cfg);
+  const out = await ctx.handlers['agent/pre-step'][0]({ agent: agent(), messages: [msg('user', 'on reprend le devis')], turn: 3, step: 0 },
+    async () => { order.push(['next']); return { kind: 'enter', messages: [] }; });
+  assert.deepEqual(order, [['window', { thread: 'th-5' }], ['next']]);
+  assert.equal(out.messages[0].source.thread, 'th-5');
+  const row = observations(cfg).find((r) => r.kind === 'window');
+  assert.deepEqual([row.applied, row.reason, row.tokens.gain], [true, 'cold_cache', 44400]);
+  engine.window = async () => { throw new Error('bridge down'); };
+  const again = await ctx.handlers['agent/pre-step'][0]({ agent: agent(), messages: [msg('user', 'encore')], turn: 4, step: 0 },
+    async () => ({ kind: 'enter', messages: [] }));
+  assert.equal(again.messages.length, 1);                        // the turn goes on
+  assert.equal(observations(cfg).filter((r) => r.kind === 'window').at(-1).reason, 'error');
+  delete globalThis[Symbol.for('walter.context.window')];
+  await ctx.handlers['agent/pre-step'][0]({ agent: agent(), messages: [msg('user', 'sans contexte')], turn: 5, step: 0 },
+    async () => ({ kind: 'enter', messages: [] }));
+  assert.equal(observations(cfg).filter((r) => r.kind === 'window').at(-1).reason, 'no_entry');   // visible, never silent
+});
+
+test('native: the end of a turn says how it went (status, numbers, error) on the run', async () => {
+  const cfg = config('native');
+  const ctx = fakeCtx();
+  events.apply(ctx, cfg);
+  const session = journal([ev('turn/start', { turn: 1 }), ev('step/start'), ev('tool/call'), ev('tool/result', { message: { isError: true } }, { surfaceOp: 'append' }),
+    ev('step/start'), ev('tool/call'), ev('tool/result', { message: { isError: false } }, { surfaceOp: 'append' }), ev('step/start')]);
+  assert.deepEqual(turnStats(session), { steps: 3, tool_calls: 2, tool_errors: 1 });
+  currentRuns.set('dsh/vm/session-1', { run_id: 'run-o', turn: 1 });
+  await ctx.handlers['agent/turn-stopping'][0]({ agent: { session }, turn: 1 });
+  let end = calls.find((c) => c.path === '/v1/runs/end');
+  assert.deepEqual(end.body.outcome, { status: 'ok', steps: 3, tool_calls: 2, tool_errors: 1 });
+  calls.length = 0;
+  currentRuns.set('dsh/vm/session-1', { run_id: 'run-p', turn: 2 });
+  const failure = Object.assign(new Error('upstream 529 overloaded'), { status: 529 });
+  ctx.handlers['agent/error'][0]({ agent: { session }, error: failure });
+  ctx.handlers['agent/status'][0]({ agent: { session }, status: 'idle' });
+  await new Promise((r) => setTimeout(r, 30));
+  end = calls.find((c) => c.path === '/v1/runs/end');
+  assert.equal(end.body.status, 'failed');
+  assert.deepEqual(end.body.outcome.error, { kind: 'Error', message: 'upstream 529 overloaded' });
+  assert.equal(end.body.outcome.status, 'failed');
+});
+
+test('native: runs left open by an engine process that died are closed as interrupted at the next start, once', async () => {
+  const cfg = config('native');
+  const { settings } = await import('../plugins/shared.mjs');
+  const real = settings(cfg);
+  trackRun(real, 'dsh/vm/alive', { run_id: 'run-alive', turn: 1 });          // this process: still running
+  const file = join(cfg.stateDir, 'open-runs.json');
+  const rows = JSON.parse(readFileSync(file, 'utf8'));
+  rows['dsh/vm/dead'] = { run_id: 'run-dead', turn: 7, pid: 2 ** 22 + 12345, at: 1 };   // no such process
+  writeFileSync(file, JSON.stringify(rows));
+  assert.deepEqual(await events.closeOrphans(real), ['run-dead']);
+  const end = calls.find((c) => c.path === '/v1/runs/end');
+  assert.deepEqual([end.body.run_id, end.body.status, end.body.outcome.status, end.body.outcome.error.kind],
+    ['run-dead', 'cancelled', 'interrupted', 'engine_restart']);
+  assert.deepEqual(await events.closeOrphans(real), []);                       // once
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(file, 'utf8'))), ['dsh/vm/alive']);
 });
 
 test('native: a turn end closes its run and emits turn.ended once per run; archive emits session.ended; unload does not', async () => {
@@ -263,4 +399,6 @@ test('planRequest: a sub-agent mission says so (one tier lower), an owner messag
   const cfg = { runtime: 'dsh' };
   assert.equal(intake.planRequest(cfg, 's', 'm', 'r', 1, 'machine').channel, 'machine');
   assert.equal('channel' in intake.planRequest(cfg, 's', 'm', 'r', 1, 'owner'), false);
+  // the engine says how long it waits: the preflight answers inside it (13/11, three plans lost to a late answer)
+  assert.equal(intake.planRequest({ runtime: 'dsh', preflightTimeoutMs: 7000 }, 's', 'm').answer_within_ms, 7000);
 });

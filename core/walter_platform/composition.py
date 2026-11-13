@@ -150,6 +150,30 @@ def _drop_managed(original,name):
     return original[:m.start()]+(foreign+'\n' if foreign else '')+original[m.end():]
 
 
+def engine_budget(values):
+    """[dsh.budget] as the budget plugin reads it: general ceilings and the ceilings of each ContextPlan level."""
+    b=values.get('dsh',{}).get('budget',{})
+    def minutes(v,what):
+        if isinstance(v,bool) or not isinstance(v,(int,float)) or v<=0:raise ValueError(f'[dsh.budget] {what}: a positive number of minutes')
+        return int(v*60_000)
+    def steps(v,what):
+        if isinstance(v,bool) or not isinstance(v,int) or v<0:raise ValueError(f'[dsh.budget] {what}: a whole number of steps')
+        return v
+    out={}
+    if 'max_steps' in b:out['maxSteps']=steps(b['max_steps'],'max_steps')
+    if 'grace_steps' in b:out['graceSteps']=steps(b['grace_steps'],'grace_steps')
+    if 'max_turn_min' in b:out['maxTurnMs']=minutes(b['max_turn_min'],'max_turn_min')
+    if 'grace_min' in b:out['graceMs']=minutes(b['grace_min'],'grace_min')
+    levels={}
+    for name,row in sorted((b.get('levels') or {}).items()):
+        if not isinstance(row,dict):raise ValueError(f'[dsh.budget.levels] {name}: a table')
+        levels[name]={'checkpoint':steps(row.get('checkpoint',0),f'{name}.checkpoint'),
+                      'maxSteps':steps(row['max_steps'],f'{name}.max_steps'),
+                      'maxTurnMs':minutes(row['max_turn_min'],f'{name}.max_turn_min')}
+    if levels:out['levels']=levels
+    return out
+
+
 def _engine_rows(mode,policy='off'):
     """The engine's intake and events plugins for this mode (none for `hook`), and its policy plugin when enforced.
     Locations come from the instance and from Walter Memory's public client (its gateway credential file), never
@@ -166,7 +190,7 @@ def _engine_rows(mode,policy='off'):
         rows.append({'id':'walter-policy','name':str(ENGINE_PLUGINS/'policy'/'index.mjs'),
                      'config':{'interface':'web','stateDir':str(inst.path('state','core','security')),'tokenFile':out.stdout.strip()}})
         rows.append({'id':'walter-budget','name':str(ENGINE_PLUGINS/'budget'/'index.mjs'),
-                     'config':{'stateDir':str(inst.path('state','core','security'))}})
+                     'config':{'stateDir':str(inst.path('state','core','security')),**engine_budget(engine_values())}})
     if mode=='hook':return rows
     cfg={'mode':mode,'runtime':'dsh','stateDir':str(inst.path('state','core','engine','intake')),
          'runsDir':str(inst.path('state','runs','current')),'tokenFile':out.stdout.strip()}

@@ -51,8 +51,15 @@
   ],
   "services": [
     "walter-standby.timer",
-    "walter-telegram.service"
+    "walter-telegram.service",
+    "dsh-web.service"
   ],
+  "service_code": {
+    "dsh-web": {
+      "code_roots": ["engine/plugins", "interfaces/api"],
+      "code_files": ["/opt/dsh/home/cordis.patch.yml", "/opt/dsh/home/walter-hooks.json", "/opt/dsh/home/profiles/web/cordis.patch.yml"]
+    }
+  },
   "optional": [],
   "contract": {
     "schema_version": 1,
@@ -441,6 +448,16 @@
       "role": "Mise en veille des services à la demande",
       "status": "active",
       "readme": "README.md",
+      "vision_target": "ops"
+    },
+    {
+      "id": "deploy-check",
+      "path": "walter_platform/deploy.py",
+      "role": "Fraîcheur du déploiement : chaque service long compare son démarrage au code qu'il charge (imports statiques + racines déclarées `service_code`) ; réparation gardée du gardien core (redémarrage, interrupteur config/deploy.toml)",
+      "status": "active",
+      "readme": "README.md",
+      "contracts": ["contracts/core.json"],
+      "interfaces": [{"transport": "cli", "interface": "walter deploy status|check|restart"}],
       "vision_target": "ops"
     }
   ]

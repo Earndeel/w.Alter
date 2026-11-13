@@ -32,7 +32,8 @@ export const channelOf = (principal) => ({ machine: 'machine', test: 'test' }[pr
 function publish(row) {
   doors().set(row.kernel, row.door);
   sessionMeta().set(row.kernel, { channel: channelOf(row.principal), parent_run_id: row.parent?.run_id || null,
-    model: row.model || null });   // a model named by the owner and validated by Walter Router (delegation, E5)
+    model: row.model || null,      // a model named by the owner and validated by Walter Router (delegation, E5)
+    interface: row.door || null, engine_session: row.session_id || null });   // the door and its conversation (traceability)
 }
 
 /** `<door>/<account>/<conversation>`, validated against engine-api.v1 `session_id`. */

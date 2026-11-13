@@ -85,3 +85,35 @@ les régler d'eux-mêmes ; pour le Mac qui se déconnecte, pas besoin de me noti
   the owner can do), `evidence` by incident kind (`*` = always), `actions` (`level`, `command` with `{param}`,
   `params` allow-lists, `async`, `timeout_seconds`), `fallback` by kind, `settle_seconds`. Written for browse,
   memory, secrets, skills, context, ops. Adding knowledge to a guardian = editing its playbook, not the engine.
+
+## Failures must be visible (SOCLE A8, 2026-11-11)
+
+Incident of 2026-11-11: `walter_memory/llm.py` fixed on disk at 06:17 UTC and a credentials file removed, but
+`walter-context-preflight`, `walter-memory-pipeline` and `walter-memory-gateway` (started the day before) kept the old
+code in RAM. 07:37–11:28 UTC: 409 failed model calls (triage, episodic.attest, preflight), 9 owner turns served by a
+degraded plan — guardians said ok every pass and memory-autopilot scored 100/100 twice. New checks:
+
+- **core `deploy:stale:<unit>`** (`deploy_stale`): `walter deploy check` — each long-running service of the registry
+  started before the newest code it loads (static first-party imports + `service_code` roots declared by contracts).
+  Repair `restart_stale` = `walter deploy restart <unit>` (G1, async, playbook fallback): re-checks, defers `dsh-web` /
+  `walter-telegram` while an engine turn is in flight (open `dsh` run < 30 min; unknown = busy), one restart per unit
+  per hour, checks again (rc 1 → the guardian's `failed`, two rounds → `needs_owner` → Telegram). **Switch**:
+  `core/config/deploy.toml [repair] enabled` (instance override `@instance/config/core/deploy.toml`), **false** in the
+  working tree until deployment: stale services are then `warning` incidents (never handed to the guardian, nothing
+  restarted) and `walter deploy restart` answers `defer:repair_disabled`. On: `high`, handed to the core guardian.
+- **context `preflight:degraded`** (`preflight_degraded`, high): ≥ 2 plans and ≥ 30 % of the plans of the last 30 min
+  decided without their model (`plan.decision.error` or `.degraded`). Repair `restart_if_stale` =
+  `walter deploy restart walter-context-preflight --require-stale` (rc 3 when fresh or repair off → escalate). The
+  latency check now ignores degraded rows (they answer in milliseconds and pulled the median down).
+- **memory `health:model_calls:<processor>`** (`model_calls_failing`, high): `walter-memory health` reports
+  `model_calls:<processor>:<ratio>` (severity error) when a processor with ≥ `min_calls` calls in `window_min` fails
+  more than `error_ratio` (memory `config/health.toml`: 30 min, 5, 0.5), with the dominant error masked (no URL, path or
+  token); triage decisions stored with `payload.error` (24 h, ≥ 5) and `processing.stats` errors are problems too.
+  memory-autopilot counts a `model_calls:` problem as an error (−25 each): the outage replay scores error, < 92.
+
+| Signal | guardians (15 min) | memory-autopilot (daily) | `walter-memory health` | `walter_health` (MCP) |
+|---|---|---|---|---|
+| Preflight degraded plans | context `preflight:degraded` | — | — (model calls of processor `walter-context-preflight` only) | degraded / plans 30 min |
+| Model-call error rate per processor | memory `health:model_calls:*` | error, score −25 each | `model_calls:*` (error) | failing processors |
+| Pipeline / assimilation errors, decisions by fallback | memory `health:*` (warning) | warning, −10 each | bus lag, dead letters, `triage:`, `assimilation …` | triage fallback line |
+| Code staleness (service older than its code) | core `deploy:stale:*` (+ gated restart) | — | — | `deploy:` line, repair plan |

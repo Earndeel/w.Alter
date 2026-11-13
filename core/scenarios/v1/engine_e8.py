@@ -147,19 +147,25 @@ def main() -> int:
         except B.EngineError as e:
             return e.status == 422 and e.code == "model_unavailable", f"{e.status} {e.code} {e.detail}"
 
-    def delegate(goal, key, budget):
+    def delegate(goal, key, budget, model=None):
         api = B.Engine("http://127.0.0.1:8895", token)
         return api.op({"op": "delegate", "caller": "e2e", "delegation": {
-            "version": 1, "goal": goal, "idempotency_key": key, "budget_seconds": budget, "parent": {"depth": 0}}},
-            timeout=budget + 90)
+            "version": 1, "goal": goal, "idempotency_key": key, "budget_seconds": budget, "parent": {"depth": 0},
+            **({"model": model} if model else {})}}, timeout=budget + 90)
 
     def c_budget():
         t = time.time()
         # a long answer, no tool (an unattended delegation gets no shell): cut at 60 s, a few thousand tokens at most
         # a legitimate long task: an absurd one (3 000 numbers in letters) is now declined in one sentence
         # (soul rule « Effort proportionné », 2026-11-10), which never reaches the budget
+        # 13/11/2026: the plan asked the everyday tier for this sub-agent mission and that model wrote the essay in
+        # 12 s — the budget was never reached and nothing was proven. The caller names the model Walter Router gives
+        # for the most demanding text tier (asked to the Router here, never a model id of the scenario's own).
+        pick = json.loads(subprocess.run(["walter-router", "pick", "general", "--level", "L3"], capture_output=True,
+                                         text=True, timeout=60).stdout)
         r = delegate("Sans aucun outil, rédige en une seule réponse un essai complet d'environ 5 000 mots sur "
-                     "l'histoire de l'imprimerie, en dix sections détaillées.", f"e8-{run}-budget", 60)
+                     "l'histoire de l'imprimerie, en dix sections détaillées.", f"e8-{run}-budget", 60,
+                     model={"id": pick["model_id"], "provider": pick["provider"]})
         r = r.get("result") or r
         took = time.time() - t
         return r.get("status") == "cancelled" and r.get("reason") == "budget_seconds" and took < 120, \
@@ -187,4 +193,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    rc = main()
+    import sys                                             # the objectives this scenario opened are test data
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from e2e_objectives import close
+    close("objectif de test du scénario engine_e8")
+    raise SystemExit(rc)

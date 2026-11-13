@@ -23,5 +23,12 @@
   {"why": "a child keeps what its parent has for ordinary work", "req": {"tool": "bash", "args": {"command": "ls"}, "iface": "web", "depth": 2}, "decision": "allow"},
   {"why": "delegation stops at the maximum depth", "req": {"tool": "subagent", "args": {"prompt": "x"}, "iface": "web", "depth": 3}, "decision": "deny", "rule": "never.max_depth"},
   {"why": "delegation below the maximum depth is allowed on the web", "req": {"tool": "subagent", "args": {"prompt": "x"}, "iface": "web", "depth": 1}, "decision": "allow"},
-  {"why": "dev tools (Claude Code, Codex) keep their own prompts but still never read secrets", "req": {"tool": "read", "args": {"file_path": "/root/.hermes/.env"}, "iface": "dev"}, "decision": "deny"}
+  {"why": "dev tools (Claude Code, Codex) keep their own prompts but still never read secrets", "req": {"tool": "read", "args": {"file_path": "/root/.hermes/.env"}, "iface": "dev"}, "decision": "deny"},
+  {"why": "listing what the generic door holds opens nothing", "req": {"tool": "mcp__walter__walter_call", "args": {}, "iface": "telegram"}, "decision": "allow", "rule": "preset.telegram-owner.read"},
+  {"why": "reading a tool's description through the generic door is not using it", "req": {"tool": "mcp__walter__walter_call", "args": {"tool": "computer_use", "describe": true}, "iface": "telegram"}, "decision": "allow", "rule": "preset.telegram-owner.read"},
+  {"why": "a voice note is read, not acted on: transcription needs no approval", "req": {"tool": "mcp__walter__audio_transcribe", "args": {"paths": ["/tmp/walter-vault/note.ogg"]}, "iface": "telegram"}, "decision": "allow", "rule": "preset.telegram-owner.read"},
+  {"why": "a transcription never reads a secret file either", "req": {"tool": "mcp__walter__audio_transcribe", "args": {"paths": ["/root/.pgpass"]}, "iface": "telegram"}, "decision": "deny"},
+  {"why": "the owner's tasks are read from any door", "req": {"tool": "mcp__walter__tasks_list", "args": {}, "iface": "api"}, "decision": "allow"},
+  {"why": "an unattended door does not change the owner's tasks without him", "req": {"tool": "mcp__walter__task_update", "args": {"task_id": "t", "status": "ended"}, "iface": "api"}, "decision": "ask"},
+  {"why": "from his own conversation a task is updated directly", "req": {"tool": "mcp__walter__task_update", "args": {"task_id": "t", "status": "ended"}, "iface": "telegram"}, "decision": "allow"}
 ]

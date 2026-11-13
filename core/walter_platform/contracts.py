@@ -147,6 +147,8 @@ def validate(module, *, source=False):
         _presentation(module['presentation'], check)
     if 'components' in module:
         _components(module['components'], name, check)
+    if 'service_code' in module:
+        _service_code(module['service_code'], check)
     scenarios = c.get('acceptance')
     _require(isinstance(scenarios, list) and bool(scenarios), 'acceptance scenarios required')
     ids = set()
@@ -192,6 +194,23 @@ def _components(value, module, check):
                      and bool(op['interface']), 'invalid component interface')
         if 'vision_target' in item:
             layout.relative(item['vision_target'])
+
+
+UNIT = re.compile(r'[A-Za-z0-9@._:-]{1,120}\Z')
+
+
+def _service_code(value, check):
+    """Code a long-running unit loads that its ExecStart does not reveal (deploy freshness, SOCLE A8, 2026-11-11):
+    ``{"<unit>": {"code_roots": [paths], "code_files": [paths]}}``. Any module may declare its own code for a unit it
+    does not own (context declares its DSH port for dsh-web): the deploy check takes the union."""
+    _require(isinstance(value, dict), 'service_code must be an object')
+    for unit, item in value.items():
+        _require(isinstance(unit, str) and UNIT.fullmatch(unit) and not unit.endswith(('.timer', '.socket')),
+                 'invalid service_code unit')
+        _require(isinstance(item, dict) and set(item) <= {'code_roots', 'code_files'} and item, 'invalid service_code entry')
+        for key in ('code_roots', 'code_files'):
+            for p in _strings(item.get(key, []), 'service_code.' + key):
+                check(p)
 
 
 PRESENTATION_KEYS = {'audience', 'title', 'order', 'summary', 'manifest', 'manifest_command', 'guide', 'tools', 'index'}
@@ -254,6 +273,12 @@ def expand(manifest, root, target_root):
                         item[key] = str(layout.join(base, item[key]))
                 if isinstance(item.get('contracts'), list):
                     item['contracts'] = [str(layout.join(base, v)) for v in item['contracts']]
+    if isinstance(raw.get('service_code'), dict):
+        for item in raw['service_code'].values():
+            if isinstance(item, dict):
+                for key in ('code_roots', 'code_files'):
+                    if isinstance(item.get(key), list):
+                        item[key] = [str(layout.join(base, v)) for v in item[key]]
     c = raw.get('contract')
     if isinstance(c, dict):
         if isinstance(c.get('config_paths'), list):

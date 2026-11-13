@@ -138,7 +138,7 @@ Préparer et ordonner le contexte par message et par sous-agent, et compresser l
 Contrat 1.3.0; propriétaire : context.
 Racine actuelle : `/walter/cognition/context`. Cible : `/walter/cognition/context`.
 
-Interfaces : Python Session (walter_context.compress), Hermes ContextEngine adapter, DSH CompactionEngine adapter, CLI walter-context, CLI walter-context capability router (versioned stable note), Python walter_context.capabilities.TurnNotes, JSON bridge op=capability for trusted module notes, CLI walter-context capability all [--write] (Modules W.Alter layer from walter present notes), HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it), Python walter_context.retrieval.gather and walter_context.assembly.pack, Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON), POST /preflight?inject=1 -> plan/text/pack/error; POST /preflight?shadow=1 -> private instance record without injection, CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow.
+Interfaces : Python Session (walter_context.compress), Hermes ContextEngine adapter, DSH CompactionEngine adapter, CLI walter-context, CLI walter-context capability router (versioned stable note), Python walter_context.capabilities.TurnNotes, JSON bridge op=capability for trusted module notes, CLI walter-context capability all [--write] (Modules W.Alter layer from walter present notes), HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it), Python walter_context.retrieval.gather and walter_context.assembly.pack, Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON), POST /preflight?inject=1 -> plan/text/pack/degraded/error (degraded = decision failed, prudent L3 plan, SOCLE A2; pack.cuts = blocks cut to the level budget); POST /preflight?shadow=1 -> private instance record without injection, CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow, In-process walter.context.window: globalThis[Symbol.for('walter.context.window')](agent, {plan}, signal) published by the DSH port -> window decision report {applied, reason, warm, turns, tokens, measured_tokens} (SOCLE A1; the kernel isolates its compaction service, the engine's intake plugin calls this entry at each owner turn).
 
 **Critères de validation :**
 
@@ -155,7 +155,7 @@ Interfaces : Python Session (walter_context.compress), Hermes ContextEngine adap
 | child | active | ChildContextSpec : dossier de départ d'un sous-agent | `/walter/cognition/context/walter_context/child.py` | cognition/context |
 | compress | active | Moteur de compaction (projection head→record→compact→live) | `/walter/cognition/context/walter_context/compress` | cognition/context/compress |
 | recover | active | Retrouver l'original d'une sortie compactée (walter_logs) | `/walter/cognition/context/walter_context/recover.py` | cognition/context |
-| dsh-port | active | Prise DSH (injection et compaction) ; deviendra la stratégie context du moteur | `/walter/cognition/context/ports/dsh` | core/engine/plugins |
+| dsh-port | active | Prise DSH : fenêtre du tour du propriétaire (frontière par pertinence, A1), point de contrôle sous pression, context_recover | `/walter/cognition/context/ports/dsh` | core/engine/plugins |
 | bench | active | Bancs (levels, replay, quality, acceptance) | `/walter/cognition/context/bench` | cognition/context/bench |
 | session-state | active | État de travail par fil (SessionState v1) | `/walter/cognition/context/contracts/schemas/session-state.v1.json` | cognition/context/contracts |
 
@@ -214,6 +214,7 @@ Interfaces : MCP stdio, walter CLI, CLI contracts, matrix, doctor, Declarative h
 | scenarios | active | Scénarios de bout en bout (walter-scenario) | `/walter/core/scenarios` | lab/scenarios |
 | browser-session | active | Session navigateur du propriétaire côté serveur (MCP browser_session) — responsabilité de Browse mal placée | `/walter/core/browser_auth.py` | capabilities/browse |
 | standby | active | Mise en veille des services à la demande | `/walter/core/walter_platform/standby.py` | ops |
+| deploy-check | active | Fraîcheur du déploiement : chaque service long compare son démarrage au code qu'il charge (imports statiques + racines déclarées `service_code`) ; réparation gardée du gardien core (redémarrage, interrupteur config/deploy.toml) | `/walter/core/walter_platform/deploy.py` | ops |
 
 **Limites déclarées :**
 
@@ -265,7 +266,7 @@ Exécuter les appels modèles des consommateurs autorisés via les postes du Rou
 Contrat 1.2.0; propriétaire : llm.
 Racine actuelle : `/walter/cognition/router/llm`. Cible : `/walter/cognition/router/llm`.
 
-Interfaces : OpenAI-compatible :8894, CLI walter-llm call: one exact model/provider, JSON stdin/stdout, no implicit retry or fallback.
+Interfaces : OpenAI-compatible :8894, POST /v1/decisions {state, questions, samples?, model?|models?, paid_floor_usd?} on the Router's decision chain; POST /v1/rerank {query, documents, top_n?, model?} on the rerank poste; GET /v1/balance (SOCLE A6), CLI walter-llm call: one exact model/provider, JSON stdin/stdout, no implicit retry or fallback.
 
 **Critères de validation :**
 
@@ -316,7 +317,7 @@ Posséder les événements et objets canoniques, leur provenance et les connaiss
 Contrat 1.2.0; propriétaire : memory.
 Racine actuelle : `/walter/cognition/memory`. Cible : `/walter/cognition/memory`.
 
-Interfaces : Python library, HTTP :8890, CLI, MCP, Overland authenticated HTTP :3010, CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer.
+Interfaces : Python library, HTTP :8890, CLI, MCP, Overland authenticated HTTP :3010, CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer, HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience), CLI tasks list|show|update|sweep|triage-redecide [--execute]; CLI experience [--thread] [--query].
 
 **Critères de validation :**
 
@@ -329,11 +330,12 @@ Interfaces : Python library, HTTP :8890, CLI, MCP, Overland authenticated HTTP :
 | Composant | État | Rôle | Chemin | Cible (vision) |
 |---|---|---|---|---|
 | events | active | Journal canonique core.events (append-only, idempotent) | `/walter/cognition/memory/walter_memory/events.py` | cognition/memory |
+| media | active | Dérivation des médias du Raw Vault (A5) : audio → transcription (poste stt), document → extraction locale, image → OCR/légende (poste vision, désactivé) ; pilotée par le bus (memory.object), texte sur core.objects.derived_* | `/walter/cognition/memory/walter_memory/media.py` | cognition/memory |
 | gateway | active | Seule porte d'écriture (127.0.0.1:8890) | `/walter/cognition/memory/walter_memory/gateway.py` | cognition/memory |
 | connectors | active | Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…) | `/walter/cognition/memory/connectors` | cognition/memory/connectors |
 | organic | active | Mémoire organique V1 (vues, épisodes, périodes, flux) | `/walter/cognition/memory/walter_memory/organic.py` | cognition/memory |
 | assimilation | active | Assimilation pilotée par le bus (memory.organic) | `/walter/cognition/memory/walter_memory/assimilation.py` | cognition/memory |
-| runs | active | Run Plane (runs, tâches, épisodes de run) | `/walter/cognition/memory/walter_memory/runs.py` | core/orchestration |
+| runs | active | Run Plane (runs, tâches déléguées et objectifs durables du propriétaire A3, épisodes de run et expérience A4) | `/walter/cognition/memory/walter_memory/runs.py` | core/orchestration |
 | kardex | active | Couche sociale Kardex (schéma kardex) | `/walter/cognition/memory/walter_memory/social.py` | cognition/memory/kardex |
 | search | active | Index de recherche (search.chunks) | `/walter/cognition/memory/walter_memory/search.py` | cognition/memory |
 | privacy | active | Classes de confidentialité et règle de lecture | `/walter/cognition/memory/walter_memory/privacy.py` | cognition/memory |
@@ -440,7 +442,6 @@ Interfaces : CLI, walter-llm task routes, MCP walter_route / walter_run / walter
 | analysis | active | Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6) | `/walter/cognition/router/analysis` | cognition/router/analysis |
 | plan | active | Forfaits du propriétaire et quotas | `/walter/cognition/router/plan` | cognition/router/plan |
 | serve | active | Choix du modèle par tâche, exécution texte et médias | `/walter/cognition/router/serve` | cognition/router/serve |
-| walter-run-loop | active | Boucle de sous-agent de walter_run — seconde boucle agentique, absorbée par le moteur au lot E5 ; terminal retiré le 09/11 | `/walter/cognition/router/serve/text_agent.py` | — |
 | oneshot | obsolete | Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6) | `/walter/cognition/router/serve/oneshot.py` | — |
 | interface | active | Page publique de la bibliothèque des modèles | `/walter/cognition/router/interface` | cognition/router/interface |
 | store | active | Schéma Postgres models (lecture/écriture) | `/walter/cognition/router/store` | cognition/router/store |

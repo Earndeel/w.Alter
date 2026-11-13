@@ -690,12 +690,13 @@
         "HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it)",
         "Python walter_context.retrieval.gather and walter_context.assembly.pack",
         "Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON)",
-        "POST /preflight?inject=1 -> plan/text/pack/error; POST /preflight?shadow=1 -> private instance record without injection",
-        "CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow"
+        "POST /preflight?inject=1 -> plan/text/pack/degraded/error (degraded = decision failed, prudent L3 plan, SOCLE A2; pack.cuts = blocks cut to the level budget); POST /preflight?shadow=1 -> private instance record without injection",
+        "CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow",
+        "In-process walter.context.window: globalThis[Symbol.for('walter.context.window')](agent, {plan}, signal) published by the DSH port -> window decision report {applied, reason, warm, turns, tokens, measured_tokens} (SOCLE A1; the kernel isolates its compaction service, the engine's intake plugin calls this entry at each owner turn)"
       ],
       "bindings": {
         "hermes": "native compressor until walter-context replaces it (plan lot 6)",
-        "dsh": "Public checkpoint adapter selected by composition; per-message injection legacy by default, pack opt-in",
+        "dsh": "Walter Engine (dsh-web): public checkpoint adapter selected by composition; per-message context through the engine's native intake plugin (core/engine/plugins/intake, mode native, inject pack by default) calling POST /preflight?inject=1; the legacy Memory block only when the preflight fails or times out (verified 2026-11-11 in /opt/dsh/home/cordis.patch.yml)",
         "codex": "Native compaction; additive module notes and hook preflight",
         "claude-code": "Native compaction; additive module notes and hook preflight; entrance reduction of large tool outputs in SHADOW (hook PostToolUse, records numbers only)",
         "router": "Text sub-agents request ChildContextSpec v1 through walter-context-child; caller-only mode remains available"
@@ -715,6 +716,13 @@
       "services": [
         "walter-context-preflight"
       ],
+      "service_code": {
+        "dsh-web": {
+          "code_roots": [
+            "/walter/cognition/context/ports/dsh"
+          ]
+        }
+      },
       "optional": [
         "core",
         "logs",
@@ -929,10 +937,16 @@
         {
           "id": "dsh-port",
           "path": "/walter/cognition/context/ports/dsh",
-          "role": "Prise DSH (injection et compaction) ; deviendra la stratégie context du moteur",
+          "role": "Prise DSH : fenêtre du tour du propriétaire (frontière par pertinence, A1), point de contrôle sous pression, context_recover",
           "status": "active",
           "readme": "/walter/cognition/context/README.md",
-          "vision_target": "core/engine/plugins"
+          "vision_target": "core/engine/plugins",
+          "interfaces": [
+            {
+              "transport": "library",
+              "interface": "walter.context.window"
+            }
+          ]
         },
         {
           "id": "bench",
@@ -1006,8 +1020,22 @@
       ],
       "services": [
         "walter-standby.timer",
-        "walter-telegram.service"
+        "walter-telegram.service",
+        "dsh-web.service"
       ],
+      "service_code": {
+        "dsh-web": {
+          "code_roots": [
+            "/walter/core/engine/plugins",
+            "/walter/core/interfaces/api"
+          ],
+          "code_files": [
+            "/opt/dsh/home/cordis.patch.yml",
+            "/opt/dsh/home/walter-hooks.json",
+            "/opt/dsh/home/profiles/web/cordis.patch.yml"
+          ]
+        }
+      },
       "optional": [],
       "contract": {
         "schema_version": 1,
@@ -1397,6 +1425,23 @@
           "status": "active",
           "readme": "/walter/core/README.md",
           "vision_target": "ops"
+        },
+        {
+          "id": "deploy-check",
+          "path": "/walter/core/walter_platform/deploy.py",
+          "role": "Fraîcheur du déploiement : chaque service long compare son démarrage au code qu'il charge (imports statiques + racines déclarées `service_code`) ; réparation gardée du gardien core (redémarrage, interrupteur config/deploy.toml)",
+          "status": "active",
+          "readme": "/walter/core/README.md",
+          "contracts": [
+            "/walter/core/contracts/core.json"
+          ],
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter deploy status|check|restart"
+            }
+          ],
+          "vision_target": "ops"
         }
       ]
     },
@@ -1628,6 +1673,7 @@
       ],
       "interfaces": [
         "OpenAI-compatible :8894",
+        "POST /v1/decisions {state, questions, samples?, model?|models?, paid_floor_usd?} on the Router's decision chain; POST /v1/rerank {query, documents, top_n?, model?} on the rerank poste; GET /v1/balance (SOCLE A6)",
         "CLI walter-llm call: one exact model/provider, JSON stdin/stdout, no implicit retry or fallback"
       ],
       "bindings": {
@@ -1978,7 +2024,9 @@
         "CLI",
         "MCP",
         "Overland authenticated HTTP :3010",
-        "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer"
+        "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer",
+        "HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience)",
+        "CLI tasks list|show|update|sweep|triage-redecide [--execute]; CLI experience [--thread] [--query]"
       ],
       "bindings": {
         "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
@@ -2165,6 +2213,18 @@
           "vision_target": "cognition/memory"
         },
         {
+          "id": "media",
+          "path": "/walter/cognition/memory/walter_memory/media.py",
+          "role": "Dérivation des médias du Raw Vault (A5) : audio → transcription (poste stt), document → extraction locale, image → OCR/légende (poste vision, désactivé) ; pilotée par le bus (memory.object), texte sur core.objects.derived_*",
+          "status": "active",
+          "readme": "/walter/cognition/memory/README.md",
+          "data": [
+            "postgres:core",
+            "postgres:processing"
+          ],
+          "vision_target": "cognition/memory"
+        },
+        {
           "id": "gateway",
           "path": "/walter/cognition/memory/walter_memory/gateway.py",
           "role": "Seule porte d'écriture (127.0.0.1:8890)",
@@ -2205,7 +2265,7 @@
         {
           "id": "runs",
           "path": "/walter/cognition/memory/walter_memory/runs.py",
-          "role": "Run Plane (runs, tâches, épisodes de run)",
+          "role": "Run Plane (runs, tâches déléguées et objectifs durables du propriétaire A3, épisodes de run et expérience A4)",
           "status": "active",
           "readme": "/walter/cognition/memory/README.md",
           "data": [
@@ -2772,7 +2832,9 @@
         "The guardian lands repairs only in research/, analysis/parse.py, analysis/identity.py, analysis/aliases.json, interface/ and tests/, through deterministic gates; owner choices, execution policy, schema and units are never changed by it."
       ],
       "services": [
-        "walter-router-guardian.timer"
+        "walter-router-guardian.timer",
+        "walter-router-control.service",
+        "walter-router-quota.service"
       ],
       "optional": [
         "core",
@@ -2965,13 +3027,6 @@
             }
           ],
           "vision_target": "cognition/router/serve"
-        },
-        {
-          "id": "walter-run-loop",
-          "path": "/walter/cognition/router/serve/text_agent.py",
-          "role": "Boucle de sous-agent de walter_run — seconde boucle agentique, absorbée par le moteur au lot E5 ; terminal retiré le 09/11",
-          "status": "active",
-          "readme": "/walter/cognition/router/README.md"
         },
         {
           "id": "oneshot",

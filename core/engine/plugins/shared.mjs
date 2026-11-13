@@ -43,6 +43,7 @@ export function settings(config = {}) {
     preflight: config.preflight || `http://127.0.0.1:${env.WALTER_CONTEXT_PREFLIGHT_PORT || '8897'}`,
     skills: config.skills || env.WALTER_SKILLS_URL || 'http://127.0.0.1:8891',
     inject: config.inject || 'pack',
+    preflightTimeoutMs: config.preflightTimeoutMs || 7000,
   };
 }
 
@@ -106,6 +107,88 @@ export function observe(cfg, row) {
 
 /** Current run per session (native mode): the turn that opened it, for its end and for a steering message. */
 export const currentRuns = new Map();
+
+/** What the preflight understood of the session's current owner turn ({thread, act, level, degraded}), published by
+ * the intake for the strategies that apply it: the budget (effort checkpoint of the level) and the events (outcome). */
+export const turnPlans = new Map();
+
+/** The last completed exchange of a session, read from its journal (never from the surface: a record may have
+ * replaced it): the owner's words, the final answer, how long ago, and the thread its context pack carried. The
+ * preflight judges a new message in its conversation with it (short replies, floor of the plan). */
+export function lastExchange(session, now = Date.now(), limit = 1200) {
+  if (!session?.eventAt) return null;
+  const text = (m) => (m?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  let ended = null, answer = '', message = '', thread = null;
+  for (let seq = session.seq - 1, scanned = 0; seq >= 0 && scanned < 5000; seq -= 1, scanned += 1) {
+    const event = session.eventAt(seq);
+    if (ended === null) { if (event.type === 'turn/end') ended = event.time; continue; }
+    if (event.type === 'turn/start') break;
+    if (event.surfaceOp !== 'append') continue;
+    if (event.type === 'assistant/message' && !answer) answer = text(event.data?.message);
+    if (event.type === 'user/message') {
+      const kind = event.data?.source?.kind;
+      if (kind === 'walter-intake' && event.data.source.thread) thread = String(event.data.source.thread);
+      if (kind === 'user') message = text(event.data) + (message ? `\n${message}` : '');
+    }
+  }
+  if (ended === null || (!message && !answer)) return null;
+  return { message: message.slice(0, limit), answer: answer.slice(0, limit),
+    age_s: Math.max(0, Math.round((now - ended) / 1000)), thread_id: thread };
+}
+
+/** What a turn did, counted from the session journal (numbers only): model steps, tool calls, tool errors. */
+export function turnStats(session) {
+  const out = { steps: 0, tool_calls: 0, tool_errors: 0 };
+  if (!session?.eventAt) return out;
+  for (let seq = session.seq - 1, scanned = 0; seq >= 0 && scanned < 20000; seq -= 1, scanned += 1) {
+    const event = session.eventAt(seq);
+    if (event.type === 'turn/start') break;
+    if (event.type === 'step/start') out.steps += 1;
+    else if (event.type === 'tool/call') out.tool_calls += 1;
+    else if (event.type === 'tool/result' && event.surfaceOp === 'append' && event.data?.message?.isError) out.tool_errors += 1;
+  }
+  return out;
+}
+
+// The runs this engine process holds open, kept on disk so the next process can close what a restart interrupted
+// (the gateway closes a session's older run when its next turn starts; a session that never speaks again would keep
+// its run open for ever). One file per engine state directory; each row names the process that opened it.
+const openFile = (cfg) => (cfg.stateDir ? join(cfg.stateDir, 'open-runs.json') : null);
+function readOpen(cfg) {
+  try { const rows = JSON.parse(readFileSync(openFile(cfg), 'utf8')); return rows && typeof rows === 'object' ? rows : {}; }
+  catch { return {}; }
+}
+function writeOpen(cfg, rows) {
+  const file = openFile(cfg);
+  mkdirSync(cfg.stateDir, { recursive: true, mode: 0o700 });
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(rows), { mode: 0o600 });
+  renameSync(tmp, file);
+}
+/** Note a run as open (run given) or closed (run null) for a session. Never on the turn's path. */
+export function trackRun(cfg, session, run = null) {
+  if (!openFile(cfg)) return;
+  try {
+    const rows = readOpen(cfg);
+    if (run?.run_id) rows[session] = { run_id: run.run_id, turn: run.turn ?? null, pid: process.pid, at: Date.now() };
+    else if (rows[session]?.pid === process.pid || !alive(rows[session]?.pid)) delete rows[session];
+    else return;
+    writeOpen(cfg, rows);
+  } catch { /* a measurement of last resort: the gateway's own sweep still closes abandoned runs */ }
+}
+const alive = (pid) => { try { return Boolean(pid) && (process.kill(pid, 0), true); } catch (e) { return e?.code === 'EPERM'; } };
+/** The runs left open by an engine process that no longer exists: [{session, run_id, turn}], removed from the file. */
+export function orphanRuns(cfg) {
+  if (!openFile(cfg)) return [];
+  try {
+    const rows = readOpen(cfg);
+    const gone = Object.entries(rows).filter(([, r]) => r?.pid !== process.pid && !alive(r?.pid));
+    if (!gone.length) return [];
+    for (const [session] of gone) delete rows[session];
+    writeOpen(cfg, rows);
+    return gone.map(([session, r]) => ({ session, run_id: r.run_id, turn: r.turn ?? null }));
+  } catch { return []; }
+}
 
 /** The run record the walter MCP server (a child of this process) reads back, as walter_hook/runctx writes it. */
 export function recordRun(cfg, runId, session) {

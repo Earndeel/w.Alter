@@ -6,6 +6,7 @@
 # Entry points named first by each module's one-line presentation (M0), plus the module guides.
 core = [
   "memory_context", "memory_search", "person_lookup",
+  "tasks_list", "task_update",
   "logs_search",
   "vault_search",
   "secret_search",

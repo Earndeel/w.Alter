@@ -6,6 +6,9 @@ Replaces the Hermes-era health watchdog (~/.hermes/scripts/walter-health-watchdo
   door       walter-telegram active and its bot + engine reachable (`walter-telegram check`)
   ingress    cloudflared-tunnel, tailscaled
   host       failed system units, load, available memory, root disk
+  deploy     every declared long-running service runs the code on disk (`walter deploy check`, SOCLE A8): one
+             incident `deploy:stale:<unit>` per stale service; the guardian's repair is `walter deploy restart <unit>`
+             (re-checked, deferred while an engine turn is in flight, at most once per service per hour)
 Standard library, system python3; numbers only in the evidence, never a token.
 """
 import json, os, shutil, subprocess, urllib.request
@@ -81,4 +84,26 @@ d = shutil.disk_usage("/")
 pct = int(d.used * 100 / d.total)
 if pct >= MAX_DISK_PCT:
     out.append(inc("host:disk", "resource", "high", f"Disque / plein à {pct} %.", {"used_pct": pct}))
+# Deploy freshness (2026-11-11 incident: fixed library on disk, old code in RAM for 4 h while every check said ok).
+r = sh("walter", "deploy", "check", "--json", timeout=120)
+try:
+    dep = json.loads(r.stdout)
+    if r.returncode not in (0, 1) or not isinstance(dep.get("services"), list):
+        raise ValueError("deploy_check_failed")
+    plan = dep.get("repair_plan") or {}
+    # Repair switch off (config/deploy.toml [repair] enabled = false): reported as a warning, never handed to the
+    # guardian, so nothing can restart it; on: high, the guardian repairs (restart_stale) and tells only on failure.
+    repair_on = dep.get("repair_enabled") is True
+    for row in dep["services"]:
+        if row.get("stale"):
+            u = row["unit"]
+            out.append(inc(f"deploy:stale:{u}", "deploy_stale", "high" if repair_on else "warning",
+                           f"Le service {u} tourne avec un code plus ancien que celui sur disque "
+                           f"(démarré {str(row.get('started_at'))[:16]}, code modifié {str(row.get('newest_mtime'))[:16]}).",
+                           {"unit": u, "module": row.get("module"), "started_at": row.get("started_at"),
+                            "newest": row.get("newest"), "newest_mtime": row.get("newest_mtime"),
+                            "behind_s": row.get("behind_s"), "repair": plan.get(u)}, "G1"))
+except (ValueError, AttributeError, TypeError):
+    out.append(inc("deploy:unreadable", "check_failed", "warning", "walter deploy check ne répond pas correctement.",
+                   {"rc": r.returncode}))
 print(json.dumps(out, ensure_ascii=False))

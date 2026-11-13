@@ -70,8 +70,10 @@ const REASONS = { allow: '', check: "contrôle de divulgation avant l'envoi",
 
 export function decide(p, { tool, args, iface = 'api', depth = 0, home = '/root' }) {
   args = args && typeof args === 'object' && !Array.isArray(args) ? args : {};
-  if (tool === 'mcp__walter__walter_call' && args.tool) { tool = `mcp__walter__${args.tool}`; args = args.arguments || {}; }
-  const cls = classify(p, tool);
+  // the generic door is judged as what it opens; listing what it holds or reading a tool's description opens nothing
+  const looking = tool === 'mcp__walter__walter_call' && (!args.tool || args.describe === true);
+  if (tool === 'mcp__walter__walter_call' && !looking) { tool = `mcp__walter__${args.tool}`; args = args.arguments || {}; }
+  const cls = looking ? 'read' : classify(p, tool);
   const base = { class: cls, tool };
   const maxDepth = Number(p.never.max_depth ?? 3);
   if (cls === 'delegate' && depth >= maxDepth) {

@@ -18,6 +18,10 @@ def main(argv=None):
     sub.add_parser('matrix')
     q=sub.add_parser('engine');q.add_argument('engine_action',choices=('kernel',));q.add_argument('--install');q.add_argument('--home')
     sub.add_parser('doctor')
+    q=sub.add_parser('deploy',help='deploy freshness: does every long-running service run the code on disk?')
+    q.add_argument('deploy_action',choices=('status','check','restart'));q.add_argument('unit',nargs='?')
+    q.add_argument('--json',action='store_true');q.add_argument('--dry-run',action='store_true')
+    q.add_argument('--require-stale',action='store_true',help='restart: exit 3 when the unit is fresh or the repair is off (the caller escalates)')
     q=sub.add_parser('export');q.add_argument('destination');q.add_argument('--apply',action='store_true');q.add_argument('--wheelhouse')
     q=sub.add_parser('install');q.add_argument('bundle');q.add_argument('--root',required=True);q.add_argument('--apply',action='store_true');q.add_argument('--backup-root')
     r=sub.add_parser('release');rs=r.add_subparsers(dest='release_action',required=True)
@@ -105,6 +109,19 @@ def main(argv=None):
         elif a.command=='matrix':
             from . import composition
             out=composition.matrix()
+        elif a.command=='deploy':
+            from . import deploy
+            if a.deploy_action=='restart':
+                if not a.unit:raise ValueError('usage: walter deploy restart <unit> [--dry-run]')
+                out=deploy.restart(a.unit,dry_run=a.dry_run,require_stale=a.require_stale)
+                print(json.dumps(out,ensure_ascii=False,indent=2));return out['rc']
+            out=deploy.status()
+            # check = status + what the guardian's repair would do now (never acts); exit 1 when any service is stale
+            if a.deploy_action=='check':out['repair_enabled']=deploy.repair_enabled();out['repair_plan']=deploy.plan(out,enabled=out['repair_enabled'])
+            if not a.json:
+                print(deploy.table(out,out.get('repair_plan')))
+                return 0 if out['ok'] or a.deploy_action=='status' else 1
+            print(json.dumps(out,ensure_ascii=False,indent=2));return 0 if out['ok'] or a.deploy_action=='status' else 1
         elif a.command=='doctor':
             from . import contracts
             out={'installation':registry.report(scan=True,live=True),'contracts':contracts.check(),
