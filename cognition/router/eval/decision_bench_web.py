@@ -2,7 +2,8 @@
 
 Temporary door, asked by the owner: one page, tailnet address only (never public), started as a transient systemd
 unit and stopped once the labels are in. Same state as the Telegram buttons (decision_bench.record): either door
-can be used, answers can be changed. The models' answers are never read here.
+can be used, answers can be changed until the owner asks to see the models' answers to that case: they are shown
+only for a case he has answered (or skipped), and his answers to it freeze from then (decision_bench.reveal).
 """
 from __future__ import annotations
 
@@ -28,7 +29,8 @@ def cases_view() -> dict:
                                         "help": crit_of(k).get(v) if isinstance(crit_of(k).get(v), str) else ""}
                                        for v, label in opts]}
                           for k, text, opts in bench.labelled_questions(c)],
-            "done": bool(lab.get("_done")), "skipped": bool(lab.get("_skipped"))})
+            "done": bool(lab.get("_done")), "skipped": bool(lab.get("_skipped")),
+            "revealed": bool(lab.get("_revealed"))})
     return {"cases": out}
 
 
@@ -57,13 +59,16 @@ class Handler(BaseHTTPRequestHandler):
         self._send(404, b"not found", "text/plain")
 
     def do_POST(self):  # noqa: N802
-        if self.path != "/api/label":
+        if self.path not in ("/api/label", "/api/reveal"):
             return self._send(404, b"not found", "text/plain")
         n = int(self.headers.get("Content-Length") or 0)
         if n > 4096:
             return self._send(413, b"too large", "text/plain")
         try:
-            out = label(json.loads(self.rfile.read(n) or b"{}"))
+            body = json.loads(self.rfile.read(n) or b"{}")
+            out = label(body) if self.path == "/api/label" else bench.reveal(int(body["no"]))
+        except bench.RevealedError:
+            return self._send(409, b'{"ok": false, "frozen": true}', "application/json")
         except (KeyError, ValueError, IndexError, TypeError):
             return self._send(400, b'{"ok": false}', "application/json")
         self._send(200, json.dumps({"ok": True, **out}, ensure_ascii=False).encode(), "application/json")
@@ -105,13 +110,22 @@ nav button{min-width:120px;text-align:center}
 .dots span.d{background:var(--b);border-color:var(--b)}
 .dots span.s{background:#444}
 .dots span.c{outline:2px solid #fff}
+.dots span.r{box-shadow:inset 0 0 0 3px #000}
+button:disabled{opacity:.55;cursor:default}
+#reveal{margin-top:14px;width:100%;text-align:center;border-color:var(--b)}
+.models{margin-top:14px}
+.m{border:2px solid #2a3a44;border-radius:10px;padding:10px 12px;margin:0 0 10px}
+.m h3{margin:0 0 6px;font-size:15px;color:var(--b)}
+.m div{font-size:14px}
+.y{color:#3ddc84}.n{color:#ff5c5c}.u{color:#9aa}
 </style></head><body><main>
 <header><h1>Banc de décision</h1><span class="meta" id="count"></span></header>
 <div class="bar"><div id="prog" style="width:0"></div></div>
 <div id="case"></div>
+<div id="rev"></div>
 <nav><button id="prev">← Précédent</button><button id="skip">Passer ce cas</button><button id="next">Suivant →</button></nav>
 <div class="dots" id="dots"></div>
-<p class="meta">Vous ne voyez jamais les réponses des modèles. « ? » = je ne sais pas. Chaque clic est enregistré ; vous pouvez revenir changer une réponse.</p>
+<p class="meta">Répondez d'abord ; le bouton « Voir les réponses des modèles » apparaît ensuite (vos réponses à ce cas sont alors figées). « ? » = je ne sais pas. Chaque clic est enregistré.</p>
 </main>
 <script>
 let cases=[],cur=0;
@@ -129,21 +143,36 @@ function draw(){
     q.options.forEach((o,oi)=>{const b=el('button',{className:q.answer===o.value?'on':''},o.label);
       if(o.help&&o.help!==o.label)b.append(el('small',{textContent:o.help}));b.onclick=()=>answer(qi,oi);opts.append(b)});
     const x=el('button',{className:q.answer===null?'on':''},'?');x.onclick=()=>answer(qi,null);opts.append(x);
+    if(c.revealed)opts.querySelectorAll('button').forEach(b=>b.disabled=true);
     box.append(el('div',{className:'q'},el('h2',{textContent:(qi+1)+'. '+q.text}),opts))});
+  const rev=$('rev');rev.innerHTML='';
+  if(c.shown)showModels(c);
+  else if(c.revealed){reveal()}
+  else if(c.done){const b=el('button',{id:'reveal'},'Voir les réponses des modèles');
+    b.append(el('small',{textContent:'Vos réponses à ce cas seront figées ensuite'}));b.onclick=reveal;rev.append(b)}
   const dots=$('dots');dots.innerHTML='';
-  cases.forEach((k,i)=>{const d=el('span',{className:(k.skipped?'s':k.done?'d':'')+(i===cur?' c':''),title:'Cas '+(i+1)});d.onclick=()=>{cur=i;draw()};dots.append(d)});
+  cases.forEach((k,i)=>{const d=el('span',{className:(k.skipped?'s':k.done?'d':'')+(k.revealed?' r':'')+(i===cur?' c':''),title:'Cas '+(i+1)});d.onclick=()=>{cur=i;draw()};dots.append(d)});
 }
-async function post(body){const r=await fetch('/api/label',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){alert('Non enregistré, réessayez');return null}return r.json()}
+async function post(body){const r=await fetch('/api/label',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.status===409){alert('Réponses des modèles déjà vues : la vôtre reste celle donnée avant');return null}if(!r.ok){alert('Non enregistré, réessayez');return null}return r.json()}
+async function reveal(){const c=cases[cur],r=await fetch('/api/reveal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({no:c.no})});
+  if(!r.ok){alert('Répondez d\'abord au cas');return}c.shown=await r.json();c.revealed=true;draw()}
+function showModels(c){
+  const rev=$('rev'),d=c.shown,box=el('div',{className:'models'});
+  const qs=c.questions;
+  box.append(el('div',{className:'meta',textContent:'Réponses des modèles (majorité de leurs essais · accord · confiance). Vert = comme vous, rouge = différent, gris = vous avez répondu « ? ».'}));
+  d.models.forEach(m=>{const card=el('div',{className:'m'},el('h3',{textContent:m.model+(m.ms?' · '+m.ms+' ms':'')+(m.failures?' · '+m.failures+' échec(s)':'')}));
+    m.questions.forEach((q,i)=>{const cls=q.match===true?'y':q.match===false?'n':'u';
+      card.append(el('div',{className:cls,textContent:(i+1)+'. '+(q.label??'pas de réponse')+(q.of?'  ('+q.agree+'/'+q.of+(q.confidence!=null?' · '+Math.round(q.confidence*100)+' %':'')+')':'')}))});
+    box.append(card)});
+  rev.append(box)}
 async function answer(qi,oi){
   const c=cases[cur],r=await post({no:c.no,qi,oi});if(!r)return;
   c.questions.forEach(q=>{q.answer=(q.key in r.labels)?r.labels[q.key]:'__none__'});
   const was=c.done;c.done=r.done;c.skipped=false;
-  if(r.done&&!was){const n=cases.findIndex((k,i)=>i>cur&&!k.done);setTimeout(()=>{if(n>=0)cur=n;draw();window.scrollTo(0,0)},250)}
   draw()}
 $('prev').onclick=()=>{if(cur>0){cur--;draw();window.scrollTo(0,0)}};
 $('next').onclick=()=>{if(cur<cases.length-1){cur++;draw();window.scrollTo(0,0)}};
-$('skip').onclick=async()=>{const c=cases[cur],r=await post({no:c.no,skip:true});if(!r)return;c.done=true;c.skipped=true;
-  const n=cases.findIndex((k,i)=>i>cur&&!k.done);if(n>=0)cur=n;draw();window.scrollTo(0,0)};
+$('skip').onclick=async()=>{const c=cases[cur],r=await post({no:c.no,skip:true});if(!r)return;c.done=true;c.skipped=true;draw()};
 load();
 </script></body></html>
 """

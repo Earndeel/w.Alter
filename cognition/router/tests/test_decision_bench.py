@@ -105,3 +105,31 @@ def test_the_web_page_shows_cases_and_questions_never_a_models_answer_and_shares
     assert web.label({"no": 0, "qi": 0, "oi": 1})["labels"]["act"] == "continue"   # an answer can be changed
     assert web.label({"no": 1, "skip": True})["labels"]["_skipped"]
     assert bench.status()["labelled"] == 1 and bench.status()["skipped"] == 1
+
+
+def test_the_models_answers_are_shown_only_after_the_owner_answered_and_then_his_answers_freeze(home):
+    from walter_router.eval import decision_bench_web as web
+    tmp, _ = home
+    rows = [{"case": "t1", "model": "m", "ok": True, "ms": 400, "answers": {
+                "action": {"choice": "notify", "confidence": 0.9}, "urgency": {"choice": "now", "confidence": 0.8},
+                "needs_reply": {"type": "noul", "noul": 0.9}}},
+            {"case": "t1", "model": "m", "ok": True, "ms": 500, "answers": {
+                "action": {"choice": "ignore", "confidence": 0.6}, "urgency": {"choice": "now", "confidence": 0.7},
+                "needs_reply": {"type": "noul", "noul": 0.8}}},
+            {"case": "t1", "model": "m", "ok": True, "ms": 450, "answers": {
+                "action": {"choice": "notify", "confidence": 0.7}, "urgency": {"choice": "later", "confidence": 0.5},
+                "needs_reply": {"type": "noul", "noul": 0.2}}}]
+    (tmp / "answers.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    with pytest.raises(ValueError):
+        bench.reveal(1)                                            # not answered yet: nothing shown
+    for qi, oi in ((0, 2), (1, 0), (2, None)):                     # notify, now, « ? »
+        web.label({"no": 1, "qi": qi, "oi": oi})
+    m = bench.reveal(1)["models"][0]
+    a, u, r = m["questions"]
+    assert (a["answer"], a["agree"], a["of"], a["confidence"], a["match"]) == ("notify", 2, 3, 0.8, True)
+    assert u["match"] is True and r["answer"] == "yes" and r["match"] is None and a["label"] == "Me prévenir"
+    assert web.cases_view()["cases"][1]["revealed"]
+    with pytest.raises(bench.RevealedError):
+        web.label({"no": 1, "qi": 0, "oi": 0})
+    assert bench.button("wr:b:1:0:0")["ok"] is False
+    assert json.loads((tmp / "labels.json").read_text())["t1"]["action"] == "notify"

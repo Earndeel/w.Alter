@@ -28,6 +28,7 @@ import statistics
 import subprocess
 import threading
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -333,6 +334,49 @@ def _send(text: str, rows) -> None:
         raise RuntimeError(f"walter-telegram send: exit {r.returncode}")
 
 
+class RevealedError(ValueError):
+    """The case's model answers were shown: the owner's answers to it are frozen."""
+
+
+def reveal(case_no: int) -> dict:
+    """The models' answers to one case, once the owner answered it (or skipped it); his answers freeze from then.
+    Per model: per question the majority answer of its samples, how many agree, mean confidence, and whether it
+    matches the owner's answer."""
+    cases = _read("cases.json", {}).get("cases") or []
+    case = cases[case_no]
+    with (home() / ".labels.lock").open("w") as lockf:
+        fcntl.flock(lockf, fcntl.LOCK_EX)
+        labels = _read("labels.json", {})
+        lab = labels.get(case["id"]) or {}
+        if not lab.get("_done"):
+            raise ValueError("answer the case first")
+        if not lab.get("_revealed"):
+            lab["_revealed"] = datetime.now(timezone.utc).isoformat()
+            labels[case["id"]] = lab
+            _write("labels.json", labels)
+    qs = labelled_questions(case)
+    rows = [r for r in answers() if r.get("case") == case["id"]]
+    out = []
+    for m in dict.fromkeys(r["model"] for r in rows):
+        mine = [r for r in rows if r["model"] == m]
+        ok = [r for r in mine if r.get("ok")]
+        per_q = []
+        for key, _, opts in qs:
+            names = dict(opts)
+            got = [_choice(r.get("answers") or {}, key, case) for r in ok]
+            votes = Counter(g for g, _ in got if g is not None)
+            top, n = votes.most_common(1)[0] if votes else (None, 0)
+            confs = [c for g, c in got if g == top and c is not None]
+            gold = lab.get(key, "__none__")
+            per_q.append({"key": key, "answer": top, "label": names.get(top, top), "agree": n, "of": len(ok),
+                          "confidence": round(statistics.mean(confs), 2) if confs else None,
+                          "match": None if gold in (None, "__none__") or top is None else top == gold})
+        out.append({"model": m, "failures": len(mine) - len(ok),
+                    "ms": sorted(r["ms"] for r in ok)[len(ok) // 2] if ok else None, "questions": per_q})
+    return {"case": case["id"], "owner": {k: lab.get(k) for k, _, _ in qs}, "skipped": bool(lab.get("_skipped")),
+            "models": out}
+
+
 def record(case_no: int, qi: int | None, oi: int | None, skip: bool = False) -> dict:
     """One owner answer (oi None = « ? », no gold for it) or a skipped case; shared by Telegram and the web page.
     Returns {case, labels, done}. A file lock: every Telegram press is its own process."""
@@ -342,6 +386,8 @@ def record(case_no: int, qi: int | None, oi: int | None, skip: bool = False) -> 
         fcntl.flock(lockf, fcntl.LOCK_EX)
         labels = _read("labels.json", {})
         lab = labels.setdefault(case["id"], {})
+        if lab.get("_revealed"):          # the owner saw the models' answers: his own stay as given, blind
+            raise RevealedError(case["id"])
         qs = labelled_questions(case)
         if skip:
             lab.update(_done=True, _skipped=True, _at=datetime.now(timezone.utc).isoformat())
@@ -367,6 +413,13 @@ def button(data: str) -> dict:
         cases[case_no]
     except (IndexError, ValueError):
         return {"ok": False, "toast": "Cas inconnu"}
+    try:
+        return _button(case_no, parts)
+    except RevealedError:
+        return {"ok": False, "toast": "Réponses des modèles déjà vues : la vôtre reste celle donnée avant"}
+
+
+def _button(case_no: int, parts: list[str]) -> dict:
     if parts[3] == "s":
         out = record(case_no, None, None, skip=True)
         toast, drop = "Cas passé", [f"wr:b:{case_no}:"]

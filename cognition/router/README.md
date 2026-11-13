@@ -138,7 +138,9 @@ answers, not only on public leaderboards. `walter-router decision-bench build | 
   case per message, buttons `wr:b:…` through the door's existing `wr` prefix; « ? » = no answer, « Passer »);
   `report` compares per use and question: agreement with the owner, confidence when right / wrong, latency, cost.
 - **Web page** (temporary, asked by the owner): `decision-bench serve --host <tailnet address> [--port 3090]`
-  (`eval/decision_bench_web.py`), the same cases and the same labels file as Telegram, answers can be changed; run
+  (`eval/decision_bench_web.py`), the same cases and the same labels file as Telegram, answers can be changed until
+  the owner asks to see the models' answers to that case (« Voir les réponses des modèles », only once he answered or
+  skipped it; per model the majority of its samples, agreement, confidence; his answers to it freeze then); run
   as a transient unit `walter-decision-bench-web` (tailnet only, no request log), stopped once the labels are in.
 
 ## Access from outside
