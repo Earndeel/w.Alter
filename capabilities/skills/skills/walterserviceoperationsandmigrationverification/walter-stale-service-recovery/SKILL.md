@@ -67,3 +67,31 @@ cat /user/Lucas/logs/memory-autopilot/latest.json
 ```
 
 Treat that report as supplementary. In this incident it reported 100/100 despite having missed the decision-path outage. Require a successful functional preflight replay before declaring recovery.
+
+## Diagnose stale services with the A8 deployment checker before authorizing repairs
+
+1. Read `/walter/docs/SOCLE.md` decision A8 and `/walter/core/GUARDIANS.md`. Treat code fixed on disk and code loaded by a running service as separate facts: the incident documented in this session involved a memory fix and removed credentials file while `walter-context-preflight`, `walter-memory-pipeline` and `walter-memory-gateway` still held old code.
+2. Run the read-only deployment diagnostics:
+   ```sh
+   cd /tmp
+   walter deploy status
+   walter deploy check
+   ```
+   Inspect the reported stale causes rather than restarting every unit. Do not infer command success from a pipeline ending in `cut`, `grep` or another formatter; capture the check's exit status directly.
+3. Inspect `/walter/core/config/deploy.toml`. The implementation delivered in this session has `[repair] enabled = false`: stale-service incidents remain warnings and are not handed to a guardian; `walter deploy restart` returns `defer:repair_disabled` without calling systemd. Do not flip this switch merely to test detection. Respect any task-specific prohibition on restarts or unit edits.
+4. Test the individual diagnostic producers without invoking the supervisor or guardian repair engine:
+   ```sh
+   python3 /walter/core/guardian/check
+   python3 /walter/cognition/memory/guardian/check
+   python3 /walter/cognition/context/guardian/check
+   ```
+   Their output is Incident v1 JSON. Use `walter check` for the broader contract, documentation and neutrality checks; it is not a substitute for runtime deployment status.
+5. Do not confuse context degradation with a stale or broken preflight service. `decision.degraded` means the Router decision chain failed and the turn received a prudent L3 fallback pack. Diagnose Router/provider health rather than restarting `walter-context-preflight` for that signal alone. When testing degradation aggregation, use timestamped temporary fixtures: historical shadow rows must not count as a current incident, and timestamps must preserve their UTC offset.
+6. Inspect relevant units read-only if retired configuration remains:
+   ```sh
+   systemctl show -p FragmentPath --value walter-router-quota.service
+   systemctl show -p FragmentPath --value walter-router-refresh.service
+   systemctl show -p FragmentPath --value walter-memory-hermes.service
+   systemctl list-timers --all --no-pager
+   ```
+   Report required unit changes separately when unit edits are forbidden. Check whether current code still reads a legacy environment variable before declaring it harmless; never dump complete environments or credentials.
