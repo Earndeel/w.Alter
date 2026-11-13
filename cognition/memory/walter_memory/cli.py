@@ -148,6 +148,9 @@ def main(argv=None) -> None:
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
     vw.add_argument("--query", default="", help="find: the V1 views closest to these words (subjects, episodes, periods)")
     vw.add_argument("--local", action="store_true", help="owner reading on the VM: local_only views too")
+    dq = sub.add_parser("decision-questions", help="the exact questions a Memory processor asks the decision model "
+                        "(Walter Router's decision bench, 2026-11-13); no call, nothing recorded")
+    dq.add_argument("processor", choices=["triage"])
     ds = sub.add_parser("disclosure", help="P1.7: may this outgoing message leave? allow | ask | block, with reasons")
     ds.add_argument("action", choices=["check"]); ds.add_argument("--to", default=None); ds.add_argument("--text", default=None)
     ds.add_argument("--channel", default="cli"); ds.add_argument("--no-model", action="store_true")
@@ -539,6 +542,12 @@ def main(argv=None) -> None:
             print(json.dumps(res, default=str, ensure_ascii=False, indent=1))
         else:
             print(res.get("content") or json.dumps(res, default=str, ensure_ascii=False, indent=1))
+    elif a.cmd == "decision-questions":
+        from . import triage
+        _print({"processor": a.processor, "questions": triage.QUESTIONS,
+                "state_keys": ["source", "network", "thread_kind", "monsieur_messages_30d", "their_messages_30d",
+                               "monsieur_answered_after", "monsieur_mentioned", "subject", "labels", "attachments",
+                               "messages", "content_withheld"]})
     elif a.cmd == "disclosure":
         from . import disclosure
         text = a.text if a.text is not None else sys.stdin.read()
