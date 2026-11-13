@@ -22,12 +22,13 @@ import json
 import os
 import re
 import subprocess
+from concurrent.futures import TimeoutError as FutureTimeout
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import SETTINGS, Exchange, Request, refresh_router, run
+from . import SETTINGS, WORK_MIN, Exchange, Request, degraded_plan, refresh_router, run
 
 
 _STATE: list[Path | None] = []
@@ -92,7 +93,10 @@ def requested(plan: dict, message: str, channel: str | None = None) -> dict:
         out["degraded"] = True          # Run Plane: needs `degraded` in walter_memory.runs.REQUESTED_KEYS to be kept
     work = (plan.get("decision") or {}).get("work")
     if isinstance(work, (int, float)) and not isinstance(work, bool):
-        out["work"] = work >= 0.5       # the Run Plane opens a durable task on it (walter_memory.runs.actionable)
+        out["work"] = work >= WORK_MIN  # the Run Plane opens a durable task on it (walter_memory.runs.actionable)
+    resume = (plan.get("decision") or {}).get("resume")
+    if isinstance(resume, (int, float)) and not isinstance(resume, bool) and resume >= WORK_MIN:
+        out["resume"] = True            # the Run Plane carries on the thread's open or suspended task, whatever the act
     if plan.get("answer"):
         out.update(answer=plan["answer"], message_sha=hashlib.sha256(message.strip().encode()).hexdigest())
     return out
@@ -115,12 +119,27 @@ def _attach_run(run_id: str, plan: dict, message: str = "", channel: str | None 
 _POOL: list = []
 
 
-def _bounded(fn, timeout: float):
-    """fn() within timeout seconds, on a shared worker thread (a slow database never holds the plan)."""
+def _io():
+    """Shared worker threads for what the answer must not wait for in line (previous exchange, the decision, run
+    attachment); wide enough that decisions left running by a slow provider do not queue the next requests."""
     from concurrent.futures import ThreadPoolExecutor
     if not _POOL:
-        _POOL.append(ThreadPoolExecutor(max_workers=4, thread_name_prefix="preflight-io"))
-    return _POOL[0].submit(fn).result(timeout=timeout)
+        _POOL.append(ThreadPoolExecutor(max_workers=24, thread_name_prefix="preflight-io"))
+    return _POOL[0]
+
+
+def _bounded(fn, timeout: float):
+    """fn() within timeout seconds, on a shared worker thread (a slow database never holds the plan)."""
+    return _io().submit(fn).result(timeout=timeout)
+
+
+def answer_within(caller_ms=None) -> float:
+    """Seconds this request has to be answered: [preflight] answer_within_s, or the caller's own wait when it is
+    shorter, minus the margin (never under one second: the plan itself is always tried)."""
+    s = SETTINGS["answer_within_s"]
+    if isinstance(caller_ms, (int, float)) and not isinstance(caller_ms, bool) and caller_ms > 0:
+        s = min(s, caller_ms / 1000 - SETTINGS["answer_margin_s"])
+    return max(s, 1.0)
 
 
 def last_exchange(key: str, message: str, reader=None, now: float | None = None) -> dict | None:
@@ -203,7 +222,8 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
     service's own start-up request (nothing recorded, nothing signalled).
     Without candidates in the request, the subjects come from Walter Memory (step D). In shadow mode the context
     pack the plan asks for is assembled and recorded next to the host's current injection, nothing is injected."""
-    t0 = time.time()
+    t0, m0 = time.time(), time.monotonic()
+    due = m0 + (3600 if warm else answer_within(d.get("answer_within_ms")))     # the warm-up loads, unhurried
     try:
         prev = dict(d.get("previous") or {}) or None
         prev_note = None
@@ -225,7 +245,13 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
                       candidates=cands, privacy_class=d.get("privacy_class") or "cloud_allowed",
                       default_thread=waiting or d.get("default_thread"), waiting_age_s=waiting_age,
                       previous_profile=previous_profile(key))
-        plan_obj = run(req, purpose="walter-context preflight" + (" (shadow)" if shadow else ""))
+        purpose = "walter-context preflight" + (" (shadow)" if shadow else "")
+        p0 = time.perf_counter()
+        try:                                # the decision has the answer's time less what the pack needs at least
+            left = max(due - time.monotonic() - SETTINGS["pack_reserve_s"], 0.5)
+            plan_obj = _bounded(lambda: run(req, purpose=purpose, within=None if warm else left), left)
+        except FutureTimeout:               # no decision in time: the degraded plan, said as such (A2), not silence
+            plan_obj = degraded_plan(req, TimeoutError("no decision within the time the caller waits"), p0)
         plan = plan_obj.to_dict()
         degraded = bool(plan_obj.decision.get("degraded"))
         if key and not degraded and not plan_obj.fast_path and plan_obj.decision.get("model"):
@@ -241,23 +267,32 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
             row["degraded"] = True
             if not shadow and not warm:  # an observation never reaches the production bus
                 _signal_degraded(d, plan)
+        attached = None
         if d.get("run_id"):                 # Walter Run Plane: the plan's level and thread belong to the run
-            row["run_id"] = d["run_id"]
-            _attach_run(d["run_id"], plan, req.message, d.get("channel"))
+            row["run_id"] = d["run_id"]     # … written while the pack is read, not before it
+            attached = _io().submit(_attach_run, d["run_id"], plan, req.message, d.get("channel"))
         if (shadow or want_pack) and req.privacy_class != "local_only":
             from ..assembly import pack
             from ..retrieval import gather
-            blocks, notes = gather(plan_obj, req.message, session_key=key,
+            g0 = time.monotonic()
+            blocks, notes = gather(plan_obj, req.message, session_key=key, deadline=due,
                                    native_history=d.get("runtime") in ("claude_code", "codex", "dsh"))
             skip = set(d.get("exclude_blocks") or [])      # what the host already shows natively (its profile)
             blocks = [b for b in blocks if b.id not in skip]
             row["mode"] = "inject" if want_pack else "shadow"
             p = pack(plan_obj, blocks, notes)
+            p.wall_ms = round((time.monotonic() - g0) * 1000, 1)
             cur = d.get("current_injection") or {}
             row["pack"] = p.summary()
             row["pack_text"] = p.text()
             row["current"] = {"tokens": len(cur.get("text") or "") // 4 + (1 if cur.get("text") else 0),
                               "parts": cur.get("parts"), "text": cur.get("text")}
+        if attached is not None:            # the run is normally attached by now; past the deadline it finishes alone
+            try:
+                attached.result(timeout=max(due - time.monotonic(), 0))
+            except Exception:  # noqa: BLE001 — late or failed: the answer does not wait for it
+                row["run_attach"] = "late"
+        row["total_ms"] = round((time.monotonic() - m0) * 1000)
     except Exception as exc:  # noqa: BLE001 — fail-open
         row, plan = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                      "error": f"{type(exc).__name__}: {str(exc)[:200]}"}, None

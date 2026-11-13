@@ -95,13 +95,14 @@ def capability_settings(path: str | Path | None = None) -> dict:
 # --- preflight and per-message pack (lot C2, 2026-11-11) -----------------------------------------------------------
 PREFLIGHT_KEYS = {"decision_samples": int, "decision_timeout_s": (int, float), "reply_window_s": (int, float),
                   "floor_window_s": (int, float), "router_ttl_s": (int, float), "degraded_min_similarity": (int, float),
-                  "degraded_profile_max_age_s": (int, float), "previous_chars": int, "previous_timeout_s": (int, float)}
+                  "degraded_profile_max_age_s": (int, float), "previous_chars": int, "previous_timeout_s": (int, float),
+                  "answer_within_s": (int, float), "answer_margin_s": (int, float), "pack_reserve_s": (int, float)}
 PACK_KEYS = {"budget": dict, "cut_order": list, "min_block_tokens": int, "board_tokens": int, "board_max_lines": int,
              "board_recent_hours": (int, float), "board_states": list, "subject_tokens": int,
              "horizon_max_age_s": dict, "recent_exchanges": int, "unsure_plan": (int, float), "tasks_tokens": int,
              "tasks_others": int, "experience_tokens": int, "experience_items": int,
              "experience_recent_days": (int, float), "gateway_timeout_s": (int, float), "memory_budget": dict,
-             "records_budget": dict, "state_budget": dict}
+             "records_budget": dict, "state_budget": dict, "workers": int, "late_grace_s": (int, float)}
 
 
 def _section(name: str, keys: dict, path: str | Path | None) -> dict:

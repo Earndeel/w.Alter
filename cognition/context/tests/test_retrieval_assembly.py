@@ -232,3 +232,33 @@ def test_memory_assembly_is_asked_without_tasks_and_experience(sources, monkeypa
     monkeypatch.setitem(sys.modules, "walter_memory.context", fake)
     retrieval.gather(plan("L3", caps=("tools", "memory")), "qui décide ?")
     assert budgets and all(b["tasks"] == 0 and b["experience"] == 0 for b in budgets)
+
+
+def test_the_sources_are_asked_together_and_a_late_one_is_said_not_waited_for(sources, monkeypatch):
+    """13/11: plan 2 s + session state 1 s + memory 3 s, one after the other, passed the engine's 7 s and three
+    sub-agent turns lost their whole plan. The pack costs its slowest source; one not ready when the answer is due is
+    left out, noted, and the pack tells the model which."""
+    import time
+    slow = lambda name, layer, s: lambda *a, **k: (time.sleep(s), retrieval.Block(name, layer, name + " ok"))[1]  # noqa: E731
+    monkeypatch.setattr(retrieval, "session_state", slow("session_state", 2, 0.4))
+    monkeypatch.setattr(retrieval, "memory", slow("memory", 4, 0.4))
+    monkeypatch.setattr(retrieval, "board", slow("subjects_board", 1, 0.4))
+    t0 = time.monotonic()
+    blocks, notes = retrieval.gather(plan("L3"), "et la suite ?")
+    took = time.monotonic() - t0
+    assert {"session_state", "memory", "subjects_board"} <= {b.id for b in blocks} and not notes
+    assert took < 0.9, took                                              # three sources of 0.4 s: one wait, not three
+    assert [b.id for b in blocks].index("subjects_board") < [b.id for b in blocks].index("memory")   # order of the steps
+
+    monkeypatch.setattr(retrieval, "memory", slow("memory", 4, 3.0))
+    t0 = time.monotonic()
+    blocks, notes = retrieval.gather(plan("L3"), "et la suite ?", deadline=time.monotonic() + 0.6)
+    took = time.monotonic() - t0
+    assert took < 1.5, took
+    assert "memory" not in [b.id for b in blocks] and "session_state" in [b.id for b in blocks]
+    assert notes == ["memory: not ready in time"]
+    p = pack(plan("L3"), blocks, notes)
+    assert p.text().startswith("Contexte incomplet : la mémoire n'a pas répondu à temps")
+    assert p.summary()["late"] == ["memory"] and "session_state ok" in p.text()
+    # nothing but late sources: the model is still told
+    assert pack(plan("L3"), [], ["memory: not ready in time"]).text().startswith("Contexte incomplet")

@@ -146,6 +146,14 @@ degraded_min_similarity = 0.55      # degraded plan: the closest subject (local 
 degraded_profile_max_age_s = 1800   # degraded plan: the session's previous model profile is reused if this recent
 previous_chars = 1200               # previous exchange read from walter_logs when the caller sends none: chars per side
 previous_timeout_s = 1.0            # … within this time, else the plan is made without it (noted in the journal)
+# The plan and its pack are answered within this time. A caller that says how long it waits (`answer_within_ms`, the
+# engine's own timeout) gets the shorter of the two, minus the margin (journal write, the answer's way back). A pack
+# source not ready by then is left out and the pack says so (13/11: three sub-agent turns at once lost their whole
+# plan because the pack, read source after source, came 1.5 s after the engine had stopped waiting).
+answer_within_s = 5.5
+answer_margin_s = 1.0
+pack_reserve_s = 1.0                # the decision stops this long before the answer is due: past it, the degraded plan
+                                    # (said to the model, on the run and on the bus) instead of no answer at all
 
 # Per-message pack (walter_context.assembly / retrieval). Budgets in tokens (chars / 4), header included.
 # Measured 07-11/11 (741 packs): median L0 115, L1 1588, L2 2983, L3 2889, L4 4666; max 7257.
@@ -170,6 +178,8 @@ experience_tokens = 400             # Memory POST /v1/experience: attempts, fail
 experience_items = 4
 experience_recent_days = 7          # below L2 the block appears only for a failed/partial attempt this recent
 gateway_timeout_s = 1.5             # per Memory gateway call of the pack (tasks, experience); past it the block is dropped
+workers = 16                        # threads asking the pack's sources together (up to 9 sources per message)
+late_grace_s = 0.25                 # a source is given at least this long once the answer's deadline has passed
 
 [pack.memory_budget.L3]             # Memory get_context sections (tasks/experience come from their own routes: 0 here)
 profile = 0

@@ -19,6 +19,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import wait
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -409,11 +410,28 @@ def now(at: "datetime | None" = None) -> Block:
     return Block("now", 5, text, sources=[f"tz:{tz}"])
 
 
-def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, native_history: bool = True) -> tuple[list[Block], list[str]]:
+LATE = "not ready in time"                      # note of a source the pack did not wait for
+_WORKERS: list = []
+
+
+def _workers():
+    """Shared worker threads of the pack's sources (each one is I/O: Memory's database, its gateway, a command)."""
+    from concurrent.futures import ThreadPoolExecutor
+    if not _WORKERS:
+        _WORKERS.append(ThreadPoolExecutor(max_workers=PACK["workers"], thread_name_prefix="pack-source"))
+    return _WORKERS[0]
+
+
+def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, native_history: bool = True,
+           deadline: float | None = None) -> tuple[list[Block], list[str]]:
     """The blocks the plan asks for. L0: capabilities (+ records when unsure or a lookup is needed), and — at every
     level, two short Memory calls — the objectives of the plan's thread and a recent failed attempt at the same thing
     (SOCLE A3/A4: a light request is exactly the one that would otherwise be retried blind). Returns (blocks, notes
-    on failed sources)."""
+    on failed sources), in the order of the steps.
+    The sources are asked together: the pack costs its slowest source, not their sum (13/11: plan 2 s + session state
+    1 s + memory 3 s one after the other passed the engine's 7 s and the whole plan was lost). `deadline`
+    (time.monotonic) is when the caller must answer: a source not ready by then gives no block and the note
+    « <source>: not ready in time », which the pack says to the model — late context is said, never silent."""
     steps = [("capabilities", lambda: capabilities(plan)), ("tool_cards", lambda: tool_cards(plan)), ("now", now)]
     if plan.level != "L0":
         steps += [("board", lambda: board(plan)), ("session_state", lambda: session_state(plan, message, session_key)),
@@ -423,16 +441,29 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
         steps += [("memory", lambda: memory(plan, message)), ("recent", lambda: recent(session_key, native_history))]
     if not _gets_memory(plan):
         steps.append(("records", lambda: records(plan, message)))
-    blocks, notes = [], []
-    for name, step in steps:
+
+    def timed(step):
         t0 = time.perf_counter()
+        b = step()
+        if b is not None:
+            b.ms = round((time.perf_counter() - t0) * 1000, 1)
+        return b
+
+    futures = [(name, _workers().submit(timed, step)) for name, step in steps]
+    blocks, notes = [], []
+    for name, f in futures:
+        if deadline is not None:
+            wait([f], timeout=max(deadline - time.monotonic(), PACK["late_grace_s"]))
+            if not f.done():                        # (a source's own TimeoutError is a failure, not a late source)
+                f.cancel()                          # not started yet: never will; started: its result is dropped
+                notes.append(f"{name}: {LATE}")
+                continue
         try:
-            b = step()
+            b = f.result()
         except Exception as exc:  # noqa: BLE001 — one source failing never drops the others
             reason = "route absent" if isinstance(exc, RouteAbsent) else f"{type(exc).__name__}: {str(exc)[:120]}"
             notes.append(f"{name}: {reason}")
             continue
         if b is not None:
-            b.ms = round((time.perf_counter() - t0) * 1000, 1)
             blocks.append(b)
     return blocks, notes

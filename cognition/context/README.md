@@ -76,7 +76,24 @@ Tâches / Expérience (routes Memory `/v1/tasks/list`, `/v1/experience`) : secti
 tâches du fil et un échec récent entrent dans le pack à tous les niveaux, L0 compris (12/11/2026). Le preflight juge
 aussi si le message est un travail à suivre (`decision.work`) : c'est ce qui ouvre une tâche durable au Run Plane.
 Une approbation ou une correction (`act` = `approve` / `correct`) envoyée moins de 30 min après un échange reste dans
-le fil de cet échange (`decision.thread_by = previous_exchange`, le choix du modèle en `thread.alternates`).
+le fil de cet échange (`decision.thread_by = previous_exchange`, le choix du modèle en `thread.alternates`) ; le fil
+du dernier tour est désigné au modèle de décision, et une hésitation sans majorité y laisse la conversation.
+Le plan énonce aussi l'effort du tour (`decision.effort`) : le niveau de contexte dit ce que le modèle doit voir,
+l'effort ce qu'il doit faire (relevé par le palier de texte demandé, L4 pour un travail à mener) ; le moteur en tire
+les plafonds du tour.
+**Réponse dans le délai de l'appelant** (13/11/2026) : l'appelant dit combien de temps il attend
+(`answer_within_ms`, 7 s pour le moteur et le hook) ; le preflight répond avant (`[preflight] answer_within_s`,
+`answer_margin_s`). Les sources du pack sont interrogées ensemble (le pack coûte sa source la plus lente, pas leur
+somme) et le run est rattaché pendant ce temps. Une source pas prête à l'échéance est laissée de côté, notée
+(`pack.late`, `notes`) et **dite au modèle** en tête du pack (« Contexte incomplet : … ») ; une décision pas rendue à
+temps (`pack_reserve_s` avant l'échéance) donne le plan dégradé déclaré, jamais une absence de réponse. Chaque ligne
+du journal porte `total_ms`. La décision elle-même reçoit le temps dont dispose l'appelant (et non plus 15 s fixes).
+**Reprise d'une tâche** (13/11/2026) : quand un fil candidat porte une tâche ouverte ou suspendue (champ `task` de sa
+carte, ou carte de genre `task`), le preflight juge aussi si le message la reprend (`decision.resume`, question posée
+seulement dans ce cas) ; ≥ 0,5 → `requested.resume` au Run Plane, qui rattache le run à la tâche du fil au lieu d'en
+ouvrir une autre — une reprise depuis une autre interface n'a pas d'échange précédent, son acte revient « new ».
+**Plan dégradé et fil** : sans jugement du modèle, moins de 30 min après un échange, la conversation reste dans le fil
+de cet échange (`thread_by = previous_exchange`) ; au-delà, le sujet le plus proche en mots, s'il l'est assez.
 
 L’état d’un port de compression ne détermine pas le mode d’injection par message. Les essais `pack` ne constituent
 pas une décision de migration globale. Voir la maintenance pour les commandes et les modes dégradés.

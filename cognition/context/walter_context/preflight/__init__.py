@@ -44,6 +44,20 @@ PLANS = {"none": "nothing beyond the new message: the assistant's tools suffice"
          "thread": "more of its subject's history: earlier decisions, other sessions or tools",
          "thread_and_memory": "its subject plus long-term memory: people, past events, other sources"}
 PLAN_LEVEL = {"none": "L0", "last_exchange": "L1", "thread": "L2", "thread_and_memory": "L3"}
+RESUME_QUESTION = ("A thread shows a task of the owner still open or suspended. Does the new message ask to carry on, "
+                   "resume or finish that task, rather than ask something else or start a different piece of work?")
+WORK_MIN = 0.5                          # decision.work at or above: work to carry out and follow (a durable task)
+EFFORT_BY_TIER = {"L2": "L2", "L3": "L3"}                # the text tier the request asks for → the least effort level
+
+
+def effort(level: str, model_level: str | None, work: float | None) -> str:
+    """The ceilings the engine gives the turn (`decision.effort`, SOCLE A7). The plan's level says what the model
+    must SEE, not how much it must DO: a request can need nothing beyond its own message (L0) and still be a long
+    piece of work (three delegated evaluations and a file to write — cut short at L0 ceilings on 2026-11-12). So:
+    the context level, raised to the difficulty the plan states (text tier L2 / L3), and to L4 — the general
+    ceilings — for work to carry out and follow."""
+    floor = "L4" if isinstance(work, (int, float)) and work >= WORK_MIN else EFFORT_BY_TIER.get(model_level or "", "L0")
+    return max(level, floor, key=list(LEVELS).index)
 
 WORD = re.compile(r"[a-zà-ÿ0-9][a-zà-ÿ0-9'’\-]+", re.I)
 SHORT = re.compile(r"^\s*(oui|ok|okay|non|vas[- ]?y|go|parfait|merci|d'?accord|valid|fais[- ]le|c'?est bon|top|"
@@ -220,7 +234,7 @@ def questions(req: Request) -> tuple[dict, dict]:
                                    if req.previous.age_s is not None else None,
                                    "message": _line(req.previous.message, 300), "answer": _line(req.previous.answer, 400)}
              if req.previous else None,
-             "threads": {k: {x: c.get(x) for x in ("title", "objective", "state", "last_message", "last_answer",
+             "threads": {k: {x: c.get(x) for x in ("title", "objective", "state", "task", "last_message", "last_answer",
                                                     "keywords", "hours_since_last") if c.get(x)} for k, c in ids.items()}}
     q = {"act": {"type": "choice", "criteria": ACT_CRITERIA,
                  "instructions": "What does the new message do, given the previous exchange?" + NOTE},
@@ -239,8 +253,13 @@ def questions(req: Request) -> tuple[dict, dict]:
              "L3": "hardest or high stakes: deep synthesis, complex reasoning, important decision"},
              "instructions": "How demanding is the work this message asks for?" + NOTE}}
     if ids:
+        # the thread the previous exchange went to is said on its own line: its title alone does not tell the model
+        # that « ok vas-y pour la première » answers it (2026-11-12)
+        last = req.previous.thread_id if req.previous and req.previous.age_s is not None \
+            and req.previous.age_s <= REPLY_WINDOW_S else None
         q["thread"] = {"type": "choice", "criteria": {**{k: "continues: " + (c.get("title") or ", ".join(
-            c.get("keywords") or [])[:80] or k) for k, c in ids.items()}, "new": "opens a subject none of these covers"},
+            c.get("keywords") or [])[:80] or k) + (" — the thread of the previous exchange" if k == last else "")
+            for k, c in ids.items()}, "new": "opens a subject none of these covers"},
             "instructions": ("The owner talks to their assistant in one continuous stream and switches subjects freely. "
                              "Which thread does the new message belong to? Short replies belong to the thread of the "
                              "previous exchange. Choose 'new' only for a subject none of the threads covers." + NOTE)}
@@ -251,10 +270,13 @@ def questions(req: Request) -> tuple[dict, dict]:
     for cap, text in CAPABILITY_QUESTIONS.items():
         q["cap_" + cap] = {"type": "noul", "instructions": text + NOTE}
     q["work"] = {"type": "noul", "instructions": WORK_QUESTION + NOTE}
+    if any(c.get("task") or c.get("kind") == "task" for c in ids.values()):
+        q["resume"] = {"type": "noul", "instructions": RESUME_QUESTION + NOTE}
     return state, q
 
 
-def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPlan:
+def run(req: Request, *, purpose: str = "walter-context preflight", within: float | None = None) -> ContextPlan:
+    """`within`: seconds the caller has for the decision; each call of the decision chain gets no more than that."""
     t0 = time.perf_counter()
     plan = fast_path(req)
     if plan is not None:
@@ -269,7 +291,8 @@ def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPl
         from walter_memory import llm
         res = llm.decide(state, q, processor="walter-context-preflight", privacy_class=req.privacy_class,
                          models=decision_chain(), purpose=purpose, budget="recurring",
-                         timeout=SETTINGS["decision_timeout_s"], samples=DECISION_SAMPLES)
+                         timeout=min(SETTINGS["decision_timeout_s"], max(within, 1.0)) if within
+                         else SETTINGS["decision_timeout_s"], samples=DECISION_SAMPLES)
         a = res.get("answers") if isinstance(res, dict) else None
         if not isinstance(a, dict) or not a:
             raise ValueError("the decision returned no answers")
@@ -312,13 +335,25 @@ def run(req: Request, *, purpose: str = "walter-context preflight") -> ContextPl
         # sent the approval to another subject and cut the task from its follow-up. Its pick stays as an alternate.
         thread = ThreadChoice(id=prev.thread_id, confidence=conf("thread"), alternates=[thread.id] if thread.id else [])
         by = "previous_exchange"
+    elif (act != "new" and prev and prev.thread_id and prev.age_s is not None and prev.age_s <= FLOOR_WINDOW_S
+          and thread.id and thread.id != prev.thread_id and prev.thread_id in thread.alternates
+          and (conf("thread") or 0) < 0.5):
+        # the model hesitates (no majority for its pick) between the thread just talked about and another one: the
+        # conversation stays where it is; a clear switch of subject is honoured
+        thread = ThreadChoice(id=prev.thread_id, confidence=conf("thread"),
+                              alternates=[thread.id, *(k for k in thread.alternates if k != prev.thread_id)][:2])
+        by = "previous_exchange_alternate"
+    tier = pick("model_level") if pick("model_level") in MODEL_LEVELS else "L1"
+    work = round(float(a["work"]["noul"]), 2) if isinstance((a.get("work") or {}).get("noul"), (int, float)) else None
+    resume = round(float(a["resume"]["noul"]), 2) if isinstance((a.get("resume") or {}).get("noul"), (int, float)) else None
     plan = ContextPlan(
         turn_id=req.turn_id, thread=thread, act=act, level=level,
         domains=[domain] if domain in DOMAINS else [], horizons=[horizon] if horizon in HORIZONS else [],
         capabilities=["tools", *caps],
-        model_profile=ModelProfile(task=task, level=pick("model_level") if pick("model_level") in MODEL_LEVELS else "L1"),
+        model_profile=ModelProfile(task=task, level=tier),
         decision={"model": res.get("model"), "ms": round((time.perf_counter() - t0) * 1000),
-                  **({"work": round(float(a["work"]["noul"]), 2)} if isinstance((a.get("work") or {}).get("noul"), (int, float)) else {}),
+                  **({"work": work} if work is not None else {}), "effort": effort(level, tier, work),
+                  **({"resume": resume} if resume is not None else {}),
                   **({"samples": res["samples"]} if res.get("samples") else {}),
                   **({"thread_by": by} if by else {}),
                   "confidence": {k: conf(k) for k in ("thread", "act", "plan", "domain", "horizon", "task")
@@ -342,10 +377,15 @@ def degraded_plan(req: Request, exc: BaseException, t0: float | None = None) -> 
     """The decision failed: a prudent plan made with local means only, marked as such (SOCLE A2). Never raises."""
     best = max((c for c in req.candidates if c.get("id") and isinstance(c.get("similarity"), (int, float))),
                key=lambda c: c["similarity"], default=None)
-    if best is not None and best["similarity"] >= SETTINGS["degraded_min_similarity"]:
+    close = best is not None and best["similarity"] >= SETTINGS["degraded_min_similarity"]
+    if req.default_thread and req.waiting_age_s is not None and req.waiting_age_s < FLOOR_WINDOW_S:
+        # nobody judged the message: within the half hour of an exchange the conversation stays where it is (13/11:
+        # the closest subject in words was another one, and the task of the exchange lost its follow-up)
+        thread = ThreadChoice(id=req.default_thread, alternates=[best["id"]] if close and best["id"] != req.default_thread else [])
+        how = "previous_exchange"
+    elif close:
         thread, how = ThreadChoice(id=best["id"], confidence=None), "similarity"
-    elif req.default_thread and (req.waiting_age_s is None or req.waiting_age_s < FLOOR_WINDOW_S
-                                 or req.default_thread.startswith("session:")):
+    elif req.default_thread and (req.waiting_age_s is None or req.default_thread.startswith("session:")):
         thread, how = ThreadChoice(id=req.default_thread), "session"
     else:
         thread, how = ThreadChoice(id=None, new=True), "none"

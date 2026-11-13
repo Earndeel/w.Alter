@@ -216,6 +216,18 @@ def test_an_approval_or_a_correction_stays_in_the_thread_of_the_exchange_it_answ
     _full(answers, act={"choice": "approve"}, thread={"choice": "th-9", "confidence": 0.9})
     p = run(Request("t", "ok vas-y pour la première seulement, décris-la en une phrase", previous=prev(age=86400), candidates=cands))
     assert p.thread.id == "th-9"                                            # an old exchange is not « the previous »
+    # the previous exchange's thread is named to the decision model on its own line
+    assert "the thread of the previous exchange" in calls["decide"][-2][1]["thread"]["criteria"]["th-1"]
+    assert "previous exchange" not in calls["decide"][-2][1]["thread"]["criteria"]["th-9"]
+    # a continuation the model hesitates on (no majority) stays where the conversation is; a clear switch is honoured
+    _full(answers, act={"choice": "continue"},
+          thread={"choice": "th-9", "confidence": 0.45, "probabilities": {"th-9": 0.45, "th-1": 0.35, "new": 0.2}})
+    p = run(Request("t", "décris la première étape en une phrase, sans outil", previous=prev(), candidates=cands))
+    assert p.thread.id == "th-1" and p.thread.alternates == ["th-9"] and p.decision["thread_by"] == "previous_exchange_alternate"
+    _full(answers, act={"choice": "continue"},
+          thread={"choice": "th-9", "confidence": 0.7, "probabilities": {"th-9": 0.7, "th-1": 0.25}})
+    p = run(Request("t", "décris la première étape en une phrase, sans outil", previous=prev(), candidates=cands))
+    assert p.thread.id == "th-9" and "thread_by" not in p.decision
 
 
 def test_the_decision_says_whether_the_message_is_work_to_keep_as_a_task(fake_llm):
@@ -230,6 +242,22 @@ def test_the_decision_says_whether_the_message_is_work_to_keep_as_a_task(fake_ll
     assert requested(run(Request("t", "Tu en penses quoi de ce code, en deux mots ?", previous=prev())).to_dict(), "x")["work"] is False
     answers.pop("work")
     assert "work" not in requested(run(Request("t", "Une question sans jugement de travail ici", previous=prev())).to_dict(), "x")
+
+
+def test_the_effort_of_a_turn_is_not_its_context_level(fake_llm):
+    """SOCLE A7 (2026-11-12): a request that needs nothing beyond its own message can still be long work — the
+    ceilings follow what must be DONE (`decision.effort`), the level what must be SEEN."""
+    calls, answers = fake_llm
+    _full(answers, plan={"choice": "none"}, work={"noul": 0.9}, model_level={"choice": "L2"})
+    p = run(Request("t", "Recherche trois options, compare-les, choisis la meilleure et écris le résultat dans un fichier"))
+    assert p.level == "L0" and p.decision["effort"] == "L4"            # work to carry out: the general ceilings
+    _full(answers, plan={"choice": "none"}, work={"noul": 0.1}, model_level={"choice": "L2"})
+    assert run(Request("t", "Compare ces deux formulations et dis laquelle est la plus claire")).decision["effort"] == "L2"
+    _full(answers, plan={"choice": "none"}, work={"noul": 0.1}, model_level={"choice": "L1"})
+    p = run(Request("t", "Quelle est la capitale de l'Australie, en un mot ?"))
+    assert p.level == "L0" and p.decision["effort"] == "L0"            # a light question keeps the light ceilings
+    _full(answers, plan={"choice": "thread_and_memory"}, work={"noul": 0.1}, model_level={"choice": "L1"})
+    assert run(Request("t", "Rappelle-moi ce qu'on avait dit sur le budget", previous=prev())).decision["effort"] == "L3"
 
 
 def test_extensive_search_lifts_a_thread_plan_to_l4(fake_llm):
@@ -333,3 +361,86 @@ def test_memory_needed_lifts_the_plan_to_the_level_that_carries_memory(fake_llm)
     assert run(Request(turn_id="t2", message="Traduis « bonjour » en espagnol")).level == "L0"
     answers.update({"plan": {"choice": "thread_and_memory"}, "extensive": {"noul": 0.9}, "cap_memory": {"noul": 0.9}})
     assert run(Request(turn_id="t3", message="Fais le point complet sur mes projets")).level == "L4"
+
+
+def test_the_answer_comes_within_the_time_the_caller_waits(fake_llm, monkeypatch, tmp_path):
+    """13/11: the engine waits 7 s; the run was attached then the pack read, in line, after the decision — the answer
+    came 1.5 s too late and the turn went on without its plan. The caller's wait bounds the whole answer: a decision
+    that is not there in time gives the degraded plan (said), a slow run attachment is not waited for."""
+    import time
+    from walter_context.preflight import __main__ as cli
+    from walter_context import retrieval
+    assert cli.answer_within(None) == cli.SETTINGS["answer_within_s"]
+    assert cli.answer_within(7000) == min(cli.SETTINGS["answer_within_s"], 7 - cli.SETTINGS["answer_margin_s"])
+    assert cli.answer_within(3000) == 3 - cli.SETTINGS["answer_margin_s"] and cli.answer_within(200) == 1.0
+    assert cli.answer_within(True) == cli.SETTINGS["answer_within_s"]
+    monkeypatch.setattr(cli, "_STATE", [tmp_path])
+    monkeypatch.setattr(cli, "subjects", lambda d: ([], None, None))
+    monkeypatch.setattr(cli, "last_exchange", lambda key, message: None)
+    monkeypatch.setattr(cli, "_signal_degraded", lambda d, plan: None)
+    seen = {}
+    monkeypatch.setattr(cli, "_attach_run", lambda *a: (time.sleep(4), seen.setdefault("attached", True)))
+    monkeypatch.setattr(retrieval, "gather", lambda plan, msg, **kw: (
+        seen.setdefault("deadline", kw.get("deadline")), ([retrieval.Block("now", 5, "Maintenant : x")], []))[1])
+    real = sys.modules["walter_memory.llm"].decide
+    monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", lambda *a, **k: (time.sleep(5), real(*a, **k))[1])
+    d = {"message": "une vraie question qui demande une décision", "runtime": "dsh", "session_id": "dsh/vm/s9",
+         "run_id": "r9", "turn_id": "dsh/vm/s9:1", "answer_within_ms": 2500}
+    t0 = time.monotonic()
+    plan, row = cli.handle(d, shadow=False, want_pack=True)
+    took = time.monotonic() - t0
+    assert took < 2.5, took
+    assert plan["decision"]["degraded"] and "no decision within" in plan["decision"]["error"]
+    assert row["pack_text"].startswith("Attention : l'intention de ce message")
+    assert row["run_attach"] == "late" and "attached" not in seen and row["total_ms"] < 2500
+    assert seen["deadline"] is not None
+
+
+def test_a_resumption_is_judged_when_a_thread_shows_a_task_and_travels_to_the_run_plane(fake_llm):
+    """13/11 (live engine): « reprends la tâche … » through another interface has no previous exchange there; its act
+    came back « new » and a second objective was opened. The preflight judges the resumption itself, only when a
+    thread shows an open or suspended task, and says it to the Run Plane (`requested.resume`)."""
+    from walter_context.preflight import __main__ as cli
+    calls, answers = fake_llm
+    plain = [{"id": "th-1", "title": "Lot B"}, {"id": "th-9", "title": "Autre sujet"}]
+    _full(answers, act={"choice": "new"}, thread={"choice": "th-1", "confidence": 0.64})
+    p = run(Request("t", "reprends la tâche du lot B là où elle s'est arrêtée et termine-la", candidates=plain))
+    assert "resume" not in calls["decide"][-1][1] and "resume" not in p.decision      # no task shown: not asked
+    carrying = [{"id": "th-1", "title": "Lot B", "task": "tâche suspendue (interrompue) — déploie le lot B"}, plain[1]]
+    _full(answers, act={"choice": "new"}, thread={"choice": "th-1", "confidence": 0.64}, resume={"noul": 0.91},
+          work={"noul": 0.97})
+    p = run(Request("t", "reprends la tâche du lot B là où elle s'est arrêtée et termine-la", candidates=carrying))
+    state, q, _ = calls["decide"][-1]
+    assert "resume" in q and state["threads"]["th-1"]["task"].startswith("tâche suspendue")
+    assert p.decision["resume"] == 0.91 and p.thread.id == "th-1"
+    assert cli.requested(p.to_dict(), "m")["resume"] is True and cli.requested(p.to_dict(), "m")["work"] is True
+    _full(answers, act={"choice": "new"}, thread={"choice": "th-1", "confidence": 0.64}, resume={"noul": 0.1})
+    p = run(Request("t", "dans le lot B, ajoute aussi une page d'aide", candidates=carrying))
+    assert "resume" not in cli.requested(p.to_dict(), "m")                            # another piece of work
+    # a task that is its own thread (no subject yet) asks the question too
+    own = [{"id": "task:42", "kind": "task", "title": "déploie le lot B", "state": "tâche suspendue"}]
+    run(Request("t", "reprends la tâche du lot B là où elle s'est arrêtée et termine-la", candidates=own))
+    assert "resume" in calls["decide"][-1][1]
+
+
+def test_a_degraded_plan_stays_in_the_thread_of_a_recent_exchange(fake_llm, monkeypatch):
+    """13/11: the decision did not come in time 3 s after an exchange; the closest subject in words was another one
+    and the task of the exchange lost its follow-up. Nobody judged: the conversation stays where it is."""
+    monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", _boom)
+    cands = [{"id": "subject:a", "similarity": 0.81}, {"id": "subject:b", "similarity": 0.6}]
+    p = run(Request("t", "continue la tâche : fais maintenant la deuxième étape", candidates=cands,
+                    default_thread="subject:b", waiting_age_s=3.5))
+    assert p.thread.id == "subject:b" and p.thread.alternates == ["subject:a"]
+    assert p.decision["degraded"] and p.decision["thread_by"] == "previous_exchange"
+    p = run(Request("t", "continue la tâche : fais maintenant la deuxième étape", candidates=cands,
+                    default_thread="subject:b", waiting_age_s=7200))
+    assert p.thread.id == "subject:a" and p.decision["thread_by"] == "similarity"      # an old exchange: the words
+
+
+def test_the_decision_is_given_the_time_the_caller_has(fake_llm):
+    calls, answers = fake_llm
+    _full(answers)
+    run(Request("t", "une vraie question qui demande une décision du modèle"), within=3.2)
+    assert calls["decide"][-1][2]["timeout"] == 3.2
+    run(Request("t", "une vraie question qui demande une décision du modèle"))
+    assert calls["decide"][-1][2]["timeout"] == preflight.SETTINGS["decision_timeout_s"]

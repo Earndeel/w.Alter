@@ -244,7 +244,16 @@ def schemas() -> dict[str, dict]:
                     "properties": {"degraded": {"type": "boolean"}, "error": {"type": "string", "maxLength": 120},
                                    "work": {"type": "number", "minimum": 0, "maximum": 1, "description": (
                                        "the decision model's judgement that the message asks for work to carry out and "
-                                       "follow (>= 0.5: the Run Plane keeps it as a durable task, SOCLE A3, 2026-11-12)")}}}}},
+                                       "follow (>= 0.5: the Run Plane keeps it as a durable task, SOCLE A3, 2026-11-12)")},
+                                   "resume": {"type": "number", "minimum": 0, "maximum": 1, "description": (
+                                       "asked only when a thread shows an open or suspended task: the judgement that "
+                                       "the message carries on, resumes or finishes it (>= 0.5: the Run Plane attaches "
+                                       "the run to the thread's task instead of opening another, 2026-11-13)")},
+                                   "effort": {"enum": list(LEVELS), "description": (
+                                       "the level whose ceilings the engine gives the turn (SOCLE A7): the context "
+                                       "level raised to the difficulty asked (text tier) and to L4 for work to carry "
+                                       "out; absent (fast path, degraded plan) = the plan's level, or the general "
+                                       "ceilings when degraded")}}}}},
         "session-state.v1.json": {
             "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": base + "session-state.v1.json",
             "title": "SessionState v1", "type": "object", "required": ["version", "thread_id"],
