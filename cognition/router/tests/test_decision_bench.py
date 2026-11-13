@@ -133,3 +133,12 @@ def test_the_models_answers_are_shown_only_after_the_owner_answered_and_then_his
         web.label({"no": 1, "qi": 0, "oi": 0})
     assert bench.button("wr:b:1:0:0")["ok"] is False
     assert json.loads((tmp / "labels.json").read_text())["t1"]["action"] == "notify"
+
+
+def test_the_specialism_is_no_longer_asked_and_a_stale_page_is_refused(home):
+    from walter_router.eval import decision_bench_web as web
+    case = dict(CASES[0], questions={**CASES[0]["questions"], "task": {"type": "choice", "criteria": {"general": "", "coding": ""}}})
+    assert "task" not in [k for k, _, _ in bench.labelled_questions(case)]   # 13/11: the L2/L3 model delegates it
+    with pytest.raises(ValueError):
+        web.label({"no": 0, "qi": 0, "oi": 0, "key": "thread"})
+    assert web.label({"no": 0, "qi": 0, "oi": 0, "key": "act"})["labels"]["act"] == "new"

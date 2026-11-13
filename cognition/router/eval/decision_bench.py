@@ -48,7 +48,10 @@ LEVEL_NAMES = {"comprehension": "Compréhension de vos messages", "triage": "Tri
 YES_NO = {"yes": "Oui", "no": "Non"}
 LEVEL3 = {"L1": "Simple", "L2": "Exigeant", "L3": "Très exigeant"}
 # What the owner answers, per use: question key → (question in plain French, option key → button text).
-# Options None = the question's own criteria (thread, task: labels from their descriptions); noul = yes/no.
+# Options None = the question's own criteria (thread: labels from their descriptions); noul = yes/no.
+# « Quel type de travail ? » (task) left the bench on 2026-11-13: the owner rules that the specialism is not the
+# decision model's to choose — the L2/L3 model calls a specialised sub-agent (DECISIONS.md); its earlier labels stay
+# in labels.json, unused.
 LABELED = {
     "comprehension": [
         ("act", "Que fait ce message ?", {"new": "Nouveau sujet", "continue": "Suite du sujet", "approve": "Accord, go",
@@ -58,15 +61,13 @@ LABELED = {
             "none": "Rien", "last_exchange": "Dernier échange", "thread": "Historique du sujet",
             "thread_and_memory": "Sujet + mémoire"}),
         ("model_level", "Difficulté du travail demandé ?", LEVEL3),
-        ("work", "Travail à mener (pas seulement répondre) ?", YES_NO),
-        ("task", "Quel type de travail ?", None)],
+        ("work", "Travail à mener (pas seulement répondre) ?", YES_NO)],
     "triage": [
         ("action", "Que doit faire votre assistant ?", {"ignore": "Ignorer", "remember": "Retenir",
                                                         "notify": "Me prévenir", "prepare_reply": "Préparer réponse"}),
         ("urgency", "Quand devez-vous le voir ?", {"now": "Maintenant", "today": "Aujourd'hui", "later": "Plus tard"}),
         ("needs_reply", "Quelqu'un attend votre réponse ?", YES_NO)],
     "routing": [
-        ("task", "Quel type de travail ?", None),
         ("level", "Difficulté pour un modèle texte ?", LEVEL3),
         ("unrestricted", "Faut-il un modèle sans restriction ?", {"no": "Non", "yes": "Oui"})],
 }

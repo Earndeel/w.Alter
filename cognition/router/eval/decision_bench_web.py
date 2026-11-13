@@ -39,7 +39,12 @@ def label(body: dict) -> dict:
     if body.get("skip"):
         return bench.record(no, None, None, skip=True)
     oi = body.get("oi")
-    return bench.record(no, int(body["qi"]), None if oi is None else int(oi))
+    qi = int(body["qi"])
+    if "key" in body:          # the page names the question: a page loaded before a question list change is refused
+        keys = [k for k, _, _ in bench.labelled_questions(bench._read("cases.json", {})["cases"][no])]
+        if qi >= len(keys) or keys[qi] != body["key"]:
+            raise ValueError("stale page")
+    return bench.record(no, qi, None if oi is None else int(oi))
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -153,7 +158,7 @@ function draw(){
   const dots=$('dots');dots.innerHTML='';
   cases.forEach((k,i)=>{const d=el('span',{className:(k.skipped?'s':k.done?'d':'')+(k.revealed?' r':'')+(i===cur?' c':''),title:'Cas '+(i+1)});d.onclick=()=>{cur=i;draw()};dots.append(d)});
 }
-async function post(body){const r=await fetch('/api/label',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.status===409){alert('Réponses des modèles déjà vues : la vôtre reste celle donnée avant');return null}if(!r.ok){alert('Non enregistré, réessayez');return null}return r.json()}
+async function post(body){const r=await fetch('/api/label',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.status===409){alert('Réponses des modèles déjà vues : la vôtre reste celle donnée avant');return null}if(!r.ok){alert('Non enregistré : rechargez la page');return null}return r.json()}
 async function reveal(){const c=cases[cur],r=await fetch('/api/reveal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({no:c.no})});
   if(!r.ok){alert('Répondez d\'abord au cas');return}c.shown=await r.json();c.revealed=true;draw()}
 function showModels(c){
@@ -166,7 +171,7 @@ function showModels(c){
     box.append(card)});
   rev.append(box)}
 async function answer(qi,oi){
-  const c=cases[cur],r=await post({no:c.no,qi,oi});if(!r)return;
+  const c=cases[cur],r=await post({no:c.no,qi,oi,key:c.questions[qi].key});if(!r)return;
   c.questions.forEach(q=>{q.answer=(q.key in r.labels)?r.labels[q.key]:'__none__'});
   const was=c.done;c.done=r.done;c.skipped=false;
   draw()}
