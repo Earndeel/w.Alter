@@ -313,3 +313,12 @@ def test_voice_note_that_cannot_be_transcribed_is_said_and_never_submitted(door,
     door.handle(msg("", 52, voice={"file_id": "F", "duration": 3}))
     assert [o for o in door.engine.ops if o["op"] == "turn.submit"] == []
     assert "pas pu transcrire" in door.tg.sent()[-1]
+
+
+def test_send_accepts_options_before_its_text_as_every_module_calls_it():
+    """2026-11-13: `send --plain -` (Router proposals, alerts, gateway notices) was refused by argparse since 10/11."""
+    a = B.parse_cli(["send", "--plain", "--buttons", "[]", "-"])
+    assert (a.command, a.text, a.plain, a.buttons) == ("send", "-", True, "[]")
+    assert B.parse_cli(["send", "--plain", "bonjour"]).text == "bonjour"
+    assert B.parse_cli(["send", "bonjour", "--silent"]).silent is True
+    assert B.parse_cli(["--check"]).check is True and B.parse_cli([]).command == "serve"

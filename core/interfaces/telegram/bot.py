@@ -833,7 +833,10 @@ def notify(tg: Telegram, owners: list[int], text: str, *, plain: bool, silent: b
     return {"ok": True, "messages": sent}
 
 
-def main() -> int:
+def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
+    """Options may stand between `send` and its text (`send --plain -`, the form every module uses): intermixed
+    parsing. Plain parse_args took `send` and an empty text in one go and refused the trailing `-` (2026-11-13: the
+    Router's proposals, alerts and gateway notices had failed this way since 10/11)."""
     ap = argparse.ArgumentParser(prog="walter-telegram")
     ap.add_argument("command", nargs="?", default="serve", choices=("serve", "check", "send"))
     ap.add_argument("text", nargs="?", help="send: the message (« - » or absent = stdin)")
@@ -841,7 +844,11 @@ def main() -> int:
     ap.add_argument("--plain", action="store_true", help="send: no Markdown conversion")
     ap.add_argument("--silent", action="store_true", help="send: no notification sound")
     ap.add_argument("--buttons", help="send: inline keyboard as JSON rows [[{text, callback_data}]]")
-    a = ap.parse_args()
+    return ap.parse_intermixed_args(argv)
+
+
+def main() -> int:
+    a = parse_cli()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     s = load_settings()
     if not s["owner_ids"]:
