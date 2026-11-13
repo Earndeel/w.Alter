@@ -1,0 +1,11 @@
+{
+ "base_sha": "1b39dd37a0083115e62af3ae2cba5abb9df9ecdc73272d80a9d6f3babe68c399",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-13T04:13:51.340824+00:00",
+ "domain": "walterserviceoperationsandmigrationverification",
+ "kind": "patch",
+ "reason": "Adds the A8 report-only deployment-check workflow to the existing stale-service skill rather than creating a duplicate. Evidence includes live `walter deploy status/check` runs, direct guardian checks, the delivered disabled-repair configuration and its `defer:repair_disabled` behavior, plus a concrete false-repair pitfall: context degradation originates in the Router chain, not necessarily the preflight service. [session claude_code/vm/c530007a-b622-4c0a-8ab6-13324975c83b:afc4b71f08c2b48ad]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/c530007a-b622-4c0a-8ab6-13324975c83b:afc4b71f08c2b48ad",
+ "target": "walter-stale-service-recovery"
+}
