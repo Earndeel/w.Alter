@@ -699,6 +699,16 @@ Deterministic digest of a refresh cycle, the input of the 48 h analysis agent (e
 - `price_changes(conn)` — Price moves since the previous snapshot of each provider, restricted to the router's short list.
 - `digest(conn)` — 
 
+## research/agent/run.py
+
+Step 2 of the 48 h cycle: the research agent, run by Walter Engine (2026-11-13; before, a Hermes loop with shell,
+
+- `prompt(data: dict)` — 
+- `parse(text: str | None)` — The agent's JSON object {aliases, report} (tolerates a code fence or text around it); None if absent.
+- `apply(conn, aliases: list[dict], add)` — 
+- `report_text(day: str, answer: dict | None, added: list[dict], refused: list[dict], raw: str | None)` — 
+- `run(conn, *, delegate=None, gather=None, add=None, log_dir: Path | None=None, now: datetime | None=None)` — 
+
 ## research/benchmarks/__init__.py
 
 Leaderboards and evaluations, one module per site (fetch only; parsing is analysis.parse).

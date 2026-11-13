@@ -84,9 +84,12 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 
 ## Operating it
 
-The 48 h cycle (`walter-router-refresh.timer`, `bin/walter-router-cycle`): research + analysis → research agent on the
-economic tier (names checked on the web) → plan research (meters, mails, web, news, cost price) → final analysis and
-Telegram → Hermes follows, the page is republished → the guardian follows up what is still broken. Services:
+The 48 h cycle (`walter-router-refresh.timer`, `bin/walter-router-cycle`): research + analysis → research agent
+(`walter-router analyze`, `research/agent/run.py`: one Walter Engine delegation that reads the cycle digest and checks
+names on the web, read and browse only; the Router applies its certain name links through the validated `alias-add`
+and writes `analysis-<day>.md` — since 2026-11-13, before a Hermes loop with shell and file tools) → plan research
+(meters, mails, web, news, cost price) → final analysis and Telegram → Hermes follows (no-op while it is retired), the
+page is republished → the guardian follows up what is still broken. Services:
 `walter-router-quota` (meters after each agent turn), `walter-router-control` (page trigger), `walter-llm`,
 `walter-router-guardian.timer` (every 6 h, and after each cycle).
 

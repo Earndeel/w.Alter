@@ -110,6 +110,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("tasks", help="task keys, labels and interfaces (for tool descriptions)")
     sub.add_parser("decision-chain", help="decision models to try, in order (consumed by walter-memory triage)")
     sub.add_parser("review", help="deterministic digest of the last cycle (input of the 48 h analysis agent)")
+    sub.add_parser("analyze", help="48 h cycle step 2: the research agent, delegated to Walter Engine; the Router "
+                                   "applies its name links (validated) and writes the report")
     aa = sub.add_parser("alias-add", help="link an unscored model id to the scored id it is (validated, with evidence)")
     aa.add_argument("key")
     aa.add_argument("model_id")
@@ -330,6 +332,9 @@ def main(argv: list[str] | None = None) -> int:
                 out = aliases_admin.listing()
             elif args.cmd == "review":
                 out = review.digest(conn)
+            elif args.cmd == "analyze":
+                from walter_router.research.agent import run as agent_run
+                out = agent_run.run(conn)
             elif args.cmd == "subscriptions":
                 if args.action == "refresh":
                     subscriptions.refresh(conn, args.sub_id)

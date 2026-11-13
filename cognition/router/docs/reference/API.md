@@ -103,6 +103,8 @@ walter-router alias-list
 walter-router alias-remove
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   key :  ; défaut=—
+walter-router analyze
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
 walter-router ask
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   question :  ; défaut=—
