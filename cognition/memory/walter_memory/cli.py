@@ -429,11 +429,24 @@ def main(argv=None) -> None:
             with connect() as conn:
                 rows = conn.execute(f"""select {fields} from runs.runs where {identity} = %s {opened}
                                         order by started_at desc limit {limit}""", (reference,)).fetchall()
-            ambiguous = len(rows) > 1
-            row = rows[0] if rows and not ambiguous else None
+                ambiguous = len(rows) > 1
+                row = rows[0] if rows and not ambiguous else None
+                # the door conversation the run answers — its own, or that of the run it works for (a sub-agent):
+                # metadata only, by which the model gateway tells a test account's run (its test budget)
+                door = conn.execute("""
+                    with recursive up as (
+                        select run_id, parent_run_id, origin, 0 depth from runs.runs where run_id = %s
+                        union all
+                        select r.run_id, r.parent_run_id, r.origin, up.depth + 1
+                        from runs.runs r join up on r.run_id = up.parent_run_id where up.depth < 12)
+                    select origin->>'engine_session' engine_session from up
+                    where origin->>'engine_session' is not null order by depth desc limit 1""",
+                                    (row["run_id"],)).fetchone() if row and a.open_only else None
             res = {"run_id": str(row["run_id"]) if row else None}
             if a.open_only:
                 res.update({key: row[key] if row else None for key in ("status", "privacy_class", "channel", "requested")})
+                if door and door["engine_session"]:
+                    res["engine_session"] = door["engine_session"]
                 if ambiguous:
                     res["error"] = "ambiguous_open_runs"
         elif a.action == "routing":         # observed route only; caller content never enters the decision

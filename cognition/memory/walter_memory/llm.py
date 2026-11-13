@@ -212,7 +212,11 @@ def _book_calls(base: dict, calls: list[dict]) -> None:
     for c in calls or []:
         row = {**base, "provider": c.get("provider") or "walter-llm", "model": c.get("model") or base["model"],
                "latency_ms": int(float(c.get("seconds") or 0) * 1000)}
-        if c.get("skipped"):
+        if c.get("skipped") == "straggler":     # a late sample the gateway did not wait for (the mean was made of
+            _log(**row, status="dropped", error="straggler")            # the others): not a failure of the decision
+        elif c.get("skipped") == "route_unavailable":   # set aside by the gateway (model gone, no grant): a failure
+            _log(**row, status="error", error=f"route_unavailable: {c.get('error') or ''}"[:200])   # of the route
+        elif c.get("skipped"):
             _log(**row, status="refused_budget", error=str(c["skipped"])[:200])
         elif c.get("ok"):
             _log(**row, status="ok", input_tokens=c.get("input_tokens"), output_tokens=0, cost_usd=c.get("cost_usd"))

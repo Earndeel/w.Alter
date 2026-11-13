@@ -433,25 +433,33 @@ def subject_candidates(message: str, session_id: str | None = None, at: datetime
     at = at or _now()
     ex = {"message": message or "", "at": at, "session_id": session_id or ""}
     from .generations import read_set
+    try:        # the owner's active objectives are threads too (Run Plane, A3): a task is found from any session
+        from . import runs
+        tasks = runs.objective_candidates(message, session_id, at, embed)
+    except Exception:  # noqa: BLE001 — the subjects alone
+        tasks = {"candidates": [], "waiting": None, "waiting_age_s": None}
     with connection() as conn:
         rows = candidates(conn, ex, embed, read_set())[:limit] if message else []
-        waiting = _previous(conn, ex) if session_id else None
-        if waiting and all(r["view_key"] != waiting["view_key"] for r in rows):
+        prev = _previous(conn, ex) if session_id else None
+        # the thread the session's last exchange went to: Memory's attached subject, or — more recent, known at once —
+        # the thread the Run Plane recorded for the session's last run (a subject is attached only after the exchange)
+        waiting = prev["view_key"] if prev else None
+        age = (at - prev["occurred_at"]).total_seconds() if prev else None
+        if tasks["waiting"] and (waiting is None or (tasks["waiting_age_s"] or 0) < (age or 0)):
+            waiting, age = tasks["waiting"], tasks["waiting_age_s"]
+        if waiting and all(r["view_key"] != waiting for r in rows):         # proposed even when not close in words
             row = conn.execute("select view_key, title, last_at from views.view where view_key = %s",
-                               (waiting["view_key"],)).fetchone()
+                               (waiting,)).fetchone()
             if row:
                 rows = [*rows[:max(0, limit - 1)], {**row, "sim": None}]
         cards = [{"id": r["view_key"], **_card(conn, r["view_key"]),
                   "hours_since_last": round((at - r["last_at"]).total_seconds() / 3600, 1),
                   "similarity": round(float(r["sim"]), 3) if r.get("sim") is not None else None} for r in rows]
-    out = {"candidates": cards, "waiting": waiting["view_key"] if waiting else None,
-           "waiting_age_s": (at - waiting["occurred_at"]).total_seconds() if waiting else None}
-    try:        # the owner's active objectives are threads too (Run Plane, A3): a task is found from any session
-        from . import runs
-        tasks = runs.objective_candidates(message, session_id, at, embed, exclude={c["id"] for c in cards})
-    except Exception:  # noqa: BLE001 — the subjects alone
-        tasks = {"candidates": [], "waiting": None, "waiting_age_s": None}
-    out["candidates"] = [*cards, *tasks["candidates"]]
-    if tasks["waiting"] and (out["waiting"] is None or (tasks["waiting_age_s"] or 0) < (out["waiting_age_s"] or 0)):
-        out["waiting"], out["waiting_age_s"] = tasks["waiting"], tasks["waiting_age_s"]
-    return out
+    seen = {c["id"] for c in cards}
+    carried = {c["id"]: c for c in tasks["candidates"]}
+    for c in cards:         # a subject that carries an open or suspended task says so on its card: the preflight can
+        t = carried.get(c["id"])        # then tell a resumption from a new request, from any session or interface
+        if t:
+            c["task"] = f"{t['state']} — {t['objective']}"[:400]
+    return {"candidates": [*cards, *(c for c in tasks["candidates"] if c["id"] not in seen)],
+            "waiting": waiting, "waiting_age_s": age}

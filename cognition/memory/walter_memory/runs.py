@@ -212,7 +212,7 @@ def supersede(session_id: str, run_id: str, status: str = "cancelled") -> list[s
 # model / provider: a model named by the owner for this run (Engine API delegation, lot E5), set at the start; the
 # preflight's plan is merged into it, never erases it
 REQUESTED_KEYS = ("task", "level", "require", "fast_path", "answer", "message_sha", "model", "provider", "degraded",
-                  "work")
+                  "work", "resume")
 
 
 def update(run_id: str, *, thread_id: str | None = None, level: str | None = None, act: str | None = None,
@@ -384,12 +384,17 @@ def suspend_idle() -> list[str]:
 
 def actionable(requested: dict | None) -> bool:
     """Is a new request real work (→ an objective) rather than a chat or a question? The preflight's own judgement
-    (`work`) when it gave one; without it (degraded plan, older caller), from what it asks of the Router: not answered
+    (`work`) when it gave one; a degraded plan judged nothing and opens nothing; without either (older caller), from
+    what it asks of the Router: not answered
     by a rule / fast path, and either a text tier from L2 up, a Router task other than a plain chat (CHAT_TASKS), or
     tools required."""
     r = requested if isinstance(requested, dict) else {}
     if r.get("fast_path") or r.get("answer"):
         return False
+    if r.get("degraded") is True:           # a plan made without its model judged nothing: its prudent profile (a
+        return False                        # high tier, tools) is not a judgement that the message is work to carry
+        #   through — every message of an outage opened a task under its own words (13/11/2026). An open task of the
+        #   thread is still carried on (ATTACH_ACTS); a new one waits for a plan that judged.
     if isinstance(r.get("work"), bool):     # the preflight judged it (2026-11-12): its answer, not the proxy below
         return r["work"]
     require = r.get("require") or []
@@ -420,6 +425,7 @@ def _objective_for(conn, run_id: str, act: str) -> dict:
       act in ATTACH_ACTS                                                  → this run becomes an attempt of the most
           recent objective of the same thread still open or suspended (a suspended one re-opens; a correction also
           re-opens a done / failed one), last active within ATTACH_WINDOW; none and actionable → a new objective
+      the plan says `resume` (requested.resume), whatever the act        → same as ATTACH_ACTS
       channel machine (sub-agents)                                        → never opens: inherits through parent_run_id
     Without a thread the same harness session stands in for it. Idempotent per run."""
     run = conn.execute("""select run_id, thread_id, goal, privacy_class, origin, parent_run_id, routing->'requested' req
@@ -437,7 +443,9 @@ def _objective_for(conn, run_id: str, act: str) -> dict:
         return {}
     req = run["req"] or {}
     own = bool(run["thread_id"]) and str(run["thread_id"]).startswith(TASK_THREAD)   # the preflight chose the task itself
-    if act in ATTACH_ACTS or own:
+    resume = req.get("resume") is True         # … or judged that the message carries on the thread's task (13/11): a
+    #   resumption from another session or interface has no previous exchange there, its act is « new »
+    if act in ATTACH_ACTS or own or resume:
         statuses = list(ACTIVE) + (["done", "failed"] if act in REOPEN_ACTS else [])
         sid = origin.get("session_id")
         if run["thread_id"]:
@@ -565,8 +573,13 @@ def objective_candidates(message: str, session_id: str | None = None, at: dateti
             select r.run_id, r.thread_id, coalesce(r.ended_at, r.started_at) at,
                    (select tr.task_id::text from runs.task_runs tr where tr.run_id = r.run_id limit 1) task_id
             from runs.runs r where {_session_match()} and coalesce(r.origin->>'channel', 'owner') = 'owner'
-              and r.started_at < %s order by r.started_at desc limit 1""",
+              and r.started_at < %s
+              and not (r.status = 'open' and r.act is null and r.level is null and r.thread_id is null)
+            order by r.started_at desc limit 1""",
             (session_id, session_id, at)).fetchone() if session_id else None
+        # ^ the run of the message being planned is already open when the preflight asks (the engine opens the run,
+        #   then plans it): it has no plan yet, and it is not « the last exchange » (found on the live engine,
+        #   2026-11-12: 'waiting' was always empty there, the unit tests had no run in progress)
     # the thread the session's last exchange went to, as the Run Plane recorded it (the plan's thread, or the
     # objective's): known at once, where Memory attaches a subject to an exchange only after it
     went = ({"waiting": last["thread_id"], "waiting_age_s": max(0.0, (at - last["at"]).total_seconds())}

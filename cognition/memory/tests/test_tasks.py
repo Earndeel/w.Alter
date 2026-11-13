@@ -92,9 +92,77 @@ def test_the_thread_of_the_sessions_last_run_is_known_at_once():
     a = runs.start(origin=origin(sid), goal="propose un plan pour ranger les photos")
     runs.update(a, thread_id="subject:photos", act="new", requested=CHAT)       # a plain exchange: no objective
     runs.end(a)
+    runs.start(origin=origin(sid), goal="ok vas-y pour la première")        # the engine opens the run, then plans it
     out = runs.objective_candidates("ok vas-y pour la première", session_id=sid)
     assert out["waiting"] == "subject:photos" and out["waiting_age_s"] is not None and out["waiting_age_s"] < 60
     assert runs.objective_candidates("ok vas-y", session_id=f"s-{uuid.uuid4().hex[:8]}")["waiting"] is None
+
+
+def test_the_subject_of_the_last_run_is_offered_to_the_preflight_even_when_its_words_are_far():
+    """« ok vas-y pour la première » shares no word with the subject it answers: the thread of the session's last
+    run is a candidate card anyway (2026-11-12: it was missing, the reply went to another subject)."""
+    from walter_memory import views
+    from walter_memory.db import connection
+    key, sid = f"subject:pytest-{uuid.uuid4().hex[:8]}", f"{RT}/vm/{uuid.uuid4()}"
+    with connection() as conn:
+        conn.execute("insert into views.view (view_key, domain, horizon, title, last_at) values (%s, 'projects', 'medium', "
+                     "'Rangement des photos', now())", (key,))
+    a = runs.start(origin=origin(sid), goal="propose un plan pour ranger les photos")
+    runs.update(a, thread_id=key, act="new", requested=CHAT)
+    runs.end(a)
+    runs.start(origin=origin(sid), goal="ok vas-y pour la première")
+    got = views.subject_candidates("ok vas-y pour la première", sid, embed=lambda texts: [[0.0, 1.0] for _ in texts])
+    assert got["waiting"] == key and any(c["id"] == key for c in got["candidates"])
+
+
+def test_a_degraded_plan_carries_on_an_open_task_but_opens_none():
+    """13/11/2026: with the decision model unreachable every plan is degraded — prudent tier, tools — and the Run
+    Plane read that prudence as « this is work »: a bare « continue » opened a task under its own words."""
+    s = f"{RT}/telegram/{uuid.uuid4()}"
+    degraded = {"task": "general", "level": "L3", "require": ["tools"], "degraded": True}
+    assert not runs.actionable(degraded) and runs.actionable({k: v for k, v in degraded.items() if k != "degraded"})
+    a = runs.start(origin=origin(s), goal="continue là où tu en étais")
+    assert "task_id" not in runs.update(a, act="new", requested=degraded)
+    runs.end(a, status="ended")
+    b = runs.start(origin=origin(s), goal="tâche en deux étapes : écris deux noms de fleurs, puis trie-les")
+    opened = runs.update(b, act="new", requested={**CODING, "work": True})
+    runs.end(b, status="ended")
+    c = runs.start(origin=origin(s), goal="continue")                    # the open task of the conversation goes on
+    out = runs.update(c, act="continue", requested=degraded)
+    assert (out["task_id"], out["task"]) == (opened["task_id"], "attached")
+
+
+def test_a_resumption_from_another_interface_carries_on_the_subjects_task():
+    """13/11/2026 (live engine): a task opened on Telegram inside a known subject, interrupted, then « reprends la
+    tâche … » through the API. A new session has no previous exchange, the act came back « new », and a second
+    objective was opened next to the suspended one. The preflight now judges the resumption (`requested.resume`) and
+    the subject's card says the task it carries."""
+    from walter_memory import views
+    from walter_memory.db import connection
+    key, s1, s2 = f"subject:pytest-{uuid.uuid4().hex[:8]}", f"{RT}/telegram/{uuid.uuid4()}", f"{RT}/api/{uuid.uuid4()}"
+    with connection() as conn:
+        conn.execute("insert into views.view (view_key, domain, horizon, title, last_at) values (%s, 'projects', 'medium', "
+                     "'Liste des arbres', now())", (key,))
+    a = runs.start(origin=origin(s1), goal="tâche en trois étapes : écris trois noms d'arbres, puis trie-les")
+    opened = runs.update(a, thread_id=key, act="new", requested={**CODING, "work": True})
+    runs.end(a, status="cancelled", outcome={"status": "interrupted", "reason": "engine_restart"})
+    got = views.subject_candidates("reprends la tâche des arbres et termine-la", s2,
+                                   embed=lambda texts: [[0.0, 1.0] for _ in texts])
+    card = next(c for c in got["candidates"] if c["id"] == key)            # the task stands for its thread there
+    assert card["kind"] == "task" and card["state"].startswith("tâche suspendue")
+    runs.start(origin=origin(s1), goal="reprends la tâche des arbres")       # where the subject itself is a card
+    got = views.subject_candidates("reprends la tâche des arbres", s1, embed=lambda texts: [[0.0, 1.0] for _ in texts])
+    card = next(c for c in got["candidates"] if c["id"] == key)
+    assert card["task"].startswith("tâche suspendue") and "trois noms d'arbres" in card["task"]
+    assert [c["id"] for c in got["candidates"]].count(key) == 1
+    b = runs.start(origin=origin(s2), goal="reprends la tâche des arbres et termine-la")
+    out = runs.update(b, thread_id=key, act="new", requested={**CODING, "work": True, "resume": True})
+    assert out == {"task_id": opened["task_id"], "task": "reopened"}
+    assert runs.task_get(opened["task_id"])["status"] == "open"
+    # without that judgement a new request in the same subject is another piece of work: its own objective
+    c = runs.start(origin=origin(s2), goal="ajoute aussi une liste de fleurs")
+    other = runs.update(c, thread_id=key, act="new", requested={**CODING, "work": True})
+    assert other["task"] == "opened" and other["task_id"] != opened["task_id"]
 
 
 def test_an_interrupted_run_suspends_its_objective_at_once():

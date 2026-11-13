@@ -15,7 +15,8 @@ def run_store(monkeypatch):
     conn.row_factory = sqlite3.Row
     conn.execute("attach database ':memory:' as runs")
     conn.execute('''create table runs.runs
-        (run_id text, origin text, status text, privacy_class text, started_at text, goal text, routing text)''')
+        (run_id text, origin text, status text, privacy_class text, started_at text, goal text, routing text,
+         parent_run_id text)''')
 
     class Connection:
         def execute(self, sql, args=()):
@@ -28,11 +29,13 @@ def run_store(monkeypatch):
 
     monkeypatch.setattr(db, 'connect', connect)
 
-    def add(run_id, status, started_at, session='dsh/vm/fixture', pclass='cloud_allowed', channel=None, routing=None):
-        origin = {'session_id': session, **({'channel': channel} if channel else {})}
-        conn.execute('insert into runs.runs values (?, ?, ?, ?, ?, ?, ?)',
+    def add(run_id, status, started_at, session='dsh/vm/fixture', pclass='cloud_allowed', channel=None, routing=None,
+            door=None, parent=None):
+        origin = {'session_id': session, **({'channel': channel} if channel else {}),
+                  **({'engine_session': door} if door else {})}
+        conn.execute('insert into runs.runs values (?, ?, ?, ?, ?, ?, ?, ?)',
             (run_id, json.dumps(origin), status, pclass, started_at, 'Never expose this goal',
-             json.dumps(routing) if routing else None))
+             json.dumps(routing) if routing else None, parent))
 
     yield add
     conn.close()
@@ -46,6 +49,18 @@ def test_open_lookup_selects_latest_open_run_of_exact_session_with_metadata_only
     cli.main(['runs', 'find', '--session', 'dsh/vm/fixture', '--open-only'])
     assert json.loads(capsys.readouterr().out) == {
         'run_id': 'open-current', 'status': 'open', 'privacy_class': 'local_only', 'channel': None, 'requested': None}
+
+
+def test_open_lookup_gives_the_door_conversation_the_run_answers_even_for_a_sub_agent(run_store, capsys):
+    """13/11/2026: the model gateway tells a test account's run by the door conversation (`<door>/<account>/…`); a
+    sub-agent's run has none of its own, it works for the run that has one."""
+    run_store('asked', 'ended', '2026-11-13T01:00:00', session='dsh/vm/parent', channel='owner', door='telegram/e2e/chat-1')
+    run_store('child', 'open', '2026-11-13T01:00:05', channel='machine', parent='asked')
+    cli.main(['runs', 'find', '--session', 'dsh/vm/fixture', '--open-only'])
+    out = json.loads(capsys.readouterr().out)
+    assert out['run_id'] == 'child' and out['channel'] == 'machine' and out['engine_session'] == 'telegram/e2e/chat-1'
+    cli.main(['runs', 'find', '--session', 'dsh/vm/fixture'])                # the plain lookup stays the run id only
+    assert json.loads(capsys.readouterr().out) == {'run_id': 'child'}
 
 
 def test_open_lookup_returns_the_preflight_plan_written_on_the_run(run_store, capsys):

@@ -108,8 +108,11 @@ def check() -> tuple[list[str], dict]:
                                   and at > now() - interval '1 day'""").fetchone()["n"]
         m["new_secret_flags_24h"] = secrets
         cfg = settings()
-        mc = conn.execute("""select processor, count(*) calls, count(*) filter (where status <> 'ok') failed,
-                                    mode() within group (order by left(error, 200)) filter (where status <> 'ok') dominant
+        # 'dropped' = a late sample of a multi-sample decision the gateway did not wait for: neither ok nor failed
+        mc = conn.execute("""select processor, count(*) filter (where status <> 'dropped') calls,
+                                    count(*) filter (where status not in ('ok', 'dropped')) failed,
+                                    mode() within group (order by left(error, 200))
+                                        filter (where status not in ('ok', 'dropped')) dominant
                              from system.model_calls where at > now() - make_interval(mins => %s)
                              group by 1""", (int(cfg["model_calls"]["window_min"]),)).fetchall()
         m["model_calls_window"] = {r["processor"]: {"calls": r["calls"], "failed": r["failed"]} for r in mc}
