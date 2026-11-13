@@ -25,6 +25,13 @@ Le gateway transporte les messages et outils de l'appelant. Il ne crée pas une 
   (fournisseur/modèle + raison courte), jamais de repli codé en dur. `paid_floor_usd` (corps) ou l'en-tête
   `X-Walter-Paid-Floor-USD` (chat) : une route OpenRouter payante est sautée quand le crédit est sous ce plancher.
   `GET /v1/balance` : crédit OpenRouter restant (cache 5 min), pour la santé de Memory.
+  `samples` > 1 : appels parallèles du même modèle, moyennés ; dès qu'une majorité a répondu, les retardataires ont
+  `straggler_s` (0,4 s par défaut, `null` = tous attendus) puis sont écartés (`skipped: straggler`, la moyenne est
+  faite des présents) — un échantillon lent ne retient plus la décision d'un message (13/11/2026).
+  Une route qui ne peut pas répondre pour une raison qui lui est propre — modèle disparu chez le fournisseur
+  (HTTP 404 / 410), pas d'autorisation ou de clé — est **mise de côté dix minutes** (`skipped: route_unavailable`,
+  avec sa raison dans `attempts`) au lieu d'être redemandée à chaque décision ; un échec passager (délai, 5xx,
+  crédit) ne met jamais une route de côté (13/11/2026 : crédit vide, chaque décision perdait 4,4 s sur deux routes mortes).
 - `walter-llm call` : une route exacte, JSON sur stdin/stdout, sans repli de modèle implicite.
 - HTTP `/v1/web/converse` (2026-11-08) : services web conversationnels. Règle déterministe de la table
   `web_services` (config, relue à chaud : service → recette Browse hôte/capacité, session moteur, site de connexion,
@@ -90,7 +97,11 @@ la télémétrie conservent des types d'erreur, jamais les messages bruts des ex
   (`RATE_LIMIT_WAITS`, 4 puis 12 s) avant tout repli payant ; il est journalisé `skipped='rate_limit'` et ne rend pas
   l'abonnement « non fiable ».
 - Les runs ouverts par `walter-scenario` (donc aussi `walter-lab`) sont du canal `test` (`WALTER_RUN_CHANNEL`).
-  Leur dépense chez les fournisseurs payants (Kie, OpenRouter, Arnict) est plafonnée à `test_budget.paid_limit_eur`
+  **Sont aussi des essais les runs demandés par un compte de test du moteur** (`test_budget.accounts`, `e2e` : les
+  scénarios `core/scenarios/` passent par les vraies portes, sur le chemin du propriétaire, canal `owner`) et les
+  sous-agents de ces runs : la passerelle le lit dans la conversation de porte du run (`engine_session` rendu par
+  `walter-memory runs find`) et note le canal `test` au journal (13/11/2026 : ces passes échappaient au plafond).
+  Leur dépense chez les fournisseurs payants (Kie, OpenRouter, Arnict, Venice) est plafonnée à `test_budget.paid_limit_eur`
   (2 €) sur 24 h glissantes ; au-delà, chaque route payante leur est refusée (`skipped='test_budget'`) et le propriétaire
   reçoit un message Telegram par fenêtre. Lui seul valide un montant de plus :
   `walter-llm test-budget approve <EUR> [note]` (valable 24 h) ; `walter-llm test-budget` = état.

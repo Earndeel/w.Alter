@@ -19,6 +19,13 @@ sys.path.insert(0, str(LLM))
 import structured  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _no_route_set_aside():
+    structured._unavailable.clear()
+    yield
+    structured._unavailable.clear()
+
+
 # ── fixtures ────────────────────────────────────────────────────────────────────────────────────────────────────
 def old_merge(samples):
     """walter_memory.llm.merge_answers as it was before the move (2026-11-11), verbatim: the parity reference."""
@@ -179,6 +186,65 @@ def test_paid_model_below_the_callers_floor_is_skipped_free_ones_still_answer():
     assert [c["json"]["model"] for c in client.calls] == ["inception/mercury-decide:free"]
 
 
+def test_a_late_sample_does_not_hold_the_decision():
+    """13/11/2026: one sample in three took 9.6 s; the plan of the message waited for it and missed its caller."""
+    class Slow(Client):
+        async def post(self, url, headers=None, json=None, timeout=None):
+            n = len(self.calls)
+            out = await super().post(url, headers=headers, json=json, timeout=timeout)
+            if n == 1:
+                await asyncio.sleep(5)
+            return out
+    answers = iter(SAMPLES)
+    logs = []
+    client = Slow({"alpha/decisions": lambda body: (200, {"answers": next(answers), "usage": {"cost": 0.0}})})
+    t0 = time.perf_counter()
+    code, out = run(structured.decisions({"state": {}, "questions": Q, "samples": 3, "straggler_s": 0.2}, client=client,
+                                         key=key, log=logs.append, chain=["inception/mercury-decide:free"]))
+    assert time.perf_counter() - t0 < 2 and code == 200 and out["samples"] == 2
+    assert out["answers"] == old_merge([SAMPLES[0], SAMPLES[2]])
+    assert [c.get("skipped") for c in out["calls"]].count("straggler") == 1
+    assert sum(1 for e in logs if e.get("skipped") == "straggler") == 1 and sum(1 for e in logs if e["ok"]) == 2
+    # a lone sample that answered is not a majority: the others are waited for (up to their own timeout)
+    answers = iter(SAMPLES)
+    client = Slow({"alpha/decisions": lambda body: (200, {"answers": next(answers), "usage": {"cost": 0.0}})})
+    code, out = run(structured.decisions({"state": {}, "questions": Q, "samples": 2, "straggler_s": 0.1}, client=client,
+                                         key=key, log=lambda e: None, chain=["inception/mercury-decide:free"]))
+    assert code == 200 and out["samples"] == 2
+
+
+def test_a_route_that_cannot_answer_is_set_aside_not_asked_again_at_every_decision():
+    """13/11/2026: credit empty, the free model gone at the provider (404) and no grant for the last route: every
+    decision spent 4.4 s asking the two dead routes again before failing."""
+    def missing(name):
+        if name.startswith("CLOUDFLARE"):
+            raise structured.MissingGrant("missing_grant: CLOUDFLARE_AI_TOKEN: llm is not allowed by cloudflare-workers-ai")
+        return key(name)
+    state = {"gone": True}
+    client = Client({"alpha/decisions": lambda body: (404, {"error": {"code": 404}}) if state["gone"] else answer()})
+    chain = ["inception/mercury-decide:free", "cloudflare/clef"]
+    body = {"state": {}, "questions": Q, "samples": 3}
+    logs = []
+    code, out = run(structured.decisions(body, client=client, key=missing, log=logs.append, chain=chain))
+    assert code == 502 and len(client.calls) == 3
+    code, out = run(structured.decisions(body, client=client, key=missing, log=logs.append, chain=chain))
+    assert code == 502 and len(client.calls) == 3                      # nothing asked again
+    assert [c.get("skipped") for c in out["calls"]] == ["route_unavailable", "route_unavailable"]
+    assert [a["reason"].split(":")[0] for a in out["attempts"]] == ["route_unavailable", "route_unavailable"]
+    assert "HTTP 404" in out["attempts"][0]["reason"] and "missing_grant" in out["attempts"][1]["reason"]
+    assert sum(1 for e in logs if e.get("skipped") == "route_unavailable") == 2
+    # … for a while only: the route is asked again afterwards, and an answer clears it
+    structured._unavailable.update({m: (time.monotonic() - 1, why) for m, (_, why) in structured._unavailable.items()})
+    state["gone"] = False
+    code, out = run(structured.decisions(body, client=client, key=missing, log=logs.append, chain=chain))
+    assert code == 200 and out["samples"] == 3 and "inception/mercury-decide:free" not in structured._unavailable
+    # a passing failure (timeout, 5xx, no credit) never sets a route aside
+    structured._unavailable.clear()
+    client = Client({"alpha/decisions": (503, {})})
+    run(structured.decisions(body, client=client, key=key, log=lambda e: None, chain=["liquid/d1-ultra"]))
+    assert not structured._unavailable
+
+
 @pytest.mark.parametrize("body", [{"questions": Q}, {"state": {}, "questions": {}}, {"state": {}, "questions": Q, "samples": 9},
                                   {"state": {}, "questions": Q, "samples": True}])
 def test_malformed_requests_are_refused_before_any_call(body):
@@ -227,14 +293,14 @@ def test_rerank_failure_is_explicit_and_a_model_off_the_poste_is_refused():
 def app_ns(tmp_path, monkeypatch, chain=("inception/mercury-decide:free",)):
     source = LLM / "gateway.py"
     tree = ast.parse(source.read_text())
-    names = {"build_app", "_correlation", "_uuid", "_dsh_session", "log"}
+    names = {"build_app", "_correlation", "_channel", "_uuid", "_dsh_session", "log"}
     nodes = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in names]
     agents = tmp_path / "agents.json"
     agents.write_text(json.dumps({hashlib.sha256(b"fixture-token").hexdigest(): {"agent": "walter-memory"}}))
     logs = []
     ns = {"json": json, "hashlib": hashlib, "uuid": uuid, "time": time, "re": re, "Request": Request,
           "threading": SimpleNamespace(Thread=lambda **k: SimpleNamespace(start=lambda: None)),
-          "AGENTS": agents, "warm": lambda: None, "_install_codex_auth": lambda: None,
+          "AGENTS": agents, "TEST_BUDGET": {"accounts": ["e2e"]}, "warm": lambda: None, "_install_codex_auth": lambda: None,
           "decision_chain": lambda: list(chain),
           "decision": lambda task: {"execution": ROUTES[:1]} if task == "rerank" else pytest.fail(task),
           "structured_key": key, "_run_metadata": lambda run: {"run_id": run, "status": "open",

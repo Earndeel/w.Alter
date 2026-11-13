@@ -18,7 +18,8 @@
     "verified_models": []
   },
   "test_budget": {
-    "_doc": "Runs of channel test (walter-scenario, walter-lab): paid-provider spend cap per window; above it the owner approves (walter-llm test-budget approve EUR). Owner decision 2026-10-30.",
+    "_doc": "Runs of channel test (walter-scenario, walter-lab) and runs asked by a test account of the engine (accounts: the scenarios drive the owner's path as that account): paid-provider spend cap per window; above it the owner approves (walter-llm test-budget approve EUR). Owner decision 2026-10-30.",
+    "accounts": ["e2e"],
     "paid_limit_eur": 2.0,
     "usd_per_eur": 1.1,
     "window_hours": 24,

@@ -24,7 +24,7 @@ SESSION='22222222-2222-4222-8222-222222222222'
 def gateway(tmp_path, monkeypatch):
     source=Path(__file__).resolve().parents[1]/'llm'/'gateway.py'
     tree=ast.parse(source.read_text())
-    names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_session_run','_run_metadata','_record_attempt','exact_call','log','build_app',
+    names={'_usage','_number','_telemetry','_uuid','_dsh_session','_correlation','_channel','_session_run','_run_metadata','_record_attempt','exact_call','log','build_app',
            'start_completion','_rate_limited','_charge','_price_usd','_priced','test_budget','test_gate','_ledger','_ledger_add','approve_tests',
            'planned_task','exact_task','owner_tasks','rule_answer','_text_parts','_rule_completion','_rule_stream','_rule_routing',
            'route_state','selection_plan','selection_check','log_selection','cost_headers'}
@@ -43,7 +43,7 @@ def gateway(tmp_path, monkeypatch):
         '_run_metadata':lambda run:{'run_id':run,'status':'open','privacy_class':'cloud_allowed'},
         'litellm_target':lambda route:{'model':'fixture-model'},'as_json':lambda x:x,'json_instruction':lambda x:'JSON',
         'PAID':{'kie','openrouter','arnict'},'QUOTA_SWITCH':90.0,'RATE_LIMIT_WAITS':(0,0),'Path':Path,'os':os,'_telegram':lambda *a:None,
-        'TEST_BUDGET':{'paid_limit_eur':2.0,'usd_per_eur':1.10,'window_hours':24,'ledger':str(tmp_path/'test-spend.jsonl')},
+        'TEST_BUDGET':{'paid_limit_eur':2.0,'usd_per_eur':1.10,'window_hours':24,'accounts':['e2e'],'ledger':str(tmp_path/'test-spend.jsonl')},
         '_instance_path':lambda value:Path(value)}
     monkeypatch.setitem(sys.modules,'litellm',SimpleNamespace())
     # Only local fixture lookups run here. Avoid the sandbox's executor-shutdown stall;
@@ -396,6 +396,35 @@ def test_test_runs_paid_spend_is_charged_then_refused_above_the_cap(tmp_path,mon
     assert logs[-2]['skipped']=='test_budget' and logs[-1]['error']=='all routes failed'
     assert post(app,{'model':'coding','messages':[]}).status_code==200   # owner's untracked calls are never capped
     ns['approve_tests'](2.0,'fixture')
+
+
+def test_a_run_of_a_test_account_spends_on_the_test_budget_on_the_owner_path(tmp_path,monkeypatch):
+    # the scenarios drive the engine as a test account with channel `owner` (and their sub-agents with `machine`):
+    # the cap applies to them too; the owner's own conversation is never capped
+    ns=gateway(tmp_path,monkeypatch);logs=[];calls=[]
+    rows={'owner':{'channel':'owner','engine_session':'telegram/e2e/chat-1'},
+          'child':{'channel':'machine','engine_session':'api/e2e/v1-2'},
+          'real':{'channel':'owner','engine_session':'telegram/owner-1/chat-9'}}
+    which=['owner']
+    ns['_run_metadata']=lambda run:{'run_id':run,'status':'open','privacy_class':'cloud_allowed',**rows[which[0]]}
+    ns['decision']=lambda task:{'model_id':'m','execution':[{'provider':'openrouter','model':'m','access':'paid',
+                                                                'host':{'price_in_1m':4.0,'price_out_1m':20.0}}]}
+    async def complete(route,**kw):
+        calls.append(1)
+        return SimpleNamespace(usage={'prompt_tokens':100,'completion_tokens':10,'cost':1.5},_hidden_params={},
+                               choices=[],model_dump=lambda:{'choices':[]})
+    ns.update(log=logs.append,provider_completion=complete)
+    app=ns['build_app']()
+    assert post(app,{'model':'coding','messages':[]},{'X-Walter-Run-Id':RUN}).status_code==200
+    assert logs[-1]['channel']=='test' and ns['test_budget']()['spent_usd']==1.5
+    which[0]='child'
+    assert post(app,{'model':'coding','messages':[]},{'X-Walter-Run-Id':RUN}).status_code==200
+    assert ns['test_budget']()['spent_usd']==3.0
+    refused=post(app,{'model':'coding','messages':[]},{'X-Walter-Run-Id':RUN})
+    assert refused.status_code==502 and 'test_budget' in refused.text and len(calls)==2
+    which[0]='real'
+    assert post(app,{'model':'coding','messages':[]},{'X-Walter-Run-Id':RUN}).status_code==200
+    assert logs[-1]['channel']=='owner' and ns['test_budget']()['spent_usd']==3.0 and len(calls)==3
     assert post(app,{'model':'coding','messages':[]},{'X-Walter-Run-Id':RUN}).status_code==200
 
 

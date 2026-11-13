@@ -81,7 +81,11 @@ RATE_LIMIT_WAITS = (4, 12)
 # Tests (walter-scenario, walter-lab: runs of channel `test`) may spend at most this on paid providers per window;
 # above it every paid route is refused to them until the owner approves more (owner, 2026-10-30: « au-dessus de
 # 2 € les tests doivent être validés manuellement »). Ledger = the tests' paid calls and the owner's approvals.
-TEST_BUDGET = {"paid_limit_eur": 2.0, "usd_per_eur": 1.10, "window_hours": 24,
+# `accounts`: the engine accounts that are tests. The scenarios drive the engine through its real doors as such an
+# account, on the owner's path (channel `owner`, so that what they prove is the path the owner uses): their runs,
+# and the sub-agents of those runs, spend on this budget all the same (2026-11-13: the validation passes of the
+# 12th and 13th spent about 14 $ on paid routes unseen by this cap, and emptied the OpenRouter credit).
+TEST_BUDGET = {"paid_limit_eur": 2.0, "usd_per_eur": 1.10, "window_hours": 24, "accounts": ["e2e"],
                "ledger": "@instance/state/llm/test-spend.jsonl", **(_CONF.get("test_budget") or {})}
 
 
@@ -709,6 +713,17 @@ def _run_metadata(run_id: str) -> dict:
         return {}
 
 
+def _channel(row: dict) -> str | None:
+    """The channel of an identified run, for the test budget and the journal: `test` when the run was asked by a test
+    account of the engine (`engine_session` = `<door>/<account>/<conversation>` of the run or of the run it works
+    for, as Memory's metadata lookup gives it), whatever channel the engine gave it."""
+    session = row.get("engine_session")
+    parts = session.split("/") if isinstance(session, str) else []
+    if len(parts) >= 2 and parts[1] in (TEST_BUDGET.get("accounts") or ()):
+        return "test"
+    return row.get("channel")
+
+
 async def _correlation(request, body: dict, agent: str) -> dict:
     """Request-local transport metadata. DSH's public pi-ai cache key carries its native session identity only
     to this local gateway; it is consumed here and never forwarded to a provider as an internal identifier."""
@@ -732,7 +747,7 @@ async def _correlation(request, body: dict, agent: str) -> dict:
             row = await asyncio.to_thread(_run_metadata, out["run_id"])
             out["run_id"] = checked(row, out["run_id"])
             out["correlation_status"] = "resolved"
-            out["channel"] = row.get("channel")
+            out["channel"] = _channel(row)
             out["requested"] = row.get("requested")
         if agent == "dsh":
             session_id = _dsh_session(body.pop("prompt_cache_key", None))
@@ -743,7 +758,7 @@ async def _correlation(request, body: dict, agent: str) -> dict:
                 found = checked(row)
                 if out["run_id"] and out["run_id"] != found:
                     raise HTTPException(400, "conflicting correlation identifiers")
-                out.update(run_id=found, session_id=session, correlation_status="resolved", channel=row.get("channel"),
+                out.update(run_id=found, session_id=session, correlation_status="resolved", channel=_channel(row),
                            requested=row.get("requested"))
         if out["task_id"] and not out["run_id"]:
             raise HTTPException(409, "task correlation requires a resolved run")

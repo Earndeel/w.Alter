@@ -129,6 +129,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/structured.py | `MAX_SAMPLES` | 5 |  |
 | llm/structured.py | `MAX_DOCUMENTS` | 1000 |  |
 | llm/structured.py | `DEFAULT_TIMEOUT` | 30.0 |  |
+| llm/structured.py | `STRAGGLER_S` | 0.4 | samples > 1: once a majority has answered, the late ones get this long (body `straggler_s`) |
+| llm/structured.py | `UNAVAILABLE_S` | 600.0 |  |
 | plan/codex_account.py | `BASE` | https://chatgpt.com/backend-api |  |
 | plan/codex_account.py | `GRANT` | codex-subscription |  |
 | plan/codex_account.py | `CLIENT_VERSIONS` | ["99.0.0", "0.0.0"] |  |

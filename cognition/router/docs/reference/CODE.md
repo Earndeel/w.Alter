@@ -537,6 +537,7 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_dsh_session(value)` — Accept DSH's native session-UUID and bare UUID forms, preserving exact local identity.
 - `_session_run(session: str)` — The public metadata-only lookup; no database import or global most-recent-run guess.
 - `_run_metadata(run_id: str)` — Validate explicit request correlation through Memory's metadata-only public CLI.
+- `_channel(row: dict)` — The channel of an identified run, for the test budget and the journal: `test` when the run was asked by a test
 - `_correlation(request, body: dict, agent: str)` — Request-local transport metadata. DSH's public pi-ai cache key carries its native session identity only
 - `planned_task(asked: str, requested: dict | None)` — (Router task for this call, what the plan set). Lot 2 (2026-11-07): `auto` takes the task and tier the
 - `_text_parts(content)` — 
@@ -572,6 +573,9 @@ Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and
 - `_requested(body: dict, offered: list[str])` — The models to try: the Router's list, or the caller's narrowing of it (each must be offered).
 - `_floor(body: dict)` — 
 - `_timeout(body: dict)` — 
+- `_straggler(body: dict)` — Seconds the late samples are given once a majority has answered; `straggler_s: null` waits for all of them.
+- `_samples(once, n: int, grace: float | None)` — n parallel samples. Once a majority has answered, the others get `grace` seconds, then are dropped: the mean
+- `_route_level(why: str)` — 
 - `decisions(body: dict, *, chain: list[str], key, client, log, balance=None)` — Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
 - `rerank_once(client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float)` — 
 - `rerank(body: dict, *, routes: list[dict], key, client, log, balance=None)` — Execute a rerank request on the Router's `rerank` poste routes, in order.

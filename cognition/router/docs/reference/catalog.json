@@ -7595,6 +7595,11 @@
             "signature": "run_id: str"
           },
           {
+            "description": "The channel of an identified run, for the test budget and the journal: `test` when the run was asked by a test",
+            "name": "_channel",
+            "signature": "row: dict"
+          },
+          {
             "description": "Request-local transport metadata. DSH's public pi-ai cache key carries its native session identity only",
             "name": "_correlation",
             "signature": "request, body: dict, agent: str"
@@ -7749,6 +7754,21 @@
             "description": "",
             "name": "_timeout",
             "signature": "body: dict"
+          },
+          {
+            "description": "Seconds the late samples are given once a majority has answered; `straggler_s: null` waits for all of them.",
+            "name": "_straggler",
+            "signature": "body: dict"
+          },
+          {
+            "description": "n parallel samples. Once a majority has answered, the others get `grace` seconds, then are dropped: the mean",
+            "name": "_samples",
+            "signature": "once, n: int, grace: float | None"
+          },
+          {
+            "description": "",
+            "name": "_route_level",
+            "signature": "why: str"
           },
           {
             "description": "Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.",
@@ -15887,6 +15907,18 @@
         "value": 30.0
       },
       {
+        "comment": "samples > 1: once a majority has answered, the late ones get this long (body `straggler_s`)",
+        "file": "llm/structured.py",
+        "name": "STRAGGLER_S",
+        "value": 0.4
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "UNAVAILABLE_S",
+        "value": 600.0
+      },
+      {
         "comment": "",
         "file": "plan/codex_account.py",
         "name": "BASE",
@@ -17594,10 +17626,10 @@
     "interface/translate.py": "a1796785414cd3fac4908088dab4a23780bf67976bd5ce0677b0a3469ddd4171",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
-    "llm/config/gateway.json": "b819d655a4314f3d91482b41ad73b3685983992c187284761edbc871c05ec835",
+    "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
-    "llm/gateway.py": "1241405137e0d6c7527affb3761b40180bb53247fdef560391e2fda325ab5a42",
-    "llm/structured.py": "d7e7f72b969d8306a878615a0ded14a085b1002e8b00a4c3cd4d593df4690b51",
+    "llm/gateway.py": "f95463295dfaa2d1f816914f5cac3afcde1c95ff4ce4b00547cb5f29a8eb4b46",
+    "llm/structured.py": "cb1a22fdb08a653d33c3674f0e38ebc7e7843b4532fa89e848fcea4837932b1b",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",

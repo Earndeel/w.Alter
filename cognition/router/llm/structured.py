@@ -1,7 +1,9 @@
 """Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and rerank.
 
-    POST /v1/decisions {state, questions, samples?, model?, models?, paid_floor_usd?, timeout?}
+    POST /v1/decisions {state, questions, samples?, straggler_s?, model?, models?, paid_floor_usd?, timeout?}
         → {answers, usage, model, provider, route, samples?, calls, attempts}
+        samples > 1: parallel calls of the same model, averaged; once a majority has answered the late ones get
+        `straggler_s` (default 0.4 s, null = wait for all) and are then dropped (`samples` = how many were averaged).
     POST /v1/rerank    {query, documents, top_n?, model?, paid_floor_usd?, timeout?}
         → {results: [{index, relevance_score}], model, provider, route, usage, cost_usd, cost_status, attempts}
 
@@ -32,6 +34,7 @@ CF_PRICE = {"clef": 0.24, "clef-flash": 0.09}   # USD per M input tokens (Worker
 MAX_SAMPLES = 5
 MAX_DOCUMENTS = 1000
 DEFAULT_TIMEOUT = 30.0
+STRAGGLER_S = 0.4          # samples > 1: once a majority has answered, the late ones get this long (body `straggler_s`)
 
 
 class MissingGrant(RuntimeError):
@@ -161,6 +164,47 @@ def _timeout(body: dict) -> float:
     return max(1.0, min(value, 120.0)) if value else DEFAULT_TIMEOUT
 
 
+def _straggler(body: dict) -> float | None:
+    """Seconds the late samples are given once a majority has answered; `straggler_s: null` waits for all of them."""
+    if "straggler_s" in body and body["straggler_s"] is None:
+        return None
+    value = _float(body.get("straggler_s"))
+    return STRAGGLER_S if value is None else max(0.0, min(value, 30.0))
+
+
+async def _samples(once, n: int, grace: float | None) -> tuple[list, list[float]]:
+    """n parallel samples. Once a majority has answered, the others get `grace` seconds, then are dropped: the mean
+    is made of those that came (13/11/2026: one sample in three took 9.6 s and held the whole decision of a message
+    past the time its caller waits). Returns (results of the finished samples, seconds of each dropped one)."""
+    t0 = time.perf_counter()
+    tasks = [asyncio.ensure_future(once()) for _ in range(n)]
+    pending = set(tasks)
+    need = n // 2 + 1
+    while pending and sum(1 for t in tasks if t.done() and t.result()[1] is not None) < need:
+        _, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+    dropped: list[float] = []
+    if pending:
+        _, pending = await asyncio.wait(pending, timeout=grace)
+        for t in pending:
+            t.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+            dropped = [round(time.perf_counter() - t0, 3)] * len(pending)
+    return [t.result() for t in tasks if not t.cancelled()], dropped
+
+
+# A route that cannot answer for a reason of its own — the model is gone at the provider (HTTP 404 / 410), the
+# gateway has no grant or key for it — is set aside for a while instead of being asked again at every decision
+# (2026-11-13: with the OpenRouter credit empty, each preflight decision spent 4.4 s on two such routes before
+# failing, most of the time the caller waits). It is still named in `attempts` and `calls`, and asked again after.
+UNAVAILABLE_S = 600.0
+_unavailable: dict[str, tuple[float, str]] = {}
+
+
+def _route_level(why: str) -> bool:
+    return why.startswith(("HTTP 404", "HTTP 410", "missing_grant", "key_unavailable"))
+
+
 async def decisions(body: dict, *, chain: list[str], key, client, log, balance=None) -> tuple[int, dict]:
     """Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call."""
     state, questions = body.get("state"), body.get("questions")
@@ -179,6 +223,14 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
     calls: list[dict] = []
     for model in models:
         provider = provider_of(model)
+        aside = _unavailable.get(model)
+        if aside and time.monotonic() < aside[0]:
+            call = {"provider": provider, "model": model, "ok": False, "skipped": "route_unavailable",
+                    "error": aside[1], "seconds": 0}
+            attempts.append({"provider": provider, "model": model, "reason": f"route_unavailable: {aside[1]}"})
+            calls.append(call)
+            log({**call})
+            continue
         if floor is not None and balance is not None and not is_free(model):
             bal = await balance()
             if bal is not None and bal < floor:
@@ -201,12 +253,20 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
                     "cost_usd": res["cost_usd"], "cost_status": res["cost_status"], "input_tokens": res["input_tokens"]}
             log({**call, "usage": {"in": res["input_tokens"], "out": 0, "cached": None}})
             return call, res
-        got = await asyncio.gather(*(once() for _ in range(samples)))
+        got, dropped = await _samples(once, samples, _straggler(body))
         calls += [c for c, _ in got]
+        for seconds in dropped:              # a sample the answer did not wait for: counted, not an error of the model
+            call = {"provider": provider, "model": model, "ok": False, "skipped": "straggler", "seconds": seconds}
+            calls.append(call)
+            log({**call})
         ok = [res for _, res in got if res is not None]
         if not ok:
-            attempts.append({"provider": provider, "model": model, "reason": got[0][0]["error"]})
+            why = str(got[0][0]["error"])
+            attempts.append({"provider": provider, "model": model, "reason": why})
+            if all(_route_level(str(c.get("error") or "")) for c, _ in got):
+                _unavailable[model] = (time.monotonic() + UNAVAILABLE_S, why[:120])
             continue
+        _unavailable.pop(model, None)
         first = ok[0]
         out = {"answers": first["answers"] if len(ok) == 1 else merge_answers([r["answers"] for r in ok]),
                "usage": first["usage"], "model": first["model"] if provider == "openrouter" else model,
