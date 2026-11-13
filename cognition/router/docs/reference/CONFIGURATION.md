@@ -252,7 +252,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/hermes_sync.py | `MAX_FALLBACKS` | 2 |  |
 | serve/intent.py | `URL` | https://openrouter.ai/api/alpha/decisions |  |
 | serve/intent.py | `MODEL` | ~typesafe/jev-latest |  |
-| serve/intent.py | `FREE_FALLBACKS` | ["inception/mercury-decide:free", "cloudflare/clef"] | free: survive an exhausted OpenRouter credit |
+| serve/intent.py | `FREE_FALLBACKS` | ["cloudflare/clef"] | free, off OpenRouter: survives an exhausted OpenRouter credit |
 | serve/intent.py | `ACCEPTED_PREFIXES` | ["typesafe/jev-", "inception/mercury-decide", "cloudflare/clef"] |  |
 | serve/intent.py | `CF_RUN` | https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/{model} |  |
 | serve/intent.py | `MIN_CONFIDENCE` | 0.35 | eval 2026-10-02: a correct task came back at 0.48 |

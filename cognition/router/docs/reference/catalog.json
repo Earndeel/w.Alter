@@ -17080,11 +17080,10 @@
         "value": "~typesafe/jev-latest"
       },
       {
-        "comment": "free: survive an exhausted OpenRouter credit",
+        "comment": "free, off OpenRouter: survives an exhausted OpenRouter credit",
         "file": "serve/intent.py",
         "name": "FREE_FALLBACKS",
         "value": [
-          "inception/mercury-decide:free",
           "cloudflare/clef"
         ]
       },
@@ -17741,7 +17740,7 @@
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "5ec59ae8ed7895ce42e763e2ffa3556404e0eb9664c3d45dbb8ca8a4c1435856",
     "serve/hermes_sync.py": "c1df622e2bab7c3d597788b60b82896f2d911c836c2dfabccf7ec276ab511bee",
-    "serve/intent.py": "5c5dca9360e59c2756ef9fef6edbf46fef09590ac07f05d2a37e872ac333a9a7",
+    "serve/intent.py": "279a99ef0be9af31392cab95e7aa91d5d8329242925e117a27409aa9d711debd",
     "serve/media_exec.py": "58f2a5f4250edb309ee6b0d75cc519d80f8cb8b2714ea1b153783720b1b5f345",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",

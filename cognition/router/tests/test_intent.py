@@ -51,27 +51,28 @@ def test_forwarding_router_model_is_refused(conn, monkeypatch):
 
 
 def test_chain_falls_back_to_the_next_decision_model(conn, monkeypatch):
-    """best_first (2026-10-14): the cycle's best (paid, OpenRouter) fails, e.g. HTTP 402 → Mercury Decide free."""
+    """best_first (2026-10-14): the cycle's best (paid, OpenRouter) fails, e.g. HTTP 402 → Clef on Workers AI, free
+    and off OpenRouter (Mercury Decide free, withdrawn by OpenRouter, left the chain on 2026-11-13)."""
     calls = []
     chain = intent.chain(conn)
+    assert "inception/mercury-decide:free" not in chain and "cloudflare/clef" in chain
+
+    def answer(payload):
+        return {n: {"choice": next(iter(q["criteria"])), "confidence": 0.9, "probabilities": {}}
+                for n, q in payload["questions"].items()}
 
     def fake_cloudflare(model, payload, timeout):
         calls.append(model)
-        raise RuntimeError("quota")
+        return {"answers": answer(payload), "model": model}
 
     def fake_urlopen(req, timeout):
-        body = json.loads(req.data)
-        calls.append(body["model"])
-        if body["model"] == chain[0] and not body["model"].endswith(":free"):
-            raise RuntimeError("HTTP Error 402: Payment Required")
-        answers = {n: {"choice": next(iter(q["criteria"])), "confidence": 0.9, "probabilities": {}}
-                   for n, q in body["questions"].items()}
-        return _Resp(json.dumps({"model": "inception/mercury-decide-x", "answers": answers}).encode())
+        calls.append(json.loads(req.data)["model"])
+        raise RuntimeError("HTTP Error 402: Payment Required")
 
     monkeypatch.setattr(intent, "_cloudflare", fake_cloudflare)
     monkeypatch.setattr(intent, "urlopen", fake_urlopen)
     monkeypatch.setattr(intent.instance, "secret_value", lambda name: "k")
     out = intent.classify(conn, "une pub vidéo")
-    assert chain[-2:] == ("inception/mercury-decide:free", "cloudflare/clef") or chain[0] == "cloudflare/clef"
-    assert "inception/mercury-decide:free" in calls and out["model"].startswith("inception/mercury-decide")
-    assert out["fallback_errors"]
+    assert calls[-1] == "cloudflare/clef" and out["model"] == "cloudflare/clef"
+    if chain[0] != "cloudflare/clef":
+        assert out["fallback_errors"]

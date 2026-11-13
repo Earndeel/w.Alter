@@ -23,8 +23,9 @@ URL = "https://openrouter.ai/api/alpha/decisions"
 MODEL = "~typesafe/jev-latest"
 # Same Decisions contract, tried in order when the previous one fails (e.g. HTTP 402 when the OpenRouter credit is
 # exhausted — the free model still answers). Eval 2026-10-04 on eval/intents_fr.json before being admitted.
-MODELS = ("cloudflare/clef", "inception/mercury-decide:free", MODEL)  # eval 2026-10-04: Clef 30/30 (Flash 29/30)
-FREE_FALLBACKS = ("inception/mercury-decide:free", "cloudflare/clef")  # free: survive an exhausted OpenRouter credit
+# Mercury Decide free left the chain on 2026-11-13: OpenRouter withdrew it (HTTP 404 on every call since).
+MODELS = ("cloudflare/clef", MODEL)  # eval 2026-10-04: Clef 30/30 (Flash 29/30)
+FREE_FALLBACKS = ("cloudflare/clef",)  # free, off OpenRouter: survives an exhausted OpenRouter credit
 ACCEPTED_PREFIXES = ("typesafe/jev-", "inception/mercury-decide", "cloudflare/clef")
 KNOWLEDGE = instance.config_path("knowledge.json")
 
@@ -32,7 +33,7 @@ KNOWLEDGE = instance.config_path("knowledge.json")
 def chain(conn) -> tuple[str, ...]:
     """Decision models to try, in order. The best one comes from the 48 h cycle (task 'decision', AA Decision Index,
     callable Decisions-API offer); knowledge.json `decision.order` says where it goes:
-      best_first  best, then the free fallbacks (Mercury Decide free, Clef on Workers AI)
+      best_first  best, then the free fallback (Clef on Workers AI)
       free_first  the free models first, the best last (the owner's choice of 2026-10-04: Clef, free allocation)"""
     order = (json.loads(KNOWLEDGE.read_text()).get("decision") or {}).get("order", "free_first")
     # the owner's pinned decision model first (a new #1 is only proposed, 2026-10-16), else the cycle's #1
