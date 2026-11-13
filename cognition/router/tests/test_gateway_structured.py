@@ -165,7 +165,7 @@ def test_cloudflare_adapter_prices_input_tokens_and_keeps_the_model():
 
 
 def test_nace_adapter_calls_systemone_with_its_own_key_and_prices_input_tokens():
-    """2026-11-13: Drex Max 1.1 (Monsieur's default decision model) on Nace's own API, same contract."""
+    """2026-11-13: Drex Max 1.1 (the owner's default decision model) on Nace's own API, same contract."""
     client = Client({"console.nace.ai/v1/systemone": (200, {"model": "drex-max-v1.1", "usage": {
         "input_tokens": 1000, "output_tokens": 125}, "answers": {"task": {"choice": "b", "confidence": 0.9}}})})
     code, out = run(structured.decisions({"state": {}, "questions": Q}, client=client, key=key, log=lambda e: None,
