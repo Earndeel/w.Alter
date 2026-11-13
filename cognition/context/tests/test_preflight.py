@@ -444,3 +444,17 @@ def test_the_decision_is_given_the_time_the_caller_has(fake_llm):
     assert calls["decide"][-1][2]["timeout"] == 3.2
     run(Request("t", "une vraie question qui demande une décision du modèle"))
     assert calls["decide"][-1][2]["timeout"] == preflight.SETTINGS["decision_timeout_s"]
+
+
+def test_preflight_questions_gives_the_decision_bench_the_exact_production_payload(monkeypatch):
+    """2026-11-13: Walter Router's decision bench asks the models what production asks (`walter-context
+    preflight-questions`), built by this module's own code; a case the rules settle says so."""
+    from walter_context.cli import preflight_questions
+    monkeypatch.setattr(preflight, "router_tasks", lambda: {"general": "Texte", "coding": "Code"})
+    case = {"message": "Écris un script qui surveille le disque", "previous": {"message": "salut", "answer": "Bonjour",
+            "age_s": 3600, "thread_id": "t1"}, "candidates": [{"id": "t1", "title": "Entretien du serveur"}]}
+    out = preflight_questions(case)
+    state, q = preflight.questions(Request(turn_id="bench", message=case["message"],
+                                           previous=Exchange(**case["previous"]), candidates=case["candidates"]))
+    assert out["state"] == state and out["questions"] == q and out["fast_path"] is None
+    assert preflight_questions({"message": "combien font 2+2 ?"})["fast_path"] == "trivial"

@@ -38,7 +38,13 @@ def main(argv=None) -> int:
     sub.add_parser("quality", help="retention probes, LLM-judged; --estimate by default (see bench/quality.py)")
     sub.add_parser("threads", help="thread (fil) attachment bench on the real stream; offline, read-only")
     sub.add_parser("acceptance", help="synthetic exact-retention corpus; no private data or external model calls")
+    sub.add_parser("preflight-questions",
+                   help="the exact decision payload the preflight would send for one case (JSON on stdin: message, "
+                        "previous {message, answer, age_s, thread_id}, candidates); no model call, nothing recorded")
     a = ap.parse_args(argv)
+    if a.cmd == "preflight-questions":
+        print(json.dumps(preflight_questions(json.load(sys.stdin)), ensure_ascii=False))
+        return 0
     if a.cmd == "capability":
         from .capabilities import compose, router_note, write_layer
         if a.write:
@@ -53,6 +59,21 @@ def main(argv=None) -> int:
         from .recover import recover
         print(json.dumps(recover(a.ref, a.offset, a.max_privacy, a.own), ensure_ascii=False))
     return 0
+
+
+def preflight_questions(case: dict) -> dict:
+    """The decision payload of one owner message, built by the preflight's own code (decision bench of Walter Router,
+    2026-11-13: the bench asks the models exactly what production asks). `fast_path` = rules settle it without a
+    model call in production (the bench then leaves the case out)."""
+    from .preflight import Exchange, Request, fast_path, questions
+    prev = case.get("previous") or None
+    req = Request(turn_id="bench", message=str(case.get("message") or ""),
+                  previous=Exchange(message=str(prev.get("message") or ""), answer=str(prev.get("answer") or ""),
+                                    age_s=prev.get("age_s"), thread_id=prev.get("thread_id")) if prev else None,
+                  candidates=[c for c in case.get("candidates") or [] if isinstance(c, dict)])
+    state, q = questions(req)
+    fast = fast_path(req)
+    return {"state": state, "questions": q, "fast_path": fast.fast_path if fast else None}
 
 
 if __name__ == "__main__":
