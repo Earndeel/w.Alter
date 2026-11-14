@@ -6,7 +6,7 @@
 | **Propriétaire** | walter-memory (`/walter/cognition/memory`). |
 | **État** | **active** (constat du 09/11/2026) : `walter-memory-gateway` (:8890), `walter-logs-watch`, timers des connecteurs ; génération g0 active, g1 lue aussi. Nettoyage : phases 0, 1 et 2 faites le 09/11/2026 ([docs/NETTOYAGE-2026-11.md](docs/NETTOYAGE-2026-11.md)). |
 | **Ne fait pas** | Garder les octets bruts (Raw Vault, [vault/](vault/README.md)) ; choisir un modèle (Router) ; décider ce qui entre dans le contexte (Context) ; recopier l'exécution des agents dans `core.events` (elle vit dans `walter_logs` ; `tool.called`/`skill.used` sont des types retirés, refusés à l'écriture — `walter_memory/observability.py`). |
-| **Contrats** | [contracts/memory.json](contracts/memory.json), [bus.json](contracts/bus.json), [logs.json](contracts/logs.json), [data-classes.json](contracts/data-classes.json), [maintenance.json](contracts/maintenance.json) ; [migrations/](migrations/) ; MCP `memory_*`, `logs_*`, `vault_*` ; passerelle 127.0.0.1:8890. |
+| **Contrats** | [contracts/memory.json](contracts/memory.json), [bus.json](contracts/bus.json), [logs.json](contracts/logs.json), [data-classes.json](contracts/data-classes.json), [maintenance.json](contracts/maintenance.json) ; [migrations/](migrations/) ; MCP `memory_*`, `logs_*`, `vault_*` ; passerelle 127.0.0.1:8890 ; `walter-memory logs digest <session> [--after-seq N] [--max-chars N] --cloud-safe --json` = condensé d'une session pour un lecteur (messages du propriétaire, dernière réponse de chaque tour, fichiers écrits, résumés de compaction ; par tranches, reprise par `to_seq` ; lecteur : ops/devboard, 2026-11-14). |
 
 Walter Memory core (spec and decisions: `/walter/docs/` — ARCHITECTURE, DECISIONS, PLAN, RUNBOOK).
 

@@ -750,6 +750,76 @@ def get(conn, session: str, seq: int, max_privacy: str = "local_only") -> dict:
     return r
 
 
+_INJECTED = re.compile(r"^\s*(?:# AGENTS\.md instructions|Base directory for this skill:|<environment_context>"
+                       r"|<(?P<tag>[a-z_][a-z0-9_-]*)>.*</(?P=tag)>\s*$)", re.S)
+DIGEST_ITEM_CHARS = 6000   # one pasted prompt or long answer never fills a whole slice
+
+
+_PATCH_FILE = re.compile(r"\*\*\* (?:Update|Add|Delete) File: (\S+)")
+
+
+def _files_of(tool: str | None, text: str | None) -> list[str]:
+    """Paths a tool call writes: `file_path`/`path`/`notebook_path` of a JSON argument object (Edit, Write…), or the
+    `*** Update File:` lines of a patch (apply_patch, also inside a Codex exec)."""
+    if not text:
+        return []
+    try:
+        args = json.loads(text)
+    except ValueError:
+        args = None
+    if isinstance(args, dict):
+        if (tool or "").lower() in ("read", "grep", "glob", "ls", "view"):
+            return []
+        p = args.get("file_path") or args.get("notebook_path") or (args.get("path") if tool in ("Write", "Edit") else None)
+        if isinstance(p, str):
+            return [p]
+        text = args.get("input") if isinstance(args.get("input"), str) else ""
+    return list(dict.fromkeys(_PATCH_FILE.findall(text or "")))
+
+
+def digest(conn, session: str, *, after_seq: int = 0, max_chars: int = 60000, max_privacy: str = "local_only") -> dict:
+    """A session condensed for a reader (ops/devboard, 2026-11-14), from `after_seq` on: the owner's messages, the last
+    answer of each turn, the files written and the compaction summaries — reasoning and tool results left out. Stops
+    before `max_chars`; `to_seq` = last seq included (resume with after_seq=to_seq), `more` = something is left."""
+    sid = resolve_session(conn, session)
+    if not sid:
+        return {"error": f"session inconnue: {session}"}
+    s = dict(conn.execute("select * from walter_logs.sessions where session_id = %s", (sid,)).fetchone())
+    s.pop("meta", None)
+    s["title"] = _title(s["title"], s["privacy_class"], max_privacy)
+    rows = conn.execute("""select seq, type, occurred_at, turn, tool, text, privacy_class from walter_logs.events
+                           where session_id = %s and seq > %s and privacy_class = any(%s)
+                             and type in ('user/message', 'assistant/message', 'tool/call', 'compaction/summary')
+                           order by seq""", (sid, after_seq, _cloud_view(max_privacy))).fetchall()
+    last_answer: dict = {}
+    for r in rows:   # the last answer of each turn
+        if r["type"] == "assistant/message":
+            last_answer[r["turn"]] = r["seq"]
+    items, used, to_seq, more = [], 0, after_seq, False
+    for r in rows:
+        kind, texts = None, []
+        if r["type"] == "user/message":   # skill bodies, AGENTS.md, environment tags: injected, not the owner's words
+            kind, texts = "user", [] if _INJECTED.match(r["text"] or "") else [r["text"]]
+        elif r["type"] == "assistant/message" and last_answer.get(r["turn"]) == r["seq"]:
+            kind, texts = "assistant", [r["text"]]
+        elif r["type"] == "compaction/summary":
+            kind, texts = "compaction", [r["text"]]
+        elif r["type"] == "tool/call":
+            kind, texts = "file", [f"{r['tool']} {p}" for p in _files_of(r["tool"], r["text"])]
+        texts = [t for t in (_show(t, r["privacy_class"], max_privacy, min(max_chars, DIGEST_ITEM_CHARS)) for t in texts) if t]
+        if not kind or not texts:
+            to_seq = r["seq"] if not more else to_seq
+            continue
+        size = sum(len(t) for t in texts)
+        if items and used + size > max_chars:
+            more = True
+            break
+        used += size
+        items += [{"seq": r["seq"], "at": r["occurred_at"], "kind": kind, "text": t} for t in texts]
+        to_seq = r["seq"]
+    return {"session": s, "from_seq": after_seq + 1, "to_seq": to_seq, "more": more, "items": items}
+
+
 def _title(title: str | None, cls: str, max_privacy: str) -> str | None:
     return title if cls in _cloud_view(max_privacy) else ("[session locale]" if title else None)
 
@@ -767,8 +837,8 @@ def sessions(conn, *, runtime: str | None = None, text: str | None = None, since
     if since:
         where.append("coalesce(last_event_at, started_at) >= %s"); args.append(since)
     return [{**dict(r), "title": _title(r["title"], r["privacy_class"], max_privacy)} for r in conn.execute(
-        f"""select session_id, runtime, profile, platform, title, model, started_at, last_event_at, last_seq as events,
-                   turns, privacy_class from walter_logs.sessions where {' and '.join(where)}
+        f"""select session_id, runtime, profile, platform, title, model, cwd, started_at, last_event_at,
+                   last_seq as events, turns, privacy_class from walter_logs.sessions where {' and '.join(where)}
             order by coalesce(last_event_at, started_at) desc nulls last limit %s""", [*args, limit])]
 
 
@@ -797,6 +867,10 @@ def render(action: str, res) -> str:
             what = r["type"] + (f" {r['tool']}" if r["tool"] else "") + (" ✗" if r["status"] == "error" else "")
             lines.append(f"- [{r['ref']}] {_when(r['occurred_at'])}Z {who} « {(r['title'] or '')[:60]} » · {what}\n"
                          f"    {' '.join((r['snippet'] or '').split())[:400]}")
+        return "\n".join(lines)
+    if action == "digest":
+        lines = [f"{res['session']['session_id']} · seq {res['from_seq']}–{res['to_seq']}" + (" (suite disponible)" if res["more"] else "")]
+        lines += [f"- [{i['seq']}] {i['kind']}: {' '.join((i['text'] or '').split())[:400]}" for i in res["items"]]
         return "\n".join(lines)
     if action == "timeline":
         s = res["session"]

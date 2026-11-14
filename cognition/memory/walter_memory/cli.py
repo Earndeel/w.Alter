@@ -130,13 +130,15 @@ def main(argv=None) -> None:
     ob.add_argument("--by"); ob.add_argument("--reason"); ob.add_argument("--expect-sha")
     ob.add_argument("--out", help="also write the JSON report here")
     lg = sub.add_parser("logs", help="walter-logs: what the agents did (messages, reasoning, tool calls/results), all runtimes")
-    lg.add_argument("action", choices=["search", "timeline", "get", "sessions", "stats"])
+    lg.add_argument("action", choices=["search", "timeline", "get", "sessions", "stats", "digest"])
     lg.add_argument("query", nargs="?", default="", help="search: words / exact string; timeline/get: session id")
     lg.add_argument("--runtime"); lg.add_argument("--type", action="append"); lg.add_argument("--tool")
     lg.add_argument("--session"); lg.add_argument("--since"); lg.add_argument("--until")
     lg.add_argument("--seq", type=int, help="timeline: anchor event; get: the event")
     lg.add_argument("--before", type=int, default=5); lg.add_argument("--after", type=int, default=15)
-    lg.add_argument("--max-chars", type=int, default=600); lg.add_argument("--limit", type=int, default=20)
+    lg.add_argument("--max-chars", type=int, default=None, help="timeline: per event (600); digest: per slice (60000)")
+    lg.add_argument("--limit", type=int, default=20)
+    lg.add_argument("--after-seq", type=int, default=0, help="digest: resume after this seq")
     lg.add_argument("--cloud-safe", action="store_true", help="hide local_only, pseudonymise redacted_cloud")
     lg.add_argument("--json", action="store_true")
     vw = sub.add_parser("views", help="Memory Views (lot 3): attach exchanges to subjects, read a view at a depth")
@@ -372,9 +374,12 @@ def main(argv=None) -> None:
                                   since=a.since, until=a.until, limit=a.limit, max_privacy=mp)
             elif a.action == "timeline":
                 res = logs.timeline(conn, a.query or a.session, around=a.seq, before=a.before, after=a.after,
-                                    types=a.type, max_chars=a.max_chars, max_privacy=mp)
+                                    types=a.type, max_chars=a.max_chars or 600, max_privacy=mp)
             elif a.action == "get":
                 res = logs.get(conn, a.query or a.session, a.seq, max_privacy=mp)
+            elif a.action == "digest":
+                res = logs.digest(conn, a.query or a.session, after_seq=a.after_seq, max_chars=a.max_chars or 60000,
+                                  max_privacy=mp)
             elif a.action == "sessions":
                 res = logs.sessions(conn, runtime=a.runtime, text=a.query or None, since=a.since, limit=a.limit, max_privacy=mp)
             else:
