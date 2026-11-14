@@ -143,6 +143,29 @@ answers, not only on public leaderboards. `walter-router decision-bench build | 
   skipped it; per model the majority of its samples, agreement, confidence; his answers to it freeze then); run
   as a transient unit `walter-decision-bench-web` (tailnet only, no request log), stopped once the labels are in.
 
+## Preflight bench (2026-11-14)
+
+Chooses the model that will drive the preflight on the target question set 3 (walter-context
+`preflight-questions --set 3`: handling, act, thread, C0–C4, L1–L3, one D2 question per presented module,
+domain/horizon, work, resume; no task family, no delegation). `walter-router preflight-bench build | run | readings
+| serve | status | report` (`eval/preflight_bench.py`, page `eval/preflight_bench_web.py`):
+- **50 cases** in the owner's categories (simple 8, short replies 8, thread 7, memory 6, module docs 6, complex 5,
+  ambiguous 5, voice/desktop/connector/API 5): authentic ones drawn from the preflight journal (owner turns, cloud-safe,
+  scrubbed, rebuilt with their previous exchange and candidate threads as of then, `real-draw.json`), fictitious ones
+  from `@instance/config/router/preflight-bench-cases.json`. Each carries the payload built by the preflight's code.
+- **Four models**, same door (`intent._decisions`), same payload: `liquid/d1-ultra`, `perplexity/pplx-decider-v1.3:free`
+  (the only OpenRouter id serving v1.3 on 14/11; the paid id answers 404), `nace/drex-max-v1.1`, `typesafe/jev-1.14`;
+  3 samples each, spending cap 1 $; sample 1 = the proposal shown, the mean of samples (`merge_answers`, what
+  production does) is compared in the report. Answers are read by `walter-context preflight-read` (the same reader P1
+  will use).
+- **Blind**: the owner gives his own decision first; the four proposals appear as A–D in a per-case random order once
+  it is complete, and his decision freezes (a revision is kept apart). He grades each field (✓ / ≈ / ✗; equal fields
+  are pre-graded ✓), flags grave errors, picks a preferred one, comments. Model names appear only in `report`
+  (agreement strict/lenient per field, grave errors, C/L under/over-sizing, docs precision/recall, stability,
+  calibration, latency p50/p90, cost per decision and per month at the real daily volume, single vs mean of samples).
+- Page: transient unit `walter-preflight-bench-web` on the tailnet address, port 3092, no request log; state in
+  `@instance/state/router/preflight-bench/` (0700).
+
 ## Access from outside
 
 | Door | Protection |

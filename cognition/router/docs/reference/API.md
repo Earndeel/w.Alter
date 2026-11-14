@@ -212,6 +212,14 @@ walter-router prefer
   --note :  ; défaut=—
   --role :  ; défaut=default
   --watch :  ; défaut=— ; valeurs=["quality", "dominance", "none"]
+walter-router preflight-bench
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
+  action :  ; défaut=— ; valeurs=["build", "run", "readings", "serve", "status", "report"]
+  --host : serve: address to listen on (the tailnet address, never a public one) ; défaut=—
+  --port :  ; défaut=3092
+  --models : run: comma-separated decision offers (default: the bench's four) ; défaut=—
+  --samples :  ; défaut=3
+  --draw : build: the authentic draw (JSON list; default real-draw.json in the state folder) ; défaut=—
 walter-router probe
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   --provider : only this status key (kie, kie-codex, openrouter, arnict) ; défaut=—

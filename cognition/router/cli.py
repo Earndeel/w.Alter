@@ -98,6 +98,14 @@ def build_parser() -> argparse.ArgumentParser:
     dbn.add_argument("--port", type=int, default=3090)
     dbn.add_argument("--models", help="run: comma-separated decision offers (default: the bench's list)")
     dbn.add_argument("--samples", type=int, default=3)
+    pfb = sub.add_parser("preflight-bench", help="preflight decision models (question set 3: L/C/D) judged blind "
+                         "by the owner on 50 cases (build | run | serve the review page | status | report)")
+    pfb.add_argument("action", choices=("build", "run", "readings", "serve", "status", "report"))
+    pfb.add_argument("--host", help="serve: address to listen on (the tailnet address, never a public one)")
+    pfb.add_argument("--port", type=int, default=3092)
+    pfb.add_argument("--models", help="run: comma-separated decision offers (default: the bench's four)")
+    pfb.add_argument("--samples", type=int, default=3)
+    pfb.add_argument("--draw", help="build: the authentic draw (JSON list; default real-draw.json in the state folder)")
     lb = sub.add_parser("library", help="the model library: per task/category model, chooser, providers, fallback")
     lb.add_argument("--json", action="store_true")
     hs = sub.add_parser("sync-hermes", help="Hermes follows the router: auxiliary jobs, OpenRouter host order per model, cron postes")
@@ -263,6 +271,22 @@ def main(argv: list[str] | None = None) -> int:
             with db.connect() as conn:
                 out = bench.build(conn) if args.action == "build" else bench.run(
                     conn, tuple(args.models.split(",")) if args.models else bench.MODELS, args.samples)
+        print(json.dumps(out, ensure_ascii=False, indent=1))
+        return 0
+    if args.cmd == "preflight-bench":
+        from walter_router.eval import preflight_bench as pb
+        if args.action == "serve":
+            from walter_router.eval import preflight_bench_web
+            if not args.host:
+                raise SystemExit("--host required (the tailnet address)")
+            preflight_bench_web.serve(args.host, args.port)
+            return 0
+        if args.action == "build":
+            out = pb.build(args.draw)
+        elif args.action == "run":
+            out = pb.run(tuple(args.models.split(",")) if args.models else pb.MODELS, args.samples)
+        else:
+            out = {"readings": pb.readings, "status": pb.status, "report": pb.report}[args.action]()
         print(json.dumps(out, ensure_ascii=False, indent=1))
         return 0
     if args.cmd == "research":
