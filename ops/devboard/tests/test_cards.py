@@ -150,7 +150,7 @@ def test_several_cards_with_links_keep_evidence_kind(conn):
     assert kinds == {"task"}
 
 
-ITEMS = {3: "Monsieur : « oui, on active le jeu 3 demain »", 5: "on active le jeu 3", 7: "réponse de l'agent"}
+ITEMS = {3: "Le propriétaire : « oui, on active le jeu 3 demain »", 5: "on active le jeu 3", 7: "réponse de l'agent"}
 
 
 def test_evidence_must_cite_a_shown_event_and_its_text(conn):
@@ -160,7 +160,7 @@ def test_evidence_must_cite_a_shown_event_and_its_text(conn):
     unseen = {**ok, "cards": [card(seq=4)]}                # 4 is in range but was not shown (reasoning, step…)
     with pytest.raises(ValueError, match="not shown"):
         cards.validate(conn, unseen, 1, 10, items=ITEMS)
-    invented = {**ok, "cards": [card(seq=7, evidence=[{"seq": 7, "quote": "Monsieur a validé"}])]}
+    invented = {**ok, "cards": [card(seq=7, evidence=[{"seq": 7, "quote": "le propriétaire a validé"}])]}
     with pytest.raises(ValueError, match="quote"):
         cards.validate(conn, invented, 1, 10, items=ITEMS)
 
