@@ -46,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
         from . import backfill, docs, due, reading
         cfg = config.load()
         with db.autocommit() as c:
+            if not db.try_lock(c):
+                print(json.dumps({"busy": True}))
+                return 0
             if a.cmd == "due":
                 out = {"docs": docs.sync(c, cfg), **due.run(cfg, c)}
             elif a.cmd == "backfill":

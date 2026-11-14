@@ -44,6 +44,11 @@ def autocommit():
         c.close()
 
 
+def try_lock(conn) -> bool:
+    """Session lock of the reading passes (due, backfill, read-session): one at a time, released with the connection."""
+    return conn.execute("select pg_try_advisory_lock(hashtext('walter-devboard.reading')) ok").fetchone()["ok"]
+
+
 def close() -> None:
     global _conn
     if _conn is not None:
