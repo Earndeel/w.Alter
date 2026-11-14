@@ -64,7 +64,7 @@ test("le flux en direct déclenche le rechargement", () => {
   const reload = vi.fn();
   function Probe() { useStream(reload); return null; }
   render(<Probe />);
-  expect(FakeSource.last.url).toBe("/api/stream");
+  expect(FakeSource.last.url).toBe("api/stream");
   act(() => FakeSource.last.listeners["change"](new MessageEvent("change", { data: "{}" })));
   expect(reload).toHaveBeenCalledTimes(1);
   vi.unstubAllGlobals();

@@ -40,18 +40,18 @@ async function get<T>(url: string): Promise<T> {
 }
 
 export const api = {
-  summary: () => get<Summary>("/api/summary"),
-  inbox: () => get<Card[]>("/api/inbox"),
+  summary: () => get<Summary>("api/summary"),
+  inbox: () => get<Card[]>("api/inbox"),
   cards: (group: "status" | "module", q = "") =>
-    get<Group[]>(`/api/cards?group=${group}&q=${encodeURIComponent(q)}`),
-  card: (ref: string) => get<CardDetail>(`/api/cards/${encodeURIComponent(ref)}`),
-  today: () => get<Activity[]>("/api/today"),
-  decisions: (replaced = false) => get<Decision[]>(`/api/decisions${replaced ? "?replaced=1" : ""}`),
-  vision: () => get<VisionComponent[]>("/api/vision"),
-  live: () => get<Live[]>("/api/live"),
-  docs: () => get<DocInfo[]>("/api/docs"),
+    get<Group[]>(`api/cards?group=${group}&q=${encodeURIComponent(q)}`),
+  card: (ref: string) => get<CardDetail>(`api/cards/${encodeURIComponent(ref)}`),
+  today: () => get<Activity[]>("api/today"),
+  decisions: (replaced = false) => get<Decision[]>(`api/decisions${replaced ? "?replaced=1" : ""}`),
+  vision: () => get<VisionComponent[]>("api/vision"),
+  live: () => get<Live[]>("api/live"),
+  docs: () => get<DocInfo[]>("api/docs"),
   doc: (path: string, anchor?: string) =>
-    get<DocText>(`/api/docs${path.split("/").map(encodeURIComponent).join("/")}` +
+    get<DocText>(`api/docs${path.split("/").map(encodeURIComponent).join("/")}` +
                  (anchor ? `?anchor=${encodeURIComponent(anchor)}` : "")),
 };
 
@@ -61,7 +61,7 @@ export function useStream(onChange: () => void): void {
   cb.current = onChange;
   useEffect(() => {
     if (typeof EventSource === "undefined") return;
-    const es = new EventSource("/api/stream");
+    const es = new EventSource("api/stream");
     es.addEventListener("change", () => cb.current());
     return () => es.close();
   }, []);
