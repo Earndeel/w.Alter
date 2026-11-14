@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from psycopg.rows import dict_row
 
-from . import cards, db
+from . import cards, config, db
 
 DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 COMPONENTS = [("core", "Core"), ("cognition", "Cognition"), ("capabilities", "Capabilities"), ("ops", "Ops"),
@@ -29,6 +29,16 @@ PING_S = 25.0
 
 app = FastAPI(title="walter-devboard", docs_url=None, redoc_url=None, openapi_url=None)
 _cache: dict[str, tuple[float, dict]] = {}
+_owner: list[str] = []
+
+
+def _owner_name() -> str:
+    if not _owner:
+        try:
+            _owner.append(config.load().owner_name)
+        except Exception:
+            _owner.append(config.Config.owner_name)
+    return _owner[0]
 
 
 def _q(sql: str, args=()) -> list[dict]:
@@ -101,7 +111,7 @@ def summary() -> dict:
             "decisions": _q("select count(*) n from devboard.decisions where removed_at is null")[0]["n"],
             "replaced": _q("select count(distinct older_id) n from devboard.decision_links")[0]["n"],
             "live": _q("select count(*) n from devboard.live")[0]["n"],
-            "pause": pause[0]["value"] if pause else None}
+            "pause": pause[0]["value"] if pause else None, "owner_name": _owner_name()}
 
 
 @app.get("/api/inbox")

@@ -24,6 +24,8 @@ def c(database, monkeypatch):
     monkeypatch.setattr(cards, "known_modules", lambda: {m["id"] for m in LAYOUT["modules"]})
     monkeypatch.setattr(server, "_layout", lambda: LAYOUT)
     monkeypatch.setattr(server, "_status", lambda: STATUS)
+    monkeypatch.setattr(server.config, "load", lambda: server.config.Config(owner_name="Camille"))
+    server._owner.clear()
     with db.autocommit() as conn:
         yield conn
         conn.execute("""truncate devboard.cards, devboard.card_evidence, devboard.card_links, devboard.corrections,
@@ -140,6 +142,7 @@ def test_today_and_live(c, api):
     assert live[0]["runtime"] == "claude_code" and live[0]["ref"] == "W-1"
     s = api.get("/api/summary").json()
     assert s["open"] == 1 and s["inbox"] == 0 and s["live"] == 1
+    assert s["owner_name"] == "Camille"                   # from the instance settings
 
 
 def _free_port():

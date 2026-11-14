@@ -28,7 +28,8 @@ class Config:
     gateway_url: str = "http://127.0.0.1:8894"
     token_file: Path | None = None
     sessions_per_pass: int = 20
-    dev_cwds: list = field(default_factory=list)     # Claude Code sessions opened there are development sessions
+    dev_cwds: list = field(default_factory=list)
+    owner_name: str = "le propriétaire"              # how the page names the owner (« corrigé par … »)     # Claude Code sessions opened there are development sessions
 
 
 def _run_json(*cmd: str) -> dict:
