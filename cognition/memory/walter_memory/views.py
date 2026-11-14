@@ -288,7 +288,9 @@ def rewrite_card(conn, key: str, ex: dict, *, embed, llm) -> None:
 def run(since: datetime | None = None, until: datetime | None = None, limit: int = 500, cursor: str = "subjects",
         dry: bool = False) -> dict:
     """Attach the exchanges after the cursor (or `since`), oldest first; idempotent (attached exchanges skip)."""
-    from . import llm
+    from . import llm, organic
+    if organic.extraction_paused() and not dry:
+        return {"skipped": "extraction paused"}       # the cursor does not move: exchanges are attached on resume
     from .db import connection
     from .search import embed
     t0 = time.time()

@@ -636,6 +636,9 @@ def tick(limit: int = 8, workers: int = 4, chat=None, budget: str = "recurring")
     import concurrent.futures as cf
     total = {"threads": 0, "segments": 0, "items": 0, "reused": 0, "superseded": 0, "rejected": 0, "filtered": 0,
              "local_only": 0, "cost_usd": 0.0, "errors": 0}
+    from . import organic
+    if organic.extraction_paused():      # nothing claimed: dirty threads stay pending until the pause ends
+        return {**total, "paused": True}
     claimed = claim(limit)
 
     def one(t):

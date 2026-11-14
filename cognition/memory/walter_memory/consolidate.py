@@ -379,7 +379,9 @@ Ne regroupe pas deux règles différentes ; ne remplace pas une règle durable p
 def reconsolidate(subject: str, *, chat=None, apply: bool | None = None) -> dict:
     """One Router call over the subject's current cloud items. Proposals are validated (ids exist, same kind for a
     merge, the replacing item is newer and stated by the owner) and recorded; applied only in mode 'apply'."""
-    from . import llm
+    from . import llm, organic
+    if organic.extraction_paused():
+        return {"skipped": "extraction paused"}
     chat = chat or llm.chat
     apply = (mode() == "active") if apply is None else apply
     now = _now()

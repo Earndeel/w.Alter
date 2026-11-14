@@ -6,6 +6,13 @@
 # P1.0: read derived knowledge only from readable generations (core.generations); false = no generation filter.
 enforce = true
 
+[extraction]
+# 2026-11-14 (owner: « met l'extraction de mémoire en pause pour l'instant », the extraction chain is to be redesigned):
+# "paused" = no model-driven derivation of conversations — L3 extraction, subject cards (views), reconsolidation,
+# run-episode summaries. Ingestion, search index, GPS flows, triage, Kardex and media keep running; pending messages
+# stay uncovered and are taken up on "active". Restart walter-memory-pipeline after a change.
+mode = "paused"
+
 [working_memory]
 # P1.1: "adaptive" (2026-11-03, owner: integrate, no long shadow) = the adaptive trigger drives extraction (long,
 # marked or directive owner messages at once, the rest grouped) and the working state is injected by Context;

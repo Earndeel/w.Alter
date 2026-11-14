@@ -139,7 +139,9 @@ def check() -> tuple[list[str], dict]:
             problems.append(f"memory pipeline: {lg['dead']} dead letters (walter-memory bus dead / replay)")
         st = extract2.stats(24)
         m["extraction_backlog"] = st["backlog"]
-        if (st["backlog"]["oldest_s"] or 0) > 6 * 3600:
+        from . import organic
+        m["extraction_mode"] = "paused" if organic.extraction_paused() else "active"
+        if m["extraction_mode"] == "active" and (st["backlog"]["oldest_s"] or 0) > 6 * 3600:   # a pause is the owner's
             problems.append(f"extraction backlog: {st['backlog']['n']} messages, oldest waiting "
                             f"{st['backlog']['oldest_s'] // 3600} h")
         failed = next((r["segments"] for r in st["segments"] if r["status"] == "failed"), 0)

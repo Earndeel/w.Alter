@@ -6,7 +6,7 @@ import tomllib
 from functools import lru_cache
 from pathlib import Path
 
-DEFAULTS = {"generations": {"enforce": True}, "working_memory": {"mode": "shadow"},
+DEFAULTS = {"generations": {"enforce": True}, "extraction": {"mode": "active"}, "working_memory": {"mode": "shadow"},
             "consolidation": {"mode": "shadow", "poste": "general/L3"},
             "episodes": {"mode": "active", "every_s": 600, "plans_every_s": 1800, "plans_per_run": 20, "attest": True},
             "periods": {"tz": "Asia/Bangkok"}, "kardex": {"mode": "daily", "per_run": 5, "days": 60, "max_messages": 160},
@@ -27,6 +27,13 @@ def settings() -> dict:
     except (OSError, tomllib.TOMLDecodeError):
         data = {}
     return {k: {**v, **(data.get(k) or {})} for k, v in DEFAULTS.items()}
+
+
+def extraction_paused() -> bool:
+    """[extraction] mode = "paused" (owner, 2026-11-14): the model-driven derivation of conversations stops — L3
+    extraction, subject cards (views), reconsolidation, run-episode summaries. Raw events keep being ingested and
+    indexed; nothing is lost: uncovered messages stay pending and are taken up when the mode is "active" again."""
+    return str(settings().get("extraction", {}).get("mode", "active")) == "paused"
 
 
 def enabled(section: str, key: str = "enforce") -> bool:
