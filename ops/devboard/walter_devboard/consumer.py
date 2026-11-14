@@ -6,12 +6,14 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
+from datetime import datetime, timedelta, timezone
 
 from . import db
 from .config import Config, load
 
 SOURCES = ("claude_code", "codex")
 TYPES = ("turn.ended", "session.ended")
+LIVE_FOR = timedelta(minutes=10)                 # = the prune of devboard.live in due
 log = logging.getLogger("walter.devboard")
 
 
@@ -49,15 +51,19 @@ def on_event(cfg: Config, conn, ev: dict) -> None:
     if not row["eligible"]:
         return
     sid = row["session_id"]
-    conn.execute("""update devboard.sessions set dirty = true, last_turn_at = now(),
+    at = ev.get("at") or datetime.now(timezone.utc)
+    conn.execute("""update devboard.sessions set dirty = true,
+                      last_turn_at = greatest(coalesce(last_turn_at, %s), %s),
                       state = case when %s = 'session.ended' then 'ended' else state end
-                    where session_id = %s""", (ev.get("type"), sid))
+                    where session_id = %s""", (at, at, ev.get("type"), sid))
+    if at < datetime.now(timezone.utc) - LIVE_FOR:      # a replayed old turn (catch-up): read later, not live
+        return
     conn.execute("""insert into devboard.live (session_id, runtime, title, card_id, at)
                     values (%s, %s, %s, (select card_id from devboard.card_evidence where source_ref = %s
-                                         order by id desc limit 1), now())
-                    on conflict (session_id) do update set at = now(), title = excluded.title,
-                      card_id = coalesce(excluded.card_id, devboard.live.card_id)""",
-                 (sid, row["runtime"], row["title"], sid))
+                                         order by id desc limit 1), %s)
+                    on conflict (session_id) do update set at = greatest(devboard.live.at, excluded.at),
+                      title = excluded.title, card_id = coalesce(excluded.card_id, devboard.live.card_id)""",
+                 (sid, row["runtime"], row["title"], sid, at))
     db.notify(conn, "live", session=sid)
 
 

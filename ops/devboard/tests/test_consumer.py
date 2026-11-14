@@ -174,3 +174,15 @@ def test_due_leaves_pause_marker(conn, logs, monkeypatch):
     monkeypatch.setattr(reading, "read_session", lambda *a: "done")
     due.run(CFG, conn)
     assert conn.execute("select value from devboard.state where key = 'pause'").fetchone()["value"] is None
+
+
+def test_replayed_old_event_marks_dirty_but_not_live(conn, logs):
+    """Catch-up after a restart replays old turns: they are read later, but never shown as live work."""
+    from datetime import datetime, timedelta, timezone
+    old = datetime.now(timezone.utc) - timedelta(hours=3)
+    consumer.on_event(CFG, conn, {**ev("turn.ended", "codex", "bbb"), "at": old})
+    s = conn.execute("select dirty, last_turn_at from devboard.sessions where session_id = %s", (CX,)).fetchone()
+    assert s["dirty"] and abs((s["last_turn_at"] - old).total_seconds()) < 1
+    assert conn.execute("select count(*) n from devboard.live").fetchone()["n"] == 0
+    consumer.on_event(CFG, conn, {**ev("turn.ended", "codex", "bbb"), "at": datetime.now(timezone.utc)})
+    assert conn.execute("select count(*) n from devboard.live").fetchone()["n"] == 1
