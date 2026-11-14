@@ -61,6 +61,7 @@ PHRASES = {
     "Logo / identité visuelle": "Logo / visual identity", "Application mobile (agent)": "Mobile app (agent)",
     "Résumé / compression de contexte": "Summarisation / context compression",
     "Extraction mémoire structurée": "Structured memory extraction",
+    "Lecture du développement (tableau)": "Development reading (board)",
     "Aide texte pendant un appel vocal": "Text helper during a phone call",
     "Transcription (parole vers texte)": "Transcription (speech to text)",
     "Vectorisation (embeddings)": "Embeddings",

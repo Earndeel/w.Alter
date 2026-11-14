@@ -15712,6 +15712,7 @@
           "Juridique / droit": "Legal",
           "Kie (payant)": "Kie (paid)",
           "Le router conserve sa dernière lecture valable pendant 21 jours.": "The router keeps its last valid reading for 21 days.",
+          "Lecture du développement (tableau)": "Development reading (board)",
           "Logo / identité visuelle": "Logo / visual identity",
           "Long contexte (très longs documents)": "Long context (very long documents)",
           "Lus en cache": "Cache reads",
@@ -17881,7 +17882,7 @@
     "interface/site/functions/api/plans.js": "636563511ae2c5c794990c5d0571eb731de30d05eae457e32fe62b8378abd69f",
     "interface/site/functions/api/run.js": "f0c5e0aaae262eae630e2b685f2f3c28e4c1430bca9451e3015f5c4d9f7506f3",
     "interface/site/functions/api/status.js": "37fbd922a3eae2e33236fe4cda7d4546dafd6b69f7d76b50aea92d2deafd92cb",
-    "interface/translate.py": "a1796785414cd3fac4908088dab4a23780bf67976bd5ce0677b0a3469ddd4171",
+    "interface/translate.py": "eb4f4543dba5704ea11820add5ecea5a3fb0006f7c351a51c9972250ce6b04ad",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
@@ -17989,7 +17990,8 @@
     "store/migrations/036_exec_telemetry.sql": "22728fe19ef56564fa75c99995101232578c331942aaaeec0e4887670415eb52",
     "store/migrations/037_neutral_task_texts.sql": "9a776b3d51975ef7fb6a780bad99240ac47ffa50bb53908ca4370de78ea53bff",
     "store/migrations/038_neutral_embeddings_requirement.sql": "399cbec430a8090dbd319089de215d173cb4655762ff71c699945171dec20649",
-    "store/migrations/039_exec_log_account.sql": "f1711eeb24fa9d054e25ae9993a83465a5bf220315dab33261e44481a5833a75"
+    "store/migrations/039_exec_log_account.sql": "f1711eeb24fa9d054e25ae9993a83465a5bf220315dab33261e44481a5833a75",
+    "store/migrations/040_devboard_reading.sql": "60d718a4071dd9eb75e356acb444868f54095ca58553b853966487fef9d601c5"
   },
   "tasks": [
     {
@@ -18091,6 +18093,23 @@
       "quality_task": "decision",
       "requirements": {},
       "task": "decision_vision"
+    },
+    {
+      "consumers": "ops/devboard",
+      "default_objective": "best_available",
+      "description": "Lire un condensé de session d'agent ou une décision et en tirer chantiers, états, accords et remplacements, en JSON fidèle avec preuves.",
+      "intent_hint": null,
+      "interface": "chat",
+      "internal": true,
+      "label": "Lecture du développement (tableau)",
+      "modes": [],
+      "quality_benchmark": "aa_intelligence",
+      "quality_task": "intelligence",
+      "requirements": {
+        "min_context": 128000,
+        "structured_output": true
+      },
+      "task": "devboard_reading"
     },
     {
       "consumers": null,
