@@ -11,6 +11,9 @@ Ancien walter-backup (renommé le 2026-10-29 ; `walter-backup` reste un alias ex
 
 Les compatibilités déclarées et les preuves historiques ne sont pas des résidus à supprimer. Voir `git.preserved_paths`
 et `git.generated_patterns` dans la configuration ; détail et limites dans le README.
+- Tableau de développement (`devboard`, page tailnet :3093) : chantiers de Walter, accords attendus, décisions
+  remplacées, documents, travail des agents en direct. Lecture seule ; `walter-devboard status` dit ce qu'il attend ;
+  une carte fausse se corrige par l'outil MCP `devboard_correct`, seulement à la demande de {{owner.address}}.
 
 Une restauration réelle se fait seulement avec l'accord de {{owner.address}}.
 
