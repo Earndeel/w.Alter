@@ -82,7 +82,12 @@ def gateway(monkeypatch):
 
     def handler(request: httpx.Request):
         state["posts"].append(json.loads(request.content))
-        content, route = state["answers"].pop(0)
+        answer = state["answers"].pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        if isinstance(answer, int):                       # a gateway error status
+            return httpx.Response(answer, json={"detail": "every route failed"})
+        content, route = answer
         return httpx.Response(200, headers={"X-Walter-Route": route},
                               json={"choices": [{"message": {"content": content}}]})
     monkeypatch.setattr(llm, "_transport", lambda: httpx.MockTransport(handler))

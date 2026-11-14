@@ -121,3 +121,44 @@ def test_schema_checked_locally(router, gateway, conn):
     assert r == {"cards": []}
     assert gateway["posts"][0]["messages"][0]["content"].startswith("règles")
     assert "array" in gateway["posts"][1]["messages"][-1]["content"]
+
+
+# --- final review fixes (C1, I1) ---
+
+@pytest.mark.parametrize("answer", [502, 503, 429, httpx.ConnectError("walter-llm down")])
+def test_gateway_failure_is_a_pause_not_an_attempt(router, gateway, conn, answer):
+    """All Pro accounts refused (502 'every route failed'), gateway down, or rate limited: stop and keep the slice."""
+    gateway["answers"] = [answer]
+    with pytest.raises(llm.Paused) as e:
+        ask(conn)
+    assert e.value.reason in ("quota", "gateway")
+    row = conn.execute("select attempts from devboard.readings where key = 'k1'").fetchone()
+    assert row is None or row["attempts"] == 0
+    assert len(gateway["posts"]) == 1                    # no second call in the same pass
+
+
+def test_gate_pauses_on_the_five_hour_window(router):
+    """The weekly meter has room but the session window (shared with the owner's own Claude use) is at 80 %."""
+    router["subs"] = subs(100.0, 57.0)
+    router["pick"] = {**router["pick"], "execution": [
+        {"provider": "claude-pro", "account": "anthropic-pro-2",
+         "subscription": {"account": "anthropic-pro-2", "quota_used_percent": 57.0, "session_used_percent": 80.0}},
+        {"provider": "claude-pro", "account": "anthropic-pro",
+         "subscription": {"account": "anthropic-pro", "quota_used_percent": 100.0, "session_used_percent": 0.0}}]}
+    with pytest.raises(llm.Paused) as e:
+        llm.gate(CFG)
+    assert e.value.reason == "quota"
+    router["pick"]["execution"][0]["subscription"]["session_used_percent"] = 40.0
+    assert llm.gate(CFG)["model_id"] == "claude-haiku-5-5"
+
+
+def test_wrong_route_failure_survives_the_rollback(router, gateway, conn):
+    gateway["answers"] = [('{"a": 1}', "kie/x")]
+    with pytest.raises(llm.Paused):
+        with conn.transaction():
+            ask(conn, key="k-route")
+    from walter_devboard import db
+    with db.autocommit() as other:
+        row = other.execute("select status, error from devboard.readings where key = 'k-route'").fetchone()
+        other.execute("delete from devboard.readings where key = 'k-route'")
+    assert row and row["status"] == "failed" and "kie/x" in row["error"]

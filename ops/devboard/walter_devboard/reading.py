@@ -51,6 +51,11 @@ def _digest(session_id: str, after: int) -> dict:
     return json.loads(out)
 
 
+def _shown(d: dict) -> dict[int, str]:
+    """seq → text of the events shown to the model: the only ones it may cite."""
+    return {i["seq"]: i["text"] for i in d["items"]}
+
+
 def _when(text) -> datetime | None:
     try:
         return datetime.fromisoformat(str(text)) if text else None
@@ -108,7 +113,7 @@ def read_session(cfg: Config, conn, session_id: str) -> str:
             with conn.transaction():
                 result = llm.read(cfg, conn, key=k, kind="session", source_ref=session_id, from_seq=lo, to_seq=hi,
                                   prompt=_session_prompt(conn, d), schema=SESSION_SCHEMA,
-                                  validate=lambda r: cards.validate(conn, r, lo, hi))
+                                  validate=lambda r: cards.validate(conn, r, lo, hi, items=_shown(d)))
                 if result is not None:
                     if result.get("is_walter_development"):
                         dev = True
@@ -152,7 +157,7 @@ def read_task(cfg: Config, conn, task: dict) -> str:
         with conn.transaction():
             result = llm.read(cfg, conn, key=llm.key("task", f"{ref}@{task.get('updated_at')}", 1, 2), kind="task",
                               source_ref=ref, from_seq=1, to_seq=2, prompt=_session_prompt(conn, d),
-                              schema=SESSION_SCHEMA, validate=lambda r: cards.validate(conn, r, 1, 2))
+                              schema=SESSION_SCHEMA, validate=lambda r: cards.validate(conn, r, 1, 2, items=_shown(d)))
             if result is not None and result.get("is_walter_development"):
                 cards.apply(conn, ref, 1, 2, result, at=_when(task.get("updated_at")))
     except llm.Paused:

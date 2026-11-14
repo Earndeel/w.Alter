@@ -53,8 +53,36 @@ def similarity(a: str, b: str) -> float:
     return max(ratio, contained)
 
 
-def validate(conn, result: dict, from_seq: int, to_seq: int) -> None:
-    """Raise ValueError on anything that must fail the reading (it is then retried once by llm.read)."""
+_QUOTE_NOISE = re.compile(r"[«»\"“”‘’`*]")
+
+
+def _norm(text: str) -> str:
+    return " ".join(_QUOTE_NOISE.sub(" ", unicodedata.normalize("NFC", text or "")).lower().split())
+
+
+def _quoted(quote: str, text: str) -> bool:
+    """The quote is in the event's text, up to case, quote marks, spaces and an ellipsis for a cut."""
+    body = _norm(text)
+    parts = [p.strip(" .,;:") for p in re.split(r"…|\.\.\.", _norm(quote))]
+    parts = [p for p in parts if p]
+    return bool(parts) and all(p in body for p in parts)
+
+
+def _check_cite(seq, quote, lo: int, hi: int, items: dict[int, str] | None, what: str) -> None:
+    if not isinstance(seq, int) or not lo <= seq <= hi:
+        raise ValueError(f"{what}: seq {seq} outside the slice {lo}-{hi}")
+    if not (quote or "").strip():
+        raise ValueError(f"{what}: empty quote")
+    if items is not None:
+        if seq not in items:
+            raise ValueError(f"{what}: seq {seq} was not shown; cite one of the [n] shown")
+        if not _quoted(quote, items[seq]):
+            raise ValueError(f"{what}: the quote is not in event [{seq}]; copy its exact words")
+
+
+def validate(conn, result: dict, from_seq: int, to_seq: int, items: dict[int, str] | None = None) -> None:
+    """Raise ValueError on anything that must fail the reading (it is then retried once by llm.read). With
+    `items` (seq → text shown to the model), every citation must point at a shown event and quote its words."""
     if not isinstance(result.get("cards", []), list) or not isinstance(result.get("approvals", []), list):
         raise ValueError("cards/approvals must be lists")
     modules = known_modules()
@@ -74,9 +102,14 @@ def validate(conn, result: dict, from_seq: int, to_seq: int) -> None:
                 raise ValueError(f"unknown decision anchor {a}")
         if c.get("deadline"):
             date.fromisoformat(c["deadline"])
+        if not c.get("evidence"):
+            raise ValueError(f"card « {c.get('title')} » without evidence")
+        for e in c["evidence"]:
+            _check_cite(e.get("seq"), e.get("quote"), from_seq, to_seq, items, f"card « {c.get('title')} »")
     for a in result.get("approvals", []):
         if a.get("ref") not in refs:
             raise ValueError(f"unknown card {a.get('ref')} in approvals")
+        _check_cite(a.get("seq"), a.get("quote"), from_seq, to_seq, items, f"approval of {a.get('ref')}")
 
 
 def _evidence_ok(evidence, lo: int, hi: int) -> list[dict]:

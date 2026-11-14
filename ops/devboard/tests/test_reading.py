@@ -18,7 +18,7 @@ def slice_(lo, hi, more):
     return {"session": {"session_id": S, "runtime": "codex", "title": "t", "cwd": "/srv/dev"}, "from_seq": lo,
             "to_seq": hi, "more": more,
             "items": [{"seq": lo, "at": "2026-11-10 10:00:00+00:00", "kind": "user", "text": "fais le lot 3"},
-                      {"seq": hi, "at": "2026-11-10 10:05:00+00:00", "kind": "assistant", "text": "fait"}]}
+                      {"seq": hi, "at": "2026-11-10 10:05:00+00:00", "kind": "assistant", "text": "fait, le lot avance"}]}
 
 
 def answer(title, seq, dev=True):
@@ -58,7 +58,7 @@ def test_not_dev_session_skipped(conn, fake):
 
 def test_session_read_in_slices(conn, fake):
     fake["slices"] = {0: slice_(1, 9, True), 9: slice_(10, 20, False)}
-    fake["answers"] = [answer("Mémoire : lot 3", 5), answer("Mémoire : lot 3 de l'extraction", 15)]
+    fake["answers"] = [answer("Mémoire : lot 3", 1), answer("Mémoire : lot 3 de l'extraction", 10)]
     assert reading.read_session(CFG, conn, S) == "done"
     assert [r[2:4] for r in fake["reads"]] == [(1, 9), (10, 20)]
     s = seq(conn)
@@ -67,18 +67,18 @@ def test_session_read_in_slices(conn, fake):
 
 def test_open_cards_given_to_the_model(conn, fake):
     fake["slices"] = {0: slice_(1, 9, True), 9: slice_(10, 20, False)}
-    fake["answers"] = [answer("Mémoire : lot 3", 5), answer("Autre chose", 15)]
+    fake["answers"] = [answer("Mémoire : lot 3", 1), answer("Autre chose", 10)]
     reading.read_session(CFG, conn, S)
     assert "W-1" in fake["reads"][1][4][-1]["content"]
 
 
 def test_pause_midway_resumes(conn, fake):
     fake["slices"] = {0: slice_(1, 9, True), 9: slice_(10, 20, False)}
-    fake["answers"] = [answer("Mémoire : lot 3", 5), llm.Paused("quota")]
+    fake["answers"] = [answer("Mémoire : lot 3", 1), llm.Paused("quota")]
     assert reading.read_session(CFG, conn, S) == "paused"
     assert seq(conn)["read_seq"] == 9
     assert conn.execute("select count(*) n from devboard.cards").fetchone()["n"] == 1
-    fake["answers"] = [answer("Router : autre", 15)]
+    fake["answers"] = [answer("Router : autre", 10)]
     assert reading.read_session(CFG, conn, S) == "done"
     assert fake["reads"][-1][2] == 10 and seq(conn)["read_seq"] == 20
 
@@ -117,3 +117,11 @@ def test_decision_unknown_anchor_refused(conn, fake):
     fake["answers"] = [{"succeeds": [{"anchor": "2026-10-99-inventee", "quote": "x"}]}]
     with pytest.raises(ValueError):
         reading.read_decision(CFG, conn, 2)
+
+
+def test_reading_checks_citations_against_the_shown_events(conn, fake):
+    """The model cites seq 3, inside 1-5 but not shown (only 1 and 5 were): the reading is refused."""
+    fake["slices"] = {0: slice_(1, 5, False)}
+    fake["answers"] = [answer("Lot 3", 3)]
+    with pytest.raises(ValueError, match="not shown"):
+        reading.read_session(CFG, conn, S)

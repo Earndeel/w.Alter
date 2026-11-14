@@ -39,12 +39,15 @@ def test_new_card_gets_ref(conn):
 
 
 def test_card_without_evidence_rejected(conn):
-    assert apply(conn, card(evidence=[])) == []
+    with pytest.raises(ValueError):
+        apply(conn, card(evidence=[]))
     assert conn.execute("select count(*) n from devboard.cards").fetchone()["n"] == 0
 
 
 def test_evidence_out_of_range_rejected(conn):
-    assert apply(conn, card(seq=11)) == []
+    """Review focus 3: a seq outside the slice refuses the whole reading (it is retried), never a silent drop."""
+    with pytest.raises(ValueError):
+        apply(conn, card(seq=11))
     assert conn.execute("select count(*) n from devboard.cards").fetchone()["n"] == 0
 
 
@@ -145,3 +148,27 @@ def test_several_cards_with_links_keep_evidence_kind(conn):
           card("Activer le jeu 3", module="memory", seq=1), session="task:y", lo=1, hi=2)
     kinds = {r["kind"] for r in conn.execute("select kind from devboard.card_evidence").fetchall()}
     assert kinds == {"task"}
+
+
+ITEMS = {3: "Monsieur : « oui, on active le jeu 3 demain »", 5: "on active le jeu 3", 7: "réponse de l'agent"}
+
+
+def test_evidence_must_cite_a_shown_event_and_its_text(conn):
+    ok = {"is_walter_development": True, "approvals": [], "cards": [card(seq=3, evidence=[
+        {"seq": 3, "quote": "« Oui, on active le jeu 3 … demain »"}])]}
+    cards.validate(conn, ok, 1, 10, items=ITEMS)          # case, quote marks and an ellipsis are tolerated
+    unseen = {**ok, "cards": [card(seq=4)]}                # 4 is in range but was not shown (reasoning, step…)
+    with pytest.raises(ValueError, match="not shown"):
+        cards.validate(conn, unseen, 1, 10, items=ITEMS)
+    invented = {**ok, "cards": [card(seq=7, evidence=[{"seq": 7, "quote": "Monsieur a validé"}])]}
+    with pytest.raises(ValueError, match="quote"):
+        cards.validate(conn, invented, 1, 10, items=ITEMS)
+
+
+def test_approval_must_quote_the_text(conn):
+    apply(conn, card(status="waiting_owner"))
+    bad = {"is_walter_development": True, "cards": [], "approvals": [{"ref": "W-1", "seq": 7, "quote": "oui vas-y"}]}
+    with pytest.raises(ValueError, match="quote"):
+        cards.validate(conn, bad, 1, 10, items=ITEMS)
+    good = {**bad, "approvals": [{"ref": "W-1", "seq": 3, "quote": "oui, on active le jeu 3"}]}
+    cards.validate(conn, good, 1, 10, items=ITEMS)
