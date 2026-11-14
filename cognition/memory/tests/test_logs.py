@@ -150,3 +150,15 @@ def test_codex_desktop_format_messages_and_encrypted_reasoning():
     assert [e["type"] for e in w.events] == ["user/message", "user/message", "assistant/reasoning", "assistant/message"]
     assert w.events[0]["data"] == {"injected": True} and w.events[1]["turn"] == 1
     assert w.events[2]["data"]["encrypted"] is True
+
+
+def test_dsh_sub_agent_session_names_its_parent():
+    """2026-11-14: the 57 sub-agent sessions of a week had no parent in walter_logs (header `parentSession`)."""
+    w, st = FakeWriter(), {}
+    L.parse_dsh(w, {"type": "session", "id": "c1", "createdAt": 1794540753078, "cwd": "/w",
+                    "parentSession": "session-p0", "origin": "subagent", "delegationDepth": 1}, "1", st)
+    f = w.sess["dsh/vm/c1"]["fields"]
+    assert f["parent_session_id"] == "dsh/vm/session-p0" and f["meta"] == {"delegation_depth": 1, "origin": "subagent"}
+    w2, st2 = FakeWriter(), {}
+    L.parse_dsh(w2, {"type": "session", "id": "session-p0", "createdAt": 1794540753078, "delegationDepth": 0}, "1", st2)
+    assert "parent_session_id" not in w2.sess["dsh/vm/session-p0"]["fields"]

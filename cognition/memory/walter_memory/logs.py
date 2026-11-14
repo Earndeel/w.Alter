@@ -538,8 +538,13 @@ def parse_dsh(w: Writer, d: dict, ref: str, st: dict) -> None:
     kind, data = d.get("type"), d.get("data") or {}
     if kind == "session":
         st.update(sid=d.get("id"))
+        # a sub-agent's session names its parent (header `parentSession`, origin `subagent`): the tree of an
+        # orchestrated turn is readable in walter_logs (2026-11-14; before, 0 of the children carried it)
+        parent = d.get("parentSession")
         w.session(f"dsh/vm/{st['sid']}", runtime="dsh", native_id=st["sid"], cwd=d.get("cwd"),
-                  started_at=_ts(d.get("time") or d.get("createdAt")), meta={"delegation_depth": d.get("delegationDepth")})
+                  parent_session_id=f"dsh/vm/{parent}" if parent else None,
+                  started_at=_ts(d.get("time") or d.get("createdAt")),
+                  meta={"delegation_depth": d.get("delegationDepth"), **({"origin": d["origin"]} if d.get("origin") else {})})
         return
     if not st.get("sid") or not kind:
         return

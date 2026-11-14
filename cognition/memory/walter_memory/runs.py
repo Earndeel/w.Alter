@@ -30,7 +30,8 @@ ACTIVE = ("open", "suspended")
 ATTACH_ACTS = ("continue", "correct", "approve", "validate")   # preflight acts that carry on the thread's objective
 REOPEN_ACTS = ("correct",)                 # a correction also re-opens a done / failed objective of the thread
 CHAT_TASKS = ("general",)                  # Router tasks of a plain chat / information exchange
-ACTIONABLE_LEVELS = ("L2", "L3", "L4")     # a requested text tier from L2 up means real work
+ACTIONABLE_LEVELS = ("L2", "L3", "L4")     # a requested text tier L2/L3 means real work; L4 is not a tier: requests
+                                           # that carried the context level (L0-L4, C0-C4 after P5) also match
 TASK_THREAD = "task:"                     # an objective opened outside any known subject is its own thread: `task:<id>`
 THREAD_SQL = "coalesce(t.thread_id, 'task:' || t.task_id::text)"   # the thread of an objective, always defined
 CANDIDATE_SIM = 0.30                       # message ↔ goal similarity (local embeddings) from which an objective is proposed
