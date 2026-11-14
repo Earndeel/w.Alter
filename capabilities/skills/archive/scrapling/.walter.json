@@ -1,4 +1,7 @@
 {
+ "archived_at": "2026-11-14T04:14:13+00:00",
+ "archived_reason": "not read for 30 days",
+ "domain": "web",
  "hermes": {
   "path": "/root/.hermes/skills/research/scrapling",
   "sha": "da296f1820601ea4199afcda464ae11e542629074ad16d31072e4fb9dfe1d33a",
@@ -7,5 +10,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-repo",
  "owner": "upstream",
+ "reserve": true,
  "store_sha": "da296f1820601ea4199afcda464ae11e542629074ad16d31072e4fb9dfe1d33a"
 }
