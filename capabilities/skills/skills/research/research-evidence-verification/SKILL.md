@@ -153,3 +153,32 @@ For OTA URL parameter formats, tool-specific `wait_until` strategies (Booking.co
   ```
   Un service `active` ne garantit pas que son endpoint répond. Ne pas boucler indéfiniment, créer des onglets de secours en série, supprimer des caches, tuer largement des processus ou redémarrer le navigateur partagé. Préserver la session authentifiée, enregistrer le blocage et ne reprendre qu'après rétablissement vérifié.
 - Dans les transformations, séparer les champs `country`, `window` et `variant` du nom de fichier : des variantes comme `DEb` ou des noms comportant plusieurs underscores ne sont pas des codes pays. Valider les mappings avant agrégation et reconstruire les sorties après exclusion des collectes invalides.
+
+## Vérifier les téléchargements de textes officiels et récupérer les PDF
+
+- Si WebFetch renvoie un PDF téléchargé plutôt qu'un texte exploitable, utiliser le chemin réellement retourné par l'outil ; ne jamais deviner son nom ni le réutiliser entre sessions.
+- Vérifier les outils et extraire le texte dans un répertoire temporaire :
+```bash
+command -v pdftotext || exit 1
+WORK=$(mktemp -d /tmp/evidence-pdf.XXXXXX)
+PDF='/chemin/reel/retourne/par/outil.pdf'
+test -s "$PDF" || exit 1
+file "$PDF"
+pdftotext -layout "$PDF" "$WORK/source.txt" || exit 1
+test -s "$WORK/source.txt" || exit 1
+wc -l "$WORK/source.txt"
+grep -n -i -E 'import|distance|online|threshold|exemption|article' "$WORK/source.txt" | head -60
+```
+- Lire ensuite les paragraphes complets avec `sed -n 'DEBUT,FINp' "$WORK/source.txt"` ; vérifier champ territorial, exceptions, dates et statut du texte avant de transformer une occurrence en règle.
+- Pour un téléchargement direct, contrôler séparément le statut HTTP, la taille et le type réel :
+```bash
+URL='https://adresse-officielle-du-document'
+curl -L -sS --max-time 60 -A 'Mozilla/5.0' \
+  -o "$WORK/download" \
+  -w 'HTTP=%{http_code} bytes=%{size_download}\n' "$URL"
+test -s "$WORK/download" || exit 1
+file "$WORK/download"
+```
+- Ne pas considérer un HTTP 2xx comme une preuve d'accès au document : un HTTP 202 avec zéro octet n'est pas un texte consulté. Ne lancer `pdftotext` que sur un PDF identifié ; une page HTML de blocage n'est pas un PDF.
+- Si l'HTML officiel échoue, essayer une variante officielle HTML/ELI/PDF ou un PDF déjà fourni par l'outil. Après échecs des variantes officielles et du navigateur, arrêter les tentatives équivalentes ; consigner URL, erreur et absence de vérification directe.
+- Une recherche, un extrait indexé ou une source secondaire peut orienter la collecte, mais ne doit pas être présenté comme une lecture directe du texte officiel. Marquer les affirmations concernées selon les statuts de preuve du contrat et signaler la validation nécessaire.
