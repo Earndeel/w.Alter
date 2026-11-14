@@ -65,7 +65,12 @@
     "Uncommitted age is estimated from visible file mtimes; touching/deleting a file limits that estimate.",
     "Configured preserved evidence paths remain visible but are excluded from hygiene warnings; intentional compatibility is not inferred to be obsolete."
   ],
-  "services": [],
+  "services": [
+    "walter-devboard-web",
+    "walter-devboard-bus",
+    "walter-devboard-due.timer",
+    "walter-devboard-docs.path"
+  ],
   "optional": [
     "memory",
     "core",
