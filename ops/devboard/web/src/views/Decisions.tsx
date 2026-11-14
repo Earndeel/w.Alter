@@ -18,7 +18,7 @@ export function Decisions({ tick, replacedOnly, onOpenDoc }: { tick: number; rep
           {d.replaced_by.map((n) => (
             <div key={n.anchor} className="ml-[62px] text-xs">
               <span className="text-walter">→ </span>remplacée le {ddmm(n.date)} par{" "}
-              <button type="button" className="text-bright hover:text-walter" onClick={() => onOpenDoc(d.doc_path, n.anchor)}>{n.title}</button>
+              <button type="button" className="text-left text-bright hover:text-walter" onClick={() => onOpenDoc(d.doc_path, n.anchor)}>{n.title}</button>
               {n.quote && <div className="text-soft">« {n.quote} »</div>}
             </div>
           ))}

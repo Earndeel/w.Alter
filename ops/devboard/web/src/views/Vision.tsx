@@ -2,6 +2,7 @@ import type { VisionComponent } from "../api";
 
 const FRAME: Record<string, string> = { red: "border-late", amber: "border-wait", green: "border-ok", blue: "border-walter" };
 const TEXT: Record<string, string> = { red: "text-late", amber: "text-wait", green: "text-ok", blue: "text-walter" };
+const HEALTH: Record<string, string> = { failed: "en panne", inactive: "arrêté", degraded: "dégradé" };
 const SAY: Record<string, string> = { red: "un chantier oublié ou en retard", amber: "attend ton accord",
                                       green: "tout est fini", blue: "rien de bloquant" };
 
@@ -20,7 +21,7 @@ export function Vision({ vision, onModule }: { vision: VisionComponent[]; onModu
               <div className="mt-1 text-[11px] text-muted">
                 {[["waiting_owner", "attend"], ["in_progress", "en cours"], ["late_or_stale", "oublié"], ["done", "fini"]]
                   .filter(([k]) => m.counts[k]).map(([k, l]) => `${m.counts[k]} ${l}`).join(" · ") || "aucun chantier"}
-                {m.health && m.health !== "active" ? ` · service ${m.health}` : ""}
+                {m.health && !["active", "no_dedicated_service"].includes(m.health) ? ` · service ${HEALTH[m.health] ?? m.health}` : ""}
               </div>
             </button>
           ))}
