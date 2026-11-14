@@ -19,9 +19,14 @@ def report(conn) -> dict:
     else:
         lines.append("lectures actives")
     lines.append(f"{s['to_read']} session(s) à lire sur {s['eligible']} suivies")
+    errors = conn.execute("select value from devboard.state where key = 'errors'").fetchone()
+    errors = errors["value"] if errors else {}
+    if errors:
+        worst = max(errors.items(), key=lambda kv: kv[1].get("n", 0))
+        lines.append(f"{len(errors)} source(s) en erreur (mise de côté après 3) ; ex. {worst[0]} : {worst[1].get('error')}")
     if failed:
         lines.append(f"{readings.get('failed', 0)} lecture(s) en échec, dernière : {failed[0]['source_ref']} "
                      f"({failed[0]['error'] or 'sans détail'})")
     return {"pause": pause, "readings": readings, "failed": failed,
-            "sessions": {"eligible": s["eligible"], "to_read": s["to_read"]},
+            "sessions": {"eligible": s["eligible"], "to_read": s["to_read"]}, "errors": errors,
             "last_pass": last["at"] if last else None, "text": "\n".join(lines)}

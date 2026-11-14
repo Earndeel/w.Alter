@@ -48,7 +48,10 @@ DECISION_SCHEMA = {
 def _digest(session_id: str, after: int) -> dict:
     out = subprocess.run(["walter-memory", "logs", "digest", session_id, "--after-seq", str(after), "--cloud-safe",
                           "--json"], capture_output=True, text=True, check=True, timeout=120).stdout
-    return json.loads(out)
+    d = json.loads(out)
+    if not isinstance(d, dict) or "items" not in d:      # e.g. {"error": "session inconnue"} (purged, renamed)
+        raise LookupError(f"digest {session_id}: {(d.get('error') if isinstance(d, dict) else d) or 'no items'}")
+    return d
 
 
 def _shown(d: dict) -> dict[int, str]:

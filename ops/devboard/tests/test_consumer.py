@@ -199,3 +199,41 @@ def test_old_event_of_unknown_session_is_skipped_without_lookup(conn, logs, monk
     assert called == [] and conn.execute("select count(*) n from devboard.sessions").fetchone()["n"] == 0
     with pytest.raises(LookupError):                       # a fresh one waits for walter-logs (bus retry)
         consumer.on_event(CFG, conn, {**ev("turn.ended", "codex", "never-logged"), "at": datetime.now(timezone.utc)})
+
+
+def test_one_broken_session_never_stops_the_others(conn, logs, monkeypatch):
+    """Review I3: a purged session (digest error) or a timeout is recorded and skipped; the pass goes on."""
+    from walter_devboard import status
+    for s in (CC, CX):
+        conn.execute("""insert into devboard.sessions (session_id, runtime, dirty, last_turn_at)
+                        values (%s, %s, true, now() - interval '1 hour')""", (s, s.split("/")[0]))
+    read = []
+
+    def fake(cfg, c, sid):
+        read.append(sid)
+        if sid == CC:
+            raise LookupError("session inconnue")
+        return "done"
+    monkeypatch.setattr(reading, "read_session", fake)
+    out = due.run(CFG, conn)
+    assert read == [CC, CX] and out["sessions"][CC] == "error" and out["paused"] is None
+    assert "session inconnue" in status.report(conn)["text"]
+    for _ in range(2):
+        due.run(CFG, conn)
+    read.clear()
+    due.run(CFG, conn)                                    # set aside after 3 errors
+    assert CC not in read
+
+
+def test_digest_error_answer_is_an_error():
+    import subprocess
+    from walter_devboard import reading as r
+    class Out:
+        stdout = '{"error": "session inconnue"}'
+    orig = subprocess.run
+    subprocess.run = lambda *a, **k: Out()
+    try:
+        with pytest.raises(LookupError, match="session inconnue"):
+            r._digest("codex/x", 0)
+    finally:
+        subprocess.run = orig

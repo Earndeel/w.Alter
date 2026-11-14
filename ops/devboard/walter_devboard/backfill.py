@@ -41,8 +41,9 @@ def run(cfg: Config, conn, since: str | None = None, limit: int = 20) -> dict:
         out["paused"] = "task"
         return out
     for r in conn.execute("""select session_id from devboard.sessions where eligible and dirty
-                             order by last_turn_at nulls first limit %s""", (limit,)).fetchall():
-        st = reading.read_session(cfg, conn, r["session_id"])
+                               and not (session_id = any(%s))
+                             order by last_turn_at nulls first limit %s""", (due.set_aside(conn), limit)).fetchall():
+        st = due.guarded(conn, r["session_id"], lambda: reading.read_session(cfg, conn, r["session_id"]))
         out["results"][r["session_id"]] = st
         if st == "paused":
             out["paused"] = "session"
