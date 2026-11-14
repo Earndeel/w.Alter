@@ -177,3 +177,27 @@ def test_stream_relays_notify(c):
     t.join(timeout=2)
     srv.should_exit = True
     assert any(l.startswith("event: change") for l in got) and time.monotonic() - sent < 2.5
+
+
+def test_removed_decision_listed_as_removed(c, api):
+    """Review I4: a section removed from DECISIONS stays visible, flagged « retirée du document »."""
+    decisions(c)
+    c.execute("update devboard.decisions set removed_at = now() where anchor = '2026-11-01-ancienne'")
+    rows = {d["anchor"]: d for d in api.get("/api/decisions").json()}
+    assert rows["2026-11-01-ancienne"]["removed"] is True and rows["2026-11-13-nouvelle"]["removed"] is False
+    assert api.get("/api/summary").json()["decisions"] == 1          # the count is of decisions still in force
+
+
+def test_done_this_week_uses_last_activity(c, api):
+    """Review I5: a card finished long ago but read today (backfill) is not « fini cette semaine » nor green."""
+    card(c, "Fini il y a longtemps", module="ops", status="done")
+    c.execute("update devboard.cards set last_activity_at = now() - interval '20 days'")
+    groups = {g["key"]: g["cards"] for g in api.get("/api/cards?group=status").json()}
+    assert groups["done"] == []
+    colour = {m["id"]: m["color"] for x in api.get("/api/vision").json() for m in x["modules"]}
+    assert colour["ops"] == "blue"
+
+
+def test_live_never_sends_the_raw_session_title(c, api):
+    c.execute("insert into devboard.live (session_id, runtime, title) values ('codex/x', 'codex', 'titre perso')")
+    assert "titre perso" not in api.get("/api/live").text

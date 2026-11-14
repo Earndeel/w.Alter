@@ -66,16 +66,21 @@ def sync(conn, cfg: Config, module_roots: list[Path] | None = None) -> dict:
     if module_roots is None:
         from .config import module_roots as roots
         module_roots = roots()
-    res = {"documents": 0, "sections_changed": 0, "decisions_new": 0, "decisions_changed": 0, "removed": 0}
+    res = {"documents": 0, "sections_changed": 0, "decisions_new": 0, "decisions_changed": 0, "removed": 0,
+           "documents_removed": 0}
     present = set()
     for path, kind in documents(cfg, module_roots):
         text = path.read_text(errors="replace")
         key, sha = str(path), _sha(text)
         present.add(key)
         res["documents"] += 1
-        old = conn.execute("select sha256 from devboard.documents where path = %s", (key,)).fetchone()
-        if old and old["sha256"] == sha:
+        old = conn.execute("select sha256, removed_at from devboard.documents where path = %s", (key,)).fetchone()
+        if old and old["sha256"] == sha and old["removed_at"] is None:
             continue
+        if old and old["removed_at"] is not None:            # back on disk: everything is read again
+            conn.execute("update devboard.documents set removed_at = null, sha256 = '' where path = %s", (key,))
+            conn.execute("update devboard.sections set sha256 = '' where doc_path = %s", (key,))
+            conn.execute("update devboard.decisions set sha256 = '' where doc_path = %s", (key,))
         secs = sections(text)
         title = next((s["heading"] for s in secs if s["level"] == 1), path.stem)
         conn.execute("""insert into devboard.documents (path, title, kind, sha256, mtime) values (%s, %s, %s, %s, %s)
@@ -101,7 +106,15 @@ def sync(conn, cfg: Config, module_roots: list[Path] | None = None) -> dict:
             res["removed"] += len(gone)
         if kind == "decisions":
             _decisions(conn, key, secs, res)
-    if res["sections_changed"] or res["removed"]:
+    for r in conn.execute("select path from devboard.documents where removed_at is null").fetchall():
+        if r["path"] not in present:
+            conn.execute("update devboard.documents set removed_at = now() where path = %s", (r["path"],))
+            conn.execute("update devboard.sections set removed_at = now() where doc_path = %s and removed_at is null",
+                         (r["path"],))
+            conn.execute("update devboard.decisions set removed_at = now() where doc_path = %s and removed_at is null",
+                         (r["path"],))
+            res["documents_removed"] += 1
+    if res["sections_changed"] or res["removed"] or res["documents_removed"]:
         notify(conn, "docs", **res)
     return res
 

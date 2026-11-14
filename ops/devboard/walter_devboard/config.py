@@ -29,6 +29,7 @@ class Config:
     token_file: Path | None = None
     sessions_per_pass: int = 20
     dev_cwds: list = field(default_factory=list)
+    excluded_cwds: list = field(default_factory=list)   # never read, whatever the runtime (W.Alter mode profiles)
     owner_name: str = "le propriétaire"              # how the page names the owner (« corrigé par … »)     # Claude Code sessions opened there are development sessions
 
 
@@ -72,3 +73,11 @@ def load() -> Config:
     if "WALTER_DEVBOARD_DATABASE_URL" in os.environ:
         cfg.dsn = os.environ["WALTER_DEVBOARD_DATABASE_URL"]
     return cfg
+
+
+def eligible(cfg: "Config", runtime: str, cwd: str | None) -> bool:
+    """A development session: never in an excluded folder; Claude Code only in dev_cwds; Codex anywhere else."""
+    c = (cwd or "").rstrip("/")
+    if any(c == p.rstrip("/") or c.startswith(p.rstrip("/") + "/") for p in cfg.excluded_cwds):
+        return False
+    return runtime == "codex" or cwd in cfg.dev_cwds

@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import subprocess
 
-from . import due, reading
+from . import config, due, reading
 from .config import Config
 
 
@@ -29,7 +29,7 @@ def run(cfg: Config, conn, since: str | None = None, limit: int = 20) -> dict:
         for s in _sessions(runtime, since):
             if ":" in s["session_id"]:                   # sub-agent of a session: its parent carries the result
                 continue
-            eligible = runtime == "codex" or s.get("cwd") in cfg.dev_cwds
+            eligible = config.eligible(cfg, runtime, s.get("cwd"))
             r = conn.execute("""insert into devboard.sessions (session_id, runtime, title, cwd, eligible, dirty,
                                                                last_turn_at)
                                 values (%s, %s, %s, %s, %s, %s, %s) on conflict (session_id) do nothing""",

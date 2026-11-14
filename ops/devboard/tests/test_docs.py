@@ -96,3 +96,18 @@ def test_path_unit_watches_docs_reports_and_module_docs(tmp_path):
     lines = [l for l in unit.splitlines() if l.startswith("PathModified=")]
     assert lines == [f"PathModified={tmp_path}/docs", f"PathModified={tmp_path}/rep", f"PathModified={tmp_path}/mod/docs"]
     assert "Unit=walter-devboard-docs.service" in unit
+
+
+def test_vanished_document_marked_removed(conn, tmp_path):
+    """Review I4: a document that disappears is marked removed (and its decisions), never served as present."""
+    c = cfg(tmp_path)
+    docs.sync(conn, c, module_roots=[])
+    (c.docs_dir / "DECISIONS.md").unlink()
+    res = docs.sync(conn, c, module_roots=[])
+    d = conn.execute("select removed_at from devboard.documents where path like '%DECISIONS.md'").fetchone()
+    assert d["removed_at"] is not None and res["documents_removed"] == 1
+    assert conn.execute("select count(*) n from devboard.decisions where removed_at is null").fetchone()["n"] == 0
+    (c.docs_dir / "DECISIONS.md").write_text(DECISIONS)       # it comes back: present again
+    docs.sync(conn, c, module_roots=[])
+    assert conn.execute("select removed_at from devboard.documents where path like '%DECISIONS.md'").fetchone()["removed_at"] is None
+    assert conn.execute("select count(*) n from devboard.decisions where removed_at is null").fetchone()["n"] == 3

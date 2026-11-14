@@ -12,8 +12,9 @@ export function Decisions({ tick, replacedOnly, onOpenDoc }: { tick: number; rep
       {items?.map((d) => (
         <div key={d.anchor} className="border-b border-row px-[18px] py-2">
           <button type="button" onClick={() => onOpenDoc(d.doc_path, d.anchor)}
-            className={`grid w-full grid-cols-[52px_1fr] gap-2.5 text-left hover:text-walter ${d.replaced_by.length ? "text-[#6b7b84] line-through" : "text-bright"}`}>
-            <span className="text-xs text-muted no-underline">{ddmm(d.date)}</span><span>{d.title}</span>
+            className={`grid w-full grid-cols-[52px_1fr] gap-2.5 text-left hover:text-walter ${d.replaced_by.length || d.removed ? "text-[#6b7b84] line-through" : "text-bright"}`}>
+            <span className="text-xs text-muted no-underline">{ddmm(d.date)}</span>
+            <span>{d.title}{d.removed && <span className="ml-2 text-xs text-wait no-underline">retirée du document</span>}</span>
           </button>
           {d.replaced_by.map((n) => (
             <div key={n.anchor} className="ml-[62px] text-xs">

@@ -8,7 +8,7 @@ import logging
 import subprocess
 from datetime import datetime, timedelta, timezone
 
-from . import db
+from . import config, db
 from .config import Config, load
 
 SOURCES = ("claude_code", "codex")
@@ -47,7 +47,7 @@ def on_event(cfg: Config, conn, ev: dict) -> None:
             raise LookupError(f"{source} session {subject} not in walter-logs yet")
         if ":" in s["session_id"]:
             return
-        eligible = source == "codex" or s.get("cwd") in cfg.dev_cwds
+        eligible = config.eligible(cfg, source, s.get("cwd"))
         conn.execute("""insert into devboard.sessions (session_id, runtime, title, cwd, eligible)
                         values (%s, %s, %s, %s, %s) on conflict (session_id) do nothing""",
                      (s["session_id"], source, s.get("title"), s.get("cwd"), eligible))

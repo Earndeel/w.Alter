@@ -96,7 +96,7 @@ def _cards(where: str = "true", args=()) -> list[dict]:
 def _group_key(c: dict) -> str | None:
     if c["status"] in ("in_progress", "paused") and (c["flags"]["late"] or c["flags"]["stale"]):
         return "late_or_stale"
-    if c["status"] == "done" and c["updated_at"].date() < _today() - timedelta(days=7):
+    if c["status"] == "done" and c["last_activity_at"].date() < _today() - timedelta(days=7):
         return None
     return c["status"]
 
@@ -204,7 +204,7 @@ def today() -> list[dict]:
 @app.get("/api/decisions")
 def decisions(replaced: int = 0) -> list[dict]:
     rows = _q("""select id, anchor, date, title, doc_path, removed_at from devboard.decisions
-                 where removed_at is null order by date desc, id desc""")
+                 order by date desc, id desc""")
     links = _links()
     out = []
     for r in rows:
@@ -246,13 +246,13 @@ def vision() -> list[dict]:
 
 @app.get("/api/live")
 def live() -> list[dict]:
-    return _q("""select l.session_id, l.runtime, l.title, l.at, c.ref, c.title card_title, c.module
+    return _q("""select l.session_id, l.runtime, l.at, c.ref, c.title card_title, c.module
                  from devboard.live l left join devboard.cards c on c.id = l.card_id order by l.at desc""")
 
 
 @app.get("/api/docs")
 def docs_list() -> list[dict]:
-    docs = _q("select path, title, kind, mtime from devboard.documents order by kind, path")
+    docs = _q("select path, title, kind, mtime from devboard.documents where removed_at is null order by kind, path")
     secs = _q("""select doc_path, anchor, heading, level, line from devboard.sections where removed_at is null
                  order by doc_path, line""")
     by: dict[str, list] = {}

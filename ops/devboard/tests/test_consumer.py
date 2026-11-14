@@ -237,3 +237,16 @@ def test_digest_error_answer_is_an_error():
             r._digest("codex/x", 0)
     finally:
         subprocess.run = orig
+
+
+def test_codex_in_an_excluded_folder_is_not_read(conn, logs, monkeypatch):
+    """Review I7: W.Alter's personal mode (a profile folder) is never read, even for Codex."""
+    cfg = Config(dev_cwds=["/srv/dev"], excluded_cwds=["/srv/profiles"])
+    logs[CX]["cwd"] = "/srv/profiles/codex"
+    consumer.on_event(cfg, conn, ev("turn.ended", "codex", "bbb"))
+    assert sessions(conn)[CX]["eligible"] is False
+    assert conn.execute("select count(*) n from devboard.live").fetchone()["n"] == 0
+    conn.execute("delete from devboard.sessions")
+    monkeypatch.setattr(reading, "read_session", lambda *a: "done")
+    backfill.run(cfg, conn, since="2026-10-01", limit=0)
+    assert sessions(conn)[CX]["eligible"] is False

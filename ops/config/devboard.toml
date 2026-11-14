@@ -10,4 +10,5 @@ listen_host = "127.0.0.1"
 port = 3093
 sessions_per_pass = 20
 dev_cwds = []                         # the instance names the folders where development sessions are opened
+excluded_cwds = []                    # folders never read, whatever the runtime (the instance names its personal-mode profiles)
 owner_name = "le propriétaire"           # the instance names its owner
