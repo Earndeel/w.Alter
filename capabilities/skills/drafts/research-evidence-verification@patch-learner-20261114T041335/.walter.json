@@ -1,0 +1,11 @@
+{
+ "base_sha": "0d55851e3e236ed7ea59ecd2e174134fe9987ef7535fcfedefd880c0b531641e",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-14T04:13:35.086164+00:00",
+ "domain": "research",
+ "kind": "patch",
+ "reason": "La session a récupéré et exploité avec succès un PDF officiel via `pdftotext -layout`, recherche de lignes puis lecture de paragraphes. À l'inverse, les variantes EUR-Lex ont renvoyé HTTP 202, zéro octet et « Document stream is empty » ; le navigateur a aussi rencontré un timeout HTTP 500. Cela ajoute une procédure concrète de récupération et de contrôle, avec un garde-fou contre les faux succès HTTP, sans dupliquer le skill de recherche existant. [session claude_code/vm/7d580ba9-9fce-45ed-88c6-08a9f08283c0:aa566571c9f01e030]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/7d580ba9-9fce-45ed-88c6-08a9f08283c0:aa566571c9f01e030",
+ "target": "research-evidence-verification"
+}
