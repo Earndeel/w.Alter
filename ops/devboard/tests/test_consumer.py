@@ -180,9 +180,22 @@ def test_replayed_old_event_marks_dirty_but_not_live(conn, logs):
     """Catch-up after a restart replays old turns: they are read later, but never shown as live work."""
     from datetime import datetime, timedelta, timezone
     old = datetime.now(timezone.utc) - timedelta(hours=3)
+    conn.execute("insert into devboard.sessions (session_id, runtime, eligible) values (%s, 'codex', true)", (CX,))
     consumer.on_event(CFG, conn, {**ev("turn.ended", "codex", "bbb"), "at": old})
     s = conn.execute("select dirty, last_turn_at from devboard.sessions where session_id = %s", (CX,)).fetchone()
     assert s["dirty"] and abs((s["last_turn_at"] - old).total_seconds()) < 1
     assert conn.execute("select count(*) n from devboard.live").fetchone()["n"] == 0
     consumer.on_event(CFG, conn, {**ev("turn.ended", "codex", "bbb"), "at": datetime.now(timezone.utc)})
     assert conn.execute("select count(*) n from devboard.live").fetchone()["n"] == 1
+
+
+def test_old_event_of_unknown_session_is_skipped_without_lookup(conn, logs, monkeypatch):
+    """History is the backfill's job: an old turn of a session never registered costs no lookup and no retry."""
+    from datetime import datetime, timedelta, timezone
+    called = []
+    monkeypatch.setattr(consumer, "_lookup", lambda ref, runtime: called.append(ref))
+    old = datetime.now(timezone.utc) - timedelta(days=20)
+    consumer.on_event(CFG, conn, {**ev("turn.ended", "codex", "never-logged"), "at": old})
+    assert called == [] and conn.execute("select count(*) n from devboard.sessions").fetchone()["n"] == 0
+    with pytest.raises(LookupError):                       # a fresh one waits for walter-logs (bus retry)
+        consumer.on_event(CFG, conn, {**ev("turn.ended", "codex", "never-logged"), "at": datetime.now(timezone.utc)})

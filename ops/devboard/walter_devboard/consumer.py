@@ -36,8 +36,12 @@ def on_event(cfg: Config, conn, ev: dict) -> None:
     source, subject = ev.get("source"), ev.get("subject")
     if source not in SOURCES or not subject or ":" in subject:      # ':' = a sub-agent of a session
         return
+    at = ev.get("at") or datetime.now(timezone.utc)
+    old = at < datetime.now(timezone.utc) - LIVE_FOR
     row = _cached(conn, subject, source)
     if row is None:
+        if old:         # history is the backfill's job; Codex also emits turns of threads walter-logs never keeps
+            return
         s = _lookup(subject, source)
         if s is None:
             raise LookupError(f"{source} session {subject} not in walter-logs yet")
@@ -51,12 +55,11 @@ def on_event(cfg: Config, conn, ev: dict) -> None:
     if not row["eligible"]:
         return
     sid = row["session_id"]
-    at = ev.get("at") or datetime.now(timezone.utc)
     conn.execute("""update devboard.sessions set dirty = true,
                       last_turn_at = greatest(coalesce(last_turn_at, %s), %s),
                       state = case when %s = 'session.ended' then 'ended' else state end
                     where session_id = %s""", (at, at, ev.get("type"), sid))
-    if at < datetime.now(timezone.utc) - LIVE_FOR:      # a replayed old turn (catch-up): read later, not live
+    if old:                                             # a replayed old turn (catch-up): read later, not live
         return
     conn.execute("""insert into devboard.live (session_id, runtime, title, card_id, at)
                     values (%s, %s, %s, (select card_id from devboard.card_evidence where source_ref = %s
