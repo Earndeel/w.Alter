@@ -205,7 +205,9 @@ def run(models: tuple = MODELS, samples: int = SAMPLES) -> dict:
         prices = {m: _price(conn, m) for m in models}
     state = {"spent": spent, "cap": False}
     out = home() / "answers.jsonl"
-    sem = {m: threading.Semaphore(WORKERS_PER_MODEL) for m in models}
+    out.touch(exist_ok=True)
+    out.chmod(0o600)                             # readings of the owner's messages: owner-only, like the other files
+    sem ={m: threading.Semaphore(WORKERS_PER_MODEL) for m in models}
 
     def one(job):
         model, case, sample = job
