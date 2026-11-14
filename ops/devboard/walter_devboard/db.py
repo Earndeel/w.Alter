@@ -34,6 +34,16 @@ def connection():
         yield c
 
 
+@contextmanager
+def autocommit():
+    """A connection of its own for long passes: each `with conn.transaction()` block commits on its own."""
+    c = psycopg.connect(dsn(), row_factory=dict_row, autocommit=True, application_name="walter-devboard")
+    try:
+        yield c
+    finally:
+        c.close()
+
+
 def close() -> None:
     global _conn
     if _conn is not None:

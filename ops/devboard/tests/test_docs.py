@@ -82,3 +82,17 @@ def test_module_docs_and_reports(conn, tmp_path):
     docs.sync(conn, c, module_roots=[mod])
     kinds = {r["kind"] for r in conn.execute("select kind from devboard.documents").fetchall()}
     assert {"module", "report", "decisions", "vision"} <= kinds
+
+
+def test_path_unit_watches_docs_reports_and_module_docs(tmp_path):
+    from walter_devboard import docs
+    from walter_devboard.config import Config
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "rep").mkdir()
+    (tmp_path / "mod" / "docs").mkdir(parents=True)
+    (tmp_path / "nodocs").mkdir()
+    unit = docs.path_unit(Config(docs_dir=tmp_path / "docs", reports_dir=tmp_path / "rep"),
+                          module_roots=[tmp_path / "mod", tmp_path / "nodocs"])
+    lines = [l for l in unit.splitlines() if l.startswith("PathModified=")]
+    assert lines == [f"PathModified={tmp_path}/docs", f"PathModified={tmp_path}/rep", f"PathModified={tmp_path}/mod/docs"]
+    assert "Unit=walter-devboard-docs.service" in unit

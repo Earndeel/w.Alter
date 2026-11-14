@@ -90,6 +90,7 @@ def _set(conn, session_id: str, **cols) -> None:
 def read_session(cfg: Config, conn, session_id: str) -> str:
     row = conn.execute("select read_seq from devboard.sessions where session_id = %s", (session_id,)).fetchone()
     pos = row["read_seq"] if row else 0
+    started = conn.execute("select clock_timestamp() t").fetchone()["t"]
     dev = read = False
     while True:
         d = _digest(session_id, pos)
@@ -127,8 +128,38 @@ def read_session(cfg: Config, conn, session_id: str) -> str:
         if not d.get("more"):
             break
     state = "done" if dev or not read else "skipped"
-    _set(conn, session_id, state=state, dirty=False)
+    # A turn that ended while this pass was reading keeps the session dirty for the next pass.
+    conn.execute("""update devboard.sessions set state = %s,
+                      dirty = case when last_turn_at is null or last_turn_at <= %s then false else dirty end
+                    where session_id = %s""", (state, started, session_id))
     return state
+
+
+def _task_digest(task: dict) -> dict:
+    progress = json.dumps({k: task.get(k) for k in ("status", "progress", "attempts", "last_outcome")},
+                          ensure_ascii=False, default=str)
+    return {"session": {"runtime": "tâche du propriétaire", "title": (task.get("goal") or "")[:80]},
+            "from_seq": 1, "to_seq": 2,
+            "items": [{"seq": 1, "at": task.get("updated_at"), "kind": "user", "text": (task.get("goal") or "")[:6000]},
+                      {"seq": 2, "at": task.get("updated_at"), "kind": "assistant", "text": progress[:6000]}]}
+
+
+def read_task(cfg: Config, conn, task: dict) -> str:
+    """A durable task of the owner (walter-memory tasks) read with the session schema; source = task:<id>."""
+    ref = f"task:{task['task_id']}"
+    d = _task_digest(task)
+    try:
+        with conn.transaction():
+            result = llm.read(cfg, conn, key=llm.key("task", f"{ref}@{task.get('updated_at')}", 1, 2), kind="task",
+                              source_ref=ref, from_seq=1, to_seq=2, prompt=_session_prompt(conn, d),
+                              schema=SESSION_SCHEMA, validate=lambda r: cards.validate(conn, r, 1, 2))
+            if result is not None and result.get("is_walter_development"):
+                cards.apply(conn, ref, 1, 2, result, at=_when(task.get("updated_at")))
+    except llm.Paused:
+        return "paused"
+    if result is None:
+        return "failed"
+    return "done" if result.get("is_walter_development") else "skipped"
 
 
 def read_decision(cfg: Config, conn, decision_id: int) -> str:

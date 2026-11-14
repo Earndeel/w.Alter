@@ -1,0 +1,9 @@
+[Unit]
+Description=walter-devboard due: read idle development sessions, changed decisions and tasks (poste devboard_reading, paused when the subscription quota is high); record commits
+After=network-online.target docker.service walter-llm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/walter-devboard due
+Nice=10
+TimeoutStartSec=50min

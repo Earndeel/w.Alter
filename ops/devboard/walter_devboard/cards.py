@@ -111,6 +111,7 @@ def apply(conn, session_id: str, from_seq: int, to_seq: int, result: dict, *, at
     validate(conn, result, from_seq, to_seq)
     at = at or datetime.now(timezone.utc)
     src = f"{session_id}#{from_seq}-{to_seq}"
+    kind = "task" if session_id.startswith("task:") else "session"
     touched: list[str] = []
     for c in result.get("cards", []):
         ev = _evidence_ok(c.get("evidence"), from_seq, to_seq)
@@ -138,8 +139,8 @@ def apply(conn, session_id: str, from_seq: int, to_seq: int, result: dict, *, at
             what = ("mise à jour : " + ", ".join(sorted(new))) if new else "citée"
         for e in ev:
             conn.execute("""insert into devboard.card_evidence (card_id, kind, source_ref, seq, quote, at)
-                            values (%s, 'session', %s, %s, %s, %s)""",
-                         (row["id"], session_id, e["seq"], e["quote"].strip()[:400], at))
+                            values (%s, %s, %s, %s, %s, %s)""",
+                         (row["id"], kind, session_id, e["seq"], e["quote"].strip()[:400], at))
         for kind, targets in (("decision", c.get("decisions")), ("file", c.get("files")), ("blocks", c.get("blocks"))):
             for t in targets or []:
                 if kind == "blocks" and not conn.execute("select 1 from devboard.cards where ref = %s", (t,)).fetchone():

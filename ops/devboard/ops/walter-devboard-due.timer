@@ -1,0 +1,10 @@
+[Unit]
+Description=walter-devboard due every 10 minutes (= the idle deadline of a session)
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=10min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

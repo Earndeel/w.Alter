@@ -273,8 +273,8 @@
       "id": "devboard",
       "path": "devboard",
       "role": "Tableau de développement de Walter : chantiers, accords attendus, décisions remplacées, documents, activité des agents en direct (page tailnet, lecture seule)",
-      "status": "building",
-      "readme": "README.md",
+      "status": "experimental",
+      "readme": "devboard/README.md",
       "interfaces": [
         {
           "transport": "cli",

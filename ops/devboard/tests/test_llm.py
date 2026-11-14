@@ -1,53 +1,16 @@
 """Model calls and their guards: the Router must route the poste to the required provider, one subscription
 account must have room under the pause threshold, a reading is never asked twice, the route header is checked and
 an invalid answer is retried once. walter-router and the gateway are simulated."""
-import json
+import json  # noqa: F401
 
 import httpx
 import pytest
 
 from walter_devboard import llm
+from conftest import subs
 from walter_devboard.config import Config
 
 CFG = Config(token_file=None)
-
-
-def subs(*percents, age=10.0):
-    return [{"id": "openai-plus", "meter": {"used_percent": 1.0, "age_s": age}}] + [
-        {"id": "anthropic-pro" + ("" if i == 0 else f"-{i + 1}"), "meter": {"used_percent": p, "age_s": age}}
-        for i, p in enumerate(percents)]
-
-
-@pytest.fixture
-def router(monkeypatch):
-    state = {"pick": {"model_id": "claude-haiku-5-5", "provider": "claude-pro"}, "subs": subs(49.0), "calls": []}
-
-    def fake(*args):
-        state["calls"].append(args)
-        if args[0] == "pick":
-            return state["pick"]
-        if args[:2] == ("subscriptions", "show"):
-            return state["subs"]
-        if args[:2] == ("subscriptions", "refresh"):
-            return {}
-        raise AssertionError(args)
-    monkeypatch.setattr(llm, "_router", fake)
-    monkeypatch.setenv("WALTER_LLM_TOKEN", "test-token")
-    return state
-
-
-@pytest.fixture
-def gateway(monkeypatch):
-    """Queue of (content, route header) answers; every POST body is kept."""
-    state = {"answers": [], "posts": []}
-
-    def handler(request: httpx.Request):
-        state["posts"].append(json.loads(request.content))
-        content, route = state["answers"].pop(0)
-        return httpx.Response(200, headers={"X-Walter-Route": route},
-                              json={"choices": [{"message": {"content": content}}]})
-    monkeypatch.setattr(llm, "_transport", lambda: httpx.MockTransport(handler))
-    return state
 
 
 def ask(conn, key="k1", validate=lambda r: None):
