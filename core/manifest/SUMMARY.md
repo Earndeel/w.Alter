@@ -1,1 +1,1 @@
-Le harnais : `walter_health` (état), `walter_run` (déléguer à Walter Engine), `module_index` / `module_guide` (détails d'un module).
+Le harnais : `walter_health` (état), `module_guide(module, depth="D2"|"D3")` / `module_index` (documentation d'un module à la demande), `walter_run` (sous-tâche au moteur).

@@ -97,8 +97,20 @@ def report(*, scan=False, live=False, path=None):
         out['neutrality']=neutrality()
         from .documentation import scan as documentation
         out['documentation']=documentation(enforce=True)   # blocking since 2026-11-09 (stock caught up in E1)
-        out['ok']=out['ok'] and out['interconnect']['ok'] and out['neutrality']['ok'] and out['documentation']['ok']
+        out['presentation']=_presentation_check()   # 2026-11-14: an invalid M0/M1 blocks here, not silently at injection
+        out['ok']=(out['ok'] and out['interconnect']['ok'] and out['neutrality']['ok'] and out['documentation']['ok']
+                   and out['presentation']['ok'])
     return out
+
+
+def _presentation_check():
+    """Every presented module's M0 line and M1 card must pass the injection rules (presentation.summary / manifest):
+    an invalid one was rejected at injection without anyone seeing it (Router and ops M0, 11-14/11)."""
+    from . import presentation
+    problems=[]
+    for form in ('m0','full'):
+        problems+=[p for p in presentation.notes(form,[]).get('problems') or [] if p not in problems]
+    return {'ok':not problems,'problems':problems}
 
 
 def backup_paths(path=None):

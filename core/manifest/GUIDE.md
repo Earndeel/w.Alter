@@ -8,9 +8,11 @@ remplace ni le runtime ni ses permissions.
 
 ## Comment l'utiliser
 
-- **Découvrir un module** : son niveau 1 est déjà dans la couche « Modules W.Alter » des instructions ;
-  `module_index(module, section)` liste ce qu'il contient quand il publie un index ; `module_guide(module)` donne
-  son guide détaillé. Sans argument, `module_guide()` dit où vit la présentation de chaque module.
+- **Découvrir un module** : sa ligne (D1) est dans la couche « Modules W.Alter » des instructions ; sa fiche
+  d'utilisation (D2) arrive avec un message quand elle est utile, ou se lit avec `module_guide(module, depth="D2")` ;
+  `module_guide(module)` (D3) donne son guide détaillé ; `module_index(module, section)` liste ce qu'il contient quand
+  il publie un index. Sans argument, `module_guide()` dit où vit la présentation de chaque module. D1/D2/D3 = les
+  fichiers SUMMARY / MANIFEST / GUIDE du dossier `manifest/` de chaque module (aucune copie ailleurs).
 - **État** : `walter_health` (services, moteur, score mémoire, routeur, disque).
 - **Déclarations techniques** : `walter_modules(module)` (contrats, dépendances, limites par harness).
 - **Déléguer à Walter Engine** : `walter_run(request, goal)` (session déléguée du moteur, lectures permises, rien de ce

@@ -113,13 +113,18 @@ def register(mcp,client='unknown',*,local_control=True):
         except Exception as exc:return _error('registry',exc)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
-    def module_guide(module: str='') -> str:
-        """Detailed guide of a W.Alter module (manifest/GUIDE.md in its folder): components, interfaces per runtime,
-        privacy and limits. Each module's level 1 (what it is, how to use it) is already in your instructions;
-        open the guide only when the task needs more. Without module: where each module's presentation lives."""
+    def module_guide(module: str='',depth: str='D3') -> str:
+        """Documentation of a W.Alter module, read during the turn when the task needs it. Your instructions show
+        each module in one line (D1). depth='D2': its usage card (what it is, its tools, parameters, conventions —
+        manifest/MANIFEST.md, with its live part); depth='D3' (default): its detailed guide (components, interfaces
+        per runtime, privacy, limits — manifest/GUIDE.md). Reading a module's documentation is not an order to use
+        it. Without module: where each module's presentation lives."""
         try:
             from walter_platform import presentation
-            return presentation.guide(module) if module else json.dumps(presentation.catalog(),ensure_ascii=False)
+            if not module:return json.dumps(presentation.catalog(),ensure_ascii=False)
+            if depth.upper()=='D2':return presentation.manifest(module)
+            if depth.upper()!='D3':return _error(module,ValueError("depth is 'D2' or 'D3'"))
+            return presentation.guide(module)
         except Exception as exc:return _error(module or 'presentation',exc)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))

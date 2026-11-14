@@ -129,7 +129,8 @@ test('delegate: one engine session per task, parent run published, task model, d
   const r = await api.op({ version: 1, op: 'delegate', caller: 'claude', delegation: d });
   assert.equal(r.ok, true); assert.match(r.output, /^ok:\[Délégation Walter\]/); assert.match(r.session_id, /^mcp\/claude\/task-/);
   const kernel = r.walter_session.replace('dsh/vm/', '');
-  assert.deepEqual(sessionMeta().get(kernel), { channel: 'machine', parent_run_id: 'run-parent', model: null });
+  assert.deepEqual(sessionMeta().get(kernel), { channel: 'machine', parent_run_id: 'run-parent', model: null,
+    interface: 'mcp', engine_session: r.session_id });   // the door and its conversation (traceability, 13/11)
   assert.deepEqual(sessions.selected, [{ sessionId: kernel, provider: 'walter', model: 'general' }]);
   const again = await api.op({ version: 1, op: 'delegate', caller: 'claude', delegation: d });
   assert.equal(again.resumed, true); assert.equal(sessions.prompts.length, 1, 'a replayed delegation runs once');

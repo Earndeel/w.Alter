@@ -96,3 +96,12 @@ def test_m0_must_stay_one_short_line(registry, tmp_path):
     assert presentation.notes('m0')['problems'][0]['level'] == 'M0'
     with pytest.raises(ValueError):
         presentation.notes('compact')
+
+
+def test_walter_check_fails_on_a_presentation_injection_would_reject(registry, tmp_path):
+    """2026-11-14: the Router's and ops' M0 lines (274 / 223 chars) were dropped at injection for three days, silently."""
+    from walter_platform import registry as reg
+    assert reg._presentation_check() == {'ok': True, 'problems': []}
+    (tmp_path / 'SUMMARY.md').write_text('x' * 201 + '\n')
+    out = reg._presentation_check()
+    assert not out['ok'] and out['problems'][0]['module'] == 'demo' and out['problems'][0]['level'] == 'M0'
