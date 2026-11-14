@@ -154,31 +154,20 @@ For OTA URL parameter formats, tool-specific `wait_until` strategies (Booking.co
   Un service `active` ne garantit pas que son endpoint répond. Ne pas boucler indéfiniment, créer des onglets de secours en série, supprimer des caches, tuer largement des processus ou redémarrer le navigateur partagé. Préserver la session authentifiée, enregistrer le blocage et ne reprendre qu'après rétablissement vérifié.
 - Dans les transformations, séparer les champs `country`, `window` et `variant` du nom de fichier : des variantes comme `DEb` ou des noms comportant plusieurs underscores ne sont pas des codes pays. Valider les mappings avant agrégation et reconstruire les sorties après exclusion des collectes invalides.
 
-## Vérifier les téléchargements de textes officiels et récupérer les PDF
+## Auditer des avis clients et des dispositifs UX sans surinterpréter les preuves
 
-- Si WebFetch renvoie un PDF téléchargé plutôt qu'un texte exploitable, utiliser le chemin réellement retourné par l'outil ; ne jamais deviner son nom ni le réutiliser entre sessions.
-- Vérifier les outils et extraire le texte dans un répertoire temporaire :
-```bash
-command -v pdftotext || exit 1
-WORK=$(mktemp -d /tmp/evidence-pdf.XXXXXX)
-PDF='/chemin/reel/retourne/par/outil.pdf'
-test -s "$PDF" || exit 1
-file "$PDF"
-pdftotext -layout "$PDF" "$WORK/source.txt" || exit 1
-test -s "$WORK/source.txt" || exit 1
-wc -l "$WORK/source.txt"
-grep -n -i -E 'import|distance|online|threshold|exemption|article' "$WORK/source.txt" | head -60
-```
-- Lire ensuite les paragraphes complets avec `sed -n 'DEBUT,FINp' "$WORK/source.txt"` ; vérifier champ territorial, exceptions, dates et statut du texte avant de transformer une occurrence en règle.
-- Pour un téléchargement direct, contrôler séparément le statut HTTP, la taille et le type réel :
-```bash
-URL='https://adresse-officielle-du-document'
-curl -L -sS --max-time 60 -A 'Mozilla/5.0' \
-  -o "$WORK/download" \
-  -w 'HTTP=%{http_code} bytes=%{size_download}\n' "$URL"
-test -s "$WORK/download" || exit 1
-file "$WORK/download"
-```
-- Ne pas considérer un HTTP 2xx comme une preuve d'accès au document : un HTTP 202 avec zéro octet n'est pas un texte consulté. Ne lancer `pdftotext` que sur un PDF identifié ; une page HTML de blocage n'est pas un PDF.
-- Si l'HTML officiel échoue, essayer une variante officielle HTML/ELI/PDF ou un PDF déjà fourni par l'outil. Après échecs des variantes officielles et du navigateur, arrêter les tentatives équivalentes ; consigner URL, erreur et absence de vérification directe.
-- Une recherche, un extrait indexé ou une source secondaire peut orienter la collecte, mais ne doit pas être présenté comme une lecture directe du texte officiel. Marquer les affirmations concernées selon les statuts de preuve du contrat et signaler la validation nécessaire.
+1. Lis le contrat de recherche avant toute collecte. Sépare les livrables : registre des sources, synthèse des avis par plateforme, thèmes d'avis, matrice UX et captures. Utilise le préfixe source attribué et relie chaque observation à une URL, une date de collecte et un identifiant de preuve.
+
+2. Collecte les avis par plateforme sans fusionner leurs notes. Relève la note, le nombre total d'avis et la distribution des étoiles seulement lorsqu'ils sont visibles. Conserve séparément la taille de l'échantillon effectivement lu, les dates et les thèmes. Une demande de « dix avis » adressée à WebFetch ne prouve pas que dix avis exploitables ont été obtenus. Vérifie le résultat et annonce le déficit d'échantillon.
+
+3. Applique trois états aux critères UX : `oui` = observé ; `non` = absence vérifiée dans un périmètre inspecté et explicité ; `nd` = non déterminé. Un critère non mentionné dans une extraction, un domaine inaccessible, une page bloquée ou une capture incomplète ne justifie jamais `non`. Vérifie aussi le domaine officiel avant de conclure qu'une marque n'a pas de site accessible.
+
+4. Inspecte successivement l'accueil, une fiche produit et les pages de service pertinentes. Traite le tunnel de commande comme un périmètre distinct : l'accueil ne démontre pas la visibilité des garanties au moment de l'achat. Respecte les limites de lecture seule ; ne commande pas, ne soumets pas de formulaire et ne contacte pas un vendeur pour compléter une preuve manquante.
+
+5. Pour les éléments visuels, vérifie d'abord l'environnement local avec `python3 -c "from playwright.sync_api import sync_playwright; print('playwright import OK')"`. Capture les pages publiques en desktop et mobile, par exemple avec `browser.new_page(viewport={"width": 1440, "height": 900})` puis `browser.new_page(viewport={"width": 390, "height": 844})`. Enregistre avec `page.screenshot(path=chemin, full_page=True)`. Ouvre ensuite les fichiers : une capture créée peut montrer seulement un bandeau de consentement, une erreur ou un chargement incomplet. Ne compte pas ces fichiers comme preuves du contenu masqué. Journalise URL finale, viewport et résultat.
+
+6. En cas de blocage, essaie une autre voie publique autorisée : extraction WebFetch, `walter_browse`, puis navigateur local. Une recherche ou un extrait de moteur sert à découvrir une source, pas à remplacer automatiquement son contenu. Si les forums restent inaccessibles, note la lacune au lieu de multiplier les requêtes puis de présenter la collecte comme complète.
+
+7. Pour calculer une fréquence de dispositif UX, affiche séparément `oui`, `non` et `nd`. Donne le nombre de marques réellement évaluables ; n'assimile pas les inconnus à des absences. Distingue ensuite observation du panel, témoignage individuel et recommandation analytique. La présence fréquente d'un dispositif chez les concurrents ne démontre pas, à elle seule, qu'il est indispensable à la conversion.
+
+8. Avant remise, compare couverture demandée et couverture obtenue : plateformes, avis lus, marques, pages et captures vérifiées. Déclare explicitement les périmètres partiels, notamment le tunnel et les expériences transfrontalières. Si la mission exige `SubagentHandback`, termine par cet appel unique avec les fichiers, résultats et limites ; ne double pas l'envoi par un autre canal.
