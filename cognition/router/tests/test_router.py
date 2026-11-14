@@ -182,6 +182,13 @@ def test_level_poste_follows_the_owners_text_tier(conn):
         assert d["follows"] == {"task": "general", "level": "L1"} and d["task"] == poste
 
 
+def test_devboard_reading_is_internal_structured(conn):
+    """ops/devboard (2026-11-14) reads agent sessions and decisions through its own poste, never offered to the intent
+    classifier, with structured output."""
+    r = conn.execute("select internal, requirements from models.tasks where task = 'devboard_reading'").fetchone()
+    assert r is not None and r["internal"] is True and r["requirements"].get("structured_output") is True
+
+
 def test_internal_postes_are_not_offered_to_the_intent_classifier(conn):
     from walter_router.serve import intent
     tasks, _ = intent._criteria(conn)
