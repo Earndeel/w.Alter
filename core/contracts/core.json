@@ -56,7 +56,7 @@
   ],
   "service_code": {
     "dsh-web": {
-      "code_roots": ["engine/plugins", "interfaces/api"],
+      "code_roots": ["engine/plugins", "interfaces/api", "interfaces/web"],
       "code_files": ["/opt/dsh/home/cordis.patch.yml", "/opt/dsh/home/walter-hooks.json", "/opt/dsh/home/profiles/web/cordis.patch.yml"]
     }
   },
@@ -385,6 +385,20 @@
       "role": "Personnalisation de l'interface web DSH (couleurs, porte web du propriétaire)",
       "status": "active",
       "readme": "README.md",
+      "vision_target": "core/interfaces/web"
+    },
+    {
+      "id": "web-panels",
+      "path": "interfaces/web/panels",
+      "role": "Panneaux de l'interface web : pages d'autres modules Walter (tableau de développement…) dans la barre latérale et la zone principale, relayées en lecture seule derrière la connexion de l'interface ; liste dans engine.toml [[dsh.web.panels]]",
+      "status": "active",
+      "readme": "interfaces/web/panels/README.md",
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "dsh-web <path>/… (GET/HEAD) → upstream du panneau"
+        }
+      ],
       "vision_target": "core/interfaces/web"
     },
     {

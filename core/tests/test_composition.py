@@ -404,3 +404,30 @@ def test_web_sign_in_link_never_printed(monkeypatch,tmp_path):
     assert web['config']['printUrl'] is False
     login=[e for r in rows for e in r.get('insert',[]) if e.get('id')=='walter-web-login'][0]
     assert login['name'].endswith('interfaces/web/login-link.mjs') and login['config']['file']==str(tmp_path/'login-url')
+
+
+def test_dsh_panels_rendered_from_engine_values_and_dropped_when_none(home,monkeypatch):
+    """Panels of the web interface (pages of other modules in its sidebar) come from engine.toml [[dsh.web.panels]]."""
+    c.install('dsh',home,apply=True,backup_root=home.parent/'backups')
+    assert '# walter:dsh-panels ' not in _web(home)
+    values=c.engine_values()
+    values['dsh']['web']['panels']=[{'id':'board','label':'Développement','path':'/board','upstream':'http://127.0.0.1:9'}]
+    monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(values))
+    c.install('dsh',home,apply=True,backup_root=home.parent/'backups')
+    text=_web(home)
+    assert text.count('# walter:dsh-panels ')==1 and text.index('# walter:dsh-panels ')<text.index('# walter:dsh-web ')
+    [row]=[r for r in c._dsh_yaml(text) if any(e.get('id')=='walter-web-panels' for e in r.get('insert',[]))]
+    entry=row['insert'][0]
+    assert entry['name'].endswith('/interfaces/web/panels/index.mjs')
+    assert entry['config']=={'panels':[{'id':'board','label':'Développement','path':'/board','upstream':'http://127.0.0.1:9'}]}
+    assert not c.install('dsh',home)['changed']
+    values['dsh']['web']['panels']=[]
+    c.install('dsh',home,apply=True,backup_root=home.parent/'backups')
+    assert '# walter:dsh-panels ' not in _web(home)
+
+
+def test_dsh_panels_bad_values_fail(home):
+    for bad in ({'id':'board','label':'B','path':'board','upstream':'http://h'},
+                {'id':'board','label':'B','path':'/board','upstream':'file:///etc'},
+                {'id':'board','path':'/board','upstream':'http://h'}):
+        with pytest.raises(ValueError,match='panels'):c._dsh_panels({'dsh':{'web':{'panels':[bad]}}})

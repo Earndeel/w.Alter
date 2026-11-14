@@ -1,0 +1,22 @@
+{
+  "name": "@walter/web-panels",
+  "version": "0.1.0",
+  "description": "Panels of the W.Alter web interface: pages of other Walter modules in the sidebar and main area, behind the interface's sign-in",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    }
+  },
+  "license": "MIT"
+}

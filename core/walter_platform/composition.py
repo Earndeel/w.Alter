@@ -107,6 +107,7 @@ def engine_subagents(values):
 
 ENGINE_API=('off','on')                             # lot E4: the engine's own API door (core/interfaces/api)
 ENGINE_API_PLUGIN=ROOT/'interfaces'/'api'/'index.mjs'
+WEB_PANELS_PLUGIN=ROOT/'interfaces'/'web'/'panels'/'index.mjs'
 WEB_LOGIN_PLUGIN=ROOT/'interfaces'/'web'/'login-link.mjs'
 
 
@@ -211,6 +212,25 @@ def _dsh_face(values):
         name=json.dumps(str(web.get('name') or 'Walter'),ensure_ascii=False),
         tagline=json.dumps(str(web.get('tagline') or ''),ensure_ascii=False))
     return text
+
+
+def _dsh_panels(values):
+    """Fenced `dsh-panels` block of the web profile: pages of other Walter modules shown in the web interface's
+    sidebar and main area, behind its sign-in (engine.toml [[dsh.web.panels]]: id, label, path, upstream). None when
+    the instance declares no panel (the block is then dropped)."""
+    import yaml
+    panels=values.get('dsh',{}).get('web',{}).get('panels') or []
+    out=[]
+    for p in panels:
+        ok=(isinstance(p,dict) and re.fullmatch(r'[a-z][a-z0-9-]{0,31}',str(p.get('id',''))) and p.get('id')!='conversation'
+            and isinstance(p.get('label'),str) and p['label'] and re.fullmatch(r'/[a-z0-9][a-z0-9-]{0,31}',str(p.get('path','')))
+            and re.fullmatch(r'https?://[^/?#\s]+/?',str(p.get('upstream',''))))
+        if not ok:raise ValueError(f'engine.toml [[dsh.web.panels]] invalid entry {p!r} (id, label, path /name, upstream http(s) origin)')
+        out.append({'id':p['id'],'label':p['label'],'path':p['path'],'upstream':p['upstream']})
+    if not out:return None
+    return ('# Panels: pages of other Walter modules in the sidebar and main area, behind the interface\'s sign-in (reads only).\n'
+            +yaml.safe_dump([{'insert':[{'id':'walter-web-panels','name':str(WEB_PANELS_PLUGIN),'config':{'panels':out}}]}],
+                            sort_keys=False,allow_unicode=True,width=120))
 
 
 def _unfenced_rows(text):
@@ -542,6 +562,8 @@ def _plan(host,home=None,profile_dir=None):
                     after=_managed_yaml(after,_dsh_face(values),'dsh-face',anchor='dsh-web')
                     after=(_managed_yaml(after,_dsh_api(values),'dsh-api',anchor='dsh-web') if engine_api(values)=='on'
                            else _drop_managed(after,'dsh-api'))
+                    panels=_dsh_panels(values)
+                    after=(_managed_yaml(after,panels,'dsh-panels',anchor='dsh-web') if panels else _drop_managed(after,'dsh-panels'))
                 after=_managed_yaml(after,block(_context_port()),'dsh-'+profile)
                 _dsh_yaml(after)
                 if after!=before:file(wp,after,'identity,context,skills,browse')
