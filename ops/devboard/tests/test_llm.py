@@ -97,7 +97,8 @@ def test_memo_never_asks_twice(router, gateway, conn):
     assert len(gateway["posts"]) == 1
     body = gateway["posts"][0]
     assert body["model"] == "exact:claude-haiku-5-5@claude-pro"
-    assert body["response_format"]["type"] == "json_schema"
+    assert "response_format" not in body            # the subscription bridge refuses json_schema (2026-11-14)
+    assert '"type": "object"' in body["messages"][0]["content"]
 
 
 def test_route_header_checked(router, gateway, conn):
@@ -137,3 +138,23 @@ def test_key_depends_on_range_and_version():
     k = llm.key("session", "s1", 1, 9)
     assert k != llm.key("session", "s1", 1, 10)
     assert len(k) == 64
+
+
+def test_retry_tells_the_model_why(router, gateway, conn):
+    def strict(r):
+        if "cards" not in r:
+            raise ValueError("cards manquant")
+    gateway["answers"] = [('{"a": 1}', "claude-pro/m"), ('{"cards": []}', "claude-pro/m")]
+    assert ask(conn, validate=strict) == {"cards": []}
+    assert "cards manquant" in gateway["posts"][1]["messages"][-1]["content"]
+
+
+def test_schema_checked_locally(router, gateway, conn):
+    schema = {"type": "object", "required": ["cards"], "properties": {"cards": {"type": "array"}}}
+    gateway["answers"] = [('{"cards": "non"}', "claude-pro/m"), ('{"cards": []}', "claude-pro/m")]
+    r = llm.read(CFG, conn, key="k2", kind="session", source_ref="s1", from_seq=1, to_seq=9,
+                 prompt=[{"role": "system", "content": "règles"}, {"role": "user", "content": "lis"}],
+                 schema=schema, validate=lambda r: None)
+    assert r == {"cards": []}
+    assert gateway["posts"][0]["messages"][0]["content"].startswith("règles")
+    assert "array" in gateway["posts"][1]["messages"][-1]["content"]

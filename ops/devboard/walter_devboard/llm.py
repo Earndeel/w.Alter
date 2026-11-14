@@ -3,7 +3,8 @@ provider, and at least one subscription account (`subscription_prefix*`) must ha
 threshold. Otherwise nothing is sent and the caller waits (`Paused`) — never a silent paid fallback.
 
 The gateway is called with `exact:<picked model>@<required provider>`: the model still comes from the Router, but
-the gateway cannot fall through to another provider. Readings are memoized in devboard.readings by their exact
+the gateway cannot fall through to another provider. The schema travels in the prompt and is checked here (the
+subscription bridge refuses response_format json_schema). Readings are memoized in devboard.readings by their exact
 inputs: a done reading is never asked twice."""
 from __future__ import annotations
 
@@ -14,13 +15,15 @@ import subprocess
 from typing import Callable
 
 import httpx
+import jsonschema
 
 from .config import Config
 
 PROMPT_VERSION = "1"
 POSTE = "devboard_reading"
 FRESH_S = 900
-MAX_ATTEMPTS = 4          # two calls per read, one later read of a failed reading
+MAX_ATTEMPTS = 4
+MAX_TOKENS = 8000          # two calls per read, one later read of a failed reading
 
 
 class Paused(Exception):
@@ -108,13 +111,15 @@ def read(cfg: Config, conn, *, key: str, kind: str, source_ref: str, from_seq: i
     if attempts >= MAX_ATTEMPTS:
         return None
     pick = gate(cfg)
+    prompt = with_schema(prompt, schema)
     body = {"model": f"exact:{pick['model_id']}@{cfg.required_provider}", "messages": prompt, "temperature": 0,
-            "response_format": {"type": "json_schema", "json_schema": {"name": kind, "schema": schema}}}
+            "max_tokens": MAX_TOKENS}
     headers = {"Authorization": f"Bearer {_token(cfg)}"}
     error = ""
     with httpx.Client(base_url=cfg.gateway_url, timeout=120, transport=_transport()) as client:
         for _ in range(2):
             attempts += 1
+            content = None
             try:
                 resp = client.post("/v1/chat/completions", json=body, headers=headers)
             except httpx.HTTPError as e:
@@ -135,14 +140,33 @@ def read(cfg: Config, conn, *, key: str, kind: str, source_ref: str, from_seq: i
                 result = json.loads(_strip_fence(content))
                 if not isinstance(result, dict):
                     raise ValueError("answer is not an object")
+                jsonschema.validate(result, schema)
                 validate(result)
-            except (ValueError, KeyError, IndexError, TypeError) as e:
+            except (ValueError, KeyError, IndexError, TypeError, jsonschema.ValidationError) as e:
+                if isinstance(e, jsonschema.ValidationError):
+                    e = ValueError(f"{e.message} (at {'/'.join(map(str, e.absolute_path)) or 'root'})")
                 error = f"invalid answer: {e}"
+                body["messages"] = list(prompt) + [
+                    {"role": "assistant", "content": str(content or "")[:4000]},
+                    {"role": "user", "content": f"Réponse refusée : {e}. Corrige et renvoie le JSON complet."}]
                 continue
             _save(conn, key, kind, source_ref, from_seq, to_seq, "done", attempts, result=result)
             return result
     _save(conn, key, kind, source_ref, from_seq, to_seq, "failed", attempts, error=error[:1000])
     return None
+
+
+def with_schema(prompt: list[dict], schema: dict) -> list[dict]:
+    """The Claude subscription bridge refuses response_format json_schema (BadRequest, 2026-11-14): the schema goes
+    at the end of the system message and the answer is checked here against it."""
+    rule = ("\n\nRéponds uniquement par un objet JSON, sans texte autour, conforme à ce schéma JSON :\n"
+            + json.dumps(schema, ensure_ascii=False))
+    msgs = [dict(m) for m in prompt]
+    if msgs and msgs[0].get("role") == "system":
+        msgs[0]["content"] = str(msgs[0]["content"]) + rule
+    else:
+        msgs.insert(0, {"role": "system", "content": rule.strip()})
+    return msgs
 
 
 def _strip_fence(text: str) -> str:
