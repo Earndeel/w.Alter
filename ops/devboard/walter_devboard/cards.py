@@ -141,12 +141,12 @@ def apply(conn, session_id: str, from_seq: int, to_seq: int, result: dict, *, at
             conn.execute("""insert into devboard.card_evidence (card_id, kind, source_ref, seq, quote, at)
                             values (%s, %s, %s, %s, %s, %s)""",
                          (row["id"], kind, session_id, e["seq"], e["quote"].strip()[:400], at))
-        for kind, targets in (("decision", c.get("decisions")), ("file", c.get("files")), ("blocks", c.get("blocks"))):
+        for link, targets in (("decision", c.get("decisions")), ("file", c.get("files")), ("blocks", c.get("blocks"))):
             for t in targets or []:
-                if kind == "blocks" and not conn.execute("select 1 from devboard.cards where ref = %s", (t,)).fetchone():
+                if link == "blocks" and not conn.execute("select 1 from devboard.cards where ref = %s", (t,)).fetchone():
                     continue
                 conn.execute("""insert into devboard.card_links (card_id, kind, target) values (%s, %s, %s)
-                                on conflict do nothing""", (row["id"], kind, str(t)[:500]))
+                                on conflict do nothing""", (row["id"], link, str(t)[:500]))
         _activity(conn, row, src, what, at)
         touched.append(row["ref"])
     for a in result.get("approvals", []):

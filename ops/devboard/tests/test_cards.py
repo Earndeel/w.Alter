@@ -136,3 +136,12 @@ def test_flags_stale_after_7_days(conn):
     assert f["stale"] is True and f["waiting_days"] is None
     conn.execute("update devboard.cards set last_activity_at = now() - interval '2 days'")
     assert cards.flags(conn, one(conn, "W-1"), date.today())["stale"] is False
+
+
+def test_several_cards_with_links_keep_evidence_kind(conn):
+    """A reading with several cards and links: each card's evidence keeps the source kind (task here)."""
+    apply(conn, card("Tableau", seq=1), session="task:x", lo=1, hi=2)
+    apply(conn, card("Choisir l'option A ou B", module="ops", seq=2, blocks=["W-1"], files=["/walter/x.md"]),
+          card("Activer le jeu 3", module="memory", seq=1), session="task:y", lo=1, hi=2)
+    kinds = {r["kind"] for r in conn.execute("select kind from devboard.card_evidence").fetchall()}
+    assert kinds == {"task"}
