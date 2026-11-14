@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kie-gemini-api",
+  "sha": "f1e83fdb9f510a7ab31f45a2300cf7fa2b64a6e68a0b3b083f12d895bbb16781",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "f1e83fdb9f510a7ab31f45a2300cf7fa2b64a6e68a0b3b083f12d895bbb16781"
+}

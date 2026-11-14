@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/human-in-the-loop-gate",
+  "sha": "bdeb3ec28ed36f32e73065c3d225922c49c851faacc87765724dfab8195960ae",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "bdeb3ec28ed36f32e73065c3d225922c49c851faacc87765724dfab8195960ae"
+}

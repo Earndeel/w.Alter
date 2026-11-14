@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
+ "reason": "La session fournit une procédure distincte des skills existants : conversion Markdown → PDF sans installation, validation du contenu extrait et consultation des dépendances. Preuves concrètes : chaîne exécutée avec PyMuPDF, perte silencieuse de longues lignes dans <pre> découverte puis corrigée par repli préalable, float/flex ignorés, et différences de PDF isolées au trailer /ID. Les scripts exacts étant partiellement absents du transcript, le skill impose de vérifier leurs fichiers et les signatures plutôt que de reconstruire une implémentation non attestée. [session dsh/vm/11f604ba-d85d-4571-88f9-c0b22f6ddfba]",
+ "store_sha": "bbd16230b7d6874d2c9e2618682872522d6aa663072e17bf3672521eefff97e0"
+}

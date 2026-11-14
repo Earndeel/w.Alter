@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "module": "context",
+ "notes": ["walter-context-preflight (:8897) prepares context before a model call; when it is down nothing is injected (ghost mode), it restarts safely.", "A degraded plan (decision.degraded, bus event context.degraded, counted by walter-context-preflight --report) means the Router's decision chain failed, not the preflight: the turn is still served with a prudent L3 pack that says so. Do not restart the preflight for it with restart_unit; check walter-router health and the OpenRouter balance, tell the owner only if the rate stays high.",
+  "preflight:degraded (watchdog: >= 2 degraded plans and >= 30 % of the plans of the last 30 min) has one exception: the preflight process may run library code older than the code on disk (2026-11-11: credentials moved, fixed code on disk, old code in RAM, 4 h of degraded plans). The only repair is restart_if_stale (walter deploy restart walter-context-preflight --require-stale): it restarts only when the service is stale (evidence service_stale: true) and the deploy repair is switched on, at most once per hour; rc 3 = fresh or repair off, a restart cannot help: answer needs_owner if the Router/provider cause persists."],
+ "evidence": {"service_down": [["systemctl","status","--no-pager","-n","0","{unit}"], ["journalctl","-u","{unit}","-n","40","--no-pager","-o","short-iso"]], "service_unhealthy": [["journalctl", "-u", "walter-context-preflight", "-n", "40", "--no-pager", "-o", "short-iso"]],
+              "preflight_degraded": [["walter", "deploy", "restart", "walter-context-preflight", "--dry-run"], ["journalctl", "-u", "walter-context-preflight", "-n", "40", "--no-pager", "-o", "short-iso"]]},
+ "actions": {
+  "restart_unit": {"level": "G1", "describe": "restart the context preflight",
+                   "command": ["systemctl", "restart", "{unit}"], "params": {"unit": ["walter-context-preflight"]}},
+  "restart_if_stale": {"level": "G1", "describe": "restart the preflight only if it runs code older than the code on disk (gated: once per hour, deploy repair switch)",
+                       "command": ["walter", "deploy", "restart", "walter-context-preflight", "--require-stale"], "timeout_seconds": 180}
+ },
+ "fallback": {"service_down": {"action": "restart_unit", "params": {"unit": "unit"}},
+              "preflight_degraded": {"action": "restart_if_stale"}},
+ "settle_seconds": 15
+}

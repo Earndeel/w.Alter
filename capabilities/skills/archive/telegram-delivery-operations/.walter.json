@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/telegram-delivery-operations",
+  "sha": "cfb26c1b3765a9436510d086f1748681feb0cf490a857a05c9a1a87b367c8c5f",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "cfb26c1b3765a9436510d086f1748681feb0cf490a857a05c9a1a87b367c8c5f"
+}

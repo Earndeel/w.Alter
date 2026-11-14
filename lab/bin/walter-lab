@@ -1,0 +1,4 @@
+#!/bin/sh
+# walter-lab: measured experiments on Walter (shared runtime: needs PyYAML for experiment files).
+root="$(dirname "$(readlink -f "$0")")/.."
+PYTHONPATH="$root" exec walter-python -m walter_lab.cli "$@"

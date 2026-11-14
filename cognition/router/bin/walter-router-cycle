@@ -1,0 +1,41 @@
+#!/bin/bash
+# Walter Router 48 h cycle:
+#   1. research + analysis: every source fetched by the router itself (research/), understood and organised in the
+#      database, models ranked, active library written (analysis/); no message yet
+#   2. research agent, one delegation to Walter Engine (2026-11-13; before, a Hermes loop): reads the cycle digest,
+#      checks names on the web; the Router applies its "same model" links through the validated alias-add; report only
+#   3. analysis again with the new name links, then Telegram (only news worth it: a model above an active one…)
+#   4. Hermes auxiliary jobs follow the postes; the agents' brief is rewritten (profiles re-rendered when it
+#      changed); interface: the library page is republished; then the guardian (own unit) follows up what is
+#      still broken: stale source, provider down, failing test
+# A failing source keeps its last good snapshot; step 2 never blocks the cycle.
+# Instance bindings (Hermes home, log folder, rendered agent prompt, library URL) come from the active Walter
+# instance through `walter-router instance-env`.
+set -uo pipefail
+WR=walter-router
+export HOME="${HOME:-$(getent passwd "$(id -un)" | cut -d: -f6)}"
+eval "$("$WR" instance-env)" || { echo "[cycle] no instance bindings"; exit 1; }
+export HERMES_HOME
+mkdir -p "$LOG"
+day=$(date -u +%Y%m%d)
+
+echo "[cycle] 1/4 research + analysis (no message yet)"
+"$WR" refresh --no-notify || exit 1   # a failed refresh fails the unit (Telegram only after 2 failed cycles)
+
+echo "[cycle] 2/4 research agent on Walter Engine (names checked on the web; the Router applies the validated links)"
+timeout 1300 "$WR" analyze > "$LOG/analysis-run-$day.json" 2>&1 \
+  || echo "[cycle] research agent failed (exit $?) — see $LOG/analysis-run-$day.json"
+
+echo "[cycle] plans: meters, billing mails, web research on the plans, cost price of a token"
+timeout 1500 "$WR" research plans > "$LOG/plans-$day.json" 2>&1 || echo "[cycle] plans research failed (non-blocking)"
+
+echo "[cycle] 3/4 analysis with the new name links, then Telegram (only: a new model above an active one)"
+"$WR" refresh --skip-collect || exit 1
+echo "[cycle] 4/4 Hermes auxiliary jobs follow the postes (no-op while Hermes is retired); library page republished"
+"$WR" sync-hermes --apply > "$LOG/sync-hermes-$day.json" 2>&1 || echo "[cycle] sync-hermes failed (non-blocking)"
+"$WR" brief --write || echo "[cycle] agents' brief not written (non-blocking)"
+echo "[cycle] library page ${LIBRARY_URL:-(not published by this instance)} (Cloudflare Access)"
+"$WR" publish-library || echo "[cycle] library page not published (non-blocking)"
+echo "[cycle] guardian started on its own unit: what this cycle left broken is followed up (guardian/README.md)"
+systemctl start --no-block walter-router-guardian.service || echo "[cycle] guardian not started (non-blocking)"
+exit 0

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/authenticated-usage-verification",
+  "sha": "e8f45416f3dc1480e5ce3d03f1ba84c8ffb49985006382886a8f53bdbc0cc5a2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e8f45416f3dc1480e5ce3d03f1ba84c8ffb49985006382886a8f53bdbc0cc5a2"
+}

@@ -1,0 +1,7 @@
+# Deploy freshness (walter deploy, SOCLE A8). Instance override: @instance/config/core/deploy.toml.
+[repair]
+# The core guardian's repair `walter deploy restart <unit>` really restarts a stale service only when true.
+# Off: `walter deploy check` and the guardian still report every stale service (warning, not handed to the
+# guardian), and `walter deploy restart` answers `defer:repair_disabled` without touching systemd.
+# Turned on by the orchestrator at deployment (2026-11-11 lot O).
+enabled = false

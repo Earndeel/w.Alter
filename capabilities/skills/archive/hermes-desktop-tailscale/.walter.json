@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-tailscale",
+  "sha": "cfb6db546a9dbfe369f6a4fb94407f077272422c17f60c55f39e6cd9e02a1294",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "cfb6db546a9dbfe369f6a4fb94407f077272422c17f60c55f39e6cd9e02a1294"
+}

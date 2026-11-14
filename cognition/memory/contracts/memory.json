@@ -1,0 +1,365 @@
+{
+  "id": "memory",
+  "anchors": [
+    "contracts/memory.json",
+    "walter_memory/events.py",
+    "walter_memory/objects.py",
+    "walter_memory/client.py",
+    "walter_memory/read_policy.py",
+    "ports/hermes/__init__.py",
+    "walter_memory/overland.py"
+  ],
+  "requires": [],
+  "external": [
+    "PostgreSQL hindsight-pg:5433",
+    "pgvector",
+    "walter-llm for derived extraction"
+  ],
+  "data": [
+    "core.*",
+    "ingestion.*",
+    "privacy.*",
+    "search.*",
+    "system.*",
+    "kardex.*",
+    "extraction.*",
+    "processing.*"
+  ],
+  "core_paths": [
+    "walter_memory/events.py",
+    "walter_memory/objects.py"
+  ],
+  "backup_paths": [
+    ".",
+    "/root/.pgpass",
+    "@instance/bootstrap/overland.env"
+  ],
+  "interfaces": [
+    "Python library",
+    "HTTP :8890",
+    "CLI",
+    "MCP",
+    "Overland authenticated HTTP :3010",
+    "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer",
+    "HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience)",
+    "CLI tasks list|show|update|sweep|triage-redecide [--execute]; CLI experience [--thread] [--query]"
+  ],
+  "bindings": {
+    "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
+    "dsh": "common MCP",
+    "codex": "common MCP",
+    "claude-code": "common MCP",
+    "voice": "Authenticated canonical gateway through voice-memory HTTP port"
+  },
+  "limitations": [
+    "Canonical reads exclude stale, retracted, private and unprovenanced legacy cognitive rows.",
+    "Wild profile reads are refused by the cloud-safe port; local-only history remains local.",
+    "Existing desktop provider instances change on next session initialization; not force-restarted."
+  ],
+  "services": [
+    "walter-memory-gateway",
+    "walter-memory-overland",
+    "walter-memory-pipeline"
+  ],
+  "optional": [
+    "llm"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.2.0",
+    "owner": "memory",
+    "kind": "capability",
+    "purpose": "Posséder les événements et objets canoniques, leur provenance et les connaissances dérivées.",
+    "target_root": "cognition/memory",
+    "config_paths": [
+      ".env"
+    ],
+    "permissions": [
+      "classification de confidentialité",
+      "budget des traitements modèle"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "mcp",
+        "interface": "memory_recall",
+        "access": "read",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "retain",
+        "transport": "mcp",
+        "interface": "memory_retain",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "reflect",
+        "transport": "mcp",
+        "interface": "memory_reflect",
+        "access": "execute",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "postgres:core",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "canonical"
+      },
+      {
+        "id": "postgres:ingestion",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "configuration"
+      },
+      {
+        "id": "postgres:privacy",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "configuration"
+      },
+      {
+        "id": "postgres:search",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "projection"
+      },
+      {
+        "id": "postgres:system",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "configuration"
+      },
+      {
+        "id": "postgres:kardex",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "projection"
+      },
+      {
+        "id": "embedding-models",
+        "role": "owner",
+        "owner": "memory",
+        "durability": "projection"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "privacy-provenance",
+        "assertion": "Les lectures refusent les sources privées, purgées ou rétractées et les fragments périmés.",
+        "scope": "integration"
+      },
+      {
+        "id": "temporal-decisions",
+        "assertion": "Les décisions datées et remplacées ne sont pas présentées comme des instructions actuelles.",
+        "scope": "live"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Memory",
+    "order": 10,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "tools": [
+      "memory_context",
+      "memory_search",
+      "memory_events",
+      "person_lookup",
+      "memory_retain"
+    ]
+  },
+  "components": [
+    {
+      "id": "events",
+      "path": "walter_memory/events.py",
+      "role": "Journal canonique core.events (append-only, idempotent)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:core"
+      ],
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "media",
+      "path": "walter_memory/media.py",
+      "role": "Dérivation des médias du Raw Vault (A5) : audio → transcription (poste stt), document → extraction locale, image → OCR/légende (poste vision, désactivé) ; pilotée par le bus (memory.object), texte sur core.objects.derived_*",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:core",
+        "postgres:processing"
+      ],
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "gateway",
+      "path": "walter_memory/gateway.py",
+      "role": "Seule porte d'écriture (127.0.0.1:8890)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:8890/v1"
+        }
+      ],
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "connectors",
+      "path": "connectors",
+      "role": "Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory/connectors"
+    },
+    {
+      "id": "organic",
+      "path": "walter_memory/organic.py",
+      "role": "Mémoire organique V1 (vues, épisodes, périodes, flux)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "assimilation",
+      "path": "walter_memory/assimilation.py",
+      "role": "Assimilation pilotée par le bus (memory.organic)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "runs",
+      "path": "walter_memory/runs.py",
+      "role": "Run Plane (runs, tâches déléguées et objectifs durables du propriétaire A3, épisodes de run et expérience A4)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:runs"
+      ],
+      "vision_target": "core/orchestration"
+    },
+    {
+      "id": "kardex",
+      "path": "walter_memory/social.py",
+      "role": "Couche sociale Kardex (schéma kardex)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:kardex"
+      ],
+      "vision_target": "cognition/memory/kardex"
+    },
+    {
+      "id": "search",
+      "path": "walter_memory/search.py",
+      "role": "Index de recherche (search.chunks)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "privacy",
+      "path": "walter_memory/privacy.py",
+      "role": "Classes de confidentialité et règle de lecture",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "disclosure",
+      "path": "walter_memory/disclosure.py",
+      "role": "Contrôle de divulgation des messages sortants",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/security"
+    },
+    {
+      "id": "llm-client",
+      "path": "walter_memory/llm.py",
+      "role": "Appels de modèles de Memory (refuse local_only, budgets) ; clés par autorisation Walter Secrets (allow memory), sans repli fichier",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory"
+    },
+    {
+      "id": "migrations",
+      "path": "migrations",
+      "role": "Migrations Postgres",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/memory/migrations"
+    },
+    {
+      "id": "hermes-plugin",
+      "path": "hermes-plugins",
+      "role": "Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7)",
+      "status": "active",
+      "readme": "README.md"
+    },
+    {
+      "id": "overland",
+      "path": "walter_memory/overland.py",
+      "role": "Réception GPS (Overland, :3010)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:3010"
+        }
+      ],
+      "vision_target": "cognition/memory/connectors"
+    }
+  ]
+}

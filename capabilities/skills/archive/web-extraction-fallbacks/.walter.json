@@ -1,0 +1,17 @@
+{
+ "absorbed_into": "universal-web-extraction-router",
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "merged into universal-web-extraction-router (2026-11-01 reorganisation)",
+ "domain": "web",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/web-extraction-fallbacks",
+  "sha": "29b24b6486387614a8bd506f97dfd2baf659dfd67a797dd7d897fda1ed7c291c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "29b24b6486387614a8bd506f97dfd2baf659dfd67a797dd7d897fda1ed7c291c"
+}

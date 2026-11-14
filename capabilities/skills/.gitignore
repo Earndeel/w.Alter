@@ -1,0 +1,5 @@
+bench/data/
+__pycache__/
+.cache/
+.worktrees/
+.config/

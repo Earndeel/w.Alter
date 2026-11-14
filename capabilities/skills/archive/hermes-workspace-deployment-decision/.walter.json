@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-workspace-deployment-decision",
+  "sha": "ecab8dc0d123a8343a73420fd79ec921a2602b0728e9401f10f132031a6499f0",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "ecab8dc0d123a8343a73420fd79ec921a2602b0728e9401f10f132031a6499f0"
+}

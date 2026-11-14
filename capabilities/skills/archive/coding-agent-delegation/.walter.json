@@ -1,0 +1,12 @@
+{
+ "domain": "autonomous-ai-agents",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/coding-agent-delegation",
+  "sha": "6ac589605a83864d615d05d10f92fccc80f643010c135228d9fe561f15ebb0fe",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "6ac589605a83864d615d05d10f92fccc80f643010c135228d9fe561f15ebb0fe"
+}

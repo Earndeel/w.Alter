@@ -1,0 +1,15 @@
+{
+ "archived_at": "2026-11-14T04:14:13+00:00",
+ "archived_reason": "not read for 30 days",
+ "domain": "scena",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/scena-image-routing",
+  "sha": "a49dbfcdaa282a8da13d992373d72d1e983a5259004ea5c9e410311b57b2d4a7",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "a49dbfcdaa282a8da13d992373d72d1e983a5259004ea5c9e410311b57b2d4a7"
+}

@@ -1,0 +1,311 @@
+{
+  "id": "context",
+  "anchors": [
+    "contracts/context.json",
+    "ports/dsh/index.mjs",
+    "ports/hermes/__init__.py",
+    "walter_context/compress/session.py"
+  ],
+  "requires": [],
+  "external": [
+    "Python 3.11+ standard library for local compression; optional public clients are loaded only by their consuming operation",
+    "Host compaction/context APIs; DSH retains its own raw journal"
+  ],
+  "data": [
+    "per-session projection epochs and caches (ephemeral)",
+    "preflight plans/pack observations and published module notes in instance state; canonical sources stay owned by Memory/Logs/Skills"
+  ],
+  "core_paths": [
+    "walter_context"
+  ],
+  "backup_paths": [
+    "."
+  ],
+  "interfaces": [
+    "Python Session (walter_context.compress)",
+    "Hermes ContextEngine adapter",
+    "DSH CompactionEngine adapter",
+    "CLI walter-context",
+    "CLI walter-context capability router (versioned stable note)",
+    "Python walter_context.capabilities.TurnNotes",
+    "JSON bridge op=capability for trusted module notes",
+    "CLI walter-context capability all [--write] (Modules W.Alter layer from walter present notes)",
+    "HTTP 127.0.0.1:8897 preflight (POST /preflight[?shadow=1], GET /health; CLI walter-context-preflight goes through it)",
+    "Python walter_context.retrieval.gather and walter_context.assembly.pack",
+    "Python walter_context.child.build; CLI walter-context-child (ChildContextSpec v1 JSON)",
+    "POST /preflight?inject=1 -> plan/text/pack/degraded/error (degraded = decision failed, prudent L3 plan, SOCLE A2; pack.cuts = blocks cut to the level budget); POST /preflight?shadow=1 -> private instance record without injection",
+    "CLI walter-context-entrance (Claude Code PostToolUse event on stdin; --report) — large tool outputs on their way in, shadow",
+    "In-process walter.context.window: globalThis[Symbol.for('walter.context.window')](agent, {plan}, signal) published by the DSH port -> window decision report {applied, reason, warm, turns, tokens, measured_tokens} (SOCLE A1; the kernel isolates its compaction service, the engine's intake plugin calls this entry at each owner turn)"
+  ],
+  "bindings": {
+    "hermes": "native compressor until walter-context replaces it (plan lot 6)",
+    "dsh": "Walter Engine (dsh-web): public checkpoint adapter selected by composition; per-message context through the engine's native intake plugin (core/engine/plugins/intake, mode native, inject pack by default) calling POST /preflight?inject=1; the legacy Memory block only when the preflight fails or times out (verified 2026-11-11 in /opt/dsh/home/cordis.patch.yml)",
+    "codex": "Native compaction; additive module notes and hook preflight",
+    "claude-code": "Native compaction; additive module notes and hook preflight; entrance reduction of large tool outputs in SHADOW (hook PostToolUse, records numbers only)",
+    "router": "Text sub-agents request ChildContextSpec v1 through walter-context-child; caller-only mode remains available"
+  },
+  "limitations": [
+    "DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.",
+    "Hermes runs its native compressor (walter-compress retired 2026-10-21); the walter-context Hermes port is not activated.",
+    "Structural and known-answer tests do not certify semantic model quality.",
+    "Capability-note preparation does not activate the lot-4 composer or inject into an unconnected host.",
+    "Memory, Skills, Core, Router, Logs and Soul are optional at module startup; their dependent operations degrade or fail when unavailable.",
+    "retrieval, assembly, preflight and child are implemented; their availability is separate from activation and semantic quality.",
+    "Source failures omit only the affected retrieval/child block and leave a note; absence of a block does not prove absence of matching knowledge.",
+    "Preflight can write plan metadata through the Memory runs CLI; it does not own canonical memory, notebooks or procedures.",
+    "Local compression has no general semantic quality proof; recoverability depends on source availability and privacy.",
+    "Entrance runs in shadow only: walter_logs records the text the model saw, so replacing an output needs the hook to journal the original first; [entrance].mode=on is refused until then."
+  ],
+  "services": [
+    "walter-context-preflight"
+  ],
+  "service_code": {
+    "dsh-web": {
+      "code_roots": [
+        "ports/dsh"
+      ]
+    }
+  },
+  "optional": [
+    "core",
+    "logs",
+    "memory",
+    "router",
+    "skills",
+    "soul"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.3.0",
+    "owner": "context",
+    "kind": "capability",
+    "purpose": "Préparer et ordonner le contexte par message et par sous-agent, et compresser l’historique selon le contrat du harness ; les données canoniques restent dans leurs modules propriétaires.",
+    "target_root": "cognition/context",
+    "config_paths": [
+      "config/walter-context.toml"
+    ],
+    "permissions": [
+      "limites du modèle et du harness",
+      "confidentialité des originaux récupérés"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "library",
+        "interface": "Session / ContextEngine / CompactionEngine",
+        "access": "read",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "capability-note",
+        "transport": "library",
+        "interface": "router note preparation and TurnNotes",
+        "access": "read",
+        "timeout_seconds": 10,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "preflight",
+        "transport": "http",
+        "interface": "POST /preflight[?shadow=1|?inject=1]",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "target"
+      },
+      {
+        "id": "child",
+        "transport": "cli",
+        "interface": "walter-context-child, ChildContextSpec v1",
+        "access": "read",
+        "timeout_seconds": 45,
+        "timeout_status": "target"
+      },
+      {
+        "id": "publish-module-notes",
+        "transport": "cli",
+        "interface": "walter-context capability all --write",
+        "access": "write",
+        "timeout_seconds": 150,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "context-session-state",
+        "role": "owner",
+        "owner": "context",
+        "durability": "ephemeral"
+      },
+      {
+        "id": "postgres:walter_logs",
+        "role": "consumer",
+        "owner": "logs",
+        "durability": "canonical"
+      },
+      {
+        "id": "postgres:core",
+        "role": "consumer",
+        "owner": "memory",
+        "durability": "canonical"
+      },
+      {
+        "id": "skills-git-store",
+        "role": "consumer",
+        "owner": "skills",
+        "durability": "canonical"
+      },
+      {
+        "id": "context-preflight-observations",
+        "role": "owner",
+        "owner": "context",
+        "durability": "projection"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "context-retention",
+        "assertion": "Les contraintes, instructions, références et budgets survivent aux checkpoints répétés ou l’opération est refusée.",
+        "scope": "integration"
+      },
+      {
+        "id": "semantic-quality",
+        "assertion": "Un corpus fixé à l’avance respecte les seuils de qualité, coût et rétention visible.",
+        "scope": "live"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "components": [
+    {
+      "id": "preflight",
+      "path": "walter_context/preflight",
+      "role": "Décision unique par message : ContextPlan (intention, niveau, capacités, voie rapide)",
+      "status": "active",
+      "readme": "README.md",
+      "contracts": [
+        "contracts/schemas/context-plan.v2.json"
+      ],
+      "interfaces": [
+        {
+          "transport": "http",
+          "interface": "127.0.0.1:8897/preflight"
+        }
+      ],
+      "vision_target": "cognition/context/preflight"
+    },
+    {
+      "id": "assembly",
+      "path": "walter_context/assembly.py",
+      "role": "Assemblage du contexte selon le plan (pack)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/context"
+    },
+    {
+      "id": "child",
+      "path": "walter_context/child.py",
+      "role": "ChildContextSpec : dossier de départ d'un sous-agent",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-context-child"
+        }
+      ],
+      "vision_target": "cognition/context"
+    },
+    {
+      "id": "compress",
+      "path": "walter_context/compress",
+      "role": "Moteur de compaction (projection head→record→compact→live)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/context/compress"
+    },
+    {
+      "id": "recover",
+      "path": "walter_context/recover.py",
+      "role": "Retrouver l'original d'une sortie compactée (walter_logs)",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-context recover"
+        }
+      ],
+      "vision_target": "cognition/context"
+    },
+    {
+      "id": "dsh-port",
+      "path": "ports/dsh",
+      "role": "Prise DSH : fenêtre du tour du propriétaire (frontière par pertinence, A1), point de contrôle sous pression, context_recover",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "core/engine/plugins",
+      "interfaces": [
+        {
+          "transport": "library",
+          "interface": "walter.context.window"
+        }
+      ]
+    },
+    {
+      "id": "bench",
+      "path": "bench",
+      "role": "Bancs (levels, replay, quality, acceptance)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/context/bench"
+    },
+    {
+      "id": "session-state",
+      "path": "contracts/schemas/session-state.v1.json",
+      "role": "État de travail par fil (SessionState v1)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/context/contracts"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "mcp",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/mcp-oauth-troubleshooting",
+  "sha": "f05d3e970f58f94b0cce6c20bb8bc5141824a26651fc5bd264ac328b4e02185a",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "f05d3e970f58f94b0cce6c20bb8bc5141824a26651fc5bd264ac328b4e02185a"
+}

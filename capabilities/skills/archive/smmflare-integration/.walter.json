@@ -1,0 +1,15 @@
+{
+ "archived_at": "2026-10-23T04:15:09+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "misc",
+ "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
+  "path": "/root/.hermes/skills/smmflare-integration",
+  "sha": "41913678ce8dc8f6d7d0e405adaad1e88cc4e06fed7412a6edbb930ef8651c5c",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "26959114e5ff1b7bad16e8480eda94662c1734c1701dc5236731131f2b94409a"
+}

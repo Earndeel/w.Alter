@@ -1,0 +1,12 @@
+{
+ "domain": "software-development",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/conversational-intake-orchestration",
+  "sha": "8bef0b17aa1d0b14b129df4d51808ba55cdf04a4edf66cb6c38c11d72ce82b5e",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "8bef0b17aa1d0b14b129df4d51808ba55cdf04a4edf66cb6c38c11d72ce82b5e"
+}

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GSAP Cinematic Landing</title>
+<!-- GSAP plugins: copy from node_modules/gsap/dist/ to local js/ -->
+<script src="js/gsap.min.js"></script>
+<script src="js/ScrollTrigger.min.js"></script>
+<script src="js/ScrollSmoother.min.js"></script>
+<script src="js/ScrollToPlugin.min.js"></script>
+<script src="js/SplitText.min.js"></script>
+<script src="js/ScrambleTextPlugin.min.js"></script>
+<script src="js/DrawSVGPlugin.min.js"></script>
+<script src="js/MorphSVGPlugin.min.js"></script>
+<script src="js/MotionPathPlugin.min.js"></script>
+<script src="js/Flip.min.js"></script>
+<script src="js/Observer.min.js"></script>
+<script src="js/CustomEase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#030303;--bg2:#08080a;--txt:#f0f0f0;--muted:#555;--a1:#8b5cf6;--a2:#06b6d4;--a3:#f472b6}
+html{scroll-behavior:auto}
+body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--txt);overflow-x:hidden;cursor:none}
+
+/* cursor */
+.cursor{position:fixed;width:10px;height:10px;border-radius:50%;background:var(--a2);pointer-events:none;z-index:99999;mix-blend-mode:difference;will-change:transform}
+.cursor-trail{position:fixed;width:40px;height:40px;border-radius:50%;border:1px solid rgba(6,182,212,.3);pointer-events:none;z-index:99998;will-change:transform}
+
+/* grain + vignette */
+.grain{position:fixed;inset:0;z-index:99997;pointer-events:none;opacity:.04;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-repeat:repeat;background-size:200px}
+.vignette{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.7) 100%)}
+
+/* progress */
+.progress{position:fixed;top:0;left:0;height:2px;z-index:99999;background:linear-gradient(90deg,var(--a1),var(--a2),var(--a3));width:0%;mix-blend-mode:screen}
+
+/* nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:1.2rem 2.5rem;display:flex;justify-content:space-between;align-items:center;mix-blend-mode:difference}
+nav .logo{font-weight:700;font-size:1.1rem}nav .logo span{color:var(--a2)}
+nav .links{display:flex;gap:2rem;font-family:'JetBrains Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.15em}
+nav .links a{color:var(--muted);text-decoration:none;transition:color .3s}nav .links a:hover{color:var(--txt)}
+
+/* buttons */
+.btn{padding:.85rem 2rem;border-radius:100px;font-family:inherit;font-size:.8rem;font-weight:600;cursor:none;border:none;position:relative;overflow:hidden;letter-spacing:.05em;text-transform:uppercase;transition:transform .2s;display:inline-flex;align-items:center;gap:.5rem;text-decoration:none}
+.btn:hover{transform:translateY(-2px)}
+.btn-pri{background:linear-gradient(135deg,var(--a1),var(--a2));color:#fff}.btn-pri::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--a2),var(--a3));opacity:0;transition:opacity .4s}.btn-pri:hover::before{opacity:1}.btn span{position:relative;z-index:1}
+.btn-sec{background:transparent;color:var(--txt);border:1px solid rgba(255,255,255,.12)}
+
+section{position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+
+/* HERO */
+.hero{min-height:100vh;flex-direction:column;text-align:center;padding:0 2rem}
+.hero-eyebrow{font-family:'JetBrains Mono',monospace;font-size:.65rem;text-transform:uppercase;letter-spacing:.3em;color:var(--a2);margin-bottom:2rem}
+.hero h1{font-size:clamp(2.8rem,9vw,8.5rem);font-weight:700;line-height:.92;letter-spacing:-.04em;max-width:1100px;perspective:1000px}
+.hero h1 .word{display:inline-block;overflow:hidden}.hero h1 .word-inner{display:inline-block;transform-style:preserve-3d}
+.hero-sub{font-size:clamp(1rem,1.8vw,1.25rem);color:var(--muted);max-width:520px;margin:2.5rem 0 3rem;line-height:1.6;font-weight:300}
+.hero-actions{display:flex;gap:1rem;justify-content:center}
+
+/* orbs */
+.orb{position:absolute;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:-1}
+.orb-1{width:500px;height:500px;background:rgba(139,92,246,.15);top:-10%;left:-10%}
+.orb-2{width:400px;height:400px;background:rgba(6,182,212,.12);bottom:-10%;right:-10%}
+.orb-3{width:300px;height:300px;background:rgba(244,114,182,.1);top:40%;right:15%}
+
+/* data orbs */
+.data-orb{position:absolute;font-family:'JetBrains Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted)}
+.data-orb span{display:block;color:var(--a2);font-size:.8rem;margin-top:.2rem;font-weight:700}
+.do1{top:18%;left:5%}.do2{top:28%;right:6%}.do3{bottom:22%;left:7%}.do4{bottom:18%;right:5%}
+
+.spacer{height:20vh}
+
+/* sections common */
+.section-block{padding:8rem 2rem;flex-direction:column}
+.section-head{text-align:center;margin-bottom:4rem;max-width:700px}
+.section-head .eyebrow{font-family:'JetBrains Mono',monospace;font-size:.65rem;text-transform:uppercase;letter-spacing:.3em;color:var(--a1);margin-bottom:1rem}
+.section-head h2{font-size:clamp(2rem,5vw,3.5rem);font-weight:700;line-height:1;letter-spacing:-.03em}
+.section-head p{color:var(--muted);font-size:1.1rem;margin-top:1rem;line-height:1.6}
+
+/* cards */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;max-width:1100px;width:100%}
+.card{padding:2.5rem;border-radius:24px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);position:relative;overflow:hidden;transition:border-color .3s;text-decoration:none;color:inherit;display:block}
+.card::before{content:'';position:absolute;inset:-1px;border-radius:24px;padding:1px;background:linear-gradient(135deg,rgba(139,92,246,.3),rgba(6,182,212,.2),transparent 60%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;opacity:0;transition:opacity .3s}
+.card:hover::before{opacity:1}.card:hover{border-color:rgba(139,92,246,.2)}
+.card .num{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--a2);margin-bottom:1.5rem;display:block}
+.card h3{font-size:1.35rem;font-weight:600;margin-bottom:.75rem}
+.card p{color:var(--muted);font-size:.9rem;line-height:1.6}
+
+/* split */
+.split-section{flex-direction:column;padding:10rem 2rem;background:var(--bg2)}
+.split-section h2{font-size:clamp(2.2rem,5.5vw,4rem);font-weight:700;text-align:center;max-width:800px;line-height:1;letter-spacing:-.03em}
+.split-desc{color:var(--muted);font-size:1.1rem;margin-top:2rem;text-align:center;max-width:500px;line-height:1.7}
+
+/* svg */
+.svg-section{flex-direction:column;padding:8rem 2rem;background:var(--bg2)}
+.svg-label{font-family:'JetBrains Mono',monospace;font-size:.65rem;text-transform:uppercase;letter-spacing:.3em;color:var(--a1);margin-bottom:2rem}
+.draw-svg{width:350px;height:350px}.draw-svg *{fill:none;stroke:var(--a2);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}.draw-svg .a1{stroke:var(--a1)}.draw-svg .a3{stroke:var(--a3)}
+
+/* pinned */
+.pin-section{padding:0}
+.pin-panel{width:100%;min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative}
+.pin-panel:nth-child(odd){background:var(--bg)}.pin-panel:nth-child(even){background:var(--bg2)}
+.pin-content{display:grid;grid-template-columns:1fr 1fr;gap:4rem;max-width:1200px;padding:0 2rem;align-items:center;width:100%}
+.pin-text h3{font-family:'JetBrains Mono',monospace;font-size:.65rem;text-transform:uppercase;letter-spacing:.3em;color:var(--a1);margin-bottom:1.5rem}
+.pin-text h2{font-size:clamp(2rem,4vw,3.2rem);font-weight:700;margin-bottom:1.5rem;line-height:1.1}
+.pin-text p{color:var(--muted);font-size:1.05rem;line-height:1.7}
+.pin-vis{aspect-ratio:1;border-radius:24px;background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(6,182,212,.08));border:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:3rem;position:relative;overflow:hidden}
+.pin-vis::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 30%,rgba(139,92,246,.15),transparent 50%)}
+.pin-prog{position:absolute;bottom:0;left:0;height:3px;background:linear-gradient(90deg,var(--a1),var(--a2));width:0%}
+
+/* cta */
+.cta-section{min-height:70vh;flex-direction:column;text-align:center;padding:8rem 2rem}
+.cta-section h2{font-size:clamp(2.5rem,7vw,5.5rem);font-weight:700;line-height:.95;letter-spacing:-.04em}
+.cta-section .grad{background:linear-gradient(135deg,var(--a3),var(--a1),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.cta-section p{color:var(--muted);font-size:1.2rem;margin:2rem 0 2.5rem;max-width:480px}
+
+footer{padding:3rem;text-align:center;border-top:1px solid rgba(255,255,255,.08);color:var(--muted);font-size:.75rem;font-family:'JetBrains Mono',monospace}
+
+@media(max-width:768px){
+.pin-content{grid-template-columns:1fr}.card-grid{grid-template-columns:1fr}
+.hero-actions{flex-direction:column;align-items:center}.data-orb{display:none}
+}
+</style>
+</head>
+<body>
+<div class="cursor" id="c"></div>
+<div class="cursor-trail" id="ct"></div>
+<div class="grain"></div>
+<div class="vignette"></div>
+<div class="progress" id="prog"></div>
+
+<nav>
+<div class="logo">BRAND<span>.AI</span></div>
+<div class="links">
+<a href="#features">Features</a>
+<a href="#showcase">Showcase</a>
+<a href="#pricing">Pricing</a>
+</div>
+</nav>
+
+<div id="smooth-wrapper">
+<div id="smooth-content">
+
+<!-- HERO -->
+<section class="hero" id="hero">
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<div class="data-orb do1">Metric A<br><span>Value</span></div>
+<div class="data-orb do2">Metric B<br><span>Value</span></div>
+<div class="data-orb do3">Metric C<br><span>Value</span></div>
+<div class="data-orb do4">Metric D<br><span>Value</span></div>
+
+<div class="hero-eyebrow">Your tagline here</div>
+<h1 id="h1">Your Headline Here</h1>
+<p class="hero-sub" id="hsub">Your subheadline describing the product in one compelling sentence.</p>
+<div class="hero-actions">
+<button class="btn btn-pri"><span>Primary CTA</span></button>
+<a class="btn btn-sec" href="#">Secondary CTA</a>
+</div>
+</section>
+
+<div class="spacer"></div>
+
+<!-- FEATURES -->
+<section class="section-block" id="features">
+<div class="section-head">
+<div class="eyebrow">Features</div>
+<h2 id="suiteTitle">What you get.</h2>
+<p>Describe your product suite in a short paragraph.</p>
+</div>
+<div class="card-grid">
+<div class="card"><span class="num">01</span><h3>Feature One</h3><p>Description of the first feature.</p></div>
+<div class="card"><span class="num">02</span><h3>Feature Two</h3><p>Description of the second feature.</p></div>
+<div class="card"><span class="num">03</span><h3>Feature Three</h3><p>Description of the third feature.</p></div>
+</div>
+</section>
+
+<div class="spacer"></div>
+
+<!-- SPLIT TEXT -->
+<section class="split-section">
+<h2 id="splitTitle">A statement that moves.</h2>
+<p class="split-desc">Supporting description for the split text section.</p>
+</section>
+
+<div class="spacer"></div>
+
+<!-- SVG DRAW -->
+<section class="svg-section">
+<div class="svg-label">Visual pipeline</div>
+<svg class="draw-svg" viewBox="0 0 400 400">
+<path d="M200 50 L350 200 L200 350 L50 200 Z"/>
+<path d="M200 80 L320 200 L200 320 L80 200 Z" class="a1"/>
+<circle cx="200" cy="200" r="60" class="a3"/>
+<circle cx="200" cy="200" r="100"/>
+<line x1="200" y1="20" x2="200" y2="380"/>
+<line x1="20" y1="200" x2="380" y2="200"/>
+<path d="M200 120 Q280 120 280 200 T200 280 T120 200 T200 120" class="a1"/>
+<path d="M200 150 Q250 150 250 200 T200 250 T150 200 T200 150" class="a3"/>
+</svg>
+<p style="color:var(--muted);margin-top:2rem;font-size:.875rem;text-align:center">Pipeline description</p>
+</section>
+
+<div class="spacer"></div>
+
+<!-- PINNED SHOWCASE -->
+<section class="pin-section" id="showcase">
+<div class="pin-panel">
+<div class="pin-prog"></div>
+<div class="pin-content">
+<div class="pin-text">
+<h3>Step 01</h3>
+<h2>First Pinned Panel</h2>
+<p>Describe what happens in this step. Content animates in on scroll, then out before the next panel.</p>
+</div>
+<div class="pin-vis">🚀</div>
+</div>
+</div>
+<div class="pin-panel">
+<div class="pin-prog"></div>
+<div class="pin-content">
+<div class="pin-text">
+<h3>Step 02</h3>
+<h2>Second Pinned Panel</h2>
+<p>Describe the second step. Each panel is pinned for 130% of viewport height.</p>
+</div>
+<div class="pin-vis">⚡</div>
+</div>
+</div>
+<div class="pin-panel">
+<div class="pin-prog"></div>
+<div class="pin-content">
+<div class="pin-text">
+<h3>Step 03</h3>
+<h2>Third Pinned Panel</h2>
+<p>Describe the third step. Progress bar at bottom tracks scroll progress.</p>
+</div>
+<div class="pin-vis">🎯</div>
+</div>
+</div>
+</section>
+
+<div class="spacer"></div>
+
+<!-- CTA -->
+<section class="cta-section" id="pricing">
+<h2 id="ctaTitle">Ready to <span class="grad">start</span>?</h2>
+<p>Final call-to-action paragraph.</p>
+<div class="hero-actions">
+<button class="btn btn-pri"><span>Get Started</span></button>
+<a class="btn btn-sec" href="#">Learn More</a>
+</div>
+</section>
+
+<footer>
+© <span id="year"></span> Brand · Your tagline.
+</footer>
+
+</div><!-- /smooth-content -->
+</div><!-- /smooth-wrapper -->
+
+<script>
+gsap.registerPlugin(ScrollTrigger,ScrollSmoother,ScrollToPlugin,SplitText,DrawSVGPlugin,Flip,Observer,CustomEase);
+
+// SMOOTH SCROLL
+ScrollSmoother.create({wrapper:'#smooth-wrapper',content:'#smooth-content',smooth:1.5,effects:true});
+
+// CURSOR
+const c=document.getElementById('c'),ct=document.getElementById('ct');
+let mx=0,my=0,fx=0,fy=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY});
+function ac(){fx+=(mx-fx)*.15;fy+=(my-fy)*.15;c.style.transform=`translate(${mx-5}px,${my-5}px)`;ct.style.transform=`translate(${fx-20}px,${fy-20}px)`;requestAnimationFrame(ac)}
+ac();
+
+// GLOBAL PROGRESS
+gsap.to('#prog',{width:'100%',ease:'none',scrollTrigger:{trigger:'body',start:'top top',end:'bottom bottom',scrub:true}});
+
+// HERO
+const h1s=new SplitText('#h1',{type:'words'});
+h1s.words.forEach(w=>{const d=document.createElement('span');d.className='word';w.parentNode.insertBefore(d,w);d.appendChild(w);w.className='word-inner'});
+gsap.timeline({delay:.3})
+.from('#h1 .word-inner',{y:'120%',rotateX:-90,opacity:0,duration:1.2,ease:'power4.out',stagger:.06,transformOrigin:'center bottom'})
+.from('.hero-eyebrow',{opacity:0,y:20,duration:.8,ease:'power2.out'},.2)
+.to('#hsub',{opacity:1,y:0,duration:.8,ease:'power2.out'},.6)
+.from('.hero-actions .btn',{opacity:0,y:30,duration:.6,ease:'power2.out',stagger:.1},.8)
+.from('.data-orb',{opacity:0,duration:1,stagger:.2},.4);
+
+gsap.to('.orb-1',{y:-200,scrollTrigger:{trigger:'.hero',start:'top top',end:'bottom top',scrub:1}});
+gsap.to('.orb-2',{y:-100,scrollTrigger:{trigger:'.hero',start:'top top',end:'bottom top',scrub:1.5}});
+gsap.to('.orb-3',{y:-150,scrollTrigger:{trigger:'.hero',start:'top top',end:'bottom top',scrub:2}});
+
+gsap.to('.orb-1',{x:40,y:-30,duration:10,ease:'sine.inOut',repeat:-1,yoyo:true});
+gsap.to('.orb-2',{x:-30,y:25,duration:12,ease:'sine.inOut',repeat:-1,yoyo:true});
+gsap.to('.orb-3',{x:20,y:-20,duration:8,ease:'sine.inOut',repeat:-1,yoyo:true});
+
+// SUITE TITLE
+const st=new SplitText('#suiteTitle',{type:'words'});
+st.words.forEach(w=>{const d=document.createElement('span');d.className='word';w.parentNode.insertBefore(d,w);d.appendChild(w);w.className='word-inner'});
+gsap.from('#suiteTitle .word-inner',{y:60,opacity:0,rotateZ:3,duration:1,ease:'power3.out',stagger:.08,scrollTrigger:{trigger:'#features',start:'top 70%'}});
+
+// CARDS
+gsap.from('.card',{y:60,opacity:0,duration:.8,stagger:.12,ease:'power2.out',scrollTrigger:{trigger:'.card-grid',start:'top 80%'}});
+
+// SPLIT TEXT SECTION
+gsap.from('#splitTitle',{y:80,opacity:0,duration:1,ease:'power3.out',scrollTrigger:{trigger:'.split-section',start:'top 70%'}});
+gsap.from('.split-desc',{y:40,opacity:0,duration:.8,scrollTrigger:{trigger:'.split-section',start:'top 60%'}});
+
+// SVG DRAW
+const dp=gsap.utils.toArray('.draw-svg path,.draw-svg circle,.draw-svg line');
+gsap.set(dp,{drawSVG:'0%'});
+gsap.to(dp,{drawSVG:'100%',duration:2,stagger:.15,ease:'power2.inOut',scrollTrigger:{trigger:'.svg-section',start:'top 60%',toggleActions:'play none none reverse'}});
+
+// PINNED PANELS
+gsap.utils.toArray('.pin-panel').forEach(panel=>{
+const text=panel.querySelector('.pin-text'),vis=panel.querySelector('.pin-vis'),prog=panel.querySelector('.pin-prog');
+ScrollTrigger.create({trigger:panel,start:'top top',end:'+=130%',pin:true,pinSpacing:true,scrub:1});
+const tl=gsap.timeline({scrollTrigger:{trigger:panel,start:'top top',end:'+=130%',scrub:1}});
+tl.from(text.children,{y:60,opacity:0,stagger:.08,duration:.3},0)
+.from(vis,{scale:.8,opacity:0,duration:.3,ease:'power2.out'},0)
+.to(prog,{width:'100%',duration:.5,ease:'none'},0)
+.to(text.children,{y:-40,opacity:0,stagger:.05,duration:.2},.75)
+.to(vis,{scale:.9,opacity:0,duration:.2},.75);
+});
+
+// CTA
+gsap.from('#ctaTitle',{y:80,opacity:0,duration:1,ease:'power3.out',scrollTrigger:{trigger:'#pricing',start:'top 70%'}});
+gsap.from('.cta-section p, .cta-section .hero-actions',{y:40,opacity:0,duration:.8,stagger:.15,scrollTrigger:{trigger:'#pricing',start:'top 60%'}});
+
+// NAV SMOOTH SCROLL
+document.querySelectorAll('nav a').forEach(link=>{
+link.addEventListener('click',e=>{e.preventDefault();gsap.to(window,{duration:1.2,scrollTo:{y:link.getAttribute('href'),offsetY:80},ease:'power3.inOut'});});
+});
+
+// MAGNETIC BUTTONS
+document.querySelectorAll('.btn').forEach(btn=>{
+btn.addEventListener('mousemove',e=>{const r=btn.getBoundingClientRect();btn.style.transform=`translate(${(e.clientX-r.left-r.width/2)*.15}px,${(e.clientY-r.top-r.height/2)*.15}px)`});
+btn.addEventListener('mouseleave',()=>btn.style.transform='');
+});
+
+// YEAR
+document.getElementById('year').textContent=new Date().getFullYear();
+</script>
+</body>
+</html>

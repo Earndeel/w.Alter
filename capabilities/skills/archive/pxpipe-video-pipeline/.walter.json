@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/pxpipe-video-pipeline",
+  "sha": "6231f6ebad836db74193cf9291d1954573217fa44183469d37b5fa33d96f0e9e",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "6231f6ebad836db74193cf9291d1954573217fa44183469d37b5fa33d96f0e9e"
+}

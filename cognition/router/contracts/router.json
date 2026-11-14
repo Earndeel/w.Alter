@@ -1,0 +1,298 @@
+{
+  "id": "router",
+  "anchors": [
+    "contracts/router.json",
+    "cli.py",
+    "docs/README.md",
+    "serve/api.py",
+    "documentation.py"
+  ],
+  "requires": [],
+  "external": [
+    "PostgreSQL models schema",
+    "leaderboard/provider APIs"
+  ],
+  "data": [
+    "models.*",
+    "config",
+    "models.guardian_incidents"
+  ],
+  "core_paths": [
+    "store/db.py"
+  ],
+  "backup_paths": [
+    ".",
+    "@instance/config/router",
+    "@instance/state/router"
+  ],
+  "interfaces": [
+    "CLI",
+    "walter-llm task routes",
+    "MCP walter_route / walter_run / walter_decide / walter_plans / walter_web / audio_transcribe",
+    "CLI walter-router transcribe FILE… (stt poste via walter-llm)",
+    "agents' brief (`walter-router brief`, @instance/state/router/brief.md)",
+    "CLI walter-router schema (public tool contract v1)",
+    "CLI walter-router docs --write/--check [--offline]",
+    "CLI walter-router brief --json (versioned orchestrator note v1)",
+    "CLI walter-router-guardian check | run | status (the module's own maintenance)"
+  ],
+  "bindings": {
+    "hermes": "router plugin (same tools, brief as a system-prompt section) + auxiliary configuration adapter",
+    "dsh": "walter-llm provider; router tools through the walter MCP + brief in the profile",
+    "codex": "router tools through the walter MCP + brief in the profile; primary model native",
+    "claude-code": "router tools through the walter MCP, brief in the server instructions; primary model native"
+  },
+  "limitations": [
+    "New model choices remain subject to the owner's approval; no automatic switching introduced.",
+    "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
+    "Text runs execute natively with bounded terminal/file tools; only providers of the selected model are tried, and callers must forward user_notice on failover.",
+    "The guardian lands repairs only in research/, analysis/parse.py, analysis/identity.py, analysis/aliases.json, interface/ and tests/, through deterministic gates; owner choices, execution policy, schema and units are never changed by it."
+  ],
+  "services": [
+    "walter-router-guardian.timer",
+    "walter-router-control.service",
+    "walter-router-quota.service"
+  ],
+  "optional": [
+    "core",
+    "browse"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.2.0",
+    "owner": "router",
+    "kind": "capability",
+    "purpose": "Choisir les modèles par poste avec décisions et coûts traçables.",
+    "target_root": "cognition/router",
+    "config_paths": [],
+    "permissions": [
+      "accord propriétaire pour changer un choix"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "mcp",
+        "interface": "walter_route",
+        "access": "read",
+        "timeout_seconds": 30,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "run",
+        "transport": "mcp",
+        "interface": "walter_run",
+        "access": "write",
+        "timeout_seconds": 3600,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "decide",
+        "transport": "mcp",
+        "interface": "walter_decide",
+        "access": "read",
+        "timeout_seconds": 40,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "transcribe",
+        "transport": "mcp",
+        "interface": "audio_transcribe",
+        "access": "read",
+        "timeout_seconds": 200,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "plans",
+        "transport": "mcp",
+        "interface": "walter_plans",
+        "access": "write",
+        "timeout_seconds": 60,
+        "timeout_status": "implemented"
+      },
+      {
+        "id": "web",
+        "transport": "mcp",
+        "interface": "walter_web",
+        "access": "write",
+        "timeout_seconds": 780,
+        "timeout_status": "implemented"
+      }
+    ],
+    "resources": [
+      {
+        "id": "postgres:models",
+        "role": "owner",
+        "owner": "router",
+        "durability": "configuration"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "route-selection",
+        "assertion": "Un poste renvoie le choix actif et un poste inconnu échoue explicitement sans sélection arbitraire.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "public": [
+    "@instance/state/router/brief.md",
+    "@instance/state/router/brief.json"
+  ],
+  "presentation": {
+    "audience": "agent",
+    "title": "Walter Router",
+    "order": 70,
+    "summary": "manifest/SUMMARY.md",
+    "manifest": "manifest/MANIFEST.md",
+    "guide": "manifest/GUIDE.md",
+    "manifest_command": [
+      "walter-router",
+      "brief",
+      "--json"
+    ],
+    "tools": [
+      "walter_route",
+      "walter_run",
+      "walter_decide",
+      "walter_plans",
+      "walter_web",
+      "audio_transcribe"
+    ],
+    "index": {
+      "command": [
+        "walter-router",
+        "tasks"
+      ],
+      "sections": "tâches (clé, libellé, interface)"
+    }
+  },
+  "components": [
+    {
+      "id": "research",
+      "path": "research",
+      "role": "Collecte des classements et prix (AA, Arena, OpenRouter…)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/router/research"
+    },
+    {
+      "id": "analysis",
+      "path": "analysis",
+      "role": "Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6)",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/router/analysis"
+    },
+    {
+      "id": "plan",
+      "path": "plan",
+      "role": "Forfaits du propriétaire et quotas",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/router/plan"
+    },
+    {
+      "id": "serve",
+      "path": "serve",
+      "role": "Choix du modèle par tâche, exécution texte et médias",
+      "status": "active",
+      "readme": "README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter-router route|pick|run"
+        }
+      ],
+      "vision_target": "cognition/router/serve"
+    },
+    {
+      "id": "oneshot",
+      "path": "serve/oneshot.py",
+      "role": "Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6)",
+      "status": "obsolete",
+      "readme": "README.md"
+    },
+    {
+      "id": "interface",
+      "path": "interface",
+      "role": "Page publique de la bibliothèque des modèles",
+      "status": "active",
+      "readme": "README.md",
+      "vision_target": "cognition/router/interface"
+    },
+    {
+      "id": "store",
+      "path": "store",
+      "role": "Schéma Postgres models (lecture/écriture)",
+      "status": "active",
+      "readme": "README.md",
+      "data": [
+        "postgres:models"
+      ],
+      "vision_target": "cognition/router/store"
+    },
+    {
+      "id": "hermes-plugin",
+      "path": "hermes-plugins",
+      "role": "Greffon Hermes walter-router — à retirer avec Hermes (E7)",
+      "status": "active",
+      "readme": "README.md"
+    },
+    {
+      "id": "guardian",
+      "path": "guardian",
+      "role": "Gardien du Router",
+      "status": "active",
+      "readme": "guardian/README.md",
+      "vision_target": "cognition/router/guardian"
+    },
+    {
+      "id": "documentation",
+      "path": "documentation.py",
+      "role": "Référence générée (CODE, CONFIGURATION, DATABASE…) contrôlée par les tests",
+      "status": "active",
+      "readme": "docs/README.md",
+      "vision_target": "cognition/router/docs"
+    }
+  ]
+}

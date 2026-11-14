@@ -1,0 +1,32 @@
+# Walter Telegram door (core/interfaces/telegram) — shipped defaults, neutral.
+# The instance overrides this file in @instance/config/core/telegram.toml (owner accounts at least).
+
+[telegram]
+# walter-secrets grant holding the bot token (never the token itself)
+grant = "telegram-walter-bot"
+# Telegram user ids served; anyone else is ignored. Empty = the door refuses to start.
+owner_ids = []
+# engine account of the owner: sessions are telegram/<account>/chat-<id>
+account = "owner"
+state = "@instance/state/core/telegram"
+
+[engine]
+url = "http://127.0.0.1:8895"
+token_file = "@instance/bootstrap/engine/api.token"
+
+[callbacks]
+# callback_data prefix (before the first « : ») → command; the door runs `<command> <data>`, which prints
+# {"ok": bool, "toast": "…", "drop": ["prefixes of the buttons to remove"]}
+wr = ["walter-router", "button"]
+
+[web]
+# conversational web services (« /gpt … »): `list` prints {"command": "service"}; `run` takes a JSON spec on stdin
+# {service, message, model?, files?: [paths], conversation, request_id} and prints {ok, reply, files: [{path, kind, mime}]}
+list = ["walter-router", "web-commands"]
+run = ["walter-router", "web"]
+
+[stt]
+# voice notes → text by Walter Router's `stt` poste through walter-llm, with the door's own agent token (0600)
+url = "http://127.0.0.1:8894"
+task = "stt"
+token_file = "@instance/bootstrap/llm/walter-telegram.env"

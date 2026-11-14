@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/memory-recall-injection",
+  "sha": "e240d39240e5ad8982906ced95e50f1a4e7ac4bb64e29de14422ff61731d46d2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "e240d39240e5ad8982906ced95e50f1a4e7ac4bb64e29de14422ff61731d46d2"
+}

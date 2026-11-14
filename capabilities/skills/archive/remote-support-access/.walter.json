@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/remote-support-access",
+  "sha": "397c16b3c6bbfc698437a1bb53cbdc8ca8f9182f066ac1b8d48ac220407badea",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "397c16b3c6bbfc698437a1bb53cbdc8ca8f9182f066ac1b8d48ac220407badea"
+}

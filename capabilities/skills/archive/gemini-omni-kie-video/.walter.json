@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/gemini-omni-kie-video",
+  "sha": "0364e73457f9d7261ed2d889981ce067acc1a475ca01894417333bb17a47cccc",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "0364e73457f9d7261ed2d889981ce067acc1a475ca01894417333bb17a47cccc"
+}

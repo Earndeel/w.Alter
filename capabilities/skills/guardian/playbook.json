@@ -1,0 +1,68 @@
+{
+ "version": 1,
+ "module": "skills",
+ "notes": [
+  "walter-skills (:8891) serves the skill library; walter-skills-bus reacts to bus events. Both restart safely.",
+  "The guardian looks after the service only, never the content of skills (that is the Curator's job)."
+ ],
+ "evidence": {
+  "service_down": [
+   [
+    "systemctl",
+    "status",
+    "--no-pager",
+    "-n",
+    "0",
+    "{unit}"
+   ],
+   [
+    "journalctl",
+    "-u",
+    "{unit}",
+    "-n",
+    "40",
+    "--no-pager",
+    "-o",
+    "short-iso"
+   ]
+  ],
+  "service_unhealthy": [
+   [
+    "journalctl",
+    "-u",
+    "walter-skills",
+    "-n",
+    "40",
+    "--no-pager",
+    "-o",
+    "short-iso"
+   ]
+  ]
+ },
+ "actions": {
+  "restart_unit": {
+   "level": "G1",
+   "describe": "restart a skills service",
+   "command": [
+    "systemctl",
+    "restart",
+    "{unit}"
+   ],
+   "params": {
+    "unit": [
+     "walter-skills",
+     "walter-skills-bus"
+    ]
+   }
+  }
+ },
+ "fallback": {
+  "service_down": {
+   "action": "restart_unit",
+   "params": {
+    "unit": "unit"
+   }
+  }
+ },
+ "settle_seconds": 15
+}

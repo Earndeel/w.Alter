@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/google-workspace-multi-account",
+  "sha": "771bab9b922f01fc724a5d0475cc253124971724c22a5ac3d44440dd9a6aa744",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "771bab9b922f01fc724a5d0475cc253124971724c22a5ac3d44440dd9a6aa744"
+}

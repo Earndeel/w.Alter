@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "module": "router",
+  "check": [
+    "python3",
+    "/walter/cognition/router/guardian/check-v1"
+  ],
+  "max_level": "G2",
+  "levels": {
+    "G0": "détection (checks.py)",
+    "G1": "sondes, relectures, régénération de la référence",
+    "G2": "réparation L2 sur copie, barrières déterministes"
+  },
+  "note": "Guardian complet : walter-router-guardian (timer 6 h). Ce contrôle n'en est que la vue Incident v1.",
+  "format": "incident-v1",
+  "timeout_seconds": 240,
+  "guardian": "self"
+}

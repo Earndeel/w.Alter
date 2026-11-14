@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
+ "reason": "The session established a recurring, multi-step procedure for auditing and consolidating Walter on its Oracle Ubuntu ARM64 VM: resolve /instances/monsieur, inventory Walter modules and systemd services, inspect PostgreSQL/network/runtimes, move projects to /srv/projects and apps to /srv/apps while retaining /root/projects compatibility links, archive unused scripts and root material, ingest personal files into the deduplicating Raw Vault, update decision records, and validate services and endpoints. It also captured hard-won pitfalls: stale paths in Hermes configuration, the need to verify /proc/<pid>/cwd, preserving reversible archives, not deleting 1.9 GB of copies without approval, and treating timed-out orchestration hooks as unexecuted until independently verified. [session claude_code/vm/50ff6bc9-d14b-4a8b-9c6f-f3f6b5ca3329]",
+ "store_sha": "79b17fa52da8cce03ad97c592fb1125921b6991d91814271073228bfecb9ce57"
+}

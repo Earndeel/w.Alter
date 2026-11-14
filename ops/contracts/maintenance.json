@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "module": "ops",
+  "check": [
+    "walter-ops",
+    "check"
+  ],
+  "format": "incident-v1",
+  "timeout_seconds": 240,
+  "max_level": "G1",
+  "levels": {
+    "G0": "constat",
+    "G1": "relancer une unité de sauvegarde existante"
+  },
+  "note": "Le guardian du module Ops (sauvegardes, git, restaurabilité) ; aucune réparation automatique au-delà de G1. Ancien id : backup (2026-10-29).",
+  "guardian": [
+    "walter-guardian",
+    "run",
+    "--module",
+    "ops"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "web",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/lawful-digital-downloads",
+  "sha": "752d449822f37e4870d86e530f034eae29c864d42b9a71bbcfd6d5bb627bc5b8",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "752d449822f37e4870d86e530f034eae29c864d42b9a71bbcfd6d5bb627bc5b8"
+}

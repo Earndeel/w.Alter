@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/cloudflare-worker-deploy-curl",
+  "sha": "1cb728f6f996abe5e327506550aeee60b28c87cf74359b4055759908b1fed7fb",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "1cb728f6f996abe5e327506550aeee60b28c87cf74359b4055759908b1fed7fb"
+}

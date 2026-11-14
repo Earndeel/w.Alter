@@ -1,0 +1,12 @@
+{
+ "domain": "email",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/email-triage-preferences",
+  "sha": "cdb4cbed3b268fb22ccbec35b63c08e82d59d3244f142abe82e48a2e443b147e",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "cdb4cbed3b268fb22ccbec35b63c08e82d59d3244f142abe82e48a2e443b147e"
+}

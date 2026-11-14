@@ -1,0 +1,92 @@
+# Memory V1 "organic memory" switches (P1). The instance overrides this file with
+# `walter instance config memory organic.toml` (an instance copy under its config/memory/).
+# Every P1 step ships behind its switch; false = the behaviour before that step.
+
+[generations]
+# P1.0: read derived knowledge only from readable generations (core.generations); false = no generation filter.
+enforce = true
+
+[extraction]
+# 2026-11-14 (owner: « met l'extraction de mémoire en pause pour l'instant », the extraction chain is to be redesigned):
+# "paused" = no model-driven derivation of conversations — L3 extraction, subject cards (views), reconsolidation,
+# run-episode summaries. Ingestion, search index, GPS flows, triage, Kardex and media keep running; pending messages
+# stay uncovered and are taken up on "active". Restart walter-memory-pipeline after a change.
+mode = "paused"
+
+[working_memory]
+# P1.1: "adaptive" (2026-11-03, owner: integrate, no long shadow) = the adaptive trigger drives extraction (long,
+# marked or directive owner messages at once, the rest grouped) and the working state is injected by Context;
+# "shadow" = extraction keeps its 20-minute policy, states only recorded (extraction.working_shadow); "off" = neither.
+mode = "adaptive"
+
+[consolidation]
+# P1.2: g1 subject views rebuilt from current V1 knowledge and evidence (status 'shadow': built, not served).
+# "active" (2026-11-03) = views served, reconsolidation applies only the safe proposals (strict duplicates, finished
+# task items, replaced decisions; never closes a durable rule — those stay proposals in views.ledger);
+# "shadow" = views built, proposals recorded only; "off" = nothing.
+mode = "active"
+# Router tier for reconsolidation (the memory_extraction route proposed nothing on real subjects; L3 did, 2026-11-02)
+poste = "general/L3"
+
+[episodes]
+# P1.4-P1.5 (2026-11-03): flows (GPS visits computed on the VM, conversation bursts, appointments, work sessions) and
+# multi-source episodes every `every_s`; dated plans read from pseudonymised conversation bursts (one model call per
+# burst where the owner wrote and a time is mentioned) every `plans_every_s`, at most `plans_per_run` bursts.
+# "off" = none of it. Hypotheses never go past "probable" without the owner's words (`attest`: decision model).
+mode = "active"
+# engine (2026-11-03): "events" = event-driven assimilation (memory.organic consumer: only what each event touches,
+# model decisions reused while their inputs are unchanged); "timer" = the former window rebuild every `every_s`
+# (now harmless: unchanged rows are not rewritten, decisions are reused) — kept as the rollback switch; restart
+# walter-memory-pipeline after a change
+engine = "events"
+every_s = 600
+plans_every_s = 1800
+plans_per_run = 20
+attest = true
+
+[periods]
+# P1.6: the owner's local time zone for days, weeks and months.
+tz = "Asia/Bangkok"
+
+[kardex]
+# Kardex enrichment (2026-11-03): once a day, the `per_run` people the owner exchanged with most in 1:1 recently; their
+# last `days` of messages (redacted_cloud only, pseudonymised) → claims about the CONTACT only, status proposed,
+# sensitivity tightened by type, mention policy derived. "off" = only on demand (walter-memory organic kardex).
+mode = "daily"
+per_run = 5
+days = 60
+max_messages = 160
+
+[privacy]
+# What a cloud reader (a cloud model's context or call, MCP tools of cloud agents) may read. Monsieur, 2026-11-03:
+# « Oui tout » — Walter has no local model, all its reasoning is cloud: "local_only" = everything (GPS, places,
+# conversations marked local, messaging). Earlier values: "redacted_cloud", "cloud_allowed" (the strict rule).
+# Classes stay on every row; what goes to a PERSON is decided apart (disclosure check on outgoing messages).
+cloud_context = "local_only"
+# false = no pseudonymisation before a cloud model call or in a cloud context (real names).
+pseudonymise = false
+# "full" = the cloud model reasons with everything Kardex knows about people (each claim tagged when it must never be
+# repeated to someone else); "policy" = the filtered view used before.
+kardex_cloud = "full"
+
+[media]
+# A5 (SOCLE, 2026-11-11): every Raw Vault object gets a derived text found from its message (walter_memory/media.py).
+# A new object is derived by the event-driven assimilation (bus memory.object → processing key media.derive); the
+# history by `walter-memory media backfill --kind K` (dry run unless --apply). "on" | "off" per kind group.
+# audio → transcript (Router poste `stt`); document → local extraction, no model; image/screenshot → OCR / caption
+# (Router poste `vision`, off until Monsieur fixes the catch-up budget); video → not derived (out of scope).
+audio = "on"
+document = "on"
+image = "off"
+video = "off"
+# above these sizes an object is recorded as derived with empty text, meta.media.reason = "too_large"
+max_audio_mb = 25
+max_document_mb = 50
+max_image_mb = 15
+# extracted / transcribed text kept on core.objects (characters)
+max_text_chars = 20000
+# default number of objects per backfill run (CLI --limit overrides)
+per_run = 200
+# cost estimate per model call when system.model_calls has no observed cost yet (USD)
+est_usd_audio = 0.0003
+est_usd_image = 0.002

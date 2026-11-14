@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+.pytest_cache/
+interface/site/index.html
+.control.env
+interface/site/fr/
+interface/site/.wrangler/
+/venv
+/llm/venv

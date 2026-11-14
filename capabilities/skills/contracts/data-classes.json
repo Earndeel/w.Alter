@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "module": "skills",
+  "note": "Data classes of the skills schema (addendum 2026-10-29, C.2). The skills themselves are files in the git store; the catalogue and cards are rebuilt from it. Which skills form the generic library shipped with Walter Clean is decided on the store, not here.",
+  "tables": {
+    "skills.catalog": {"class": "runtime", "note": "rebuilt from the store"},
+    "skills.cards": {"class": "runtime", "note": "rebuilt from the store"},
+    "skills.rankers": {"class": "runtime"},
+    "skills.labels": {"class": "instance"},
+    "skills.ledger": {"class": "instance"},
+    "skills.reads": {"class": "instance"},
+    "skills.retrievals": {"class": "instance"},
+    "skills.state": {"class": "instance"}
+  }
+}

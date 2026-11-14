@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/llm-model-value-analysis",
+  "sha": "a475002eee92308cf73a6d5466648eeca7d5f6146abc1444f5a72f86124da9eb",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "a475002eee92308cf73a6d5466648eeca7d5f6146abc1444f5a72f86124da9eb"
+}

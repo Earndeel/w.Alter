@@ -1,0 +1,12 @@
+{
+ "domain": "software-development",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/llm-build-benchmarking",
+  "sha": "b331731c822fa9f986b2f1b7f141262a6408a3acf1ba888046110b3b492859fb",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "b331731c822fa9f986b2f1b7f141262a6408a3acf1ba888046110b3b492859fb"
+}

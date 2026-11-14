@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/blogwatcher",
+  "sha": "0b02ae80b9d7980f6afca1aef64030c3b91fb084b636c648b5f3069469a978da",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "store_sha": "0b02ae80b9d7980f6afca1aef64030c3b91fb084b636c648b5f3069469a978da"
+}

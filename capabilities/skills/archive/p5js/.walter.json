@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-24T04:13:51+00:00",
+ "archived_reason": "not read for 137 days",
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/p5js",
+  "sha": "e1f81dc9343d947d869384c5aad50aff8c0a517a2140a3e9390bc81b996be963",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "e1f81dc9343d947d869384c5aad50aff8c0a517a2140a3e9390bc81b996be963"
+}

@@ -1,0 +1,15 @@
+{
+ "archived_at": "2026-11-10T04:15:10+00:00",
+ "archived_reason": "not read for 31 days",
+ "domain": "messaging",
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/archived-conversation-analysis",
+  "sha": "5e0f918064a86d9a89ddeb1077d32da449e03ea9e6ac9d17b2f60b7450089e0f",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "5e0f918064a86d9a89ddeb1077d32da449e03ea9e6ac9d17b2f60b7450089e0f"
+}

@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Walter Memory watchdog in Incident v1 (2026-10-28): services, walter-memory health, the daily autopilot."""
+import json, subprocess, sys, time, urllib.request
+
+
+def sh(*cmd, timeout=60):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(cmd, 124, "", str(exc))
+
+
+def active(unit):
+    return sh("systemctl", "is-active", unit).stdout.strip() == "active"
+
+
+def http_json(url, timeout=5):
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return json.loads(r.read())
+    except Exception as exc:  # noqa: BLE001
+        return {"_error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+
+
+def inc(module, key, kind, severity, summary, evidence=None, level="G0"):
+    return {"version": 1, "module": module, "key": key, "kind": kind, "severity": severity, "summary": summary,
+            "evidence": evidence or {}, "suggested_level": level}
+
+
+def units_down(module, units, severity="high"):
+    return [inc(module, f"service:{u}", "service_down", severity, f"Le service {u} n'est pas actif.", {"unit": u}, "G1")
+            for u in units if not active(u)]
+
+
+out = units_down("memory", ["walter-memory-gateway", "walter-logs-watch", "raw-vault-s3"])
+r = sh("walter-memory", "health", timeout=120)
+try:
+    h = json.loads(r.stdout)
+    for p in h.get("problems") or []:
+        if p.startswith("model_calls:"):
+            # SOCLE A8: a processor whose model calls mostly fail (severity error in walter-memory health). Often a
+            # service still running old library code: the core guardian's deploy:stale covers the restart.
+            proc = p.split(":")[1]
+            out.append(inc("memory", f"health:model_calls:{proc}", "model_calls_failing", "high",
+                           f"Walter Memory : les appels modèle du processeur {proc} échouent ({p.split(' — ', 1)[-1][:200]}).",
+                           {"problem": p[:300], "processor": proc}, "G1"))
+            continue
+        sev = "info" if "dead jobs" in p else "warning"
+        out.append(inc("memory", "health:" + p.split(":")[0], "health_problem", sev, f"Walter Memory : {p}.", {"problem": p}, "G1"))
+except ValueError:
+    out.append(inc("memory", "health:unavailable", "check_failed", "high", "walter-memory health ne répond pas.", {"rc": r.returncode}))
+try:
+    import os
+    # the instance's logs (/root/.hermes/logs is only a compatibility link to them since 2026-11-11)
+    ap = (sh("walter", "instance", "path", "logs", "memory-autopilot", "latest.json", timeout=20).stdout.strip()
+          or "/root/.hermes/logs/memory-autopilot/latest.json")
+    age = (time.time() - os.stat(ap).st_mtime) / 3600
+    s = json.load(open(ap))["summary"]
+    if age > 30:
+        out.append(inc("memory", "autopilot:stale", "supervisor_stale", "warning", f"L autopilot mémoire n a pas tourné depuis {age:.0f} h.", {"age_h": round(age, 1)}, "G1"))
+    for e in s.get("errors") or []:
+        out.append(inc("memory", "autopilot:" + str(e)[:60], "autopilot_error", "high", f"Autopilot mémoire : {e}.", {"score": s.get("score")}, "G1"))
+except (OSError, ValueError, KeyError):
+    out.append(inc("memory", "autopilot:missing", "supervisor_stale", "warning", "Rapport de l autopilot mémoire introuvable."))
+
+
+def merged(items):
+    """One incident per key (Incident v1 rejects duplicates): a connector both stale and failing yields two problems
+    with the same `health:<connector>` key, which made the whole response invalid (2026-10-30)."""
+    by_key = {}
+    for i in items:
+        k = i["key"]
+        if k not in by_key:
+            by_key[k] = i
+            continue
+        m = by_key[k]
+        sev = ("info", "warning", "high", "critical")
+        if sev.index(i["severity"]) > sev.index(m["severity"]):
+            m["severity"] = i["severity"]
+        m["summary"] = f"{m['summary']} {i['summary']}"[:400]
+        m["evidence"].setdefault("also", []).append(i["evidence"])
+    return list(by_key.values())
+
+
+print(json.dumps(merged(out), ensure_ascii=False))

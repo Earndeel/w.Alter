@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/live-network-extraction",
+  "sha": "1af3319673a83933604ae1d73f73fb2c993d6f398ef5231d7f86cfddb460ede9",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "1af3319673a83933604ae1d73f73fb2c993d6f398ef5231d7f86cfddb460ede9"
+}

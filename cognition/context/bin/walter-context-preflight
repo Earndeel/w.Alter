@@ -1,0 +1,22 @@
+#!/bin/sh
+# walter-context preflight: JSON request on stdin -> ContextPlan (--shadow: recorded in the instance, nothing printed).
+# The warm service (unit walter-context-preflight, 127.0.0.1:8897) answers first; only when it cannot be reached
+# (connection refused, curl exit 7) does this process run the preflight itself, so a request is never decided twice.
+# Separate entry point until the shared CLI (bin/walter-context) gains a `preflight` subcommand.
+root="$(dirname "$(readlink -f "$0")")/.."
+case "$1" in
+  --serve|--refresh-router|--report) cd "$root" && PYTHONPATH="$root" exec walter-python -m walter_context.preflight "$@" ;;
+esac
+req="$(cat)"
+query=""; [ "$1" = "--shadow" ] && query="?shadow=1"
+out="$(printf '%s' "$req" | curl -s --connect-timeout 1 --max-time 60 -H 'Content-Type: application/json' \
+       --data-binary @- -w '\n%{http_code}' "http://127.0.0.1:${WALTER_CONTEXT_PREFLIGHT_PORT:-8897}/preflight$query")"
+rc=$?
+if [ "$rc" -ne 7 ] && command -v curl >/dev/null 2>&1; then
+  code="$(printf '%s' "$out" | tail -n 1)"
+  body="$(printf '%s' "$out" | sed '$d')"
+  [ -n "$body" ] && printf '%s\n' "$body"
+  [ "$code" = "200" ] || [ "$code" = "204" ]
+  exit $?
+fi
+printf '%s' "$req" | { cd "$root" && PYTHONPATH="$root" exec walter-python -m walter_context.preflight "$@"; }

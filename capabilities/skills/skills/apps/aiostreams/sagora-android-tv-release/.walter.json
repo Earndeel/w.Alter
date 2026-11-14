@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
+ "reason": "The session completed a Sagora release through GitHub Actions, publish.sh, an armeabi-v7a APK transfer, and the Mac TV bridge, then checked the installed version and remote-control interaction. It also exposed a concrete pitfall: an old local screenshot was mistaken for a fresh capture while the bridge command was still running. None of the listed skills covers this Android TV release and verification procedure. [session claude_code/vm/86e342ad-905f-49d6-be7a-aa1223b6dfb7]",
+ "store_sha": "9ac848056b912eeb28b122be173428cbd86094c929c7b05b6c84ca08a2272865"
+}

@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/autonomous-ai-agents/hermes-agent",
+  "sha": "c54878e1a7cd1fd53e93bffb7943c1fe2f014acdab5e070a406387a9ee5e9721",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "kind": "entry",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "c54878e1a7cd1fd53e93bffb7943c1fe2f014acdab5e070a406387a9ee5e9721"
+}

@@ -1,0 +1,30 @@
+# Engine composition values (walter harness install dsh), neutral defaults. An instance overrides any of them in
+# @instance/config/core/engine.toml (merged key by key over this file).
+
+[dsh.web]
+# Rendered into the fenced `dsh-face` block of the web profile (template: core/engine/compositions/dsh-face.patch.yml).
+name = "Walter"
+tagline = "Que puis-je faire pour vous ?"
+cookie_max_age_days = 30          # DSH's own default
+
+[dsh.model_names]
+# Display names of the Walter Router tasks DSH offers (auto, coding, general, document, summarization).
+# A task without a name here is shown as "Walter <task>".
+
+[dsh.budget]
+# Ceilings of one engine turn (plugin `budget`). General ones: a turn without a plan, with a degraded plan, or a
+# delegated mission. `levels`: an owner request the preflight understood, by the EFFORT its plan states (`decision.effort`
+# = context level raised by the difficulty asked and, for work to carry out, to L4; decision A7 2026-11-11, 12/11):
+# checkpoint = steps after which the agent is told once where it stands; then the same two stages as the general
+# ceilings (told to conclude, refused after the grace). A level never exceeds the general ceilings.
+max_steps = 80
+max_turn_min = 45
+grace_steps = 3
+grace_min = 5
+
+[dsh.budget.levels]
+L0 = { checkpoint = 4, max_steps = 12, max_turn_min = 5 }
+L1 = { checkpoint = 8, max_steps = 20, max_turn_min = 10 }
+L2 = { checkpoint = 14, max_steps = 36, max_turn_min = 20 }
+L3 = { checkpoint = 24, max_steps = 60, max_turn_min = 35 }
+L4 = { checkpoint = 36, max_steps = 80, max_turn_min = 45 }

@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/tui-ink-modifications",
+  "sha": "c92de805d3cea2b04474241b6138207739e18a2e12bc2c2687334c09d1df85f1",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "c92de805d3cea2b04474241b6138207739e18a2e12bc2c2687334c09d1df85f1"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "media",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/media-generation-workflows",
+  "sha": "23a2f0b1adba0b14f5de859f777f0154ace9a15942d1f79eef9431927c471be8",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "23a2f0b1adba0b14f5de859f777f0154ace9a15942d1f79eef9431927c471be8"
+}

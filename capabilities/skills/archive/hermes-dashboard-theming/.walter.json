@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-dashboard-theming",
+  "sha": "1730845aeaec8516d661fe79e7b23c27066cb1b8ea3fa27e51ba6b6d70e939b5",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "1730845aeaec8516d661fe79e7b23c27066cb1b8ea3fa27e51ba6b6d70e939b5"
+}

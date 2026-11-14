@@ -1,0 +1,12 @@
+{
+ "domain": "software-development",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/fail-closed-boundary-testing",
+  "sha": "2ea3432f4e993bb1b264e0fee6d4fea57fec3870c995b9a2dfdb751de067ba8b",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "2ea3432f4e993bb1b264e0fee6d4fea57fec3870c995b9a2dfdb751de067ba8b"
+}

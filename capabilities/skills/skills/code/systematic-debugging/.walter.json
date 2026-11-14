@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/systematic-debugging",
+  "sha": "1ba1aeb0c49b1f05a7748309385531d17ea6de2831ae5c0c4c3da65f71b6e55b",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "1ba1aeb0c49b1f05a7748309385531d17ea6de2831ae5c0c4c3da65f71b6e55b"
+}

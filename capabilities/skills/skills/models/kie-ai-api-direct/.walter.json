@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/kie-ai-api-direct",
+  "sha": "4e6226291f2395868a6b580fdcf45885c3c172dad234680065fa512392cc70b3",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "4e6226291f2395868a6b580fdcf45885c3c172dad234680065fa512392cc70b3"
+}

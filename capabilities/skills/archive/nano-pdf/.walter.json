@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/nano-pdf",
+  "sha": "ab02d1b073182d32ffd852236f8c7816c1a6fbff64f7fd84f4b4d454da3f4643",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "ab02d1b073182d32ffd852236f8c7816c1a6fbff64f7fd84f4b4d454da3f4643"
+}

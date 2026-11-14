@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/live-flight-search",
+  "sha": "cf25fbdc9fed30e295d64f9362bf792d6600a453103e45c4dd6b97a121b47875",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "cf25fbdc9fed30e295d64f9362bf792d6600a453103e45c4dd6b97a121b47875"
+}

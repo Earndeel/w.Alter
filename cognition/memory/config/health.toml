@@ -1,0 +1,10 @@
+# Walter Memory health thresholds (walter-memory health; SOCLE A8, 2026-11-11). Instance override:
+# @instance/config/memory/health.toml.
+[model_calls]
+window_min = 30        # look-back on system.model_calls
+min_calls = 5          # a processor is judged only with at least this many calls in the window
+error_ratio = 0.5      # failed / calls above this = problem `model_calls:<processor>:<ratio>` (severity error)
+
+[triage]
+window_h = 24          # triage decisions stored with payload.error (model failed, rule fallback used)
+min_errors = 5

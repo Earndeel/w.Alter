@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:11+00:00",
+ "archived_reason": "not read for 88 days",
+ "domain": "red-teaming",
+ "hermes": {
+  "path": "/root/.hermes/skills/red-teaming/godmode",
+  "sha": "ca266c0a7ea3d0b9e16a2189248db3562f1458b95bc00447aacb87dc6df6ba42",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "store_sha": "ca266c0a7ea3d0b9e16a2189248db3562f1458b95bc00447aacb87dc6df6ba42"
+}

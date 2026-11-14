@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/llm-provider-evaluation",
+  "sha": "f3b08a28429d404c7c17fb3eeb1c6c3ebbae998634ff5be855b9a39cd11407fd",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "f3b08a28429d404c7c17fb3eeb1c6c3ebbae998634ff5be855b9a39cd11407fd"
+}

@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/walter-operating-mode/walter-browse-orchestrator",
+  "sha": "1bfbe8ee5073954ee162e3325f4c1cd5586087632d2b0675e8d5626478546816",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "kind": "entry",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "1bfbe8ee5073954ee162e3325f4c1cd5586087632d2b0675e8d5626478546816"
+}

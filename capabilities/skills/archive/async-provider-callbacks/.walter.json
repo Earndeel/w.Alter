@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/async-provider-callbacks",
+  "sha": "4426aae4e78b346c1803e25075bd26db275cbe9193bd359fcd0aeca4be0481d2",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "4426aae4e78b346c1803e25075bd26db275cbe9193bd359fcd0aeca4be0481d2"
+}

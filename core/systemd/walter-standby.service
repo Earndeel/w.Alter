@@ -1,0 +1,7 @@
+[Unit]
+Description=Walter standby: record use of on-demand services, stop the idle ones (walter standby sweep)
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/walter standby sweep

@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/mac-computer-use-ssh",
+  "sha": "71014488c26314bb70710372b55153a80266544677983bf1073efb085cddd457",
+  "state": "active",
+  "synced_at": "2026-10-10T04:11:29+00:00"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "71014488c26314bb70710372b55153a80266544677983bf1073efb085cddd457"
+}

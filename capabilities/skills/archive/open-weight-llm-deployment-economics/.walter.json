@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/open-weight-llm-deployment-economics",
+  "sha": "918c9d31ce55033caf8adb827dc910ae353de1e6dbc80d3bbd79554fde60cd0f",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "918c9d31ce55033caf8adb827dc910ae353de1e6dbc80d3bbd79554fde60cd0f"
+}

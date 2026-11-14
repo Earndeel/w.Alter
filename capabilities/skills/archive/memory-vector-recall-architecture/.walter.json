@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/memory-vector-recall-architecture",
+  "sha": "7d30a7e1f291b090fd19a7a2f2bbe5bc3cccfd3292f0445297013e8f762483a1",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "7d30a7e1f291b090fd19a7a2f2bbe5bc3cccfd3292f0445297013e8f762483a1"
+}

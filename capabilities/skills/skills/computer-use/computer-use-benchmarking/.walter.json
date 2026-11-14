@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/computer-use-benchmarking",
+  "sha": "d7ba5df6341a40060b3fae6f00db4665d613d148c021bc6db906ed00be92c0e9",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "d7ba5df6341a40060b3fae6f00db4665d613d148c021bc6db906ed00be92c0e9"
+}

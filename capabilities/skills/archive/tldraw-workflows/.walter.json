@@ -1,0 +1,12 @@
+{
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/tldraw-workflows",
+  "sha": "5dd50f603ba54e177eff5ed0ad245645dc1399083cfe3b63e8d99bfcf3963d3a",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5dd50f603ba54e177eff5ed0ad245645dc1399083cfe3b63e8d99bfcf3963d3a"
+}

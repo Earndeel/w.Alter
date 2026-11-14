@@ -1,0 +1,305 @@
+{
+ "valid": {
+  "engine-api.v1.json": [
+   {
+    "version": 1,
+    "op": "session.open",
+    "interface": "telegram",
+    "conversation": "chat-1",
+    "principal": {
+     "kind": "owner",
+     "id": "owner"
+    },
+    "mode": "interactive",
+    "permissions": "telegram-owner"
+   },
+   {
+    "version": 1,
+    "op": "turn.submit",
+    "session_id": "telegram/owner/chat-1",
+    "message": {
+     "text": "Quel temps demain ?"
+    },
+    "channel": "owner",
+    "idempotency_key": "telegram:chat-1:msg-42"
+   },
+   {
+    "version": 1,
+    "op": "turn.cancel",
+    "session_id": "web/owner/s-1",
+    "reason": "stop button"
+   },
+   {
+    "version": 1,
+    "op": "approval.answer",
+    "request_id": "apr-1",
+    "decision": "deny",
+    "principal": {
+     "kind": "owner",
+     "id": "owner"
+    }
+   },
+   {
+    "version": 1,
+    "op": "delegate",
+    "delegation": {
+     "version": 1,
+     "goal": "Comparer trois offres",
+     "toolsets": [
+      "walter-web"
+     ],
+     "parent": {
+      "run_id": "r-1",
+      "session_id": "web/owner/s-1",
+      "depth": 0,
+      "reuse_plan": false
+     }
+    }
+   },
+   {
+    "version": 1,
+    "op": "health"
+   }
+  ],
+  "turn-intake.v1.json": [
+   {
+    "version": 1,
+    "session_id": "web/owner/s-1",
+    "interface": "web",
+    "principal": {
+     "kind": "owner",
+     "id": "owner"
+    },
+    "channel": "owner",
+    "run_id": "r-1",
+    "owner_text": "Quelle heure est-il ?",
+    "plan": {
+     "version": 2,
+     "turn_id": "t-1",
+     "thread": {
+      "id": null,
+      "new": true
+     },
+     "act": "new",
+     "level": "L0",
+     "fast_path": "trivial"
+    },
+    "fast_path_answer": "10:42"
+   }
+  ],
+  "delegation.v1.json": [
+   {
+    "version": 1,
+    "goal": "Résumer ce document",
+    "toolsets": [
+     "file"
+    ],
+    "budget_seconds": 120,
+    "max_turns": 8,
+    "parent": {
+     "run_id": "r-1",
+     "session_id": "api/router/job-7",
+     "depth": 1
+    }
+   }
+  ],
+  "policy-decision.v1.json": [
+   {
+    "version": 1,
+    "request": {
+     "session_id": "telegram/owner/chat-1",
+     "run_id": "r-2",
+     "principal": {
+      "kind": "owner",
+      "id": "owner"
+     },
+     "interface": "telegram",
+     "action": {
+      "kind": "outgoing_message",
+      "name": "send_message",
+      "target": "third-party",
+      "data_class": "redacted_cloud"
+     }
+    },
+    "decision": {
+     "outcome": "ask",
+     "source": "disclosure",
+     "reason": "message to a third party",
+     "answerer": "telegram",
+     "request_id": "apr-2"
+    }
+   },
+   {
+    "version": 1,
+    "request": {
+     "session_id": "command/router/c-1",
+     "run_id": "r-3",
+     "principal": {
+      "kind": "machine",
+      "id": "router"
+     },
+     "interface": "command",
+     "action": {
+      "kind": "shell",
+      "name": "bash"
+     }
+    },
+    "decision": {
+     "outcome": "deny",
+     "source": "approval",
+     "reason": "no answerer in command mode",
+     "answerer": "none"
+    }
+   }
+  ],
+  "engine-event.v1.json": [
+   {
+    "version": 1,
+    "type": "turn.ended",
+    "key": "turn.ended:r-1",
+    "run_id": "r-1",
+    "session_id": "web/owner/s-1",
+    "interface": "web",
+    "at": "2026-11-09T10:00:00Z",
+    "status": "ok",
+    "data": {
+     "steps": 3
+    }
+   }
+  ],
+  "strategy.v1.json": [
+   {
+    "version": 1,
+    "id": "intake-walter",
+    "seam": "intake",
+    "plugin": "intake/index.mjs",
+    "replaces": null,
+    "reads": [
+     "https://walter.local/contracts/context/context-plan.v2.json"
+    ],
+    "writes": [
+     "runs.runs"
+    ],
+    "switch": "walter.intake",
+    "owner": "core",
+    "status": "planned",
+    "origin": "Walter (owner-turn hook)",
+    "tests": [
+     "engine/tests/test_engine_contracts.py"
+    ]
+   }
+  ]
+ },
+ "invalid": {
+  "engine-api.v1.json": [
+   {
+    "version": 1,
+    "op": "turn.submit",
+    "session_id": "web/owner/s-1",
+    "message": {
+     "text": "x"
+    },
+    "channel": "owner"
+   }
+  ],
+  "turn-intake.v1.json": [
+   {
+    "version": 1,
+    "session_id": "/root/x",
+    "interface": "web",
+    "principal": {
+     "kind": "owner",
+     "id": "o"
+    },
+    "channel": "owner",
+    "run_id": "r",
+    "owner_text": "x",
+    "plan": {
+     "version": 2,
+     "turn_id": "t",
+     "thread": {
+      "id": null,
+      "new": true
+     },
+     "act": "new",
+     "level": "L0"
+    }
+   }
+  ],
+  "delegation.v1.json": [
+   {
+    "version": 1,
+    "goal": "x",
+    "toolsets": [
+     "terminal"
+    ],
+    "parent": {
+     "run_id": "r",
+     "session_id": "web/o/s",
+     "depth": 0
+    }
+   },
+   {
+    "version": 1,
+    "goal": "x",
+    "parent": {
+     "run_id": "r",
+     "session_id": "web/o/s",
+     "depth": 4
+    }
+   }
+  ],
+  "policy-decision.v1.json": [
+   {
+    "version": 1,
+    "request": {
+     "session_id": "web/o/s",
+     "run_id": "r",
+     "principal": {
+      "kind": "owner",
+      "id": "o"
+     },
+     "interface": "web",
+     "action": {
+      "kind": "shell",
+      "name": "bash"
+     }
+    },
+    "decision": {
+     "outcome": "ask",
+     "source": "approval",
+     "reason": "x",
+     "answerer": "none",
+     "request_id": "a"
+    }
+   }
+  ],
+  "engine-event.v1.json": [
+   {
+    "version": 1,
+    "type": "turn.ended",
+    "key": "k",
+    "run_id": "r",
+    "session_id": "web/o/s",
+    "interface": "web",
+    "at": "2026-11-09T10:00:00Z",
+    "text": "leak"
+   }
+  ],
+  "strategy.v1.json": [
+   {
+    "version": 1,
+    "id": "x",
+    "seam": "intake",
+    "plugin": "p",
+    "replaces": null,
+    "reads": [],
+    "writes": [],
+    "switch": "s",
+    "owner": "core",
+    "status": "active",
+    "tests": []
+   }
+  ]
+ }
+}

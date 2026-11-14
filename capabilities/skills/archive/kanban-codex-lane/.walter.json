@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:05+00:00",
+ "archived_reason": "not read for 109 days",
+ "domain": "autonomous-ai-agents",
+ "hermes": {
+  "path": "/root/.hermes/skills/autonomous-ai-agents/kanban-codex-lane",
+  "sha": "bc029017ade22cf9eb634ed755f4120d1820d153f3c9185ba5671ba66fd54e35",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "bc029017ade22cf9eb634ed755f4120d1820d153f3c9185ba5671ba66fd54e35"
+}

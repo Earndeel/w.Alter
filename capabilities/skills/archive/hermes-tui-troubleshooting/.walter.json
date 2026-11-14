@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-tui-troubleshooting",
+  "sha": "2bd2d01a51c4426337fea0431d27dd58abb0f2782b3a3b726f2c2cc8f1474748",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "2bd2d01a51c4426337fea0431d27dd58abb0f2782b3a3b726f2c2cc8f1474748"
+}

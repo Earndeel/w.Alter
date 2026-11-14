@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-v2-ssh",
+  "sha": "c07e0fa560b2ca7940a785867ee008ed239ca7a86ac043aab5159c9ff78481cd",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "c07e0fa560b2ca7940a785867ee008ed239ca7a86ac043aab5159c9ff78481cd"
+}

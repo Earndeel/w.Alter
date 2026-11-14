@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:09+00:00",
+ "archived_reason": "not read for 70 days",
+ "domain": "github",
+ "hermes": {
+  "path": "/root/.hermes/skills/github/github-workflow-mastery",
+  "sha": "2feb4018d024cbf69064843dc7754f8f316a697e11f80c5666981403159b6ceb",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "2feb4018d024cbf69064843dc7754f8f316a697e11f80c5666981403159b6ceb"
+}

@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/authenticated-portal-document-retrieval",
+  "sha": "ea30d7db92aa3c7012df9fec6192aefe7a6b089d60f0012ea0d24f1f8d0c91d5",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "ea30d7db92aa3c7012df9fec6192aefe7a6b089d60f0012ea0d24f1f8d0c91d5"
+}

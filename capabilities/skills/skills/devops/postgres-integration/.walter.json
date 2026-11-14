@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/postgres-integration",
+  "sha": "1c670a071865899464b100108434e3d88d9ff6ea1f72702e3a48bd029c85bbc1",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "1c670a071865899464b100108434e3d88d9ff6ea1f72702e3a48bd029c85bbc1"
+}

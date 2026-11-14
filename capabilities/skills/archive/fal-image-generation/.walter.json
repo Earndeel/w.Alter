@@ -1,0 +1,15 @@
+{
+ "archived_at": "2026-11-14T04:14:13+00:00",
+ "archived_reason": "not read for 30 days",
+ "domain": "images",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/fal-image-generation",
+  "sha": "401ddf2097e081e38ec53656678942faf8c5d4f13077d273816e7105b3009cf5",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "401ddf2097e081e38ec53656678942faf8c5d4f13077d273816e7105b3009cf5"
+}

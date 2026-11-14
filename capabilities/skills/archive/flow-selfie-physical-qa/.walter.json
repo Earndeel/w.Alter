@@ -1,0 +1,15 @@
+{
+ "archived_at": "2026-11-10T04:15:10+00:00",
+ "archived_reason": "not read for 30 days",
+ "domain": "video",
+ "hermes": {
+  "path": "/root/.hermes/skills/flow-selfie-physical-qa",
+  "sha": "2e6e85f8607c1b2690d63cb0e60cc7ec2e298b69cfd16edf5db86241e92fdc81",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "2e6e85f8607c1b2690d63cb0e60cc7ec2e298b69cfd16edf5db86241e92fdc81"
+}

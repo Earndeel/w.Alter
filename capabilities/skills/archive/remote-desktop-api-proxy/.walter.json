@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/remote-desktop-api-proxy",
+  "sha": "d8bdf5ed97d0134887b33ca79fca46ec9cc2ab1299be0522a958e592d5ee1436",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "d8bdf5ed97d0134887b33ca79fca46ec9cc2ab1299be0522a958e592d5ee1436"
+}

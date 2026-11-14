@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/react-spa-automation",
+  "sha": "7ef23424534857944cd05bcfe93f125fd1e499a26c0fce7333a1925f32122adc",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "7ef23424534857944cd05bcfe93f125fd1e499a26c0fce7333a1925f32122adc"
+}

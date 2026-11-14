@@ -1,0 +1,14 @@
+# ops/devboard defaults (neutral). The instance overrides them in `walter instance config ops devboard.toml`.
+[devboard]
+required_provider = "claude-pro"      # subscription provider the board's model calls must run on (no paid fallback)
+subscription_prefix = "anthropic-pro" # Router subscriptions whose meter gates the calls (any one with room is enough)
+quota_pause_percent = 70
+idle_minutes = 30                     # a session is read after this much calm
+stale_days = 7                        # an in-progress chantier without activity for this long is flagged
+since = "2026-10-01"
+listen_host = "127.0.0.1"
+port = 3093
+sessions_per_pass = 20
+dev_cwds = []                         # the instance names the folders where development sessions are opened
+excluded_cwds = []                    # folders never read, whatever the runtime (the instance names its personal-mode profiles)
+owner_name = "le propriétaire"           # the instance names its owner

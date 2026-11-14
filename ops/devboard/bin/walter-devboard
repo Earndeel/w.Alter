@@ -1,0 +1,4 @@
+#!/bin/sh
+# walter-devboard: the development board (ops/devboard). Runs on Walter's shared Python runtime.
+root="$(dirname "$(readlink -f "$0")")/.."
+PYTHONPATH="$root${PYTHONPATH:+:$PYTHONPATH}" exec walter-python -m walter_devboard.cli "$@"

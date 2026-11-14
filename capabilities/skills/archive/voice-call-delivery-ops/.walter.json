@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/voice-call-delivery-ops",
+  "sha": "979e4e92e42e492ec23c7854b4ed4f08ba3834e911bf80963bfc268a8a54768f",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "979e4e92e42e492ec23c7854b4ed4f08ba3834e911bf80963bfc268a8a54768f"
+}

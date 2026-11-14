@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/google-oauth-session-persistence",
+  "sha": "1c7b8a54722b6f7d4be4ffe96330a82b0bf8ed82e34b37ce1b3597b37d68d7a0",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "1c7b8a54722b6f7d4be4ffe96330a82b0bf8ed82e34b37ce1b3597b37d68d7a0"
+}

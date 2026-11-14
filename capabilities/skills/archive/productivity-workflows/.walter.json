@@ -1,0 +1,12 @@
+{
+ "domain": "productivity",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/productivity-workflows",
+  "sha": "ff1071ec1dd2b06807b184857d4641dc242f4142db37cd7016ecac6c83a3eb9f",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "ff1071ec1dd2b06807b184857d4641dc242f4142db37cd7016ecac6c83a3eb9f"
+}

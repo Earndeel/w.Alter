@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/github-key-scanner",
+  "sha": "8d0c8edcb7d57dec497d3fcdc97ccc11adc8199e4d5c53fd541a1fa24c0a2815",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "8d0c8edcb7d57dec497d3fcdc97ccc11adc8199e4d5c53fd541a1fa24c0a2815"
+}

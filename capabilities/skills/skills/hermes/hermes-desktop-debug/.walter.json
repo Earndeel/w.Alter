@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-debug",
+  "sha": "57ff23a77e4d844bf1521214ac9555c7d29ea2acc77360d3edcd4b9b48d1e01b",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "57ff23a77e4d844bf1521214ac9555c7d29ea2acc77360d3edcd4b9b48d1e01b"
+}

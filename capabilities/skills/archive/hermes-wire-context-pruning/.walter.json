@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-wire-context-pruning",
+  "sha": "ddef81d138c4a8284af6488858e2bc7ccd03ca75d0ff031b31774dd5d600a468",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "ddef81d138c4a8284af6488858e2bc7ccd03ca75d0ff031b31774dd5d600a468"
+}

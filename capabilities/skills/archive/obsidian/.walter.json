@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:11+00:00",
+ "archived_reason": "not read for 140 days",
+ "domain": "note-taking",
+ "hermes": {
+  "path": "/root/.hermes/skills/note-taking/obsidian",
+  "sha": "6e5803b71bbe4daa837aa461dc693a8caffd51bbbfff37bb9d343f72330928a5",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "6e5803b71bbe4daa837aa461dc693a8caffd51bbbfff37bb9d343f72330928a5"
+}

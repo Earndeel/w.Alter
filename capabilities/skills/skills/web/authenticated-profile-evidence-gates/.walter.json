@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/authenticated-profile-evidence-gates",
+  "sha": "d0886aa9504c7b9c265d981872dcd1c437cae8f1ff941eb455f47274840ecc4d",
+  "state": "active"
+ },
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "proposed_by": "hermes",
+ "reason": "created by the Hermes agent (skill_manage)",
+ "store_sha": "d0886aa9504c7b9c265d981872dcd1c437cae8f1ff941eb455f47274840ecc4d"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-payload-composition",
+  "sha": "53efbdd700453f43151114ecee87ff7511f60ea9393df896267d9146fa08ffaa",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "53efbdd700453f43151114ecee87ff7511f60ea9393df896267d9146fa08ffaa"
+}

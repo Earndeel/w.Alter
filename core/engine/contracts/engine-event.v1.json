@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/core/engine/engine-event.v1.json",
+  "title": "EngineEvent v1",
+  "description": "Bus events the engine emits (Walter bus, through the Memory gateway: no second bus). The execution journal itself keeps the existing walter_logs vocabulary unchanged. Status: DRAFT (E0), implemented at E2. Every event is idempotent on (type, key).",
+  "type": "object",
+  "required": [
+    "version",
+    "type",
+    "key",
+    "run_id",
+    "session_id",
+    "interface",
+    "at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "type": {
+      "enum": [
+        "turn.started",
+        "turn.ended",
+        "session.ended",
+        "run.started",
+        "run.ended",
+        "approval.requested",
+        "approval.answered",
+        "delegation.started",
+        "delegation.ended",
+        "engine.recovered"
+      ]
+    },
+    "key": {
+      "type": "string",
+      "minLength": 8,
+      "description": "Idempotency key of the event (bus dedupe)"
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^(web|telegram|api|mcp|command|schedule|webhook|lab)/[A-Za-z0-9._:@/-]{1,200}$",
+      "description": "Stable engine session id: <interface>/<account or caller>/<conversation>. Fixed by intake, never by the model."
+    },
+    "interface": {
+      "enum": [
+        "web",
+        "telegram",
+        "api",
+        "mcp",
+        "command",
+        "schedule",
+        "webhook",
+        "lab"
+      ]
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "error",
+        "cancelled",
+        "interrupted",
+        "budget_exhausted",
+        "unknown_outcome",
+        null
+      ]
+    },
+    "data": {
+      "type": "object",
+      "description": "Ids and counters only; no message text, no secret"
+    },
+    "observation": {
+      "type": "boolean",
+      "default": false,
+      "description": "Observation-mode events never reach the production bus"
+    }
+  }
+}

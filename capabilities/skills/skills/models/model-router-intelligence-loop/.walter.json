@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/model-router-intelligence-loop",
+  "sha": "28bc60b49979099dc90c8cf6e04602141c9a905c96e108ddd8337d954fe1b68b",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "28bc60b49979099dc90c8cf6e04602141c9a905c96e108ddd8337d954fe1b68b"
+}

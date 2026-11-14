@@ -1,0 +1,17 @@
+# walter-soul : sources de l'identité et cibles générées. Valeurs par défaut du logiciel ; une instance les
+# surcharge dans config/soul/targets.toml. Chemins absolus, ou @instance/... (instance active, `walter instance`).
+
+[sources]
+identity = "@instance/soul/identity.md"   # qui est l'agent de cette instance (git de l'instance)
+rules = "@instance/soul/rules.md"
+runtimes = "@instance/soul/runtimes"      # ajouts propres à l'instance, par runtime (facultatif)
+profile = "@instance/profile/USER.md"     # profil utilisateur curé ({{include profile}})
+state = "@instance/state/soul"            # empreintes des derniers rendus
+drift = "@instance/backups/soul-drift"    # copies des cibles retouchées à la main
+
+[targets]
+hermes = "@instance/harness/hermes/SOUL.md"
+claude-code = "@instance/profiles/claude-code/CLAUDE.md"
+codex = "@instance/profiles/codex/AGENTS.md"
+dsh = "@instance/profiles/dsh/AGENTS.md"
+agent = "@instance/profiles/agent.md"

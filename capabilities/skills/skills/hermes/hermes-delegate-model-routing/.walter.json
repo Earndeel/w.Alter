@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-delegate-model-routing",
+  "sha": "2d0ba9ce0f11ec7ccc5ee919954759f70ba179b311396a50ea4138387cc08000",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "2d0ba9ce0f11ec7ccc5ee919954759f70ba179b311396a50ea4138387cc08000"
+}

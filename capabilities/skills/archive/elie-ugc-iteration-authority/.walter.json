@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/elie-ugc-iteration-authority",
+  "sha": "315cd1b780df0266fd3e3a2b0804db35bdc6f961392a22388d15ad58a167d055",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "315cd1b780df0266fd3e3a2b0804db35bdc6f961392a22388d15ad58a167d055"
+}

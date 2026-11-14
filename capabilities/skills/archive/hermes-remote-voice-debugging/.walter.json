@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-remote-voice-debugging",
+  "sha": "9554e323b9f955ca23fc8b2f358d5694ea87f1425609440157162c7130241525",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "9554e323b9f955ca23fc8b2f358d5694ea87f1425609440157162c7130241525"
+}

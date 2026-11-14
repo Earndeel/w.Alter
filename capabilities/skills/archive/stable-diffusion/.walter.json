@@ -1,0 +1,15 @@
+{
+ "archived_at": "2026-11-11T04:16:55+00:00",
+ "archived_reason": "not read for 30 days",
+ "domain": "images",
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/models/stable-diffusion",
+  "sha": "852804819c9815b1b7ee45123b5066c5896e6b5309d1c6effc1061fb804aaae8",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "reserve": true,
+ "store_sha": "852804819c9815b1b7ee45123b5066c5896e6b5309d1c6effc1061fb804aaae8"
+}

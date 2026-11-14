@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/character-video-generation",
+  "sha": "652b870aa8f22a8ccfd540cd646c1400f800f50a232dec8068a37d02c10dec14",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "652b870aa8f22a8ccfd540cd646c1400f800f50a232dec8068a37d02c10dec14"
+}

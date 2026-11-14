@@ -1,0 +1,220 @@
+# walter-context — the ONLY place for tunables (code holds no magic numbers).
+# Profiles are priors: the replay bench (bench/replay.py) is what justifies changing them.
+
+[projection]
+keep_turns = 1               # completed turns kept verbatim after a boundary, besides the live turn
+live_keep_steps = 4          # emergency mid-turn cut: last assistant steps of the live turn kept verbatim
+tool_keep_chars = 600        # compact zone: tool outputs up to this size stay verbatim (a digest would not pay)
+excerpt_chars = 280          # compact zone: excerpt kept from a compacted tool output
+args_chars = 240             # compact zone: tool-call arguments longer than this are clipped
+text_clip_chars = 6000       # compact zone: assistant text longer than this keeps head + tail (owner text: never)
+brief_answer_chars = 160     # record, one-line level: the answer kept beside the owner's full request
+user_label = "User"
+assistant_label = "Assistant"
+
+[policy]
+horizon_calls = 12           # prior for cached reuses after a boundary; replaced by the session's own calls-per-turn
+min_gain_tokens = 6000       # a boundary must remove at least this much
+compact_share = 0.4          # fold the compact zone into the record when it exceeds this share of the effective budget
+record_share = 0.3           # condense the record beyond this share (oldest turns to one line, owner text kept), down to half
+regret_tokens = 4000         # mid-turn, weigh moves again only after the payload grew this much over budget
+emergency_share = 0.92       # host-side compression only above this share of the context window (should never fire)
+
+# Window of an owner turn (compress/window.py, decision A1 of 2026-11-11): decided when a new owner message arrives,
+# before it enters the session. Relevance first (thread of the message, recency), size second, provider cache third.
+[relevance]
+keep_turns = 1               # completed turns left verbatim (tool outputs included), only while recent and small
+recent_s = 1800              # "recent": a turn that ended less than this ago stays verbatim, or at least a full entry
+verbatim_budget_tokens = 8000  # verbatim turns heavier than this become full record entries (payloads behind their refs)
+thread_full_turns = 6        # turns of the message's thread (and recent ones) kept as full entries; older: one line
+record_budget_tokens = 6000  # whole record; past it oldest full entries go to one line, then oldest lines leave (said)
+min_gain_cold_tokens = 1000  # cache cold (idle past the model's cache_ttl_s): a boundary must free at least this
+                             # (cache warm: policy.min_gain_tokens; under pressure: any gain)
+frame_tokens = 60            # the host's own framing around a record, counted against the gain
+
+# Model profiles: first `match` (fnmatch on the lower-cased model id) wins; the last one is the default.
+# effective_budget = where quality starts to suffer (not the advertised window); hard_budget = never exceed.
+# cache: prefix (automatic prefix cache) | breakpoints (explicit markers) | none.  Costs are relative to input = 1.
+# Walter Engine: the model is a Router alias (`walter/auto`, `walter/<task>`), resolved per call by walter-llm among the
+# engine tiers (GPT-6 / Claude today). Budgets = the smallest of those profiles; without this entry the engine fell to
+# the 64k default and compacted (and lost its cache) every few calls on a 40-60k conversation (2026-11-10).
+[[model]]
+match = "walter/*"
+effective_budget = 96000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "gpt-6*"
+effective_budget = 96000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 900
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "gpt-5*"
+effective_budget = 80000
+hard_budget = 140000
+cache = "prefix"
+cache_ttl_s = 900
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "claude-*"
+effective_budget = 120000
+hard_budget = 180000
+cache = "breakpoints"
+cache_ttl_s = 300
+cached_cost = 0.10
+write_cost = 1.25
+
+[[model]]
+match = "gemini-*"
+effective_budget = 64000
+hard_budget = 200000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.25
+write_cost = 1.0
+
+[[model]]
+match = "*deepseek*"
+effective_budget = 64000
+hard_budget = 110000
+cache = "prefix"
+cache_ttl_s = 3600
+cached_cost = 0.10
+write_cost = 1.0
+
+[[model]]
+match = "*glm*"
+effective_budget = 64000
+hard_budget = 160000
+cache = "prefix"
+cache_ttl_s = 600
+cached_cost = 0.20
+write_cost = 1.0
+
+[[model]]
+match = "*"
+effective_budget = 64000
+hard_budget = 100000
+cache = "prefix"
+cache_ttl_s = 300
+cached_cost = 0.25
+write_cost = 1.0
+
+# Trusted, bounded capability notes; unchanged within an owner turn. No model call.
+[capabilities]
+router_enabled = true
+timeout_seconds = 10
+max_chars = 6000
+# Module layer: every agent-facing module's level-0 brief (walter present notes), composed once per owner turn.
+modules_enabled = true
+layer_max_chars = 20000
+
+# Entrance: a large tool output reduced when it enters the context (Claude Code PostToolUse), before the model reads
+# it. shadow = record what would be cut (numbers only, @instance/state/context/shadow/entrance-<day>.jsonl);
+# off = nothing. "on" is refused until the hook journals originals itself (walter_logs keeps what the model saw).
+[entrance]
+mode = "shadow"
+min_chars = 8000             # outputs below this stay verbatim (2.3 % of outputs = 26 % of the volume, 14 days, 06/11)
+head_chars = 1000            # kept from the start
+tail_chars = 800             # kept from the end (exit status, final lines)
+signal_lines = 8             # at most this many middle lines matching signal_words, with their line numbers
+signal_line_chars = 160
+signal_words = ["error", "erreur", "failed", "échec", "exception", "traceback", "warning", "denied", "fatal",
+                "panic", "not found", "refused", "timeout"]
+exempt_tools = ["Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Skill", "mcp__walter__skill_read",
+                "mcp__walter__module_guide", "mcp__visualize__read_me"]   # instructions the model needs whole
+chars_per_token = 3.5        # report only: estimated tokens from characters
+
+# Preflight (walter_context.preflight): one decision per owner message, explicit degraded plan when it fails (SOCLE A2).
+[preflight]
+decision_samples = 3                # parallel decisions averaged (2026-11-09): one call flipped memory on 2 messages in 7
+decision_timeout_s = 15             # per decision call (the Router chain's own fallbacks run inside it)
+reply_window_s = 7200               # past that, « ok, regarde X » opens a subject rather than answering one
+floor_window_s = 1800               # a message this close to the previous exchange needs at least that exchange
+router_ttl_s = 600                  # cached Walter Router answers (chat tasks, decision chain) refreshed past that
+degraded_min_similarity = 0.55      # degraded plan: the closest subject (local embeddings) is claimed only above this
+degraded_profile_max_age_s = 1800   # degraded plan: the session's previous model profile is reused if this recent
+previous_chars = 1200               # previous exchange read from walter_logs when the caller sends none: chars per side
+previous_timeout_s = 1.0            # … within this time, else the plan is made without it (noted in the journal)
+# The plan and its pack are answered within this time. A caller that says how long it waits (`answer_within_ms`, the
+# engine's own timeout) gets the shorter of the two, minus the margin (journal write, the answer's way back). A pack
+# source not ready by then is left out and the pack says so (13/11: three sub-agent turns at once lost their whole
+# plan because the pack, read source after source, came 1.5 s after the engine had stopped waiting).
+answer_within_s = 5.5
+answer_margin_s = 1.0
+pack_reserve_s = 1.0                # the decision stops this long before the answer is due: past it, the degraded plan
+                                    # (said to the model, on the run and on the bus) instead of no answer at all
+
+# Per-message pack (walter_context.assembly / retrieval). Budgets in tokens (chars / 4), header included.
+# Measured 07-11/11 (741 packs): median L0 115, L1 1588, L2 2983, L3 2889, L4 4666; max 7257.
+[pack]
+budget = { L0 = 800, L1 = 1200, L2 = 2000, L3 = 3000, L4 = 4500 }
+# Over budget, blocks are shrunk (whole lines kept) then dropped in this order, least relevant first; a block id not
+# listed is cut last; `now` and the degraded-plan line are never cut. Every cut is recorded in the pack's `cuts`.
+cut_order = ["subjects_board", "records", "tool_cards", "recent_exchanges", "memory", "experience", "subject",
+             "session_state", "tasks"]
+min_block_tokens = 80               # a block that would shrink below this is dropped instead
+board_tokens = 200                  # subjects board: active subjects only (before: the whole table, 17 lines, ~350)
+board_max_lines = 6
+board_recent_hours = 48             # recent = last activity within this (instant: 6 h, day: 24 h, from the plan horizon)
+board_states = ["en_cours", "attend_le_proprietaire"]   # states shown besides the plan's own thread
+subject_tokens = 900
+horizon_max_age_s = { instant = 3600, day = 43200 }     # plan horizon → MemoryViewQuery.max_age_s of the subject view
+recent_exchanges = 3
+unsure_plan = 0.5                   # below this plan confidence, the cheap records lookup is added (calibration 28/10)
+tasks_tokens = 250                  # Memory POST /v1/tasks/list: the thread's objectives + others, one line each
+tasks_others = 3
+experience_tokens = 400             # Memory POST /v1/experience: attempts, failures, validated solutions of the thread
+experience_items = 4
+experience_recent_days = 7          # below L2 the block appears only for a failed/partial attempt this recent
+gateway_timeout_s = 1.5             # per Memory gateway call of the pack (tasks, experience); past it the block is dropped
+workers = 16                        # threads asking the pack's sources together (up to 9 sources per message)
+late_grace_s = 0.25                 # a source is given at least this long once the answer's deadline has passed
+
+[pack.memory_budget.L3]             # Memory get_context sections (tasks/experience come from their own routes: 0 here)
+profile = 0
+rules = 0
+working = 0
+people = 300
+knowledge = 600
+evidence = 300
+views = 200
+tasks = 0
+experience = 0
+
+[pack.memory_budget.L4]
+profile = 0
+rules = 0
+working = 0
+people = 600
+knowledge = 1200
+evidence = 800
+views = 300
+tasks = 0
+experience = 0
+
+[pack.records_budget]
+profile = 0
+rules = 0
+working = 0
+people = 0
+records = 900
+knowledge = 0
+evidence = 0
+views = 0
+tasks = 0
+experience = 0
+
+[pack.state_budget]                 # layer 2 (Memory V1 P1.1): every level but L0 without a thread
+rules = 350
+working = 1200

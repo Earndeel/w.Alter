@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/agent-loop-prevention",
+  "sha": "1eb919655475d50ac6e4e696de5d9547e95d7d1db604bdaa6742f8994a86c42a",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "1eb919655475d50ac6e4e696de5d9547e95d7d1db604bdaa6742f8994a86c42a"
+}

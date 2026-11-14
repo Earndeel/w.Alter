@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "about": "Walter's one execution policy (lot E3). Read by the engine policy plugin (policy.mjs) and the MCP server backstop (walter_security). Order: never → disclosure → class by interface preset → child preset (a child never gets more than its parent) → kernel sandbox and approval. The most restrictive answer wins; without an answerer, ask fails closed.",
+  "never": {
+    "paths": [
+      "@instance/bootstrap/**",
+      "**/.env",
+      "**/.env.*",
+      "**/.pgpass",
+      "**/.credentials.yaml",
+      "**/rclone.conf",
+      "**/*.agekey",
+      "**/.ssh/**",
+      "**/.git-credentials",
+      "/dev/shm/walter-secret*",
+      "/root/.hermes/vault/**",
+      "/root/.hermes/raw-vault/**",
+      "/root/.hermes/walter-llm/**",
+      "/root/.hermes/.env"
+    ],
+    "path_allow": [
+      "**/.env.example",
+      "**/.env.sample"
+    ],
+    "commands": [
+      "\\bbw\\s+(unlock|get|export|list|login|serve)\\b",
+      "\\bwalter-secret\\s+(get|file|grant\\s+access)\\b",
+      "\\bBW_SESSION=",
+      "/user/[^/\\s]+/bootstrap\\b"
+    ],
+    "max_depth": 3
+  },
+  "classes": {
+    "read": [
+      "read",
+      "read_image",
+      "glob",
+      "grep",
+      "present",
+      "ask_user_question",
+      "job_list",
+      "job_output",
+      "list_subagent_models",
+      "list_agents",
+      "team_task_list",
+      "team_task_get",
+      "mcp__walter__memory_context",
+      "mcp__walter__memory_recall",
+      "mcp__walter__memory_search",
+      "mcp__walter__memory_events",
+      "mcp__walter__memory_reflect",
+      "mcp__walter__memory_view",
+      "mcp__walter__person_lookup",
+      "mcp__walter__logs_*",
+      "mcp__walter__vault_search",
+      "mcp__walter__vault_get",
+      "mcp__walter__skills_*",
+      "mcp__walter__skill_read",
+      "mcp__walter__walter_profile",
+      "mcp__walter__walter_health",
+      "mcp__walter__walter_modules",
+      "mcp__walter__module_*",
+      "mcp__walter__secret_search",
+      "mcp__walter__secret_reference",
+      "mcp__walter__walter_route",
+      "mcp__walter__walter_decide",
+      "mcp__walter__browser_sites",
+      "mcp__walter__walter_browse",
+      "mcp__walter__walter_plans", "mcp__walter__audio_transcribe", "mcp__walter__tasks_list"
+    ],
+    "write_local": [
+      "write",
+      "edit",
+      "str_replace_editor",
+      "todo_write",
+      "team_task_create",
+      "team_task_update",
+      "mcp__walter__memory_retain",
+      "mcp__walter__vault_put",
+      "mcp__walter__skill_propose",
+      "mcp__walter__skill_patch", "mcp__walter__task_update"
+    ],
+    "shell": [
+      "bash",
+      "run_code",
+      "job_kill",
+      "pwsh"
+    ],
+    "outgoing": [
+      "mcp__*__send_message",
+      "mcp__*__reply",
+      "mcp__*__forward",
+      "mcp__walter__walter_web"
+    ],
+    "act_as_owner": [
+      "mcp__walter__browser_session",
+      "mcp__walter__computer_use"
+    ],
+    "delegate": [
+      "subagent",
+      "subagent_fork",
+      "spawn_teammate",
+      "send_message",
+      "wait_agent",
+      "interrupt_agent",
+      "mcp__walter__walter_run"
+    ]
+  },
+  "presets": {
+    "web-owner": {
+      "read": "allow",
+      "write_local": "allow",
+      "shell": "allow",
+      "outgoing": "check",
+      "act_as_owner": "allow",
+      "delegate": "allow",
+      "unknown": "ask"
+    },
+    "telegram-owner": {
+      "read": "allow",
+      "write_local": "allow",
+      "shell": "allow",
+      "outgoing": "check",
+      "act_as_owner": "ask",
+      "delegate": "allow",
+      "unknown": "ask"
+    },
+    "api": {
+      "read": "allow",
+      "write_local": "ask",
+      "shell": "ask",
+      "outgoing": "ask",
+      "act_as_owner": "ask",
+      "delegate": "ask",
+      "unknown": "ask"
+    },
+    "command": {
+      "read": "allow",
+      "write_local": "deny",
+      "shell": "deny",
+      "outgoing": "deny",
+      "act_as_owner": "deny",
+      "delegate": "deny",
+      "unknown": "deny"
+    },
+    "child": {
+      "read": "allow",
+      "write_local": "allow",
+      "shell": "allow",
+      "outgoing": "deny",
+      "act_as_owner": "ask",
+      "delegate": "allow",
+      "unknown": "ask"
+    },
+    "dev": {
+      "read": "allow",
+      "write_local": "allow",
+      "shell": "allow",
+      "outgoing": "check",
+      "act_as_owner": "allow",
+      "delegate": "allow",
+      "unknown": "allow"
+    }
+  },
+  "interfaces": {
+    "web": "web-owner",
+    "telegram": "telegram-owner",
+    "api": "api",
+    "command": "command",
+    "test": "api",
+    "dev": "dev"
+  },
+  "mcp_clients": {
+    "dsh": "engine",
+    "engine": "engine",
+    "claude": "dev",
+    "claude_code": "dev",
+    "claude-code": "dev",
+    "codex": "dev",
+    "hermes": "telegram"
+  },
+  "path_keys": [
+    "path",
+    "file_path",
+    "paths",
+    "files",
+    "file",
+    "filename",
+    "cwd",
+    "directory"
+  ],
+  "shell_text_keys": [
+    "command",
+    "code",
+    "script"
+  ]
+}

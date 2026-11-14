@@ -1,0 +1,13 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/mlops/models/whisper",
+  "sha": "38dd5fbd61d04eccba0c6eb9ab9336328229a53fc68f6fc14bf6f478c5338966",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "restore_reason": "read by an agent",
+ "restored_at": "2026-11-10T16:47:33+00:00",
+ "store_sha": "38dd5fbd61d04eccba0c6eb9ab9336328229a53fc68f6fc14bf6f478c5338966"
+}

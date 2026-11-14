@@ -1,0 +1,23 @@
+{
+ "version": 1,
+ "module": "ops",
+ "notes": [
+  "Ops runs the backups: walter-pg-backup (03:30 UTC, Postgres dump), walter-statedb-backup (03:50 UTC, Hermes state.db), walter-offsite-backup (04:40 UTC, encrypted copy to the owner's Drive). Each is a oneshot unit that can be started again safely; a run takes minutes.",
+  "A stale backup is usually a failed nightly run: read its journal, start it again once. If it fails again for the same reason (disk full, Drive token expired, Postgres down), the owner must be told what is blocking.",
+  "The recovery key existing only on the VM (recovery_key_on_vm_only, G3) is the owner's action: storing a copy in his vault. Never act, needs_owner.",
+  "Uncommitted or untracked work in git repositories is someone's work in progress: info/warning only, never act.",
+  "An engine_kernel_drift incident means the installed engine kernel (today DSH in /opt/dsh) no longer matches the frozen fingerprints (`walter engine kernel`). Never reinstall or roll back alone: the kernel changes only through Lab; needs_owner."
+ ],
+ "evidence": {
+  "backup_stale": [["systemctl", "list-timers", "--all", "--no-pager", "walter-pg-backup.timer", "walter-statedb-backup.timer", "walter-offsite-backup.timer"],
+                   ["journalctl", "-u", "walter-pg-backup", "-u", "walter-statedb-backup", "-u", "walter-offsite-backup", "-n", "40", "--no-pager", "-o", "short-iso"],
+                   ["df", "-h", "/"]],
+  "offsite_stale": [["journalctl", "-u", "walter-offsite-backup", "-n", "40", "--no-pager", "-o", "short-iso"]]
+ },
+ "actions": {
+  "run_backup": {"level": "G1", "describe": "start one backup unit again now", "async": true,
+                 "command": ["systemctl", "start", "--no-block", "{unit}.service"],
+                 "params": {"unit": ["walter-pg-backup", "walter-statedb-backup", "walter-offsite-backup"]}}
+ },
+ "settle_seconds": 5
+}

@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "modules": [
+    {
+      "id": "browse",
+      "target": "capabilities/browse",
+      "legacy": "/opt/walter-browse",
+      "manifest": "contracts/browse.json",
+      "neutral": true,
+      "vision_target": "capabilities/browse",
+      "compat_links": [
+        "/walter/browse"
+      ]
+    },
+    {
+      "id": "bus",
+      "target": "cognition/memory",
+      "legacy": "/opt/walter-memory",
+      "manifest": "contracts/bus.json",
+      "vision_target": "core/bus"
+    },
+    {
+      "id": "colab",
+      "target": "capabilities/colab",
+      "legacy": "/opt/walter-colab",
+      "manifest": "contracts/colab.json",
+      "vision_target": "capabilities/colab",
+      "compat_links": [
+        "/walter/colab"
+      ]
+    },
+    {
+      "id": "computer",
+      "target": "capabilities/computer",
+      "legacy": "/opt/walter-computer",
+      "manifest": "contracts/computer.json",
+      "neutral": true,
+      "vision_target": "capabilities/computer",
+      "compat_links": [
+        "/walter/computer"
+      ]
+    },
+    {
+      "id": "context",
+      "target": "cognition/context",
+      "legacy": "/opt/walter-context",
+      "manifest": "contracts/context.json",
+      "neutral": true,
+      "vision_target": "cognition/context",
+      "compat_links": [
+        "/walter/context"
+      ]
+    },
+    {
+      "id": "core",
+      "target": "core",
+      "legacy": "/opt/walter-core",
+      "manifest": "contracts/core.json",
+      "vision_target": "core"
+    },
+    {
+      "id": "lab",
+      "target": "lab",
+      "legacy": "/opt/walter-lab",
+      "manifest": "contracts/lab.json",
+      "neutral": true,
+      "vision_target": "lab"
+    },
+    {
+      "id": "llm",
+      "target": "cognition/router/llm",
+      "legacy": "/opt/walter-llm",
+      "manifest": "contracts/llm.json",
+      "neutral": true,
+      "vision_target": "cognition/router/llm"
+    },
+    {
+      "id": "logs",
+      "target": "cognition/memory",
+      "legacy": "/opt/walter-memory",
+      "manifest": "contracts/logs.json",
+      "vision_target": "core/observability"
+    },
+    {
+      "id": "memory",
+      "target": "cognition/memory",
+      "legacy": "/opt/walter-memory",
+      "manifest": "contracts/memory.json",
+      "vision_target": "cognition/memory",
+      "compat_links": [
+        "/walter/memory"
+      ]
+    },
+    {
+      "id": "ops",
+      "target": "ops",
+      "legacy": "/opt/walter-backup",
+      "aliases": [
+        "backup"
+      ],
+      "compat_links": [
+        "/walter/backup",
+        "/opt/walter-ops"
+      ],
+      "manifest": "contracts/ops.json",
+      "neutral": true,
+      "vision_target": "ops"
+    },
+    {
+      "id": "raw-vault",
+      "target": "cognition/memory/vault",
+      "legacy": "/opt/walter-raw-vault",
+      "manifest": "contracts/raw-vault.json",
+      "vision_target": "cognition/memory/vault"
+    },
+    {
+      "id": "router",
+      "target": "cognition/router",
+      "legacy": "/opt/walter-router",
+      "manifest": "contracts/router.json",
+      "neutral": true,
+      "vision_target": "cognition/router",
+      "compat_links": [
+        "/walter/router"
+      ]
+    },
+    {
+      "id": "runtime",
+      "target": "ops/runtime",
+      "legacy": null,
+      "manifest": "contracts/runtime.json",
+      "neutral": true,
+      "vision_target": "ops/runtime",
+      "compat_links": [
+        "/walter/runtime"
+      ]
+    },
+    {
+      "id": "secrets",
+      "target": "core/security/secrets",
+      "legacy": "/opt/walter-secrets",
+      "manifest": "contracts/secrets.json",
+      "neutral": true,
+      "vision_target": "core/security/secrets",
+      "compat_links": [
+        "/walter/secrets"
+      ]
+    },
+    {
+      "id": "skills",
+      "target": "capabilities/skills",
+      "legacy": "/opt/walter-skills",
+      "manifest": "contracts/skills.json",
+      "vision_target": "capabilities/skills",
+      "compat_links": [
+        "/walter/skills"
+      ]
+    },
+    {
+      "id": "soul",
+      "target": "core/identity",
+      "legacy": "/opt/walter-soul",
+      "manifest": "contracts/soul.json",
+      "neutral": true,
+      "vision_target": "core/identity",
+      "compat_links": [
+        "/walter/soul"
+      ]
+    }
+  ]
+}

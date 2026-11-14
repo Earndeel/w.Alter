@@ -1,0 +1,17 @@
+{
+ "absorbed_into": "kie-image-generation-operations",
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "merged into kie-image-generation-operations (2026-11-01 reorganisation)",
+ "domain": "images",
+ "hermes": {
+  "path": "/root/.hermes/skills/productivity/kie-qwen-image-ops",
+  "sha": "8cd6a3ab27588004c65843aabcd32a3bb341de19e203910e5c60d75222432d6f",
+  "state": "active"
+ },
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "proposed_by": "hermes",
+ "reason": "created by the Hermes agent (skill_manage)",
+ "store_sha": "8cd6a3ab27588004c65843aabcd32a3bb341de19e203910e5c60d75222432d6f"
+}

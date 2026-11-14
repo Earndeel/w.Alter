@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/conversational-workflow-orchestration",
+  "sha": "58d175e3ee92ed54a0e14de8fdb9de411c42eeb99ad21fe9b6bf8686e214fd1b",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "58d175e3ee92ed54a0e14de8fdb9de411c42eeb99ad21fe9b6bf8686e214fd1b"
+}

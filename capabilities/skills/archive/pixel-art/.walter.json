@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:06+00:00",
+ "archived_reason": "never read by any agent",
+ "domain": "creative",
+ "hermes": {
+  "path": "/root/.hermes/skills/creative/pixel-art",
+  "sha": "06ef8938adeb9ce005edaf026397a6851f5f15d9765a6af29316538ce10ae086",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-hub",
+ "owner": "upstream",
+ "store_sha": "06ef8938adeb9ce005edaf026397a6851f5f15d9765a6af29316538ce10ae086"
+}

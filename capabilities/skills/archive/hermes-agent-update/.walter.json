@@ -1,0 +1,14 @@
+{
+ "archived_at": "2026-10-23T04:15:07+00:00",
+ "archived_reason": "not read for 72 days",
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hermes-agent-update",
+  "sha": "5cf08c7bf27461ebf282b11b0437298ded84d3fa1f87603c551fb50cdf8132d6",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "5cf08c7bf27461ebf282b11b0437298ded84d3fa1f87603c551fb50cdf8132d6"
+}

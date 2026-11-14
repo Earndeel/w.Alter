@@ -1,0 +1,12 @@
+{
+ "domain": "media",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/reference-video-workflows",
+  "sha": "52f0e6f3f483455eb121d31a96b3a5d42cc972c007b056394c6c86dc62f0a7ff",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "52f0e6f3f483455eb121d31a96b3a5d42cc972c007b056394c6c86dc62f0a7ff"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/human-preference-model-leaderboards",
+  "sha": "bdba295f426df947692c642c99ff7941e27c259822d9679c79dd78fa4e919776",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "bdba295f426df947692c642c99ff7941e27c259822d9679c79dd78fa4e919776"
+}

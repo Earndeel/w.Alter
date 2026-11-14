@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/web/blocked-page-recovery",
+  "sha": "4f7d6d23c6f247253e672ee7a0b49d5ce4236b75c69b46c7648e09947fa64b9a",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "store_sha": "4f7d6d23c6f247253e672ee7a0b49d5ce4236b75c69b46c7648e09947fa64b9a"
+}

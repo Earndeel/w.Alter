@@ -1,0 +1,76 @@
+#!/bin/bash
+# SUPERSEDED 2026-10-29: the live copy is walter/ops backup/scripts/walter-offsite-backup (the host unit links there).
+# Kept unchanged below for rollback only; do not edit here.
+# W.Alter offsite backup (2026-10-01, Walter Memory P0.2).
+# Encrypts (age, W.Alter recovery key) and copies to Google Drive "W.Alter Backups":
+#   pg/        newest local PG dump        (walter-pg-backup, 03:30 UTC)
+#   statedb/   newest state.db snapshot    (walter-statedb-backup, ~04:00 UTC)
+#   bitwarden/ Bitwarden vault JSON export (vault_react.py; also pushed on every vault change)
+#   config/    config bundle: Hermes config/secrets/skills/plugins/cron/docs, /opt/walter-*, units, rclone, pgpass
+# Remote retention per kind: 7 daily + 4 weekly (Sunday) + 12 monthly (1st). Upload is hash-verified by rclone.
+# Restore: rclone copy "gdrive:W.Alter Backups/<kind>/<file>.age" . && age -d -i <recovery key> <file>.age > <file>
+# The private recovery key is /root/.hermes/vault/walter-recovery.agekey; a copy MUST live outside the VM.
+set -euo pipefail
+umask 077
+REC=/root/.hermes/vault/walter-recovery.pub
+REMOTE="gdrive:W.Alter Backups"
+WORK=$(mktemp -d /var/tmp/walter-offsite.XXXXXX); trap 'rm -rf "$WORK"' EXIT
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+
+push() {  # push <kind> <local file> [remote name]
+  local kind=$1 src=$2 name=${3:-$(basename "$2")}
+  if rclone lsf "$REMOTE/$kind/" 2>/dev/null | grep -qxF "$name.age"; then echo "skip $kind/$name (already offsite)"; return; fi
+  age -R "$REC" -o "$WORK/$name.age" "$src"
+  rclone copyto "$WORK/$name.age" "$REMOTE/$kind/$name.age" --drive-chunk-size 64M
+  echo "pushed $kind/$name.age ($(du -h "$WORK/$name.age" | cut -f1))"; rm -f "$WORK/$name.age"
+}
+
+pg=$(ls -1t /root/.hermes/backups/pg/hindsight-*.dump 2>/dev/null | head -1 || true)
+[ -n "$pg" ] && push pg "$pg"
+sdb=$(ls -1t /root/.hermes/backups/statedb/state-*.db.zst 2>/dev/null | head -1 || true)
+[ -n "$sdb" ] && push statedb "$sdb"
+
+# Bitwarden vault (Vaultwarden lucas-bitwarden.duckdns.org, account of Monsieur): full JSON export, encrypted in
+# memory (never written in clear; vault_react.py export, also used on every vault change), kept locally (all < 48 h,
+# then one per day for 14 days) and offsite. A failed export does not stop the rest,
+# but the run exits 1 at the end so the unit shows failed. Added 2026-10-16.
+BW_FAILED=0
+BWDIR=/root/.hermes/backups/bitwarden
+if walter-secret vault-export "$BWDIR/vault-$TS.json.age"   # Walter Secrets interface
+then
+  rclone copyto "$BWDIR/vault-$TS.json.age" "$REMOTE/bitwarden/vault-$TS.json.age"   # already age-encrypted
+  echo "pushed bitwarden/vault-$TS.json.age ($(du -h "$BWDIR/vault-$TS.json.age" | cut -f1))"
+  walter-secret vault-prune >/dev/null
+else
+  BW_FAILED=1; echo "WARNING: bitwarden export failed" >&2
+fi
+
+# Fail closed: inventory modules + mutual integrations; verify every archived file.
+walter-python -m walter_memory.backup_bundle create "$WORK/config-$TS.tar"
+zstd -q -T2 -10 --rm "$WORK/config-$TS.tar" -o "$WORK/config-$TS.tar.zst"
+push config "$WORK/config-$TS.tar.zst"
+
+# Remote retention
+python3 - "$REMOTE" <<'PY'
+import json, re, subprocess, sys
+from datetime import date
+remote = sys.argv[1]
+for kind in ("pg", "statedb", "config", "bitwarden"):
+    out = subprocess.run(["rclone", "lsjson", f"{remote}/{kind}/"], capture_output=True, text=True)
+    if out.returncode: continue
+    files = []
+    for f in json.loads(out.stdout or "[]"):
+        m = re.search(r"(\d{8})T\d{6}Z", f["Name"])
+        if m: files.append((date(int(m[1][:4]), int(m[1][4:6]), int(m[1][6:])), f["Name"]))
+    files.sort(reverse=True)
+    keep, days, weeks, months = set(), [], [], []
+    for d, n in files:
+        if d not in days and len(days) < 7: days.append(d); keep.add(n)
+        if d.isoweekday() == 7 and d not in weeks and len(weeks) < 4: weeks.append(d); keep.add(n)
+        if (d.year, d.month) not in months and len(months) < 12: months.append((d.year, d.month)); keep.add(n)
+    for d, n in files:
+        if n not in keep:
+            subprocess.run(["rclone", "deletefile", f"{remote}/{kind}/{n}"], check=False); print("pruned", kind, n)
+PY
+[ "$BW_FAILED" = 0 ] || { echo "offsite backup done $TS, but the Bitwarden export FAILED" >&2; exit 1; }
+echo "offsite backup ok $TS"

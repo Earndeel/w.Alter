@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "never read by any agent",
+ "domain": "code",
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/h-architectural-patterns",
+  "sha": "f31fccd3cd8f2ea928c0cd31694cceaf6671a1b6a6eb3918261f7f710527d6d4",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "f31fccd3cd8f2ea928c0cd31694cceaf6671a1b6a6eb3918261f7f710527d6d4"
+}

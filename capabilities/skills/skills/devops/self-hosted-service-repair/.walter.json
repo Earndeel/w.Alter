@@ -1,0 +1,13 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/self-hosted-service-repair",
+  "sha": "4a9c43d35713fbd2c7b5f22c2cccdffb86607137144a4b378814833fe9b3d0e5",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "read by an agent",
+ "restored_at": "2026-11-07T20:11:41+00:00",
+ "store_sha": "4a9c43d35713fbd2c7b5f22c2cccdffb86607137144a4b378814833fe9b3d0e5"
+}

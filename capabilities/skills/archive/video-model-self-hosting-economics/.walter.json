@@ -1,0 +1,12 @@
+{
+ "domain": "mlops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/video-model-self-hosting-economics",
+  "sha": "0bb7dbb0681ad4f9a18cf9e6221d40328ffc627111d848f95a78efbfcbc60d56",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "0bb7dbb0681ad4f9a18cf9e6221d40328ffc627111d848f95a78efbfcbc60d56"
+}

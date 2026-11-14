@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/cloudflare-named-tunnel-multi-host",
+  "sha": "da16084ae064792e3242e20d4d9e0afbfe23912f22533cd7c2472a11a6681281",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "da16084ae064792e3242e20d4d9e0afbfe23912f22533cd7c2472a11a6681281"
+}

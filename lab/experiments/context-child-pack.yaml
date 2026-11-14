@@ -1,0 +1,14 @@
+# First Lab experiment (P6, 2026-10-28): the P2-b decision checked by measurement, as the plan required.
+name: context-child-pack
+hypothesis: >-
+  Un sous-agent walter_run qui reçoit le paquet de contexte walter-context (mission, modules, skills, mémoire) réussit
+  au moins aussi souvent qu'avec la seule chaîne de l'appelant, avec au plus autant d'appels de modèle.
+scenario: e2e-minimal
+repeats: 3
+variants:
+  caller: {env: {WALTER_RUN_CONTEXT: caller}, note: "avant P2-b : seulement le contexte passé par l'appelant"}
+  walter: {env: {WALTER_RUN_CONTEXT: walter}, note: "P2-b : paquet construit par walter-context-child (comportement actuel)"}
+metrics: [ok, task_seconds, model_calls, tool_calls]
+decision:
+  prefer: walter
+  if: ["ok_rate >= baseline", "median model_calls <= baseline"]

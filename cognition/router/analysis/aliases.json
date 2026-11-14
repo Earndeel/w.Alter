@@ -1,0 +1,93 @@
+{
+  "_doc": "Manual identity links. '*' maps a normalised base from any namespace to a canonical model_id. Every entry needs a reason; never add a guess.",
+  "*": {
+    "hailuo-3-max": {
+      "model_id": "minimax-h3-max",
+      "reason": "OpenRouter minimax/hailuo-3-max = AA 'MiniMax H3 Max' (Hailuo is MiniMax's video brand; same vendor, same version)"
+    },
+    "hailuo-3": {
+      "model_id": "minimax-h3",
+      "reason": "OpenRouter minimax/hailuo-3 = AA 'MiniMax H3'"
+    },
+    "dreamina-seedance-2-5": {
+      "model_id": "seedance-2-5",
+      "reason": "AA 'Dreamina Seedance 2.5' = OpenRouter bytedance/seedance-2.5"
+    },
+    "dreamina-seedance-2-0": {
+      "model_id": "seedance-2-0",
+      "reason": "AA 'Dreamina Seedance 2.0' = OpenRouter bytedance/seedance-2.0"
+    },
+    "wan-3-0-video": {
+      "model_id": "wan-3-0",
+      "reason": "Kie 'wan 3.0 video' = AA/OpenRouter Wan 3.0"
+    },
+    "wan3-0-video-prime": {
+      "model_id": "wan-3-0-prime",
+      "reason": "Kie 'wan3.0 video prime' = OpenRouter alibaba/wan-3.0-prime"
+    },
+    "grok-imagine-video-1-5-preview": {
+      "model_id": "grok-imagine-video-1-5",
+      "reason": "Kie 'grok-imagine-video-1-5-preview' = AA/OpenRouter grok-imagine-video-1.5 (same version, Kie labels it preview)"
+    },
+    "gemini-omni-1-1-flash": {
+      "model_id": "gemini-omni-flash-1-1",
+      "reason": "Arena 'gemini-omni-1.1-flash' = AA/Kie Gemini Omni Flash 1.1 (same model, Arena orders the words differently; Google blog link on Arena confirms)"
+    },
+    "grok-voice-transcribe-1": {
+      "model_id": "grok-stt-1",
+      "reason": "AA Speech-to-Text 'Grok Voice Transcribe 1.0' (SpaceXAI): AA's own family slug for Grok Voice Transcribe is grok-stt; OpenRouter x-ai/grok-stt-1.0 = « Grok STT, SpaceXAI's speech-to-text model » (same vendor, same version)"
+    },
+    "grok-voice-transcribe-2": {
+      "model_id": "grok-stt-2",
+      "reason": "AA 'Grok Voice Transcribe 2.0' = next version of the grok-stt family (AA slug grok-stt), named like grok-stt-1"
+    },
+    "voxtral-small": {
+      "model_id": "voxtral-small-24b-2507",
+      "reason": "AA 'Voxtral Small' (Mistral, 24 B parameters in AA's open-weights table) = the only Voxtral Small release, Voxtral-Small-24B-2507 (OpenRouter mistralai/voxtral-small-24b-2507)"
+    },
+    "rerank-3-5": {
+      "model_id": "rerank-v3-5",
+      "reason": "Agentset 'Cohere Rerank 3.5' = Cohere API id rerank-v3.5 (OpenRouter cohere/rerank-v3.5); Cohere names the model Rerank 3.5"
+    },
+    "gemini-3-pro-preview": {
+      "model_id": "gemini-3-pro",
+      "reason": "Gemini 3 Pro shipped under the API id gemini-3-pro-preview (Google, 2025-11-18); LLM Stats keys it by that id, Video-MME-v2, Arena and Kie name it Gemini 3 Pro"
+    },
+    "gemini-3-flash": {
+      "model_id": "gemini-3-flash-preview",
+      "reason": "Gemini 3 Flash is served as gemini-3-flash-preview (OpenRouter google/gemini-3-flash-preview, LLM Stats); Arena and Video-MME-v2 call it Gemini-3-Flash; no other Gemini 3 Flash release"
+    }
+  },
+  "kie": {},
+  "openrouter": {},
+  "aa": {},
+  "da": {},
+  "mm": {
+    "Suno v6": {
+      "model_id": "suno",
+      "reason": "AA Music 'Suno v6' = the Suno W.Alter runs: Kie ai-music-api/generate is called with model V6 (config/kie_media_schemas.json, request accepted 2026-10-02); docs.kie.ai lists V6, V6_MINI, V6_WILD"
+    }
+  },
+  "codex": {},
+  "declared": {},
+  "arena": {
+    "grok-imagine-video-1.5-agent": {
+      "model_id": "grok-imagine-video-1-5",
+      "variant": "agent",
+      "reason": "Arena row of Grok Imagine Video 1.5 driven by its agent mode (co-release); same model, different generation mode"
+    }
+  },
+  "aa_stt": {
+    "Large v2": {
+      "model_id": "whisper-1",
+      "reason": "AA STT row 'Large v2', host OpenAI = 'Whisper Large v2, OpenAI' in AA's open-weights table (same WER 4.06 %); OpenAI's API serves Whisper large-v2 as whisper-1 (OpenAI speech-to-text docs)"
+    }
+  },
+  "agentset": {
+    "Gemini Embedding 2": {
+      "model_id": "gemini-embedding-2-preview",
+      "reason": "Agentset links its 'Gemini Embedding 2' row to /embeddings/gemini-embedding-2-preview (board updated 2026-02-15, when only the preview existed)"
+    }
+  },
+  "mteb": {}
+}

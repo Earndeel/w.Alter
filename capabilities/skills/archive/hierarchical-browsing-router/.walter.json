@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hierarchical-browsing-router",
+  "sha": "5937fe3263cc4429bf95d3004145862d07a8935da16395bb33fe91a2876987b5",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5937fe3263cc4429bf95d3004145862d07a8935da16395bb33fe91a2876987b5"
+}

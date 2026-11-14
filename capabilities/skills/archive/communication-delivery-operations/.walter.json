@@ -1,0 +1,12 @@
+{
+ "domain": "social-media",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/communication-delivery-operations",
+  "sha": "0c3af799f99a61b13e34b85cfa784e4708998856dfcd4ba71fa56ae27b9a9bdc",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "0c3af799f99a61b13e34b85cfa784e4708998856dfcd4ba71fa56ae27b9a9bdc"
+}

@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/authenticated-workflows",
+  "sha": "1e2067dc87dccd2fbe438f157622eda4a479a6442077fb3e758a5fd37f2fb7e1",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "1e2067dc87dccd2fbe438f157622eda4a479a6442077fb3e758a5fd37f2fb7e1"
+}

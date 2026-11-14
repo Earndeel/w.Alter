@@ -1,0 +1,12 @@
+{
+ "hermes": {
+  "note": "vault-value scrub applied on both sides 2026-11-01",
+  "path": "/root/.hermes/skills/mcp/fal-mcp-integration",
+  "sha": "50fe51f30c21812137b709289d337fcb487e7c2b109a761fa71a990184b869e8",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "6cebab720245ab2dfd307cfd6983b11a1ccc826f7ba6fe0dcc7f67225f019380"
+}

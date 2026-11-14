@@ -1,0 +1,18 @@
+{
+ "archived_at": "2026-11-01T17:06:55+00:00",
+ "archived_by": "reorg-2026-11-01",
+ "archived_reason": "not read by any agent for 30+ days",
+ "domain": "messaging",
+ "hermes": {
+  "note": "secret scrub applied on both sides",
+  "path": "/root/.hermes/skills/devops/telegram-notification-delivery",
+  "sha": "8234f4f3851f3fac49c068d04427c7e4cce7baf67cbb2dc1644f7218669f6cf2",
+  "state": "active",
+  "synced_at": "2026-11-01T18:00:00+00:00"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "reserve": true,
+ "store_sha": "6c002c38d2f371dc9acbe6194e8b7e0a5f9f8b2755f29f3492fad2992d82beb8"
+}

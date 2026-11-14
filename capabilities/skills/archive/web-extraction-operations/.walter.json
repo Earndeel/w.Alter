@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/web-extraction-operations",
+  "sha": "2d2a963a20039426a4355a5ffd5019c0a9369f25a654b1ac8a4ffbbcc81580e5",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:25+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "2d2a963a20039426a4355a5ffd5019c0a9369f25a654b1ac8a4ffbbcc81580e5"
+}

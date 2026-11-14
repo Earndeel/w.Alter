@@ -1,0 +1,11 @@
+{
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hermes-voice-module",
+  "sha": "105a9f8f10594d1811c06ff825c6e9f1aa381a9005d1c0883a85c423035d562a",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "store_sha": "105a9f8f10594d1811c06ff825c6e9f1aa381a9005d1c0883a85c423035d562a"
+}

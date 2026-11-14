@@ -1,0 +1,3 @@
+#!/bin/sh
+# Walter Telegram door (core/interfaces/telegram): serve | check | send
+exec /usr/local/bin/walter-python "$(walter path core)/interfaces/telegram/bot.py" "$@"

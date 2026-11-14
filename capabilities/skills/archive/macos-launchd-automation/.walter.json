@@ -1,0 +1,12 @@
+{
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/macos-launchd-automation",
+  "sha": "6497a1da20c53e9e7f8204d19ec3d534e2127ee6dbd0c91054b5828c28f4c1f6",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "6497a1da20c53e9e7f8204d19ec3d534e2127ee6dbd0c91054b5828c28f4c1f6"
+}

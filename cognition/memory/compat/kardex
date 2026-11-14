@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# kardex — Raccourci vers le profil perso du propriétaire (ID 0, self) dans le Kardex PostgreSQL.
+# Compatibilité (E9.8, 2026-11-10) : ancien raccourci de ~/.hermes/bin, rangé dans Memory. Écrit le schéma kardex hors du
+# processeur walter-memory (écart A10 connu, voir DECISIONS 2026-10-11) : lecture seule recommandée.
+# Le Kardex est le système de contact intelligence (hindsight-pg, schema kardex).
+# Usage:
+#   kardex                  → profil complet du propriétaire (ID 0)
+#   kardex <field>          → un champ précis (ex: kardex phone_numbers, kardex emails)
+#   kardex set <field> <v>  → met à jour un champ du profil ID 0
+#   kardex contact <query>  → cherche un contact par nom/alias
+#   kardex who <id>          → affiche le profil d'un contact par ID
+
+set -euo pipefail
+
+PG="docker exec hindsight-pg psql -U hindsight -d hindsight"
+
+case "${1:-}" in
+    set)
+        # kardex set phone_numbers '{+66...}'  (array) ou kardex set occupation 'texte'
+        field="$2"; shift 2
+        val="$*"
+        $PG -c "UPDATE kardex.contacts SET $field = '$val', updated_at = now() WHERE id = 0;" 2>&1
+        ;;
+    contact)
+        shift
+        q="$*"
+        $PG -c "SELECT id, canonical_name, relationship_type, location_current FROM kardex.contacts WHERE canonical_name ILIKE '%$q%' OR '$q' = ANY(aliases) ORDER BY id;" 2>&1
+        ;;
+    who)
+        $PG -x -c "SELECT * FROM kardex.contacts WHERE id = ${2};" 2>&1
+        ;;
+    "")
+        $PG -x -c "SELECT id, canonical_name, aliases, phone_numbers, emails, handles, nationality, languages, location_current, location_home, occupation, relationship_type, personality_profile, communication_style, interests FROM kardex.contacts WHERE id = 0;" 2>&1
+        ;;
+    *)
+        $PG -t -c "SELECT $1 FROM kardex.contacts WHERE id = 0;" 2>&1 | sed 's/^ *//'
+        ;;
+esac

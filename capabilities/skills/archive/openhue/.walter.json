@@ -1,0 +1,12 @@
+{
+ "domain": "smart-home",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/openhue",
+  "sha": "6fcb1d29a6047986063b70fbba55fac71327274a7b9fc8ee18721e28e5bf5071",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-repo",
+ "owner": "upstream",
+ "store_sha": "6fcb1d29a6047986063b70fbba55fac71327274a7b9fc8ee18721e28e5bf5071"
+}

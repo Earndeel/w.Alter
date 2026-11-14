@@ -1,0 +1,12 @@
+{
+ "domain": "",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/scena-factory-deployment",
+  "sha": "235c1b09c87401d84d0fdc5f97c61d12120758212212a70e9e53b91051f4e5a0",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "235c1b09c87401d84d0fdc5f97c61d12120758212212a70e9e53b91051f4e5a0"
+}
