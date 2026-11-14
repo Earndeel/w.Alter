@@ -83,8 +83,8 @@ def capabilities(plan: ContextPlan, ttl: float = 600) -> Block | None:
 
 # capability → modules whose agent brief (M1) is shown *for this message* (tool cards, layer 4): the host lists only a
 # core toolset and every module's one line (M0), so the plan says which modules' tools fit the request (07/11: a web
-# question answered with `curl` from the VM because nothing pointed at walter_browse). Delegation has none: walter_run
-# carries its own description.
+# question answered with `curl` from the VM because nothing pointed at walter_browse). Delegation has none: the engine
+# delegates through its own `subagent` tool; which modules' guide helps a message is question set 3's D question (P4).
 TOOL_CARD_MODULES = {"web": ["browse"], "browser": ["browse", "computer"], "secrets": ["secrets"],
                      "memory": ["memory"], "skills": ["skills"]}
 _CARD_CACHE: dict[str, tuple[float, str]] = {}

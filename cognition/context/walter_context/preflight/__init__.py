@@ -1,7 +1,7 @@
 """preflight: understands one owner message in its conversation and produces a ContextPlan (walter_context.plan).
 
 One typed call to Walter Router's decision model (walter_memory.llm.decide, the Router's decision chain:
-d1-ultra first since 25/10) answers, together: which thread (or a new one), the act, the context level L0-L4,
+Drex Max 1.1 first since 13/11) answers, together: which thread (or a new one), the act, the context level L0-L4,
 the main knowledge domain and horizon, the capabilities the answer needs, the task family and text tier asked
 of the Router. Rules settle the obvious cases without a call (short reply right after an exchange, a bare
 calculation or the time). The decision model settles everything else alone: escalating an unsure plan to a chat
@@ -124,6 +124,7 @@ class Request:
     default_thread: str | None = None                      # e.g. "session:<id>" while threads do not exist yet
     waiting_age_s: float | None = None                     # age of the session's last attached exchange (its subject)
     previous_profile: dict | None = None                   # the session's previous model profile, if recent (degraded)
+    origin: dict | None = None    # set 3: where the input comes from {channel: chat|voice|desktop|connector|api, kind, source}
 
 
 def _words(text: str) -> list[str]:
@@ -157,9 +158,16 @@ def _router_cache() -> Path:
 def refresh_router() -> dict:
     """Ask Walter Router (public command) for its chat task families and its decision chain, both at once, and keep
     them on disk: the preflight is one process per message and each `walter-router` call costs ~0.5 s."""
-    procs = {k: subprocess.Popen(["walter-router", *cmd], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-             for k, cmd in (("tasks", ["tasks"]), ("chain", ["decision-chain"]))}
-    out = {"at": time.time(), "tasks": {}, "chain": []}
+    procs = {k: subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+             for k, cmd in (("tasks", ["walter-router", "tasks"]), ("chain", ["walter-router", "decision-chain"]),
+                            ("modules", ["walter", "present", "notes", "--form", "m0"]))}
+    out = {"at": time.time(), "tasks": {}, "chain": [], "modules": []}
+    try:        # the modules' one-line presentations (D1), for the question set 3's documentation questions
+        notes = json.loads(procs["modules"].communicate(timeout=20)[0]).get("notes") or []
+        out["modules"] = [{"module": n["module"], "line": n["content"]} for n in notes
+                          if n.get("level") == "M0" and n.get("module") and n.get("content")]
+    except Exception:  # noqa: BLE001 — set 3 then asks no documentation question
+        procs["modules"].kill()
     try:
         rows = json.loads(procs["tasks"].communicate(timeout=20)[0])
         # internal postes (memory extraction, compression, voice…) are called by modules, never asked for by the owner
@@ -218,6 +226,11 @@ def router_tasks() -> dict[str, str]:
     return _router().get("tasks") or {}
 
 
+def module_lines() -> list[dict]:
+    """Every presented module's one-line presentation (D1 = M0): [{module, line}], from `walter present`."""
+    return _router().get("modules") or []
+
+
 def decision_chain() -> tuple[str, ...] | None:
     """Walter Router's decision models, in order; None lets walter_memory.llm read them itself."""
     return tuple(_router().get("chain") or ()) or None
@@ -273,6 +286,85 @@ def questions(req: Request) -> tuple[dict, dict]:
     if any(c.get("task") or c.get("kind") == "task" for c in ids.values()):
         q["resume"] = {"type": "noul", "instructions": RESUME_QUESTION + NOTE}
     return state, q
+
+
+# ── question set 3 (2026-11-14): the owner's L / C / D architecture, prepared, NOT asked in production ──────────────
+# Three independent scales: L = the general main model's tier (the Router picks the concrete model), C = what the
+# model must see (C0-C4, today's context levels L0-L4 renamed), D = which modules' usage guide (D2 = M1) it should
+# have in hand; D1 (one line per module, M0) is always there and D3 (guide) is read on demand. Against set 2: no task
+# family (the main model is always the general one; specialists are its own choice, through the Router, at
+# delegation — owner, 13/11) and no capability questions (cap_delegation decided nothing; « which documentation
+# helps » replaces « which capability »); a `handling` question for inputs that are not a chat message (voice,
+# desktop, connectors, API). The decision bench (walter-router preflight-bench) asks exactly this set.
+CONTEXT_LEVELS = ("C0", "C1", "C2", "C3", "C4")
+C_OF_PLAN = {"none": "C0", "last_exchange": "C1", "thread": "C2", "thread_and_memory": "C3"}
+HANDLING_CRITERIA = {"answer": "the owner expects the assistant to answer or act on it now",
+                     "record": "information or an event to take into account and keep; no answer expected now",
+                     "notify": "the owner should be told about it soon, briefly, without a full answer",
+                     "ignore": "nothing to do and nothing worth keeping"}
+DOC_QUESTION = ("The assistant always sees one line presenting each module. Should it also have the usage guide of "
+                "this module in hand from the start (its tools, parameters, conventions) because handling this input "
+                "well is likely to call on what the module does? Having the guide is not an order to use the module. "
+                "Module: {line}")
+
+
+def doc_key(module: str) -> str:
+    return "doc_" + re.sub(r"[^a-z0-9]+", "_", module.lower()).strip("_")
+
+
+def questions_v3(req: Request, modules: list[dict] | None = None) -> tuple[dict, dict]:
+    """The set 3 decision payload of one input (state, questions). `modules`: [{module, line}] (default: the
+    presented modules, `walter present`)."""
+    state, q2 = questions(req)
+    if req.origin:
+        state["input"] = {k: v for k, v in req.origin.items() if k in ("channel", "kind", "source") and v}
+    q = {"handling": {"type": "choice", "criteria": HANDLING_CRITERIA,
+                      "instructions": "What does this input call for? It may come from a chat, a voice note, the "
+                                      "computer, a connector (mail, messages, calendar) or an API." + NOTE}}
+    for k in ("act", "thread", "plan", "extensive", "model_level", "domain", "horizon"):
+        if k in q2:
+            q[k] = q2[k]
+    for m in (module_lines() if modules is None else modules):
+        q[doc_key(m["module"])] = {"type": "noul", "instructions": DOC_QUESTION.format(line=_line(m["line"], 240)) + NOTE}
+    for k in ("work", "resume"):
+        if k in q2:
+            q[k] = q2[k]
+    return state, q
+
+
+def context_level(plan_choice: str | None, extensive: float | None, req: Request | None = None) -> str:
+    """C0-C4 from the plan question and the extensive yes/no, with the production floor (a message close to the
+    previous exchange sees at least that exchange). Same reading as run() for set 2's L0-L4."""
+    c = C_OF_PLAN.get(plan_choice or "", "C1")
+    if (extensive or 0) >= 0.5 and c in ("C2", "C3"):
+        c = "C4"
+    prev = req.previous if req else None
+    if c == "C0" and prev and prev.age_s is not None and prev.age_s < FLOOR_WINDOW_S:
+        c = "C1"
+    return c
+
+
+def read_v3(a: dict, req: Request | None = None, modules: list[dict] | None = None) -> dict:
+    """One set 3 decision → the plan's fields (what the bench compares; what run() will read at P1).
+    {handling, act, thread, C, L, domain, horizon, docs: [module], work, resume} + confidence per field."""
+    pick = lambda k: (a.get(k) or {}).get("choice")                      # noqa: E731
+    noul = lambda k: (a.get(k) or {}).get("noul")                        # noqa: E731
+    mods = [m["module"] for m in (module_lines() if modules is None else modules)]
+    out = {"handling": pick("handling"), "act": pick("act"), "thread": pick("thread"),
+           "C": context_level(pick("plan"), noul("extensive"), req), "L": pick("model_level"),
+           "domain": pick("domain"), "horizon": pick("horizon"),
+           "docs": sorted(m for m in mods if (noul(doc_key(m)) or 0) >= 0.5)}
+    for k in ("work", "resume"):
+        if isinstance(noul(k), (int, float)):
+            out[k] = "yes" if noul(k) >= WORK_MIN else "no"
+    conf = {k: (a.get(k) or {}).get("confidence") for k in ("handling", "act", "thread", "plan", "model_level",
+                                                             "domain", "horizon")}
+    for k in ("extensive", "work", "resume", *(doc_key(m) for m in mods)):
+        p = noul(k)
+        if isinstance(p, (int, float)):
+            conf[k] = round(max(p, 1 - p), 3)
+    out["confidence"] = {k: v for k, v in conf.items() if v is not None}
+    return out
 
 
 def run(req: Request, *, purpose: str = "walter-context preflight", within: float | None = None) -> ContextPlan:

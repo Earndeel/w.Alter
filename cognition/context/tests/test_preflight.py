@@ -278,14 +278,17 @@ def test_router_answers_are_cached_and_refreshed_off_the_message_path(tmp_path, 
         def __init__(self, args, **kw):
             spawned.append(args)
             self.out = json.dumps([{"task": "general", "label": "Général", "interface": "chat"}]
-                                  if args[1:] == ["tasks"] else {"chain": ["a/decider", "b/decider"]})
+                                  if args[1:] == ["tasks"] else {"chain": ["a/decider", "b/decider"]}
+                                  if args[1:] == ["decision-chain"] else
+                                  {"notes": [{"module": "memory", "level": "M0", "content": "- **Memory** — x"}]})
 
         def communicate(self, timeout=None):
             return self.out, ""
 
     monkeypatch.setattr(preflight.subprocess, "Popen", Proc)
     assert preflight.router_tasks() == {"general": "Général"} and preflight.decision_chain() == ("a/decider", "b/decider")
-    assert len(spawned) == 2 and (tmp_path / "walter-context" / "router.json").exists()
+    assert len(spawned) == 3 and (tmp_path / "walter-context" / "router.json").exists()
+    assert preflight.module_lines() == [{"module": "memory", "line": "- **Memory** — x"}]
     monkeypatch.setattr(preflight, "_ROUTER", None)
     spawned.clear()
     assert preflight.decision_chain() == ("a/decider", "b/decider") and not spawned        # fresh: disk only
@@ -458,3 +461,36 @@ def test_preflight_questions_gives_the_decision_bench_the_exact_production_paylo
                                            previous=Exchange(**case["previous"]), candidates=case["candidates"]))
     assert out["state"] == state and out["questions"] == q and out["fast_path"] is None
     assert preflight_questions({"message": "combien font 2+2 ?"})["fast_path"] == "trivial"
+
+
+MODS = [{"module": "memory", "line": "- **Walter Memory** — la mémoire"},
+        {"module": "raw-vault", "line": "- **Raw Vault** — fichiers bruts"}]
+
+
+def test_question_set_3_asks_l_c_d_and_neither_task_nor_capabilities(monkeypatch):
+    """2026-11-14 (owner's L/C/D architecture): set 3 asks the tier, the context plan and which modules' usage guide
+    helps; no task family (specialists are the main model's choice) and no capability/delegation question."""
+    monkeypatch.setattr(preflight, "router_tasks", lambda: {"general": "G", "coding": "C"})
+    req = Request("t", "Analyse ce mail de la banque", previous=prev(),
+                  candidates=[{"id": "s1", "title": "Banque", "task": "dossier prêt"}],
+                  origin={"channel": "connector", "kind": "email", "source": "gmail", "secret": "x"})
+    state, q = preflight.questions_v3(req, MODS)
+    assert state["input"] == {"channel": "connector", "kind": "email", "source": "gmail"}
+    assert {"handling", "act", "thread", "plan", "extensive", "model_level", "domain", "horizon", "work", "resume",
+            "doc_memory", "doc_raw_vault"} == set(q)
+    assert "Raw Vault" in q["doc_raw_vault"]["instructions"] and "not an order" in q["doc_raw_vault"]["instructions"]
+    _, q2 = preflight.questions(req)
+    assert "task" in q2 and "cap_delegation" in q2                       # production (set 2) unchanged
+
+
+def test_set_3_reading_maps_plans_to_c_levels_with_the_floor():
+    a = {"handling": {"choice": "answer", "confidence": 0.9}, "act": {"choice": "continue", "confidence": 0.8},
+         "plan": {"choice": "thread", "confidence": 0.6}, "extensive": {"noul": 0.7},
+         "model_level": {"choice": "L2", "confidence": 0.7}, "doc_memory": {"noul": 0.8}, "doc_raw_vault": {"noul": 0.2},
+         "work": {"noul": 0.6}}
+    out = preflight.read_v3(a, Request("t", "x"), MODS)
+    assert (out["C"], out["L"], out["docs"], out["work"], out["handling"]) == ("C4", "L2", ["memory"], "yes", "answer")
+    assert out["confidence"]["doc_raw_vault"] == 0.8 and "resume" not in out
+    near = Request("t", "ok", previous=prev())                       # within the floor window: C0 becomes C1
+    assert preflight.context_level("none", None, near) == "C1" and preflight.context_level("none", None) == "C0"
+    assert preflight.context_level("thread_and_memory", 0.2) == "C3"

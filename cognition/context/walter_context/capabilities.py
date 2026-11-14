@@ -86,12 +86,13 @@ HEADER = ("## Modules W.Alter\n"
           "Chaque module branché se présente ci-dessous (niveau 1 : ce que c'est, son organisation, comment s'en servir), "
           "depuis le dossier manifest/ du module. Pour aller plus loin, seulement si la tâche le demande : "
           "`module_index(module, section)` liste ce qu'il contient, tenu à jour par le module ; "
-          "`module_guide(module)` donne son guide détaillé ; puis l'outil de l'élément.")
+          "`module_guide(module)` donne son guide détaillé (D3) ; puis l'outil de l'élément.")
 HEADER_M0 = ("## Modules W.Alter\n"
-             "Chaque module branché tient en une ligne (M0) ; ceux utiles à cette demande sont présentés en détail "
-             "(M1 : ce que c'est, son organisation, comment s'en servir). Pour aller plus loin, seulement si la tâche "
-             "le demande : `module_guide(module)` donne la documentation complète d'un module ; "
-             "`module_index(module, section)` liste ce qu'il contient ; puis l'outil de l'élément.")
+             "Chaque module branché tient en une ligne (D1). Sa fiche d'utilisation (D2 : outils, paramètres, "
+             "conventions) accompagne un message quand elle est utile et se lit à tout moment avec "
+             "`module_guide(module, depth=\"D2\")` ; `depth=\"D3\"` donne sa documentation détaillée, "
+             "`module_index(module, section)` ce qu'il contient. Lire une documentation n'oblige pas à utiliser le "
+             "module.")
 HEADER_BARE = "## Modules W.Alter"
 
 
