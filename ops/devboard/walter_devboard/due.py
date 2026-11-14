@@ -95,6 +95,12 @@ def record_commits(cfg: Config, conn) -> int:
 
 
 def run(cfg: Config, conn) -> dict:
+    out = _run(cfg, conn)
+    _put(conn, "pause", {"what": out["paused"], "at": datetime.now(timezone.utc).isoformat()} if out["paused"] else None)
+    return out
+
+
+def _run(cfg: Config, conn) -> dict:
     out = {"sessions": {}, "decisions": {}, "tasks": None, "commits": 0, "paused": None}
     conn.execute("delete from devboard.live where at < now() - interval '10 minutes'")
     out["commits"] = record_commits(cfg, conn)

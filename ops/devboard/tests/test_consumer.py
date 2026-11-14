@@ -163,3 +163,14 @@ def test_due_records_commits(conn, logs, reads, tmp_path, monkeypatch):
     assert [(r["card_id"], r["text"]) for r in rows] == [(1, "ops : W-1 : premier écran du tableau"),
                                                          (None, "ops : sans numéro")]
     assert conn.execute("select count(*) n from devboard.card_evidence where kind = 'commit'").fetchone()["n"] == 1
+
+
+def test_due_leaves_pause_marker(conn, logs, monkeypatch):
+    conn.execute("""insert into devboard.sessions (session_id, runtime, dirty, last_turn_at)
+                    values (%s, 'claude_code', true, now() - interval '1 hour')""", (CC,))
+    monkeypatch.setattr(reading, "read_session", lambda *a: "paused")
+    due.run(CFG, conn)
+    assert conn.execute("select value from devboard.state where key = 'pause'").fetchone()["value"]["what"] == "session"
+    monkeypatch.setattr(reading, "read_session", lambda *a: "done")
+    due.run(CFG, conn)
+    assert conn.execute("select value from devboard.state where key = 'pause'").fetchone()["value"] is None

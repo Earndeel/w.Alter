@@ -17,6 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--since")
     b.add_argument("--limit", type=int, default=20)
     sub.add_parser("correct", help='owner correction, JSON on stdin: {"ref","field","value","reason"}')
+    sub.add_parser("serve", help="the web page and read API (listen_host:port of the instance settings)")
     sub.add_parser("path-unit", help="print walter-devboard-docs.path for this instance's watched folders")
     r = sub.add_parser("read-session", help="read one session now (guards apply)")
     r.add_argument("session_id")
@@ -25,6 +26,12 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "bus":
         from . import consumer
         consumer.main()
+        return 0
+    if a.cmd == "serve":
+        import uvicorn
+        cfg = config.load()
+        uvicorn.run("walter_devboard.server:app", host=cfg.listen_host, port=cfg.port, log_level="warning",
+                    proxy_headers=False)
         return 0
     if a.cmd == "correct":
         from . import correct
