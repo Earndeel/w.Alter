@@ -239,6 +239,24 @@ def task_update(task_id: str, status: str = "", progress: dict | None = None, re
     return r.stdout.strip()
 
 
+DEVBOARD_FIELDS = ("status", "title", "module", "owner", "change", "deadline", "decision_link")
+
+
+@mcp.tool()
+def devboard_correct(ref: str, field: str, value: str, reason: str) -> str:
+    """Correct a card of the development board (ops/devboard), seulement quand Monsieur signale une carte fausse —
+    never on your own inference. ref = "W-12"; field = status (waiting_owner|in_progress|paused|done|abandoned) |
+    title | module | owner | change | deadline (YYYY-MM-DD, "" to clear) | decision_link (a decision anchor);
+    reason = his words. The correction wins over every later reading of the agents' sessions."""
+    if field not in DEVBOARD_FIELDS:
+        return json.dumps({"ok": False, "error": f"field: one of {', '.join(DEVBOARD_FIELDS)}"})
+    spec = {"ref": (ref or "").strip()[:20], "field": field, "value": (value or "")[:2000],
+            "reason": (reason or "")[:500], "by": "owner"}
+    r = subprocess.run(["walter-devboard", "correct"], input=json.dumps(spec, ensure_ascii=False),
+                       capture_output=True, text=True, timeout=60)
+    return (r.stdout or r.stderr).strip()[-2000:]
+
+
 @mcp.tool()
 def memory_search(query: str, limit: int = 10, source: str = "", since: str = "", until: str = "",
                   evidence_only: bool = False, history: bool = False) -> str:

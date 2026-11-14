@@ -2618,6 +2618,28 @@
           "role": "Tunnel Cloudflare (entrée publique de l'instance) ; réglages et identifiants (0600) dans config/, rangés le 2026-11-11 depuis le dossier d'intégrations de Hermes",
           "status": "active",
           "readme": "/services/cloudflared/README.md"
+        },
+        {
+          "id": "devboard",
+          "path": "/walter/ops/devboard",
+          "role": "Tableau de développement de Walter : chantiers, accords attendus, décisions remplacées, documents, activité des agents en direct (page tailnet, lecture seule)",
+          "status": "experimental",
+          "readme": "/walter/ops/devboard/README.md",
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter-devboard"
+            },
+            {
+              "transport": "http",
+              "interface": "tailnet :3093 (lecture seule)"
+            },
+            {
+              "transport": "mcp",
+              "interface": "devboard_correct"
+            }
+          ],
+          "vision_target": "ops/devboard"
         }
       ]
     },
