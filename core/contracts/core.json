@@ -397,6 +397,10 @@
         {
           "transport": "http",
           "interface": "dsh-web <path>/… (GET/HEAD) → upstream du panneau"
+        },
+        {
+          "transport": "http",
+          "interface": "Worker Cloudflare walter-web-edge (interfaces/web/edge) devant l'adresse publique : recharge same-origin d'une navigation venue d'un autre site refusée 401"
         }
       ],
       "vision_target": "core/interfaces/web"

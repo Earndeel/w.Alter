@@ -25,3 +25,12 @@
 
 Tailnet : `http://100.91.35.121:3080` ; Internet : `https://walter.walter-ai.cloud` (tunnel Cloudflare, application
 Cloudflare Access « W.Alter web », règle « Monsieur only » = code par e-mail, puis cookie de connexion de l'interface).
+
+## Adresse publique : le Worker de bord (`../edge/worker.mjs`)
+
+Le cookie de connexion de l'interface est `SameSite=Strict` : une page atteinte depuis un autre site (connexion
+Cloudflare Access, lien dans une messagerie) peut arriver sans lui et recevoir 401 alors que le navigateur est connecté.
+Le Worker `walter-web-edge` (route de l'adresse publique, après Access) répond à ce seul cas (navigation GET venue d'un
+autre site, 401) par une page qui se recharge elle-même depuis le site : le cookie part alors. Un navigateur vraiment
+non connecté reçoit le 401 au rechargement (pas de boucle). Tests : `node --test ../edge/tests/edge.test.mjs`.
+Déploiement : `walter-cloudflare -- wrangler deploy --config @instance/config/core/web-edge.wrangler.toml`.
