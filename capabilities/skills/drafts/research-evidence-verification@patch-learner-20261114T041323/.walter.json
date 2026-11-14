@@ -1,0 +1,11 @@
+{
+ "base_sha": "89f8db2cd3a9cde627c099d49d2b73db7b65604add651d7a6a2fa22026ba4651",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-14T04:13:23.589867+00:00",
+ "domain": "research",
+ "kind": "patch",
+ "reason": "La session a obtenu des tableaux Trends par extraction DOM, puis rencontré des pages sans tableau, une erreur 429 et des timeouts du navigateur partagé malgré un service actif. Les indices locaux nécessitaient une interprétation distincte des comparaisons internationales ; Keyword Planner n'a pas été vérifié et les métriques manquantes ont été laissées vides. Les scripts ont aussi échoué sur un identifiant de variante interprété comme pays (`KeyError: 'DEb'`). Ce complément apporte une procédure réutilisable de collecte, validation, interprétation et arrêt sûr, sans créer une compétence voisine. [session claude_code/vm/7d580ba9-9fce-45ed-88c6-08a9f08283c0:a11a1ee1c6d181098]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/7d580ba9-9fce-45ed-88c6-08a9f08283c0:a11a1ee1c6d181098",
+ "target": "research-evidence-verification"
+}
