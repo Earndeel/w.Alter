@@ -300,3 +300,51 @@ These procedures were separate skills; their full original text is kept here, un
 
 - **multi-model-coder-router** — The `hephaestus` Hermes coding-worker profile in practice: invocation, task capsule template, Kie provider integration, external routing, live validation checklist.
   Read `references/merged-coder-profile/multi-model-coder-router.md`.
+
+## Attribute unexpected OpenRouter charges to the originating agent
+
+Investigate actual billed requests before explaining routing policy. Do not substitute a remembered incident for today's activity, and do not treat a matching timestamp, `tool_calls`, or a Claude Pro `rate_limit` as proof of attribution.
+
+1. Establish Monsieur's requested date and timezone. Search canonical traces with `logs_search(query="openrouter", since=<UTC start>, until=<UTC end>, limit=20)` and separately search `opus` and `rate_limit`. Expand relevant results with `logs_timeline(session=<session>, seq=<sequence>, before=3, after=3, max_chars=2000)`. Use `logs_get` for an exact event. Bangkok is UTC+7; establish the timezone used by each source before correlating timestamps.
+
+2. Inspect the authenticated OpenRouter account through the W.Alter browser harness; never extract cookies or tokens. Check `browser_sites` for `openrouter`, then call `browser_session(site="openrouter", session="openrouter-audit", engine="chromium")`. Chromium worked in this investigation where the Camoufox session did not expose the authenticated activity reliably. Do not interpret an inaccessible page in one engine as missing activity.
+
+```bash
+walter-browser -e chromium -s openrouter-audit new audit
+walter-browser -s openrouter-audit nav https://openrouter.ai/activity
+walter-browser -s openrouter-audit snap
+```
+
+3. Wait for the page to load, repeat `snap`, then open the displayed Logs link using its current element reference:
+
+```bash
+walter-browser -s openrouter-audit click <current-Logs-ref>
+walter-browser -s openrouter-audit snap
+walter-browser -s openrouter-audit eval 'document.body.innerText.slice(-12000)'
+```
+
+Record the model, displayed timestamp, cost, application, downstream provider and finish reason. `liteLLM` identifies an application layer, not the originating agent. A downstream provider such as AWS does not establish why OpenRouter was selected. Refresh element references after navigation; do not reuse incident-specific `eNN` values.
+
+4. Open an individual billed row using the current snapshot reference and inspect its detail view. If a Prompt control exists but is absent from the snapshot or outside the viewport, inspect and scroll the actual DOM control:
+
+```bash
+walter-browser -s openrouter-audit eval 'Array.from(document.querySelectorAll("button")).filter(e=>/Prompt|Completion|Generation Data/.test(e.innerText)).map(e=>({text:e.innerText,html:e.outerHTML.slice(0,1000)}))'
+walter-browser -s openrouter-audit eval 'document.querySelector("button[aria-label=\"Open prompt details\"]").scrollIntoView({block:"center"}); "ok"'
+walter-browser -s openrouter-audit eval 'JSON.stringify(document.querySelector("button[aria-label=\"Open prompt details\"]").getBoundingClientRect())'
+walter-browser -s openrouter-audit clickxy <current-rect-center-x> <current-rect-center-y>
+walter-browser -s openrouter-audit eval 'document.body.innerText.slice(-7000)'
+```
+
+Only use this selector if inspection confirms it still exists. Compute coordinates from the current rectangle; never reuse fixed coordinates. Do not claim OpenRouter retains prompts until the detail view actually shows content.
+
+5. Match a distinctive task instruction from the billed prompt against local traces with `logs_search`, then follow `logs_timeline` back to the parent launch. In the observed investigation, the billed prompt contained the exact Chromium-headless Markdown-to-PDF sub-agent instruction and its history; local traces tied that task to a parallel W.Alter foundation V1 end-to-end test. This was materially stronger evidence than the earlier timestamp/rate-limit correlation.
+
+6. Separate conclusions: an inspected prompt can prove that request's originating task; a nearby cluster is only associated unless additional requests or shared identifiers verify it. Determining why the route selected OpenRouter requires the corresponding router/fallback events. Do not present a Claude Pro rate limit found elsewhere as the proven cause. Sum only the visible selected requests and report the currency shown by OpenRouter, without conflating charged requests with failed or free attempts.
+
+7. Close the audit tab:
+
+```bash
+walter-browser -s openrouter-audit close
+```
+
+Keep prompt inspection narrowly scoped to attribution, and avoid copying full private prompts into persistent procedure documentation.
