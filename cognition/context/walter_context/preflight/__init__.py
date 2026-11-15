@@ -416,7 +416,10 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
         # call (77 of 203 draws, 13 of the 29 bench messages): the specific question wins, the plan
         # takes the level that carries the owner's memory
         level = "L3"
-    task = pick("task") if pick("task") in router_tasks() else "general"
+    # The turn's main model is always the general one at the plan's tier (Monsieur 2026-11-13, restated 2026-11-15:
+    # « le routeur ne doit plus proposer de modèle spécialisé ») : a specialism is a sub-agent the L1/L2/L3 model
+    # chooses, never a pre-classification that swaps the whole turn's model. The decision model's answer is ignored.
+    task = "general"
     act = pick("act") if pick("act") in ACTS else "continue"
     by = None
     prev = req.previous
@@ -483,7 +486,7 @@ def degraded_plan(req: Request, exc: BaseException, t0: float | None = None) -> 
         thread, how = ThreadChoice(id=None, new=True), "none"
     prof = req.previous_profile or {}
     if prof.get("level") in MODEL_LEVELS and prof.get("task"):
-        profile, source = ModelProfile(task=str(prof["task"]), level=prof["level"],
+        profile, source = ModelProfile(task="general", level=prof["level"],   # main model = general (2026-11-15)
                                        require=list(prof.get("require") or [])), "previous_run"
     else:
         profile, source = ModelProfile(**DEGRADED_PROFILE), "default"

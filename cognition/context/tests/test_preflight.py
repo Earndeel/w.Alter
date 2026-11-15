@@ -68,7 +68,7 @@ def test_decision_maps_onto_a_valid_plan(fake_llm):
                     candidates=[{"id": "th-1", "title": "A"}, {"id": "th-2", "title": "B"}]))
     assert p.thread.id == "th-2" and p.thread.alternates == ["th-1"] and p.level == "L2" and not p.escalated
     assert p.domains == ["projects"] and p.horizons == ["medium"] and p.capabilities == ["tools", "skills"]
-    assert (p.model_profile.task, p.model_profile.level) == ("coding", "L2")
+    assert (p.model_profile.task, p.model_profile.level) == ("general", "L2")   # specialism never swaps the main model
     q = calls["decide"][0][1]
     assert set(q["thread"]["criteria"]) == {"th-1", "th-2", "new"} and q["cap_secrets"]["type"] == "noul"
 
@@ -112,7 +112,7 @@ def test_a_failed_decision_gives_an_explicit_prudent_plan(fake_llm, monkeypatch)
     p = run(Request("t", "une autre question", candidates=[{"id": "subject:b", "similarity": 0.3}],
                     previous_profile={"task": "coding", "level": "L3"}))
     assert p.thread.new and p.decision["thread_by"] == "none"
-    assert (p.model_profile.task, p.model_profile.level) == ("coding", "L3") and p.decision["profile_from"] == "previous_run"
+    assert (p.model_profile.task, p.model_profile.level) == ("general", "L3") and p.decision["profile_from"] == "previous_run"
     # an empty or malformed decision is a failure too, never a KeyError out of the preflight
     monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", lambda *a, **k: {"model": "x"})
     assert run(Request("t", "encore une question longue")).decision["degraded"] is True
