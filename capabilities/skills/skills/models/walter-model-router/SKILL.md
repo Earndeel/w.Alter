@@ -174,3 +174,53 @@ PY
 - Avant toute correction de nom, consultez `/walter/cognition/router/bin/walter-router --help`, puis l'aide d'`alias-add` pour obtenir la syntaxe effective. Vérifiez que les deux noms désignent bien le même modèle et la même variante ; un rapprochement proposé n'est pas une preuve. Utilisez uniquement la commande validée `alias-add`, jamais une écriture directe dans la base, les alias ou la configuration. Relisez ensuite `alias-list` et `review` pour vérifier le résultat.
 - Distinguez la réussite globale du cycle de la fraîcheur de chaque source : un cycle `ok` peut coexister avec une erreur de collecte et des scores périmés. Signalez l'âge, le périmètre touché et l'erreur exacte ; présentez une cause supposée comme une hypothèse. Ne réparez pas le collecteur pendant une mission limitée à l'analyse et aux alias.
 - Ne déléguez pas et n'appelez pas d'autres modèles lorsque le mandat l'interdit. Ne modifiez aucun autre fichier du projet.
+
+## Audit Preflight production routing and Router context delivery
+
+When asked whether a Router change is live, verify the active call path, actual root-run routing, and context delivery separately. Do not treat implemented functions, tests, documentation, or available MCP tools as proof of deployment. Keep this audit read-only unless Monsieur authorizes changes.
+
+### 1. Locate the active Preflight question selector
+
+```bash
+cd /walter/cognition/context
+grep -rn -E 'def questions_v3|def questions_v2|def questions\b|questions_v3\(|questions\(req' --include='*.py' walter_context
+sed -n '230,300p' walter_context/preflight/__init__.py
+```
+
+Trace callers, not just definitions. In this session, the new question set existed, but the production path still used the old task-family question near line 278. Recheck the current location rather than assuming this line number remains valid.
+
+### 2. Verify what actually served recent turns
+
+Use the installed Hindsight PostgreSQL container. A guessed `postgres` role failed in this setup. Read only the username from the existing client configuration; never print the full `.pgpass` or its password field.
+
+```bash
+U=$(cut -d: -f4 /root/.pgpass | head -1)
+Q(){ docker exec -i hindsight-pg psql -U "$U" -d hindsight "$@"; }
+Q -At -c "select column_name || ' ' || data_type from information_schema.columns where table_schema='runs' and table_name='runs'"
+Q -c "select origin->>'runtime' runtime, routing->>'applied' applied, routing->'requested'->>'task' task, routing->'requested'->>'level' level, count(*) from runs.runs where started_at > now()-interval '3 days' and parent_run_id is null group by 1,2,3,4 order by 1,5 desc"
+Q -At -c "select started_at, origin->>'runtime', routing::text from runs.runs where parent_run_id is null and routing->>'applied'='true' order by started_at desc limit 4"
+```
+
+Use `started_at`, not an assumed `created_at`. Exclude child runs with `parent_run_id is null` when auditing the main model; specialist delegation is a separate behavior. Distinguish a requested task family from an applied route, and inspect full routing records to establish the served model. Separate runtimes before drawing production conclusions.
+
+### 3. Trace Router knowledge into the model's context
+
+```bash
+walter-router brief --json
+walter present notes --form m0
+walter present notes --form m0 --m1 router
+cd /walter/cognition/context
+grep -n -E 'capabilities|tool_cards|injected|stable_capabilities' walter_context/retrieval.py
+sed -n '1,150p' walter_context/capabilities.py
+cat /user/Lucas/config/context/inject.json
+cd /walter/core
+grep -n -E 'def router_brief|def module_layer|def apply_toolset|def client_profile' walter_capabilities.py
+cat config/toolsets.toml
+grep -n -E 'capabilities|tool_cards|stable_capabilities' /opt/walter-core/hooks/walter_hook.py /opt/walter-core/server.py
+```
+
+Compare the short m0 note with the requested Router m1 usage guide. Trace retrieval selection, injection gating, and the runtime hook/server consumer. A brief generator or exposed `module_layer`/`router_brief` function does not prove the engine receives that content automatically. Check the relevant client toolset rather than assuming every runtime exposes the same interface.
+
+### 4. Report distinct findings
+
+State separately: which question set is called, whether recent main turns were actually rerouted, whether the short Router description is injected, and whether the full usage guide is injected or merely retrievable. Identify pending deployment gates without silently changing them. Explicitly state whether anything was modified.
