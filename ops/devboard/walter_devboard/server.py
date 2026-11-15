@@ -1,5 +1,6 @@
-"""Read-only HTTP API of the development board + the live stream (SSE relaying pg_notify 'devboard') + the web page
-(web/dist). Never writes: corrections go through `walter-devboard correct` (MCP devboard_correct)."""
+"""HTTP API of the development board + the live stream (SSE relaying pg_notify 'devboard') + the web page (web/dist).
+Reads everywhere; the owner's two buttons (POST /api/actions/abandon|resume, actions.py) are answered only on the
+loopback listener (`actions_port`), the one Walter Web's sign-in panel relays to: the tailnet page shows no button."""
 from __future__ import annotations
 
 import json
@@ -8,12 +9,16 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import threading
+from contextlib import asynccontextmanager
+
 import psycopg
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from psycopg.rows import dict_row
 
-from . import cards, config, db
+from . import actions, cards, config, db
 
 DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 COMPONENTS = [("core", "Core"), ("cognition", "Cognition"), ("capabilities", "Capabilities"), ("ops", "Ops"),
@@ -27,9 +32,51 @@ CARD_COLS = """c.id, c.ref, c.title, c.module, c.status, c.owner, c.change, c.de
                  as corrected"""
 PING_S = 25.0
 
-app = FastAPI(title="walter-devboard", docs_url=None, redoc_url=None, openapi_url=None)
+@asynccontextmanager
+async def _lifespan(_app):
+    _start_follower()
+    yield
+
+
+app = FastAPI(title="walter-devboard", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
 _cache: dict[str, tuple[float, dict]] = {}
 _owner: list[str] = []
+_cfg: list = []
+LOOPBACK = ("127.0.0.1", "::1")
+
+
+def _config():
+    if not _cfg:
+        _cfg.append(config.load())
+    return _cfg[0]
+
+
+def _actions_here(request: Request) -> bool:
+    """The buttons exist only on the loopback listener (reached through Walter Web's signed-in panel)."""
+    server = request.scope.get("server") or ("", 0)
+    cfg = _config()
+    return bool(cfg.actions_port) and server[0] in LOOPBACK and server[1] == cfg.actions_port
+
+
+def _engine() -> actions.Engine:
+    cfg = _config()
+    if not cfg.engine_token_file:
+        raise HTTPException(503, "moteur non configuré (engine_token_file)")
+    return actions.Engine(cfg.engine_url, cfg.engine_token_file)
+
+
+def _follow() -> None:
+    cfg = _config()
+    while True:
+        actions.follow_once(cfg, _engine())
+        time.sleep(max(5, cfg.follow_seconds))
+
+
+def _start_follower() -> None:
+    """Follows the running resumes until their turn ends (one thread per process, whatever the listeners)."""
+    cfg = _config()
+    if cfg.actions_port and cfg.engine_token_file and not any(t.name == "devboard-follow" for t in threading.enumerate()):
+        threading.Thread(target=_follow, name="devboard-follow", daemon=True).start()
 
 
 def _owner_name() -> str:
@@ -102,7 +149,7 @@ def _group_key(c: dict) -> str | None:
 
 
 @app.get("/api/summary")
-def summary() -> dict:
+def summary(request: Request) -> dict:
     all_ = _cards()
     pause = _q("select value from devboard.state where key = 'pause'")
     return {"inbox": sum(c["status"] == "waiting_owner" for c in all_),
@@ -111,7 +158,8 @@ def summary() -> dict:
             "decisions": _q("select count(*) n from devboard.decisions where removed_at is null")[0]["n"],
             "replaced": _q("select count(distinct older_id) n from devboard.decision_links")[0]["n"],
             "live": _q("select count(*) n from devboard.live")[0]["n"],
-            "pause": pause[0]["value"] if pause else None, "owner_name": _owner_name()}
+            "pause": pause[0]["value"] if pause else None, "owner_name": _owner_name(),
+            "actions": _actions_here(request)}
 
 
 @app.get("/api/inbox")
@@ -191,7 +239,62 @@ def card_detail(ref: str) -> dict:
                           order by at desc, id desc limit 100""", (cid,))
     c["corrections"] = _q("""select field, value, reason, by, at from devboard.corrections where card_id = %s
                              order by at desc""", (cid,))
+    c["resumes"] = _q("""select id, walter_session, note, status_before, status, outcome, summary, started_at, ended_at
+                         from devboard.resumes where card_id = %s order by started_at desc limit 5""", (cid,))
     return c
+
+
+def _guard(request: Request) -> None:
+    if not _actions_here(request):
+        raise HTTPException(403, "actions seulement depuis Walter Web")
+    # A browser can only send this header same-origin (anything else is preflighted, and nothing here answers CORS).
+    if request.headers.get("x-walter-action") != "1" or \
+            not request.headers.get("content-type", "").startswith("application/json"):
+        raise HTTPException(400, "requête d'action invalide")
+
+
+async def _body(request: Request) -> dict:
+    raw = await request.body()
+    if len(raw) > 16_384:
+        raise HTTPException(413, "trop long")
+    try:
+        data = json.loads(raw or b"{}")
+    except ValueError:
+        raise HTTPException(400, "JSON invalide") from None
+    if not isinstance(data, dict) or not isinstance(data.get("ref"), str):
+        raise HTTPException(400, "ref manquant")
+    return data
+
+
+def _act_sync(fn):
+    try:
+        with psycopg.connect(db.dsn(), row_factory=dict_row, application_name="walter-devboard-actions") as conn:
+            with conn.transaction():
+                return fn(conn)
+    except actions.ActionError as e:
+        raise HTTPException(e.status, str(e)) from None
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from None
+
+
+async def _act(fn):
+    return await run_in_threadpool(_act_sync, fn)       # the engine call may take seconds: off the event loop
+
+
+@app.post("/api/actions/abandon")
+async def act_abandon(request: Request) -> dict:
+    _guard(request)
+    data = await _body(request)
+    engine = _engine() if _config().engine_token_file else None
+    return await _act(lambda conn: actions.abandon(conn, engine, data["ref"], str(data.get("reason") or "")))
+
+
+@app.post("/api/actions/resume")
+async def act_resume(request: Request) -> dict:
+    _guard(request)
+    data = await _body(request)
+    cfg, engine = _config(), _engine()
+    return await _act(lambda conn: actions.resume(conn, cfg, engine, data["ref"], str(data.get("note") or "")))
 
 
 @app.get("/api/today")

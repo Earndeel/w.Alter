@@ -121,7 +121,8 @@ export function App() {
         </div>
       </main>
       <aside className="overflow-auto px-[18px] py-4">
-        {card ? <CardPanel card={card} ownerName={summary?.owner_name ?? ""} onOpenDoc={openDoc} onOpenCard={openCard} />
+        {card ? <CardPanel card={card} ownerName={summary?.owner_name ?? ""} onOpenDoc={openDoc} onOpenCard={openCard}
+                                actions={!!summary?.actions} onChanged={() => setTick((t) => t + 1)} />
           : route.view === "doc" && route.arg && route.arg !== "reports" ? <DocOutline path={route.arg} docs={docs} onOpenDoc={openDoc} />
           : <p className="text-muted">Choisis un chantier pour voir son détail, ses décisions et ses preuves.</p>}
       </aside>

@@ -69,3 +69,36 @@ test("le flux en direct déclenche le rechargement", () => {
   expect(reload).toHaveBeenCalledTimes(1);
   vi.unstubAllGlobals();
 });
+
+test("CardPanel sans actions : pas de bouton, renvoi vers Walter Web", () => {
+  render(<CardPanel card={detail} ownerName="Camille" onOpenDoc={() => {}} onOpenCard={() => {}} />);
+  expect(screen.queryByText("Reprendre")).not.toBeInTheDocument();
+  expect(screen.getByText(/depuis le panneau Développement de Walter Web/)).toBeInTheDocument();
+});
+
+test("Reprendre explique ce qui va se passer puis envoie la consigne", async () => {
+  const calls: { url: string; body: string; headers: Record<string, string> }[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+    calls.push({ url, body: String(init.body), headers: init.headers as Record<string, string> });
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  }));
+  const changed = vi.fn();
+  render(<CardPanel card={detail} ownerName="Camille" onOpenDoc={() => {}} onOpenCard={() => {}} actions onChanged={changed} />);
+  act(() => screen.getByText("Reprendre").click());
+  expect(screen.getByText(/Il vérifie d'abord l'état réel/)).toBeInTheDocument();
+  expect(screen.getByText(/un message en votre nom/)).toBeInTheDocument();
+  await act(async () => screen.getByText("Lancer la reprise").click());
+  expect(calls[0].url).toBe("api/actions/resume");
+  expect(JSON.parse(calls[0].body)).toEqual({ ref: "W-12", note: "" });
+  expect(calls[0].headers["X-Walter-Action"]).toBe("1");
+  expect(changed).toHaveBeenCalled();
+  vi.unstubAllGlobals();
+});
+
+test("Une reprise en cours bloque un second clic", () => {
+  const running = { ...detail, resumes: [{ id: 1, walter_session: "dsh/vm/x", note: null, status_before: "paused" as const,
+    status: "running", outcome: null, summary: null, started_at: new Date().toISOString(), ended_at: null }] };
+  render(<CardPanel card={running} ownerName="Camille" onOpenDoc={() => {}} onOpenCard={() => {}} actions />);
+  expect(screen.getByText("Reprise en cours…")).toBeDisabled();
+  expect(screen.getByText(/Reprise en cours depuis/)).toBeInTheDocument();
+});

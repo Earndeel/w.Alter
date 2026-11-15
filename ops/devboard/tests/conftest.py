@@ -43,7 +43,7 @@ def conn(database):
     with db.connection() as c:
         c.execute("""truncate devboard.cards, devboard.card_evidence, devboard.card_links, devboard.corrections,
                      devboard.documents, devboard.sections, devboard.decisions, devboard.decision_links,
-                     devboard.readings, devboard.sessions, devboard.activity, devboard.live, devboard.state
+                     devboard.readings, devboard.sessions, devboard.activity, devboard.live, devboard.state, devboard.resumes
                      restart identity cascade""")
     with db.connection() as c:
         yield c

@@ -16,14 +16,18 @@ export type Evidence = { kind: string; source_ref: string; seq: number | null; q
 export type Activity = { at: string; kind: string; source_ref: string | null; text: string; ref?: string | null;
                          title?: string | null; module?: string | null };
 export type Correction = { field: string; value: unknown; reason: string | null; by: string; at: string };
+export type Resume = { id: number; walter_session: string | null; note: string | null; status_before: Status;
+                       status: string; outcome: Status | null; summary: string | null; started_at: string;
+                       ended_at: string | null };
 export type CardDetail = Card & {
   decisions: Decision[]; files: string[]; blocks: Pick<Card, "ref" | "title" | "status">[];
   blocked_by: Pick<Card, "ref" | "title" | "status">[]; evidence: Evidence[]; activity: Activity[];
-  corrections: Correction[];
+  corrections: Correction[]; resumes: Resume[];
 };
 export type Group = { key: string; label: string; component?: string | null; cards: Card[] };
 export type Summary = { inbox: number; open: number; late_or_stale: number; decisions: number; replaced: number;
-                        live: number; pause: { what: string; at: string } | null; owner_name: string };
+                        live: number; pause: { what: string; at: string } | null; owner_name: string;
+                        actions?: boolean };
 export type VisionModule = { id: string; path: string; health: string | null; color: "red" | "amber" | "green" | "blue";
                              counts: Record<string, number> };
 export type VisionComponent = { key: string; label: string; modules: VisionModule[] };
@@ -39,7 +43,21 @@ async function get<T>(url: string): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+/** An owner action: same-origin only (the custom header forbids a cross-site form or a simple request). */
+async function act(url: string, body: Record<string, string>): Promise<unknown> {
+  const r = await fetch(url, { method: "POST", body: JSON.stringify(body),
+                               headers: { "Content-Type": "application/json", "X-Walter-Action": "1" } });
+  if (!r.ok) {
+    let detail = `${r.status}`;
+    try { detail = ((await r.json()) as { detail?: string }).detail ?? detail; } catch { /* not JSON */ }
+    throw new Error(detail);
+  }
+  return r.json();
+}
+
 export const api = {
+  resume: (ref: string, note: string) => act("api/actions/resume", { ref, note }),
+  abandon: (ref: string, reason: string) => act("api/actions/abandon", { ref, reason }),
   summary: () => get<Summary>("api/summary"),
   inbox: () => get<Card[]>("api/inbox"),
   cards: (group: "status" | "module", q = "") =>

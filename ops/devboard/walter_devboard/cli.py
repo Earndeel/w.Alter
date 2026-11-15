@@ -29,10 +29,26 @@ def main(argv: list[str] | None = None) -> int:
         consumer.main()
         return 0
     if a.cmd == "serve":
+        import asyncio
+
         import uvicorn
+        from .server import app
         cfg = config.load()
-        uvicorn.run("walter_devboard.server:app", host=cfg.listen_host, port=cfg.port, log_level="warning",
-                    proxy_headers=False)
+        binds = [(cfg.listen_host, cfg.port)]
+        if cfg.actions_port and (cfg.actions_host, cfg.actions_port) != binds[0]:
+            binds.append((cfg.actions_host, cfg.actions_port))     # loopback: the panel of Walter Web, buttons on
+        servers = [uvicorn.Server(uvicorn.Config(app, host=h, port=p, log_level="warning", proxy_headers=False,
+                                                  timeout_graceful_shutdown=5))   # open live streams never hold a stop
+                   for h, p in binds]
+
+        async def one(server):
+            await server.serve()
+            for other in servers:                      # one stops (SIGTERM reaches one of them): all stop
+                other.should_exit = True
+
+        async def both():
+            await asyncio.gather(*(one(s) for s in servers))
+        asyncio.run(both())
         return 0
     if a.cmd == "correct":
         from . import correct

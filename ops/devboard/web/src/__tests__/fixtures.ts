@@ -22,4 +22,5 @@ export const detail: CardDetail = {
   activity: [{ at: "2026-11-14T10:00:00+00:00", kind: "reading", source_ref: "x", text: "W-12 créée" }],
   corrections: [{ field: "status", value: "waiting_owner", reason: "j'attends", by: "owner",
                   at: "2026-11-14T09:00:00+00:00" }],
+  resumes: [],
 };

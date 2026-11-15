@@ -28,9 +28,19 @@ class Config:
     gateway_url: str = "http://127.0.0.1:8894"
     token_file: Path | None = None
     sessions_per_pass: int = 20
-    dev_cwds: list = field(default_factory=list)
+    dev_cwds: list = field(default_factory=list)      # Claude Code sessions opened there are development sessions
     excluded_cwds: list = field(default_factory=list)   # never read, whatever the runtime (W.Alter mode profiles)
-    owner_name: str = "le propriétaire"              # how the page names the owner (« corrigé par … »)     # Claude Code sessions opened there are development sessions
+    owner_name: str = "le propriétaire"              # how the page names the owner (« corrigé par … »)
+    # The owner's buttons (2026-11-15): served only on the loopback listener (behind Walter Web's sign-in panel).
+    actions_host: str = "127.0.0.1"
+    actions_port: int = 0                             # 0 = no buttons
+    engine_url: str = "http://127.0.0.1:8895"
+    engine_token_file: Path | None = None             # @instance/bootstrap/engine/api.token
+    engine_interface: str = "web"                     # door of the resumes: the owner's own (full access)
+    engine_account: str = "owner"
+    notify_command: list = field(default_factory=list)   # end of a resume told to the owner (text appended)
+    follow_seconds: int = 20
+    resume_lost_hours: float = 8.0
 
 
 def _run_json(*cmd: str) -> dict:
@@ -61,6 +71,16 @@ def _config_file() -> Path | None:
     return Path(p) if p and Path(p).is_file() else None
 
 
+def _instance_path(value: str) -> str:
+    """`@instance/…` (contract notation) → the instance's folder."""
+    value = str(value)
+    if not value.startswith("@instance/"):
+        return value
+    root = subprocess.run(["walter", "instance", "path"], capture_output=True, text=True, check=True,
+                          timeout=30).stdout.strip()
+    return root.rstrip("/") + "/" + value.removeprefix("@instance/")
+
+
 def load() -> Config:
     data: dict = {}
     f = _config_file()
@@ -69,7 +89,9 @@ def load() -> Config:
     cfg = Config(docs_dir=Path(data.pop("docs_dir", "") or walter_root() / "docs"))
     for key, value in data.items():
         if hasattr(cfg, key):
-            setattr(cfg, key, Path(value) if key in ("reports_dir", "token_file", "docs_dir") else value)
+            if key in ("reports_dir", "token_file", "docs_dir", "engine_token_file"):
+                value = Path(_instance_path(value))
+            setattr(cfg, key, value)
     if "WALTER_DEVBOARD_DATABASE_URL" in os.environ:
         cfg.dsn = os.environ["WALTER_DEVBOARD_DATABASE_URL"]
     return cfg

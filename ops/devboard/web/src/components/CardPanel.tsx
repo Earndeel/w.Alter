@@ -1,10 +1,11 @@
 import type { CardDetail } from "../api";
 import { ago, COMPONENT_LABEL, day, ddmm, dotKind, fileName, FIELD_LABEL, OWNER_LABEL, STATUS_LABEL } from "../labels";
 import { Box } from "./Box";
+import { CardActions } from "./CardActions";
 import { StatusDot } from "./StatusDot";
 
 type Props = { card: CardDetail; ownerName: string; onOpenDoc: (path: string, anchor?: string) => void;
-               onOpenCard: (ref: string) => void };
+               onOpenCard: (ref: string) => void; actions?: boolean; onChanged?: () => void };
 
 function stateLabel(c: CardDetail): string {
   if (c.status === "waiting_owner") return STATUS_LABEL.waiting_owner + (c.flags.waiting_days ? ` depuis ${c.flags.waiting_days} j` : "");
@@ -13,7 +14,7 @@ function stateLabel(c: CardDetail): string {
   return STATUS_LABEL[c.status];
 }
 
-export function CardPanel({ card: c, ownerName, onOpenDoc, onOpenCard }: Props) {
+export function CardPanel({ card: c, ownerName, onOpenDoc, onOpenCard, actions = false, onChanged = () => {} }: Props) {
   const lastCorrection = c.corrections[0];
   const vision = [c.component ? COMPONENT_LABEL[c.component] ?? c.component : null, c.module].filter(Boolean).join(" › ");
   return (
@@ -32,6 +33,7 @@ export function CardPanel({ card: c, ownerName, onOpenDoc, onOpenCard }: Props) 
         {c.blocked_by.length > 0 && <><div className="text-muted">Bloqué par</div>
           <div>{c.blocked_by.map((b) => <button key={b.ref} type="button" className="mr-2 hover:text-walter" onClick={() => onOpenCard(b.ref)}>{b.ref} {b.title}</button>)}</div></>}
       </div>
+      <CardActions card={c} enabled={actions} onDone={onChanged} />
       {c.corrected.length > 0 && lastCorrection && (
         <p className="mb-2 text-xs text-[#7fd8ff]">
           corrigé par {ownerName} le {ddmm(lastCorrection.at)} ({c.corrected.map((f) => FIELD_LABEL[f] ?? f).join(", ")})
