@@ -2,7 +2,9 @@
 // A panel is a page served by another Walter module (its own loopback/tailnet HTTP server) that the web interface
 // shows in its sidebar and main area. The host half mounts one route per panel on the web server and relays reads
 // to the module, only for a browser that passed the web interface's own Host/Origin fence and sign-in cookie
-// (`connection.requestRejection`). The browser half (client.js) adds the sidebar entry and the framed page.
+// (`connection.requestRejection`). A panel may declare `actions` (path prefixes, e.g. `/api/actions/`): POSTs there
+// are relayed too (small JSON bodies), behind the same fence; everything else stays read-only.
+// The browser half (client.js) adds the sidebar entry and the framed page.
 // Neutral software: which panels exist (id, label, path, upstream) comes from the Loader config (instance patch).
 import http from 'node:http';
 import https from 'node:https';
@@ -13,6 +15,8 @@ export const inject = ['webServer'];
 const RESERVED = ['/api', '/hmr', '/plugins', '/assets', '/@'];
 const ID = /^[a-z][a-z0-9-]{0,31}$/;
 const PATH = /^\/[a-z0-9][a-z0-9-]{0,31}$/;
+const ACTION = /^\/[a-z0-9][a-z0-9/_-]{0,63}\/$/;
+const MAX_ACTION_BODY = 65536;
 // Hop-by-hop headers, and what must not cross: the interface's sign-in cookie stays with the interface.
 const DROP_REQUEST = new Set(['connection', 'keep-alive', 'proxy-connection', 'transfer-encoding', 'upgrade', 'te',
   'trailer', 'cookie', 'authorization', 'host']);
@@ -37,15 +41,19 @@ export function checkPanels(panels) {
     if (!u || !['http:', 'https:'].includes(u.protocol) || u.pathname !== '/' || u.search) {
       throw new Error(`walter-web-panels: ${p.id}: upstream must be an http(s) origin`);
     }
+    if (p.actions !== undefined && (!Array.isArray(p.actions) || p.actions.some((a) => !ACTION.test(String(a)) || String(a).includes('..')))) {
+      throw new Error(`walter-web-panels: ${p.id}: actions must be path prefixes like /api/actions/`);
+    }
   }
   return panels;
 }
 
 /**
  * Request handler for one panel: `<path>` redirects to `<path>/`; `<path>/<rest>` is relayed to `<upstream>/<rest>`
- * (GET/HEAD only — a panel is a view) once `admit(req)` returns no rejection status.
+ * (GET/HEAD — a panel is a view — plus POST under its declared `actions` prefixes) once `admit(req)` returns no
+ * rejection status.
  */
-export function proxyHandler({ path, upstream, admit }) {
+export function proxyHandler({ path, upstream, admit, actions = [] }) {
   const base = new URL(upstream);
   const client = base.protocol === 'https:' ? https : http;
   return (req, res) => {
@@ -61,9 +69,16 @@ export function proxyHandler({ path, upstream, admit }) {
       res.end(rejection === 401 ? 'unauthorized' : 'forbidden');
       return;
     }
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
+    const rest = target.pathname.slice(path.length);
+    const action = req.method === 'POST' && actions.some((a) => rest.startsWith(a)) && !rest.includes('..');
+    if (req.method !== 'GET' && req.method !== 'HEAD' && !action) {
       res.writeHead(405, { allow: 'GET, HEAD', 'content-type': 'text/plain' });
       res.end('read only');
+      return;
+    }
+    if (action && !(Number(req.headers['content-length']) <= MAX_ACTION_BODY)) {
+      res.writeHead(413, { 'content-type': 'text/plain' });
+      res.end('action body too large or without length');
       return;
     }
     const headers = {};
@@ -71,7 +86,7 @@ export function proxyHandler({ path, upstream, admit }) {
     headers['x-forwarded-prefix'] = path;
     const up = client.request({
       protocol: base.protocol, hostname: base.hostname, port: base.port, method: req.method, headers,
-      path: target.pathname.slice(path.length) + target.search,
+      path: rest + target.search,
     }, (upRes) => {
       const out = {};
       for (const [k, v] of Object.entries(upRes.headers)) if (!DROP_RESPONSE.has(k)) out[k] = v;
@@ -93,7 +108,7 @@ export function apply(ctx, config = {}) {
   ctx.inject(['webServer', 'connection'], (web) => {
     const admit = (req) => web.connection.requestRejection(req);
     for (const p of panels) {
-      const handler = proxyHandler({ path: p.path, upstream: p.upstream, admit });
+      const handler = proxyHandler({ path: p.path, upstream: p.upstream, admit, actions: p.actions ?? [] });
       // The web server's prefix rule covers `<path>` and `<path>/…` (not `<path>x`): one route per panel.
       web.effect(() => web.webServer.register({ kind: 'prefix', path: p.path, handler }), `walter-web-panels: ${p.path}`);
     }

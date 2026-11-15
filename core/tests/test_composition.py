@@ -431,3 +431,13 @@ def test_dsh_panels_bad_values_fail(home):
                 {'id':'board','label':'B','path':'/board','upstream':'file:///etc'},
                 {'id':'board','path':'/board','upstream':'http://h'}):
         with pytest.raises(ValueError,match='panels'):c._dsh_panels({'dsh':{'web':{'panels':[bad]}}})
+
+
+def test_dsh_panels_actions_passed_and_checked(home):
+    """A panel may declare action prefixes (POSTs relayed, e.g. the board's buttons); anything else is refused."""
+    ok={'id':'board','label':'D','path':'/board','upstream':'http://127.0.0.1:9','actions':['/api/actions/']}
+    text=c._dsh_panels({'dsh':{'web':{'panels':[ok]}}})
+    [row]=[r for r in c._dsh_yaml(text) if any(e.get('id')=='walter-web-panels' for e in r.get('insert',[]))]
+    assert row['insert'][0]['config']['panels'][0]['actions']==['/api/actions/']
+    for bad in (['api/actions'],['/api/../x/'],'/api/actions/'):
+        with pytest.raises(ValueError,match='panels'):c._dsh_panels({'dsh':{'web':{'panels':[{**ok,'actions':bad}]}}})

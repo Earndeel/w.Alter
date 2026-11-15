@@ -216,7 +216,8 @@ def _dsh_face(values):
 
 def _dsh_panels(values):
     """Fenced `dsh-panels` block of the web profile: pages of other Walter modules shown in the web interface's
-    sidebar and main area, behind its sign-in (engine.toml [[dsh.web.panels]]: id, label, path, upstream). None when
+    sidebar and main area, behind its sign-in (engine.toml [[dsh.web.panels]]: id, label, path, upstream, and optional
+    actions = path prefixes where POSTs are relayed, e.g. the board's buttons). None when
     the instance declares no panel (the block is then dropped)."""
     import yaml
     panels=values.get('dsh',{}).get('web',{}).get('panels') or []
@@ -225,10 +226,13 @@ def _dsh_panels(values):
         ok=(isinstance(p,dict) and re.fullmatch(r'[a-z][a-z0-9-]{0,31}',str(p.get('id',''))) and p.get('id')!='conversation'
             and isinstance(p.get('label'),str) and p['label'] and re.fullmatch(r'/[a-z0-9][a-z0-9-]{0,31}',str(p.get('path','')))
             and re.fullmatch(r'https?://[^/?#\s]+/?',str(p.get('upstream',''))))
-        if not ok:raise ValueError(f'engine.toml [[dsh.web.panels]] invalid entry {p!r} (id, label, path /name, upstream http(s) origin)')
-        out.append({'id':p['id'],'label':p['label'],'path':p['path'],'upstream':p['upstream']})
+        acts=p.get('actions')
+        if acts is not None and not (isinstance(acts,list) and all(isinstance(a,str) and re.fullmatch(r'/[a-z0-9][a-z0-9/_-]{0,63}/',a)
+                                                                     and '..' not in a for a in acts)):ok=False
+        if not ok:raise ValueError(f'engine.toml [[dsh.web.panels]] invalid entry {p!r} (id, label, path /name, upstream http(s) origin, actions = path prefixes /x/)')
+        out.append({'id':p['id'],'label':p['label'],'path':p['path'],'upstream':p['upstream'],**({'actions':acts} if acts else {})})
     if not out:return None
-    return ('# Panels: pages of other Walter modules in the sidebar and main area, behind the interface\'s sign-in (reads only).\n'
+    return ('# Panels: pages of other Walter modules in the sidebar and main area, behind the interface\'s sign-in (reads, plus declared actions).\n'
             +yaml.safe_dump([{'insert':[{'id':'walter-web-panels','name':str(WEB_PANELS_PLUGIN),'config':{'panels':out}}]}],
                             sort_keys=False,allow_unicode=True,width=120))
 

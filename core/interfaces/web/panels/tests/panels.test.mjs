@@ -9,9 +9,9 @@ function listen(handler) {
   return new Promise((ok) => { const s = http.createServer(handler); s.listen(0, '127.0.0.1', () => ok(s)); });
 }
 const url = (s) => `http://127.0.0.1:${s.address().port}`;
-async function withProxy(admit, upstreamHandler, fn) {
+async function withProxy(admit, upstreamHandler, fn, actions = []) {
   const up = await listen(upstreamHandler);
-  const front = await listen(proxyHandler({ path: '/devboard', upstream: url(up), admit }));
+  const front = await listen(proxyHandler({ path: '/devboard', upstream: url(up), admit, actions }));
   try { await fn(url(front)); } finally { front.close(); up.close(); }
 }
 const ok = () => undefined;
@@ -98,4 +98,39 @@ test('apply mounts one route per panel and publishes id, label and path only', (
   assert.deepEqual(routes.map((r) => [r.kind, r.path]), [['prefix', '/devboard']]);
   assert.deepEqual(table, [{ kind: 'global', name: '__WALTER_PANELS__',
     value: [{ id: 'devboard', label: 'Développement', path: '/devboard' }] }]);
+});
+
+test('a POST under a declared action prefix is relayed with its body; elsewhere still 405', async () => {
+  const seen = [];
+  await withProxy(ok, (req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => { seen.push([req.method, req.url, body, req.headers['x-walter-action'], req.headers.cookie]); res.end('{"ok":true}'); });
+  }, async (base) => {
+    const r = await fetch(`${base}/devboard/api/actions/resume`, { method: 'POST', body: '{"ref":"W-1"}',
+      headers: { 'content-type': 'application/json', 'x-walter-action': '1', cookie: 'dsh-auth-x=secret' } });
+    assert.equal(r.status, 200);
+    assert.equal((await fetch(`${base}/devboard/api/cards`, { method: 'POST', body: '{}' })).status, 405);
+    assert.equal((await fetch(`${base}/devboard/api/actions/../cards`, { method: 'POST', body: '{}' })).status, 405);
+  }, ['/api/actions/']);
+  assert.deepEqual(seen, [['POST', '/api/actions/resume', '{"ref":"W-1"}', '1', undefined]]);
+});
+
+test('an action is refused without sign-in, and when too large', async () => {
+  let hits = 0;
+  await withProxy(() => 401, (req, res) => { hits++; res.end('x'); }, async (base) => {
+    assert.equal((await fetch(`${base}/devboard/api/actions/abandon`, { method: 'POST', body: '{}' })).status, 401);
+  }, ['/api/actions/']);
+  await withProxy(ok, (req, res) => { hits++; res.end('x'); }, async (base) => {
+    const r = await fetch(`${base}/devboard/api/actions/abandon`, { method: 'POST', body: 'x'.repeat(70000) });
+    assert.equal(r.status, 413);
+  }, ['/api/actions/']);
+  assert.equal(hits, 0);
+});
+
+test('actions must be plain path prefixes', () => {
+  const base = { id: 'devboard', label: 'D', path: '/devboard', upstream: 'http://127.0.0.1:9' };
+  assert.throws(() => checkPanels([{ ...base, actions: ['api/actions'] }]), /actions/);
+  assert.throws(() => checkPanels([{ ...base, actions: ['/api/../x/'] }]), /actions/);
+  assert.doesNotThrow(() => checkPanels([{ ...base, actions: ['/api/actions/'] }]));
 });
