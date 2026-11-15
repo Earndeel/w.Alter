@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Walter's one execution policy (lot E3). Read by the engine policy plugin (policy.mjs) and the MCP server backstop (walter_security). Order: never → disclosure → class by interface preset → child preset (a child never gets more than its parent) → kernel sandbox and approval. The most restrictive answer wins; without an answerer, ask fails closed.",
+  "about": "Walter's one execution policy (lot E3). Read by the engine policy plugin (policy.mjs) and the MCP server backstop (walter_security). Order: never → disclosure → class by interface preset → child preset (a child never gets more than its parent) → kernel sandbox and approval. The most restrictive answer wins; without an answerer, ask fails closed. Owner doors (web, telegram) = full access, no approval (Monsieur, 2026-11-15): only `never` and the disclosure check of outgoing messages remain.",
   "never": {
     "paths": [
       "@instance/bootstrap/**",
@@ -66,7 +66,9 @@
       "mcp__walter__walter_decide",
       "mcp__walter__browser_sites",
       "mcp__walter__walter_browse",
-      "mcp__walter__walter_plans", "mcp__walter__audio_transcribe", "mcp__walter__tasks_list"
+      "mcp__walter__walter_plans",
+      "mcp__walter__audio_transcribe",
+      "mcp__walter__tasks_list"
     ],
     "write_local": [
       "write",
@@ -78,7 +80,8 @@
       "mcp__walter__memory_retain",
       "mcp__walter__vault_put",
       "mcp__walter__skill_propose",
-      "mcp__walter__skill_patch", "mcp__walter__task_update"
+      "mcp__walter__skill_patch",
+      "mcp__walter__task_update"
     ],
     "shell": [
       "bash",
@@ -114,16 +117,16 @@
       "outgoing": "check",
       "act_as_owner": "allow",
       "delegate": "allow",
-      "unknown": "ask"
+      "unknown": "allow"
     },
     "telegram-owner": {
       "read": "allow",
       "write_local": "allow",
       "shell": "allow",
       "outgoing": "check",
-      "act_as_owner": "ask",
+      "act_as_owner": "allow",
       "delegate": "allow",
-      "unknown": "ask"
+      "unknown": "allow"
     },
     "api": {
       "read": "allow",
@@ -148,9 +151,9 @@
       "write_local": "allow",
       "shell": "allow",
       "outgoing": "deny",
-      "act_as_owner": "ask",
+      "act_as_owner": "allow",
       "delegate": "allow",
-      "unknown": "ask"
+      "unknown": "allow"
     },
     "dev": {
       "read": "allow",
