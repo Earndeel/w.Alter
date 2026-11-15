@@ -223,3 +223,48 @@ The `[verified]` prefix indicates an independent reviewer approved this change.
 - **delegate_task returns non-JSON** — retry once with stricter prompt, then treat as FAIL
 - **No test framework found** — skip regression check, reviewer verdict still runs
 - **Lint tools not installed** — skip that check silently, don't fail
+
+## Review deployed-in-place W.Alter modules without changing production
+
+- Treat `/walter` module repositories as live deployments, not disposable checkouts. Read the review package, design, plan and progress ledger first; identify the baseline and reviewed HEAD separately for every affected repository. Do not checkout, reset, restart services, run migrations or trigger a backfill during a read-only review.
+- Compare committed code with deployed artifacts. For walter-devboard, run:
+  ```bash
+  cd /walter/ops
+  git log --oneline <baseline>..HEAD
+  git diff --stat <baseline>..HEAD
+  cd /walter/ops/devboard
+  for u in bus.service docs.service due.service due.timer web.service; do
+    diff -u "ops/walter-devboard-$u" "/etc/systemd/system/walter-devboard-$u"
+  done
+  ls -l /usr/local/bin/walter-devboard
+  cat bin/walter-devboard
+  ```
+  Record deployment drift rather than assuming a passing repository test validates installed units or wrappers.
+- Inspect test fixtures before executing tests against a live module. For devboard, inspect `/walter/ops/devboard/tests/conftest.py`: its database fixture is intended to create and drop a throwaway database on the memory test server at `127.0.0.1:5440`, not production at port `5433`. Verify environment overrides preserve that separation. Run tests while retaining their actual exit status:
+  ```bash
+  cd /walter/ops/devboard
+  set -o pipefail
+  timeout 600 walter-python -m pytest -q 2>&1 | tail -15
+  cd web
+  timeout 300 npm test 2>&1 | tail -15
+  ```
+  Do not report the exit status of `tail` or `grep` as the test command's status.
+- Enforce read-only database access explicitly, before the first query. Use the locally configured connection without copying credentials into reports:
+  ```python
+  import psycopg
+  c = psycopg.connect("postgresql://hindsight@127.0.0.1:5433/hindsight")
+  c.read_only = True
+  ```
+  Inspect live state as well as tests: `devboard.sessions` grouped by runtime, eligibility and state; `devboard.cards` grouped by status and activity age; and `bus.dead` filtered to `consumer='devboard'`. A working HTTP endpoint does not prove ingestion, retries or backfill are healthy.
+- Check the installed CLI from outside the repository, then probe the deployed read-only API:
+  ```bash
+  cd /tmp
+  walter-devboard status
+  for p in summary inbox 'cards?group=status' 'cards?group=module' today decisions vision live docs; do
+    curl -s -o /dev/null -m 20 -w "$p %{http_code} %{time_total}s %{size_download}B\n" "http://100.91.35.121:3093/api/$p"
+  done
+  ```
+  Inspect document path resolution in code and probe traversal attempts without printing sensitive file contents; a 404 alone is not a complete authorization audit.
+- Audit model-produced claims against their stored sources, not only JSON schemas or mocked model responses. For devboard, join session evidence to logs with `walter_logs.events.session_id = devboard.card_evidence.source_ref` and `walter_logs.events.seq = devboard.card_evidence.seq`, restricting evidence to `kind='session'`. Check source existence, speaker/event type, quotation fidelity, and whether approval or decision claims are actually supported.
+- Trace subscription-only routing end to end: configured Router poste, selected provider, freshness and threshold of subscription meters, exact gateway model/provider request, and gateway error handling. Distinguish a burst rate limit from exhausted subscription quota; check that retries cannot silently select a paid route. Do not make paid model calls merely to verify this policy.
+- Separate report evidence into code findings, test results and timestamped live observations. Distinguish ongoing backfill from permanent missing coverage. Remove temporary review scripts after use, and recommend operational interventions rather than executing them without authorization.
