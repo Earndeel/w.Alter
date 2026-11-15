@@ -165,6 +165,7 @@ single as (   -- single chats and their counterpart entity
        join core.entities pe on pe.entity_id = l.entity_id and pe.entity_type = 'person'
   where e.source = 'beeper' and e.payload->'chat'->>'type' = 'single' and e.event_type = 'message.received'
     and l.entity_id not in (select entity_id from self_ent)
+    and pe.canonical_name !~ '^@[a-z0-9_]*bot:beeper\\.local$'   -- bridge bots (e.g. @whatsappbot) are not the counterpart
   group by e.thread_id having count(distinct l.entity_id) = 1),
 msgs as (
   select s.other, e.source_account, e.occurred_at, e.event_type = 'message.sent' as me, length(coalesce(e.content,'')) len,
