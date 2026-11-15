@@ -1,7 +1,7 @@
 ---
 name: beeper-messages
 description: Read, search, analyze or send Beeper chats. Reading and analysis start from Walter Memory (messages already ingested, voice notes already transcribed); the Beeper Desktop local REST API is for sending and for what Memory does not hold yet.
-version: 1.3.0
+version: 1.4.0
 author: W.Alter
 license: MIT
 metadata:
@@ -35,8 +35,12 @@ without text): `vault_search` / `vault_get` the object, then `audio_transcribe(p
 
 - Beeper Desktop running on the remote machine (100.127.150.1 via Tailscale)
 - API: `http://100.127.150.1:23373`
-- Token: stored in vault — `vault get beeper/token`
-- **Always get token from vault** — old hardcoded tokens expire
+- Token: Walter Secrets grant `beeper` (variable `BEEPER_TOKEN`). Run every live call as
+  `walter-secret grant exec beeper --as engine -- <command>`: the command gets `$BEEPER_TOKEN`, its output comes back
+  (since 2026-11-15). Never `walter-secret exec` to read (output discarded by design), never print the token.
+- **A person has several networks** (e.g. Alina = Telegram `cinnamonro` + Instagram `shaulskayaa_`): take every account
+  from `person_lookup`, then `GET /v1/chats/search?query=<pseudo>` for each, and read the chat with the latest
+  `lastActivity` — the sender is the person, never a word to look for in message text.
 
 ## Mandatory Temporal Context
 
@@ -50,7 +54,8 @@ This is critical for contextual understanding — Lucas needs to know if a messa
 ## Quick Reference
 
 ```bash
-TOKEN=$(vault get beeper/token)
+# run as: walter-secret grant exec beeper --as engine -- bash -c '…'
+TOKEN="$BEEPER_TOKEN"
 API="http://100.127.150.1:23373"
 
 # List all chats
@@ -76,9 +81,10 @@ Chat IDs look like `!7Le8lDsatbsQfj7WHrk4:beeper.local` — they are Matrix room
 The chat list endpoint returns 25 chats per page. The response contains `oldestCursor` and `newestCursor` for pagination:
 
 ```python
-import json, subprocess
+import json, os, subprocess
 
-token = subprocess.getoutput("vault get beeper/token").strip()
+# run as: walter-secret grant exec beeper --as engine -- python3 script.py
+token = os.environ["BEEPER_TOKEN"]
 all_chats = []
 cursor = None
 
@@ -137,7 +143,7 @@ Stripe sends verification codes via iMessage to `+•• •• •• •• 59
 Chat: `stripelink` on `imessagecloud`, ID: `!0Yv8SCqY2O98k6y8V9wN:beeper.local`
 
 ```bash
-TOKEN=$(vault get beeper/token)
+TOKEN="$BEEPER_TOKEN"   # inside walter-secret grant exec beeper --as engine -- bash -c '…'
 curl -s "http://100.127.150.1:23373/v1/chats/!0Yv8SCqY2O98k6y8V9wN:beeper.local/messages?limit=1" \
   -H "Authorization: Bearer $TOKEN" | jq '.items[0].text'
 # → "062680 is your Link verification code."
@@ -157,7 +163,7 @@ When the user gives a contact name that doesn't match any chat title:
 1. **Check Walter Memory FIRST** — `person_lookup` / `memory_search` with the contact name. Past sessions often have the mapping (e.g. "Hani (WhatsApp) — projet PuttGame"). If it returns a match with a chat ID or network, use that directly.
 2. Search ALL chats for partial matches (username, fullName, title, participant names)
 3. If no match found, show the 15-20 most recent chats sorted by `lastActivity` so the user can identify the right one
-4. Instagram usernames often diverge from real names (e.g. `shaulskayaa_` = "Charles Kaya") — don't assume the chat title matches the person's name
+4. Instagram usernames often diverge from real names (e.g. `shaulskayaa_` = Alina, confirmed by Monsieur 2026-09-09) — don't assume the chat title matches the person's name; the person card (`person_lookup`) lists every pseudo
 
 **Critical: the API returns max 25 chats.** Contacts inactive for 3+ days may fall off the list. If the user names a contact that was active recently (within a week) but isn't in the current list, check Walter Memory (`person_lookup`) — the contact likely existed but was pushed out by more recent chats.
 
