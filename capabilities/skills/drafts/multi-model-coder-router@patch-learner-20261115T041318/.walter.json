@@ -1,0 +1,11 @@
+{
+ "base_sha": "088d2387c850f53d0a39c9739899f745318fadb1b794e468c9751e059dc0d66a",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-15T04:13:18.967650+00:00",
+ "domain": "code",
+ "kind": "patch",
+ "reason": "Adds a reusable paid-call provenance investigation to the existing routing skill. The session initially misattributed today's charges to an old incident, then found 17 billed Opus calls but could only hypothesize their source. Switching to authenticated Chromium and opening a billed request's Prompt details exposed the exact Markdown-to-PDF sub-agent instruction; canonical log timelines traced it to the foundation V1 test. The procedure preserves the hard-won browser/DOM steps and distinguishes proven request provenance from unproven fallback causality. [session codex/Codex Desktop/01a1d34c-62ad-75a1-b2cf-33121f4f507a]",
+ "runtime": "learner",
+ "session_id": "codex/Codex Desktop/01a1d34c-62ad-75a1-b2cf-33121f4f507a",
+ "target": "multi-model-coder-router"
+}
