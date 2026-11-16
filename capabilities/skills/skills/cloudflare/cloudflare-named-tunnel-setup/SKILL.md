@@ -189,3 +189,54 @@ When deploying a new webapp (e.g. ExcaliDash, MiroShark, etc.) behind an already
 - **Tunnel secret can't be empty** — Cloudflare API requires a non-empty `tunnel_secret` when creating tunnels. Generate with `base64.b64encode(os.urandom(32)).decode()`.
 - **Tunnel token vs API token** — `cloudflared tunnel run --token` expects the tunnel's JWT (from `/cfd_tunnel/{id}/token` API), NOT the Cloudflare API token. The JWT is ~180 chars.
 - **Tunnel config via API** — when `remote_config: true` (default), ingress rules are set via `PUT /cfd_tunnel/{id}/configurations`, not via local config.yml.
+
+## Rename an Access-protected hostname and preserve W.Alter web sign-in
+
+1. Inventory the whole request path before editing DNS. For Monsieur's portal, inspect:
+   - `/services/cloudflared/config/config.yml`
+   - `/user/Lucas/config/core/web-edge.wrangler.toml`
+   - `/etc/systemd/system/dsh-web.service` (including `--trusted-host`)
+   - Cloudflare DNS, Worker routes, and the Access application's hostname configuration.
+   Use `walter-cloudflare -- bash -c '…'` for authenticated Cloudflare operations; never print credentials. Back up local files and export the current Access application before changes.
+
+2. Treat hostname migration as a coordinated change, not a DNS-only rename. Update tunnel ingress, trusted host, Worker configuration/routes, DNS, and Access coverage. Preserve existing Access policies. Check API response `success` and `errors` before reading `result`: a failed update can return `result: null`. Do not delete the old hostname's resources until the new route and protection are checked. Update operational documentation, not historical records indiscriminately.
+
+3. Account for DSH's separate authentication. Its browser cookie is host-bound; a rename invalidates the old browser's effective login. The launch token also changes when `dsh-web` restarts. Cloudflare Access success alone does not establish a DSH session. Do not solve this by publishing a launch-token URL or repeatedly sending login links through Telegram.
+
+4. For the installed single-login setup, preserve this public request path:
+   `portal.walter-ai.cloud → Cloudflare Access → tunnel → 127.0.0.1:3081 (walter-web-gate) → 127.0.0.1:3080 (dsh-web)`.
+   Inspect the implementation and instance configuration before changing it:
+   ```sh
+   cat /user/Lucas/config/core/web-gate.json
+   systemctl cat walter-web-gate dsh-web
+   grep -n -A3 -B2 'portal.walter-ai.cloud' /services/cloudflared/config/config.yml
+   ```
+   Gate source: `/walter/core/interfaces/web/access-gate/gate.mjs`. The current DSH sign-in URL is stored at `/user/Lucas/state/core/engine/web/login-url`; treat the entire file as a credential and do not print it. Keep it root-only. The gate must use the current token internally to obtain the DSH cookie rather than expose the token to the browser.
+
+5. Keep authentication fail-closed. Before forwarding HTTP or WebSocket traffic, require a cryptographically verified Access JWT, with the configured issuer, audience, and time validity; a supplied identity header is not proof. Check missing/invalid JWT refusal, cookie bootstrap, redirect-loop protection, ordinary proxying, and WebSocket upgrades. Do not disable DSH authentication or expose its upstream port publicly to eliminate the second login.
+
+6. Run the gate's explicit test file:
+   ```sh
+   cd /walter/core/interfaces/web/access-gate
+   timeout 40 node --test --test-reporter=spec --test-timeout=5000 tests/gate.test.mjs
+   ```
+   In this environment, `node --test tests/` failed; use the file path. Tests involving upgraded sockets can hang after assertions finish: track connections and destroy them during test teardown before closing servers. Avoid `pkill -f` patterns embedded in the invoking shell command; they can terminate that shell too.
+
+7. Validate the configuration and restart only affected services:
+   ```sh
+   cloudflared tunnel ingress validate
+   # After editing a systemd unit:
+   systemctl daemon-reload
+   # When the gate configuration or implementation changed:
+   systemctl restart walter-web-gate
+   # When tunnel ingress changed:
+   systemctl restart cloudflared-tunnel
+   systemctl is-active walter-web-gate dsh-web cloudflared-tunnel
+   ```
+   Restart `dsh-web` only when necessary; doing so rotates its launch token. If Worker configuration changed, the session used:
+   ```sh
+   walter-cloudflare -- bash -c 'cd /tmp && timeout 300 npx --yes wrangler@3 deploy --config /user/Lucas/config/core/web-edge.wrangler.toml'
+   ```
+   Review the resulting Worker routes as well as DNS; stale routes are separate resources.
+
+8. Finish with a fresh-browser test through the public hostname: complete Access login, verify automatic DSH sign-in without a Telegram link, then verify an interactive WebSocket-backed action. Local tests and active services do not prove this end-to-end flow. Explicitly report a pending browser check rather than claiming full verification.
