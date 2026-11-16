@@ -102,6 +102,11 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/claude_subscription.py | `PROVIDER` | claude-pro |  |
 | llm/claude_subscription.py | `GRANT` | claude-subscription |  |
 | llm/claude_subscription.py | `UPSTREAM` | https://api.anthropic.com/v1/messages |  |
+| llm/decision.py | `TYPES` | ["noul", "choice", "score", "number", "date", "text", "spans", "box", "boxes"] |  |
+| llm/decision.py | `MAX_QUESTIONS` | 32 |  |
+| llm/decision.py | `MAX_INSTRUCTIONS` | 6000 |  |
+| llm/decision.py | `DEFAULT_POLICY` | {"escalate_below": null, "max_timeout_s": null, "memo_ttl_s": 0} | undeclared: no reuse |
+| llm/decision.py | `MEMO_SIZE` | 512 |  |
 | llm/gateway.py | `ROUTER` | walter-router | Walter Router CLI on the PATH |
 | llm/gateway.py | `UA` | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36 |  |
 | llm/gateway.py | `DEFAULT_TASK` | coding |  |
@@ -122,6 +127,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/structured.py | `CF_PRICE` | {"clef": 0.24, "clef-flash": 0.09} | USD per M input tokens (Workers AI catalogue, 2026-10-03) |
 | llm/structured.py | `NACE_SYSTEMONE` | https://console.nace.ai/v1/systemone |  |
 | llm/structured.py | `NACE_PRICE` | {"drex-max-v1.1": 0.03} | USD per M input tokens, output not billed (Nace docs, launch price, 2026-11-13) |
+| llm/structured.py | `LIQUID_SYSTEMONE` | https://api.liquid.ai/decisions/v1/systemone |  |
+| llm/structured.py | `LIQUID_PRICE` | {"d1.2": 0.02, "d1.2-ultra": 0.042} | USD per M input tokens, output not billed (Liquid docs, 2026-11) |
 | llm/structured.py | `MAX_SAMPLES` | 5 |  |
 | llm/structured.py | `MAX_DOCUMENTS` | 1000 |  |
 | llm/structured.py | `DEFAULT_TIMEOUT` | 30.0 |  |
@@ -249,8 +256,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/intent.py | `URL` | https://openrouter.ai/api/alpha/decisions |  |
 | serve/intent.py | `MODEL` | ~typesafe/jev-latest |  |
 | serve/intent.py | `FREE_FALLBACKS` | ["cloudflare/clef"] | free, off OpenRouter: survives an exhausted OpenRouter credit |
-| serve/intent.py | `ACCEPTED_PREFIXES` | ["typesafe/jev-", "inception/mercury-decide", "cloudflare/clef", "nace/"] |  |
+| serve/intent.py | `ACCEPTED_PREFIXES` | ["typesafe/jev-", "inception/mercury-decide", "cloudflare/clef", "nace/", "liquidai/"] |  |
 | serve/intent.py | `NACE_SYSTEMONE` | https://console.nace.ai/v1/systemone | Nace's own Decisions API (Drex Max), key NACE_API_KEY |
+| serve/intent.py | `LIQUID_SYSTEMONE` | https://api.liquid.ai/decisions/v1/systemone | Liquid's own (d1.2 family), key LIQUID_API_KEY |
 | serve/intent.py | `CF_RUN` | https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/{model} |  |
 | serve/intent.py | `MIN_CONFIDENCE` | 0.35 | eval 2026-10-02: a correct task came back at 0.48 |
 | serve/intent.py | `LEVELS` | {"L1": "Everyday: short answer, simple summary, quick fact, small rewrite", "L2": "Harder: multi-step analysis, comparison, careful writing, planning", "L3": "Hardest or high stakes: deep research synthesis, complex reasoning, important decision"} |  |
@@ -295,7 +303,6 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `VENICE_API_KEY` | serve/execution.py | secret_value | aucun | Nom d'accès fournisseur (autorisation venice, lecteurs llm et router) ; jamais affiché. |
 | `CLOUDFLARE_ACCOUNT_ID` | serve/intent.py | secret_value | aucun | Identifiant du compte pour la voie de décision configurée ; valeur privée hors documentation. |
 | `CLOUDFLARE_AI_TOKEN` | serve/intent.py | secret_value | aucun | Nom d'un accès secret pour la voie de décision ; ne pas afficher sa valeur. |
-| `NACE_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'accès fournisseur (autorisation nace, lecteurs llm et router : décisions Drex Max) ; jamais affiché. |
 | `OPENROUTER_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'accès fournisseur ; la passerelle utilise Walter Secrets. |
 | `CLOUDFLARE_API_KEY` | serve/intent.py | secret_value | aucun | Nom d'un accès secret utilisé par un adaptateur ; ne pas afficher sa valeur. |
 | `CLOUDFLARE_EMAIL` | serve/intent.py | secret_value | aucun | Identité de compte pour l'adaptateur Cloudflare ; donnée d'instance. |
@@ -368,6 +375,49 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/aliases_auto.json | `aliases.seedream-v4.model_id` | str | seedream-4 |
 | config/aliases_auto.json | `aliases.seedream-v4.origin` | str | agent |
 | config/aliases_auto.json | `aliases.seedream-v4.reason` | str | BytePlus ModelArk identifie le modèle comme Seedream 4.0 (version seedream-4-0-250828) ; seedream-v4 et seedream-4 sont deux écritures de cette même génération. https://docs.byteplus.com/en/docs/ModelArk/1824718 |
+| config/decision-needs.json | `about` | str | Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's). |
+| config/decision-needs.json | `needs.context-intent-bench.escalate_below` | NoneType | — |
+| config/decision-needs.json | `needs.context-intent-bench.latency_ms` | int | 5000 |
+| config/decision-needs.json | `needs.context-intent-bench.max_timeout_s` | NoneType | — |
+| config/decision-needs.json | `needs.context-intent-bench.memo_ttl_s` | int | 0 |
+| config/decision-needs.json | `needs.context-intent-bench.owner` | str | cognition/context |
+| config/decision-needs.json | `needs.context-intent-bench.purpose` | str | bench of the intent questions (never reused: each sample counts) |
+| config/decision-needs.json | `needs.disclosure.commitment.escalate_below` | NoneType | — |
+| config/decision-needs.json | `needs.disclosure.commitment.latency_ms` | int | 3000 |
+| config/decision-needs.json | `needs.disclosure.commitment.max_timeout_s` | NoneType | — |
+| config/decision-needs.json | `needs.disclosure.commitment.memo_ttl_s` | int | 600 |
+| config/decision-needs.json | `needs.disclosure.commitment.owner` | str | cognition/memory |
+| config/decision-needs.json | `needs.disclosure.commitment.purpose` | str | does an outgoing message commit the owner |
+| config/decision-needs.json | `needs.documents.verify.escalate_below` | NoneType | — |
+| config/decision-needs.json | `needs.documents.verify.latency_ms` | int | 10000 |
+| config/decision-needs.json | `needs.documents.verify.max_timeout_s` | NoneType | — |
+| config/decision-needs.json | `needs.documents.verify.memo_ttl_s` | int | 3600 |
+| config/decision-needs.json | `needs.documents.verify.owner` | str | cognition/memory |
+| config/decision-needs.json | `needs.documents.verify.purpose` | str | check a fact drawn from a document against it |
+| config/decision-needs.json | `needs.sourced-observation/1.verify.escalate_below` | NoneType | — |
+| config/decision-needs.json | `needs.sourced-observation/1.verify.latency_ms` | int | 10000 |
+| config/decision-needs.json | `needs.sourced-observation/1.verify.max_timeout_s` | NoneType | — |
+| config/decision-needs.json | `needs.sourced-observation/1.verify.memo_ttl_s` | int | 3600 |
+| config/decision-needs.json | `needs.sourced-observation/1.verify.owner` | str | cognition/memory |
+| config/decision-needs.json | `needs.sourced-observation/1.verify.purpose` | str | check an observation against its source |
+| config/decision-needs.json | `needs.triage.escalate_below` | NoneType | — |
+| config/decision-needs.json | `needs.triage.latency_ms` | int | 5000 |
+| config/decision-needs.json | `needs.triage.max_timeout_s` | NoneType | — |
+| config/decision-needs.json | `needs.triage.memo_ttl_s` | int | 3600 |
+| config/decision-needs.json | `needs.triage.owner` | str | cognition/memory |
+| config/decision-needs.json | `needs.triage.purpose` | str | incoming event: ignore / remember / notify / prepare a reply |
+| config/decision-needs.json | `needs.views.escalate_below` | NoneType | — |
+| config/decision-needs.json | `needs.views.latency_ms` | int | 10000 |
+| config/decision-needs.json | `needs.views.max_timeout_s` | NoneType | — |
+| config/decision-needs.json | `needs.views.memo_ttl_s` | int | 3600 |
+| config/decision-needs.json | `needs.views.owner` | str | cognition/memory |
+| config/decision-needs.json | `needs.views.purpose` | str | organic memory views: subject / episode / period assignment |
+| config/decision-needs.json | `needs.walter-context-preflight.escalate_below` | NoneType | — |
+| config/decision-needs.json | `needs.walter-context-preflight.latency_ms` | int | 1500 |
+| config/decision-needs.json | `needs.walter-context-preflight.max_timeout_s` | NoneType | — |
+| config/decision-needs.json | `needs.walter-context-preflight.memo_ttl_s` | int | 120 |
+| config/decision-needs.json | `needs.walter-context-preflight.owner` | str | cognition/context |
+| config/decision-needs.json | `needs.walter-context-preflight.purpose` | str | plan of each owner message: thread, act, context level, tier, modules |
 | config/declared_offers.json | `_doc` | str | Offers declared by the instance's owner that no provider API lists (web interfaces, subscriptions). Only explicit declarations go here; an instance keeps its own in config/router/declared_offers.json. |
 | config/declared_offers.json | `offers` | list | [] |
 | config/host.json | `_doc` | str | Host bindings of an instance (shipped default: none). An instance overrides this file in config/router/host.json. Paths: absolute, ~/ or @instance/. log_dir: cycle logs; collect_script: leaderboard collection (empty = skipped); control_env: HMAC secret of the manual trigger; control_origin / library_domain: where the library page and its trigger are served (empty = not published). aa_api_key: vault item and field of the Artificial Analysis Data API key, read through walter-secrets (null = scores from the leaderboard page only). |

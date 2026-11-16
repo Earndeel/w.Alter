@@ -469,6 +469,19 @@ Claude subscription transport; Walter owns every message, tool and model paramet
 - `acknowledgement(model: str)` — Terminate the CLI after one transport request, without giving it real model output.
 - `completion(config: dict, access_token: str, **kwargs)` — OpenAI completion, including real streaming/tool calls, over native subscription transport.
 
+## llm/decision.py
+
+Walter Decision (2026-11-16): the typed decision language, the needs registry, reuse and escalation — the layer
+
+- `_canon(value)` — 
+- `_digest(value)` — 
+- `compile_questions(questions)` — Check a question set against the language → (the questions, their schema key). Extra fields a provider
+- `needs()` — Declared needs (re-read when the file changes); {} when there is no registry.
+- `policy(need: str | None)` — 
+- `confidence(answer)` — How sure the model was of one answer: a choice's confidence (else its top probability), a noul's distance
+- `confidences(answers: dict)` — 
+- `uncertain(answers: dict, below: float | None)` — 
+
 ## llm/gateway.py
 
 exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run on the module venv
@@ -557,6 +570,7 @@ Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and
 - `_samples(once, n: int, grace: float | None)` — n parallel samples. Once a majority has answered, the others get `grace` seconds, then are dropped: the mean
 - `_route_level(why: str)` — 
 - `decisions(body: dict, *, chain: list[str], key, client, log, balance=None)` — Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
+- `_escalate(out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log, timeout: float, tag: dict)` — Ask the uncertain questions — only those — to the next model of the chain; its answers replace them.
 - `rerank_once(client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float)` — 
 - `rerank(body: dict, *, routes: list[dict], key, client, log, balance=None)` — Execute a rerank request on the Router's `rerank` poste routes, in order.
 
@@ -1046,7 +1060,7 @@ Intent classification by the decision model (OpenRouter's Decisions API, or Clou
 
 - `chain(conn)` — Decision models to try, in order. The best one comes from the 48 h cycle (task 'decision', AA Decision Index,
 - `_cloudflare(model: str, payload: dict, timeout: float)` — Cloudflare Workers AI (Clef family, free daily allocation). Scoped token preferred; the global key only when
-- `_nace(model: str, payload: dict, timeout: float)` — Nace systemone (Drex Max): the OpenRouter Decisions contract on Nace's own API (2026-11-13).
+- `_nace(model: str, payload: dict, timeout: float)` — Nace systemone (Drex Max): the OpenRouter Decisions contract on Nace's own API (2026-11-13); Liquid's own
 - `_criteria(conn)` — 
 - `_decisions(conn, state: dict, questions: dict, timeout: float, models: tuple | None=None)` — One Decisions call along the chain (first model that answers) -> (answers, raw answer, ms, errors). Every
 - `ask(conn, question: str, options: dict[str, str], context: str | None=None, timeout: float=8.0, models: tuple | None=None)` — The decision model for an agent's own quick choice (sort, yes/no, pick one of several options):

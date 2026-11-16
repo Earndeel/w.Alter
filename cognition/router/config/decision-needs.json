@@ -1,0 +1,12 @@
+{
+  "about": "Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's).",
+  "needs": {
+    "walter-context-preflight": {"owner": "cognition/context", "purpose": "plan of each owner message: thread, act, context level, tier, modules", "latency_ms": 1500, "memo_ttl_s": 120, "escalate_below": null, "max_timeout_s": null},
+    "triage": {"owner": "cognition/memory", "purpose": "incoming event: ignore / remember / notify / prepare a reply", "latency_ms": 5000, "memo_ttl_s": 3600, "escalate_below": null, "max_timeout_s": null},
+    "views": {"owner": "cognition/memory", "purpose": "organic memory views: subject / episode / period assignment", "latency_ms": 10000, "memo_ttl_s": 3600, "escalate_below": null, "max_timeout_s": null},
+    "disclosure.commitment": {"owner": "cognition/memory", "purpose": "does an outgoing message commit the owner", "latency_ms": 3000, "memo_ttl_s": 600, "escalate_below": null, "max_timeout_s": null},
+    "documents.verify": {"owner": "cognition/memory", "purpose": "check a fact drawn from a document against it", "latency_ms": 10000, "memo_ttl_s": 3600, "escalate_below": null, "max_timeout_s": null},
+    "sourced-observation/1.verify": {"owner": "cognition/memory", "purpose": "check an observation against its source", "latency_ms": 10000, "memo_ttl_s": 3600, "escalate_below": null, "max_timeout_s": null},
+    "context-intent-bench": {"owner": "cognition/context", "purpose": "bench of the intent questions (never reused: each sample counts)", "latency_ms": 5000, "memo_ttl_s": 0, "escalate_below": null, "max_timeout_s": null}
+  }
+}

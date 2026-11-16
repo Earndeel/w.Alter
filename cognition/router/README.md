@@ -167,6 +167,25 @@ domain/horizon, work, resume; no task family, no delegation). `walter-router pre
 - Page: transient unit `walter-preflight-bench-web` on the tailnet address, port 3092, no request log; state in
   `@instance/state/router/preflight-bench/` (0700).
 
+## Walter Decision (2026-11-16)
+
+The layer between a module that needs a quick typed judgement and the decision APIs (`llm/decision.py`, applied by
+`structured.decisions` on `POST /v1/decisions`):
+- **Language**: a `state` and named questions of nine types (noul, choice, score, number, date, text, spans, box,
+  boxes), written once and sent unchanged to whichever provider answers; checked before any call (400 with the
+  question and the reason), and named by a **schema key**.
+- **Needs**: `config/decision-needs.json` — what each module asks (owner, purpose, latency budget) and its policy:
+  `memo_ttl_s` (the same state + questions + chain within that window gets the answer already given, `reused: true`,
+  no call), `escalate_below` (the questions answered under that confidence — only those — go to the next model of the
+  chain; `null` = off), `max_timeout_s`. The caller names its need in `need` (`walter_memory.llm.decide` sends its
+  processor). Undeclared need: no reuse, no escalation. Policy only: the decision chain stays the Router's.
+- **Calibration**: each answered call's journal line carries `need`, `schema` and `confidence` per question.
+- **Liquid's own API**: offers `liquidai/<id>` (d1.2, d1.2-ultra) on `https://api.liquid.ai/decisions/v1/systemone`,
+  key `LIQUID_API_KEY` (grant card, reader walter-llm); `liquid/…` stays OpenRouter's resale. Inactive until the key
+  exists (a missing grant is named and the route set aside 10 min).
+- Comparison of 16/11 (preflight bench, d1-ultra = Drex Max agreement at 3.3× the speed; escalation off by the data):
+  `/walter/core/engine/docs/07-CONVERGENCE.md` § 4. Tests: `tests/test_walter_decision.py`.
+
 ## Access from outside
 
 | Door | Protection |

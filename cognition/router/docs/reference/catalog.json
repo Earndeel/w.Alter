@@ -7508,6 +7508,52 @@
         ]
       },
       {
+        "description": "Walter Decision (2026-11-16): the typed decision language, the needs registry, reuse and escalation — the layer",
+        "file": "llm/decision.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_canon",
+            "signature": "value"
+          },
+          {
+            "description": "",
+            "name": "_digest",
+            "signature": "value"
+          },
+          {
+            "description": "Check a question set against the language → (the questions, their schema key). Extra fields a provider",
+            "name": "compile_questions",
+            "signature": "questions"
+          },
+          {
+            "description": "Declared needs (re-read when the file changes); {} when there is no registry.",
+            "name": "needs",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "policy",
+            "signature": "need: str | None"
+          },
+          {
+            "description": "How sure the model was of one answer: a choice's confidence (else its top probability), a noul's distance",
+            "name": "confidence",
+            "signature": "answer"
+          },
+          {
+            "description": "",
+            "name": "confidences",
+            "signature": "answers: dict"
+          },
+          {
+            "description": "",
+            "name": "uncertain",
+            "signature": "answers: dict, below: float | None"
+          }
+        ]
+      },
+      {
         "description": "exec\" \"$(dirname \"$(readlink -f \"$0\")\")/venv/bin/python3\" \"$0\" \"$@\"  # sh: run on the module venv",
         "file": "llm/gateway.py",
         "functions": [
@@ -7911,6 +7957,11 @@
             "description": "Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.",
             "name": "decisions",
             "signature": "body: dict, *, chain: list[str], key, client, log, balance=None"
+          },
+          {
+            "description": "Ask the uncertain questions — only those — to the next model of the chain; its answers replace them.",
+            "name": "_escalate",
+            "signature": "out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log, timeout: float, tag: dict"
           },
           {
             "description": "",
@@ -9278,7 +9329,7 @@
             "signature": "model: str, payload: dict, timeout: float"
           },
           {
-            "description": "Nace systemone (Drex Max): the OpenRouter Decisions contract on Nace's own API (2026-11-13).",
+            "description": "Nace systemone (Drex Max): the OpenRouter Decisions contract on Nace's own API (2026-11-13); Liquid's own",
             "name": "_nace",
             "signature": "model: str, payload: dict, timeout: float"
           },
@@ -9864,6 +9915,264 @@
         "default": "BytePlus ModelArk identifie le modèle comme Seedream 4.0 (version seedream-4-0-250828) ; seedream-v4 et seedream-4 sont deux écritures de cette même génération. https://docs.byteplus.com/en/docs/ModelArk/1824718",
         "file": "config/aliases_auto.json",
         "key": "aliases.seedream-v4.reason",
+        "type": "str"
+      },
+      {
+        "default": "Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's).",
+        "file": "config/decision-needs.json",
+        "key": "about",
+        "type": "str"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.context-intent-bench.escalate_below",
+        "type": "NoneType"
+      },
+      {
+        "default": 5000,
+        "file": "config/decision-needs.json",
+        "key": "needs.context-intent-bench.latency_ms",
+        "type": "int"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.context-intent-bench.max_timeout_s",
+        "type": "NoneType"
+      },
+      {
+        "default": 0,
+        "file": "config/decision-needs.json",
+        "key": "needs.context-intent-bench.memo_ttl_s",
+        "type": "int"
+      },
+      {
+        "default": "cognition/context",
+        "file": "config/decision-needs.json",
+        "key": "needs.context-intent-bench.owner",
+        "type": "str"
+      },
+      {
+        "default": "bench of the intent questions (never reused: each sample counts)",
+        "file": "config/decision-needs.json",
+        "key": "needs.context-intent-bench.purpose",
+        "type": "str"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.escalate_below",
+        "type": "NoneType"
+      },
+      {
+        "default": 3000,
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.latency_ms",
+        "type": "int"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.max_timeout_s",
+        "type": "NoneType"
+      },
+      {
+        "default": 600,
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.memo_ttl_s",
+        "type": "int"
+      },
+      {
+        "default": "cognition/memory",
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.owner",
+        "type": "str"
+      },
+      {
+        "default": "does an outgoing message commit the owner",
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.purpose",
+        "type": "str"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.escalate_below",
+        "type": "NoneType"
+      },
+      {
+        "default": 10000,
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.latency_ms",
+        "type": "int"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.max_timeout_s",
+        "type": "NoneType"
+      },
+      {
+        "default": 3600,
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.memo_ttl_s",
+        "type": "int"
+      },
+      {
+        "default": "cognition/memory",
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.owner",
+        "type": "str"
+      },
+      {
+        "default": "check a fact drawn from a document against it",
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.purpose",
+        "type": "str"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.sourced-observation/1.verify.escalate_below",
+        "type": "NoneType"
+      },
+      {
+        "default": 10000,
+        "file": "config/decision-needs.json",
+        "key": "needs.sourced-observation/1.verify.latency_ms",
+        "type": "int"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.sourced-observation/1.verify.max_timeout_s",
+        "type": "NoneType"
+      },
+      {
+        "default": 3600,
+        "file": "config/decision-needs.json",
+        "key": "needs.sourced-observation/1.verify.memo_ttl_s",
+        "type": "int"
+      },
+      {
+        "default": "cognition/memory",
+        "file": "config/decision-needs.json",
+        "key": "needs.sourced-observation/1.verify.owner",
+        "type": "str"
+      },
+      {
+        "default": "check an observation against its source",
+        "file": "config/decision-needs.json",
+        "key": "needs.sourced-observation/1.verify.purpose",
+        "type": "str"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.escalate_below",
+        "type": "NoneType"
+      },
+      {
+        "default": 5000,
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.latency_ms",
+        "type": "int"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.max_timeout_s",
+        "type": "NoneType"
+      },
+      {
+        "default": 3600,
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.memo_ttl_s",
+        "type": "int"
+      },
+      {
+        "default": "cognition/memory",
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.owner",
+        "type": "str"
+      },
+      {
+        "default": "incoming event: ignore / remember / notify / prepare a reply",
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.purpose",
+        "type": "str"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.views.escalate_below",
+        "type": "NoneType"
+      },
+      {
+        "default": 10000,
+        "file": "config/decision-needs.json",
+        "key": "needs.views.latency_ms",
+        "type": "int"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.views.max_timeout_s",
+        "type": "NoneType"
+      },
+      {
+        "default": 3600,
+        "file": "config/decision-needs.json",
+        "key": "needs.views.memo_ttl_s",
+        "type": "int"
+      },
+      {
+        "default": "cognition/memory",
+        "file": "config/decision-needs.json",
+        "key": "needs.views.owner",
+        "type": "str"
+      },
+      {
+        "default": "organic memory views: subject / episode / period assignment",
+        "file": "config/decision-needs.json",
+        "key": "needs.views.purpose",
+        "type": "str"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.escalate_below",
+        "type": "NoneType"
+      },
+      {
+        "default": 1500,
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.latency_ms",
+        "type": "int"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.max_timeout_s",
+        "type": "NoneType"
+      },
+      {
+        "default": 120,
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.memo_ttl_s",
+        "type": "int"
+      },
+      {
+        "default": "cognition/context",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.owner",
+        "type": "str"
+      },
+      {
+        "default": "plan of each owner message: thread, act, context level, tier, modules",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.purpose",
         "type": "str"
       },
       {
@@ -15770,6 +16079,50 @@
         "value": "https://api.anthropic.com/v1/messages"
       },
       {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "TYPES",
+        "value": [
+          "noul",
+          "choice",
+          "score",
+          "number",
+          "date",
+          "text",
+          "spans",
+          "box",
+          "boxes"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "MAX_QUESTIONS",
+        "value": 32
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "MAX_INSTRUCTIONS",
+        "value": 6000
+      },
+      {
+        "comment": "undeclared: no reuse",
+        "file": "llm/decision.py",
+        "name": "DEFAULT_POLICY",
+        "value": {
+          "escalate_below": null,
+          "max_timeout_s": null,
+          "memo_ttl_s": 0
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "MEMO_SIZE",
+        "value": 512
+      },
+      {
         "comment": "Walter Router CLI on the PATH",
         "file": "llm/gateway.py",
         "name": "ROUTER",
@@ -15911,6 +16264,21 @@
         "name": "NACE_PRICE",
         "value": {
           "drex-max-v1.1": 0.03
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "LIQUID_SYSTEMONE",
+        "value": "https://api.liquid.ai/decisions/v1/systemone"
+      },
+      {
+        "comment": "USD per M input tokens, output not billed (Liquid docs, 2026-11)",
+        "file": "llm/structured.py",
+        "name": "LIQUID_PRICE",
+        "value": {
+          "d1.2": 0.02,
+          "d1.2-ultra": 0.042
         }
       },
       {
@@ -17069,7 +17437,8 @@
           "typesafe/jev-",
           "inception/mercury-decide",
           "cloudflare/clef",
-          "nace/"
+          "nace/",
+          "liquidai/"
         ]
       },
       {
@@ -17077,6 +17446,12 @@
         "file": "serve/intent.py",
         "name": "NACE_SYSTEMONE",
         "value": "https://console.nace.ai/v1/systemone"
+      },
+      {
+        "comment": "Liquid's own (d1.2 family), key LIQUID_API_KEY",
+        "file": "serve/intent.py",
+        "name": "LIQUID_SYSTEMONE",
+        "value": "https://api.liquid.ai/decisions/v1/systemone"
       },
       {
         "comment": "",
@@ -17410,13 +17785,6 @@
       },
       {
         "default_expression": "aucun",
-        "description": "Nom d'accès fournisseur (autorisation nace, lecteurs llm et router : décisions Drex Max) ; jamais affiché.",
-        "file": "serve/intent.py",
-        "name": "NACE_API_KEY",
-        "operation": "secret_value"
-      },
-      {
-        "default_expression": "aucun",
         "description": "Nom d'accès fournisseur ; la passerelle utilise Walter Secrets.",
         "file": "serve/intent.py",
         "name": "OPENROUTER_API_KEY",
@@ -17510,7 +17878,6 @@
       "CLOUDFLARE_EMAIL",
       "CODEX_SESSIONS",
       "KIE_API_KEY",
-      "NACE_API_KEY",
       "OPENROUTER_API_KEY",
       "VENICE_API_KEY",
       "WALTER_DELEGATION_DEPTH",
@@ -17596,6 +17963,7 @@
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
     "cli.py": "3fadfebf6b2e9ea1442c472b9ac4e0d65d18f454cae74172c627f034748f6eba",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
+    "config/decision-needs.json": "e2374eae48b758e8cd909cb9f324fa7a69654213d06057e2234f00cee3880808",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
     "config/kie_media_schemas.json": "278e5d624ffa274e473eaaf6ab044df1c454c43bb39df40613e6cde9c6f8edd1",
@@ -17628,8 +17996,9 @@
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
+    "llm/decision.py": "b5c106491786f3217d634e3869eb8ff5906fd8f1e4c8d3e2b8a6c187947ecce5",
     "llm/gateway.py": "f95463295dfaa2d1f816914f5cac3afcde1c95ff4ce4b00547cb5f29a8eb4b46",
-    "llm/structured.py": "555403466fe28fb08e099f7637a6a8f9079822350394c1baf8987708d5476952",
+    "llm/structured.py": "a5d81f0c18d7116206ae947fc6e707c6f0574d3578eea403033cf504b7af4a42",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
@@ -17685,7 +18054,7 @@
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "bd32cc241c3c1dbf2c7b95617fce3bcdf77a6203658ac9b9420a1b1095483487",
-    "serve/intent.py": "8ae5e3b089657d766ea1e61f6e9ab982fa0ae68d1bc5ed83b21d32d9269834d1",
+    "serve/intent.py": "27249e14b6c7f7465397ab0c6f992cd916855b65a18bbbcc10d3c34ebe952deb",
     "serve/media_exec.py": "2d1cc2912695ec9011219a2f73a6a1832faeea5df23551c34f69ff9b9a111593",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",

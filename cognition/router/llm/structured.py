@@ -34,6 +34,10 @@ CF_RUN = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/clo
 CF_PRICE = {"clef": 0.24, "clef-flash": 0.09}   # USD per M input tokens (Workers AI catalogue, 2026-10-03)
 NACE_SYSTEMONE = "https://console.nace.ai/v1/systemone"
 NACE_PRICE = {"drex-max-v1.1": 0.03}  # USD per M input tokens, output not billed (Nace docs, launch price, 2026-11-13)
+# Liquid AI's own System One API (d1.2 family, 2026-11): same contract as Nace's. Offers are named `liquidai/<id>` so
+# they never collide with OpenRouter's `liquid/d1…` resale of the older ones. Key LIQUID_API_KEY (grant card).
+LIQUID_SYSTEMONE = "https://api.liquid.ai/decisions/v1/systemone"
+LIQUID_PRICE = {"d1.2": 0.02, "d1.2-ultra": 0.042}  # USD per M input tokens, output not billed (Liquid docs, 2026-11)
 MAX_SAMPLES = 5
 MAX_DOCUMENTS = 1000
 DEFAULT_TIMEOUT = 30.0
@@ -70,6 +74,8 @@ def merge_answers(samples: list[dict]) -> dict:
 def provider_of(model: str) -> str:
     if model.startswith("nace/"):
         return "nace"
+    if model.startswith("liquidai/"):
+        return "liquid"
     return "cloudflare" if model.startswith("cloudflare/") or "/" not in model else "openrouter"
 
 
@@ -134,16 +140,19 @@ async def decide_once(client, key, model: str, state: dict, questions: dict, tim
         tok = (res.get("usage") or {}).get("input_tokens") or 0
         return {"answers": res["answers"], "usage": res.get("usage") or {}, "model": model,
                 "cost_usd": tok * CF_PRICE.get(short, 0.24) / 1e6, "cost_status": "estimated", "input_tokens": tok}
-    if provider_of(model) == "nace":
+    if provider_of(model) in ("nace", "liquid"):        # the two System One APIs: one contract, own host and key
         short = model.split("/", 1)[1]
-        r = await client.post(NACE_SYSTEMONE, headers={"Authorization": f"Bearer {key('NACE_API_KEY')}"},
+        nace = provider_of(model) == "nace"
+        url, var, prices = (NACE_SYSTEMONE, "NACE_API_KEY", NACE_PRICE) if nace else \
+            (LIQUID_SYSTEMONE, "LIQUID_API_KEY", LIQUID_PRICE)
+        r = await client.post(url, headers={"Authorization": f"Bearer {key(var)}"},
                               json={"model": short, "state": state, "questions": questions}, timeout=timeout)
         data = _json(r)
         if r.status_code >= 400 or not isinstance(data, dict) or not isinstance(data.get("answers"), dict):
             raise ProviderError(r.status_code, _error_code(data))
         usage = data.get("usage") or {}
-        tok = usage.get("input_tokens") or 0
-        price = NACE_PRICE.get(short)
+        tok = usage.get("input_tokens") or usage.get("prompt_tokens") or 0
+        price = prices.get(short)
         return {"answers": data["answers"], "usage": usage, "model": model,
                 "cost_usd": tok * price / 1e6 if price is not None else None,
                 "cost_status": "estimated" if price is not None else "unknown", "input_tokens": tok}
@@ -224,10 +233,21 @@ def _route_level(why: str) -> bool:
 
 
 async def decisions(body: dict, *, chain: list[str], key, client, log, balance=None) -> tuple[int, dict]:
-    """Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call."""
+    """Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
+    Walter Decision (decision.py): the questions are checked against the language first, the caller's `need` gives
+    the policy (reuse window, timeout cap, escalation), a decision already given is reused, and each answered call's
+    journal entry carries the need, the schema key and the confidence per question (calibration)."""
+    import decision as wd
     state, questions = body.get("state"), body.get("questions")
     if not isinstance(state, dict) or not isinstance(questions, dict) or not questions:
         return 400, {"error": "state (object) and questions (non-empty object) required"}
+    try:
+        questions, schema = wd.compile_questions(questions)
+    except wd.Invalid as exc:
+        return 400, {"error": f"not a Walter decision: {exc}"}
+    need = body.get("need") if isinstance(body.get("need"), str) and body.get("need") else None
+    need = need[:80] if need else None
+    pol = wd.policy(need)
     samples = body.get("samples", 1)
     if isinstance(samples, bool) or not isinstance(samples, int) or not 1 <= samples <= MAX_SAMPLES:
         return 400, {"error": f"samples must be an integer 1..{MAX_SAMPLES}"}
@@ -237,9 +257,18 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
     if refused:
         return 400, {"error": refused, "chain": chain}
     floor, timeout = _floor(body), _timeout(body)
+    if pol.get("max_timeout_s"):
+        timeout = min(timeout, max(1.0, float(pol["max_timeout_s"])))
+    tag = {"need": need, "schema": schema}
+    memo_key = wd.Memo.key(models, samples, state, schema) \
+        if pol.get("memo_ttl_s") and body.get("reuse", True) is not False else None
+    if memo_key and (hit := wd.MEMO.get(memo_key)) is not None:
+        log({"provider": hit.get("provider"), "model": hit.get("model"), "ok": True, "reused": True, "seconds": 0,
+             "cost_usd": 0.0, "cost_status": "reused", **tag})
+        return 200, {**hit, "reused": True, "calls": [], "attempts": []}
     attempts: list[dict] = []
     calls: list[dict] = []
-    for model in models:
+    for i, model in enumerate(models):
         provider = provider_of(model)
         aside = _unavailable.get(model)
         if aside and time.monotonic() < aside[0]:
@@ -270,7 +299,8 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
                 return call, None
             call = {"provider": provider, "model": model, "ok": True, "seconds": round(time.perf_counter() - t0, 3),
                     "cost_usd": res["cost_usd"], "cost_status": res["cost_status"], "input_tokens": res["input_tokens"]}
-            log({**call, "usage": {"in": res["input_tokens"], "out": 0, "cached": None}})
+            log({**call, "usage": {"in": res["input_tokens"], "out": 0, "cached": None}, **tag,
+                 "confidence": wd.confidences(res["answers"])})
             return call, res
         got, dropped = await _samples(once, samples, _straggler(body))
         calls += [c for c, _ in got]
@@ -292,8 +322,41 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
                "provider": provider, "route": f"{provider}/{model}", "calls": calls, "attempts": attempts}
         if samples > 1:
             out["samples"] = len(ok)
+        doubt = wd.uncertain(out["answers"], pol.get("escalate_below"))
+        nxt = next((m for m in models[i + 1:] if not (_unavailable.get(m) and time.monotonic() < _unavailable[m][0])),
+                   None)
+        if doubt and nxt:
+            out["escalated"] = await _escalate(out, doubt, nxt, state, questions, key=key, client=client, log=log,
+                                               timeout=timeout, tag=tag)
+            calls.append(out["escalated"].pop("call"))
+        out["schema"], out["need"] = schema, need
+        if memo_key:
+            wd.MEMO.put(memo_key, {k: v for k, v in out.items() if k not in ("calls", "attempts")},
+                        pol.get("memo_ttl_s") or 0)
         return 200, out
     return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls}
+
+
+async def _escalate(out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log,
+                    timeout: float, tag: dict) -> dict:
+    """Ask the uncertain questions — only those — to the next model of the chain; its answers replace them."""
+    import decision as wd
+    provider, t0 = provider_of(model), time.perf_counter()
+    try:
+        res = await decide_once(client, key, model, state, {k: questions[k] for k in doubt}, timeout)
+    except Exception as exc:  # noqa: BLE001 — the first answers stand
+        call = {"provider": provider, "model": model, "ok": False, "error": reason(exc), "escalation": True,
+                "seconds": round(time.perf_counter() - t0, 3)}
+        log({**call, **tag})
+        return {"model": model, "questions": doubt, "error": call["error"], "call": call}
+    call = {"provider": provider, "model": model, "ok": True, "escalation": True,
+            "seconds": round(time.perf_counter() - t0, 3), "cost_usd": res["cost_usd"],
+            "cost_status": res["cost_status"], "input_tokens": res["input_tokens"]}
+    log({**call, "usage": {"in": res["input_tokens"], "out": 0, "cached": None}, **tag,
+         "confidence": wd.confidences(res["answers"])})
+    replaced = [k for k in doubt if isinstance(res["answers"].get(k), dict)]
+    out["answers"] = {**out["answers"], **{k: res["answers"][k] for k in replaced}}
+    return {"model": model, "questions": replaced, "call": call}
 
 
 async def rerank_once(client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float) -> dict:
