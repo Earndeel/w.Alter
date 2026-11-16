@@ -52,6 +52,21 @@ def sync_hermes(profiles: list[str] | None = None) -> dict:
     return out
 
 
+def hermes_fingerprint(path: Path) -> tuple:
+    """What a Hermes write changes: size and mtime of state.db and of its WAL. A reader changes neither, but its
+    open still raises an inotify event on the WAL (metadata only: ctime moves, SQLite run as root re-owns the file),
+    which watchfiles reports as `modified`. Reacting to that event made the daemon re-read every profile in a loop,
+    ~2 Hz, and start walter-memory-hermes every 20 s with nothing new (2026-11-16)."""
+    out = []
+    for p in (path, path.with_name(path.name + "-wal")):
+        try:
+            s = p.stat()
+            out.append((s.st_size, s.st_mtime_ns))
+        except FileNotFoundError:
+            out.append(None)
+    return tuple(out)
+
+
 def sync_files(paths: list[tuple[str, Path]]) -> dict:
     out = {"files": 0, "rows": 0, "inserted": 0}
     for runtime, p in paths:
@@ -89,7 +104,9 @@ def watch_main() -> int:
     threading.Thread(target=_watch, args=(hermes_dirs, False, q, stop), daemon=True).start()
     threading.Thread(target=_watch, args=(tree_dirs, True, q, stop), daemon=True).start()
     profiles_at_start = set(logs.hermes_dbs())
+    hermes_seen: dict[str, tuple] = {}      # profile → fingerprint at its last sync (only real writes trigger one)
     last_sweep = last_core = last_dsh = last_profile_check = 0.0
+    core_pending = dsh_pending = False
     print(f"walter-logs watch: {len(hermes_dirs)} Hermes dirs, {tree_dirs}", flush=True)
     while True:
         changed: set[str] = set()
@@ -100,30 +117,39 @@ def watch_main() -> int:
         except Empty:
             pass
         now = time.time()
-        hermes = sorted({p for p, path in logs.hermes_dbs().items()
-                         for c in changed if c.startswith(str(path))})        # state.db, -wal, -shm
+        dbs = logs.hermes_dbs()
+        touched = {p for p, path in dbs.items() for c in changed if c.startswith(str(path))}   # state.db, -wal, -shm
+        prints = {p: hermes_fingerprint(dbs[p]) for p in touched}
+        hermes = sorted(p for p in touched if prints[p] != hermes_seen.get(p))     # a reader's event is no write
         files = sorted({(rt, Path(c)) for c in changed if c.endswith((".jsonl", ".jsonl.zstd"))
                         for rt in [logs.runtime_of(Path(c))] if rt and Path(c).exists()})
         try:
             with _locked():
                 res = {}
                 if now - last_sweep > SWEEP_S:
+                    prints = {p: hermes_fingerprint(path) for p, path in dbs.items()}      # taken before reading
+                    hermes = sorted(p for p in dbs if prints[p] != hermes_seen.get(p))
                     res = sync_all(); last_sweep = now
                 else:
                     if hermes:
                         res.update(sync_hermes(hermes))
                     if files:
                         res["files"] = sync_files(files)
-            if hermes and now - last_core > CORE_EVENTS_S:      # core.events (Monsieur's journal) follows
+                hermes_seen.update(prints)           # before-read prints: a write during the read re-syncs next time
+            # A change inside the 20 s window stays pending (the loop wakes at least every 30 s) instead of waiting for
+            # the next write: only real writes wake the loop now.
+            core_pending = core_pending or bool(hermes)
+            dsh_pending = dsh_pending or any(rt == "dsh" for rt, _ in files)
+            if core_pending and now - last_core > CORE_EVENTS_S:      # core.events (Monsieur's journal) follows
                 subprocess.run(["systemctl", "start", "--no-block", "walter-memory-hermes.service"], check=False)
-                last_core = now
+                last_core, core_pending = now, False
             # Engine lot E2 (2026-11-10): the engine's sessions reach core.events because their files changed, not
             # because a hook ran at the end of a turn (the engine's native events no longer call walter_hook.py).
             # agent-sessions is incremental and locked: a run that overlaps the hook's own journal steps aside.
-            if any(rt == "dsh" for rt, _ in files) and now - last_dsh > CORE_EVENTS_S:
+            if dsh_pending and now - last_dsh > CORE_EVENTS_S:
                 subprocess.Popen(["walter-memory", "agent-sessions", "--dsh"], stdin=subprocess.DEVNULL,
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                last_dsh = now
+                last_dsh, dsh_pending = now, False
             ins = sum(v.get("inserted", 0) for v in res.values() if isinstance(v, dict))
             if ins and (len(res) > 2 or ins >= 200):     # sweeps and big catch-ups only (journal stays quiet)
                 print(f"{datetime.now(timezone.utc):%H:%M:%S}Z +{ins} {res}", flush=True)
