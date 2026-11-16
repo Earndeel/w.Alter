@@ -26,7 +26,7 @@ KEYS = ("service", "message", "model", "files", "conversation", "request_id", "t
 
 def out_dir() -> Path:
     """Same place as the router's generated media (the agents already look there)."""
-    return instance.hermes_home() / "generated" / "walter-router"
+    return instance.media_dir()
 
 
 def converse(spec: dict) -> dict:

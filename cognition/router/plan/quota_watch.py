@@ -13,8 +13,8 @@ from walter_memory import bus
 from walter_router.store import db
 from walter_router.plan import subscriptions
 
-# Which subscription a runtime's turns spend: Hermes and Codex CLI run on ChatGPT (Codex), Claude Code on Claude Pro.
-SOURCE_SUBS = {"hermes": "openai-plus", "codex": "openai-plus", "claude_code": "anthropic-pro"}
+# Which subscription a runtime's turns spend: Codex CLI runs on ChatGPT (Codex), Claude Code on Claude Pro.
+SOURCE_SUBS = {"codex": "openai-plus", "claude_code": "anthropic-pro"}
 MIN_AGE_S = {"openai-plus": 120, "anthropic-pro": 300}
 log = logging.getLogger("walter.router.quota")
 

@@ -10,7 +10,7 @@ import pytest
 from walter_router import paths
 from walter_router.analysis import parse
 from walter_router.research.prices import claude_pro
-from walter_router.serve import execution, hermes_sync
+from walter_router.serve import execution
 
 spec = importlib.util.spec_from_file_location("claude_subscription", paths.ROOT / "llm/claude_subscription.py")
 transport = importlib.util.module_from_spec(spec)
@@ -82,16 +82,6 @@ def test_usage_comes_from_real_vendor_windows_not_transcript_estimates(monkeypat
 def test_unverified_model_is_rejected_before_any_network_or_process():
     with pytest.raises(transport.TransportError, match="unverified"):
         asyncio.run(transport.completion({"verified_models": []}, "fake", model="claude-unverified"))
-
-
-def test_hermes_sync_keeps_gateway_only_routes_out_of_native_config(monkeypatch):
-    from walter_router.serve import choose, routes
-    monkeypatch.setattr(choose, "pick", lambda *a: {})
-    monkeypatch.setattr(routes, "with_execution", lambda *a: {"model_id": "claude-test", "execution": [
-        {"provider": "claude-pro", "hermes_provider": None, "model": "claude-test"},
-        {"provider": "openrouter", "hermes_provider": "openrouter", "model": "anthropic/claude-test"}]})
-    result = hermes_sync._wanted(None, "coding")
-    assert result["provider"] == "openrouter" and result["fallback_chain"] == []
 
 
 def test_stream_closes_native_transport_even_before_first_token():

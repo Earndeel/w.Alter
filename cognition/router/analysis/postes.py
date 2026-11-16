@@ -11,16 +11,12 @@ of agentic/reliability measured (the job is about tools). Weights per poste live
 """
 from __future__ import annotations
 
-import re
-
 from walter_router.analysis import knowledge
 from walter_router.analysis import scoring
 from walter_router.analysis import select as sel
-from walter_router import instance
 
 BOARDS = {"intelligence": ("aa_intelligence", "intelligence"), "agentic": ("arena", "agent"),
           "reliability": ("bridgebench", "trustworthiness"), "speed": ("bridgebench", "speed")}
-HERMES_CONFIG = instance.hermes_home() / "config.yaml"
 
 
 def _board(conn, snaps: dict, benchmark: str, task: str) -> dict[str, float]:
@@ -62,14 +58,3 @@ def rank(conn, poste: str, limit: int = 8) -> list[dict]:
         out.append({"model_id": mid, "score": round(score, 1), "attributes": {a: round(v, 1) for a, v in got.items()},
                     "coverage": round(w, 2), "context_length": ctx.get(mid)})
     return sorted(out, key=lambda x: -x["score"])[:limit]
-
-
-def current_orchestrator() -> dict:
-    """model.default / model.provider of the live Hermes config (read-only text parse); nothing once Hermes is
-    retired (host.json `hermes`): Walter never reads a Hermes configuration file then."""
-    if not instance.hermes_active():
-        return {"model": None, "provider": None, "note": "Hermes retired: no orchestrator configured in Hermes"}
-    text = HERMES_CONFIG.read_text()
-    block = re.search(r"^model:\n((?:[ \t]+.*\n)+)", text, re.M)
-    vals = dict(re.findall(r"^[ \t]+(default|provider):[ \t]*(\S+)", block.group(1), re.M)) if block else {}
-    return {"model": vals.get("default"), "provider": vals.get("provider")}

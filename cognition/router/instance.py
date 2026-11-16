@@ -51,12 +51,6 @@ def host() -> dict:
     return json.loads(config_path("host.json").read_text())
 
 
-def hermes_active() -> bool:
-    """Whether the instance still runs Hermes as a runtime the Router configures (host.json `hermes`; default active).
-    Retired: nothing is applied to Hermes any more (sync-hermes, orchestrator) — walter-llm reads the Router itself."""
-    return str(host().get("hermes", "active")) != "retired"
-
-
 def _expand(value: str) -> Path:
     if value == "@instance" or value.startswith("@instance/"):
         root = _walter("path")
@@ -80,28 +74,10 @@ def own_file(name: str) -> Path:
     return Path(root) / "config" / "router" / name
 
 
-@functools.lru_cache(maxsize=1)
-def hermes_home() -> Path:
-    """The Hermes home this instance runs (HERMES_HOME, else the instance's declared harness home)."""
-    if os.environ.get("HERMES_HOME"):
-        return Path(os.environ["HERMES_HOME"])
-    found = _walter("harness", "hermes")
-    return Path(found) if found else Path.home() / ".hermes"
-
-
-def hermes_bin() -> Path:
-    return hermes_home() / "hermes-agent" / "venv" / "bin" / "hermes"
-
-
-def hermes_python() -> Path:
-    return hermes_home() / "hermes-agent" / "venv" / "bin" / "python"
-
-
-def child_env(**extra: str) -> dict:
-    """Environment of a Hermes child process run on behalf of the Router."""
-    return {**os.environ, "HOME": str(Path.home()), "HERMES_HOME": str(hermes_home()), **extra}
-
-
+def media_dir() -> Path:
+    """Where the Router writes the media it generates (host.json `media_dir`, default
+    @instance/workspace/generated/walter-router; was the Hermes home's generated/ until 2026-11-16)."""
+    return host_path("media_dir") or _expand("@instance/workspace/generated/walter-router")
 
 
 def secret_value(name: str) -> str | None:

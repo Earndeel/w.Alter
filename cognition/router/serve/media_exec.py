@@ -27,7 +27,7 @@ from walter_router.serve import execution
 from walter_router.analysis import select as sel
 
 CONFIG = paths.CONFIG
-OUT_DIR = instance.hermes_home() / "generated" / "walter-router"
+OUT_DIR = instance.media_dir()
 UA = execution.UA
 KIE = "https://api.kie.ai"
 OPENROUTER = "https://openrouter.ai/api/v1"

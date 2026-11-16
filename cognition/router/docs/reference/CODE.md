@@ -24,8 +24,7 @@ Alerts: a pinned favourite overtaken, unranked new releases, stale sources — a
 - `stale_sources(conn)` — 
 - `boards_down(conn)` — 2026-10-14: tell them when a leaderboard used by a task can no longer be read — the whole source
 - `tiers(conn, run_id: int | None=None, chg: dict | None=None)` — When the owner's method (nightly L1/L2/L3 in models.selection) designates another model x reasoning level than
-- `adopt_orchestrator(conn, model_id: str)` — The owner adopted a new orchestrator: point Hermes model.default/provider at its first route (subscription
-- `postes(conn)` — Orchestrator fiche de poste vs the model Hermes really runs: a clearly better one (>= margin) is proposed.
+- `adopt_orchestrator(conn, model_id: str)` — The owner adopted a new orchestrator: it is a Router poste, walter-llm follows the adoption (Hermes, which
 - `nerfs(conn, run_id: int, chg: dict | None=None)` — An ACTIVE model (favourite, text tier, auto #1) lost score on a board of the task it is active for.
 - `pareto(conn, run_id: int, chg: dict | None=None)` — A price drop (or a release) that puts a model on the text Pareto frontier.
 - `billing(conn)` — Providers whose last probe found no credit left: one alert each, auto-cleared once topped up.
@@ -180,7 +179,6 @@ Fiches de poste: which model fits a JOB (orchestrator, agent worker), not only a
 - `_board(conn, snaps: dict, benchmark: str, task: str)` — 
 - `_access(conn, snaps: dict)` — 
 - `rank(conn, poste: str, limit: int=8)` — 
-- `current_orchestrator()` — model.default / model.provider of the live Hermes config (read-only text parse); nothing once Hermes is
 
 ## analysis/recommend.py
 
@@ -285,7 +283,7 @@ The owner's method for the three functional text tiers (declared 2026-10-02).
 walter-router CLI: migrate | refresh | pick | prefer | alerts | verdict | status | route | run | web …
 
 - `feedback(conn, model: str, rating: int, task: str | None, note: str | None)` — 
-- `_instance_env()` — HERMES_HOME, LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
+- `_instance_env()` — LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
 - `build_parser()` — 
 - `main(argv: list[str] | None=None)` — 
 
@@ -378,39 +376,6 @@ Health of the Walter Router module: last refresh, source ages, providers, subscr
 - `health()` — Is the router fed and usable? ok=False lists what is wrong (used by walter_health and the failure alert).
 - `notify_failure()` — Called by systemd OnFailure: tell the owner on Telegram that the nightly refresh failed (one short message).
 
-## hermes-plugins/kie-compat/__init__.py
-
-Kie.ai compatibility shim (LLM request middleware; Hermes core untouched).
-
-- `_strip_output_config(request: Any=None, base_url: Any=None, api_mode: Any=None, **_: Any)` — 
-- `register(ctx: Any)` — 
-
-## hermes-plugins/walter-router/__init__.py
-
-Walter Router tools for Hermes (plugin; Hermes core is never patched). Thin: every decision and every run is the
-
-- `_cli(*args: str, timeout: int=60, stdin: str | None=None)` — 
-- `_tasks()` — 
-- `_brief()` — What the agent must know to use the router (tools, levels, specialities, generation, constraints — no model
-- `_spec(args: Mapping[str, Any])` — 
-- `_handle_route(args: Mapping[str, Any], **_: Any)` — 
-- `_handle_run(args: Mapping[str, Any], **_: Any)` — 
-- `_handle_decide(args: Mapping[str, Any], **_: Any)` — 
-- `_handle_verdict(args: Mapping[str, Any], **_: Any)` — 
-- `_handle_feedback(args: Mapping[str, Any], **_: Any)` — 
-- `_handle_plans(args: Mapping[str, Any], **_: Any)` — The owner's subscriptions (Walter Router plan/): list, change or cancel when he says so (2026-10-22).
-- `_available()` — 
-- `_home_chat()` — The owner's Telegram chat (gateway home channel); only they may press the buttons.
-- `_wire_buttons(application: Any, adapter: Any)` — Buttons of the Walter Router notification (callback data 'wr:<a|d>:<ref>[:<role>]', sent by the
-- `_web_commands()` — Telegram command → service, from the router gateway's own rule table (read once, at load).
-- `_post_web(body: dict, timeout: float)` — 
-- `_chunks(text: str, size: int=4000)` — 
-- `_split_model(text: str)` — `[GPT-6 high] question` → ("GPT-6 high", "question"); without brackets the service keeps its own model.
-- `web_exchange(service: str, text: str, chat_id: Any, message_id: Any, sent_at: float | None, reply: Any, *, model: str | None=None, files: list[tuple[str, bytes]] | None=None, send_file: Any=None)` — One owner message to a web service and its verbatim reply (`reply(str)` sends one Telegram message,
-- `_wire_web_commands(application: Any, adapter: Any)` — Owner-only Telegram commands of the web services. Group -1 + ApplicationHandlerStop: the message never
-- `_handle_web(args: Mapping[str, Any], **_: Any)` — POST /v1/web/converse through the router's own CLI (`walter-router web`); its JSON even on failure.
-- `register(ctx: Any)` — 
-
 ## instance.py
 
 What the Router needs from the active Walter instance, asked through its public interface (`walter instance`).
@@ -420,14 +385,10 @@ What the Router needs from the active Walter instance, asked through its public 
 - `owner()` — How messages, notes and prompts name the person this instance serves (its declared address form).
 - `config_path(name: str)` — An instance's own Router file (config/router/<name>) when it has one, else the shipped default.
 - `host()` — Host bindings of the instance (config host.json): runtime profiles, cron jobs, publishing helpers.
-- `hermes_active()` — Whether the instance still runs Hermes as a runtime the Router configures (host.json `hermes`; default active).
 - `_expand(value: str)` — 
 - `host_path(key: str)` — A path binding of host.json (absolute, ~/ or @instance/); None when the instance has none.
 - `own_file(name: str)` — Where the instance keeps its own copy of a Router file it writes (config/router/<name>).
-- `hermes_home()` — The Hermes home this instance runs (HERMES_HOME, else the instance's declared harness home).
-- `hermes_bin()` — 
-- `hermes_python()` — 
-- `child_env(**extra: str)` — Environment of a Hermes child process run on behalf of the Router.
+- `media_dir()` — Where the Router writes the media it generates (host.json `media_dir`, default
 - `secret_value(name: str)` — A key the Router component is granted under NAME (Walter Secrets: instance accounts/<id>.toml, `allow` + [env],
 - `state_file(name: str)` — A file the Router generates for the instance (state/router/<name>), e.g. the agents' brief.
 
@@ -1078,20 +1039,6 @@ Ordered provider routes and execution metadata for Walter consumers.
 - `_kie_media(kie: str)` — Kie's media API (video, image, music tasks) is another service than its Claude chat API: usable when the
 - `_post(url: str, body: dict, headers: dict, timeout: int | None=None, must: str | None=None)` — POST and read the whole answer (SSE included); ok = HTTP 200, non-empty, containing `must` when given
 - `probe(conn, only: str | None=None, timeout: int=90)` — Tiny live call per API provider (max 5 output tokens, streamed when the provider streams for Hermes).
-
-## serve/hermes_sync.py
-
-Hermes auxiliary jobs follow Walter Router (2026-10-16, the owner: every W.Alter module that uses AI goes through
-
-- `_wanted(conn, poste: str, level: str | None=None)` — 
-- `_aux(home: Path)` — 
-- `plan(conn)` — 
-- `_plan_home(home: Path, aux: dict, wanted: dict)` — 
-- `host_orders(conn)` — OpenRouter model id -> the router's host order (cheapest usable host first) for every OpenRouter route of
-- `_routing(home: Path)` — 
-- `_plan_routing(conn)` — 
-- `_plan_crons(conn)` — 
-- `apply(conn, restart: bool=True)` — 
 
 ## serve/intent.py
 

@@ -40,7 +40,7 @@ def feedback(conn, model: str, rating: int, task: str | None, note: str | None) 
 
 
 def _instance_env() -> int:
-    """HERMES_HOME, LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
+    """LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
     rendered for the instance: its owner, its log folder), as shell assignments."""
     import shlex
     log = instance.host_path("log_dir")
@@ -51,7 +51,7 @@ def _instance_env() -> int:
                               timeout=30, check=True).stdout
     (log / "analysis-prompt.md").write_text(rendered)
     domain = instance.host().get("library_domain") or ""
-    values = {"HERMES_HOME": instance.hermes_home(), "LOG": log,
+    values = {"LOG": log,
               "CONTROL_ENV": instance.host_path("control_env") or "",
               "LIBRARY_URL": f"https://{domain}" if domain else "", "ANALYSIS_PROMPT": log / "analysis-prompt.md"}
     for k, v in values.items():
@@ -113,9 +113,6 @@ def build_parser() -> argparse.ArgumentParser:
     pfb.add_argument("--draw", help="build: the authentic draw (JSON list; default real-draw.json in the state folder)")
     lb = sub.add_parser("library", help="the model library: per task/category model, chooser, providers, fallback")
     lb.add_argument("--json", action="store_true")
-    hs = sub.add_parser("sync-hermes", help="Hermes follows the router: auxiliary jobs, OpenRouter host order per model, cron postes")
-    hs.add_argument("--apply", action="store_true", help="apply (config backup + graceful gateway restart)")
-    hs.add_argument("--no-restart", action="store_true")
     pl = sub.add_parser("publish-library", help="rebuild and deploy the instance library page (host.json library_domain, Cloudflare Access)")
     pl.add_argument("--no-deploy", action="store_true")
     sb = sub.add_parser("subscriptions", help="the owner's subscriptions: quota meters, status, plan values")
@@ -386,7 +383,7 @@ def main(argv: list[str] | None = None) -> int:
                                           voice=args.voice, style=args.style)
             elif args.cmd == "postes":
                 from walter_router.analysis import postes as postes_mod
-                out = {"current": postes_mod.current_orchestrator(), "ranking": postes_mod.rank(conn, args.poste)}
+                out = {"ranking": postes_mod.rank(conn, args.poste)}
             elif args.cmd == "alias-add":
                 out = aliases_admin.add(conn, args.key, args.model_id, args.reason, args.origin)
             elif args.cmd == "alias-remove":
@@ -406,9 +403,6 @@ def main(argv: list[str] | None = None) -> int:
                         p.error("calibrate needs <sub_id> <percent>")
                     subscriptions.calibrate(conn, args.sub_id, args.percent)
                 out = subscriptions.state(conn)
-            elif args.cmd == "sync-hermes":
-                from walter_router.serve import hermes_sync
-                out = hermes_sync.apply(conn, restart=not args.no_restart) if args.apply else hermes_sync.plan(conn)
             elif args.cmd == "publish-library":
                 from walter_router.interface import library
                 out = library.publish(conn, deploy=not args.no_deploy)
@@ -435,7 +429,7 @@ def main(argv: list[str] | None = None) -> int:
                 conn.commit()
                 import subprocess   # local, as in the verdict branch below (a local import there shadows the module's)
                 wr = paths.ROOT / "bin" / "walter-router"   # the library page follows (background, after this commit)
-                subprocess.Popen(["sh", "-c", f'sleep 3; "{wr}" sync-hermes --apply; "{wr}" publish-library'],
+                subprocess.Popen(["sh", "-c", f'sleep 3; "{wr}" publish-library'],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             elif args.cmd == "alerts":
                 rows = conn.execute("select * from models.alerts order by alert_id").fetchall() if args.all else alerts.pending(conn)
@@ -453,7 +447,7 @@ def main(argv: list[str] | None = None) -> int:
                            "drop": [f"wr:a:{args.alert_id}", f"wr:d:{args.alert_id}"], "verdict": out}
                 import subprocess   # the library page follows the owner's answer (background, non-blocking)
                 wr = paths.ROOT / "bin" / "walter-router"   # after this command's commit
-                subprocess.Popen(["sh", "-c", f'sleep 5; "{wr}" sync-hermes --apply; "{wr}" publish-library'],
+                subprocess.Popen(["sh", "-c", f'sleep 5; "{wr}" publish-library'],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             conn.commit()
     json.dump(out, sys.stdout, indent=1, ensure_ascii=False, default=str)

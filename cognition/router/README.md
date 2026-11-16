@@ -75,8 +75,7 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 
 | Consumer | How |
 |---|---|
-| Hermes | plugin `walter-router` (tools `walter_route`, `walter_run`, `walter_decide`, `walter_plans`, `walter_web`, plus `walter_verdict`, `walter_feedback` for the Telegram buttons and the owner's verdicts); the brief as a system-prompt section; `sync-hermes` writes its auxiliary jobs, cron postes and `provider_routing.models.<id>.order` |
-| Modules (walter-memory, Hindsight, voice, Kardex…) | walter-llm with `model` = a router task; `pick` for service postes (STT, rerank, embeddings) |
+| Modules (walter-memory, Kardex…) | walter-llm with `model` = a router task; `pick` for service postes (STT, rerank, embeddings) |
 | walter-memory triage | `decision-chain` (Drex Max 1.1 on Nace's own API — pinned by the owner 2026-11-13, declared offer `nace/drex-max-v1.1`, grant `nace` —, then Clef on Workers AI; Mercury Decide withdrawn 2026-11-13) |
 | Claude Code, Codex, DSH | the `walter` MCP: the same four tools under the same names, the same runs; the brief in the MCP server instructions (Claude Code) and in their W.Alter profile (Codex, DSH). Their own model stays theirs |
 | walter-context (planned) | the decision model (`classify` / `ask`) to set the agentic level of a turn |
@@ -117,7 +116,7 @@ walter-router plans list | consumption | set ID [--vendor --plan --price --model
 walter-router subscriptions [refresh | calibrate anthropic-pro PERCENT]
 walter-router brief [--write]        # what an agent must know to use the router: tools, levels, specialities,
                                      # generation, analysis, constraints — never a model or provider name
-walter-router sync-hermes [--apply] | publish-library | declare | migrate | probe | decision-chain
+walter-router publish-library | declare | migrate | probe | decision-chain
 walter-router alias-add | alias-remove | alias-list | postes | log-exec | notify-failure | instance-env
 walter-router-guardian check [--no-tests] | run [--no-agent] [--no-tests] [--no-notify] [--dry-run] | status
 ```

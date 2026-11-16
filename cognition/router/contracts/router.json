@@ -37,14 +37,12 @@
     "CLI walter-router-guardian check | run | status (the module's own maintenance)"
   ],
   "bindings": {
-    "hermes": "router plugin (same tools, brief as a system-prompt section) + auxiliary configuration adapter",
     "dsh": "walter-llm provider; router tools through the walter MCP + brief in the profile",
     "codex": "router tools through the walter MCP + brief in the profile; primary model native",
     "claude-code": "router tools through the walter MCP, brief in the server instructions; primary model native"
   },
   "limitations": [
     "New model choices remain subject to the owner's approval; no automatic switching introduced.",
-    "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
     "Text runs execute natively with bounded terminal/file tools; only providers of the selected model are tried, and callers must forward user_notice on failover.",
     "The guardian lands repairs only in research/, analysis/parse.py, analysis/identity.py, analysis/aliases.json, interface/ and tests/, through deterministic gates; owner choices, execution policy, schema and units are never changed by it."
   ],
@@ -218,7 +216,7 @@
     {
       "id": "analysis",
       "path": "analysis",
-      "role": "Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6)",
+      "role": "Analyse, propositions Telegram, alertes",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/router/analysis"
@@ -248,8 +246,8 @@
     {
       "id": "oneshot",
       "path": "serve/oneshot.py",
-      "role": "Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6)",
-      "status": "obsolete",
+      "role": "Réponses ponctuelles du Router : walter-llm direct (poste économique) ou délégation à Walter Engine",
+      "status": "active",
       "readme": "README.md"
     },
     {
@@ -270,13 +268,6 @@
         "postgres:models"
       ],
       "vision_target": "cognition/router/store"
-    },
-    {
-      "id": "hermes-plugin",
-      "path": "hermes-plugins",
-      "role": "Greffon Hermes walter-router — à retirer avec Hermes (E7)",
-      "status": "active",
-      "readme": "README.md"
     },
     {
       "id": "guardian",

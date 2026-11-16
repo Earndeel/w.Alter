@@ -268,10 +268,6 @@ walter-router subscriptions
   action :  ; défaut=show ; valeurs=["show", "refresh", "calibrate"]
   sub_id : calibrate: subscription id (anthropic-pro) ; défaut=—
   percent : calibrate: weekly %% shown by the vendor ; défaut=—
-walter-router sync-hermes
-  -h, --help : show this help message and exit ; défaut===SUPPRESS==
-  --apply : apply (config backup + graceful gateway restart) ; défaut=false
-  --no-restart :  ; défaut=false
 walter-router tasks
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
 walter-router transcribe

@@ -161,7 +161,6 @@ ENV_MEANINGS = {
     "WALTER_LLM_URL": "URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894).",
     "WALTER_LLM_TOKEN": "Jeton local d'agent pour la passerelle walter-llm, propre à chaque runtime (@instance/bootstrap/llm/<agent>.env 0600 ; jamais affiché).",
     "WALTER_FLARESOLVERR": "Adresse du service de lecture des sources qui le nécessitent.",
-    "HERMES_HOME": "Emplacement du runtime historique pour les opérations/adaptateurs qui en dépendent encore.",
     "CLAUDE_PROJECTS": "Source locale de métriques des sessions Claude pour estimer un abonnement.",
     "CODEX_SESSIONS": "Source locale de métriques des sessions Codex pour estimer un abonnement.",
     "TELEGRAM_HOME_CHANNEL": "Destination d'instance des avis/propositions ; ne pas exporter sa valeur.",
@@ -207,7 +206,7 @@ def database(conn):
 
 
 def source_files():
-    roots = ('analysis','serve','research','plan','interface','store','llm','config','hermes-plugins','contracts','guardian')
+    roots = ('analysis','serve','research','plan','interface','store','llm','config','contracts','guardian')
     files = [paths.ROOT / n for n in ('cli.py','instance.py','paths.py','health.py','documentation.py')]
     for root in roots:
         files += [p for p in (paths.ROOT/root).rglob('*') if p.is_file() and p.suffix in ('.py','.json','.sql','.js','.mjs','.html')

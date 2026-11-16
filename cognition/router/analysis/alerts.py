@@ -9,7 +9,6 @@ from walter_router.analysis import changes
 from walter_router import instance
 from walter_router.analysis import select as sel
 
-HERMES = instance.hermes_bin()
 UNRANKED_DAYS = 30
 STALE_HOURS = {"aa": 60, "aa_eval": 60, "aa_decision": 60, "mm": 60, "da": 60, "arena": 60, "bridgebench": 60, "aa_stt": 60,
                "agentset": 60, "mteb": 60, "openrouter": 60, "kie": 60, "codex": 60, "hermes_providers": 60,
@@ -333,51 +332,9 @@ def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]
 
 
 def adopt_orchestrator(conn, model_id: str) -> dict:
-    """The owner adopted a new orchestrator: point Hermes model.default/provider at its first route (subscription
-    first), config backed up, gateway restarted gracefully."""
-    import shutil
-    from datetime import datetime, timezone
-    from walter_router.serve import execution
-    if not instance.hermes_active():   # the engine's orchestrator is a Router poste: walter-llm follows the adoption
-        return {"orchestrator": model_id, "applied": "walter-llm (Hermes retired)"}
-    route = next((r for r in execution.routes(conn, model_id)
-                  if r.get("probe_ok") is not False and r.get("hermes_provider")), None)
-    if not route:
-        raise RuntimeError(f"no usable route for {model_id}")
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    shutil.copy2(instance.hermes_home() / "config.yaml",
-                 instance.hermes_home() / "backups" / "config" / f"config.yaml.{ts}.pre-orchestrator")
-    for key, value in (("model.default", route["model"]), ("model.provider", route["hermes_provider"])):
-        subprocess.run([str(HERMES), "config", "set", key, value], check=True, capture_output=True, timeout=60)
-    subprocess.run([str(HERMES), "gateway", "restart"], capture_output=True, timeout=1900)
-    return {"orchestrator": route["model"], "provider": route["hermes_provider"], "backup": ts}
-
-
-def postes(conn) -> list[str]:
-    """Orchestrator fiche de poste vs the model Hermes really runs: a clearly better one (>= margin) is proposed."""
-    from walter_router.analysis import identity
-    from walter_router.analysis import knowledge
-    from walter_router.analysis import postes as postes_mod
-    cfg = knowledge.load().get("postes", {}).get("orchestrator")
-    if not cfg or not instance.hermes_active():   # the orchestrator poste = the model Hermes runs: none when retired
-        return []
-    ranking = postes_mod.rank(conn, "orchestrator", 20)
-    cur = postes_mod.current_orchestrator()
-    cur_id = identity.normalize("codex", cur["model"] or "")[0]
-    current = next((r for r in ranking if r["model_id"] == cur_id), None)
-    if not ranking or ranking[0]["model_id"] == cur_id:
-        conn.execute("""update models.alerts set status = 'dismissed', verdict_note = 'auto: orchestrateur déjà optimal'
-                        where kind = 'tier' and role = 'orchestrator' and status in ('open', 'notified')""")
-        return []
-    top = ranking[0]
-    if current and top["score"] - current["score"] < cfg.get("margin", 3.0):
-        return []
-    ev = {"level": "orchestrator", "poste": cfg["label"], "proposed": top["model_id"], "score": top["score"],
-          "attributes": top["attributes"], "current": cur_id, "current_score": current and current["score"],
-          "current_attributes": current and current["attributes"]}
-    return [f'orchestrator:{top["model_id"]}'] if record(conn, "tier", "general", top["model_id"], ev, "open",
-                                                            "orchestrator") else []
-
+    """The owner adopted a new orchestrator: it is a Router poste, walter-llm follows the adoption (Hermes, which
+    had its own model setting, was removed on 2026-11-16)."""
+    return {"orchestrator": model_id, "applied": "walter-llm"}
 
 def nerfs(conn, run_id: int, chg: dict | None = None) -> list[str]:
     """An ACTIVE model (favourite, text tier, auto #1) lost score on a board of the task it is active for."""
