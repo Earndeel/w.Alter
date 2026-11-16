@@ -52,7 +52,10 @@ DSH_OFF=DSH_OFF+DSH_ORCHESTRATION
 DSH_WEB_OFF=('preset-ptc','preset-minimal','preset-cordis','account-controller','ui-brand-official',
              'ui-model-selection','ui-agent-preset','ui-plugin-manager','ui-settings-plugin-inventory',
              'ui-settings-plugins','ui-settings-shell','ui-settings-agent-loop','ui-settings-subagent',
-             'ui-settings-web-search')
+             'ui-settings-web-search',
+             # 2026-11-16: DSH's Models page (its provider directory, DeepSeek sign-in onboarding) is not Walter's —
+             # the Router picks the model; an instance link with section = "models" takes that page (its glyph).
+             'ui-settings-models')
 DSH_TASKS=('coding','general','document','summarization','auto')   # Walter Router tasks offered to DSH (live order)
 DSH_TITLE={'targetWords':5,'targetCjkCharacters':10,'maxInputBytes':4096,'maxOutputTokens':64,'timeoutMs':60000,
            'provider':'walter','model':'summarization'}
@@ -236,9 +239,14 @@ def _dsh_panels(values):
     for l in values.get('dsh',{}).get('web',{}).get('links') or []:
         if not (isinstance(l,dict) and re.fullmatch(r'[a-z][a-z0-9-]{0,31}',str(l.get('id',''))) and isinstance(l.get('label'),str)
                 and l['label'] and isinstance(l.get('description',''),str) and re.fullmatch(r'https://[^/?#\s@]+(/\S*)?',str(l.get('url','')))
-                and l['id'] not in {x['id'] for x in links}):
-            raise ValueError(f'engine.toml [[dsh.web.links]] invalid entry {l!r} (id, label, optional description, url https://…)')
-        links.append({'id':l['id'],'label':l['label'],**({'description':l['description']} if l.get('description') else {}),'url':l['url']})
+                and l['id'] not in {x['id'] for x in links}
+                and (l.get('section') is None or (re.fullmatch(r'[a-z][a-z0-9-]{0,31}',str(l['section'])) and l['section']!='general'
+                                                  and l['section'] not in {x.get('section') for x in links}))
+                and (l.get('section_label') is None or (isinstance(l['section_label'],str) and l['section_label']))):
+            raise ValueError(f'engine.toml [[dsh.web.links]] invalid entry {l!r} (id, label, optional description, url https://…, '
+                             'optional section = Settings page id, section_label)')
+        links.append({'id':l['id'],'label':l['label'],**({'description':l['description']} if l.get('description') else {}),'url':l['url'],
+                      **{k:l[k] for k in ('section','section_label') if l.get(k)}})
     if not out and not links:return None
     config={**({'panels':out} if out else {}),**({'links':links} if links else {})}
     return ('# Panels: pages of other Walter modules in the sidebar and main area, behind the interface\'s sign-in (reads, plus declared actions);\n'

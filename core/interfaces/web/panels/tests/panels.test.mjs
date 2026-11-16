@@ -116,6 +116,22 @@ test('settings links are published as given (no route), and checked', () => {
   assert.throws(() => checkLinks([{ id: 'x', label: 'X', url: 'https://a.example/' }, { id: 'x', label: 'Y', url: 'https://b.example/' }]), /duplicate/);
 });
 
+test('a link may take a Settings page of its own (section), its nav label defaulting to the link label', () => {
+  const table = [];
+  const web = { webServer: { register: () => () => {} }, connection: { requestRejection: () => undefined },
+    effect: (f) => f(), on: (ev, f) => f(table) };
+  apply({ inject: (deps, f) => f(web) }, { links: [
+    { id: 'library', label: 'Bibliothèque', url: 'https://lib.example/fr/', section: 'models', section_label: 'Modèles' },
+    { id: 'other', label: 'Autre', url: 'https://o.example/', section: 'other' }] });
+  assert.deepEqual(table[1].value, [
+    { id: 'library', label: 'Bibliothèque', description: '', url: 'https://lib.example/fr/', section: 'models', section_label: 'Modèles' },
+    { id: 'other', label: 'Autre', description: '', url: 'https://o.example/', section: 'other', section_label: 'Autre' }]);
+  assert.throws(() => checkLinks([{ id: 'x', label: 'X', url: 'https://a.example/', section: 'general' }]), /section/);
+  assert.throws(() => checkLinks([{ id: 'x', label: 'X', url: 'https://a.example/', section: 'Bad id' }]), /section/);
+  assert.throws(() => checkLinks([{ id: 'x', label: 'X', url: 'https://a.example/', section: 'm' },
+    { id: 'y', label: 'Y', url: 'https://b.example/', section: 'm' }]), /section/);
+});
+
 test('a POST under a declared action prefix is relayed with its body; elsewhere still 405', async () => {
   const seen = [];
   await withProxy(ok, (req, res) => {

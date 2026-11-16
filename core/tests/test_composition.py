@@ -435,7 +435,10 @@ def test_dsh_settings_links_rendered_alone_and_checked(home,monkeypatch):
     c.install('dsh',home,apply=True,backup_root=home.parent/'backups')
     [row]=[r for r in c._dsh_yaml(_web(home)) if any(e.get('id')=='walter-web-panels' for e in r.get('insert',[]))]
     assert row['insert'][0]['config']=={'links':[{'id':'library','label':'Bibliothèque','description':'Modèles actifs','url':'https://lib.example/fr/'}]}
-    for bad in ({'id':'x','label':'X','url':'http://lib.example/'},{'id':'x','label':'X','url':'javascript:alert(1)'},{'id':'x','url':'https://a.b/'}):
+    values['dsh']['web']['links']=[{'id':'library','label':'Bibliothèque','url':'https://lib.example/fr/','section':'models','section_label':'Modèles'}]
+    assert yaml.safe_load(c._dsh_panels(values))[0]['insert'][0]['config']['links'][0]['section']=='models'
+    for bad in ({'id':'x','label':'X','url':'http://lib.example/'},{'id':'x','label':'X','url':'javascript:alert(1)'},{'id':'x','url':'https://a.b/'},
+                {'id':'x','label':'X','url':'https://a.b/','section':'general'},{'id':'x','label':'X','url':'https://a.b/','section':'Bad'}):
         values['dsh']['web']['links']=[bad]
         with pytest.raises(ValueError,match='dsh.web.links'):c._dsh_panels(values)
 

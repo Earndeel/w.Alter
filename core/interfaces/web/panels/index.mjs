@@ -49,15 +49,25 @@ export function checkPanels(panels) {
   return panels;
 }
 
-/** Validate the instance's settings links (id, label, optional description, https url); returns them unchanged. */
+/**
+ * Validate the instance's settings links (id, label, optional description, https url, optional `section` = a Settings
+ * page id of its own, with optional `section_label` for its nav entry); returns them unchanged.
+ */
 export function checkLinks(links) {
   if (!Array.isArray(links)) throw new Error('walter-web-panels: links must be a list');
-  const ids = new Set();
+  const ids = new Set(), sections = new Set();
   for (const l of links) {
     if (!l || !ID.test(String(l.id)) || ids.has(l.id)) {
       throw new Error(`walter-web-panels: invalid or duplicate link id ${JSON.stringify(l?.id)}`);
     }
     ids.add(l.id);
+    if (l.section !== undefined && (!ID.test(String(l.section)) || l.section === 'general' || sections.has(l.section))) {
+      throw new Error(`walter-web-panels: link ${l.id}: invalid or duplicate section ${JSON.stringify(l.section)}`);
+    }
+    if (l.section !== undefined) sections.add(l.section);
+    if (l.section_label !== undefined && (typeof l.section_label !== 'string' || !l.section_label)) {
+      throw new Error(`walter-web-panels: link ${l.id}: section_label must be text`);
+    }
     if (!l.label || typeof l.label !== 'string') throw new Error(`walter-web-panels: link ${l.id}: label is required`);
     if (l.description !== undefined && typeof l.description !== 'string') {
       throw new Error(`walter-web-panels: link ${l.id}: description must be text`);
@@ -140,7 +150,9 @@ export function apply(ctx, config = {}) {
       table.push({ kind: 'global', name: '__WALTER_PANELS__',
         value: panels.map(({ id, label, path }) => ({ id, label, path })) });
       table.push({ kind: 'global', name: '__WALTER_LINKS__',
-        value: links.map(({ id, label, description, url }) => ({ id, label, description: description ?? '', url })) });
+        value: links.map(({ id, label, description, url, section, section_label }) => ({
+          id, label, description: description ?? '', url,
+          ...(section ? { section, section_label: section_label ?? label } : {}) })) });
     });
   });
 }

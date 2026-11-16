@@ -27,9 +27,24 @@ window.__ModuleLoader__.load({
       };
     }
 
-    // Settings links: one Settings › General row per entry of window.__WALTER_LINKS__ (title, description and an
-    // « Ouvrir » button opening the page in a new tab — a row draws its own internals, the section passes no props).
+    // Settings links (window.__WALTER_LINKS__): a page opened in a new tab. Without `section`, one Settings › General
+    // row (title, description, « Ouvrir » button — a row draws its own internals, the section passes no props); with
+    // `section`, a whole Settings page under that nav id (the shell picks the nav glyph by id, e.g. `models`).
     const LINKS = Array.isArray(window.__WALTER_LINKS__) ? window.__WALTER_LINKS__ : [];
+
+    function linkPage(link) {
+      return function LinkPage() {
+        return h("div", { style: { padding: "8px 0" } },
+          h("div", { style: { fontSize: 16, lineHeight: "24px", fontWeight: 500 } }, link.label),
+          link.description ? h("div", { style: { color: "var(--dsw-alias-label-secondary)", marginTop: 6,
+            fontSize: 13, lineHeight: "20px" } }, link.description) : null,
+          h("a", { href: link.url, target: "_blank", rel: "noopener noreferrer",
+              style: { display: "block", marginTop: 20, padding: "12px 16px", border: "2px solid #01B7FF",
+                borderRadius: 10, color: "#01B7FF", fontSize: 14, lineHeight: "20px", textAlign: "center",
+                textDecoration: "none" } },
+            "Ouvrir ↗"));
+      };
+    }
 
     function linkRow(link) {
       return function LinkRow() {
@@ -46,10 +61,35 @@ window.__ModuleLoader__.load({
       };
     }
 
+    // A section link opens its page straight from the nav: a click on its nav entry (Settings dialog, nav button whose
+    // label is the section label — the shell gives the button no id) opens the page in a new tab inside the same user
+    // gesture and stops there, before the shell's own listener (window, capture phase). If the browser refuses the new
+    // tab, the click goes on and the section page (with its button) shows instead.
+    const DIRECT = new Map(LINKS.filter((l) => l.section).map((l) => [l.section_label || l.label, l.url]));
+    if (DIRECT.size) {
+      window.addEventListener("click", (ev) => {
+        const button = ev.target instanceof Element
+          && ev.target.closest('[data-shortcut-modal="settings"] nav button');
+        const url = button && DIRECT.get(button.textContent.trim());
+        if (!url) return;
+        const tab = window.open(url, "_blank");
+        if (!tab) return;
+        try { tab.opener = null; } catch { /* cross-origin already */ }
+        ev.preventDefault();
+        ev.stopPropagation();
+      }, true);
+    }
+
     const inject = ["slots"];
 
     function apply(ctx) {
       LINKS.forEach((link, i) => {
+        if (link.section) {
+          ctx.slots.inject("settings.section", () => ctx.slots.register({
+            name: "settings.section", id: link.section, order: 10 + i, label: link.section_label || link.label },
+            linkPage(link)));
+          return;
+        }
         ctx.slots.inject("settings.general.item", () => ctx.slots.register({
           name: "settings.general.item", id: "walter-link-" + link.id, order: 90 + i }, linkRow(link)));  // above the version line (100)
       });
