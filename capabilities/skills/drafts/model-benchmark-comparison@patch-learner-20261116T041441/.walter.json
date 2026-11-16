@@ -1,0 +1,11 @@
+{
+ "base_sha": "3a25865ffa2d3e2344b2c8cf2b21a0135c50ad4774730b4a806be98ee0371895",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-16T04:14:41.294673+00:00",
+ "domain": "models",
+ "kind": "patch",
+ "reason": "Adds a concrete benchmark integration procedure for Nace's non-gateway decision API using Walter's real preflight and router fixtures, runtime paths, process-local hooks, and aggregation semantics. The session also exposed a reproducibility pitfall: five live exchanges were absent from the 156-message gold set, requiring benchmark-only alignment. No completed comparative results are visible, so the patch makes no winner claim. [session dsh/vm/session-3eb06fcd-eb5e-44a4-a1c4-c70eb33b8fa5]",
+ "runtime": "learner",
+ "session_id": "dsh/vm/session-3eb06fcd-eb5e-44a4-a1c4-c70eb33b8fa5",
+ "target": "model-benchmark-comparison"
+}
