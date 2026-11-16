@@ -134,6 +134,8 @@ export async function nativeTurn(cfg, { session, turn, step, message, parent = n
         if (out?.error || !out?.plan) throw new Error(out?.error || 'no plan');
         const degraded = Boolean(out.degraded || out.plan.decision?.degraded);
         plan = { thread: out.plan.thread?.id || null, act: out.plan.act || null, level: out.plan.level || null,
+          // what a wake-up turn of this session inherits (no new decision for a runtime notice): the Router task + tier
+          task: out.plan.model_profile?.task || null, model_level: out.plan.model_profile?.level || null,
           effort: out.plan.decision?.effort || null, degraded, channel };
         source = degraded ? 'pack_degraded' : 'pack';   // the preflight says so itself in the pack, on the run and on the bus
         return out.text || '';                   // empty = the plan's own decision (L0: nothing beyond the message)
@@ -159,7 +161,59 @@ export async function nativeTurn(cfg, { session, turn, step, message, parent = n
     privacy_class: run?.privacy_class || null, run_outcome: runOutcome, context_source: source, level: plan?.level || null, effort: plan?.effort || null,
     previous_sent: Boolean(lastTurn), memory_chars: mem.length, skills_chars: sk.length,
     run_ms: run?.ms ?? null, memory_ms: memoryMs, skills_ms: skillsMs, native_ms: Math.round(performance.now() - t0) }); } catch { /* never on the turn's path */ }
-  return { run_id: run?.run_id || null, plan, text: parts.length ? `<walter-context>\n${parts.join('\n\n')}\n</walter-context>` : '' };
+  return { run_id: run?.run_id || null, plan, channel, text: parts.length ? `<walter-context>\n${parts.join('\n\n')}\n</walter-context>` : '' };
+}
+
+/** The last owner (or mission) turn of each session: what its wake-up turns continue. In-process only: after an
+ *  engine restart a wake-up turn opens a run without a parent and with the default plan (said in the measurement). */
+export const lastTurns = new Map();
+
+/** Runtime notices that start a turn without anyone writing (a background job or a sub-agent settled): DSH puts
+ *  them in the session as user-role messages whose source is the runtime's (`tool-jobs`…), never `user`. */
+export function wakeNotice(messages) {
+  const notes = (messages || []).filter((m) => m?.role === 'user' && m?.source?.kind
+    && m.source.kind !== 'user' && m.source.kind !== SOURCE.kind);
+  const text = notes.map((m) => (m.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('')).join('\n').trim();
+  return text ? { text, kinds: [...new Set(notes.map((m) => m.source.kind))] } : null;
+}
+
+/** A wake-up turn (2026-11-16, convergence): the engine woke an idle session on an event of its own work. Every model
+ *  call needs an open run (walter-llm refuses others), so it gets one — filed under the turn it continues, with that
+ *  turn's channel and Router plan (task + tier). No new decision, no new context: a runtime notice is not a new
+ *  request; the owner's next message is (decision on significant events only). Fails open like nativeTurn. */
+export async function wakeTurn(cfg, { session, turn, step, notice, parent = null }) {
+  const t0 = performance.now();
+  const meta = globalThis[Symbol.for('walter.engine.sessionMeta')]?.get?.(session.replace(/^[^/]+\/vm\//, '')) || {};
+  const last = lastTurns.get(session) || null;
+  const channel = process.env.WALTER_RUN_CHANNEL || last?.channel || (parent ? 'machine' : null)
+    || (meta.channel && meta.channel !== 'owner' ? meta.channel : null) || 'owner';
+  const parentRunId = last?.run_id || (parent ? currentRuns.get(parent)?.run_id : null) || meta.parent_run_id || null;
+  const inherited = last?.plan || null;
+  const requested = { ...(inherited?.task ? { task: inherited.task } : {}),
+    ...(inherited?.model_level ? { level: inherited.model_level } : {}),
+    // what the conversation itself asks (Engine API): a named model, a pinned text tier — as on its owner turns
+    ...(meta.model?.id ? { model: meta.model.id, ...(meta.model.provider ? { provider: meta.model.provider } : {}) } : {}),
+    ...(/^L[1-3]$/.test(meta.level || '') ? { pinned_level: meta.level } : {}) };
+  const key = dedupeKey(session, turn, step, notice.text);
+  let run = null;
+  let runOutcome = 'delivered';
+  try {
+    run = await post(`${cfg.gateway}/v1/runs/start`, {
+      origin: { channel, runtime: cfg.runtime, session_id: session, trigger: `wake:${notice.kinds.join(',')}`.slice(0, 200),
+        ...(meta.interface ? { interface: meta.interface } : {}), ...(meta.engine_session ? { engine_session: meta.engine_session } : {}) },
+      goal: notice.text.slice(0, 2000), dedupe_key: key, ...(parentRunId ? { parent_run_id: parentRunId } : {}),
+      routing: { applied: false, configured: true, via: 'walter-llm poste (DSH provider walter)', trigger: 'wake',
+        ...(Object.keys(requested).length ? { requested } : {}) },
+    }, { auth: token(cfg), timeoutMs: 5000 });
+    currentRuns.set(session, { run_id: run.run_id, turn, key });
+    trackRun(cfg, session, { run_id: run.run_id, turn });
+    recordRun(cfg, run.run_id, session);
+  } catch (e) { run = null; runOutcome = outcome(e); }
+  const plan = inherited ? { ...inherited, wake: true, channel } : null;
+  try { observe(cfg, { kind: 'wake', session, turn, step, notice: notice.kinds, notice_sha: sha16(notice.text), run_id: run?.run_id || null,
+    parent_run_id: parentRunId, inherited: Boolean(inherited), run_outcome: runOutcome, privacy_class: run?.privacy_class || null,
+    native_ms: Math.round(performance.now() - t0) }); } catch { /* never on the turn's path */ }
+  return { run_id: run?.run_id || null, plan };
 }
 
 /** The window of this owner turn: walter-context decides what the completed turns become (its DSH port, `window`),
@@ -189,8 +243,17 @@ export function apply(ctx, config) {
   ctx.on('agent/pre-step', async ({ agent, messages, turn, step, signal }, next) => {
     const session = sessionKey(cfg.runtime, agent);
     const message = ownerText(messages);
-    if (!session || !message) return next();
+    if (!session) return next();
     const parentId = parentIdOf(agent);         // an in-process sub-agent: its parent's session (E5)
+    if (!message) {
+      // a wake-up: no one wrote, the runtime woke the session (a job or a sub-agent settled) while no run is open
+      const notice = cfg.mode === 'native' && !currentRuns.has(session) ? wakeNotice(messages) : null;
+      if (!notice) return next();
+      const { plan } = await wakeTurn(cfg, { session, turn, step, notice, parent: parentId ? `${cfg.runtime}/vm/${parentId}` : null })
+        .catch((e) => { ctx.logger.warn(`walter-intake wake: ${String(e)}`); return { plan: null }; });
+      if (plan) turnPlans.set(session, { ...plan, turn }); else turnPlans.delete(session);
+      return next();
+    }
     const requestId = (messages || []).find((m) => m?.source?.kind === 'user' && m.source.rpcId)?.source.rpcId || null;
     const input = { session, turn, step, message, parent: parentId ? `${cfg.runtime}/vm/${parentId}` : null,
       previous: lastExchange(agent.session), requestId };
@@ -200,9 +263,13 @@ export function apply(ctx, config) {
       pending.add(p);
       return next();
     }
-    const { text, plan } = await nativeTurn(cfg, input)
+    const { text, plan, run_id: runId, channel } = await nativeTurn(cfg, input)
       .catch((e) => { ctx.logger.warn(`walter-intake: ${String(e)}`); return { text: '', plan: null }; });
     if (plan) turnPlans.set(session, { ...plan, turn }); else turnPlans.delete(session);
+    if (runId) {
+      lastTurns.delete(session); lastTurns.set(session, { run_id: runId, channel, plan });
+      if (lastTurns.size > 1000) lastTurns.delete(lastTurns.keys().next().value);   // the oldest session
+    }
     // Context holds the window: decided now, with what was understood of the message, before it enters the session.
     await windowTurn(ctx, cfg, agent, plan, signal, { session, turn, step });
     const downstream = await next();

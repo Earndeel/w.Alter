@@ -169,6 +169,38 @@ test('native: an in-process sub-agent turn is a machine run filed under its pare
   assert.equal(start.body.parent_run_id, parentRun);
 });
 
+test('wake-up: a runtime notice with no open run gets a run under the turn it continues, with its plan, no new decision', async () => {
+  const cfg = config('native');
+  const ctx = fakeCtx();
+  intake.apply(ctx, cfg);
+  const pre = (input) => ctx.handlers['agent/pre-step'][0](input, async () => ({ kind: 'enter', messages: [] }));
+  behaviour['/preflight?inject=1'] = (d, reply) => reply(200, { plan: { level: 'L2', model_profile: { task: 'code', level: 'L2' },
+    decision: { effort: 'L2' } }, text: 'PACK' });
+  const a = agent('wake-1');
+  await pre({ agent: a, messages: [msg('user', 'lance le calcul en arrière-plan et préviens-moi')], turn: 1, step: 0 });
+  const first = currentRuns.get('dsh/vm/wake-1').run_id;
+  currentRuns.delete('dsh/vm/wake-1'); turnPlans.delete('dsh/vm/wake-1');      // the turn ended (events plugin)
+  calls.length = 0;
+  const out = await pre({ agent: a, messages: [msg('tool-jobs', 'background job python-1 (python: bash: sleep 25) finished [status: completed].')], turn: 2, step: 1 });
+  assert.deepEqual(paths(), ['/v1/runs/start']);                           // no preflight, no skills, no context block
+  const start = calls[0].body;
+  assert.equal(start.parent_run_id, first);
+  assert.equal(start.origin.trigger, 'wake:tool-jobs');
+  assert.equal(start.origin.channel, 'owner');
+  assert.deepEqual(start.routing.requested, { task: 'code', level: 'L2' });
+  assert.match(start.dedupe_key, /^dsh\/vm\/wake-1:2:1:/);
+  assert.ok(currentRuns.get('dsh/vm/wake-1').run_id);
+  assert.equal(turnPlans.get('dsh/vm/wake-1').wake, true);
+  assert.equal(turnPlans.get('dsh/vm/wake-1').effort, 'L2');                // the budget keeps the continued turn's effort
+  assert.equal(out.messages.length, 0);
+  calls.length = 0;                                                          // mid-turn (a run is open): nothing opened
+  await pre({ agent: a, messages: [msg('tool-jobs', 'another notice')], turn: 2, step: 2 });
+  assert.equal(calls.length, 0);
+  assert.equal(intake.wakeNotice([msg('walter-intake', 'PACK'), { role: 'tool', source: { kind: 'tool' }, content: [] }]), null);
+  const wake = observations(cfg).find((o) => o.kind === 'wake');
+  assert.equal(wake.parent_run_id, first); assert.equal(wake.inherited, true); assert.ok(!('text' in wake));
+});
+
 test('native: no pack (failure or secret) → the legacy memory block, cloud-safe, with its header', async () => {
   const cfg = config('native');
   behaviour['/preflight?inject=1'] = (d, reply) => reply(500, {});

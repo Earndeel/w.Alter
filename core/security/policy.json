@@ -87,7 +87,8 @@
       "bash",
       "run_code",
       "job_kill",
-      "pwsh"
+      "pwsh",
+      "python"
     ],
     "outgoing": [
       "mcp__*__send_message",

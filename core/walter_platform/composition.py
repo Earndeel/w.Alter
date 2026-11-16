@@ -28,7 +28,7 @@ DSH_OWNER_TURN=ROOT/'hooks'/'dsh'/'owner-turn.mjs'
 # SessionStart and PostToolUse. Switch: [dsh.engine] intake in @instance/config/core/engine.toml.
 ENGINE_PLUGINS=ROOT/'engine'/'plugins'
 ENGINE_INTAKE=('hook','shadow','native')
-ENGINE_ROWS=('walter-intake','walter-events','walter-policy','walter-budget')
+ENGINE_ROWS=('walter-intake','walter-events','walter-policy','walter-budget','walter-python')
 ENGINE_POLICY=('off','enforce')                     # lot E3: Walter's one execution policy in the engine
 NATIVE_HOOKS=('UserPromptSubmit','Stop')            # what the native plugins take over from walter_hook.py
 # Lot 1 (2026-11-07, /walter/docs/DECISIONS.md): DSH is only the agent loop and technical tool execution. Every DSH
@@ -108,6 +108,17 @@ def engine_subagents(values):
     return mode
 
 
+ENGINE_PYTHON=('off','on')                          # convergence (2026-11-16): persistent Python kernel tool, in its bubble
+PYTHON_SANDBOX_USER='walter-sandbox'
+
+
+def engine_python(values):
+    # WALTER_ENGINE_PYTHON: a test or Lab home composed otherwise (`--home`), never set for the live service
+    mode=str(os.environ.get('WALTER_ENGINE_PYTHON') or values.get('dsh',{}).get('engine',{}).get('python','off'))
+    if mode not in ENGINE_PYTHON:raise ValueError('unknown [dsh.engine] python (off or on)')
+    return mode
+
+
 ENGINE_API=('off','on')                             # lot E4: the engine's own API door (core/interfaces/api)
 ENGINE_API_PLUGIN=ROOT/'interfaces'/'api'/'index.mjs'
 WEB_PANELS_PLUGIN=ROOT/'interfaces'/'web'/'panels'/'index.mjs'
@@ -178,11 +189,11 @@ def engine_budget(values):
     return out
 
 
-def _engine_rows(mode,policy='off'):
-    """The engine's intake and events plugins for this mode (none for `hook`), and its policy plugin when enforced.
-    Locations come from the instance and from Walter Memory's public client (its gateway credential file), never
-    written here by hand."""
-    if mode=='hook' and policy=='off':return []
+def _engine_rows(mode,policy='off',python='off'):
+    """The engine's intake and events plugins for this mode (none for `hook`), its policy plugin when enforced, and
+    its persistent Python kernel when on. Locations come from the instance and from Walter Memory's public client
+    (its gateway credential file), never written here by hand."""
+    if mode=='hook' and policy=='off' and python=='off':return []
     import subprocess
     from . import instance as inst
     # Walter Memory's public client names its credential file (the shared runtime has it; this CLI may not)
@@ -195,6 +206,9 @@ def _engine_rows(mode,policy='off'):
                      'config':{'interface':'web','stateDir':str(inst.path('state','core','security')),'tokenFile':out.stdout.strip()}})
         rows.append({'id':'walter-budget','name':str(ENGINE_PLUGINS/'budget'/'index.mjs'),
                      'config':{'stateDir':str(inst.path('state','core','security')),**engine_budget(engine_values())}})
+    if python=='on':        # after the policy: every call it makes from Python goes through that same door
+        rows.append({'id':'walter-python','name':str(ENGINE_PLUGINS/'python'/'index.mjs'),
+                     'config':{'stateDir':str(inst.path('state','core','engine','python')),'user':PYTHON_SANDBOX_USER}})
     if mode=='hook':return rows
     cfg={'mode':mode,'runtime':'dsh','stateDir':str(inst.path('state','core','engine','intake')),
          'runsDir':str(inst.path('state','runs','current')),'tokenFile':out.stdout.strip()}
@@ -494,7 +508,7 @@ def _plan(host,home=None,profile_dir=None):
             if item:additions.append(item);data.append(item)
         add(_dsh_addition(data,{'id':'hooks-walter','name':'@deepseek-ai/dsh-hooks-claude-code','config':{'configPath':str(hp)}}))
         # Engine plugins (lot E2): replaced as a whole when the mode or a location changes, removed for `hook`.
-        wanted=_engine_rows(mode,policy);have=[e for r in data for e in r.get('insert',[]) if e.get('id') in ENGINE_ROWS]
+        wanted=_engine_rows(mode,policy,engine_python(values));have=[e for r in data for e in r.get('insert',[]) if e.get('id') in ENGINE_ROWS]
         if have!=wanted:
             for row in [r for r in data if any(e.get('id') in ENGINE_ROWS for e in r.get('insert',[]))]:
                 row['insert']=[e for e in row['insert'] if e.get('id') not in ENGINE_ROWS]
