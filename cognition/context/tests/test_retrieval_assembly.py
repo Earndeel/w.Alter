@@ -262,3 +262,30 @@ def test_the_sources_are_asked_together_and_a_late_one_is_said_not_waited_for(so
     assert p.summary()["late"] == ["memory"] and "session_state ok" in p.text()
     # nothing but late sources: the model is still told
     assert pack(plan("L3"), [], ["memory: not ready in time"]).text().startswith("Contexte incomplet")
+
+
+def test_prefetch_is_taken_only_for_the_same_inputs(sources, monkeypatch):
+    """Sources started before the plan (2026-11-16) serve gather() only when the plan asks for exactly what they were
+    started with: same message, same session, same Memory budget. Otherwise gather() asks again, as before."""
+    monkeypatch.setattr(retrieval, "_notes", lambda ttl=600: [])
+    asked = lambda: [c for c in sources if isinstance(c, tuple) and c[0] == "memory"]   # memory + session state
+    pre = retrieval.Prefetch("tout ce qu'on a décidé", "claude-code/vm/abc")
+    pre.memory.result(), pre.state.result()
+    sources.clear()
+    blocks, _ = retrieval.gather(plan("L3"), "tout ce qu'on a décidé", session_key="claude-code/vm/abc", prefetch=pre)
+    assert not asked() and {"memory", "session_state"} <= {b.id for b in blocks}
+    blocks, _ = retrieval.gather(plan("L2"), "tout ce qu'on a décidé", session_key="claude-code/vm/abc", prefetch=pre)
+    assert not asked() and "memory" not in {b.id for b in blocks}          # this plan gets no memory: dropped
+    blocks, _ = retrieval.gather(plan("L3"), "autre chose", session_key="claude-code/vm/abc", prefetch=pre)
+    assert len(asked()) == 2                                                # another message: both asked again
+
+
+def test_one_notes_call_gives_each_subset(monkeypatch):
+    notes = [{"id": "memory.m0", "module": "memory", "content": "M0 mem"},
+             {"id": "browse.m0", "module": "browse", "content": "M0 web"},
+             {"id": "memory.manifest", "module": "memory", "content": "M1 mem"},
+             {"id": "browse.manifest", "module": "browse", "content": "M1 web"}]
+    monkeypatch.setattr(retrieval, "_notes", lambda ttl=600: notes)
+    b = retrieval.capabilities(plan("L2", caps=("web",)))
+    assert b.sources == ["memory.m0", "browse.m0", "browse.manifest"]
+    assert retrieval._card("memory") == "M1 mem"

@@ -228,6 +228,13 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
         prev = dict(d.get("previous") or {}) or None
         prev_note = None
         key = session_key(d)
+        pre = None                          # the sources that need only the message start now, under the decision
+        if (shadow or want_pack) and (d.get("privacy_class") or "cloud_allowed") != "local_only":
+            try:
+                from ..retrieval import Prefetch
+                pre = Prefetch(str(d.get("message") or ""), key)
+            except Exception:  # noqa: BLE001 — gather() asks them itself
+                pre = None
         if prev is None and key:
             try:
                 prev = _bounded(lambda: last_exchange(key, str(d.get("message") or "")), SETTINGS["previous_timeout_s"])
@@ -275,7 +282,7 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
             from ..assembly import pack
             from ..retrieval import gather
             g0 = time.monotonic()
-            blocks, notes = gather(plan_obj, req.message, session_key=key, deadline=due,
+            blocks, notes = gather(plan_obj, req.message, session_key=key, deadline=due, prefetch=pre,
                                    native_history=d.get("runtime") in ("claude_code", "codex", "dsh"))
             skip = set(d.get("exclude_blocks") or [])      # what the host already shows natively (its profile)
             blocks = [b for b in blocks if b.id not in skip]

@@ -16,6 +16,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -61,24 +62,39 @@ class Block:
         return {**{k: v for k, v in asdict(self).items() if k != "text"}, "tokens": self.tokens}
 
 
-_CAP_CACHE: dict[tuple, tuple[float, str, list]] = {}
+_NOTES: list = []                               # [(fetched at, notes)]
+_NOTES_LOCK = threading.Lock()
+
+
+def _notes(ttl: float = 600) -> list[dict]:
+    """Every module's M0 and the M1 of every module a plan can name, from ONE `walter present` call per ttl
+    (2026-11-16). One call per module set, each with its own 10-minute cache, cost a subprocess at most messages
+    (0.6–1.5 s measured in the service). Filtering the full call gives exactly the notes a call for a subset gives
+    (42 sets compared on 2026-11-16)."""
+    with _NOTES_LOCK:                           # sources asking together wait for one call, not one each
+        if _NOTES and time.time() - _NOTES[0][0] < ttl:
+            return _NOTES[0][1]
+        mods = sorted({m for table in (CAPABILITY_MODULES, DOMAIN_MODULES, TOOL_CARD_MODULES)
+                       for ms in table.values() for m in ms})
+        out = json.loads(subprocess.run(["walter", "present", "notes", "--form", "m0", "--m1", ",".join(mods)],
+                                        capture_output=True, text=True, timeout=20).stdout)
+        notes = out.get("notes") or []
+        _NOTES[:] = [(time.time(), notes)]
+        return notes
+
+
+def _subset(notes: list[dict], m1: set[str]) -> list[dict]:
+    """What `walter present notes --form m0 --m1 <m1>` gives: every M0 note, and the M1 (manifest) of m1 only."""
+    return [n for n in notes if not str(n.get("id", "")).endswith(".manifest") or n.get("module") in m1]
 
 
 def capabilities(plan: ContextPlan, ttl: float = 600) -> Block | None:
     """M0 of every module + M1 of the modules the plan needs (session layer: changes rarely, cached)."""
-    m1 = sorted({m for c in plan.capabilities for m in CAPABILITY_MODULES.get(c, [])} |
-                {m for d in plan.domains for m in DOMAIN_MODULES.get(d, [])})
-    key = tuple(m1)
-    hit = _CAP_CACHE.get(key)
-    if hit and time.time() - hit[0] < ttl:
-        return Block("capabilities", 0, hit[1], sources=hit[2])
-    args = ["walter", "present", "notes", "--form", "m0"] + (["--m1", ",".join(m1)] if m1 else [])
-    out = json.loads(subprocess.run(args, capture_output=True, text=True, timeout=20).stdout)
-    notes = out.get("notes") or []
+    m1 = ({m for c in plan.capabilities for m in CAPABILITY_MODULES.get(c, [])} |
+          {m for d in plan.domains for m in DOMAIN_MODULES.get(d, [])})
+    notes = _subset(_notes(ttl), m1)
     text = "\n\n".join(n["content"].strip() for n in notes if n.get("content"))
-    ids = [n.get("id") for n in notes]
-    _CAP_CACHE[key] = (time.time(), text, ids)
-    return Block("capabilities", 0, text, sources=ids)
+    return Block("capabilities", 0, text, sources=[n.get("id") for n in notes])
 
 
 # capability → modules whose agent brief (M1) is shown *for this message* (tool cards, layer 4): the host lists only a
@@ -87,19 +103,11 @@ def capabilities(plan: ContextPlan, ttl: float = 600) -> Block | None:
 # delegates through its own `subagent` tool; which modules' guide helps a message is question set 3's D question (P4).
 TOOL_CARD_MODULES = {"web": ["browse"], "browser": ["browse", "computer"], "secrets": ["secrets"],
                      "memory": ["memory"], "skills": ["skills"]}
-_CARD_CACHE: dict[str, tuple[float, str]] = {}
 
 
 def _card(module: str, ttl: float = 600) -> str:
-    hit = _CARD_CACHE.get(module)
-    if hit and time.time() - hit[0] < ttl:
-        return hit[1]
-    out = json.loads(subprocess.run(["walter", "present", "notes", "--form", "m0", "--m1", module],
-                                    capture_output=True, text=True, timeout=20).stdout)
-    text = "\n\n".join(n["content"].strip() for n in out.get("notes") or []
-                        if n.get("module") == module and str(n.get("id", "")).endswith(".manifest") and n.get("content"))
-    _CARD_CACHE[module] = (time.time(), text)
-    return text
+    return "\n\n".join(n["content"].strip() for n in _subset(_notes(ttl), {module})
+                       if n.get("module") == module and str(n.get("id", "")).endswith(".manifest") and n.get("content"))
 
 
 def tool_cards(plan: ContextPlan) -> Block | None:
@@ -341,16 +349,25 @@ def _gets_memory(plan: ContextPlan) -> bool:
     return plan.level != "L0" and bool(MEMORY_BUDGET.get(plan.level) or (set(plan.domains) - {"projects"}))
 
 
-def memory(plan: ContextPlan, message: str) -> Block | None:
-    budget = MEMORY_BUDGET.get(plan.level)
+def _memory_budget(plan: ContextPlan) -> dict | None:
+    """The sections Memory's context assembly is asked for, or None when the plan gets no memory block."""
     if not _gets_memory(plan):
         return None
+    return {**(MEMORY_BUDGET.get(plan.level) or MEMORY_BUDGET["L3"]), **NOT_HERE}
+
+
+def _memory_block(message: str, budget: dict) -> Block | None:
     from walter_memory import context
-    r = context.get_context(message, budget={**(budget or MEMORY_BUDGET["L3"]), **NOT_HERE}, include_profile=False)
+    r = context.get_context(message, budget=budget, include_profile=False)
     if not r.get("text"):
         return None
     refs = [ref for s in (r.get("trace") or {}).get("sections", {}).values() for ref in (s.get("refs") or [])]
     return Block("memory", 4, r["text"], sources=refs[:20])
+
+
+def memory(plan: ContextPlan, message: str) -> Block | None:
+    budget = _memory_budget(plan)
+    return _memory_block(message, budget) if budget is not None else None
 
 
 def records(plan: ContextPlan, message: str) -> Block | None:
@@ -422,8 +439,43 @@ def _workers():
     return _WORKERS[0]
 
 
+def _timed(step):
+    t0 = time.perf_counter()
+    b = step()
+    if b is not None:
+        b.ms = round((time.perf_counter() - t0) * 1000, 1)
+    return b
+
+
+class Prefetch:
+    """The sources that need the message but not the plan, started as the message arrives (2026-11-16). Before this,
+    they waited for the plan's decision (median 0.8 s) and then took up to 1.3 s more: Memory's rerank call, the
+    thread's working state, the module notes. Started early, they run during the decision.
+    Memory is started at the budget most plans ask for: L3, and L1/L2 with a personal domain (about 60 % of the
+    14–16/11 records). gather() takes a result only when the plan asks for exactly these inputs, so the same
+    functions get the same arguments: the pack is the same, only ready sooner. A result the plan does not ask for is
+    dropped, never shown. Its cost is one memoized rerank call and about 0.3 s of CPU."""
+
+    def __init__(self, message: str, session_key: str | None):
+        w = _workers()
+        self.message, self.session_key = message, session_key
+        self.memory_budget = {**MEMORY_BUDGET["L3"], **NOT_HERE}
+        w.submit(_notes)                         # warms the shared notes; their blocks read the cache
+        self.state = w.submit(_timed, lambda: session_state(None, message, session_key))
+        self.memory = w.submit(_timed, lambda: _memory_block(message, self.memory_budget))
+
+    def taken(self, plan: ContextPlan, message: str, session_key: str | None) -> dict:
+        """name → future, for the sources this plan asks for with exactly the prefetched inputs."""
+        if message != self.message or session_key != self.session_key:
+            return {}
+        out = {"session_state": self.state} if plan.level != "L0" else {}
+        if plan.level != "L0" and _memory_budget(plan) == self.memory_budget:
+            out["memory"] = self.memory
+        return out
+
+
 def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, native_history: bool = True,
-           deadline: float | None = None) -> tuple[list[Block], list[str]]:
+           deadline: float | None = None, prefetch: Prefetch | None = None) -> tuple[list[Block], list[str]]:
     """The blocks the plan asks for. L0: capabilities (+ records when unsure or a lookup is needed), and — at every
     level, two short Memory calls — the objectives of the plan's thread and a recent failed attempt at the same thing
     (SOCLE A3/A4: a light request is exactly the one that would otherwise be retried blind). Returns (blocks, notes
@@ -431,7 +483,9 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
     The sources are asked together: the pack costs its slowest source, not their sum (13/11: plan 2 s + session state
     1 s + memory 3 s one after the other passed the engine's 7 s and the whole plan was lost). `deadline`
     (time.monotonic) is when the caller must answer: a source not ready by then gives no block and the note
-    « <source>: not ready in time », which the pack says to the model — late context is said, never silent."""
+    « <source>: not ready in time », which the pack says to the model — late context is said, never silent.
+    `prefetch`: sources already started with this message (Prefetch); a block's `ms` is then its own time since that
+    start, and `retrieval_ms` alone says what the pack added after the plan."""
     steps = [("capabilities", lambda: capabilities(plan)), ("tool_cards", lambda: tool_cards(plan)), ("now", now)]
     if plan.level != "L0":
         steps += [("board", lambda: board(plan)), ("session_state", lambda: session_state(plan, message, session_key)),
@@ -442,14 +496,12 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
     if not _gets_memory(plan):
         steps.append(("records", lambda: records(plan, message)))
 
-    def timed(step):
-        t0 = time.perf_counter()
-        b = step()
-        if b is not None:
-            b.ms = round((time.perf_counter() - t0) * 1000, 1)
-        return b
-
-    futures = [(name, _workers().submit(timed, step)) for name, step in steps]
+    early = prefetch.taken(plan, message, session_key) if prefetch is not None else {}
+    if prefetch is not None:                    # an early source this plan does not ask for: not started, never will
+        for f in (prefetch.state, prefetch.memory):
+            if f not in early.values():
+                f.cancel()
+    futures = [(name, early.get(name) or _workers().submit(_timed, step)) for name, step in steps]
     blocks, notes = [], []
     for name, f in futures:
         if deadline is not None:
