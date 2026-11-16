@@ -10,6 +10,8 @@ the instance's control_env file (0600).
   GET  /consumption  what each subscription gives back this week (`walter-router plans consumption`, cached 60 s)
   POST /plans   edit the owner's plans from the page: {"action": "set"|"retire", "sub_id", "fields"} (HMAC also covers
                 the body: ts + method + path + sha256(body)); applied by `walter-router plans`, page republished
+  POST /lock    padlock of an active model: {"task", "role", "locked": bool} (same body HMAC); applied by
+                `walter-router lock` (opening it may switch the model at once and tell the owner), page republished
 """
 import hashlib
 import hmac
@@ -117,9 +119,32 @@ class H(BaseHTTPRequestHandler):
         subprocess.Popen(["walter-router", "publish-library"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return self._ok(200, {"message": "Enregistré", "result": json.loads(out.stdout)})
 
+    def _lock(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        if n <= 0 or n > 1000:
+            return self._ok(400, {"error": "bad body"})
+        raw = self.rfile.read(n)
+        if not self._auth(hashlib.sha256(raw).hexdigest()):
+            return self._ok(404, {"error": "not found"})
+        try:
+            req = json.loads(raw)
+            task, role = str(req["task"]), str(req.get("role") or "default")
+            if not re.fullmatch(r"[a-z0-9_]{1,40}", task) or not re.fullmatch(r"[A-Za-z0-9_-]{1,40}", role) \
+                    or not isinstance(req.get("locked"), bool):
+                raise ValueError("bad request")
+        except (ValueError, KeyError, TypeError):
+            return self._ok(400, {"error": "requête invalide"})
+        cmd = ["walter-router", "lock", task, "on" if req["locked"] else "off", "--role", role]
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        if out.returncode != 0:
+            return self._ok(400, {"error": (out.stdout + out.stderr).strip()[-300:]})
+        return self._ok(200, json.loads(out.stdout))
+
     def do_POST(self):  # noqa: N802
         if self.path == "/plans":
             return self._plans()
+        if self.path == "/lock":
+            return self._lock()
         if self.path != "/run" or not self._auth():
             return self._ok(404, {"error": "not found"})
         st = status()

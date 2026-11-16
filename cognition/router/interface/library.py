@@ -183,13 +183,15 @@ def rows(conn) -> list[dict]:
     runnable = set(media_exec._models())
     hosts = best_hosts(conn)
     out = []
-    for e in conn.execute(f"""select t.task, t.label, t.interface, t.modes, p.role, p.pinned_model_id, p.label as role_label
+    for e in conn.execute(f"""select t.task, t.label, t.interface, t.modes, p.role, p.pinned_model_id, p.label as role_label,
+                                     coalesce(p.locked, true) as locked
                               from models.tasks t left join models.preferences p using (task)
                               where t.interface <> 'tool' order by t.interface, t.task, {ROLE_ORDER}, p.priority"""):
         task, role, iface = e["task"], e["role"], e["interface"]
         bfr, ben = boards_of(conn, task)
         row = {"type": iface, "task": task, "label": e["label"], "boards": bfr, "boards_en": ben,
                "category": e["role_label"] or ("" if role in (None, "default") else role),
+               "role": role or "default", "locked": e["locked"],   # padlock (owner 2026-11-16)
                "warning": None}
         try:
             d = choose.pick(conn, task, level=role if task == "general" else None,

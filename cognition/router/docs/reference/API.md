@@ -171,6 +171,11 @@ walter-router instance-env
 walter-router library
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   --json :  ; défaut=false
+walter-router lock
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
+  task :  ; défaut=—
+  state :  ; défaut=— ; valeurs=["on", "off"]
+  --role : role of the task (L1/L2/L3 for general; default otherwise) ; défaut=—
 walter-router log-exec
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   entry :  ; défaut=—

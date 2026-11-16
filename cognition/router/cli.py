@@ -81,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--note")
     f.add_argument("--role", default="default")
     f.add_argument("--watch", choices=("quality", "dominance", "none"))
+    lk = sub.add_parser("lock", help="padlock of an active model: on = changes only on the owner's Telegram answer "
+                                     "(default); off = follows by itself the model overtaking it, owner informed")
+    lk.add_argument("task")
+    lk.add_argument("state", choices=("on", "off"))
+    lk.add_argument("--role", help="role of the task (L1/L2/L3 for general; default otherwise)")
     a = sub.add_parser("alerts")
     a.add_argument("--all", action="store_true")
     v = sub.add_parser("verdict")
@@ -422,6 +427,16 @@ def main(argv: list[str] | None = None) -> int:
                 out = dossier.latest(conn, args.task)
             elif args.cmd == "declare":
                 out = knowledge.declare(conn)
+            elif args.cmd == "lock":
+                out = alerts.set_lock(conn, args.task, args.role, args.state == "on")
+                if out["changed"]:
+                    from walter_router.analysis import telegram
+                    out["notify"] = telegram.notify_auto(conn, out["changed"])
+                conn.commit()
+                import subprocess   # local, as in the verdict branch below (a local import there shadows the module's)
+                wr = paths.ROOT / "bin" / "walter-router"   # the library page follows (background, after this commit)
+                subprocess.Popen(["sh", "-c", f'sleep 3; "{wr}" sync-hermes --apply; "{wr}" publish-library'],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             elif args.cmd == "alerts":
                 rows = conn.execute("select * from models.alerts order by alert_id").fetchall() if args.all else alerts.pending(conn)
                 out = rows

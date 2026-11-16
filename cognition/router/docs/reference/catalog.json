@@ -1833,6 +1833,56 @@
             "required": false
           }
         ],
+        "lock": [
+          {
+            "choices": null,
+            "default": "==SUPPRESS==",
+            "dest": "help",
+            "flags": [
+              "-h",
+              "--help"
+            ],
+            "help": "show this help message and exit",
+            "nargs": 0,
+            "required": false
+          },
+          {
+            "choices": null,
+            "default": null,
+            "dest": "task",
+            "flags": [
+              "task"
+            ],
+            "help": "",
+            "nargs": null,
+            "required": true
+          },
+          {
+            "choices": [
+              "on",
+              "off"
+            ],
+            "default": null,
+            "dest": "state",
+            "flags": [
+              "state"
+            ],
+            "help": "",
+            "nargs": null,
+            "required": true
+          },
+          {
+            "choices": null,
+            "default": null,
+            "dest": "role",
+            "flags": [
+              "--role"
+            ],
+            "help": "role of the task (L1/L2/L3 for general; default otherwise)",
+            "nargs": null,
+            "required": false
+          }
+        ],
         "log-exec": [
           {
             "choices": null,
@@ -4898,6 +4948,13 @@
             "name": "priority",
             "nullable": false,
             "type": "integer"
+          },
+          {
+            "default": "true",
+            "description": "true (default): the pinned model changes only on the owner's Telegram answer; false: alerts.auto_adopt switches it to the model overtaking it (challenger / tier / new #1) and the owner is informed (padlock of the library page)",
+            "name": "locked",
+            "nullable": false,
+            "type": "boolean"
           }
         ],
         "constraints": [
@@ -5929,6 +5986,16 @@
             "signature": "conn"
           },
           {
+            "description": "Unlocked favourites follow the best (owner, 2026-11-16: padlock of the library page). For each preference with",
+            "name": "auto_adopt",
+            "signature": "conn, only_task: str | None=None, only_role: str | None=None"
+          },
+          {
+            "description": "Close or open the padlock of one active model. Opening a task the owner never declared first records the model",
+            "name": "set_lock",
+            "signature": "conn, task: str, role: str | None, locked: bool"
+          },
+          {
             "description": "Record the owner's answer. 'adopted' on a challenger also pins the challenger as the new favourite.",
             "name": "verdict",
             "signature": "conn, alert_id: int, decision: str, note: str | None=None, role: str | None=None, _resolved: bool=False"
@@ -6751,6 +6818,21 @@
             "signature": "text: str, rows: list[list[dict]]"
           },
           {
+            "description": "",
+            "name": "_pin_name",
+            "signature": "conn, pin: str"
+          },
+          {
+            "description": "Information only, no button (owner 2026-11-16): models whose padlock is open switched by themselves.",
+            "name": "render_auto",
+            "signature": "changes: list[dict], conn=None"
+          },
+          {
+            "description": "",
+            "name": "notify_auto",
+            "signature": "conn, changes: list[dict], dry_run: bool=False"
+          },
+          {
             "description": "Short numbers the owner can answer with (1, 2, 3…), unique among alerts still awaiting their answer.",
             "name": "_assign_refs",
             "signature": "conn, alerts: list[dict]"
@@ -7435,13 +7517,23 @@
         ]
       },
       {
-        "description": "Library web page (v3, 2026-10-14: « le design fait trop IA, pas pro »).",
+        "description": "Library web page (v3, 2026-10-14: « le design fait trop IA, pas pro » ; v4 2026-11-16 « plus lisible » : level cards, task rows in three zones, first provider in clear and the rest folded, long lists folded).",
         "file": "interface/page.py",
         "functions": [
           {
-            "description": "",
-            "name": "_route",
+            "description": "Padlock of one active model (owner 2026-11-16), sent to /api/lock (Access + HMAC), applied by walter-router lock.",
+            "name": "_lock",
+            "signature": "task: str, role: str | None, locked: bool"
+          },
+          {
+            "description": "'Claude Pro ≈ 0,068/0,34 $/M (prix de revient, …) → Kie 1,6/8 $/M' -> [(name, price, detail), …]",
+            "name": "_steps",
             "signature": "text: str | None"
+          },
+          {
+            "description": "First provider in clear, the rest folded under « Ensuite : … », fallback on its own line.",
+            "name": "_route_block",
+            "signature": "providers: str | None, fallback: str | None=None"
           },
           {
             "description": "",
@@ -7454,8 +7546,8 @@
             "signature": "conn, rs: list[dict]"
           },
           {
-            "description": "",
-            "name": "_table",
+            "description": "One task per row in three zones — task, model, providers — instead of a 7-column table (readable page v4,",
+            "name": "_tasks",
             "signature": "rs: list[dict]"
           },
           {
@@ -7484,9 +7576,9 @@
             "signature": "conn"
           },
           {
-            "description": "Cost price of a token per plan (2026-10-22): what the router uses to price a subscription route.",
+            "description": "Cost price of a token per plan (2026-10-22): what the router uses to price a subscription route. Plans shown by",
             "name": "_plan_costs",
-            "signature": "conn"
+            "signature": "conn, names: dict[str, str] | None=None"
           },
           {
             "description": "Everything known about each plan, with its source (web research, billing mails, measures, the owner).",
@@ -14435,6 +14527,12 @@
         ]
       },
       {
+        "comment": "an alert re-seen by the last cycle (48 h) still describes the boards as they are",
+        "file": "analysis/alerts.py",
+        "name": "FRESH",
+        "value": "50 hours"
+      },
+      {
         "comment": "below: a rename (Hailuo 3 = MiniMax H3) — accepted only with a source URL in the reason",
         "file": "analysis/aliases_admin.py",
         "name": "MIN_SIMILARITY",
@@ -15761,6 +15859,21 @@
       {
         "comment": "",
         "file": "interface/page.py",
+        "name": "LOCK_SVG",
+        "value": "<svg viewBox=\"0 0 16 16\" width=\"13\" height=\"13\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"7.2\" width=\"10\" height=\"7\" rx=\"1.3\"/><path class=\"shut\" d=\"M5.2 7.2V5.2a2.8 2.8 0 0 1 5.6 0v2\"/><path class=\"open\" d=\"M5.2 7.2V5.2a2.8 2.8 0 0 1 5.5-.7\"/></svg>"
+      },
+      {
+        "comment": "",
+        "file": "interface/page.py",
+        "name": "LOCK_TITLE",
+        "value": {
+          "False": "Déverrouillé : le router passe seul au modèle qui le dépasse et te prévient sur Telegram. Cliquer pour verrouiller.",
+          "True": "Verrouillé : s’il est dépassé dans sa catégorie, le changement attend ta validation sur Telegram. Cliquer pour déverrouiller."
+        }
+      },
+      {
+        "comment": "",
+        "file": "interface/page.py",
         "name": "ORIGIN_ICON",
         "value": {
           "email": "📧 mail",
@@ -15815,6 +15928,7 @@
           "$/recherche": "$/search",
           "$/requête": "$/request",
           "(abonnement)": "(subscription)",
+          "(compte ": "(account ",
           "(gratuit)": "(free)",
           "(même modèle)": "(same model)",
           "(pas de fournisseur branché)": "(no provider wired)",
@@ -15864,6 +15978,7 @@
           "Coût réel": "Real cost",
           "Cybersécurité": "Cybersecurity",
           "Décision": "Decision",
+          "Ensuite : ": "Then: ",
           "Extraction mémoire structurée": "Structured memory extraction",
           "Finance / comptabilité / économie": "Finance / accounting / economics",
           "Flow à la main": "Flow, by hand",
@@ -15905,7 +16020,7 @@
           "N°1 Design Arena, si différent": "Design Arena #1, if different",
           "Optimum de Pareto calculé par ta méthode sur la frontière AA": "Pareto optimum computed with your method on the AA frontier",
           "Origine": "Origin",
-          "Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements\npondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Une ligne surlignée signale un choix de ta part différent du n°1 mesuré, avec la raison.": "Origin: “Your pick” = model you set; “Computed” = best runnable model on the weighted leaderboards; “Pareto method” = levels L1, L2, L3. A highlighted row marks a pick of yours that differs from the measured #1, with the reason.",
+          "Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements\npondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Un trait orange en marge signale un choix de ta part différent du n°1 mesuré, avec la raison.": "Origin: “Your pick” = model you set; “Computed” = best runnable model on the weighted leaderboards; “Pareto method” = levels L1, L2, L3. An orange bar in the margin marks a pick of yours that differs from the measured #1, with the reason.",
           "Page générée le ": "Page generated on ",
           "Part du quota hebdomadaire utilisée (compteur réel), valeur API que cela représente et ce qu’il reste à prendre avant la remise à zéro": "Share of the weekly quota used (real meter), the API value it represents and what is left to take before the reset",
           "Pas de données AA.": "No AA data.",
@@ -15958,6 +16073,8 @@
           "Vue d'ensemble": "Overview",
           "aucun modèle exécutable": "no runnable model",
           "avant la remise à zéro": "before the reset",
+          "classement inaccessible": "leaderboard unreachable",
+          "classements inaccessibles": "leaderboards unreachable",
           "combinaisons modèle × niveau de réflexion exécutables": "runnable model × reasoning-level combinations",
           "compteur non lisible : consommation non mesurée": "meter not readable: usage not measured",
           "coût officiel par tâche AA (prix de référence)": "official cost per AA task (reference price)",
@@ -16026,11 +16143,15 @@
         "value": {
           "' $ par tâche'": "' $ per task'",
           "' (échec)'": "' (failed)'",
+          "'Déverrouiller ce modèle ? Le router passera seul au modèle qui le dépasse dans sa catégorie, sans attendre ta validation ; tu seras prévenu sur Telegram.'": "'Unlock this model? The router will switch by itself to the model overtaking it in its category, without waiting for your approval; you will be told on Telegram.'",
+          "'Déverrouillé : le router suivra seul le meilleur modèle de cette catégorie.'": "'Unlocked: the router will follow the best model of this category by itself.'",
+          "'Déverrouillé : le router vient de passer au modèle qui le dépassait. La page se met à jour…'": "'Unlocked: the router has just switched to the model overtaking it. The page is updating…'",
           "'Enregistré, la page se met à jour…'": "'Saved, the page is updating…'",
           "'Envoi…'": "'Sending…'",
           "'Indice '": "'Index '",
           "'Refusé'": "'Refused'",
           "'Résilier ce plan ? Il sortira de tes abonnements (gardé dans l’historique).'": "'Cancel this plan? It leaves your plans (kept in the history).'",
+          "'Verrouillé : un changement attendra ta validation sur Telegram.'": "'Locked: a change will wait for your approval on Telegram.'",
           "'démarrage'": "'starting'",
           "'fr-FR'": "'en-GB'",
           "'Échec de l’envoi'": "'Sending failed'",
@@ -18029,7 +18150,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "17f3cb1c3a8a6a188de6d389209eb2ae1b8af705105327d371d68174cf53d735",
+    "analysis/alerts.py": "377df51820662ab64ee76f9cf97a99a64806b910ef6f78f743b0f0378e6f6067",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -18044,16 +18165,16 @@
     "analysis/parse.py": "cf82c94b379e607f9793738b1e770374b3e96c6da328062ecb16292d43b59317",
     "analysis/postes.py": "8bb913efa9bc2ba553acc0dc81b8ec69e014bda4aa8dfba887e19d50c39556d0",
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
-    "analysis/refresh.py": "17a00934a816292587e26c292795177ce6e3199ce05b3612fd5a580a5487822a",
+    "analysis/refresh.py": "dcc93f5a5ac7a7f89177ec1a8900c669b499585c5dc31df1aba7c2608d0e3a1f",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
     "analysis/select.py": "d144ffd109701a68864467208a4ece10a02a4d34cc6421d232b8792fd1e85bd2",
-    "analysis/telegram.py": "08128546ad28d87ed6ec6c1686b841356e5bf1fdba837a2db5a386d59b9bc11a",
+    "analysis/telegram.py": "7d6224219b10f0568d76bf652375c7f58e1278a191c9d5933960f5d4d7c69fb5",
     "analysis/tiers.py": "a21de3334f3580930208ccc43aea948bf33997c154209f1779db92cfe0d52f2a",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
-    "bin/walter-router-control": "82982ddcc580c814abb6ba7a4e55523d412d371bf1f341531d4a01b08e77f4ee",
+    "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
     "bin/walter-router-cycle": "f67a9221b33e8da97dcdf5e4180d19b29383421fa82bd26be33b4e53181dfdb5",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "08e167a680b4fe8e99eeb3ba72694c2b1e6683b190e23831fce166c5afc258b7",
+    "cli.py": "e7ec86dec18f2d3a6b944011bb239c9947466882a42811dad887fc43037e362b",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
@@ -18076,14 +18197,15 @@
     "hermes-plugins/walter-router/__init__.py": "b27d39ca479bb27d6639a6bff8779f33cd419e1f9480ca34e85cecd90478c8db",
     "instance.py": "59951f30cc91100f7bb12b60da02b9bf34c04341a9c4b6dfa1a9c7cae5c792a9",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
-    "interface/library.py": "649216011e2545152c4a2c7387a335fcd5a7c59bf49748283c98de725055a570",
-    "interface/page.py": "c50f1f78f6c556c8f51c2d5b025e5a9130e7a7708b02de8643be4c6f0a9d8956",
+    "interface/library.py": "af65c945e4b1738f7d6b1bc40e8bb898e877fd0004cee921cd2714eaf719d7cd",
+    "interface/page.py": "e8d655bd694a122b7c23ed2ae9d1cdabb9f74070335a7ee72cf258ce4a7b7bd8",
     "interface/site/functions/_middleware.js": "7698f9a6d90639f63790b347aaa8d4b7473f128e5ac2f130158481768217a12f",
     "interface/site/functions/api/consumption.js": "84af305ac0a0d70a56bf142c08d5332d793d3acdfe280776f3f2f58919ddb9ad",
+    "interface/site/functions/api/lock.js": "7a5f1ca04741451016686e4f10a7416692d842e3bc0823cc27321f64111529a3",
     "interface/site/functions/api/plans.js": "636563511ae2c5c794990c5d0571eb731de30d05eae457e32fe62b8378abd69f",
     "interface/site/functions/api/run.js": "f0c5e0aaae262eae630e2b685f2f3c28e4c1430bca9451e3015f5c4d9f7506f3",
     "interface/site/functions/api/status.js": "37fbd922a3eae2e33236fe4cda7d4546dafd6b69f7d76b50aea92d2deafd92cb",
-    "interface/translate.py": "6d4f3270ee5ad57a8a32ece2e7e986014f5549c7790c36472f4b62aab8ada269",
+    "interface/translate.py": "1d95781d0817a7590212867af01c36f0d9719d839c3dfdd67c468fe3df885daf",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
@@ -18195,7 +18317,8 @@
     "store/migrations/038_neutral_embeddings_requirement.sql": "399cbec430a8090dbd319089de215d173cb4655762ff71c699945171dec20649",
     "store/migrations/039_exec_log_account.sql": "f1711eeb24fa9d054e25ae9993a83465a5bf220315dab33261e44481a5833a75",
     "store/migrations/040_devboard_reading.sql": "60d718a4071dd9eb75e356acb444868f54095ca58553b853966487fef9d601c5",
-    "store/migrations/041_plan_evidence_modeldial.sql": "8e5ad3892b3dcae5c15cd54ff103ff3d487174640e0d37d045a612d6829b6de8"
+    "store/migrations/041_plan_evidence_modeldial.sql": "8e5ad3892b3dcae5c15cd54ff103ff3d487174640e0d37d045a612d6829b6de8",
+    "store/migrations/042_preferences_locked.sql": "fd9839a6d6353037ab2385c5c1325eaf4ad3b2ebd30fbe9653a78c7d0f8b5995"
   },
   "tasks": [
     {

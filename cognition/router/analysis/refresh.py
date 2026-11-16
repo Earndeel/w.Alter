@@ -55,12 +55,16 @@ def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = Fal
                                     "nerfs": alerts.nerfs(conn, run_id, chg),
                                     "pareto": alerts.pareto(conn, run_id, chg),
                                     "stale": alerts.stale_sources(conn), "boards_down": alerts.boards_down(conn)}
+                # open padlocks (owner 2026-11-16): those models follow the best by themselves; locked ones wait for
+                # the Telegram answer (never in a dry run, which must not switch anything)
+                report["auto_adopted"] = [] if dry_run else alerts.auto_adopt(conn)
                 report["pruned_snapshots"] = sources.prune(conn)
                 conn.execute("update models.runs set status = 'ok', finished_at = now(), summary = %s::jsonb where run_id = %s",
                              (json.dumps(report, default=str), run_id))
             if notify:
                 with conn.transaction():
                     report["notify"] = telegram.notify(conn, dry_run=dry_run)
+                    report["notify_auto"] = telegram.notify_auto(conn, report["auto_adopted"], dry_run=dry_run)
         except Exception as exc:
             conn.rollback()
             conn.execute("update models.runs set status = 'failed', finished_at = now(), summary = %s::jsonb where run_id = %s",

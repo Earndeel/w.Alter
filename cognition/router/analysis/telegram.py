@@ -362,6 +362,34 @@ def send_with_buttons(text: str, rows: list[list[dict]]) -> None:
         raise RuntimeError(f"telegram: {out.get('error')}")
 
 
+def _pin_name(conn, pin: str) -> str:
+    mid, _, var = (pin or "").partition("/")
+    return f"{_name(conn, mid)} ({var})" if var else _name(conn, mid)
+
+
+def render_auto(changes: list[dict], conn=None) -> str:
+    """Information only, no button (owner 2026-11-16): models whose padlock is open switched by themselves."""
+    blocks = []
+    for c in changes:
+        where = c["label"] + (f' · {c["role"]}' if c.get("role") not in (None, "default") else "")
+        blocks.append(f"{where}\n{_pin_name(conn, c['from'])} → {_pin_name(conn, c['to'])}")
+    return ("🔓 Changé automatiquement (cadenas ouvert)\n\n" + "\n\n".join(blocks)
+            + "\n\nFermer le cadenas dans la bibliothèque des modèles remet la validation par ici.")
+
+
+def notify_auto(conn, changes: list[dict], dry_run: bool = False) -> dict:
+    if not changes:
+        return {"sent": 0}
+    text = render_auto(changes, conn)
+    if dry_run:
+        return {"sent": 0, "dry_run": text}
+    try:
+        send_with_buttons(text, [])
+    except Exception as exc:  # noqa: BLE001 — the switch is done and recorded; only the information is missing
+        return {"sent": 0, "error": str(exc)[:200]}
+    return {"sent": len(changes)}
+
+
 def _assign_refs(conn, alerts: list[dict]) -> list[dict]:
     """Short numbers the owner can answer with (1, 2, 3…), unique among alerts still awaiting their answer."""
     used = {r["ref"] for r in conn.execute("""select ref from models.alerts where ref is not null

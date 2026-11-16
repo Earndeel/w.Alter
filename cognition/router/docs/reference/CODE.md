@@ -31,6 +31,8 @@ Alerts: a pinned favourite overtaken, unranked new releases, stale sources — a
 - `billing(conn)` — Providers whose last probe found no credit left: one alert each, auto-cleared once topped up.
 - `_watched_interfaces(conn)` — Interfaces the owner has a declared preference on: new unranked releases there are worth a message.
 - `pending(conn)` — What goes to Telegram. Unranked releases are recorded but never sent (too many, unproven): a new model is
+- `auto_adopt(conn, only_task: str | None=None, only_role: str | None=None)` — Unlocked favourites follow the best (owner, 2026-11-16: padlock of the library page). For each preference with
+- `set_lock(conn, task: str, role: str | None, locked: bool)` — Close or open the padlock of one active model. Opening a task the owner never declared first records the model
 - `verdict(conn, alert_id: int, decision: str, note: str | None=None, role: str | None=None, _resolved: bool=False)` — Record the owner's answer. 'adopted' on a challenger also pins the challenger as the new favourite.
 
 ## analysis/aliases_admin.py
@@ -260,6 +262,9 @@ Telegram side of the alerts: one message per piece of news with its buttons (202
 - `_name(conn, model_id: str | None)` — 
 - `_button_text(conn, a: dict, label: str, code: str)` — '✅ Passer à Grok Imagine Video 1.5' / '✖️ Garder MiniMax H3' (names, not numbers: several news per message).
 - `send_with_buttons(text: str, rows: list[list[dict]])` — Through Walter's own Telegram door (lot E6, 2026-11-10: `walter-telegram send`, no longer Hermes' bot): it
+- `_pin_name(conn, pin: str)` — 
+- `render_auto(changes: list[dict], conn=None)` — Information only, no button (owner 2026-11-16): models whose padlock is open switched by themselves.
+- `notify_auto(conn, changes: list[dict], dry_run: bool=False)` — 
 - `_assign_refs(conn, alerts: list[dict])` — Short numbers the owner can answer with (1, 2, 3…), unique among alerts still awaiting their answer.
 - `notify(conn, dry_run: bool=False)` — 
 
@@ -453,18 +458,20 @@ The model library as the owner reads it (2026-10-14): per task and category, the
 
 ## interface/page.py
 
-Library web page (v3, 2026-10-14: « le design fait trop IA, pas pro »).
+Library web page (v3, 2026-10-14: « le design fait trop IA, pas pro » ; v4 2026-11-16 « plus lisible » : level cards, task rows in three zones, first provider in clear and the rest folded, long lists folded).
 
-- `_route(text: str | None)` — 
+- `_lock(task: str, role: str | None, locked: bool)` — Padlock of one active model (owner 2026-11-16), sent to /api/lock (Access + HMAC), applied by walter-router lock.
+- `_steps(text: str | None)` — 'Claude Pro ≈ 0,068/0,34 $/M (prix de revient, …) → Kie 1,6/8 $/M' -> [(name, price, detail), …]
+- `_route_block(providers: str | None, fallback: str | None=None)` — First provider in clear, the rest folded under « Ensuite : … », fallback on its own line.
 - `_chart(points: list[dict], frontier: list[dict], levels: dict[str, dict], key: str='cost')` — 
 - `_da(conn, rs: list[dict])` — 
-- `_table(rs: list[dict])` — 
+- `_tasks(rs: list[dict])` — One task per row in three zones — task, model, providers — instead of a 7-column table (readable page v4,
 - `_tok(n: float | None)` — 
 - `_usd(x: float | None)` — 
 - `_subscriptions(conn)` — Subscriptions pane (information only): our measurement on the owner's account + SemiAnalysis' plan values.
 - `_pct(x: float | None)` — 
 - `_consumption(conn)` — This week on each plan (owner, 2026-11-16: get every token the subscriptions offer): used, API value recovered,
-- `_plan_costs(conn)` — Cost price of a token per plan (2026-10-22): what the router uses to price a subscription route.
+- `_plan_costs(conn, names: dict[str, str] | None=None)` — Cost price of a token per plan (2026-10-22): what the router uses to price a subscription route. Plans shown by
 - `_plan_facts(conn)` — Everything known about each plan, with its source (web research, billing mails, measures, the owner).
 - `_plan_forms(subs: list[dict])` — Edit a plan, cancel it, or add one (2026-10-22). Sent to /api/plans (Access + HMAC), applied by
 - `render(conn, rs: list[dict], ctx: dict)` — 

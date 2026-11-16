@@ -143,9 +143,12 @@ PHRASES = {
     "Classements recalculés le ": "Leaderboards recomputed on ",
     " ; cycle complet automatique toutes les 48 heures, page republiée après chacune de tes réponses.":
         "; full cycle every 48 hours, page republished after each of your answers.",
-    "Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements\npondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Une ligne surlignée signale un choix de ta part différent du n°1 mesuré, avec la raison.":
+    "Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements\npondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Un trait orange en marge signale un choix de ta part différent du n°1 mesuré, avec la raison.":
         "Origin: “Your pick” = model you set; “Computed” = best runnable model on the weighted leaderboards; “Pareto "
-        "method” = levels L1, L2, L3. A highlighted row marks a pick of yours that differs from the measured #1, with the reason.",
+        "method” = levels L1, L2, L3. An orange bar in the margin marks a pick of yours that differs from the measured #1, with the reason.",
+    # readable page v4 (2026-11-16)
+    "Ensuite : ": "Then: ", "(compte ": "(account ",
+    "classements inaccessibles": "leaderboards unreachable", "classement inaccessible": "leaderboard unreachable",
     "Prix : texte en dollars par million de tokens (entrée/sortie), image par image, vidéo par seconde (plage selon la résolution) ;\n« estimé » lorsque le fournisseur facture au token.":
         "Prices: text in dollars per million tokens (input/output), images per image, video per second (range by "
         "resolution); “estimated” when the provider bills per token.",
@@ -155,6 +158,16 @@ PHRASES = {
 FRENCH_MARKERS = ("Fournisseur", "Secours", "Abonnement", "Modèle", "Tâche", "réflexion", "Calculé", "mesuré",
                   "Économique", "Vidéo", "Coût", "Rechercher", "Lancer", "généré", "estimé", "Équilibré")
 JS = {
+    # padlock (2026-11-16)
+    "'Déverrouiller ce modèle ? Le router passera seul au modèle qui le dépasse dans sa catégorie, sans attendre ta validation ; tu seras prévenu sur Telegram.'":
+        "'Unlock this model? The router will switch by itself to the model overtaking it in its category, without waiting "
+        "for your approval; you will be told on Telegram.'",
+    "'Verrouillé : un changement attendra ta validation sur Telegram.'": "'Locked: a change will wait for your approval on Telegram.'",
+    "'Déverrouillé : le router vient de passer au modèle qui le dépassait. La page se met à jour…'":
+        "'Unlocked: the router has just switched to the model overtaking it. The page is updating…'",
+    "'Déverrouillé : le router suivra seul le meilleur modèle de cette catégorie.'":
+        "'Unlocked: the router will follow the best model of this category by itself.'",
+    "'Échec de l’envoi'": "'Sending failed'",
     "'Envoi…'": "'Sending…'", "'Enregistré, la page se met à jour…'": "'Saved, the page is updating…'", "'Refusé'": "'Refused'",
     "'Échec de l’envoi'": "'Sending failed'",
     "'Résilier ce plan ? Il sortira de tes abonnements (gardé dans l’historique).'": "'Cancel this plan? It leaves your plans (kept in the history).'",
@@ -202,7 +215,14 @@ PHRASES.update({
  "Enregistrer": "Save",
  "Résilier": "Cancel plan",
  "ex. google-ai-pro": "e.g. google-ai-pro",
- "ids séparés par des virgules": "comma-separated ids"
+ "ids séparés par des virgules": "comma-separated ids",
+ # padlock (2026-11-16)
+ "Cadenas fermé = s’il est dépassé dans sa catégorie, le changement attend ta validation sur Telegram ; ouvert = le router passe seul au meilleur et te prévient.":
+     "Closed padlock = if it is overtaken in its category, the change waits for your approval on Telegram; open = the router switches to the best by itself and tells you.",
+ "Verrouillé : s’il est dépassé dans sa catégorie, le changement attend ta validation sur Telegram. Cliquer pour déverrouiller.":
+     "Locked: if it is overtaken in its category, the change waits for your approval on Telegram. Click to unlock.",
+ "Déverrouillé : le router passe seul au modèle qui le dépasse et te prévient sur Telegram. Cliquer pour verrouiller.":
+     "Unlocked: the router switches by itself to the model overtaking it and tells you on Telegram. Click to lock."
 })
 # Leaderboard labels ("Arena vidéo depuis texte", analysis.telegram._board_fr), shown on the page when a board is
 # unreachable (2026-11-07: the banner was the only French left on the English page while Arena collection failed).

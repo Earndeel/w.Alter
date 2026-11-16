@@ -1,4 +1,4 @@
-"""Library web page (v3, 2026-10-14: « le design fait trop IA, pas pro »).
+"""Library web page (v3, 2026-10-14: « le design fait trop IA, pas pro » ; v4 2026-11-16 « plus lisible » : level cards, task rows in three zones, first provider in clear and the rest folded, long lists folded).
 
 Editorial / market-terminal posture: paper background, black ink, one accent, hairline rules, dense tables with
 tabular figures, no emoji, no gradient, no pill badges. Home: the three reasoning levels (Pareto optimum of
@@ -11,6 +11,7 @@ from __future__ import annotations
 import html
 import json
 import math
+import re
 from datetime import datetime, timezone
 
 from walter_router.analysis import catalog
@@ -27,12 +28,58 @@ LEVELS = {"L1": ("Économique", "Quotidien : réponses courtes, résumés, petit
           "L3": ("Haut de gamme", "Raisonnement profond, synthèse, enjeu important")}
 EFFORT = {"low": "faible", "medium": "moyenne", "high": "élevée", "xhigh": "très élevée", "max": "maximale"}
 ORIGIN = {"toi": "Ton choix", "calcul": "Calculé", "méthode des niveaux": "Méthode Pareto"}
+LOCK_SVG = ('<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" '
+            'stroke-linecap="round" aria-hidden="true"><rect x="3" y="7.2" width="10" height="7" rx="1.3"/>'
+            '<path class="shut" d="M5.2 7.2V5.2a2.8 2.8 0 0 1 5.6 0v2"/><path class="open" d="M5.2 7.2V5.2a2.8 2.8 0 0 1 5.5-.7"/></svg>')
+LOCK_TITLE = {True: "Verrouillé : s’il est dépassé dans sa catégorie, le changement attend ta validation sur Telegram. "
+                    "Cliquer pour déverrouiller.",
+              False: "Déverrouillé : le router passe seul au modèle qui le dépasse et te prévient sur Telegram. "
+                     "Cliquer pour verrouiller."}
 
 
-def _route(text: str | None) -> str:
-    if not text or text == "—":
+def _lock(task: str, role: str | None, locked: bool) -> str:
+    """Padlock of one active model (owner 2026-11-16), sent to /api/lock (Access + HMAC), applied by walter-router lock."""
+    return (f'<button type="button" class="lock" data-task="{esc(task)}" data-role="{esc(role or "default")}" '
+            f'data-locked="{int(bool(locked))}" title="{LOCK_TITLE[bool(locked)]}" '
+            f'aria-label="{LOCK_TITLE[bool(locked)]}">{LOCK_SVG}</button>')
+
+
+_PRICE = re.compile(r"(?:≈\s?)?\d[\d,./–\s]*\$/\S+(?:\s(?:tokens(?:\saudio)?|estimé))?")
+
+
+def _steps(text: str | None) -> list[tuple[str, str, str]]:
+    """'Claude Pro ≈ 0,068/0,34 $/M (prix de revient, …) → Kie 1,6/8 $/M' -> [(name, price, detail), …]
+    (readable page v4, 2026-11-16). A plan met twice (two accounts) is numbered."""
+    out, seen = [], {}
+    for part in (text or "").split("→"):
+        part = part.strip()
+        if not part or part.startswith("—"):
+            continue
+        m = _PRICE.search(part)
+        name, price, rest = (part[:m.start()].strip(), m.group(0).strip(), part[m.end():].strip()) if m else (part, "", "")
+        seen[name] = seen.get(name, 0) + 1
+        if seen[name] > 1:
+            name = f"{name} (compte {seen[name]})"
+        out.append((name, price, re.sub(r"^\((.*?)\)", r"\1", rest).strip()))
+    return out
+
+
+def _route_block(providers: str | None, fallback: str | None = None) -> str:
+    """First provider in clear, the rest folded under « Ensuite : … », fallback on its own line."""
+    steps = _steps(providers)
+    if not steps:
         return '<span class="mute">—</span>'
-    return '<span class="arr"> → </span>'.join(f'<span class="nw">{esc(p.strip())}</span>' for p in text.split("→"))
+    name, price, detail = steps[0]
+    html_ = (f'<div class="r1"><b>{esc(name)}</b>{f" <span class=pr>{esc(price)}</span>" if price else ""}'
+             f'{f"<div class=rd>{esc(detail)}</div>" if detail else ""}</div>')
+    if len(steps) > 1:
+        items = "".join(f'<li><b>{esc(n)}</b>{f" <span class=pr>{esc(p)}</span>" if p else ""}'
+                        f'{f"<div class=rd>{esc(d)}</div>" if d else ""}</li>' for n, p, d in steps[1:])
+        html_ += (f'<details class="rmore"><summary>Ensuite : {esc(", ".join(n for n, _, _ in steps[1:]))}</summary>'
+                  f'<ol start="2">{items}</ol></details>')
+    if fallback and not fallback.startswith("—"):
+        html_ += f'<div class="rl"><span class="rk">Secours</span> {esc(fallback)}</div>'
+    return html_
 
 
 def _chart(points: list[dict], frontier: list[dict], levels: dict[str, dict], key: str = "cost") -> str:
@@ -102,40 +149,42 @@ def _da(conn, rs: list[dict]) -> list[dict]:
     return sorted(out, key=lambda r: r["label"])
 
 
-def _table(rs: list[dict]) -> str:
-    head = ('<thead><tr><th>Tâche</th><th>Modèle</th><th>Origine</th><th class="num" title="Score /100 : moyenne pondérée des classements indiqués sous chaque tâche">Score</th>'
-            '<th>Fournisseurs (ordre, prix)</th><th>Secours</th><th>Abonnement</th></tr></thead>')
+def _tasks(rs: list[dict]) -> str:
+    """One task per row in three zones — task, model, providers — instead of a 7-column table (readable page v4,
+    2026-11-16): the model name gets room, only the first provider shows in clear, the rest folds."""
+    head = ('<div class="thead"><span>Tâche</span><span>Modèle</span><span>Fournisseurs (ordre, prix)</span></div>')
     body, last = [], None
-    multi = {r["label"] for r in rs if r.get("category")}   # tasks split into categories get a group header row
+    multi = {r["label"] for r in rs if r.get("category")}   # tasks split into categories get a group header
     for r in rs:
         differs = bool(r.get("differs")) and r.get("chosen_by") == "toi"
         first = r["label"] != last
         last = r["label"]
         bench = (f'<div class="bench" data-en="Leaderboards: {esc(r.get("boards_en") or "")}">'
                  f'Classements : {esc(r["boards"])}</div>') if r.get("boards") else ""
-        if first and r["label"] in multi:
-            body.append(f'<tr class="grp"><td colspan="7"><span class="gname">{esc(r["label"])}</span>{bench}</td></tr>')
-            task = ""
+        if r["label"] in multi:
+            if first:
+                body.append(f'<div class="grp"><span class="gname">{esc(r["label"])}</span>{bench}</div>')
+            task = f'<div class="tname">{esc(r.get("category") or "")}</div>'
         else:
-            task = (esc(r["label"]) + bench) if first else ""
-        cat = f'<div class="cat">{esc(r["category"])}</div>' if r.get("category") else ""
+            task = f'<div class="tname">{esc(r["label"])}</div>{bench}' if first else ""
         notes = ""
         if r.get("differs"):
             notes += f'<div class="n-amber">≠ {esc(r["differs"])}</div>'
         if r.get("warning"):
             notes += f'<div class="n-red">{esc(r["warning"])}</div>'
         search = " ".join(str(r.get(k) or "") for k in ("label", "category", "model", "providers", "fallback")).lower()
-        score = r.get("score") if r.get("score") is not None else "—"
+        score = (f'<span class="sep">·</span><span title="Score /100 : moyenne pondérée des classements indiqués sous '
+                 f'chaque tâche">Score {r["score"]}</span>') if r.get("score") is not None else ""
         origin = ORIGIN.get(r.get("chosen_by") or "", "Calculé")
+        lock = _lock(r["task"], r.get("role"), r.get("locked", True)) if r.get("model") and r.get("task") else ""
         body.append(
-            f'<tr class="{"diff" if differs else ""}" data-search="{esc(search)}" data-differs="{int(differs)}">'
-            f'<td class="task">{task}{cat}</td>'
-            f'<td class="model">{esc(r.get("model") or "Aucun modèle")}{notes}</td>'
-            f'<td class="origin{" mine" if r.get("chosen_by") == "toi" else ""}">{origin}</td>'
-            f'<td class="num">{score}</td><td class="route">{_route(r.get("providers"))}</td>'
-            f'<td>{_route(r.get("fallback"))}</td>'
-            f'<td class="nw">{esc(r["subscription"]) if r.get("subscription") not in (None, "—") else ""}</td></tr>')
-    return f'<div class="tw"><table class="lib">{head}<tbody>{"".join(body)}</tbody></table></div>'
+            f'<div class="trow{" diff" if differs else ""}" data-search="{esc(search)}" data-differs="{int(differs)}">'
+            f'<div class="t-task">{task}</div>'
+            f'<div class="t-model"><div class="mname">{esc(r.get("model") or "Aucun modèle")}</div>'
+            f'<div class="meta">{lock}<span class="origin{" mine" if r.get("chosen_by") == "toi" else ""}">{origin}</span>'
+            f'{score}</div>{notes}</div>'
+            f'<div class="t-route">{_route_block(r.get("providers"), r.get("fallback"))}</div></div>')
+    return f'<div class="tasks">{head}{"".join(body)}</div>'
 
 
 def _tok(n: float | None) -> str:
@@ -217,7 +266,7 @@ def _subscriptions(conn) -> tuple[str, int]:
     return (
         '<h2>💳 Abonnements</h2><p class="dek">Ce que tes forfaits valent au prix API, le prix de revient d’un token par '
         'forfait (il entre dans le choix du fournisseur), ce que l’on sait de chaque plan, et la modification de tes plans.</p>'
-        + _plan_costs(conn) + _plan_facts(conn) + _plan_forms(subs) +
+        + _plan_costs(conn, {s["id"]: s["name"] for s in subs}) + _plan_facts(conn) + _plan_forms(subs) +
         '<h3>Compteur et consommation des 7 derniers jours</h3>'
         '<div class="tw"><table><thead><tr><th>Abonnement</th><th class="num">Prix</th><th>Utilisé par</th>'
         '<th class="num">Compteur hebdo</th><th>Remise à zéro</th><th class="num">Tokens</th>'
@@ -295,14 +344,16 @@ METRIC_FR = {"usd_value_month": "valeur API par mois", "tokens_month": "tokens p
              "plan_change": "événement"}
 
 
-def _plan_costs(conn) -> str:
-    """Cost price of a token per plan (2026-10-22): what the router uses to price a subscription route."""
+def _plan_costs(conn, names: dict[str, str] | None = None) -> str:
+    """Cost price of a token per plan (2026-10-22): what the router uses to price a subscription route. Plans shown by
+    their name, not their id (2026-11-16)."""
+    names = names or {}
     rows = []
     for r in conn.execute("""select c.*, extract(epoch from now() - c.at) / 3600 as age_h from models.latest_subscription_costs c
                              order by sub_id"""):
         pct = lambda x: "—" if x is None else f"{x * 100:.1f}".replace(".", ",") + "\u202f%"
         quota = "—" if r["used_percent"] is None else f'{r["used_percent"]:.0f}\u202f%'
-        rows.append(f'<tr><td class="model">{esc(r["sub_id"])}</td><td class="num strong">{pct(r["ratio_pace"])}</td>'
+        rows.append(f'<tr><td class="model">{esc(names.get(r["sub_id"], r["sub_id"]))}</td><td class="num strong">{pct(r["ratio_pace"])}</td>'
                     f'<td class="num">{pct(r["ratio_full"])}</td><td class="num">{_usd(r["api_value_month_pace"])}</td>'
                     f'<td class="num">{_usd(r["api_value_month_full"])}</td><td class="num">{quota}</td>'
                     f'<td class="num mute small">{r["age_h"]:.0f} h</td></tr>')
@@ -330,9 +381,9 @@ def _plan_facts(conn) -> str:
                     f'<td>{src}</td><td class="nw">{r["published"] or "—"}</td><td class="nw">{ORIGIN_ICON.get(r["origin"], r["origin"])}</td></tr>')
     if not rows:
         return ""
-    return ('<h3 class="block">Ce que l’on sait de chaque plan</h3><div class="tw"><table><thead><tr><th>Plan</th><th>Quoi</th>'
+    return ('<details class="fold block"><summary>Ce que l’on sait de chaque plan</summary><div class="tw"><table><thead><tr><th>Plan</th><th>Quoi</th>'
             '<th>Valeur</th><th>Source</th><th>Date</th><th>Trouvé par</th></tr></thead>'
-            f'<tbody>{"".join(rows)}</tbody></table></div>')
+            f'<tbody>{"".join(rows)}</tbody></table></div></details>')
 
 
 def _plan_forms(subs: list[dict]) -> str:
@@ -354,9 +405,9 @@ def _plan_forms(subs: list[dict]) -> str:
     raw = {d["id"]: d for d in declared.read().get("subscriptions", [])}
     forms = [form(s["id"], {**raw.get(s["id"], {}), "name": s["name"], "plan_name": raw.get(s["id"], {}).get("plan")}) for s in subs]
     forms.append(form("", {}))
-    return ('<h3 class="block">Modifier mes abonnements</h3><p class="mute small">Aussi possible dans la discussion '
+    return ('<details class="fold"><summary>Modifier mes abonnements</summary><p class="mute small">Aussi possible dans la discussion '
             '(« walter-router plans set … ») ; un mail de facturation qui ne correspond pas devient une proposition sur Telegram.</p>'
-            f'<div class="planforms">{"".join(forms)}</div>')
+            f'<div class="planforms">{"".join(forms)}</div></details>')
 
 
 
@@ -404,17 +455,21 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
         score = f'{p["score"]:.1f}'.replace(".", ",") if p.get("score") else "—"
         spent = lv.get("when_quota_spent")
         proposal = s and (s["model_id"], s["variant"]) != (mid, var)
+        fb = card.get("fallback") if card.get("fallback") not in (None, "—") and lv.get("fallback") != spent else None
         lrows.append(
-            f'<tr><td class="lvl">{lvl}</td><td><div class="lname">{LEVELS[lvl][0]}</div></td>'
-            f'<td class="model">{esc(_name(conn, mid))}<div class="mute small">réflexion {effort}</div></td>'
-            f'<td class="num" data-label="Indice AA">{score}</td><td class="num" data-label="Coût AA officiel">{cost_aa}</td><td class="num strong" data-label="Coût réel">{cost}</td></tr>'
-            f'<tr class="sub"><td></td><td colspan="5"><div class="mute desc">{LEVELS[lvl][1]}</div><span class="mute">Fournisseurs</span> {_route(card.get("providers"))}'
-            + (f'<span class="mute sep2">Abonnement</span> {esc(sub)}' if sub not in (None, "—") else "")
-            + (f'<div><span class="mute">Quota épuisé</span> {esc(pin_name(spent))}</div>' if spent else "")
-            + (f'<div><span class="mute">Secours</span> {esc(card["fallback"])}</div>'
-               if card.get("fallback") not in (None, "—") and lv.get("fallback") != spent else "")
+            f'<article class="lvc"><div class="lvtop"><span class="lvl">{lvl}</span><span class="lname">{LEVELS[lvl][0]}</span>'
+            f'{_lock("general", lvl, card.get("locked", True))}</div>'
+            f'<div class="lvmodel">{esc(_name(conn, mid))}</div><div class="mute">réflexion {effort}</div>'
+            f'<div class="lvdesc">{LEVELS[lvl][1]}</div>'
+            f'<dl class="figs"><div><dt>Indice AA</dt><dd>{score}</dd></div>'
+            f'<div><dt title="Recalculé avec le prix du fournisseur utilisé">Coût réel</dt><dd class="strong">{cost}</dd></div>'
+            f'<div><dt title="Prix de référence publié par Artificial Analysis">Coût AA officiel</dt><dd>{cost_aa}</dd></div></dl>'
+            f'<div class="lvroute"><div class="rk">Fournisseurs</div>{_route_block(card.get("providers"), fb)}'
+            + (f'<div class="rl"><span class="rk">Abonnement</span> {esc(sub)}</div>' if sub not in (None, "—") else "")
+            + (f'<div class="rl"><span class="rk">Quota épuisé</span> {esc(pin_name(spent))}</div>' if spent else "")
+            + "</div>"
             + (f'<div class="amber">Proposition du dernier calcul : {esc(pin_name(f"{s["model_id"]}/{s["variant"]}"))}</div>'
-               if proposal else "") + "</td></tr>")
+               if proposal else "") + "</article>")
     da_rows = []
     for r in _da(conn, rs):
         lead = r["leader"]
@@ -423,8 +478,7 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
         elo = f'{r["elo"]:.0f}' if r.get("elo") else "—"
         da_rows.append(f'<tr><td>{esc(r["label"])}</td><td class="model">{esc(r.get("model") or "—")}</td>'
                        f'<td class="num">{r["rank"] or "—"}<span class="mute"> / {r["of"]}</span></td>'
-                       f'<td class="num">{elo}</td>'
-                       f'<td class="amber">{lead_txt}</td><td class="route">{_route(r.get("providers"))}</td></tr>')
+                       f'<td class="num">{elo}</td><td class="amber">{lead_txt}</td></tr>')
     panes = {k: [r for r in rs if r["task"] != "general" and TAB_OF.get(r["type"]) == k] for k, _, _ in TABS}
     run_info = ctx.get("run") or {}
     when = run_info.get("finished_at") or run_info.get("started_at")
@@ -442,7 +496,7 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
     nav ="".join(f'<a href="#{k}" data-tab="{k}"{" class=on" if k == "home" else ""}><span class="ic">{i}</span>{n}'
                   + (f'<span class="ct">{n_subs if k == "subs" else len(panes[k])}</span>' if k != "home" else "")
                   + "</a>" for k, i, n in TABS)
-    tab_html = "".join(f'<section class="pane" data-pane="{k}" hidden><h2>{i} {n}</h2>{_table(panes[k])}</section>'
+    tab_html = "".join(f'<section class="pane" data-pane="{k}" hidden><h2>{i} {n}</h2>{_tasks(panes[k])}</section>'
                        for k, i, n in TABS if k not in ("home", "subs"))
     tab_html += f'<section class="pane" data-pane="subs" hidden>{subs_html}</section>'
     generated = datetime.now(timezone.utc).strftime("%d/%m/%Y, %H:%M UTC")
@@ -456,7 +510,7 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
 --rule:#262624;--rule2:#3a3a37;--accent:#7aa2ff;--amber:#e3a63b;--amberbg:#221a0c;--red:#f0786b;--c1:#3987e5;--c2:#d95926;
 --pt:#4a4a46;--surface:#141414}}}}
 *{{box-sizing:border-box}}
-body{{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+body{{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.55"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
 -webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1,"lnum" 1}}
 .wrap{{max-width:1240px;margin:0 auto;padding:0 32px}}
 header{{padding:32px 0 22px}}.foot-figs{{color:var(--ink2);margin-bottom:8px}}.kicker{{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}}
@@ -492,18 +546,45 @@ table{{width:100%;border-collapse:collapse}}th{{text-align:left;font-weight:600;
 text-transform:uppercase;color:var(--mute);padding:8px 10px 8px 0;border-bottom:1px solid var(--ink)}}
 td{{padding:10px 10px 10px 0;border-bottom:1px solid var(--rule);vertical-align:top}}
 .num{{text-align:right;white-space:nowrap}}th.num{{text-align:right}}
-.levels td{{border-bottom:0;padding-bottom:2px}}.levels tr.sub td{{border-bottom:1px solid var(--rule);padding-top:0;padding-bottom:12px;
-font-size:12.5px;color:var(--ink2)}}.lvl{{font-weight:700;font-size:15px;width:34px}}.lname{{font-weight:600;white-space:nowrap}}
+.lvcards{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:6px}}
+.lvc{{background:var(--paper);border:1px solid var(--rule);border-top:2px solid var(--ink);padding:16px 18px 18px;display:flex;flex-direction:column;gap:2px}}
+.lvtop{{display:flex;align-items:center;gap:10px;margin-bottom:10px}}.lvl{{font-weight:700;font-size:13px;letter-spacing:.04em;color:var(--mute)}}
+.lname{{font-weight:600;flex:1}}.lvtop .lock{{padding:4px}}
+.lvmodel{{font:600 22px/1.2 Georgia,"Times New Roman",serif;letter-spacing:-.01em}}.lvdesc{{color:var(--ink2);font-size:13.5px;margin:10px 0 2px}}
+.figs{{display:grid;grid-template-columns:repeat(3,1fr);margin:12px 0 4px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}}
+.figs div{{padding:9px 0;display:flex;flex-direction:column;justify-content:space-between}}.figs div+div{{border-left:1px solid var(--rule);padding-left:12px}}.figs dt{{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)}}
+.figs dd{{margin:2px 0 0;font-size:17px}}.lvroute{{margin-top:10px;font-size:13.5px}}.lvroute>.rk{{margin-bottom:3px}}
+.rk{{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)}}.rl{{margin-top:6px}}.rl .rk{{margin-right:6px}}
+.r1 b,.rmore b{{font-weight:600}}.pr{{white-space:nowrap}}.rd{{color:var(--mute);font-size:12.5px}}
+.rmore{{margin-top:6px}}.rmore summary{{cursor:pointer;color:var(--ink2);font-size:12.5px;list-style:none}}
+.rmore summary::-webkit-details-marker{{display:none}}.rmore summary::before{{content:"+ ";color:var(--mute)}}.rmore[open] summary::before{{content:"− "}}
+.rmore ol{{margin:6px 0 0;padding-left:20px}}.rmore li{{margin-bottom:5px}}.rmore li::marker{{color:var(--mute)}}
+.lvc .amber{{margin-top:8px}}
 .planforms{{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin:8px 0 28px}}.planform{{border:1px solid var(--rule);padding:14px 16px;display:flex;flex-direction:column;gap:8px}}.planform .pf-title{{font-weight:600;margin-bottom:2px}}.planform label{{display:flex;flex-direction:column;font-size:12px;color:var(--mute);gap:3px}}.planform input{{font:inherit;font-size:14px;color:inherit;padding:6px 8px;border:1px solid var(--rule);background:transparent}}.pf-actions{{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px}}.pf-actions button{{font:inherit;font-size:13px;padding:6px 12px;border:1px solid currentColor;background:transparent;cursor:pointer}}.pf-actions button[type=submit]{{background:var(--ink,#111);color:var(--bg,#fff);border-color:var(--ink,#111)}}
 .model{{font-weight:600}}.levels .model{{white-space:nowrap}}.small{{font-size:12px;font-weight:400}}.mute{{color:var(--mute)}}.sep2{{margin-left:14px}}
 .arr{{color:var(--mute)}}.nw{{white-space:nowrap}}.amber{{color:var(--amber);font-size:12.5px}}
-.lib td.task{{width:21%;font-weight:600}}.lib .cat{{font-weight:400;color:var(--ink2)}}.lib td.route{{font-size:12.5px}}
-.lib td{{font-size:13px}}.origin{{color:var(--mute);white-space:nowrap}}.origin.mine{{color:var(--ink);font-weight:600}}
+.tasks{{border-top:1px solid var(--ink);margin-top:12px}}
+.thead,.trow{{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.35fr);gap:28px}}
+.thead{{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);padding:8px 0;border-bottom:1px solid var(--rule2)}}
+.trow{{padding:14px 0;border-bottom:1px solid var(--rule);position:relative}}
+.trow.diff::before{{content:"";position:absolute;left:-12px;top:14px;bottom:14px;width:3px;background:var(--amber)}}
+.tname{{font-weight:600}}.mname{{font-weight:600;font-size:15px}}.t-route{{font-size:13.5px}}
+.meta{{display:flex;align-items:center;flex-wrap:wrap;gap:0 6px;color:var(--mute);font-size:13px;margin-top:3px}}.meta .lock{{padding:2px 0}}
+.meta .sep{{color:var(--rule2)}}.origin{{color:var(--mute);white-space:nowrap}}.origin.mine{{color:var(--ink);font-weight:600}}
+details.notice summary{{cursor:pointer;list-style:none}}details.notice summary::-webkit-details-marker{{display:none}}
+details.notice summary::after{{content:" ▾";color:var(--mute)}}details.notice p{{margin:8px 0 0;color:var(--ink2)}}
+.fold{{margin-top:28px}}.fold>summary{{cursor:pointer;font:600 15px/1.3 Georgia,"Times New Roman",serif;padding:8px 0;border-bottom:1px solid var(--rule)}}
+.fold>summary::marker{{color:var(--mute)}}.fold[open]>summary{{margin-bottom:10px}}
+.lock{{background:none;border:0;padding:2px 6px 2px 0;margin:0;cursor:pointer;color:var(--ink2);vertical-align:-2px;line-height:0}}
+.lock:hover{{color:var(--ink)}}.lock[data-locked="0"]{{color:var(--accent)}}.lock[data-locked="1"] .open,.lock[data-locked="0"] .shut{{display:none}}
+.lock:disabled{{opacity:.4;cursor:wait}}.lock:focus-visible{{outline:1px solid var(--accent);outline-offset:1px}}
+#locknote{{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:calc(100% - 32px);background:var(--paper);
+color:var(--ink);border:1px solid var(--rule2);padding:10px 14px;font-size:13px;line-height:1.45;z-index:20}}
 .bench{{font-weight:400;font-size:11.5px;color:var(--mute);margin-top:3px;line-height:1.4}}
-tr.grp td{{padding:16px 0 6px;border-bottom:1px solid var(--rule2)}}tr.grp .gname{{font-weight:700;font-size:13.5px}}
-tr.grp .bench{{display:inline;margin-left:12px}}.lib td.task .cat{{font-weight:600;color:var(--ink)}}
-.n-amber{{font-weight:400;font-size:12px;color:var(--amber);margin-top:3px}}.n-red{{font-weight:400;font-size:12px;color:var(--red);margin-top:3px}}
-tr.diff td{{background:var(--amberbg)}}.tw{{overflow-x:auto;-webkit-overflow-scrolling:touch}}.tw table.lib{{min-width:980px}}.tw table{{min-width:720px}}.tw table.levels{{min-width:0}}
+.grp{{padding:20px 0 8px;border-bottom:1px solid var(--rule2)}}.grp .gname{{font-weight:700;font-size:14.5px}}
+.grp .bench{{display:inline;margin-left:12px}}
+.n-amber{{font-weight:400;font-size:12.5px;color:var(--amber);margin-top:5px}}.n-red{{font-weight:400;font-size:12.5px;color:var(--red);margin-top:5px}}
+.tw{{overflow-x:auto;-webkit-overflow-scrolling:touch}}.tw table{{min-width:720px}}.tw table.da{{min-width:0}}
 .chart{{margin:0;position:relative}}.chart svg{{width:100%;height:auto;display:block}}
 .gl{{stroke:var(--rule);stroke-width:1}}.ax{{stroke:var(--ink);stroke-width:1}}.tk{{fill:var(--mute);font-size:11px}}
 .pt{{fill:var(--pt)}}.fr{{fill:none;stroke:var(--c1);stroke-width:2}}.fp{{fill:var(--c1);stroke:var(--surface);stroke-width:2}}
@@ -520,16 +601,12 @@ font-size:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.08)}}
 footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;padding:16px 0 40px;line-height:1.6}}
 .lang{{margin-top:14px;font-size:13px}}.lang a{{color:var(--ink2);text-decoration:none;padding:2px 0}}.lang a:hover{{color:var(--ink)}}
 .lang a.on{{color:var(--ink);font-weight:600;border-bottom:1px solid var(--ink)}}.lang .sep{{margin:0 8px;color:var(--mute)}}
-@media (max-width:980px){{.split{{grid-template-columns:1fr}}.figures{{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:980px){{.split{{grid-template-columns:minmax(0,1fr)}}.figures{{grid-template-columns:repeat(3,1fr)}}
 .figures div:nth-child(4){{border-left:0;padding-left:0}}}}
 @media (max-width:1100px){{.tools{{margin-left:0;width:100%;justify-content:space-between}}input[type=search]{{flex:1}}}}
-@media (max-width:600px){{.levels thead{{display:none}}.levels tr:not(.sub){{display:flex;flex-wrap:wrap;align-items:baseline}}
-.levels tr:not(.sub) td{{border:0;padding:12px 0 0}}.levels td.lvl{{width:34px}}.levels tr:not(.sub) td:nth-child(2){{flex:1}}
-.levels colgroup{{display:none}}.levels td{{width:auto!important}}.levels td.lvl{{flex:0 0 34px}}.levels{{table-layout:auto}}
-.levels td.model{{flex:0 0 100%;padding:4px 0 0 34px!important;white-space:normal}}
-.levels td.num{{flex:1 1 0;min-width:0;text-align:left;padding:10px 0 0 34px!important}}.levels td.num+td.num{{padding-left:12px!important}}
-.levels td.num::before{{content:attr(data-label);display:block;color:var(--mute);font-size:11px;font-weight:400;letter-spacing:.04em;text-transform:uppercase}}
-.levels tr.sub td{{padding-left:34px}}.levels tr.sub td:first-child{{display:none}}}}
+@media (max-width:980px){{.lvcards{{grid-template-columns:minmax(0,1fr)}}}}
+@media (max-width:760px){{.thead{{display:none}}.trow{{grid-template-columns:minmax(0,1fr);gap:8px}}.tname{{font:600 17px/1.3 Georgia,"Times New Roman",serif}}.t-task:empty{{display:none}}
+.grp .bench{{display:block;margin:3px 0 0}}}}
 @media (max-width:600px){{.wrap{{padding:0 16px}}.figures{{grid-template-columns:repeat(2,1fr)}}
 .figures div{{border-left:0!important;padding-left:0!important}}}}
 </style></head><body>
@@ -539,26 +616,29 @@ footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;paddi
 <nav><div class="wrap navin"><div class="seg" role="tablist">{nav}</div><div class="tools"><input type="search" id="q" placeholder="Rechercher">
 <label class="f"><input type="checkbox" id="diff"> Mes choix ≠ n°1 <span class="mute">({n_diff})</span></label></div></div></nav>
 <main class="wrap">
-{f'<p class="notice">Classement inaccessible : {esc(down_txt)}. Le router conserve sa dernière lecture valable pendant 21 jours.</p>' if down else ''}
+{(f'<details class="notice"><summary>{len(down)} {"classements inaccessibles" if len(down) > 1 else "classement inaccessible"}. '
+   f'Le router conserve sa dernière lecture valable pendant 21 jours.</summary><p>Classement inaccessible : {esc(down_txt)}.</p></details>') if down else ''}
 <section class="pane" data-pane="home">
-<div class="split"><div><h2>🧠 Niveaux de réflexion</h2><p class="dek">Niveaux actifs : ta méthode sur la frontière AA, abonnements à leur prix de revient ModelDial</p>
-<div class="tw"><table class="levels"><colgroup><col style="width:34px"><col style="width:120px"><col><col style="width:64px"><col style="width:84px"><col style="width:84px"></colgroup><thead><tr><th></th><th>Niveau</th><th>Modèle</th><th class="num">Indice AA</th><th class="num" title="Prix de référence publié par Artificial Analysis">Coût AA officiel</th><th class="num" title="Recalculé avec le prix du fournisseur utilisé">Coût réel</th></tr></thead>
-<tbody>{"".join(lrows)}</tbody></table></div></div>
-<div><h2>📈 Indice d'intelligence et coût par tâche</h2><p class="dek">{len(pts)} combinaisons modèle × niveau de réflexion exécutables</p><div class="seg small-seg" id="costseg"><button data-cost="cost" class="on">Coût réel</button><button data-cost="cost_aa">Coût AA officiel</button></div>
-{_chart(pts, frontier, levels)}{_chart(pts, frontier, levels, "cost_aa")}</div></div>
+<h2>🧠 Niveaux de réflexion</h2><p class="dek">Niveaux actifs : ta méthode sur la frontière AA, abonnements à leur prix de revient ModelDial</p>
+<div class="lvcards">{"".join(lrows)}</div>
 {conso_html}
-<div class="block"><h2>🎨 Spécialisations Design Arena</h2><p class="dek">Rang du modèle retenu sur le classement Design Arena de chaque tâche</p>
-<div class="tw"><table><thead><tr><th>Tâche</th><th>Modèle retenu</th><th class="num">Rang</th><th class="num">Score</th>
-<th>N°1 Design Arena, si différent</th><th>Fournisseurs</th></tr></thead><tbody>{"".join(da_rows)}</tbody></table></div></div>
+<div class="split block"><div><h2>📈 Indice d'intelligence et coût par tâche</h2><p class="dek">{len(pts)} combinaisons modèle × niveau de réflexion exécutables</p><div class="seg small-seg" id="costseg"><button data-cost="cost" class="on">Coût réel</button><button data-cost="cost_aa">Coût AA officiel</button></div>
+{_chart(pts, frontier, levels)}{_chart(pts, frontier, levels, "cost_aa")}</div>
+<div><h2>🎨 Spécialisations Design Arena</h2><p class="dek">Rang du modèle retenu sur le classement Design Arena de chaque tâche</p>
+<div class="tw"><table class="da"><thead><tr><th>Tâche</th><th>Modèle retenu</th><th class="num">Rang</th><th class="num">Score</th>
+<th>N°1 Design Arena, si différent</th></tr></thead><tbody>{"".join(da_rows)}</tbody></table></div></div></div>
 </section>
 {tab_html}
 </main>
 <div class="wrap"><footer><div class="foot-figs">{" · ".join(f"{esc(lbl)} {v}" for lbl, v in figures if not lbl.startswith("Tes"))}.
 Classements recalculés le {esc(when)} ; cycle complet automatique toutes les 48 heures, page republiée après chacune de tes réponses.</div>Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements
-pondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Une ligne surlignée signale un choix de ta part différent du n°1 mesuré, avec la raison.
+pondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Un trait orange en marge signale un choix de ta part différent du n°1 mesuré, avec la raison.
+Cadenas fermé = s’il est dépassé dans sa catégorie, le changement attend ta validation sur Telegram ; ouvert = le router passe seul au meilleur et te prévient.
 Prix : texte en dollars par million de tokens (entrée/sortie), image par image, vidéo par seconde (plage selon la résolution) ;
 « estimé » lorsque le fournisseur facture au token. Page générée le {generated}.
 <div class="lang"><a href="/" data-lang="en">English</a><span class="sep">·</span><a href="/fr/" data-lang="fr" class="on">Français</a></div></footer></div>
+<div id="locknote" role="status" hidden></div>
+<template id="locktitles"><span data-s="1">{LOCK_TITLE[True]}</span><span data-s="0">{LOCK_TITLE[False]}</span></template>
 <script>
 (function(){{const want=localStorage.getItem('walterLang'),here=document.documentElement.lang;
 if(want&&want!==here){{location.replace((want==='fr'?'/fr/':'/')+location.hash);return}}
@@ -567,7 +647,7 @@ const links=document.querySelectorAll('nav a[data-tab]'),panes=document.querySel
 d=document.getElementById('diff');let cur='home';
 function show(t){{cur=t;links.forEach(a=>{{a.classList.toggle('on',a.dataset.tab===t);if(a.dataset.tab===t)a.scrollIntoView({{block:'nearest',inline:'nearest'}})}});panes.forEach(p=>p.hidden=p.dataset.pane!==t);filter()}}
 function filter(){{const s=(q.value||'').trim().toLowerCase();if((s||d.checked)&&cur==='home'){{show(d.checked?'video':'chat');return}}
-document.querySelectorAll('tbody tr[data-search]').forEach(r=>r.classList.toggle('hide',!((!s||(r.dataset.search+' '+r.textContent.toLowerCase()).includes(s))&&(!d.checked||r.dataset.differs==='1'))))}}
+document.querySelectorAll('[data-search]').forEach(r=>r.classList.toggle('hide',!((!s||(r.dataset.search+' '+r.textContent.toLowerCase()).includes(s))&&(!d.checked||r.dataset.differs==='1'))))}}
 links.forEach(a=>a.onclick=e=>{{e.preventDefault();show(a.dataset.tab);history.replaceState(null,'','#'+a.dataset.tab)}});
 q.oninput=filter;d.onchange=filter;
 document.querySelectorAll('#costseg button').forEach(b=>b.onclick=()=>{{
@@ -606,4 +686,14 @@ const o=await r.json();st.textContent=r.ok?'Enregistré, la page se met à jour�
 f.onsubmit=e=>{{e.preventDefault();const d=Object.fromEntries(new FormData(f));const id=f.dataset.id||d.sub_id;delete d.sub_id;
 d.models=(d.models||'').split(',').map(x=>x.trim()).filter(Boolean);send({{action:'set',sub_id:id,fields:d}})}};
 const r=f.querySelector('.pf-retire');if(r)r.onclick=()=>{{if(confirm('Résilier ce plan ? Il sortira de tes abonnements (gardé dans l’historique).'))send({{action:'retire',sub_id:f.dataset.id}})}}}});
+const ln=document.getElementById('locknote'),lt=document.getElementById('locktitles').content;let lnT=null;
+function lnote(t){{ln.textContent=t;ln.hidden=false;clearTimeout(lnT);lnT=setTimeout(()=>{{ln.hidden=true}},9000)}}
+document.querySelectorAll('button.lock').forEach(b=>b.onclick=async()=>{{const want=b.dataset.locked!=='1';
+if(!want&&!confirm('Déverrouiller ce modèle ? Le router passera seul au modèle qui le dépasse dans sa catégorie, sans attendre ta validation ; tu seras prévenu sur Telegram.'))return;
+const same=document.querySelectorAll('button.lock[data-task="'+b.dataset.task+'"][data-role="'+b.dataset.role+'"]');same.forEach(x=>x.disabled=true);
+try{{const r=await fetch('/api/lock',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{task:b.dataset.task,role:b.dataset.role,locked:want}})}});
+const o=await r.json();if(!r.ok){{lnote(o.error||'Refusé');return}}const t=lt.querySelector('[data-s="'+(want?1:0)+'"]').textContent;
+same.forEach(x=>{{x.dataset.locked=want?'1':'0';x.title=t;x.setAttribute('aria-label',t)}});const moved=(o.changed||[]).length>0;
+lnote(want?'Verrouillé : un changement attendra ta validation sur Telegram.':(moved?'Déverrouillé : le router vient de passer au modèle qui le dépassait. La page se met à jour…':'Déverrouillé : le router suivra seul le meilleur modèle de cette catégorie.'));
+if(moved)setTimeout(()=>location.reload(),45000)}}catch(e){{lnote('Échec de l’envoi')}}finally{{same.forEach(x=>x.disabled=false)}}}});
 </script></body></html>"""

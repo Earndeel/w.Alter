@@ -856,6 +856,7 @@ the owner's choices per task / role: objective, pinned model/variant/provider, r
 | `description` | text | True | — | Description fonctionnelle. |
 | `signals` | text[] | False | '{}'::text[] | Indices textuels aidant à reconnaître un rôle/objectif. |
 | `priority` | integer | False | 0 | Priorité relative d'un rôle lors de sa sélection. |
+| `locked` | boolean | False | true | true (default): the pinned model changes only on the owner's Telegram answer; false: alerts.auto_adopt switches it to the model overtaking it (challenger / tier / new #1) and the owner is informed (padlock of the library page) |
 
 constraints :
 

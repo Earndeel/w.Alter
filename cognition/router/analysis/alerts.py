@@ -453,6 +453,74 @@ def pending(conn) -> list[dict]:
                                 order by kind, task, alert_id"""))
 
 
+FRESH = "50 hours"   # an alert re-seen by the last cycle (48 h) still describes the boards as they are
+
+
+def auto_adopt(conn, only_task: str | None = None, only_role: str | None = None) -> list[dict]:
+    """Unlocked favourites follow the best (owner, 2026-11-16: padlock of the library page). For each preference with
+    locked = false, the model overtaking it in its category — the best challenger on the task's composite, or the
+    tier the method designates for L1/L2/L3 — is adopted through `verdict` (the very path of the Telegram « Passer à … »
+    button); its other proposals are closed. Locked preferences (the default) are untouched: their proposals go to
+    Telegram and wait for the owner. Returns what changed, for the information message."""
+    done = []
+    for p in conn.execute("""select p.task, p.role, p.pinned_model_id, p.pinned_variant, t.label from models.preferences p
+                             join models.tasks t using (task) where not p.locked and p.pinned_model_id is not null
+                             and (%s::text is null or p.task = %s) and (%s::text is null or p.role = %s)
+                             order by p.task, p.role""", (only_task, only_task, only_role, only_role)).fetchall():
+        current = f'{p["pinned_model_id"]}/{p["pinned_variant"]}' if p["pinned_variant"] else p["pinned_model_id"]
+        if p["task"] == "general":
+            pick = conn.execute(f"""select * from models.alerts where kind = 'tier' and task = 'general' and role = %s
+                                    and status in ('open', 'notified', 'baseline') and subject <> %s
+                                    and last_seen > now() - interval '{FRESH}' order by last_seen desc limit 1""",
+                                (p["role"], current)).fetchone()
+            others = "kind = 'tier' and task = 'general' and role = %s"
+            args = (p["role"],)
+        else:
+            cands = conn.execute(f"""select * from models.alerts where kind = 'challenger' and task = %s and role = %s
+                                     and status in ('open', 'notified', 'baseline') and subject <> %s
+                                     and subject not like '%%:unmeasured' and evidence ? 'boards'
+                                     and last_seen > now() - interval '{FRESH}'""",
+                                 (p["task"], p["role"], p["pinned_model_id"])).fetchall()
+            pick = max(cands, key=lambda a: ((a["evidence"].get("composite") or {}).get("challenger") or 0), default=None)
+            others = "kind in ('challenger', 'new_best') and task = %s and role = %s"
+            args = (p["task"], p["role"])
+        if not pick:
+            continue
+        note = f"automatique : modèle déverrouillé (cadenas ouvert), remplace {current}"
+        verdict(conn, pick["alert_id"], "adopted", note, _resolved=True)
+        conn.execute(f"""update models.alerts set status = 'dismissed', verdict_note = %s
+                         where {others} and status in ('open', 'notified') and alert_id <> %s""",
+                     (f"auto: {pick['subject']} adopté (cadenas ouvert)", *args, pick["alert_id"]))
+        done.append({"task": p["task"], "role": p["role"], "label": p["label"], "from": current, "to": pick["subject"],
+                     "alert_id": pick["alert_id"]})
+    return done
+
+
+def set_lock(conn, task: str, role: str | None, locked: bool) -> dict:
+    """Close or open the padlock of one active model. Opening a task the owner never declared first records the model
+    in use as its favourite (pinned, so it is watched); opening a specialised favourite nobody watched (watch = none)
+    starts watching its quality, since following the best needs a comparison. Opening also applies at once what the
+    last cycle already knows (`auto_adopt` on that row)."""
+    role = role or ("L1" if task == "general" else "default")
+    row = conn.execute("select * from models.preferences where task = %s and role = %s", (task, role)).fetchone()
+    if not conn.execute("select 1 from models.tasks where task = %s", (task,)).fetchone():
+        raise KeyError(task)
+    if row is None:
+        if locked:
+            return {"task": task, "role": role, "locked": True, "changed": []}   # nothing declared = already locked
+        from walter_router.serve import choose
+        d = choose.pick(conn, task, role=None if role == "default" else role)
+        if not d.get("model_id"):
+            raise ValueError(f"{task}: aucun modèle en place à suivre")
+        pin = f'{d["model_id"]}/{d["variant"]}' if d.get("variant") else d["model_id"]
+        choose.set_preference(conn, task, pin=pin, role=role, watch="quality",
+                              note="Modèle en place gardé à l'ouverture du cadenas (suit le meilleur).")
+    elif not locked and row["watch"] == "none" and task != "general":
+        conn.execute("update models.preferences set watch = 'quality' where task = %s and role = %s", (task, role))
+        challengers(conn, status_for_new="baseline", only_task=task, only_role=role)
+    conn.execute("update models.preferences set locked = %s where task = %s and role = %s", (locked, task, role))
+    return {"task": task, "role": role, "locked": locked,
+            "changed": [] if locked else auto_adopt(conn, only_task=task, only_role=role)}
 
 
 def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: str | None = None,
