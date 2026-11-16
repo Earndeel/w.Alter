@@ -1,191 +1,57 @@
 ---
 name: beeper-messages
-description: Read, search, analyze or send Beeper chats. Reading and analysis start from Walter Memory (messages already ingested, voice notes already transcribed); the Beeper Desktop local REST API is for sending and for what Memory does not hold yet.
-version: 1.4.0
+description: Read and analyze Beeper through Walter Memory first; use the native local Server MCP channel for fresh messages and Engine-authorized sends.
+version: 1.5.0
 author: W.Alter
 license: MIT
 metadata:
   hermes:
-    tags: [messaging, beeper, chat, api, voice, osint, transcription]
+    tags: [messaging, beeper, chat, api, voice]
 ---
 
 # Beeper Messages
 
-Read Beeper chats from Walter Memory first; use the Beeper Desktop local REST API to send, or for what Memory does
-not hold yet.
+Read the existing Memory history first. Changing Beeper's installation changes the live source, not Memory's history: never trigger a full reimport as a migration default.
 
-## Start here: reading or analysing an exchange (since 2026-11-12)
+## Reading and identifying the recipient
 
-Every Beeper message is already in Walter Memory (connector every 3 min), and **voice notes and documents are
-already transcribed there**: a message with files carries `attachments` with the transcription. For « lis-moi les
-derniers échanges avec X », « résume la conversation », « propose une réponse » :
+1. Use person_lookup for the person, their networks and full Matrix chat IDs; use memory_context for wider context.
+2. Read memory_events(source="beeper", since=…, until=…, order="oldest") and its attachments. Ingestion is asynchronous: verify freshness before claiming every latest message is present.
+3. Use beeper_read(operation="status"|"accounts"|"chats"|"messages"|"search", chat_id=…, query=…, cursor=…, direction="before", limit=…) for missing or fresh data. The native Server runs on Oracle; no Mac is needed.
+4. Search is literal message search, not contact identity resolution. Match names/handles across the person's networks and the paginated chat list. Never infer the recipient from a matching word inside message text.
 
-1. `person_lookup(name)` — the person, their networks and conversations.
-2. `memory_events(source="beeper", text=…, since=…, until=…, order="oldest")` — the messages of the period, in order,
-   voice-note transcriptions included (`attachments`). `memory_context(query)` when the subject is wider than one chat.
-3. Answer from that. Do **not** page the live API, copy media from the Mac or transcribe audio yourself for messages
-   Memory already holds: on 2026-11-11 that path cost 24 tool calls and 13 model calls for one request and still
-   missed the voice notes.
+For a client using a reduced MCP toolset: walter_call(tool="beeper_read", arguments={…}); use describe=true if needed. Existing MCP connections may need reconnecting to discover the tool.
 
-Use the live API below only to **send**, for a message of the last few minutes that Memory has not ingested yet, or
-when `memory_events` clearly lacks something (say so). A voice note whose transcription is missing (`attachments`
-without text): `vault_search` / `vault_get` the object, then `audio_transcribe(paths=[…])`.
+Resolve all named contacts before analysis. Do not assume that a chat title or username is the right person. Use full chat IDs beginning with !.
 
-## Prerequisites
+## Pagination, identifiers and dates
 
-- Beeper Desktop running on the remote machine (100.127.150.1 via Tailscale)
-- API: `http://100.127.150.1:23373`
-- Token: Walter Secrets grant `beeper` (variable `BEEPER_TOKEN`). Run every live call as
-  `walter-secret grant exec beeper --as engine -- <command>`: the command gets `$BEEPER_TOKEN`, its output comes back
-  (since 2026-11-15). Never `walter-secret exec` to read (output discarded by design), never print the token.
-- **A person has several networks** (e.g. Alina = Telegram `cinnamonro` + Instagram `shaulskayaa_`): take every account
-  from `person_lookup`, then `GET /v1/chats/search?query=<pseudo>` for each, and read the chat with the latest
-  `lastActivity` — the sender is the person, never a word to look for in message text.
+Use oldestCursor/newestCursor returned by the same installation and direction before/after. Cursors are opaque: do not construct one from sortKey or reuse a Mac cursor on Server. Stop on an empty page, hasMore=false, a date cutoff, or a repeated cursor.
 
-## Mandatory Temporal Context
+Message IDs are installation-local. Memory keeps its canonical source IDs; the connector resolves shared chat/order metadata and validates time, direction and sender. Do not treat a local numeric ID as portable or create a second message store.
 
-When fetching Beeper messages, ALWAYS include:
-1. Current time at moment of request (UTC+7 Bangkok)
-2. All timestamps converted from UTC to UTC+7: `datetime.fromisoformat(ts.replace("Z","+00:00")).astimezone(timezone(timedelta(hours=7)))`
-3. Full dates (DD/MM HH:mm) for situational awareness
+Messages arrive newest first. Sort ascending for presentation and verify actual timestamps before saying "hier" or "ce matin". lastActivity can reflect a reaction. Use full dates DD/MM HH:mm and convert UTC to the owner's timezone from their profile (Bangkok UTC+7 as of this instance), including the current time when timing matters. Clean rich text for presentation.
 
-This is critical for contextual understanding — Lucas needs to know if a message is from 5 minutes ago or 5 hours ago.
+## Media and codes
 
-## Quick Reference
+Already ingested media/transcripts are in Memory attachments and Raw Vault. Use vault_search/vault_get for missing derived text, and audio_transcribe for audio through the Router. Do not recopy media from the Mac or call model providers directly.
 
-```bash
-# run as: walter-secret grant exec beeper --as engine -- bash -c '…'
-TOKEN="$BEEPER_TOKEN"
-API="http://100.127.150.1:23373"
+The current Server exposes assets/download and assets/serve, used by the existing Memory media connector. Old references claiming that the API cannot serve media describe an older version.
 
-# List all chats
-curl -s "$API/v1/chats" -H "Authorization: Bearer $TOKEN"
+Received verification codes: walter-secret otp locally; never show a code or token to the model or place it in argv, a URL or a unit. Try the authorized Gmail source if Beeper has no applicable channel. Do not assume SMS/iMessage exists: check connected accounts.
 
-# Fetch messages from a specific chat
-curl -s "$API/v1/chats/{chat_id}/messages?limit=10" -H "Authorization: Bearer $TOKEN"
-```
+## Sending and permissions
 
-## Chat ID Format
+Use beeper_send_message(chat_id, text, reply_to="") only through Walter Engine with an explicit owner request and an identified recipient. The existing Engine permission/disclosure plugin applies, including through walter_call. The writer is not exposed to external Codex/Claude clients or HTTP MCP; command and child execution are refused by the Engine policy.
 
-Chat IDs look like `!7Le8lDsatbsQfj7WHrk4:beeper.local` — they are Matrix room IDs.
+Never replace this route with a curl/CLI POST from a shell to bypass the Engine gate. A send timeout means delivery unknown: inspect history before deciding on a retry. The transport never retries sends automatically. Never send test messages without explicit authorization.
 
-## Response Structure
+## Operations
 
-- Chats: `{"items": [...]}` — each item has `id`, `name`, `unreadCount`, etc.
-- Messages: `{"items": [...]}` — each item has `senderName`, `text`, `timestamp`
+Current configuration comes from walter instance config core beeper.toml; credentials from the named Secrets grant, never pasted into a command. Native production services: beeper-server, walter-memory-beeper-watch, walter-memory-beeper.timer. Memory remains the only canonical store, jobs/checkpoints and bus.
 
-## Pagination
+Server 4.3.308 and CLI 0.6.4 were qualified on Linux ARM64 on 2026-11-16. Recheck official releases for a future deployment. Issues https://github.com/beeper/cli/issues/21 and /31 require a production/stable artifact and real chats/history/search tests; ready state or a populated SQLite DB alone is insufficient.
 
-### Chat list pagination (`/v1/chats`)
+The WS is at-most-once with no replay; reconnect schedules bounded HTTP recovery. Older edits/deletions missed during an outage cannot be guaranteed by this protocol. Preserve old checkpoints when switching sources; no historical backfill without a reason and explicit scope.
 
-The chat list endpoint returns 25 chats per page. The response contains `oldestCursor` and `newestCursor` for pagination:
-
-```python
-import json, os, subprocess
-
-# run as: walter-secret grant exec beeper --as engine -- python3 script.py
-token = os.environ["BEEPER_TOKEN"]
-all_chats = []
-cursor = None
-
-while True:
-    url = f"http://100.127.150.1:23373/v1/chats"
-    if cursor:
-        url += f"?cursor={cursor}"
-    data = json.loads(subprocess.getoutput(f'curl -s "{url}" -H "Authorization: Bearer {token}"'))
-    items = data.get("items", [])
-    if not items:
-        break
-    all_chats.extend(items)
-    cursor = data.get("oldestCursor")
-    if not data.get("hasMore") or not cursor:
-        break
-
-# all_chats now contains ALL contacts (typically 200-300+)
-```
-
-### Message pagination (`/v1/chats/{id}/messages`)
-
-The messages endpoint returns `hasMore: true` but **never sends `nextCursor`**. You MUST paginate using the **`sortKey`** of the oldest message on each page:
-
-```python
-cursor = None
-while True:
-    url = f"{API}/v1/chats/{chat_id}/messages?limit=50"
-    if cursor:
-        url += f"&cursor={cursor}"
-    # ... fetch and process items ...
-    cursor = items[-1].get("sortKey")
-    if not cursor:
-        break
-```
-
-This works because Beeper Desktop's API uses `sortKey` as an internal sequence number. Each page returns up to 20 items regardless of `limit`. **Full history can be very deep** — active chats return 400+ pages (8000+ messages). `hasMore` may remain `true` even when the next page is empty, so stop on: empty `items`, missing `sortKey`, `hasMore=false`, timestamp cutoff, or an explicit safety limit (e.g. 500 pages).
-
-## Media Files (audio, images, voice notes)
-
-**Media filtering:** before claiming photos were recovered, classify copied files by header/size/hash. See `references/media-filtering-kardex.md` for the Kardex/CL filtering pattern (real photos vs GIF stickers/placeholders vs view-once unrecoverable media).
-
-**The API does NOT serve media files.** Attachments contain metadata only (`srcURL` is a local Mac filesystem path). However, W.Alter has SSH access to the Mac, so media CAN be accessed and processed.
-
-See **`references/media-access-pipeline.md`** for the full pipeline:
-- Copy files from Mac via SCP (`~/Library/Application Support/BeeperTexts/media/local.beeper.com/` — WhatsApp/Instagram voice notes and images live under `local.beeper.com/`, NOT the parent `media/` directory. The parent contains `beeper.com/`, `gitter.im/`, and `local.beeper.com/` subdirectories.)
-- **Images**: Gemini 2.5 Flash via OpenRouter (free, ~2s)
-- **Audio / voice notes**: MCP `audio_transcribe(paths=[...])` (Router `stt` poste, ~2 s per note, up to 20 files) after copying them to the VM — never a provider key under `walter-secret exec` (its output is discarded by design, so a transcript can never come back)
-- ~5000 media files on disk, no extensions — use `file -b --mime-type` to detect type
-- **Batch retrieval** for a specific chat: see `references/batch-media-retrieval.md`
-
-**Note**: The built-in `vision_analyze` tool may or may not work depending on the session model. As of 2026-05, it worked with mimo-v2.5-pro (returned text descriptions). For guaranteed reliability, use OpenRouter directly with Gemini 2.5 Flash.
-
-## Stripe 3DS Code Retrieval
-
-Stripe sends verification codes via iMessage to `+•• •• •• •• 59`.
-Chat: `stripelink` on `imessagecloud`, ID: `!0Yv8SCqY2O98k6y8V9wN:beeper.local`
-
-```bash
-TOKEN="$BEEPER_TOKEN"   # inside walter-secret grant exec beeper --as engine -- bash -c '…'
-curl -s "http://100.127.150.1:23373/v1/chats/!0Yv8SCqY2O98k6y8V9wN:beeper.local/messages?limit=1" \
-  -H "Authorization: Bearer $TOKEN" | jq '.items[0].text'
-# → "062680 is your Link verification code."
-```
-
-**User preference**: NEVER ask Lucas for a verification code. Always retrieve it from Beeper automatically. If Beeper is unreachable, try Gmail. Only ask as last resort.
-
-## Remote Access
-If Beeper Desktop has remote access enabled, MCP endpoint is at `http://192.168.1.35:23373/v0/mcp` (LAN) and OpenAPI at `http://192.168.1.35:23373/v1/spec`. Via Tailscale: `http://100.127.150.1:23373`. MCP requires auth token.
-
-## Memory ingestion (Walter Memory)
-
-Beeper messages are ingested automatically by the walter-memory Beeper connector (timer `walter-memory-beeper`, every 3 min, read-only Mac API; media go to the encrypted Raw Vault). To find past messages use `memory_search` / `person_lookup` (MCP) or `walter-memory search`. The former Hindsight connector notes are kept verbatim in `references/legacy-hindsight-ingestion.md` (Hindsight retired 2026-10-19).
-
-## Contact Resolution
-When the user gives a contact name that doesn't match any chat title:
-1. **Check Walter Memory FIRST** — `person_lookup` / `memory_search` with the contact name. Past sessions often have the mapping (e.g. "Hani (WhatsApp) — projet PuttGame"). If it returns a match with a chat ID or network, use that directly.
-2. Search ALL chats for partial matches (username, fullName, title, participant names)
-3. If no match found, show the 15-20 most recent chats sorted by `lastActivity` so the user can identify the right one
-4. Instagram usernames often diverge from real names (e.g. `shaulskayaa_` = Alina, confirmed by Monsieur 2026-09-09) — don't assume the chat title matches the person's name; the person card (`person_lookup`) lists every pseudo
-
-**Critical: the API returns max 25 chats.** Contacts inactive for 3+ days may fall off the list. If the user names a contact that was active recently (within a week) but isn't in the current list, check Walter Memory (`person_lookup`) — the contact likely existed but was pushed out by more recent chats.
-
-Pattern: the user will often know someone by a different name than their handle. Show recent chats with network and participant info, let them pick.
-
-**Confirm contact identity BEFORE deep-diving.** When the user names multiple contacts (e.g. "check Yohan and Hani"), resolve ALL of them first. If one is missing from the API, tell the user immediately rather than analyzing the wrong contact. Don't assume a chat that exists is the one they meant — the user knows their contacts better than the handle matching does.
-
-## Critical: Message Fetching & Analysis Rules
-
-1. **API returns messages NEWEST FIRST** — do NOT use `[-3:]` to get latest messages. Use `[:3]` instead. `[-3:]` gives the OLDEST messages on the page, not the most recent.
-2. **Always verify dates before writing "hier", "ce matin", "hier soir"** — calculate `time_ago()` from actual timestamps. If a message is from 2 months ago, say "il y a 2 mois", NOT "hier soir".
-3. **Sort messages chronologically** (oldest first) for display — `msgs.sort(key=lambda m: m["ts"])` after fetching.
-4. **Clean HTML from text** — strip `<br>`, `<a>`, decode `&amp;` entities before displaying.
-5. **Never assume temporal proximity** — a chat with `lastActivity` of 2 hours ago does NOT mean the last TEXT MESSAGE was 2 hours ago. The lastActivity may reflect a reaction, a read receipt, or an outgoing message not returned by the API.
-
-## Further reading (moved out of this file on 2026-11-01, unchanged)
-
-These files predate November 2026. What no longer exists in them: `vault get <provider>/api_key`, `~/.hermes/.env`,
-`execute_code`, and direct calls to a model provider (OpenRouter, Groq, Gemini URLs). Keys are reached only through
-Walter Secrets grants and models only through Walter's own tools (`audio_transcribe` for audio); read these files
-for the Beeper API behaviour they describe, not for those commands.
-
-- `references/pitfalls.md` — All known pitfalls (pagination, IDs, media, contacts, API quirks) — read before any long analysis.
-- `references/multi-source-export.md` — Exporting a multi-source conversation with chronological merge and voice-note transcription.
-- `references/analysis-workflows.md` — Full conversation analysis, batch media retrieval for one chat, the audio transcription pipeline, image analysis.
+Never reset a recovery key or add/remove/reconfigure existing bridges without the owner's approval. The Oracle Desktop rollback and first-import duplicate repair were still awaiting approval at qualification time; inspect the current change report before cleanup.
