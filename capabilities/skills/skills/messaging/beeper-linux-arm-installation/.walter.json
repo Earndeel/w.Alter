@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-16T12:07:41.649280+00:00",
- "description": "Install Beeper Desktop on an ARM64 Linux server and prepare migration from a Mac without cloning active credentials or cryptographic device state.",
- "domain": "messaging",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "codex",
  "reason": "Installation réelle du 16/11/2026 sur Ubuntu 24.04 ARM64 : distribution officielle ARM64 confirmée dans la page Linux ; plantage natif SystemError résolu en créant le dossier de cache avant le démarrage ; connexion e-mail réussie et vérification inter-appareils encore nécessaire. Évite la copie des secrets et du même appareil cryptographique du Mac.",
- "runtime": "codex",
- "session_id": null,
- "target": "beeper-linux-arm-installation"
+ "store_sha": "b8873406b69576ff440f557c7dc33efd85631d9bc5476c62c5d6ab1eabab0c82"
 }
