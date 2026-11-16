@@ -66,7 +66,7 @@ test('helpers: search ranks name hits, clip keeps head and tail, bubble denies p
   const c = clip('a'.repeat(100) + 'b'.repeat(100), 50);
   assert.ok(c.startsWith('aaa') && c.endsWith('bbb') && c.includes('omitted'));
   const argv = bubbleArgv({ ...DEFAULTS }, { unit: 'u', dir: '/d', uid: 993, gid: 985 }).join(' ');
-  for (const p of ['User=993', 'ProtectSystem=strict', 'ProtectHome=yes', 'NoNewPrivileges=yes', '127.0.0.0/8', '169.254.0.0/16', '100.64.0.0/10', 'BindPaths=/d:/kernel', 'CapabilityBoundingSet='])
+  for (const p of ['User=993', 'ProtectSystem=strict', 'ProtectHome=yes', 'NoNewPrivileges=yes', '127.0.0.0/8', '169.254.0.0/16', '100.64.0.0/10', 'BindPaths=/d:/kernel', 'CapabilityBoundingSet=', '--setenv=PATH=/services/python/engine-python/bin:'])
     assert.ok(argv.includes(p), p);
 });
 

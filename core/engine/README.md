@@ -20,7 +20,9 @@
    Monsieur.**
 4. Lire [docs/04-BASELINE.md](docs/04-BASELINE.md) (mesures de référence) et
    [docs/05-CARTOGRAPHIE.md](docs/05-CARTOGRAPHIE.md) (arborescence actuelle → cible).
-5. Règle documentaire commune : `/walter/docs/DOCUMENTATION.md`.
+5. Lire [docs/07-CONVERGENCE.md](docs/07-CONVERGENCE.md) (16/11) : noyau Python persistant en bulle, tours de
+   réveil, Walter Decision — scénarios, mesures avant/après, ce qui reste.
+6. Règle documentaire commune : `/walter/docs/DOCUMENTATION.md`.
 
 ## Règles qui s'appliquent à ce dossier
 

@@ -230,6 +230,20 @@
       "vision_target": "core/engine/plugins"
     },
     {
+      "id": "engine-python",
+      "path": "engine/plugins/python",
+      "role": "Outil python du moteur (16/11, convergence Unharnessed) : noyau Python persistant par conversation, en bulle systemd non privilégiée (walter-sandbox, seul son dossier inscriptible, réseau local refusé) ; outils Walter depuis Python sous la politique, tâches de fond = tâches du moteur avec tour de réveil, sous-agents ; interrupteur [dsh.engine] python off|on",
+      "status": "implemented",
+      "readme": "engine/plugins/python/README.md",
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter harness install dsh"
+        }
+      ],
+      "vision_target": "core/engine/plugins"
+    },
+    {
       "id": "security",
       "path": "security",
       "role": "Politique d'exécution unique de Walter (lot E3) : policy.json (jamais, classes d'outils, presets par porte, enfant ≤ parent) lue par le greffon policy du moteur (policy.mjs) et par le filet du serveur MCP pour tout client (walter_security) ; mêmes vecteurs d'essai des deux côtés",

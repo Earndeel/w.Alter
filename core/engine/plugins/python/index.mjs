@@ -94,7 +94,9 @@ export function bubbleArgv(cfg, { unit, dir, uid, gid }) {
     `MemoryMax=${cfg.memoryMax}`, `TasksMax=${cfg.tasksMax}`, `CPUQuota=${cfg.cpuQuota}`, 'KillMode=control-group',
     'TimeoutStopSec=20',
   ];
-  const env = { HOME: '/kernel', PYTHONPATH: cfg.runtimeDir, PYTHONUNBUFFERED: '1',
+  // the kernel's own interpreter first: `python`, `pip` in bash() are the kernel's (only python3 is on the host PATH)
+  const env = { HOME: '/kernel', PATH: `${dirname(cfg.python)}:/usr/local/bin:/usr/bin:/bin`,
+    PYTHONPATH: cfg.runtimeDir, PYTHONUNBUFFERED: '1',
     PYTHONUSERBASE: '/kernel/.local', MPLBACKEND: 'Agg', LANG: 'C.UTF-8',
     WALTER_KERNEL_SNAPSHOT: '/kernel/.snapshot/state.pkl', WALTER_KERNEL_BIND_JOBS: '1' };
   return ['systemd-run', '--wait', '--pipe', '--collect', '--quiet', `--unit=${unit}`, '--working-directory=/kernel',
