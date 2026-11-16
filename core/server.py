@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """walter-core — the W.Alter harness as one stable MCP surface.
 
-Any MCP client (Claude Code, Claude Desktop, Cursor, Codex, another Hermes...) gets the same
-capabilities without importing Hermes internals:
+Any MCP client (Walter Engine, Claude Code, Claude Desktop, Cursor, Codex...) gets the same
+capabilities:
 
   memory_recall / memory_retain / memory_reflect  → Walter Memory canonical facade (privacy + Router synthesis)
   walter_profile                                  → USER.md / SOUL.md / MEMORY.md
@@ -15,8 +15,7 @@ capabilities without importing Hermes internals:
                                                     injected server-side; agents never see a cookie value)
   walter_health                                   → status of the stack services
 
-Each tool talks to a public HTTP API or a file, never to Hermes' Python modules, so `hermes update`
-cannot break this server and this server cannot break Hermes.
+Each tool talks to a module's public interface (HTTP API, CLI, client) or a file, never to a runtime's internals.
 
 Transport: stdio by default (local clients). `--http` serves streamable HTTP on 127.0.0.1 for a
 reverse proxy that adds authentication (never expose it bare).
@@ -32,7 +31,6 @@ from pathlib import Path
 import httpx
 from mcp.server.fastmcp import FastMCP
 
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", "/root/.hermes"))
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
 # Machine services Walter relies on without owning them; module services come from the registry.
 HOST_UNITS = ["cloudflared-tunnel", "docker"]
@@ -113,9 +111,10 @@ def walter_profile() -> str:
     """Return the user's curated profile (USER.md), W.Alter's identity/style rules (walter-soul, the
     runtime-neutral render) and the critical memory buffer (MEMORY.md). Small; safe to load at the start of a session."""
     parts = []
-    for label, path in (("USER.md", HERMES_HOME / "memories" / "USER.md"),
+    from walter_platform import instance  # the owner's profile lives in the instance (was ~/.hermes/memories)
+    for label, path in (("USER.md", instance.path("profile", "USER.md")),
                         ("W.Alter identity", _soul_profile()),
-                        ("MEMORY.md", HERMES_HOME / "memories" / "MEMORY.md")):
+                        ("MEMORY.md", instance.path("profile", "MEMORY.md"))):
         try:
             parts.append(f"## {label}\n{path.read_text(errors='replace').strip()}")
         except OSError as e:
