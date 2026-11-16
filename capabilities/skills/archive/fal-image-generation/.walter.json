@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-11-14T04:14:13+00:00",
  "archived_reason": "not read for 30 days",
+ "content_since": "2026-05-25T13:15:51Z",
  "domain": "images",
  "hermes": {
   "path": "/root/.hermes/skills/mlops/fal-image-generation",

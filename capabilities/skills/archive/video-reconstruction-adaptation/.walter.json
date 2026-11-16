@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "reference-video-workflows",
+ "content_since": "2026-08-20T19:37:34Z",
  "domain": "media",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/video-reconstruction-adaptation",

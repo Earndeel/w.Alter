@@ -2,6 +2,7 @@
  "archived_at": "2026-11-01T17:06:55+00:00",
  "archived_by": "reorg-2026-11-01",
  "archived_reason": "describes a system retired on 2026-10-19 (voice calls, Asterisk)",
+ "content_since": "2026-10-27T04:19:39Z",
  "domain": "audio",
  "hermes": {
   "note": "vault-value scrub applied on both sides 2026-11-01",

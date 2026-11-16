@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "evidence-to-execution-workflows",
+ "content_since": "2026-07-25T10:59:24Z",
  "domain": "productivity",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/contact-project-brief-planning",

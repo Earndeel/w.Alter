@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "llm-provider-operations",
+ "content_since": "2026-11-01T18:13:16Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/aws-bedrock-setup",

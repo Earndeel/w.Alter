@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "hermes-tui-operations",
+ "content_since": "2026-07-03T13:17:56Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/hermes-tui-troubleshooting",

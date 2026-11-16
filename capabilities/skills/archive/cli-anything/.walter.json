@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-10-23T04:15:12+00:00",
  "archived_reason": "not read for 140 days",
+ "content_since": "2026-06-05T03:03:09Z",
  "domain": "software-development",
  "hermes": {
   "path": "/root/.hermes/skills/software-development/cli-anything",

@@ -124,12 +124,11 @@ def test_bundle_never_truncates_silently(tmp_path):
 
 
 def test_bus_consumer_routes_events(monkeypatch):
-    """skill.changed from Hermes → sync of exactly those skills; drafts judged once per batch; learning splits
-    turn.ended (implicit only) from session.ended (implicit + learner)."""
+    """skill events → drafts judged once per batch; learning splits turn.ended (implicit only) from session.ended
+    (implicit + learner)."""
     from datetime import datetime, timedelta, timezone
     from walter_skills import consumer
     calls = {}
-    monkeypatch.setattr(consumer.hermes_sync, "sync", lambda names: calls.setdefault("sync", names) and {})
     monkeypatch.setattr(consumer.curation, "run", lambda **kw: calls.setdefault("drafts", []).append(kw) or
                         {"summary": {"done": 0}})
     monkeypatch.setattr(consumer.cards, "refresh", lambda skills: 0)
@@ -142,11 +141,11 @@ def test_bus_consumer_routes_events(monkeypatch):
                         lambda session_ids, max_sessions: calls.setdefault("learner", session_ids) and {})
     ev = lambda i, t, src, sub: {"id": i, "type": t, "source": src, "subject": sub,  # noqa: E731
                                  "at": datetime.now(timezone.utc) - timedelta(minutes=5), "payload": {}}
-    consumer.react([ev(1, "skill.changed", "hermes", "a"), ev(2, "skill.changed", "hermes", "b"),
+    consumer.react([ev(1, "skill.changed", "dsh", "a"), ev(2, "skill.changed", "dsh", "b"),
                     ev(3, "skill.proposed", "claude_code", "c")])
-    assert calls["sync"] == {"a", "b"} and len(calls["drafts"]) == 1
-    consumer.learn([ev(4, "turn.ended", "dsh", "dsh/vm/s1"), ev(5, "session.ended", "hermes", "hermes/main/s2")])
-    assert calls["implicit"] == ["dsh/vm/s1", "hermes/main/s2"] and calls["learner"] == ["hermes/main/s2"]
+    assert len(calls["drafts"]) == 1
+    consumer.learn([ev(4, "turn.ended", "dsh", "dsh/vm/s1"), ev(5, "session.ended", "codex", "codex/vm/s2")])
+    assert sorted(calls["implicit"]) == ["codex/vm/s2", "dsh/vm/s1"] and calls["learner"] == ["codex/vm/s2"]
 
 
 

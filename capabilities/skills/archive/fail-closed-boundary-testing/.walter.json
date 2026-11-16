@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "security-assurance",
+ "content_since": "2026-08-06T11:30:52Z",
  "domain": "software-development",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/fail-closed-boundary-testing",

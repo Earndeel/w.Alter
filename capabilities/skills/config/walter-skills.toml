@@ -25,7 +25,7 @@ error_max = 2              # after a failed command: at most N skills ...
 error_min_symptom = 8.0    # ... whose card symptoms match the specific words of the error (BM25) at least this much
 domain_map = true          # first turn of a session: the domain map (tier 0, stable, cache-friendly)
 # Runtimes whose "Modules W.Alter" layer (walter-context: MCP instructions, file profiles) already carries this
-# module's level 0 (overview + domain map): the policy does not repeat it. Hermes keeps its plugin's map.
+# module's level 0 (overview + domain map): the policy does not repeat it.
 layer_runtimes = ["claude_code", "dsh", "codex"]
 
 [learning]

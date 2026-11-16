@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-10-23T04:15:10+00:00",
  "archived_reason": "not read for 191 days",
+ "content_since": "2026-04-22T11:50:18Z",
  "domain": "mlops",
  "hermes": {
   "path": "/root/.hermes/skills/mlops/piapi-video-generation",

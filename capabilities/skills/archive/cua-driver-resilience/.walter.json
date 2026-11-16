@@ -3,6 +3,7 @@
  "archived_at": "2026-11-01T17:06:55+00:00",
  "archived_by": "reorg-2026-11-01",
  "archived_reason": "merged into remote-computer-use (2026-11-01 reorganisation)",
+ "content_since": "2026-08-12T13:54:17Z",
  "domain": "computer-use",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/cua-driver-resilience",

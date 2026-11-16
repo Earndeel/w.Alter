@@ -2,6 +2,7 @@
  "absorbed_into": "hermes-desktop-debug",
  "archived_at": "2026-10-30T04:14:43+00:00",
  "archived_reason": "merged into hermes-desktop-debug",
+ "content_since": "2026-08-28T09:47:14Z",
  "domain": "hermes-desktop",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/hermes-desktop-debugging",

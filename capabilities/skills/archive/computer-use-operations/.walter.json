@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "durable-computer-use-architecture",
+ "content_since": "2026-09-08T14:15:15Z",
  "domain": "autonomous-ai-agents",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/computer-use-operations",

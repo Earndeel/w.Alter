@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "security-assurance",
+ "content_since": "2026-07-23T08:39:30Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/credential-scope-verification",

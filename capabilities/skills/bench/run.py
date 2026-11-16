@@ -3,7 +3,7 @@
   python bench/run.py            active ranker on the held-out slice (bench + judge labels)
   python bench/run.py --hermes   + the Hermes baselines recorded on 2026-10-09 (data/llm_*.jsonl), on the same truth
 
-History of the method and of every number: /root/.hermes/docs/walter-memory/DECISIONS.md (P10, 2026-10-09/10).
+History of the method and of every number: /walter/docs/DECISIONS.md (P10, 2026-10-09/10).
 The scripts used on 2026-10-09 (dataset build, LLM baselines, judge pools, shortlist choosers) are in git history
 (tag v1-before-refactor); their outputs stay in data/ (0600, private messages, never committed).
 """

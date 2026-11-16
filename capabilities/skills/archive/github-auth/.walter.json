@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-10-23T04:15:08+00:00",
  "archived_reason": "not read for 183 days",
+ "content_since": "2026-08-13T07:48:55Z",
  "domain": "github",
  "hermes": {
   "path": "/root/.hermes/skills/github/github-auth",

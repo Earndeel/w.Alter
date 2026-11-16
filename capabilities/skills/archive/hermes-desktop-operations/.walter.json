@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "hermes-desktop-remote-operations",
+ "content_since": "2026-09-08T14:15:14Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/hermes-desktop-operations",

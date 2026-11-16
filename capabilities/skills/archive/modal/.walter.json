@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-10-23T04:15:09+00:00",
  "archived_reason": "not read for 155 days",
+ "content_since": "2026-04-03T20:08:56Z",
  "domain": "mlops/cloud",
  "hermes": {
   "path": "/root/.hermes/skills/mlops/cloud/modal",

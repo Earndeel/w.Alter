@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "hermes-profile-operations",
+ "content_since": "2026-08-20T19:52:22Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/hermes-profile-layout-migration",

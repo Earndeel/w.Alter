@@ -4,8 +4,8 @@
   expose "message" [--runtime …] [--session …]    exactly what the policy would show
   read <name> [--file path]                       a skill (or one of its files)
   nightly [--only step,…]                         the nightly graph (see jobs.py)
-  quick                                           every 15 min: Hermes sync → judged drafts live → cards
-  sync | cards | catalog | implicit | judge | sessions | train [--force] | curate [--apply|--shadow] | map | digest
+  quick                                           every 15 min: judged drafts live → cards → catalog
+  cards | catalog | implicit | judge | sessions | train [--force] | curate [--apply|--shadow] | map | digest
   health                                          problems as JSON, exit 1 if any (5-min watchdog)
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ def main() -> int:
     r.add_argument("--peek", action="store_true", help="read without restoring a skill from the reserve")
     n = sub.add_parser("nightly")
     n.add_argument("--only", default="")
-    for c in ("sync", "cards", "catalog", "implicit", "judge", "sessions", "map", "digest", "health", "quick"):
+    for c in ("cards", "catalog", "implicit", "judge", "sessions", "map", "digest", "health", "quick"):
         sub.add_parser(c)
     sub.add_parser("manifest")
     br = sub.add_parser("brief")
@@ -68,9 +68,6 @@ def main() -> int:
     elif a.cmd == "quick":
         from . import jobs
         p(jobs.quick())
-    elif a.cmd == "sync":
-        from . import hermes_sync
-        p({k: (v if isinstance(v, int) else v[:20]) for k, v in hermes_sync.sync().items()})
     elif a.cmd == "cards":
         from . import cards
         p(cards.refresh())
@@ -108,7 +105,8 @@ def main() -> int:
         from . import curation
         text = curation.digest()
         print(text)
-        subprocess.run(["/root/.hermes/hermes-agent/venv/bin/hermes", "send", "-t", "telegram", text],
+        # Weekly, silent: walter-telegram replaced the Hermes CLI (which stopped on 2026-11-10).
+        subprocess.run(["walter-telegram", "send", "--silent", "--plain", text],
                        capture_output=True, text=True, timeout=120)
     elif a.cmd == "health":
         from . import jobs

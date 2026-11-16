@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "web-extraction-operations",
+ "content_since": "2026-08-04T14:34:52Z",
  "domain": "research",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/live-network-extraction",

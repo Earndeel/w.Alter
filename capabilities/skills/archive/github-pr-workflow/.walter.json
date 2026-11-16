@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-11-07T04:14:01+00:00",
  "archived_reason": "not read for 30 days",
+ "content_since": "2026-08-13T07:48:55Z",
  "domain": "code",
  "hermes": {
   "path": "/root/.hermes/skills/github/github-pr-workflow",

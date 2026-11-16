@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "hermes-runtime-operations",
+ "content_since": "2026-09-16T16:19:40Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/hermes-ui-runtime-operations",

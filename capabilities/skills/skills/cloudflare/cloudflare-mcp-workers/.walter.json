@@ -1,4 +1,5 @@
 {
+ "content_since": "2026-11-01T18:12:02Z",
  "hermes": {
   "note": "vault-value scrub applied on both sides 2026-11-01",
   "path": "/root/.hermes/skills/cloud/cloudflare-mcp-workers",

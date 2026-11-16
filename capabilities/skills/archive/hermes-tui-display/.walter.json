@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "hermes-tui-operations",
+ "content_since": "2026-06-29T10:28:17Z",
  "domain": "hermes-deep",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/hermes-tui-display",

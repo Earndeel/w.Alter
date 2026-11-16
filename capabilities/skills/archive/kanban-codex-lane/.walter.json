@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-10-23T04:15:05+00:00",
  "archived_reason": "not read for 109 days",
+ "content_since": "2026-05-21T04:08:14Z",
  "domain": "autonomous-ai-agents",
  "hermes": {
   "path": "/root/.hermes/skills/autonomous-ai-agents/kanban-codex-lane",

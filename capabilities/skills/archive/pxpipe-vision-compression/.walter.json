@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "pxpipe-workflows",
+ "content_since": "2026-07-09T12:46:49Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/pxpipe-vision-compression",

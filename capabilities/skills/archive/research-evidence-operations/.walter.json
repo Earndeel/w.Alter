@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "web-research-operations",
+ "content_since": "2026-09-08T14:52:53Z",
  "domain": "research",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/research-evidence-operations",

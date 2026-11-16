@@ -10,7 +10,7 @@ import re
 import shutil
 from pathlib import Path
 
-from .. import hermes_sync, postes, registry, secret_refs, store
+from .. import postes, registry, secret_refs, store
 from . import base, signals
 
 RETIRED = {
@@ -20,6 +20,7 @@ RETIRED = {
     "jarvis-memory-gateway": r"jarvis[-_]memory[-_]gateway",
     "web call (call.walter-ai.cloud)": r"call\.walter-ai\.cloud|hermes-voice-call",
     "walter-ops remote admin": r"walter-ops\b",
+    "Hermes (removed 2026-11-16)": r"(~|/root)/\.hermes\b|\bhermes (chat|gateway|send|update|config)\b|hermes-agent/",
 }
 
 
@@ -251,41 +252,26 @@ def issues_body(verdict: dict | None) -> str:
 
 class Secrets:
     """No secret value in a skill (2026-11-01, Monsieur): every Bitwarden value becomes its Walter Secrets placeholder
-    {{bw:<item>:<field>}}, resolved at execution, never shown to a model. Covers the store (active, reserve, drafts)
-    and, for security only, Hermes' own copies (otherwise never edited). Value-free detection; always active."""
+    {{bw:<item>:<field>}}, resolved at execution, never shown to a model. Covers the store (active, reserve, drafts).
+    Value-free detection; always active."""
     name, limit, editor = "secrets", None, False
 
     def propose(self, ctx: base.Context) -> list[dict]:
         if not secret_refs.available():
             return []
         roots = [ctx.root / d for d in ("skills", "archive", "drafts")]
-        if ctx.root == store.ROOT:
-            roots.append(hermes_sync.HERMES)
         files = secret_refs.scan(roots)
         return [{"files": [str(f) for f in files]}] if files else []
 
     def apply(self, ctx: base.Context, p: dict) -> dict:
-        paths = [Path(f) for f in p["files"]]
-        # A Hermes copy that matched our last sync before the rewrite is realigned, so the rewrite is not drafted
-        # back as a "Hermes change"; a copy Hermes really changed keeps its pending state.
-        hermes_files = [f for f in paths if str(f).startswith(str(hermes_sync.HERMES) + "/")]
-        touched = {n: d for n, (d, _) in hermes_sync.hermes_active().items()
-                   if any(str(f).startswith(str(d) + "/") for f in hermes_files)} if hermes_files else {}
-        ours = {s.name: s for s in store.iter_skills(include_archived=True, root=ctx.root)}
-        in_sync = {n for n, d in touched.items()
-                   if n in ours and (ours[n].meta.get("hermes") or {}).get("sha") == store.tree_hash(d)}
-        r = secret_refs.fix(paths)
-        for n in in_sync:
-            s = ours[n]
-            store.write_sidecar(s.path, s.meta | {"hermes": (s.meta.get("hermes") or {}) | {"sha": store.tree_hash(touched[n])}})
+        r = secret_refs.fix([Path(f) for f in p["files"]])
         c = ctx.commit(f"curator: secrets -> Bitwarden placeholders ({r['placeholders']} placeholders, "
-                       f"{r['generic_masks']} generic masks, {r['files']} files)", "secrets", None,
-                       r | {"hermes_files": len(hermes_files)})
+                       f"{r['generic_masks']} generic masks, {r['files']} files)", "secrets", None, r)
         return {"status": "done", "commit": c, **r}
 
 
 class Drafts:
-    """Agents' proposals (write door) and Hermes' own changes → live at once, no model judge (git keeps the trace)."""
+    """Agents' proposals (write door) → live at once, no model judge (git keeps the trace)."""
     name, limit, editor = "drafts", None, False
 
     def propose(self, ctx: base.Context) -> list[dict]:
@@ -295,8 +281,6 @@ class Drafts:
 
     def apply(self, ctx: base.Context, p: dict) -> dict:
         d, kind, target = ctx.root / "drafts" / p["draft"], p.get("kind"), p.get("target")
-        if kind == "hermes_update":
-            return {"status": "skipped", "reason": "Hermes changed a skill Walter also changed: manual merge"}
         # No model judge on drafts (2026-10-26, Monsieur: "beaucoup trop strict inutilement"). The write door already
         # refuses secrets, malformed frontmatter, oversize text and paths outside the skill; here only the target is
         # checked. A wrong change is undone with git (every acceptance is its own commit).
@@ -305,7 +289,7 @@ class Drafts:
             verdict = {"ok": target not in sk and not (ctx.root / "archive" / target).exists(),
                        "issues": [f"{target} already exists"] if target in sk or (ctx.root / "archive" / target).exists()
                        else []}
-        elif kind in ("patch", "hermes_patch") and target in sk:
+        elif kind == "patch" and target in sk:
             verdict = {"ok": True, "issues": []}
         else:
             verdict = {"ok": False, "issues": [f"{target} is not an active skill"]}
@@ -314,21 +298,12 @@ class Drafts:
                 dst = ctx.root / "skills" / (p.get("domain") or "learned") / target
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(d), str(dst))
-                side = {"origin": "hermes-agent" if p.get("runtime") == "hermes" else "agent-proposal", "owner": "walter",
-                        "proposed_by": p.get("runtime"), "reason": p.get("reason"), "hermes": p.get("hermes"),
-                        "review_notes": verdict.get("minor")}
+                side = {"origin": "agent-proposal", "owner": "walter", "proposed_by": p.get("runtime"),
+                        "reason": p.get("reason"), "review_notes": verdict.get("minor")}
                 store.write_sidecar(dst, {k: v for k, v in side.items() if v} | {"store_sha": store.tree_hash(dst)})
-            elif kind == "patch":
+            else:  # patch
                 shutil.copyfile(d / p.get("changed", "SKILL.md"), sk[target].path / p.get("changed", "SKILL.md"))
                 shutil.rmtree(d)
-            else:  # hermes_patch: Hermes' new version replaces ours (we never edited it)
-                meta = sk[target].meta
-                shutil.rmtree(sk[target].path)
-                shutil.move(str(d), str(sk[target].path))
-                hermes = (meta.get("hermes") or {}) | (p.get("hermes") or {})
-                hermes.pop("pending_sha", None)
-                store.write_sidecar(sk[target].path, meta | {"hermes": hermes})
-                store.write_sidecar(sk[target].path, meta | {"hermes": hermes, "store_sha": store.tree_hash(sk[target].path)})
             c = ctx.commit(f"curator: accept {kind} {target} ({str(p.get('reason'))[:100]})" + issues_body(verdict),
                            f"draft_{kind}", target,
                            {"draft": p["draft"], "judge": verdict}, paths=["skills", "drafts"])
@@ -342,7 +317,7 @@ class Drafts:
 
 class Organize:
     """Domains that help the agent: the editor proposes a taxonomy (~20 domains) and assigns every walter-owned skill;
-    folders move (git mv), names never change — retrieval, links and Hermes sync are unaffected."""
+    folders move (git mv), names never change — retrieval and links are unaffected."""
     name, limit, editor = "organize", "max_moves", True
 
     def propose(self, ctx: base.Context) -> list[dict]:
@@ -357,7 +332,7 @@ class Organize:
                           for s in sorted(sk.values(), key=lambda x: x.name))
         obj, _ = postes.ask_json("editor", (
             "Organise W.Alter's skill library into 15–25 domains that an agent would recognise at a glance (by "
-            "service/activity, e.g. 'hermes-runtime', 'video-production', 'web-browsing-auth', 'messaging', "
+            "service/activity, e.g. 'video-production', 'web-browsing-auth', 'messaging', "
             f"'model-routing'…), each with at most {ctx.cfg['max_domain_size']} skills; no 'misc'. Keep a skill's "
             "current domain when it already fits. Return JSON only: {\"domains\": {\"<domain>\": \"one-line scope\"}, "
             "\"assign\": {\"<skill name>\": \"<domain>\"}}\n\nSkills [current domain]: summary\n" + lines),
@@ -387,7 +362,7 @@ class Organize:
 
 
 class Flags:
-    """Report only: mentions of retired services, Hermes conflicts."""
+    """Report only: mentions of retired services."""
     name, limit, editor = "flags", None, False
 
     def propose(self, ctx: base.Context) -> list[dict]:

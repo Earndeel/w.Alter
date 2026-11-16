@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "llm-provider-operations",
+ "content_since": "2026-09-16T16:19:41Z",
  "domain": "mlops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/llm-provider-evaluation",

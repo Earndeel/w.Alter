@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "google-workspace-operations",
+ "content_since": "2026-08-12T06:22:45Z",
  "domain": "productivity",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/gmail-opportunity-intelligence",

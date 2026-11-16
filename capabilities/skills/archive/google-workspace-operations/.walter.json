@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "evidence-to-execution-workflows",
+ "content_since": "2026-09-16T16:26:27Z",
  "domain": "productivity",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/google-workspace-operations",

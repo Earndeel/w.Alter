@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-11-11T04:16:54+00:00",
  "archived_reason": "not read for 30 days",
+ "content_since": "2026-05-20T08:48:15Z",
  "domain": "gpu",
  "hermes": {
   "path": "/root/.hermes/skills/cloud/free-gpu-stack",

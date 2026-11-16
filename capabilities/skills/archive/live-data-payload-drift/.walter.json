@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "web-extraction-operations",
+ "content_since": "2026-09-02T09:38:47Z",
  "domain": "research",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/live-data-payload-drift",

@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-11-10T04:15:10+00:00",
  "archived_reason": "not read for 30 days",
+ "content_since": "2026-09-21T17:28:02Z",
  "domain": "video",
  "hermes": {
   "path": "/root/.hermes/skills/flow-selfie-physical-qa",

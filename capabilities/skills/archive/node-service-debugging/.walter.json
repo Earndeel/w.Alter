@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-10-23T04:15:12+00:00",
  "archived_reason": "not read for 119 days",
+ "content_since": "2026-06-11T00:11:42Z",
  "domain": "software-development",
  "hermes": {
   "path": "/root/.hermes/skills/software-development/node-service-debugging",

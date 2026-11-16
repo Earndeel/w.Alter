@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "telegram-delivery-operations",
+ "content_since": "2026-07-31T15:47:26Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/telegram-rich-message-formatting",

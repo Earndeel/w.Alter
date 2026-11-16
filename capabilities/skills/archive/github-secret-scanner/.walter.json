@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-10-23T04:15:07+00:00",
  "archived_reason": "not read for 160 days",
+ "content_since": "2026-04-20T06:47:17Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/devops/github-secret-scanner",

@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "security-assurance",
+ "content_since": "2026-08-13T11:22:15Z",
  "domain": "software-development",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/security-audit",

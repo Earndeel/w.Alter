@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-10-23T04:15:05+00:00",
  "archived_reason": "never read by any agent",
+ "content_since": "2026-06-11T00:13:01Z",
  "domain": "apple",
  "hermes": {
   "path": "/root/.hermes/skills/apple/apple-automation-suite",

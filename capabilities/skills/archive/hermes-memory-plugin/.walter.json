@@ -1,7 +1,8 @@
 {
  "archived_at": "2026-11-01T17:06:55+00:00",
  "archived_by": "reorg-2026-11-01",
- "archived_reason": "not read by any agent for 30+ days",
+ "archived_reason": "Hermes removed from the VM (2026-11-16, Monsieur)",
+ "content_since": "2026-05-22T11:34:23Z",
  "domain": "walter",
  "hermes": {
   "path": "/root/.hermes/skills/devops/hermes-memory-plugin",
@@ -11,6 +12,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
- "reserve": true,
+ "retired": "hermes",
  "store_sha": "927b0dfd8ca05d3d829e17e4d16d5d4ebd049a667d6f87b595d93d5bb25d0a6b"
 }

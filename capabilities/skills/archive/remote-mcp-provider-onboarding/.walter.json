@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "mcp-provider-operations",
+ "content_since": "2026-08-03T08:06:00Z",
  "domain": "mcp",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/remote-mcp-provider-onboarding",

@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "ai-provider-operations",
+ "content_since": "2026-09-21T17:32:26Z",
  "domain": "",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/elie-ugc-iteration-authority",

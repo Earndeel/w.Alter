@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-11-14T04:14:13+00:00",
  "archived_reason": "not read for 30 days",
+ "content_since": "2026-06-02T03:03:02Z",
  "domain": "scena",
  "hermes": {
   "path": "/root/.hermes/skills/mlops/scena-image-routing",

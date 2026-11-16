@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "communication-delivery-operations",
+ "content_since": "2026-06-29T03:03:31Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/voice-call-delivery-ops",

@@ -100,9 +100,7 @@ def manifest(root: Path | None = None) -> str:
 
 
 def render(search_tool: str) -> str:
-    hermes = search_tool.startswith('walter_')
-    index_tool = 'walter_skills_index' if hermes else 'skills_index'
-    manifest_tool = 'walter_skills_manifest' if hermes else 'skills_manifest'
+    index_tool, manifest_tool = 'skills_index', 'skills_manifest'
     data = index()
     header = ("W.Alter Skills — bibliothèque de procédures et workflows, partagée entre les agents.\n"
               f"{manifest_tool} explique le module ; {index_tool}(domain=…) indique à quoi sert chaque entrée. "
@@ -125,10 +123,8 @@ def domain_map() -> str:
 def brief_document(search_tool: str = 'skills_search') -> dict:
     """Level 0 of the module in the shared v1 note envelope consumed by walter-context (walter present)."""
     import hashlib
-    hermes = search_tool.startswith('walter_')
     content = '### W.Alter Skills — procédures et workflows partagés entre les agents\n' + render(search_tool).split('\n', 1)[1]
-    tools = ([search_tool, 'walter_skills_index', 'walter_skill_read'] if hermes
-             else [search_tool, 'skills_index', 'skill_read'])
+    tools = [search_tool, 'skills_index', 'skill_read']
     return {'schema_version': 1, 'note_version': 1, 'id': 'walter-skills.brief', 'module': 'skills',
             'format': 'text/markdown', 'content': content, 'sha256': hashlib.sha256(content.encode()).hexdigest(),
             'chars': len(content), 'required_tools': tools, 'placement': 'stable_capabilities',

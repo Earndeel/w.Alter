@@ -1,7 +1,10 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "security-assurance",
  "archived_at": "2026-11-01T17:06:55+00:00",
  "archived_by": "reorg-2026-11-01",
  "archived_reason": "not read by any agent for 30+ days",
+ "content_since": "2026-09-03T10:21:23Z",
  "domain": "code",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/evidence-integrity-verification",

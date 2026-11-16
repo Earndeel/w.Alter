@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-16T17:03:19+00:00",
+ "archived_reason": "Hermes removed from the VM (2026-11-16, Monsieur)",
+ "content_since": "2026-07-13T11:54:05Z",
+ "domain": "hermes",
+ "hermes": {
+  "path": "/root/.hermes/skills/devops/hermes-context-management",
+  "sha": "4b5e0d1ccf21b2a23a669d239e5d68362eaa6d5d591c515c68c3583b3cb1dcf8",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-agent",
+ "owner": "walter",
+ "retired": "hermes",
+ "store_sha": "4b5e0d1ccf21b2a23a669d239e5d68362eaa6d5d591c515c68c3583b3cb1dcf8"
+}

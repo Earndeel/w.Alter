@@ -28,11 +28,9 @@
   "interfaces": [
     "HTTP :8891",
     "stdlib client",
-    "MCP",
-    "Hermes plugin"
+    "MCP"
   ],
   "bindings": {
-    "hermes": "native walter-skills adapter and lifecycle hook",
     "dsh": "common MCP",
     "codex": "common MCP",
     "claude-code": "common MCP"

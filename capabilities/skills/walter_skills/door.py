@@ -127,8 +127,6 @@ def patch(name: str, reason: str, skill_md: str | None = None, file_path: str | 
     s = store.find(name, include_archived=False)
     if s is None:
         raise Refused(f"unknown active skill {name!r}")
-    if s.meta.get("owner") == "upstream":
-        raise Refused(f"{name!r} ships with Hermes (upstream, read-only): propose a separate skill instead")
     if len((reason or "").strip()) < 15:
         raise Refused("reason: what was wrong or missing, and the evidence (command output, session)")
     if bool(skill_md) == bool(file_path):

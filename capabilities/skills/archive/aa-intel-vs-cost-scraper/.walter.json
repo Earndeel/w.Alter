@@ -3,6 +3,7 @@
  "archived_at": "2026-11-01T17:06:55+00:00",
  "archived_by": "reorg-2026-11-01",
  "archived_reason": "merged into aa-pareto-model-optimizer (2026-11-01 reorganisation)",
+ "content_since": "2026-09-27T08:16:01Z",
  "domain": "models",
  "hermes": {
   "path": "/root/.hermes/skills/aa-intel-vs-cost-scraper",

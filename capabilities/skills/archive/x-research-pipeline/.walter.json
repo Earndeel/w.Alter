@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-11-09T04:17:31+00:00",
  "archived_reason": "not read for 30 days",
+ "content_since": "2026-06-16T07:38:28Z",
  "domain": "research",
  "hermes": {
   "path": "/root/.hermes/skills/research/x-research-pipeline",

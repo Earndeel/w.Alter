@@ -1,4 +1,5 @@
 {
+ "content_since": "2026-05-15T04:32:53Z",
  "hermes": {
   "path": "/root/.hermes/skills/landing-page-product-images",
   "sha": "df29618b8b5e0eada06b7847ad0a20dc53cc41b877f6bcdb82611b731b408b40",
@@ -7,5 +8,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
+ "pinned": true,
  "store_sha": "df29618b8b5e0eada06b7847ad0a20dc53cc41b877f6bcdb82611b731b408b40"
 }

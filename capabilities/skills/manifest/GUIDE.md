@@ -26,11 +26,11 @@ Le modèle choisit la procédure à lire. Le Curator entretient la bibliothèque
 | `cards.py` | Fiches de découverte ; pas de chargement des procédures complètes dans le prompt |
 | `ranker.py`, `retrieval.py` | Recherche locale lexicale et sémantique, classement, lecture des skills |
 | `policy.py` | Politique commune d'exposition, indépendante des runtimes |
-| `door.py`, `hermes_sync.py` | Propositions et synchronisation ; les conflits ne doivent pas écraser une modification locale |
+| `door.py` | Propositions ; une proposition ne doit pas écraser une modification locale |
 | `curation/` | Entretien des noms, descriptions, domaines, liens et workflows ; publication de l'index après les opérations actives |
 | `learning.py`, `evaluate.py` | Labels, entraînement et évaluation ; ne remplacent pas une vérification de réussite de tâche |
 | `jobs.py`, `consumer.py` | Passage nocturne, réactions aux événements et réconciliation ; actualisation de l'index |
-| `api.py`, `client.py` | Interfaces communes HTTP et client léger ; les adaptateurs MCP et Hermes transportent ces mêmes opérations |
+| `api.py`, `client.py` | Interfaces communes HTTP et client léger ; l'adaptateur MCP transporte ces mêmes opérations |
 | `postes.py` | Accès aux postes IA via Walter Router pour l'entretien hors du chemin de chaque message |
 
 ## Index et fraîcheur
@@ -43,12 +43,12 @@ Le Curator entretient la qualité sémantique des descriptions et du classement 
 
 ## Interfaces
 
-| Besoin | MCP commun | Hermes | HTTP / CLI |
-|---|---|---|---|
-| Comprendre le module | `skills_manifest()` | `walter_skills_manifest()` | `GET /v1/manifest` ; `walter-skills manifest` |
-| Parcourir l'index | `skills_index(domain, offset, limit)` | `walter_skills_index(domain, offset, limit)` | `GET /v1/index` ; `walter-skills index [--domain …]` |
-| Chercher par intention | `skills_search(query, context)` | `walter_skill_search(query, context)` | `POST /v1/search` ; `walter-skills search` |
-| Charger une procédure | `skill_read(name, file_path)` | `walter_skill_read(name, file_path)` | `GET /v1/skill/{name}` ; `walter-skills read` |
+| Besoin | MCP commun | HTTP / CLI |
+|---|---|---|
+| Comprendre le module | `skills_manifest()` | `GET /v1/manifest` ; `walter-skills manifest` |
+| Parcourir l'index | `skills_index(domain, offset, limit)` | `GET /v1/index` ; `walter-skills index [--domain …]` |
+| Chercher par intention | `skills_search(query, context)` | `POST /v1/search` ; `walter-skills search` |
+| Charger une procédure | `skill_read(name, file_path)` | `GET /v1/skill/{name}` ; `walter-skills read` |
 
 `contracts/skills.json` décrit le contrat technique, les dépendances, les ressources et la restauration. `README.md` décrit l'exploitation. Le présent manifeste explique la structure ; il ne reproduit pas l'index vivant.
 

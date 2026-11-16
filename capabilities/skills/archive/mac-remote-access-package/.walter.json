@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "mac-remote-access-operations",
+ "content_since": "2026-07-05T11:37:32Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/mac-remote-access-package",

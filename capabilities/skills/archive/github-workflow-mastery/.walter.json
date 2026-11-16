@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-10-23T04:15:09+00:00",
  "archived_reason": "not read for 70 days",
+ "content_since": "2026-06-11T00:09:22Z",
  "domain": "github",
  "hermes": {
   "path": "/root/.hermes/skills/github/github-workflow-mastery",

@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "conversational-workflow-operations",
+ "content_since": "2026-07-29T12:14:42Z",
  "domain": "software-development",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/conversational-intake-orchestration",

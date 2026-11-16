@@ -52,8 +52,8 @@ def _safe(fn, default):
 
 
 def _tools(runtime: str) -> tuple[str, str]:
-    """Names of the read/search tools in this runtime (the only runtime-specific detail)."""
-    return ("walter_skill_read", "walter_skill_search") if runtime.startswith("hermes") else ("skill_read", "skills_search")
+    """Names of the read/search tools: the walter MCP ones, the same in every runtime (Hermes had its own until 2026-11-16)."""
+    return ("skill_read", "skills_search")
 
 
 def _cards_text(rows: list[dict], read_tool: str) -> str:

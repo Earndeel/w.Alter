@@ -1,7 +1,6 @@
 """No secret value in a skill: every Bitwarden value found in skill text becomes its placeholder {{bw:<item>:<field>}}.
 
-The placeholder is Walter Secrets' own convention: Hermes resolves it in tool arguments right before execution,
-`walter-secret get <item> <field>` resolves it in a terminal, and the model only ever sees the placeholder
+The placeholder is Walter Secrets' own convention: `walter-secret get <item> <field>` resolves it at execution, and the model only ever sees the placeholder
 (Monsieur, 2026-11-01: « ça doit être le rôle du curateur de faire cela »).
 
 Detection is value-free and cheap (Walter Secrets' fingerprint index); the vault itself is read only when a file

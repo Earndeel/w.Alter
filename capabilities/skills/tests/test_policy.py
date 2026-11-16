@@ -56,10 +56,11 @@ def test_new_session_gets_up_to_k_max_cards(env, monkeypatch):
     assert len(e.shown) == 15 and "skill_read" in e.text
 
 
-def test_hermes_gets_its_own_tool_names_and_the_map_on_first_turn(env, monkeypatch):
+def test_first_turn_gets_the_map_with_the_mcp_tool_names(env, monkeypatch):
+    """A runtime without the module layer (not in layer_runtimes) gets the domain map on its first turn."""
     use(monkeypatch, FakeEngine([row("s1")]))
-    e = policy.expose("message", "lis mes derniers messages beeper", runtime="hermes", first_turn=True)
-    assert e.text.startswith("MAP(walter_skill_search)") and "walter_skill_read" in e.text
+    e = policy.expose("message", "lis mes derniers messages beeper", runtime="agent", first_turn=True)
+    assert e.text.startswith("MAP(skills_search)") and "skill_read" in e.text
 
 
 def test_ongoing_session_only_new_cards_and_follow_ups_get_nothing(env, monkeypatch):

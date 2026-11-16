@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "mcp-provider-operations",
+ "content_since": "2026-07-03T13:23:26Z",
  "domain": "mcp",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/hosted-mcp-oauth",

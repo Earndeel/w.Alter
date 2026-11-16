@@ -1,7 +1,8 @@
 {
  "archived_at": "2026-11-01T17:06:55+00:00",
  "archived_by": "reorg-2026-11-01",
- "archived_reason": "not read by any agent for 30+ days",
+ "archived_reason": "Hermes removed from the VM (2026-11-16, Monsieur)",
+ "content_since": "2026-06-24T14:53:15Z",
  "domain": "hermes",
  "hermes": {
   "path": "/root/.hermes/skills/productivity/petdex",
@@ -11,6 +12,6 @@
  "imported_at": "2026-10-09T17:16:13+00:00",
  "origin": "hermes-agent",
  "owner": "walter",
- "reserve": true,
+ "retired": "hermes",
  "store_sha": "ad9af06534d52f38cdd6adb755c710803c3dabb889c8cf7f5f39582ffeac8f58"
 }

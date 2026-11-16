@@ -1,6 +1,7 @@
 {
  "archived_at": "2026-11-11T04:16:54+00:00",
  "archived_reason": "not read for 30 days",
+ "content_since": "2026-06-29T02:31:45Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/devops/ondemand-services",

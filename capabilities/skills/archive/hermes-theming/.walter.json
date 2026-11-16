@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "hermes-theme-operations",
+ "content_since": "2026-07-04T21:13:40Z",
  "domain": "devops",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/hermes-theming",

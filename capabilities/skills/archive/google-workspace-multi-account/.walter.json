@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "google-workspace-operations",
+ "content_since": "2026-08-10T13:02:04Z",
  "domain": "productivity",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/google-workspace-multi-account",

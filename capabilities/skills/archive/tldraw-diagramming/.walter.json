@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "tldraw-workflows",
+ "content_since": "2026-07-24T11:14:44Z",
  "domain": "creative",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/tldraw-diagramming",

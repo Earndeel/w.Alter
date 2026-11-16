@@ -1,6 +1,6 @@
 """The nightly graph — small idempotent steps; one failing step never blocks the others; results in the registry.
 
-sync Hermes → cards → catalog → implicit labels → judge sample → drafts from sessions → curation (also judges the
+cards → catalog → implicit labels → judge sample → drafts from sessions → curation (also judges the
 drafts) → cards of what curation changed → train + promote → domain map. The service hot-reloads by itself.
 """
 from __future__ import annotations
@@ -9,7 +9,7 @@ import json
 import time
 from datetime import datetime, timezone
 
-from . import cards, curation, domains, hermes_sync, learning, registry, store
+from . import cards, curation, domains, learning, registry, store
 
 
 def catalog() -> int:
@@ -39,15 +39,13 @@ def curation_rest() -> dict:
     return curation.run(only=ops)["summary"]
 
 
-QUICK = [  # every 15 minutes: what agents and Hermes just changed goes live within minutes, judged
-    ("sync", lambda: {k: (v if isinstance(v, int) else len(v)) for k, v in hermes_sync.sync().items()}),
+QUICK = [  # every 15 minutes: what agents just changed goes live within minutes, judged
     ("drafts", curation_always_active),
     ("cards", cards.refresh),
     ("catalog", catalog),
 ]
 
 STEPS = [
-    ("sync", lambda: {k: (v if isinstance(v, int) else len(v)) for k, v in hermes_sync.sync().items()}),
     ("cards", cards.refresh),
     ("catalog", catalog),
     ("implicit", learning.implicit),

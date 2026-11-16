@@ -1,4 +1,7 @@
 {
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "evidence-to-execution-workflows",
+ "content_since": "2026-09-18T16:27:51Z",
  "domain": "productivity",
  "hermes": {
   "path": "/root/.hermes/skills/.archive/productivity-workflows",

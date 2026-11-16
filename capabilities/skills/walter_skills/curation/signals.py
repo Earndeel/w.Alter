@@ -4,13 +4,11 @@ from __future__ import annotations
 import json
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import numpy as np
 
 from .. import registry, store
 
-HERMES_SKILLS = Path("/root/.hermes/skills")
 READ_TOOLS = ("skill_view", "mcp__walter__skill_read", "walter_skill_read", "Skill")
 
 
@@ -66,11 +64,8 @@ def judged_needed(days: int) -> Counter:
 
 
 def pinned() -> set[str]:
-    try:
-        d = json.loads((HERMES_SKILLS / ".usage.json").read_text())
-        return {k for k, v in d.items() if isinstance(v, dict) and v.get("pinned")}
-    except (OSError, json.JSONDecodeError):
-        return set()
+    """Skills pinned in their sidecar (`pinned: true`; Hermes' pins were copied there on 2026-11-16)."""
+    return {s.name for s in store.iter_skills() if s.meta.get("pinned")}
 
 
 def recently_curated(days: int) -> set[str]:
@@ -82,25 +77,18 @@ def recently_curated(days: int) -> set[str]:
 
 
 def content_age_days(s: store.Skill) -> int:
-    """Age of the content: the Hermes source file when it still exists (store import dates are all recent)."""
-    src = (s.meta.get("hermes") or {}).get("path")
-    p = Path(src) / "SKILL.md" if src and (Path(src) / "SKILL.md").exists() else s.skill_md
-    return (now() - datetime.fromtimestamp(p.stat().st_mtime, timezone.utc)).days
+    """Age of the content: sidecar `content_since` (the original file's date, kept when Hermes was removed on
+    2026-11-16, since store import dates are all recent), else the stored SKILL.md."""
+    since = s.meta.get("content_since")
+    t = (datetime.fromisoformat(since.replace("Z", "+00:00")) if since
+         else datetime.fromtimestamp(s.skill_md.stat().st_mtime, timezone.utc))
+    return (now() - t).days
 
 
 def successors() -> dict[str, str]:
-    """archived skill → its direct, specific successor: Hermes' absorption chain (first hop only, never a catch-all
-    umbrella with ≥ 5 absorptions) and walter-skills' own merges (archive sidecar absorbed_into)."""
-    chain = {}
-    led = HERMES_SKILLS / ".curator_ledger.jsonl"
-    if led.exists():
-        for line in led.read_text().splitlines():
-            r = json.loads(line)
-            tgt = (r.get("evidence") or {}).get("absorbed_into")
-            if r.get("actor") == "curator" and tgt:
-                chain[r["skill"]] = tgt
-    fan_in = Counter(chain.values())
-    out = {k: v for k, v in chain.items() if fan_in[v] < 5}
+    """archived skill → its direct, specific successor (archive sidecar absorbed_into: walter-skills' own merges and,
+    since 2026-11-16, the first hop of Hermes' absorption chain, never a catch-all umbrella with ≥ 5 absorptions)."""
+    out = {}
     for s in store.iter_skills(include_archived=True):
         if s.state == "archived" and s.meta.get("absorbed_into"):
             out[s.name] = s.meta["absorbed_into"]

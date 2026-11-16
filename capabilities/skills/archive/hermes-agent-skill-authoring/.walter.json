@@ -1,0 +1,16 @@
+{
+ "archived_at": "2026-11-16T17:03:19+00:00",
+ "archived_reason": "Hermes removed from the VM (2026-11-16, Monsieur)",
+ "content_since": "2026-09-23T13:54:57Z",
+ "domain": "code",
+ "hermes": {
+  "path": "/root/.hermes/skills/software-development/hermes-agent-skill-authoring",
+  "sha": "a0bba326cfa3798c75215414ca8a97745c1fd31883ebc1eaf29ca4c4ff681fe1",
+  "state": "active"
+ },
+ "imported_at": "2026-10-09T17:16:13+00:00",
+ "origin": "hermes-bundled",
+ "owner": "upstream",
+ "retired": "hermes",
+ "store_sha": "a0bba326cfa3798c75215414ca8a97745c1fd31883ebc1eaf29ca4c4ff681fe1"
+}
