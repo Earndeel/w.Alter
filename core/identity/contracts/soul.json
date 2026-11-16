@@ -27,7 +27,6 @@
     "walter_profile MCP"
   ],
   "bindings": {
-    "hermes": "rendered SOUL.md",
     "dsh": "rendered AGENTS.md + walter_profile MCP",
     "codex": "common MCP",
     "claude-code": "common MCP"

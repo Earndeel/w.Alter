@@ -16,9 +16,9 @@ répondre ou les préférences de {{owner.address}} comptent et que le profil n'
 | Partie | Rôle |
 |---|---|
 | Moteur de rendu `walter-soul` | Compose identité + règles + adaptateurs de runtime ; `render`, `sync`, `check`, `init` |
-| `runtimes/*.md` | Adaptateurs neutres par runtime (Hermes, Claude Code, Codex, DSH) |
+| `runtimes/*.md` | Adaptateurs neutres par runtime (Claude Code, Codex, DSH) |
 | Instance `soul/{identity,rules}.md` | L'identité elle-même ; un commit lance `walter-soul sync` |
-| Cibles | `SOUL.md` de Hermes (généré), profils `/opt/walter-profiles/*`, MCP `walter_profile` |
+| Cibles | profils `/opt/walter-profiles/*`, MCP `walter_profile` |
 
 ## Règles et limites
 

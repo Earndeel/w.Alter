@@ -8,7 +8,7 @@
 | **Ne fait pas** | Contenir l'identité d'une personne (elle est dans l'instance). Accepter une modification à la main des fichiers rendus (`walter-soul check` la détecte). |
 | **Contrats** | [contracts/soul.json](contracts/soul.json) ; CLI `walter-soul` ; MCP `walter_profile`. |
 
-Rend l'identité de l'agent de l'**instance active** pour chaque runtime (Hermes, Claude Code, Codex, DSH, MCP
+Rend l'identité de l'agent de l'**instance active** pour chaque runtime (Claude Code, Codex, DSH, MCP
 `walter_profile`). Logiciel identique pour toutes les instances : aucune identité de personne ici.
 
 | Logiciel (ce module) | Instance (`walter instance path`) |

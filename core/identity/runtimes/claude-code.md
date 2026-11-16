@@ -1,2 +1,2 @@
-## Profil de {{owner.address}} (provisoire : lu dans Hermes en attendant le dossier Walter Memory)
+## Profil de {{owner.address}}
 @USER.md

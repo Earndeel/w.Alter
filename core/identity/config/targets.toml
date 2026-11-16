@@ -10,7 +10,6 @@ state = "@instance/state/soul"            # empreintes des derniers rendus
 drift = "@instance/backups/soul-drift"    # copies des cibles retouchées à la main
 
 [targets]
-hermes = "@instance/harness/hermes/SOUL.md"
 claude-code = "@instance/profiles/claude-code/CLAUDE.md"
 codex = "@instance/profiles/codex/AGENTS.md"
 dsh = "@instance/profiles/dsh/AGENTS.md"
