@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Préparer et ordonner le contexte par message et par sous-agent, et compresser l'historique selon le contrat du harness. |
 | **Propriétaire** | walter-context (`/walter/cognition/context`). |
-| **État** | **active** (constat du 09/11/2026) : service `walter-context-preflight` ; DSH l'utilise ; Hermes garde son compresseur natif jusqu'au lot 6. |
+| **État** | **active** (constat du 09/11/2026) : service `walter-context-preflight` ; Walter Engine (DSH) l'utilise. |
 | **Ne fait pas** | Posséder les sujets, vues et originaux (Walter Memory, walter-logs) ; choisir un modèle (Router). |
 | **Contrats** | [contracts/context.json](contracts/context.json), [contracts/maintenance.json](contracts/maintenance.json), [contracts/schemas/](contracts/schemas/) (ContextPlan v2, ChildContextSpec v1) ; CLI `walter-context`. Spécification : `/walter/cognition/context/docs/CONTEXT-ENGINE.md`. |
 
@@ -62,7 +62,6 @@ la qualité sémantique générale des réponses, le cache réel d’un fourniss
 | Port | Contrat | État connu et portée |
 |---|---|---|
 | DSH | Transaction publique de compaction, checkpoint | Port sélectionné dans la configuration observée le 29 octobre 2026 ; chargement à confirmer par lancement/trace |
-| Hermes | `ContextEngine`, projection | Adaptateur disponible ; configuration observée : compresseur natif, port Context non activé |
 | Codex et Claude Code | Compaction native ; contexte additionnel via hook/MCP | Notes de modules et preflight disponibles ; aucune substitution du compresseur natif |
 | Claude Code, entrée des sorties | Hook PostToolUse → `walter-context-entrance` (`updatedToolOutput` à terme) | **Fantôme** depuis le 6 novembre 2026 : enregistre ce qu’il aurait coupé (chiffres seulement) ; la sortie reste entière pour le modèle |
 | Walter Engine (`dsh-web`) | Pack par message : greffon d’entrée natif du moteur (`core/engine/plugins/intake`, `mode: native`) → `POST /preflight?inject=1` | **En service** (vérifié le 11/11/2026 dans `/opt/dsh/home/cordis.patch.yml`) : `pack` par défaut ; bloc Memory `legacy` seulement si le preflight échoue ou dépasse 7 s. Le hook DSH (`walter-hooks.json`) ne fait plus que SessionStart/PostToolUse |

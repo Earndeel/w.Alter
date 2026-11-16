@@ -1,4 +1,4 @@
-"""Host-independent policy and Hermes public-interface regression tests."""
+"""Host-independent policy and port regression tests."""
 import importlib.util
 import os
 import sys
@@ -69,33 +69,6 @@ def test_recovery_privilege_requires_exact_session_and_prefers_own_collision(mon
     recover('same-call',own='hermes/main/mine')
     assert calls[-1] == ('same-call','hermes/main/mine')
     assert privacy[-1] == ('hermes/main/mine','local_only')
-
-
-def test_hermes_public_port_budget_reset_and_usage():
-    # Run in the installed Hermes venv, importing only its public base contract.
-    sys.path.insert(0,os.path.expanduser(os.environ.get('HERMES_AGENT_DIR','~/.hermes/hermes-agent')))
-    spec = importlib.util.spec_from_file_location('walter_context_test_port',ROOT/'ports/hermes/__init__.py')
-    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
-    engine = module.WalterContextEngine()
-    engine.update_model('gpt-6.1-sol',16000)
-    engine.on_session_start('fixture',hermes_home=os.path.expanduser('~/.hermes/profiles/wild'))
-    assert engine._profile == 'wild'
-    assert engine._session.profile.hard_budget == 16000
-    source = conversation(4)
-    import copy
-    original = copy.deepcopy(source)
-    engine.select_context(source,budget_tokens=12000)
-    assert source == original and engine._session.profile.hard_budget == 12000
-    engine.update_from_response({'input_tokens': 400, 'output_tokens': 50})
-    assert engine.last_prompt_tokens == 400 and engine.last_completion_tokens == 50
-    engine.compression_count = 3
-    engine.update_from_response({'prompt_tokens': 15000, 'completion_tokens': 50, 'total_tokens': 15050})
-    assert engine.should_compress()
-    engine.on_session_start('other')
-    assert engine._session.calls == 0
-    assert (engine.last_prompt_tokens, engine.last_completion_tokens,
-            engine.last_total_tokens, engine.compression_count) == (0, 0, 0, 0)
-    assert not engine.should_compress()
 
 
 def test_quality_replay_rejects_a_chain_containing_non_cloud_events():

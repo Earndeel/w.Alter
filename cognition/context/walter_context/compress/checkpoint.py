@@ -1,7 +1,7 @@
 """Portable checkpoint contract for hosts whose request must replay from a journal.
 
-Hermes can use Session's request-only four-zone projection. Event-sourced hosts
-such as DSH cannot: they commit a single checkpoint through their own transaction
+A host that rebuilds each request can use Session's request-only four-zone projection. Event-sourced
+hosts such as DSH cannot: they commit a single checkpoint through their own transaction
 API. The checkpoint policy and rendering still belong here, not in the host.
 """
 from __future__ import annotations

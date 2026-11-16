@@ -2,8 +2,7 @@
 
 The plugin connects the shared Walter Context checkpoint contract to DSH's public
 compaction service. It calls the Python 3.11+ stdlib core through bounded
-JSON/stdin subprocesses. It requires no Hermes runtime or Hermes virtualenv and
-makes no summarization model call.
+JSON/stdin subprocesses. It makes no summarization model call.
 
 The VM's `cordis.patch.yml` disables the stock entry and inserts this port:
 
@@ -107,6 +106,5 @@ all tool references, attachment refs, middle/intermediate assistant explanations
 and explicit budget/role refusals. All pass. Nine accepted cases retain complete
 visible dialogue while reducing a tool-heavy fixture from 335,910 to 9,532
 estimated tokens; five cases refuse safely. This establishes those deterministic
-properties, not model answer quality or compliance with instructions. It does not
-qualify the different Hermes projection mode; Hermes remains on `walter-compress`.
+properties, not model answer quality or compliance with instructions.
 See `../../docs/ACCEPTANCE.md`.

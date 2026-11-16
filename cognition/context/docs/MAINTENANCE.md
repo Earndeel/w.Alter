@@ -52,8 +52,6 @@ cloud. Une erreur d’une source ne constitue pas une preuve que les données co
 
 - DSH : configuration observée avec le port Context sélectionné. Le chargement effectif d’une révision exige un
   lancement et une trace ; le contrôle de configuration seul ne le démontre pas.
-- Hermes : adaptateur Context disponible, compresseur natif sélectionné dans la configuration observée. Aucun
-  remplacement automatique de ce compresseur.
 - Codex/Claude Code : compaction native ; le hook et les notes apportent du contexte supplémentaire.
 - Preflight par message : le service local reçoit `POST /preflight`, `?shadow=1` enregistre seulement et
   `?inject=1` retourne le pack. `WALTER_HOOK_PREFLIGHT=off` désactive le travail fantôme côté hook ; le hook
@@ -86,7 +84,6 @@ Commandes de contrôle, depuis le module obtenu par `walter path context` :
 
 ```sh
 walter harness check dsh
-walter harness check hermes
 systemctl is-active walter-context-preflight
 walter-context-preflight --report --days 1
 ```
@@ -124,7 +121,7 @@ qualité, durée et coût avant une décision d’activation. Aucun SLO généra
 
 Le bridge de compression et ChildContextSpec portent chacun leur version 1 ; ContextPlan a son schéma versionné.
 Vérifier les consommateurs avant de changer un format. DSH conserve le journal et les transactions de compaction,
-Hermes son API publique ContextEngine, Codex/Claude leur compaction native. Les notes de capacités exigent
+Codex/Claude leur compaction native. Les notes de capacités exigent
 l’inventaire d’outils du host ; pas de note injectée par simple présence d’un répertoire.
 
 Avant une modification, sauvegarder source, configuration et état d’instance concernés avec le mécanisme Backup

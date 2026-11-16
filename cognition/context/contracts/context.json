@@ -3,7 +3,6 @@
   "anchors": [
     "contracts/context.json",
     "ports/dsh/index.mjs",
-    "ports/hermes/__init__.py",
     "walter_context/compress/session.py"
   ],
   "requires": [],
@@ -23,7 +22,6 @@
   ],
   "interfaces": [
     "Python Session (walter_context.compress)",
-    "Hermes ContextEngine adapter",
     "DSH CompactionEngine adapter",
     "CLI walter-context",
     "CLI walter-context capability router (versioned stable note)",
@@ -38,7 +36,6 @@
     "In-process walter.context.window: globalThis[Symbol.for('walter.context.window')](agent, {plan}, signal) published by the DSH port -> window decision report {applied, reason, warm, turns, tokens, measured_tokens} (SOCLE A1; the kernel isolates its compaction service, the engine's intake plugin calls this entry at each owner turn)"
   ],
   "bindings": {
-    "hermes": "native compressor until walter-context replaces it (plan lot 6)",
     "dsh": "Walter Engine (dsh-web): public checkpoint adapter selected by composition; per-message context through the engine's native intake plugin (core/engine/plugins/intake, mode native, inject pack by default) calling POST /preflight?inject=1; the legacy Memory block only when the preflight fails or times out (verified 2026-11-11 in /opt/dsh/home/cordis.patch.yml)",
     "codex": "Native compaction; additive module notes and hook preflight",
     "claude-code": "Native compaction; additive module notes and hook preflight; entrance reduction of large tool outputs in SHADOW (hook PostToolUse, records numbers only)",
@@ -46,7 +43,6 @@
   },
   "limitations": [
     "DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.",
-    "Hermes runs its native compressor (walter-compress retired 2026-10-21); the walter-context Hermes port is not activated.",
     "Structural and known-answer tests do not certify semantic model quality.",
     "Capability-note preparation does not activate the lot-4 composer or inject into an unconnected host.",
     "Memory, Skills, Core, Router, Logs and Soul are optional at module startup; their dependent operations degrade or fail when unavailable.",

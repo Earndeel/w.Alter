@@ -1,4 +1,4 @@
-"""One conversation's context state, whatever the runtime. Ports (Hermes, DSH, a future Walter runtime, the bench)
+"""One conversation's context state, whatever the runtime. Ports (DSH / Walter Engine, the bench)
 drive it with the same four calls:
 
     select(messages)   → the payload for this call (+ a trace)    every provider request

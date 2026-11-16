@@ -21,7 +21,7 @@ faits ; **étapes A (contrats v1), B (preflight en fantôme) et C (vues v0 : les
 `~/reports/2026-10-25-walter-context-v2-integration.md`.
 
 La version du 2026-10-11 (moteur de payload seul, mesures C0) est conservée dans
-`~/.hermes/backups/retire-walter-compress-20261021/CONTEXT-ENGINE-20261011.md`.
+`@instance/backups/changes/retire-walter-compress-20261021/CONTEXT-ENGINE-20261011.md`.
 
 ## 0. Architecture v2 (le propriétaire, 25/10) — elle prime sur les §1 à §8 quand ils diffèrent
 **Principe.**
@@ -246,7 +246,6 @@ Fait au lot 2 (21/10, context e4b4f1a) :
 ## 6. Selon le harness
 | Harness | Ce que walter-context peut faire |
 |---|---|
-| Hermes | Tout : le port `ContextEngine` remplace le compresseur natif (lot 6) |
 | DSH | Tout, par son contrat de compaction (actif). Passe au moteur unifié au lot 2 |
 | Claude Code | Ajout seulement : contexte dynamique par le hook de chaque message, carnet réinjecté après chaque compaction native |
 | Codex | Ajout seulement : hook `notify`, consignes, MCP |
@@ -343,7 +342,7 @@ Fait au lot 2 (21/10, context e4b4f1a) :
 | **3. Fils et carnets** (Walter Memory) | Tables des fils, membres (renvois vers walter-logs) et carnets (ajout seul). Rattachement après chaque tour (bus). Carnet : faits sans modèle, consignes et décisions par le petit modèle. Rattrapage depuis le 14/10, fusion et scission la nuit | ≥ 85 % de rattachements justes sur T0. « Qu'a fait le propriétaire via Codex le 17-18/10 ? » retrouve les deux chantiers | oui (structure mémoire, à faire avec le chantier mémoire) |
 | **4. Contexte dynamique** | sense · decide · gather · compose, d'abord en fantôme (calculé, journalisé, sans rien injecter), puis il remplace l'injection fixe du hook (Claude Code, Codex) et réinjecte le carnet après la compaction native | Plans justes sur la référence, p95 < 1,5 s, plus d'injection hors sujet | oui (bascule du hook) |
 | **5. Qualité** | Comparer les réponses avec l'historique complet et avec le payload walter-context, sur de vraies sessions | Aucune consigne perdue, qualité égale ou meilleure | oui (budget) |
-| **6. Mise en service Hermes** | Le port remplace le compresseur natif, compression par fil, 7 jours de comparaison A8 | Non caché, latence et qualité au moins égaux | oui |
+| ~~6. Mise en service Hermes~~ | Abandonné : Hermes a été arrêté (10/11) puis retiré de la VM (16/11) ; voir la ligne 6 du tableau d'état | — | — |
 
 Ordre : 0, puis 1 et 2 en parallèle, puis 3 → 4 → 5 → 6.
 
