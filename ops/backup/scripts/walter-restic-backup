@@ -4,7 +4,7 @@
 # night is still a complete snapshot that can be restored on its own. Every location comes from the instance
 # (`walter-ops backup env restic`). One snapshot per tag:
 #   pg       plain SQL dump streamed from PostgreSQL (uncompressed on purpose: unchanged rows deduplicate)
-#   statedb  newest agent-runtime state snapshot, decompressed for the same reason (walter-statedb-backup)
+#   statedb  retired 2026-11-16 (Hermes); its last snapshot is tagged keep + hermes-final
 #   config   config bundle of the modules and their integrations (Walter Memory's backup_bundle, fail closed)
 #   folders  the owner's folder, projects, apps and their data, vault exports (restic.folders minus restic.exclude)
 # Retention per tag: keep_daily + keep_weekly + keep_monthly, snapshots tagged `keep` always kept; unreferenced chunks pruned on Sundays; repository
@@ -58,9 +58,8 @@ for l in open(sys.argv[1]):
 # 1. memory (PostgreSQL), streamed: nothing written on the VM's disk
 stream pg "$WALTER_PG_DATABASE.sql" docker exec "$WALTER_PG_CONTAINER" pg_dump -U "$WALTER_PG_USER" -d "$WALTER_PG_DATABASE"
 
-# 2. agent-runtime state (newest local snapshot, decompressed on the fly)
-sdb=$(ls -1t "$WALTER_STATEDB_DIR"/$WALTER_STATEDB_PATTERN 2>/dev/null | head -1 || true)
-if [ -n "$sdb" ]; then stream statedb state.db zstd -dc "$sdb"; else FAILED=1; echo "ERROR: no state.db snapshot" >&2; fi
+# 2. agent-runtime state: none since 2026-11-16. Hermes, the only runtime with a state.db, is retired; its last
+#    snapshot stays in the repository (tags `keep`, `hermes-final`), never forgotten by the retention below.
 
 # 3. config bundle (fail closed on missing required paths; rebuildable parts left out by WALTER_BUNDLE_EXCLUDE)
 if walter-python -m walter_memory.backup_bundle create "$WORK/config.tar" >/dev/null; then

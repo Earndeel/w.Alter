@@ -106,7 +106,7 @@ def conformity() -> dict:
 def backup_health(cfg: dict) -> dict:
     out = {}
     for kind, k in (cfg.get("kinds") or {}).items():
-        if kind.startswith("restore"):
+        if kind.startswith("restore") or k.get("retired"):     # a retired kind keeps its archive, expects no new one
             continue
         item = {"unit": unit_last(k["unit"])} if k.get("unit") else {}
         if k.get("dir"):
