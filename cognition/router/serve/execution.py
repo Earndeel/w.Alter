@@ -69,6 +69,19 @@ def reliability(conn, provider: str, model: str) -> dict:
 QUOTA_SWITCH = 90.0   # weekly meter %: above it a subscription route goes after the paid ones (quota nearly spent)
 
 
+def quota_spent(r: dict) -> bool:
+    """A subscription route whose weekly quota is nearly spent, or whose session window is full."""
+    q = (r.get("subscription") or {}).get("quota_used_percent")
+    session = (r.get("subscription") or {}).get("session_used_percent")
+    return (q is not None and q >= QUOTA_SWITCH) or (session is not None and session >= 100)
+
+
+def subscription_exhausted(execution: list[dict]) -> bool:
+    """The model has subscription routes and every one of them is spent (all accounts)."""
+    subs = [r for r in execution if r.get("access") == "subscription"]
+    return bool(subs) and all(quota_spent(r) for r in subs)
+
+
 def subscription_accounts(conn) -> dict[str, list[dict]]:
     """route provider -> its subscriptions in declaration order, each with its own quota and cost price. Several
     accounts may serve one provider (two Claude accounts, 2026-11-07): each becomes its own route. An account with no
@@ -150,10 +163,15 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
     for r in out:
         c = r.pop("_sub", None)
         if r["access"] == "subscription" and c:
-            ratio = c.get("ratio_pace") or c.get("ratio_full")
+            # cost price of THIS model through the plan (ModelDial's measured quota, owner 2026-11-16), else the
+            # plan-wide figures: at the current pace, then at capacity
+            per_model = ((c.get("detail") or {}).get("models") or {}).get(model_id) or {}
+            ratio = per_model.get("ratio") or c.get("ratio_pace") or c.get("ratio_full")
             r["subscription"] = {"plan": c.get("plan"), "quota_used_percent": c.get("used_percent"),
                                  "session_used_percent": c.get("session_used_percent"),
-                                 "cost_ratio": round(ratio, 4) if ratio else None}
+                                 "cost_ratio": round(ratio, 4) if ratio else None,
+                                 "cost_source": "modeldial" if per_model.get("ratio") else
+                                 ("pace" if c.get("ratio_pace") else "plan")}
             if r.get("account"):
                 r["subscription"]["account"] = r["account"]
             if ratio and list_in is not None:
@@ -167,11 +185,6 @@ def routes(conn, model_id: str, variant: str = "", preferred: str | None = None,
 
     or_price = min((r["blended_1m"] for r in out if r["hermes_provider"] == "openrouter" and r["blended_1m"]),
                    default=None)
-
-    def quota_spent(r: dict) -> bool:
-        q = (r.get("subscription") or {}).get("quota_used_percent")
-        session = (r.get("subscription") or {}).get("session_used_percent")
-        return (q is not None and q >= QUOTA_SWITCH) or (session is not None and session >= 100)
 
     def rank(r: dict) -> float:
         if r["access"] == "subscription":

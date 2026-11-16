@@ -16,6 +16,22 @@ def with_execution(conn, out: dict) -> dict:
         usage = "background" if background else "interactive"   # level postes (summaries, memory) may use flex hosts
         out["execution"] = execution.routes(conn, out["model_id"], out.get("variant") or "",
                                             preferred=out.get("provider"), usage=usage, modes=modes)
+        level = (out.get("follows") or {}).get("level") or (out.get("level") if out.get("task") == "general" else None)
+        spent_pin = knowledge.level_when_quota_spent("general", level) if level else None
+        if spent_pin and execution.subscription_exhausted(out["execution"]):
+            # the owner's quota rule (2026-11-16): the tier model runs on its subscription while the quota lasts; once
+            # every account is spent, the model the owner adopted for that case takes over instead of paying the
+            # API price — a declared substitute, never an improvised one
+            model_id, _, variant = spent_pin.partition("/")
+            spent_from = {"model_id": out["model_id"], "variant": out.get("variant"),
+                          "accounts": [{"account": (r.get("subscription") or {}).get("account") or r["provider"],
+                                        "weekly_percent": (r.get("subscription") or {}).get("quota_used_percent"),
+                                        "session_percent": (r.get("subscription") or {}).get("session_used_percent")}
+                                       for r in out["execution"] if r.get("access") == "subscription"]}
+            out.update(model_id=model_id, variant=variant, quota_switch={
+                "from": spent_from, "to": spent_pin,
+                "why": f"quota d'abonnement épuisé : niveau {level} sur son modèle de repli déclaré"})
+            out["execution"] = execution.routes(conn, model_id, variant, usage=usage, modes=modes)
         # Report the effective first route, never the provider from an older ranking.
         out["provider"] = out["execution"][0]["provider"] if out["execution"] else None
         # Availability never authorises another model: try only this model's providers.

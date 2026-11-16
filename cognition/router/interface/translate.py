@@ -119,6 +119,25 @@ PHRASES = {
     " % de lectures en cache ; tokens par mois = valeur ÷ prix moyen du million sur ce mélange.":
         " % cache reads; tokens per month = value ÷ average price per million on that mix.",
     " Md": " B",
+    # active levels and weekly consumption (2026-11-16)
+    "Niveaux actifs : ta méthode sur la frontière AA, abonnements à leur prix de revient ModelDial":
+        "Active levels: your method on the AA frontier, subscriptions at their ModelDial cost price",
+    "Quota épuisé": "Quota spent", "Proposition du dernier calcul : ": "Latest computation proposes: ",
+    "💳 Abonnements cette semaine": "💳 Subscriptions this week",
+    "Part du quota hebdomadaire utilisée (compteur réel), valeur API que cela représente et ce qu’il reste à prendre avant la remise à zéro":
+        "Share of the weekly quota used (real meter), the API value it represents and what is left to take before the reset",
+    " — semaine en cours : ": " — current week: ", " récupérés pour ": " recovered for ", " payés, ": " paid, ",
+    " encore disponibles.": " still available.",
+    "Valeur API récupérée": "API value recovered", "Reste à prendre": "Left to take", "Semaines précédentes": "Previous weeks",
+    "Utilisé": "Used", " × le prix de la semaine": " × the week’s price", " de valeur API sur ": " of API value on ",
+    " de valeur API": " of API value", "avant la remise à zéro": "before the reset", " jours": " days",
+    " $ par mois": " $ per month", "offert (prix catalogue ": "free offer (list price ",
+    "compteur non lisible : consommation non mesurée": "meter not readable: usage not measured",
+    "Consommation indisponible : ": "Usage unavailable: ", "(utilisé par le Router)": "(used by the Router)",
+    "Conversion sur ModelDial : quota mesuré du forfait sur le modèle de référence (celui des niveaux L1 à L3 quand le forfait les sert). Le compteur est commun à tous les modèles du forfait : la valeur est une lecture sur ce modèle, pas une somme. Compteurs relus après chaque tour d’agent et toutes les 30 minutes.":
+        "Converted with ModelDial: the plan’s measured quota on the reference model (the L1–L3 model when the plan serves "
+        "it). The meter is shared by every model of the plan: the value is a reading on that model, not a sum. Meters "
+        "re-read after each agent turn and every 30 minutes.",
     # footer
     "Modèles suivis": "Models tracked",
     "Classements recalculés le ": "Leaderboards recomputed on ",

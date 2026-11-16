@@ -115,7 +115,7 @@ Writes a snapshot and its parsed rows, with identities (models.canonical / alias
 The owner's model knowledge and the intent-aware decision built on it.
 
 - `load()` — 
-- `set_level(task: str, level: str, pin: str, why: str, provider: str | None=None, description: str | None=None, evidence: str | None=None, fallback=KEEP)` — One writer for the owner's declared text tiers (knowledge.json "levels"), the source `declare` re-applies
+- `set_level(task: str, level: str, pin: str, why: str, provider: str | None=None, description: str | None=None, evidence: str | None=None, fallback=KEEP, when_quota_spent=KEEP)` — One writer for the owner's declared text tiers (knowledge.json "levels"), the source `declare` re-applies
 - `norm(text: str)` — 
 - `hits(text: str, signals: list[str])` — 
 - `declare(conn, doc: dict | None=None)` — Apply knowledge.json: profiles, roles (favourites per objective), retired roles, affinities. Idempotent.
@@ -123,6 +123,7 @@ The owner's model knowledge and the intent-aware decision built on it.
 - `tie_margin(unit: str | None)` — 
 - `tie_break(conn, task: str, rows: list[dict], score='quality', unit='quality_unit')` — Close calls: every model within the tie margin of the current leader forms a group; inside the group
 - `level_fallback(task: str, level: str | None)` — Declared fallback (model_id/variant) of a text tier, used when every route of the pinned model fails.
+- `level_when_quota_spent(task: str, level: str | None)` — Declared model (model_id/variant) of a text tier once every account of its model's subscription is spent.
 - `declared_fallbacks(model_id: str, task: str, level: str | None, require: str | None)` — Models the owner declared to run when every provider of `model_id` failed, in order, as (model_id, variant):
 - `effective_policy(conn, model_id: str)` — 
 - `profile(conn, model_id: str)` — 
@@ -212,6 +213,8 @@ Compute ranked candidates per task from the latest snapshots, on the cheapest *r
 - `board_snapshot(conn, snaps: dict[str, int], benchmark: str, bench_task: str)` — Snapshot to read one board from: the latest of its source, or — when the board is empty there (page changed,
 - `load_offers(conn, snaps: dict[str, int])` — 
 - `blended(offer: dict)` — AA's blended token price: 3 parts input, 1 part output.
+- `load_subscription_costs(conn)` — Cost price of each model through the owner's subscriptions (owner, 2026-11-16: ModelDial's measured quota, see
+- `route_cost(route: dict)` — Real cost of a chat route: the cheaper of its best paid offer and its subscription's cost price.
 - `chat_route(offers: list[dict], list_cost: float | None, modes: list[str] | None=None)` — Cheapest paid route for a chat model, scaling AA's list-price task cost by the provider/list price ratio.
 - `_fields(o: dict)` — Stored classification of an offer (models.offers columns), or computed from its key when absent.
 - `decision_route(offers: list[dict], modes: list[str] | None=None)` — Cheapest Decisions-API offer (decision models are billed on input tokens only) that reads every input the
@@ -219,6 +222,9 @@ Compute ranked candidates per task from the latest snapshots, on the cheapest *r
 - `_intelligence_index(conn, snaps: dict[str, int], offers: dict[str, list[dict]])` — 
 - `_row(task: str, level: str, rank: int, cand: dict, **extra)` — 
 - `_ladder(cands: list[dict], minimum_score: float, cost_cap: float)` — 
+- `_on_subscription(p: dict)` — The point's real cost is a subscription's cost price (not a paid route).
+- `_sub_of(p: dict)` — Which subscription serves the point at its cost price (two Claude accounts = one route provider).
+- `_without_subscription(pts: list[dict], provider: str)` — The same points once `provider`'s subscription is spent: its models at their best paid price, or gone.
 - `_tier_rows(cands: list[dict])` — The owner's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs.
 - `_best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dict], n: int=6)` — 'best' level: callable models ordered by the weighted multi-board score (scoring.composite).
 - `family(model_id: str)` — 'gpt-image-2-5-sunburst' -> ('gpt-image', (2, 5), 'sunburst'); 'gpt-image-2' -> ('gpt-image', (2,), '').
@@ -263,7 +269,11 @@ The owner's method for the three functional text tiers (declared 2026-10-02).
 
 - `frontier(points: list[dict])` — points: {'model_id', 'variant', 'score', 'cost', ...}; strict Pareto frontier with 'marginal' filled.
 - `_gain(a: dict, b: dict)` — Points per extra dollar going from a to b.
-- `compute(points: list[dict], floor: float=QUALITY_FLOOR, band: float=CEILING_BAND, knee_drop: float=KNEE_DROP)` — 
+- `affordable(f: list[dict], floor: float=QUALITY_FLOOR, min_gain: float=CEILING_MIN_GAIN)` — The frontier up to its first point above the floor that buys less than `min_gain` points per extra dollar.
+- `compute(points: list[dict], floor: float=QUALITY_FLOOR, band: float=CEILING_BAND, knee_drop: float=KNEE_DROP, min_gain: float=CEILING_MIN_GAIN)` — 
+- `_best(ps)` — 
+- `quota_levels(points: list[dict], in_pool, sub_of=lambda p: None)` — The owner's subscription rule (2026-11-16): the subscriptions are already paid, so L2 and L3 are sought among
+- `above(points: list[dict], in_pool, base: dict)` — The subscription model above `base` (the tier just below) with the best gain from it — L3's pick once its own
 
 ## cli.py
 
@@ -452,6 +462,8 @@ Library web page (v3, 2026-10-14: « le design fait trop IA, pas pro »).
 - `_tok(n: float | None)` — 
 - `_usd(x: float | None)` — 
 - `_subscriptions(conn)` — Subscriptions pane (information only): our measurement on the owner's account + SemiAnalysis' plan values.
+- `_pct(x: float | None)` — 
+- `_consumption(conn)` — This week on each plan (owner, 2026-11-16: get every token the subscriptions offer): used, API value recovered,
 - `_plan_costs(conn)` — Cost price of a token per plan (2026-10-22): what the router uses to price a subscription route.
 - `_plan_facts(conn)` — Everything known about each plan, with its source (web research, billing mails, measures, the owner).
 - `_plan_forms(subs: list[dict])` — Edit a plan, cancel it, or add one (2026-10-22). Sent to /api/plans (Access + HMAC), applied by
@@ -602,6 +614,15 @@ The owner's ChatGPT/Codex account read with W.Alter's OWN Codex session (2026-11
 - `windows(payload: dict)` — Quota windows of a /wham/usage answer, named by their published duration (position only as fallback).
 - `usage()` — 
 
+## plan/consumption.py
+
+What the owner's subscriptions give back each week (owner, 2026-11-16: « les rentabiliser au maximum en essayant de
+
+- `_tier_models()` — 
+- `_windows(conn, sub_id: str, weeks: int)` — Weekly windows of one plan, newest first: the highest % read in each. Readings whose reset times lie within
+- `weekly(conn, weeks: int=4)` — 
+- `summary(rows: list[dict])` — The whole week across plans: API value used and left, price paid.
+
 ## plan/declared.py
 
 The owner's plans (subscriptions), editable from anywhere (owner, 2026-10-22: « les plans peuvent être ajoutés dans
@@ -625,6 +646,18 @@ Plan changes read from billing e-mails (owner, 2026-10-22: « par events en anal
 - `proposal(found: dict, plans: list[dict])` — What the owner is asked to adopt given the LATEST mail of a plan, or None when it matches what is declared.
 - `scan(conn, days: int=120)` — Read the vendors' subscription mails of the last `days`; store each once; propose on the LATEST event per plan.
 
+## plan/modeldial.py
+
+ModelDial: the measured weekly quota of each AI subscription, model by model (owner, 2026-11-16: « intègre
+
+- `_text(fragment: str)` — 
+- `_num(text: str)` — 
+- `parse(page: str)` — Every measured cell of the page: {row_id, model_name, weekly_tokens, weekly_api_usd, measured}.
+- `model_id(name: str, plan_key: str, known: set[str])` — Router id of a ModelDial row name, exact canonical match only: « Opus 5.5 » on a Claude plan -> claude-opus-5-5,
+- `cells_for(cells: list[dict], plan_key: str)` — The cells of one plan key: the row id is « <plan key>-<model>[-date] »; a longer key never steals a shorter one
+- `run(conn, page: str | None=None)` — 
+- `latest(conn, sub_id: str)` — model_id -> {usd_value_month, tokens_month, published, url} from the newest ModelDial rows of one plan.
+
 ## plan/news.py
 
 A new benefit or change on a plan the owner has -> one Telegram notice each (owner, 2026-10-22: « s'il y a un nouvel
@@ -646,7 +679,7 @@ Subscription meters on the Walter bus (information only): after agent turns, re-
 
 ## plan/subscriptions.py
 
-The owner's subscriptions — information only, no routing effect (2026-10-14).
+The owner's subscriptions: meters, usage and the cost price of a token through each plan.
 
 - `doc()` — 
 - `load()` — 
@@ -669,6 +702,7 @@ The owner's subscriptions — information only, no routing effect (2026-10-14).
 - `blended(prices: dict, mix: dict)` — $ per million tokens of a model on SemiAnalysis' workload mix.
 - `measured_point_value(readings: list[dict])` — API value per meter point from ChatGPT readings of one weekly window (oldest → newest of the window with the
 - `state(conn)` — Everything the library shows, per subscription.
+- `model_costs(conn, sub_id: str)` — Cost price of a token of each model through one plan, from ModelDial's measured quota (owner, 2026-11-16):
 - `record_costs(conn)` — Cost price of a token through each plan (owner, 2026-10-22): price / API value carried per month, at the current
 
 ## plan/watch.py
@@ -1026,6 +1060,8 @@ Ordered provider routes and execution metadata for Walter consumers.
 
 - `_runnable(offer: dict)` — (Hermes provider, model id at that provider, status key) or None when Hermes cannot run this offer.
 - `reliability(conn, provider: str, model: str)` — Recent real executions of this provider x model (models.exec_log, skipped attempts excluded: walter-llm logs a
+- `quota_spent(r: dict)` — A subscription route whose weekly quota is nearly spent, or whose session window is full.
+- `subscription_exhausted(execution: list[dict])` — The model has subscription routes and every one of them is spent (all accounts).
 - `subscription_accounts(conn)` — route provider -> its subscriptions in declaration order, each with its own quota and cost price. Several
 - `subscription_costs(conn)` — route provider (codex) -> its first subscription: cost price, plan name, quotas (see subscription_accounts).
 - `host_order(conn, model_id: str, usage: str='interactive')` — Usable hosts behind OpenRouter for this model, cheapest first (models.usable_endpoints); flex tier only for

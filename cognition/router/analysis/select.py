@@ -61,8 +61,43 @@ def blended(offer: dict) -> float | None:
     return (3 * offer["price_in_1m"] + offer["price_out_1m"]) / 4
 
 
+SUBSCRIPTION_COSTS: dict[tuple[str, str], dict] = {}   # (route provider, model_id) -> cost price (load_subscription_costs)
+
+
+def load_subscription_costs(conn) -> dict[tuple[str, str], dict]:
+    """Cost price of each model through the owner's subscriptions (owner, 2026-11-16: ModelDial's measured quota, see
+    plan/modeldial.py): (route provider, model_id) -> {ratio, sub_id}. Several accounts of one provider (two Claude
+    accounts) share one plan: the first declared one gives the ratio. Read once per selection run."""
+    out: dict[tuple[str, str], dict] = {}
+    try:
+        from walter_router.plan import subscriptions
+        subs = {s["id"]: s for s in subscriptions.load() if s.get("route_provider") and not s.get("retired")}
+        for r in conn.execute("select sub_id, detail from models.latest_subscription_costs"):
+            sub = subs.get(r["sub_id"])
+            for mid, c in ((r["detail"] or {}).get("models") or {}).items():
+                if sub and c.get("ratio") and (sub["route_provider"], mid) not in out:
+                    out[(sub["route_provider"], mid)] = {"ratio": float(c["ratio"]), "sub_id": r["sub_id"],
+                                                         "source": c.get("source")}
+    except Exception:  # noqa: BLE001 — no cost price known = the paid routes alone, as before
+        return {}
+    SUBSCRIPTION_COSTS.clear()
+    SUBSCRIPTION_COSTS.update(out)
+    return out
+
+
+def route_cost(route: dict) -> float | None:
+    """Real cost of a chat route: the cheaper of its best paid offer and its subscription's cost price."""
+    costs = [c for c in ((route.get("paid") or {}).get("cost"), (route.get("subscription_cost") or {}).get("cost"))
+             if c is not None]
+    return min(costs, default=None)
+
+
 def chat_route(offers: list[dict], list_cost: float | None, modes: list[str] | None = None) -> dict[str, Any]:
     """Cheapest paid route for a chat model, scaling AA's list-price task cost by the provider/list price ratio.
+
+    With a list cost, a subscription that serves the model and has a known cost price (SUBSCRIPTION_COSTS) is priced
+    too, in `subscription_cost` (list cost x price ÷ API value of the plan's quota); `paid` stays the best paid route,
+    the fallback once the quota is spent. route_cost() gives the cheaper of the two.
 
     The OpenRouter price is the list reference (it mirrors first-party pricing). A provider without a reference
     is kept unscaled (conservative) and flagged. `modes` = inputs the task needs besides text (video understanding:
@@ -83,7 +118,15 @@ def chat_route(offers: list[dict], list_cost: float | None, modes: list[str] | N
         if best is None or (cand["cost"] is not None and (best["cost"] is None or cand["cost"] < best["cost"])) \
                 or (cand["cost"] is None and best["cost"] is None and cand["blended_1m"] < best["blended_1m"]):
             best = cand
-    return {"paid": best, "subscription": subscription, "callable": bool(best or subscription)}
+    sub_cost = None
+    if subscription and list_cost is not None:
+        mid = next((o.get("model_id") for o in chat if o["access"] == "subscription"), None)
+        known = SUBSCRIPTION_COSTS.get((subscription, mid))
+        if known:
+            sub_cost = {"provider": subscription, "ratio": known["ratio"], "basis": "subscription_cost_price",
+                        "sub_id": known["sub_id"], "source": known.get("source"), "cost": list_cost * known["ratio"]}
+    return {"paid": best, "subscription": subscription, "subscription_cost": sub_cost,
+            "callable": bool(best or subscription)}
 
 
 def _fields(o: dict) -> dict:
@@ -160,7 +203,8 @@ def _row(task: str, level: str, rank: int, cand: dict, **extra) -> dict:
                 display_name=cand["display_name"], quality=cand["score"], quality_unit=cand["score_unit"],
                 real_cost=cand.get("real_cost"), cost_unit=cand.get("real_cost_unit"),
                 provider=paid.get("provider"), offer_key=paid.get("offer_key"), subscription=route.get("subscription"),
-                reasons={**{k: v for k, v in paid.items() if k not in ("provider", "offer_key")}, **extra})
+                reasons={**{k: v for k, v in paid.items() if k not in ("provider", "offer_key")}, **extra,
+                         **({"subscription_cost": route["subscription_cost"]} if route.get("subscription_cost") else {})})
 
 
 def _ladder(cands: list[dict], minimum_score: float, cost_cap: float) -> dict | None:
@@ -179,18 +223,68 @@ def _ladder(cands: list[dict], minimum_score: float, cost_cap: float) -> dict | 
             "frontier": [by_slug[r["slug"]] for r in frontier["pragmatic_frontier"]]}
 
 
+QUOTA_WHY = {"L2": "abonnements : meilleur modèle d'un autre abonnement que L3, moins cher par tâche que L3, "
+                   "tant que son quota dure",
+             "L3": "abonnements : choix de la méthode parmi les modèles d'abonnement, tant que son quota dure"}
+
+
+def _on_subscription(p: dict) -> bool:
+    """The point's real cost is a subscription's cost price (not a paid route)."""
+    sub = (p.get("route") or {}).get("subscription_cost")
+    return bool(sub) and sub.get("cost") is not None and p.get("cost") == sub["cost"]
+
+
+def _sub_of(p: dict) -> str | None:
+    """Which subscription serves the point at its cost price (two Claude accounts = one route provider)."""
+    return ((p.get("route") or {}).get("subscription_cost") or {}).get("provider") if _on_subscription(p) else None
+
+
+def _without_subscription(pts: list[dict], provider: str) -> list[dict]:
+    """The same points once `provider`'s subscription is spent: its models at their best paid price, or gone."""
+    out = []
+    for p in pts:
+        sub = (p.get("route") or {}).get("subscription_cost")
+        if sub and sub.get("provider") == provider:
+            paid = (p["route"].get("paid") or {}).get("cost")
+            if paid:
+                out.append({**p, "cost": paid})
+        else:
+            out.append(p)
+    return out
+
+
 def _tier_rows(cands: list[dict]) -> list[dict]:
     """The owner's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs."""
     from walter_router.analysis import tiers  # late import keeps the module graph flat
     pts = [{**c, "cost": c["real_cost"]} for c in cands if c.get("real_cost")]
     t = tiers.compute(pts)
-    rows = []
+    q = tiers.quota_levels(pts, _on_subscription, _sub_of)
+    rows, picked = [], {}
     for level, why in (("L1", "économique : premier coude au-dessus du plancher de qualité"),
                        ("L2", "intermédiaire : meilleur gain en points par $ depuis L1"),
                        ("L3", "haut de gamme : meilleur gain depuis L2 dans la bande du plafond")):
-        if t[level]:
-            p = t[level]
-            rows.append(_row("general", level, 1, p, role=why, marginal=p.get("marginal"), method=t.get("params")))
+        p, m = q.get(level), t[level]
+        # the rule only ever raises a tier: never below the method's pick, nor at or below L1
+        bar = max(m["score"] if m else 0, (t["L1"]["score"] + 1e-9) if t["L1"] else 0)
+        if p and p["score"] >= bar:
+            # the owner's subscription rule (2026-11-16); once every account of that subscription is spent, the same
+            # rule on the remaining subscriptions (L3: the best gain above L2's pick), else the method without it
+            sub = p["route"]["subscription_cost"]
+            spent = _without_subscription(pts, sub["provider"])
+            fb = None
+            if spent:
+                fb = (tiers.above(spent, _on_subscription, picked["L2"]) if level == "L3" and picked.get("L2")
+                      else tiers.quota_levels(spent, _on_subscription, _sub_of)[level])
+                fb = fb or tiers.compute(spent)[level]
+            picked[level] = p
+            rows.append(_row("general", level, 1, p, role=QUOTA_WHY[level], quota_rule={
+                "subscription": sub["sub_id"], "route_provider": sub["provider"],
+                "method_pick": m and f'{m["model_id"]}/{m["variant"]}',
+                "when_quota_spent": fb and {"pin": f'{fb["model_id"]}/{fb["variant"]}', "name": fb["display_name"],
+                                            "score": fb["score"], "real_cost": fb["cost"]}}, method=t.get("params")))
+        elif m:
+            picked[level] = m
+            rows.append(_row("general", level, 1, m, role=why, marginal=m.get("marginal"), method=t.get("params")))
     rows += [_row("general", "frontier", i + 1, p, marginal=p.get("marginal"))
              for i, p in enumerate(q for q in t["frontier"] if q["score"] >= tiers.QUALITY_FLOOR - 5)]
     return rows
@@ -215,7 +309,7 @@ def _best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dic
                 if t["interface"] == "decisions" else media_route(mo, t["interface"], t["modes"])
             if not route["callable"]:
                 continue
-            cost, variant = (route["paid"] or {}).get("cost"), ""
+            cost, variant = route_cost(route) if t["interface"] == "chat" else (route["paid"] or {}).get("cost"), ""
             unit = (route["paid"] or {}).get("unit") if t["interface"] != "chat" else None
         paid = route.get("paid") or {}
         name = conn.execute("select coalesce(display_name, model_id) as n from models.canonical where model_id = %s",
@@ -225,7 +319,8 @@ def _best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dic
                          real_cost=cost, cost_unit=unit, provider=paid.get("provider"), offer_key=paid.get("offer_key"),
                          subscription=route.get("subscription"),
                          reasons={**{k: v for k, v in paid.items() if k not in ("provider", "offer_key")},
-                                  "boards": comp["boards"], "evidence_weight": comp["evidence_weight"]}))
+                                  "boards": comp["boards"], "evidence_weight": comp["evidence_weight"],
+                                  **({"subscription_cost": route["subscription_cost"]} if route.get("subscription_cost") else {})}))
         if len(rows) >= n:
             break
     return rows
@@ -298,6 +393,7 @@ def _executable_first(conn, t: dict, ranked: list[dict], offers: dict) -> list[d
 def general_points(conn) -> list[dict]:
     """Every callable model x reasoning level on the AA Intelligence Index with its real cost per AA task (the cloud
     behind the L1/L2/L3 method) — for the library page's Pareto chart."""
+    load_subscription_costs(conn)
     snaps = latest_snapshots(conn)
     offers = load_offers(conn, snaps)
     if "aa" not in snaps:
@@ -306,7 +402,7 @@ def general_points(conn) -> list[dict]:
     for b in conn.execute("""select model_id, variant, display_name, score, cost from models.benchmarks
                              where snapshot_id = %s and benchmark = 'aa_intelligence'""", (snaps["aa"],)):
         route = chat_route(offers.get(b["model_id"], []), b["cost"])
-        cost = (route.get("paid") or {}).get("cost")
+        cost = route_cost(route)
         if route["callable"] and cost:
             out.append({"model_id": b["model_id"], "variant": b["variant"], "name": b["display_name"],
                         "score": b["score"], "cost": cost, "cost_aa": b["cost"],
@@ -316,6 +412,7 @@ def general_points(conn) -> list[dict]:
 
 
 def compute(conn) -> list[dict]:
+    load_subscription_costs(conn)
     snaps = latest_snapshots(conn)
     offers = load_offers(conn, snaps)
     intel = _intelligence_index(conn, snaps, offers)
@@ -354,7 +451,8 @@ def compute(conn) -> list[dict]:
                 cost_unit = (route["paid"] or {}).get("unit")
             if not route["callable"]:
                 continue
-            cands.append({**b, "route": route, "real_cost": (route["paid"] or {}).get("cost"), "real_cost_unit": cost_unit})
+            real = route_cost(route) if t["interface"] == "chat" else (route["paid"] or {}).get("cost")
+            cands.append({**b, "route": route, "real_cost": real, "real_cost_unit": cost_unit})
         from walter_router.analysis.knowledge import tie_break  # late import: knowledge -> choose -> select
         ranked = tie_break(conn, t["task"], _best_by_composite(conn, t, snaps, offers, cands))
         if t["interface"] in MEDIA_EXEC_INTERFACES and t["task"] != "general":

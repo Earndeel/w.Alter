@@ -37,7 +37,9 @@ def main(args) -> int:
             from walter_router.plan import mail, watch
             out["plans"] = {"meters": subscriptions.refresh(conn)}
             conn.commit()
-            for step, fn in (("mails", mail.scan), ("web", None if args.no_web else watch.run)):
+            from walter_router.plan import modeldial
+            for step, fn in (("mails", mail.scan), ("modeldial", None if args.no_web else modeldial.run),
+                             ("web", None if args.no_web else watch.run)):
                 if fn is None:
                     continue
                 try:

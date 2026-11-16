@@ -298,7 +298,7 @@ def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]
     if not run:
         return []
     created = []
-    for r in conn.execute("""select s.level, s.model_id, s.variant, s.display_name, s.quality, s.real_cost,
+    for r in conn.execute("""select s.level, s.model_id, s.variant, s.display_name, s.quality, s.real_cost, s.reasons,
                                     p.pinned_model_id, p.pinned_variant
                              from models.selection s join models.preferences p
                                on p.task = 'general' and p.role = s.level
@@ -314,10 +314,18 @@ def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]
         ev = {"level": r["level"], "proposed": f'{r["model_id"]}/{r["variant"]}', "name": r["display_name"],
               "score": r["quality"], "real_cost": r["real_cost"],
               "current": f'{r["pinned_model_id"]}/{r["pinned_variant"]}', "current_score": pinned and pinned["score"]}
+        quota = (r["reasons"] or {}).get("quota_rule")
+        if quota:   # the owner's quota rule (2026-11-16): adopting the tier also declares its model once the quota is spent
+            ev["subscription"] = quota.get("subscription")
+            ev["when_quota_spent"] = (quota.get("when_quota_spent") or {}).get("pin")
         chg = chg or changes.events(conn)
         ev["why"] = changes.changed(chg, r["model_id"]) + [
             f'{r["pinned_model_id"]} dégradé' for _ in chg["nerf"].get(r["pinned_model_id"], [])[:1]] + \
-            changes.rebased_intelligence(chg)
+            changes.rebased_intelligence(chg) + ([
+                f'règle des abonnements (propriétaire, 16/11) : {quota.get("subscription")}, '
+                f'méthode seule : {quota.get("method_pick") or "—"}'
+                + (f', repli {ev["when_quota_spent"]} quand son quota est épuisé' if ev.get("when_quota_spent") else "")]
+                if quota else [])
         if record(conn, "tier", "general", ev["proposed"], ev, "open" if ev["why"] else "baseline",
                    r["level"]) and ev["why"]:
             created.append(f'{r["level"]}:{ev["proposed"]}')
@@ -394,7 +402,13 @@ def pareto(conn, run_id: int, chg: dict | None = None) -> list[str]:
     chg = chg or changes.events(conn)
     created = []
     for r in changes.frontier_entrants(conn, run_id):
-        why = changes.changed(chg, r["model_id"])
+        sub = (r["reasons"] or {}).get("subscription_cost") or {}
+        if sub.get("cost") is not None and r["real_cost"] is not None and abs(sub["cost"] - r["real_cost"]) < 1e-9:
+            # its real cost is a subscription's cost price (ModelDial, 2026-11-16): that is the reason, not a board
+            why = [f'prix de revient via l’abonnement {sub.get("sub_id") or sub.get("provider")} : '
+                   f'{sub["ratio"] * 100:.1f} % du prix API (quota mesuré par ModelDial)'.replace(".", ",", 1)]
+        else:
+            why = changes.changed(chg, r["model_id"])
         if not why:
             continue
         ev = {"name": r["display_name"], "variant": r["variant"], "score": r["quality"], "real_cost": r["real_cost"],
@@ -486,8 +500,13 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
         from walter_router.serve.choose import set_preference
         ev = a["evidence"] or {}
         note = f"Niveau {a['role']} adopté par {instance.owner()} (alerte {alert_id}), méthode des 3 niveaux."
+        spent = ev.get("when_quota_spent")
         knowledge.set_level("general", a["role"], a["subject"], why=f"alerte {alert_id} adoptée",
-                            description=f"{ev.get('name') or a['subject']} ({ev.get('score')} AA) — {note}")
+                            description=f"{ev.get('name') or a['subject']} ({ev.get('score')} AA) — {note}",
+                            when_quota_spent=spent,
+                            # a model is never its own fallback: the declared one gives way to the quota substitute
+                            **({"fallback": spent} if spent and knowledge.level_fallback("general", a["role"]) == a["subject"]
+                               else {}))
         set_preference(conn, "general", pin=a["subject"], role=a["role"], watch="dominance", note=note)
         return {"alert_id": alert_id, "status": decision, "pinned": a["subject"]}
     if decision == "adopted" and a["kind"] == "challenger" and ("boards" in a["evidence"] or "challenger" in a["evidence"]):

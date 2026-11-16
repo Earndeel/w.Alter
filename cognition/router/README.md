@@ -41,7 +41,7 @@ et les limites actuelles des outils natifs sont explicités dans [docs/EXECUTION
 |---|---|---|
 | `research/` | **Research** — fetches, periodically or on demand, by API or straight from the page | `categories/` (text, image, video, audio, memory, decision, prices, hosts, plans: each runnable alone) · `benchmarks/` one reader per site · `prices/` provider catalogues and the hosts behind OpenRouter · `agent/` the research agent of the cycle · `web.py` shared web access · `sources.py` registry, partial reads merged into the last snapshot · `run.py` the `research` command |
 | `analysis/` | **Analysis** — understands the data and keeps the active library | `parse`, `ingest` (snapshots → benchmarks / offers with identities) · `identity`, `aliases`, `media`, `catalog` · `knowledge` (owner's declarations) · `scoring`, `select`, `pareto`, `tiers`, `decision_pareto`, `postes`, `dossier` · `changes`, `alerts` (detection, verdicts), `telegram` (messages, buttons, sending), `recommend` · `refresh` (the cycle) |
-| `plan/` | **Plan** — the owner's subscriptions | `declared` (his plans: one writer) · `subscriptions` (meters, real usage, cost price of a token) · `quota_watch` (service) · `mail` (subscription mails) · `watch` (web research per plan) · `news` (new benefits or changes → notices) |
+| `plan/` | **Plan** — the owner's subscriptions | `declared` (his plans: one writer) · `subscriptions` (meters, real usage, cost price of a token) · `quota_watch` (service) · `mail` (subscription mails) · `modeldial` (ModelDial's measured quota per plan x model → cost price of a token per model) · `watch` (web research per plan) · `news` (new benefits or changes → notices) |
 | `interface/` | **Interface** — the library page | `library` (rows, publishing) · `page` (HTML) · `translate` (English) · `site/` (Cloudflare Pages functions) |
 | `serve/` | What Walter calls at run time | `api` (schémas) · `brief` (note) · `run` / `engine` (texte exécuté par Walter Engine, lot E5 ; l'ancienne boucle `text_agent` a été retirée le 11/11/2026) · `choose` (pick) · `routes` (execution routes, free-text entry) · `intent` (decision model) · `execution` (provider order, hosts, probes, reliability) · `media_exec` (image / video / music / voice) · `oneshot` (economic-tier answers) · `hermes_sync` |
 | `guardian/` | **Guardian** — the module's own maintenance (2026-10-26) | `checks` (detection, no model) · `run` (incidents, decisions, Telegram) · `repair` (the L2 agent on a copy of the module, deterministic gates, landing) · `prompt.md` · README |
@@ -111,7 +111,9 @@ walter-router ask "<question>" --option a="…" --option b="…" [--context …]
 walter-router classify "<request>" [--context …] | decide TASK "<request>" | dossier TASK | tasks | library
 walter-router generate "<request>" [--task …] [--role …]      # costs money: on request only
 walter-router prefer TASK [--pin MODEL[/VARIANT]] … | verdict ALERT adopted|dismissed | feedback MODEL RATING
-walter-router plans list | set ID [--vendor --plan --price --models --since --until --note] | retire ID
+walter-router plans list | consumption | set ID [--vendor --plan --price --models --since --until --note] | retire ID
+                                     # consumption: this week per plan (used, API value recovered, left before the
+                                     # reset, past weeks) — plan/consumption.py; live on the page via /api/consumption
 walter-router subscriptions [refresh | calibrate anthropic-pro PERCENT]
 walter-router brief [--write]        # what an agent must know to use the router: tools, levels, specialities,
                                      # generation, analysis, constraints — never a model or provider name

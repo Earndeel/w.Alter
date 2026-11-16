@@ -4,6 +4,7 @@
     subscriptions.py  quota meters, tokens each plan really carried, cost price of a token per plan
     quota_watch.py    service: re-reads a meter after each agent turn (Walter bus)
     mail.py           billing / subscription mails from the vendors (read-only Gmail, no model)
+    modeldial.py      ModelDial's measured quota of each plan, model by model -> cost price per plan x model
     watch.py          web research on each plan (SemiAnalysis / Tokenomics, vendors' pages, other measurements)
     news.py           a new benefit or change on a plan he owns -> one Telegram notice each
 

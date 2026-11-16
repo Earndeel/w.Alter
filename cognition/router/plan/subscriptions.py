@@ -1,6 +1,9 @@
-"""The owner's subscriptions — information only, no routing effect (2026-10-14).
+"""The owner's subscriptions: meters, usage and the cost price of a token through each plan.
 
-Two sources, nothing else: our own measurement and SemiAnalysis (config/subscriptions.json).
+Since 2026-11-16 the cost price per plan x model (model_costs, from ModelDial's measured quota, plan/modeldial.py)
+prices the subscription routes (serve/execution.py) and enters the real cost of the selection, hence the L1/L2/L3
+proposals (analysis/select.py); a tier change stays a proposal to the owner, never an automatic switch.
+Plan-wide sources: our own measurement and SemiAnalysis (config/subscriptions.json), plus web evidence.
   Our measurement
     meter      ChatGPT Plus: the real weekly % from the Codex usage API, through Hermes (read-only, the token never
                leaves Hermes). Claude Pro: no Claude login on the VM → weekly % estimated from the Claude Code
@@ -373,6 +376,27 @@ def state(conn) -> list[dict]:
     return out
 
 
+def model_costs(conn, sub_id: str) -> dict[str, dict]:
+    """Cost price of a token of each model through one plan, from ModelDial's measured quota (owner, 2026-11-16):
+    ratio = monthly price ÷ API value of the plan's full monthly quota on that model; usd_per_m = price ÷ tokens.
+    A plan given for free (promotion, price 0) is costed at its list price: free today, not free by nature, and a zero
+    cost would drop its models from every Pareto frontier."""
+    from walter_router.plan import modeldial
+    sub = get(sub_id)
+    price = float(sub.get("price_usd_month") or 0) or float(sub.get("list_price_usd_month") or 0)
+    if not price:
+        return {}
+    basis = "price" if sub.get("price_usd_month") else "list_price"
+    out = {}
+    for mid, v in modeldial.latest(conn, sub_id).items():
+        tokens = v.get("tokens_month")
+        out[mid] = {"ratio": round(price / v["usd_value_month"], 5), "api_value_month": v["usd_value_month"],
+                    "tokens_month": tokens, "usd_per_m": round(price / tokens * 1e6, 5) if tokens else None,
+                    "price_basis": basis, "source": "modeldial", "published": str(v["published"] or ""),
+                    "url": v["url"]}
+    return out
+
+
 def record_costs(conn) -> dict:
     """Cost price of a token through each plan (owner, 2026-10-22): price / API value carried per month, at the current
     pace (last 7 days) and at capacity (measured meter points, else SemiAnalysis' best published value)."""
@@ -389,7 +413,8 @@ def record_costs(conn) -> dict:
                "used_percent": (st["meter"] or {}).get("used_percent"),
                "detail": {"capacity_source": "measured" if st["measured_capacity"] else "published",
                           "published_values": len(published),
-                          "tokens_7d": st["usage_7d"]["total_tokens"]}}
+                          "tokens_7d": st["usage_7d"]["total_tokens"],
+                          "models": model_costs(conn, st["id"])}}
         conn.execute("""insert into models.subscription_costs (sub_id, price_usd_month, api_value_month_pace, api_value_month_full,
                         ratio_pace, ratio_full, used_percent, detail) values (%s,%s,%s,%s,%s,%s,%s,%s::jsonb)""",
                      (st["id"], price, pace, full, row["ratio_pace"], row["ratio_full"], row["used_percent"],

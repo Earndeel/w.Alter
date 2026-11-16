@@ -185,8 +185,8 @@ def build_parser() -> argparse.ArgumentParser:
     cl.add_argument("--context", help="one line on what the conversation was about before this request")
     o = sub.add_parser("dossier", help="the task's pre-computed dossier (what the router reads)")
     o.add_argument("task")
-    q = sub.add_parser("plans", help="the owner's plans (subscriptions): list | set ID [--price …] | retire ID")
-    q.add_argument("action", choices=["list", "set", "retire"])
+    q = sub.add_parser("plans", help="the owner's plans (subscriptions): list | consumption | set ID [--price …] | retire ID")
+    q.add_argument("action", choices=["list", "consumption", "set", "retire"])
     q.add_argument("sub_id", nargs="?")
     q.add_argument("--vendor"); q.add_argument("--plan"); q.add_argument("--price", type=float, dest="price_usd_month")
     q.add_argument("--execution"); q.add_argument("--route-provider", dest="route_provider")
@@ -239,6 +239,13 @@ def main(argv: list[str] | None = None) -> int:
         from walter_router.plan import declared
         if args.action == "list":
             print(json.dumps(declared.read().get("subscriptions", []), ensure_ascii=False, indent=1))
+            return 0
+        if args.action == "consumption":   # what each plan gives back this week (plan/consumption.py)
+            from walter_router.plan import consumption
+            from walter_router.store import db as store_db
+            with store_db.connect() as conn:
+                rows = consumption.weekly(conn)
+            print(json.dumps({"plans": rows, "week": consumption.summary(rows)}, ensure_ascii=False, indent=1, default=str))
             return 0
         if not args.sub_id:
             print(json.dumps({"error": "plan id required"}))

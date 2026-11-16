@@ -818,14 +818,14 @@ Facts about subscription plans with their source: value of a plan at API prices,
 | `source_url` | text | True | — | URL de provenance, sans secret. |
 | `published` | date | True | — | Date de publication de la preuve. |
 | `quote` | text | True | — | Extrait justificatif de la source. |
-| `origin` | text | False | — | Origine de la donnée (automatique, déclarée, agent ou source selon la table). |
+| `origin` | text | False | — | web (research agent), email (billing mails), owner, measure (our meters), modeldial (ModelDial measured quotas, per model) |
 | `found_at` | timestamp with time zone | False | now() | Date de découverte de la preuve. |
 
 constraints :
 
 ```sql
 CHECK ((metric = ANY (ARRAY['usd_value_month'::text, 'tokens_month'::text, 'messages_5h'::text, 'messages_week'::text, 'price_usd_month'::text, 'limit_note'::text, 'plan_change'::text])))
-CHECK ((origin = ANY (ARRAY['web'::text, 'email'::text, 'owner'::text, 'measure'::text])))
+CHECK ((origin = ANY (ARRAY['web'::text, 'email'::text, 'owner'::text, 'measure'::text, 'modeldial'::text])))
 PRIMARY KEY (evidence_id)
 UNIQUE (sub_id, model_id, metric, source_url, value)
 ```

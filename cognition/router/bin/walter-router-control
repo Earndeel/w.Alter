@@ -7,6 +7,7 @@ Cloudflare Access app that admits only the Pages project's service token. Every 
 the instance's control_env file (0600).
   POST /run     start walter-router-refresh.service (the 48 h cycle) unless it runs or started < 10 min ago
   GET  /status  running?, current step, last start/end, result
+  GET  /consumption  what each subscription gives back this week (`walter-router plans consumption`, cached 60 s)
   POST /plans   edit the owner's plans from the page: {"action": "set"|"retire", "sub_id", "fields"} (HMAC also covers
                 the body: ts + method + path + sha256(body)); applied by `walter-router plans`, page republished
 """
@@ -32,6 +33,17 @@ def _control_env() -> Path:
 
 ENV = _control_env()
 MIN_GAP_S = 600
+_CONSUMPTION: dict = {"at": 0.0, "body": None}
+
+
+def consumption() -> dict:
+    """Live weekly consumption of the plans for the library page; one computation per minute at most."""
+    if _CONSUMPTION["body"] is None or time.time() - _CONSUMPTION["at"] > 60:
+        out = subprocess.run(["walter-router", "plans", "consumption"], capture_output=True, text=True, timeout=60)
+        if out.returncode != 0:
+            return {"error": "consommation indisponible"}
+        _CONSUMPTION.update(at=time.time(), body=json.loads(out.stdout))
+    return _CONSUMPTION["body"]
 
 
 def secret() -> bytes:
@@ -74,9 +86,9 @@ class H(BaseHTTPRequestHandler):
         return hmac.compare_digest(want, sig)
 
     def do_GET(self):  # noqa: N802
-        if self.path != "/status" or not self._auth():
+        if self.path not in ("/status", "/consumption") or not self._auth():
             return self._ok(404, {"error": "not found"})
-        self._ok(200, status())
+        self._ok(200, status() if self.path == "/status" else consumption())
 
     def _plans(self):
         n = int(self.headers.get("Content-Length") or 0)

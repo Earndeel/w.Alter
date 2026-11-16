@@ -14,7 +14,8 @@ from pathlib import Path
 from walter_router import instance
 
 EDITABLE = {"vendor": str, "plan": str, "price_usd_month": float, "execution": str, "route_provider": str,
-            "models": list, "note": str, "currency_note": str, "since": str, "until": str, "list_price_usd_month": float}
+            "models": list, "note": str, "currency_note": str, "since": str, "until": str, "list_price_usd_month": float,
+            "modeldial_plan": str}
 
 
 def _path() -> Path:

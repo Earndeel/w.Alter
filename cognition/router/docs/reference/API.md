@@ -187,7 +187,7 @@ walter-router pick
   --agent : the view an agent gets (choice, why, routes with prices) ; défaut=false
 walter-router plans
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
-  action :  ; défaut=— ; valeurs=["list", "set", "retire"]
+  action :  ; défaut=— ; valeurs=["list", "consumption", "set", "retire"]
   sub_id :  ; défaut=—
   --vendor :  ; défaut=—
   --plan :  ; défaut=—

@@ -1979,6 +1979,7 @@
           {
             "choices": [
               "list",
+              "consumption",
               "set",
               "retire"
             ],
@@ -4778,7 +4779,7 @@
           },
           {
             "default": null,
-            "description": "Origine de la donnée (automatique, déclarée, agent ou source selon la table).",
+            "description": "web (research agent), email (billing mails), owner, measure (our meters), modeldial (ModelDial measured quotas, per model)",
             "name": "origin",
             "nullable": false,
             "type": "text"
@@ -4793,7 +4794,7 @@
         ],
         "constraints": [
           "CHECK ((metric = ANY (ARRAY['usd_value_month'::text, 'tokens_month'::text, 'messages_5h'::text, 'messages_week'::text, 'price_usd_month'::text, 'limit_note'::text, 'plan_change'::text])))",
-          "CHECK ((origin = ANY (ARRAY['web'::text, 'email'::text, 'owner'::text, 'measure'::text])))",
+          "CHECK ((origin = ANY (ARRAY['web'::text, 'email'::text, 'owner'::text, 'measure'::text, 'modeldial'::text])))",
           "PRIMARY KEY (evidence_id)",
           "UNIQUE (sub_id, model_id, metric, source_url, value)"
         ],
@@ -6198,7 +6199,7 @@
           {
             "description": "One writer for the owner's declared text tiers (knowledge.json \"levels\"), the source `declare` re-applies",
             "name": "set_level",
-            "signature": "task: str, level: str, pin: str, why: str, provider: str | None=None, description: str | None=None, evidence: str | None=None, fallback=KEEP"
+            "signature": "task: str, level: str, pin: str, why: str, provider: str | None=None, description: str | None=None, evidence: str | None=None, fallback=KEEP, when_quota_spent=KEEP"
           },
           {
             "description": "",
@@ -6233,6 +6234,11 @@
           {
             "description": "Declared fallback (model_id/variant) of a text tier, used when every route of the pinned model fails.",
             "name": "level_fallback",
+            "signature": "task: str, level: str | None"
+          },
+          {
+            "description": "Declared model (model_id/variant) of a text tier once every account of its model's subscription is spent.",
+            "name": "level_when_quota_spent",
             "signature": "task: str, level: str | None"
           },
           {
@@ -6529,6 +6535,16 @@
             "signature": "offer: dict"
           },
           {
+            "description": "Cost price of each model through the owner's subscriptions (owner, 2026-11-16: ModelDial's measured quota, see",
+            "name": "load_subscription_costs",
+            "signature": "conn"
+          },
+          {
+            "description": "Real cost of a chat route: the cheaper of its best paid offer and its subscription's cost price.",
+            "name": "route_cost",
+            "signature": "route: dict"
+          },
+          {
             "description": "Cheapest paid route for a chat model, scaling AA's list-price task cost by the provider/list price ratio.",
             "name": "chat_route",
             "signature": "offers: list[dict], list_cost: float | None, modes: list[str] | None=None"
@@ -6562,6 +6578,21 @@
             "description": "",
             "name": "_ladder",
             "signature": "cands: list[dict], minimum_score: float, cost_cap: float"
+          },
+          {
+            "description": "The point's real cost is a subscription's cost price (not a paid route).",
+            "name": "_on_subscription",
+            "signature": "p: dict"
+          },
+          {
+            "description": "Which subscription serves the point at its cost price (two Claude accounts = one route provider).",
+            "name": "_sub_of",
+            "signature": "p: dict"
+          },
+          {
+            "description": "The same points once `provider`'s subscription is spent: its models at their best paid price, or gone.",
+            "name": "_without_subscription",
+            "signature": "pts: list[dict], provider: str"
           },
           {
             "description": "The owner's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs.",
@@ -6746,9 +6777,29 @@
             "signature": "a: dict, b: dict"
           },
           {
+            "description": "The frontier up to its first point above the floor that buys less than `min_gain` points per extra dollar.",
+            "name": "affordable",
+            "signature": "f: list[dict], floor: float=QUALITY_FLOOR, min_gain: float=CEILING_MIN_GAIN"
+          },
+          {
             "description": "",
             "name": "compute",
-            "signature": "points: list[dict], floor: float=QUALITY_FLOOR, band: float=CEILING_BAND, knee_drop: float=KNEE_DROP"
+            "signature": "points: list[dict], floor: float=QUALITY_FLOOR, band: float=CEILING_BAND, knee_drop: float=KNEE_DROP, min_gain: float=CEILING_MIN_GAIN"
+          },
+          {
+            "description": "",
+            "name": "_best",
+            "signature": "ps"
+          },
+          {
+            "description": "The owner's subscription rule (2026-11-16): the subscriptions are already paid, so L2 and L3 are sought among",
+            "name": "quota_levels",
+            "signature": "points: list[dict], in_pool, sub_of=lambda p: None"
+          },
+          {
+            "description": "The subscription model above `base` (the tier just below) with the best gain from it — L3's pick once its own",
+            "name": "above",
+            "signature": "points: list[dict], in_pool, base: dict"
           }
         ]
       },
@@ -7423,6 +7474,16 @@
             "signature": "conn"
           },
           {
+            "description": "",
+            "name": "_pct",
+            "signature": "x: float | None"
+          },
+          {
+            "description": "This week on each plan (owner, 2026-11-16: get every token the subscriptions offer): used, API value recovered,",
+            "name": "_consumption",
+            "signature": "conn"
+          },
+          {
             "description": "Cost price of a token per plan (2026-10-22): what the router uses to price a subscription route.",
             "name": "_plan_costs",
             "signature": "conn"
@@ -8016,6 +8077,32 @@
         ]
       },
       {
+        "description": "What the owner's subscriptions give back each week (owner, 2026-11-16: « les rentabiliser au maximum en essayant de",
+        "file": "plan/consumption.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_tier_models",
+            "signature": ""
+          },
+          {
+            "description": "Weekly windows of one plan, newest first: the highest % read in each. Readings whose reset times lie within",
+            "name": "_windows",
+            "signature": "conn, sub_id: str, weeks: int"
+          },
+          {
+            "description": "",
+            "name": "weekly",
+            "signature": "conn, weeks: int=4"
+          },
+          {
+            "description": "The whole week across plans: API value used and left, price paid.",
+            "name": "summary",
+            "signature": "rows: list[dict]"
+          }
+        ]
+      },
+      {
         "description": "The owner's plans (subscriptions), editable from anywhere (owner, 2026-10-22: « les plans peuvent être ajoutés dans",
         "file": "plan/declared.py",
         "functions": [
@@ -8093,6 +8180,47 @@
         ]
       },
       {
+        "description": "ModelDial: the measured weekly quota of each AI subscription, model by model (owner, 2026-11-16: « intègre",
+        "file": "plan/modeldial.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_text",
+            "signature": "fragment: str"
+          },
+          {
+            "description": "",
+            "name": "_num",
+            "signature": "text: str"
+          },
+          {
+            "description": "Every measured cell of the page: {row_id, model_name, weekly_tokens, weekly_api_usd, measured}.",
+            "name": "parse",
+            "signature": "page: str"
+          },
+          {
+            "description": "Router id of a ModelDial row name, exact canonical match only: « Opus 5.5 » on a Claude plan -> claude-opus-5-5,",
+            "name": "model_id",
+            "signature": "name: str, plan_key: str, known: set[str]"
+          },
+          {
+            "description": "The cells of one plan key: the row id is « <plan key>-<model>[-date] »; a longer key never steals a shorter one",
+            "name": "cells_for",
+            "signature": "cells: list[dict], plan_key: str"
+          },
+          {
+            "description": "",
+            "name": "run",
+            "signature": "conn, page: str | None=None"
+          },
+          {
+            "description": "model_id -> {usd_value_month, tokens_month, published, url} from the newest ModelDial rows of one plan.",
+            "name": "latest",
+            "signature": "conn, sub_id: str"
+          }
+        ]
+      },
+      {
         "description": "A new benefit or change on a plan the owner has -> one Telegram notice each (owner, 2026-10-22: « s'il y a un nouvel",
         "file": "plan/news.py",
         "functions": [
@@ -8150,7 +8278,7 @@
         ]
       },
       {
-        "description": "The owner's subscriptions — information only, no routing effect (2026-10-14).",
+        "description": "The owner's subscriptions: meters, usage and the cost price of a token through each plan.",
         "file": "plan/subscriptions.py",
         "functions": [
           {
@@ -8257,6 +8385,11 @@
             "description": "Everything the library shows, per subscription.",
             "name": "state",
             "signature": "conn"
+          },
+          {
+            "description": "Cost price of a token of each model through one plan, from ModelDial's measured quota (owner, 2026-11-16):",
+            "name": "model_costs",
+            "signature": "conn, sub_id: str"
           },
           {
             "description": "Cost price of a token through each plan (owner, 2026-10-22): price / API value carried per month, at the current",
@@ -9173,6 +9306,16 @@
             "description": "Recent real executions of this provider x model (models.exec_log, skipped attempts excluded: walter-llm logs a",
             "name": "reliability",
             "signature": "conn, provider: str, model: str"
+          },
+          {
+            "description": "A subscription route whose weekly quota is nearly spent, or whose session window is full.",
+            "name": "quota_spent",
+            "signature": "r: dict"
+          },
+          {
+            "description": "The model has subscription routes and every one of them is spent (all accounts).",
+            "name": "subscription_exhausted",
+            "signature": "execution: list[dict]"
           },
           {
             "description": "route provider -> its subscriptions in declaration order, each with its own quota and cost price. Several",
@@ -14201,7 +14344,7 @@
         "type": "str"
       },
       {
-        "default": "the owner's subscriptions (declared by him), for information only: no routing effect (2026-10-14). Shown on the library page with two sources only: our own measurement (meters + the tokens W.Alter's runtimes really used, priced at list API rates) and SemiAnalysis' published plan values. Readings go to models.subscription_usage.",
+        "default": "the owner's subscriptions (declared by him), its cost price per plan x model (ModelDial, 2026-11-16) prices the subscription routes and the L1/L2/L3 proposals; `modeldial_plan` = the plan key of its ModelDial cells. Shown on the library page with two sources only: our own measurement (meters + the tokens W.Alter's runtimes really used, priced at list API rates) and SemiAnalysis' published plan values. Readings go to models.subscription_usage.",
         "file": "config/subscriptions.json",
         "key": "_doc",
         "type": "str"
@@ -14689,6 +14832,15 @@
       {
         "comment": "",
         "file": "analysis/select.py",
+        "name": "QUOTA_WHY",
+        "value": {
+          "L2": "abonnements : meilleur modèle d'un autre abonnement que L3, moins cher par tâche que L3, tant que son quota dure",
+          "L3": "abonnements : choix de la méthode parmi les modèles d'abonnement, tant que son quota dure"
+        }
+      },
+      {
+        "comment": "",
+        "file": "analysis/select.py",
         "name": "MEDIA_EXEC_INTERFACES",
         "value": [
           "image",
@@ -14847,6 +14999,12 @@
         "file": "analysis/tiers.py",
         "name": "KNEE_DROP",
         "value": 2.0
+      },
+      {
+        "comment": "",
+        "file": "analysis/tiers.py",
+        "name": "CEILING_MIN_GAIN",
+        "value": 1.0
       },
       {
         "comment": "the cycle runs every 48 h",
@@ -15638,12 +15796,21 @@
         "file": "interface/translate.py",
         "name": "PHRASES",
         "value": {
+          " $ par mois": " $ per month",
           " % de lectures en cache ; tokens par mois = valeur ÷ prix moyen du million sur ce mélange.": " % cache reads; tokens per month = value ÷ average price per million on that mix.",
           " : valeur du forfait entièrement utilisé, sur un usage agentique de ": ": value of the plan fully used, on an agentic workload with ",
           " ; cycle complet automatique toutes les 48 heures, page republiée après chacune de tes réponses.": "; full cycle every 48 hours, page republished after each of your answers.",
           " Md": " B",
+          " de valeur API": " of API value",
+          " de valeur API sur ": " of API value on ",
+          " encore disponibles.": " still available.",
+          " jours": " days",
+          " payés, ": " paid, ",
           " points de compteur": " meter points",
+          " récupérés pour ": " recovered for ",
           " · puis ": " · then ",
+          " × le prix de la semaine": " × the week’s price",
+          " — semaine en cours : ": " — current week: ",
           "$/img estimé": "$/img estimated",
           "$/recherche": "$/search",
           "$/requête": "$/request",
@@ -15653,6 +15820,7 @@
           "(pas de fournisseur branché)": "(no provider wired)",
           "(proposé par aucun de nos fournisseurs)": "(offered by none of our providers)",
           "(si payant)": "(if paid)",
+          "(utilisé par le Router)": "(used by the Router)",
           ", échelle logarithmique": ", log scale",
           "7 jours glissants": "rolling 7 days",
           "AA ne teste pas encore la vision : classé sur l'index texte, parmi ceux qui lisent les images": "AA does not test vision yet: ranked on the text index, among models that read images",
@@ -15686,7 +15854,9 @@
           "Compteur Claude estimé = entrée + écriture en cache + 5 × sortie, lectures en cache gratuites, sur une capacité tirée de SemiAnalysis tant qu’il n’est pas calibré. ": "Estimated Claude meter = input + cache writes + 5 × output, cache reads free, over a capacity taken from SemiAnalysis until it is calibrated. ",
           "Compteur et consommation des 7 derniers jours": "Meter and usage over the last 7 days",
           "Compteur hebdo": "Weekly meter",
+          "Consommation indisponible : ": "Usage unavailable: ",
           "Conversation vocale temps réel": "Real-time voice conversation",
+          "Conversion sur ModelDial : quota mesuré du forfait sur le modèle de référence (celui des niveaux L1 à L3 quand le forfait les sert). Le compteur est commun à tous les modèles du forfait : la valeur est une lecture sur ce modèle, pas une somme. Compteurs relus après chaque tour d’agent et toutes les 30 minutes.": "Converted with ModelDial: the plan’s measured quota on the reference model (the L1–L3 model when the plan serves it). The meter is shared by every model of the plan: the value is a reading on that model, not a sum. Meters re-read after each agent turn and every 30 minutes.",
           "Coût AA officiel": "Official AA cost",
           "Coût du million": "Cost per million",
           "Coût du million à ton rythme": "Cost per million at your pace",
@@ -15728,6 +15898,7 @@
           "Méthode Pareto": "Pareto method",
           "Météo": "Weather",
           "Niveau": "Level",
+          "Niveaux actifs : ta méthode sur la frontière AA, abonnements à leur prix de revient ModelDial": "Active levels: your method on the AA frontier, subscriptions at their ModelDial cost price",
           "Niveaux retenus": "Selected levels",
           "Notre mesure": "Our measurement",
           "Notre mesure ChatGPT = valeur API consommée entre deux lectures du compteur ÷ points gagnés, ramenée à 100 % (un plancher : l’usage hors de la VM fait monter le compteur sans tokens vus ici). ": "Our ChatGPT measurement = API value used between two meter readings ÷ points gained, scaled to 100 % (a floor: usage outside the VM moves the meter without tokens seen here). ",
@@ -15736,11 +15907,14 @@
           "Origine": "Origin",
           "Origine : « Ton choix » = modèle fixé par toi ; « Calculé » = meilleur modèle exécutable selon les classements\npondérés ; « Méthode Pareto » = niveaux L1, L2, L3. Une ligne surlignée signale un choix de ta part différent du n°1 mesuré, avec la raison.": "Origin: “Your pick” = model you set; “Computed” = best runnable model on the weighted leaderboards; “Pareto method” = levels L1, L2, L3. A highlighted row marks a pick of yours that differs from the measured #1, with the reason.",
           "Page générée le ": "Page generated on ",
+          "Part du quota hebdomadaire utilisée (compteur réel), valeur API que cela représente et ce qu’il reste à prendre avant la remise à zéro": "Share of the weekly quota used (real meter), the API value it represents and what is left to take before the reset",
           "Pas de données AA.": "No AA data.",
           "Premium / cinématique": "Premium / cinematic",
           "Prix": "Price",
           "Prix : texte en dollars par million de tokens (entrée/sortie), image par image, vidéo par seconde (plage selon la résolution) ;\n« estimé » lorsque le fournisseur facture au token.": "Prices: text in dollars per million tokens (input/output), images per image, video per second (range by resolution); “estimated” when the provider bills per token.",
           "Prix de référence publié par Artificial Analysis": "Reference price published by Artificial Analysis",
+          "Proposition du dernier calcul : ": "Latest computation proposes: ",
+          "Quota épuisé": "Quota spent",
           "Quotidien : réponses courtes, résumés, petites rédactions": "Everyday: short answers, summaries, small writing",
           "Raisonnement profond, synthèse, enjeu important": "Deep reasoning, synthesis, high stakes",
           "Rang": "Rank",
@@ -15750,6 +15924,7 @@
           "Rechercher": "Search",
           "Reclassement de résultats (rerank)": "Result reranking",
           "Remise à zéro": "Resets",
+          "Reste à prendre": "Left to take",
           "Retouche / édition d'image": "Image retouching / editing",
           "Rédaction / qualité d'écriture": "Writing quality",
           "Résumé / compression de contexte": "Summarisation / context compression",
@@ -15758,6 +15933,7 @@
           "Sciences / recherche avancée": "Science / advanced research",
           "Score /100 : moyenne pondérée des classements indiqués sous chaque tâche": "Score /100: weighted average of the leaderboards listed under each task",
           "Secours": "Fallback",
+          "Semaines précédentes": "Previous weeks",
           "SemiAnalysis, rapport du ": "SemiAnalysis, report of ",
           "Site web / landing": "Website / landing page",
           "Stratégie / conseil / opérations": "Strategy / consulting / operations",
@@ -15768,10 +15944,12 @@
           "Ton choix": "Your pick",
           "Transcription (parole vers texte)": "Transcription (speech to text)",
           "Tâche": "Task",
+          "Utilisé": "Used",
           "Utilisé par": "Used by",
           "Valeur API": "API value",
           "Valeur API = tokens réellement consommés, au prix catalogue de l’éditeur. ": "API value = tokens actually used, at the vendor’s list price. ",
           "Valeur API par mois": "API value per month",
+          "Valeur API récupérée": "API value recovered",
           "Vectorisation (embeddings)": "Embeddings",
           "Vidéo": "Video",
           "Vidéo depuis texte": "Text to video",
@@ -15779,7 +15957,9 @@
           "Voix (lecture)": "Voice (text to speech)",
           "Vue d'ensemble": "Overview",
           "aucun modèle exécutable": "no runnable model",
+          "avant la remise à zéro": "before the reset",
           "combinaisons modèle × niveau de réflexion exécutables": "runnable model × reasoning-level combinations",
+          "compteur non lisible : consommation non mesurée": "meter not readable: usage not measured",
           "coût officiel par tâche AA (prix de référence)": "official cost per AA task (reference price)",
           "coût réel par tâche AA (meilleur fournisseur)": "real cost per AA task (best provider)",
           "du prix API": "of the API price",
@@ -15789,6 +15969,7 @@
           "non inclus dans Pro (crédits payés au prix API)": "not included in Pro (credits paid at API price)",
           "non lu": "not read",
           "n°1 mesuré : ": "measured #1: ",
+          "offert (prix catalogue ": "free offer (list price ",
           "par mois": "per month",
           "pas de fournisseur branché": "no provider wired",
           "pas encore classée sur ce benchmark": "not ranked on this benchmark yet",
@@ -15810,6 +15991,7 @@
           "— (un seul fournisseur)": "— (single provider)",
           "▶ Lancer le cycle complet": "▶ Run the full cycle",
           "🎨 Spécialisations Design Arena": "🎨 Design Arena specialisations",
+          "💳 Abonnements cette semaine": "💳 Subscriptions this week",
           "📈 Indice d'intelligence et coût par tâche": "📈 Intelligence index and cost per task",
           "🧠 Niveaux de réflexion": "🧠 Reasoning levels"
         }
@@ -16263,6 +16445,24 @@
           "payments-noreply@google.com",
           "googleone-noreply@google.com"
         ]
+      },
+      {
+        "comment": "",
+        "file": "plan/modeldial.py",
+        "name": "URL",
+        "value": "https://modeldial.com/subscriptions"
+      },
+      {
+        "comment": "",
+        "file": "plan/modeldial.py",
+        "name": "SOURCE",
+        "value": "ModelDial — 订阅额度 (measured subscription quotas)"
+      },
+      {
+        "comment": "亿",
+        "file": "plan/modeldial.py",
+        "name": "TOKENS_UNIT",
+        "value": 100000000.0
       },
       {
         "comment": "",
@@ -17829,7 +18029,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "74c2edf2d03b1967c2eafc045dc45578f09ee6cd6e1283eaaf63b79c359d896c",
+    "analysis/alerts.py": "17f3cb1c3a8a6a188de6d389209eb2ae1b8af705105327d371d68174cf53d735",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -17838,7 +18038,7 @@
     "analysis/dossier.py": "31cb4cdb76c9ada3510f040f9dd8fc30861d25b44a97db3add8a563cae4e2872",
     "analysis/identity.py": "06626cefaeea94adda2153e9b7400ab948b5bece0a821b36211546f00e8aca9f",
     "analysis/ingest.py": "d952e8f16448734710ec8d64667ce2124b422f0de0309065a64881074afa18af",
-    "analysis/knowledge.py": "193ee45063f29a805e08eece0d2988d503c38571f13c4a476e5068556ceae768",
+    "analysis/knowledge.py": "3a8059a56f954abfa97b46a4d965cf11a6723d4d8e8bd424028f4dd0dfd75891",
     "analysis/media.py": "c61030754e36087f9b9b4caf86641ec786e97eccf3b33345d04b5f2d7eb1b267",
     "analysis/pareto.py": "00621f7e0584567022991ee1bd154dfe15b64b9443dd0c89a6faf26f11d23f0f",
     "analysis/parse.py": "cf82c94b379e607f9793738b1e770374b3e96c6da328062ecb16292d43b59317",
@@ -17846,14 +18046,14 @@
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
     "analysis/refresh.py": "17a00934a816292587e26c292795177ce6e3199ce05b3612fd5a580a5487822a",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
-    "analysis/select.py": "e1eebbb5abc3b2bb455e4bbd9e4f96199cd09ce2539e7401455686e9beac5870",
+    "analysis/select.py": "d144ffd109701a68864467208a4ece10a02a4d34cc6421d232b8792fd1e85bd2",
     "analysis/telegram.py": "08128546ad28d87ed6ec6c1686b841356e5bf1fdba837a2db5a386d59b9bc11a",
-    "analysis/tiers.py": "36d9bcdf24aa8f688431dc901e8305cbccfbb33b94f57532f9050518fe2563eb",
+    "analysis/tiers.py": "a21de3334f3580930208ccc43aea948bf33997c154209f1779db92cfe0d52f2a",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
-    "bin/walter-router-control": "3373221954bd9c6b4a6092a3be30d9c0a616fa34dbc4b5f034fa68b5b6493932",
+    "bin/walter-router-control": "82982ddcc580c814abb6ba7a4e55523d412d371bf1f341531d4a01b08e77f4ee",
     "bin/walter-router-cycle": "f67a9221b33e8da97dcdf5e4180d19b29383421fa82bd26be33b4e53181dfdb5",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "2d81fe82c5f0e996382042f3d9b6896113beacc6ad142ec30b8445ade0531626",
+    "cli.py": "08e167a680b4fe8e99eeb3ba72694c2b1e6683b190e23831fce166c5afc258b7",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
@@ -17861,7 +18061,7 @@
     "config/knowledge.json": "4d8ff8f4e3cd712e48bd19d3048b9ad3a32ed78566688ec6c5c56fa8927a5a7b",
     "config/media_models.json": "1a00950c74b50b046e5a6d9ab534def777ea8c349f3058e2a842800168b1ea7a",
     "config/providers.json": "82b0a50103f1b932ab876bf06f27b50e183dc1631159bfa258c8752de168f938",
-    "config/subscriptions.json": "d2e56aa07e15344a1986746b1f8608842873639f5d37788e37e9896d6ba67017",
+    "config/subscriptions.json": "b024fe62090d03e99ea7c06e6a76fd98228ab0d9811692ae07a65ccf4f958dac",
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "39778c3ef58539ea14a375ca36c762d0d628de2c02440d7372095191affda842",
     "contracts/router.json": "b82b49dac123d08e73e84e9ef81c7a317a4de5dd3deb15fb716461e0cbf0269a",
@@ -17877,12 +18077,13 @@
     "instance.py": "59951f30cc91100f7bb12b60da02b9bf34c04341a9c4b6dfa1a9c7cae5c792a9",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
     "interface/library.py": "649216011e2545152c4a2c7387a335fcd5a7c59bf49748283c98de725055a570",
-    "interface/page.py": "e52afc7458a85fceb867a2ad52c803eddf735ff403849434e407470d9a4d0fa0",
+    "interface/page.py": "c50f1f78f6c556c8f51c2d5b025e5a9130e7a7708b02de8643be4c6f0a9d8956",
     "interface/site/functions/_middleware.js": "7698f9a6d90639f63790b347aaa8d4b7473f128e5ac2f130158481768217a12f",
+    "interface/site/functions/api/consumption.js": "84af305ac0a0d70a56bf142c08d5332d793d3acdfe280776f3f2f58919ddb9ad",
     "interface/site/functions/api/plans.js": "636563511ae2c5c794990c5d0571eb731de30d05eae457e32fe62b8378abd69f",
     "interface/site/functions/api/run.js": "f0c5e0aaae262eae630e2b685f2f3c28e4c1430bca9451e3015f5c4d9f7506f3",
     "interface/site/functions/api/status.js": "37fbd922a3eae2e33236fe4cda7d4546dafd6b69f7d76b50aea92d2deafd92cb",
-    "interface/translate.py": "eb4f4543dba5704ea11820add5ecea5a3fb0006f7c351a51c9972250ce6b04ad",
+    "interface/translate.py": "6d4f3270ee5ad57a8a32ece2e7e986014f5549c7790c36472f4b62aab8ada269",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
@@ -17890,13 +18091,15 @@
     "llm/gateway.py": "f95463295dfaa2d1f816914f5cac3afcde1c95ff4ce4b00547cb5f29a8eb4b46",
     "llm/structured.py": "555403466fe28fb08e099f7637a6a8f9079822350394c1baf8987708d5476952",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
-    "plan/__init__.py": "644b79c2feaf9ebf9d4f841effba342f80a0b1e49132e7be88e2edbfe2983195",
+    "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
-    "plan/declared.py": "e4b8930a5d4f4aee17ce08f20e898cc85949b19c762c54fb66e21e2372df4b3f",
+    "plan/consumption.py": "6ff376bf70ecd34d5d16ef9315fc20c1993aec3f178a20ead43f7f61be9d59fe",
+    "plan/declared.py": "9687186dc3b15a3aa0d4cf39633dbd2cc1b633608306eadbce87ed894276beac",
     "plan/mail.py": "541e27d036223253091b2349aa5ca4844fd72f478582b465d83abb22cc1da534",
+    "plan/modeldial.py": "2e3e08248e754052e26ea6aa543b3a7d328a9f5a6a7a08fbb8e87adf5808ff55",
     "plan/news.py": "cb79f91afd5eb20ceb83399d9281c9efa2eaa81997cc5df35c07541311972a22",
     "plan/quota_watch.py": "1af365d976fa20bec06c3c2277de5753255a805ead05f4cdff4310ae4912de2f",
-    "plan/subscriptions.py": "3d1b19bf87b485f44d19ab62400e88a055d61675f9363196482fbeda2c8e1f9c",
+    "plan/subscriptions.py": "9883d4f5897d62747dd1093b2a0b7dd23ec2fc7e8ac63c90d43205428128ce9c",
     "plan/watch.py": "9721d7f8f85084b42536b9e4c206b4845576fc5bf3325d035ab0a148b8c2dd04",
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",
@@ -17932,7 +18135,7 @@
     "research/prices/openrouter.py": "1301d99d11624c50a619146c67ef4a0af7c6a4f0b983f178966b3a4389df3f0b",
     "research/prices/openrouter_endpoints.py": "641fd7d9faf03d2c4b5ba2b71a40d28aa369ac1c3d9d4110e883c4cf319d6ac9",
     "research/prices/providers.py": "65f3d4d680016a9162b935356adb09f49a9cca0a48569402945b47fd112a811a",
-    "research/run.py": "8dac1620e046f83923397e86c92d95318c9c703b4ca9187f4f4efca0b7dcf774",
+    "research/run.py": "d2094a6df96a9ab5edd9123458677c857baa6136882f7f22ae088107610edd9a",
     "research/sources.py": "b872c4f0bc274c5c05612712b9bc04b756a52db9c837d4a5e63ec3097974cad0",
     "research/web.py": "975a4b60b130ad9396f0e3eec5f926966dff8f621cd06c04fae151ff805f6bef",
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
@@ -17941,13 +18144,13 @@
     "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
-    "serve/execution.py": "5ec59ae8ed7895ce42e763e2ffa3556404e0eb9664c3d45dbb8ca8a4c1435856",
+    "serve/execution.py": "bd32cc241c3c1dbf2c7b95617fce3bcdf77a6203658ac9b9420a1b1095483487",
     "serve/hermes_sync.py": "c1df622e2bab7c3d597788b60b82896f2d911c836c2dfabccf7ec276ab511bee",
     "serve/intent.py": "8ae5e3b089657d766ea1e61f6e9ab982fa0ae68d1bc5ed83b21d32d9269834d1",
     "serve/media_exec.py": "58f2a5f4250edb309ee6b0d75cc519d80f8cb8b2714ea1b153783720b1b5f345",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",
-    "serve/routes.py": "108b6fafa28d1b29e3de8bc38b88e9778a318a1f3d12b70836d87b5872a72857",
+    "serve/routes.py": "68e05493cf877eca35f0b3337d37cdea5c1831cf296d055773dbf25e94e5e07c",
     "serve/run.py": "ed428ba8c3dda62ccca7450aa54560841acc2c998349ee5ecb7df21f4551403f",
     "serve/web.py": "6c3abfdda219864f12930005e14db97cb0988df814ce7b1a2d072def5404b80a",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
@@ -17991,7 +18194,8 @@
     "store/migrations/037_neutral_task_texts.sql": "9a776b3d51975ef7fb6a780bad99240ac47ffa50bb53908ca4370de78ea53bff",
     "store/migrations/038_neutral_embeddings_requirement.sql": "399cbec430a8090dbd319089de215d173cb4655762ff71c699945171dec20649",
     "store/migrations/039_exec_log_account.sql": "f1711eeb24fa9d054e25ae9993a83465a5bf220315dab33261e44481a5833a75",
-    "store/migrations/040_devboard_reading.sql": "60d718a4071dd9eb75e356acb444868f54095ca58553b853966487fef9d601c5"
+    "store/migrations/040_devboard_reading.sql": "60d718a4071dd9eb75e356acb444868f54095ca58553b853966487fef9d601c5",
+    "store/migrations/041_plan_evidence_modeldial.sql": "8e5ad3892b3dcae5c15cd54ff103ff3d487174640e0d37d045a612d6829b6de8"
   },
   "tasks": [
     {

@@ -30,7 +30,7 @@ KEEP = object()
 
 
 def set_level(task: str, level: str, pin: str, why: str, provider: str | None = None, description: str | None = None,
-              evidence: str | None = None, fallback=KEEP) -> dict:
+              evidence: str | None = None, fallback=KEEP, when_quota_spent=KEEP) -> dict:
     """One writer for the owner's declared text tiers (knowledge.json "levels"), the source `declare` re-applies
     every cycle: a tier adopted on Telegram must land here, or the next cycle restores the old pin (2026-10-28).
     Writes the instance's own copy and keeps the previous file in config/router/history/."""
@@ -53,6 +53,10 @@ def set_level(task: str, level: str, pin: str, why: str, provider: str | None = 
         lv.pop("fallback", None)
         if fallback:
             lv["fallback"] = fallback
+    if when_quota_spent is not KEEP:   # the owner's quota rule (2026-11-16): the tier model once its subscription is spent
+        lv.pop("when_quota_spent", None)
+        if when_quota_spent:
+            lv["when_quota_spent"] = when_quota_spent
     doc.setdefault("changes", []).append({"at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                                           "level": f"{task}/{level}", "pin": pin, "why": why})
     target = instance.own_file("knowledge.json")
@@ -183,6 +187,13 @@ def level_fallback(task: str, level: str | None) -> str | None:
     """Declared fallback (model_id/variant) of a text tier, used when every route of the pinned model fails."""
     lv = ((load().get("levels") or {}).get(task) or {}).get(level or "")
     return lv.get("fallback") if isinstance(lv, dict) else None
+
+
+def level_when_quota_spent(task: str, level: str | None) -> str | None:
+    """Declared model (model_id/variant) of a text tier once every account of its model's subscription is spent."""
+    lv = ((load().get("levels") or {}).get(task) or {}).get(level or "")
+    pin = lv.get("when_quota_spent") if isinstance(lv, dict) else None
+    return pin if pin and "/" in pin else None
 
 
 def declared_fallbacks(model_id: str, task: str, level: str | None, require: str | None) -> list[tuple[str, str]]:

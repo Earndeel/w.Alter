@@ -155,6 +155,8 @@ def _subscriptions(conn) -> tuple[str, int]:
     try:
         subs = subscriptions.state(conn)
         semi = subscriptions.doc()["semianalysis"]
+        md = {r["sub_id"]: (r["detail"] or {}).get("models") or {}
+              for r in conn.execute("select sub_id, detail from models.latest_subscription_costs")}
     except Exception as exc:  # noqa: BLE001 — the page must still publish
         return f'<p class="notice">Abonnements indisponibles : {esc(type(exc).__name__)}</p>', 0
     usage_rows, cap_rows = [], []
@@ -198,6 +200,12 @@ def _subscriptions(conn) -> tuple[str, int]:
         else:
             row("Forfait entier", "Notre mesure", None, None, None, None,
                 '<div class="mute small">à calibrer avec le pourcentage hebdomadaire affiché par claude.ai</div>')
+        price = float(s["price_usd_month"] or 0) or None
+        for mid, v in sorted((md.get(s["id"]) or {}).items(), key=lambda kv: -(kv[1].get("api_value_month") or 0)):
+            # ModelDial's measured quota (2026-11-16): the figures the router prices subscription routes with
+            row(esc(_name(conn, mid)), "ModelDial <span class=\"mute small\">(utilisé par le Router)</span>",
+                v.get("api_value_month"), price and round(v["api_value_month"] / price, 1) if v.get("api_value_month") else None,
+                v.get("tokens_month"), v.get("usd_per_m"))
         for v in s["semianalysis"]:
             row(esc(_name(conn, v["model_id"])), "SemiAnalysis", v["usd_month"], v["multiple"], v["tokens_month"],
                 v["usd_per_m_full"])
@@ -228,6 +236,57 @@ def _subscriptions(conn) -> tuple[str, int]:
         'tirée de SemiAnalysis tant qu’il n’est pas calibré. '
         f'SemiAnalysis, rapport du {date} : valeur du forfait entièrement utilisé, sur un usage agentique de {share} % '
         'de lectures en cache ; tokens par mois = valeur ÷ prix moyen du million sur ce mélange.</p>'), len(subs)
+
+
+def _pct(x: float | None) -> str:
+    return "—" if x is None else f"{x:.0f} %"
+
+
+def _consumption(conn) -> str:
+    """This week on each plan (owner, 2026-11-16: get every token the subscriptions offer): used, API value recovered,
+    what is left before the reset, past weeks (plan/consumption.py). Static at publish time, refreshed live by the
+    page through /api/consumption (numbers only, the labels stay in the HTML)."""
+    from walter_router.plan import consumption
+    from walter_router.interface.library import _name
+    try:
+        rows = consumption.weekly(conn)
+        tot = consumption.summary(rows)
+    except Exception as exc:  # noqa: BLE001 — the page must still publish
+        return f'<p class="notice">Consommation indisponible : {esc(type(exc).__name__)}</p>'
+    trs = []
+    for r in rows:
+        c = r["current"] or {}
+        price = (f'{r["price_usd_month"]:g} $ par mois' if r["price_usd_month"]
+                 else f'offert (prix catalogue {r["price_usd_week"] * consumption.MONTH_WEEKS:.0f} $)')
+        ref = f'sur {esc(_name(conn, r["reference_model"]))}' if r["reference_model"] else ""
+        if not r["measured"]:
+            trs.append(f'<tr data-sub="{esc(r["id"])}"><td class="model">{esc(r["name"])}<div class="mute small">{price}</div></td>'
+                       '<td colspan="4" class="mute">compteur non lisible : consommation non mesurée</td></tr>')
+            continue
+        bar = min(100.0, c.get("used_percent") or 0)
+        past = " · ".join(_pct(p["used_percent"]) for p in r["past"]) or "—"
+        trs.append(
+            f'<tr data-sub="{esc(r["id"])}"><td class="model">{esc(r["name"])}<div class="mute small">{price}</div></td>'
+            f'<td class="num"><b data-k="used">{_pct(c.get("used_percent"))}</b>'
+            f'<div class="qbar"><i data-k="bar" style="width:{bar:.0f}%"></i></div></td>'
+            f'<td class="num"><b data-k="value">{_usd(c.get("api_value_usd"))}</b><div class="mute small">'
+            f'<span data-k="multiple">{"—" if c.get("multiple") is None else f"{c["multiple"]:g}".replace(".", ",")}</span> × le prix de la semaine</div></td>'
+            f'<td class="num"><b data-k="left">{_tok(c.get("tokens_left"))}</b> tokens<div class="mute small">'
+            f'<span data-k="leftvalue">{_usd(c.get("api_value_left_usd"))}</span> de valeur API {ref}</div></td>'
+            f'<td class="num"><span data-k="days">{"—" if c.get("days_to_reset") is None else f"{c["days_to_reset"]:.1f}".replace(".", ",")}</span> jours'
+            f'<div class="mute small">avant la remise à zéro</div></td>'
+            f'<td class="num mute small" data-k="past">{past}</td></tr>')
+    return (
+        '<div class="block" id="conso"><h2>💳 Abonnements cette semaine</h2><p class="dek">Part du quota hebdomadaire '
+        'utilisée (compteur réel), valeur API que cela représente et ce qu’il reste à prendre avant la remise à zéro'
+        f' — semaine en cours : <b data-k="totvalue">{_usd(tot["api_value_used_usd"])}</b> récupérés pour '
+        f'{_usd(tot["price_usd_week"])} payés, <b data-k="totleft">{_usd(tot["api_value_left_usd"])}</b> encore disponibles.</p>'
+        '<div class="tw"><table class="conso"><thead><tr><th>Abonnement</th><th class="num">Utilisé</th>'
+        '<th class="num">Valeur API récupérée</th><th class="num">Reste à prendre</th><th class="num">Remise à zéro</th>'
+        f'<th class="num">Semaines précédentes</th></tr></thead><tbody>{"".join(trs)}</tbody></table></div>'
+        '<p class="mute small note">Conversion sur ModelDial : quota mesuré du forfait sur le modèle de référence (celui des '
+        'niveaux L1 à L3 quand le forfait les sert). Le compteur est commun à tous les modèles du forfait : la valeur '
+        'est une lecture sur ce modèle, pas une somme. Compteurs relus après chaque tour d’agent et toutes les 30 minutes.</p></div>')
 
 
 ORIGIN_ICON = {"web": "🌐 web", "email": "📧 mail", "owner": "✍️ toi", "measure": "📏 mesure"}
@@ -319,26 +378,43 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
                                                          "name": _name(conn, r["model_id"]), "score": r["quality"],
                                                          "cost": r["real_cost"]}
     frontier = [point(r) for r in srows if r["level"] == "frontier" and r["real_cost"]]
+    from walter_router.analysis import knowledge
+    declared = (knowledge.load().get("levels") or {}).get("general") or {}
+
+    def pin_name(pin: str | None) -> str:
+        mid, _, var = (pin or "").partition("/")
+        return (f'{_name(conn, mid)}, réflexion {EFFORT.get(var, var)}' if var else _name(conn, mid)) if mid else "—"
+
     levels, lrows = {}, []
     for lvl in ("L1", "L2", "L3"):
+        # the ACTIVE tier (the owner's declared pin), not the nightly proposal (2026-11-16)
+        lv = declared.get(lvl) or {}
+        mid, _, var = (lv.get("pin") or "").partition("/")
         s = next((r for r in srows if r["level"] == lvl), None)
-        card = next((r for r in rs if r["task"] == "general" and r.get("category") == LEVELS[lvl][0]), {})
-        if not s:
+        if not mid:
             continue
-        if s["real_cost"]:
-            levels[lvl] = point(s)
-        effort = EFFORT.get(s["variant"], s["variant"])
+        card = next((r for r in rs if r["task"] == "general" and r.get("category") == LEVELS[lvl][0]), {})
+        p = by.get((mid, var)) or {}
+        if p.get("cost"):
+            levels[lvl] = p
+        effort = EFFORT.get(var, var)
         sub = card.get("subscription")
-        cost = f'{catalog.money(s["real_cost"])} $' if s["real_cost"] else "—"
-        aa = (by.get((s["model_id"], s["variant"])) or {}).get("cost_aa")
-        cost_aa = f'{catalog.money(aa)} $' if aa else "—"
+        cost = f'{catalog.money(p["cost"])} $' if p.get("cost") else "—"
+        cost_aa = f'{catalog.money(p["cost_aa"])} $' if p.get("cost_aa") else "—"
+        score = f'{p["score"]:.1f}'.replace(".", ",") if p.get("score") else "—"
+        spent = lv.get("when_quota_spent")
+        proposal = s and (s["model_id"], s["variant"]) != (mid, var)
         lrows.append(
             f'<tr><td class="lvl">{lvl}</td><td><div class="lname">{LEVELS[lvl][0]}</div></td>'
-            f'<td class="model">{esc((card.get("model") or "—").split(" (")[0])}<div class="mute small">réflexion {effort}</div></td>'
-            f'<td class="num" data-label="Indice AA">{f"{s["quality"]:.1f}".replace(".", ",")}</td><td class="num" data-label="Coût AA officiel">{cost_aa}</td><td class="num strong" data-label="Coût réel">{cost}</td></tr>'
+            f'<td class="model">{esc(_name(conn, mid))}<div class="mute small">réflexion {effort}</div></td>'
+            f'<td class="num" data-label="Indice AA">{score}</td><td class="num" data-label="Coût AA officiel">{cost_aa}</td><td class="num strong" data-label="Coût réel">{cost}</td></tr>'
             f'<tr class="sub"><td></td><td colspan="5"><div class="mute desc">{LEVELS[lvl][1]}</div><span class="mute">Fournisseurs</span> {_route(card.get("providers"))}'
-            + (f'<span class="mute sep2">Secours</span> {esc(card["fallback"])}' if card.get("fallback") not in (None, "—") else "")
-            + (f'<span class="mute sep2">Abonnement</span> {esc(sub)}' if sub not in (None, "—") else "") + "</td></tr>")
+            + (f'<span class="mute sep2">Abonnement</span> {esc(sub)}' if sub not in (None, "—") else "")
+            + (f'<div><span class="mute">Quota épuisé</span> {esc(pin_name(spent))}</div>' if spent else "")
+            + (f'<div><span class="mute">Secours</span> {esc(card["fallback"])}</div>'
+               if card.get("fallback") not in (None, "—") and lv.get("fallback") != spent else "")
+            + (f'<div class="amber">Proposition du dernier calcul : {esc(pin_name(f"{s["model_id"]}/{s["variant"]}"))}</div>'
+               if proposal else "") + "</td></tr>")
     da_rows = []
     for r in _da(conn, rs):
         lead = r["leader"]
@@ -362,7 +438,8 @@ def render(conn, rs: list[dict], ctx: dict) -> str:
     down_txt = "; ".join(_board_fr(f'{catalog.BOARDS.get(d["subject"].split(":")[0], d["subject"].split(":")[0])} '
                                    f'{d["subject"].partition(":")[2]}') for d in down)
     subs_html, n_subs = _subscriptions(conn)
-    nav = "".join(f'<a href="#{k}" data-tab="{k}"{" class=on" if k == "home" else ""}><span class="ic">{i}</span>{n}'
+    conso_html = _consumption(conn)
+    nav ="".join(f'<a href="#{k}" data-tab="{k}"{" class=on" if k == "home" else ""}><span class="ic">{i}</span>{n}'
                   + (f'<span class="ct">{n_subs if k == "subs" else len(panes[k])}</span>' if k != "home" else "")
                   + "</a>" for k, i, n in TABS)
     tab_html = "".join(f'<section class="pane" data-pane="{k}" hidden><h2>{i} {n}</h2>{_table(panes[k])}</section>'
@@ -438,7 +515,8 @@ figcaption i{{display:inline-block;width:8px;height:8px;border-radius:50%;margin
 .tip{{position:absolute;display:none;pointer-events:none;background:var(--paper);border:1px solid var(--rule2);padding:6px 9px;
 font-size:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.08)}}
 .block{{margin-top:44px}}h3{{font:600 15px/1.3 Georgia,"Times New Roman",serif;margin:18px 0 8px}}h3.block{{margin-top:36px}}
-.note{{max-width:900px;margin-top:18px;line-height:1.6}}[hidden]{{display:none!important}}.hide{{display:none!important}}
+.note{{max-width:900px;margin-top:18px;line-height:1.6}}.qbar{{height:4px;background:var(--rule);margin-top:6px;min-width:80px}}
+.qbar i{{display:block;height:4px;background:var(--c1)}}.conso b{{font-weight:600}}[hidden]{{display:none!important}}.hide{{display:none!important}}
 footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;padding:16px 0 40px;line-height:1.6}}
 .lang{{margin-top:14px;font-size:13px}}.lang a{{color:var(--ink2);text-decoration:none;padding:2px 0}}.lang a:hover{{color:var(--ink)}}
 .lang a.on{{color:var(--ink);font-weight:600;border-bottom:1px solid var(--ink)}}.lang .sep{{margin:0 8px;color:var(--mute)}}
@@ -463,11 +541,12 @@ footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;paddi
 <main class="wrap">
 {f'<p class="notice">Classement inaccessible : {esc(down_txt)}. Le router conserve sa dernière lecture valable pendant 21 jours.</p>' if down else ''}
 <section class="pane" data-pane="home">
-<div class="split"><div><h2>🧠 Niveaux de réflexion</h2><p class="dek">Optimum de Pareto calculé par ta méthode sur la frontière AA</p>
+<div class="split"><div><h2>🧠 Niveaux de réflexion</h2><p class="dek">Niveaux actifs : ta méthode sur la frontière AA, abonnements à leur prix de revient ModelDial</p>
 <div class="tw"><table class="levels"><colgroup><col style="width:34px"><col style="width:120px"><col><col style="width:64px"><col style="width:84px"><col style="width:84px"></colgroup><thead><tr><th></th><th>Niveau</th><th>Modèle</th><th class="num">Indice AA</th><th class="num" title="Prix de référence publié par Artificial Analysis">Coût AA officiel</th><th class="num" title="Recalculé avec le prix du fournisseur utilisé">Coût réel</th></tr></thead>
 <tbody>{"".join(lrows)}</tbody></table></div></div>
 <div><h2>📈 Indice d'intelligence et coût par tâche</h2><p class="dek">{len(pts)} combinaisons modèle × niveau de réflexion exécutables</p><div class="seg small-seg" id="costseg"><button data-cost="cost" class="on">Coût réel</button><button data-cost="cost_aa">Coût AA officiel</button></div>
 {_chart(pts, frontier, levels)}{_chart(pts, frontier, levels, "cost_aa")}</div></div>
+{conso_html}
 <div class="block"><h2>🎨 Spécialisations Design Arena</h2><p class="dek">Rang du modèle retenu sur le classement Design Arena de chaque tâche</p>
 <div class="tw"><table><thead><tr><th>Tâche</th><th>Modèle retenu</th><th class="num">Rang</th><th class="num">Score</th>
 <th>N°1 Design Arena, si différent</th><th>Fournisseurs</th></tr></thead><tbody>{"".join(da_rows)}</tbody></table></div></div>
@@ -509,6 +588,18 @@ if(o.running&&!poll)poll=setInterval(state,15000)}}catch(e){{rs.textContent='Sta
 rb.onclick=async()=>{{if(!confirm('Lancer maintenant le cycle complet ? Collecte des classements, recalcul, analyse par le modèle économique, notifications et republication de cette page (20 à 60 minutes).'))return;
 rb.disabled=true;rs.textContent='Lancement…';try{{const r=await fetch('/api/run',{{method:'POST'}});const o=await r.json();rs.textContent=o.message||'';}}catch(e){{rs.textContent='Échec du lancement'}}setTimeout(state,1500)}};
 state();
+const LOC=document.documentElement.lang==='fr'?'fr-FR':'en-US';
+function usd(x){{return x==null?'—':(x>=100?Math.round(x).toLocaleString(LOC):x.toLocaleString(LOC,{{maximumFractionDigits:2}}))+' $'}}
+function tok(n){{return !n?'—':(n>=1e9?(n/1e9).toLocaleString(LOC,{{maximumFractionDigits:2}})+' Md':Math.round(n/1e6)+' M')}}
+function pct(x){{return x==null?'—':Math.round(x)+'\u202f%'}}
+async function conso(){{try{{const r=await fetch('/api/consumption',{{cache:'no-store'}});if(!r.ok)return;const o=await r.json();if(!o.plans)return;
+const box=document.getElementById('conso');if(!box)return;const set=(el,k,v)=>{{const e=el.querySelector('[data-k="'+k+'"]');if(e)e.textContent=v}};
+set(box,'totvalue',usd(o.week.api_value_used_usd));set(box,'totleft',usd(o.week.api_value_left_usd));
+o.plans.forEach(p=>{{const tr=box.querySelector('tr[data-sub="'+p.id+'"]'),c=p.current;if(!tr||!c)return;
+set(tr,'used',pct(c.used_percent));set(tr,'value',usd(c.api_value_usd));set(tr,'multiple',c.multiple==null?'—':c.multiple.toLocaleString(LOC));
+set(tr,'left',tok(c.tokens_left));set(tr,'leftvalue',usd(c.api_value_left_usd));set(tr,'days',c.days_to_reset==null?'—':c.days_to_reset.toLocaleString(LOC,{{maximumFractionDigits:1}}));
+set(tr,'past',p.past.map(w=>pct(w.used_percent)).join(' · ')||'—');const b=tr.querySelector('[data-k="bar"]');if(b)b.style.width=Math.min(100,c.used_percent||0)+'%'}})}}catch(e){{}}}}
+conso();setInterval(conso,300000);
 document.querySelectorAll('form.planform').forEach(f=>{{const st=f.querySelector('.pf-state');
 async function send(body){{st.textContent='Envoi…';try{{const r=await fetch('/api/plans',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}});
 const o=await r.json();st.textContent=r.ok?'Enregistré, la page se met à jour…':(o.error||'Refusé');if(r.ok)setTimeout(()=>location.reload(),45000)}}catch(e){{st.textContent='Échec de l’envoi'}}}}
