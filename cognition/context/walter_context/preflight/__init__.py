@@ -416,7 +416,7 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
         # call (77 of 203 draws, 13 of the 29 bench messages): the specific question wins, the plan
         # takes the level that carries the owner's memory
         level = "L3"
-    # The turn's main model is always the general one at the plan's tier (Monsieur 2026-11-13, restated 2026-11-15:
+    # The turn's main model is always the general one at the plan's tier (the owner 2026-11-13, restated 2026-11-15:
     # « le routeur ne doit plus proposer de modèle spécialisé ») : a specialism is a sub-agent the L1/L2/L3 model
     # chooses, never a pre-classification that swaps the whole turn's model. The decision model's answer is ignored.
     task = "general"
