@@ -1,0 +1,11 @@
+{
+ "base_sha": "ac277b7e046663f810366830b888e61c11a85a4fca62afd745865d1c76f4befd",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-16T14:05:56.433668+00:00",
+ "domain": "messaging",
+ "kind": "patch",
+ "reason": "Migration officielle Beeper Server ARM64 validée le 16/11/2026 : API/MCP locaux, médias servis par API, curseurs opaques, IDs de messages locaux, reprise sans backfill et writer sous politique Engine. Corrige les consignes Mac/curl/pagination devenues obsolètes. Preuves : rapport du chat et outputs Beeper-api/mcp/canonical-ids/recovery-proof.",
+ "runtime": "codex",
+ "session_id": null,
+ "target": "beeper-messages"
+}
