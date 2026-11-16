@@ -144,14 +144,6 @@ def test_reflect_empty_evidence_does_not_call_model(monkeypatch,local):
     assert out['model_called'] is False
 
 
-def test_hermes_private_profile_note_cannot_loosen_privacy(monkeypatch,local):
-    received=[]
-    monkeypatch.setattr(m.events,'record_events',lambda events,conn:received.extend(events) or {'inserted':1,'event_ids':['fixture']})
-    out=m.retain('neutral fixture',caller='hermes:wild')
-    assert out['privacy_class']=='local_only'
-    assert received[0]['source']=='hermes' and received[0]['source_account']=='wild:walter-core'
-
-
 def test_unknown_port_is_attributed_without_unknown_source(monkeypatch,local):
     received=[]
     monkeypatch.setattr(m.events,'record_events',lambda events,conn:received.extend(events) or {'inserted':1,'event_ids':['fixture']})

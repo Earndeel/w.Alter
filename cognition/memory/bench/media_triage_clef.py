@@ -5,7 +5,7 @@ Monsieur's choice (2026-10-03): images go to Workers AI as-is (Cloudflare: no st
 kept (flagged, never treated as junk). Read-only: nothing is written to core.*. Calls are logged in
 system.model_calls (processor bench.media_triage, provider cloudflare).
 
-    venv/bin/python bench/media_triage_clef.py --out /root/.hermes/logs/media-triage-test
+    venv/bin/python bench/media_triage_clef.py --out "$(walter instance path logs media-triage-test)"
 """
 from __future__ import annotations
 
@@ -113,7 +113,7 @@ def call(client: httpx.Client, account: str, headers: dict, model: str, state: s
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="/root/.hermes/logs/media-triage-test")
+    ap.add_argument("--out", required=True, help="results folder, e.g. @instance/logs/media-triage-test")
     ap.add_argument("--models", default="clef,clef-flash")
     ap.add_argument("--workers", type=int, default=6)
     args = ap.parse_args()

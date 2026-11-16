@@ -6,7 +6,6 @@
     "walter_memory/objects.py",
     "walter_memory/client.py",
     "walter_memory/read_policy.py",
-    "ports/hermes/__init__.py",
     "walter_memory/overland.py"
   ],
   "requires": [],
@@ -45,7 +44,6 @@
     "CLI tasks list|show|update|sweep|triage-redecide [--execute]; CLI experience [--thread] [--query]"
   ],
   "bindings": {
-    "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
     "dsh": "common MCP",
     "codex": "common MCP",
     "claude-code": "common MCP",
@@ -257,7 +255,7 @@
     {
       "id": "connectors",
       "path": "connectors",
-      "role": "Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…)",
+      "role": "Connecteurs (beeper, gmail, calendar, agent_sessions, triage…)",
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory/connectors"
@@ -339,13 +337,6 @@
       "status": "active",
       "readme": "README.md",
       "vision_target": "cognition/memory/migrations"
-    },
-    {
-      "id": "hermes-plugin",
-      "path": "hermes-plugins",
-      "role": "Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7)",
-      "status": "active",
-      "readme": "README.md"
     },
     {
       "id": "overland",

@@ -21,6 +21,8 @@ Each section has a token budget; the trace (sources, sizes, timings) is returned
 """
 from __future__ import annotations
 
+import functools
+
 import re
 import time
 from pathlib import Path
@@ -28,7 +30,13 @@ from pathlib import Path
 from . import privacy, search, social
 from .db import connection
 
-USER_MD = Path("/root/.hermes/memories/USER.md")
+@functools.lru_cache(maxsize=1)
+def _owner_profile() -> Path | None:
+    """The owner's curated profile, @instance/profile/USER.md (in ~/.hermes/memories until 2026-11-16)."""
+    from .purge import _instance
+    return _instance("profile", "USER.md")
+
+
 DEFAULT_BUDGET = {"profile": 600, "rules": 300, "working": 700, "people": 400, "records": 700, "knowledge": 900,
                   "evidence": 500, "views": 200, "periods": 700, "tasks": 250, "experience": 350}
 TASK_BOARD = 5                    # other open objectives listed, one line each
@@ -288,8 +296,9 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     rank = pool.submit(ranked)
     pool.shutdown(wait=False)
     fut = {k: _Section(rank, k) for k in want}
-    if include_profile and b["profile"] > 0 and USER_MD.exists():
-        text, used = _clip(USER_MD.read_text().splitlines(), b["profile"])
+    user_md = _owner_profile() if include_profile and b["profile"] > 0 else None
+    if user_md is not None and user_md.exists():
+        text, used = _clip(user_md.read_text().splitlines(), b["profile"])
         sections["profile"] = text
         trace["sections"]["profile"] = {"tokens": used}
     audience = "owner_local" if max_privacy == "local_only" else "cloud_model"

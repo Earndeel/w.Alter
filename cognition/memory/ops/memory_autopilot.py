@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 def _log_dir() -> Path:
-    """@instance/logs/memory-autopilot (the instance's logs; /root/.hermes/logs is only a compat link to it)."""
+    """@instance/logs/memory-autopilot (the instance's logs)."""
     try:
         out = subprocess.run(["walter", "instance", "path", "logs", "memory-autopilot"], capture_output=True,
                              text=True, timeout=10).stdout.strip()
@@ -31,13 +31,12 @@ def _log_dir() -> Path:
             return Path(out)
     except (OSError, subprocess.TimeoutExpired):
         pass
-    return Path("/root/.hermes/logs/memory-autopilot")
+    raise SystemExit("memory-autopilot: no active Walter instance (walter instance path logs)")
 
 
 LOG_DIR = _log_dir()
 DEFAULT_OUTPUT = LOG_DIR / "latest.json"
 ALERT_REPORT = LOG_DIR / "alert-latest.json"
-ROTATE_DOCKER_LOGS = Path("/root/.hermes/scripts/rotate_docker_logs.py")
 PG_CONTAINER = "hindsight-pg"          # historical name: it hosts every Walter schema
 MEMORY_MODULES = ("memory", "logs", "bus", "raw-vault")
 MODEL_CALL_PREFIX = "model_calls:"                         # walter_memory.health: severity error
@@ -157,9 +156,6 @@ def autofix(report: dict[str, Any]) -> dict[str, Any]:
     for item in report["checks"]["systemd"]:
         if not item["active"]:
             out["restarted"][item["unit"]] = run(["systemctl", "restart", item["unit"]], timeout=45)
-    if ROTATE_DOCKER_LOGS.exists():
-        out["log_rotation"] = run([sys.executable, str(ROTATE_DOCKER_LOGS), "--containers", PG_CONTAINER,
-                                   "--max-mb", "50", "--keep", "5"], timeout=60)
     return out
 
 

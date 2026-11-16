@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """walter-logs connector: every agent runtime's session log → walter_logs.* (see walter_memory/logs.py).
 
-  sync   one incremental pass over every source (or --hermes/--claude/--codex/--dsh, or --file PATH)
+  sync   one incremental pass over every source (or --claude/--codex/--dsh, or --file PATH)
   keys   backfill walter_logs.events.event_key (migration 015) for rows that have none; reports later copies
   watch  daemon (walter-logs-watch.service): inotify on the sources, sync the changed one within ~2 s, and a full
          catch-up sweep every SWEEP_S (a missed notification is caught there; ids make re-reads free). No timer.
-         Hermes changes also start walter-memory-hermes.service (core.events), at most every CORE_EVENTS_S — only while
-         the `hermes` connector is enabled (retired 2026-11-16, see hermes_live).
+         DSH changes also start `walter-memory agent-sessions --dsh` (core.events), at most every CORE_EVENTS_S.
+Hermes (state.db per profile) was a source until its removal on 2026-11-16; its sessions stay in walter_logs.
 """
 from __future__ import annotations
 
@@ -28,44 +28,12 @@ from walter_memory.db import connection  # noqa: E402
 LOCK = Path("/run/lock/walter-logs.lock")
 SWEEP_S = 3600
 CORE_EVENTS_S = 20
-PROFILE_CHECK_S = 600
 
 
 def _locked():
     f = LOCK.open("a")
     fcntl.flock(f, fcntl.LOCK_EX)
     return f
-
-
-def sync_hermes(profiles: list[str] | None = None) -> dict:
-    out = {}
-    for profile, path in logs.hermes_dbs().items():
-        if profiles and profile not in profiles:
-            continue
-        total = {"rows": 0, "inserted": 0}
-        while True:
-            with connection() as conn:
-                r = logs.sync_hermes(conn, profile, path)
-            total["rows"] += r["rows"]; total["inserted"] += r["inserted"]
-            if not r["more"]:
-                break
-        out[f"hermes:{profile}"] = total
-    return out
-
-
-def hermes_fingerprint(path: Path) -> tuple:
-    """What a Hermes write changes: size and mtime of state.db and of its WAL. A reader changes neither, but its
-    open still raises an inotify event on the WAL (metadata only: ctime moves, SQLite run as root re-owns the file),
-    which watchfiles reports as `modified`. Reacting to that event made the daemon re-read every profile in a loop,
-    ~2 Hz, and start walter-memory-hermes every 20 s with nothing new (2026-11-16)."""
-    out = []
-    for p in (path, path.with_name(path.name + "-wal")):
-        try:
-            s = p.stat()
-            out.append((s.st_size, s.st_mtime_ns))
-        except FileNotFoundError:
-            out.append(None)
-    return tuple(out)
 
 
 def sync_files(paths: list[tuple[str, Path]]) -> dict:
@@ -77,21 +45,9 @@ def sync_files(paths: list[tuple[str, Path]]) -> dict:
     return out
 
 
-def hermes_live() -> bool:
-    """Hermes was retired on 2026-11-10 (last write 2026-11-12). Since 2026-11-16 its connector is disabled, after a
-    final import checked session by session (archive: restic snapshot tagged `hermes-final`): its state.db files are
-    neither watched nor read. Re-enabling the `hermes` connector (rollback) brings them back; a running daemon notices
-    within PROFILE_CHECK_S and restarts."""
-    with connection() as conn:
-        r = conn.execute("select enabled from ingestion.connectors where connector = 'hermes'").fetchone()
-    return bool(r and r["enabled"])
-
-
 def sync_all(runtimes: list[str] | None = None) -> dict:
-    runtimes = runtimes or (["hermes"] if hermes_live() else []) + ["claude", "codex", "dsh"]
+    runtimes = runtimes or ["claude", "codex", "dsh"]
     out = {}
-    if "hermes" in runtimes:
-        out.update(sync_hermes())
     for rt in ("claude", "codex", "dsh"):
         if rt in runtimes:
             out[rt] = sync_files([(rt, p) for p in logs.transcript_files(rt)])
@@ -110,18 +66,11 @@ def _watch(paths: list[str], recursive: bool, q: Queue, stop: threading.Event) -
 def watch_main() -> int:
     q: Queue = Queue()
     stop = threading.Event()
-    live = hermes_live()
-    hermes_dbs = lambda: logs.hermes_dbs() if live else {}                       # noqa: E731
-    hermes_dirs = sorted({str(p.parent) for p in hermes_dbs().values()})
     tree_dirs = [str(r) for r in logs.ROOTS.values() if r.exists()]
-    if hermes_dirs:
-        threading.Thread(target=_watch, args=(hermes_dirs, False, q, stop), daemon=True).start()
     threading.Thread(target=_watch, args=(tree_dirs, True, q, stop), daemon=True).start()
-    profiles_at_start = set(hermes_dbs())
-    hermes_seen: dict[str, tuple] = {}      # profile → fingerprint at its last sync (only real writes trigger one)
-    last_sweep = last_core = last_dsh = last_profile_check = 0.0
-    core_pending = dsh_pending = False
-    print(f"walter-logs watch: {len(hermes_dirs)} Hermes dirs, {tree_dirs}", flush=True)
+    last_sweep = last_dsh = 0.0
+    dsh_pending = False
+    print(f"walter-logs watch: {tree_dirs}", flush=True)
     while True:
         changed: set[str] = set()
         try:
@@ -131,32 +80,18 @@ def watch_main() -> int:
         except Empty:
             pass
         now = time.time()
-        dbs = hermes_dbs()
-        touched = {p for p, path in dbs.items() for c in changed if c.startswith(str(path))}   # state.db, -wal, -shm
-        prints = {p: hermes_fingerprint(dbs[p]) for p in touched}
-        hermes = sorted(p for p in touched if prints[p] != hermes_seen.get(p))     # a reader's event is no write
         files = sorted({(rt, Path(c)) for c in changed if c.endswith((".jsonl", ".jsonl.zstd"))
                         for rt in [logs.runtime_of(Path(c))] if rt and Path(c).exists()})
         try:
             with _locked():
                 res = {}
                 if now - last_sweep > SWEEP_S:
-                    prints = {p: hermes_fingerprint(path) for p, path in dbs.items()}      # taken before reading
-                    hermes = sorted(p for p in dbs if prints[p] != hermes_seen.get(p))
-                    res = sync_all(None if live else ["claude", "codex", "dsh"]); last_sweep = now
-                else:
-                    if hermes:
-                        res.update(sync_hermes(hermes))
-                    if files:
-                        res["files"] = sync_files(files)
-                hermes_seen.update(prints)           # before-read prints: a write during the read re-syncs next time
+                    res = sync_all(); last_sweep = now
+                elif files:
+                    res["files"] = sync_files(files)
             # A change inside the 20 s window stays pending (the loop wakes at least every 30 s) instead of waiting for
-            # the next write: only real writes wake the loop now.
-            core_pending = core_pending or bool(hermes)
+            # the next write.
             dsh_pending = dsh_pending or any(rt == "dsh" for rt, _ in files)
-            if core_pending and now - last_core > CORE_EVENTS_S:      # core.events (Monsieur's journal) follows
-                subprocess.run(["systemctl", "start", "--no-block", "walter-memory-hermes.service"], check=False)
-                last_core, core_pending = now, False
             # Engine lot E2 (2026-11-10): the engine's sessions reach core.events because their files changed, not
             # because a hook ran at the end of a turn (the engine's native events no longer call walter_hook.py).
             # agent-sessions is incremental and locked: a run that overlaps the hook's own journal steps aside.
@@ -173,12 +108,6 @@ def watch_main() -> int:
             print(f"walter-logs: {type(e).__name__}: {e}", flush=True)
             ingestion.record_failure(logs.CONNECTOR, f"{type(e).__name__}: {e}"[:500])
             time.sleep(5)
-        if now - last_profile_check > PROFILE_CHECK_S:
-            last_profile_check = now
-            if (set(logs.hermes_dbs()) if hermes_live() else set()) != profiles_at_start:  # Hermes profile or switch
-                print("walter-logs: Hermes sources changed, restarting", flush=True)
-                stop.set()
-                return 0
 
 
 def backfill_keys(only: str | None = None) -> dict:
@@ -206,7 +135,7 @@ def backfill_keys(only: str | None = None) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("action", choices=["sync", "watch", "keys"])
-    for rt in ("hermes", "claude", "codex", "dsh"):
+    for rt in ("claude", "codex", "dsh"):
         ap.add_argument(f"--{rt}", action="store_true")
     ap.add_argument("--file")
     ap.add_argument("--session", help="keys: only this session")
@@ -223,7 +152,7 @@ def main() -> int:
             rt = logs.runtime_of(p)
             res = sync_files([(rt, p)]) if rt else {"error": "unknown runtime"}
         else:
-            res = sync_all([rt for rt in ("hermes", "claude", "codex", "dsh") if getattr(a, rt)] or None)
+            res = sync_all([rt for rt in ("claude", "codex", "dsh") if getattr(a, rt)] or None)
     ingestion.mark_success(logs.CONNECTOR)
     print(res)
     return 0

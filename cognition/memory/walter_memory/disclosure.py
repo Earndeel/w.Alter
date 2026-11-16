@@ -1,7 +1,7 @@
 """Disclosure and commitments at the point where a message leaves (Memory V1 P1.7).
 
 The prompt is not a protection: this check runs where the action leaves — Claude Code's PreToolUse on the tools that
-send (Gmail send/reply/forward…), Hermes' pre_tool_call on send_message — and answers allow | ask | block:
+send (Gmail send/reply/forward…) — and answers allow | ask | block:
   block   a secret (privacy.detect); GPS coordinates; the name of a place learned from GPS (local_only: the probable
           home, the Wi-Fi networks) — local_only never leaves, whatever the recipient
   ask     an ENGAGEMENT of the owner (a meeting, money, a promise, an agreement): never sent without his approval
@@ -208,22 +208,3 @@ def claude_code_hook(ev: dict) -> dict | None:
                                    "permissionDecision": "deny" if worst["action"] == "block" else "ask",
                                    "permissionDecisionReason": explain(worst)}}
 
-
-def hermes_hook(ev: dict) -> dict | None:
-    """Hermes shell hook pre_tool_call (matcher send_message): block, or ask the owner (approve)."""
-    args = ev.get("tool_input") or {}
-    if (args.get("action") or "send") != "send":
-        return None
-    target = str(args.get("target") or "")
-    text = str(args.get("message") or "")
-    if not text:
-        return None
-    home = ":" not in target          # 'telegram' alone = the owner's home channel
-    res = check(text, to=None if home else target.split(":", 1)[-1], channel=target, model=not home)
-    if home and res["action"] == "ask":
-        return None
-    if res["action"] == "block":
-        return {"action": "block", "message": explain(res)}
-    if res["action"] == "ask":
-        return {"action": "approve", "message": explain(res), "rule_key": "walter-disclosure"}
-    return None

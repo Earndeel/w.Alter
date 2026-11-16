@@ -18,12 +18,9 @@ BUDGETS = {'low': (6, 1024), 'mid': (12, 2048), 'high': (20, 4096)}
 
 
 def _caller_source(caller):
-    if caller.startswith('hermes:'):
-        profile = caller.split(':', 1)[1]
-        return 'hermes', profile + ':walter-core', 'local_only' if profile == 'wild' else 'cloud_allowed'
     aliases = {'claude-code': 'claude_code'}
     source = aliases.get(caller, caller)
-    if source not in {'hermes', 'codex', 'claude_code', 'dsh', 'walter'}:
+    if source not in {'codex', 'claude_code', 'dsh', 'walter'}:
         source = 'walter'
     return source, 'walter-core', 'cloud_allowed'
 
@@ -167,7 +164,7 @@ def reflect(question: str, budget: str = 'mid', *, caller: str = 'walter') -> di
             'notice': 'Synthesis over permitted canonical evidence via Walter Router; this is not a Hindsight reflect call.'}
 
 
-def context(query: str, session_id: str = '', source: str = 'hermes', *, caller: str = 'walter') -> dict:
+def context(query: str, session_id: str = '', source: str = 'walter', *, caller: str = 'walter') -> dict:
     """The same per-message context as the hooks (Memory V1): the owner's durable rules, the working state of the
     caller's thread (its session), people, curated records, knowledge, views to open, evidence — cloud-safe."""
     from . import context as ctx

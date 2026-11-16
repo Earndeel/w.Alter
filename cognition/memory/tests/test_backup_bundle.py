@@ -7,25 +7,20 @@ def tree(tmp):
     (mod/'code.py').write_text('source preserved')
     (mod/'models').mkdir();(mod/'models'/'schema.py').write_text('code directory named models must survive')
     (mod/'venv').mkdir();(mod/'venv'/'binary').write_text('rebuild')
-    link=root/'root/.hermes/plugins/memory';link.parent.mkdir(parents=True);link.symlink_to('/opt/walter-memory')
-    p=root/'root/.hermes/profiles/wild';p.mkdir(parents=True)
-    (root/'root/.hermes').chmod(0o700)
-    c=sqlite3.connect(p/'state.db');c.execute('create table messages(id integer,text text)');c.execute("insert into messages values(1,'example')");c.commit();c.close()
+    link=root/'user/instance/plugins/memory';link.parent.mkdir(parents=True);link.symlink_to('/opt/walter-memory')
+    (root/'user/instance').chmod(0o700)
     return root
 
-def test_bundle_preserves_modules_links_and_consistent_profile_state(tmp_path):
+def test_bundle_preserves_modules_links_and_private_modes(tmp_path):
     root=tree(tmp_path);out=tmp_path/'bundle.tar'
-    result=B.create(out,root,['opt/walter-memory','root/.hermes/plugins','root/.hermes/profiles'],['opt/walter-memory/code.py','root/.hermes/plugins/memory'],False)
-    assert result['ok'] and result['sqlite_snapshots']==1
+    result=B.create(out,root,['opt/walter-memory','user/instance/plugins'],['opt/walter-memory/code.py','user/instance/plugins/memory'],False)
+    assert result['ok'] and result['sqlite_snapshots']==0
     assert out.stat().st_mode & 0o777==0o600
     with tarfile.open(out) as t:
         assert 'opt/walter-memory/venv/binary' not in t.getnames()
         assert t.extractfile('opt/walter-memory/models/schema.py').read().startswith(b'code directory')
-        assert t.getmember('root/.hermes/plugins/memory').issym()
-        assert t.getmember('root/.hermes').mode==0o700
-        assert t.getmember('root/.hermes/profiles/wild/state.db').mode==(root/'root/.hermes/profiles/wild/state.db').stat().st_mode & 0o777
-        snap=tmp_path/'restored.db';snap.write_bytes(t.extractfile('root/.hermes/profiles/wild/state.db').read())
-        c=sqlite3.connect(snap);assert c.execute('pragma quick_check').fetchone()[0]=='ok';assert c.execute('select count(*) from messages').fetchone()[0]==1;c.close()
+        assert t.getmember('user/instance/plugins/memory').issym()
+        assert t.getmember('user/instance').mode==0o700
 
 def test_missing_required_integration_fails_before_archive(tmp_path):
     root=tree(tmp_path);out=tmp_path/'bundle.tar'

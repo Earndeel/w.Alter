@@ -2,12 +2,13 @@
 
 What the agents DID, in order, whatever the runtime: user/message, assistant/reasoning, assistant/message,
 tool/call (full arguments), tool/result (full output), model/selection, compaction/summary, system/message...
-(DeepSeek Harness session-log vocabulary). Readers (pure: one source row/line → events) for Hermes (every profile's
-state.db, read-only), Claude Code and Codex (JSONL transcripts) and DSH (zstd session logs); incremental per source,
+(DeepSeek Harness session-log vocabulary). Readers (pure: one source line → events) for Claude Code and Codex (JSONL
+transcripts) and DSH (zstd session logs); incremental per source,
 idempotent on the event's identity (session_id, event_key: see event_key()), not on its position in the source. Triggered by file changes (connectors/walter_logs.py watch), not by a timer.
 
 Storage rules: secrets are masked BEFORE storage (mask()); each event gets a privacy class from the same policies as
-core.events (privacy.classify on detected categories; Hermes profile `wild` = local_only). Agents read through
+core.events (privacy.classify on detected categories). Hermes sessions (runtime `hermes`, imported until Hermes was
+removed on 2026-11-16) stay readable like the others. Agents read through
 search()/timeline()/get() with max_privacy: cloud agents see cloud_allowed as is, redacted_cloud pseudonymised,
 never local_only.
 """
@@ -16,20 +17,16 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 from . import ingestion, privacy
 
 CONNECTOR = "walter_logs"
-HERMES_HOME = Path("/root/.hermes")
 CLAUDE_DIR = Path("/root/.claude/projects")
 CODEX_DIR = Path("/root/.codex/sessions")
 DSH_DIR = Path("/opt/dsh/home/sessions")
-PROFILE_PRIVACY = {"wild": "local_only"}          # macOS app, uncensored: never leaves the VM
 DETECT_CHARS = 50_000                               # privacy detectors read the head of very long outputs
-HERMES_BATCH = 5_000
 
 # ───────────────────────── secrets: masked before storage ─────────────────────────
 _EXTRA_SECRETS = [
@@ -267,109 +264,6 @@ def session_keys(conn, session_id: str) -> tuple[list[tuple[str, int]], list[tup
                 todo.append((k, r["seq"]))
     return todo, dups
 
-
-
-# ───────────────────────── Hermes (state.db of every profile, read-only) ─────────────────────────
-def hermes_dbs() -> dict[str, Path]:
-    dbs = {"main": HERMES_HOME / "state.db"}
-    for p in sorted((HERMES_HOME / "profiles").glob("*/state.db")):
-        dbs[p.parent.name] = p
-    return {k: v for k, v in dbs.items() if v.exists()}
-
-
-def _hermes_status(content: str | None) -> str | None:
-    if content is None:
-        return None
-    head = content[:400].lower()
-    return "error" if ('"error"' in head or '"success": false' in head or '"status": "error"' in head) else "ok"
-
-
-def _hermes_reasoning(m) -> str:
-    for col in ("reasoning", "reasoning_content"):
-        if m[col]:
-            return m[col]
-    if m["reasoning_details"]:
-        try:
-            det = json.loads(m["reasoning_details"])
-            return "\n".join(d.get("text") or d.get("summary") or "" for d in det if isinstance(d, dict)).strip()
-        except (ValueError, TypeError):
-            return ""
-    return ""
-
-
-def sync_hermes(conn, profile: str, path: Path, max_rows: int = 50_000) -> dict:
-    db = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30)
-    db.row_factory = sqlite3.Row
-    stream = f"hermes:{profile}"
-    cur = ingestion.get_checkpoint(CONNECTOR, stream)
-    last_id, activity = int(cur.get("last_id", 0)), float(cur.get("activity", 0))
-    rows = db.execute("""select id, session_id, role, content, tool_call_id, tool_calls, tool_name, timestamp, token_count,
-                                finish_reason, reasoning, reasoning_content, reasoning_details,
-                                length(codex_reasoning_items) enc, display_kind, _compressed_summary
-                         from messages where id > ? order by id limit ?""", (last_id, max_rows)).fetchall()
-    sids = {r["session_id"] for r in rows}
-    srows = db.execute("""select * from sessions where coalesce(last_activity_at, ended_at, started_at) > ?""",
-                       (activity,)).fetchall()
-    srows += [r for r in db.execute(f"select * from sessions where id in ({','.join('?' * len(sids))})", list(sids))
-              if r["id"] not in {s["id"] for s in srows}] if sids else []
-    w = Writer(conn)
-    pref = f"hermes/{profile}/"
-    base_cls = PROFILE_PRIVACY.get(profile, "cloud_allowed")
-    top = activity
-    for s in srows:
-        keys = s.keys()
-        g = (lambda k: s[k] if k in keys else None)
-        w.session(pref + s["id"], runtime="hermes", native_id=s["id"], privacy_class=base_cls, profile=profile,
-                  platform=s["source"], title=g("title"), model=s["model"], cwd=g("cwd"),
-                  parent_session_id=pref + s["parent_session_id"] if s["parent_session_id"] else None,
-                  started_at=_ts(s["started_at"]), ended_at=_ts(s["ended_at"]),
-                  meta={k: g(k) for k in ("end_reason", "message_count", "tool_call_count", "api_call_count", "input_tokens",
-                                          "output_tokens", "cache_read_tokens", "reasoning_tokens", "billing_provider",
-                                          "estimated_cost_usd", "actual_cost_usd", "system_prompt_hash", "chat_type")
-                        if g(k) not in (None, "", 0)})
-        top = max(top, float(g("last_activity_at") or s["ended_at"] or s["started_at"] or 0))
-    models = {s["id"]: s["model"] for s in srows}
-    for m in rows:
-        sid, ts, ref = pref + m["session_id"], _ts(m["timestamp"]), f"m{m['id']}"
-        if sid not in w.sess:     # session row missing (deleted/rewound): keep the events anyway
-            w.session(sid, runtime="hermes", native_id=m["session_id"], privacy_class=base_cls, profile=profile)
-        model = models.get(m["session_id"])
-        role, content = m["role"], m["content"]
-        if role == "user":
-            injected = bool(m["display_kind"]) or m["_compressed_summary"] in (1, "1")
-            if (content or "").startswith("[CONTEXT COMPACTION]") or m["_compressed_summary"] in (1, "1"):
-                w.add(sid, "compaction/summary", ts, ref, text=content)
-            else:
-                w.add(sid, "user/message", ts, ref, text=content, human=not injected,
-                      data={"injected": injected, "display_kind": m["display_kind"]} if injected else None)
-        elif role == "assistant":
-            reasoning = _hermes_reasoning(m)
-            if reasoning:
-                w.add(sid, "assistant/reasoning", ts, ref + ":reasoning", text=reasoning, model=model)
-            elif m["enc"]:
-                w.add(sid, "assistant/reasoning", ts, ref + ":reasoning", model=model,
-                      data={"encrypted": True, "bytes": m["enc"]})
-            if content and content.strip():
-                w.add(sid, "assistant/message", ts, ref, text=content, model=model,
-                      data={"finish_reason": m["finish_reason"], "token_count": m["token_count"]})
-            try:
-                calls = json.loads(m["tool_calls"]) if m["tool_calls"] else []
-            except ValueError:
-                calls = []
-            for i, c in enumerate(calls if isinstance(calls, list) else []):
-                fn = c.get("function") or {}
-                w.add(sid, "tool/call", ts, f"{ref}:call:{c.get('id') or i}", call_id=c.get("id"),
-                      tool=fn.get("name") or c.get("name"), text=_json(fn.get("arguments") or c.get("arguments")), model=model)
-        elif role == "tool":
-            w.add(sid, "tool/result", ts, ref, call_id=m["tool_call_id"], text=content,
-                  tool=m["tool_name"] or w.tool_of(m["tool_call_id"]), status=_hermes_status(content))
-        else:   # system, session_meta
-            w.add(sid, "system/message", ts, ref, text=content, data={"role": role})
-    n = w.flush()
-    ingestion.set_checkpoint(CONNECTOR, stream, {"last_id": rows[-1]["id"] if rows else last_id, "activity": top},
-                             last_item_at=_ts(rows[-1]["timestamp"]) if rows else None, conn=conn)
-    db.close()
-    return {"rows": len(rows), "inserted": n, "more": len(rows) == max_rows}
 
 
 # ───────────────────────── JSONL transcripts (Claude Code, Codex, DSH) ─────────────────────────

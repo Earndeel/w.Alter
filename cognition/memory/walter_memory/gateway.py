@@ -130,8 +130,7 @@ def post_views_candidates(body: dict):
 
 
 # The hooks' callers and the runtime (core.events source) whose thread their session_id names (P1.1 working state)
-RUNTIME_OF_CALLER = {"claude-code-hook": "claude_code", "codex-hook": "codex", "dsh-hook": "dsh",
-                     "hermes-shell-hook": "hermes", "hermes": "hermes"}
+RUNTIME_OF_CALLER = {"claude-code-hook": "claude_code", "codex-hook": "codex", "dsh-hook": "dsh"}
 
 
 @app.post("/v1/context", dependencies=[Depends(auth)])

@@ -4,7 +4,7 @@ seeing the rule/Jev verdicts; /stats compares afterwards.
 Images are decrypted from the vault into RAM (/dev/shm) and served only on the Tailscale address behind a random
 token path. `--wipe` deletes the decrypted copies. Labels: <out>/labels.json (0600).
 
-    venv/bin/python bench/media_triage_review.py --out /root/.hermes/logs/media-triage-test [--prepare] [--serve]
+    venv/bin/python bench/media_triage_review.py --out "$(walter instance path logs media-triage-test)" [--prepare] [--serve]
 """
 from __future__ import annotations
 
@@ -222,7 +222,7 @@ let r=await fetch('/{token}/count');document.getElementById('k').textContent=awa
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="/root/.hermes/logs/media-triage-test")
+    ap.add_argument("--out", required=True, help="results folder, e.g. @instance/logs/media-triage-test")
     ap.add_argument("--prepare", action="store_true")
     ap.add_argument("--serve", action="store_true")
     ap.add_argument("--stats", action="store_true")

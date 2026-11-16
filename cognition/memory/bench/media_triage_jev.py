@@ -4,7 +4,7 @@ Jev never sees the file: it gets the message context (network, chat type, direct
 messages, thread stats, file metadata), pseudonymised with privacy.redact, and answers three choice questions.
 Every call is logged in system.model_calls (processor bench.media_triage). Results stay on the VM (0600).
 
-    venv/bin/python bench/media_triage_jev.py --n 200 --seed 0.42 --out /root/.hermes/logs/media-triage-test
+    venv/bin/python bench/media_triage_jev.py --n 200 --seed 0.42 --out "$(walter instance path logs media-triage-test)"
 """
 from __future__ import annotations
 
@@ -175,7 +175,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=200)
     ap.add_argument("--seed", default="0.42")
-    ap.add_argument("--out", default="/root/.hermes/logs/media-triage-test")
+    ap.add_argument("--out", required=True, help="results folder, e.g. @instance/logs/media-triage-test")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True, mode=0o700)

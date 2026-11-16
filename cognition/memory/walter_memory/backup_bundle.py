@@ -4,17 +4,15 @@ This module builds/verifies a tar payload; the offsite runner applies zstd + age
 It never prints file contents or credentials. Source state.db is backed up separately.
 """
 from __future__ import annotations
-import argparse,datetime,fnmatch,hashlib,importlib.util,io,json,os,pathlib,shlex,sqlite3,subprocess,tarfile,tempfile
+import argparse,datetime,fnmatch,hashlib,importlib.util,io,json,os,pathlib,shlex,subprocess,tarfile
 
 MANIFEST='walter-backup-manifest.json'
 CORE_MODULES=('core','memory','router','skills','context','llm','soul','voice-memory','raw-vault')
 MODULE_ANCHORS={'core':'server.py','memory':'walter_memory/events.py','router':'walter_router/cli.py',
                 'skills':'walter_skills/api.py','context':'walter_context/session.py','llm':'gateway.py',
                 'soul':'identity.md','voice-memory':'server.py','raw-vault':'rawvault.py'}
-SKIP_PARTS={'.worktrees','venv','.venv','node_modules','__pycache__','.cache','.pytest_cache','.mypy_cache','.ruff_cache','.hermes-runtime'}
-SKIP_PREFIXES=('root/.hermes/hermes-agent/.git','opt/walter-memory/models/embeddings',
-               'walter/memory/models/embeddings', 'root/.hermes/skills/.curator_backups','opt/dsh/home/sessions')
-PROFILE_TRANSIENT={'cache','audio_cache','image_cache','images','sessions','sandboxes','workspace','logs','lsp'}
+SKIP_PARTS={'.worktrees','venv','.venv','node_modules','__pycache__','.cache','.pytest_cache','.mypy_cache','.ruff_cache'}
+SKIP_PREFIXES=('opt/walter-memory/models/embeddings','walter/memory/models/embeddings','opt/dsh/home/sessions')
 
 # Extra exclusions chosen by the caller (walter/ops passes the instance's list): rebuildable binaries, builds,
 # transient checkpoints. Shell-style patterns on archive names; a required path stays required (fail closed).
@@ -25,9 +23,6 @@ def excluded(name):
     if EXTRA_EXCLUDE and any(fnmatch.fnmatchcase(name,x) or fnmatch.fnmatchcase(name,x+'/*') for x in EXTRA_EXCLUDE):return True
     if any(x in SKIP_PARTS for x in p.parts):return True
     if any(name==x or name.startswith(x+'/') for x in SKIP_PREFIXES):return True
-    if name.startswith('root/.hermes/profiles/'):
-        if any(x in PROFILE_TRANSIENT for x in p.parts[4:]):return True
-        if p.name.endswith(('.db','.db-wal','.db-shm')):return True
     return False
 
 def _core(root):
@@ -106,34 +101,23 @@ def inventory(root):
     sources=set(required)
     for p in [*(root/'opt').glob('walter-*'),*(root/'walter').glob('*')]:
         if p.is_dir():sources.add(str(p.relative_to(root)))
-    optional=['root/.hermes/config.yaml','root/.hermes/.env','root/.hermes/walter-llm',
-              'root/.config/systemd/user/hermes-gateway.service','root/.hermes/SOUL.md','root/.hermes/memories','root/.hermes/skills',
-              'root/.hermes/plugins','root/.hermes/cron/jobs.json','root/.hermes/docs',
-              'root/.hermes/vault','root/.hermes/hindsight','root/.hermes/webhook_subscriptions.json',
-              'root/.hermes/scripts','root/.hermes/services','root/.hermes/raw-vault',
-              'root/.hermes/kardex','root/.hermes/bin','root/.hermes/hooks',
-              'root/.hermes/google-accounts','root/.hermes/profiles','root/.hermes/hermes-agent',
-              'root/.hermes/desktop-backend.env','root/.config/systemd/user','root/.cloudflared','services/cloudflared',
+    optional=['root/.config/systemd/user','root/.cloudflared','services/cloudflared',
               'root/.ssh/config','root/.ssh/known_hosts','root/.codex/config.toml','root/.codex/auth.json',
               'root/.codex/AGENTS.md','root/.claude/settings.json','root/.claude.json','root/CLAUDE.md',
-              'etc/systemd/system','etc/asterisk','etc/logrotate.d/walter-hermes',
-              'etc/iptables','etc/ssh/sshd_config.d','etc/rclone','usr/local/sbin','opt/openclaw','opt/dsh']
+              'etc/systemd/system','etc/logrotate.d/walter-instance-logs',
+              'etc/iptables','etc/ssh/sshd_config.d','etc/rclone','usr/local/sbin','opt/dsh']
     absent=[]
     for n in optional:
         p=root/n
         if p.exists() or p.is_symlink():sources.add(n)
         else:absent.append(n)
     for p in (root/'usr/local/bin').glob('walter-*'):sources.add(str(p.relative_to(root)))
-    # Current Desktop has a protected credential dependency outside its module directory.
-    if (root/'etc/systemd/system/hermes-desktop-backend.service').exists():
-        required.update(('etc/systemd/system/hermes-desktop-backend.service',
-                         'etc/systemd/system/hermes-desktop-tailscale.service','root/.hermes/desktop-backend.env'))
     # Credential/config dependencies declared by Walter services, even outside module roots.
     for unit_root in ('etc/systemd/system','root/.config/systemd/user'):
         for p in (root/unit_root).rglob('*'):
             if p.suffix not in ('.service','.conf') or not p.is_file():continue
             if not any(x in str(p.relative_to(root/unit_root)).lower() for x in
-                       ('walter','hermes','hindsight','raw-vault','memory-','voice-router','camoufox')):continue
+                       ('walter','raw-vault','memory-','camoufox')):continue
             for line in p.read_text(errors='replace').splitlines():
                 if not line.strip().startswith('EnvironmentFile='):continue
                 for value in shlex.split(line.strip().split('=',1)[1]):
@@ -160,9 +144,8 @@ def dependencies(root):
     out={}
     envs=list((root/'opt').glob('walter-*/venv/bin/python'))
     envs += list((root/'opt').glob('walter-*/.venv/bin/python'))
-    envs += [root/'root/.hermes/hermes-agent/venv/bin/python',root/'root/.hermes/hindsight-venv/bin/python',
-             root/'root/walter-computer-use/.venv/bin/python',root/'root/.venv/scrapling/bin/python',
-             root/'opt/openclaw/venv/bin/python',root/'opt/walter-colab/mcp/.venv/bin/python',root/'opt/walter-colab/python/bin/python']
+    envs += [root/'root/walter-computer-use/.venv/bin/python',root/'root/.venv/scrapling/bin/python',
+             root/'opt/walter-colab/mcp/.venv/bin/python',root/'opt/walter-colab/python/bin/python']
     code='import importlib.metadata,json; print(json.dumps(sorted({(d.metadata["Name"],d.version) for d in importlib.metadata.distributions()})))'
     for p in envs:
         if p.exists():
@@ -251,22 +234,7 @@ def create(output,root=pathlib.Path('/'),sources=None,required=None,include_depe
                 archive.addfile(info);entries[name]={'kind':'symlink','target':info.linkname,'mode':info.mode}
             # Sockets/devices/pipes are not portable configuration payloads.
         for n in sources:add(root/n,n)
-        # Consistent profile database copies, never an uncoordinated tar of SQLite/WAL.
-        for db in sorted((root/'root/.hermes/profiles').glob('*/*.db')):
-            name=str(db.relative_to(root))
-            if not any(name.startswith(n+'/') for n in sources):continue
-            with tempfile.TemporaryDirectory() as tmp:
-                snap=pathlib.Path(tmp)/db.name
-                source=sqlite3.connect('file:'+str(db)+'?mode=ro',uri=True,timeout=20)
-                dest=sqlite3.connect(snap);source.backup(dest,pages=256,sleep=.01)
-                assert dest.execute('pragma quick_check').fetchone()[0]=='ok'
-                dest.close();source.close()
-                # Snapshot bypasses exclusion of the live database.
-                info=archive.gettarinfo(str(snap),arcname=name)
-                info.mode=db.stat().st_mode & 0o777
-                with snap.open('rb') as f:
-                    reader=DigestReader(f);archive.addfile(info,reader)
-                entries[name]={'kind':'sqlite_snapshot','bytes':info.size,'sha256':reader.hash.hexdigest(),'mode':info.mode};snapshots.append(name)
+        # Hermes profile SQLite snapshots ended with Hermes (2026-11-16); `sqlite_snapshots` stays in the manifest, empty.
         missing=required_paths_missing(required,entries)
         if missing:raise RuntimeError('required paths not archived: '+', '.join(missing))
         if contracts_check(root)!=contract_state:raise RuntimeError('module contracts changed during backup')

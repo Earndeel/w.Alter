@@ -41,7 +41,3 @@ def test_host_adapters(monkeypatch):
     cc = disclosure.claude_code_hook({"tool_name": "mcp__g__send_message", "tool_input": {
         "to": "x@example.invalid", "body": "Je confirme le rendez-vous de mardi 15h et je paie l'acompte de 50 €."}})
     assert cc["hookSpecificOutput"]["permissionDecision"] == "ask"
-    assert disclosure.hermes_hook({"tool_input": {"action": "send", "target": "telegram", "message": "Rapport du jour"}}) is None
-    h = disclosure.hermes_hook({"tool_input": {"action": "send", "target": "signal:+15550000000",
-                                               "message": "D'accord pour vendredi, je t'envoie l'argent ce soir"}})
-    assert h["action"] in ("approve", "block")

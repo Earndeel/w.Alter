@@ -1,4 +1,4 @@
-"""walter_memory — Walter Memory core library (spec: /root/.hermes/docs/walter-memory/ARCHITECTURE.md).
+"""walter_memory — Walter Memory core library (spec: /walter/docs/ARCHITECTURE.md).
 
 Truth = core.events (append-only, observed) + core.objects (Raw Vault). Everything else is derived.
 Connectors write only through this library or the HTTP gateway (never directly into Kardex/Hindsight).
