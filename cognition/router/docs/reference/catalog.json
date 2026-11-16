@@ -8399,11 +8399,6 @@
             "signature": "since: datetime | None, root: Path=CLAUDE_PROJECTS"
           },
           {
-            "description": "Tokens per model of Hermes sessions billed to the ChatGPT subscription (main + every profile, read-only).",
-            "name": "hermes_codex_usage",
-            "signature": "since: datetime | None, home: Path=HERMES_HOME"
-          },
-          {
             "description": "Tokens per model of Codex CLI / Codex Desktop sessions (last cumulative token_count of each session).",
             "name": "codex_cli_usage",
             "signature": "since: datetime | None, root: Path=CODEX_SESSIONS"
@@ -18221,7 +18216,7 @@
     "plan/modeldial.py": "2e3e08248e754052e26ea6aa543b3a7d328a9f5a6a7a08fbb8e87adf5808ff55",
     "plan/news.py": "cb79f91afd5eb20ceb83399d9281c9efa2eaa81997cc5df35c07541311972a22",
     "plan/quota_watch.py": "1af365d976fa20bec06c3c2277de5753255a805ead05f4cdff4310ae4912de2f",
-    "plan/subscriptions.py": "9883d4f5897d62747dd1093b2a0b7dd23ec2fc7e8ac63c90d43205428128ce9c",
+    "plan/subscriptions.py": "3c614b30df9844bf2ef0b82af69ccfe53cbe94531122a035b32cfcd2cf96553d",
     "plan/watch.py": "9721d7f8f85084b42536b9e4c206b4845576fc5bf3325d035ab0a148b8c2dd04",
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",

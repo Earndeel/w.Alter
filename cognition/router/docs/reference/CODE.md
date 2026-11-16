@@ -693,7 +693,6 @@ The owner's subscriptions: meters, usage and the cost price of a token through e
 - `get(sub_id: str)` — 
 - `_add(acc: dict, model: str, **kinds: float)` — 
 - `claude_code_usage(since: datetime | None, root: Path=CLAUDE_PROJECTS)` — Tokens per Claude model in the Claude Code transcripts (each API call once).
-- `hermes_codex_usage(since: datetime | None, home: Path=HERMES_HOME)` — Tokens per model of Hermes sessions billed to the ChatGPT subscription (main + every profile, read-only).
 - `codex_cli_usage(since: datetime | None, root: Path=CODEX_SESSIONS)` — Tokens per model of Codex CLI / Codex Desktop sessions (last cumulative token_count of each session).
 - `walter_claude_usage(since: datetime | None, sub: dict | None=None)` — Actual model usage of the subscription bridge (not the CLI's synthetic acknowledgement), for one account:
 - `usage(sub: dict, since: datetime | None)` — 

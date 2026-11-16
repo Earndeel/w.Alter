@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -28,7 +27,6 @@ from walter_router.analysis import select as sel
 from walter_router import instance
 
 CONFIG = instance.config_path("subscriptions.json")
-HERMES_HOME = instance.hermes_home()
 CLAUDE_PROJECTS = Path(os.environ.get("CLAUDE_PROJECTS") or Path.home() / ".claude" / "projects")
 CODEX_SESSIONS = Path(os.environ.get("CODEX_SESSIONS") or Path.home() / ".codex" / "sessions")
 WEEK = timedelta(days=7)
@@ -92,27 +90,6 @@ def claude_code_usage(since: datetime | None, root: Path = CLAUDE_PROJECTS) -> d
     return acc
 
 
-def hermes_codex_usage(since: datetime | None, home: Path = HERMES_HOME) -> dict:
-    """Tokens per model of Hermes sessions billed to the ChatGPT subscription (main + every profile, read-only)."""
-    acc: dict = {}
-    for db in [home / "state.db", *sorted(home.glob("profiles/*/state.db"))]:
-        if not db.exists():
-            continue
-        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
-        try:
-            rows = con.execute("""select model, sum(input_tokens), sum(cache_read_tokens), sum(cache_write_tokens),
-                                  sum(output_tokens) from sessions where billing_provider = 'openai-codex'
-                                  and coalesce(last_activity_at, started_at) >= ? group by model""",
-                               (since.timestamp() if since else 0,)).fetchall()
-        except sqlite3.Error:
-            rows = []
-        finally:
-            con.close()
-        for model, i, cr, cw, o in rows:
-            _add(acc, identity.normalize("codex", model or "")[0], input=i, cache_read=cr, cache_write=cw, output=o)
-    return acc
-
-
 def codex_cli_usage(since: datetime | None, root: Path = CODEX_SESSIONS) -> dict:
     """Tokens per model of Codex CLI / Codex Desktop sessions (last cumulative token_count of each session)."""
     acc: dict = {}
@@ -167,7 +144,7 @@ def walter_claude_usage(since: datetime | None, sub: dict | None = None) -> dict
     return acc
 
 
-USAGE = {"claude_code": claude_code_usage, "hermes_codex": hermes_codex_usage, "codex_cli": codex_cli_usage,
+USAGE = {"claude_code": claude_code_usage, "codex_cli": codex_cli_usage,   # hermes_codex retired 2026-11-16
          "walter_claude": walter_claude_usage}
 
 
