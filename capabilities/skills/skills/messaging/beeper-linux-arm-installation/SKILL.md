@@ -1,10 +1,18 @@
 ---
 name: beeper-linux-arm-installation
-description: Install Beeper Desktop on an ARM64 Linux server and prepare migration from a Mac without cloning active credentials or cryptographic device state.
-version: 1.0.0
+description: Install Beeper Desktop only when a graphical client is explicitly wanted on ARM64 Linux. For a permanent headless VM channel, use the official Beeper Server instead.
+version: 1.0.1
 ---
 
 # Beeper Desktop Linux ARM64
+
+## Select the intended product first
+
+For a permanent 24/7 channel on a VM without a desktop or Mac dependency, use the official **Beeper Server** from https://github.com/beeper/cli. Do not install Electron Desktop/X11/Wayland for that task. The steps below apply only when a graphical Desktop is explicitly intended.
+
+The official CLI 0.6.4 and Server 4.3.308 production/stable Linux ARM64 were verified on 2026-11-16. Recheck releases and the Server production/stable feed; issues #21/#31 require a fixed version (maintainer: 4.3.121+) and real API chats, pagination and search tests. CLI 0.6.4 email auth had a missing client.app.login.start SDK method; the official setup REST routes and same-owner SAS verification worked without a vendor patch or recovery reset.
+
+Isolate the new profile, UID, data directory and loopback API port from Desktop. Supervise with systemd. Preserve Memory history and checkpoints: switching sources does not justify reimporting it. API message IDs are local to each installation, unlike shared chat/server order metadata; never reuse opaque page cursors across profiles. Read the current native channel documentation and beeper-messages for the qualified integration. Never stop/remove Desktop, reset recovery or change bridges without the owner's required approval.
 
 Read the current instance and app layout first; packages belong under /apps/beeper, personal state under the instance (resolve with `walter instance path state/apps/beeper`). Read beeper-messages for the existing Mac integration. Do not change the Memory connector before the Linux instance is verified and coverage is compared.
 
