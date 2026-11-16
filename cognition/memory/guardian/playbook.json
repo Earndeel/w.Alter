@@ -22,7 +22,7 @@
                    "params": {"unit": ["walter-memory-gateway", "walter-logs-watch", "raw-vault-s3"]}},
   "run_connector": {"level": "G1", "describe": "run a connector once now (oneshot unit)", "async": true,
                     "command": ["systemctl", "start", "--no-block", "walter-memory-{connector}.service"],
-                    "params": {"connector": ["hermes", "beeper", "index", "social", "extract", "triage", "agent-calls", "gmail", "calendar", "overland", "hermes-export"]}},
+                    "params": {"connector": ["beeper", "index", "social", "extract", "triage", "gmail", "calendar", "overland"]}},
   "run_autopilot": {"level": "G1", "describe": "run the daily memory autopilot again now", "async": true,
                     "command": ["systemctl", "start", "--no-block", "memory-autopilot.service"]}
  },

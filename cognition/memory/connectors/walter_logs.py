@@ -5,7 +5,8 @@
   keys   backfill walter_logs.events.event_key (migration 015) for rows that have none; reports later copies
   watch  daemon (walter-logs-watch.service): inotify on the sources, sync the changed one within ~2 s, and a full
          catch-up sweep every SWEEP_S (a missed notification is caught there; ids make re-reads free). No timer.
-         Hermes changes also start walter-memory-hermes.service (core.events), at most every CORE_EVENTS_S.
+         Hermes changes also start walter-memory-hermes.service (core.events), at most every CORE_EVENTS_S — only while
+         the `hermes` connector is enabled (retired 2026-11-16, see hermes_live).
 """
 from __future__ import annotations
 
@@ -76,8 +77,18 @@ def sync_files(paths: list[tuple[str, Path]]) -> dict:
     return out
 
 
+def hermes_live() -> bool:
+    """Hermes was retired on 2026-11-10 (last write 2026-11-12). Since 2026-11-16 its connector is disabled, after a
+    final import checked session by session (archive: restic snapshot tagged `hermes-final`): its state.db files are
+    neither watched nor read. Re-enabling the `hermes` connector (rollback) brings them back; a running daemon notices
+    within PROFILE_CHECK_S and restarts."""
+    with connection() as conn:
+        r = conn.execute("select enabled from ingestion.connectors where connector = 'hermes'").fetchone()
+    return bool(r and r["enabled"])
+
+
 def sync_all(runtimes: list[str] | None = None) -> dict:
-    runtimes = runtimes or ["hermes", "claude", "codex", "dsh"]
+    runtimes = runtimes or (["hermes"] if hermes_live() else []) + ["claude", "codex", "dsh"]
     out = {}
     if "hermes" in runtimes:
         out.update(sync_hermes())
@@ -99,11 +110,14 @@ def _watch(paths: list[str], recursive: bool, q: Queue, stop: threading.Event) -
 def watch_main() -> int:
     q: Queue = Queue()
     stop = threading.Event()
-    hermes_dirs = sorted({str(p.parent) for p in logs.hermes_dbs().values()})
+    live = hermes_live()
+    hermes_dbs = lambda: logs.hermes_dbs() if live else {}                       # noqa: E731
+    hermes_dirs = sorted({str(p.parent) for p in hermes_dbs().values()})
     tree_dirs = [str(r) for r in logs.ROOTS.values() if r.exists()]
-    threading.Thread(target=_watch, args=(hermes_dirs, False, q, stop), daemon=True).start()
+    if hermes_dirs:
+        threading.Thread(target=_watch, args=(hermes_dirs, False, q, stop), daemon=True).start()
     threading.Thread(target=_watch, args=(tree_dirs, True, q, stop), daemon=True).start()
-    profiles_at_start = set(logs.hermes_dbs())
+    profiles_at_start = set(hermes_dbs())
     hermes_seen: dict[str, tuple] = {}      # profile → fingerprint at its last sync (only real writes trigger one)
     last_sweep = last_core = last_dsh = last_profile_check = 0.0
     core_pending = dsh_pending = False
@@ -117,7 +131,7 @@ def watch_main() -> int:
         except Empty:
             pass
         now = time.time()
-        dbs = logs.hermes_dbs()
+        dbs = hermes_dbs()
         touched = {p for p, path in dbs.items() for c in changed if c.startswith(str(path))}   # state.db, -wal, -shm
         prints = {p: hermes_fingerprint(dbs[p]) for p in touched}
         hermes = sorted(p for p in touched if prints[p] != hermes_seen.get(p))     # a reader's event is no write
@@ -129,7 +143,7 @@ def watch_main() -> int:
                 if now - last_sweep > SWEEP_S:
                     prints = {p: hermes_fingerprint(path) for p, path in dbs.items()}      # taken before reading
                     hermes = sorted(p for p in dbs if prints[p] != hermes_seen.get(p))
-                    res = sync_all(); last_sweep = now
+                    res = sync_all(None if live else ["claude", "codex", "dsh"]); last_sweep = now
                 else:
                     if hermes:
                         res.update(sync_hermes(hermes))
@@ -161,8 +175,8 @@ def watch_main() -> int:
             time.sleep(5)
         if now - last_profile_check > PROFILE_CHECK_S:
             last_profile_check = now
-            if set(logs.hermes_dbs()) != profiles_at_start:    # a new Hermes profile: restart to watch it
-                print("walter-logs: Hermes profiles changed, restarting", flush=True)
+            if (set(logs.hermes_dbs()) if hermes_live() else set()) != profiles_at_start:  # Hermes profile or switch
+                print("walter-logs: Hermes sources changed, restarting", flush=True)
                 stop.set()
                 return 0
 
