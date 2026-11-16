@@ -166,7 +166,7 @@ ENGINE_BUS_TYPES = {"turn.started", "turn.ended", "session.ended", "context.degr
 # owner's text: any other payload key is refused
 BUS_PAYLOAD_KEYS = {"context.degraded": {"run_id", "stage", "reason"}}
 RUN_CHANNELS = {"owner", "machine", "test"}
-ORIGIN_EXTRA = ("interface", "engine_session", "request_id")
+ORIGIN_EXTRA = ("interface", "engine_session", "request_id", "trigger")   # trigger: wake:<notice> (engine wake-up turns)
 
 
 class RunStartIn(BaseModel):
