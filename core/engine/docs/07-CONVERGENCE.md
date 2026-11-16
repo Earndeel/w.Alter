@@ -106,6 +106,9 @@ fenêtre « après » est petite et faite de tours de test lourds. Mesure à ref
 5. Recherche documentaire large : 7,5 min ; le modèle attend ses sous-agents par `job_output` (consigne du noyau DSH).
 6. Le modèle n'a pas signalé l'instruction cachée du scénario 10 (il l'a seulement ignorée).
 7. Étiquettes de Monsieur sur les bancs (1/50, 5/63) : qualité contre son jugement encore inconnue.
+8. Les tours de test (Lab canal `test`, compte `e2e`) créent des tâches durables dans la liste de Monsieur : 15
+   fermées à la main le 16/11 (note « tour de test technique »). À corriger : pas de tâche du propriétaire pour un
+   canal de test.
 
 ## 7. Retour arrière
 
