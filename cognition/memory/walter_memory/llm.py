@@ -235,6 +235,7 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
     `model` / `models`: a request to narrow the Router's chain (the gateway refuses a model the Router does not offer).
     local_only state is refused; redacted_cloud state is pseudonymised (strings, recursively) before leaving Memory.
     Paid models are skipped by the gateway when OpenRouter's credit is under this budget's floor.
+    `processor` is also the Walter Decision need (router config/decision-needs.json: reuse window, escalation).
     Returns {"answers": {...}, "usage": {...}, "model": ..., "provider": ..., "route": ...[, "samples": n]}."""
     asked = [model] if model else (list(models) if models else None)
     label = asked[0] if asked else "router:decision"
@@ -244,7 +245,7 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
         raise PrivacyRefused(f"{processor}: {privacy_class} data cannot be sent to a decision model")
     if privacy_class == "redacted_cloud" and privacy.pseudonymise():
         state = _redact_tree(state, names, {})
-    body = {"state": state, "questions": questions, "samples": samples, "timeout": timeout,
+    body = {"state": state, "questions": questions, "samples": samples, "timeout": timeout, "need": processor,
             "paid_floor_usd": ACCOUNT_FLOOR_USD.get(budget, 1.0), **({"models": asked} if asked else {})}
     t0 = time.perf_counter()
     try:
@@ -261,6 +262,9 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
            "provider": out.get("provider"), "route": out.get("route")}
     if samples > 1:
         res["samples"] = out.get("samples")
+    for k in ("reused", "escalated", "schema"):           # Walter Decision: reuse, escalation, question-set key
+        if out.get(k):
+            res[k] = out[k]
     return res
 
 
