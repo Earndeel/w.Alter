@@ -426,6 +426,20 @@ def test_dsh_panels_rendered_from_engine_values_and_dropped_when_none(home,monke
     assert '# walter:dsh-panels ' not in _web(home)
 
 
+def test_dsh_settings_links_rendered_alone_and_checked(home,monkeypatch):
+    """Settings links (rows of Settings › General opening a page in a new tab) come from engine.toml [[dsh.web.links]]."""
+    values=c.engine_values()
+    values['dsh']['web']['panels']=[]
+    values['dsh']['web']['links']=[{'id':'library','label':'Bibliothèque','description':'Modèles actifs','url':'https://lib.example/fr/'}]
+    monkeypatch.setattr(c,'engine_values',lambda instance=True:copy.deepcopy(values))
+    c.install('dsh',home,apply=True,backup_root=home.parent/'backups')
+    [row]=[r for r in c._dsh_yaml(_web(home)) if any(e.get('id')=='walter-web-panels' for e in r.get('insert',[]))]
+    assert row['insert'][0]['config']=={'links':[{'id':'library','label':'Bibliothèque','description':'Modèles actifs','url':'https://lib.example/fr/'}]}
+    for bad in ({'id':'x','label':'X','url':'http://lib.example/'},{'id':'x','label':'X','url':'javascript:alert(1)'},{'id':'x','url':'https://a.b/'}):
+        values['dsh']['web']['links']=[bad]
+        with pytest.raises(ValueError,match='dsh.web.links'):c._dsh_panels(values)
+
+
 def test_dsh_panels_bad_values_fail(home):
     for bad in ({'id':'board','label':'B','path':'board','upstream':'http://h'},
                 {'id':'board','label':'B','path':'/board','upstream':'file:///etc'},

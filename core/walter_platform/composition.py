@@ -217,8 +217,9 @@ def _dsh_face(values):
 def _dsh_panels(values):
     """Fenced `dsh-panels` block of the web profile: pages of other Walter modules shown in the web interface's
     sidebar and main area, behind its sign-in (engine.toml [[dsh.web.panels]]: id, label, path, upstream, and optional
-    actions = path prefixes where POSTs are relayed, e.g. the board's buttons). None when
-    the instance declares no panel (the block is then dropped)."""
+    actions = path prefixes where POSTs are relayed, e.g. the board's buttons), plus [[dsh.web.links]] (id, label,
+    description, https url: Settings › General rows opening a page in a new tab). None when the instance declares
+    neither (the block is then dropped)."""
     import yaml
     panels=values.get('dsh',{}).get('web',{}).get('panels') or []
     out=[]
@@ -231,9 +232,18 @@ def _dsh_panels(values):
                                                                      and '..' not in a for a in acts)):ok=False
         if not ok:raise ValueError(f'engine.toml [[dsh.web.panels]] invalid entry {p!r} (id, label, path /name, upstream http(s) origin, actions = path prefixes /x/)')
         out.append({'id':p['id'],'label':p['label'],'path':p['path'],'upstream':p['upstream'],**({'actions':acts} if acts else {})})
-    if not out:return None
-    return ('# Panels: pages of other Walter modules in the sidebar and main area, behind the interface\'s sign-in (reads, plus declared actions).\n'
-            +yaml.safe_dump([{'insert':[{'id':'walter-web-panels','name':str(WEB_PANELS_PLUGIN),'config':{'panels':out}}]}],
+    links=[]
+    for l in values.get('dsh',{}).get('web',{}).get('links') or []:
+        if not (isinstance(l,dict) and re.fullmatch(r'[a-z][a-z0-9-]{0,31}',str(l.get('id',''))) and isinstance(l.get('label'),str)
+                and l['label'] and isinstance(l.get('description',''),str) and re.fullmatch(r'https://[^/?#\s@]+(/\S*)?',str(l.get('url','')))
+                and l['id'] not in {x['id'] for x in links}):
+            raise ValueError(f'engine.toml [[dsh.web.links]] invalid entry {l!r} (id, label, optional description, url https://…)')
+        links.append({'id':l['id'],'label':l['label'],**({'description':l['description']} if l.get('description') else {}),'url':l['url']})
+    if not out and not links:return None
+    config={**({'panels':out} if out else {}),**({'links':links} if links else {})}
+    return ('# Panels: pages of other Walter modules in the sidebar and main area, behind the interface\'s sign-in (reads, plus declared actions);\n'
+            '# links: Settings › General rows opening another page in a new tab.\n'
+            +yaml.safe_dump([{'insert':[{'id':'walter-web-panels','name':str(WEB_PANELS_PLUGIN),'config':config}]}],
                             sort_keys=False,allow_unicode=True,width=120))
 
 

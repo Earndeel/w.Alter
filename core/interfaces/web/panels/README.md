@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Rôle** | Afficher dans l'interface web de Walter (dsh-web) des pages servies par d'autres modules Walter : une entrée dans la barre latérale, la page dans la zone principale. Le serveur web relaie `<path>/…` vers le serveur du module, seulement pour un navigateur qui a passé la barrière Host/Origin et le cookie de connexion de l'interface. |
+| **Rôle** | Afficher dans l'interface web de Walter (dsh-web) des pages servies par d'autres modules Walter : une entrée dans la barre latérale, la page dans la zone principale ; et des **liens** (Réglages › Général : une ligne titre + description + bouton « Ouvrir ↗ » qui ouvre une page dans un nouvel onglet, sans relais). Le serveur web relaie `<path>/…` vers le serveur du module, seulement pour un navigateur qui a passé la barrière Host/Origin et le cookie de connexion de l'interface. |
 | **Propriétaire** | walter-core (interfaces). |
-| **État** | En service depuis le 14/11/2026 : panneau `devboard` (tableau de développement, ops/devboard) sous `/devboard/`. |
+| **État** | En service depuis le 14/11/2026 : panneau `devboard` (tableau de développement, ops/devboard) sous `/devboard/`. Lien `model-library` (bibliothèque des modèles du Router, derrière Cloudflare Access) depuis le 16/11/2026. |
 | **Ne fait pas** | Lecture seule (GET/HEAD, autre méthode = 405), sauf les `POST` sous les préfixes `actions` que le panneau déclare (corps JSON ≤ 64 Kio, même barrière ; ex. les boutons du tableau, `/api/actions/`) ; ne transmet jamais le cookie ni l'en-tête `Authorization` de l'interface au module, ni les `Set-Cookie` du module au navigateur ; pas de WebSocket ; ne choisit pas quels panneaux existent (réglage de l'instance). |
-| **Contrats** | Réglage `@instance/config/core/engine.toml` `[[dsh.web.panels]]` (`id`, `label`, `path` = `/nom`, `upstream` = origine http(s), `actions` facultatif = préfixes `/x/` où un `POST` est relayé) ; rendu dans le bloc géré `dsh-panels` du profil web par `walter harness install dsh`. |
+| **Contrats** | Réglage `@instance/config/core/engine.toml` `[[dsh.web.panels]]` (`id`, `label`, `path` = `/nom`, `upstream` = origine http(s), `actions` facultatif = préfixes `/x/` où un `POST` est relayé) ; et `[[dsh.web.links]]` (`id`, `label`, `description` facultative, `url` https) ; rendus dans le bloc géré `dsh-panels` du profil web par `walter harness install dsh`. |
 
 ## Fichiers
 

@@ -27,9 +27,32 @@ window.__ModuleLoader__.load({
       };
     }
 
+    // Settings links: one Settings › General row per entry of window.__WALTER_LINKS__ (title, description and an
+    // « Ouvrir » button opening the page in a new tab — a row draws its own internals, the section passes no props).
+    const LINKS = Array.isArray(window.__WALTER_LINKS__) ? window.__WALTER_LINKS__ : [];
+
+    function linkRow(link) {
+      return function LinkRow() {
+        return h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24,
+            padding: "16px 0", borderBottom: ".5px solid var(--dsw-alias-border-l2)" } },
+          h("div", null,
+            h("div", { style: { fontSize: 14, lineHeight: "20px" } }, link.label),
+            link.description ? h("div", { style: { color: "var(--dsw-alias-label-secondary)", marginTop: 4,
+              fontSize: 12, lineHeight: "18px" } }, link.description) : null),
+          h("a", { href: link.url, target: "_blank", rel: "noopener noreferrer", "aria-label": link.label,
+              style: { flex: "none", padding: "6px 14px", border: "1px solid #01B7FF", borderRadius: 8,
+                color: "#01B7FF", fontSize: 13, lineHeight: "18px", textDecoration: "none", whiteSpace: "nowrap" } },
+            "Ouvrir ↗"));
+      };
+    }
+
     const inject = ["slots"];
 
     function apply(ctx) {
+      LINKS.forEach((link, i) => {
+        ctx.slots.inject("settings.general.item", () => ctx.slots.register({
+          name: "settings.general.item", id: "walter-link-" + link.id, order: 90 + i }, linkRow(link)));  // above the version line (100)
+      });
       PANELS.forEach((panel, i) => {
         const Page = framed(panel);
         ctx.slots.inject("main", function* () {

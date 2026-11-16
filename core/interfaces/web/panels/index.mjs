@@ -4,7 +4,8 @@
 // to the module, only for a browser that passed the web interface's own Host/Origin fence and sign-in cookie
 // (`connection.requestRejection`). A panel may declare `actions` (path prefixes, e.g. `/api/actions/`): POSTs there
 // are relayed too (small JSON bodies), behind the same fence; everything else stays read-only.
-// The browser half (client.js) adds the sidebar entry and the framed page.
+// The browser half (client.js) adds the sidebar entry and the framed page, and one Settings › General row per link
+// (`links`: a page opened in a new tab, nothing relayed — e.g. a module page behind its own sign-in).
 // Neutral software: which panels exist (id, label, path, upstream) comes from the Loader config (instance patch).
 import http from 'node:http';
 import https from 'node:https';
@@ -46,6 +47,28 @@ export function checkPanels(panels) {
     }
   }
   return panels;
+}
+
+/** Validate the instance's settings links (id, label, optional description, https url); returns them unchanged. */
+export function checkLinks(links) {
+  if (!Array.isArray(links)) throw new Error('walter-web-panels: links must be a list');
+  const ids = new Set();
+  for (const l of links) {
+    if (!l || !ID.test(String(l.id)) || ids.has(l.id)) {
+      throw new Error(`walter-web-panels: invalid or duplicate link id ${JSON.stringify(l?.id)}`);
+    }
+    ids.add(l.id);
+    if (!l.label || typeof l.label !== 'string') throw new Error(`walter-web-panels: link ${l.id}: label is required`);
+    if (l.description !== undefined && typeof l.description !== 'string') {
+      throw new Error(`walter-web-panels: link ${l.id}: description must be text`);
+    }
+    let u;
+    try { u = new URL(l.url); } catch { u = undefined; }
+    if (!u || u.protocol !== 'https:' || u.username || u.password) {
+      throw new Error(`walter-web-panels: link ${l.id}: url must be an https address`);
+    }
+  }
+  return links;
 }
 
 /**
@@ -105,6 +128,7 @@ export function proxyHandler({ path, upstream, admit, actions = [] }) {
 
 export function apply(ctx, config = {}) {
   const panels = checkPanels(config.panels ?? []);
+  const links = checkLinks(config.links ?? []);
   ctx.inject(['webServer', 'connection'], (web) => {
     const admit = (req) => web.connection.requestRejection(req);
     for (const p of panels) {
@@ -115,6 +139,8 @@ export function apply(ctx, config = {}) {
     web.on('webserver/index-inject', (table) => {
       table.push({ kind: 'global', name: '__WALTER_PANELS__',
         value: panels.map(({ id, label, path }) => ({ id, label, path })) });
+      table.push({ kind: 'global', name: '__WALTER_LINKS__',
+        value: links.map(({ id, label, description, url }) => ({ id, label, description: description ?? '', url })) });
     });
   });
 }

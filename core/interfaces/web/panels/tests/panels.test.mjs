@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { test } from 'node:test';
-import { apply, checkPanels, proxyHandler } from '../index.mjs';
+import { apply, checkLinks, checkPanels, proxyHandler } from '../index.mjs';
 
 function listen(handler) {
   return new Promise((ok) => { const s = http.createServer(handler); s.listen(0, '127.0.0.1', () => ok(s)); });
@@ -97,7 +97,23 @@ test('apply mounts one route per panel and publishes id, label and path only', (
   // The web server's prefix rule matches `/devboard` and `/devboard/…` (never `/devboardx`): one route.
   assert.deepEqual(routes.map((r) => [r.kind, r.path]), [['prefix', '/devboard']]);
   assert.deepEqual(table, [{ kind: 'global', name: '__WALTER_PANELS__',
-    value: [{ id: 'devboard', label: 'Développement', path: '/devboard' }] }]);
+    value: [{ id: 'devboard', label: 'Développement', path: '/devboard' }] },
+  { kind: 'global', name: '__WALTER_LINKS__', value: [] }]);
+});
+
+test('settings links are published as given (no route), and checked', () => {
+  const routes = [], table = [];
+  const web = { webServer: { register: (r) => { routes.push(r); return () => {}; } },
+    connection: { requestRejection: () => undefined }, effect: (f) => f(), on: (ev, f) => f(table) };
+  apply({ inject: (deps, f) => f(web) }, { links: [{ id: 'library', label: 'Bibliothèque', url: 'https://lib.example/fr/' }] });
+  assert.deepEqual(routes, []);
+  assert.deepEqual(table[1], { kind: 'global', name: '__WALTER_LINKS__',
+    value: [{ id: 'library', label: 'Bibliothèque', description: '', url: 'https://lib.example/fr/' }] });
+  assert.throws(() => checkLinks([{ id: 'x', label: 'X', url: 'http://lib.example/' }]), /https/);
+  assert.throws(() => checkLinks([{ id: 'x', label: 'X', url: 'javascript:alert(1)' }]), /https/);
+  assert.throws(() => checkLinks([{ id: 'x', label: 'X', url: 'https://u:p@lib.example/' }]), /https/);
+  assert.throws(() => checkLinks([{ id: 'x', url: 'https://lib.example/' }]), /label/);
+  assert.throws(() => checkLinks([{ id: 'x', label: 'X', url: 'https://a.example/' }, { id: 'x', label: 'Y', url: 'https://b.example/' }]), /duplicate/);
 });
 
 test('a POST under a declared action prefix is relayed with its body; elsewhere still 405', async () => {
