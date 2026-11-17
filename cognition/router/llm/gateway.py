@@ -327,6 +327,36 @@ def decision_chain() -> list[str]:
     return _refresh_chain()
 
 
+_SIGNALS: dict = {"at": 0.0, "data": None, "refreshing": False}
+SIGNALS_TTL = 60.0
+
+
+def _refresh_signals() -> dict | None:
+    try:
+        r = subprocess.run(["walter", "decisions"], capture_output=True, text=True, timeout=30)
+        data = json.loads(r.stdout) if r.returncode == 0 else None
+        if isinstance(data, dict) and isinstance(data.get("signals"), list):
+            _SIGNALS.update(at=time.time(), data=data)
+        return _SIGNALS["data"]
+    except Exception:   # noqa: BLE001 — the copy in hand stays; none = the endpoint says signals are unavailable
+        return _SIGNALS["data"]
+    finally:
+        _SIGNALS["refreshing"] = False
+
+
+def decision_signals() -> dict | None:
+    """The decision signals the modules declare (Core: `walter decisions`), for decisions asked by occasion (Walter
+    Decision 2.0). Same pattern as the decision chain: the copy in hand is served and refreshed in the background
+    past SIGNALS_TTL, so a module that declares a new signal is heard within a minute, never on a message's path."""
+    if _SIGNALS["data"] is not None:
+        if time.time() - _SIGNALS["at"] > SIGNALS_TTL and not _SIGNALS["refreshing"]:
+            _SIGNALS["refreshing"] = True
+            threading.Thread(target=_refresh_signals, daemon=True).start()
+        return _SIGNALS["data"]
+    _SIGNALS["refreshing"] = True
+    return _refresh_signals()
+
+
 def structured_key(env_name: str) -> str:
     """provider_key for the decision / rerank adapters, with a refusal that names what to provision (the variable and
     the grant cards, from walter_secrets' own message), never a value or a storage path."""
@@ -350,8 +380,9 @@ def warm() -> None:
             pass
     with ThreadPoolExecutor(4) as pool:   # the phone's poste first
         list(pool.map(one, sorted(chat_tasks(), key=lambda t: t != "voice_assist")))
-    try:   # the decision chain and the rerank poste (preflight: 3 decision samples per owner message)
+    try:   # the decision chain, the declared signals and the rerank poste (preflight: hedged decision per message)
         decision_chain()
+        decision_signals()
         decision("rerank")
     except Exception:   # noqa: BLE001 — said by the endpoint when asked
         pass
@@ -1122,8 +1153,9 @@ def build_app():
                 chain = await asyncio.to_thread(decision_chain)
             except Exception as exc:  # noqa: BLE001 — the Router could not say: explicit, no built-in chain
                 return 503, {"error": "decision chain unavailable", "attempts": [{"reason": type(exc).__name__}]}
+            signals = await asyncio.to_thread(decision_signals) if body.get("occasion") is not None else None
             return await structured.decisions(body, chain=chain, key=structured_key, client=http(), log=attempt,
-                                              balance=balance)
+                                              balance=balance, signals=signals)
         return await structured_call(request, authorization, "decision", run)
 
     @app.post("/v1/rerank")

@@ -197,6 +197,20 @@ The layer between a module that needs a quick typed judgement and the decision A
 - Comparisons of 16/11 and 17/11 (preflight bench 50 × 3; 17/11: d1.2-ultra = d1-ultra quality, Drex Max within
   1.5 pt, 3.9× faster for the 3-sample decision; d1.2 7 pts lower; new kinds on Walter cases):
   `/walter/core/engine/docs/07-CONVERGENCE.md` § 4. Tests: `tests/test_walter_decision.py`.
+- **Signals (Walter Decision 2.0, 2026-11-17)**: a module declares the judgements and readings it asks in its own
+  `manifest/decisions.json` (contract key `decisions`; id `<module>.<name>`; occasion turn | incoming | outgoing |
+  document | result; layer observation | inference; `when` facts; `options_from`; `required`; what uses the answer
+  and who consumes it). Core collects them (`walter decisions [--occasion]`, envelope checked, one bad file never
+  hides the others); the gateway reads that command (cached 60 s, warmed at start). A caller then sends `occasion`
+  (+ `facts`, `options`, `focus` = the state key the cues read, `now`) instead of — or besides — `questions`: the
+  gateway keeps the signals whose `when` holds (the caller's facts + cues read in the text without a model: date,
+  amount, contact, person, number, media), fills their options, dedupes, caches the composition (no model call) and
+  answers `signals` by id with a `trace` {registry hash, asked, skipped + why, unavailable + why}. A required signal
+  left unanswered fails the call; an optional one is said unavailable. A new module joins by its manifest alone.
+  Parts made only of passages or boxes run once whatever `samples` (they are never averaged). Walter reads what a
+  model found but did not give: a date in words against `now` (number words, « mardi 25/11 » keeps the 25th and
+  says the weekday does not match), a number from its passage (« 300 euros », « 1 200 € »). Router signal:
+  `router.tier`. Tests: `tests/test_walter_decision_v2.py`.
 
 ## Access from outside
 

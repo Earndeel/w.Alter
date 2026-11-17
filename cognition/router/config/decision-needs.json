@@ -10,10 +10,13 @@
       "max_timeout_s": null,
       "types": [
         "choice",
-        "noul"
+        "noul",
+        "multiple",
+        "spans"
       ],
       "new_kinds": {
-        "multiple": "modules a message needs, as one question of several options (today one noul per module); emulated as nouls on every route, native on Liquid's own API"
+        "multiple": "since 17/11 (2.0) the modules a message needs (Context's `needs` signal) are one multiple, emulated as one noul per option on every route (OpenRouter included); native only on Liquid's own API (not wired: no key)",
+        "spans": "since 17/11 the days (resolved by Walter) and the people the message names, asked apart from the judgements so the plan never waits for them; only d1.2 / d1.2-ultra carry them (OpenRouter Extractions)"
       }
     },
     "triage": {
@@ -25,12 +28,14 @@
       "max_timeout_s": null,
       "types": [
         "choice",
-        "noul"
+        "noul",
+        "number",
+        "date"
       ],
       "new_kinds": {
-        "number": "amount in an incoming message (unit EUR)",
-        "date": "deadline, with order dmy",
-        "text": "the person to answer"
+        "number": "since 17/11 (2.0): the amount of the last incoming message (EUR), read by Walter when the model finds it without its value",
+        "date": "since 17/11: the deadline, read by Walter against the message's day (order dmy)",
+        "text": "the person to answer (not asked yet)"
       }
     },
     "views": {
@@ -52,10 +57,13 @@
       "escalate_below": null,
       "max_timeout_s": null,
       "types": [
-        "choice"
+        "choice",
+        "spans",
+        "number"
       ],
       "new_kinds": {
-        "spans": "every piece of personal data in an outgoing message (17/11: 13/13 found on Walter cases)"
+        "spans": "since 17/11 (2.0): the days an outgoing message commits to (resolved by Walter); every piece of personal data (17/11: 13/13 found on Walter cases) not asked yet",
+        "number": "since 17/11: the amount it commits to"
       }
     },
     "documents.verify": {

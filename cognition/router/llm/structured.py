@@ -1,9 +1,16 @@
 """Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and rerank.
 
-    POST /v1/decisions {state, questions, samples?, straggler_s?, model?, models?, paid_floor_usd?, timeout?}
-        → {answers, usage, model, provider, route, samples?, calls, attempts}
-        samples > 1: parallel calls of the same model, averaged; once a majority has answered the late ones get
-        `straggler_s` (default 0.4 s, null = wait for all) and are then dropped (`samples` = how many were averaged).
+    POST /v1/decisions {state, questions?, occasion?, ask?, layers?, facts?, focus?, options?, now?, media?, need?,
+                        samples?,
+                        sampling?, straggler_s?, model?, models?, paid_floor_usd?, timeout?}
+        → {answers, usage, model, provider, route, samples?, parts?, unavailable?, signals?, trace?, calls, attempts}
+        samples > 1, sampling "mean" (default): parallel calls of the same model, averaged; once a majority has
+        answered the late ones get `straggler_s` (default 0.4 s, null = wait for all) and are then dropped.
+        sampling "first": the same calls hedged, the first answer is kept (the need's policy may set either).
+        occasion: the questions are composed from the signals the modules declare (decision.compose); `focus` =
+        the state key holding the event itself (e.g. new_message), the only text the cues read. `ask`: the signal
+        ids of a complementary decision (only those are asked; one the occasion does not declare → 400);
+        `layers`: ["observation"] and/or ["inference"] (readings asked apart from the judgements, in parallel).
     POST /v1/rerank    {query, documents, top_n?, model?, paid_floor_usd?, timeout?}
         → {results: [{index, relevance_score}], model, provider, route, usage, cost_usd, cost_status, attempts}
 
@@ -98,6 +105,9 @@ def merge_answers(samples: list[dict]) -> dict:
                   "confidence": sum(g.get("confidence") or 0 for g in agree) / len(got),
                   "agreement": len(agree) / len(got)}
     return out
+
+
+UNMERGED = frozenset({"spans", "box", "boxes"})
 
 
 def provider_of(model: str) -> str:
@@ -248,6 +258,8 @@ async def _decide_route(client, key, model: str, state: dict, questions: dict, t
         return {"answers": data["answers"], "usage": usage, "model": model,
                 "cost_usd": tok * price / 1e6 if price is not None else None,
                 "cost_status": "estimated" if price is not None else "unknown", "input_tokens": tok}
+    if media:      # images beside the state: a top-level state array with image_url parts (verified 17/11, d1.2 family)
+        state = [state, *({"type": "image_url", "image_url": {"url": u}} for u in _liquid_media(media).get("images", []))]
     r = await client.post(OPENROUTER_DECISIONS, headers={"Authorization": f"Bearer {key('OPENROUTER_API_KEY')}"},
                           json={"model": model, "state": state, "questions": questions}, timeout=timeout)
     data = _json(r)
@@ -324,26 +336,139 @@ def _route_level(why: str) -> bool:
     return why.startswith(("HTTP 404", "HTTP 410", "missing_grant", "key_unavailable"))
 
 
-async def decisions(body: dict, *, chain: list[str], key, client, log, balance=None) -> tuple[int, dict]:
+OCCASIONS = ("turn", "incoming", "outgoing", "document", "result")
+SAMPLING = ("mean", "first")
+
+
+async def _first(once, n: int) -> tuple[list, int]:
+    """Hedged samples: n identical calls at once, the first answer is the decision, the others are cancelled
+    (17/11 replay of 600 preflight calls, d1.2-ultra: first of 2 = 614 / 665 ms p50 / p95 against 663 / 1119 for
+    the mean of 3 with the same agreement with the jury, 0.910). Returns (finished results, how many cancelled)."""
+    tasks = [asyncio.ensure_future(once()) for _ in range(n)]
+    pending, done_all = set(tasks), []
+    while pending:
+        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        for t in done:
+            done_all.append(t.result())
+        if any(r[1] is not None for r in done_all):
+            break
+    for t in pending:
+        t.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+    return done_all, len(pending)
+
+
+def _assign(models: list[str], questions: dict, media, usable: dict) -> tuple[dict, list]:
+    """Each question → the first usable model of the chain that carries it (its kind, the media). Returns
+    ({model: [question keys]} in chain order, [questions no model carries])."""
+    import decision as wd
+    groups: dict = {}
+    nowhere = []
+    for name, q in questions.items():
+        for m in models:
+            if not usable.get(m):
+                continue
+            try:
+                wd.plan(provider_of(m), m, {name: q}, media)
+            except wd.Unsupported:
+                continue
+            groups.setdefault(m, []).append(name)
+            break
+        else:
+            nowhere.append(name)
+    return {m: groups[m] for m in models if m in groups}, nowhere
+
+
+def _carries(model: str, questions: dict, media) -> bool:
+    import decision as wd
+    try:
+        wd.plan(provider_of(model), model, questions, media)
+        return True
+    except wd.Unsupported:
+        return False
+
+
+async def decisions(body: dict, *, chain: list[str], key, client, log, balance=None, signals=None) -> tuple[int, dict]:
     """Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
+
     Walter Decision (decision.py): the questions are checked against the language first, the caller's `need` gives
-    the policy (reuse window, timeout cap, escalation), a decision already given is reused, and each answered call's
-    journal entry carries the need, the schema key and the confidence per question (calibration)."""
+    the policy (reuse window, timeout cap, escalation, sampling), a decision already given is reused, and each
+    answered call's journal entry carries the need, the schema key and the confidence per question (calibration).
+
+    2.0 (17/11): `occasion` (+ `facts`, `options`, `now`) composes the questions from the signals the modules declare
+    (`signals` = `walter decisions`); the reply adds `signals` (answers by signal id) and `trace` (asked, skipped and
+    why, unavailable and why). Each question goes to the first model of the chain that carries it: the parts that
+    need another route (a value read by OpenRouter's Extractions, an image) go to the model that has it, in parallel
+    with the rest, and each part fails over along the models able to carry it. A part that fails or that no model
+    carries leaves its optional signals `unavailable` (said, never guessed); a required one fails the decision."""
     import decision as wd
     state, questions = body.get("state"), body.get("questions")
-    if not isinstance(state, dict) or not isinstance(questions, dict) or not questions:
-        return 400, {"error": "state (object) and questions (non-empty object) required"}
+    occasion = body.get("occasion")
+    composed = None
     try:
-        questions, schema = wd.compile_questions(questions)
         media = wd.check_media(body.get("media"))
     except wd.Invalid as exc:
         return 400, {"error": f"not a Walter decision: {exc}"}
+    if occasion is not None:
+        if occasion not in OCCASIONS:
+            return 400, {"error": f"occasion must be one of {', '.join(OCCASIONS)}"}
+        if not isinstance(state, dict):
+            return 400, {"error": "state (object) required"}
+        facts, opts = body.get("facts") or [], body.get("options") or {}
+        if not isinstance(facts, list) or not all(isinstance(f, str) and f for f in facts):
+            return 400, {"error": "facts is a list of names"}
+        if not isinstance(opts, dict) or not all(isinstance(v, dict) for v in opts.values()):
+            return 400, {"error": "options maps a set name to {option: description}"}
+        if not isinstance(signals, dict) or not isinstance(signals.get("signals"), list):
+            return 503, {"error": "decision signals unavailable (walter decisions)", "attempts": []}
+        focus = body.get("focus")
+        if focus is not None and (not isinstance(focus, str) or focus not in state):
+            return 400, {"error": "focus names a key of the state (the part the cues read)"}
+        # the cues read the event itself (`focus`: the new message), not the history the state carries beside it
+        cue_text = wd.state_text(state[focus] if focus else state)
+        facts = set(facts) | wd.cues(cue_text) | {f"media.{m['type']}" for m in media}
+        ask = body.get("ask")
+        if ask is not None:
+            declared = {x.get("id") for x in signals["signals"] if occasion in (x.get("occasions") or ())}
+            if not isinstance(ask, list) or not ask or not all(isinstance(a, str) and a for a in ask):
+                return 400, {"error": "ask is a non-empty list of signal ids"}
+            if set(ask) - declared:
+                return 400, {"error": f"ask names signals not declared for {occasion}: "
+                                      + ", ".join(sorted(set(ask) - declared))[:300]}
+        layers = body.get("layers")
+        if layers is not None and (not isinstance(layers, list) or not layers
+                                   or not set(layers) <= {"observation", "inference"}):
+            return 400, {"error": "layers is a non-empty list among observation, inference"}
+        composed = wd.compose(signals["signals"], occasion, facts, opts, registry=signals.get("hash") or "", only=ask,
+                              layers=layers)
+        extra = questions if isinstance(questions, dict) else {}
+        clash = sorted(set(extra) & set(composed["questions"]))
+        if clash:
+            return 400, {"error": "questions named like composed signals: " + ", ".join(clash)}
+        questions = {**composed["questions"], **extra}
+        trace = {"occasion": occasion, "registry": composed["registry"], "facts": composed["facts"],
+                 "asked": composed["asked"], "skipped": composed["skipped"]}
+        if not questions:
+            return 200, {"answers": {}, "signals": {}, "trace": {**trace, "unavailable": {}}, "calls": [],
+                         "attempts": [], "model": None, "provider": None, "route": None, "schema": None}
+    elif not isinstance(state, dict) or not isinstance(questions, dict) or not questions:
+        return 400, {"error": "state (object) and questions (non-empty object) required"}
+    try:
+        questions, schema = wd.compile_questions(questions)
+    except wd.Invalid as exc:
+        return 400, {"error": f"not a Walter decision: {exc}"}
+    required = set(questions) if composed is None else \
+        {composed["ids"][s] for s in composed["required"]} | (set(questions) - set(composed["questions"]))
     need = body.get("need") if isinstance(body.get("need"), str) and body.get("need") else None
     need = need[:80] if need else None
     pol = wd.policy(need)
-    samples = body.get("samples", 1)
+    samples = body.get("samples", (pol.get("sampling") or {}).get("k", 1))
     if isinstance(samples, bool) or not isinstance(samples, int) or not 1 <= samples <= MAX_SAMPLES:
         return 400, {"error": f"samples must be an integer 1..{MAX_SAMPLES}"}
+    mode = body.get("sampling") or (pol.get("sampling") or {}).get("mode") or "mean"
+    if mode not in SAMPLING:
+        return 400, {"error": "sampling is mean or first"}
     if not chain:
         return 503, {"error": "no_decision_chain", "attempts": []}
     models, refused = _requested(body, chain)
@@ -352,8 +477,11 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
     floor, timeout = _floor(body), _timeout(body)
     if pol.get("max_timeout_s"):
         timeout = min(timeout, max(1.0, float(pol["max_timeout_s"])))
+    now = body.get("now") if isinstance(body.get("now"), str) else None
     tag = {"need": need, "schema": schema}
-    memo_key = wd.Memo.key(models, samples, {"state": state, "media": wd._digest(media)} if media else state, schema) \
+    asked_state = state if not media and not now else \
+        {"state": state, "media": wd._digest(media) if media else None, "now": (now or "")[:10]}
+    memo_key = wd.Memo.key(models, samples if mode == "mean" else 1, asked_state, schema) \
         if pol.get("memo_ttl_s") and body.get("reuse", True) is not False else None
     if memo_key and (hit := wd.MEMO.get(memo_key)) is not None:
         log({"provider": hit.get("provider"), "model": hit.get("model"), "ok": True, "reused": True, "seconds": 0,
@@ -361,15 +489,9 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
         return 200, {**hit, "reused": True, "calls": [], "attempts": []}
     attempts: list[dict] = []
     calls: list[dict] = []
-    for i, model in enumerate(models):
+    usable: dict = {}
+    for model in models:                 # set-aside routes and the OpenRouter credit floor, once per decision
         provider = provider_of(model)
-        try:                     # a model whose routes cannot carry these questions is not asked (named, not an error)
-            wd.plan(provider, model, questions, media)
-        except wd.Unsupported as exc:
-            attempts.append({"provider": provider, "model": model, "reason": f"unsupported: {exc}"[:240]})
-            calls.append({"provider": provider, "model": model, "ok": False, "skipped": "unsupported", "seconds": 0})
-            log({"provider": provider, "model": model, "ok": False, "seconds": 0, "skipped": "unsupported", **tag})
-            continue
         aside = _unavailable.get(model)
         if aside and time.monotonic() < aside[0]:
             call = {"provider": provider, "model": model, "ok": False, "skipped": "route_unavailable",
@@ -387,57 +509,135 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
                               "seconds": 0})
                 log({"provider": provider, "model": model, "ok": False, "seconds": 0, "skipped": "balance_below_floor"})
                 continue
-
-        async def once(model=model, provider=provider):
-            t0 = time.perf_counter()
+        usable[model] = True
+    groups, nowhere = _assign(models, questions, media, usable)
+    for model in models:                 # a usable model that carries none of the questions: named, not an error
+        if usable.get(model) and model not in groups and not any(_carries(model, {k: questions[k]}, media)
+                                                                 for k in questions):
             try:
-                res = await decide_once(client, key, model, state, questions, timeout, *([media] if media else []))
-            except Exception as exc:  # noqa: BLE001 — the next model of the chain
-                call = {"provider": provider, "model": model, "ok": False, "error": reason(exc),
-                        "seconds": round(time.perf_counter() - t0, 3)}
-                log({**call})
-                return call, None
-            call = {"provider": provider, "model": model, "ok": True, "seconds": round(time.perf_counter() - t0, 3),
-                    "cost_usd": res["cost_usd"], "cost_status": res["cost_status"], "input_tokens": res["input_tokens"]}
-            log({**call, "usage": {"in": res["input_tokens"], "out": 0, "cached": None}, **tag,
-                 "confidence": wd.confidences(res["answers"])})
-            return call, res
-        got, dropped = await _samples(once, samples, _straggler(body))
-        calls += [c for c, _ in got]
-        for seconds in dropped:              # a sample the answer did not wait for: counted, not an error of the model
-            call = {"provider": provider, "model": model, "ok": False, "skipped": "straggler", "seconds": seconds}
-            calls.append(call)
-            log({**call})
-        ok = [res for _, res in got if res is not None]
-        if not ok:
-            why = str(got[0][0]["error"])
-            attempts.append({"provider": provider, "model": model, "reason": why})
-            if all(_route_level(str(c.get("error") or "")) for c, _ in got):
-                _unavailable[model] = (time.monotonic() + UNAVAILABLE_S, why[:120])
-            continue
-        _unavailable.pop(model, None)
-        first = ok[0]
-        out = {"answers": first["answers"] if len(ok) == 1 else merge_answers([r["answers"] for r in ok]),
-               "usage": first["usage"], "model": first["model"] if provider == "openrouter" else model,
-               "provider": provider, "route": f"{provider}/{model}", "calls": calls, "attempts": attempts}
-        if samples > 1:
-            out["samples"] = len(ok)
-        doubt = wd.uncertain(out["answers"], pol.get("escalate_below"))
-        nxt = next((m for m in models[i + 1:] if not (_unavailable.get(m) and time.monotonic() < _unavailable[m][0])),
-                   None)
-        if doubt and nxt:
-            out["escalated"] = await _escalate(out, doubt, nxt, state, questions, key=key, client=client, log=log,
-                                               timeout=timeout, tag=tag, media=media)
-            calls.append(out["escalated"].pop("call"))
-        out["schema"], out["need"] = schema, need
-        if memo_key:
-            wd.MEMO.put(memo_key, {k: v for k, v in out.items() if k not in ("calls", "attempts")},
-                        pol.get("memo_ttl_s") or 0)
-        return 200, out
-    if attempts and all(a["reason"].startswith("unsupported") for a in attempts):
+                wd.plan(provider_of(model), model, questions, media)
+            except wd.Unsupported as exc:
+                attempts.append({"provider": provider_of(model), "model": model, "reason": f"unsupported: {exc}"[:240]})
+                calls.append({"provider": provider_of(model), "model": model, "ok": False, "skipped": "unsupported",
+                              "seconds": 0})
+                log({"provider": provider_of(model), "model": model, "ok": False, "seconds": 0,
+                     "skipped": "unsupported", **tag})
+    if nowhere and (set(nowhere) & required or not groups):
+        if not groups and not usable:
+            return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls}
         return 422, {"error": "no model of the decision chain can answer these questions", "attempts": attempts,
-                     "calls": calls}
-    return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls}
+                     "calls": calls, "unsupported": nowhere}
+    straggler = _straggler(body)
+
+    async def part(names: list[str], first_model: str) -> tuple[dict | None, list, list]:
+        sub = {k: questions[k] for k in names}
+        # passages and boxes are never averaged (merge_answers keeps the first sample's): one call is the answer —
+        # unless the samples are hedged (sampling "first"): the first of n identical calls is then the answer, which
+        # cuts the tail of a slow route (17/11: OpenRouter's Extractions route, 0.1–3.6 s for the same kind of text)
+        n = 1 if mode != "first" and all(wd.kind(q) in UNMERGED for q in sub.values()) else samples
+        cands = [first_model] + [m for m in models[models.index(first_model) + 1:]
+                                 if usable.get(m) and _carries(m, sub, media)]
+        p_calls, p_attempts = [], []
+        for i, model in enumerate(cands):
+            provider = provider_of(model)
+
+            async def once(model=model, provider=provider):
+                t0 = time.perf_counter()
+                try:
+                    res = await decide_once(client, key, model, state, sub, timeout, *([media] if media else []))
+                except Exception as exc:  # noqa: BLE001 — the next model able to carry this part
+                    call = {"provider": provider, "model": model, "ok": False, "error": reason(exc),
+                            "seconds": round(time.perf_counter() - t0, 3)}
+                    log({**call})
+                    return call, None
+                call = {"provider": provider, "model": model, "ok": True,
+                        "seconds": round(time.perf_counter() - t0, 3), "cost_usd": res["cost_usd"],
+                        "cost_status": res["cost_status"], "input_tokens": res["input_tokens"]}
+                log({**call, "usage": {"in": res["input_tokens"], "out": 0, "cached": None}, **tag,
+                     "confidence": wd.confidences(res["answers"])})
+                return call, res
+            if mode == "first" and n > 1:
+                got, cancelled = await _first(once, n)
+                dropped = []
+                for _ in range(cancelled):       # a hedge the answer did not wait for: billed, not an error
+                    call = {"provider": provider, "model": model, "ok": False, "skipped": "hedged", "seconds": 0,
+                            "cost_status": "unknown"}
+                    p_calls.append(call)
+                    log({**call, **tag})
+            else:
+                got, dropped = await _samples(once, n, straggler)
+            p_calls += [c for c, _ in got]
+            for seconds in dropped:              # a sample the answer did not wait for: counted, not an error
+                call = {"provider": provider, "model": model, "ok": False, "skipped": "straggler", "seconds": seconds}
+                p_calls.append(call)
+                log({**call})
+            ok = [res for _, res in got if res is not None]
+            if not ok:
+                why = str(got[0][0]["error"])
+                p_attempts.append({"provider": provider, "model": model, "reason": why})
+                if all(_route_level(str(c.get("error") or "")) for c, _ in got):
+                    _unavailable[model] = (time.monotonic() + UNAVAILABLE_S, why[:120])
+                continue
+            _unavailable.pop(model, None)
+            first = ok[0]
+            res = {"answers": first["answers"] if len(ok) == 1 or mode == "first"
+                   else merge_answers([r["answers"] for r in ok]),
+                   "usage": first["usage"], "model": first["model"] if provider == "openrouter" else model,
+                   "provider": provider, "route": f"{provider}/{model}", "questions": names}
+            if n > 1:
+                res["samples"] = 1 if mode == "first" else len(ok)
+            doubt = wd.uncertain(res["answers"], pol.get("escalate_below"))
+            nxt = next((m for m in cands[i + 1:] if not (_unavailable.get(m) and time.monotonic() < _unavailable[m][0])),
+                       None)
+            if doubt and nxt:
+                res["escalated"] = await _escalate(res, doubt, nxt, state, sub, key=key, client=client, log=log,
+                                                   timeout=timeout, tag=tag, media=media)
+                p_calls.append(res["escalated"].pop("call"))
+            return res, p_calls, p_attempts
+        return None, p_calls, p_attempts
+
+    done = await asyncio.gather(*(part(names, m) for m, names in groups.items()))
+    answered, unavailable = [], {k: "unsupported: no model of the chain carries it" for k in nowhere}
+    for res, p_calls, p_attempts in done:
+        calls += p_calls
+        attempts += p_attempts
+        if res is not None:
+            answered.append(res)
+    failed = [k for (m, names), (res, _, pa) in zip(groups.items(), done) if res is None for k in names]
+    if not answered or set(failed) & required:
+        return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls,
+                     **({"failed": failed} if answered else {})}
+    for (m, names), (res, _, pa) in zip(groups.items(), done):
+        if res is None:
+            why = pa[-1]["reason"] if pa else "failed"
+            unavailable.update({k: f"failed: {why}"[:160] for k in names})
+    main = max(answered, key=lambda r: (len(set(r["questions"]) & required), len(r["questions"])))
+    answers: dict = {}
+    for r in answered:
+        answers.update(r["answers"])
+    answers = wd.resolve(questions, answers, now)
+    out = {"answers": answers, "usage": main["usage"], "model": main["model"], "provider": main["provider"],
+           "route": main["route"], "calls": calls, "attempts": attempts}
+    if samples > 1:
+        out["samples"] = main.get("samples")
+    if mode == "first" and samples > 1:
+        out["sampling"] = "first"
+    if len(answered) > 1 or unavailable:
+        out["parts"] = [{"model": r.get("model"), "route": r["route"], "questions": r["questions"]} for r in answered]
+    esc = [r["escalated"] for r in answered if r.get("escalated")]
+    if esc:
+        out["escalated"] = esc[0] if len(esc) == 1 else {"parts": esc}
+    if unavailable:
+        out["unavailable"] = unavailable
+    out["schema"], out["need"] = schema, need
+    if composed is not None:
+        out["signals"] = wd.by_signal(composed, answers)
+        out["trace"] = {**trace, "unavailable": {sid: unavailable[k] for sid, k in composed["ids"].items()
+                                                 if k in unavailable}}
+    if memo_key and not unavailable:
+        wd.MEMO.put(memo_key, {k: v for k, v in out.items() if k not in ("calls", "attempts")},
+                    pol.get("memo_ttl_s") or 0)
+    return 200, out
 
 
 async def _escalate(out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log,

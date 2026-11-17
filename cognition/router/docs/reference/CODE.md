@@ -487,6 +487,7 @@ Walter Decision (2026-11-16): the typed decision language, the needs registry, r
 - `render_state(state)` — The state as text for a text-only route: as Liquid renders a JSON state (2-space indentation), so the
 - `extraction_fields(extract: dict)` — Walter questions → OpenRouter Extractions fields (estimate = number with a range, list of text = spans).
 - `from_extraction(q: dict, a, text: str)` — One Extractions answer → the canonical (Liquid) shape.
+- `parse_number(text)` — The first number written in a passage: « 1 200 € », « 89,90 € », « 1,200.50 $ », « 2k€ ». One separator
 - `finish(questions: dict, answers: dict)` — What Walter reads itself, whatever the model: a date the model found but left unread because its written form
 - `assemble(questions: dict, p: dict, native: dict, extracted: dict, text: str)` — The answers of the parts of a plan, in the order of the questions and in the canonical shape.
 - `needs()` — Declared needs (re-read when the file changes); {} when there is no registry.
@@ -495,6 +496,16 @@ Walter Decision (2026-11-16): the typed decision language, the needs registry, r
 - `confidence(answer)` — How sure the model was of one answer: a choice's confidence (else its top probability), a noul's distance
 - `confidences(answers: dict)` — 
 - `uncertain(answers: dict, below: float | None)` — 
+- `_with_lead(text: str, span: list, written: str | None)` — 
+- `_count(word: str)` — 
+- `_today(now)` — 
+- `resolve_date(text: str, now=None, order: str='dmy')` — Words of a date → {date, past?, time?, ambiguous?} against `now` (ISO date); None when they name no day.
+- `resolve(questions: dict, answers: dict, now=None)` — `resolve: "date"`: every passage of a spans answer, and a date the model found but could not read, read by
+- `cues(text: str)` — Facts read in the text without a model: is there something that looks like a date, an amount, a contact, a
+- `state_text(state)` — The text of a state (a JSON state's string values), for the cues.
+- `holds(when, facts)` — Every term of `when` holds: a fact, `!fact` (absent), or `a|b|!c` (any of them).
+- `compose(signals: list, occasion: str, facts=(), options: dict | None=None, *, registry: str='', only=None, layers=None)` — The decision of one event from the declared signals → {questions, ids: {signal id: question key}, asked,
+- `by_signal(composed: dict, answers: dict)` — Answers keyed by signal id (None = asked, not answered).
 
 ## llm/gateway.py
 
@@ -519,6 +530,8 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `decision(task: str)` — The router's routes for a task. A stale entry is served at once and refreshed in the background (a phone call
 - `_refresh_chain()` — 
 - `decision_chain()` — The Router's decision models in order (`walter-router decision-chain`: the owner's pinned / the cycle's best
+- `_refresh_signals()` — 
+- `decision_signals()` — The decision signals the modules declare (Core: `walter decisions`), for decisions asked by occasion (Walter
 - `structured_key(env_name: str)` — provider_key for the decision / rerank adapters, with a refusal that names what to provision (the variable and
 - `warm()` — Fill the route cache at start-up for every chat task (background).
 - `chat_tasks()` — 
@@ -586,7 +599,10 @@ Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and
 - `_straggler(body: dict)` — Seconds the late samples are given once a majority has answered; `straggler_s: null` waits for all of them.
 - `_samples(once, n: int, grace: float | None)` — n parallel samples. Once a majority has answered, the others get `grace` seconds, then are dropped: the mean
 - `_route_level(why: str)` — 
-- `decisions(body: dict, *, chain: list[str], key, client, log, balance=None)` — Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
+- `_first(once, n: int)` — Hedged samples: n identical calls at once, the first answer is the decision, the others are cancelled
+- `_assign(models: list[str], questions: dict, media, usable: dict)` — Each question → the first usable model of the chain that carries it (its kind, the media). Returns
+- `_carries(model: str, questions: dict, media)` — 
+- `decisions(body: dict, *, chain: list[str], key, client, log, balance=None, signals=None)` — Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
 - `_escalate(out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log, timeout: float, tag: dict, media=None)` — Ask the uncertain questions — only those — to the next model of the chain; its answers replace them.
 - `rerank_once(client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float)` — 
 - `rerank(body: dict, *, routes: list[dict], key, client, log, balance=None)` — Execute a rerank request on the Router's `rerank` poste routes, in order.
@@ -1076,6 +1092,7 @@ Ordered provider routes and execution metadata for Walter consumers.
 Intent classification by the decision model (OpenRouter's Decisions API, or Cloudflare Workers AI for Clef).
 
 - `chain(conn)` — Decision models to try, in order. The best one comes from the 48 h cycle (task 'decision', AA Decision Index,
+- `_typed(conn, best: str, decision: dict)` — Walter Decision 2.0 (17/11): the model whose routes carry d1.2's typed kinds (values read, estimates,
 - `_cloudflare(model: str, payload: dict, timeout: float)` — Cloudflare Workers AI (Clef family, free daily allocation). Scoped token preferred; the global key only when
 - `_nace(model: str, payload: dict, timeout: float)` — Nace systemone (Drex Max): the OpenRouter Decisions contract on Nace's own API (2026-11-13); Liquid's own
 - `_criteria(conn)` — 

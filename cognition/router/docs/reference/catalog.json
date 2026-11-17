@@ -7596,6 +7596,11 @@
             "signature": "q: dict, a, text: str"
           },
           {
+            "description": "The first number written in a passage: « 1 200 € », « 89,90 € », « 1,200.50 $ », « 2k€ ». One separator",
+            "name": "parse_number",
+            "signature": "text"
+          },
+          {
             "description": "What Walter reads itself, whatever the model: a date the model found but left unread because its written form",
             "name": "finish",
             "signature": "questions: dict, answers: dict"
@@ -7634,6 +7639,56 @@
             "description": "",
             "name": "uncertain",
             "signature": "answers: dict, below: float | None"
+          },
+          {
+            "description": "",
+            "name": "_with_lead",
+            "signature": "text: str, span: list, written: str | None"
+          },
+          {
+            "description": "",
+            "name": "_count",
+            "signature": "word: str"
+          },
+          {
+            "description": "",
+            "name": "_today",
+            "signature": "now"
+          },
+          {
+            "description": "Words of a date → {date, past?, time?, ambiguous?} against `now` (ISO date); None when they name no day.",
+            "name": "resolve_date",
+            "signature": "text: str, now=None, order: str='dmy'"
+          },
+          {
+            "description": "`resolve: \"date\"`: every passage of a spans answer, and a date the model found but could not read, read by",
+            "name": "resolve",
+            "signature": "questions: dict, answers: dict, now=None"
+          },
+          {
+            "description": "Facts read in the text without a model: is there something that looks like a date, an amount, a contact, a",
+            "name": "cues",
+            "signature": "text: str"
+          },
+          {
+            "description": "The text of a state (a JSON state's string values), for the cues.",
+            "name": "state_text",
+            "signature": "state"
+          },
+          {
+            "description": "Every term of `when` holds: a fact, `!fact` (absent), or `a|b|!c` (any of them).",
+            "name": "holds",
+            "signature": "when, facts"
+          },
+          {
+            "description": "The decision of one event from the declared signals → {questions, ids: {signal id: question key}, asked,",
+            "name": "compose",
+            "signature": "signals: list, occasion: str, facts=(), options: dict | None=None, *, registry: str='', only=None, layers=None"
+          },
+          {
+            "description": "Answers keyed by signal id (None = asked, not answered).",
+            "name": "by_signal",
+            "signature": "composed: dict, answers: dict"
           }
         ]
       },
@@ -7734,6 +7789,16 @@
           {
             "description": "The Router's decision models in order (`walter-router decision-chain`: the owner's pinned / the cycle's best",
             "name": "decision_chain",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "_refresh_signals",
+            "signature": ""
+          },
+          {
+            "description": "The decision signals the modules declare (Core: `walter decisions`), for decisions asked by occasion (Walter",
+            "name": "decision_signals",
             "signature": ""
           },
           {
@@ -8053,9 +8118,24 @@
             "signature": "why: str"
           },
           {
+            "description": "Hedged samples: n identical calls at once, the first answer is the decision, the others are cancelled",
+            "name": "_first",
+            "signature": "once, n: int"
+          },
+          {
+            "description": "Each question → the first usable model of the chain that carries it (its kind, the media). Returns",
+            "name": "_assign",
+            "signature": "models: list[str], questions: dict, media, usable: dict"
+          },
+          {
+            "description": "",
+            "name": "_carries",
+            "signature": "model: str, questions: dict, media"
+          },
+          {
             "description": "Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.",
             "name": "decisions",
-            "signature": "body: dict, *, chain: list[str], key, client, log, balance=None"
+            "signature": "body: dict, *, chain: list[str], key, client, log, balance=None, signals=None"
           },
           {
             "description": "Ask the uncertain questions — only those — to the next model of the chain; its answers replace them.",
@@ -9423,6 +9503,11 @@
             "signature": "conn"
           },
           {
+            "description": "Walter Decision 2.0 (17/11): the model whose routes carry d1.2's typed kinds (values read, estimates,",
+            "name": "_typed",
+            "signature": "conn, best: str, decision: dict"
+          },
+          {
             "description": "Cloudflare Workers AI (Clef family, free daily allocation). Scoped token preferred; the global key only when",
             "name": "_cloudflare",
             "signature": "model: str, payload: dict, timeout: float"
@@ -10095,7 +10180,13 @@
         "type": "int"
       },
       {
-        "default": "every piece of personal data in an outgoing message (17/11: 13/13 found on Walter cases)",
+        "default": "since 17/11: the amount it commits to",
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.new_kinds.number",
+        "type": "str"
+      },
+      {
+        "default": "since 17/11 (2.0): the days an outgoing message commits to (resolved by Walter); every piece of personal data (17/11: 13/13 found on Walter cases) not asked yet",
         "file": "config/decision-needs.json",
         "key": "needs.disclosure.commitment.new_kinds.spans",
         "type": "str"
@@ -10114,6 +10205,18 @@
       },
       {
         "default": "choice",
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.types[]",
+        "type": "str"
+      },
+      {
+        "default": "spans",
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.types[]",
+        "type": "str"
+      },
+      {
+        "default": "number",
         "file": "config/decision-needs.json",
         "key": "needs.disclosure.commitment.types[]",
         "type": "str"
@@ -10257,19 +10360,19 @@
         "type": "int"
       },
       {
-        "default": "deadline, with order dmy",
+        "default": "since 17/11: the deadline, read by Walter against the message's day (order dmy)",
         "file": "config/decision-needs.json",
         "key": "needs.triage.new_kinds.date",
         "type": "str"
       },
       {
-        "default": "amount in an incoming message (unit EUR)",
+        "default": "since 17/11 (2.0): the amount of the last incoming message (EUR), read by Walter when the model finds it without its value",
         "file": "config/decision-needs.json",
         "key": "needs.triage.new_kinds.number",
         "type": "str"
       },
       {
-        "default": "the person to answer",
+        "default": "the person to answer (not asked yet)",
         "file": "config/decision-needs.json",
         "key": "needs.triage.new_kinds.text",
         "type": "str"
@@ -10294,6 +10397,18 @@
       },
       {
         "default": "noul",
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.types[]",
+        "type": "str"
+      },
+      {
+        "default": "number",
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.types[]",
+        "type": "str"
+      },
+      {
+        "default": "date",
         "file": "config/decision-needs.json",
         "key": "needs.triage.types[]",
         "type": "str"
@@ -10365,9 +10480,15 @@
         "type": "int"
       },
       {
-        "default": "modules a message needs, as one question of several options (today one noul per module); emulated as nouls on every route, native on Liquid's own API",
+        "default": "since 17/11 (2.0) the modules a message needs (Context's `needs` signal) are one multiple, emulated as one noul per option on every route (OpenRouter included); native only on Liquid's own API (not wired: no key)",
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.new_kinds.multiple",
+        "type": "str"
+      },
+      {
+        "default": "since 17/11 the days (resolved by Walter) and the people the message names, asked apart from the judgements so the plan never waits for them; only d1.2 / d1.2-ultra carry them (OpenRouter Extractions)",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.new_kinds.spans",
         "type": "str"
       },
       {
@@ -10390,6 +10511,18 @@
       },
       {
         "default": "noul",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.types[]",
+        "type": "str"
+      },
+      {
+        "default": "multiple",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.types[]",
+        "type": "str"
+      },
+      {
+        "default": "spans",
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.types[]",
         "type": "str"
@@ -16332,7 +16465,8 @@
         "value": {
           "escalate_below": null,
           "max_timeout_s": null,
-          "memo_ttl_s": 0
+          "memo_ttl_s": 0,
+          "sampling": null
         }
       },
       {
@@ -16356,7 +16490,16 @@
         "file": "llm/decision.py",
         "name": "WALTER_ONLY",
         "value": [
-          "order"
+          "order",
+          "resolve"
+        ]
+      },
+      {
+        "comment": "`resolve: \"date\"` on spans: each passage read as a calendar date by Walter (resolve_date)",
+        "file": "llm/decision.py",
+        "name": "RESOLVE",
+        "value": [
+          "date"
         ]
       },
       {
@@ -16379,6 +16522,193 @@
         "file": "llm/decision.py",
         "name": "NOT_FOUND",
         "value": 0.5
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "_WEEKDAYS",
+        "value": {
+          "dimanche": 6,
+          "friday": 4,
+          "jeudi": 3,
+          "lundi": 0,
+          "mardi": 1,
+          "mercredi": 2,
+          "monday": 0,
+          "samedi": 5,
+          "saturday": 5,
+          "sunday": 6,
+          "thursday": 3,
+          "tuesday": 1,
+          "vendredi": 4,
+          "wednesday": 2
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "_MONTHS",
+        "value": {
+          "aout": 8,
+          "août": 8,
+          "apr": 4,
+          "april": 4,
+          "aug": 8,
+          "august": 8,
+          "avr": 4,
+          "avril": 4,
+          "dec": 12,
+          "december": 12,
+          "decembre": 12,
+          "déc": 12,
+          "décembre": 12,
+          "feb": 2,
+          "february": 2,
+          "fev": 2,
+          "fevrier": 2,
+          "fév": 2,
+          "févr": 2,
+          "février": 2,
+          "jan": 1,
+          "january": 1,
+          "janv": 1,
+          "janvier": 1,
+          "juil": 7,
+          "juillet": 7,
+          "juin": 6,
+          "jul": 7,
+          "july": 7,
+          "jun": 6,
+          "june": 6,
+          "mai": 5,
+          "mar": 3,
+          "march": 3,
+          "mars": 3,
+          "may": 5,
+          "nov": 11,
+          "november": 11,
+          "novembre": 11,
+          "oct": 10,
+          "october": 10,
+          "octobre": 10,
+          "sep": 9,
+          "sept": 9,
+          "september": 9,
+          "septembre": 9
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "_OFFSETS",
+        "value": [
+          [
+            "après-demain",
+            2
+          ],
+          [
+            "apres-demain",
+            2
+          ],
+          [
+            "après demain",
+            2
+          ],
+          [
+            "day after tomorrow",
+            2
+          ],
+          [
+            "avant-hier",
+            -2
+          ],
+          [
+            "avant hier",
+            -2
+          ],
+          [
+            "demain",
+            1
+          ],
+          [
+            "tomorrow",
+            1
+          ],
+          [
+            "hier",
+            -1
+          ],
+          [
+            "yesterday",
+            -1
+          ],
+          [
+            "aujourd'hui",
+            0
+          ],
+          [
+            "aujourd’hui",
+            0
+          ],
+          [
+            "today",
+            0
+          ],
+          [
+            "ce soir",
+            0
+          ],
+          [
+            "ce matin",
+            0
+          ],
+          [
+            "tonight",
+            0
+          ],
+          [
+            "cet après-midi",
+            0
+          ],
+          [
+            "this afternoon",
+            0
+          ],
+          [
+            "this evening",
+            0
+          ]
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "_NUMBERS",
+        "value": {
+          "a": 1,
+          "cinq": 5,
+          "deux": 2,
+          "dix": 10,
+          "eight": 8,
+          "fifteen": 15,
+          "five": 5,
+          "four": 4,
+          "huit": 8,
+          "neuf": 9,
+          "nine": 9,
+          "one": 1,
+          "quatre": 4,
+          "quinze": 15,
+          "sept": 7,
+          "seven": 7,
+          "six": 6,
+          "ten": 10,
+          "three": 3,
+          "trois": 3,
+          "two": 2,
+          "un": 1,
+          "une": 1
+        }
       },
       {
         "comment": "Walter Router CLI on the PATH",
@@ -16455,6 +16785,12 @@
         "file": "llm/gateway.py",
         "name": "_DECISION_CHAIN",
         "value": "__decision_chain__"
+      },
+      {
+        "comment": "",
+        "file": "llm/gateway.py",
+        "name": "SIGNALS_TTL",
+        "value": 60.0
       },
       {
         "comment": "",
@@ -16574,6 +16910,27 @@
         "file": "llm/structured.py",
         "name": "UNAVAILABLE_S",
         "value": 600.0
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "OCCASIONS",
+        "value": [
+          "turn",
+          "incoming",
+          "outgoing",
+          "document",
+          "result"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
+        "name": "SAMPLING",
+        "value": [
+          "mean",
+          "first"
+        ]
       },
       {
         "comment": "",
@@ -17686,6 +18043,15 @@
         "value": "~typesafe/jev-latest"
       },
       {
+        "comment": "",
+        "file": "serve/intent.py",
+        "name": "TYPED_COMPLEMENTS",
+        "value": [
+          "liquid/d1.2-ultra",
+          "liquid/d1.2"
+        ]
+      },
+      {
         "comment": "free, off OpenRouter: survives an exhausted OpenRouter credit",
         "file": "serve/intent.py",
         "name": "FREE_FALLBACKS",
@@ -18227,7 +18593,7 @@
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
     "cli.py": "676ccdd84a9e47a74f16bc31dddbbdcaa03a6540517fb886be35e52b7a68904d",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
-    "config/decision-needs.json": "78dfb64f485e4a1b6528ebe8cbb9cdbd4faec416bf993d282d2051b835b176d7",
+    "config/decision-needs.json": "6eeffaf297527bb71c6d7ab29eedb4e70cc7389143ca50cc57e5be6fa3a5de4b",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
     "config/kie_media_schemas.json": "278e5d624ffa274e473eaaf6ab044df1c454c43bb39df40613e6cde9c6f8edd1",
@@ -18237,7 +18603,7 @@
     "config/subscriptions.json": "b024fe62090d03e99ea7c06e6a76fd98228ab0d9811692ae07a65ccf4f958dac",
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "39778c3ef58539ea14a375ca36c762d0d628de2c02440d7372095191affda842",
-    "contracts/router.json": "ac383d2edd3786256f00de8746e971fac50ac59d910663cf444ed4209b7aeef4",
+    "contracts/router.json": "2c22033548faf73d7cba8f3e98e7309cccce1ffb267e0f68efa10d7cb8d3b185",
     "documentation.py": "bc32530f551ad3e0189b0927d42873f3ba7f0b8d8f3d9f56dd98587a37477870",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
@@ -18260,9 +18626,9 @@
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
-    "llm/decision.py": "e6061c857edb37b92dee9ccbf163dfa90ce4c08abdb0c2e694bef511e8c350ba",
-    "llm/gateway.py": "f95463295dfaa2d1f816914f5cac3afcde1c95ff4ce4b00547cb5f29a8eb4b46",
-    "llm/structured.py": "41cc580b8c3f6c1f19b8d0c7f1884b63b0e82d0fba0c710975088fa48685bd0a",
+    "llm/decision.py": "96af29052c0755fd93f84107c9c4598f04fe82148295dfccc694f62b35697b7c",
+    "llm/gateway.py": "9b7e32f7fdadb3f420e33e0c35e6c5704584edb57176a01affea8ce657eff8a0",
+    "llm/structured.py": "eb4669d9ef72692a87741bbdadf8d06454116a2bbd0b50fabfed1f648757bbe6",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
@@ -18318,7 +18684,7 @@
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "bd32cc241c3c1dbf2c7b95617fce3bcdf77a6203658ac9b9420a1b1095483487",
-    "serve/intent.py": "27249e14b6c7f7465397ab0c6f992cd916855b65a18bbbcc10d3c34ebe952deb",
+    "serve/intent.py": "03dcb7186db39a240ae9be7404a20d6ef82773a4a9e795c7c925a96d08827799",
     "serve/media_exec.py": "2d1cc2912695ec9011219a2f73a6a1832faeea5df23551c34f69ff9b9a111593",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",

@@ -105,13 +105,18 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/decision.py | `TYPES` | ["noul", "choice", "score", "number", "date", "text", "spans", "box", "boxes"] |  |
 | llm/decision.py | `MAX_QUESTIONS` | 32 |  |
 | llm/decision.py | `MAX_INSTRUCTIONS` | 6000 |  |
-| llm/decision.py | `DEFAULT_POLICY` | {"escalate_below": null, "max_timeout_s": null, "memo_ttl_s": 0} | undeclared: no reuse |
+| llm/decision.py | `DEFAULT_POLICY` | {"escalate_below": null, "max_timeout_s": null, "memo_ttl_s": 0, "sampling": null} | undeclared: no reuse |
 | llm/decision.py | `MEMO_SIZE` | 512 |  |
 | llm/decision.py | `DATE_ORDERS` | ["dmy", "mdy", "ymd"] |  |
-| llm/decision.py | `WALTER_ONLY` | ["order"] | read by Walter, never sent to a provider |
+| llm/decision.py | `WALTER_ONLY` | ["order", "resolve"] | read by Walter, never sent to a provider |
+| llm/decision.py | `RESOLVE` | ["date"] | `resolve: "date"` on spans: each passage read as a calendar date by Walter (resolve_date) |
 | llm/decision.py | `MEDIA_TYPES` | ["image", "audio"] |  |
 | llm/decision.py | `MAX_MEDIA` | 8 |  |
 | llm/decision.py | `NOT_FOUND` | 0.5 | a value or an option under this probability is absent (Liquid's own threshold) |
+| llm/decision.py | `_WEEKDAYS` | {"dimanche": 6, "friday": 4, "jeudi": 3, "lundi": 0, "mardi": 1, "mercredi": 2, "monday": 0, "samedi": 5, "saturday": 5, "sunday": 6, "thursday": 3, "tuesday": 1, "vendredi": 4, "wednesday": 2} |  |
+| llm/decision.py | `_MONTHS` | {"aout": 8, "août": 8, "apr": 4, "april": 4, "aug": 8, "august": 8, "avr": 4, "avril": 4, "dec": 12, "december": 12, "decembre": 12, "déc": 12, "décembre": 12, "feb": 2, "february": 2, "fev": 2, "fevrier": 2, "fév": 2, "févr": 2, "février": 2, "jan": 1, "january": 1, "janv": 1, "janvier": 1, "juil": 7, "juillet": 7, "juin": 6, "jul": 7, "july": 7, "jun": 6, "june": 6, "mai": 5, "mar": 3, "march": 3, "mars": 3, "may": 5, "nov": 11, "november": 11, "novembre": 11, "oct": 10, "october": 10, "octobre": 10, "sep": 9, "sept": 9, "september": 9, "septembre": 9} |  |
+| llm/decision.py | `_OFFSETS` | [["après-demain", 2], ["apres-demain", 2], ["après demain", 2], ["day after tomorrow", 2], ["avant-hier", -2], ["avant hier", -2], ["demain", 1], ["tomorrow", 1], ["hier", -1], ["yesterday", -1], ["aujourd'hui", 0], ["aujourd’hui", 0], ["today", 0], ["ce soir", 0], ["ce matin", 0], ["tonight", 0], ["cet après-midi", 0], ["this afternoon", 0], ["this evening", 0]] |  |
+| llm/decision.py | `_NUMBERS` | {"a": 1, "cinq": 5, "deux": 2, "dix": 10, "eight": 8, "fifteen": 15, "five": 5, "four": 4, "huit": 8, "neuf": 9, "nine": 9, "one": 1, "quatre": 4, "quinze": 15, "sept": 7, "seven": 7, "six": 6, "ten": 10, "three": 3, "trois": 3, "two": 2, "un": 1, "une": 1} |  |
 | llm/gateway.py | `ROUTER` | walter-router | Walter Router CLI on the PATH |
 | llm/gateway.py | `UA` | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36 |  |
 | llm/gateway.py | `DEFAULT_TASK` | coding |  |
@@ -123,6 +128,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/gateway.py | `RATE_LIMIT_WAITS` | [4, 12] |  |
 | llm/gateway.py | `EXACT` | exact: | a model named by the owner, validated by Walter Router (lot E5) |
 | llm/gateway.py | `_DECISION_CHAIN` | __decision_chain__ |  |
+| llm/gateway.py | `SIGNALS_TTL` | 60.0 |  |
 | llm/gateway.py | `ANTHROPIC_CACHE_POINTS` | [{"location": "message", "role": "system"}, {"index": -1, "location": "message"}] |  |
 | llm/gateway.py | `QUOTA_SWITCH` | 90.0 | same threshold as the Router's execution.routes (weekly %), mirrored for the trace only |
 | llm/structured.py | `OPENROUTER_DECISIONS` | https://openrouter.ai/api/alpha/decisions |  |
@@ -140,6 +146,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/structured.py | `DEFAULT_TIMEOUT` | 30.0 |  |
 | llm/structured.py | `STRAGGLER_S` | 0.4 | samples > 1: once a majority has answered, the late ones get this long (body `straggler_s`) |
 | llm/structured.py | `UNAVAILABLE_S` | 600.0 |  |
+| llm/structured.py | `OCCASIONS` | ["turn", "incoming", "outgoing", "document", "result"] |  |
+| llm/structured.py | `SAMPLING` | ["mean", "first"] |  |
 | plan/codex_account.py | `BASE` | https://chatgpt.com/backend-api |  |
 | plan/codex_account.py | `GRANT` | codex-subscription |  |
 | plan/codex_account.py | `CLIENT_VERSIONS` | ["99.0.0", "0.0.0"] |  |
@@ -261,6 +269,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/execution.py | `_TIMEOUT` | 90 |  |
 | serve/intent.py | `URL` | https://openrouter.ai/api/alpha/decisions |  |
 | serve/intent.py | `MODEL` | ~typesafe/jev-latest |  |
+| serve/intent.py | `TYPED_COMPLEMENTS` | ["liquid/d1.2-ultra", "liquid/d1.2"] |  |
 | serve/intent.py | `FREE_FALLBACKS` | ["cloudflare/clef"] | free, off OpenRouter: survives an exhausted OpenRouter credit |
 | serve/intent.py | `ACCEPTED_PREFIXES` | ["typesafe/jev-", "inception/mercury-decide", "cloudflare/clef", "nace/", "liquidai/"] |  |
 | serve/intent.py | `NACE_SYSTEMONE` | https://console.nace.ai/v1/systemone | Nace's own Decisions API (Drex Max), key NACE_API_KEY |
@@ -394,10 +403,13 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/decision-needs.json | `needs.disclosure.commitment.latency_ms` | int | 3000 |
 | config/decision-needs.json | `needs.disclosure.commitment.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.disclosure.commitment.memo_ttl_s` | int | 600 |
-| config/decision-needs.json | `needs.disclosure.commitment.new_kinds.spans` | str | every piece of personal data in an outgoing message (17/11: 13/13 found on Walter cases) |
+| config/decision-needs.json | `needs.disclosure.commitment.new_kinds.number` | str | since 17/11: the amount it commits to |
+| config/decision-needs.json | `needs.disclosure.commitment.new_kinds.spans` | str | since 17/11 (2.0): the days an outgoing message commits to (resolved by Walter); every piece of personal data (17/11: 13/13 found on Walter cases) not asked yet |
 | config/decision-needs.json | `needs.disclosure.commitment.owner` | str | cognition/memory |
 | config/decision-needs.json | `needs.disclosure.commitment.purpose` | str | does an outgoing message commit the owner |
 | config/decision-needs.json | `needs.disclosure.commitment.types[]` | str | choice |
+| config/decision-needs.json | `needs.disclosure.commitment.types[]` | str | spans |
+| config/decision-needs.json | `needs.disclosure.commitment.types[]` | str | number |
 | config/decision-needs.json | `needs.documents.verify.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.documents.verify.latency_ms` | int | 10000 |
 | config/decision-needs.json | `needs.documents.verify.max_timeout_s` | NoneType | — |
@@ -421,13 +433,15 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/decision-needs.json | `needs.triage.latency_ms` | int | 5000 |
 | config/decision-needs.json | `needs.triage.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.triage.memo_ttl_s` | int | 3600 |
-| config/decision-needs.json | `needs.triage.new_kinds.date` | str | deadline, with order dmy |
-| config/decision-needs.json | `needs.triage.new_kinds.number` | str | amount in an incoming message (unit EUR) |
-| config/decision-needs.json | `needs.triage.new_kinds.text` | str | the person to answer |
+| config/decision-needs.json | `needs.triage.new_kinds.date` | str | since 17/11: the deadline, read by Walter against the message's day (order dmy) |
+| config/decision-needs.json | `needs.triage.new_kinds.number` | str | since 17/11 (2.0): the amount of the last incoming message (EUR), read by Walter when the model finds it without its value |
+| config/decision-needs.json | `needs.triage.new_kinds.text` | str | the person to answer (not asked yet) |
 | config/decision-needs.json | `needs.triage.owner` | str | cognition/memory |
 | config/decision-needs.json | `needs.triage.purpose` | str | incoming event: ignore / remember / notify / prepare a reply |
 | config/decision-needs.json | `needs.triage.types[]` | str | choice |
 | config/decision-needs.json | `needs.triage.types[]` | str | noul |
+| config/decision-needs.json | `needs.triage.types[]` | str | number |
+| config/decision-needs.json | `needs.triage.types[]` | str | date |
 | config/decision-needs.json | `needs.views.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.views.latency_ms` | int | 10000 |
 | config/decision-needs.json | `needs.views.max_timeout_s` | NoneType | — |
@@ -439,11 +453,14 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/decision-needs.json | `needs.walter-context-preflight.latency_ms` | int | 1500 |
 | config/decision-needs.json | `needs.walter-context-preflight.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.walter-context-preflight.memo_ttl_s` | int | 120 |
-| config/decision-needs.json | `needs.walter-context-preflight.new_kinds.multiple` | str | modules a message needs, as one question of several options (today one noul per module); emulated as nouls on every route, native on Liquid's own API |
+| config/decision-needs.json | `needs.walter-context-preflight.new_kinds.multiple` | str | since 17/11 (2.0) the modules a message needs (Context's `needs` signal) are one multiple, emulated as one noul per option on every route (OpenRouter included); native only on Liquid's own API (not wired: no key) |
+| config/decision-needs.json | `needs.walter-context-preflight.new_kinds.spans` | str | since 17/11 the days (resolved by Walter) and the people the message names, asked apart from the judgements so the plan never waits for them; only d1.2 / d1.2-ultra carry them (OpenRouter Extractions) |
 | config/decision-needs.json | `needs.walter-context-preflight.owner` | str | cognition/context |
 | config/decision-needs.json | `needs.walter-context-preflight.purpose` | str | plan of each owner message: thread, act, context level, tier, modules |
 | config/decision-needs.json | `needs.walter-context-preflight.types[]` | str | choice |
 | config/decision-needs.json | `needs.walter-context-preflight.types[]` | str | noul |
+| config/decision-needs.json | `needs.walter-context-preflight.types[]` | str | multiple |
+| config/decision-needs.json | `needs.walter-context-preflight.types[]` | str | spans |
 | config/declared_offers.json | `_doc` | str | Offers declared by the instance's owner that no provider API lists (web interfaces, subscriptions). Only explicit declarations go here; an instance keeps its own in config/router/declared_offers.json. |
 | config/declared_offers.json | `offers` | list | [] |
 | config/host.json | `_doc` | str | Host bindings of an instance (shipped default: none). An instance overrides this file in config/router/host.json. Paths: absolute, ~/ or @instance/. log_dir: cycle logs; collect_script: leaderboard collection (empty = skipped); control_env: HMAC secret of the manual trigger; control_origin / library_domain: where the library page and its trigger are served (empty = not published). aa_api_key: vault item and field of the Artificial Analysis Data API key, read through walter-secrets (null = scores from the leaderboard page only). |

@@ -1,5 +1,6 @@
 {
   "id": "router",
+  "decisions": "manifest/decisions.json",
   "anchors": [
     "contracts/router.json",
     "cli.py",

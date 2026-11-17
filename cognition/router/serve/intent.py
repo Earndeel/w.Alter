@@ -25,6 +25,10 @@ MODEL = "~typesafe/jev-latest"
 # exhausted — the free model still answers). Eval 2026-10-04 on eval/intents_fr.json before being admitted.
 # Mercury Decide free left the chain on 2026-11-13: OpenRouter withdrew it (HTTP 404 on every call since).
 MODELS = ("cloudflare/clef", MODEL)  # eval 2026-10-04: Clef 30/30 (Flash 29/30)
+# Walter Decision 2.0 (17/11): models whose routes carry d1.2's typed kinds (values read, estimates, passages through
+# OpenRouter's Extractions route; images beside the state), measured in llm/decision.py `capabilities`. The instance's
+# knowledge.json `decision.typed` may replace the list ([] = none).
+TYPED_COMPLEMENTS = ("liquid/d1.2-ultra", "liquid/d1.2")
 FREE_FALLBACKS = ("cloudflare/clef",)  # free, off OpenRouter: survives an exhausted OpenRouter credit
 ACCEPTED_PREFIXES = ("typesafe/jev-", "inception/mercury-decide", "cloudflare/clef", "nace/", "liquidai/")
 NACE_SYSTEMONE = "https://console.nace.ai/v1/systemone"  # Nace's own Decisions API (Drex Max), key NACE_API_KEY
@@ -37,7 +41,8 @@ def chain(conn) -> tuple[str, ...]:
     callable Decisions-API offer); knowledge.json `decision.order` says where it goes:
       best_first  best, then the free fallback (Clef on Workers AI)
       free_first  the free models first, the best last (the owner's choice of 2026-10-04: Clef, free allocation)"""
-    order = (json.loads(KNOWLEDGE.read_text()).get("decision") or {}).get("order", "free_first")
+    decision = json.loads(KNOWLEDGE.read_text()).get("decision") or {}
+    order = decision.get("order", "free_first")
     # the owner's pinned decision model first (a new #1 is only proposed, 2026-10-16), else the cycle's #1
     row = conn.execute("""select o.offer_key from models.preferences p join models.offers o on o.model_id = p.pinned_model_id
                           join models.latest_snapshots s using (snapshot_id)
@@ -47,8 +52,24 @@ def chain(conn) -> tuple[str, ...]:
         conn.execute("""select offer_key from models.selection where run_id = (select run_id from models.latest_run)
                         and task = 'decision' and rank = 1""").fetchone()
     best = row["offer_key"] if row and row["offer_key"] else MODEL
-    seq = (best, *FREE_FALLBACKS) if order == "best_first" else (*FREE_FALLBACKS[::-1], best)
+    typed = _typed(conn, best, decision)
+    seq = (best, *typed, *FREE_FALLBACKS) if order == "best_first" else (*FREE_FALLBACKS[::-1], best, *typed)
     return tuple(dict.fromkeys(seq))
+
+
+def _typed(conn, best: str, decision: dict) -> tuple[str, ...]:
+    """Walter Decision 2.0 (17/11): the model whose routes carry d1.2's typed kinds (values read, estimates,
+    passages, images), right after the best when the best does not carry them itself (TYPED_COMPLEMENTS or the
+    instance's knowledge.json `decision.typed`: the first one that is a current decision offer). The modules' typed questions go to it in
+    parallel with the rest; it is also the paid fallback before the free one."""
+    typed = [m for m in (decision["typed"] if isinstance(decision.get("typed"), list) else TYPED_COMPLEMENTS)
+             if isinstance(m, str) and m]
+    if not typed or best in typed:
+        return ()
+    rows = conn.execute("""select o.offer_key from models.offers o join models.latest_snapshots s using (snapshot_id)
+                           where o.interface = 'decisions' and o.offer_key = any(%s)""", (typed,)).fetchall()
+    offered = {r["offer_key"] for r in rows}
+    return tuple(m for m in typed if m in offered)[:1]
 CF_RUN = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/{model}"
 
 
