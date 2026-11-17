@@ -8029,6 +8029,52 @@
         ]
       },
       {
+        "description": "Walter Decision — the Decision Resolver (2026-11-17, mission « Native Engine × Cognitive Architecture » §6).",
+        "file": "llm/resolver.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_num",
+            "signature": "v"
+          },
+          {
+            "description": "",
+            "name": "_conf",
+            "signature": "a"
+          },
+          {
+            "description": "",
+            "name": "_probs",
+            "signature": "a: dict"
+          },
+          {
+            "description": "→ (holds, how sure). None = no answer to judge it on (unanswered, unavailable, set aside).",
+            "name": "evaluate",
+            "signature": "cond: dict, answers: dict, facts: set"
+          },
+          {
+            "description": "Change the answer of `cond`'s signal so that `cond` holds (or not) → the new answer; None = cannot (a fact,",
+            "name": "_make",
+            "signature": "cond: dict, answers: dict, hold: bool"
+          },
+          {
+            "description": "",
+            "name": "_side",
+            "signature": "cond: dict"
+          },
+          {
+            "description": "The answers of one decision (by signal id) resolved against the declared relations → {signals, changed,",
+            "name": "resolve",
+            "signature": "answers: dict, relations: list, facts=(), *, floor: float=FLOOR, required=(), asked=None"
+          },
+          {
+            "description": "What a consumer journals or shows: counts and names, no answers.",
+            "name": "brief",
+            "signature": "res: dict"
+          }
+        ]
+      },
+      {
         "description": "Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and rerank.",
         "file": "llm/structured.py",
         "functions": [
@@ -8078,7 +8124,7 @@
             "signature": "client, key, model: str, text: str, fields: dict, timeout: float"
           },
           {
-            "description": "Images and audio for Liquid's own API: `images` (data URLs) and `media` (audio clips).",
+            "description": "Images and audio for Liquid's own API (measured 17/11, against its docs): images go in `images` (data URLs);",
             "name": "_liquid_media",
             "signature": "media"
           },
@@ -16814,6 +16860,18 @@
         "value": 90.0
       },
       {
+        "comment": "below it an answer is « uncertain » (Walter Decision's calibration: choice confidence / noul distance)",
+        "file": "llm/resolver.py",
+        "name": "FLOOR",
+        "value": 0.6
+      },
+      {
+        "comment": "a several-options answer « has » an option at this probability (the consumers' NEED_MIN)",
+        "file": "llm/resolver.py",
+        "name": "HAS_MIN",
+        "value": 0.5
+      },
+      {
         "comment": "",
         "file": "llm/structured.py",
         "name": "OPENROUTER_DECISIONS",
@@ -18052,6 +18110,15 @@
         ]
       },
       {
+        "comment": "",
+        "file": "serve/intent.py",
+        "name": "NATIVE_TYPED",
+        "value": [
+          "liquidai/d1.2-ultra",
+          "liquidai/d1.2"
+        ]
+      },
+      {
         "comment": "free, off OpenRouter: survives an exhausted OpenRouter credit",
         "file": "serve/intent.py",
         "name": "FREE_FALLBACKS",
@@ -18626,9 +18693,10 @@
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
-    "llm/decision.py": "96af29052c0755fd93f84107c9c4598f04fe82148295dfccc694f62b35697b7c",
+    "llm/decision.py": "46237fb05c86b406aada12ffe19727a32764dc922f720828fb3f62d32808781f",
     "llm/gateway.py": "9b7e32f7fdadb3f420e33e0c35e6c5704584edb57176a01affea8ce657eff8a0",
-    "llm/structured.py": "eb4669d9ef72692a87741bbdadf8d06454116a2bbd0b50fabfed1f648757bbe6",
+    "llm/resolver.py": "c30e85c26b81e9a62927025dfd09b9a1beb005b5e6c40c0c31ab03dde1c87daf",
+    "llm/structured.py": "89b4af36232a3f36491dd0da4969e42ee4f9c0593b79ecd91d10078a64da6700",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
@@ -18678,17 +18746,17 @@
     "research/sources.py": "b872c4f0bc274c5c05612712b9bc04b756a52db9c837d4a5e63ec3097974cad0",
     "research/web.py": "975a4b60b130ad9396f0e3eec5f926966dff8f621cd06c04fae151ff805f6bef",
     "serve/__init__.py": "3b3764d60a3a2bc6fb97e2d74bf82bfca45279ca8f686247c3ebcc18fc8d60ea",
-    "serve/agent_view.py": "dfde57589a82c4176da1ba752a4964a63dd416f7de3a842322d0234b06b2c0ba",
+    "serve/agent_view.py": "07946ccdf7f8e57d0a721b5727fb51c7d8b6a2c7c37cb24ce05481cd233f0eb1",
     "serve/api.py": "ca15f8aecd1b00dd6cc546263694a0de92b1e2b1d54f34373d60bae61621cb9e",
     "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "bd32cc241c3c1dbf2c7b95617fce3bcdf77a6203658ac9b9420a1b1095483487",
-    "serve/intent.py": "03dcb7186db39a240ae9be7404a20d6ef82773a4a9e795c7c925a96d08827799",
+    "serve/intent.py": "31e6ba9747d690ee684384c7ae58e9dd54639f2af430d39de0a9b7cf031bf93f",
     "serve/media_exec.py": "2d1cc2912695ec9011219a2f73a6a1832faeea5df23551c34f69ff9b9a111593",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",
-    "serve/routes.py": "68e05493cf877eca35f0b3337d37cdea5c1831cf296d055773dbf25e94e5e07c",
+    "serve/routes.py": "d0c7dc71e713c6a7f1dfea8f4c1bba8f0225dbd6fb03c310c1fe4f3607f54ed6",
     "serve/run.py": "ed428ba8c3dda62ccca7450aa54560841acc2c998349ee5ecb7df21f4551403f",
     "serve/web.py": "a7c4019f149f362fb5a9f6edf99bf798af9cf12447d9da13b3f39435ec3303dd",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",

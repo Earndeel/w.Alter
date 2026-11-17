@@ -23,6 +23,8 @@ def view(d: dict) -> dict:
     if isinstance(d.get("intent"), dict):
         out["intent"] = {k: d["intent"].get(k) for k in ("task", "task_confidence", "video_role", "level",
                                                           "unrestricted", "error") if d["intent"].get(k) is not None}
+    if d.get("task_ignored"):                          # the agent named a task the Router does not know: say it
+        out["task_ignored"] = d["task_ignored"]
     if d.get("brief"):
         out["brief"] = d["brief"]
     if d.get("alternatives"):

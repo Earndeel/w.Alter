@@ -578,6 +578,19 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `build_app()` — 
 - `add_agent(name: str, cred_file: str, ref: str='WALTER_LLM_TOKEN')` — New token for NAME (one per agent: rotates). cred_file = a DSH credentials YAML, or `env:FILE[:VAR]` = a
 
+## llm/resolver.py
+
+Walter Decision — the Decision Resolver (2026-11-17, mission « Native Engine × Cognitive Architecture » §6).
+
+- `_num(v)` — 
+- `_conf(a)` — 
+- `_probs(a: dict)` — 
+- `evaluate(cond: dict, answers: dict, facts: set)` — → (holds, how sure). None = no answer to judge it on (unanswered, unavailable, set aside).
+- `_make(cond: dict, answers: dict, hold: bool)` — Change the answer of `cond`'s signal so that `cond` holds (or not) → the new answer; None = cannot (a fact,
+- `_side(cond: dict)` — 
+- `resolve(answers: dict, relations: list, facts=(), *, floor: float=FLOOR, required=(), asked=None)` — The answers of one decision (by signal id) resolved against the declared relations → {signals, changed,
+- `brief(res: dict)` — What a consumer journals or shows: counts and names, no answers.
+
 ## llm/structured.py
 
 Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and rerank.
@@ -591,7 +604,7 @@ Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and
 - `_float(value)` — 
 - `decide_once(client, key, model: str, state: dict, questions: dict, timeout: float, media=None)` — One decision on one model → {answers, usage, model, cost_usd, cost_status, input_tokens}. Walter Decision's
 - `_extract_once(client, key, model: str, text: str, fields: dict, timeout: float)` — OpenRouter's Extractions route (text state, typed fields).
-- `_liquid_media(media)` — Images and audio for Liquid's own API: `images` (data URLs) and `media` (audio clips).
+- `_liquid_media(media)` — Images and audio for Liquid's own API (measured 17/11, against its docs): images go in `images` (data URLs);
 - `_decide_route(client, key, model: str, state: dict, questions: dict, timeout: float, media=None)` — One decision call on the model's own decision route.
 - `_requested(body: dict, offered: list[str])` — The models to try: the Router's list, or the caller's narrowing of it (each must be offered).
 - `_floor(body: dict)` — 

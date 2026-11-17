@@ -1,0 +1,4 @@
+{"phase": "I", "provider": "liquid", "model": "d1.2", "mode": "idle420s", "status": 200, "ms": 9403.9, "at": "11:25:04"}
+{"phase": "I", "provider": "openrouter", "model": "d1.2", "mode": "idle420s", "status": 200, "ms": 772.0, "at": "11:25:04"}
+{"phase": "I", "provider": "liquid", "model": "d1.2-ultra", "mode": "idle420s", "status": 200, "ms": 337.0, "at": "11:25:05"}
+{"phase": "I", "provider": "openrouter", "model": "d1.2-ultra", "mode": "idle420s", "status": 200, "ms": 543.4, "at": "11:25:05"}

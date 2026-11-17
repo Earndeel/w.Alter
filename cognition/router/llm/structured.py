@@ -213,16 +213,18 @@ async def _extract_once(client, key, model: str, text: str, fields: dict, timeou
 
 
 def _liquid_media(media) -> dict:
-    """Images and audio for Liquid's own API: `images` (data URLs) and `media` (audio clips)."""
+    """Images and audio for Liquid's own API (measured 17/11, against its docs): images go in `images` (data URLs);
+    audio goes in the top-level `audio` field as data URLs (WAV, MP3, FLAC, OGG). Its documented `media` field is
+    silently IGNORED by the live API (the answer is then about no audio at all), so it is never used."""
     def url(m, mime):
         return m["data"] if m["data"].startswith("data:") else f"data:{mime};base64,{m['data']}"
     out = {}
     imgs = [url(m, "image/png") for m in media or [] if m["type"] == "image"]
-    clips = [{"type": "audio", "data": url(m, "audio/wav")} for m in media or [] if m["type"] == "audio"]
+    clips = [url(m, "audio/wav") for m in media or [] if m["type"] == "audio"]
     if imgs:
         out["images"] = imgs
     if clips:
-        out["media"] = clips
+        out["audio"] = clips
     return out
 
 
@@ -255,6 +257,10 @@ async def _decide_route(client, key, model: str, state: dict, questions: dict, t
         usage = data.get("usage") or {}
         tok = usage.get("input_tokens") or usage.get("prompt_tokens") or 0
         price = prices.get(short)
+        reported = _float(usage.get("cost"))          # Liquid reports the cost of the call (USD) beside the tokens
+        if reported is not None:
+            return {"answers": data["answers"], "usage": usage, "model": model, "cost_usd": reported,
+                    "cost_status": "reported", "input_tokens": tok}
         return {"answers": data["answers"], "usage": usage, "model": model,
                 "cost_usd": tok * price / 1e6 if price is not None else None,
                 "cost_status": "estimated" if price is not None else "unknown", "input_tokens": tok}
@@ -634,6 +640,10 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
         out["signals"] = wd.by_signal(composed, answers)
         out["trace"] = {**trace, "unavailable": {sid: unavailable[k] for sid, k in composed["ids"].items()
                                                  if k in unavailable}}
+        if signals.get("relations"):        # Decision Resolver (§6, 17/11): the answers resolved against the declared
+            import resolver                 # relations, deterministically; `signals` stays what the models said
+            out["resolution"] = resolver.resolve(out["signals"], signals["relations"], composed["facts"],
+                                                 required=composed["required"], asked=composed["asked"])
     if memo_key and not unavailable:
         wd.MEMO.put(memo_key, {k: v for k, v in out.items() if k not in ("calls", "attempts")},
                     pol.get("memo_ttl_s") or 0)

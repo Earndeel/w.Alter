@@ -29,6 +29,11 @@ MODELS = ("cloudflare/clef", MODEL)  # eval 2026-10-04: Clef 30/30 (Flash 29/30)
 # OpenRouter's Extractions route; images beside the state), measured in llm/decision.py `capabilities`. The instance's
 # knowledge.json `decision.typed` may replace the list ([] = none).
 TYPED_COMPLEMENTS = ("liquid/d1.2-ultra", "liquid/d1.2")
+# Liquid's own API for the same models (measured 17/11, bench/reports/liquid-native-2026-11-17.md): one call carries
+# judgements AND values/estimates/passages/boxes/audio (p50 ~0.32 s vs ~0.56 s for OpenRouter's Decisions call, and
+# two routes needed there), same price, every kind verified. NOT the default: to prefer it, set the instance's
+# knowledge.json `decision.typed` to this list (the OpenRouter resale of the same model follows it as failover).
+NATIVE_TYPED = ("liquidai/d1.2-ultra", "liquidai/d1.2")
 FREE_FALLBACKS = ("cloudflare/clef",)  # free, off OpenRouter: survives an exhausted OpenRouter credit
 ACCEPTED_PREFIXES = ("typesafe/jev-", "inception/mercury-decide", "cloudflare/clef", "nace/", "liquidai/")
 NACE_SYSTEMONE = "https://console.nace.ai/v1/systemone"  # Nace's own Decisions API (Drex Max), key NACE_API_KEY
@@ -66,10 +71,18 @@ def _typed(conn, best: str, decision: dict) -> tuple[str, ...]:
              if isinstance(m, str) and m]
     if not typed or best in typed:
         return ()
+    # Liquid's own route (`liquidai/<id>`) is not a catalogued offer: it is the same model as the OpenRouter offer
+    # `liquid/<id>`, which must be a current decision offer; that resale then follows it as its failover.
+    wanted = {m: (f"liquid/{m.split('/', 1)[1]}" if m.startswith("liquidai/") else m) for m in typed}
     rows = conn.execute("""select o.offer_key from models.offers o join models.latest_snapshots s using (snapshot_id)
-                           where o.interface = 'decisions' and o.offer_key = any(%s)""", (typed,)).fetchall()
+                           where o.interface = 'decisions' and o.offer_key = any(%s)""", (list(wanted.values()),)).fetchall()
     offered = {r["offer_key"] for r in rows}
-    return tuple(m for m in typed if m in offered)[:1]
+    first = next((m for m in typed if wanted[m] in offered), None)
+    if first is None:
+        return ()
+    return (first, wanted[first]) if first.startswith("liquidai/") else (first,)
+
+
 CF_RUN = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/{model}"
 
 

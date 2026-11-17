@@ -56,6 +56,17 @@ def test_route_passes_the_conversation_to_the_decision_model(monkeypatch):
         conn.rollback()
 
 
+def test_an_unknown_task_name_is_dropped_and_said_never_a_failed_call(monkeypatch):
+    """17/11/2026: an agent asked walter_route for task « image »; the call died (KeyError → opaque RuntimeError)."""
+    monkeypatch.setattr(intent, "classify", lambda conn, request, context=None, **k: {
+        "task": "general", "task_confidence": 0.9, "level": "L1", "unrestricted": False})
+    with db.connect() as conn:
+        out = routes.route(conn, "génère une image", task="pas-une-tache")
+        assert out["task_ignored"]["given"] == "pas-une-tache" and out["task"] == "general"
+        assert "task_ignored" not in routes.route(conn, "planifie", task="general", level="L1")
+        conn.rollback()
+
+
 class _Resp(io.BytesIO):
     def __enter__(self):
         return self

@@ -21,8 +21,8 @@ Routes (2026-11-17). The language is Liquid's typed one (d1.2): besides noul/cho
 `multiple: true` (each option its own probability), `text` / `number` / `date` (a value read from the state, with
 its `span` and `found`), `number` with `range` (+ `step`, `unit`: an estimate, median and [p10, p90] `interval`),
 `spans` (every passage, `max` ≤ 64), `box` / `boxes` (images), and `media` beside the state (images, audio). What a
-route can carry differs and is said once, in `capabilities` (measured by real calls on 17/11; Liquid's own API from
-its documentation, untested without a key). `plan` splits a question set for one model: what its decision route
+route can carry differs and is said once, in `capabilities` (measured by real calls on 17/11, Liquid's own API
+included). `plan` splits a question set for one model: what its decision route
 answers natively, what goes to OpenRouter's Extractions route (d1.2 models: values, estimates, passages), what is
 emulated (several options = one noul per option, since OpenRouter and Nace silently answer ONE option to
 `multiple: true`), and refuses by name what it cannot carry (box, audio outside Liquid's own API) — the chain then
@@ -153,7 +153,13 @@ def check_media(media) -> list:
 # choice / score for every decision model and refuses text, number, date, spans, box(es) and audio (400); with
 # `multiple: true` it answers ONE option (probabilities summing to 1) — Nace's own API the same. OpenRouter's
 # Extractions route answers text / number / date / list / estimate, for d1.2 and d1.2-ultra only (d1-ultra, Drex
-# Max: 404). Liquid's own API answers every kind for d1.2 / d1.2-ultra (its documentation; no key yet: untested).
+# Max: 404). Liquid's own API (`liquidai/…`) answers every kind for d1.2 / d1.2-ultra in ONE call (measured 17/11 with
+# a key, bench/liquid_native_features.py: noul, choice, score, multiple with independent probabilities, text, number,
+# date, estimate + interval, spans, box, boxes, images, audio). Two traps found against its documentation: audio goes
+# in the top-level `audio` field (data URLs; WAV, MP3, FLAC, OGG), NOT `media` — `media` is silently ignored and the
+# answer is then about no audio at all; a spoken question (audio as `instructions`) is refused 422 on every shape
+# tried; a document/PDF is not a media type (the text layer goes in the state); `now`, `stream` and unknown media
+# types are accepted and ignored, so there is no reference date on this route either.
 BASE_KINDS = frozenset({"noul", "choice", "score"})
 TYPED_KINDS = frozenset({"multiple", "text", "number", "date", "estimate", "spans", "box", "boxes"})
 EXTRACTION_KINDS = frozenset({"text", "number", "date", "estimate", "spans"})
@@ -164,6 +170,8 @@ OPENROUTER_EXTRACTIONS = frozenset({"liquid/d1.2", "liquid/d1.2-ultra"})
 # these two on 17/11 (count of squares, 0.5-0.7 s); OpenRouter's Extractions route takes images for estimates only,
 # so an extraction part is always read from the text state.
 OPENROUTER_IMAGES = frozenset({"liquid/d1.2", "liquid/d1.2-ultra"})
+# Liquid's own API, named and refused (measured 17/11): audio read aloud as a question, documents/PDF as media.
+LIQUID_REFUSED = frozenset({"spoken_question", "document"})
 NOT_FOUND = 0.5        # a value or an option under this probability is absent (Liquid's own threshold)
 
 
@@ -190,7 +198,8 @@ def capabilities(provider: str, model: str) -> dict:
         typed = short in LIQUID_TYPED
         return {"native": BASE_KINDS | (TYPED_KINDS if typed else frozenset()), "extract": frozenset(),
                 "emulate": frozenset() if typed else frozenset({"multiple"}),
-                "media": frozenset(MEDIA_TYPES) if typed else frozenset({"image"}), "verified": False}
+                "media": frozenset(MEDIA_TYPES) if typed else frozenset({"image"}), "verified": typed,
+                "refused": LIQUID_REFUSED if typed else frozenset()}
     if provider == "openrouter":
         return {"native": BASE_KINDS,
                 "extract": EXTRACTION_KINDS if model in OPENROUTER_EXTRACTIONS else frozenset(),
@@ -215,9 +224,12 @@ def plan(provider: str, model: str, questions: dict, media=()) -> dict:
     cap = capabilities(provider, model)
     refused = [f"media {t}" for t in sorted({m["type"] for m in media or ()} - cap["media"])]
     native, extract, emulated = {}, {}, {}
+    images = sum(1 for m in media or () if m.get("type") == "image")
     for name, q in questions.items():
         k = kind(q)
-        if k in cap["native"]:
+        if k in ("box", "boxes") and k in cap["native"] and images != 1:
+            refused.append(f"{name} ({k}: needs exactly one image, got {images})")
+        elif k in cap["native"]:
             native[name] = provider_question(q)
         elif k in cap["extract"]:
             extract[name] = q
@@ -347,6 +359,13 @@ def finish(questions: dict, answers: dict) -> dict:
     out = None
     for name, q in questions.items():
         a = answers.get(name)
+        if q.get("type") == "number" and q.get("range") is None and isinstance(a, dict) and a.get("number") is None \
+                and _num(a.get("found")) and a["found"] >= NOT_FOUND:
+            n = parse_number(a.get("text"))        # « 300 euros »: found, written, value left null (17/11, Liquid native)
+            if n is not None:
+                out = out if out is not None else dict(answers)
+                out[name] = {**a, "number": n, "read_by": "walter"}
+            continue
         if q.get("type") != "date" or not q.get("order") or not isinstance(a, dict) or a.get("date") is not None \
                 or not _num(a.get("found")) or a["found"] < NOT_FOUND:
             continue

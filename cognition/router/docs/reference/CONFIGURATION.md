@@ -131,6 +131,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/gateway.py | `SIGNALS_TTL` | 60.0 |  |
 | llm/gateway.py | `ANTHROPIC_CACHE_POINTS` | [{"location": "message", "role": "system"}, {"index": -1, "location": "message"}] |  |
 | llm/gateway.py | `QUOTA_SWITCH` | 90.0 | same threshold as the Router's execution.routes (weekly %), mirrored for the trace only |
+| llm/resolver.py | `FLOOR` | 0.6 | below it an answer is « uncertain » (Walter Decision's calibration: choice confidence / noul distance) |
+| llm/resolver.py | `HAS_MIN` | 0.5 | a several-options answer « has » an option at this probability (the consumers' NEED_MIN) |
 | llm/structured.py | `OPENROUTER_DECISIONS` | https://openrouter.ai/api/alpha/decisions |  |
 | llm/structured.py | `OPENROUTER_EXTRACTIONS` | https://openrouter.ai/api/alpha/extractions | values, estimates, passages (d1.2, 17/11) |
 | llm/structured.py | `OPENROUTER_RERANK` | https://openrouter.ai/api/v1/rerank |  |
@@ -270,6 +272,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/intent.py | `URL` | https://openrouter.ai/api/alpha/decisions |  |
 | serve/intent.py | `MODEL` | ~typesafe/jev-latest |  |
 | serve/intent.py | `TYPED_COMPLEMENTS` | ["liquid/d1.2-ultra", "liquid/d1.2"] |  |
+| serve/intent.py | `NATIVE_TYPED` | ["liquidai/d1.2-ultra", "liquidai/d1.2"] |  |
 | serve/intent.py | `FREE_FALLBACKS` | ["cloudflare/clef"] | free, off OpenRouter: survives an exhausted OpenRouter credit |
 | serve/intent.py | `ACCEPTED_PREFIXES` | ["typesafe/jev-", "inception/mercury-decide", "cloudflare/clef", "nace/", "liquidai/"] |  |
 | serve/intent.py | `NACE_SYSTEMONE` | https://console.nace.ai/v1/systemone | Nace's own Decisions API (Drex Max), key NACE_API_KEY |

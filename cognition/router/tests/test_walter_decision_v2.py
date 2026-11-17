@@ -334,3 +334,24 @@ def test_a_duration_read_without_its_preposition_takes_it_back_from_the_passage(
     b = wd.from_extraction(q, {"value": None, "span": [j, j + 8], "p_null": 0.03}, plain)
     assert b["text"] == "10 jours" and wd.resolve({"d": q}, {"d": b}, "2026-11-17")["d"].get("date") is None
     assert wd.resolve_date("d'ici 10 jours", "2026-11-17")["date"] == "2026-11-27"
+
+
+def test_declared_relations_come_back_resolved_beside_what_the_models_said():
+    rel = [{"id": "memory.work_not_new", "module": "memory", "type": "excludes", "if": {"signal": "memory.work", "above": 0.5},
+            "then": {"signal": "context.act", "is": "new"}, "prefer": "none", "use": "reported only, for the test"}]
+    client = Client({"console.nace.ai": (200, {"answers": BASE, "usage": {"input_tokens": 90}}),
+                     "alpha/extractions": ext_reply})
+    code, out = run(structured.decisions(
+        {"state": STATE, "occasion": "turn", "now": "2026-11-17"},
+        chain=["nace/drex-max-v1.1", "liquid/d1.2-ultra"], key=key, client=client, log=lambda e: None,
+        signals={"hash": "h1", "signals": SIGNALS, "relations": rel}))
+    assert code == 200, out
+    res = out["resolution"]
+    assert res["signals"] == out["signals"] and not res["changed"]                 # report-only: nothing changed
+    broken = res["conflicts"] + res["uncertain_relations"]
+    assert (out["signals"]["memory.work"]["noul"] >= 0.5) == bool(broken)
+    code, plain = run(structured.decisions(
+        {"state": STATE, "occasion": "turn", "now": "2026-11-17"},
+        chain=["nace/drex-max-v1.1", "liquid/d1.2-ultra"], key=key, client=client, log=lambda e: None,
+        signals={"hash": "h2", "signals": SIGNALS}))
+    assert "resolution" not in plain                                               # no relation declared: as before

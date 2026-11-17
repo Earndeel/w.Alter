@@ -216,7 +216,7 @@ def test_the_plan_says_what_each_route_carries():
     with pytest.raises(wd.Unsupported, match="media audio"):
         wd.plan("openrouter", "liquid/d1.2", Q, [{"type": "audio", "data": "UklGRg=="}])
     native = wd.plan("liquid", "liquidai/d1.2", {**MULTI, **READ, "face": {"type": "box"}},
-                     [{"type": "audio", "data": "x"}])
+                     [{"type": "image", "data": "x"}, {"type": "audio", "data": "x"}])    # a box needs one image
     assert set(native["native"]) == {"topics", *READ, "face"} and not native["extract"] and not native["emulated"]
 
 
@@ -298,7 +298,7 @@ def test_liquids_own_api_takes_every_kind_and_the_media_as_they_are():
     sent = client.calls[0]["json"]
     assert code == 200 and sent["questions"]["topics"]["multiple"] is True
     assert sent["images"] == ["data:image/png;base64,iVBORw0K"]
-    assert sent["media"] == [{"type": "audio", "data": "data:audio/wav;base64,UklGRg=="}]
+    assert sent["audio"] == ["data:audio/wav;base64,UklGRg=="] and "media" not in sent   # live API reads audio here only
     with pytest.raises(wd.Invalid, match="media 0"):
         wd.check_media([{"type": "video", "data": "x"}])
 

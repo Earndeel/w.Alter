@@ -59,7 +59,13 @@ def route(conn, request: str, task: str | None = None, level: str | None = None,
     The decision model reads the request and, when given, `context` (one line on what earlier turns were about, so
     « fais la suite » is understood). It is not called when the caller already fixed everything it would decide: a
     task other than general and the video tasks (whose objective it picks), or general with its level. Without it
-    (network, credits, contract error) the task must be given or defaults to 'general' + keywords."""
+    (network, credits, contract error) the task must be given or defaults to 'general' + keywords.
+
+    A task name the Router does not know (an agent guessing « image » for text_to_image, 17/11/2026) is not an error
+    that stops the call: it is dropped, said in `task_ignored`, and the decision model reads the request instead."""
+    ignored = None
+    if task and not conn.execute("select 1 from models.tasks where task = %s", (task,)).fetchone():
+        ignored, task = {"given": task, "reason": "unknown task: the request decides (walter-router library lists the tasks)"}, None
     if task and ((task != "general" and task not in intent.VIDEO_TASKS) or (task == "general" and level)):
         found = {"skipped": "task and level given by the caller"}
     else:
@@ -79,4 +85,4 @@ def route(conn, request: str, task: str | None = None, level: str | None = None,
     target = web.route_for(task, found.get("level") or level) if web_rules else None
     if target:
         out = {**out, "mode": "web", "web": {**target, "fallback_mode": out.get("mode")}}
-    return {**out, "intent": found}
+    return {**out, "intent": found, **({"task_ignored": ignored} if ignored else {})}
