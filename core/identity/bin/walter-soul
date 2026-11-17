@@ -29,6 +29,7 @@ PARTS = {  # instance sources (identity, rules) + shipped runtime adapters, in o
     "claude-code": ["identity", "rules", "agent-cli", "claude-code"],
     "codex": ["identity", "rules", "agent-cli", "codex"],
     "dsh": ["identity", "rules", "dsh"],  # 2026-11-07: tools are described once, by the MCP walter module layer
+    "engine": ["identity", "rules", "engine"],  # 2026-11-17: Walter Engine native (core/engine/walter_engine)
     "agent": ["identity", "rules"],
 }
 INCLUDE = re.compile(r"^\{\{include (\S+)\}\}$", re.M)
