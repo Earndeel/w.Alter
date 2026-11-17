@@ -357,3 +357,68 @@ Ordre : 0, puis 1 et 2 en parallèle, puis 3 → 4 → 5 → 6.
     dit »).
 - Le hook mémoire actuel injecte à chaque message avec un budget fixe. Exemple du 21/10 : des souvenirs sur Scena,
   injectés pour une question sur ce plan. Le lot 4 le corrige.
+
+
+## 10. État vivant, DecisionState, réévaluation, messages longs (17/11/2026)
+Code : `walter_context/{state,decision_state,reassess,longtext}.py`, routes dans `preflight/service.py`, réglages `[state]` et
+`[longtext]` de `config/walter-context.toml`, tests `tests/test_{state,decision_state,longtext}.py`, banc
+`bench/decision_state_ablation.py`. Rien de tout cela n'écrit dans Walter Memory.
+
+**WorkingState (`state.py`).** Contexte vivant d'une session : fil actif, objectifs, tâches et sous-agents, contraintes,
+décisions prises, informations disponibles, observations récentes, références de sources, éléments en attente,
+incertitudes, contradictions, état de l'opération, capacités utiles. Chaque élément porte sa provenance
+(`source` {type message|tool|task|subagent|memory|system|observation, id, at}), sa fraîcheur (`observed_at`, `ttl_s`,
+`stale`) et son statut de vérification (`observed` vu par un outil ou le système · `inferred` · `reported` dit par le
+propriétaire, un sous-agent ou la mémoire · `unverified`). **La mémoire reste la vérité** (`walter_memory.working` rebâtit
+l'état d'un fil depuis `core.events`) : ce qui en vient est une projection invalidable (`memory_ref` {ref, updated_at,
+version}) ; `memory.changed` la marque périmée et non vérifiée, ou la remplace par la projection fraîche que l'événement
+porte ; avec `[state] memory_refresh = true` le service relit `working.session_state` (bibliothèque Memory, en arrière-plan).
+Événements, appliqués par du code déterministe sans modèle : `message.owner`, `tool.result`, `task.started|updated|ended`,
+`subagent.started|reply`, `objective.changed`, `observation`, `memory.changed`, `failure`, `interrupted`, `context.changed`
+(un genre inconnu est refusé, jamais deviné). Une observation à clé qui change de valeur remplace la précédente, sauf si la
+nouvelle source est moins certaine que l'ancienne observée : c'est alors une contradiction notée, pas un écrasement.
+Les événements d'une session sont mis en file et appliqués ensemble après `coalesce_ms` ; la version croît de 1 par
+événement ; une écriture = verrou de thread + `flock` du fichier, relecture si un autre processus a écrit, écriture atomique
+0600 (`compare-and-set` : `update(expected_version=n)` → `VersionConflict`). Borné (`max_items`, `text_chars`) : la
+compaction n'écarte que ce qui se recalcule (vieilles observations, informations périmées, tâches closes, références) et
+dit combien et lesquelles ; éléments en attente, contraintes, tâches ouvertes, objectifs, décisions, contradictions et
+incertitudes ne sont jamais écartés. Un arrêt du service (SIGTERM) applique d'abord la file.
+
+**HTTP (service preflight 127.0.0.1:8897, loopback, sans jeton comme `/preflight`).**
+`POST /v1/state/event` `{session_id, thread_id?, run_id?, kind, at?, payload}` → `{"ok": true, "version": n}` (la version que
+l'état aura une fois l'événement appliqué) · `GET /v1/state?session_id=…[&thread_id=…]` → `{version, updated_at, state, text}`
+(`text` : bloc français ≤ 2 500 caractères, éléments en attente et contraintes d'abord, « écartés pour la taille » dit) ·
+`POST /v1/reassess` `{session_id, run_id?, trigger:{kind,…}, facts?}` → `{asked, reason, decision_state, decisions, text}`.
+
+**DecisionState (`decision_state.py`).** Construit par occasion (tour du preflight, réévaluation) depuis le message, le
+dernier échange, le fil, l'objectif actif, les tâches, la mémoire récente, les décisions déjà prises, les sources, les
+capacités et le WorkingState. Il sépare l'**observation** vérifiable de l'**inférence**, et le **connu** du **cherchable**
+(une source peut répondre, pas encore interrogée), du **non consulté** et du **manquant** (aucune capacité ne peut
+répondre, ou référence non résolue) ; il note les contradictions, les contraintes d'exécution et dit en clair ce qui est
+**inconnu**, sans jamais le combler. `compact()` = ce que lit le modèle de décision ; `summary()` est porté par le
+ContextPlan dans `plan.decision["decision_state"]` (le champ `decision` est libre : pas de changement de contrat). Branché au
+preflight par `[state] decision_state` : les `facts` envoyés à `/v1/decisions` et la clé `decision_state` de l'état en
+viennent ; `[state] living_state` (avec le précédent) y ajoute le WorkingState de la session. Éteints : comportement d'avant.
+
+**Réévaluation (`reassess.py`).** Jamais un preflight complet : une barrière déterministe dit `asked:false` + raison quand
+rien de pertinent n'a changé (information déjà connue, rien d'ouvert à reprendre, même objectif, même échec déjà évalué,
+alternative déjà connue, contradiction absente) ; sinon un DecisionState restreint à ce que touche le déclencheur, et
+Walter Decision (`/v1/decisions`, occasion `turn`, `ask` = seulement les signaux qui conviennent : failure →
+plan, needs, extensive · subagent.alternative → plan, needs · memory.contradiction → plan, needs, domain, horizon ·
+info.arrived → plan, needs · objective.changed → plan, needs, extensive, domain, horizon, tier · interrupted → resume, plan ·
+external → plan, needs). Pas de modèle généraliste. Mémoïsé par (version de l'état, déclencheur, faits) : jamais deux fois ;
+un même échec n'est pas réévalué même si l'état a bougé. Les occasions de Walter Decision sont un ensemble fermé du Core
+(turn, incoming, outgoing, document, result) : Context n'en déclare pas de nouvelle (`execution` demanderait un changement de
+`walter_platform.decisions`) et réutilise les signaux `turn`.
+
+**Messages longs (`longtext.py`).** L'ancienne coupe `message[:1500]` perdait une consigne, une négation ou une contrainte
+écrite plus loin. Au-delà de `inline_chars`, le modèle lit : début + fin + chaque phrase portant consigne, négation,
+contrainte, date, montant ou question (détecteurs français et anglais, déterministes), les trous dits
+(`[…N caractères omis, offsets a–b…]`), la longueur totale en tête, les offsets rapportés au texte d'origine. Pas de
+résumé par modèle. `[longtext] enabled = false` rend l'ancienne coupe.
+
+**Mesure d'ablation** (`bench/decision_state_ablation.py`, 21 cas synthétiques, 18 conditions, 3 échantillons moyennés,
+décision act/plan/needs, coût ≈ 0 $) : voir `bench/reports/decision-state-20261117T1110.jsonl`. Le petit modèle de décision
+exploite peu l'état : message seul 0,571, tous les apports 0,635 (+0,064) ; le plus utile : décisions déjà prises
+(+0,064 seul), fil (+0,032) ; mémoire, sources et capacités n'apportent rien mesurable. n = 21, bruit de l'ordre de ±0,05 :
+à lire comme une indication, pas une preuve.

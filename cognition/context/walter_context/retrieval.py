@@ -64,21 +64,45 @@ class Block:
 
 _NOTES: list = []                               # [(fetched at, notes)]
 _NOTES_LOCK = threading.Lock()
+_NOTES_REFRESH: list = []                       # the background refresh running, if any
+
+
+def _fetch_notes() -> list[dict]:
+    mods = sorted({m for table in (CAPABILITY_MODULES, DOMAIN_MODULES, TOOL_CARD_MODULES)
+                   for ms in table.values() for m in ms})
+    out = json.loads(subprocess.run(["walter", "present", "notes", "--form", "m0", "--m1", ",".join(mods)],
+                                    capture_output=True, text=True, timeout=20).stdout)
+    return out.get("notes") or []
+
+
+def _refresh_notes() -> None:
+    try:
+        notes = _fetch_notes()
+        with _NOTES_LOCK:
+            _NOTES[:] = [(time.time(), notes)]
+    except Exception:  # noqa: BLE001 — the notes in hand stay; the next message past the ttl tries again
+        pass
+    finally:
+        _NOTES_REFRESH.clear()
 
 
 def _notes(ttl: float = 600) -> list[dict]:
     """Every module's M0 and the M1 of every module a plan can name, from ONE `walter present` call per ttl
     (2026-11-16). One call per module set, each with its own 10-minute cache, cost a subprocess at most messages
     (0.6–1.5 s measured in the service). Filtering the full call gives exactly the notes a call for a subset gives
-    (42 sets compared on 2026-11-16)."""
+    (42 sets compared on 2026-11-16).
+    Past the ttl the notes in hand are answered and ONE refresh runs beside (17/11, critical path §9: the owner's
+    messages are often more than 10 minutes apart, so the expired cache put the 1.2 s subprocess on most turns —
+    tool cards p50 1.19 s in the 16–17/11 records). A module's presentation changes with a deployment, rarely: it is
+    at most one message late. Only the very first call of the process waits for the subprocess."""
     with _NOTES_LOCK:                           # sources asking together wait for one call, not one each
-        if _NOTES and time.time() - _NOTES[0][0] < ttl:
+        if _NOTES:
+            if time.time() - _NOTES[0][0] >= ttl and not _NOTES_REFRESH:
+                t = threading.Thread(target=_refresh_notes, name="notes-refresh", daemon=True)
+                _NOTES_REFRESH.append(t)
+                t.start()
             return _NOTES[0][1]
-        mods = sorted({m for table in (CAPABILITY_MODULES, DOMAIN_MODULES, TOOL_CARD_MODULES)
-                       for ms in table.values() for m in ms})
-        out = json.loads(subprocess.run(["walter", "present", "notes", "--form", "m0", "--m1", ",".join(mods)],
-                                        capture_output=True, text=True, timeout=20).stdout)
-        notes = out.get("notes") or []
+        notes = _fetch_notes()
         _NOTES[:] = [(time.time(), notes)]
         return notes
 

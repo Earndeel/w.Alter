@@ -144,3 +144,39 @@ def pack_settings(path: str | Path | None = None) -> dict:
             isinstance(v, int) and v > 0 for v in out["budget"].values()):
         raise ValueError("[pack].budget: a positive token budget for each of L0..L4")
     return out
+
+
+# --- optional sections: absent from an older file = the defaults below (the behaviour before they existed) --------
+LONGTEXT_DEFAULTS = {"enabled": True, "inline_chars": 1500, "head_chars": 500, "tail_chars": 600,
+                     "signal_chars": 1200, "signal_sentence_chars": 280}
+STATE_DEFAULTS = {"decision_state": False,        # preflight facts + plan summary built from the DecisionState
+                  "living_state": False,          # the preflight reads the session's WorkingState into the DecisionState
+                  "memory_refresh": False,        # memory.changed re-projects Memory's working state (lib call, background)
+                  "coalesce_ms": 150, "max_items": 120, "text_chars": 2500, "observation_ttl_s": 1800,
+                  "memory_ttl_s": 3600, "tool_ttl_s": 900, "max_sessions": 200, "idle_evict_s": 86400,
+                  "reassess_cache": 256, "reassess_timeout_s": 6.0}
+
+
+def _optional(name: str, defaults: dict, path: str | Path | None) -> dict:
+    raw = tomllib.loads(Path(path or DEFAULT_PATH).read_text()).get(name) or {}
+    out = dict(defaults)
+    for k, v in raw.items():
+        if k not in defaults:
+            raise ValueError(f"[{name}].{k}: unknown key")
+        d = defaults[k]
+        ok = isinstance(v, bool) if isinstance(d, bool) else (isinstance(v, (int, float)) and not isinstance(v, bool)
+                                                             and v >= 0)
+        if not ok:
+            raise ValueError(f"[{name}].{k}: invalid value")
+        out[k] = v
+    return out
+
+
+def longtext_settings(path: str | Path | None = None) -> dict:
+    """[longtext]: how a long owner message is represented for the decision model (never cut at its end)."""
+    return _optional("longtext", LONGTEXT_DEFAULTS, path)
+
+
+def state_settings(path: str | Path | None = None) -> dict:
+    """[state]: the living WorkingState and the DecisionState; the two preflight switches default to off."""
+    return _optional("state", STATE_DEFAULTS, path)

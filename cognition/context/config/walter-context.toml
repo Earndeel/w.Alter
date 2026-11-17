@@ -236,3 +236,38 @@ experience = 0
 [pack.state_budget]                 # layer 2 (Memory V1 P1.1): every level but L0 without a thread
 rules = 350
 working = 1200
+
+# Long owner messages (walter_context/longtext.py, 2026-11-17): the decision model reads head + tail + every sentence
+# holding an instruction / negation / constraint / date / amount / question, with the omitted ranges said — it used to
+# read the first 1500 characters only. enabled = false: the old cut (rollback). Restart walter-context-preflight.
+[longtext]
+enabled = true
+inline_chars = 1500          # a message up to this stays whole (whitespace collapsed)
+head_chars = 500
+tail_chars = 600
+signal_chars = 1200          # budget of the middle's key sentences
+signal_sentence_chars = 280
+
+# Living state (walter_context/state.py) and DecisionState (decision_state.py), 2026-11-17. The HTTP routes
+# /v1/state, /v1/state/event, /v1/reassess are always available; these two switches only change the PREFLIGHT:
+#   decision_state = true  → the facts sent to /v1/decisions and the plan's `decision_state` summary come from the DecisionState
+#   living_state   = true  → … and the DecisionState reads the session's WorkingState (needs decision_state = true)
+# Both off = the preflight behaves as before. Restart walter-context-preflight after changing them.
+[state]
+# Critical-path bench 17/11 (bench/critical_path.py, report critical-path-20261117T1614): with the WorkingState read
+# into the turn decision the plan is no better (quality 0.524 against 0.556 without, same 21 synthetic cases, within
+# noise; same latency) — a more complex preflight with no gain stays off (mission §9). The living state itself stays
+# served: the engine's state events, GET /v1/state and the targeted reassessments (§7) read it whatever these say.
+decision_state = false
+living_state = false
+memory_refresh = false       # memory.changed also re-projects Memory's working state (walter_memory lib, background)
+coalesce_ms = 150            # events of a session are applied together after this window
+max_items = 120              # bound of a state (compaction keeps pending / constraints / open tasks)
+text_chars = 2500            # bound of the French rendering
+observation_ttl_s = 1800
+memory_ttl_s = 3600
+tool_ttl_s = 900
+max_sessions = 200
+idle_evict_s = 86400
+reassess_cache = 256
+reassess_timeout_s = 6.0

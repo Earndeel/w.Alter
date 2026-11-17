@@ -185,3 +185,43 @@ def test_readings_can_be_hedged(registry, monkeypatch):
     p._readings.settle(p, 2)
     read = next(c for c in calls if c[2].get("layers") == ["observation"])
     assert read[2]["samples"] == 2 and read[2]["sampling"] == "first"
+
+
+def test_the_plan_follows_the_decision_resolver_and_carries_its_trace(registry, monkeypatch):
+    """§6 (17/11): the gateway resolves the answers against the declared relations; the plan reads the resolved
+    answers (not the raw ones) and journals which relation changed what — names only."""
+    calls, signals = registry
+    _answers(signals, **{"context.plan": {"choice": "none"}, "context.extensive": {"noul": 0.9}})
+    resolved = {**signals, "context.plan": {"choice": "thread_and_memory", "resolved_by": "context.needs_memory_plan"},
+                "context.extensive": None}
+    base = sys.modules["walter_memory.llm"].decide
+
+    def decide(state, questions, **kw):
+        res = base(state, questions, **kw)
+        if kw.get("layers") != ["observation"]:
+            res["resolution"] = {"signals": resolved, "changed": {
+                "context.plan": {"by": ["context.needs_memory_plan"]}, "context.extensive": {"by": ["context.extensive_needs_thread"]}},
+                "conflicts": [{"relation": "context.needs_memory_plan"}], "uncertain_relations": [], "uncertain": [],
+                "missing": [], "set_aside": [{"signal": "context.extensive"}]}
+        return res
+    monkeypatch.setattr(sys.modules["walter_memory.llm"], "decide", decide)
+    monkeypatch.setattr(preflight, "_anchors", lambda m: ["Orme"])
+    p = run(Request("t", MSG))
+    assert p.level == "L3"                                   # resolved plan; the set-aside « extensive » makes no L4
+    assert p.decision["resolution"] == {"changed": {"context.plan": ["context.needs_memory_plan"],
+                                                    "context.extensive": ["context.extensive_needs_thread"]},
+                                        "conflicts": ["context.needs_memory_plan"], "set_aside": ["context.extensive"]}
+    assert "anchor.memory" in _judged(calls)[2]["facts"]     # the deterministic fact the relation reads
+    assert p.decision["anchors"] == ["Orme"]
+
+
+def test_an_unsettled_conflict_is_said_to_the_model_in_the_modules_own_words():
+    from walter_context.assembly import Pack
+    from walter_context.preflight import resolution_brief
+    rb = resolution_brief({"resolution": {"signals": {}, "changed": {}, "conflicts": [
+        {"relation": "context.new_subject_new_thread", "settled": None, "use": "un sujet neuf et un fil existant"}],
+        "uncertain_relations": [], "uncertain": [], "missing": [], "set_aside": []}})
+    assert rb["unsettled"] == ["un sujet neuf et un fil existant"]
+    p = run(Request("t", "bonjour"))
+    p.decision["resolution"] = rb
+    assert "un sujet neuf et un fil existant" in Pack(plan=p).lead

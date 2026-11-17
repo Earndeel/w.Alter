@@ -198,5 +198,64 @@
       ],
       "since": "2026-11-17"
     }
+  },
+  "relations": {
+    "needs_memory_plan": {
+      "type": "implies",
+      "if": {
+        "signal": "context.needs",
+        "has": "memory"
+      },
+      "then": {
+        "signal": "context.plan",
+        "in": [
+          "thread_and_memory"
+        ]
+      },
+      "prefer": "if",
+      "strict": true,
+      "use": "« la mémoire est nécessaire » et « rien / le fil suffit » dans la même réponse (77 tirages sur 203, banc du 09/11) : la question précise l'emporte, le plan porte la mémoire du propriétaire",
+      "since": "2026-11-09"
+    },
+    "named_project_memory": {
+      "type": "implies",
+      "if": {
+        "fact": "anchor.memory"
+      },
+      "then": {
+        "signal": "context.needs",
+        "has": "memory"
+      },
+      "prefer": "if",
+      "use": "un projet que la mémoire connaît est nommé dans le message (repère déterministe de Context) : la mémoire est nécessaire, quoi qu'ait dit le modèle",
+      "since": "2026-11-17"
+    },
+    "extensive_needs_thread": {
+      "type": "depends",
+      "signal": "context.extensive",
+      "on": {
+        "signal": "context.plan",
+        "in": [
+          "thread",
+          "thread_and_memory"
+        ]
+      },
+      "use": "une recherche étendue ne s'applique qu'à un plan qui lit au moins le fil ; sinon la réponse est mise de côté",
+      "since": "2026-11-17"
+    },
+    "new_subject_new_thread": {
+      "type": "implies",
+      "if": {
+        "signal": "context.act",
+        "is": "new"
+      },
+      "then": {
+        "signal": "context.thread",
+        "is": "new"
+      },
+      "prefer": "none",
+      "use": "« ouvre un sujet qu'aucun fil ne couvre » et un fil existant choisi : signalé (conflit ou incertitude), le fil n'est pas changé sans banc",
+      "since": "2026-11-17"
+    }
   }
 }

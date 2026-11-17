@@ -332,3 +332,27 @@ def test_people_named_get_their_card_once_and_memory_resolves_them(monkeypatch):
     retrieval.people(_observed("L1", people=[{"text": "Sophie"}]), "appelle Sophie")
     assert seen["exclude"] == []                                               # L1: no memory block, nothing shown
     assert retrieval.people(_observed("L1"), "appelle Sophie") is None
+
+
+def test_expired_notes_are_answered_at_once_and_refreshed_beside(monkeypatch):
+    """Critical path (17/11): past the ttl the notes in hand answer, one background refresh replaces them."""
+    import threading
+    import time as _t
+    calls, gate = [], threading.Event()
+
+    def fetch():
+        calls.append(1)
+        gate.wait(2)
+        return [{"id": f"v{len(calls)}"}]
+    monkeypatch.setattr(retrieval, "_fetch_notes", fetch)
+    monkeypatch.setattr(retrieval, "_NOTES", [(_t.time() - 3600, [{"id": "old"}])])
+    monkeypatch.setattr(retrieval, "_NOTES_REFRESH", [])
+    t0 = _t.monotonic()
+    assert retrieval._notes(600) == [{"id": "old"}] and retrieval._notes(600) == [{"id": "old"}]
+    assert _t.monotonic() - t0 < 0.5 and len(calls) == 1          # answered at once, one refresh only
+    gate.set()
+    for _ in range(50):
+        if not retrieval._NOTES_REFRESH:
+            break
+        _t.sleep(0.02)
+    assert retrieval._notes(600) == [{"id": "v1"}]

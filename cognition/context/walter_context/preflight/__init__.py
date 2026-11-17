@@ -27,7 +27,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..config import preflight_settings
+from ..config import preflight_settings, state_settings
 from ..plan import (ACTS, CAPABILITIES, DOMAINS, HORIZONS, LEVELS, MODEL_LEVELS, ContextPlan, ModelProfile,
                     ThreadChoice)
 
@@ -124,6 +124,7 @@ class Request:
     default_thread: str | None = None                      # e.g. "session:<id>" while threads do not exist yet
     waiting_age_s: float | None = None                     # age of the session's last attached exchange (its subject)
     previous_profile: dict | None = None                   # the session's previous model profile, if recent (degraded)
+    session_id: str | None = None                         # the caller's session: its WorkingState (living_state switch)
     origin: dict | None = None    # set 3: where the input comes from {channel: chat|voice|desktop|connector|api, kind, source}
 
 
@@ -240,13 +241,23 @@ def _line(text: str, n: int) -> str:
     return re.sub(r"\s+", " ", text or "").strip()[:n]
 
 
+def _message(text: str) -> str:
+    """The owner's message as the decision model reads it. Up to [longtext].inline_chars: whole. Beyond: head + tail +
+    the key sentences with the omitted ranges said (walter_context.longtext) — the end of a long message is never
+    cut (the old `[:1500]` lost instructions and negations written after it). [longtext].enabled = false: old cut."""
+    from ..longtext import long_text
+    from ..config import longtext_settings
+    st = longtext_settings()
+    return long_text(text, st["inline_chars"]) if st["enabled"] else _line(text, 1500)
+
+
 def _ids(req: Request) -> dict:
     return {c["id"]: c for c in req.candidates if c.get("id")}
 
 
 def _state(req: Request) -> dict:
     ids = _ids(req)
-    return {"new_message": _line(req.message, 1500),
+    return {"new_message": _message(req.message),
             "previous_exchange": {"thread": req.previous.thread_id, "minutes_ago": round(req.previous.age_s / 60, 1)
                                   if req.previous.age_s is not None else None,
                                   "message": _line(req.previous.message, 300), "answer": _line(req.previous.answer, 400)}
@@ -373,14 +384,58 @@ def _readers():
     return _READERS[0]
 
 
+def decision_state_for(req: Request) -> dict | None:
+    """The turn's DecisionState (walter_context.decision_state) when [state].decision_state is on: built once per
+    request from the message, the last exchange, the thread the previous exchange went to, its objective and task,
+    the capabilities the plan can ask for and — with [state].living_state — the session's WorkingState. None = off."""
+    st = state_settings()
+    if not st["decision_state"]:
+        return None
+    cached = getattr(req, "_ds", None)
+    if cached is not None:
+        return cached
+    from .. import decision_state as DS
+    ids = _ids(req)
+    thread = ids.get(req.previous.thread_id) if req.previous and req.previous.thread_id else None
+    thread = dict(thread, id=req.previous.thread_id) if thread else None
+    working = None
+    if st["living_state"] and req.session_id:
+        try:
+            from ..state import manager
+            working = manager().get(req.session_id)
+        except Exception:  # noqa: BLE001 — the living state is an addition: the decision goes on without it
+            working = None
+    ds = DS.build(req.message, previous={"message": req.previous.message, "answer": req.previous.answer,
+                                         "age_s": req.previous.age_s, "thread_id": req.previous.thread_id}
+                  if req.previous else None, thread=thread,
+                  objective=(thread or {}).get("objective"),
+                  tasks=[{"text": c.get("task") or c.get("title"), "status": "open", "kind": "thread"}
+                         for c in ids.values() if c.get("task") or c.get("kind") == "task"][:3] or None,
+                  capabilities=[c for c in CAPABILITIES if c != "tools"] + ["tools"], working=working,
+                  use=DS.TURN_INPUTS)
+    req._ds = ds
+    return ds
+
+
 def turn(req: Request) -> tuple[dict, list[str], dict]:
     """The turn decision's inputs: (state, facts, options). Facts are what the caller knows without a model (there
-    are candidate threads, one of them carries an open task); Walter Decision adds the cues it reads itself."""
+    are candidate threads, one of them carries an open task); Walter Decision adds the cues it reads itself.
+    With [state].decision_state the facts and a compact `decision_state` come from the DecisionState."""
     ids = _ids(req)
     facts = ["threads"] if ids else []
     if any(c.get("task") or c.get("kind") == "task" for c in ids.values()):
         facts.append("open_task")
-    return _state(req), facts, ({"threads": _thread_options(req)} if ids else {})
+    named = _anchors(req.message)                 # deterministic: a name Walter Memory knows (relation
+    object.__setattr__(req, "_anchors", named)    # context.named_project_memory reads it; run() reuses it)
+    if named:
+        facts.append("anchor.memory")
+    state = _state(req)
+    ds = decision_state_for(req)
+    if ds is not None:
+        from .. import decision_state as DS
+        facts = sorted(set(facts) | set(ds["facts"]) - ({"threads"} if not ids else set()))
+        state["decision_state"] = DS.compact(ds)
+    return state, facts, ({"threads": _thread_options(req)} if ids else {})
 
 
 def owner_today() -> str | None:
@@ -418,6 +473,32 @@ def observations(signals: dict, message: str) -> dict:
     return out
 
 
+def resolved(res: dict) -> dict:
+    """The answers by signal as the Decision Resolver left them (Walter Decision §6, 17/11: declared relations applied
+    deterministically, provenance in `resolution.changed`), else as the models gave them (no relation declared)."""
+    r = res.get("resolution") if isinstance(res, dict) else None
+    return (r.get("signals") if isinstance(r, dict) and isinstance(r.get("signals"), dict) else None) \
+        or (res.get("signals") if isinstance(res, dict) else None) or {}
+
+
+def resolution_brief(res: dict) -> dict | None:
+    """What the plan carries of the resolution: which answers a relation changed, set aside, the conflicts, the
+    uncertainties and what is missing — names, never values (the plan is journaled)."""
+    r = res.get("resolution") if isinstance(res, dict) else None
+    if not isinstance(r, dict):
+        return None
+    out = {"changed": {k: v.get("by") for k, v in (r.get("changed") or {}).items()}}
+    for key, field in (("conflicts", "relation"), ("uncertain_relations", "relation"), ("uncertain", "signal"),
+                       ("missing", "signal"), ("set_aside", "signal")):
+        if r.get(key):
+            out[key] = [x.get(field) for x in r[key]]
+    open_ = [x.get("use", "")[:200] for x in (r.get("conflicts") or []) + (r.get("uncertain_relations") or [])
+             if x.get("settled") is None and x.get("use")]
+    if open_:                              # declared wording (the module's `use`), never the answers themselves
+        out["unsettled"] = open_
+    return out if any(out.values()) else {}
+
+
 def _decide_turn(req: Request, timeout: float, purpose: str) -> tuple[dict, dict, dict, Readings | None]:
     """→ (answers by set 2 name, the full reply, the trace of the signals, the readings asked apart or None)."""
     from walter_memory import llm
@@ -441,7 +522,7 @@ def _decide_turn(req: Request, timeout: float, purpose: str) -> tuple[dict, dict
         readings = Readings(_readers().submit(read), req.message, time.perf_counter())
     res = llm.decide(state, None, samples=DECISION_SAMPLES, **sampling, facts=facts, options=opts,
                      **({"layers": ["inference"]} if READINGS_APART else {}), **turn_args)
-    sig = res.get("signals") or {}
+    sig = resolved(res)
     a = {LEGACY_IDS[k]: v for k, v in sig.items() if k in LEGACY_IDS and v}
     tr = res.get("trace") or {}
     trace = {"registry": tr.get("registry"), "asked": len(tr.get("asked") or ()),
@@ -570,10 +651,11 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
     if SIGNALS == "questions":
         caps = [c for c in CAPABILITIES if c != "tools" and ((a.get("cap_" + c) or {}).get("noul") or 0) >= 0.5]
     else:                     # one several-options question (emulated as one noul per option where not native)
-        probs = ((res.get("signals") or {}).get("context.needs") or {}).get("probabilities") or {}
+        probs = (resolved(res).get("context.needs") or {}).get("probabilities") or {}
         caps = [c for c in CAPABILITIES if c != "tools" and isinstance(probs.get(c), (int, float)) and probs[c] >= 0.5]
     seen = observations(res.get("signals") or {}, req.message) if SIGNALS != "questions" and not pending else {}
-    named = _anchors(req.message)
+    named = getattr(req, "_anchors", None)
+    named = _anchors(req.message) if named is None else named
     if named and "memory" not in caps:      # a project the owner's memory knows is named: memory, whatever the model said
         caps.insert(0, "memory")
     if "memory" in caps and level in ("L0", "L1", "L2"):
@@ -620,6 +702,13 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
                   **({"thread_by": by} if by else {}),
                   "confidence": {k: conf(k) for k in ("thread", "act", "plan", "domain", "horizon", "task")
                                  if conf(k) is not None}, **({"anchors": named} if named else {})})
+    rb = resolution_brief(res)
+    if rb:
+        plan.decision["resolution"] = rb
+    ds = getattr(req, "_ds", None)
+    if ds is not None:                     # the plan carries the DecisionState's summary (no contract change: decision is free)
+        from .. import decision_state as DS
+        plan.decision["decision_state"] = DS.summary(ds)
     if pending is not None:
         plan._readings = pending           # not a field of the contract: the pending call, settled by the pack
         if readings == "wait":

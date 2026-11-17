@@ -36,6 +36,8 @@ DEGRADED = ("Attention : l'intention de ce message n'a pas pu être évaluée (p
             "logs_search, memory_context) si la demande en a besoin.")
 LATE = ("Contexte incomplet : {names} n'a pas répondu à temps pour ce message ; si la demande en dépend, lis-le avec "
         "les outils de mémoire (memory_context, memory_search, logs_search).")
+UNSETTLED = ("Préparation de ce message : des lectures du message ne concordent pas et n'ont pas été tranchées "
+             "(Walter Decision) — {what}. Tranche toi-même en relisant le message.")
 LATE_NAMES = {"memory": "la mémoire", "session_state": "l'état de travail du fil", "subject": "la synthèse du sujet",
               "board": "le tableau des sujets", "tasks": "la liste des objectifs", "experience": "l'expérience d'exécution",
               "records": "le registre des décisions", "recent": "les derniers échanges", "tool_cards": "les fiches d'outils",
@@ -71,6 +73,9 @@ class Pack:
         said = [DEGRADED] if self.degraded else []
         if self.late:
             said.append(LATE.format(names=", ".join(LATE_NAMES.get(n, n) for n in self.late)))
+        unsettled = ((self.plan.decision or {}).get("resolution") or {}).get("unsettled")
+        if unsettled and not self.degraded:
+            said.append(UNSETTLED.format(what=" ; ".join(unsettled[:2])))
         return "\n\n".join(said)
 
     @property

@@ -32,6 +32,9 @@ La spécification et les décisions propres à une instance restent dans sa docu
 | `plan`, `preflight` | Produire un ContextPlan : sujet, acte, niveau, capacités et profil demandé au Router | Implémenté ; règles locales puis décision routée quand nécessaire, repli local L1 |
 | `retrieval` | Récupérer présentations de modules, vues, mémoire, registres et échanges selon le plan | Implémenté ; une source en échec retire son bloc et ajoute une note |
 | `assembly` | Ordonner les blocs stables avant les blocs volatils et compter l’injection | Implémenté ; ajoute du contexte sans remplacer l’historique natif du host |
+| `state`, `reassess` | État vivant d'une session (WorkingState) mis à jour par événements, réévaluation ciblée en cours d'exécution | Implémenté (17/11) ; routes `/v1/state*` et `/v1/reassess` du service preflight, état sous `<instance>/state/context/working/` ; la mémoire reste la vérité |
+| `decision_state` | Ce sur quoi une décision se prend : observé / déduit, connu / cherchable / non consulté / manquant, contradictions, contraintes | Implémenté ; branché au preflight derrière `[state] decision_state` (éteint par défaut) |
+| `longtext` | Représentation d'un long message du propriétaire (début, fin, phrases à consigne / négation / date / montant, plages omises dites) | Implémenté ; actif par défaut (`[longtext]`), remplace la coupe à 1 500 caractères |
 | `child` | Préparer mission, capacités, suggestions de skills, sujet, observations et mémoire d’un sous-agent | Implémenté ; sources optionnelles isolées, contexte de l’appelant conservé |
 
 Les anciens noms de plan `sense`, `gather` et `compose` ne désignent pas trois sous-modules à construire : la

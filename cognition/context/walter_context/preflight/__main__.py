@@ -251,7 +251,7 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
                       if prev else None,
                       candidates=cands, privacy_class=d.get("privacy_class") or "cloud_allowed",
                       default_thread=waiting or d.get("default_thread"), waiting_age_s=waiting_age,
-                      previous_profile=previous_profile(key))
+                      previous_profile=previous_profile(key), session_id=d.get("session_id"))
         purpose = "walter-context preflight" + (" (shadow)" if shadow else "")
         p0 = time.perf_counter()
         try:                                # the decision has the answer's time less what the pack needs at least
