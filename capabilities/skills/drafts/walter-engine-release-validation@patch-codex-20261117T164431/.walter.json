@@ -1,0 +1,11 @@
+{
+ "base_sha": "90e37b11041ea1dbbed86c0f023fa566cc3deda6432ca64234738b575fff34ec",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-17T16:44:31.565097+00:00",
+ "domain": "walter-engine",
+ "kind": "patch",
+ "reason": "Lors de l’application du thème Portal le 17/11/2026, dsh-web.service a été arrêté puis masqué et walter-engine.service est devenu le moteur actif (Python walter_engine serve). La procédure actuelle redémarre toujours DSH : cela échoue et ne doit pas entraîner sa réactivation. Le frontend natif est servi via FileResponse à chaque requête (index no-store, assets no-cache) : aucun redémarrage pour un changement HTML/CSS/JS. Avant une relance nécessaire pour prendre en compte une configuration valide, le contrôle des journaux natifs et métadonnées des sessions a distingué deux tests e2e en attente d’approbation de vrais tours utilisateur ; aucun noyau actif. Le Portal public a été vérifié via browser_session puis walter-browser, sans extraire cookies ni clés. Le TOML d’instance avait une section [native] dupliquée qui était ignorée silencieusement par load : vérifier le parsing effectif avant de conclure qu’un service actif est correctement configuré.",
+ "runtime": "codex",
+ "session_id": null,
+ "target": "walter-engine-release-validation"
+}
