@@ -162,3 +162,31 @@ def test_dsh_sub_agent_session_names_its_parent():
     w2, st2 = FakeWriter(), {}
     L.parse_dsh(w2, {"type": "session", "id": "session-p0", "createdAt": 1794540753078, "delegationDepth": 0}, "1", st2)
     assert "parent_session_id" not in w2.sess["dsh/vm/session-p0"]["fields"]
+
+
+def test_walter_engine_journal_keeps_the_dsh_key_and_adds_only_what_the_native_engine_wrote():
+    """17/11: Walter Engine runs natively; a conversation taken over from DSH keeps `dsh/vm/<id>` and its walter_logs
+    session, and only the events above the imported `seq_base` are added (the rest came from the DSH file)."""
+    w, st = FakeWriter(), {}
+    L.parse_walter(w, {"type": "session", "id": "session-x", "walter_key": "dsh/vm/session-x", "seq_base": 40,
+                       "created_at": 1794540753078, "cwd": "/w", "door": "telegram", "imported_from": "dsh",
+                       "principal": {"kind": "owner", "id": "monsieur"}}, "1", st)
+    for d in ({"type": "user/message", "seq": 12, "time": 1, "data": {"text": "ancien", "source": {"kind": "user"}}},
+              {"type": "user/message", "seq": 41, "time": 2, "data": {"text": "nouveau", "source": {"kind": "user"}}},
+              {"type": "assistant/message", "seq": 42, "time": 3, "data": {"text": "ok", "reasoning": "r", "model": "m",
+                                                                           "tool_calls": [{"id": "c", "name": "bash"}]}},
+              {"type": "tool/call", "seq": 43, "time": 4, "data": {"callId": "c", "name": "bash", "arguments": "{}"}},
+              {"type": "tool/result", "seq": 44, "time": 5, "data": {"callId": "c", "name": "bash", "content": "x",
+                                                                     "isError": True}},
+              {"type": "compaction/window", "seq": 45, "time": 6, "data": {"cut_seq": 41, "content": "résumé"}}):
+        L.parse_walter(w, d, "1", st)
+    s = w.sess["dsh/vm/session-x"]
+    assert s["runtime"] == "walter" and s["fields"]["profile"] == "owner" and s["fields"]["platform"] == "telegram"
+    assert [e["type"] for e in w.events] == ["user/message", "assistant/reasoning", "assistant/message", "tool/call",
+                                              "tool/result", "compaction/summary"]
+    assert w.events[0]["text"] == "nouveau" and w.events[4]["status"] == "error" and w.events[4]["tool"] == "bash"
+    w2, st2 = FakeWriter(), {}
+    L.parse_walter(w2, {"type": "session", "id": "n1", "parent": "p1", "parent_key": "walter/vm/p1", "depth": 1,
+                        "principal": {"kind": "test", "id": "e2e"}}, "1", st2)
+    f = w2.sess["walter/vm/n1"]["fields"]
+    assert f["parent_session_id"] == "walter/vm/p1" and f["profile"] == "test"

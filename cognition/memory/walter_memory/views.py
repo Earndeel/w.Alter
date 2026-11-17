@@ -85,10 +85,10 @@ def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict
     rows = conn.execute("""
         select e.session_id, e.seq, e.type, e.occurred_at, e.text, e.privacy_class, s.runtime,
                coalesce(s.platform, '') platform, coalesce(s.model, '') model, s.privacy_class session_privacy,
-               coalesce(s.cwd, '') cwd
+               coalesce(s.cwd, '') cwd, coalesce(s.profile, '') profile
         from walter_logs.events e join walter_logs.sessions s using (session_id)
         where e.occurred_at >= %s and e.occurred_at < %s
-          and s.runtime in ('claude_code', 'codex', 'hermes', 'dsh')
+          and s.runtime in ('claude_code', 'codex', 'hermes', 'dsh', 'walter')
           and e.type in ('user/message', 'assistant/message')
         order by e.session_id, e.seq""", (since, until or _now() + timedelta(days=1))).fetchall()
     out, cur, seen, replayed = [], {}, set(), set()
@@ -96,6 +96,7 @@ def exchanges(conn, since: datetime, until: datetime | None = None) -> list[dict
         sid = r["session_id"]
         if (r["model"] == "codex-auto-review" or r["session_privacy"] == "local_only" or is_test_session(sid, r.get("cwd") or "")
                 or (r["runtime"] == "claude_code" and ":" in sid)                       # subagent prompts
+                or r.get("profile") in ("test", "machine")          # Walter Engine: test accounts, delegations
                 or (r["runtime"] == "hermes" and r["platform"] not in ("telegram", "desktop", "tui", "cli"))):
             continue
         if r["privacy_class"] != "cloud_allowed":

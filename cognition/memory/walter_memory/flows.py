@@ -34,7 +34,7 @@ log = logging.getLogger("walter.flows")
 RADIUS_M, MIN_STAY, MAX_GAP = 80.0, timedelta(minutes=10), timedelta(hours=3)
 PLACE_RADIUS_M = 150.0
 BURST_GAP = timedelta(minutes=45)
-RUNTIMES = ("hermes", "claude_code", "codex", "dsh")
+RUNTIMES = ("hermes", "claude_code", "codex", "dsh", "walter")
 CHAT_SOURCES = ("beeper", "gmail")
 CHAT_TYPES = ("message.sent", "message.received", "email.sent", "email.received")
 NOISE_CALENDARS = ("#holiday@", "#weeknum@", "#contacts@")

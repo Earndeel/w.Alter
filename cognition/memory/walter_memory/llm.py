@@ -212,8 +212,12 @@ def _book_calls(base: dict, calls: list[dict]) -> None:
     for c in calls or []:
         row = {**base, "provider": c.get("provider") or "walter-llm", "model": c.get("model") or base["model"],
                "latency_ms": int(float(c.get("seconds") or 0) * 1000)}
-        if c.get("skipped") == "straggler":     # a late sample the gateway did not wait for (the mean was made of
-            _log(**row, status="dropped", error="straggler")            # the others): not a failure of the decision
+        if c.get("skipped") in ("straggler", "hedged", "unsupported"):
+            # straggler: a late sample the gateway did not wait for (the mean was made of the others); hedged: the
+            # loser of a two-call race, cancelled once the first answered (Walter Decision 2.0); unsupported: a route
+            # that cannot carry that kind of question, never called. None is a failure of the decision (17/11/2026:
+            # booked as refused_budget they made the health check see 59 % failed preflight calls).
+            _log(**row, status="dropped", error=str(c["skipped"]))
         elif c.get("skipped") == "route_unavailable":   # set aside by the gateway (model gone, no grant): a failure
             _log(**row, status="error", error=f"route_unavailable: {c.get('error') or ''}"[:200])   # of the route
         elif c.get("skipped"):
@@ -247,7 +251,7 @@ def decide(state: dict, questions: dict | None, *, processor: str, privacy_class
     never the whole occasion again; `layers` (observation | inference): readings asked apart from judgements.
     `sampling` "first" hedges the samples instead of averaging them.
     Returns {"answers": {...}, "usage": {...}, "model": ..., "provider": ..., "route": ...[, "samples": n]
-    [, "signals": {signal id: answer}, "trace": {asked, skipped, unavailable}]}."""
+    [, "signals": {signal id: answer}, "trace": {asked, skipped, unavailable}][, "resolution": {...}]}."""
     asked = [model] if model else (list(models) if models else None)
     label = asked[0] if asked else "router:decision"
     base = {"processor": processor, "model": label, "purpose": purpose, "budget": budget, "privacy_class": privacy_class}
@@ -282,6 +286,8 @@ def decide(state: dict, questions: dict | None, *, processor: str, privacy_class
             res[k] = out[k]
     if occasion:
         res["signals"], res["trace"] = out.get("signals") or {}, out.get("trace") or {}
+        if out.get("resolution"):          # Decision Resolver (§6): the answers resolved against declared relations
+            res["resolution"] = out["resolution"]
     return res
 
 

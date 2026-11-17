@@ -80,3 +80,24 @@ def test_codex_desktop_messages_reach_core_events():
     assert out[0]["event_type"] == "message.received"
     assert A.parse_codex({"type": "event_msg", "timestamp": TS, "payload": {"type": "agent_message", "message": "Voici."}},
                          3, st) == []   # same answer, older duplicate channel
+
+
+def test_walter_engine_owner_words_only():
+    """17/11: Walter Engine's journals reach core.events for the owner's own conversations only (not a test account,
+    a delegation or a sub-agent), and a conversation taken over from DSH adds only what the native engine wrote."""
+    def run(header, lines):
+        st = {}
+        return [e for i, d in enumerate([header, *lines]) for e in A.PARSERS["walter"](d, i, st)]
+    msgs = [{"type": "user/message", "seq": 5, "time": 1794540753078, "data": {"text": "bonjour", "source": {"kind": "user"}}},
+            {"type": "user/message", "seq": 6, "time": 1794540753079, "data": {"text": "pack", "source": {"kind": "walter-intake"}}},
+            {"type": "assistant/message", "seq": 7, "time": 1794540753080, "data": {"text": "Bonjour Monsieur", "model": "m"}}]
+    owner = run({"type": "session", "id": "a", "created_at": 1794540753000, "principal": {"kind": "owner", "id": "monsieur"},
+                 "door": "web"}, msgs)
+    assert [e["event_type"] for e in owner] == ["conversation.started", "message.sent", "message.received"]
+    assert owner[1]["source"] == "walter" and owner[1]["thread_id"] == "a" and owner[2]["reply_to"] == owner[1]["source_id"]
+    assert run({"type": "session", "id": "b", "principal": {"kind": "test", "id": "e2e", "claimed": "owner"}}, msgs) == []
+    assert run({"type": "session", "id": "c", "principal": {"kind": "machine", "id": "walter_run"}}, msgs) == []
+    assert run({"type": "session", "id": "d", "depth": 1, "parent": "a", "principal": {"kind": "owner", "id": "owner"}}, msgs) == []
+    taken = run({"type": "session", "id": "session-e", "seq_base": 6, "imported_from": "dsh",
+                 "principal": {"kind": "owner", "id": "monsieur"}}, msgs)
+    assert [e["event_type"] for e in taken] == ["message.received"] and taken[0]["thread_id"] == "session-e"

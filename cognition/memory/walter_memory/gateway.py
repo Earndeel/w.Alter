@@ -130,7 +130,7 @@ def post_views_candidates(body: dict):
 
 
 # The hooks' callers and the runtime (core.events source) whose thread their session_id names (P1.1 working state)
-RUNTIME_OF_CALLER = {"claude-code-hook": "claude_code", "codex-hook": "codex", "dsh-hook": "dsh"}
+RUNTIME_OF_CALLER = {"claude-code-hook": "claude_code", "codex-hook": "codex", "dsh-hook": "dsh", "walter-engine": "walter"}
 
 
 @app.post("/v1/context", dependencies=[Depends(auth)])
@@ -167,6 +167,43 @@ ENGINE_BUS_TYPES = {"turn.started", "turn.ended", "session.ended", "context.degr
 BUS_PAYLOAD_KEYS = {"context.degraded": {"run_id", "stage", "reason"}}
 RUN_CHANNELS = {"owner", "machine", "test"}
 ORIGIN_EXTRA = ("interface", "engine_session", "request_id", "trigger")   # trigger: wake:<notice> (engine wake-up turns)
+
+
+def _test_accounts() -> frozenset:
+    """The engine's test accounts (Core identity: @instance/config/core/principals.json `test`, read through
+    `walter instance config`), cached one minute. A run whose engine conversation belongs to one is a test run
+    whatever channel its engine claims (17/11: the `e2e` account had opened its objectives on the owner's channel)."""
+    import json
+    import shutil
+    import subprocess
+    import time
+    now = time.monotonic()
+    if now - _TEST_ACCOUNTS[0] < 60:
+        return _TEST_ACCOUNTS[1]
+    accounts = frozenset({"e2e"})        # the scenarios' account when Core cannot be asked: fail towards `test`
+    try:
+        if shutil.which("walter"):
+            path = subprocess.run(["walter", "instance", "config", "core", "principals.json"], capture_output=True,
+                                  text=True, timeout=10).stdout.strip()
+            if path:
+                accounts = frozenset(str(a) for a in json.loads(Path(path).read_text()).get("test") or ()) | {"e2e"}
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    _TEST_ACCOUNTS[:] = [now, accounts]
+    return accounts
+
+
+_TEST_ACCOUNTS: list = [-1e9, frozenset()]
+
+
+def run_channel(origin: dict) -> str:
+    """The channel a run is filed under: `test` for an owner-channel run of a test account's conversation
+    (`engine_session` = `<door>/<account>/<conversation>`), else the channel the engine gave (a sub-agent stays
+    `machine`: it opens nothing and inherits its parent's objective)."""
+    parts = str(origin.get("engine_session") or "").split("/")
+    if origin.get("channel", "owner") == "owner" and len(parts) >= 3 and parts[1] in _test_accounts():
+        return "test"
+    return origin.get("channel", "owner")
 
 
 class RunStartIn(BaseModel):
@@ -230,6 +267,9 @@ def post_runs_start(body: RunStartIn):
             if not isinstance(o[key], (str, int)):
                 raise HTTPException(422, f"origin.{key} must be a string")
             origin[key] = str(o[key])[:200]
+    claimed, origin["channel"] = origin["channel"], run_channel(origin)
+    if claimed != origin["channel"]:
+        origin["claimed_channel"] = claimed     # the engine said owner; the account says test (identity wins)
     if body.cancel_run_id:              # only a run of the same session is ever interrupted
         prev = _run_of(body.cancel_run_id)       # a replay of the same turn never cancels the run it gets back
         if prev and prev["session"] == origin["session_id"] and (not body.dedupe_key or prev["dedupe_key"] != body.dedupe_key):

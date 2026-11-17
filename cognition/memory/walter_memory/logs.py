@@ -26,6 +26,22 @@ CONNECTOR = "walter_logs"
 CLAUDE_DIR = Path("/root/.claude/projects")
 CODEX_DIR = Path("/root/.codex/sessions")
 DSH_DIR = Path("/opt/dsh/home/sessions")
+
+
+def _engine_sessions() -> Path:
+    """Walter Engine's session journals (core/engine, native runtime since 2026-11-17): `WALTER_ENGINE_SESSIONS`, else
+    the instance's engine state (instance pointer `/etc/walter/instance`, the platform's documented resolution)."""
+    import os
+    if os.environ.get("WALTER_ENGINE_SESSIONS"):
+        return Path(os.environ["WALTER_ENGINE_SESSIONS"])
+    try:
+        root = Path(Path("/etc/walter/instance").read_text().strip())
+    except OSError:
+        root = Path("/nonexistent")
+    return root / "state" / "core" / "engine" / "native" / "sessions"
+
+
+WALTER_DIR = _engine_sessions()
 DETECT_CHARS = 50_000                               # privacy detectors read the head of very long outputs
 
 # ───────────────────────── secrets: masked before storage ─────────────────────────
@@ -459,13 +475,65 @@ def parse_dsh(w: Writer, d: dict, ref: str, st: dict) -> None:
           data={k: data[k] for k in ("reason", "interrupted", "usage") if k in data})
 
 
-PARSERS = {"claude": parse_claude, "codex": parse_codex, "dsh": parse_dsh}
-ROOTS = {"claude": CLAUDE_DIR, "codex": CODEX_DIR, "dsh": DSH_DIR}
+def _key(header: dict) -> str:
+    return header.get("walter_key") or f"walter/vm/{header.get('id')}"
+
+
+def parse_walter(w: Writer, d: dict, ref: str, st: dict) -> None:
+    """Walter Engine's native journal (one JSONL per session, DSH's vocabulary kept). A session taken over from DSH
+    keeps its key `dsh/vm/<id>` and its walter_logs session: only the events the native engine wrote (seq above the
+    imported `seq_base`) are added — the imported part is already there from the DSH file."""
+    kind, data = d.get("type"), d.get("data") or {}
+    if kind == "session":
+        principal = d.get("principal") or {}
+        st.update(sid=_key(d), native=d.get("id"), base=int(d.get("seq_base") or 0))
+        w.session(st["sid"], runtime="walter", native_id=d.get("id"), cwd=d.get("cwd"),
+                  parent_session_id=d.get("parent_key") or (f"walter/vm/{d['parent']}" if d.get("parent") else None),
+                  started_at=_ts(d.get("created_at")), platform=d.get("door"),
+                  profile=principal.get("kind") if isinstance(principal, dict) else None,
+                  meta={k: d[k] for k in ("depth", "door", "interface", "description", "imported_from") if d.get(k) is not None})
+        return
+    if not st.get("sid") or not kind or int(d.get("seq") or 0) <= st.get("base", 0):
+        return
+    sid = st["sid"]
+    if sid not in w.sess:
+        w.session(sid, runtime="walter", native_id=st.get("native"))
+    ts = _ts(d.get("time"))
+    ref = f"seq:{d.get('seq', ref)}"
+    small = {k: data[k] for k in ("status", "reason", "usage", "nested", "route", "ms", "source", "recovered") if data.get(k) is not None}
+    if kind == "session/title" and data.get("title"):
+        w.session(sid, runtime="walter", native_id=st.get("native"), title=str(data["title"])[:200])
+    if kind == "session/model":
+        w.add(sid, "model/selection", ts, ref, model=data.get("model"), data=small)
+        return
+    if kind == "assistant/message":
+        model = data.get("model")
+        if model:
+            st["model"] = model
+        if data.get("reasoning"):
+            w.add(sid, "assistant/reasoning", ts, ref + ":r", text=data["reasoning"], model=model)
+        w.add(sid, kind, ts, ref, text=data.get("text") or None, model=model or st.get("model"), data=small)
+        return
+    if kind == "compaction/window":
+        w.add(sid, "compaction/summary", ts, ref, text=data.get("content"),
+              data={k: data[k] for k in ("cut_seq", "reason", "tokens", "turns", "force") if data.get(k) is not None})
+        return
+    text = data.get("text") if kind == "user/message" else data.get("arguments") if kind == "tool/call" \
+        else data.get("content") if kind == "tool/result" else data.get("reason") if kind == "approval/asked" else None
+    w.add(sid, kind, ts, ref, text=text if isinstance(text, str) else (_json(text) if text else None),
+          human=kind == "user/message" and (data.get("source") or {}).get("kind") == "user",
+          call_id=data.get("callId"), tool=data.get("name") or data.get("tool"), model=st.get("model"),
+          status=("error" if data.get("isError") else "ok") if kind == "tool/result" else None, data=small)
+
+
+PARSERS = {"claude": parse_claude, "codex": parse_codex, "dsh": parse_dsh, "walter": parse_walter}
+ROOTS = {"claude": CLAUDE_DIR, "codex": CODEX_DIR, "dsh": DSH_DIR, "walter": WALTER_DIR}
 
 
 def transcript_files(runtime: str) -> list[Path]:
     root = ROOTS[runtime]
-    pattern = {"claude": "**/*.jsonl", "codex": "*/*/*/rollout-*.jsonl", "dsh": "*/session-*/session.v4.jsonl.zstd"}[runtime]
+    pattern = {"claude": "**/*.jsonl", "codex": "*/*/*/rollout-*.jsonl", "dsh": "*/session-*/session.v4.jsonl.zstd",
+               "walter": "*.jsonl"}[runtime]
     return sorted(root.glob(pattern)) if root.exists() else []
 
 

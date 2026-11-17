@@ -223,5 +223,21 @@
       ],
       "since": "2026-11-17"
     }
+  },
+  "relations": {
+    "resume_not_new_subject": {
+      "type": "excludes",
+      "if": {
+        "signal": "memory.resume",
+        "above": 0.5
+      },
+      "then": {
+        "signal": "context.act",
+        "is": "new"
+      },
+      "prefer": "none",
+      "use": "reprendre la tâche ouverte et ouvrir un sujet qu'aucun fil ne couvre ne vont pas ensemble : signalé à l'Engine et au modèle, rien n'est changé",
+      "since": "2026-11-17"
+    }
   }
 }

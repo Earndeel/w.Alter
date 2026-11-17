@@ -150,11 +150,27 @@ CATEGORY_PATTERNS = {
 }
 
 
+def _vault_value(text: str) -> bool:
+    """A value of the owner's vault, whatever its shape (17/11/2026: a provider key pasted in a message has no known
+    prefix; mask_secrets scrubbed it, detect did not see it, so a reader that masks only what detect flags let it
+    through). Value-free fingerprints of walter-secrets; fail-open to the patterns without the index."""
+    try:
+        from walter_secrets import fingerprints
+    except ImportError:
+        return False
+    try:
+        return fingerprints.scrub(text) != text
+    except Exception:  # noqa: BLE001 — an unreadable index never blocks a detection
+        return False
+
+
 def detect(text: str | None) -> list[tuple[str, str]]:
     """Return [(category, rule)] for the content. Never returns the matched text."""
     if not text:
         return []
     found = [("secret", name) for name, rx in SECRET_PATTERNS if rx.search(text)]
+    if _vault_value(text):
+        found.append(("secret", "vault_value"))
     candidates = list(CARD.finditer(text))
     # bare digit runs only count right after a card word (e.g. "carte: 4111…", "card_number 4111…")
     candidates += [m for m in CARD_BARE.finditer(text) if CARD_CONTEXT.search(text[max(0, m.start() - 40):m.start()])]

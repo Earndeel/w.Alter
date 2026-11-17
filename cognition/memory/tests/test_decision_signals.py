@@ -108,3 +108,16 @@ def test_a_complementary_decision_sends_only_the_signals_it_asks(monkeypatch):
                    privacy_class="cloud_allowed", occasion="turn", focus="new_message", ask=["memory.resume"])
     assert sent["ask"] == ["memory.resume"] and sent["occasion"] == "turn" and "questions" not in sent
     assert r["signals"] == {"memory.resume": {"noul": 0.8}}
+
+
+def test_a_hedged_loser_or_an_unsupported_route_is_booked_dropped_never_failed(monkeypatch):
+    from walter_memory import llm
+    booked = []
+    monkeypatch.setattr(llm, "_log", lambda **k: booked.append((k.get("status"), k.get("error"))))
+    llm._book_calls({"processor": "t", "model": "m"}, [
+        {"provider": "nace", "model": "a", "ok": True, "seconds": 0.4},
+        {"provider": "nace", "model": "a", "ok": False, "skipped": "hedged", "seconds": 0},
+        {"provider": "openrouter", "model": "b", "ok": False, "skipped": "unsupported"},
+        {"provider": "x", "model": "c", "ok": False, "skipped": "budget"}])
+    assert booked == [("ok", None), ("dropped", "hedged"), ("dropped", "unsupported"), ("refused_budget", "budget")]
+

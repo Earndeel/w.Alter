@@ -157,3 +157,22 @@ def test_after_an_engine_restart_the_sessions_unfinished_run_is_closed_without_c
     kept = client.post("/v1/runs/start", json={"origin": origin(other), "goal": "autre"}).json()["run_id"]
     new = client.post("/v1/runs/start", json={"origin": origin(sid), "goal": "après redémarrage"}).json()["run_id"]
     assert status(lost) == "cancelled" and status(new) == "open" and status(kept) == "open"
+
+
+def test_a_test_account_never_opens_an_owner_run(client):
+    """17/11: the scenarios' `e2e` account opened its objectives on the owner's channel. Identity (Core principals)
+    wins over the channel an engine claims; a sub-agent of a test conversation stays `machine`."""
+    def channel_of(run_id):
+        with connect() as conn:
+            return conn.execute("select origin from runs.runs where run_id = %s", (run_id,)).fetchone()["origin"]
+    sid = f"{RUNTIME}/vm/{uuid.uuid4()}"
+    test = client.post("/v1/runs/start", json={"origin": {**origin(sid), "engine_session": "telegram/e2e/v1-x"},
+                                               "goal": "rappelle-moi d'acheter du pain"}).json()
+    o = channel_of(test["run_id"])
+    assert o["channel"] == "test" and o["claimed_channel"] == "owner"
+    owner = client.post("/v1/runs/start", json={"origin": {**origin(f"{sid}-2"), "engine_session": "telegram/monsieur/c1"},
+                                                "goal": "bonjour"}).json()
+    assert channel_of(owner["run_id"])["channel"] == "owner"
+    child = client.post("/v1/runs/start", json={"origin": {**origin(f"{sid}-3"), "channel": "machine",
+                                                           "engine_session": "mcp/e2e/task-1"}, "goal": "sous-tâche"}).json()
+    assert channel_of(child["run_id"])["channel"] == "machine"

@@ -192,7 +192,7 @@ def classify(conn):
         where e.event_type in ('tool.called', 'skill.used') and e.source <> 'hermes'""")
     for eid, at, src, p, has_r, r_tool, r_status, r_chars, has_k, k_tool, k_text, n_res in cur:
         key = f"{src} tool.called"
-        if src not in ("claude_code", "codex", "dsh"):
+        if src not in ("claude_code", "codex", "dsh", "walter"):
             yield eid, at, f"{src} (no proof for this source)", "unproven source"
             continue
         if not has_r and not has_k:

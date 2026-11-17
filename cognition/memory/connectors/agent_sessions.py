@@ -35,16 +35,26 @@ CLAUDE_DIR = Path("/root/.claude/projects")
 CODEX_DIR = Path("/root/.codex/sessions")
 DSH_DIR = Path("/opt/dsh/home/sessions")
 LOCK = Path("/run/lock/walter-agent-sessions.lock")
+WALTER_DIR = None                             # Walter Engine's journals: resolved below with walter_memory.logs
 ROOTS = {"claude": CLAUDE_DIR, "codex": CODEX_DIR, "dsh": DSH_DIR}
 MONSIEUR = {"external_id": "monsieur", "display_name": "Monsieur", "is_self": True}
 AGENTS = {"claude_code": {"external_id": "claude-code", "display_name": "Claude Code"},
           "codex": {"external_id": "codex", "display_name": "Codex"},
-          "dsh": {"external_id": "dsh", "display_name": "DeepSeek Harness"}}
+          "dsh": {"external_id": "dsh", "display_name": "DeepSeek Harness"},
+          "walter": {"external_id": "walter", "display_name": "W.Alter"}}
 DELEGATOR = {"external_id": "delegator", "display_name": "Agent délégant (codex exec)"}
 CODEX_INTERACTIVE = {"codex_cli_rs", "codex-tui", "codex_vscode", "codex_desktop"}
 REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 INJECTED = ("<local-command-", "<command-name>", "<command-message>", "<task-notification>", "Caveat: The messages")
 BATCH = 2000
+
+
+def _engine_dir() -> Path:
+    from walter_memory.logs import WALTER_DIR as d
+    return d
+
+
+ROOTS["walter"] = WALTER_DIR = _engine_dir()
 
 
 def _text(content) -> str:
@@ -207,7 +217,51 @@ def parse_dsh(d: dict, idx: int, st: dict) -> list[dict]:
     return []
 
 
-PARSERS = {"claude": parse_claude, "codex": parse_codex, "dsh": parse_dsh}
+def parse_walter(d: dict, idx: int, st: dict) -> list[dict]:
+    """One line of a Walter Engine session journal (core/engine, native runtime since 2026-11-17). Only the owner's
+    own conversations are his life: a test account's, a delegation's (machine) or a sub-agent's stay in walter_logs.
+    A conversation taken over from DSH keeps its thread (same id); its imported part is already here from DSH."""
+    kind, data = d.get("type"), d.get("data") or {}
+    if kind == "session":
+        p = d.get("principal") or {}
+        st.update(sid=d.get("id"), cwd=d.get("cwd"), base=int(d.get("seq_base") or 0),
+                  owner=isinstance(p, dict) and p.get("kind", "owner") == "owner" and not d.get("depth") and not d.get("parent"),
+                  door=d.get("door"))
+        if not st["owner"] or d.get("imported_from"):
+            return []
+        ms = d.get("created_at")
+        return [{"source": "walter", "source_account": "vm", "thread_id": st["sid"], "event_type": "conversation.started",
+                 "occurred_at": datetime.fromtimestamp(ms / 1000, tz=timezone.utc) if ms else None,
+                 "source_id": f"session:{st['sid']}:start", "actor": {**AGENTS["walter"], "account": "vm"},
+                 "payload": {"platform": "walter", "door": st.get("door"), "model": None, "title": None,
+                             "parent_session_id": None, "cwd": st.get("cwd")}}]
+    sid = st.get("sid")
+    if not sid or not st.get("owner") or int(d.get("seq") or 0) <= st.get("base", 0):
+        return []
+    ms = d.get("time")
+    base = {"source": "walter", "source_account": "vm", "thread_id": sid,
+            "occurred_at": datetime.fromtimestamp(ms / 1000, tz=timezone.utc) if ms else None}
+    chat = {"id": sid, "type": "agent", "network": "walter", "door": st.get("door")}
+    ref = f"{sid}:{d.get('seq', idx)}"
+    if kind == "user/message" and (data.get("source") or {}).get("kind") == "user":
+        text = (data.get("text") or "").strip()
+        if not text:
+            return []
+        st["last_user"] = f"msg:{ref}"
+        return [{**base, "event_type": "message.sent", "source_id": f"msg:{ref}", "content": text,
+                 "actor": {**MONSIEUR, "account": "vm"},
+                 "payload": {"chat": chat, "session_id": sid, "message_id": ref, "role": "user", "cwd": st.get("cwd"),
+                             "attachments": []}}]
+    if kind == "assistant/message":
+        text = (data.get("text") or "").strip()
+        return [{**base, "event_type": "message.received", "source_id": f"msg:{ref}", "content": text,
+                 "reply_to": st.get("last_user"), "actor": {**AGENTS["walter"], "account": "vm"},
+                 "payload": {"chat": chat, "session_id": sid, "message_id": ref, "role": "assistant",
+                             "model": data.get("model"), "served_by": data.get("route"), "attachments": []}}] if text else []
+    return []
+
+
+PARSERS = {"claude": parse_claude, "codex": parse_codex, "dsh": parse_dsh, "walter": parse_walter}
 
 
 def read_complete_lines(path: Path, offset: int, max_bytes: int = 64 << 20):
@@ -250,6 +304,8 @@ def files(runtime: str) -> list[Path]:
         return sorted(CLAUDE_DIR.glob("*/*.jsonl"))
     if runtime == "dsh":
         return sorted(DSH_DIR.glob("*/session-*/session.v4.jsonl.zstd"))
+    if runtime == "walter":
+        return sorted(ROOTS["walter"].glob("*.jsonl")) if ROOTS["walter"].exists() else []
     return sorted(CODEX_DIR.glob("*/*/*/rollout-*.jsonl"))
 
 
@@ -301,6 +357,7 @@ def main() -> int:
     ap.add_argument("--claude", action="store_true")
     ap.add_argument("--codex", action="store_true")
     ap.add_argument("--dsh", action="store_true")
+    ap.add_argument("--walter", action="store_true")
     ap.add_argument("--file", help="one transcript (runtime inferred from its path)")
     a = ap.parse_args()
     from walter_memory import ingestion
@@ -323,7 +380,8 @@ def main() -> int:
             runtime = next((r for r, root in ROOTS.items() if str(p).startswith(str(root) + "/")), None)
             targets = [(runtime, p)] if runtime else []          # unknown runtime: never parse with a wrong reader
         else:
-            runtimes = [r for r, on in (("claude", a.claude), ("codex", a.codex), ("dsh", a.dsh)) if on] or list(ROOTS)
+            runtimes = [r for r, on in (("claude", a.claude), ("codex", a.codex), ("dsh", a.dsh), ("walter", a.walter))
+                        if on] or list(ROOTS)
             targets = [(r, p) for r in runtimes for p in files(r)]
         total = ins = 0
         try:

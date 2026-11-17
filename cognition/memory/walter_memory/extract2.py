@@ -42,7 +42,7 @@ log = logging.getLogger("walter.extract2")
 
 PROCESSOR, VERSION = "l3.extract", "2"
 POSTE = "memory_extraction"          # Walter Router poste: the router picks the model (never hardcoded)
-RUNTIMES = ("hermes", "claude_code", "codex", "dsh")
+RUNTIMES = ("hermes", "claude_code", "codex", "dsh", "walter")
 MESSAGE_TYPES = ("message.sent", "message.received")    # sent = the owner, received = the assistant
 KINDS = ("fact", "decision", "preference", "goal", "constraint", "commitment", "correction")
 OWNER_KINDS = {"decision", "preference", "goal", "constraint", "correction"}

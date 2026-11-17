@@ -28,7 +28,7 @@ MODEL_DIR = os.environ.get("WALTER_MEMORY_MODEL_DIR", str(Path(__file__).resolve
 TEXT_EVENT_TYPES = ("message.received", "message.sent", "message.edited", "email.received", "email.sent",
                     "calendar.event", "note.recorded", "person.met", "location.stay", "page.visited", "search.performed")
 CHUNK = 1500
-AGENT_SOURCES = ("hermes", "codex", "claude_code", "dsh")
+AGENT_SOURCES = ("hermes", "codex", "claude_code", "dsh", "walter")
 # Recall noise (2026-10-19): rows that stay in core.events (append-only history) but are kept out of the index's
 # readable part — hidden with a reason, recomputed by `walter-memory index --hide-noise`. Generic runtime artefacts
 # only (no personal content): harness injections, transcript replays, tool output, memory blocks already injected.

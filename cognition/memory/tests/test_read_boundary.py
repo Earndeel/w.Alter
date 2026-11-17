@@ -110,3 +110,19 @@ def test_transport_failure_redacts_response_and_never_retries_write(monkeypatch,
     response=client.call('retain',{'content':'test'},caller='test-port')
     assert len(calls)==1 and 'private provider response' not in json.dumps(response)
     assert response['status']=='error'
+
+
+def test_a_vault_value_without_a_known_shape_is_a_secret_for_every_reader(monkeypatch):
+    """17/11/2026: a provider key pasted in a message was masked by mask_secrets (vault fingerprints) but not seen by
+    detect, and readers mask only what detect flags."""
+    import sys, types
+    from walter_memory import privacy
+    fake = types.ModuleType("walter_secrets.fingerprints")
+    fake.scrub = lambda text: text.replace("zq7-not-a-pattern-9xk", "«secret:vault»")
+    pkg = types.ModuleType("walter_secrets")
+    pkg.fingerprints = fake
+    monkeypatch.setitem(sys.modules, "walter_secrets", pkg)
+    monkeypatch.setitem(sys.modules, "walter_secrets.fingerprints", fake)
+    assert ("secret", "vault_value") in privacy.detect("la clé zq7-not-a-pattern-9xk à garder")
+    assert ("secret", "vault_value") not in privacy.detect("rien de secret ici")
+
