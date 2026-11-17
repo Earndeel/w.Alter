@@ -14,7 +14,7 @@ prouvé, avec DSH réellement arrêté, et ce qui ne l'est pas encore.
 | Preuve « sans DSH » | drop-in `walter-engine.service.d/90-validation-sans-dsh.conf` (`InaccessiblePaths=/opt/dsh`) | Le moteur et tout ce qu'il lance (bash, Python, sous-agents) ne voient pas `/opt/dsh` : une dépendance cachée échouerait |
 | Reprise des conversations DSH | `walter-python -m walter_engine import-dsh` | 199 conversations reprises, mêmes numéros `seq` (un client reprend où il en était), idempotent, fichiers DSH seulement lus |
 | Portes | `walter-telegram`, `walter-web-gate` (drop-ins `20-walter-engine.conf`) | Inchangées : elles parlent l'Engine API et la porte web, servies par le natif |
-| Garde-fou core, registre, scénarios | `guardian/check`, `contracts/core.json` → `modules/registry.json`, `scenarios/` | Suivent l'unité moteur activée (`walter-engine`, ou `dsh-web` après un retour arrière) |
+| Garde-fou core, registre, scénarios | `guardian/check`, `contracts/core.json` → `modules/registry.json`, `scenarios/` | Le garde-fou, `walter_health`, le report des redémarrages et les scénarios suivent l'unité activée ; le contrat et le registre déclarent `walter-engine` |
 | Identité | walter-soul, cible `engine` → `@instance/profiles/engine/AGENTS.md` | Identité + règles + « Outils enchaînés » (Python, `await tools.x()`, `asyncio.gather`) |
 | Outils Walter (MCP) | `tools/mcp.py`, `core/config/toolsets.toml [clients.engine]` | Même jeu `core` que DSH (19 outils listés) ; les autres par `walter_call` |
 
@@ -38,9 +38,9 @@ depuis le noyau par `await tools.<nom>(…)`, sous la même politique et le mêm
 | `subagent` (57), `send_message`, `interrupt_agent`, `list_agents` | délégation v1, profondeur ≤ 3, enfant ≤ parent | `tools/agents.py` | oui | `engine_native` subagent + background ; `engine_e5` | aucun |
 | `python` (7) + appels d'outils depuis le noyau (`ptc-dispatch`, 4) | protocole walter-1 (`plugins/python/runtime`) | `tools/python.py` | — | `engine_native` python_persist, python_tools, restart (variables restaurées) | **droits du moteur** (`python = "full"`, Monsieur 17/11) au lieu de la bulle `walter-sandbox` ; la bulle reste un réglage (`python = "sandbox"`) |
 | Outils Walter MCP (41-42), `walter_call` (67) | MCP `core/server.py`, jeu `core` | `tools/mcp.py` (client tag `engine`) | oui | `walter_v1_live` (mémoire, navigation, Router) | aucun |
-| Accueil d'un tour (greffon intake) : run Memory, plan et paquet de contexte, texte du propriétaire | `turn-intake.v1`, ContextPlan v2, `/v1/runs/start|end` | `walter.py`, `engine.py` (`_intake`) | — | `v1_criterion` étapes 1–3 | aucun |
+| Accueil d'un tour (greffon intake) : run Memory, plan et paquet de contexte, texte du propriétaire | `turn-intake.v1`, ContextPlan v2, `/v1/runs/start|end` | `walter.py`, `engine.py` (`_intake`) | — | `walter_v1_live` trace (3 runs Memory ouverts et fermés, `routing.selected`, `turn.ended`) ; `v1_criterion` adapté, **pas rejoué** en natif | aucun |
 | Politique (greffon policy) : jamais-liste, préréglage par porte, enfant ≤ parent, divulgation, accords | `core/security/policy.json` | `policy.py` | même politique | `engine_api_e2e` never + approval ; `engine_e5` policy | aucun |
-| Plafonds du tour (greffon budget) | `[dsh.budget]` par niveau d'effort | `engine.py` (lit le même bloc) | — | test hors ligne | aucun |
+| Plafonds du tour (greffon budget) | `[dsh.budget]` par niveau d'effort | `engine.py` (lit le même bloc) | — | `engine_e8` budget (tour annulé `budget_seconds` à 62 s) | aucun |
 | Fin de tour (greffon events) : run fermé, `turn.ended` | bus `turn.ended`, `/v1/runs/end` | `engine.py` | — | bus : 59 `turn.ended` source `walter` | `session.ended` non émis : DSH n'en a jamais émis (0 sur le bus) |
 | Réveil : tâche ou sous-agent fini → avis ; pendant un tour → inséré dans ce tour | `agent/inbox/spliced` (2 292 chez DSH) | `engine.py` | — | `engine_native` background, bash_job (les deux formes) | aucun |
 | Reprise après redémarrage et crash | point durable avant appel ; « résultat inconnu » jamais rejoué | journal + `resume_interrupted` | variables du noyau restaurées | `engine_native` restart + crash (effet de bord exécuté une seule fois) ; `engine_api_e2e` restart | aucun |
@@ -144,6 +144,10 @@ Anomalies, sans moyenne qui les cache :
 - 429 de Nace : 191, **tous pendant des rafales de bancs**, aucun en production.
 - d1.2-ultra : p50 0,68 / p90 3,04 / p99 7,02 s, 9 délais dépassés (n 733) ; banc Liquid direct : 0,34–0,36 s p50,
   d1.2 réveil à froid ≈ 9,5 s après ≈ 7 min d'inactivité (natif comme OpenRouter).
+- Production du 17/11 (journal d'exécution du Router, `models.exec_log`) : d1.2-ultra par l'**API directe de Liquid**
+  99 réponses, p50 0,35 / p95 0,71 / p99 1,92 s, 2 échecs (11:44, à la mise en route), 42 doublons annulés (`hedged`) ;
+  par **OpenRouter** 733 réponses, p50 0,68 / p95 4,61 / p99 6,99 s, 10 échecs. Chaîne de décision : Drex Max (Nace)
+  → Liquid direct → OpenRouter → Clef ; depuis 11:44 la part de d1.2-ultra passe par Liquid direct.
 - Lectures tardives du préflight : 0 ; rattachements de run tardifs : 0.
 - Lancement d'un noyau Python : 61–84 ms en mode `full` (restauration comprise), 110–125 ms en bulle.
 - Goulots de DSH : aucun mesurable sur l'accueil (1,31 s p50 avant la bascule, 1,43 s après, même préflight) ; la
