@@ -15,6 +15,7 @@ def main(argv=None):
     q=sub.add_parser('standby');q.add_argument('standby_action',nargs='?',choices=('status','start','stop','ensure','sweep'),default='status');q.add_argument('group',nargs='?');q.add_argument('--by',default='agent')
     q=sub.add_parser('instance');q.add_argument('instance_action',nargs='?',choices=('show','check','path','render','config','harness'),default='show');q.add_argument('parts',nargs='*')
     q=sub.add_parser('present');q.add_argument('level',choices=('notes','note','catalog','summary','manifest','guide','index'));q.add_argument('module',nargs='?');q.add_argument('--form',choices=('full','m0'),default='full');q.add_argument('--m1',action='append',default=[]);q.add_argument('--level',choices=('M0','M1'),default='M1');q.add_argument('--section',default='');q.add_argument('--offset',type=int,default=0);q.add_argument('--limit',type=int,default=20)
+    q=sub.add_parser('decisions',help='decision signals the modules declare (Walter Decision)');q.add_argument('--occasion');q.add_argument('--catalog');q.add_argument('--root',default='/')
     sub.add_parser('matrix')
     q=sub.add_parser('engine');q.add_argument('engine_action',choices=('kernel',));q.add_argument('--install');q.add_argument('--home')
     sub.add_parser('doctor')
@@ -45,6 +46,9 @@ def main(argv=None):
                 out=contracts.compile_registry(a.catalog,root=a.root)
                 if a.format=='markdown':
                     print(contracts.render_markdown(out),end='');return 0
+        elif a.command=='decisions':
+            from . import decisions
+            out=decisions.collect(a.catalog,root=a.root,occasion=a.occasion)
         elif a.command=='path':
             from . import paths
             print(paths.module_path(a.module,*a.parts));return 0

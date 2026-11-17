@@ -145,6 +145,8 @@ def validate(module, *, source=False):
         _strings(recovery.get(key), 'recovery.' + key, nonempty=True)
     if 'presentation' in module:
         _presentation(module['presentation'], check)
+    if 'decisions' in module:        # decision signals the module declares (walter_platform.decisions)
+        check(module['decisions'])
     if 'components' in module:
         _components(module['components'], name, check)
     if 'service_code' in module:
@@ -260,6 +262,8 @@ def expand(manifest, root, target_root):
                 else:
                     expanded.append(str(layout.join(base, v)))
             raw[key] = expanded
+    if isinstance(raw.get('decisions'), str):      # the module's declared decision signals (decisions.py)
+        raw['decisions'] = str(layout.join(base, raw['decisions']))
     pres = raw.get('presentation')
     if isinstance(pres, dict):
         for key in ('summary', 'manifest', 'guide'):

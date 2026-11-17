@@ -657,10 +657,10 @@
     {
       "id": "context",
       "root": "/walter/cognition/context",
+      "decisions": "/walter/cognition/context/manifest/decisions.json",
       "anchors": [
         "/walter/cognition/context/contracts/context.json",
         "/walter/cognition/context/ports/dsh/index.mjs",
-        "/walter/cognition/context/ports/hermes/__init__.py",
         "/walter/cognition/context/walter_context/compress/session.py"
       ],
       "requires": [],
@@ -680,7 +680,6 @@
       ],
       "interfaces": [
         "Python Session (walter_context.compress)",
-        "Hermes ContextEngine adapter",
         "DSH CompactionEngine adapter",
         "CLI walter-context",
         "CLI walter-context capability router (versioned stable note)",
@@ -695,7 +694,6 @@
         "In-process walter.context.window: globalThis[Symbol.for('walter.context.window')](agent, {plan}, signal) published by the DSH port -> window decision report {applied, reason, warm, turns, tokens, measured_tokens} (SOCLE A1; the kernel isolates its compaction service, the engine's intake plugin calls this entry at each owner turn)"
       ],
       "bindings": {
-        "hermes": "native compressor until walter-context replaces it (plan lot 6)",
         "dsh": "Walter Engine (dsh-web): public checkpoint adapter selected by composition; per-message context through the engine's native intake plugin (core/engine/plugins/intake, mode native, inject pack by default) calling POST /preflight?inject=1; the legacy Memory block only when the preflight fails or times out (verified 2026-11-11 in /opt/dsh/home/cordis.patch.yml)",
         "codex": "Native compaction; additive module notes and hook preflight",
         "claude-code": "Native compaction; additive module notes and hook preflight; entrance reduction of large tool outputs in SHADOW (hook PostToolUse, records numbers only)",
@@ -703,7 +701,6 @@
       },
       "limitations": [
         "DSH uses public compaction transactions; checkpoints retain all visible user and assistant dialogue or refuse.",
-        "Hermes runs its native compressor (walter-compress retired 2026-10-21); the walter-context Hermes port is not activated.",
         "Structural and known-answer tests do not certify semantic model quality.",
         "Capability-note preparation does not activate the lot-4 composer or inject into an unconnected host.",
         "Memory, Skills, Core, Router, Logs and Soul are optional at module startup; their dependent operations degrade or fail when unavailable.",
@@ -880,6 +877,7 @@
           "status": "active",
           "readme": "/walter/cognition/context/README.md",
           "contracts": [
+            "/walter/cognition/context/contracts/schemas/context-plan.v3.json",
             "/walter/cognition/context/contracts/schemas/context-plan.v2.json"
           ],
           "interfaces": [
@@ -1198,6 +1196,20 @@
             "/walter/core/engine/contracts/policy-decision.v1.json",
             "/walter/core/engine/contracts/turn-intake.v1.json"
           ],
+          "interfaces": [
+            {
+              "transport": "cli",
+              "interface": "walter harness install dsh"
+            }
+          ],
+          "vision_target": "core/engine/plugins"
+        },
+        {
+          "id": "engine-python",
+          "path": "/walter/core/engine/plugins/python",
+          "role": "Outil python du moteur (16/11, convergence Unharnessed) : noyau Python persistant par conversation, en bulle systemd non privilégiée (walter-sandbox, seul son dossier inscriptible, réseau local refusé) ; outils Walter depuis Python sous la politique, tâches de fond = tâches du moteur avec tour de réveil, sous-agents ; interrupteur [dsh.engine] python off|on",
+          "status": "implemented",
+          "readme": "/walter/core/engine/plugins/python/README.md",
           "interfaces": [
             {
               "transport": "cli",
@@ -2003,13 +2015,13 @@
     {
       "id": "memory",
       "root": "/walter/cognition/memory",
+      "decisions": "/walter/cognition/memory/manifest/decisions.json",
       "anchors": [
         "/walter/cognition/memory/contracts/memory.json",
         "/walter/cognition/memory/walter_memory/events.py",
         "/walter/cognition/memory/walter_memory/objects.py",
         "/walter/cognition/memory/walter_memory/client.py",
         "/walter/cognition/memory/walter_memory/read_policy.py",
-        "/walter/cognition/memory/ports/hermes/__init__.py",
         "/walter/cognition/memory/walter_memory/overland.py"
       ],
       "requires": [],
@@ -2045,10 +2057,9 @@
         "Overland authenticated HTTP :3010",
         "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer",
         "HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience)",
-        "CLI tasks list|show|update|sweep|triage-redecide [--execute]; CLI experience [--thread] [--query]"
+        "CLI tasks list|show|update|sweep|triage-redecide [--execute] [--channels owner|all|a,b]; CLI experience [--thread] [--query]"
       ],
       "bindings": {
-        "hermes": "Public walter-memory MemoryProvider selected in main and four profiles; native state.db collected independently",
         "dsh": "common MCP",
         "codex": "common MCP",
         "claude-code": "common MCP",
@@ -2260,7 +2271,7 @@
         {
           "id": "connectors",
           "path": "/walter/cognition/memory/connectors",
-          "role": "Connecteurs (hermes, beeper, gmail, calendar, agent_sessions, triage…)",
+          "role": "Connecteurs (beeper, gmail, calendar, agent_sessions, triage…)",
           "status": "active",
           "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory/connectors"
@@ -2342,13 +2353,6 @@
           "status": "active",
           "readme": "/walter/cognition/memory/README.md",
           "vision_target": "cognition/memory/migrations"
-        },
-        {
-          "id": "hermes-plugin",
-          "path": "/walter/cognition/memory/hermes-plugins",
-          "role": "Fournisseur mémoire walter-memory pour Hermes — à retirer avec Hermes (E7)",
-          "status": "active",
-          "readme": "/walter/cognition/memory/README.md"
         },
         {
           "id": "overland",
@@ -2829,6 +2833,7 @@
     {
       "id": "router",
       "root": "/walter/cognition/router",
+      "decisions": "/walter/cognition/router/manifest/decisions.json",
       "anchors": [
         "/walter/cognition/router/contracts/router.json",
         "/walter/cognition/router/cli.py",
@@ -2866,14 +2871,12 @@
         "CLI walter-router-guardian check | run | status (the module's own maintenance)"
       ],
       "bindings": {
-        "hermes": "router plugin (same tools, brief as a system-prompt section) + auxiliary configuration adapter",
         "dsh": "walter-llm provider; router tools through the walter MCP + brief in the profile",
         "codex": "router tools through the walter MCP + brief in the profile; primary model native",
         "claude-code": "router tools through the walter MCP, brief in the server instructions; primary model native"
       },
       "limitations": [
         "New model choices remain subject to the owner's approval; no automatic switching introduced.",
-        "Codex subscription catalog and quota collection retain optional Hermes subprocess adapters.",
         "Text runs execute natively with bounded terminal/file tools; only providers of the selected model are tried, and callers must forward user_notice on failover.",
         "The guardian lands repairs only in research/, analysis/parse.py, analysis/identity.py, analysis/aliases.json, interface/ and tests/, through deterministic gates; owner choices, execution policy, schema and units are never changed by it."
       ],
@@ -3047,7 +3050,7 @@
         {
           "id": "analysis",
           "path": "/walter/cognition/router/analysis",
-          "role": "Analyse, propositions Telegram, alertes (alertes = rôle Hermes à retirer, E6)",
+          "role": "Analyse, propositions Telegram, alertes",
           "status": "active",
           "readme": "/walter/cognition/router/README.md",
           "vision_target": "cognition/router/analysis"
@@ -3077,8 +3080,8 @@
         {
           "id": "oneshot",
           "path": "/walter/cognition/router/serve/oneshot.py",
-          "role": "Appels ponctuels via hermes chat --oneshot — rôle Hermes à retirer (E6)",
-          "status": "obsolete",
+          "role": "Réponses ponctuelles du Router : walter-llm direct (poste économique) ou délégation à Walter Engine",
+          "status": "active",
           "readme": "/walter/cognition/router/README.md"
         },
         {
@@ -3099,13 +3102,6 @@
             "postgres:models"
           ],
           "vision_target": "cognition/router/store"
-        },
-        {
-          "id": "hermes-plugin",
-          "path": "/walter/cognition/router/hermes-plugins",
-          "role": "Greffon Hermes walter-router — à retirer avec Hermes (E7)",
-          "status": "active",
-          "readme": "/walter/cognition/router/README.md"
         },
         {
           "id": "guardian",
@@ -3484,11 +3480,9 @@
       "interfaces": [
         "HTTP :8891",
         "stdlib client",
-        "MCP",
-        "Hermes plugin"
+        "MCP"
       ],
       "bindings": {
-        "hermes": "native walter-skills adapter and lifecycle hook",
         "dsh": "common MCP",
         "codex": "common MCP",
         "claude-code": "common MCP"
@@ -3727,7 +3721,6 @@
         "walter_profile MCP"
       ],
       "bindings": {
-        "hermes": "rendered SOUL.md",
         "dsh": "rendered AGENTS.md + walter_profile MCP",
         "codex": "common MCP",
         "claude-code": "common MCP"
