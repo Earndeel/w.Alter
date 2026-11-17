@@ -1,0 +1,11 @@
+{
+ "base_sha": "279db9339af10de98cc0eff433e747d9242a865029197aa8322d7420cd3c88b0",
+ "changed": "SKILL.md",
+ "created_at": "2026-11-17T04:12:40.512709+00:00",
+ "domain": "walter",
+ "kind": "patch",
+ "reason": "The session exposed a real mismatch: the resume brief's preflight selected L2 despite the intended strongest route. The repair pinned the session to L3 and preserved its execution budget. A live trivial-message test then recorded preflight L1, pinned_level L3 and selection general/L3. Regression work also uncovered stale generated Router documentation, a test incorrectly assuming all live preferences remained locked, and board tests unintentionally calling the real memory CLI. This adds a concrete verification procedure to the existing integration skill rather than duplicating Router operation guidance. [session claude_code/vm/9c742f90-8f7c-4cbf-8b22-6cd178ccb6bc]",
+ "runtime": "learner",
+ "session_id": "claude_code/vm/9c742f90-8f7c-4cbf-8b22-6cd178ccb6bc",
+ "target": "walter-integration-verification"
+}
