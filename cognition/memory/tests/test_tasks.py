@@ -370,9 +370,9 @@ def test_a_failed_triage_decision_is_not_stored_and_is_retried(monkeypatch):
     triage._decide([old])
     row = _row(old["event_id"])
     assert row["action"] == "remember" and row["payload"]["error"].startswith("RuntimeError")
-    monkeypatch.setattr(triage.llm, "decide", lambda *a, **k: {"model": "m", "answers": {
-        "action": {"choice": "notify", "confidence": 0.9}, "urgency": {"choice": "now"},
-        "category": {"choice": "personal"}, "needs_reply": {"noul": 0.9}}})
+    monkeypatch.setattr(triage.llm, "decide", lambda *a, **k: {"model": "m", "signals": {   # by signal (17/11)
+        "memory.action": {"choice": "notify", "confidence": 0.9}, "memory.urgency": {"choice": "now"},
+        "memory.category": {"choice": "personal"}, "memory.needs_reply": {"noul": 0.9}}})
     triage._decide([{**old, "ingested_at": datetime.now(timezone.utc)}], replace_errors=True)   # re-decided
     row = _row(old["event_id"])
     assert row["model_action"] == "notify" and row["payload"].get("error") is None
@@ -442,3 +442,16 @@ def test_the_hourly_reconciliation_closes_runs_that_never_ended(monkeypatch):
     assert status == {old: "abandoned", fresh: "open"}
     monkeypatch.setattr(runs, "sweep", lambda: 1 / 0)             # one step failing never stops the others
     assert assimilation.reconcile_runs() == {"abandoned": "error: ZeroDivisionError", "episodes": 0}
+
+
+def test_the_owners_list_never_shows_a_lab_channels_objectives(monkeypatch, capsys):
+    # 07-CONVERGENCE § 6.8 (16/11): Lab turns (channel test) opened objectives that showed in Monsieur's list
+    from walter_memory import cli, runs as r
+    seen = []
+    monkeypatch.setattr(r, "tasks_list", lambda **kw: seen.append(kw["channels"]) or [])
+    for argv, want in ((["tasks", "list"], ["owner"]), (["tasks", "list", "--channels", "all"], None),
+                       (["tasks", "list", "--channels", "owner,test"], ["owner", "test"]),
+                       (["tasks", "list", "--thread", "task:x"], None)):
+        cli.main(argv)
+        assert seen[-1] == want
+    capsys.readouterr()

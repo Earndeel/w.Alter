@@ -18,6 +18,14 @@ Walter Memory core (spec and decisions: `/walter/docs/` — ARCHITECTURE, DECISI
   (break-glass : base active + registre hors base, `reapply`/`verify` après restauration, sauvegardes jamais modifiées
   automatiquement), `observability` (preuve contre `walter_logs` et retrait tracé des copies), `gateway` (HTTP 127.0.0.1:8890 ; pour le moteur, lot E2 : `POST /v1/runs/start|end`, `/v1/bus/emit` limité à `turn.started|turn.ended|session.ended` sans observation, `/v1/privacy/classify`, `cloud_safe` sur `/v1/context` ; socle A3/A4 : `/v1/tasks/list|update`, `/v1/experience`, `outcome` sur `/v1/runs/end`), `runs` (Run Plane : runs, sous-tâches déléguées et **objectifs** du propriétaire `runs.tasks` kind `objective` — ouverts / rattachés au fil par `runs.update` (un message que le preflight juge être une reprise — `requested.resume` — poursuit la tâche du fil quel que soit son acte ; la carte d'un sujet candidat dit la tâche qu'il porte ; un plan dégradé, qui n'a rien jugé, poursuit une tâche ouverte mais n'en ouvre aucune), suspendus sans activité, jamais perdus ; `walter-memory tasks`), `episodes` (épisode de tout run significatif, échecs compris, avec `outcome` {status, errors, lessons, solutions, pending}, publié en dérivé g1 `experience` ; `walter-memory experience`), `cli` (`walter-memory`).
 - `connectors/` — source connectors (P2).
+- `manifest/decisions.json` — Memory's decision signals (Walter Decision 2.0, 2026-11-17), asked by occasion through
+  `llm.decide(..., occasion=, facts=, focus=, now=)`: `turn` (work, resume — read by the preflight for the Run Plane),
+  `incoming` (triage: action, urgency, category, needs_reply; readings on a cue only: deadline, amount →
+  `triage.observed`, rules « deadline within a day » → today, « amount to pay or receive: kept » instead of ignore),
+  `outgoing` (disclosure: commits, and the days and amount committed to, said in `check()` reasons). Dates are read
+  against the day the message was received. `context.resolve_people` / `people_cards`: names read in a message → one
+  person (exact name, alias or unique first name among people with ≥ 20 messages) or « N people carry this name »,
+  never the candidates. Readings are never written as memory by themselves.
 - `tests/` — `venv/bin/python -m pytest -q tests/`.
 
 - `ops/` — authoritative offsite backup/restore and maintenance scripts; installed entrypoints are symlinks.

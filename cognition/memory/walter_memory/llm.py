@@ -224,9 +224,12 @@ def _book_calls(base: dict, calls: list[dict]) -> None:
             _log(**row, status="error", error=str(c.get("error"))[:500])
 
 
-def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, names: list[str] | None = None,
+def decide(state: dict, questions: dict | None, *, processor: str, privacy_class: str, names: list[str] | None = None,
            model: str | None = None, models: tuple[str, ...] | None = None, purpose: str | None = None,
-           budget: str = "recurring", timeout: float = 30, samples: int = 1) -> dict:
+           budget: str = "recurring", timeout: float = 30, samples: int = 1, occasion: str | None = None,
+           facts: list[str] | None = None, options: dict | None = None, now: str | None = None,
+           media: list | None = None, sampling: str | None = None, focus: str | None = None,
+           ask: list | None = None, layers: list | None = None) -> dict:
     """Typed decisions (System One contract: one call, a probability per option) from a decision model, executed by
     the walter-llm gateway (POST /v1/decisions) on Walter Router's decision chain, in order, first model that answers.
     `samples` > 1 asks the same model that many times in parallel and averages the answers (the gateway's
@@ -236,7 +239,15 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
     local_only state is refused; redacted_cloud state is pseudonymised (strings, recursively) before leaving Memory.
     Paid models are skipped by the gateway when OpenRouter's credit is under this budget's floor.
     `processor` is also the Walter Decision need (router config/decision-needs.json: reuse window, escalation).
-    Returns {"answers": {...}, "usage": {...}, "model": ..., "provider": ..., "route": ...[, "samples": n]}."""
+    Walter Decision 2.0 (17/11): `occasion` (turn, incoming, outgoing, document, result) has the questions composed
+    from the signals the modules declare, for this event's `facts` (+ the cues Walter Decision reads itself), with
+    the criteria the caller provides (`options`, e.g. its threads), `focus` (the state key of the event itself, the
+    only text the cues read) and `now` (the owner's local date, for dates in
+    words); `questions` then only adds ad-hoc ones. `ask` (signal ids): a complementary decision asks only those,
+    never the whole occasion again; `layers` (observation | inference): readings asked apart from judgements.
+    `sampling` "first" hedges the samples instead of averaging them.
+    Returns {"answers": {...}, "usage": {...}, "model": ..., "provider": ..., "route": ...[, "samples": n]
+    [, "signals": {signal id: answer}, "trace": {asked, skipped, unavailable}]}."""
     asked = [model] if model else (list(models) if models else None)
     label = asked[0] if asked else "router:decision"
     base = {"processor": processor, "model": label, "purpose": purpose, "budget": budget, "privacy_class": privacy_class}
@@ -245,8 +256,12 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
         raise PrivacyRefused(f"{processor}: {privacy_class} data cannot be sent to a decision model")
     if privacy_class == "redacted_cloud" and privacy.pseudonymise():
         state = _redact_tree(state, names, {})
-    body = {"state": state, "questions": questions, "samples": samples, "timeout": timeout, "need": processor,
-            "paid_floor_usd": ACCOUNT_FLOOR_USD.get(budget, 1.0), **({"models": asked} if asked else {})}
+    body = {"state": state, "samples": samples, "timeout": timeout, "need": processor,
+            "paid_floor_usd": ACCOUNT_FLOOR_USD.get(budget, 1.0), **({"models": asked} if asked else {}),
+            **({"questions": questions} if questions else {}),
+            **{k: v for k, v in (("occasion", occasion), ("facts", facts), ("options", options), ("now", now),
+                                 ("media", media), ("sampling", sampling), ("focus", focus), ("ask", ask),
+                                 ("layers", layers)) if v}}
     t0 = time.perf_counter()
     try:
         out = _structured("/v1/decisions", body, timeout * 3 + 10)   # the gateway may try up to the whole chain
@@ -262,9 +277,11 @@ def decide(state: dict, questions: dict, *, processor: str, privacy_class: str, 
            "provider": out.get("provider"), "route": out.get("route")}
     if samples > 1:
         res["samples"] = out.get("samples")
-    for k in ("reused", "escalated", "schema"):           # Walter Decision: reuse, escalation, question-set key
+    for k in ("reused", "escalated", "schema", "sampling", "parts", "unavailable"):   # Walter Decision
         if out.get(k):
             res[k] = out[k]
+    if occasion:
+        res["signals"], res["trace"] = out.get("signals") or {}, out.get("trace") or {}
     return res
 
 

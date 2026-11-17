@@ -1,5 +1,6 @@
 {
   "id": "memory",
+  "decisions": "manifest/decisions.json",
   "anchors": [
     "contracts/memory.json",
     "walter_memory/events.py",
@@ -41,7 +42,7 @@
     "Overland authenticated HTTP :3010",
     "CLI runs find [RUN_ID|--session SESSION] --open-only: unique open-run metadata run_id/status/privacy_class, ambiguity refused; runs routing RUN_ID: JSONstdin allowlist applied/via/model_id/model/provider/observed_model; runs end RUN_ID: explicit ended/failed/cancelled status, idempotent canonical writer",
     "HTTP :8890 socle A3/A4: POST /v1/tasks/list {thread_id?, session_id?, status?, limit} -> {tasks: [{task_id, goal, status, thread_id, updated_at, progress, attempts, last_outcome}]}; POST /v1/tasks/update {task_id, status?, progress?, result?, note?}; POST /v1/experience {thread_id?, query?, limit} -> {items: [{at, run_id, status, summary, errors, lessons, solutions, pending}]}; /v1/runs/end accepts outcome; /v1/runs/start origin accepts interface, engine_session, request_id; /v1/context accepts thread_id (layers tasks, experience)",
-    "CLI tasks list|show|update|sweep|triage-redecide [--execute]; CLI experience [--thread] [--query]"
+    "CLI tasks list|show|update|sweep|triage-redecide [--execute] [--channels owner|all|a,b]; CLI experience [--thread] [--query]"
   ],
   "bindings": {
     "dsh": "common MCP",

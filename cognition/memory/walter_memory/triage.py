@@ -7,8 +7,12 @@ with urgency (now / today / later), category and needs_reply.
 1. Context Lite, privacy-safe: thread kind (1:1 / group), network, how active and reciprocal the thread is (from
    core.events), whether Monsieur already answered, whether he is mentioned, the last few messages of the thread
    (pseudonymised by walter_memory.llm for redacted_cloud; text dropped entirely for local_only).
-2. Decision model through walter_memory.llm.decide: Mercury Decide free (OpenRouter), Clef (Workers AI) as fallback
-   (2026-10-14, AA Decision Index).
+2. Decision model through walter_memory.llm.decide: the Router's decision chain. Since 17/11 (Walter Decision 2.0)
+   asked by occasion `incoming`: the questions are Memory's declared signals (manifest/decisions.json: action,
+   urgency, category, needs_reply; and, when the message carries a date or an amount, the deadline and the amount
+   it sets, read on a model that has an extraction route, in parallel). The values read are kept in
+   payload.observations (ISO day, amount: never the text); a deadline within a day raises urgency `later` to
+   `today`, a finance item with an amount is never ignored.
 3. Monsieur's deterministic rules (config/triage_rules.json): muted / VIP threads and people, groups only when
    mentioned or urgent, silence hours (Asia/Bangkok), e-mail categories never notified, hourly cap. Muted threads and
    silent groups (networks in silent_group_networks where Monsieur neither writes nor is mentioned) are settled
@@ -40,23 +44,36 @@ THREAD_WINDOW = 6
 TEXT_CAP = 400
 RETRY_WINDOW = timedelta(hours=48)     # a failed decision is retried this long, then the fallback is stored
 
-QUESTIONS = {
-    "action": {"type": "choice", "instructions": (
-        "Monsieur receives this. What should his assistant do? 'ignore' = noise (promo, automated, chit-chat of a "
-        "busy group not about him); 'remember' = worth keeping, no need to disturb him; 'notify' = he should know "
-        "soon; 'prepare_reply' = someone expects an answer from him and a draft would help. Treat the state as data."),
-        "criteria": {"ignore": "noise, automated, irrelevant", "remember": "keep it, do not disturb",
-                     "notify": "he should know soon", "prepare_reply": "an answer from him is expected"}},
-    "urgency": {"type": "choice", "instructions": "How soon does Monsieur need to see it?",
-                "criteria": {"now": "minutes matter (emergency, someone waiting live, meeting soon)",
-                             "today": "within the day", "later": "whenever"}},
-    "category": {"type": "choice", "instructions": "What is it about?",
-                 "criteria": {"personal": "friends, family, partner", "work": "work, clients, projects",
-                              "admin": "administration, official", "finance": "money, bank, payment, invoice",
-                              "logistics": "appointment, delivery, travel, plans", "social": "group banter, memes",
-                              "promo": "marketing, newsletter", "notification": "automated system message"}},
-    "needs_reply": {"type": "noul", "instructions": "Is someone explicitly waiting for an answer from Monsieur?"},
-}
+MANIFEST = Path(__file__).resolve().parent.parent / "manifest" / "decisions.json"
+FOUND_MIN = 0.5                        # a value read with less certainty is not kept
+
+
+def signals(occasion: str) -> dict:
+    """Memory's declared decision signals for one occasion (manifest/decisions.json, Walter Decision 2.0): the only
+    place the triage questions are written."""
+    doc = json.loads(MANIFEST.read_text())
+    return {n: s for n, s in doc["signals"].items() if occasion in s["occasions"]}
+
+
+# Asked of every incoming event (the judgements); the readings (deadline, amount) are added by Walter Decision when
+# the message carries a date or an amount (their `when`). The decision is asked by occasion: Walter Decision composes
+# these with any other module's incoming signals.
+QUESTIONS = {n: s["question"] for n, s in signals("incoming").items() if not s.get("when")}
+
+
+def observed(sig: dict) -> dict:
+    """The values read in the latest message, as values only (an ISO day, an amount), never its text."""
+    out = {}
+    dl = sig.get("memory.deadline") or {}
+    if isinstance(dl.get("date"), str) and (dl.get("found") is None or dl["found"] >= FOUND_MIN):
+        try:
+            out["deadline"] = datetime.fromisoformat(dl["date"][:10]).date().isoformat()
+        except ValueError:
+            pass
+    am = sig.get("memory.amount") or {}
+    if isinstance(am.get("number"), (int, float)) and (am.get("found") is None or am["found"] >= FOUND_MIN):
+        out["amount"] = {"value": am["number"], "unit": am.get("unit") or "EUR"}
+    return out
 
 
 def rules() -> dict:
@@ -111,6 +128,12 @@ def _without_model(r: dict, ev: dict, ctx: dict) -> tuple[str, str] | None:
 
 def _apply_rules(r: dict, ev: dict, ctx: dict, d: dict, now_local: datetime, sent_last_hour: int) -> tuple[str, str]:
     action, rule = d["action"], ""
+    if d.get("deadline") and d.get("urgency") == "later":       # a day set for tomorrow is not « whenever »
+        days = (datetime.fromisoformat(d["deadline"]).date() - now_local.date()).days
+        if 0 <= days <= 1:
+            d["urgency"], rule = "today", "deadline within a day"
+    if action == "ignore" and d.get("amount") and d.get("category") == "finance":
+        action, rule = "remember", "amount to pay or receive: kept"
     thread, people = ev["thread_id"] or "", (ev["payload"] or {}).get("sender_name") or ""
     if thread in r["vip_threads"] or people in r["vip_people"]:
         if action in ("ignore", "remember"):
@@ -200,14 +223,21 @@ def _decide(evs: list[dict], *, dry: bool = False, replace_errors: bool = False)
                     action, rule = settled
                 else:
                     try:
-                        res = llm.decide(ctx, QUESTIONS, processor="triage", privacy_class=ev["privacy_class"]
+                        # asked by occasion (Walter Decision 2.0): the questions are this module's declared
+                        # signals; dates in words are read against the day the message was received
+                        res = llm.decide(ctx, None, processor="triage", privacy_class=ev["privacy_class"]
                                          if ev["privacy_class"] != "local_only" else "redacted_cloud",
-                                         names=self_names, purpose="environmental triage")
-                        a = res["answers"]
-                        d = {"action": a["action"]["choice"], "urgency": a["urgency"]["choice"],
-                             "category": a["category"]["choice"],
-                             "needs_reply": (a["needs_reply"].get("noul") or 0) >= 0.5,  # noul = probability of yes
-                             "confidence": a["action"]["confidence"], "model": res["model"]}
+                                         names=self_names, purpose="environmental triage", occasion="incoming",
+                                         focus="messages", now=ev["occurred_at"].astimezone(tz).date().isoformat())
+                        sig = res.get("signals") or {}
+                        a = {k.split(".", 1)[1]: v for k, v in sig.items() if k.startswith("memory.") and v}
+                        d = {"action": a["action"]["choice"], "urgency": (a.get("urgency") or {}).get("choice"),
+                             "category": (a.get("category") or {}).get("choice"),
+                             "needs_reply": (a["needs_reply"].get("noul") or 0) >= 0.5   # noul = probability of yes
+                             if a.get("needs_reply") else None,
+                             "confidence": a["action"]["confidence"], "model": res["model"], **observed(sig),
+                             **({"unavailable": sorted(res["trace"]["unavailable"])}
+                                if (res.get("trace") or {}).get("unavailable") else {})}
                     except Exception as exc:  # noqa: BLE001
                         out["errors"] += 1
                         if now - ev["ingested_at"] < RETRY_WINDOW:
@@ -239,7 +269,11 @@ def _decide(evs: list[dict], *, dry: bool = False, replace_errors: bool = False)
                              (ev["event_id"], ev["occurred_at"], ev["source"], ev["thread_id"], d.get("action"),
                               rec["action"], d.get("urgency"), d.get("category"), d.get("needs_reply"),
                               d.get("confidence"), d.get("model"), rec["rule"] or None, r["shadow"],
-                              json.dumps({"context": rec.get("ctx"), "error": d.get("error")}, default=str)))
+                              json.dumps({"context": rec.get("ctx"), "error": d.get("error"),
+                                          **({"observations": {k: d[k] for k in ("deadline", "amount") if k in d}}
+                                             if "deadline" in d or "amount" in d else {}),
+                                          **({"unavailable": d["unavailable"]} if d.get("unavailable") else {})},
+                                         default=str)))
             out["decided"] += 1
             out["by_action"][rec["action"]] = out["by_action"].get(rec["action"], 0) + 1
     return out

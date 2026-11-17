@@ -184,6 +184,8 @@ def main(argv=None) -> None:
     tk.add_argument("--thread"); tk.add_argument("--session"); tk.add_argument("--status")
     tk.add_argument("--limit", type=int, default=10); tk.add_argument("--since")
     tk.add_argument("--execute", action="store_true", help="triage-redecide: write the new decisions")
+    tk.add_argument("--channels", help="list: channels whose objectives are shown, comma-separated, or 'all' (default: "
+                                       "the owner's only, unless --thread / --session narrows the list)")
     xp = sub.add_parser("experience", help="socle A4: what was already tried (thread first, then other threads by query)")
     xp.add_argument("--thread"); xp.add_argument("--query"); xp.add_argument("--limit", type=int, default=5)
     xp.add_argument("--local", action="store_true", help="owner on the VM: local_only runs included")
@@ -502,7 +504,11 @@ def main(argv=None) -> None:
     elif a.cmd == "tasks":
         from . import runs
         if a.action == "list":
-            res = runs.tasks_list(thread_id=a.thread, session_id=a.session, status=a.status, limit=a.limit)
+            # the owner's list never shows a Lab or test channel's objectives (07-CONVERGENCE § 6.8, 17/11); a list
+            # narrowed to a thread or a session shows what was worked there, whatever the channel
+            ch = None if a.channels == "all" or (a.channels is None and (a.thread or a.session)) else \
+                [c.strip() for c in (a.channels or "owner").split(",") if c.strip()]
+            res = runs.tasks_list(thread_id=a.thread, session_id=a.session, status=a.status, limit=a.limit, channels=ch)
         elif a.action == "show":
             res = runs.task_get(a.task_id) or {"error": "unknown task"}
         elif a.action == "update":          # {"task_id"?, "status", "progress", "result", "note"} on stdin

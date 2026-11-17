@@ -108,6 +108,44 @@ def people_in(query: str) -> list[str]:
                               if re.search(rf"(?<!\w){re.escape(name)}(?!\w)", q)))[:2]
 
 
+def resolve_people(names, exclude=()) -> dict:
+    """People named in a message as read by Walter Decision (passages, Walter Decision 2.0, 17/11) → the people
+    Monsieur talks with: {"matched": {name: entity_id}, "ambiguous": {name: n candidates}, "unknown": [names]}.
+    A name is matched when it is exactly one known person's name or alias, or the first name of exactly one of them;
+    several candidates are said, never picked. `exclude`: entity ids already shown (Memory's own name match)."""
+    known = _known_people()
+    by_name: dict = {}
+    by_first: dict = {}
+    for n, eid in known:
+        by_name.setdefault(n, set()).add(eid)
+        by_first.setdefault(n.split()[0], set()).add(eid)
+    out = {"matched": {}, "ambiguous": {}, "unknown": []}
+    for raw in list(dict.fromkeys(str(x).strip() for x in names or () if str(x).strip()))[:6]:
+        key = re.sub(r"\s+", " ", raw.lstrip("@").lower())
+        ids = by_name.get(key) or by_first.get(key) or set()
+        if len(ids) == 1:
+            eid = next(iter(ids))
+            if eid not in exclude and eid not in out["matched"].values():
+                out["matched"][raw] = eid
+        elif ids:
+            out["ambiguous"][raw] = len(ids)
+        else:
+            out["unknown"].append(raw)
+    return out
+
+
+def people_cards(names, *, exclude=(), budget: int = 300) -> dict:
+    """The Kardex cards (cloud-safe, as in the people section) of the people a message names, read by the caller
+    (Context's preflight observation); → {"text", "matched": [entity ids], "ambiguous": {name: n}, "unknown": [names]}.
+    An ambiguous name gets one line saying so (how many, not who): the model asks or looks the person up."""
+    r = resolve_people(names, exclude)
+    lines = [l for eid in r["matched"].values() for l in _card_lines(eid)]
+    lines += [f"- « {n} » : {k} personnes connues portent ce nom (person_lookup pour préciser)"
+              for n, k in r["ambiguous"].items()]
+    text, _ = _clip(lines, budget)
+    return {"text": text, "matched": list(r["matched"].values()), "ambiguous": r["ambiguous"], "unknown": r["unknown"]}
+
+
 def _card_lines(entity_id: str) -> list[str]:
     c = social.person_card(entity_id, "cloud_allowed")
     e, rel = c["entity"], c["relationship"].get("all") or {}
