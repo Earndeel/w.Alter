@@ -93,6 +93,15 @@ Cinq corrections du système trouvées par ces passages et la vérification qui 
   comme refus de budget et faisaient tomber le score de l'autopilote à 75 ; ils sont notés `dropped` (ni réussis ni
   échoués), 1 266 lignes passées reclassées (liste des identifiants gardée pour le retour arrière) ; score 100.
 
+Vérification finale (tests du module core, 17/11 ≈ 17:10), quatre écarts de la bascule corrigés :
+- le guide du gardien core ne nommait que `dsh-web` : il n'aurait pas pu relancer un `walter-engine` arrêté ou
+  périmé ; il nomme désormais `walter-engine` (et `dsh-web` pour le retour arrière) ;
+- `walter deploy` ne différait pas un redémarrage de `walter-engine` pendant un tour (il ne comptait que les runs
+  `dsh`) : il compte aussi les runs natifs (`walter`) ;
+- `walter_health` (MCP) lisait l'état de `dsh-web` : il lit l'unité moteur activée ;
+- le moteur nommait en dur les dossiers de Memory et de Context (règle d'interconnexion) : il passe par le client
+  public de Memory et par `walter path`. Moteur relancé à 17:15 UTC (aucun tour en cours), `check` vert.
+
 ## 4. Chemin critique (mission § 9)
 
 **Que fait Walter entre l'arrivée d'un message et la première action utile du modèle principal ?** Mesures du
@@ -158,8 +167,9 @@ Non mesuré : la qualité d'exécution du modèle principal par mode (le banc ju
 ## 6. Retour arrière
 
 `/user/Lucas/backups/changes/2026-11-17-native-engine/README.md` § 1 : moins d'une minute, sans perte (l'état DSH n'a
-pas été modifié ; les conversations tenues pendant la période native restent dans l'état natif). Le garde-fou, le
-registre et les scénarios suivent seuls l'unité activée.
+pas été modifié ; les conversations tenues pendant la période native restent dans l'état natif). Le garde-fou core,
+`walter_health`, le report des redémarrages pendant un tour et les scénarios suivent seuls l'unité activée ; le contrat
+`core` déclare `walter-engine` : un retour arrière durable y remet `dsh-web` (et dans le guide du gardien).
 
 ## 7. Ce qui reste (non fait, ou fait mais pas prouvé)
 
