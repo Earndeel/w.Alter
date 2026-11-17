@@ -4,7 +4,7 @@
 |---|---|
 | **Rôle** | Le seul moteur agentique de production de Walter : sessions persistantes, boucle d'agent, appels d'outils, sous-agents, interruptions, permissions appliquées, événements, reprise après incident. |
 | **Propriétaire** | walter-core (`/walter/core`, composante « core » de la vision). |
-| **État** | **En service** : Walter Engine est le runtime de production depuis le 10/11/2026 (lots E1–E9, tableau `/walter/docs/V1.md`) — noyau DSH 0.2.0-rc.2 figé et vérifié (`kernel/`, `walter engine kernel`), installé dans `/opt/dsh` (`dsh-web.service`), composé par `walter harness install dsh` avec les greffons Walter (`plugins/` : accueil, événements, politique, budget), l'Engine API (:8895, `core/interfaces/api`) et la porte Telegram (`core/interfaces/telegram`). Hermes est arrêté. Socle du 12/11 (`/walter/docs/SOCLE.md`) : fenêtre du tour décidée par walter-context, contexte dégradé déclaré, tâche durable et expérience d'exécution portées par le Run Plane, plafonds par niveau de plan ; scénarios de bout en bout `core/scenarios/{v1,socle}/`. |
+| **État** | **En service, natif depuis le 17/11/2026 16:21 UTC** : `walter_engine/` (Python, ≈ 5 400 lignes) possède tout le runtime — boucle, sessions et journal, outils, noyau Python persistant (droits du moteur), sous-agents, tâches de fond, réveils, reprise après redémarrage ou crash, Engine API v1 (:8895), porte web (:3080) — unité `walter-engine.service`, état `@instance/state/core/engine/native`. DSH (`/opt/dsh`, `dsh-web`) est **arrêté et masqué**, gardé pour le retour arrière ; ses 199 conversations ont été reprises (`walter-python -m walter_engine import-dsh`). Parité, preuves avec DSH arrêté, chemin critique : [docs/08-NATIF.md](docs/08-NATIF.md). Historique : moteur DSH composé par greffons du 10/11 au 17/11 (lots E1–E9, `/walter/docs/V1.md`, socle du 12/11 `/walter/docs/SOCLE.md`). |
 | **Ne fait pas** | Choisir un modèle (Router), composer le contexte (Context), se souvenir (Memory), définir l'identité (Soul), décider l'intention d'un message (preflight de Context). Il les appelle par leurs interfaces déclarées et ne refait aucune de leurs décisions. |
 | **Contrats** | Schémas brouillons dans [contracts/](contracts/), expliqués dans [docs/02-ARCHITECTURE.md § 4](docs/02-ARCHITECTURE.md#4-contrats). Réutilisés tels quels : ContextPlan v2 et ChildContextSpec v1 (Context), passerelle de modèles OpenAI-compatible (Router), outils MCP walter (core), Run Plane (`runs.*`), bus Walter, vocabulaire walter_logs. |
 | **Référence** | `/walter/docs/VISION.md` (§ 4 Core, § 8 flux, § 9 principes) ; décisions : `DECISIONS.md` 2026-11-09. |
@@ -22,15 +22,18 @@
    [docs/05-CARTOGRAPHIE.md](docs/05-CARTOGRAPHIE.md) (arborescence actuelle → cible).
 5. Lire [docs/07-CONVERGENCE.md](docs/07-CONVERGENCE.md) (16/11) : noyau Python persistant en bulle, tours de
    réveil, Walter Decision — scénarios, mesures avant/après, ce qui reste.
-6. Règle documentaire commune : `/walter/docs/DOCUMENTATION.md`.
+6. Lire [docs/08-NATIF.md](docs/08-NATIF.md) (17/11) : le moteur natif, matrice de parité avec DSH, validation avec
+   DSH arrêté, chemin critique d'un tour, retour arrière.
+7. Règle documentaire commune : `/walter/docs/DOCUMENTATION.md`.
 
 ## Règles qui s'appliquent à ce dossier
 
-- **Un seul runtime** (vision § 9). On ne construit pas de troisième boucle : le moteur est la base DSH/Cordis figée,
-  adaptée par des greffons Walter. La boucle des sous-agents de `walter_run` est absorbée, pas copiée.
-- **Le code amont n'est pas modifié.** Les adaptations passent par les points d'extension publics de Cordis/DSH
-  (greffons, remplacement par identifiant). Un manque de point d'extension est consigné, mesuré par Lab, puis
-  seulement corrigé.
+- **Un seul runtime** (vision § 9) : `walter_engine/`, natif depuis le 17/11. On ne construit pas de seconde boucle ;
+  la délégation de `walter_run` passe par l'Engine API (`delegate`). Le moteur ne réimplémente aucun module : runs,
+  bus et divulgation chez Memory, plan et fenêtre chez Context, modèles chez le Router, politique dans `core/security`.
+- **DSH/Cordis n'est plus une dépendance d'exécution** : `kernel/`, `plugins/*.mjs` et `/opt/dsh` ne servent qu'au
+  retour arrière (et `import-dsh`, une fois). Le moteur tourne avec `InaccessiblePaths=/opt/dsh` : une dépendance
+  cachée échouerait au lieu de passer inaperçue.
 - **Une seule source de vérité.** Pas de second journal, registre, bus ou mémoire : le moteur écrit dans les
   mécanismes existants (Run Plane, walter_logs, bus, `core.events` par Memory).
 - **Documentation auto-descriptive** (règle de Monsieur du 09/11, `/walter/docs/DOCUMENTATION.md`) : chaque

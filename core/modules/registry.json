@@ -1019,9 +1019,19 @@
       "services": [
         "walter-standby.timer",
         "walter-telegram.service",
-        "dsh-web.service"
+        "walter-engine.service"
       ],
       "service_code": {
+        "walter-engine": {
+          "code_roots": [
+            "/walter/core/engine/walter_engine",
+            "/walter/core/engine/plugins/python/runtime"
+          ],
+          "code_files": [
+            "/walter/core/security/policy.json",
+            "/walter/core/config/engine.toml"
+          ]
+        },
         "dsh-web": {
           "code_roots": [
             "/walter/core/engine/plugins",
@@ -1141,7 +1151,7 @@
         {
           "id": "engine",
           "path": "/walter/core/engine",
-          "role": "Runtime agentique unique de Walter : noyau DSH/Cordis approprié (base adaptable) + greffons et portes Walter ; en service dans /opt/dsh (dsh-web)",
+          "role": "Runtime agentique unique de Walter : moteur natif walter_engine (walter-engine.service, depuis le 17/11/2026 ; boucle, sessions, outils, Python, sous-agents, tâches, Engine API) ; ancien noyau DSH/Cordis gelé dans /opt/dsh, arrêté (retour arrière seulement)",
           "status": "implemented",
           "readme": "/walter/core/engine/README.md",
           "vision_target": "core/engine"

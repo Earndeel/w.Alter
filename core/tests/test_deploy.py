@@ -145,6 +145,7 @@ class RepairTests(Tree):
         self.assertEqual(deploy.decide(engine, busy=None, now=T0), 'defer:engine_state_unknown')
         self.assertEqual(deploy.decide(engine, busy=0, now=T0), 'restart')
         self.assertEqual(deploy.decide({'unit': 'walter-telegram', 'stale': True}, busy=2, now=T0), 'defer:turn_in_flight')
+        self.assertEqual(deploy.decide({'unit': 'walter-engine', 'stale': True}, busy=1, now=T0), 'defer:turn_in_flight')
         self.assertEqual(deploy.decide(stale, now=T0, enabled=False), 'defer:repair_disabled')
         self.assertEqual(deploy.plan({'services': [stale]}, history={}, now=T0, enabled=False),
                          {'walter-llm': 'defer:repair_disabled'})
@@ -154,9 +155,10 @@ class RepairTests(Tree):
             returncode = 0
             stdout = json.dumps([{'status': 'open', 'runtime': 'dsh', 'seconds': 40},
                                  {'status': 'open', 'runtime': 'dsh', 'seconds': 99999},       # abandoned, not a turn
+                                 {'status': 'open', 'runtime': 'walter', 'seconds': 20},       # native engine (17/11)
                                  {'status': 'open', 'runtime': 'claude_code', 'seconds': 10},
                                  {'status': 'ended', 'runtime': 'dsh', 'seconds': 10}])
-        self.assertEqual(deploy.turns_in_flight(lambda *a, **k: R()), 1)
+        self.assertEqual(deploy.turns_in_flight(lambda *a, **k: R()), 2)
         self.assertIsNone(deploy.turns_in_flight(lambda *a, **k: (_ for _ in ()).throw(OSError())))
 
     def test_restart_dry_run_and_refusal_never_touch_systemd(self):
@@ -214,8 +216,8 @@ class ContractTests(unittest.TestCase):
     def test_live_registry_declares_engine_code(self):
         from walter_platform import registry
         units, code = deploy.declared_services(registry.load())
-        self.assertIn('dsh-web', units)
-        self.assertTrue(any(p.endswith('ports/dsh') for p in code['dsh-web']['code_roots']))
+        self.assertIn('walter-engine', units)   # native engine since 2026-11-17; dsh-web is the stopped rollback
+        self.assertTrue(any(p.endswith('engine/walter_engine') for p in code['walter-engine']['code_roots']))
         self.assertNotIn('walter-standby', units)   # timers are not long-running
 
     def test_core_guardian_may_restart_every_declared_service_and_nothing_else(self):

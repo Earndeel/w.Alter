@@ -118,6 +118,18 @@ def test_failed_and_cancelled_turns_are_said(door):
     assert door.tg.sent()[-1] == "à moitié\n\n⏹ Interrompu."
 
 
+def test_an_engine_restart_says_resumed_only_when_the_engine_resumes(door):
+    sid = "s"
+    door.on_event(CHAT, sid, {"type": "turn.started"})
+    door.on_event(CHAT, sid, {"type": "turn.ended", "status": "interrupted"})
+    assert "Redis-moi" in door.tg.sent()[-1]          # health without `resumes_interrupted` (DSH): ask to repeat
+    door._resumes = None
+    door.engine.op = lambda body, timeout=60: {"ok": True, "resumes_interrupted": True}
+    door.on_event(CHAT, sid, {"type": "turn.started"})
+    door.on_event(CHAT, sid, {"type": "turn.ended", "status": "interrupted"})
+    assert door.tg.sent()[-1] == B.RESUMED_NOTICE      # native engine: it picks the request up by itself
+
+
 def test_approval_buttons_answer_the_engine_as_the_owner(door):
     door.on_event(CHAT, "s", {"type": "approval.requested", "request_id": "r-1", "tool": "mcp__walter__browser_session",
                               "reason": "ouvrir Google"})

@@ -63,10 +63,31 @@ def main() -> int:
         results.append((name, ok, info))
         print(f"{'ok  ' if ok else 'FAIL'} {name:<10} {time.time() - t0:6.1f}s  {info}", flush=True)
 
+    sessions: set = set()
+    stop = threading.Event()
+
+    def approver():
+        # The test account is judged under the `test` preset (native engine, 17/11): every delegation and shell call
+        # ASKS. The scenario answers its own conversations' requests as the account itself (allow_once) — except the
+        # policy check, whose never-rule refuses before any request exists.
+        while not stop.is_set():
+            for sid in list(sessions):
+                try:
+                    _, r = api.op({'op': 'approval.list', 'session_id': sid}, timeout=10)
+                    for p in r.get('approvals') or []:
+                        api.op({'op': 'approval.answer', 'request_id': p['request_id'], 'decision': 'allow_once',
+                                'principal': owner}, timeout=10)
+                except Exception:  # noqa: BLE001 — the engine may be restarting
+                    pass
+            stop.wait(0.5)
+
+    threading.Thread(target=approver, daemon=True).start()
+
     def session(conv):
         s, r = api.op({'op': 'session.open', 'interface': 'telegram', 'conversation': f'e5-{conv}-{run}',
                        'principal': owner, 'mode': 'interactive'})
         assert s == 200, r
+        sessions.add(r['session_id'])
         return r['session_id']
 
     def submit(sid, text, key, wait_ms=300000):
@@ -107,6 +128,9 @@ def main() -> int:
         return s == 200 and res.get('status') == 'cancelled', f"cancel={s} status={res.get('status')} tools={res.get('tools')}"
 
     def c_delegate():
+        # A delegation's run is `machine` for a real caller; the test account's own runs are `test` since 17/11
+        # (mission « Native Engine » §10: test traffic never counted as the owner's or the machine's).
+        want_channel = 'test' if owner['id'] == 'e2e' else 'machine'
         parent = a_parent_run()
         s, r = api.op({'op': 'delegate', 'caller': 'e2e', 'delegation': {
             'version': 1, 'goal': 'Donne seulement le résultat de 12*12.', 'task': 'general', 'budget_seconds': 120,
@@ -120,7 +144,7 @@ def main() -> int:
             'parent': {'run_id': parent, 'depth': 0}}}, timeout=60)
         r2 = r2.get('result', r2)
         return s == 200 and r.get('ok') and '144' in r.get('output', '') and mine and \
-            mine[0]['origin'].get('channel') == 'machine' and r2.get('resumed') and len(runs_under(parent)) == len(kids), \
+            mine[0]['origin'].get('channel') == want_channel and r2.get('resumed') and len(runs_under(parent)) == len(kids), \
             f"« {r.get('output', '')[:30]} » child runs={len(mine)} channel={mine[0]['origin'].get('channel') if mine else None} replay resumed={r2.get('resumed')}"
 
     def c_depth():
@@ -146,6 +170,7 @@ def main() -> int:
     for name, fn in (('depth', c_depth), ('delegate', c_delegate), ('router', c_router), ('parallel', c_parallel),
                      ('policy', c_policy), ('interrupt', c_interrupt)):
         check(name, fn)
+    stop.set()
     failed = [n for n, ok, _ in results if not ok]
     print(json.dumps({'run': run, 'passed': len(results) - len(failed), 'failed': failed}))
     return 1 if failed else 0

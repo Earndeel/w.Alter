@@ -4,13 +4,13 @@ Telegram itself is simulated (recording stand-in), the engine is the real one; a
 own conversations, never the owner's.
   door_restart    the door stops in the middle of a turn, a new door takes over from its saved state: the answer is
                   delivered once, by the new door
-  engine_restart  the engine (dsh-web) restarts in the middle of a turn: the door says so, the turn is not replayed
+  engine_restart  the engine (walter-engine) restarts in the middle of a turn: the door says so, the turn is not replayed
                   (one owner message in the log), the same conversation answers the next message with its memory
   tool_failure    a tool fails (missing file): the turn ends normally and says what happened
   model           a model the Router cannot run → explicit refusal (422) before any session, never another loop
   budget          a delegated task over its time budget is interrupted and said so (cancelled, budget_seconds)
   delegate_replay the same delegated task sent twice (same idempotency key) runs once
-Restarting dsh-web interrupts whatever runs on it: run this on the development instance only, at a quiet moment.
+Restarting the engine interrupts whatever runs on it: run this on the development instance only, at a quiet moment.
 
     walter-python core/scenarios/v1/engine_e8.py [--only door_restart,tool_failure]
 """
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -28,8 +29,13 @@ HERE = Path(__file__).resolve()
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parents[2] / "interfaces" / "telegram"))
 import bot as B  # noqa: E402
-from telegram_door import TEST_USER, RecordingTg  # noqa: E402
+from telegram_door import TEST_USER, RecordingTg, auto_allow  # noqa: E402
 
+
+
+# the engine's unit: walter-engine (native, 17/11) unless the rollback re-enabled dsh-web; WALTER_ENGINE_UNIT overrides
+ENGINE_UNIT = os.environ.get("WALTER_ENGINE_UNIT") or ("dsh-web" if subprocess.run(
+    ["systemctl", "is-enabled", "walter-engine"], capture_output=True, text=True).stdout.strip() != "enabled" else "walter-engine")
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -76,11 +82,16 @@ def main() -> int:
         b = json.loads((root / "state/core/engine/api/bindings.json").read_text())
         return b["sessions"][sid]["kernel"]
 
+    def log_keys(kernel):
+        # a session's key in walter_logs: walter/vm/<id> (native engine), dsh/vm/<id> (DSH, and sessions imported from it)
+        return [f"walter/vm/{kernel}", f"dsh/vm/{kernel}"]
+
     def owner_messages(sid, needle):
         from walter_memory import db
         with db.connect() as c:
-            return c.execute("""select count(*) n from walter_logs.events where session_id = %s and type = 'user/message'
-                                and text like %s""", (f"dsh/vm/{kernel_of(sid)}", f"{needle}%")).fetchone()["n"]
+            return c.execute("""select count(*) n from walter_logs.events where session_id = any(%s)
+                                and type = 'user/message' and coalesce(data->'source'->>'kind', 'user') = 'user' and text like %s""",
+                             (log_keys(kernel_of(sid)), f"{needle}%")).fetchone()["n"]
 
     def c_door_restart():
         chat = 30_000_000 + mid[0] % 1_000_000
@@ -104,13 +115,14 @@ def main() -> int:
         chat = 31_000_000 + mid[0] % 1_000_000
         tg = RecordingTg()
         d = new_door(tg)
+        allow = auto_allow(d, tg)          # test preset: the resumed research asks before its shell / web calls
         say(d, chat, f"Retiens le code PIVOINE-{run}. Réponds seulement « noté ».")
         wait_texts(tg, 0, 120)
         n = len(tg.calls)
         say(d, chat, f"Test de panne {run} : cherche sur le web les trois dernières versions de Node.js et détaille "
                      "chacune en un paragraphe.")
         time.sleep(6)
-        subprocess.run(["systemctl", "restart", "dsh-web"], check=True)
+        subprocess.run(["systemctl", "restart", ENGINE_UNIT], check=True)
         said = wait_texts(tg, n, 120, lambda t: any("redémarr" in x or "échoué" in x or "Interrompu" in x for x in t))
         for _ in range(60):                              # engine back
             try:
@@ -121,12 +133,19 @@ def main() -> int:
         time.sleep(3)
         n2 = len(tg.calls)
         say(d, chat, "Quel est le code que je t'ai demandé de retenir ? Donne-le seul.")
-        after = wait_texts(tg, n2, 180)
+        code = f"PIVOINE-{run}".lower()
+        after = wait_texts(tg, n2, 300, lambda t: any(code in x.lower() for x in t))
         sid = d.sessions[chat]
         once = owner_messages(sid, f"Test de panne {run}")
+        # the native engine resumes the cut request by itself (a notice, then the work, never the owner's message
+        # again); DSH asked the owner to repeat it
+        resumes = bool(d.engine.op({"op": "health"}, timeout=10).get("resumes_interrupted"))
+        resumed = any("node" in x.lower() for x in tg.texts(n) if not x.startswith(("🔐", "⚠️")))
+        allow.set()
         d.stop.set()
-        return any(f"PIVOINE-{run}".lower() in x.lower() for x in after) and once == 1 and bool(said), \
-            f"said={said[-1][:50] if said else None!r} replays={once} continuity={after[-1][:30] if after else None!r}"
+        return any(code in x.lower() for x in after) and once == 1 and bool(said) and (resumed or not resumes), \
+            f"said={said[-1][:50] if said else None!r} replays={once} resumed={resumed} " \
+            f"continuity={next((x for x in after if code in x.lower()), after[-1] if after else '')[:30]!r}"
 
     def c_tool_failure():
         chat = 32_000_000 + mid[0] % 1_000_000
@@ -179,8 +198,10 @@ def main() -> int:
         from walter_memory import db
         bind = json.loads((root / "state/core/engine/api/bindings.json").read_text())["sessions"][a_["session_id"]]
         with db.connect() as c:
-            n = c.execute("""select count(*) n from walter_logs.events where session_id = %s and type = 'user/message'
-                             and text like %s""", (f"dsh/vm/{bind['kernel']}", f"%{word}%")).fetchone()["n"]
+            # the caller's message only: the context block walter-context adds to the turn quotes it (source walter-intake)
+            n = c.execute("""select count(*) n from walter_logs.events where session_id = any(%s)
+                             and type = 'user/message' and coalesce(data->'source'->>'kind', 'user') = 'user' and text like %s""",
+                          (log_keys(bind['kernel']), f"%{word}%")).fetchone()["n"]
         return word in (a_.get("output") or "") and a_.get("session_id") == b_.get("session_id") and n == 1, \
             f"first={a_.get('status')} again={b_.get('status')} « {(b_.get('output') or '')[:30]} » executed={n}"
 

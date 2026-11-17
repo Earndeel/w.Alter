@@ -23,3 +23,8 @@ core = [
 # 2026-11-07 (lot 3, stage-measured): simple messages −38 % / −43 % prompt tokens, same answers and latency.
 toolset = "core"
 module_layer = "m0"
+
+[clients.engine]
+# 2026-11-17: Walter Engine natif (production depuis la bascule) — même jeu que DSH ; le reste via walter_call.
+toolset = "core"
+module_layer = "m0"

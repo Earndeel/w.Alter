@@ -52,12 +52,30 @@
   "services": [
     "walter-standby.timer",
     "walter-telegram.service",
-    "dsh-web.service"
+    "walter-engine.service"
   ],
   "service_code": {
+    "walter-engine": {
+      "code_roots": [
+        "engine/walter_engine",
+        "engine/plugins/python/runtime"
+      ],
+      "code_files": [
+        "security/policy.json",
+        "config/engine.toml"
+      ]
+    },
     "dsh-web": {
-      "code_roots": ["engine/plugins", "interfaces/api", "interfaces/web"],
-      "code_files": ["/opt/dsh/home/cordis.patch.yml", "/opt/dsh/home/walter-hooks.json", "/opt/dsh/home/profiles/web/cordis.patch.yml"]
+      "code_roots": [
+        "engine/plugins",
+        "interfaces/api",
+        "interfaces/web"
+      ],
+      "code_files": [
+        "/opt/dsh/home/cordis.patch.yml",
+        "/opt/dsh/home/walter-hooks.json",
+        "/opt/dsh/home/profiles/web/cordis.patch.yml"
+      ]
     }
   },
   "optional": [],
@@ -166,7 +184,7 @@
     {
       "id": "engine",
       "path": "engine",
-      "role": "Runtime agentique unique de Walter : noyau DSH/Cordis approprié (base adaptable) + greffons et portes Walter ; en service dans /opt/dsh (dsh-web)",
+      "role": "Runtime agentique unique de Walter : moteur natif walter_engine (walter-engine.service, depuis le 17/11/2026 ; boucle, sessions, outils, Python, sous-agents, tâches, Engine API) ; ancien noyau DSH/Cordis gelé dans /opt/dsh, arrêté (retour arrière seulement)",
       "status": "implemented",
       "readme": "engine/README.md",
       "vision_target": "core/engine"
@@ -488,8 +506,15 @@
       "role": "Fraîcheur du déploiement : chaque service long compare son démarrage au code qu'il charge (imports statiques + racines déclarées `service_code`) ; réparation gardée du gardien core (redémarrage, interrupteur config/deploy.toml)",
       "status": "active",
       "readme": "README.md",
-      "contracts": ["contracts/core.json"],
-      "interfaces": [{"transport": "cli", "interface": "walter deploy status|check|restart"}],
+      "contracts": [
+        "contracts/core.json"
+      ],
+      "interfaces": [
+        {
+          "transport": "cli",
+          "interface": "walter deploy status|check|restart"
+        }
+      ],
       "vision_target": "ops"
     }
   ]

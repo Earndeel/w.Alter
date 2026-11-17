@@ -39,7 +39,8 @@ EXCLUDE_DIRS = {'.git', '__pycache__', 'node_modules', 'venv', '.venv', 'tests',
 TOLERANCE_S = 2.0
 RESTART_EVERY_S = 3600              # one restart per service per hour
 TURN_MAX_S = 1800                   # an open engine run older than this is not a turn in flight
-ENGINE_UNITS = {'dsh-web', 'walter-telegram'}   # interrupting them drops a running owner turn
+ENGINE_UNITS = {'walter-engine', 'dsh-web', 'walter-telegram'}   # interrupting them drops a running owner turn
+ENGINE_RUNTIMES = {'walter', 'dsh'}   # Memory run plane: native engine (17/11) and the DSH rollback
 PYTHON = re.compile(r'(^|/)(python3?(\.\d+)?|walter-python)$')
 
 
@@ -422,7 +423,7 @@ def turns_in_flight(runner=subprocess.run):
         return None
     if r.returncode or not isinstance(rows, list):
         return None
-    return sum(1 for x in rows if isinstance(x, dict) and x.get('status') == 'open' and x.get('runtime') == 'dsh'
+    return sum(1 for x in rows if isinstance(x, dict) and x.get('status') == 'open' and x.get('runtime') in ENGINE_RUNTIMES
                and (x.get('seconds') or 0) < TURN_MAX_S)
 
 

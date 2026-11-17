@@ -31,7 +31,7 @@ HERE = Path(__file__).resolve()
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parents[2] / "interfaces" / "telegram"))
 import bot as B  # noqa: E402
-from telegram_door import TEST_USER, RecordingTg  # noqa: E402
+from telegram_door import TEST_USER, RecordingTg, auto_allow  # noqa: E402
 
 PHRASE = "Recherche trois options pour accomplir cette tâche, compare-les, choisis la meilleure et prépare le résultat"
 
@@ -42,8 +42,14 @@ def db():
 
 
 def kernel_of(root: Path, sid: str) -> str:
-    b = json.loads((root / "state/core/engine/api/bindings.json").read_text())
-    return "dsh/vm/" + b["sessions"][sid]["kernel"]
+    """The session's key in walter_logs and runs: the native engine's header says it (walter/vm/<id>, or dsh/vm/<id> for
+    a conversation imported from DSH); without a native journal, DSH's."""
+    k = json.loads((root / "state/core/engine/api/bindings.json").read_text())["sessions"][sid]["kernel"]
+    try:
+        with open(root / f"state/core/engine/native/sessions/{k}.jsonl", encoding="utf-8") as fh:
+            return json.loads(fh.readline()).get("walter_key") or "walter/vm/" + k
+    except OSError:
+        return "dsh/vm/" + k
 
 
 def trace(root: Path, sid: str) -> dict:
@@ -58,11 +64,11 @@ def trace(root: Path, sid: str) -> dict:
         ev = c.execute("""select type, tool, status, text, seq from walter_logs.events where session_id = %s
                           and seq >= (select min(seq) from walter_logs.events where session_id = %s and type = 'user/message'
                                       and text like %s) order by seq""", (k, k, PHRASE[:40] + "%")).fetchall()
-        children = c.execute("select run_id, status from runs.runs where parent_run_id = %s and origin->>'channel' = 'machine'",
-                             (rid,)).fetchall()
+        children = c.execute("""select run_id, status from runs.runs where parent_run_id = %s
+                                and origin->>'channel' in ('machine', 'test')""", (rid,)).fetchall()
         models = c.execute("""select model_id, provider, task, ok from models.exec_log where run_id = any(%s)""",
                            ([rid, *[ch["run_id"] for ch in children]],)).fetchall()
-        core_n = c.execute("""select count(*) n from core.events where source = 'dsh'
+        core_n = c.execute("""select count(*) n from core.events where source in ('dsh', 'walter')
                               and (payload->>'session_id' = %s or thread_id = %s)""",
                            (k.split("/")[-1], k.split("/")[-1])).fetchone()["n"]
         episode = c.execute("select count(*) n from runs.links where run_id = %s and kind = 'episode'", (rid,)).fetchone()["n"]
@@ -87,7 +93,9 @@ def found_choice(chosen: str, later: str) -> bool:
     return bool(words) and any(w in later.lower() for w in words)
 
 
-def judge(t: dict, delivered: bool, result_file: bool | None) -> list[tuple[str, bool, str]]:
+def judge(t: dict, delivered: bool, result_file: bool | None, test: bool = False) -> list[tuple[str, bool, str]]:
+    """`test`: the conversation is the test account's — since 17/11/2026 it never enters core.events (Monsieur's life),
+    only walter_logs: step 8 then checks that it stayed out."""
     req = t.get("requested") or {}
     acts = [x for x in t.get("tools", []) if x not in ("subagent",)]
     return [
@@ -101,8 +109,11 @@ def judge(t: dict, delivered: bool, result_file: bool | None) -> list[tuple[str,
         ("6 actions", bool(acts) and t.get("refused", 0) == 0 and result_file is not False,
          f"{len(acts)} actions, {t.get('refused')} refusées, fichier résultat {result_file}"),
         ("7 résultat", delivered, "réponse livrée sur Telegram" if delivered else "aucune réponse"),
-        ("8 garder", t.get("logged", 0) > 0 and t.get("core_events", 0) > 0 and t.get("status") != "open",
-         f"walter_logs {t.get('logged')}, core.events {t.get('core_events')}, run {t.get('status')}, épisode {t.get('episode')}"),
+        ("8 garder", t.get("logged", 0) > 0 and t.get("status") != "open"
+         and (t.get("core_events", 0) == 0 if test else t.get("core_events", 0) > 0),
+         f"walter_logs {t.get('logged')}, core.events {t.get('core_events')}"
+         f"{' (compte de test : doit rester hors de la mémoire)' if test else ''}, run {t.get('status')}, "
+         f"épisode {t.get('episode')}"),
     ]
 
 
@@ -145,6 +156,7 @@ def main() -> int:
 
     out_file = f"{root}/workspace/e2e/resultat-v1-{run}.md"     # inside the engine's workspace: no approval
     t0 = time.time()
+    allow = auto_allow(door, tg)              # test preset: sub-agents and shell calls ask, answered by the account
     say(f"{PHRASE}. Tâche : convertir des notes Markdown en PDF sur ce serveur, avec un outil libre, sans rien "
         f"installer pour l'instant. Fais étudier les trois options en parallèle par des sous-agents. Prépare le résultat "
         f"dans le fichier {out_file} (comparatif court + choix motivé). Commence ta réponse par « Choix : <nom de "
@@ -157,7 +169,7 @@ def main() -> int:
     print(f"  tour V1 : {time.time() - t0:.0f}s, réponse « {' '.join(answer)[:100]} »", flush=True)
     time.sleep(10)
     t = trace(root, sid)
-    steps = judge(t, delivered, Path(out_file).is_file())
+    steps = judge(t, delivered, Path(out_file).is_file(), test=True)
 
     # 9: later, in a new conversation, the task and the choice are found again
     time.sleep(a.wait_memory)
@@ -169,6 +181,7 @@ def main() -> int:
     later = " ".join(final(n, 300)).lower()
     found = "pdf" in later and found_choice(chosen, later)
     steps.append(("9 retrouver", found, f"choix « {chosen[:30]} » ; réponse « {later[:90]} »"))
+    allow.set()
     door.stop.set()
     for name, ok, info in steps:
         print(f"{'ok  ' if ok else 'FAIL'} {name:<17} {info}", flush=True)

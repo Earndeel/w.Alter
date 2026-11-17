@@ -450,8 +450,11 @@ def walter_health() -> str:
     units = _stack_units()
     states = subprocess.run(["systemctl", "is-active", *units], capture_output=True, text=True).stdout.split()
     out += [f"{u}: {s}" for u, s in zip(units, states)]
-    eng = subprocess.run(["systemctl", "is-active", "dsh-web", "walter-telegram"], capture_output=True, text=True)
-    out.append("walter engine (dsh-web) / telegram door: " + " / ".join(eng.stdout.split()))
+    # the engine's unit: walter-engine (native, 17/11) unless the rollback re-enabled dsh-web
+    unit = "dsh-web" if subprocess.run(["systemctl", "is-enabled", "walter-engine"], capture_output=True,
+                                       text=True).stdout.strip() != "enabled" else "walter-engine"
+    eng = subprocess.run(["systemctl", "is-active", unit, "walter-telegram"], capture_output=True, text=True)
+    out.append(f"walter engine ({unit}) / telegram door: " + " / ".join(eng.stdout.split()))
     try:  # SOCLE A8: a service running old code looked healthy for 4 h on 2026-11-11
         r = subprocess.run(["walter", "deploy", "check", "--json"], capture_output=True, text=True, timeout=120)
         d = json.loads(r.stdout)

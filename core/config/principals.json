@@ -1,0 +1,5 @@
+{
+ "_doc": "Who speaks through the engine's doors (Core identity, 2026-11-17). An account named here is resolved by the engine, never by what a client claims: `owner` = the instance owner's accounts (owner-only operations, channel owner); `test` = test accounts (their conversations are test conversations: channel test, capped by walter-llm's test budget, never an objective in the owner's list). An instance overrides this file in @instance/config/core/principals.json.",
+ "owner": ["owner"],
+ "test": ["e2e"]
+}

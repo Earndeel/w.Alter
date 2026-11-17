@@ -49,6 +49,33 @@ class RecordingTg:
         return [p["text"] for m, p in self.calls[since:] if m == "sendMessage" and not p.get("disable_notification")]
 
 
+def auto_allow(door, tg, since: int = 0) -> threading.Event:
+    """Press « Autoriser une fois » on every approval the door shows from `since` on; set the returned event to stop.
+
+    The test account is judged under the `test` preset (native engine, 17/11/2026): shell, Python and sub-agents ASK.
+    A check that is not about approvals answers its own requests through the door's buttons, as the account itself —
+    the approval path is exercised on every run, never bypassed."""
+    stop, seen = threading.Event(), set()
+
+    def run():
+        while not stop.is_set():
+            with tg.lock:
+                calls = list(tg.calls[since:])
+            for m, p in calls:
+                for row in (p.get("reply_markup") or {}).get("inline_keyboard") or [] if m == "sendMessage" else []:
+                    for b in row:
+                        data = b.get("callback_data") or ""
+                        if data.startswith("ap|") and data.endswith("|a") and data not in seen:
+                            seen.add(data)
+                            try:
+                                door.on_callback({"id": "auto", "from": {"id": TEST_USER}, "data": data})
+                            except Exception:  # noqa: BLE001 — engine restarting: the request is asked again
+                                seen.discard(data)
+            stop.wait(0.5)
+    threading.Thread(target=run, daemon=True).start()
+    return stop
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default=None)
@@ -143,10 +170,15 @@ def main() -> int:
 
     def c_stop():
         n = len(tg.calls)
+        allow = auto_allow(door, tg, n)                   # the test preset asks before the shell call runs
         say("Test d'interruption : exécute `sleep 120` dans bash puis réponds « fini ».")
         time.sleep(25)
         say("/stop")
-        t = answer(n, timeout=90)
+        end = time.time() + 90
+        while time.time() < end and not any("Interrompu" in x for x in tg.texts(n)):
+            time.sleep(1)
+        allow.set()
+        t = [x for x in tg.texts(n) if not x.startswith("🔐")]
         return any("Interrompu" in x for x in t), f"« {' | '.join(t)[:80]} »"
 
     for name, fn in (("identity", c_identity), ("continuity", c_continuity), ("replay", c_replay),

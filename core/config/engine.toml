@@ -28,3 +28,29 @@ L1 = { checkpoint = 8, max_steps = 20, max_turn_min = 10 }
 L2 = { checkpoint = 14, max_steps = 36, max_turn_min = 20 }
 L3 = { checkpoint = 24, max_steps = 60, max_turn_min = 35 }
 L4 = { checkpoint = 36, max_steps = 80, max_turn_min = 45 }
+
+# ── Walter Engine natif (2026-11-17, mission « Walter Native Engine ») ──────────────────────────────────────────────
+# Le moteur de production en Python (core/engine/walter_engine), sans DSH/Cordis : boucle, sessions, outils, Python
+# persistant, sous-agents, tâches, réveils, Engine API v1 et porte web. Les plafonds de tour restent ceux de
+# [dsh.budget] (mêmes niveaux d'effort, lus par le moteur natif) tant que le moteur DSH sert de retour arrière.
+[native]
+api_host = "127.0.0.1"
+api_port = 8895
+web_host = "127.0.0.1"
+web_port = 3080
+trusted_hosts = []                # Host headers the web door accepts besides loopback (an instance adds its own)
+workspace = "@instance/workspace"
+instructions = "@instance/profiles/engine/AGENTS.md"   # Walter's identity, rendered by walter-soul (target `engine`); "" = none
+model = "auto"                    # Walter Router poste of an owner turn (walter-llm plans it from the run)
+models = ["auto", "coding", "general", "document", "summarization"]
+max_depth = 3                     # sub-agents: a child never goes deeper
+approval_timeout_min = 10
+tool_result_chars = 8192          # a longer tool result is cut for the model (head + tail), the original stays
+tool_result_head = 4096
+tool_result_tail = 1024
+context_window = 200000           # tokens the main model accepts (walter-context decides the window inside it)
+resume_interrupted = true         # a turn cut by a restart resumes from its journal (never re-running a done action)
+python = "full"                   # full = the engine's own rights; sandbox = the old walter-sandbox bubble
+python_idle_min = 30
+python_interpreter = "/services/python/engine-python/bin/python"
+web_cookie_days = 30

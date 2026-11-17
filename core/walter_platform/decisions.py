@@ -20,6 +20,20 @@ or Core is edited.
         "consumers": ["<module>.<part>"],
         "since": "YYYY-MM-DD"}}}
 
+Relations (Decision Resolver, 2026-11-17). Beside its signals a module may declare how answers relate — its own and
+other modules' signals, by global id — so that the answers of one decision are resolved deterministically before
+anyone acts on them (cognition/router/llm/resolver.py applies them; no model, no second orchestrator):
+
+    "relations": {"<name>": {
+        "type": "implies" | "excludes" | "depends",
+        "if":   <condition>,        # implies / excludes: the first side
+        "then": <condition>,        # implies: what must also hold; excludes: what cannot hold with `if`
+        "signal": "<id>", "on": <condition>,   # depends: the answer of `signal` only counts when `on` holds
+        "prefer": "if" | "then" | "none",       # who wins a real conflict (none: reported, nothing changed)
+        "strict": false,            # true: `prefer` wins even when it is the less sure side (a bench-validated rule)
+        "use": "why the relation holds", "since": "YYYY-MM-DD"}}
+    <condition> = {"signal": "<id>", "is" | "in" | "has" | "above" | "below": …} | {"fact": "name" | "!name"}
+
 The global id of a signal is `<module>.<name>`. `collect()` compiles the contracts afresh (never the registry file,
 which may lag behind them) and keeps every valid module's signals: one invalid file is reported in `problems` and
 left out, it never takes the others down.
@@ -41,6 +55,11 @@ FACT = re.compile(r"!?[a-z][a-z0-9_.:-]{0,63}\Z")
 CONSUMER = re.compile(r"[a-z][a-z0-9-]{0,63}(\.[a-z0-9_.-]{1,64})?\Z")
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
 MAX_SIGNALS = 32          # per module: a module that needs more questions than that asks them itself
+MAX_RELATIONS = 32
+REL_KEYS = {"type", "if", "then", "signal", "on", "prefer", "strict", "use", "since"}
+REL_TYPES = ("implies", "excludes", "depends")
+GLOBAL_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\.[a-z][a-z0-9_]{0,40}\Z")
+TESTS = {"is": str, "in": list, "has": str, "above": (int, float), "below": (int, float)}
 
 
 def _require(ok, message):
@@ -75,6 +94,55 @@ def check_signal(name: str, s) -> dict:
     return s
 
 
+def check_condition(where: str, c) -> dict:
+    _require(isinstance(c, dict), f"{where}: a condition is an object")
+    if "fact" in c:
+        _require(set(c) == {"fact"} and isinstance(c["fact"], str) and FACT.fullmatch(c["fact"]),
+                 f"{where}: {{fact: name | !name}}")
+        return c
+    tests = set(c) - {"signal"}
+    _require(isinstance(c.get("signal"), str) and GLOBAL_ID.fullmatch(c["signal"]), f"{where}: signal = <module>.<name>")
+    _require(len(tests) == 1 and tests <= set(TESTS), f"{where}: one test among {', '.join(TESTS)}")
+    t = tests.pop()
+    v = c[t]
+    _require(isinstance(v, TESTS[t]) and not isinstance(v, bool), f"{where}: {t} has the wrong type")
+    if t == "in":
+        _require(v and all(isinstance(x, str) for x in v), f"{where}: in = a non-empty list of options")
+    if t in ("above", "below"):
+        _require(0 <= float(v) <= 1, f"{where}: {t} is a probability")
+    return c
+
+
+def check_relation(name: str, r) -> dict:
+    """The envelope of one declared relation between answers (applied by Walter Decision's resolver)."""
+    _require(isinstance(name, str) and NAME.fullmatch(name), f"relation name {str(name)[:40]!r}: a-z, 0-9, _")
+    _require(isinstance(r, dict) and set(r) <= REL_KEYS, f"relation {name}: unknown keys {sorted(set(r or {}) - REL_KEYS)}")
+    _require(r.get("type") in REL_TYPES, f"relation {name}: type among {', '.join(REL_TYPES)}")
+    if r["type"] == "depends":
+        _require(isinstance(r.get("signal"), str) and GLOBAL_ID.fullmatch(r["signal"]), f"relation {name}: signal = <module>.<name>")
+        check_condition(f"relation {name}.on", r.get("on"))
+        _require("if" not in r and "then" not in r, f"relation {name}: depends takes signal + on")
+    else:
+        check_condition(f"relation {name}.if", r.get("if"))
+        check_condition(f"relation {name}.then", r.get("then"))
+        _require(r.get("prefer", "none") in ("if", "then", "none"), f"relation {name}: prefer is if, then or none")
+        _require(not ("fact" in r["then"] and r.get("prefer") == "if" and r["type"] == "implies"),
+                 f"relation {name}: a fact cannot be changed (prefer then, or none)")
+    _require(isinstance(r.get("strict", False), bool), f"relation {name}: strict is true or false")
+    _require(isinstance(r.get("use"), str) and len(r["use"].strip()) >= 8, f"relation {name}: use says why it holds")
+    if "since" in r:
+        _require(isinstance(r["since"], str) and DATE.fullmatch(r["since"]), f"relation {name}: since is YYYY-MM-DD")
+    return r
+
+
+def read_relations(path, module: str) -> list[dict]:
+    """One module's declared relations (an absent key = none), checked, with their global ids."""
+    doc = json.loads(Path(path).read_text())
+    rel = doc.get("relations", {})
+    _require(isinstance(rel, dict) and len(rel) <= MAX_RELATIONS, f"relations: 0..{MAX_RELATIONS} per module")
+    return [{"id": f"{module}.{name}", "module": module, **check_relation(name, r)} for name, r in rel.items()]
+
+
 def read(path, module: str) -> list[dict]:
     """One module's declared signals, checked, with their global ids."""
     p = Path(path)
@@ -94,7 +162,7 @@ def collect(catalog=None, *, root="/", occasion: str | None = None) -> dict:
     """Every module's declared signals → {version, hash, signals, sources, problems}. `hash` identifies the whole
     set (Walter Decision keys its compiled schemas and its journal on it)."""
     compiled = contracts.compile_registry(catalog, root=root)
-    out, sources, problems = [], [], []
+    out, relations, sources, problems = [], [], [], []
     for m in compiled["modules"]:
         path = m.get("decisions")
         if not path:
@@ -104,9 +172,24 @@ def collect(catalog=None, *, root="/", occasion: str | None = None) -> dict:
         except (OSError, ValueError) as exc:
             problems.append({"module": m["id"], "path": path, "error": str(exc)[:200]})
             continue
-        sources.append({"module": m["id"], "path": path, "signals": len(sigs)})
+        try:                                # a bad relation drops the module's relations, never its signals
+            rels = read_relations(Path(root) / str(path).lstrip("/"), m["id"])
+        except (OSError, ValueError) as exc:
+            problems.append({"module": m["id"], "path": path, "error": f"relations: {str(exc)[:180]}"})
+            rels = []
+        sources.append({"module": m["id"], "path": path, "signals": len(sigs), "relations": len(rels)})
         out += sigs
-    digest = hashlib.sha256(json.dumps(out, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
+        relations += rels
+    ids = {s["id"] for s in out}
+    for r in list(relations):               # a relation naming an undeclared signal is reported and left out
+        named = {c.get("signal") for c in (r.get("if"), r.get("then"), r.get("on")) if isinstance(c, dict)} | {r.get("signal")}
+        unknown = sorted(n for n in named if n and n not in ids)
+        if unknown:
+            problems.append({"module": r["module"], "relation": r["id"], "error": "unknown signals " + ", ".join(unknown)})
+            relations.remove(r)
+    digest = hashlib.sha256(json.dumps([out, relations], sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16] \
+        if relations else hashlib.sha256(json.dumps(out, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
     if occasion:
         out = [s for s in out if occasion in s["occasions"]]
-    return {"version": 1, "hash": digest, "signals": out, "sources": sources, "problems": problems}
+    return {"version": 1, "hash": digest, "signals": out, "relations": relations, "sources": sources,
+            "problems": problems}

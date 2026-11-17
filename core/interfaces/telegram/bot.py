@@ -311,6 +311,8 @@ END_NOTICE = {
     "interrupted": "⚠️ Mon moteur a redémarré pendant ce tour. Redis-moi si je dois reprendre.",
     "unknown_outcome": "⚠️ Ce tour s'est terminé sans issue claire.",
 }
+# 17/11/2026: the native engine resumes a turn cut by its restart on its own (health `resumes_interrupted`); DSH did not
+RESUMED_NOTICE = "⚠️ Mon moteur a redémarré pendant ce tour ; je reprends là où j'en étais."
 
 
 def _at(v) -> float | None:
@@ -494,7 +496,9 @@ class Bot:
                 self.send(chat, (turn.text + "\n\n" if turn.text else "") +
                           f"⚠️ Ce tour a échoué ({ev.get('reason') or 'erreur'}). Rien d'autre n'a été lancé à sa place.")
             else:
-                self.send(chat, (turn.text + "\n\n" if turn.text else "") + END_NOTICE.get(status, f"Fin : {status}"))
+                note = RESUMED_NOTICE if status == "interrupted" and self.engine_resumes() else \
+                    END_NOTICE.get(status, f"Fin : {status}")
+                self.send(chat, (turn.text + "\n\n" if turn.text else "") + note)
         elif kind == "stream.error":
             raise EngineError(0, ev.get("code") or "stream_error")
 
@@ -516,6 +520,15 @@ class Bot:
     # updates ---------------------------------------------------------------------------------------------------------
     def owner(self, user: dict | None) -> bool:
         return bool(user) and int(user.get("id", 0)) in self.s["owner_ids"]
+
+    def engine_resumes(self) -> bool:
+        """Does the engine resume a turn its restart cut (native engine: yes; DSH: no)? Asked once, when it matters."""
+        if getattr(self, "_resumes", None) is None:
+            try:
+                self._resumes = bool(self.engine.op({"op": "health"}, timeout=5).get("resumes_interrupted"))
+            except Exception:  # noqa: BLE001 — engine still coming back: say the cautious notice, ask again next time
+                return False
+        return self._resumes
 
     def handle(self, u: dict) -> None:
         if "callback_query" in u:

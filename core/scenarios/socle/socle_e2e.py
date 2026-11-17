@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -42,6 +43,11 @@ from telegram_door import TEST_USER, RecordingTg  # noqa: E402
 
 API = "http://127.0.0.1:8895"
 
+
+
+# the engine's unit: walter-engine (native, 17/11) unless the rollback re-enabled dsh-web; WALTER_ENGINE_UNIT overrides
+ENGINE_UNIT = os.environ.get("WALTER_ENGINE_UNIT") or ("dsh-web" if subprocess.run(
+    ["systemctl", "is-enabled", "walter-engine"], capture_output=True, text=True).stdout.strip() != "enabled" else "walter-engine")
 
 def sh(*cmd, timeout=120) -> subprocess.CompletedProcess:
     return subprocess.run(list(cmd), capture_output=True, text=True, timeout=timeout)
@@ -273,7 +279,7 @@ def main() -> int:
             # the engine restarts in the middle of step 2
             n = c.send(f"Continue la {marker} : avant l'étape 2, exécute `sleep 90` dans bash, puis fais l'étape 2.")
             time.sleep(25)
-            sh("systemctl", "restart", "dsh-web")
+            sh("systemctl", "restart", ENGINE_UNIT)
             up = engine_up()
             end = time.time() + 90
             while time.time() < end and not c.tg.texts(n):
