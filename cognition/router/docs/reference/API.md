@@ -135,6 +135,8 @@ walter-router decision-bench
   --samples :  ; défaut=3
 walter-router decision-chain
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
+walter-router decision-needs
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
 walter-router declare
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
 walter-router docs

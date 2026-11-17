@@ -476,7 +476,21 @@ Walter Decision (2026-11-16): the typed decision language, the needs registry, r
 - `_canon(value)` — 
 - `_digest(value)` — 
 - `compile_questions(questions)` — Check a question set against the language → (the questions, their schema key). Extra fields a provider
+- `_num(v)` — 
+- `provider_question(q: dict)` — 
+- `check_media(media)` — `media` beside the state: [{type: image | audio, data: base64 or a data: URL}], 8 at most (Liquid's limit).
+- `kind(q: dict)` — The kind of a question: its type, `multiple` for a choice of several options, `estimate` for a number with
+- `capabilities(provider: str, model: str)` — What a route carries: `native` kinds (its decision call), `extract` kinds (OpenRouter's Extractions route),
+- `options(q: dict)` — 
+- `_option_key(name: str, i: int)` — 
+- `plan(provider: str, model: str, questions: dict, media=())` — Split a question set for one model → {native, extract, emulated}; raises Unsupported naming what it cannot
+- `render_state(state)` — The state as text for a text-only route: as Liquid renders a JSON state (2-space indentation), so the
+- `extraction_fields(extract: dict)` — Walter questions → OpenRouter Extractions fields (estimate = number with a range, list of text = spans).
+- `from_extraction(q: dict, a, text: str)` — One Extractions answer → the canonical (Liquid) shape.
+- `finish(questions: dict, answers: dict)` — What Walter reads itself, whatever the model: a date the model found but left unread because its written form
+- `assemble(questions: dict, p: dict, native: dict, extracted: dict, text: str)` — The answers of the parts of a plan, in the order of the questions and in the canonical shape.
 - `needs()` — Declared needs (re-read when the file changes); {} when there is no registry.
+- `coverage(chain: list[str], provider_of)` — For each declared need: each kind it asks (`types`) or could ask (`new_kinds`) → per model of the chain, how it
 - `policy(need: str | None)` — 
 - `confidence(answer)` — How sure the model was of one answer: a choice's confidence (else its top probability), a noul's distance
 - `confidences(answers: dict)` — 
@@ -562,7 +576,10 @@ Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and
 - `_error_code(data)` — 
 - `_json(resp)` — 
 - `_float(value)` — 
-- `decide_once(client, key, model: str, state: dict, questions: dict, timeout: float)` — One decision call on its provider → {answers, usage, model, cost_usd, cost_status, input_tokens}.
+- `decide_once(client, key, model: str, state: dict, questions: dict, timeout: float, media=None)` — One decision on one model → {answers, usage, model, cost_usd, cost_status, input_tokens}. Walter Decision's
+- `_extract_once(client, key, model: str, text: str, fields: dict, timeout: float)` — OpenRouter's Extractions route (text state, typed fields).
+- `_liquid_media(media)` — Images and audio for Liquid's own API: `images` (data URLs) and `media` (audio clips).
+- `_decide_route(client, key, model: str, state: dict, questions: dict, timeout: float, media=None)` — One decision call on the model's own decision route.
 - `_requested(body: dict, offered: list[str])` — The models to try: the Router's list, or the caller's narrowing of it (each must be offered).
 - `_floor(body: dict)` — 
 - `_timeout(body: dict)` — 
@@ -570,7 +587,7 @@ Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and
 - `_samples(once, n: int, grace: float | None)` — n parallel samples. Once a majority has answered, the others get `grace` seconds, then are dropped: the mean
 - `_route_level(why: str)` — 
 - `decisions(body: dict, *, chain: list[str], key, client, log, balance=None)` — Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
-- `_escalate(out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log, timeout: float, tag: dict)` — Ask the uncertain questions — only those — to the next model of the chain; its answers replace them.
+- `_escalate(out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log, timeout: float, tag: dict, media=None)` — Ask the uncertain questions — only those — to the next model of the chain; its answers replace them.
 - `rerank_once(client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float)` — 
 - `rerank(body: dict, *, routes: list[dict], key, client, log, balance=None)` — Execute a rerank request on the Router's `rerank` poste routes, in order.
 

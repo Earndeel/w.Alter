@@ -107,6 +107,11 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/decision.py | `MAX_INSTRUCTIONS` | 6000 |  |
 | llm/decision.py | `DEFAULT_POLICY` | {"escalate_below": null, "max_timeout_s": null, "memo_ttl_s": 0} | undeclared: no reuse |
 | llm/decision.py | `MEMO_SIZE` | 512 |  |
+| llm/decision.py | `DATE_ORDERS` | ["dmy", "mdy", "ymd"] |  |
+| llm/decision.py | `WALTER_ONLY` | ["order"] | read by Walter, never sent to a provider |
+| llm/decision.py | `MEDIA_TYPES` | ["image", "audio"] |  |
+| llm/decision.py | `MAX_MEDIA` | 8 |  |
+| llm/decision.py | `NOT_FOUND` | 0.5 | a value or an option under this probability is absent (Liquid's own threshold) |
 | llm/gateway.py | `ROUTER` | walter-router | Walter Router CLI on the PATH |
 | llm/gateway.py | `UA` | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36 |  |
 | llm/gateway.py | `DEFAULT_TASK` | coding |  |
@@ -121,6 +126,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/gateway.py | `ANTHROPIC_CACHE_POINTS` | [{"location": "message", "role": "system"}, {"index": -1, "location": "message"}] |  |
 | llm/gateway.py | `QUOTA_SWITCH` | 90.0 | same threshold as the Router's execution.routes (weekly %), mirrored for the trace only |
 | llm/structured.py | `OPENROUTER_DECISIONS` | https://openrouter.ai/api/alpha/decisions |  |
+| llm/structured.py | `OPENROUTER_EXTRACTIONS` | https://openrouter.ai/api/alpha/extractions | values, estimates, passages (d1.2, 17/11) |
 | llm/structured.py | `OPENROUTER_RERANK` | https://openrouter.ai/api/v1/rerank |  |
 | llm/structured.py | `OPENROUTER_CREDITS` | https://openrouter.ai/api/v1/credits |  |
 | llm/structured.py | `CF_RUN` | https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/cloudflare/{model} |  |
@@ -375,49 +381,69 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/aliases_auto.json | `aliases.seedream-v4.model_id` | str | seedream-4 |
 | config/aliases_auto.json | `aliases.seedream-v4.origin` | str | agent |
 | config/aliases_auto.json | `aliases.seedream-v4.reason` | str | BytePlus ModelArk identifie le modèle comme Seedream 4.0 (version seedream-4-0-250828) ; seedream-v4 et seedream-4 sont deux écritures de cette même génération. https://docs.byteplus.com/en/docs/ModelArk/1824718 |
-| config/decision-needs.json | `about` | str | Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's). |
+| config/decision-needs.json | `about` | str | Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's). types = the question kinds the need asks today (noul, choice, score, multiple = choice of several options, text, number, date, estimate = number with a range, spans, box, boxes); new_kinds = kinds that fit its purpose and that a route can carry since 17/11, with where (not asked yet: the owning module adopts them). Each kind is checked against the decision chain by `walter-router decision-needs` (llm/decision.py capabilities: native, Extractions route, emulated, or refused). |
 | config/decision-needs.json | `needs.context-intent-bench.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.context-intent-bench.latency_ms` | int | 5000 |
 | config/decision-needs.json | `needs.context-intent-bench.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.context-intent-bench.memo_ttl_s` | int | 0 |
 | config/decision-needs.json | `needs.context-intent-bench.owner` | str | cognition/context |
 | config/decision-needs.json | `needs.context-intent-bench.purpose` | str | bench of the intent questions (never reused: each sample counts) |
+| config/decision-needs.json | `needs.context-intent-bench.types[]` | str | choice |
+| config/decision-needs.json | `needs.context-intent-bench.types[]` | str | noul |
 | config/decision-needs.json | `needs.disclosure.commitment.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.disclosure.commitment.latency_ms` | int | 3000 |
 | config/decision-needs.json | `needs.disclosure.commitment.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.disclosure.commitment.memo_ttl_s` | int | 600 |
+| config/decision-needs.json | `needs.disclosure.commitment.new_kinds.spans` | str | every piece of personal data in an outgoing message (17/11: 13/13 found on Walter cases) |
 | config/decision-needs.json | `needs.disclosure.commitment.owner` | str | cognition/memory |
 | config/decision-needs.json | `needs.disclosure.commitment.purpose` | str | does an outgoing message commit the owner |
+| config/decision-needs.json | `needs.disclosure.commitment.types[]` | str | choice |
 | config/decision-needs.json | `needs.documents.verify.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.documents.verify.latency_ms` | int | 10000 |
 | config/decision-needs.json | `needs.documents.verify.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.documents.verify.memo_ttl_s` | int | 3600 |
+| config/decision-needs.json | `needs.documents.verify.new_kinds.date` | str | idem, order dmy |
+| config/decision-needs.json | `needs.documents.verify.new_kinds.number` | str | idem |
+| config/decision-needs.json | `needs.documents.verify.new_kinds.text` | str | the value a fact claims, read from the document with its span |
 | config/decision-needs.json | `needs.documents.verify.owner` | str | cognition/memory |
 | config/decision-needs.json | `needs.documents.verify.purpose` | str | check a fact drawn from a document against it |
+| config/decision-needs.json | `needs.documents.verify.types[]` | str | choice |
+| config/decision-needs.json | `needs.documents.verify.types[]` | str | noul |
 | config/decision-needs.json | `needs.sourced-observation/1.verify.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.sourced-observation/1.verify.latency_ms` | int | 10000 |
 | config/decision-needs.json | `needs.sourced-observation/1.verify.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.sourced-observation/1.verify.memo_ttl_s` | int | 3600 |
 | config/decision-needs.json | `needs.sourced-observation/1.verify.owner` | str | cognition/memory |
 | config/decision-needs.json | `needs.sourced-observation/1.verify.purpose` | str | check an observation against its source |
+| config/decision-needs.json | `needs.sourced-observation/1.verify.types[]` | str | choice |
+| config/decision-needs.json | `needs.sourced-observation/1.verify.types[]` | str | noul |
 | config/decision-needs.json | `needs.triage.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.triage.latency_ms` | int | 5000 |
 | config/decision-needs.json | `needs.triage.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.triage.memo_ttl_s` | int | 3600 |
+| config/decision-needs.json | `needs.triage.new_kinds.date` | str | deadline, with order dmy |
+| config/decision-needs.json | `needs.triage.new_kinds.number` | str | amount in an incoming message (unit EUR) |
+| config/decision-needs.json | `needs.triage.new_kinds.text` | str | the person to answer |
 | config/decision-needs.json | `needs.triage.owner` | str | cognition/memory |
 | config/decision-needs.json | `needs.triage.purpose` | str | incoming event: ignore / remember / notify / prepare a reply |
+| config/decision-needs.json | `needs.triage.types[]` | str | choice |
+| config/decision-needs.json | `needs.triage.types[]` | str | noul |
 | config/decision-needs.json | `needs.views.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.views.latency_ms` | int | 10000 |
 | config/decision-needs.json | `needs.views.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.views.memo_ttl_s` | int | 3600 |
 | config/decision-needs.json | `needs.views.owner` | str | cognition/memory |
 | config/decision-needs.json | `needs.views.purpose` | str | organic memory views: subject / episode / period assignment |
+| config/decision-needs.json | `needs.views.types[]` | str | choice |
 | config/decision-needs.json | `needs.walter-context-preflight.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.walter-context-preflight.latency_ms` | int | 1500 |
 | config/decision-needs.json | `needs.walter-context-preflight.max_timeout_s` | NoneType | — |
 | config/decision-needs.json | `needs.walter-context-preflight.memo_ttl_s` | int | 120 |
+| config/decision-needs.json | `needs.walter-context-preflight.new_kinds.multiple` | str | modules a message needs, as one question of several options (today one noul per module); emulated as nouls on every route, native on Liquid's own API |
 | config/decision-needs.json | `needs.walter-context-preflight.owner` | str | cognition/context |
 | config/decision-needs.json | `needs.walter-context-preflight.purpose` | str | plan of each owner message: thread, act, context level, tier, modules |
+| config/decision-needs.json | `needs.walter-context-preflight.types[]` | str | choice |
+| config/decision-needs.json | `needs.walter-context-preflight.types[]` | str | noul |
 | config/declared_offers.json | `_doc` | str | Offers declared by the instance's owner that no provider API lists (web interfaces, subscriptions). Only explicit declarations go here; an instance keeps its own in config/router/declared_offers.json. |
 | config/declared_offers.json | `offers` | list | [] |
 | config/host.json | `_doc` | str | Host bindings of an instance (shipped default: none). An instance overrides this file in config/router/host.json. Paths: absolute, ~/ or @instance/. log_dir: cycle logs; collect_script: leaderboard collection (empty = skipped); control_env: HMAC secret of the manual trigger; control_origin / library_domain: where the library page and its trigger are served (empty = not published). aa_api_key: vault item and field of the Artificial Analysis Data API key, read through walter-secrets (null = scores from the leaderboard page only). |

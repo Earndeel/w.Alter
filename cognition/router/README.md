@@ -116,7 +116,7 @@ walter-router plans list | consumption | set ID [--vendor --plan --price --model
 walter-router subscriptions [refresh | calibrate anthropic-pro PERCENT]
 walter-router brief [--write]        # what an agent must know to use the router: tools, levels, specialities,
                                      # generation, analysis, constraints — never a model or provider name
-walter-router publish-library | declare | migrate | probe | decision-chain
+walter-router publish-library | declare | migrate | probe | decision-chain | decision-needs
 walter-router alias-add | alias-remove | alias-list | postes | log-exec | notify-failure | instance-env
 walter-router-guardian check [--no-tests] | run [--no-agent] [--no-tests] [--no-notify] [--dry-run] | status
 ```
@@ -167,14 +167,25 @@ domain/horizon, work, resume; no task family, no delegation). `walter-router pre
 - Page: transient unit `walter-preflight-bench-web` on the tailnet address, port 3092, no request log; state in
   `@instance/state/router/preflight-bench/` (0700).
 
-## Walter Decision (2026-11-16)
+## Walter Decision (2026-11-16, typed kinds 2026-11-17)
 
 The layer between a module that needs a quick typed judgement and the decision APIs (`llm/decision.py`, applied by
 `structured.decisions` on `POST /v1/decisions`):
-- **Language**: a `state` and named questions of nine types (noul, choice, score, number, date, text, spans, box,
-  boxes), written once and sent unchanged to whichever provider answers; checked before any call (400 with the
-  question and the reason), and named by a **schema key**.
-- **Needs**: `config/decision-needs.json` — what each module asks (owner, purpose, latency budget) and its policy:
+- **Language** (Liquid d1.2's typed one): a `state` (+ `media`: images, audio) and named questions — noul, choice,
+  score, `choice` with `multiple` (each option its own probability), `text` / `number` (+ `unit`) / `date` (+ `order`
+  dmy | mdy | ymd, read by Walter when the model finds an ambiguous date and leaves it unread), `number` with `range`
+  (+ `step`: an estimate, median and [p10, p90] `interval`), `spans` (+ `max`), `box`, `boxes`. Checked before any
+  call (400 with the question and the reason), named by a **schema key**; answers come back in one canonical shape
+  (Liquid's), whichever route answered.
+- **Routes** (`capabilities`, measured 17/11): every decision route answers noul / choice / score; OpenRouter's
+  Extractions route answers values, estimates and passages for `liquid/d1.2` and `liquid/d1.2-ultra` only (the plan
+  sends them there, in parallel with the decision call); several options are asked as one noul per option on
+  OpenRouter, Nace and Workers AI, which **silently answer ONE option** to `multiple: true`; box, boxes and audio only
+  on Liquid's own API (documented, untested without its key). A model whose routes cannot carry a question set is not
+  asked (`unsupported`, named) and the chain goes on; none can → 422. `walter-router decision-needs` checks each
+  need's kinds against the chain.
+- **Needs**: `config/decision-needs.json` — what each module asks (owner, purpose, latency budget, `types` asked,
+  `new_kinds` that fit it since 17/11) and its policy:
   `memo_ttl_s` (the same state + questions + chain within that window gets the answer already given, `reused: true`,
   no call), `escalate_below` (the questions answered under that confidence — only those — go to the next model of the
   chain; `null` = off), `max_timeout_s`. The caller names its need in `need` (`walter_memory.llm.decide` sends its
@@ -183,7 +194,8 @@ The layer between a module that needs a quick typed judgement and the decision A
 - **Liquid's own API**: offers `liquidai/<id>` (d1.2, d1.2-ultra) on `https://api.liquid.ai/decisions/v1/systemone`,
   key `LIQUID_API_KEY` (grant card, reader walter-llm); `liquid/…` stays OpenRouter's resale. Inactive until the key
   exists (a missing grant is named and the route set aside 10 min).
-- Comparison of 16/11 (preflight bench, d1-ultra = Drex Max agreement at 3.3× the speed; escalation off by the data):
+- Comparisons of 16/11 and 17/11 (preflight bench 50 × 3; 17/11: d1.2-ultra = d1-ultra quality, Drex Max within
+  1.5 pt, 3.9× faster for the 3-sample decision; d1.2 7 pts lower; new kinds on Walter cases):
   `/walter/core/engine/docs/07-CONVERGENCE.md` § 4. Tests: `tests/test_walter_decision.py`.
 
 ## Access from outside

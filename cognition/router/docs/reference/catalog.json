@@ -1495,6 +1495,20 @@
             "required": false
           }
         ],
+        "decision-needs": [
+          {
+            "choices": null,
+            "default": "==SUPPRESS==",
+            "dest": "help",
+            "flags": [
+              "-h",
+              "--help"
+            ],
+            "help": "show this help message and exit",
+            "nargs": 0,
+            "required": false
+          }
+        ],
         "declare": [
           {
             "choices": null,
@@ -7527,9 +7541,79 @@
             "signature": "questions"
           },
           {
+            "description": "",
+            "name": "_num",
+            "signature": "v"
+          },
+          {
+            "description": "",
+            "name": "provider_question",
+            "signature": "q: dict"
+          },
+          {
+            "description": "`media` beside the state: [{type: image | audio, data: base64 or a data: URL}], 8 at most (Liquid's limit).",
+            "name": "check_media",
+            "signature": "media"
+          },
+          {
+            "description": "The kind of a question: its type, `multiple` for a choice of several options, `estimate` for a number with",
+            "name": "kind",
+            "signature": "q: dict"
+          },
+          {
+            "description": "What a route carries: `native` kinds (its decision call), `extract` kinds (OpenRouter's Extractions route),",
+            "name": "capabilities",
+            "signature": "provider: str, model: str"
+          },
+          {
+            "description": "",
+            "name": "options",
+            "signature": "q: dict"
+          },
+          {
+            "description": "",
+            "name": "_option_key",
+            "signature": "name: str, i: int"
+          },
+          {
+            "description": "Split a question set for one model → {native, extract, emulated}; raises Unsupported naming what it cannot",
+            "name": "plan",
+            "signature": "provider: str, model: str, questions: dict, media=()"
+          },
+          {
+            "description": "The state as text for a text-only route: as Liquid renders a JSON state (2-space indentation), so the",
+            "name": "render_state",
+            "signature": "state"
+          },
+          {
+            "description": "Walter questions → OpenRouter Extractions fields (estimate = number with a range, list of text = spans).",
+            "name": "extraction_fields",
+            "signature": "extract: dict"
+          },
+          {
+            "description": "One Extractions answer → the canonical (Liquid) shape.",
+            "name": "from_extraction",
+            "signature": "q: dict, a, text: str"
+          },
+          {
+            "description": "What Walter reads itself, whatever the model: a date the model found but left unread because its written form",
+            "name": "finish",
+            "signature": "questions: dict, answers: dict"
+          },
+          {
+            "description": "The answers of the parts of a plan, in the order of the questions and in the canonical shape.",
+            "name": "assemble",
+            "signature": "questions: dict, p: dict, native: dict, extracted: dict, text: str"
+          },
+          {
             "description": "Declared needs (re-read when the file changes); {} when there is no registry.",
             "name": "needs",
             "signature": ""
+          },
+          {
+            "description": "For each declared need: each kind it asks (`types`) or could ask (`new_kinds`) → per model of the chain, how it",
+            "name": "coverage",
+            "signature": "chain: list[str], provider_of"
           },
           {
             "description": "",
@@ -7919,9 +8003,24 @@
             "signature": "value"
           },
           {
-            "description": "One decision call on its provider → {answers, usage, model, cost_usd, cost_status, input_tokens}.",
+            "description": "One decision on one model → {answers, usage, model, cost_usd, cost_status, input_tokens}. Walter Decision's",
             "name": "decide_once",
-            "signature": "client, key, model: str, state: dict, questions: dict, timeout: float"
+            "signature": "client, key, model: str, state: dict, questions: dict, timeout: float, media=None"
+          },
+          {
+            "description": "OpenRouter's Extractions route (text state, typed fields).",
+            "name": "_extract_once",
+            "signature": "client, key, model: str, text: str, fields: dict, timeout: float"
+          },
+          {
+            "description": "Images and audio for Liquid's own API: `images` (data URLs) and `media` (audio clips).",
+            "name": "_liquid_media",
+            "signature": "media"
+          },
+          {
+            "description": "One decision call on the model's own decision route.",
+            "name": "_decide_route",
+            "signature": "client, key, model: str, state: dict, questions: dict, timeout: float, media=None"
           },
           {
             "description": "The models to try: the Router's list, or the caller's narrowing of it (each must be offered).",
@@ -7961,7 +8060,7 @@
           {
             "description": "Ask the uncertain questions — only those — to the next model of the chain; its answers replace them.",
             "name": "_escalate",
-            "signature": "out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log, timeout: float, tag: dict"
+            "signature": "out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log, timeout: float, tag: dict, media=None"
           },
           {
             "description": "",
@@ -9918,7 +10017,7 @@
         "type": "str"
       },
       {
-        "default": "Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's).",
+        "default": "Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's). types = the question kinds the need asks today (noul, choice, score, multiple = choice of several options, text, number, date, estimate = number with a range, spans, box, boxes); new_kinds = kinds that fit its purpose and that a route can carry since 17/11, with where (not asked yet: the owning module adopts them). Each kind is checked against the decision chain by `walter-router decision-needs` (llm/decision.py capabilities: native, Extractions route, emulated, or refused).",
         "file": "config/decision-needs.json",
         "key": "about",
         "type": "str"
@@ -9960,6 +10059,18 @@
         "type": "str"
       },
       {
+        "default": "choice",
+        "file": "config/decision-needs.json",
+        "key": "needs.context-intent-bench.types[]",
+        "type": "str"
+      },
+      {
+        "default": "noul",
+        "file": "config/decision-needs.json",
+        "key": "needs.context-intent-bench.types[]",
+        "type": "str"
+      },
+      {
         "default": null,
         "file": "config/decision-needs.json",
         "key": "needs.disclosure.commitment.escalate_below",
@@ -9984,6 +10095,12 @@
         "type": "int"
       },
       {
+        "default": "every piece of personal data in an outgoing message (17/11: 13/13 found on Walter cases)",
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.new_kinds.spans",
+        "type": "str"
+      },
+      {
         "default": "cognition/memory",
         "file": "config/decision-needs.json",
         "key": "needs.disclosure.commitment.owner",
@@ -9993,6 +10110,12 @@
         "default": "does an outgoing message commit the owner",
         "file": "config/decision-needs.json",
         "key": "needs.disclosure.commitment.purpose",
+        "type": "str"
+      },
+      {
+        "default": "choice",
+        "file": "config/decision-needs.json",
+        "key": "needs.disclosure.commitment.types[]",
         "type": "str"
       },
       {
@@ -10020,6 +10143,24 @@
         "type": "int"
       },
       {
+        "default": "idem, order dmy",
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.new_kinds.date",
+        "type": "str"
+      },
+      {
+        "default": "idem",
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.new_kinds.number",
+        "type": "str"
+      },
+      {
+        "default": "the value a fact claims, read from the document with its span",
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.new_kinds.text",
+        "type": "str"
+      },
+      {
         "default": "cognition/memory",
         "file": "config/decision-needs.json",
         "key": "needs.documents.verify.owner",
@@ -10029,6 +10170,18 @@
         "default": "check a fact drawn from a document against it",
         "file": "config/decision-needs.json",
         "key": "needs.documents.verify.purpose",
+        "type": "str"
+      },
+      {
+        "default": "choice",
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.types[]",
+        "type": "str"
+      },
+      {
+        "default": "noul",
+        "file": "config/decision-needs.json",
+        "key": "needs.documents.verify.types[]",
         "type": "str"
       },
       {
@@ -10068,6 +10221,18 @@
         "type": "str"
       },
       {
+        "default": "choice",
+        "file": "config/decision-needs.json",
+        "key": "needs.sourced-observation/1.verify.types[]",
+        "type": "str"
+      },
+      {
+        "default": "noul",
+        "file": "config/decision-needs.json",
+        "key": "needs.sourced-observation/1.verify.types[]",
+        "type": "str"
+      },
+      {
         "default": null,
         "file": "config/decision-needs.json",
         "key": "needs.triage.escalate_below",
@@ -10092,6 +10257,24 @@
         "type": "int"
       },
       {
+        "default": "deadline, with order dmy",
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.new_kinds.date",
+        "type": "str"
+      },
+      {
+        "default": "amount in an incoming message (unit EUR)",
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.new_kinds.number",
+        "type": "str"
+      },
+      {
+        "default": "the person to answer",
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.new_kinds.text",
+        "type": "str"
+      },
+      {
         "default": "cognition/memory",
         "file": "config/decision-needs.json",
         "key": "needs.triage.owner",
@@ -10101,6 +10284,18 @@
         "default": "incoming event: ignore / remember / notify / prepare a reply",
         "file": "config/decision-needs.json",
         "key": "needs.triage.purpose",
+        "type": "str"
+      },
+      {
+        "default": "choice",
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.types[]",
+        "type": "str"
+      },
+      {
+        "default": "noul",
+        "file": "config/decision-needs.json",
+        "key": "needs.triage.types[]",
         "type": "str"
       },
       {
@@ -10140,6 +10335,12 @@
         "type": "str"
       },
       {
+        "default": "choice",
+        "file": "config/decision-needs.json",
+        "key": "needs.views.types[]",
+        "type": "str"
+      },
+      {
         "default": null,
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.escalate_below",
@@ -10164,6 +10365,12 @@
         "type": "int"
       },
       {
+        "default": "modules a message needs, as one question of several options (today one noul per module); emulated as nouls on every route, native on Liquid's own API",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.new_kinds.multiple",
+        "type": "str"
+      },
+      {
         "default": "cognition/context",
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.owner",
@@ -10173,6 +10380,18 @@
         "default": "plan of each owner message: thread, act, context level, tier, modules",
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.purpose",
+        "type": "str"
+      },
+      {
+        "default": "choice",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.types[]",
+        "type": "str"
+      },
+      {
+        "default": "noul",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.types[]",
         "type": "str"
       },
       {
@@ -16123,6 +16342,45 @@
         "value": 512
       },
       {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "DATE_ORDERS",
+        "value": [
+          "dmy",
+          "mdy",
+          "ymd"
+        ]
+      },
+      {
+        "comment": "read by Walter, never sent to a provider",
+        "file": "llm/decision.py",
+        "name": "WALTER_ONLY",
+        "value": [
+          "order"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "MEDIA_TYPES",
+        "value": [
+          "image",
+          "audio"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "MAX_MEDIA",
+        "value": 8
+      },
+      {
+        "comment": "a value or an option under this probability is absent (Liquid's own threshold)",
+        "file": "llm/decision.py",
+        "name": "NOT_FOUND",
+        "value": 0.5
+      },
+      {
         "comment": "Walter Router CLI on the PATH",
         "file": "llm/gateway.py",
         "name": "ROUTER",
@@ -16224,6 +16482,12 @@
         "file": "llm/structured.py",
         "name": "OPENROUTER_DECISIONS",
         "value": "https://openrouter.ai/api/alpha/decisions"
+      },
+      {
+        "comment": "values, estimates, passages (d1.2, 17/11)",
+        "file": "llm/structured.py",
+        "name": "OPENROUTER_EXTRACTIONS",
+        "value": "https://openrouter.ai/api/alpha/extractions"
       },
       {
         "comment": "",
@@ -17961,9 +18225,9 @@
     "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
     "bin/walter-router-cycle": "0dcd43cafbfbed0de2ebfffa9d6beab43aa9a494b7ad5d4a6d694e4d43904e79",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "3fadfebf6b2e9ea1442c472b9ac4e0d65d18f454cae74172c627f034748f6eba",
+    "cli.py": "676ccdd84a9e47a74f16bc31dddbbdcaa03a6540517fb886be35e52b7a68904d",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
-    "config/decision-needs.json": "e2374eae48b758e8cd909cb9f324fa7a69654213d06057e2234f00cee3880808",
+    "config/decision-needs.json": "78dfb64f485e4a1b6528ebe8cbb9cdbd4faec416bf993d282d2051b835b176d7",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
     "config/kie_media_schemas.json": "278e5d624ffa274e473eaaf6ab044df1c454c43bb39df40613e6cde9c6f8edd1",
@@ -17996,9 +18260,9 @@
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
-    "llm/decision.py": "b5c106491786f3217d634e3869eb8ff5906fd8f1e4c8d3e2b8a6c187947ecce5",
+    "llm/decision.py": "e6061c857edb37b92dee9ccbf163dfa90ce4c08abdb0c2e694bef511e8c350ba",
     "llm/gateway.py": "f95463295dfaa2d1f816914f5cac3afcde1c95ff4ce4b00547cb5f29a8eb4b46",
-    "llm/structured.py": "a5d81f0c18d7116206ae947fc6e707c6f0574d3578eea403033cf504b7af4a42",
+    "llm/structured.py": "41cc580b8c3f6c1f19b8d0c7f1884b63b0e82d0fba0c710975088fa48685bd0a",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
