@@ -51,7 +51,7 @@ def test_schema_files_are_generated_from_the_code():
     for name, schema in schemas().items():
         on_disk = json.loads((ROOT / "contracts" / "schemas" / name).read_text())
         assert on_disk == schema, f"{name} is stale: python -m walter_context.plan --write"
-    assert schemas()["context-plan.v2.json"]["properties"]["capabilities"]["items"]["enum"] == list(CAPABILITIES)
+    assert schemas()["context-plan.v3.json"]["properties"]["capabilities"]["items"]["enum"] == list(CAPABILITIES)
 
 
 def test_v1_plan_search_reads_as_memory_and_web():
@@ -60,7 +60,7 @@ def test_v1_plan_search_reads_as_memory_and_web():
     v1 = {"version": 1, "turn_id": "t", "thread": {"id": None, "new": True}, "act": "new", "level": "L0",
           "capabilities": ["tools", "search", "skills"]}
     p = ContextPlan.from_dict(v1)
-    assert p.version == PLAN_VERSION == 2 and p.capabilities == ["tools", "memory", "web", "skills"]
+    assert p.version == PLAN_VERSION == 3 and p.capabilities == ["tools", "memory", "web", "skills"]
     import pytest
     with pytest.raises(ContractError):
         ContextPlan.from_dict({**v1, "version": 2})

@@ -240,15 +240,35 @@ def _line(text: str, n: int) -> str:
     return re.sub(r"\s+", " ", text or "").strip()[:n]
 
 
+def _ids(req: Request) -> dict:
+    return {c["id"]: c for c in req.candidates if c.get("id")}
+
+
+def _state(req: Request) -> dict:
+    ids = _ids(req)
+    return {"new_message": _line(req.message, 1500),
+            "previous_exchange": {"thread": req.previous.thread_id, "minutes_ago": round(req.previous.age_s / 60, 1)
+                                  if req.previous.age_s is not None else None,
+                                  "message": _line(req.previous.message, 300), "answer": _line(req.previous.answer, 400)}
+            if req.previous else None,
+            "threads": {k: {x: c.get(x) for x in ("title", "objective", "state", "task", "last_message", "last_answer",
+                                                   "keywords", "hours_since_last") if c.get(x)} for k, c in ids.items()}}
+
+
+def _thread_options(req: Request) -> dict:
+    """One option per candidate thread. The thread the previous exchange went to is said on its own line: its title
+    alone does not tell the model that « ok vas-y pour la première » answers it (2026-11-12)."""
+    ids = _ids(req)
+    last = req.previous.thread_id if req.previous and req.previous.age_s is not None \
+        and req.previous.age_s <= REPLY_WINDOW_S else None
+    return {k: "continues: " + (c.get("title") or ", ".join(c.get("keywords") or [])[:80] or k)
+            + (" — the thread of the previous exchange" if k == last else "") for k, c in ids.items()}
+
+
 def questions(req: Request) -> tuple[dict, dict]:
-    ids = {c["id"]: c for c in req.candidates if c.get("id")}
-    state = {"new_message": _line(req.message, 1500),
-             "previous_exchange": {"thread": req.previous.thread_id, "minutes_ago": round(req.previous.age_s / 60, 1)
-                                   if req.previous.age_s is not None else None,
-                                   "message": _line(req.previous.message, 300), "answer": _line(req.previous.answer, 400)}
-             if req.previous else None,
-             "threads": {k: {x: c.get(x) for x in ("title", "objective", "state", "task", "last_message", "last_answer",
-                                                    "keywords", "hours_since_last") if c.get(x)} for k, c in ids.items()}}
+    """Question set 2 (until 17/11, `[preflight] signals = "questions"`): the preflight's own list of questions."""
+    ids = _ids(req)
+    state = _state(req)
     q = {"act": {"type": "choice", "criteria": ACT_CRITERIA,
                  "instructions": "What does the new message do, given the previous exchange?" + NOTE},
          "plan": {"type": "choice", "criteria": PLANS,
@@ -266,13 +286,7 @@ def questions(req: Request) -> tuple[dict, dict]:
              "L3": "hardest or high stakes: deep synthesis, complex reasoning, important decision"},
              "instructions": "How demanding is the work this message asks for?" + NOTE}}
     if ids:
-        # the thread the previous exchange went to is said on its own line: its title alone does not tell the model
-        # that « ok vas-y pour la première » answers it (2026-11-12)
-        last = req.previous.thread_id if req.previous and req.previous.age_s is not None \
-            and req.previous.age_s <= REPLY_WINDOW_S else None
-        q["thread"] = {"type": "choice", "criteria": {**{k: "continues: " + (c.get("title") or ", ".join(
-            c.get("keywords") or [])[:80] or k) + (" — the thread of the previous exchange" if k == last else "")
-            for k, c in ids.items()}, "new": "opens a subject none of these covers"},
+        q["thread"] = {"type": "choice", "criteria": {**_thread_options(req), "new": "opens a subject none of these covers"},
             "instructions": ("The owner talks to their assistant in one continuous stream and switches subjects freely. "
                              "Which thread does the new message belong to? Short replies belong to the thread of the "
                              "previous exchange. Choose 'new' only for a subject none of the threads covers." + NOTE)}
@@ -286,6 +300,154 @@ def questions(req: Request) -> tuple[dict, dict]:
     if any(c.get("task") or c.get("kind") == "task" for c in ids.values()):
         q["resume"] = {"type": "noul", "instructions": RESUME_QUESTION + NOTE}
     return state, q
+
+
+# ── Walter Decision 2.0 (2026-11-17): the turn's questions composed from the modules' declared signals ───────────
+# Context declares its own (act, thread, plan, extensive, domain, horizon, needs, dates, people:
+# manifest/decisions.json), Router the tier, Memory work and resume; Walter Decision composes the ones this message
+# concerns (`walter decisions`, decision.compose), splits them over the chain (choices on the first decision model,
+# readings of dates and names on a model with an extraction route, in parallel) and answers by signal id. A module
+# that needs a turn judgement declares a signal: nothing here changes. Set 2's « task » question is not asked any
+# more: its answer was ignored since 13/11 (the main model is always the general one).
+SIGNALS = SETTINGS["signals"]          # "registry" (composed) | "questions" (set 2, rollback)
+LEGACY_IDS = {"context.act": "act", "context.thread": "thread", "context.plan": "plan",
+              "context.extensive": "extensive", "context.domain": "domain", "context.horizon": "horizon",
+              "router.tier": "model_level", "memory.work": "work", "memory.resume": "resume"}
+FOUND_MIN = 0.5                        # an observation the model reads with less certainty is left out
+# Readings apart (17/11, measured): the readings (layer `observation`: dates, people) run on the extraction route,
+# slower than the judgements (2-part decision p50 / p95 0.79 / 1.31 s against 0.66 / 0.85 s for the judgements
+# alone). The plan does not need them, only the pack's `now` and `people` blocks do: they are asked in parallel and
+# the plan is made as soon as the judgements are in (`Readings`).
+READINGS_APART = SETTINGS["readings_apart"]
+DECISION_SAMPLING = SETTINGS["decision_sampling"]     # "mean" (average the samples) | "first" (hedge: first answer)
+READINGS_SAMPLES = SETTINGS["readings_samples"]       # > 1: the readings hedged (passages are never averaged)
+_READERS: list = []
+
+
+class Readings:
+    """The turn's readings asked apart from its judgements: a running call. `settle(plan, timeout)` waits at most
+    `timeout` for it and, once it is in, writes the plan's observations and their trace (once, whoever asks first:
+    the pack's `now` and `people` blocks, then the preflight's answer). Late or failed: no observation, said in
+    `decision.signals.readings`, the plan stands."""
+
+    def __init__(self, future, message: str, t0: float):
+        import threading
+        self.future, self.message, self.t0, self.lock, self.done = future, message, t0, threading.Lock(), False
+
+    def settle(self, plan: ContextPlan, timeout: float = 0.0) -> bool:
+        from concurrent.futures import TimeoutError as FutureTimeout
+        try:
+            res, err = self.future.result(timeout=max(float(timeout), 0.0)), None
+        except FutureTimeout:
+            return False
+        except Exception as exc:  # noqa: BLE001 — a failed reading is said, never fatal
+            res, err = {}, error_text(exc)
+        with self.lock:
+            if self.done:
+                return True
+            self.done = True
+            res = res if isinstance(res, dict) else {}
+            plan.observations = observations(res.get("signals") or {}, self.message)
+            tr = res.get("trace") or {}
+            r = {"asked": len(tr.get("asked") or ()), "model": res.get("model"), "ms": res.get("_ms")}
+            if tr.get("unavailable"):
+                r["unavailable"] = tr["unavailable"]
+            if err:
+                r["error"] = err
+            sig = plan.decision.setdefault("signals", {})
+            sig["readings"] = {k: v for k, v in r.items() if v is not None}
+            return True
+
+    def late(self, plan: ContextPlan) -> None:
+        """The answer leaves without them: said in the trace (the call's result, if it comes, is dropped)."""
+        with self.lock:
+            if not self.done:
+                self.done = True
+                plan.decision.setdefault("signals", {})["readings"] = {"late": True}
+
+
+def _readers():
+    from concurrent.futures import ThreadPoolExecutor
+    if not _READERS:
+        _READERS.append(ThreadPoolExecutor(max_workers=8, thread_name_prefix="preflight-readings"))
+    return _READERS[0]
+
+
+def turn(req: Request) -> tuple[dict, list[str], dict]:
+    """The turn decision's inputs: (state, facts, options). Facts are what the caller knows without a model (there
+    are candidate threads, one of them carries an open task); Walter Decision adds the cues it reads itself."""
+    ids = _ids(req)
+    facts = ["threads"] if ids else []
+    if any(c.get("task") or c.get("kind") == "task" for c in ids.values()):
+        facts.append("open_task")
+    return _state(req), facts, ({"threads": _thread_options(req)} if ids else {})
+
+
+def owner_today() -> str | None:
+    """The owner's local date (dates in words are read against it); None = the decision model's own day (UTC)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from .trivial import owner_tz
+    try:
+        tz = owner_tz()
+        return datetime.now(ZoneInfo(tz)).date().isoformat() if tz else None
+    except Exception:  # noqa: BLE001 — unknown zone: no reference day
+        return None
+
+
+def observations(signals: dict, message: str) -> dict:
+    """What the message itself says, apart from the judgements: dates (as written + the calendar day Walter reads)
+    and people named. Kept only when the passage is really in the message (the extraction reads the whole state)
+    and read with enough certainty: an observation is checkable against the input, or it is not one."""
+    out = {}
+    for key, fields in (("dates", ("text", "date", "past", "time", "ambiguous", "found")), ("people", ("text", "found"))):
+        items, seen = [], set()
+        for sp in ((signals.get("context." + key) or {}).get("spans") or []):
+            text = sp.get("text") if isinstance(sp, dict) else None
+            found = sp.get("found")
+            if not isinstance(text, str) or not text.strip() or text.lower() in seen or text not in (message or ""):
+                continue
+            if isinstance(found, (int, float)) and found < FOUND_MIN:
+                continue
+            if key == "dates" and not sp.get("date"):       # « 14h » alone names no day: nothing to place
+                continue
+            seen.add(text.lower())
+            items.append({f: sp[f] for f in fields if sp.get(f) is not None})
+        if items:
+            out[key] = items
+    return out
+
+
+def _decide_turn(req: Request, timeout: float, purpose: str) -> tuple[dict, dict, dict, Readings | None]:
+    """→ (answers by set 2 name, the full reply, the trace of the signals, the readings asked apart or None)."""
+    from walter_memory import llm
+    common = dict(processor="walter-context-preflight", privacy_class=req.privacy_class, models=decision_chain(),
+                  purpose=purpose, budget="recurring", timeout=timeout)
+    sampling = {"sampling": DECISION_SAMPLING} if DECISION_SAMPLING != "mean" else {}
+    if SIGNALS == "questions":
+        state, q = questions(req)
+        res = llm.decide(state, q, samples=DECISION_SAMPLES, **sampling, **common)
+        return (res.get("answers") if isinstance(res, dict) else None) or {}, res, {}, None
+    state, facts, opts = turn(req)
+    turn_args = dict(occasion="turn", focus="new_message", now=owner_today(), **common)
+    readings = None
+    if READINGS_APART:
+        def read(t0=time.perf_counter()):
+            hedge = {"sampling": "first"} if READINGS_SAMPLES > 1 else {}
+            r = llm.decide({"new_message": state["new_message"]}, None, samples=READINGS_SAMPLES, **hedge,
+                           layers=["observation"], **turn_args)
+            r["_ms"] = round((time.perf_counter() - t0) * 1000)
+            return r
+        readings = Readings(_readers().submit(read), req.message, time.perf_counter())
+    res = llm.decide(state, None, samples=DECISION_SAMPLES, **sampling, facts=facts, options=opts,
+                     **({"layers": ["inference"]} if READINGS_APART else {}), **turn_args)
+    sig = res.get("signals") or {}
+    a = {LEGACY_IDS[k]: v for k, v in sig.items() if k in LEGACY_IDS and v}
+    tr = res.get("trace") or {}
+    trace = {"registry": tr.get("registry"), "asked": len(tr.get("asked") or ()),
+             **({"skipped": sorted(tr["skipped"])} if tr.get("skipped") else {}),
+             **({"unavailable": tr["unavailable"]} if tr.get("unavailable") else {})}
+    return a, res, trace, readings
 
 
 # ── question set 3 (2026-11-14): the owner's L / C / D architecture, prepared, NOT asked in production ──────────────
@@ -367,8 +529,11 @@ def read_v3(a: dict, req: Request | None = None, modules: list[dict] | None = No
     return out
 
 
-def run(req: Request, *, purpose: str = "walter-context preflight", within: float | None = None) -> ContextPlan:
-    """`within`: seconds the caller has for the decision; each call of the decision chain gets no more than that."""
+def run(req: Request, *, purpose: str = "walter-context preflight", within: float | None = None,
+        readings: str = "wait") -> ContextPlan:
+    """`within`: seconds the caller has for the decision; each call of the decision chain gets no more than that.
+    `readings` (asked apart): "wait" = the plan carries its observations (waited within `within`); "apart" = the plan
+    is answered as soon as the judgements are in, its pending readings in `plan._readings` (the pack settles them)."""
     t0 = time.perf_counter()
     plan = fast_path(req)
     if plan is not None:
@@ -378,14 +543,9 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
         # a decision model is a cloud call: local_only messages get the safe default, nothing leaves the VM
         return ContextPlan(turn_id=req.turn_id, thread=_default_thread(req), act="continue", level="L1",
                            decision={"skipped": "local_only"}).validate()
-    state, q = questions(req)
     try:
-        from walter_memory import llm
-        res = llm.decide(state, q, processor="walter-context-preflight", privacy_class=req.privacy_class,
-                         models=decision_chain(), purpose=purpose, budget="recurring",
-                         timeout=min(SETTINGS["decision_timeout_s"], max(within, 1.0)) if within
-                         else SETTINGS["decision_timeout_s"], samples=DECISION_SAMPLES)
-        a = res.get("answers") if isinstance(res, dict) else None
+        limit = min(SETTINGS["decision_timeout_s"], max(within, 1.0)) if within else SETTINGS["decision_timeout_s"]
+        a, res, traced, pending = _decide_turn(req, limit, purpose)
         if not isinstance(a, dict) or not a:
             raise ValueError("the decision returned no answers")
     except Exception as exc:  # noqa: BLE001 — fail-open, explicitly (A2)
@@ -407,7 +567,12 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
     if level == "L0" and req.previous and req.previous.age_s is not None and req.previous.age_s < FLOOR_WINDOW_S:
         level = "L1"                                                       # plan floor
     domain, horizon = pick("domain"), pick("horizon")
-    caps = [c for c in CAPABILITIES if c != "tools" and ((a.get("cap_" + c) or {}).get("noul") or 0) >= 0.5]
+    if SIGNALS == "questions":
+        caps = [c for c in CAPABILITIES if c != "tools" and ((a.get("cap_" + c) or {}).get("noul") or 0) >= 0.5]
+    else:                     # one several-options question (emulated as one noul per option where not native)
+        probs = ((res.get("signals") or {}).get("context.needs") or {}).get("probabilities") or {}
+        caps = [c for c in CAPABILITIES if c != "tools" and isinstance(probs.get(c), (int, float)) and probs[c] >= 0.5]
+    seen = observations(res.get("signals") or {}, req.message) if SIGNALS != "questions" and not pending else {}
     named = _anchors(req.message)
     if named and "memory" not in caps:      # a project the owner's memory knows is named: memory, whatever the model said
         caps.insert(0, "memory")
@@ -444,15 +609,25 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
     plan = ContextPlan(
         turn_id=req.turn_id, thread=thread, act=act, level=level,
         domains=[domain] if domain in DOMAINS else [], horizons=[horizon] if horizon in HORIZONS else [],
-        capabilities=["tools", *caps],
+        capabilities=["tools", *caps], observations=seen,
         model_profile=ModelProfile(task=task, level=tier),
         decision={"model": res.get("model"), "ms": round((time.perf_counter() - t0) * 1000),
+                  **({"signals": traced} if traced else {}),
+                  **({"parts": [p.get("model") for p in res["parts"]]} if len(res.get("parts") or ()) > 1 else {}),
                   **({"work": work} if work is not None else {}), "effort": effort(level, tier, work),
                   **({"resume": resume} if resume is not None else {}),
                   **({"samples": res["samples"]} if res.get("samples") else {}),
                   **({"thread_by": by} if by else {}),
                   "confidence": {k: conf(k) for k in ("thread", "act", "plan", "domain", "horizon", "task")
                                  if conf(k) is not None}, **({"anchors": named} if named else {})})
+    if pending is not None:
+        plan._readings = pending           # not a field of the contract: the pending call, settled by the pack
+        if readings == "wait":
+            left = (within - (time.perf_counter() - t0)) if within else limit
+            if not pending.settle(plan, left):
+                pending.late(plan)
+        else:
+            pending.settle(plan, 0)
     return plan.validate()
 
 

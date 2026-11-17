@@ -137,7 +137,11 @@ chars_per_token = 3.5        # report only: estimated tokens from characters
 
 # Preflight (walter_context.preflight): one decision per owner message, explicit degraded plan when it fails (SOCLE A2).
 [preflight]
-decision_samples = 3                # parallel decisions averaged (2026-11-09): one call flipped memory on 2 messages in 7
+decision_samples = 2                # parallel calls of the decision model per turn
+decision_sampling = "first"         # "first" = hedged, the first answer kept; "mean" = averaged (2026-11-09: one call
+                                    # flipped memory on 2 messages in 7). 17/11 bench, 48 cases: Drex Max's plans are
+                                    # identical with mean of 3 and first of 2 (0 difference), first of 2 is faster
+                                    # (judgements p50 0.52 s / p95 0.71 s against 0.66 / 0.85)
 decision_timeout_s = 15             # per decision call (the Router chain's own fallbacks run inside it)
 reply_window_s = 7200               # past that, « ok, regarde X » opens a subject rather than answering one
 floor_window_s = 1800               # a message this close to the previous exchange needs at least that exchange
@@ -154,6 +158,17 @@ answer_within_s = 5.5
 answer_margin_s = 1.0
 pack_reserve_s = 1.0                # the decision stops this long before the answer is due: past it, the degraded plan
                                     # (said to the model, on the run and on the bus) instead of no answer at all
+# Where the turn's questions come from (Walter Decision 2.0, 2026-11-17): "registry" = composed from the signals the
+# modules declare (`walter decisions`; Context, Router, Memory), "questions" = the preflight's own set 2 (rollback).
+signals = "registry"                # activated 2026-11-17 (Walter Decision 2.0; bench decision2: same judgements as set 2,
+                                    # plan p50/p95 0.71/1.29 s against 0.86/1.29 s, dates and people read); rollback = "questions"
+# The turn's readings (dates, people named: signals of layer observation) asked apart from its judgements and in
+# parallel: the plan does not wait for them, the pack's `now` and `people` blocks do ([pack] readings_wait_s).
+# false = one call carrying both (the plan then waits for the slower extraction route).
+readings_apart = true
+# Calls of the readings: passages are never averaged, so more than 1 = hedged, the first answer kept (17/11, 60
+# messages each: 1 call 54/60 under 1 s, max 2.1 s; 2 hedged 59/60, max 1.7 s; +0.00003 $ a message).
+readings_samples = 2
 
 # Per-message pack (walter_context.assembly / retrieval). Budgets in tokens (chars / 4), header included.
 # Measured 07-11/11 (741 packs): median L0 115, L1 1588, L2 2983, L3 2889, L4 4666; max 7257.
@@ -161,7 +176,7 @@ pack_reserve_s = 1.0                # the decision stops this long before the an
 budget = { L0 = 800, L1 = 1200, L2 = 2000, L3 = 3000, L4 = 4500 }
 # Over budget, blocks are shrunk (whole lines kept) then dropped in this order, least relevant first; a block id not
 # listed is cut last; `now` and the degraded-plan line are never cut. Every cut is recorded in the pack's `cuts`.
-cut_order = ["subjects_board", "records", "tool_cards", "recent_exchanges", "memory", "experience", "subject",
+cut_order = ["subjects_board", "records", "tool_cards", "recent_exchanges", "memory", "people", "experience", "subject",
              "session_state", "tasks"]
 min_block_tokens = 80               # a block that would shrink below this is dropped instead
 board_tokens = 200                  # subjects board: active subjects only (before: the whole table, 17 lines, ~350)
@@ -180,6 +195,9 @@ experience_recent_days = 7          # below L2 the block appears only for a fail
 gateway_timeout_s = 1.5             # per Memory gateway call of the pack (tasks, experience); past it the block is dropped
 workers = 16                        # threads asking the pack's sources together (up to 9 sources per message)
 late_grace_s = 0.25                 # a source is given at least this long once the answer's deadline has passed
+people_tokens = 300                 # people the message names (preflight observation, Walter Decision 2.0): their cards
+readings_wait_s = 1.0               # the most `now` / `people` wait for readings asked apart, counted from the message
+                                    # (never past the deadline); 17/11 bench, cal split: readings p95 0.75 s
 
 [pack.memory_budget.L3]             # Memory get_context sections (tasks/experience come from their own routes: 0 here)
 profile = 0

@@ -10,6 +10,9 @@ contract version, not a silent extension. ContextPlan v2 (2026-11-07): the v1 ca
 memory and the web, so a web question (« prix du Bitcoin ») pulled memory records; it is split into `memory` and
 `web`, and `browser` (act in a web page or an app as the owner) is added. A v1 plan still reads: `search` becomes
 `memory` + `web` (nothing lost).
+ContextPlan v3 (2026-11-17, Walter Decision 2.0): `observations` = what was read in the message itself and can be
+checked against it (dates written in words, each read as a calendar day by Walter; the people it names), apart from
+the judgements (act, level, capabilities…). A v1 or v2 plan still reads (no observations).
 """
 from __future__ import annotations
 
@@ -17,7 +20,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 VERSION = 1                 # SessionState, ThreadHint, MemoryViewQuery
-PLAN_VERSION = 2            # ContextPlan
+PLAN_VERSION = 3            # ContextPlan
 
 # Context level: how much the model needs to see beyond the message itself.
 LEVELS = {
@@ -37,6 +40,7 @@ CAPABILITIES = ("tools", "skills", "memory", "web", "browser", "delegation", "se
 V1_CAPABILITIES = {"search": ("memory", "web")}     # v1 value -> v2 values
 MODEL_LEVELS = ("L1", "L2", "L3")          # Walter Router's text tiers (not the context levels above)
 FAST_PATHS = ("short_reply", "trivial")
+OBSERVATIONS = {"dates": ("text", "date", "past", "time", "ambiguous", "found"), "people": ("text", "found")}
 
 
 class ContractError(ValueError):
@@ -88,6 +92,7 @@ class ContextPlan:
     escalated: bool = False              # a stronger model settled part of it
     decision: dict = field(default_factory=dict)          # model, ms, confidences; degraded + error (A2): trace
     answer: str | None = None            # fast_path trivial only: the exact answer, no model needed (lot 2, 07/11)
+    observations: dict = field(default_factory=dict)      # v3: read in the message (dates, people), checkable
     version: int = PLAN_VERSION
 
     def validate(self) -> "ContextPlan":
@@ -108,6 +113,12 @@ class ContextPlan:
             _one_of("fast_path", self.fast_path, FAST_PATHS)
         if self.answer is not None and self.fast_path != "trivial":
             raise ContractError("answer: only a trivial fast path answers without a model")
+        if not isinstance(self.observations, dict) or set(self.observations) - set(OBSERVATIONS):
+            raise ContractError(f"observations: keys among {sorted(OBSERVATIONS)}")
+        for k, items in self.observations.items():
+            if not isinstance(items, list) or not all(isinstance(i, dict) and isinstance(i.get("text"), str)
+                                                      and set(i) <= set(OBSERVATIONS[k]) for i in items):
+                raise ContractError(f"observations.{k}: items {{{', '.join(OBSERVATIONS[k])}}} with their text")
         return self
 
     def to_dict(self) -> dict:
@@ -118,6 +129,7 @@ class ContextPlan:
         version, caps = d.get("version", PLAN_VERSION), list(d.get("capabilities") or [])
         if version == 1:                 # a traced v1 plan: same meaning in the v2 vocabulary
             caps = list(dict.fromkeys(c2 for c in caps for c2 in V1_CAPABILITIES.get(c, (c,))))
+        if version in (1, 2):            # v1 / v2: no observations, same meaning otherwise
             version = PLAN_VERSION
         try:
             plan = cls(turn_id=d["turn_id"], thread=ThreadChoice(**d["thread"]), act=d["act"], level=d["level"],
@@ -126,7 +138,7 @@ class ContextPlan:
                        model_profile=ModelProfile(**(d.get("model_profile") or {})),
                        fast_path=d.get("fast_path"), escalated=bool(d.get("escalated")),
                        decision=dict(d.get("decision") or {}), answer=d.get("answer"),
-                       version=version)
+                       observations=dict(d.get("observations") or {}), version=version)
         except (KeyError, TypeError) as exc:
             raise ContractError(f"malformed ContextPlan: {exc}") from exc
         return plan.validate()
@@ -223,9 +235,12 @@ _STRS = {"type": "array", "items": {"type": "string"}}
 def schemas() -> dict[str, dict]:
     base = "https://walter.local/contracts/context/"
     return {
-        "context-plan.v2.json": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": base + "context-plan.v2.json",
-            "title": "ContextPlan v2", "description": "What the preflight decides for one owner message (walter-context output, traced).", "type": "object",
+        "context-plan.v3.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": base + "context-plan.v3.json",
+            "title": "ContextPlan v3", "description": (
+                "What the preflight decides for one owner message (walter-context output, traced). v3 (2026-11-17): "
+                "observations read in the message, apart from the judgements; a v1/v2 plan reads as v3 without them."),
+            "type": "object",
             "required": ["version", "turn_id", "thread", "act", "level"],
             "properties": {
                 "version": {"const": PLAN_VERSION}, "turn_id": {"type": "string", "minLength": 1},
@@ -238,6 +253,16 @@ def schemas() -> dict[str, dict]:
                     "task": {"type": "string"}, "level": _enum(MODEL_LEVELS), "require": _STRS},
                     "description": "Asked of Walter Router; the Router alone picks the concrete model."},
                 "fast_path": {"enum": [*FAST_PATHS, None]}, "escalated": {"type": "boolean"},
+                "answer": {"type": ["string", "null"], "description": "trivial fast path only: the exact answer"},
+                "observations": {"type": "object", "additionalProperties": False, "description": (
+                    "read in the message and checkable against it (Walter Decision 2.0 signals context.dates and "
+                    "context.people): each date passage as written, the calendar day Walter reads it as (`past` = "
+                    "the same words read as already gone, `ambiguous` = the words leave a choice), the people named"),
+                    "properties": {k: {"type": "array", "items": {
+                        "type": "object", "required": ["text"], "additionalProperties": False,
+                        "properties": {f: ({"type": "boolean"} if f == "ambiguous" else _PROB if f == "found"
+                                           else {"type": "string"}) for f in fields}}}
+                        for k, fields in OBSERVATIONS.items()}},
                 "decision": {"type": "object", "description": (
                     "trace only; degraded = true with error (exception class + short scrubbed reason) when the "
                     "decision failed and the plan is the prudent default (SOCLE A2, 2026-11-11)"),

@@ -3,7 +3,7 @@
 Stable first, volatile last, so a provider prefix cache reuses as much as possible between messages:
     0 capabilities (session)  1 subjects board  2 session state (owner rules + working state of the thread, Memory
     V1 P1.1)  3 subject view, tasks of the thread  4 execution experience, memory for this message, records, tool
-    cards  5 recent exchanges, the present instant.
+    cards, people the message names  5 recent exchanges, the present instant (+ the days the message names).
 The host's own system prompt and native history stay the host's: for Claude Code / Codex walter-context only adds (a
 block the host already shows is counted, not injected).
 
@@ -39,7 +39,7 @@ LATE = ("Contexte incomplet : {names} n'a pas répondu à temps pour ce message 
 LATE_NAMES = {"memory": "la mémoire", "session_state": "l'état de travail du fil", "subject": "la synthèse du sujet",
               "board": "le tableau des sujets", "tasks": "la liste des objectifs", "experience": "l'expérience d'exécution",
               "records": "le registre des décisions", "recent": "les derniers échanges", "tool_cards": "les fiches d'outils",
-              "capabilities": "la carte des modules"}
+              "capabilities": "la carte des modules", "people": "les fiches des personnes nommées"}
 NEVER_CUT = {"now"}
 SHRUNK = "\n(… coupé : budget du contexte de ce message)"
 

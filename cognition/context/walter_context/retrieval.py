@@ -409,9 +409,32 @@ _MONTHS = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet", "ao
            "novembre", "décembre")
 
 
-def now(at: "datetime | None" = None) -> Block:
+def _day(iso: str) -> str:
+    d = datetime.fromisoformat(iso)
+    return f"{_DAYS[d.weekday()]} {d.day} {_MONTHS[d.month - 1]} {d.year}"
+
+
+def dates_line(plan: ContextPlan | None) -> str:
+    """The days the message names, read by Walter (preflight observation `dates`, Walter Decision 2.0): « jeudi »
+    is said as a calendar day, and when the words leave a choice (the coming or the past Thursday, a weekday that
+    does not match the date) the line says both readings rather than one guess."""
+    out = []
+    for d in ((plan.observations or {}).get("dates") or []) if plan else []:
+        if not d.get("date"):
+            continue
+        text = f"« {d['text']} » = {_day(d['date'])}" + (f" à {d['time']}" if d.get("time") else "")
+        if d.get("past"):
+            text += f" (ou {_day(d['past'])} si c'est le passé)"
+        elif d.get("ambiguous"):
+            text += " (à confirmer : les mots laissent un choix)"
+        out.append(text)
+    return ("Dates du message : " + " ; ".join(out) + ".") if out else ""
+
+
+def now(at: "datetime | None" = None, plan: ContextPlan | None = None) -> Block:
     """The present instant in the owner's time zone (Walter Memory's setting, the owner's places). No host told the
-    model the date: on 07/11 it ran `date` in a shell (one more step) and guessed « heure de Paris » in its answers."""
+    model the date: on 07/11 it ran `date` in a shell (one more step) and guessed « heure de Paris » in its answers.
+    With a plan, the days its message names, as calendar days (dates_line)."""
     from datetime import datetime, timezone
     from zoneinfo import ZoneInfo
     try:
@@ -424,7 +447,26 @@ def now(at: "datetime | None" = None) -> Block:
     local = utc.astimezone(zone)
     text = (f"Maintenant : {_DAYS[local.weekday()]} {local.day} {_MONTHS[local.month - 1]} {local.year}, "
             f"{local:%H:%M} heure locale ({tz}) ; {utc:%Y-%m-%d %H:%M} UTC.")
-    return Block("now", 5, text, sources=[f"tz:{tz}"])
+    extra = dates_line(plan)
+    return Block("now", 5, text + ("\n" + extra if extra else ""),
+                 sources=[f"tz:{tz}", *(["preflight:dates"] if extra else [])])
+
+
+def people(plan: ContextPlan, message: str) -> Block | None:
+    """The people the message names (preflight observation `people`, Walter Decision 2.0) matched to the people the
+    owner talks with, their Kardex card (cloud-safe; Walter Memory resolves and reads, never this module). Those the
+    memory block already shows by its own name match are left to it: a person is shown once."""
+    names = [p["text"] for p in ((plan.observations or {}).get("people") or []) if p.get("text")]
+    if not names:
+        return None
+    from walter_memory import context
+    budget = _memory_budget(plan)
+    shown = context.people_in(message) if budget and budget.get("people", 0) > 0 else []
+    r = context.people_cards(names, exclude=shown, budget=PACK["people_tokens"])
+    if not r.get("text"):
+        return None
+    return Block("people", 4, "Personnes nommées dans le message (Kardex) :\n" + r["text"],
+                 sources=[f"entity:{e}" for e in r.get("matched") or []])
 
 
 LATE = "not ready in time"                      # note of a source the pack did not wait for
@@ -486,7 +528,28 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
     « <source>: not ready in time », which the pack says to the model — late context is said, never silent.
     `prefetch`: sources already started with this message (Prefetch); a block's `ms` is then its own time since that
     start, and `retrieval_ms` alone says what the pack added after the plan."""
-    steps = [("capabilities", lambda: capabilities(plan)), ("tool_cards", lambda: tool_cards(plan)), ("now", now)]
+    pending = getattr(plan, "_readings", None)      # readings asked apart from the judgements, still running
+
+    def settled(fn):
+        """A block that reads the message's dates or people waits for the readings, at most `readings_wait_s` after
+        the message — never past the answer's deadline less the grace the pack gives its sources, so `now` itself is
+        never lost to them."""
+        if pending is None:
+            return fn
+
+        def step():
+            # counted from the message, not from this step (17/11 bench: a 2 s wait from here put 2 slow readings
+            # of OpenRouter's Extractions route, 1.8–3.6 s, on the answer's total)
+            left = PACK["readings_wait_s"] - (time.perf_counter() - pending.t0)
+            if deadline is not None:
+                left = min(deadline - time.monotonic() - PACK["late_grace_s"], left)
+            pending.settle(plan, left)
+            return fn()
+        return step
+    steps = [("capabilities", lambda: capabilities(plan)), ("tool_cards", lambda: tool_cards(plan)),
+             ("now", settled(lambda: now(plan=plan)))]
+    if pending is not None or (plan.observations or {}).get("people"):
+        steps.append(("people", settled(lambda: people(plan, message))))
     if plan.level != "L0":
         steps += [("board", lambda: board(plan)), ("session_state", lambda: session_state(plan, message, session_key)),
                   ("subject", lambda: subject(plan))]

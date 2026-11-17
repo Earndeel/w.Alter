@@ -96,13 +96,16 @@ def capability_settings(path: str | Path | None = None) -> dict:
 PREFLIGHT_KEYS = {"decision_samples": int, "decision_timeout_s": (int, float), "reply_window_s": (int, float),
                   "floor_window_s": (int, float), "router_ttl_s": (int, float), "degraded_min_similarity": (int, float),
                   "degraded_profile_max_age_s": (int, float), "previous_chars": int, "previous_timeout_s": (int, float),
-                  "answer_within_s": (int, float), "answer_margin_s": (int, float), "pack_reserve_s": (int, float)}
-PACK_KEYS = {"budget": dict, "cut_order": list, "min_block_tokens": int, "board_tokens": int, "board_max_lines": int,
+                  "answer_within_s": (int, float), "answer_margin_s": (int, float), "pack_reserve_s": (int, float),
+                  "signals": str, "readings_apart": bool, "decision_sampling": str,
+                  "readings_samples": int}
+PACK_KEYS = {"budget": dict, "cut_order": list, "people_tokens": int, "min_block_tokens": int, "board_tokens": int, "board_max_lines": int,
              "board_recent_hours": (int, float), "board_states": list, "subject_tokens": int,
              "horizon_max_age_s": dict, "recent_exchanges": int, "unsure_plan": (int, float), "tasks_tokens": int,
              "tasks_others": int, "experience_tokens": int, "experience_items": int,
              "experience_recent_days": (int, float), "gateway_timeout_s": (int, float), "memory_budget": dict,
-             "records_budget": dict, "state_budget": dict, "workers": int, "late_grace_s": (int, float)}
+             "records_budget": dict, "state_budget": dict, "workers": int, "late_grace_s": (int, float),
+             "readings_wait_s": (int, float)}
 
 
 def _section(name: str, keys: dict, path: str | Path | None) -> dict:
@@ -113,14 +116,25 @@ def _section(name: str, keys: dict, path: str | Path | None) -> dict:
     if missing:
         raise ValueError(f"[{name}]: missing {missing}")
     for k, t in keys.items():
+        if t is bool:                               # a switch: true or false, nothing else
+            if not isinstance(raw[k], bool):
+                raise ValueError(f"[{name}].{k}: invalid value")
+            continue
         if not isinstance(raw[k], t) or isinstance(raw[k], bool) or (isinstance(raw[k], (int, float)) and raw[k] < 0):
             raise ValueError(f"[{name}].{k}: invalid value")
     return {k: raw[k] for k in keys}
 
 
 def preflight_settings(path: str | Path | None = None) -> dict:
-    """[preflight]: decision samples, timeouts, windows and the degraded plan's thresholds."""
-    return _section("preflight", PREFLIGHT_KEYS, path)
+    """[preflight]: decision samples, timeouts, windows, the degraded plan's thresholds, where the questions come from."""
+    out = _section("preflight", PREFLIGHT_KEYS, path)
+    if out["signals"] not in ("registry", "questions"):
+        raise ValueError('[preflight].signals: "registry" or "questions"')
+    if out["decision_sampling"] not in ("mean", "first"):
+        raise ValueError('[preflight].decision_sampling: "mean" or "first"')
+    if out["readings_samples"] < 1:
+        raise ValueError("[preflight].readings_samples: 1 or more")
+    return out
 
 
 def pack_settings(path: str | Path | None = None) -> dict:

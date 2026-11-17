@@ -289,3 +289,46 @@ def test_one_notes_call_gives_each_subset(monkeypatch):
     b = retrieval.capabilities(plan("L2", caps=("web",)))
     assert b.sources == ["memory.m0", "browse.m0", "browse.manifest"]
     assert retrieval._card("memory") == "M1 mem"
+
+
+# --- Walter Decision 2.0 (2026-11-17): the preflight's observations feed the pack ---------------------------------
+def _observed(level="L1", **obs):
+    return ContextPlan(turn_id="t", thread=ThreadChoice(id="th-1"), act="new", level=level, observations=obs)
+
+
+def test_the_days_the_message_names_are_said_as_calendar_days_with_their_doubt(monkeypatch):
+    from datetime import datetime, timezone
+    fake = types.SimpleNamespace(settings=lambda: {"periods": {"tz": "Europe/Paris"}})
+    monkeypatch.setitem(sys.modules, "walter_memory.organic", fake)
+    import walter_memory
+    monkeypatch.setattr(walter_memory, "organic", fake, raising=False)
+    p = _observed(dates=[{"text": "jeudi", "date": "2026-11-19", "past": "2026-11-12", "ambiguous": True},
+                         {"text": "demain 14h", "date": "2026-11-18", "time": "14:00"},
+                         {"text": "mardi 2 décembre", "date": "2026-12-02", "ambiguous": True},
+                         {"text": "plus tard"}])                                  # no day: not said
+    b = retrieval.now(datetime(2026, 11, 17, 9, 0, tzinfo=timezone.utc), plan=p)
+    assert b.text.splitlines()[1] == (
+        "Dates du message : « jeudi » = jeudi 19 novembre 2026 (ou jeudi 12 novembre 2026 si c'est le passé) ; "
+        "« demain 14h » = mercredi 18 novembre 2026 à 14:00 ; « mardi 2 décembre » = mercredi 2 décembre 2026 "
+        "(à confirmer : les mots laissent un choix).")
+    assert "preflight:dates" in b.sources
+    assert retrieval.now(datetime(2026, 11, 17, 9, 0, tzinfo=timezone.utc), plan=_observed()).text.count("\n") == 0
+
+
+def test_people_named_get_their_card_once_and_memory_resolves_them(monkeypatch):
+    seen = {}
+
+    def cards(names, exclude=(), budget=300):
+        seen.update(names=names, exclude=list(exclude), budget=budget)
+        return {"text": "- Sophie M. (beeper): 120 messages", "matched": ["e1"], "ambiguous": {}, "unknown": []}
+    fake = types.SimpleNamespace(people_cards=cards, people_in=lambda m: ["e9"])
+    monkeypatch.setitem(sys.modules, "walter_memory.context", fake)
+    import walter_memory
+    monkeypatch.setattr(walter_memory, "context", fake, raising=False)
+    p = _observed("L3", people=[{"text": "Sophie", "found": 0.9}])
+    b = retrieval.people(p, "appelle Sophie")
+    assert b.id == "people" and b.layer == 4 and b.sources == ["entity:e1"] and "Sophie M." in b.text
+    assert seen["names"] == ["Sophie"] and seen["exclude"] == ["e9"]          # L3: memory's own match not repeated
+    retrieval.people(_observed("L1", people=[{"text": "Sophie"}]), "appelle Sophie")
+    assert seen["exclude"] == []                                               # L1: no memory block, nothing shown
+    assert retrieval.people(_observed("L1"), "appelle Sophie") is None

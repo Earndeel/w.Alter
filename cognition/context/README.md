@@ -6,7 +6,7 @@
 | **Propriétaire** | walter-context (`/walter/cognition/context`). |
 | **État** | **active** (constat du 09/11/2026) : service `walter-context-preflight` ; Walter Engine (DSH) l'utilise. |
 | **Ne fait pas** | Posséder les sujets, vues et originaux (Walter Memory, walter-logs) ; choisir un modèle (Router). |
-| **Contrats** | [contracts/context.json](contracts/context.json), [contracts/maintenance.json](contracts/maintenance.json), [contracts/schemas/](contracts/schemas/) (ContextPlan v2, ChildContextSpec v1) ; CLI `walter-context`. Spécification : `/walter/cognition/context/docs/CONTEXT-ENGINE.md`. |
+| **Contrats** | [contracts/context.json](contracts/context.json), [contracts/maintenance.json](contracts/maintenance.json), [contracts/schemas/](contracts/schemas/) (ContextPlan v3 — v2 et v1 gardés, ChildContextSpec v1), [manifest/decisions.json](manifest/decisions.json) (signaux de décision déclarés) ; CLI `walter-context`. Spécification : `/walter/cognition/context/docs/CONTEXT-ENGINE.md`. |
 
 walter-context prépare ce qui entre dans la fenêtre d’un modèle et compresse l’historique selon le contrat du
 harness. La compression locale, la préparation d’un contexte par message et le contexte d’un sous-agent sont des
@@ -93,6 +93,26 @@ seulement dans ce cas) ; ≥ 0,5 → `requested.resume` au Run Plane, qui rattac
 ouvrir une autre — une reprise depuis une autre interface n'a pas d'échange précédent, son acte revient « new ».
 **Plan dégradé et fil** : sans jugement du modèle, moins de 30 min après un échange, la conversation reste dans le fil
 de cet échange (`thread_by = previous_exchange`) ; au-delà, le sujet le plus proche en mots, s'il l'est assez.
+**Questions composées depuis le registre** (Walter Decision 2.0, 17/11/2026, `[preflight] signals = "registry"` ;
+`"questions"` = le jeu 2 d'avant, retour arrière immédiat) : le preflight ne tient plus sa liste de questions ; il
+demande l'occasion `turn` avec ses faits (`threads`, `open_task`) et ses options (les fils candidats), et Walter
+Decision compose les signaux que Context, Router et Memory déclarent dans leur `manifest/decisions.json` (acte, plan,
+domaine, horizon, besoins en une question à plusieurs options, palier, travail, reprise, et deux lectures : dates et
+personnes nommées). Les réponses reviennent par identifiant de signal ; le plan garde les mêmes champs (contrat
+ContextPlan inchangé pour ses consommateurs) et ajoute, à part des jugements, `observations` (v3) : les dates du
+message telles qu'écrites + le jour que Walter lit (jamais celui que le modèle devine ; ambiguïté dite) et les
+personnes nommées, gardées seulement si le passage est dans le message et lu avec une certitude ≥ 0,5. Ces lectures
+nourrissent plusieurs consommateurs sans nouvel appel : le bloc `now` du pack (« Dates du message : … ») et le bloc
+`people` (fiches Kardex des personnes nommées, résolues par Memory, une homonymie dite sans nommer les candidats) ;
+extraire n'est pas mémoriser (rien n'est écrit). Une lecture qu'aucun modèle de la chaîne ne porte est dite
+`unavailable` dans `decision.signals` ; le plan tient sans elle.
+**Lectures à part** (`[preflight] readings_apart = true`) : jugements (couche `inference`) et lectures (couche
+`observation`, posées sur le seul message, un échantillon) partent en deux appels parallèles ; le plan n'attend que
+les jugements, le pack attend les lectures au plus `[pack] readings_wait_s` (borné par l'échéance de la réponse) pour
+ses blocs `now` / `people`. Une lecture encore en route quand la réponse part est dite `readings: {late: true}` (rien
+n'est perdu en silence). `decision_samples = 2` + `decision_sampling = "first"` : deux échantillons, le premier
+arrivé gardé (banc du 17/11) ; `false` / `3` / `"mean"` = le réglage d'avant. Une décision complémentaire ne repose
+que ses signaux (`ask` de `POST /v1/decisions`), jamais un préflight complet.
 
 L’état d’un port de compression ne détermine pas le mode d’injection par message. Les essais `pack` ne constituent
 pas une décision de migration globale. Voir la maintenance pour les commandes et les modes dégradés.

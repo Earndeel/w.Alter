@@ -1,5 +1,6 @@
 {
   "id": "context",
+  "decisions": "manifest/decisions.json",
   "anchors": [
     "contracts/context.json",
     "ports/dsh/index.mjs",
@@ -219,6 +220,7 @@
       "status": "active",
       "readme": "README.md",
       "contracts": [
+        "contracts/schemas/context-plan.v3.json",
         "contracts/schemas/context-plan.v2.json"
       ],
       "interfaces": [

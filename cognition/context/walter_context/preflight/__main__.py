@@ -256,7 +256,9 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
         p0 = time.perf_counter()
         try:                                # the decision has the answer's time less what the pack needs at least
             left = max(due - time.monotonic() - SETTINGS["pack_reserve_s"], 0.5)
-            plan_obj = _bounded(lambda: run(req, purpose=purpose, within=None if warm else left), left)
+            packs = (shadow or want_pack) and req.privacy_class != "local_only"
+            plan_obj = _bounded(lambda: run(req, purpose=purpose, within=None if warm else left,
+                                            readings="apart" if packs else "wait"), left)
         except FutureTimeout:               # no decision in time: the degraded plan, said as such (A2), not silence
             plan_obj = degraded_plan(req, TimeoutError("no decision within the time the caller waits"), p0)
         plan = plan_obj.to_dict()
@@ -294,6 +296,12 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
             row["pack_text"] = p.text()
             row["current"] = {"tokens": len(cur.get("text") or "") // 4 + (1 if cur.get("text") else 0),
                               "parts": cur.get("parts"), "text": cur.get("text")}
+        pending = getattr(plan_obj, "_readings", None)
+        if pending is not None:             # readings asked apart: in the answer if they came while the pack was read
+            if not pending.settle(plan_obj, 0):
+                pending.late(plan_obj)
+            now_plan = plan_obj.to_dict()
+            plan["observations"], plan["decision"] = now_plan["observations"], now_plan["decision"]
         if attached is not None:            # the run is normally attached by now; past the deadline it finishes alone
             try:
                 attached.result(timeout=max(due - time.monotonic(), 0))

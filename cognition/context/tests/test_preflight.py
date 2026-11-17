@@ -30,6 +30,9 @@ def fake_llm(monkeypatch):
     monkeypatch.setitem(sys.modules, "walter_memory.llm", mod)
     monkeypatch.setattr(preflight, "router_tasks", lambda: {"general": "Général", "coding": "Code"})
     monkeypatch.setattr(preflight, "decision_chain", lambda: ("fake/decider",))
+    # these answers are keyed by the preflight's own questions: the set-2 path, kept as the rollback
+    # (`signals = "questions"`); the registry path, in service since 17/11, is test_preflight_registry.py's
+    monkeypatch.setattr(preflight, "SIGNALS", "questions")
     return calls, answers
 
 
@@ -341,6 +344,7 @@ def test_named_project_forces_memory(monkeypatch):
     monkeypatch.setattr(pf, "_anchors", lambda m: ["edgewise"] if "edgewise" in m.lower() else [])
     monkeypatch.setattr(pf, "router_tasks", lambda: {})
     monkeypatch.setattr(pf, "decision_chain", lambda: None)
+    monkeypatch.setattr(pf, "SIGNALS", "questions")       # answers keyed by the set-2 questions (the rollback path)
     import walter_memory.llm as llm
     answers = {"act": {"choice": "new"}, "plan": {"choice": "none", "confidence": 0.8}, "cap_web": {"noul": 0.9}}
     monkeypatch.setattr(llm, "decide", lambda *a, **k: {"answers": answers, "model": "fake"})
@@ -359,7 +363,9 @@ def test_memory_needed_lifts_the_plan_to_the_level_that_carries_memory(fake_llm)
                     "cap_memory": {"noul": 0.8}})
     p = run(Request(turn_id="t", message="Qui décide si un message que je reçois mérite une notification ?"))
     assert p.level == "L3" and "memory" in p.capabilities
-    assert calls["decide"][0][2]["samples"] == preflight.DECISION_SAMPLES >= 3
+    kw = calls["decide"][0][2]                  # several samples, averaged or hedged (17/11 bench: same plans)
+    assert kw["samples"] == preflight.DECISION_SAMPLES >= 2
+    assert kw.get("sampling", "mean") == preflight.DECISION_SAMPLING
     answers["cap_memory"] = {"noul": 0.2}
     assert run(Request(turn_id="t2", message="Traduis « bonjour » en espagnol")).level == "L0"
     answers.update({"plan": {"choice": "thread_and_memory"}, "extensive": {"noul": 0.9}, "cap_memory": {"noul": 0.9}})
