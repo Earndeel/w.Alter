@@ -64,3 +64,30 @@ A returned answer is insufficient evidence of successful persistence. During the
 - If Router documentation tests report `Undocumented environment variable`, document newly introduced variables in its documentation registry and regenerate the reference through the module's documented interface. This occurred for `WALTER_RUN_TOOLS` and `WALTER_SESSION_ID`.
 
 Back up affected files before fixes, run the relevant module tests, rerun the live scenario, and finish with `walter check`. For memory-service changes, also run `systemctl start memory-autopilot` and inspect its reported score. Report remaining failures explicitly; structural success and execution quality are separate findings.
+
+## Verify a pinned Router level end to end
+
+When a caller such as the development board must always use L3, verify the Router level rather than hard-coding today's model.
+
+1. Inspect the current mapping with `walter-router dossier general`. Treat the L3 provider, model and reasoning variant as mutable configuration, not permanent constants.
+2. Trace the level through the caller, engine session and gateway. A session opened with `level: L3` must preserve that override on subsequent calls even when preflight chooses a lower level. Ensure the execution budget is at least the L3 budget; the verified deployment used 60 steps and 35 minutes. Do not infer that pinning a model also pins the level or its budget.
+3. Run the affected regression suites:
+   ```sh
+   cd /walter/cognition/router && walter-python -m pytest -q tests -p no:cacheprovider
+   cd /walter/core && node --test interfaces/api/tests/api.test.mjs
+   cd /walter/core && node --test engine/tests/plugins.test.mjs
+   cd /walter/core && walter-python -m pytest -q engine/tests -p no:cacheprovider
+   cd /walter/ops/devboard && walter-python -m pytest -q tests -p no:cacheprovider
+   walter check
+   ```
+   Inspect individual failures, not just aggregate counts. If the Router documentation test reports stale generated references, regenerate with `cd /walter/cognition/router && ./bin/walter-router docs --write`, review the diff and rerun the suite. A test assuming every live preference is locked is invalid when the owner has deliberately unlocked preferences; preserve those settings and test lock behavior with controlled fixtures instead.
+4. Before restarting services, check for active engine turns and running development-board resumptions. Once safe and authorized, deploy with:
+   ```sh
+   systemctl restart walter-llm dsh-web walter-devboard-web
+   systemctl is-active walter-llm dsh-web walter-devboard-web walter-telegram walter-devboard-bus
+   curl -fsS http://127.0.0.1:8894/health
+   ```
+5. Open an isolated test conversation through the engine's declared API with `level: L3`. Send a deliberately trivial message so preflight can select L1. Correlate that turn with its persisted gateway request and selection trace. The demonstrated successful trace contained `req.level: L1`, `req.pinned_level: L3`, and a selection event with `task: general/L3`. Confirm that the selected provider/model matches the current L3 mapping. Also test rejection of an invalid level; the observed error was `invalid_level`.
+6. Report separately: tests passing, services healthy, and live routing proven. A successful response or an L3-labelled session alone does not prove the override survived preflight. Avoid claiming that a single-turn smoke test proves multi-turn persistence; cover subsequent turns separately.
+
+For board tests that invoke the resume brief, isolate the real memory CLI. In `tests/test_actions.py`, an autouse fixture can use `monkeypatch.setattr(actions, "_cli", lambda *a, **k: None)`; individual tests should supply controlled responses when testing memory enrichment. Otherwise apparently local tests can query live logs and tasks.
