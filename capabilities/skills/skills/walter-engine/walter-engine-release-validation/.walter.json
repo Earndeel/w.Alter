@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-17T04:13:21.019410+00:00",
- "description": "Use when applying Walter Engine runtime changes, restarting dsh-web, or validating persistent Python kernel behavior in production on Monsieur's VM.",
- "domain": "walter-engine",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session established a reusable production-release validation sequence with exact service names, state paths, ports, and a kernel-level PATH probe. It also exposed a hard-earned isolation failure: Lab/test/e2e turns created real durable tasks, requiring explicit identification and cleanup. This is Walter runtime operations, not a duplicate of the listed browser, deployment, or model-lookup skills. [session claude_code/vm/4fe4bae5-dcfd-4d8c-85b6-b8c919662803]",
- "runtime": "learner",
- "session_id": "claude_code/vm/4fe4bae5-dcfd-4d8c-85b6-b8c919662803",
- "target": "walter-engine-release-validation"
+ "store_sha": "90e37b11041ea1dbbed86c0f023fa566cc3deda6432ca64234738b575fff34ec"
 }
