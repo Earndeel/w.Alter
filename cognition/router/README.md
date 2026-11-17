@@ -181,7 +181,7 @@ The layer between a module that needs a quick typed judgement and the decision A
   Extractions route answers values, estimates and passages for `liquid/d1.2` and `liquid/d1.2-ultra` only (the plan
   sends them there, in parallel with the decision call); several options are asked as one noul per option on
   OpenRouter, Nace and Workers AI, which **silently answer ONE option** to `multiple: true`; box, boxes and audio only
-  on Liquid's own API (documented, untested without its key). A model whose routes cannot carry a question set is not
+  on Liquid's own API (measured with its key on 17/11, `bench/liquid_native_features.py`). A model whose routes cannot carry a question set is not
   asked (`unsupported`, named) and the chain goes on; none can → 422. `walter-router decision-needs` checks each
   need's kinds against the chain.
 - **Needs**: `config/decision-needs.json` — what each module asks (owner, purpose, latency budget, `types` asked,
@@ -192,8 +192,10 @@ The layer between a module that needs a quick typed judgement and the decision A
   processor). Undeclared need: no reuse, no escalation. Policy only: the decision chain stays the Router's.
 - **Calibration**: each answered call's journal line carries `need`, `schema` and `confidence` per question.
 - **Liquid's own API**: offers `liquidai/<id>` (d1.2, d1.2-ultra) on `https://api.liquid.ai/decisions/v1/systemone`,
-  key `LIQUID_API_KEY` (grant card, reader walter-llm); `liquid/…` stays OpenRouter's resale. Inactive until the key
-  exists (a missing grant is named and the route set aside 10 min).
+  key `LIQUID_API_KEY` (grant card `liquid`, reader walter-llm; configured 17/11); `liquid/…` stays OpenRouter's resale.
+  Live since 17/11: the decision chain is Drex Max (Nace) → `liquidai/d1.2-ultra` → `liquid/d1.2-ultra` (OpenRouter) →
+  Clef; Liquid direct answered 0.32–0.36 s p50 against 0.54–0.63 s through OpenRouter (bench of 17/11, 08-NATIF § 4 in
+  core/engine/docs). A missing grant is named and the route set aside 10 min.
 - Comparisons of 16/11 and 17/11 (preflight bench 50 × 3; 17/11: d1.2-ultra = d1-ultra quality, Drex Max within
   1.5 pt, 3.9× faster for the 3-sample decision; d1.2 7 pts lower; new kinds on Walter cases):
   `/walter/core/engine/docs/07-CONVERGENCE.md` § 4. Tests: `tests/test_walter_decision.py`.
