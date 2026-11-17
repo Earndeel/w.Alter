@@ -39,7 +39,7 @@ HERE = Path(__file__).resolve()
 sys.path.insert(0, str(HERE.parents[1] / "v1"))
 sys.path.insert(0, str(HERE.parents[2] / "interfaces" / "telegram"))
 import bot as B  # noqa: E402
-from telegram_door import TEST_USER, RecordingTg  # noqa: E402
+from telegram_door import TEST_USER, RecordingTg, auto_allow  # noqa: E402
 
 API = "http://127.0.0.1:8895"
 
@@ -69,6 +69,15 @@ def main() -> int:
     mid = [int(time.time())]
     from walter_memory import db
 
+    def key_of(kernel_id: str) -> str:
+        """A session's key in walter_logs and runs: the native journal's header says it (walter/vm/<id>, or dsh/vm/<id>
+        for a conversation imported from DSH); without a native journal (rollback), DSH's."""
+        try:
+            with open(root / f"state/core/engine/native/sessions/{kernel_id}.jsonl", encoding="utf-8") as fh:
+                return json.loads(fh.readline()).get("walter_key") or "walter/vm/" + kernel_id
+        except OSError:
+            return "dsh/vm/" + kernel_id
+
     # ── the two interfaces ────────────────────────────────────────────────────────────────────────────────────────
     class Chat:
         """One Telegram conversation of the test account, through the door's own code."""
@@ -78,6 +87,9 @@ def main() -> int:
             self.door = B.Bot({"owner_ids": [TEST_USER], "account": "e2e", "grant": "-"}, self.tg,
                               B.Engine(API, token), B.State(f"{state_dir}-{base}"))
             self.chat = base + mid[0] % 1_000_000
+            # the test account is judged under the `test` preset: a write, shell, Python or sub-agent call asks; these
+            # checks are not about approvals, so the account answers its own requests through the door's buttons
+            self.allow = auto_allow(self.door, self.tg)
 
         def say(self, text: str, timeout: float = 240, pred=lambda t: bool(t)) -> list[str]:
             n = len(self.tg.calls)
@@ -85,9 +97,13 @@ def main() -> int:
             self.door.handle({"update_id": mid[0], "message": {"message_id": mid[0], "from": {"id": TEST_USER},
                                                                "chat": {"id": self.chat, "type": "private"}, "text": text}})
             end = time.time() + timeout
-            while time.time() < end and not pred(self.tg.texts(n)):
+            while time.time() < end and not pred(self.answers(n)):
                 time.sleep(1)
-            return self.tg.texts(n)
+            return self.answers(n)
+
+        def answers(self, n: int) -> list[str]:
+            # an approval request (« 🔐 Autorisation demandée », answered by auto_allow) is not Walter's answer
+            return [x for x in self.tg.texts(n) if not x.startswith("🔐")]
 
         def send(self, text: str) -> int:
             n = len(self.tg.calls)
@@ -99,9 +115,10 @@ def main() -> int:
         @property
         def kernel(self) -> str:
             b = json.loads((root / "state/core/engine/api/bindings.json").read_text())
-            return f"dsh/vm/{b['sessions'][self.door.sessions[self.chat]]['kernel']}"
+            return key_of(b['sessions'][self.door.sessions[self.chat]]['kernel'])
 
         def close(self):
+            self.allow.set()
             self.door.stop.set()
 
     def api(body: dict, timeout: float = 400) -> tuple[int, dict]:
@@ -131,8 +148,9 @@ def main() -> int:
 
     def observations(session: str, kind: str) -> list[dict]:
         out = []
-        for day in {dt.datetime.now(dt.timezone.utc).date(), (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)).date()}:
-            f = root / f"state/core/engine/intake/observations-{day}.jsonl"
+        days = {dt.datetime.now(dt.timezone.utc).date(), (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)).date()}
+        # the native engine writes its own (17/11); DSH's intake greffon wrote engine/intake (rollback)
+        for f in [root / f"state/core/engine/{d}/observations-{day}.jsonl" for d in ("native/intake", "intake") for day in days]:
             if f.exists():
                 for line in f.read_text().splitlines():
                     try:
@@ -162,7 +180,8 @@ def main() -> int:
                                            "last_window": None, "start": opened, "end": None})
             if r["type"] == "assistant/message":
                 u = r["u"] or {}
-                size = int(u.get("inputTokens") or 0) + int(u.get("cacheReadTokens") or 0)
+                # native (OpenAI usage: prompt_tokens counts the cached part) or DSH (new + cache read)
+                size = int(u.get("prompt_tokens") or 0) or int(u.get("inputTokens") or 0) + int(u.get("cacheReadTokens") or 0)
                 t["calls"] += 1
                 t["input"] += size
                 t["first_window"] = t["first_window"] if t["first_window"] is not None else size
@@ -178,9 +197,10 @@ def main() -> int:
 
     def runs_of(session: str) -> list[dict]:
         return q("""select run_id::text, thread_id, act, level, status, outcome, routing->'requested' requested,
-                           origin->>'interface' interface, origin->>'request_id' request_id, left(goal, 80) goal
-                    from runs.runs where origin->>'session_id' = %s and origin->>'channel' = 'owner'
-                    order by started_at""", (session,))
+                           origin->>'interface' interface, origin->>'request_id' request_id, left(goal, 80) goal,
+                           started_at
+                    from runs.runs where origin->>'session_id' = %s and origin->>'channel' in ('owner', 'test')
+                    order by started_at""", (session,))     # the e2e account's runs are channel `test` (native, 17/11)
 
     def objective(marker: str) -> dict | None:
         r = q("""select t.task_id::text, t.status, t.thread_id, t.progress, t.last_outcome,
@@ -279,14 +299,15 @@ def main() -> int:
             # the engine restarts in the middle of step 2
             n = c.send(f"Continue la {marker} : avant l'étape 2, exécute `sleep 90` dans bash, puis fais l'étape 2.")
             time.sleep(25)
+            cut_at = dt.datetime.now(dt.timezone.utc)
             sh("systemctl", "restart", ENGINE_UNIT)
             up = engine_up()
             end = time.time() + 90
-            while time.time() < end and not c.tg.texts(n):
+            while time.time() < end and not c.answers(n):
                 time.sleep(1)
-            said = c.tg.texts(n)
+            said = c.answers(n)
             time.sleep(8)                                   # the new process closes the orphan run
-            r = runs_of(k)
+            r = [x for x in runs_of(k) if x["started_at"] < cut_at]     # not the turn the new process resumes
             interrupted = r[-1] if r else {}
             o2 = objective(marker)
             # another interface, a new session: the task is found by its thread, not by the session
@@ -317,7 +338,7 @@ def main() -> int:
                 time.sleep(5)
                 o3 = objective(marker)
             b = json.loads((root / "state/core/engine/api/bindings.json").read_text())
-            k2 = f"dsh/vm/{b['sessions'][sid]['kernel']}"
+            k2 = key_of(b['sessions'][sid]['kernel'])
             measures["task"] = turns(k) + turns(k2, settle=0)
             out = interrupted.get("outcome") or {}
             ok = (step1 and o1 and o1["status"] == "open" and up
@@ -424,7 +445,11 @@ def main() -> int:
     # ── F. what runs is what is on disk ───────────────────────────────────────────────────────────────────────────
     def s_deploy():
         d = json.loads(sh("walter", "deploy", "check", "--json").stdout or "{}")
-        kern = sh("walter", "engine", "kernel")
+        if ENGINE_UNIT == "walter-engine":   # native (17/11): the engine's own check; the frozen DSH kernel is only the rollback
+            kern = subprocess.run(["walter-python", "-m", "walter_engine", "check"], capture_output=True, text=True,
+                                  timeout=120, cwd=str(Path(__file__).resolve().parents[2] / "engine"))
+        else:
+            kern = sh("walter", "engine", "kernel")
         try:
             kernel_ok = bool(json.loads(kern.stdout).get("ok"))
         except ValueError:

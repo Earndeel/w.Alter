@@ -38,12 +38,12 @@ depuis le noyau par `await tools.<nom>(…)`, sous la même politique et le mêm
 | `subagent` (57), `send_message`, `interrupt_agent`, `list_agents` | délégation v1, profondeur ≤ 3, enfant ≤ parent | `tools/agents.py` | oui | `engine_native` subagent + background ; `engine_e5` | aucun |
 | `python` (7) + appels d'outils depuis le noyau (`ptc-dispatch`, 4) | protocole walter-1 (`plugins/python/runtime`) | `tools/python.py` | — | `engine_native` python_persist, python_tools, restart (variables restaurées) | **droits du moteur** (`python = "full"`, Monsieur 17/11) au lieu de la bulle `walter-sandbox` ; la bulle reste un réglage (`python = "sandbox"`) |
 | Outils Walter MCP (41-42), `walter_call` (67) | MCP `core/server.py`, jeu `core` | `tools/mcp.py` (client tag `engine`) | oui | `walter_v1_live` (mémoire, navigation, Router) | aucun |
-| Accueil d'un tour (greffon intake) : run Memory, plan et paquet de contexte, texte du propriétaire | `turn-intake.v1`, ContextPlan v2, `/v1/runs/start|end` | `walter.py`, `engine.py` (`_intake`) | — | `walter_v1_live` trace (3 runs Memory ouverts et fermés, `routing.selected`, `turn.ended`) ; `v1_criterion` adapté, **pas rejoué** en natif | aucun |
+| Accueil d'un tour (greffon intake) : run Memory, plan et paquet de contexte, texte du propriétaire | `turn-intake.v1`, ContextPlan v2, `/v1/runs/start|end` | `walter.py`, `engine.py` (`_intake`) | — | `walter_v1_live` trace (3 runs Memory ouverts et fermés, `routing.selected`, `turn.ended`) ; `v1_criterion` **9/9** ; `socle_e2e` fenêtre + intention (§ 3) | aucun (les observations `previous_sent` et `turn` de la fenêtre, écrites par le greffon DSH, ajoutées le 17/11 au soir) |
 | Politique (greffon policy) : jamais-liste, préréglage par porte, enfant ≤ parent, divulgation, accords | `core/security/policy.json` | `policy.py` | même politique | `engine_api_e2e` never + approval ; `engine_e5` policy | aucun |
 | Plafonds du tour (greffon budget) | `[dsh.budget]` par niveau d'effort | `engine.py` (lit le même bloc) | — | `engine_e8` budget (tour annulé `budget_seconds` à 62 s) | aucun |
 | Fin de tour (greffon events) : run fermé, `turn.ended` | bus `turn.ended`, `/v1/runs/end` | `engine.py` | — | bus : 59 `turn.ended` source `walter` | `session.ended` non émis : DSH n'en a jamais émis (0 sur le bus) |
 | Réveil : tâche ou sous-agent fini → avis ; pendant un tour → inséré dans ce tour | `agent/inbox/spliced` (2 292 chez DSH) | `engine.py` | — | `engine_native` background, bash_job (les deux formes) | aucun |
-| Reprise après redémarrage et crash | point durable avant appel ; « résultat inconnu » jamais rejoué | journal + `resume_interrupted` | variables du noyau restaurées | `engine_native` restart + crash (effet de bord exécuté une seule fois) ; `engine_api_e2e` restart | aucun |
+| Reprise après redémarrage et crash | point durable avant appel ; « résultat inconnu » jamais rejoué | journal + `resume_interrupted` | variables du noyau restaurées | `engine_native` restart + crash (effet de bord exécuté une seule fois) ; `engine_api_e2e` restart ; `socle_e2e` tâche (§ 3) | aucun depuis la correction du 17/11 au soir : un arrêt propre fermait le run « annulé » (objectif jamais suspendu) et reprenait le tour sans parent |
 | Compaction | DSH : compresseur natif | fenêtre décidée par walter-context (`compaction/window`), originaux gardés | — | 21 fenêtres dans les journaux natifs | amélioration : Context décide, rien n'est perdu |
 | Titres de conversation | `session/title` | `engine.py` (`_title`) | — | titres dans les journaux natifs | aucun |
 | Engine API v1 (ouverture, envoi idempotent, accords, annulation, flux SSE, délégation) | `engine/contracts/engine-api.v1.json` | `api.py`, `server.py` | — | `engine_api_e2e` 7/7 | aucun |
@@ -67,6 +67,8 @@ d'interface web jamais ou presque jamais utilisées (pièces jointes, changement
 | `scenarios/v1/engine_e8.py` (modèle refusé, échec d'outil, porte redémarrée, **moteur redémarré en plein tour**, budget, rejeu de délégation) | **6/6** (4 au 1er passage, les 2 autres après correction du scénario) | redémarrage : la porte dit « je reprends », le message du propriétaire n'est pas rejoué (1 fois au journal), la demande coupée est reprise par le moteur, la conversation retient le code donné avant |
 | `scenarios/v1/telegram_door.py` (identité, continuité, rejeu d'un message, accord refusé par bouton, `/stop`) | **5/5** (4 au 1er passage : `/stop` tombait sur une demande d'accord du compte de test) | la porte affiche « en train d’écrire », un message rejoué n'est répondu qu'une fois, `/stop` → « ⏹ Interrompu. » |
 | `scenarios/v1/walter_v1_live.py` (mémoire, navigation, Router, trace) | **4/4** (3 au 1er passage : défaut du Router, corrigé) | 9 appels de modèle, tous comptés au journal de la passerelle, 0 $ (routes d'abonnement) ; événements du bus du run, de la tâche et de l'épisode présents |
+| `scenarios/v1/v1_criterion.py` (critère V1 de bout en bout) | **9/9** (21:00) | session `telegram/e2e/chat-40948976` : 52 lignes walter_logs, **0** dans core.events (compte de test) |
+| `scenarios/socle/socle_e2e.py` (déploiement, fenêtre réelle du modèle, intention, expérience, sous-agents, contexte dégradé, tâche durable redémarrée puis reprise par une autre interface) | **5/7** (1/7 au 1er passage : le scénario lisait les traces du greffon DSH ; puis 3 écarts réels corrigés, ci-dessous) | fenêtre : 16 210 → 8 652 jetons, le premier échange encore rappelé ; dégradé : préflight arrêté → `legacy_degraded`, `context.degraded` sur le bus, le modèle en est averti ; tâche : run `interrupted/engine_restart`, objectif `suspended`, repris par l'API dans une autre session, même objectif (Telegram + API, 4 tentatives), `done`. **Échecs non dus au moteur** : *intention* et *expérience* dépendent de la dérivation par modèle que Monsieur a mise en pause le 14/11 (`organic.toml` `[extraction] mode = "paused"`) — un échange simple n'a plus de sujet rattaché (`views.run` → « extraction paused »), donc la suite n'a pas de fil à reprendre ; un épisode n'a plus de résumé, donc l'issue d'un échec reste `unknown`. Le 13/11 (DSH, avant la pause) : 7/7 |
 
 Corrections de scénario, pas du moteur : un avis de fin qui arrive pendant le tour est inséré dans ce tour (comme
 DSH), le test attendait un nouveau tour ; le compte de test est jugé sous le préréglage `test` (chaque appel sensible
@@ -92,6 +94,20 @@ Cinq corrections du système trouvées par ces passages et la vérification qui 
 - **Santé de Memory** : les appels doublés volontairement (`hedged`, `straggler`, `unsupported`) étaient comptés
   comme refus de budget et faisaient tomber le score de l'autopilote à 75 ; ils sont notés `dropped` (ni réussis ni
   échoués), 1 266 lignes passées reclassées (liste des identifiants gardée pour le retour arrière) ; score 100.
+
+Rejeu de `socle_e2e` (17/11 au soir), trois écarts réels corrigés :
+- **Redémarrage en plein tour** : un arrêt propre du moteur fermait le run du tour « annulé » (comme un `/stop` du
+  propriétaire) ; Memory ne suspend un objectif que sur `interrupted` : l'objectif restait « ouvert » et l'épisode
+  disait « annulé ». Et le tour repris par le nouveau processus n'avait **ni parent ni plan** (`a.last` n'existait
+  qu'en mémoire vive) : hors de l'objectif. Le run reste désormais ouvert dans le fichier des runs avec son plan ; le
+  nouveau processus le ferme `interrupted/engine_restart` et en fait le parent du tour repris (test hors ligne
+  `test_a_turn_cut_by_the_engine_stopping_is_resumed_as_its_continuation` ; prouvé en production : run repris
+  `parent_run_id` = run coupé).
+- **Observations** : `previous_sent` (accueil) et `turn` (fenêtre), écrites par le greffon DSH, manquaient.
+- **Memory, objectifs proposés au préflight** : seuls ceux du canal `owner` ; depuis que le compte de test a son canal
+  `test`, une session de test (autre interface) ne retrouvait plus ses propres objectifs. Ils suivent maintenant le
+  canal de la session : le compte de test retrouve les siens, jamais ceux de Monsieur, et inversement (test
+  `test_a_test_session_finds_its_own_objectives_and_never_the_owners`, commit memory `7d02ad5`).
 
 Vérification finale (tests du module core, 17/11 ≈ 17:10), quatre écarts de la bascule corrigés :
 - le guide du gardien core ne nommait que `dsh-web` : il n'aurait pas pu relancer un `walter-engine` arrêté ou
@@ -181,10 +197,15 @@ pas été modifié ; les conversations tenues pendant la période native restent
    observée (aucune depuis la bascule).
 2. Pièces jointes et « changements de l'espace de travail » dans la porte web native (non repris, 0 et 5 usages).
 3. Un redémarrage du moteur coupe les requêtes longues en attente (`turn.submit` avec `wait_ms`) avec une trace
-   d'erreur d'uvicorn ; le tour lui-même est fermé `interrupted` et repris, le client doit relire son résultat.
+   d'erreur d'uvicorn ; le tour lui-même est fermé `interrupted` et repris (depuis la correction du soir, voir § 3),
+   le client doit relire son résultat.
 4. Le drop-in `InaccessiblePaths=/opt/dsh` est gardé tant que DSH reste installé (preuve permanente) ; la
    désinstallation de DSH n'est pas faite.
 5. TTFT du modèle principal (≈ 4 s p50) : hors du préflight, piste suivante (cache de préfixe, jetons d'entrée).
-6. `scenarios/v1/v1_criterion.py` (critère V1 de bout en bout) et `scenarios/socle/socle_e2e.py` : adaptés au
-   moteur natif (unité, clés de session, compte de test sans écriture dans Memory), **pas encore rejoués** sous le
-   moteur natif.
+6. `socle_e2e` *intention* et *expérience* : bloqués par la pause de l'extraction (Monsieur, 14/11), pas par le
+   moteur. Pendant la pause, un échange simple n'a pas de fil : le message suivant de la même conversation peut être
+   rangé sous un autre sujet proche (observé : `act=continue` mais fil d'un ancien sujet « photos ») ; le modèle
+   garde l'échange précédent dans son contexte, seul le rangement en mémoire est touché. À revoir avec la refonte de
+   l'extraction (spécification d'abord), pas contourné ici.
+7. Le compte de test **lit** les tâches et la mémoire personnelles par le MCP (exposition en lecture ; il n'écrit ni
+   dans core.events ni dans les objectifs de Monsieur).

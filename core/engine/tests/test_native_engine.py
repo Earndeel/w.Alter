@@ -319,3 +319,41 @@ def test_an_unreadable_instance_config_is_said_never_silently_dropped(tmp_path, 
     inst.path = bad
     s = config.load(tmp_path / "state")
     assert s.trusted_hosts == [] and "bad.toml" in (s.config_error or "")
+
+
+def test_a_turn_cut_by_the_engine_stopping_is_resumed_as_its_continuation(engine, tmp_path, monkeypatch):
+    """A restart in the middle of a turn: the run is closed `interrupted` (engine_restart — Memory suspends its
+    objective), never « cancelled » like an owner's stop, and the resumed turn is its child with the same plan
+    (socle_e2e B/E, 17/11: the native engine closed it `cancelled` and resumed it with no parent)."""
+    from walter_engine import engine as E
+    monkeypatch.setattr(config, "instance_root", lambda: tmp_path / "instance")      # never the real DSH run file
+    a = engine.create(cwd="/w", door="telegram", principal={"kind": "test", "id": "e2e"})
+    a.session.append("turn/start", {"turn": 1}, sync=True)
+    engine._active(a.sid, True)
+    plan = {"thread": "task:t1", "act": "continue", "task": "general", "model_level": "L2", "channel": "test"}
+    engine._track_run(a, "run-cut", 1, carry={"run_id": "run-cut", "channel": "test", "plan": plan, "open": True})
+    rows = json.loads(engine.runs_file.read_text())
+    rows[a.key]["pid"] = 2 ** 22 + 12345                                              # the stopped process
+    engine.runs_file.write_text(json.dumps(rows))
+    a.session.close()
+    asyncio.run(engine.doors.close())
+    asyncio.run(engine.llm.close())
+
+    again = E.Engine(_settings(tmp_path, budget=BUDGET))
+    ended, noticed = [], []
+
+    async def run_end(run_id, key, status, outcome=None):
+        ended.append((run_id, key, status, outcome))
+    monkeypatch.setattr(again.doors, "run_end", run_end)
+    monkeypatch.setattr(again, "notice", lambda ag, text, kind: noticed.append((ag, kind)))
+    try:
+        asyncio.run(again._recover())
+        assert len(ended) == 1 and ended[0][0] == "run-cut" and ended[0][2] == "cancelled"
+        assert ended[0][3]["status"] == "interrupted" and ended[0][3]["error"]["kind"] == "engine_restart"
+        assert len(noticed) == 1 and noticed[0][1] == "engine-restart"
+        b = noticed[0][0]
+        assert b.last["run_id"] == "run-cut" and b.last["plan"] == plan and b.last["channel"] == "test"
+        assert b.last["open"] is False and json.loads(again.runs_file.read_text()) == {}
+    finally:
+        asyncio.run(again.doors.close())
+        asyncio.run(again.llm.close())

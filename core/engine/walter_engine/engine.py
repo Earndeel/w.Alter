@@ -483,7 +483,14 @@ class Engine:
             error = {"kind": "budget", "message": "the turn reached its ceiling and was stopped"}
         if status == "error" and reason.get("error") and not error:
             error = {"kind": str(reason["error"].get("code") or "error"), "message": str(reason["error"].get("status") or "")}
-        await self._end_run(a, turn, status, stats, error)
+        if self.stopping and status == "cancelled":
+            # cut by the engine stopping, not by the owner: the run stays open in the runs file with what its
+            # continuation needs; the next process closes it `interrupted` (engine_restart: its objective is
+            # suspended, never left « open » nor closed « cancelled ») and resumes the turn as its child (_recover)
+            self._track_run(a, a.run_id, turn, carry=a.last)
+            a.run_id = None
+        else:
+            await self._end_run(a, turn, status, stats, error)
         if status == "cancelled":
             await self.state_event(a, "interrupted", {"reason": "owner" if not self.stopping else "engine_stop"})
 
@@ -864,11 +871,12 @@ class Engine:
         run_ms = int((time.monotonic() - t0) * 1000)
         local = (run or {}).get("privacy_class") == "local_only"
         plan, source, mem = None, "none", ""
+        previous = None if local else self._last_exchange(a)
         t1 = time.monotonic()
         if not local:
             try:
                 out = await self.doors.preflight({
-                    "turn_id": f"{a.key}:{journal.now_ms()}", "message": message[:6000], "previous": self._last_exchange(a),
+                    "turn_id": f"{a.key}:{journal.now_ms()}", "message": message[:6000], "previous": previous,
                     "runtime": config.RUNTIME, "session_id": a.key, "privacy_class": "cloud_allowed",
                     "run_id": (run or {}).get("run_id"), "exclude_blocks": ["capabilities"], "answer_within_ms": 7000,
                     **({"channel": "machine"} if channel == "machine" else {})}, timeout_s=8.0)
@@ -904,6 +912,7 @@ class Engine:
         self._observe({"kind": "intake", "session": a.key, "turn": turn, "message_sha": sha16(message[:6000]),
                        "run_id": (run or {}).get("run_id"), "privacy_class": (run or {}).get("privacy_class"),
                        "run_outcome": "delivered" if run else "failed", "context_source": source,
+                       "previous_sent": previous is not None,
                        "level": (plan or {}).get("level"), "effort": (plan or {}).get("effort"),
                        "memory_chars": len(mem), "skills_chars": len(sk), "run_ms": run_ms, "memory_ms": memory_ms,
                        "native_ms": int((time.monotonic() - t0) * 1000)})
@@ -955,10 +964,11 @@ class Engine:
         await self.doors.emit("turn.ended", a.key, {"run_id": run_id, "turn": turn, "status": st, "outcome": outcome["status"]},
                               dedupe_key=f"turn.ended/{run_id}")
 
-    def _track_run(self, a: Agent, run_id: str | None, turn: int | None) -> None:
+    def _track_run(self, a: Agent, run_id: str | None, turn: int | None, carry: dict | None = None) -> None:
         rows = _read_json(self.runs_file, {})
         if run_id:
-            rows[a.key] = {"run_id": run_id, "turn": turn, "pid": os.getpid(), "at": journal.now_ms()}
+            rows[a.key] = {"run_id": run_id, "turn": turn, "pid": os.getpid(), "at": journal.now_ms(),
+                           **({"last": {k: carry.get(k) for k in ("channel", "plan")}} if carry else {})}
         else:
             rows.pop(a.key, None)
         try:
@@ -1172,7 +1182,7 @@ class Engine:
                                            "plan": {"thread": plan.get("thread")} if plan and plan.get("thread") else None,
                                            "live_turn": live, "checkpoint_tokens": ck, "force": force})
         except Exception as e:  # noqa: BLE001 — the window is not managed this turn: said in the measurements
-            self._observe({"kind": "window", "session": a.key, "applied": False, "reason": "error",
+            self._observe({"kind": "window", "session": a.key, "turn": live or turn, "applied": False, "reason": "error",
                            "error": f"{type(e).__name__}: {str(e)[:120]}", "window_ms": elapsed_ms(t0)})
             return {"applied": False, "reason": "error"}
         report = {"applied": False, "reason": res.get("reason"), "warm": res.get("warm"), "turns": res.get("turns"),
@@ -1184,7 +1194,7 @@ class Engine:
                                            "tokens": res.get("tokens"), "turns": res.get("turns"), "force": force}, sync=True)
             report["applied"] = True
             asyncio.get_running_loop().create_task(self.state_event(a, "context.changed", {"reason": f"window:{res.get('reason')}"}))
-        self._observe({"kind": "window", "session": a.key, **report, "window_ms": elapsed_ms(t0)})
+        self._observe({"kind": "window", "session": a.key, "turn": live or turn, **report, "window_ms": elapsed_ms(t0)})
         return report
 
     # ── jobs, wake-ups, restarts ──
@@ -1230,6 +1240,7 @@ class Engine:
         """After a restart: close what the previous process left open, say it, resume where the journal says."""
         # 1. runs left open by a dead engine process (this one's file, and the DSH engine's at the switch)
         legacy = config.instance_root() / "state" / "core" / "engine" / "intake" / "open-runs.json"
+        carry: dict[str, dict] = {}      # session key → the cut run (and its plan): the resumed turn is its continuation
         for f in (self.runs_file, legacy):
             rows = _read_json(f, {})
             gone = {k: r for k, r in rows.items() if isinstance(r, dict) and r.get("pid") != os.getpid() and not _alive(r.get("pid"))}
@@ -1238,6 +1249,7 @@ class Engine:
             for key, r in gone.items():
                 await self.doors.run_end(r["run_id"], key, "cancelled", {"status": "interrupted",
                                                                           "error": {"kind": "engine_restart", "message": "the engine restarted during this turn"}})
+                carry[key] = {"run_id": r["run_id"], **(r.get("last") or {}), "open": False}
                 rows.pop(key, None)
             try:
                 _write_json(f, rows)
@@ -1262,6 +1274,8 @@ class Engine:
             s.append("turn/end", {"turn": turn, "status": "interrupted", "reason": {"kind": "interrupted",
                                                                                   "error": {"code": "engine_restart"}}}, sync=True)
             if self.s.resume_interrupted and not a.parent_sid and not a.unattended:
+                if not a.last and a.key in carry:     # the wake run is a child of the cut run: same objective, same plan
+                    a.last = carry[a.key]
                 resumed.append(a)
         _write_json(self.active_file, [])
         # 3. background jobs a dead process was running
