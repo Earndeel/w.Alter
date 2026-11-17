@@ -562,22 +562,28 @@ def objective_candidates(message: str, session_id: str | None = None, at: dateti
         return empty
     at = at or now()
     with connect() as conn:
+        # the asking session's channel (its run in progress is already open): the test account's sessions (channel
+        # `test`, 17/11) carry on their own objectives; the owner's never see them, and they never see the owner's
+        mine = conn.execute(f"""select coalesce(r.origin->>'channel', 'owner') ch from runs.runs r
+                                where {_session_match()} order by r.started_at desc limit 1""",
+                            (session_id, session_id)).fetchone() if session_id else None
+        chan = "test" if mine and mine["ch"] == "test" else "owner"
         rows = conn.execute(f"""
             select t.task_id::text, t.goal, t.status, {THREAD_SQL} thread, t.progress, t.last_outcome,
                    coalesce(t.updated_at, t.started_at) last_at
             from runs.tasks t join runs.runs o on o.run_id = t.run_id
             where t.kind = '{OBJECTIVE}' and t.status = any(%s) and t.goal is not null
-              and coalesce(o.origin->>'channel', 'owner') = 'owner' and o.privacy_class <> 'local_only'
+              and coalesce(o.origin->>'channel', 'owner') = %s and o.privacy_class <> 'local_only'
               and coalesce(t.updated_at, t.started_at) > %s - interval '{ATTACH_WINDOW}'
-            order by coalesce(t.updated_at, t.started_at) desc limit 20""", (list(ACTIVE), at)).fetchall()
+            order by coalesce(t.updated_at, t.started_at) desc limit 20""", (list(ACTIVE), chan, at)).fetchall()
         last = conn.execute(f"""
             select r.run_id, r.thread_id, coalesce(r.ended_at, r.started_at) at,
                    (select tr.task_id::text from runs.task_runs tr where tr.run_id = r.run_id limit 1) task_id
-            from runs.runs r where {_session_match()} and coalesce(r.origin->>'channel', 'owner') = 'owner'
+            from runs.runs r where {_session_match()} and coalesce(r.origin->>'channel', 'owner') = %s
               and r.started_at < %s
               and not (r.status = 'open' and r.act is null and r.level is null and r.thread_id is null)
             order by r.started_at desc limit 1""",
-            (session_id, session_id, at)).fetchone() if session_id else None
+            (session_id, session_id, chan, at)).fetchone() if session_id else None
         # ^ the run of the message being planned is already open when the preflight asks (the engine opens the run,
         #   then plans it): it has no plan yet, and it is not « the last exchange » (found on the live engine,
         #   2026-11-12: 'waiting' was always empty there, the unit tests had no run in progress)

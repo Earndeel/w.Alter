@@ -455,3 +455,24 @@ def test_the_owners_list_never_shows_a_lab_channels_objectives(monkeypatch, caps
         cli.main(argv)
         assert seen[-1] == want
     capsys.readouterr()
+
+
+def test_a_test_session_finds_its_own_objectives_and_never_the_owners():
+    """The e2e account's runs are channel `test` (native engine, 17/11): another test session (another interface)
+    takes up a test objective, an owner session never sees it, and a test session never sees the owner's."""
+    goal = f"tâche-pytest-{uuid.uuid4().hex[:6]} : écris trois noms d'arbres dans un fichier"
+    th_test, th_owner = thread(), thread()
+    a = runs.start(origin=origin(f"{RT}/vm/{uuid.uuid4()}", channel="test"), goal=goal)
+    assert runs.update(a, thread_id=th_test, act="new", requested=CODING).get("task_id")
+    runs.end(a)
+    o = runs.start(origin=origin(f"{RT}/vm/{uuid.uuid4()}"), goal=goal + " (propriétaire)")
+    assert runs.update(o, thread_id=th_owner, act="new", requested=CODING).get("task_id")
+    runs.end(o)
+    t2 = f"{RT}/api/{uuid.uuid4()}"
+    runs.start(origin=origin(t2, channel="test"), goal="reprends")               # the engine opens, then plans
+    seen = {c["id"] for c in runs.objective_candidates(goal, session_id=t2)["candidates"]}
+    assert th_test in seen and th_owner not in seen
+    s = f"{RT}/telegram/{uuid.uuid4()}"
+    runs.start(origin=origin(s), goal="reprends")
+    seen = {c["id"] for c in runs.objective_candidates(goal, session_id=s)["candidates"]}
+    assert th_test not in seen and th_owner in seen
