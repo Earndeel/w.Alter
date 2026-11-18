@@ -27,7 +27,6 @@
     "walter_profile MCP"
   ],
   "bindings": {
-    "dsh": "rendered AGENTS.md + walter_profile MCP",
     "codex": "common MCP",
     "claude-code": "common MCP"
   },
