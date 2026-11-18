@@ -38,7 +38,7 @@
   ],
   "bindings": {
     "walter": "Walter Engine natif (walter-engine, 17/11/2026): per-message context in the engine's intake (core/engine/walter_engine/engine.py _intake) calling POST /preflight?inject=1 with the run, the previous exchange and the session key; window decided per turn through the walter-context bridge (op `window`, applied as a `compaction/window` journal event, originals kept); the legacy Memory block only when the preflight fails or times out, said to the model and on the bus (context.degraded)",
-    "dsh": "ROLLBACK ONLY since 2026-11-17 (dsh-web stopped and masked). Walter Engine (dsh-web): public checkpoint adapter selected by composition; per-message context through the engine's native intake plugin (core/engine/plugins/intake, mode native, inject pack by default) calling POST /preflight?inject=1; the legacy Memory block only when the preflight fails or times out (verified 2026-11-11 in /opt/dsh/home/cordis.patch.yml)",
+    "dsh": "ROLLBACK ONLY since 2026-11-17 (dsh-web stopped, DSH uninstalled and archived on 2026-11-18). Walter Engine (dsh-web): public checkpoint adapter selected by composition; per-message context through the engine's native intake plugin (core/engine/plugins/intake, mode native, inject pack by default) calling POST /preflight?inject=1; the legacy Memory block only when the preflight fails or times out (verified 2026-11-11 in /opt/dsh/home/cordis.patch.yml)",
     "codex": "Native compaction; additive module notes and hook preflight",
     "claude-code": "Native compaction; additive module notes and hook preflight; entrance reduction of large tool outputs in SHADOW (hook PostToolUse, records numbers only)",
     "router": "Text sub-agents request ChildContextSpec v1 through walter-context-child; caller-only mode remains available"
@@ -279,8 +279,8 @@
     {
       "id": "dsh-port",
       "path": "ports/dsh",
-      "role": "Prise DSH : fenêtre du tour du propriétaire (frontière par pertinence, A1), point de contrôle sous pression, context_recover",
-      "status": "active",
+      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archivé ; le moteur natif appelle Context par HTTP) : prise DSH : fenêtre du tour du propriétaire (frontière par pertinence, A1), point de contrôle sous pression, context_recover",
+      "status": "obsolete",
       "readme": "README.md",
       "vision_target": "core/engine/plugins",
       "interfaces": [
