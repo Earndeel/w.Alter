@@ -7,17 +7,16 @@
 <title>W.Alter</title>
 <link rel="icon" href="/ui/favicon.svg" type="image/svg+xml">
 <!-- ?v= = 10 premiers caractères du sha256 du fichier : Cloudflare impose 4 h de cache navigateur aux .css/.js (browser_cache_ttl), une nouvelle version doit changer d'adresse. -->
-<link rel="stylesheet" href="/ui/style.css?v=c250e18e2c">
+<link rel="stylesheet" href="/ui/style.css?v=ffd0ffc2cd">
 </head>
 <body>
 <div id="app">
   <div id="scrim" hidden></div>
 
-  <!-- Cadre extérieur (noir pur) : bande du haut + barre d'icônes. L'espace de travail est posé dessus. -->
+  <!-- Cadre extérieur (noir pur) : W.Alter en haut à gauche, barre d'icônes dessous (l'icône ouverte forme un onglet
+       raccordé à l'espace de travail), bouton de la barre latérale en bas. -->
   <header id="chrome">
-    <button id="portal-toggle-side" class="chrome-btn" type="button" aria-label="Masquer la barre latérale" title="Masquer la barre latérale" aria-controls="sidebar" aria-expanded="true">
-      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="3"/><path d="M9.5 4v16"/></svg>
-    </button>
+    <span class="brand" id="brand">W.Alter</span>
   </header>
   <nav id="rail" aria-label="Sections">
     <button id="rail-chat" class="rail-btn" type="button" title="Conversations" aria-label="Conversations">
@@ -26,13 +25,16 @@
     <div id="rail-panels"></div>
     <div class="rail-spacer"></div>
     <div id="rail-links"></div>
+    <button id="portal-toggle-side" class="rail-btn" type="button" aria-label="Masquer la barre latérale" title="Masquer la barre latérale" aria-controls="sidebar" aria-expanded="true">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="3"/><path d="M9.5 4v16"/></svg>
+    </button>
   </nav>
 
   <div id="workspace">
   <!-- Barre latérale (couche 1) -->
   <aside id="sidebar" aria-label="Navigation">
     <div class="side-head">
-      <span class="brand" id="brand">W.Alter</span>
+      <span class="brand" id="brand-drawer">W.Alter</span>
     </div>
     <div class="side-actions">
       <button id="new-chat" class="tab tab-new" type="button">
@@ -107,6 +109,6 @@
   </div>
 </div>
 <script type="module" src="/ui/app.js?v=ba71150811"></script>
-<script type="module" src="/ui/portal.js?v=6955d4b0db"></script>
+<script type="module" src="/ui/portal.js?v=653a7c6c75"></script>
 </body>
 </html>

@@ -1,8 +1,8 @@
 /* W.Alter — Portal v6. Organisation façon Codex : cadre extérieur (bande du haut + barre d'icônes) en noir pur,
    espace de travail posé dessus en carte arrondie ; chaque couche superposée est un gris un peu plus clair
-   (#000 → l1 → l2 → l3). Contraste : #01B7FF. Cadres 2px : saisie et messages de Monsieur ; 1px ailleurs. */
+   (#000 → l1 → l2 → l3), sans ombres. Contraste : #01B7FF. Cadres 2px : saisie et messages de Monsieur ; 1px ailleurs. */
 :root{
-  --bg:#000;--l1:#111114;--l1s:#16161a;--l2:#1f1f24;--l3:#2a2a30;--l4:#35353c;
+  --bg:#000;--l1:#0a0a0c;--l1s:#0c0c0f;--l2:#131316;--l3:#1a1a1e;--l4:#222227;
   --blue:#01B7FF;--line:rgba(1,183,255,.55);--line-soft:rgba(1,183,255,.2);--edge:rgba(1,183,255,.32);--hover:var(--l2);
   --fg:#f4f8fb;--text:#dce5ea;--muted:#8a979f;--faint:#56626a;--red:#ff5a6a;--green:#3ddc97;
   --side:300px;--outer:10px;--r-frame:20px;--r-card:18px;--r-row:12px;
@@ -20,23 +20,31 @@ a{color:var(--blue)}
 
 /* ───────── Ossature : un seul cadre arrondi, barre latérale + conversation ───────── */
 #app{display:grid;grid-template-columns:64px minmax(0,1fr);grid-template-rows:46px minmax(0,1fr);height:100%;width:100%;background:var(--bg)}
-#chrome{grid-column:1/3;grid-row:1;display:flex;align-items:center;gap:6px;padding:0 13px}
-.chrome-btn,.rail-btn{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border:0;border-radius:12px;background:none;color:var(--muted);flex:none}
-.chrome-btn:hover,.rail-btn:hover{background:var(--l2);color:var(--fg)}
-#rail{grid-column:1;grid-row:2;display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0 14px;min-height:0}
+#chrome{grid-column:1/3;grid-row:1;display:flex;align-items:center;padding:0 22px}
+#chrome .brand{font-size:20px}
+.rail-btn{display:flex;align-items:center;justify-content:center;width:42px;height:42px;margin-left:11px;border:1px solid transparent;border-radius:12px;background:none;color:var(--muted);flex:none;position:relative}
+.rail-btn:hover{background:var(--l2);color:var(--fg)}
+.rail-btn .ico{width:21px;height:21px}
+/* La barre commence sous l'arrondi de l'espace de travail, pour que l'onglet se raccorde à un bord droit. */
+#rail{grid-column:1;grid-row:2;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:30px 0 14px;min-height:0;overflow:visible;z-index:2}
 #rail-panels,#rail-links{display:flex;flex-direction:column;gap:6px}
 .rail-spacer{flex:1}
-.rail-btn{width:42px;height:42px}
-.rail-btn .ico{width:21px;height:21px}
-.rail-btn.active{background:var(--l2);color:var(--blue);box-shadow:inset 0 0 0 1px var(--edge)}
+/* Icône ouverte = onglet : même gris que la surface qu'il touche, bord bleu sur trois côtés, ouvert vers la droite
+   (il recouvre le bord de l'espace de travail), avec deux arrondis inversés au raccord. */
+.rail-btn.active{--tab:var(--l1s);width:54px;padding-right:12px;margin-right:-1px;border-color:var(--edge);border-right-color:transparent;
+  border-radius:12px 0 0 12px;background:var(--tab);color:var(--blue)}
+body.side-closed .rail-btn.active{--tab:var(--l1)}
+.rail-btn.active::before,.rail-btn.active::after{content:"";position:absolute;right:-1px;width:10px;height:11px;pointer-events:none}
+.rail-btn.active::before{top:-11px;background:radial-gradient(circle at 0 0,transparent 9.5px,var(--edge) 10px,var(--edge) 10.5px,var(--tab) 11px)}
+.rail-btn.active::after{bottom:-11px;background:radial-gradient(circle at 0 100%,transparent 9.5px,var(--edge) 10px,var(--edge) 10.5px,var(--tab) 11px)}
 #workspace{grid-column:2;grid-row:2;display:flex;min-height:0;min-width:0;margin:0 10px 10px 0;border:1px solid var(--edge);border-radius:var(--r-frame);background:var(--l1);overflow:hidden}
 body.side-closed #sidebar{display:none}
 
 #sidebar{width:var(--side);flex:none;display:flex;flex-direction:column;min-height:0;background:var(--l1s);border-right:1px solid var(--line-soft);padding:14px 12px 10px}
-.side-head{display:flex;align-items:center;height:44px;padding:0 12px;flex:none}
+.side-head{display:none;align-items:center;height:44px;padding:0 12px;flex:none}
 .brand{font-weight:650;font-size:22px;letter-spacing:-.2px;color:var(--fg)}
 .brand::first-letter{color:var(--blue)}
-.side-actions{display:flex;flex-direction:column;gap:2px;margin:12px 0 6px;flex:none}
+.side-actions{display:flex;flex-direction:column;gap:2px;margin:4px 0 6px;flex:none}
 
 /* Lignes de la barre (Codex) : pastille arrondie ; l'ouverte = cadre bleu 1px */
 .tab,.list li,.side-search{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:42px;padding:0 12px;
@@ -98,7 +106,7 @@ body.side-closed #sidebar{display:none}
 
 /* Volet Documents : carte flottante arrondie (comme « Outputs / Sources » de Codex) */
 #portal-inspector{width:330px;flex:none;align-self:flex-start;max-height:calc(100% - 12px);overflow-y:auto;margin:0 16px 0 0;
-  border:1px solid var(--edge);border-radius:var(--r-card);background:var(--l2);padding:6px 12px 12px;box-shadow:0 18px 40px rgba(0,0,0,.55)}
+  border:1px solid var(--edge);border-radius:var(--r-card);background:var(--l2);padding:6px 12px 12px}
 .insp-head{display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 6px;color:var(--fg);font-weight:600;font-size:15px}
 .icon-x{background:none;border:0;color:var(--muted);font-size:22px;line-height:1;width:32px;height:32px;border-radius:10px}
 .icon-x:hover{color:var(--blue);background:var(--l3)}
@@ -176,8 +184,7 @@ th{color:var(--fg);font-weight:600;background:var(--l3);border-bottom-color:var(
 .spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--line-soft);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;flex:none}
 
 /* Saisie : grande carte arrondie, cadre 2px, bouton rond */
-#composer{display:flex;flex-direction:column;gap:6px;margin:8px auto 18px;width:calc(100% - 56px);max-width:860px;border:2px solid var(--blue);border-radius:26px;padding:16px 14px 12px 22px;background:var(--l2);flex:none;box-shadow:0 -14px 30px var(--l1)}
-#composer:focus-within{box-shadow:0 0 0 4px rgba(1,183,255,.12)}
+#composer{display:flex;flex-direction:column;gap:6px;margin:8px auto 18px;width:calc(100% - 56px);max-width:860px;border:2px solid var(--blue);border-radius:26px;padding:16px 14px 12px 22px;background:var(--l2);flex:none}
 #input{width:100%;resize:none;background:none;border:0;outline:none;padding:0;min-height:26px;max-height:40vh;line-height:1.55;font-size:16px;color:var(--fg)}
 #input::placeholder{color:var(--muted)}
 .composer-row{display:flex;align-items:center;gap:10px}
@@ -208,13 +215,14 @@ th{color:var(--fg);font-weight:600;background:var(--l3);border-bottom-color:var(
 
 /* Écran moyen : le volet Documents passe par-dessus la conversation */
 @media (max-width:1180px){
-  #portal-inspector{position:absolute;right:14px;top:0;z-index:5;width:min(330px,calc(100% - 28px));box-shadow:0 20px 50px #000}
+  #portal-inspector{position:absolute;right:14px;top:0;z-index:5;width:min(330px,calc(100% - 28px))}
 }
 
 /* Téléphone : plein écran, la barre latérale devient un tiroir arrondi */
 @media (max-width:760px){
   #app{display:flex}
   #chrome,#rail{display:none}
+  .side-head{display:flex}
   #workspace{flex:1;margin:0;border:0;border-radius:0}
   body.side-closed #sidebar{display:flex}
   #sidebar{position:fixed;z-index:30;left:8px;top:8px;bottom:8px;width:min(84vw,320px);background:var(--l1s);border:1px solid var(--line);border-radius:var(--r-frame);

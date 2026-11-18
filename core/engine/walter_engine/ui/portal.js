@@ -176,4 +176,8 @@ const send = $('send');
 const label = () => { send.setAttribute('aria-label', send.textContent); send.title = send.textContent; send.classList.toggle('steer', send.textContent !== 'Envoyer'); };
 new MutationObserver(label).observe(send, { childList: true, characterData: true, subtree: true });
 label();
-document.body.dataset.walterPortal = 'v6';
+/* Le nom affiché par app.js (#brand, cadre extérieur) est recopié dans le tiroir du téléphone. */
+const brandDrawer = () => { $('brand-drawer').textContent = $('brand').textContent; };
+new MutationObserver(brandDrawer).observe($('brand'), { childList: true, characterData: true, subtree: true });
+brandDrawer();
+document.body.dataset.walterPortal = 'v7';
