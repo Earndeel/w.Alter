@@ -531,7 +531,8 @@ def engine_kernel() -> dict | None:
         data = json.loads(run.stdout or "{}")
     except (subprocess.TimeoutExpired, ValueError, OSError) as exc:
         return {"ok": False, "error": type(exc).__name__}
-    keys = ("ok", "version", "integrity", "missing", "extra", "changed", "compositions_changed", "composed_changed")
+    keys = ("ok", "installed", "version", "integrity", "missing", "extra", "changed", "compositions_changed",
+            "composed_changed")
     return {k: data[k] for k in keys if k in data} or {"ok": False, "error": (run.stderr or "")[-300:]}
 
 

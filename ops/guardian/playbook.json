@@ -6,7 +6,7 @@
   "A stale backup is usually a failed nightly run: read its journal, start it again once. If it fails again for the same reason (disk full, Drive token expired, Postgres down), the owner must be told what is blocking.",
   "The recovery key existing only on the VM (recovery_key_on_vm_only, G3) is the owner's action: storing a copy in his vault. Never act, needs_owner.",
   "Uncommitted or untracked work in git repositories is someone's work in progress: info/warning only, never act.",
-  "An engine_kernel_drift incident means the installed engine kernel (today DSH in /opt/dsh) no longer matches the frozen fingerprints (`walter engine kernel`). Never reinstall or roll back alone: the kernel changes only through Lab; needs_owner."
+  "An engine_kernel_drift incident means the installed engine kernel (DSH, uninstalled on 2026-11-18: none is installed, `walter engine kernel` says installed=false; only a rollback restore brings one back) no longer matches the frozen fingerprints (`walter engine kernel`). Never reinstall or roll back alone: the kernel changes only through Lab; needs_owner."
  ],
  "evidence": {
   "backup_stale": [["systemctl", "list-timers", "--all", "--no-pager", "walter-pg-backup.timer", "walter-offsite-backup.timer"],
