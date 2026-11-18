@@ -422,3 +422,32 @@ décision act/plan/needs, coût ≈ 0 $) : voir `bench/reports/decision-state-20
 exploite peu l'état : message seul 0,571, tous les apports 0,635 (+0,064) ; le plus utile : décisions déjà prises
 (+0,064 seul), fil (+0,032) ; mémoire, sources et capacités n'apportent rien mesurable. n = 21, bruit de l'ordre de ±0,05 :
 à lire comme une indication, pas une preuve.
+
+## 11. Préflight natif d1.2-ultra (18/11/2026)
+Le préflight pose tout son jeu (jugements, choix multiples, lectures, médias) en **un** appel natif à d1.2-ultra par
+l'API Liquid directe : politique du besoin `walter-context-preflight` dans le Router (`assign: native_whole`,
+relance après 700 ms, partage par question d'avant en secours après 1,5 s ou sur erreur, `media_fallback: text`).
+Decision reste un compositeur de signaux : Context déclare ses signaux (`personal`, `places`, `amounts`, `urgency`,
+`clarity`, `image` ajoutés), Walter Decision les compose, le Router garde l'ordre de la chaîne, le résolveur applique
+les relations déclarées (nouvelle condition `has_any`). Aucun choix d'outil ni de modèle d'exécution n'y entre.
+ContextPlan v4 porte `personal`, `assessment`, `media` ; le bloc `position` (Memory `whereabouts`) répond aux besoins
+de localisation sans règle propre à un exemple : c'est le signal `personal` qui le demande. Chemin d'une entrée,
+mesures (banc `bench/preflight_native.py`, 65 cas dont 37 réels) et retour arrière : DECISIONS.md, entrée du
+2026-11-18 « Préflight natif ».
+
+**Corrections de causes du 18/11 au soir** (banc : jeux `gold` 65, `indep` 35 écrits avant les corrections, `hold`
+20 écrits après sans voir leurs résultats) :
+- **Niveau** : l'option « fil » du signal `plan` est vide quand rien ne précède ; une distribution plate tranchée par
+  argmax tombait sur `none`, alors que `domain` (connaissance stockée) disait déjà « projets ». Règle
+  `void_thread_memory` : sujet nouveau, aucun échange récent, P(plan ≠ none) ≥ ,5 et P(domain ≠ none) ≥ ,5 → la
+  capacité `memory` (trace `memory_by: void_thread`). Une position connue ne déclenche pas la mémoire : le critère
+  `needs.memory` exclut « où il est / où il habite » (le bloc `position` y répond). Les ancres de Memory ignorent
+  désormais URL, chemins, noms de fichiers et identifiants de code.
+- **Dates** : le modèle trouvait les périodes ; seul le jour unique était lu. Le résolveur du Router lit semaines,
+  week-ends, mois, années, « ces derniers jours » (bornes approximatives), « depuis… », durées (`duration` ISO) et
+  l'année la plus proche pour « 2 octobre » ; un week-end ou un jour sans temps donne les deux lectures
+  (`past`, `ambiguous`). Les observations gardent périodes et durées, la ligne des dates les dit. Repère : la date
+  locale du propriétaire.
+- **Pack** : le brief M1 d'un module venait deux fois (capacités + cartes d'outils). Le bloc capacités est M0 seul ;
+  la carte d'outil vient une fois, aussi quand un domaine lit la mémoire. Rien d'utile retiré (état de session,
+  mémoire, position gardés).

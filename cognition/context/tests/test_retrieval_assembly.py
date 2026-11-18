@@ -286,8 +286,11 @@ def test_one_notes_call_gives_each_subset(monkeypatch):
              {"id": "memory.manifest", "module": "memory", "content": "M1 mem"},
              {"id": "browse.manifest", "module": "browse", "content": "M1 web"}]
     monkeypatch.setattr(retrieval, "_notes", lambda ttl=600: notes)
-    b = retrieval.capabilities(plan("L2", caps=("web",)))
-    assert b.sources == ["memory.m0", "browse.m0", "browse.manifest"]
+    p = plan("L2", caps=("web",))
+    b = retrieval.capabilities(p)
+    assert b.sources == ["memory.m0", "browse.m0"]          # 18/11: M0 only, the same for every message
+    cards = retrieval.tool_cards(p)
+    assert cards.sources == ["browse"] and cards.text.count("M1 web") == 1   # the brief comes once
     assert retrieval._card("memory") == "M1 mem"
 
 

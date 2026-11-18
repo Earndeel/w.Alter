@@ -29,7 +29,7 @@ from pathlib import Path
 
 from ..config import preflight_settings, state_settings
 from ..plan import (ACTS, CAPABILITIES, DOMAINS, HORIZONS, LEVELS, MODEL_LEVELS, ContextPlan, ModelProfile,
-                    ThreadChoice)
+                    ThreadChoice, OBSERVATIONS, PERSONAL, URGENCY, CLARITY, IMAGE_KINDS)
 
 SETTINGS = preflight_settings()
 REPLY_WINDOW_S = SETTINGS["reply_window_s"]      # past that, « ok, regarde X » opens a subject rather than answering one
@@ -126,6 +126,7 @@ class Request:
     previous_profile: dict | None = None                   # the session's previous model profile, if recent (degraded)
     session_id: str | None = None                         # the caller's session: its WorkingState (living_state switch)
     origin: dict | None = None    # set 3: where the input comes from {channel: chat|voice|desktop|connector|api, kind, source}
+    attachments: list = field(default_factory=list)       # [{type, path}] beside the markers of the message (18/11)
 
 
 def _words(text: str) -> list[str]:
@@ -455,7 +456,7 @@ def observations(signals: dict, message: str) -> dict:
     and people named. Kept only when the passage is really in the message (the extraction reads the whole state)
     and read with enough certainty: an observation is checkable against the input, or it is not one."""
     out = {}
-    for key, fields in (("dates", ("text", "date", "past", "time", "ambiguous", "found")), ("people", ("text", "found"))):
+    for key, fields in OBSERVATIONS.items():       # dates, people; places, amounts since v4 (18/11)
         items, seen = [], set()
         for sp in ((signals.get("context." + key) or {}).get("spans") or []):
             text = sp.get("text") if isinstance(sp, dict) else None
@@ -464,8 +465,8 @@ def observations(signals: dict, message: str) -> dict:
                 continue
             if isinstance(found, (int, float)) and found < FOUND_MIN:
                 continue
-            if key == "dates" and not sp.get("date"):       # « 14h » alone names no day: nothing to place
-                continue
+            if key == "dates" and not sp.get("date") and not sp.get("duration"):
+                continue                            # « 14h » alone names no day: nothing to place
             seen.add(text.lower())
             items.append({f: sp[f] for f in fields if sp.get(f) is not None})
         if items:
@@ -511,6 +512,12 @@ def _decide_turn(req: Request, timeout: float, purpose: str) -> tuple[dict, dict
         return (res.get("answers") if isinstance(res, dict) else None) or {}, res, {}, None
     state, facts, opts = turn(req)
     turn_args = dict(occasion="turn", focus="new_message", now=owner_today(), **common)
+    from .. import media as M
+    try:                                    # the message's images and voice notes, read by the decision model itself
+        seen_media, media_notes = M.load(req.message, req.attachments)
+    except Exception as exc:  # noqa: BLE001 — the plan is made on the text alone, said in the trace
+        seen_media, media_notes = [], [error_text(exc)]
+    object.__setattr__(req, "_media", ([m["type"] for m in seen_media], media_notes))
     readings = None
     if READINGS_APART:
         def read(t0=time.perf_counter()):
@@ -521,13 +528,18 @@ def _decide_turn(req: Request, timeout: float, purpose: str) -> tuple[dict, dict
             return r
         readings = Readings(_readers().submit(read), req.message, time.perf_counter())
     res = llm.decide(state, None, samples=DECISION_SAMPLES, **sampling, facts=facts, options=opts,
-                     **({"layers": ["inference"]} if READINGS_APART else {}), **turn_args)
+                     **({"layers": ["inference"]} if READINGS_APART else {}),
+                     **({"media": seen_media} if seen_media else {}), **turn_args)
     sig = resolved(res)
     a = {LEGACY_IDS[k]: v for k, v in sig.items() if k in LEGACY_IDS and v}
     tr = res.get("trace") or {}
     trace = {"registry": tr.get("registry"), "asked": len(tr.get("asked") or ()),
              **({"skipped": sorted(tr["skipped"])} if tr.get("skipped") else {}),
-             **({"unavailable": tr["unavailable"]} if tr.get("unavailable") else {})}
+             **({"unavailable": tr["unavailable"]} if tr.get("unavailable") else {}),
+             **({"assign": tr["assign"]} if tr.get("assign") else {}),
+             **({"failover": tr["failover"]} if tr.get("failover") else {}),
+             **({"media": [m["type"] for m in seen_media]} if seen_media else {}),
+             **({"media_notes": media_notes} if media_notes else {})}
     return a, res, trace, readings
 
 
@@ -658,6 +670,9 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
     named = _anchors(req.message) if named is None else named
     if named and "memory" not in caps:      # a project the owner's memory knows is named: memory, whatever the model said
         caps.insert(0, "memory")
+    memory_by = void_thread_memory(a, thread, req) if "memory" not in caps else None
+    if memory_by:
+        caps.insert(0, "memory")
     if "memory" in caps and level in ("L0", "L1", "L2"):
         # coherence (2026-11-09): the model answers « memory needed » and « nothing / the thread suffices » in the same
         # call (77 of 203 draws, 13 of the 29 bench messages): the specific question wins, the plan
@@ -685,21 +700,33 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
         thread = ThreadChoice(id=prev.thread_id, confidence=conf("thread"),
                               alternates=[thread.id, *(k for k in thread.alternates if k != prev.thread_id)][:2])
         by = "previous_exchange_alternate"
+    sig = resolved(res) if SIGNALS != "questions" else {}
+    pprobs = (sig.get("context.personal") or {}).get("probabilities") or {}
+    personal = [k for k in PERSONAL if isinstance(pprobs.get(k), (int, float)) and pprobs[k] >= 0.5]
+    assessment = {k: (sig.get("context." + k) or {}).get("choice") for k in ("urgency", "clarity")}
+    assessment = {k: v for k, v in assessment.items() if v in (URGENCY if k == "urgency" else CLARITY)}
+    kinds = (getattr(req, "_media", None) or ([], []))[0]
+    seen_media = {}
+    if "image" in kinds:
+        img = (sig.get("context.image") or {}).get("choice")
+        seen_media["image"] = img if img in IMAGE_KINDS else "other"
+    if "audio" in kinds:
+        seen_media["audio"] = True
     tier = pick("model_level") if pick("model_level") in MODEL_LEVELS else "L1"
     work = round(float(a["work"]["noul"]), 2) if isinstance((a.get("work") or {}).get("noul"), (int, float)) else None
     resume = round(float(a["resume"]["noul"]), 2) if isinstance((a.get("resume") or {}).get("noul"), (int, float)) else None
     plan = ContextPlan(
         turn_id=req.turn_id, thread=thread, act=act, level=level,
         domains=[domain] if domain in DOMAINS else [], horizons=[horizon] if horizon in HORIZONS else [],
-        capabilities=["tools", *caps], observations=seen,
-        model_profile=ModelProfile(task=task, level=tier),
+        capabilities=["tools", *caps], observations=seen, personal=personal, assessment=assessment, media=seen_media,
+        model_profile=ModelProfile(task=task, level=tier, require=["vision"] if "image" in seen_media else []),
         decision={"model": res.get("model"), "ms": round((time.perf_counter() - t0) * 1000),
                   **({"signals": traced} if traced else {}),
                   **({"parts": [p.get("model") for p in res["parts"]]} if len(res.get("parts") or ()) > 1 else {}),
                   **({"work": work} if work is not None else {}), "effort": effort(level, tier, work),
                   **({"resume": resume} if resume is not None else {}),
                   **({"samples": res["samples"]} if res.get("samples") else {}),
-                  **({"thread_by": by} if by else {}),
+                  **({"thread_by": by} if by else {}), **({"memory_by": memory_by} if memory_by else {}),
                   "confidence": {k: conf(k) for k in ("thread", "act", "plan", "domain", "horizon", "task")
                                  if conf(k) is not None}, **({"anchors": named} if named else {})})
     rb = resolution_brief(res)
@@ -760,6 +787,29 @@ def degraded_plan(req: Request, exc: BaseException, t0: float | None = None) -> 
     return ContextPlan(turn_id=req.turn_id, thread=thread, act="continue", level="L3",
                        capabilities=["tools", "memory"], model_profile=profile, escalated=False,
                        decision=decision).validate()
+
+
+def void_thread_memory(a: dict, thread: "ThreadChoice", req: Request) -> str | None:
+    """Coherence (18/11 evening): the plan question's « the last exchange » and « its subject's history » name nothing
+    when the message opens a new subject and no exchange is recent — there is no thread to read. The probability the
+    model gave them still says the answer needs more than the message; with no thread, only the owner's memory can
+    carry it. It is taken as such when (1) the model gives less than even odds to « nothing beyond the message », and
+    (2) its domain question — which kind of stored knowledge about the owner matters, « none » = no stored knowledge
+    needed — independently says some does (≥ 0.5). Both are the model's own answers; nothing is forced on a personal
+    reference alone (location goes to the position block, not here). Bench 18/11: the one real message planned L0
+    while it asked about a project's dated state (« Sans outil : … a-t-elle changé cette semaine ? »: nothing 0.35,
+    last exchange 0.15, thread 0.31, thread and memory 0.18; domain projects 0.65); over 100 cases it adds memory to
+    that one and to one unlabelled case, to none of the 24 that must stay without memory. Returns the reason, or None."""
+    prev = req.previous
+    if not thread.new or (prev and prev.age_s is not None and prev.age_s < FLOOR_WINDOW_S):
+        return None
+    plan_p = (a.get("plan") or {}).get("probabilities") or {}
+    dom_p = (a.get("domain") or {}).get("probabilities") or {}
+    if not plan_p or not dom_p or not isinstance(plan_p.get("none"), (int, float)):
+        return None
+    beyond = 1 - float(plan_p["none"])
+    stored = 1 - float(dom_p.get("none") or 0)
+    return "void_thread" if beyond >= 0.5 and stored >= 0.5 else None
 
 
 def _anchors(message: str) -> list[str]:

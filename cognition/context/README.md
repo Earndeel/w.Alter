@@ -6,7 +6,7 @@
 | **Propriétaire** | walter-context (`/walter/cognition/context`). |
 | **État** | **active** (constat du 09/11/2026) : service `walter-context-preflight` ; Walter Engine (DSH) l'utilise. |
 | **Ne fait pas** | Posséder les sujets, vues et originaux (Walter Memory, walter-logs) ; choisir un modèle (Router). |
-| **Contrats** | [contracts/context.json](contracts/context.json), [contracts/maintenance.json](contracts/maintenance.json), [contracts/schemas/](contracts/schemas/) (ContextPlan v3 — v2 et v1 gardés, ChildContextSpec v1), [manifest/decisions.json](manifest/decisions.json) (signaux de décision déclarés) ; CLI `walter-context`. Spécification : `/walter/cognition/context/docs/CONTEXT-ENGINE.md`. |
+| **Contrats** | [contracts/context.json](contracts/context.json), [contracts/maintenance.json](contracts/maintenance.json), [contracts/schemas/](contracts/schemas/) (ContextPlan v4 — v3, v2 et v1 gardés, ChildContextSpec v1), [manifest/decisions.json](manifest/decisions.json) (signaux de décision déclarés) ; CLI `walter-context`. Spécification : `/walter/cognition/context/docs/CONTEXT-ENGINE.md`. |
 
 walter-context prépare ce qui entre dans la fenêtre d’un modèle et compresse l’historique selon le contrat du
 harness. La compression locale, la préparation d’un contexte par message et le contexte d’un sous-agent sont des
@@ -116,6 +116,25 @@ ses blocs `now` / `people`. Une lecture encore en route quand la réponse part e
 n'est perdu en silence). `decision_samples = 2` + `decision_sampling = "first"` : deux échantillons, le premier
 arrivé gardé (banc du 17/11) ; `false` / `3` / `"mean"` = le réglage d'avant. Une décision complémentaire ne repose
 que ses signaux (`ask` de `POST /v1/decisions`), jamais un préflight complet.
+**Préflight natif (18/11/2026)** : la politique du besoin `walter-context-preflight` (Router
+`config/decision-needs.json`) dit `assign: "native_whole"` — tout le jeu (jugements, choix multiples, lectures,
+images, audio) part en **un** appel au premier modèle de la chaîne qui le porte entier nativement (d1.2-ultra par
+l'API Liquid directe) ; un second appel seulement s'il n'a pas répondu en 700 ms ; au-delà de 1,5 s ou sur erreur,
+le partage par question d'avant (Drex d'abord) part aussi et la première réponse **complète** gagne
+(`decision.assign`, `decision.failover` dans la trace) ; un média qu'aucun autre modèle ne lit (audio) est alors
+laissé de côté, pas la question (`media_fallback: "text"`, la transcription est dans le message). Lectures et
+jugements voyagent donc ensemble (`readings_apart = false`). Signaux ajoutés au registre de Context : `personal`
+(de quoi de la situation du propriétaire la réponse dépend — position, préférences, historique, personnes, projets,
+tâches, agenda —, dit ou seulement impliqué), `places` et `amounts` (lectures), `urgency`, `clarity`, `image`
+(photo / capture / document) ; relation `personal_needs_memory`. **ContextPlan v4** : `personal`, `assessment`
+{urgency, clarity}, `media` {image, audio} ; une image demande `model_profile.require ["vision"]`. Quand `location`
+est dans `personal`, le bloc **`position`** (jamais coupé) donne le dernier relevé GPS de Memory
+(`walter_memory.whereabouts`) avec son heure : récent, ancien (« il a pu bouger »), absent, ou au domicile connu.
+**Médias** (`walter_context/media.py`, `[media]`) : les images et notes vocales que les portes signalent dans le
+message (« enregistré ici : … », « audio : … ») ou que l'appelant passe en `attachments` [{type, path}] sont lues
+par le modèle de décision lui-même, seulement sous les racines déclarées et sous les tailles limites ; le reste est
+dit dans la trace (`media_notes`). Banc : `bench/preflight_native.py` (jeu de référence et résultats dans
+l'instance) ; mesures et retour arrière : DECISIONS.md 2026-11-18 « Préflight natif ».
 
 L’état d’un port de compression ne détermine pas le mode d’injection par message. Les essais `pack` ne constituent
 pas une décision de migration globale. Voir la maintenance pour les commandes et les modes dégradés.

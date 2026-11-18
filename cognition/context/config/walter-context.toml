@@ -165,10 +165,21 @@ signals = "registry"                # activated 2026-11-17 (Walter Decision 2.0;
 # The turn's readings (dates, people named: signals of layer observation) asked apart from its judgements and in
 # parallel: the plan does not wait for them, the pack's `now` and `people` blocks do ([pack] readings_wait_s).
 # false = one call carrying both (the plan then waits for the slower extraction route).
-readings_apart = true
+# 18/11 (préflight natif d1.2-ultra, switched on with the need policy `assign: native_whole`): the readings ride in the
+# same native call as the judgements (Liquid's own API answers every kind at once, ~0.45 s); rollback = true.
+readings_apart = false
 # Calls of the readings: passages are never averaged, so more than 1 = hedged, the first answer kept (17/11, 60
 # messages each: 1 call 54/60 under 1 s, max 2.1 s; 2 hedged 59/60, max 1.7 s; +0.00003 $ a message).
 readings_samples = 2
+
+# Images and voice notes of a message, read by the preflight's decision model itself (18/11, walter_context.media):
+# files named by the doors' markers or the request's `attachments`, only under these roots and size limits.
+[media]
+enabled = true
+audio = true                        # the voice note itself beside its transcript (Liquid reads OGG natively)
+image_max_bytes = 3000000
+audio_max_bytes = 2000000
+roots = ["@instance/state/core/telegram", "@instance/state/context/bench"]
 
 # Per-message pack (walter_context.assembly / retrieval). Budgets in tokens (chars / 4), header included.
 # Measured 07-11/11 (741 packs): median L0 115, L1 1588, L2 2983, L3 2889, L4 4666; max 7257.

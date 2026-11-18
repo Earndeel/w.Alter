@@ -2,7 +2,7 @@
 
     {"turn_id": "...", "message": "...", "previous": {"message", "answer", "age_s", "thread_id"},
      "candidates": [{"id", "title", ...}], "privacy_class": "cloud_allowed", "default_thread": "session:<id>",
-     "runtime": "claude_code", "session_id": "..."}
+     "runtime": "claude_code", "session_id": "...", "attachments": [{"type": "image"|"audio", "path": "..."}]}
 
 --shadow: the plan is only recorded (instance state, context/shadow/preflight-<day>.jsonl, private), nothing is
 printed for injection. Used by the hook while lot 4 is in shadow mode. Fail-open: exit 0, a line in the record.
@@ -251,7 +251,8 @@ def handle(d: dict, shadow: bool, want_pack: bool = False, warm: bool = False) -
                       if prev else None,
                       candidates=cands, privacy_class=d.get("privacy_class") or "cloud_allowed",
                       default_thread=waiting or d.get("default_thread"), waiting_age_s=waiting_age,
-                      previous_profile=previous_profile(key), session_id=d.get("session_id"))
+                      previous_profile=previous_profile(key), session_id=d.get("session_id"),
+                      attachments=[a for a in (d.get("attachments") or []) if isinstance(a, dict)][:4])
         purpose = "walter-context preflight" + (" (shadow)" if shadow else "")
         p0 = time.perf_counter()
         try:                                # the decision has the answer's time less what the pack needs at least

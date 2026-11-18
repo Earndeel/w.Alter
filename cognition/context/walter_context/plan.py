@@ -13,6 +13,11 @@ memory and the web, so a web question (« prix du Bitcoin ») pulled memory reco
 ContextPlan v3 (2026-11-17, Walter Decision 2.0): `observations` = what was read in the message itself and can be
 checked against it (dates written in words, each read as a calendar day by Walter; the people it names), apart from
 the judgements (act, level, capabilities…). A v1 or v2 plan still reads (no observations).
+ContextPlan v4 (2026-11-18, préflight natif d1.2-ultra): `personal` = what of the owner's own situation the answer
+depends on, even when the message only implies it (« une pizza autour de moi » → location; « mon rendez-vous » →
+agenda): Context fetches it (the position block for `location`, memory for the rest); `observations` adds the places
+and the amounts or quantities the message names; `assessment` = urgency and clarity of the request; `media` = what an
+attached image shows (the main model then needs vision). A v1, v2 or v3 plan still reads (none of them).
 """
 from __future__ import annotations
 
@@ -20,7 +25,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 VERSION = 1                 # SessionState, ThreadHint, MemoryViewQuery
-PLAN_VERSION = 3            # ContextPlan
+PLAN_VERSION = 4            # ContextPlan
 
 # Context level: how much the model needs to see beyond the message itself.
 LEVELS = {
@@ -40,7 +45,17 @@ CAPABILITIES = ("tools", "skills", "memory", "web", "browser", "delegation", "se
 V1_CAPABILITIES = {"search": ("memory", "web")}     # v1 value -> v2 values
 MODEL_LEVELS = ("L1", "L2", "L3")          # Walter Router's text tiers (not the context levels above)
 FAST_PATHS = ("short_reply", "trivial")
-OBSERVATIONS = {"dates": ("text", "date", "past", "time", "ambiguous", "found"), "people": ("text", "found")}
+# dates (18/11 evening): a period carries `end` (and `past_end` with its other reading), `approx` when the words give
+# no exact bounds; a length of time that names no day carries `duration` (ISO 8601) instead of `date`
+OBSERVATIONS = {"dates": ("text", "date", "end", "past", "past_end", "time", "ambiguous", "approx", "duration", "found"),
+                "people": ("text", "found"),
+                "places": ("text", "found"), "amounts": ("text", "found")}          # places, amounts: v4
+# v4: the owner's own situation the answer depends on (fetched by Context: `location` → the position block, the
+# others → the owner's memory)
+PERSONAL = ("location", "preferences", "history", "people", "projects", "tasks", "agenda")
+URGENCY = ("low", "normal", "high")
+CLARITY = ("clear", "ambiguous", "missing_info")
+IMAGE_KINDS = ("photo", "screenshot", "document", "other")
 
 
 class ContractError(ValueError):
@@ -93,6 +108,9 @@ class ContextPlan:
     decision: dict = field(default_factory=dict)          # model, ms, confidences; degraded + error (A2): trace
     answer: str | None = None            # fast_path trivial only: the exact answer, no model needed (lot 2, 07/11)
     observations: dict = field(default_factory=dict)      # v3: read in the message (dates, people), checkable
+    personal: list[str] = field(default_factory=list)     # v4: the owner's situation the answer depends on
+    assessment: dict = field(default_factory=dict)        # v4: {urgency, clarity}
+    media: dict = field(default_factory=dict)             # v4: {image: kind} of an attached image
     version: int = PLAN_VERSION
 
     def validate(self) -> "ContextPlan":
@@ -119,6 +137,19 @@ class ContextPlan:
             if not isinstance(items, list) or not all(isinstance(i, dict) and isinstance(i.get("text"), str)
                                                       and set(i) <= set(OBSERVATIONS[k]) for i in items):
                 raise ContractError(f"observations.{k}: items {{{', '.join(OBSERVATIONS[k])}}} with their text")
+        _subset("personal", self.personal, PERSONAL)
+        if not isinstance(self.assessment, dict) or set(self.assessment) - {"urgency", "clarity"}:
+            raise ContractError("assessment: keys among clarity, urgency")
+        if "urgency" in self.assessment:
+            _one_of("assessment.urgency", self.assessment["urgency"], URGENCY)
+        if "clarity" in self.assessment:
+            _one_of("assessment.clarity", self.assessment["clarity"], CLARITY)
+        if not isinstance(self.media, dict) or set(self.media) - {"image", "audio"}:
+            raise ContractError("media: keys among audio, image")
+        if "image" in self.media:
+            _one_of("media.image", self.media["image"], IMAGE_KINDS)
+        if "audio" in self.media and not isinstance(self.media["audio"], bool):
+            raise ContractError("media.audio: a boolean (the voice note itself was read)")
         return self
 
     def to_dict(self) -> dict:
@@ -129,7 +160,7 @@ class ContextPlan:
         version, caps = d.get("version", PLAN_VERSION), list(d.get("capabilities") or [])
         if version == 1:                 # a traced v1 plan: same meaning in the v2 vocabulary
             caps = list(dict.fromkeys(c2 for c in caps for c2 in V1_CAPABILITIES.get(c, (c,))))
-        if version in (1, 2):            # v1 / v2: no observations, same meaning otherwise
+        if version in (1, 2, 3):         # v1 / v2: no observations; v3: no personal, assessment, media
             version = PLAN_VERSION
         try:
             plan = cls(turn_id=d["turn_id"], thread=ThreadChoice(**d["thread"]), act=d["act"], level=d["level"],
@@ -138,7 +169,9 @@ class ContextPlan:
                        model_profile=ModelProfile(**(d.get("model_profile") or {})),
                        fast_path=d.get("fast_path"), escalated=bool(d.get("escalated")),
                        decision=dict(d.get("decision") or {}), answer=d.get("answer"),
-                       observations=dict(d.get("observations") or {}), version=version)
+                       observations=dict(d.get("observations") or {}), personal=list(d.get("personal") or []),
+                       assessment=dict(d.get("assessment") or {}), media=dict(d.get("media") or {}),
+                       version=version)
         except (KeyError, TypeError) as exc:
             raise ContractError(f"malformed ContextPlan: {exc}") from exc
         return plan.validate()
@@ -235,11 +268,13 @@ _STRS = {"type": "array", "items": {"type": "string"}}
 def schemas() -> dict[str, dict]:
     base = "https://walter.local/contracts/context/"
     return {
-        "context-plan.v3.json": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": base + "context-plan.v3.json",
-            "title": "ContextPlan v3", "description": (
+        "context-plan.v4.json": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": base + "context-plan.v4.json",
+            "title": "ContextPlan v4", "description": (
                 "What the preflight decides for one owner message (walter-context output, traced). v3 (2026-11-17): "
-                "observations read in the message, apart from the judgements; a v1/v2 plan reads as v3 without them."),
+                "observations read in the message, apart from the judgements. v4 (2026-11-18): personal (the owner's "
+                "situation the answer depends on, even implied), places and amounts read, assessment (urgency, "
+                "clarity), media (what an attached image shows); a v1/v2/v3 plan reads as v4 without them."),
             "type": "object",
             "required": ["version", "turn_id", "thread", "act", "level"],
             "properties": {
@@ -256,13 +291,24 @@ def schemas() -> dict[str, dict]:
                 "answer": {"type": ["string", "null"], "description": "trivial fast path only: the exact answer"},
                 "observations": {"type": "object", "additionalProperties": False, "description": (
                     "read in the message and checkable against it (Walter Decision 2.0 signals context.dates and "
-                    "context.people): each date passage as written, the calendar day Walter reads it as (`past` = "
-                    "the same words read as already gone, `ambiguous` = the words leave a choice), the people named"),
+                    "context.people): each date passage as written, the calendar day Walter reads it as (`end` = "
+                    "the last day of a period, `past`/`past_end` = the same words read as already gone, `ambiguous` = "
+                    "the words leave a choice, `approx` = no exact bounds, `duration` = a length of time that names "
+                    "no day), the people named"),
                     "properties": {k: {"type": "array", "items": {
                         "type": "object", "required": ["text"], "additionalProperties": False,
-                        "properties": {f: ({"type": "boolean"} if f == "ambiguous" else _PROB if f == "found"
+                        "properties": {f: ({"type": "boolean"} if f in ("ambiguous", "approx") else _PROB if f == "found"
                                            else {"type": "string"}) for f in fields}}}
                         for k, fields in OBSERVATIONS.items()}},
+                "personal": {**_set_of(PERSONAL), "description": (
+                    "the owner's own situation the answer depends on, said or implied: location → Context adds the "
+                    "position block (last known position, its age and the known home); the others → owner memory")},
+                "assessment": {"type": "object", "additionalProperties": False, "properties": {
+                    "urgency": _enum(URGENCY), "clarity": _enum(CLARITY)}},
+                "media": {"type": "object", "additionalProperties": False, "properties": {
+                    "image": _enum(IMAGE_KINDS), "audio": {"type": "boolean"}},
+                    "description": "what an attached image shows (the main model then needs vision); audio = the "
+                                   "voice note itself was read by the decision model, beside its transcript"},
                 "decision": {"type": "object", "description": (
                     "trace only; degraded = true with error (exception class + short scrubbed reason) when the "
                     "decision failed and the plan is the prudent default (SOCLE A2, 2026-11-11)"),

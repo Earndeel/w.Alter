@@ -45,6 +45,7 @@ def registry(monkeypatch):
     monkeypatch.setattr(preflight, "SIGNALS", "registry")
     monkeypatch.setattr(preflight, "decision_chain", lambda: ("fake/decider",))
     monkeypatch.setattr(preflight, "owner_today", lambda: "2026-11-17")
+    monkeypatch.setattr(preflight, "READINGS_APART", True)     # the mode these tests are about (config: false since 18/11)
     return calls, signals
 
 
@@ -225,3 +226,54 @@ def test_an_unsettled_conflict_is_said_to_the_model_in_the_modules_own_words():
     p = run(Request("t", "bonjour"))
     p.decision["resolution"] = rb
     assert "un sujet neuf et un fil existant" in Pack(plan=p).lead
+
+
+# ── préflight natif (18/11): personal, places/amounts, assessment, the message's media ─────────────────────────────
+def test_v4_plan_carries_personal_assessment_places_and_amounts(registry, monkeypatch):
+    calls, signals = registry
+    monkeypatch.setattr(preflight, "READINGS_APART", False)
+    msg = "trouve moi la pizza la moins chère autour de moi, moins de 300 bahts, à Bangkok"
+    signals.update({
+        "context.act": {"choice": "new", "confidence": 0.9}, "context.plan": {"choice": "none", "confidence": 0.8},
+        "context.needs": {"probabilities": {"web": 0.9, "memory": 0.2}},
+        "context.personal": {"probabilities": {"location": 0.93, "preferences": 0.2, "history": 0.1}},
+        "context.places": {"spans": [{"text": "Bangkok", "found": 0.9}, {"text": "Paris", "found": 0.9}]},
+        "context.amounts": {"spans": [{"text": "moins de 300 bahts", "found": 0.9}]},
+        "context.urgency": {"choice": "normal"}, "context.clarity": {"choice": "clear"}})
+    p = run(Request("t", msg))
+    assert p.personal == ["location"] and p.capabilities == ["tools", "web"]
+    assert p.observations["places"] == [{"text": "Bangkok", "found": 0.9}]        # Paris is not in the message
+    assert p.observations["amounts"] == [{"text": "moins de 300 bahts", "found": 0.9}]
+    assert p.assessment == {"urgency": "normal", "clarity": "clear"} and p.media == {}
+    assert p.to_dict()["version"] == 4
+
+
+def test_an_image_of_the_message_is_read_by_the_decision_model_and_asks_for_vision(registry, monkeypatch, tmp_path):
+    calls, signals = registry
+    monkeypatch.setattr(preflight, "READINGS_APART", False)
+    from walter_context import media
+    img = tmp_path / "1-photo-1.jpg"
+    img.write_bytes(b"\xff\xd8\xff\xe0fake")
+    monkeypatch.setattr(media, "media_settings", lambda: {"enabled": True, "audio": True, "image_max_bytes": 10_000,
+                                                           "audio_max_bytes": 10_000, "roots": [str(tmp_path)]})
+    signals.update({"context.act": {"choice": "new"}, "context.plan": {"choice": "none"},
+                    "context.image": {"choice": "document"}})
+    p = run(Request("t", f"[photo reçue sur Telegram, enregistré ici : {img}] que dit ce ticket ?"))
+    sent = _judged(calls)[2]["media"]
+    assert [m["type"] for m in sent] == ["image"] and sent[0]["data"].startswith("data:image/jpeg;base64,")
+    assert p.media == {"image": "document"} and p.model_profile.require == ["vision"]
+
+
+def test_media_outside_the_roots_or_too_big_are_left_out_and_said(monkeypatch, tmp_path):
+    from walter_context import media
+    ok, big, out = tmp_path / "a.ogg", tmp_path / "b.ogg", tmp_path.parent / "c.png"
+    ok.write_bytes(b"OggS" + b"0" * 10)
+    big.write_bytes(b"OggS" + b"0" * 100)
+    out.write_bytes(b"png")
+    monkeypatch.setattr(media, "media_settings", lambda: {"enabled": True, "audio": True, "image_max_bytes": 50,
+                                                           "audio_max_bytes": 50, "roots": [str(tmp_path)]})
+    got, notes = media.load(f"[note vocale de Telegram, transcrite ; audio : {ok}] bonjour",
+                            [{"type": "audio", "path": str(big)}, {"type": "image", "path": str(out)}])
+    assert [m["type"] for m in got] == ["audio"] and got[0]["data"].startswith("data:audio/ogg;base64,")
+    assert any("over 50" in n for n in notes) and any("outside the readable roots" in n for n in notes)
+

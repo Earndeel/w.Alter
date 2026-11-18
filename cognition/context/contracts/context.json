@@ -221,6 +221,7 @@
       "status": "active",
       "readme": "README.md",
       "contracts": [
+        "contracts/schemas/context-plan.v4.json",
         "contracts/schemas/context-plan.v3.json",
         "contracts/schemas/context-plan.v2.json"
       ],

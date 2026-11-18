@@ -42,7 +42,7 @@ LATE_NAMES = {"memory": "la mémoire", "session_state": "l'état de travail du f
               "board": "le tableau des sujets", "tasks": "la liste des objectifs", "experience": "l'expérience d'exécution",
               "records": "le registre des décisions", "recent": "les derniers échanges", "tool_cards": "les fiches d'outils",
               "capabilities": "la carte des modules", "people": "les fiches des personnes nommées"}
-NEVER_CUT = {"now"}
+NEVER_CUT = {"now", "position"}     # position (18/11): asked only when the answer depends on it
 SHRUNK = "\n(… coupé : budget du contexte de ce message)"
 
 

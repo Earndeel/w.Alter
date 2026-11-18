@@ -51,7 +51,7 @@ def test_schema_files_are_generated_from_the_code():
     for name, schema in schemas().items():
         on_disk = json.loads((ROOT / "contracts" / "schemas" / name).read_text())
         assert on_disk == schema, f"{name} is stale: python -m walter_context.plan --write"
-    assert schemas()["context-plan.v3.json"]["properties"]["capabilities"]["items"]["enum"] == list(CAPABILITIES)
+    assert schemas()["context-plan.v4.json"]["properties"]["capabilities"]["items"]["enum"] == list(CAPABILITIES)
 
 
 def test_v1_plan_search_reads_as_memory_and_web():
@@ -60,7 +60,26 @@ def test_v1_plan_search_reads_as_memory_and_web():
     v1 = {"version": 1, "turn_id": "t", "thread": {"id": None, "new": True}, "act": "new", "level": "L0",
           "capabilities": ["tools", "search", "skills"]}
     p = ContextPlan.from_dict(v1)
-    assert p.version == PLAN_VERSION == 3 and p.capabilities == ["tools", "memory", "web", "skills"]
+    assert p.version == PLAN_VERSION == 4 and p.capabilities == ["tools", "memory", "web", "skills"]
     import pytest
     with pytest.raises(ContractError):
         ContextPlan.from_dict({**v1, "version": 2})
+
+
+def test_v3_plan_reads_as_v4_and_v4_vocabularies_are_closed():
+    """ContextPlan v4 (18/11): personal, assessment, media; a traced v3 plan reads without them."""
+    import pytest
+    from walter_context.plan import ContextPlan, ContractError
+    v3 = {"version": 3, "turn_id": "t", "thread": {"id": None, "new": True}, "act": "new", "level": "L0",
+          "observations": {"dates": [{"text": "jeudi", "date": "2026-11-19"}]}}
+    p = ContextPlan.from_dict(v3)
+    assert p.version == 4 and p.personal == [] and p.assessment == {} and p.media == {}
+    ok = {**v3, "version": 4, "personal": ["location", "agenda"], "assessment": {"urgency": "high", "clarity": "clear"},
+          "media": {"image": "photo", "audio": True}, "observations": {"places": [{"text": "Lyon"}],
+                                                                       "amounts": [{"text": "200 bahts"}]}}
+    assert ContextPlan.from_dict(ok).personal == ["location", "agenda"]
+    for bad in ({"personal": ["weather"]}, {"assessment": {"urgency": "now"}}, {"assessment": {"mood": "x"}},
+                {"media": {"image": "selfie"}}, {"media": {"audio": "yes"}}, {"observations": {"shops": []}}):
+        with pytest.raises(ContractError):
+            ContextPlan.from_dict({**ok, **bad})
+

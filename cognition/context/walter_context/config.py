@@ -157,6 +157,12 @@ STATE_DEFAULTS = {"decision_state": False,        # preflight facts + plan summa
                   "reassess_cache": 256, "reassess_timeout_s": 6.0}
 
 
+MEDIA_DEFAULTS = {"enabled": True,                # images / voice notes of a message read by the decision model itself
+                  "audio": True,                  # … voice notes too (beside their transcript)
+                  "image_max_bytes": 3_000_000, "audio_max_bytes": 2_000_000,   # Liquid's body limit is 4.5 MB
+                  "roots": ["@instance/state/core/telegram", "@instance/state/context/bench"]}
+
+
 def _optional(name: str, defaults: dict, path: str | Path | None) -> dict:
     raw = tomllib.loads(Path(path or DEFAULT_PATH).read_text()).get(name) or {}
     out = dict(defaults)
@@ -164,8 +170,9 @@ def _optional(name: str, defaults: dict, path: str | Path | None) -> dict:
         if k not in defaults:
             raise ValueError(f"[{name}].{k}: unknown key")
         d = defaults[k]
-        ok = isinstance(v, bool) if isinstance(d, bool) else (isinstance(v, (int, float)) and not isinstance(v, bool)
-                                                             and v >= 0)
+        ok = isinstance(v, bool) if isinstance(d, bool) else \
+            (isinstance(v, list) and all(isinstance(x, str) and x for x in v)) if isinstance(d, list) else \
+            (isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0)
         if not ok:
             raise ValueError(f"[{name}].{k}: invalid value")
         out[k] = v
@@ -180,3 +187,8 @@ def longtext_settings(path: str | Path | None = None) -> dict:
 def state_settings(path: str | Path | None = None) -> dict:
     """[state]: the living WorkingState and the DecisionState; the two preflight switches default to off."""
     return _optional("state", STATE_DEFAULTS, path)
+
+
+def media_settings(path: str | Path | None = None) -> dict:
+    """[media] (18/11): the images and voice notes of a message read by the preflight's decision model."""
+    return _optional("media", MEDIA_DEFAULTS, path)

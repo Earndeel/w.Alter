@@ -113,10 +113,11 @@ def _subset(notes: list[dict], m1: set[str]) -> list[dict]:
 
 
 def capabilities(plan: ContextPlan, ttl: float = 600) -> Block | None:
-    """M0 of every module + M1 of the modules the plan needs (session layer: changes rarely, cached)."""
-    m1 = ({m for c in plan.capabilities for m in CAPABILITY_MODULES.get(c, [])} |
-          {m for d in plan.domains for m in DOMAIN_MODULES.get(d, [])})
-    notes = _subset(_notes(ttl), m1)
+    """M0 of every module, one line each (session layer: the same for every message, so the provider's prefix cache
+    keeps it). The M1 briefs of the modules a message needs come once, in tool_cards (layer 4). Until 18/11 this block
+    also carried them: every memory, web or secrets request had the same brief twice (memory 440 tokens, browse 292),
+    and the cached prefix changed with each plan's capabilities."""
+    notes = _subset(_notes(ttl), set())
     text = "\n\n".join(n["content"].strip() for n in notes if n.get("content"))
     return Block("capabilities", 0, text, sources=[n.get("id") for n in notes])
 
@@ -136,7 +137,8 @@ def _card(module: str, ttl: float = 600) -> str:
 
 def tool_cards(plan: ContextPlan) -> Block | None:
     """The briefs of the modules the plan's capabilities need, in the volatile layer (the cached prefix stays the same)."""
-    mods = list(dict.fromkeys(m for c in plan.capabilities for m in TOOL_CARD_MODULES.get(c, [])))
+    mods = list(dict.fromkeys([*(m for c in plan.capabilities for m in TOOL_CARD_MODULES.get(c, [])),
+                               *(m for d in plan.domains for m in DOMAIN_MODULES.get(d, []))]))
     texts = [(m, _card(m)) for m in mods]
     texts = [(m, t) for m, t in texts if t]
     if not texts:
@@ -438,17 +440,38 @@ def _day(iso: str) -> str:
     return f"{_DAYS[d.weekday()]} {d.day} {_MONTHS[d.month - 1]} {d.year}"
 
 
+def _days_span(a: str, b: str | None = None) -> str:
+    return _day(a) if not b or b == a else f"du {_day(a)} au {_day(b)}"
+
+
+_DURATION_UNITS = {"D": ("jour", "jours"), "W": ("semaine", "semaines"), "M": ("mois", "mois")}
+
+
+def _duration(iso: str) -> str:
+    m = re.match(r"^P(\d+)([DWM])$", iso or "")
+    if not m:
+        return iso
+    n = int(m.group(1))
+    return f"{n} {_DURATION_UNITS[m.group(2)][n > 1]}"
+
+
 def dates_line(plan: ContextPlan | None) -> str:
     """The days the message names, read by Walter (preflight observation `dates`, Walter Decision 2.0): « jeudi »
-    is said as a calendar day, and when the words leave a choice (the coming or the past Thursday, a weekday that
-    does not match the date) the line says both readings rather than one guess."""
+    is said as a calendar day, a period as its first and last days (18/11), a length of time as a length; when the
+    words leave a choice (the coming or the past Thursday or weekend, a weekday that does not match the date) the
+    line says both readings rather than one guess, and a period with no exact bounds says so."""
     out = []
     for d in ((plan.observations or {}).get("dates") or []) if plan else []:
+        if d.get("duration") and not d.get("date"):
+            out.append(f"« {d['text']} » = une durée de {_duration(d['duration'])}, pas une date")
+            continue
         if not d.get("date"):
             continue
-        text = f"« {d['text']} » = {_day(d['date'])}" + (f" à {d['time']}" if d.get("time") else "")
+        text = f"« {d['text']} » = {_days_span(d['date'], d.get('end'))}" + (f" à {d['time']}" if d.get("time") else "")
+        if d.get("approx"):
+            text += " (bornes approximatives)"
         if d.get("past"):
-            text += f" (ou {_day(d['past'])} si c'est le passé)"
+            text += f" (ou {_days_span(d['past'], d.get('past_end'))} si c'est le passé)"
         elif d.get("ambiguous"):
             text += " (à confirmer : les mots laissent un choix)"
         out.append(text)
@@ -491,6 +514,60 @@ def people(plan: ContextPlan, message: str) -> Block | None:
         return None
     return Block("people", 4, "Personnes nommées dans le message (Kardex) :\n" + r["text"],
                  sources=[f"entity:{e}" for e in r.get("matched") or []])
+
+
+def _ago(seconds: float) -> str:
+    m = int(seconds // 60)
+    if m < 60:
+        return f"{m} min"
+    h, m = divmod(m, 60)
+    if h < 48:
+        return f"{h} h {m:02d}" if m else f"{h} h"
+    return f"{h // 24} j {h % 24} h"
+
+
+def position(plan: ContextPlan, at: "datetime | None" = None, read=None) -> Block | None:
+    """Where the owner is (v4, 18/11): asked when the plan says the answer depends on it (`personal` has location —
+    « une pizza autour de moi », « il fait quel temps ici »), at every level. Walter Memory's last position sample,
+    its time and age, whether it is recent, the known place it falls in and the known home — said as they are: an old
+    position is said old (the owner may have moved), an absent one is said absent, never guessed. Memory decides
+    what a cloud reader may read (walter_memory.whereabouts)."""
+    if "location" not in (plan.personal or []):
+        return None
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    if read is None:
+        from walter_memory import whereabouts
+        read = whereabouts.current
+    w = read()
+    st = w.get("status")
+    if st == "withheld":
+        return Block("position", 5, "Position du propriétaire : non lisible par ce modèle (classe de confidentialité).",
+                     sources=["memory:whereabouts"])
+    home = w.get("home")
+    home_line = (f"Domicile connu : « {home['name']} » (≈ {home['lat']}, {home['lng']})"
+                 + (f", à {home['distance_m'] / 1000:.1f} km de cette position" if home.get("distance_m") else "")
+                 + ".") if home else "Domicile : inconnu de la mémoire."
+    if st == "absent":
+        text = "Position du propriétaire : aucun relevé GPS en mémoire. " + home_line
+    else:
+        try:
+            from walter_memory import organic
+            zone = ZoneInfo(str(organic.settings().get("periods", {}).get("tz") or "UTC"))
+        except Exception:  # noqa: BLE001
+            zone = timezone.utc
+        when = datetime.fromisoformat(w["at"]).astimezone(zone)
+        fresh = "récente" if st == "recent" else "ancienne : il a pu bouger depuis"
+        place = w.get("place")
+        where = (" — au domicile connu" if place and place.get("home") else
+                 f" — au lieu connu « {place['name']} »" if place else "")
+        text = (f"Position du propriétaire (GPS, Walter Memory) : dernier relevé le {when:%Y-%m-%d à %H:%M} heure locale, "
+                f"il y a {_ago(w['age_s'])} ({fresh}){where} ; ≈ {w['lat']}, {w['lng']}"
+                + (f" (précision {w['accuracy_m']} m)" if w.get("accuracy_m") is not None else "") + ".\n" + home_line)
+        if st != "recent":
+            text += ("\nSi la réponse dépend de l'endroit exact, partir de cette position en disant son âge, ou "
+                     "demander confirmation en une phrase.")
+    return Block("position", 5, text, sources=["memory:whereabouts"])
 
 
 LATE = "not ready in time"                      # note of a source the pack did not wait for
@@ -574,6 +651,8 @@ def gather(plan: ContextPlan, message: str, *, session_key: str | None = None, n
              ("now", settled(lambda: now(plan=plan)))]
     if pending is not None or (plan.observations or {}).get("people"):
         steps.append(("people", settled(lambda: people(plan, message))))
+    if "location" in (plan.personal or []):
+        steps.append(("position", lambda: position(plan)))
     if plan.level != "L0":
         steps += [("board", lambda: board(plan)), ("session_state", lambda: session_state(plan, message, session_key)),
                   ("subject", lambda: subject(plan))]
