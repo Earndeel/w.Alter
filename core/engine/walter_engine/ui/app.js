@@ -301,7 +301,7 @@ function main() {
       case 'session.title': {
         const s = S.sessions.find((x) => x.session_id === S.sid);
         if (s) { s.title = ev.title; renderSessions(); }
-        $('title').textContent = ev.title || S.config.name; break;
+        $('title').textContent = ev.title || 'Conversation'; break;
       }
       default: break;
     }
@@ -364,7 +364,7 @@ function main() {
       const r = await api({ op: 'session.list', interface: 'web' });
       S.sessions = r.sessions || [];
       const cur = S.sessions.find((x) => x.session_id === S.sid);
-      if (cur) $('title').textContent = cur.title || S.config.name;
+      if (cur) $('title').textContent = cur.title || 'Conversation';
       renderSessions();
     } catch (e) { fail(e); }
   }
@@ -407,7 +407,7 @@ function main() {
     $('welcome').hidden = true; setBusy(false);
     try { localStorage.setItem('walter.last', sid); } catch (e) { /* ok */ }
     const cur = S.sessions.find((x) => x.session_id === sid);
-    $('title').textContent = cur?.title || S.config.name; renderSessions();
+    $('title').textContent = cur?.title || 'Conversation'; renderSessions();
     try {
       const r = await api({ op: 'session.history', session_id: sid, limit: 200 });
       if (token !== S.opening) return;
@@ -427,7 +427,7 @@ function main() {
   }
   function newDraft() {
     ++S.opening; closeEs(); resetThread(); S.sid = null; S.panel = null; showChat(); setBusy(false);
-    $('welcome').hidden = false; $('title').textContent = S.config.name; renderSessions();
+    $('welcome').hidden = false; $('title').textContent = 'Nouvelle conversation'; renderSessions();
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
     $('input').focus();
   }
@@ -483,7 +483,7 @@ function main() {
   });
 
   /* Navigation */
-  function showChat() { $('chat').hidden = false; $('panel-view').hidden = true; $('panel-frame').removeAttribute('src'); }
+  function showChat() { $('chat').hidden = false; $('panel-view').hidden = true; $('panel-frame').removeAttribute('src'); renderPanels(); }
   function openPanel(p) {
     ++S.opening; closeEs(); S.panel = p.id; S.sid = null;
     $('chat').hidden = true; $('panel-view').hidden = false; $('panel-frame').src = p.path;
@@ -495,7 +495,6 @@ function main() {
       const li = el('li', S.panel === p.id ? 'active' : ''); li.appendChild(el('span', 't', p.label));
       li.onclick = () => { go('#/p/' + p.id); closeDrawer(); }; ul.appendChild(li);
     }
-    $('panels-wrap').hidden = !(S.config.panels || []).length;
   }
   function renderLinks() {
     const box = $('links'); box.textContent = ''; let sec = null;
@@ -506,7 +505,6 @@ function main() {
       if (l.description) a.appendChild(el('small', null, l.description));
       box.appendChild(a);
     }
-    $('links-wrap').hidden = !(S.config.links || []).length;
   }
   const go = (h) => { if (location.hash === h) route(); else location.hash = h; };
   function route() {

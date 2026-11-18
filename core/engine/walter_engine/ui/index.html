@@ -11,51 +11,82 @@
 <body>
 <div id="app">
   <div id="scrim" hidden></div>
+
+  <!-- Barre latérale : une seule colonne d'onglets. L'onglet ouvert se raccorde au cadre principal. -->
   <aside id="sidebar" aria-label="Navigation">
     <div class="side-head">
       <span class="brand" id="brand">W.Alter</span>
     </div>
-    <button id="new-chat" class="btn primary" type="button">+ Nouvelle conversation</button>
-    <nav class="side-scroll">
-      <div class="side-title">Conversations</div>
-      <ul id="sessions" class="list"></ul>
-      <div id="panels-wrap" hidden>
-        <div class="side-title">Panneaux</div>
+    <div class="side-search">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+      <input id="portal-search" type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" autocomplete="off">
+    </div>
+    <nav class="tabs" aria-label="Onglets">
+      <button id="new-chat" class="tab tab-new" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="t">Nouvelle conversation</span>
+      </button>
+      <div class="tab-group" id="group-chat">
+        <div class="tab-title">Conversations</div>
+        <ul id="sessions" class="list"></ul>
+      </div>
+      <div class="tab-group" id="panels-wrap" hidden>
+        <div class="tab-title">Panneaux</div>
         <ul id="panels" class="list"></ul>
       </div>
-      <div id="links-wrap" hidden>
-        <div class="side-title">Liens</div>
-        <div id="links"></div>
-      </div>
     </nav>
+    <div class="side-foot" id="links-wrap" hidden>
+      <div id="links"></div>
+    </div>
   </aside>
+
+  <!-- Cadre principal -->
   <main id="main">
     <header id="topbar">
-      <button id="menu-btn" class="icon-btn" type="button" aria-label="Menu">&#9776;</button>
-      <div id="title" class="title">W.Alter</div>
+      <button id="menu-btn" class="icon-btn" type="button" aria-label="Ouvrir la navigation">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div id="title" class="title">Nouvelle conversation</div>
       <span id="busy-dot" class="busy-dot" hidden title="En cours"></span>
+      <button id="portal-toggle-documents" class="docs-btn" type="button" aria-controls="portal-inspector" aria-expanded="false">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>
+        <span>Documents</span><span class="count" id="portal-doc-count" hidden></span>
+      </button>
     </header>
     <div id="banner" class="banner" role="alert" hidden></div>
-    <section id="chat">
-      <div id="messages" aria-live="polite">
-        <div id="welcome" class="welcome">
-          <div class="welcome-name" id="welcome-name">W.Alter</div>
-          <div class="welcome-tag" id="welcome-tag">Bonjour Monsieur. Que puis-je faire pour vous ?</div>
+
+    <div class="stage">
+      <section id="chat">
+        <div id="messages" aria-live="polite">
+          <div id="welcome" class="welcome">
+            <div class="welcome-name" id="welcome-name">W.Alter</div>
+            <div class="welcome-tag" id="welcome-tag">Bonjour Monsieur. Que puis-je faire pour vous ?</div>
+          </div>
+          <div id="thread"></div>
+          <div id="working" class="working" hidden><span class="spinner"></span> W.Alter travaille…</div>
         </div>
-        <div id="thread"></div>
-        <div id="working" class="working" hidden><span class="spinner"></span> W.Alter travaille…</div>
-      </div>
-      <form id="composer" autocomplete="off">
-        <textarea id="input" rows="1" placeholder="Écrivez à W.Alter…" enterkeyhint="send"></textarea>
-        <button id="stop" class="btn danger" type="button" hidden>Arrêter</button>
-        <button id="send" class="btn primary" type="submit">Envoyer</button>
-      </form>
-    </section>
-    <section id="panel-view" hidden>
-      <iframe id="panel-frame" title="Panneau" referrerpolicy="same-origin"></iframe>
-    </section>
+        <form id="composer" autocomplete="off">
+          <textarea id="input" rows="1" placeholder="Écrivez à W.Alter…" enterkeyhint="send"></textarea>
+          <div class="composer-row">
+            <span class="hint">Entrée pour envoyer · Maj + Entrée pour aller à la ligne</span>
+            <button id="stop" class="btn danger" type="button" hidden>Arrêter</button>
+            <button id="send" class="btn primary" type="submit">Envoyer</button>
+          </div>
+        </form>
+      </section>
+      <section id="panel-view" hidden>
+        <iframe id="panel-frame" title="Panneau" referrerpolicy="same-origin"></iframe>
+      </section>
+
+      <aside id="portal-inspector" aria-label="Documents de la conversation" hidden>
+        <div class="insp-head"><span>Documents</span><button type="button" id="portal-close-documents" class="icon-x" aria-label="Fermer les documents">×</button></div>
+        <section class="insp-sec"><h2>Livrables</h2><div id="portal-deliverables"></div><p id="portal-deliverables-empty">Les fichiers produits dans cette conversation apparaîtront ici.</p></section>
+        <section class="insp-sec"><h2>Sources</h2><div id="portal-sources"></div><p id="portal-sources-empty">Les liens cités dans les réponses apparaîtront ici.</p></section>
+      </aside>
+    </div>
   </main>
 </div>
 <script type="module" src="/ui/app.js"></script>
+<script type="module" src="/ui/portal.js"></script>
 </body>
 </html>
