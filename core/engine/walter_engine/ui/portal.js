@@ -124,4 +124,9 @@ document.addEventListener('keydown', (e) => {
     $('portal-search').focus();
   }
 });
-document.body.dataset.walterPortal = 'v4';
+/* Bouton d'envoi rond : app.js y écrit « Envoyer » ou « Ajouter » (pendant un tour) ; on le reflète en infobulle. */
+const send = $('send');
+const label = () => { send.setAttribute('aria-label', send.textContent); send.title = send.textContent; send.classList.toggle('steer', send.textContent !== 'Envoyer'); };
+new MutationObserver(label).observe(send, { childList: true, characterData: true, subtree: true });
+label();
+document.body.dataset.walterPortal = 'v5';
