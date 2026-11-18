@@ -179,9 +179,28 @@ class Vault:
                 self._listed = 0.0
             return {"id": i["id"], "name": i["name"], "added": added, "unchanged": unchanged}
 
+    def _list(self) -> list[dict]:
+        return [i for i in json.loads(self._bw("list", "items")) if not i.get("deletedDate")]
+
+    def _sync_behind(self) -> None:
+        try:
+            self._bw("sync")
+            fresh = self._list()
+        except (SecretError, ValueError):
+            return                                 # offline server: the local copy in hand stays
+        with self._lock:
+            self._items, self._listed = fresh, time.time()
+
     def items(self) -> list[dict]:
         with self._lock:
             now = time.time()
+            if not self._items and now - self._synced > SYNC_TTL:
+                # A fresh process reads the local copy at once and syncs with the server behind it: the watcher
+                # (walter-secrets-sync) already keeps that copy within 30 s of the server, and a sync first made
+                # every new process wait ~3.7 s more before its first key (walter-llm cold start, 18/11).
+                self._items, self._listed, self._synced = self._list(), now, now
+                threading.Thread(target=self._sync_behind, daemon=True).start()
+                return self._items
             if now - self._synced > SYNC_TTL:
                 try:
                     self._bw("sync")
@@ -189,7 +208,7 @@ class Vault:
                     pass                           # offline server: keep serving the local encrypted cache
                 self._synced, self._listed = now, 0.0
             if now - self._listed > LIST_TTL or not self._items:
-                self._items = [i for i in json.loads(self._bw("list", "items")) if not i.get("deletedDate")]
+                self._items = self._list()
                 self._listed = now
             return self._items
 

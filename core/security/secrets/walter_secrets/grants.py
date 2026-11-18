@@ -47,13 +47,22 @@ class GrantError(RuntimeError):
 
 
 # ── registry ───────────────────────────────────────────────────────────────────────────────────────────────
+_INSTANCE: dict = {"at": 0.0, "root": None}
+INSTANCE_TTL = 60.0
+
+
 def accounts_dir() -> Path:
+    """The instance's grant cards. The instance root is asked once a minute, not once per card: each ask is a
+    `walter instance path` process (~60 ms), and one key read looked at every card (18/11: 23 asks, 1.4 s per key)."""
     if os.environ.get("WALTER_GRANTS_DIR"):
         return Path(os.environ["WALTER_GRANTS_DIR"])
-    root = settings._walter_instance("path")
-    if root is None:
-        raise GrantError("no active Walter instance")
-    return root / "accounts"
+    now = time.time()
+    if _INSTANCE["root"] is None or now - _INSTANCE["at"] > INSTANCE_TTL:
+        root = settings._walter_instance("path")
+        if root is None:
+            raise GrantError("no active Walter instance")
+        _INSTANCE.update(at=now, root=root)
+    return _INSTANCE["root"] / "accounts"
 
 
 def _validate(card: dict, ident: str) -> dict:
