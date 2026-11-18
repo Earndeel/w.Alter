@@ -105,7 +105,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/decision.py | `TYPES` | ["noul", "choice", "score", "number", "date", "text", "spans", "box", "boxes"] |  |
 | llm/decision.py | `MAX_QUESTIONS` | 32 |  |
 | llm/decision.py | `MAX_INSTRUCTIONS` | 6000 |  |
-| llm/decision.py | `DEFAULT_POLICY` | {"escalate_below": null, "max_timeout_s": null, "memo_ttl_s": 0, "sampling": null} | undeclared: no reuse |
+| llm/decision.py | `DEFAULT_POLICY` | {"assign": null, "escalate_below": null, "failover_after_ms": null, "hedge_after_ms": null, "max_timeout_s": null, "media_fallback": null, "memo_ttl_s": 0, "sampling": null, "settle_after_ms": null} | undeclared: no reuse |
 | llm/decision.py | `MEMO_SIZE` | 512 |  |
 | llm/decision.py | `DATE_ORDERS` | ["dmy", "mdy", "ymd"] |  |
 | llm/decision.py | `WALTER_ONLY` | ["order", "resolve"] | read by Walter, never sent to a provider |
@@ -117,6 +117,10 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/decision.py | `_MONTHS` | {"aout": 8, "août": 8, "apr": 4, "april": 4, "aug": 8, "august": 8, "avr": 4, "avril": 4, "dec": 12, "december": 12, "decembre": 12, "déc": 12, "décembre": 12, "feb": 2, "february": 2, "fev": 2, "fevrier": 2, "fév": 2, "févr": 2, "février": 2, "jan": 1, "january": 1, "janv": 1, "janvier": 1, "juil": 7, "juillet": 7, "juin": 6, "jul": 7, "july": 7, "jun": 6, "june": 6, "mai": 5, "mar": 3, "march": 3, "mars": 3, "may": 5, "nov": 11, "november": 11, "novembre": 11, "oct": 10, "october": 10, "octobre": 10, "sep": 9, "sept": 9, "september": 9, "septembre": 9} |  |
 | llm/decision.py | `_OFFSETS` | [["après-demain", 2], ["apres-demain", 2], ["après demain", 2], ["day after tomorrow", 2], ["avant-hier", -2], ["avant hier", -2], ["demain", 1], ["tomorrow", 1], ["hier", -1], ["yesterday", -1], ["aujourd'hui", 0], ["aujourd’hui", 0], ["today", 0], ["ce soir", 0], ["ce matin", 0], ["tonight", 0], ["cet après-midi", 0], ["this afternoon", 0], ["this evening", 0]] |  |
 | llm/decision.py | `_NUMBERS` | {"a": 1, "cinq": 5, "deux": 2, "dix": 10, "eight": 8, "fifteen": 15, "five": 5, "four": 4, "huit": 8, "neuf": 9, "nine": 9, "one": 1, "quatre": 4, "quinze": 15, "sept": 7, "seven": 7, "six": 6, "ten": 10, "three": 3, "trois": 3, "two": 2, "un": 1, "une": 1} |  |
+| llm/decision.py | `_UNIT_DAYS` | {"day": 1, "jour": 1, "mois": 30, "month": 30, "semaine": 7, "week": 7} |  |
+| llm/decision.py | `_UNIT` | (jours?\|days?\|semaines?\|weeks?\|mois\|months?) |  |
+| llm/decision.py | `_LAST` | (?:dernier\|dernière\|passé\|passée\|last\|previous) |  |
+| llm/decision.py | `_NEXT` | (?:prochain\|prochaine\|next\|coming) |  |
 | llm/gateway.py | `ROUTER` | walter-router | Walter Router CLI on the PATH |
 | llm/gateway.py | `UA` | Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36 |  |
 | llm/gateway.py | `DEFAULT_TASK` | coding |  |
@@ -126,6 +130,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/gateway.py | `KIE_GPT` | ["gpt-"] |  |
 | llm/gateway.py | `PAID` | ["arnict", "kie", "openrouter", "venice"] | providers billed per call (subscriptions are not) |
 | llm/gateway.py | `RATE_LIMIT_WAITS` | [4, 12] |  |
+| llm/gateway.py | `KEY_WAIT_S` | 60 |  |
 | llm/gateway.py | `EXACT` | exact: | a model named by the owner, validated by Walter Router (lot E5) |
 | llm/gateway.py | `_DECISION_CHAIN` | __decision_chain__ |  |
 | llm/gateway.py | `SIGNALS_TTL` | 60.0 |  |
@@ -147,9 +152,11 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/structured.py | `MAX_DOCUMENTS` | 1000 |  |
 | llm/structured.py | `DEFAULT_TIMEOUT` | 30.0 |  |
 | llm/structured.py | `STRAGGLER_S` | 0.4 | samples > 1: once a majority has answered, the late ones get this long (body `straggler_s`) |
+| llm/structured.py | `PROVIDER_KEYS` | {"cloudflare": ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_AI_TOKEN"], "liquid": ["LIQUID_API_KEY"], "nace": ["NACE_API_KEY"], "openrouter": ["OPENROUTER_API_KEY"]} |  |
 | llm/structured.py | `UNAVAILABLE_S` | 600.0 |  |
 | llm/structured.py | `OCCASIONS` | ["turn", "incoming", "outgoing", "document", "result"] |  |
 | llm/structured.py | `SAMPLING` | ["mean", "first"] |  |
+| llm/structured.py | `ASIDE_ERROR_S` | 60.0 | a native route whose every call failed (5xx, timeout): asked again after this |
 | plan/codex_account.py | `BASE` | https://chatgpt.com/backend-api |  |
 | plan/codex_account.py | `GRANT` | codex-subscription |  |
 | plan/codex_account.py | `CLIENT_VERSIONS` | ["99.0.0", "0.0.0"] |  |
@@ -179,18 +186,20 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | research/benchmarks/aa.py | `AA_MODEL_URL` | https://artificialanalysis.ai/models/{} |  |
 | research/benchmarks/aa.py | `ANCHORS` | ["gpt-6-luna", "gpt-5-6-luna", "claude-opus-5-5", "deepseek-v4-pro"] |  |
 | research/benchmarks/aa.py | `AA_LEADERBOARD_URL` | https://artificialanalysis.ai/leaderboards/models |  |
-| research/benchmarks/aa.py | `AA_API_URL` | https://artificialanalysis.ai/api/v2/data/llms/models |  |
+| research/benchmarks/aa.py | `AA_API_URL` | https://artificialanalysis.ai/api/v2/language/models/free |  |
+| research/benchmarks/aa.py | `MAX_API_PAGES` | 20 |  |
 | research/benchmarks/aa.py | `AA_METHODOLOGY_URL` | https://artificialanalysis.ai/methodology/intelligence-benchmarking |  |
 | research/benchmarks/aa.py | `MIN_PRICED` | 40 |  |
 | research/benchmarks/aa.py | `MAX_DISAGREEMENT` | 0.25 |  |
 | research/benchmarks/aa.py | `SCORE_TOLERANCE` | 0.05 |  |
 | research/benchmarks/aa.py | `AA_INDEXES_URL` | https://artificialanalysis.ai/indexes |  |
+| research/benchmarks/aa_data.py | `AA_ORIGIN` | https://artificialanalysis.ai |  |
+| research/benchmarks/aa_data.py | `MIN_CATALOGUE` | 300 |  |
 | research/benchmarks/aa_decision.py | `AA_DECISION_URL` | https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index |  |
 | research/benchmarks/aa_evaluations.py | `EVAL_URL` | https://artificialanalysis.ai/evaluations/{} |  |
 | research/benchmarks/aa_evaluations.py | `INDEX_URL` | https://artificialanalysis.ai/indexes/{} |  |
 | research/benchmarks/aa_evaluations.py | `INDEXES` | {"idx_economics": "economics", "idx_engineering": "engineering", "idx_finance": "finance-and-accounting", "idx_legal": "legal", "idx_medical": "healthcare-and-medical", "idx_strategy_ops": "strategy-and-ops"} |  |
 | research/benchmarks/aa_evaluations.py | `PAGE_ONLY` | ["healthbench", "healthbench_pro", "cyber"] |  |
-| research/benchmarks/aa_evaluations.py | `MIN_MODELS` | 300 |  |
 | research/benchmarks/aa_stt.py | `AA_STT_URL` | https://artificialanalysis.ai/speech-to-text |  |
 | research/benchmarks/aa_stt.py | `AA_STT_TABLES` | ["STT AA-WER vs Price", "STT AA-WER vs Speed Factor", "STT Speed Factor vs Price"] |  |
 | research/benchmarks/agentset.py | `AGENTSET_URLS` | {"embeddings": "https://agentset.ai/embeddings", "rerank": "https://agentset.ai/rerankers"} |  |
@@ -393,7 +402,7 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/aliases_auto.json | `aliases.seedream-v4.model_id` | str | seedream-4 |
 | config/aliases_auto.json | `aliases.seedream-v4.origin` | str | agent |
 | config/aliases_auto.json | `aliases.seedream-v4.reason` | str | BytePlus ModelArk identifie le modèle comme Seedream 4.0 (version seedream-4-0-250828) ; seedream-v4 et seedream-4 sont deux écritures de cette même génération. https://docs.byteplus.com/en/docs/ModelArk/1824718 |
-| config/decision-needs.json | `about` | str | Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's). types = the question kinds the need asks today (noul, choice, score, multiple = choice of several options, text, number, date, estimate = number with a range, spans, box, boxes); new_kinds = kinds that fit its purpose and that a route can carry since 17/11, with where (not asked yet: the owning module adopts them). Each kind is checked against the decision chain by `walter-router decision-needs` (llm/decision.py capabilities: native, Extractions route, emulated, or refused). |
+| config/decision-needs.json | `about` | str | Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's). assign (18/11) = "native_whole": the whole set in one call to the first model of the chain that carries it all natively, hedge_after_ms = a second call only past that, failover_after_ms = the per-question split starts past that or on an error (first complete answer wins); media_fallback "text" = a medium no usable model reads is left out of the split rather than the question (the state says it in words); settle_after_ms = past it, parts of the split that carry only optional questions are no longer waited for (said late). types = the question kinds the need asks today (noul, choice, score, multiple = choice of several options, text, number, date, estimate = number with a range, spans, box, boxes); new_kinds = kinds that fit its purpose and that a route can carry since 17/11, with where (not asked yet: the owning module adopts them). Each kind is checked against the decision chain by `walter-router decision-needs` (llm/decision.py capabilities: native, Extractions route, emulated, or refused). |
 | config/decision-needs.json | `needs.context-intent-bench.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.context-intent-bench.latency_ms` | int | 5000 |
 | config/decision-needs.json | `needs.context-intent-bench.max_timeout_s` | NoneType | — |
@@ -452,14 +461,20 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/decision-needs.json | `needs.views.owner` | str | cognition/memory |
 | config/decision-needs.json | `needs.views.purpose` | str | organic memory views: subject / episode / period assignment |
 | config/decision-needs.json | `needs.views.types[]` | str | choice |
+| config/decision-needs.json | `needs.walter-context-preflight.assign` | str | native_whole |
 | config/decision-needs.json | `needs.walter-context-preflight.escalate_below` | NoneType | — |
+| config/decision-needs.json | `needs.walter-context-preflight.failover_after_ms` | int | 1500 |
+| config/decision-needs.json | `needs.walter-context-preflight.hedge_after_ms` | int | 700 |
 | config/decision-needs.json | `needs.walter-context-preflight.latency_ms` | int | 1500 |
 | config/decision-needs.json | `needs.walter-context-preflight.max_timeout_s` | NoneType | — |
+| config/decision-needs.json | `needs.walter-context-preflight.media_fallback` | str | text |
 | config/decision-needs.json | `needs.walter-context-preflight.memo_ttl_s` | int | 120 |
-| config/decision-needs.json | `needs.walter-context-preflight.new_kinds.multiple` | str | since 17/11 (2.0) the modules a message needs (Context's `needs` signal) are one multiple, emulated as one noul per option on every route (OpenRouter included); native only on Liquid's own API (not wired: no key) |
-| config/decision-needs.json | `needs.walter-context-preflight.new_kinds.spans` | str | since 17/11 the days (resolved by Walter) and the people the message names, asked apart from the judgements so the plan never waits for them; only d1.2 / d1.2-ultra carry them (OpenRouter Extractions) |
+| config/decision-needs.json | `needs.walter-context-preflight.new_kinds.multiple` | str | since 18/11 native on Liquid's own API (independent probabilities, one call): `needs` and `personal`; emulated as one noul per option only on the failover split (Drex Max, OpenRouter) |
+| config/decision-needs.json | `needs.walter-context-preflight.new_kinds.spans` | str | since 18/11 asked in the same native call as the judgements (dates, people, places, amounts); on the failover split, OpenRouter's Extractions route |
 | config/decision-needs.json | `needs.walter-context-preflight.owner` | str | cognition/context |
+| config/decision-needs.json | `needs.walter-context-preflight.policy_18_11` | str | owner decision 18/11 (mission « préflight natif »): native_whole on Liquid's own API, hedge past 700 ms, split failover past 1.5 s or on error, media_fallback text. Bench preflight_native (65 cases, 2 independent runs): decision p50/p95 0.44/0.60 s (was 0.57/0.79), ~1 call per message (was 2.9), same act/needs, personal/pack/readings now read; outage drill without Liquid: 11/11 answered. Rollback = remove these four keys. |
 | config/decision-needs.json | `needs.walter-context-preflight.purpose` | str | plan of each owner message: thread, act, context level, tier, modules |
+| config/decision-needs.json | `needs.walter-context-preflight.settle_after_ms` | int | 2500 |
 | config/decision-needs.json | `needs.walter-context-preflight.types[]` | str | choice |
 | config/decision-needs.json | `needs.walter-context-preflight.types[]` | str | noul |
 | config/decision-needs.json | `needs.walter-context-preflight.types[]` | str | multiple |

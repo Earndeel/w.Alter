@@ -92,6 +92,8 @@ TEST_BUDGET = {"paid_limit_eur": 2.0, "usd_per_eur": 1.10, "window_hours": 24, "
 # ───────────────────────── secrets (Bitwarden through walter-secrets) ─────────────────────────
 _keys: dict[str, tuple[float, str]] = {}
 _keys_lock = threading.Lock()
+_reading: dict[str, threading.Event] = {}   # a first read in flight (start-up warm or a call): one Bitwarden read per key
+KEY_WAIT_S = 60
 
 
 def provider_key(env_name: str) -> str:
@@ -106,7 +108,23 @@ def provider_key(env_name: str) -> str:
             _keys[env_name] = (time.time(), hit[1])   # one background re-read per TTL
             threading.Thread(target=_read_key, args=(env_name,), daemon=True).start()
             return hit[1]
-    return _read_key(env_name)
+        reading = _reading.get(env_name)
+        if reading is None:                       # this caller reads it; a second caller waits for the same read
+            reading = _reading[env_name] = threading.Event()
+            mine = True
+        else:
+            mine = False
+    if mine:
+        try:
+            return _read_key(env_name)
+        finally:
+            with _keys_lock:
+                _reading.pop(env_name, None)
+            reading.set()
+    reading.wait(KEY_WAIT_S)
+    with _keys_lock:
+        hit = _keys.get(env_name)
+    return hit[1] if hit else _read_key(env_name)     # the other read failed: this caller says why
 
 
 def _read_key(env_name: str) -> str:
@@ -369,9 +387,45 @@ def structured_key(env_name: str) -> str:
         raise MissingGrant(f"key_unavailable: {env_name} ({type(exc).__name__})") from None
 
 
+WARMED: dict = {"started": None, "decisions_ms": None, "keys": {}, "done_ms": None}
+
+
+def warm_decisions() -> None:
+    """The decision path first (cold start, 18/11): every key a decision route reads, the decision chain beside
+    them, the declared signals. Measured: a first Bitwarden read in a fresh process is ~7 s (vault sync + list), so a preflight that
+    came before it waited for the key and fell to its safe fallback. Local only: no model is called."""
+    import structured
+    t0 = time.perf_counter()
+
+    def chain() -> None:
+        try:
+            decision_chain()
+        except Exception:   # noqa: BLE001 — the decision endpoint says it when asked
+            pass
+    asked = threading.Thread(target=chain, daemon=True)   # the Router's CLI (~0.6 s) beside the vault's first read
+    asked.start()
+    names = list(dict.fromkeys(n for keys in structured.PROVIDER_KEYS.values() for n in keys))
+    for name in names:
+        a = time.perf_counter()
+        try:
+            provider_key(name)
+            WARMED["keys"][name] = round((time.perf_counter() - a) * 1000)
+        except Exception as exc:   # noqa: BLE001 — a missing grant is said by the call that needs it
+            WARMED["keys"][name] = type(exc).__name__
+    asked.join()
+    try:
+        decision_signals()
+    except Exception:   # noqa: BLE001
+        pass
+    WARMED["decisions_ms"] = round((time.perf_counter() - t0) * 1000)
+
+
 def warm() -> None:
-    """Fill the route cache at start-up for every chat task (background)."""
+    """Fill the caches at start-up (background): the decision path first, then the route of every chat task."""
     from concurrent.futures import ThreadPoolExecutor
+    t0 = time.perf_counter()
+    WARMED["started"] = time.time()
+    warm_decisions()
 
     def one(t: str) -> None:
         try:
@@ -396,6 +450,7 @@ def warm() -> None:
         litellm.get_llm_provider("openrouter/google/gemini-3.8-flash")
     except Exception:   # noqa: BLE001
         pass
+    WARMED["done_ms"] = round((time.perf_counter() - t0) * 1000)
 
 
 def chat_tasks() -> list[str]:
@@ -802,7 +857,8 @@ def planned_task(asked: str, requested: dict | None) -> tuple[str, str | None]:
     """(Router task for this call, what the plan set). Lot 2 (2026-11-07): `auto` takes the task and tier the
     preflight asked for this owner message (written on the run); an explicitly chosen task keeps its task and gets
     the plan's tier only. Without a plan nothing changes (auto = DEFAULT_TASK). One plan per owner message, so every
-    model call of the turn gets the same answer (and the same model)."""
+    model call of the turn gets the same answer (and the same model). A `pinned_level` (2026-11-16: a tier the owner
+    pinned on the conversation through the Engine API) replaces the preflight's level; the task stays the plan's."""
     exact = exact_task(requested) if isinstance(requested, dict) else None
     if exact:   # the owner named a model for this run (Engine API delegation, lot E5): exactly that one
         return exact, "model"
@@ -810,7 +866,8 @@ def planned_task(asked: str, requested: dict | None) -> tuple[str, str | None]:
     if not requested:
         return task, None
     known = set(owner_tasks())
-    level = requested.get("level") if requested.get("level") in ("L1", "L2", "L3") else None
+    # a tier the owner pinned on the conversation (a board's resume: L3) wins over the one the preflight judged
+    level = next((v for v in (requested.get("pinned_level"), requested.get("level")) if v in ("L1", "L2", "L3")), None)
     if asked in ("auto", "walter"):
         task = requested.get("task") if requested.get("task") in known else DEFAULT_TASK
     if level and "/" not in task:
@@ -1069,6 +1126,7 @@ def log_selection(agent: str, task: str, d: dict, chosen: int | None, passed: li
 # ───────────────────────── HTTP ─────────────────────────
 def build_app():
     import asyncio
+    threading.Thread(target=warm, daemon=True).start()   # first: the decision path must not wait for imports
     import litellm
     from fastapi import FastAPI, Header, HTTPException
     from fastapi.responses import JSONResponse, StreamingResponse
@@ -1077,7 +1135,6 @@ def build_app():
     litellm.drop_params = True
     litellm.suppress_debug_info = True
     app = FastAPI(title="walter-llm")
-    threading.Thread(target=warm, daemon=True).start()
 
     def agent_of(authorization: str) -> str:
         tok = authorization.removeprefix("Bearer ").strip()
@@ -1095,7 +1152,10 @@ def build_app():
 
     @app.get("/health")
     def health():
-        return {"ok": True}
+        """Up from the first second (calls are served while the caches warm); `warm` says how far start-up is."""
+        return {"ok": True, "warm": {"decisions_ready": WARMED["decisions_ms"] is not None,
+                                     "decisions_ms": WARMED["decisions_ms"], "done_ms": WARMED["done_ms"],
+                                     "keys_ms": WARMED["keys"]}}
 
     @app.post("/v1/web/converse")
     async def web_converse_endpoint(request: Request, authorization: str = Header(default="")):

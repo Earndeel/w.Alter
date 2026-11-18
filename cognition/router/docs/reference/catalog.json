@@ -7656,14 +7656,39 @@
             "signature": "now"
           },
           {
-            "description": "Words of a date → {date, past?, time?, ambiguous?} against `now` (ISO date); None when they name no day.",
+            "description": "",
+            "name": "_iso_duration",
+            "signature": "n: int, unit: str"
+          },
+          {
+            "description": "",
+            "name": "_span",
+            "signature": "a, b, **extra"
+          },
+          {
+            "description": "A period or a duration the words name (no weekday, no day number), else None. See the comment above.",
+            "name": "_period",
+            "signature": "t: str, today"
+          },
+          {
+            "description": "« en octobre », « octobre dernier », « début décembre », « fin novembre »: that month (or part of it), the",
+            "name": "_month_span",
+            "signature": "month: int, t: str, today"
+          },
+          {
+            "description": "Words of a date → {date, end?, past?, past_end?, time?, ambiguous?, approx?} or {duration} against `now` (the",
             "name": "resolve_date",
             "signature": "text: str, now=None, order: str='dmy'"
           },
           {
+            "description": "The passage with the date words that touch it in `source` (the message), when it is found there once.",
+            "name": "_in_context",
+            "signature": "text: str, source: str | None"
+          },
+          {
             "description": "`resolve: \"date\"`: every passage of a spans answer, and a date the model found but could not read, read by",
             "name": "resolve",
-            "signature": "questions: dict, answers: dict, now=None"
+            "signature": "questions: dict, answers: dict, now=None, source: str | None=None"
           },
           {
             "description": "Facts read in the text without a model: is there something that looks like a date, an amount, a contact, a",
@@ -7807,7 +7832,12 @@
             "signature": "env_name: str"
           },
           {
-            "description": "Fill the route cache at start-up for every chat task (background).",
+            "description": "The decision path first (cold start, 18/11): every key a decision route reads, the decision chain beside",
+            "name": "warm_decisions",
+            "signature": ""
+          },
+          {
+            "description": "Fill the caches at start-up (background): the decision path first, then the route of every chat task.",
             "name": "warm",
             "signature": ""
           },
@@ -8085,6 +8115,16 @@
           },
           {
             "description": "",
+            "name": "keys_of",
+            "signature": "model: str"
+          },
+          {
+            "description": "A provider key off the event loop: a key not yet in the gateway's cache is a Bitwarden read (seconds), which",
+            "name": "_key",
+            "signature": "key, name: str"
+          },
+          {
+            "description": "",
             "name": "provider_of",
             "signature": "model: str"
           },
@@ -8177,6 +8217,16 @@
             "description": "",
             "name": "_carries",
             "signature": "model: str, questions: dict, media"
+          },
+          {
+            "description": "The model answers the whole set in one decision call: every kind and medium native, nothing emulated or",
+            "name": "_native",
+            "signature": "model: str, questions: dict, media"
+          },
+          {
+            "description": "Wait for the first answer of `tasks` (calls returning (call, result|None)); start another call when none",
+            "name": "_hedged",
+            "signature": "tasks: list, once, n: int, wait: float"
           },
           {
             "description": "Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.",
@@ -8701,7 +8751,7 @@
             "signature": "value: Any"
           },
           {
-            "description": "One record per scored model x reasoning level; the API's score wins over the page's, and a model only the",
+            "description": "One record per scored model x reasoning level; the API's score wins over the page's. Costs use the page's",
             "name": "records",
             "signature": "raw_models: list[dict[str, Any]], api: dict[str, dict] | None=None"
           },
@@ -8733,6 +8783,42 @@
           {
             "description": "",
             "name": "source_aa",
+            "signature": ""
+          }
+        ]
+      },
+      {
+        "description": "AA's full public model catalogue, loaded like its web client from the page-data manifest.",
+        "file": "research/benchmarks/aa_data.py",
+        "functions": [
+          {
+            "description": "JSON records of the complete flight stream, including records split across script pushes.",
+            "name": "flight_values",
+            "signature": "page: str"
+          },
+          {
+            "description": "Walk object/list trees without interpreting React reference strings as data.",
+            "name": "objects",
+            "signature": "value: Any"
+          },
+          {
+            "description": "Bounded binary read from AA's fixed origin; manifests cannot select another host or arbitrary path.",
+            "name": "fetch_data",
+            "signature": "path: str"
+          },
+          {
+            "description": "Decode and authenticate the public page-data format; malformed/incomplete data fails closed.",
+            "name": "manifest_data",
+            "signature": "manifest: dict"
+          },
+          {
+            "description": "The model context's catalogue, excluding the separate host-endpoint manifest on the same page.",
+            "name": "catalogue_models",
+            "signature": "page: str"
+          },
+          {
+            "description": "Read a current model page and its full catalogue; try other anchors if one is retired.",
+            "name": "model_catalogue",
             "signature": ""
           }
         ]
@@ -10148,7 +10234,7 @@
         "type": "str"
       },
       {
-        "default": "Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's). types = the question kinds the need asks today (noul, choice, score, multiple = choice of several options, text, number, date, estimate = number with a range, spans, box, boxes); new_kinds = kinds that fit its purpose and that a route can carry since 17/11, with where (not asked yet: the owning module adopts them). Each kind is checked against the decision chain by `walter-router decision-needs` (llm/decision.py capabilities: native, Extractions route, emulated, or refused).",
+        "default": "Walter Decision — needs declared by the modules that ask typed decisions (llm/decision.py). A caller names its need in the request (walter_memory.llm.decide sends its processor). Policy only: the Router's decision chain chooses and orders the models. memo_ttl_s = window in which the same state + questions + chain reuse the answer already given (0 = never); escalate_below = confidence under which a question is asked again to the next model of the chain (null = off until a bench sets it); max_timeout_s = cap on the caller's timeout per call (null = the caller's). assign (18/11) = \"native_whole\": the whole set in one call to the first model of the chain that carries it all natively, hedge_after_ms = a second call only past that, failover_after_ms = the per-question split starts past that or on an error (first complete answer wins); media_fallback \"text\" = a medium no usable model reads is left out of the split rather than the question (the state says it in words); settle_after_ms = past it, parts of the split that carry only optional questions are no longer waited for (said late). types = the question kinds the need asks today (noul, choice, score, multiple = choice of several options, text, number, date, estimate = number with a range, spans, box, boxes); new_kinds = kinds that fit its purpose and that a route can carry since 17/11, with where (not asked yet: the owning module adopts them). Each kind is checked against the decision chain by `walter-router decision-needs` (llm/decision.py capabilities: native, Extractions route, emulated, or refused).",
         "file": "config/decision-needs.json",
         "key": "about",
         "type": "str"
@@ -10502,10 +10588,28 @@
         "type": "str"
       },
       {
+        "default": "native_whole",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.assign",
+        "type": "str"
+      },
+      {
         "default": null,
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.escalate_below",
         "type": "NoneType"
+      },
+      {
+        "default": 1500,
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.failover_after_ms",
+        "type": "int"
+      },
+      {
+        "default": 700,
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.hedge_after_ms",
+        "type": "int"
       },
       {
         "default": 1500,
@@ -10520,19 +10624,25 @@
         "type": "NoneType"
       },
       {
+        "default": "text",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.media_fallback",
+        "type": "str"
+      },
+      {
         "default": 120,
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.memo_ttl_s",
         "type": "int"
       },
       {
-        "default": "since 17/11 (2.0) the modules a message needs (Context's `needs` signal) are one multiple, emulated as one noul per option on every route (OpenRouter included); native only on Liquid's own API (not wired: no key)",
+        "default": "since 18/11 native on Liquid's own API (independent probabilities, one call): `needs` and `personal`; emulated as one noul per option only on the failover split (Drex Max, OpenRouter)",
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.new_kinds.multiple",
         "type": "str"
       },
       {
-        "default": "since 17/11 the days (resolved by Walter) and the people the message names, asked apart from the judgements so the plan never waits for them; only d1.2 / d1.2-ultra carry them (OpenRouter Extractions)",
+        "default": "since 18/11 asked in the same native call as the judgements (dates, people, places, amounts); on the failover split, OpenRouter's Extractions route",
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.new_kinds.spans",
         "type": "str"
@@ -10544,10 +10654,22 @@
         "type": "str"
       },
       {
+        "default": "owner decision 18/11 (mission « préflight natif »): native_whole on Liquid's own API, hedge past 700 ms, split failover past 1.5 s or on error, media_fallback text. Bench preflight_native (65 cases, 2 independent runs): decision p50/p95 0.44/0.60 s (was 0.57/0.79), ~1 call per message (was 2.9), same act/needs, personal/pack/readings now read; outage drill without Liquid: 11/11 answered. Rollback = remove these four keys.",
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.policy_18_11",
+        "type": "str"
+      },
+      {
         "default": "plan of each owner message: thread, act, context level, tier, modules",
         "file": "config/decision-needs.json",
         "key": "needs.walter-context-preflight.purpose",
         "type": "str"
+      },
+      {
+        "default": 2500,
+        "file": "config/decision-needs.json",
+        "key": "needs.walter-context-preflight.settle_after_ms",
+        "type": "int"
       },
       {
         "default": "choice",
@@ -16509,10 +16631,15 @@
         "file": "llm/decision.py",
         "name": "DEFAULT_POLICY",
         "value": {
+          "assign": null,
           "escalate_below": null,
+          "failover_after_ms": null,
+          "hedge_after_ms": null,
           "max_timeout_s": null,
+          "media_fallback": null,
           "memo_ttl_s": 0,
-          "sampling": null
+          "sampling": null,
+          "settle_after_ms": null
         }
       },
       {
@@ -16757,6 +16884,37 @@
         }
       },
       {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "_UNIT_DAYS",
+        "value": {
+          "day": 1,
+          "jour": 1,
+          "mois": 30,
+          "month": 30,
+          "semaine": 7,
+          "week": 7
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "_UNIT",
+        "value": "(jours?|days?|semaines?|weeks?|mois|months?)"
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "_LAST",
+        "value": "(?:dernier|dernière|passé|passée|last|previous)"
+      },
+      {
+        "comment": "",
+        "file": "llm/decision.py",
+        "name": "_NEXT",
+        "value": "(?:prochain|prochaine|next|coming)"
+      },
+      {
         "comment": "Walter Router CLI on the PATH",
         "file": "llm/gateway.py",
         "name": "ROUTER",
@@ -16819,6 +16977,12 @@
           4,
           12
         ]
+      },
+      {
+        "comment": "",
+        "file": "llm/gateway.py",
+        "name": "KEY_WAIT_S",
+        "value": 60
       },
       {
         "comment": "a model named by the owner, validated by Walter Router (lot E5)",
@@ -16966,6 +17130,26 @@
       {
         "comment": "",
         "file": "llm/structured.py",
+        "name": "PROVIDER_KEYS",
+        "value": {
+          "cloudflare": [
+            "CLOUDFLARE_ACCOUNT_ID",
+            "CLOUDFLARE_AI_TOKEN"
+          ],
+          "liquid": [
+            "LIQUID_API_KEY"
+          ],
+          "nace": [
+            "NACE_API_KEY"
+          ],
+          "openrouter": [
+            "OPENROUTER_API_KEY"
+          ]
+        }
+      },
+      {
+        "comment": "",
+        "file": "llm/structured.py",
         "name": "UNAVAILABLE_S",
         "value": 600.0
       },
@@ -16989,6 +17173,12 @@
           "mean",
           "first"
         ]
+      },
+      {
+        "comment": "a native route whose every call failed (5xx, timeout): asked again after this",
+        "file": "llm/structured.py",
+        "name": "ASIDE_ERROR_S",
+        "value": 60.0
       },
       {
         "comment": "",
@@ -17259,7 +17449,13 @@
         "comment": "",
         "file": "research/benchmarks/aa.py",
         "name": "AA_API_URL",
-        "value": "https://artificialanalysis.ai/api/v2/data/llms/models"
+        "value": "https://artificialanalysis.ai/api/v2/language/models/free"
+      },
+      {
+        "comment": "",
+        "file": "research/benchmarks/aa.py",
+        "name": "MAX_API_PAGES",
+        "value": 20
       },
       {
         "comment": "",
@@ -17290,6 +17486,18 @@
         "file": "research/benchmarks/aa.py",
         "name": "AA_INDEXES_URL",
         "value": "https://artificialanalysis.ai/indexes"
+      },
+      {
+        "comment": "",
+        "file": "research/benchmarks/aa_data.py",
+        "name": "AA_ORIGIN",
+        "value": "https://artificialanalysis.ai"
+      },
+      {
+        "comment": "",
+        "file": "research/benchmarks/aa_data.py",
+        "name": "MIN_CATALOGUE",
+        "value": 300
       },
       {
         "comment": "",
@@ -17331,12 +17539,6 @@
           "healthbench_pro",
           "cyber"
         ]
-      },
-      {
-        "comment": "",
-        "file": "research/benchmarks/aa_evaluations.py",
-        "name": "MIN_MODELS",
-        "value": 300
       },
       {
         "comment": "",
@@ -18660,7 +18862,7 @@
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
     "cli.py": "676ccdd84a9e47a74f16bc31dddbbdcaa03a6540517fb886be35e52b7a68904d",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
-    "config/decision-needs.json": "6eeffaf297527bb71c6d7ab29eedb4e70cc7389143ca50cc57e5be6fa3a5de4b",
+    "config/decision-needs.json": "ced8af5a8bc2609504333ab050791990a6fd36bebf1b3ed70222eac65e6d1b55",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
     "config/kie_media_schemas.json": "278e5d624ffa274e473eaaf6ab044df1c454c43bb39df40613e6cde9c6f8edd1",
@@ -18693,10 +18895,10 @@
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
-    "llm/decision.py": "46237fb05c86b406aada12ffe19727a32764dc922f720828fb3f62d32808781f",
-    "llm/gateway.py": "9b7e32f7fdadb3f420e33e0c35e6c5704584edb57176a01affea8ce657eff8a0",
-    "llm/resolver.py": "c30e85c26b81e9a62927025dfd09b9a1beb005b5e6c40c0c31ab03dde1c87daf",
-    "llm/structured.py": "89b4af36232a3f36491dd0da4969e42ee4f9c0593b79ecd91d10078a64da6700",
+    "llm/decision.py": "999ffcf20c7a4598878369e9ad5439b0113b6a0d1b77bf7b0124c44557aba305",
+    "llm/gateway.py": "be9df224c7e9ca49c14e15a7678d693a419840681b58609b020b622e0893aed7",
+    "llm/resolver.py": "cd04d0c818891381f988d044cc910902ec3fc11e1d1401ad16190e601935d188",
+    "llm/structured.py": "8fd6b1f0f103765584f48361641246946d49b44a2fc9458c2bd2d2c4e856340e",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
@@ -18713,10 +18915,11 @@
     "research/agent/review.py": "93905a0e3b4849e11d07232e7b50799fef1bb90736e104705533569e08ea8a13",
     "research/agent/run.py": "a492c23c21a001cc958d37a31a37aa8c2c77178ae874ae8ab0da0f755fbf758a",
     "research/benchmarks/__init__.py": "5066d339167d8898f0cda8d667da3b6e935a3edda56c178ce3f4e350b58e3679",
-    "research/benchmarks/aa.py": "7ff752e58cda4c31399d704cb374d216e5647fde1364c1e3010393d8ef6c00aa",
+    "research/benchmarks/aa.py": "04c8aa990ad9d31c0aba588b0cd186a8863b15864923525285616fec9df61207",
+    "research/benchmarks/aa_data.py": "5e602b5a70e0454ee0ac3df6d6948ff215f4fa6851e4d6823b2269cfe348298d",
     "research/benchmarks/aa_decision.py": "7ff83ca212ef02ad25876dfeeac95913722a177f28b501dfbdcdb57ca76ae02e",
-    "research/benchmarks/aa_evaluations.py": "8569b8a3f19e4630229638b0c63c051c25ae06f0674ed4b2ea879f5caba6c6aa",
-    "research/benchmarks/aa_media.py": "d5bcaa8f542417f1e76b0d54d2c3c0511714c50156acbadc8530310c67080e67",
+    "research/benchmarks/aa_evaluations.py": "67407e016a78c5c472100cf96c2a429d3263f6ad5f39a16763397f67374394c5",
+    "research/benchmarks/aa_media.py": "071aa2f3e569abf11756c72a5181d530fb878f68afedeeed611c16687805537e",
     "research/benchmarks/aa_stt.py": "1df780e8e54d6a6a4e5eaea618f952de41bc3ff5878c8320d6a1efd49b320afe",
     "research/benchmarks/agentset.py": "1c73bb7619c1b0807e70b8177f4f2822e14cde7ad074af12767dcaa10dd81291",
     "research/benchmarks/arena.py": "2344ef7649f4b850956c8943da65c89cf5be0efb96b6b125f2f07c3d3106547a",

@@ -58,6 +58,13 @@ def evaluate(cond: dict, answers: dict, facts: set) -> tuple[bool | None, float 
             return None, None
         want = [cond["is"]] if "is" in cond else cond["in"]
         return c in want, _conf(a)
+    if "has_any" in cond:                  # at least one of the options (18/11)
+        got = [evaluate({"signal": cond["signal"], "has": o}, answers, facts) for o in cond["has_any"]]
+        known = [(h, s) for h, s in got if h is not None]
+        if not known:
+            return None, None
+        held = [s for h, s in known if h]
+        return (True, max(held)) if held else (False, min(s for _, s in known))
     if "has" in cond:
         opt = cond["has"]
         p = _probs(a).get(opt)
@@ -88,6 +95,12 @@ def _make(cond: dict, answers: dict, hold: bool) -> dict | None:
         probs = _probs(a)
         best = max(want, key=lambda o: (probs.get(o) if _num(probs.get(o)) else -1, -want.index(o)))
         a["choice"] = best
+        return a
+    if "has_any" in cond:                  # « one of them » names no single option to add; « none of them » can
+        if hold:
+            return None
+        for o in cond["has_any"]:
+            a = _make({"signal": cond["signal"], "has": o}, {cond["signal"]: a}, False) or a
         return a
     if "has" in cond:
         opt = cond["has"]

@@ -188,8 +188,29 @@ The layer between a module that needs a quick typed judgement and the decision A
   `new_kinds` that fit it since 17/11) and its policy:
   `memo_ttl_s` (the same state + questions + chain within that window gets the answer already given, `reused: true`,
   no call), `escalate_below` (the questions answered under that confidence — only those — go to the next model of the
-  chain; `null` = off), `max_timeout_s`. The caller names its need in `need` (`walter_memory.llm.decide` sends its
+  chain; `null` = off), `max_timeout_s`; since 18/11 `assign: "native_whole"` (the whole set in ONE call to the
+  first model of the chain that carries every question and medium natively — Liquid's own API — never Drex's
+  one-noul-per-option emulation), `hedge_after_ms` (a second identical call only past it), `failover_after_ms` (past
+  it or on an error the per-question split starts too; the first COMPLETE answer wins, a split with `unavailable`
+  never beats a pending native call; a failed native route is set aside 60 s, 10 min for route-level errors) and
+  `media_fallback: "text"` (a medium no other model reads is left out of the split, not the question:
+  `media_dropped`) and `settle_after_ms` (past it, a split whose required parts are in no longer waits for a part
+  carrying only optional questions — readings: they are said `late` in `unavailable`, never invented). Replies say
+  `assign` and `failover`. Tests: `tests/test_native_whole.py`. The caller names its need in `need` (`walter_memory.llm.decide` sends its
   processor). Undeclared need: no reuse, no escalation. Policy only: the decision chain stays the Router's.
+- **Dates read by Walter** (`decision.resolve_date`, `resolve: "date"` questions): a passage the model found is read
+  against the caller's `now` (the owner's local day) as a day, a period `{date, end}` (« cette semaine », « le mois
+  dernier », « ces derniers jours » with `approx`), both readings when the words leave the choice (`past`/`past_end`:
+  « ce week-end » on a weekday, « samedi soir »), or a length `{duration}` (« sur 3 jours », ISO 8601); a day and month
+  without a year is the nearest such day (18/11; it was read as next year's). A passage is read with the date
+  words that touch it in the message (« depuis », « dans », « il y a », « dernier », « après- »…), since where the
+  model cuts a passage varies. Tests: `tests/test_date_periods.py`.
+- **Ready at start** (18/11): the gateway's warm thread starts before anything heavy is imported and first reads the
+  decision chain, the need policies and every key a decision route reads (`structured.PROVIDER_KEYS`), then the chat
+  routes. Key reads are single-flight and run off the event loop (`_key`), so a key read never freezes the hedge and
+  failover timers. `/health` says `warm.decisions_ready` / `decisions_ms` (≈ 4 s after a restart) and per-key times,
+  never values. No warm-up model call and no periodic call: measured, Liquid adds nothing to a first call beyond TLS.
+  Tests: `tests/test_gateway_cold_start.py`.
 - **Calibration**: each answered call's journal line carries `need`, `schema` and `confidence` per question.
 - **Liquid's own API**: offers `liquidai/<id>` (d1.2, d1.2-ultra) on `https://api.liquid.ai/decisions/v1/systemone`,
   key `LIQUID_API_KEY` (grant card `liquid`, reader walter-llm; configured 17/11); `liquid/…` stays OpenRouter's resale.

@@ -49,7 +49,18 @@ MAX_QUESTIONS = 32
 MAX_INSTRUCTIONS = 6000
 KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,63}$")
 NEEDS_FILE = Path(__file__).resolve().parents[1] / "config" / "decision-needs.json"
-DEFAULT_POLICY = {"memo_ttl_s": 0, "escalate_below": None, "max_timeout_s": None, "sampling": None}   # undeclared: no reuse
+DEFAULT_POLICY = {"memo_ttl_s": 0, "escalate_below": None, "max_timeout_s": None, "sampling": None,   # undeclared: no reuse
+                  # 18/11 (préflight natif): `assign` "native_whole" = the whole set in ONE call to the first model of
+                  # the chain that carries every question and medium natively (no emulation, no Extractions split);
+                  # `hedge_after_ms` = a second identical call only if none answered by then (instead of n at once);
+                  # `failover_after_ms` = past it, or on an error, the per-question split along the chain starts too and
+                  # the first COMPLETE answer wins. The chain's order stays the Router's. `media_fallback` "text" = when
+                  # no usable model reads a medium (audio once Liquid's own API is down), the split leaves the medium
+                  # out, not the question: the state already says it in words (a voice note's transcript).
+                  "assign": None, "hedge_after_ms": None, "failover_after_ms": None, "media_fallback": None,
+                  # `settle_after_ms` = from the start of the decision, past it the split stops waiting for parts that
+                  # carry only optional questions (readings): they are said `late`, the required answers stand
+                  "settle_after_ms": None}
 MEMO_SIZE = 512
 
 
@@ -580,8 +591,130 @@ def _today(now) -> "datetime.date":
     return datetime.datetime.now(datetime.timezone.utc).date()
 
 
+# Periods and durations (18/11, bench « préflight natif »: 4 of the 13 date passages the model found were dropped —
+# « cette semaine », « ces derniers jours », « le week-end dernier », « 3 jours » — because only single days were
+# read). A period is {date: first day, end: last day}; when the words leave the choice between the coming and the
+# gone one, {past, past_end} give the other reading; `approx` = the words give no exact bounds; `duration` (ISO 8601)
+# = a length of time that names no day (« sur 3 jours »). Words are matched whole, in French and English.
+_UNIT_DAYS = {"jour": 1, "day": 1, "semaine": 7, "week": 7, "mois": 30, "month": 30}
+_UNIT = r"(jours?|days?|semaines?|weeks?|mois|months?)"
+_SINCE = re.compile(r"(?<![\w])(?:ça fait|ca fait|cela fait|depuis|for the (?:last|past)|over the (?:last|past))\s+"
+                    + _N + r"\s+" + _UNIT + r"(?![\w])")
+_LAST_N = re.compile(r"(?<![\w])(?:(?:les|ces)\s+" + _N + r"\s+derni(?:er|ère)s?\s+" + _UNIT + r"|(?:the\s+)?(?:last|past)\s+"
+                     + _N + r"\s+" + _UNIT + r")(?![\w])")
+_BARE_DURATION = re.compile(r"^\s*(?:pendant|durant|sur|for|during|over)?\s*" + _N + r"\s+" + _UNIT + r"\s*$")
+_LAST = r"(?:dernier|dernière|passé|passée|last|previous)"
+_NEXT = r"(?:prochain|prochaine|next|coming)"
+
+
+def _iso_duration(n: int, unit: str) -> str:
+    u = unit.rstrip("s")
+    return f"P{n}{'W' if u in ('semaine', 'week') else 'M' if u in ('mois', 'month') else 'D'}"
+
+
+def _span(a, b, **extra) -> dict:
+    return {"date": a.isoformat(), "end": b.isoformat(), **extra}
+
+
+def _period(t: str, today) -> dict | None:
+    """A period or a duration the words name (no weekday, no day number), else None. See the comment above."""
+    import calendar
+    import datetime
+    D = datetime.timedelta
+    has = lambda pat: re.search(r"(?<![\w-])" + pat + r"(?![\w-])", t) is not None      # noqa: E731
+    mon = today - D(days=today.weekday())
+    month_end = lambda d: d.replace(day=calendar.monthrange(d.year, d.month)[1])        # noqa: E731
+    prev_month_end = today.replace(day=1) - D(days=1)
+    next_month = month_end(today) + D(days=1)
+    m = _SINCE.search(t)
+    if m:                                               # « ça fait trois semaines », « depuis 3 jours »
+        n = _count(m.group(1)) * _UNIT_DAYS[m.group(2).rstrip("s") if m.group(2) != "mois" else "mois"]
+        return _span(today - D(days=n), today)
+    m = _LAST_N.search(t)
+    if m:                                               # « les 3 derniers jours », « the last 2 weeks »
+        word, unit = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+        n = _count(word) * _UNIT_DAYS[unit.rstrip("s") if unit != "mois" else "mois"]
+        return _span(today - D(days=n), today)
+    if has(r"(?:ces|ces tout) derniers jours") or has(r"ces jours-ci") or has(r"the (?:last|past) (?:few )?days") \
+            or has(r"(?:these|recent) days"):
+        return _span(today - D(days=7), today, approx=True)
+    if has(r"depuis le d[ée]but de (?:la|cette) semaine") or has(r"since the (?:start|beginning) of (?:the|this) week"):
+        return _span(mon, today)
+    if has(r"depuis le d[ée]but du mois") or has(r"since the (?:start|beginning) of (?:the|this) month"):
+        return _span(today.replace(day=1), today)
+    if has(r"depuis le d[ée]but de l'ann[ée]e") or has(r"since the (?:start|beginning) of (?:the|this) year"):
+        return _span(today.replace(month=1, day=1), today)
+    wk = r"(?:semaine|week)"
+    if has(rf"(?:la )?{wk} {_LAST}") or has(rf"{_LAST} {wk}"):
+        return _span(mon - D(days=7), mon - D(days=1))
+    if has(rf"(?:la )?{wk} {_NEXT}") or has(rf"{_NEXT} {wk}"):
+        return _span(mon + D(days=7), mon + D(days=13))
+    if has(rf"(?:cette|this) {wk}"):
+        return _span(mon, mon + D(days=6))
+    we = r"(?:week-end|weekend|week end|w-e|we)"
+    sat = mon + D(days=5)
+    if has(rf"(?:le )?{we} {_LAST}") or has(rf"{_LAST} {we}"):
+        start = sat - D(days=7) if today < sat else sat - D(days=7)
+        return _span(start, start + D(days=1))
+    if has(rf"(?:le )?{we} {_NEXT}") or has(rf"{_NEXT} {we}"):
+        start = sat if today < sat else sat + D(days=7)
+        return _span(start, start + D(days=1))
+    if has(rf"(?:ce|this) {we}"):
+        if today >= sat:                                # said on the weekend: this one
+            return _span(sat, sat + D(days=1))
+        # on a weekday the coming one, or the one just gone (« ce qui s'est passé ce week-end »): both readings
+        return _span(sat, sat + D(days=1), past=(sat - D(days=7)).isoformat(), past_end=(sat - D(days=6)).isoformat(),
+                     ambiguous=True)
+    mo = r"(?:mois|month)"
+    if has(rf"(?:le )?{mo} {_LAST}") or has(rf"{_LAST} {mo}"):
+        return _span(prev_month_end.replace(day=1), prev_month_end)
+    if has(rf"(?:le )?{mo} {_NEXT}") or has(rf"{_NEXT} {mo}"):
+        return _span(next_month, month_end(next_month))
+    if has(r"(?:[àa] la |en |d'ici la |avant la |by the |at the )?fin (?:du|de ce) mois") or has(r"end of (?:the|this) month"):
+        return {"date": month_end(today).isoformat()}
+    if has(rf"(?:ce|this) {mo}(?:-ci)?") or has(r"ce mois-ci"):
+        return _span(today.replace(day=1), month_end(today))
+    yr = r"(?:an|année|annee|year)"
+    if has(rf"(?:l'|l’)?{yr} {_LAST}") or has(rf"{_LAST} {yr}") or has(r"l'an pass[ée]"):
+        y = today.year - 1
+        return _span(datetime.date(y, 1, 1), datetime.date(y, 12, 31))
+    if has(rf"(?:l'|l’)?{yr} {_NEXT}") or has(rf"{_NEXT} {yr}"):
+        y = today.year + 1
+        return _span(datetime.date(y, 1, 1), datetime.date(y, 12, 31))
+    if has(rf"(?:cette|this) {yr}"):
+        return _span(datetime.date(today.year, 1, 1), datetime.date(today.year, 12, 31))
+    m = _BARE_DURATION.match(t)
+    if m:                                               # « 3 jours », « sur 2 semaines »: a length, no day
+        return {"duration": _iso_duration(_count(m.group(1)), m.group(2))}
+    return None
+
+
+def _month_span(month: int, t: str, today) -> dict:
+    """« en octobre », « octobre dernier », « début décembre », « fin novembre »: that month (or part of it), the
+    nearest one unless the words say which; « début » = days 1-10, « mi- » = 11-20, « fin » = 21 to the last."""
+    import calendar
+    import datetime
+    if re.search(r"\b(dernier|passé|last)\b", t):
+        y = today.year if month < today.month else today.year - 1
+    elif re.search(r"\b(prochain|next)\b", t):
+        y = today.year if month > today.month else today.year + 1
+    else:                                               # the nearest such month (within six months either way)
+        y = today.year + (1 if month - today.month < -6 else -1 if month - today.month > 6 else 0)
+    last = calendar.monthrange(y, month)[1]
+    a, b = 1, last
+    if re.search(r"(?<![\w])(d[ée]but|early|beginning of)(?![\w])", t):
+        a, b = 1, 10
+    elif re.search(r"(?<![\w])(mi|mid)(?=[\s-])", t):
+        a, b = 11, 20
+    elif re.search(r"(?<![\w])(fin|late|end of)(?![\w])", t):
+        a, b = 21, last
+    return _span(datetime.date(y, month, a), datetime.date(y, month, b),
+                 **({"approx": True} if (a, b) != (1, last) else {}))
+
+
 def resolve_date(text: str, now=None, order: str = "dmy") -> dict | None:
-    """Words of a date → {date, past?, time?, ambiguous?} against `now` (ISO date); None when they name no day."""
+    """Words of a date → {date, end?, past?, past_end?, time?, ambiguous?, approx?} or {duration} against `now` (the
+    owner's local ISO date); None when they name no day, period or length of time."""
     import datetime
     if not isinstance(text, str) or not text.strip():
         return None
@@ -622,6 +755,10 @@ def resolve_date(text: str, now=None, order: str = "dmy") -> dict | None:
                 return None
             if day >= today:
                 return _said(day)
+    if not named and not _NUMERIC_DATE.search(bare):
+        per = _period(t, today)
+        if per is not None:
+            return {**out, **per}
     for words, delta in _OFFSETS:
         if re.search(r"(?<![\w-])" + re.escape(words) + r"(?![\w-])", t):
             return {**out, "date": (today + datetime.timedelta(days=delta)).isoformat()}
@@ -641,18 +778,22 @@ def resolve_date(text: str, now=None, order: str = "dmy") -> dict | None:
     daynum = int(dn.group(1)) if dn and 1 <= int(dn.group(1)) <= 31 else None
     ym = _YEAR.search(t)
     if month and daynum:                                   # « 3 décembre », « le 30 nov. 2026 »
-        years = [int(ym.group(1))] if ym else [today.year, today.year + 1]
+        # no year written: the nearest such day, gone or coming (« le mail du 2 octobre » said in November is the 2nd
+        # of October just gone, not next year's — read as next year until 18/11)
+        years = [int(ym.group(1))] if ym else [today.year - 1, today.year, today.year + 1]
+        days = []
         for y in years:
             try:
-                day = datetime.date(y, month, daynum)
+                days.append(datetime.date(y, month, daynum))
             except ValueError:
-                return None
-            if ym or day >= today - datetime.timedelta(days=1):
-                res = {**out, "date": day.isoformat()}
-                if weekday is not None and day.weekday() != weekday:
-                    res["ambiguous"] = True               # « lundi 3 décembre » when the 3rd is not a Monday
-                return res
-        return None
+                pass
+        if not days:
+            return None
+        day = min(days, key=lambda d: (abs((d - today).days), d < today))
+        res = {**out, "date": day.isoformat()}
+        if weekday is not None and day.weekday() != weekday:
+            res["ambiguous"] = True                       # « lundi 3 décembre » when the 3rd is not a Monday
+        return res
     if weekday is not None and daynum:                     # « lundi 30 »: the nearest month where the 30th is a Monday
         y, mo = today.year, today.month
         for _ in range(13):
@@ -664,6 +805,10 @@ def resolve_date(text: str, now=None, order: str = "dmy") -> dict | None:
                 pass
             y, mo = (y + 1, 1) if mo == 12 else (y, mo + 1)
         return None
+    if weekday is not None and re.search(r"(semaine|week)\s+(prochaine|next)|(next|coming)\s+week", t):
+        return {**out, "date": (today + datetime.timedelta(days=7 - today.weekday() + weekday)).isoformat()}
+    if weekday is not None and re.search(r"(semaine|week)\s+(derni[èe]re|pass[ée]e|last)|(last|previous)\s+week", t):
+        return {**out, "date": (today - datetime.timedelta(days=today.weekday() + 7 - weekday)).isoformat()}
     if weekday is not None:
         ahead = (weekday - today.weekday()) % 7 or 7
         back = (today.weekday() - weekday) % 7 or 7
@@ -676,6 +821,11 @@ def resolve_date(text: str, now=None, order: str = "dmy") -> dict | None:
         if re.search(r"\b(ce|this|cette)\b", t):
             return {**out, "date": nxt.isoformat()}
         return {**out, "date": nxt.isoformat(), "past": prev.isoformat(), "ambiguous": True}
+    if month and not daynum:                               # « en octobre », « fin novembre »
+        return {**out, **_month_span(month, t, today)}
+    if ym and not month and re.match(r"^\s*(?:en|in|pour|for)?\s*20\d{2}\s*$", words_only):     # « en 2025 »
+        y = int(ym.group(1))
+        return {**out, "date": f"{y}-01-01", "end": f"{y}-12-31"}
     if daynum and re.match(r"^\s*(le\s+|the\s+)?\d{1,2}(er|st|nd|rd|th)?\s*$", words_only):   # « le 3 »
         y, mo = today.year, today.month
         for _ in range(2):
@@ -689,9 +839,38 @@ def resolve_date(text: str, now=None, order: str = "dmy") -> dict | None:
     return None
 
 
-def resolve(questions: dict, answers: dict, now=None) -> dict:
+# The words that turn a passage into another date sit just outside it, and where the model cuts a passage varies
+# (18/11: « depuis le début du mois » found as « le début du mois »). A passage is read with these words when they
+# touch it in the message; the passage itself stays as the model wrote it.
+_BEFORE = re.compile(r"(?<![\w'])(?:depuis|dans|il y a|d'ici|jusqu'à|jusqu'au|jusqu'a|avant|après|apres|ça fait|ca fait|"
+                     r"cela fait|since|in|until|by|before|after|within|over the|for the)\s*$|(?:après|apres|avant)-$")
+_AFTER = re.compile(r"^\s*(?:dernier|dernière|derniere|derniers|dernières|prochain|prochaine|prochains|passé|passée|"
+                    r"passe|-ci|ago|last|next)(?![\w])")
+
+
+def _in_context(text: str, source: str | None) -> str:
+    """The passage with the date words that touch it in `source` (the message), when it is found there once."""
+    if not source or not isinstance(text, str) or not text.strip():
+        return text
+    src = source.replace("’", "'")
+    low, t = src.lower(), text.replace("’", "'").lower().strip()
+    i = low.find(t)
+    if i < 0 or low.find(t, i + 1) >= 0:
+        return text
+    j = i + len(t)
+    b = _BEFORE.search(low[max(0, i - 16):i] if low[i - 1:i] == "-" else low[max(0, i - 16):i].rstrip())
+    a = _AFTER.match(low[j:j + 14])
+    if not b and not a:
+        return text
+    start = max(0, i - 16) + b.start() if b else i
+    end = j + a.end() if a else j
+    return src[start:end]
+
+
+def resolve(questions: dict, answers: dict, now=None, source: str | None = None) -> dict:
     """`resolve: "date"`: every passage of a spans answer, and a date the model found but could not read, read by
-    Walter as a calendar date (`read_by: walter`). Deterministic; the passage itself is kept as written."""
+    Walter as a calendar date (`read_by: walter`), with the date words that touch it in `source` (the message the
+    model read; see _in_context). Deterministic; the passage itself is kept as written."""
     out = None
     for name, q in questions.items():
         if q.get("resolve") != "date" or not isinstance(answers.get(name), dict):
@@ -700,12 +879,12 @@ def resolve(questions: dict, answers: dict, now=None) -> dict:
         if q.get("type") == "spans" and isinstance(a.get("spans"), list):
             items = []
             for it in a["spans"]:
-                got = resolve_date((it or {}).get("text"), now, order) if isinstance(it, dict) else None
+                got = resolve_date(_in_context(it.get("text"), source), now, order) if isinstance(it, dict) else None
                 items.append({**it, **got, "read_by": "walter"} if got else it)
             out = out if out is not None else dict(answers)
             out[name] = {**a, "spans": items}
         elif q.get("type") == "date" and a.get("date") is None and _num(a.get("found")) and a["found"] >= NOT_FOUND:
-            got = resolve_date(a.get("text"), now, order)
+            got = resolve_date(_in_context(a.get("text"), source), now, order)
             if got:
                 out = out if out is not None else dict(answers)
                 out[name] = {**a, **got, "read_by": "walter"}

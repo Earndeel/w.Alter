@@ -14,7 +14,7 @@ Le gateway transporte les messages et outils de l'appelant. Il ne crée pas une 
 
 ## Interfaces et dépendances
 
-- HTTP `/v1/chat/completions`, `/v1/models` ; `/health` ne certifie aucun fournisseur.
+- HTTP `/v1/chat/completions`, `/v1/models` ; `/health` ne certifie aucun fournisseur ; il dit `warm` (décisions prêtes, temps de lecture de chaque clé, jamais leur valeur).
 - HTTP `/v1/decisions` et `/v1/rerank` (SOCLE A6, 2026-11-11 ; code `structured.py`) : décisions typées sur la chaîne
   de décision du Router (`walter-router decision-chain`, en cache comme les routes), `samples` > 1 = appels parallèles
   moyennés (`structured.merge_answers`, seule implémentation) ; rerank sur le poste `rerank` du Router. Un `model`

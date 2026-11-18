@@ -499,8 +499,13 @@ Walter Decision (2026-11-16): the typed decision language, the needs registry, r
 - `_with_lead(text: str, span: list, written: str | None)` — 
 - `_count(word: str)` — 
 - `_today(now)` — 
-- `resolve_date(text: str, now=None, order: str='dmy')` — Words of a date → {date, past?, time?, ambiguous?} against `now` (ISO date); None when they name no day.
-- `resolve(questions: dict, answers: dict, now=None)` — `resolve: "date"`: every passage of a spans answer, and a date the model found but could not read, read by
+- `_iso_duration(n: int, unit: str)` — 
+- `_span(a, b, **extra)` — 
+- `_period(t: str, today)` — A period or a duration the words name (no weekday, no day number), else None. See the comment above.
+- `_month_span(month: int, t: str, today)` — « en octobre », « octobre dernier », « début décembre », « fin novembre »: that month (or part of it), the
+- `resolve_date(text: str, now=None, order: str='dmy')` — Words of a date → {date, end?, past?, past_end?, time?, ambiguous?, approx?} or {duration} against `now` (the
+- `_in_context(text: str, source: str | None)` — The passage with the date words that touch it in `source` (the message), when it is found there once.
+- `resolve(questions: dict, answers: dict, now=None, source: str | None=None)` — `resolve: "date"`: every passage of a spans answer, and a date the model found but could not read, read by
 - `cues(text: str)` — Facts read in the text without a model: is there something that looks like a date, an amount, a contact, a
 - `state_text(state)` — The text of a state (a JSON state's string values), for the cues.
 - `holds(when, facts)` — Every term of `when` holds: a fact, `!fact` (absent), or `a|b|!c` (any of them).
@@ -533,7 +538,8 @@ exec" "$(dirname "$(readlink -f "$0")")/venv/bin/python3" "$0" "$@"  # sh: run o
 - `_refresh_signals()` — 
 - `decision_signals()` — The decision signals the modules declare (Core: `walter decisions`), for decisions asked by occasion (Walter
 - `structured_key(env_name: str)` — provider_key for the decision / rerank adapters, with a refusal that names what to provision (the variable and
-- `warm()` — Fill the route cache at start-up for every chat task (background).
+- `warm_decisions()` — The decision path first (cold start, 18/11): every key a decision route reads, the decision chain beside
+- `warm()` — Fill the caches at start-up (background): the decision path first, then the route of every chat task.
 - `chat_tasks()` — 
 - `owner_tasks()` — Chat tasks an owner message can ask for: the internal postes (memory extraction, compression, voice…) are
 - `litellm_target(route: dict)` — LiteLLM arguments for one router route, or None when this gateway cannot run it (yet).
@@ -596,6 +602,8 @@ Walter Decision — the Decision Resolver (2026-11-17, mission « Native Engine 
 Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and rerank.
 
 - `merge_answers(samples: list[dict])` — The mean of several answers to the same questions. noul: mean probability. choice: mean probability per option,
+- `keys_of(model: str)` — 
+- `_key(key, name: str)` — A provider key off the event loop: a key not yet in the gateway's cache is a Bitwarden read (seconds), which
 - `provider_of(model: str)` — 
 - `is_free(model: str)` — 
 - `reason(exc: BaseException)` — A short, safe reason for one failed attempt.
@@ -615,6 +623,8 @@ Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and
 - `_first(once, n: int)` — Hedged samples: n identical calls at once, the first answer is the decision, the others are cancelled
 - `_assign(models: list[str], questions: dict, media, usable: dict)` — Each question → the first usable model of the chain that carries it (its kind, the media). Returns
 - `_carries(model: str, questions: dict, media)` — 
+- `_native(model: str, questions: dict, media)` — The model answers the whole set in one decision call: every kind and medium native, nothing emulated or
+- `_hedged(tasks: list, once, n: int, wait: float)` — Wait for the first answer of `tasks` (calls returning (call, result|None)); start another call when none
 - `decisions(body: dict, *, chain: list[str], key, client, log, balance=None, signals=None)` — Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
 - `_escalate(out: dict, doubt: list[str], model: str, state: dict, questions: dict, *, key, client, log, timeout: float, tag: dict, media=None)` — Ask the uncertain questions — only those — to the next model of the chain; its answers replace them.
 - `rerank_once(client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float)` — 
@@ -785,13 +795,24 @@ Artificial Analysis Intelligence Index and its cost per task, per model x reason
 - `flight_text(page: str)` — The page's whole flight stream, decoded (a row may span several pushes).
 - `leaderboard_models(page: str)` — The `initialModels` array of the leaderboard page: one object per model x reasoning level.
 - `task_cost(value: Any)` — Cost per AA task: a number on the leaderboard page, {'cost': {'total': …}} on the older model pages.
-- `records(raw_models: list[dict[str, Any]], api: dict[str, dict] | None=None)` — One record per scored model x reasoning level; the API's score wins over the page's, and a model only the
+- `records(raw_models: list[dict[str, Any]], api: dict[str, dict] | None=None)` — One record per scored model x reasoning level; the API's score wins over the page's. Costs use the page's
 - `api_key()` — The instance's AA key, read from its vault through walter-secrets (host.json `aa_api_key`: item + field).
 - `api_scores()` — {slug: {'score', 'name'}} from the free Data API, and an error label when it could not be read.
 - `index_version()` — The current Intelligence Index version from AA's methodology page; None when it cannot be read.
 - `updates()` — AA's own map of recently changed evaluations ({slug: {'type': 'updated'|'new'|'underReview', 'description',
 - `disagreement(raw_models: list[dict[str, Any]], scores: dict[str, dict])` — 
 - `source_aa()` — 
+
+## research/benchmarks/aa_data.py
+
+AA's full public model catalogue, loaded like its web client from the page-data manifest.
+
+- `flight_values(page: str)` — JSON records of the complete flight stream, including records split across script pushes.
+- `objects(value: Any)` — Walk object/list trees without interpreting React reference strings as data.
+- `fetch_data(path: str)` — Bounded binary read from AA's fixed origin; manifests cannot select another host or arbitrary path.
+- `manifest_data(manifest: dict)` — Decode and authenticate the public page-data format; malformed/incomplete data fails closed.
+- `catalogue_models(page: str)` — The model context's catalogue, excluding the separate host-endpoint manifest on the same page.
+- `model_catalogue()` — Read a current model page and its full catalogue; try other anchors if one is retired.
 
 ## research/benchmarks/aa_decision.py
 

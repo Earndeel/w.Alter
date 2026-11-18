@@ -110,6 +110,22 @@ def merge_answers(samples: list[dict]) -> dict:
 UNMERGED = frozenset({"spans", "box", "boxes"})
 
 
+# The keys each decision route reads (walter-llm provider_key → Walter Secrets grants). The gateway reads the ones
+# of its decision chain at start-up (gateway.warm_decisions), so a first message never waits for Bitwarden.
+PROVIDER_KEYS = {"nace": ("NACE_API_KEY",), "liquid": ("LIQUID_API_KEY",), "openrouter": ("OPENROUTER_API_KEY",),
+                 "cloudflare": ("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_AI_TOKEN")}
+
+
+def keys_of(model: str) -> tuple[str, ...]:
+    return PROVIDER_KEYS[provider_of(model)]
+
+
+async def _key(key, name: str) -> str:
+    """A provider key off the event loop: a key not yet in the gateway's cache is a Bitwarden read (seconds), which
+    must not freeze every other call, nor the hedge and failover timers of this one (cold start, 18/11)."""
+    return await asyncio.to_thread(key, name)
+
+
 def provider_of(model: str) -> str:
     if model.startswith("nace/"):
         return "nace"
@@ -200,7 +216,7 @@ async def decide_once(client, key, model: str, state: dict, questions: dict, tim
 
 async def _extract_once(client, key, model: str, text: str, fields: dict, timeout: float) -> dict:
     """OpenRouter's Extractions route (text state, typed fields)."""
-    r = await client.post(OPENROUTER_EXTRACTIONS, headers={"Authorization": f"Bearer {key('OPENROUTER_API_KEY')}"},
+    r = await client.post(OPENROUTER_EXTRACTIONS, headers={"Authorization": f"Bearer {await _key(key, 'OPENROUTER_API_KEY')}"},
                           json={"model": model, "state": text, "fields": fields}, timeout=timeout)
     data = _json(r)
     if r.status_code >= 400 or not isinstance(data, dict) or not isinstance(data.get("answers"), dict):
@@ -232,7 +248,7 @@ async def _decide_route(client, key, model: str, state: dict, questions: dict, t
     """One decision call on the model's own decision route."""
     if provider_of(model) == "cloudflare":
         short = model.split("/", 1)[-1]
-        account, token = key("CLOUDFLARE_ACCOUNT_ID"), key("CLOUDFLARE_AI_TOKEN")
+        account, token = await _key(key, "CLOUDFLARE_ACCOUNT_ID"), await _key(key, "CLOUDFLARE_AI_TOKEN")
         r = await client.post(CF_RUN.format(account=account, model=short), headers={"Authorization": f"Bearer {token}"},
                               json={"model": short, "state": state, "questions": questions}, timeout=timeout)
         data = _json(r)
@@ -248,7 +264,7 @@ async def _decide_route(client, key, model: str, state: dict, questions: dict, t
         nace = provider_of(model) == "nace"
         url, var, prices = (NACE_SYSTEMONE, "NACE_API_KEY", NACE_PRICE) if nace else \
             (LIQUID_SYSTEMONE, "LIQUID_API_KEY", LIQUID_PRICE)
-        r = await client.post(url, headers={"Authorization": f"Bearer {key(var)}"},
+        r = await client.post(url, headers={"Authorization": f"Bearer {await _key(key, var)}"},
                               json={"model": short, "state": state, "questions": questions,
                                     **(_liquid_media(media) if not nace else {})}, timeout=timeout)
         data = _json(r)
@@ -266,7 +282,7 @@ async def _decide_route(client, key, model: str, state: dict, questions: dict, t
                 "cost_status": "estimated" if price is not None else "unknown", "input_tokens": tok}
     if media:      # images beside the state: a top-level state array with image_url parts (verified 17/11, d1.2 family)
         state = [state, *({"type": "image_url", "image_url": {"url": u}} for u in _liquid_media(media).get("images", []))]
-    r = await client.post(OPENROUTER_DECISIONS, headers={"Authorization": f"Bearer {key('OPENROUTER_API_KEY')}"},
+    r = await client.post(OPENROUTER_DECISIONS, headers={"Authorization": f"Bearer {await _key(key, 'OPENROUTER_API_KEY')}"},
                           json={"model": model, "state": state, "questions": questions}, timeout=timeout)
     data = _json(r)
     if r.status_code >= 400 or not isinstance(data, dict) or not isinstance(data.get("answers"), dict):
@@ -395,6 +411,39 @@ def _carries(model: str, questions: dict, media) -> bool:
         return False
 
 
+def _native(model: str, questions: dict, media) -> bool:
+    """The model answers the whole set in one decision call: every kind and medium native, nothing emulated or
+    read by another route (Liquid's own API since 17/11: every kind, image and audio)."""
+    import decision as wd
+    try:
+        p = wd.plan(provider_of(model), model, questions, media)
+    except wd.Unsupported:
+        return False
+    return not p["extract"] and not p["emulated"]
+
+
+async def _hedged(tasks: list, once, n: int, wait: float):
+    """Wait for the first answer of `tasks` (calls returning (call, result|None)); start another call when none
+    answered within `wait` seconds or every one so far failed, up to n calls. Returns the first (call, result) with a
+    result, or None. The tasks list is grown in place (the caller cancels what is left)."""
+    while True:
+        pending = [t for t in tasks if not t.done()]
+        room = len(tasks) < n
+        done = set()
+        if pending:
+            done, _ = await asyncio.wait(pending, timeout=wait if room else None, return_when=asyncio.FIRST_COMPLETED)
+        for t in tasks:
+            if t.done() and not t.cancelled() and t.result()[1] is not None:
+                return t.result()
+        if not room and all(t.done() for t in tasks):
+            return None
+        if room and (not done or all(t.done() for t in tasks)):     # slow, or every call so far failed: hedge
+            tasks.append(asyncio.ensure_future(once()))
+
+
+ASIDE_ERROR_S = 60.0       # a native route whose every call failed (5xx, timeout): asked again after this
+
+
 async def decisions(body: dict, *, chain: list[str], key, client, log, balance=None, signals=None) -> tuple[int, dict]:
     """Execute a decision request along the Router's chain. `log(entry)` receives one entry per physical call.
 
@@ -516,26 +565,9 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
                 log({"provider": provider, "model": model, "ok": False, "seconds": 0, "skipped": "balance_below_floor"})
                 continue
         usable[model] = True
-    groups, nowhere = _assign(models, questions, media, usable)
-    for model in models:                 # a usable model that carries none of the questions: named, not an error
-        if usable.get(model) and model not in groups and not any(_carries(model, {k: questions[k]}, media)
-                                                                 for k in questions):
-            try:
-                wd.plan(provider_of(model), model, questions, media)
-            except wd.Unsupported as exc:
-                attempts.append({"provider": provider_of(model), "model": model, "reason": f"unsupported: {exc}"[:240]})
-                calls.append({"provider": provider_of(model), "model": model, "ok": False, "skipped": "unsupported",
-                              "seconds": 0})
-                log({"provider": provider_of(model), "model": model, "ok": False, "seconds": 0,
-                     "skipped": "unsupported", **tag})
-    if nowhere and (set(nowhere) & required or not groups):
-        if not groups and not usable:
-            return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls}
-        return 422, {"error": "no model of the decision chain can answer these questions", "attempts": attempts,
-                     "calls": calls, "unsupported": nowhere}
     straggler = _straggler(body)
 
-    async def part(names: list[str], first_model: str) -> tuple[dict | None, list, list]:
+    async def part(names: list[str], first_model: str, media=media) -> tuple[dict | None, list, list]:
         sub = {k: questions[k] for k in names}
         # passages and boxes are never averaged (merge_answers keeps the first sample's): one call is the answer —
         # unless the samples are hedged (sampling "first"): the first of n identical calls is then the answer, which
@@ -602,28 +634,195 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
             return res, p_calls, p_attempts
         return None, p_calls, p_attempts
 
-    done = await asyncio.gather(*(part(names, m) for m, names in groups.items()))
-    answered, unavailable = [], {k: "unsupported: no model of the chain carries it" for k in nowhere}
-    for res, p_calls, p_attempts in done:
-        calls += p_calls
-        attempts += p_attempts
-        if res is not None:
-            answered.append(res)
-    failed = [k for (m, names), (res, _, pa) in zip(groups.items(), done) if res is None for k in names]
-    if not answered or set(failed) & required:
-        return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls,
-                     **({"failed": failed} if answered else {})}
-    for (m, names), (res, _, pa) in zip(groups.items(), done):
-        if res is None:
-            why = pa[-1]["reason"] if pa else "failed"
-            unavailable.update({k: f"failed: {why}"[:160] for k in names})
+    dropped_media: list = []
+
+    async def split(usable_now: dict) -> tuple[int, dict]:
+        """Each question → the first usable model of the chain that carries it; the parts in parallel. With the need's
+        `media_fallback: "text"` (18/11), a medium no usable model reads is left out rather than the question: the
+        caller's state already says it in words (a voice note's transcript), and the reply names what was left out
+        (`media_dropped`)."""
+        nonlocal attempts, calls
+        media_ = media
+        groups, nowhere = _assign(models, questions, media_, usable_now)
+        if media and nowhere and pol.get("media_fallback") == "text":
+            for drop in (("audio",), ("audio", "image")):
+                fewer = [m for m in media if m.get("type") not in drop] or None
+                g2, n2 = _assign(models, questions, fewer, usable_now)
+                if not n2:
+                    groups, nowhere, media_ = g2, n2, fewer
+                    dropped_media[:] = sorted({m.get("type") for m in media} - {m.get("type") for m in fewer or []})
+                    break
+        for model in models:             # a usable model that carries none of the questions: named, not an error
+            if usable_now.get(model) and model not in groups and not any(_carries(model, {k: questions[k]}, media_)
+                                                                         for k in questions):
+                try:
+                    wd.plan(provider_of(model), model, questions, media_)
+                except wd.Unsupported as exc:
+                    attempts.append({"provider": provider_of(model), "model": model,
+                                     "reason": f"unsupported: {exc}"[:240]})
+                    calls.append({"provider": provider_of(model), "model": model, "ok": False,
+                                  "skipped": "unsupported", "seconds": 0})
+                    log({"provider": provider_of(model), "model": model, "ok": False, "seconds": 0,
+                         "skipped": "unsupported", **tag})
+        if nowhere and (set(nowhere) & required or not groups):
+            if not groups and not usable_now:
+                return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls}
+            return 422, {"error": "no model of the decision chain can answer these questions", "attempts": attempts,
+                         "calls": calls, "unsupported": nowhere}
+        tasks = [asyncio.ensure_future(part(names, m, media_)) for m, names in groups.items()]
+        late = set()
+        if settle_at is not None:
+            # past the need's `settle_after_ms` (from the start of the decision), parts that carry only optional
+            # questions stop being waited for: said `late`, never guessed — a required part is waited for to the end
+            await asyncio.wait(tasks, timeout=max(0.0, settle_at - time.monotonic()))
+            open_ = [i for i, t in enumerate(tasks) if not t.done()]
+            if open_ and not any(set(list(groups.values())[i]) & required for i in open_):
+                late = set(open_)
+                for i in open_:
+                    tasks[i].cancel()
+                    m = list(groups)[i]
+                    call = {"provider": provider_of(m), "model": m, "ok": False, "skipped": "late", "seconds": 0,
+                            "cost_status": "unknown"}
+                    calls.append(call)
+                    log({**call, **tag})
+        await asyncio.gather(*tasks, return_exceptions=True)
+        done = [(None, [], [{"reason": f"late: past settle_after_ms {pol.get('settle_after_ms')}"}]) if i in late
+                else t.result() for i, t in enumerate(tasks)]
+        answered, unavailable = [], {k: "unsupported: no model of the chain carries it" for k in nowhere}
+        for res, p_calls, p_attempts in done:
+            calls += p_calls
+            attempts += p_attempts
+            if res is not None:
+                answered.append(res)
+        failed = [k for (m, names), (res, _, pa) in zip(groups.items(), done) if res is None for k in names]
+        if not answered or set(failed) & required:
+            return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls,
+                         **({"failed": failed} if answered else {})}
+        for (m, names), (res, _, pa) in zip(groups.items(), done):
+            if res is None:
+                why = pa[-1]["reason"] if pa else "failed"
+                unavailable.update({k: (why if why.startswith("late") else f"failed: {why}")[:160] for k in names})
+        return 200, {"answered": answered, "unavailable": unavailable, **({"late": True} if late else {})}
+
+    async def whole(model: str) -> dict | None:
+        """The whole set in one native call; a hedge only if no answer by `hedge_after_ms` (or at once after an
+        error), up to `samples` calls. None when every call failed."""
+        provider = provider_of(model)
+        n = samples if mode == "first" else 1
+        hedge = pol.get("hedge_after_ms")
+        wait = (float(hedge) / 1000) if hedge else 0.0
+
+        async def once():
+            t0 = time.perf_counter()
+            try:
+                res = await decide_once(client, key, model, state, questions, timeout, *([media] if media else []))
+            except Exception as exc:  # noqa: BLE001
+                call = {"provider": provider, "model": model, "ok": False, "error": reason(exc),
+                        "seconds": round(time.perf_counter() - t0, 3)}
+                log({**call, **tag})
+                return call, None
+            call = {"provider": provider, "model": model, "ok": True, "assign": "native_whole",
+                    "seconds": round(time.perf_counter() - t0, 3), "cost_usd": res["cost_usd"],
+                    "cost_status": res["cost_status"], "input_tokens": res["input_tokens"]}
+            log({**call, "usage": {"in": res["input_tokens"], "out": 0, "cached": None}, **tag,
+                 "confidence": wd.confidences(res["answers"])})
+            return call, res
+        tasks = [asyncio.ensure_future(once())]
+        got = None
+        try:
+            got = await _hedged(tasks, once, n, wait)
+        except asyncio.CancelledError:           # the split path answered first: the native calls stop here
+            for t in tasks:
+                t.cancel()
+            raise
+        for t in tasks:
+            if not t.done():
+                t.cancel()
+                call = {"provider": provider, "model": model, "ok": False, "skipped": "hedged", "seconds": 0,
+                        "cost_status": "unknown"}
+                calls.append(call)
+                log({**call, **tag})
+        await asyncio.gather(*tasks, return_exceptions=True)
+        for t in tasks:
+            if t.done() and not t.cancelled():
+                calls.append(t.result()[0])
+        if not got:
+            errs = [t.result()[0] for t in tasks if t.done() and not t.cancelled()]
+            why = str((errs[-1] if errs else {}).get("error") or "failed")
+            attempts.append({"provider": provider, "model": model, "reason": why})
+            if errs and all(not c.get("ok") for c in errs):
+                aside = UNAVAILABLE_S if all(_route_level(str(c.get("error") or "")) for c in errs) else ASIDE_ERROR_S
+                _unavailable[model] = (time.monotonic() + aside, why[:120])
+            return None
+        _unavailable.pop(model, None)
+        res = got[1]
+        out_ = {"answers": res["answers"], "usage": res["usage"],
+                "model": res["model"] if provider == "openrouter" else model, "provider": provider,
+                "route": f"{provider}/{model}", "questions": list(questions), "assign": "native_whole"}
+        if n > 1:
+            out_["samples"] = 1
+        doubt = wd.uncertain(out_["answers"], pol.get("escalate_below"))
+        if doubt:
+            sub = {k: questions[k] for k in doubt}
+            nxt = next((m for m in models if m != model and usable.get(m) and _carries(m, sub, media)
+                        and not (_unavailable.get(m) and time.monotonic() < _unavailable[m][0])), None)
+            if nxt:
+                out_["escalated"] = await _escalate(out_, doubt, nxt, state, questions, key=key, client=client,
+                                                    log=log, timeout=timeout, tag=tag, media=media)
+                calls.append(out_["escalated"].pop("call"))
+        return out_
+
+    settle = pol.get("settle_after_ms")
+    settle_at = time.monotonic() + float(settle) / 1000 if settle else None
+    native = next((m for m in models if usable.get(m) and _native(m, questions, media)), None) \
+        if pol.get("assign") == "native_whole" else None
+    failover = None
+    if native:
+        wt = asyncio.ensure_future(whole(native))
+        fo = pol.get("failover_after_ms")
+        await asyncio.wait({wt}, timeout=(float(fo) / 1000) if fo else None)
+        if wt.done() and wt.result() is not None:
+            answered, unavailable = [wt.result()], {}
+        else:
+            failover = "error" if wt.done() else "slow"
+            st = asyncio.ensure_future(split({m: v for m, v in usable.items() if m != native}))
+            pending, kept, answered = {t for t in (wt, st) if not t.done()}, None, None
+            while pending and answered is None:
+                done_, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                if wt in done_ and wt.result() is not None:
+                    answered, unavailable = [wt.result()], {}
+                    failover += ", native answered first"
+                elif st in done_:
+                    kept = st.result()
+                    if kept[0] == 200 and (not kept[1]["unavailable"] or wt.done() or kept[1].get("late")):
+                        answered, unavailable = kept[1]["answered"], kept[1]["unavailable"]
+            for t in pending:
+                t.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            if answered is None:
+                if kept and kept[0] == 200:          # the native call failed too: the split's partial answer stands
+                    answered, unavailable = kept[1]["answered"], kept[1]["unavailable"]
+                elif kept:
+                    return kept
+                else:
+                    return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls}
+    else:
+        status, got = await split(usable)
+        if status != 200:
+            return status, got
+        answered, unavailable = got["answered"], got["unavailable"]
     main = max(answered, key=lambda r: (len(set(r["questions"]) & required), len(r["questions"])))
     answers: dict = {}
     for r in answered:
         answers.update(r["answers"])
-    answers = wd.resolve(questions, answers, now)
+    answers = wd.resolve(questions, answers, now, cue_text if occasion is not None else wd.state_text(state))
     out = {"answers": answers, "usage": main["usage"], "model": main["model"], "provider": main["provider"],
-           "route": main["route"], "calls": calls, "attempts": attempts}
+           "route": main["route"], "calls": calls, "attempts": attempts,
+           "assign": "native_whole" if main.get("assign") else "split"}
+    if failover:
+        out["failover"] = failover
+    if dropped_media and not main.get("assign"):
+        out["media_dropped"] = list(dropped_media)
     if samples > 1:
         out["samples"] = main.get("samples")
     if mode == "first" and samples > 1:
@@ -639,12 +838,14 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
     if composed is not None:
         out["signals"] = wd.by_signal(composed, answers)
         out["trace"] = {**trace, "unavailable": {sid: unavailable[k] for sid, k in composed["ids"].items()
-                                                 if k in unavailable}}
+                                                 if k in unavailable},
+                        "assign": out["assign"], **({"failover": failover} if failover else {}),
+                        **({"media_dropped": out["media_dropped"]} if out.get("media_dropped") else {})}
         if signals.get("relations"):        # Decision Resolver (§6, 17/11): the answers resolved against the declared
             import resolver                 # relations, deterministically; `signals` stays what the models said
             out["resolution"] = resolver.resolve(out["signals"], signals["relations"], composed["facts"],
                                                  required=composed["required"], asked=composed["asked"])
-    if memo_key and not unavailable:
+    if memo_key and not unavailable and not out.get("media_dropped"):
         wd.MEMO.put(memo_key, {k: v for k, v in out.items() if k not in ("calls", "attempts")},
                     pol.get("memo_ttl_s") or 0)
     return 200, out
@@ -674,7 +875,7 @@ async def _escalate(out: dict, doubt: list[str], model: str, state: dict, questi
 
 
 async def rerank_once(client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float) -> dict:
-    r = await client.post(OPENROUTER_RERANK, headers={"Authorization": f"Bearer {key('OPENROUTER_API_KEY')}"},
+    r = await client.post(OPENROUTER_RERANK, headers={"Authorization": f"Bearer {await _key(key, 'OPENROUTER_API_KEY')}"},
                           json={"model": model, "query": query, "documents": documents, "top_n": top_n}, timeout=timeout)
     data = _json(r)
     if r.status_code >= 400 or not isinstance(data, dict) or not isinstance(data.get("results"), list):
@@ -752,7 +953,7 @@ class Balance:
         if self.value and time.time() - self.value[0] < self.ttl:
             return self.value[1]
         try:
-            r = await self.client.get(OPENROUTER_CREDITS, headers={"Authorization": f"Bearer {self.key('OPENROUTER_API_KEY')}"},
+            r = await self.client.get(OPENROUTER_CREDITS, headers={"Authorization": f"Bearer {await _key(self.key, 'OPENROUTER_API_KEY')}"},
                                       timeout=15)
             d = r.json()["data"]
             value = float(d["total_credits"]) - float(d["total_usage"])
