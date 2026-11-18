@@ -35,3 +35,8 @@ Walter Memory core (spec and decisions: `/walter/docs/` — ARCHITECTURE, DECISI
   not yet prove a complete install on a clean VM. See the operational runbook for encrypted restore commands.
 
 - `walter_memory.overland` — restricted Overland GPS ingress, separate systemd unit on loopback :3010; see `docs/OVERLAND.md`. Raw samples stay local_only.
+- `walter_memory.whereabouts.current()` (2026-11-18) — where the owner is, read-only, no model: the last
+  `location.sample` with its time (`recent` under 2 h, `old`, `absent`), coordinates rounded to ~110 m, the known
+  place it falls in and the probable home (Memory V1 flows). Read only when the reader may read `local_only` (the
+  cloud ceiling of organic.toml), else `withheld`. Consumer: walter-context's `position` block, when the preflight
+  says the answer depends on where the owner is.

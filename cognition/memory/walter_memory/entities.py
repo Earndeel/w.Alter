@@ -136,6 +136,13 @@ ANCHOR_TTL_S = 600
 _ANCHOR_AT = [0.0]
 
 
+# What names a thing without mentioning the project: a URL, a file path (« /walter/docs »), a file name, a code
+# identifier (« walter_browse », a tool). Until 18/11 they matched (« walter » in « /walter/docs »), and the owner's
+# memory was added to a plain file count or a web lookup through a tool named after the project.
+_NOT_MENTIONS = re.compile(r"https?://\S+|\S*[/\\]\S*|\b[\w.-]+\.(?:md|py|json|toml|ya?ml|txt|sh|js|ts|html|css|sql|log|db|"
+                           r"jsonl|csv|pdf)\b|\b\w+_\w+\b|`[^`]*`", re.I)
+
+
 def anchors(text: str) -> list[dict]:
     """The owner's projects and organisations a message names (whole words, distinctive aliases of 3+ chars), one
     per entity. Deterministic and local, no model: walter-context uses it so a named project always reaches the
@@ -145,7 +152,7 @@ def anchors(text: str) -> list[dict]:
     if time.time() - _ANCHOR_AT[0] > ANCHOR_TTL_S:     # long-lived callers see new projects within minutes
         _aliases.cache_clear()
         _ANCHOR_AT[0] = time.time()
-    n = f" {norm(text)} "
+    n = f" {norm(_NOT_MENTIONS.sub(' ', text or ''))} "
     out, seen = [], set()
     for a, eid, etype in _aliases():
         if eid in seen or len(a) < 3 or a in COMMON_ALIASES:

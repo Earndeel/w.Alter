@@ -67,7 +67,8 @@ def observed(sig: dict) -> dict:
     dl = sig.get("memory.deadline") or {}
     if isinstance(dl.get("date"), str) and (dl.get("found") is None or dl["found"] >= FOUND_MIN):
         try:
-            out["deadline"] = datetime.fromisoformat(dl["date"][:10]).date().isoformat()
+            # a period (« cette semaine », 18/11) is due by its last day
+            out["deadline"] = datetime.fromisoformat((dl.get("end") or dl["date"])[:10]).date().isoformat()
         except ValueError:
             pass
     am = sig.get("memory.amount") or {}
