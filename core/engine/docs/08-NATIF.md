@@ -10,10 +10,10 @@ prouvé, avec DSH réellement arrêté, et ce qui ne l'est pas encore.
 | Élément | Où | État |
 |---|---|---|
 | Moteur natif (boucle, sessions, outils, Python, sous-agents, tâches, réveils, reprise, Engine API v1, porte web) | `core/engine/walter_engine/` (≈ 5 400 lignes Python), unité `walter-engine.service` | **En service** : Engine API 127.0.0.1:8895, porte web 127.0.0.1:3080, état `@instance/state/core/engine/native` |
-| DSH (`dsh-web`) | `/opt/dsh` (gelé, inchangé) | **Arrêté, désactivé, masqué** ; unité gardée dans la sauvegarde pour le retour arrière |
-| Preuve « sans DSH » | drop-in `walter-engine.service.d/90-validation-sans-dsh.conf` (`InaccessiblePaths=/opt/dsh`) | Le moteur et tout ce qu'il lance (bash, Python, sous-agents) ne voient pas `/opt/dsh` : une dépendance cachée échouerait |
+| DSH (`dsh-web`) | **désinstallé le 18/11** (`/opt/dsh`, `/services/dsh`, `/opt/walter-profiles/dsh` archivés) | Moteur natif validé définitivement par Monsieur (18/11) ; archive + instantané restic + unités dans `@instance/backups/changes/2026-11-18-dsh-retrait/` (§ 6) |
+| Garde « sans DSH » | drop-in `walter-engine.service.d/90-sans-dsh.conf` (`InaccessiblePaths=-/opt/dsh -/services/dsh`) | Gardé après la désinstallation : si DSH est restauré pour un retour arrière, le moteur et tout ce qu'il lance ne le voient toujours pas |
 | Reprise des conversations DSH | `walter-python -m walter_engine import-dsh` | 199 conversations reprises, mêmes numéros `seq` (un client reprend où il en était), idempotent, fichiers DSH seulement lus |
-| Portes | `walter-telegram`, `walter-web-gate` (drop-ins `20-walter-engine.conf`) | Inchangées : elles parlent l'Engine API et la porte web, servies par le natif |
+| Portes | `walter-telegram`, `walter-web-gate` (`After=walter-engine.service` dans leurs unités depuis le 18/11) | Inchangées : elles parlent l'Engine API et la porte web, servies par le natif |
 | Garde-fou core, registre, scénarios | `guardian/check`, `contracts/core.json` → `modules/registry.json`, `scenarios/` | Le garde-fou, `walter_health`, le report des redémarrages et les scénarios suivent l'unité activée ; le contrat et le registre déclarent `walter-engine` |
 | Identité | walter-soul, cible `engine` → `@instance/profiles/engine/AGENTS.md` | Identité + règles + « Outils enchaînés » (Python, `await tools.x()`, `asyncio.gather`) |
 | Outils Walter (MCP) | `tools/mcp.py`, `core/config/toolsets.toml [clients.engine]` | Même jeu `core` que DSH (19 outils listés) ; les autres par `walter_call` |
@@ -186,21 +186,28 @@ Non mesuré : la qualité d'exécution du modèle principal par mode (le banc ju
 
 ## 6. Retour arrière
 
-`/user/Lucas/backups/changes/2026-11-17-native-engine/README.md` § 1 : moins d'une minute, sans perte (l'état DSH n'a
-pas été modifié ; les conversations tenues pendant la période native restent dans l'état natif). Le garde-fou core,
+Depuis la désinstallation (18/11) : `/user/Lucas/backups/changes/2026-11-18-dsh-retrait/README.md` (≈ 5 min :
+empreintes, extraction des trois archives sous `/`, unité `dsh-web` remise, puis la procédure du 17/11). Il ne dépend
+d'aucune installation DSH active : l'archive a été extraite dans un dossier isolé et DSH a démarré depuis cette copie
+(empreintes du noyau identiques à `kernel/installed.json`) ; copie hors site = instantané restic `12a4fbef…`
+(`keep` + `dsh-final`). Procédure du 17/11 : `/user/Lucas/backups/changes/2026-11-17-native-engine/README.md` § 1 (sans
+perte ; les conversations tenues pendant la période native restent dans l'état natif). Le garde-fou core,
 `walter_health`, le report des redémarrages pendant un tour et les scénarios suivent seuls l'unité activée ; le contrat
 `core` déclare `walter-engine` : un retour arrière durable y remet `dsh-web` (et dans le guide du gardien).
 
 ## 7. Ce qui reste (non fait, ou fait mais pas prouvé)
 
-1. Ingestion en mémoire d'une **vraie** conversation de Monsieur par le moteur natif : testée hors ligne, pas encore
-   observée (aucune depuis la bascule).
-2. Pièces jointes et « changements de l'espace de travail » dans la porte web native (non repris, 0 et 5 usages).
+1. ~~Ingestion d'une vraie conversation de Monsieur~~ — **fait le 18/11** (§ 8) : quatre tours du compte `monsieur`
+   (porte web puis porte api), ingérés en ≈ 1 s, indexés, pause de l'extraction respectée.
+2. Pièces jointes : la porte Telegram native reçoit photo et document (contrôle `attachment` de `telegram_door`, § 8).
+   **Reste** : l'envoi de fichiers par la porte web native et le champ `message.attachments` de l'Engine API (déclaré
+   au contrat, implémenté par aucune porte) — 0 usage côté DSH web, aucune perte à la désinstallation.
+   « Changements de l'espace de travail » (résumé par tour, 5 usages) : non repris ; `git` par bash le donne à la
+   demande. Changement d'espace de travail : jamais utilisé (un seul espace, `/user/Lucas/workspace`).
 3. Un redémarrage du moteur coupe les requêtes longues en attente (`turn.submit` avec `wait_ms`) avec une trace
    d'erreur d'uvicorn ; le tour lui-même est fermé `interrupted` et repris (depuis la correction du soir, voir § 3),
    le client doit relire son résultat.
-4. Le drop-in `InaccessiblePaths=/opt/dsh` est gardé tant que DSH reste installé (preuve permanente) ; la
-   désinstallation de DSH n'est pas faite.
+4. ~~Désinstallation de DSH~~ — **faite le 18/11** (§ 8) ; le drop-in reste comme garde (chemins absents ignorés).
 5. TTFT du modèle principal (≈ 4 s p50) : hors du préflight, piste suivante (cache de préfixe, jetons d'entrée).
 6. `socle_e2e` *intention* et *expérience* : bloqués par la pause de l'extraction (Monsieur, 14/11), pas par le
    moteur. Pendant la pause, un échange simple n'a pas de fil : le message suivant de la même conversation peut être
@@ -209,3 +216,23 @@ pas été modifié ; les conversations tenues pendant la période native restent
    l'extraction (spécification d'abord), pas contourné ici.
 7. Le compte de test **lit** les tâches et la mémoire personnelles par le MCP (exposition en lecture ; il n'écrit ni
    dans core.events ni dans les objectifs de Monsieur).
+
+## 8. Validation finale et désinstallation de DSH (18/11)
+
+Monsieur a validé définitivement le moteur natif (18/11) et demandé, avant la désinstallation, cinq vérifications.
+
+| Vérification | Preuve |
+|---|---|
+| Ancien fichier des runs DSH au démarrage | Orphelins vérifiés d'abord : le fichier de l'accueil DSH valait `{}` à la bascule, 0 run DSH ouvert sur 724, et un run que personne ne ferme est terminé par le balayage de Memory (`runs.sweep`). `_recover` ne lit plus que son propre fichier ; test hors ligne : un fichier DSH présent n'est ni lu ni réécrit (19 tests). |
+| Vrais tours propriétaire | 4 tours du compte `monsieur` (porte web ×2 puis porte api ×2, 29 s / 4 s / 14 s / 4,5 s), sur une vraie tâche (vérification avant désinstallation). **Continuité** : même fil, run parent relié, un seul objectif ouvert, repris depuis l'autre porte. **Context** : pack injecté à chaque tour, fenêtre décidée par tour. **Memory** : tours ingérés en ≈ 1 s (source `walter`, 8 morceaux indexés) ; **aucun appel d'extraction** (pause du 14/11 respectée, rien contourné). |
+| Fonctions perdues ? | Pièces jointes : Telegram natif reçoit photo + document (`telegram_door` `attachment`, nouveau contrôle). Envoi web DSH : 0 usage. Choix d'espace de travail DSH : jamais changé (un seul espace) ; natif : `cwd` `/user/Lucas/workspace` pour les 269 sessions, `workdir` par appel bash. Résumés « changements de l'espace » : 5 usages, couverts par `git` à la demande. Écart restant : § 7.2. |
+| Retour arrière indépendant de DSH actif | Archives `opt-dsh`, `services-dsh`, `walter-profiles-dsh` + empreintes ; extraites dans un dossier isolé, DSH démarré depuis la copie (empreintes du noyau identiques au manifeste) ; instantané restic hors site vérifié. Procédure : § 6. |
+| Dépendances DSH cachées | Réelles, corrigées : garde-fou ops (incident `ops:engine:kernel` sur un noyau absent → `walter engine kernel` dit `installed: false`), composant `kernel-npm-cache` (ops), `backup_paths` core vers `/opt/dsh`, drop-in moteur qui aurait refusé de démarrer sur un chemin absent (préfixe `-`), `After=` des portes en drop-ins, cible walter-soul `dsh`, scénarios visant le moteur d'essai DSH (:8892). Sans effet (dossier absent ignoré ou retour arrière seulement) : connecteurs Memory et walter-logs (0 fichier DSH), détection du runtime dans `walter_hook`, branches `dsh-web` de `walter deploy`, du gardien et de `walter_health`, `walter layout move`, `walter instance harness dsh`, bancs. |
+
+Retrait (18/11 ≈ 05:47 UTC) : `/opt/dsh` et `/services/dsh` d'abord renommés et fermés (`chmod 000`), moteur et
+`walter-logs-watch` relancés (aucun tour en cours), puis : `walter check`, `walter contracts check`,
+`walter deploy check` (rien de périmé), `walter engine kernel` (`installed: false`, ok), gardiens (plus d'incident
+moteur), `walter-memory health`, `walter_health`, score de l'autopilote Memory, scénarios `engine_api_e2e` et
+`telegram_door` sur le moteur en service — puis suppression des copies renommées. Composants de contrat passés
+`obsolete` (code gardé dans git pour le retour arrière) : core `engine-kernel`, `engine-compositions`,
+`engine-plugins`, `engine-api`, `dsh-hooks`, `dsh-web-ui` ; context `dsh-port`.

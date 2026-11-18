@@ -326,7 +326,10 @@ def test_a_turn_cut_by_the_engine_stopping_is_resumed_as_its_continuation(engine
     objective), never « cancelled » like an owner's stop, and the resumed turn is its child with the same plan
     (socle_e2e B/E, 17/11: the native engine closed it `cancelled` and resumed it with no parent)."""
     from walter_engine import engine as E
-    monkeypatch.setattr(config, "instance_root", lambda: tmp_path / "instance")      # never the real DSH run file
+    monkeypatch.setattr(config, "instance_root", lambda: tmp_path / "instance")
+    legacy = tmp_path / "instance" / "state" / "core" / "engine" / "intake" / "open-runs.json"   # DSH's run file
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text(json.dumps({"dsh/vm/old": {"run_id": "run-dsh", "pid": 2 ** 22 + 54321}}))
     a = engine.create(cwd="/w", door="telegram", principal={"kind": "test", "id": "e2e"})
     a.session.append("turn/start", {"turn": 1}, sync=True)
     engine._active(a.sid, True)
@@ -354,6 +357,7 @@ def test_a_turn_cut_by_the_engine_stopping_is_resumed_as_its_continuation(engine
         b = noticed[0][0]
         assert b.last["run_id"] == "run-cut" and b.last["plan"] == plan and b.last["channel"] == "test"
         assert b.last["open"] is False and json.loads(again.runs_file.read_text()) == {}
+        assert "run-dsh" in legacy.read_text()        # DSH's run file is no longer read (2026-11-18), nor rewritten
     finally:
         asyncio.run(again.doors.close())
         asyncio.run(again.llm.close())

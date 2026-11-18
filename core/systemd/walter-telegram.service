@@ -1,7 +1,7 @@
 [Unit]
 Description=W.Alter Telegram door (core/interfaces/telegram): @«secret:vault», a client of the Engine API
 Documentation=file:///walter/core/interfaces/telegram/README.md
-After=network-online.target dsh-web.service
+After=network-online.target walter-engine.service
 Wants=network-online.target
 
 [Service]

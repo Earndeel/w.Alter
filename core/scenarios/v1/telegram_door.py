@@ -7,6 +7,8 @@ synthetic updates from a test owner account (`e2e`, its own conversations: the o
   replay      the same Telegram update delivered twice runs once (idempotency key = message id)
   approval    an action that needs the owner → buttons → « Refuser » → the engine says it was refused
   stop        /stop during a long turn → « Interrompu »
+  attachment  a photo and a document sent on Telegram → kept by the door, named to the engine, read with its tools
+              (read_image for the photo): the only attachment path the owner has since DSH's web upload (18/11)
 Prints one line per check; exit 0 when all pass. Costs a few model turns.
 
     walter-python core/scenarios/v1/telegram_door.py [--only identity,stop]
@@ -36,6 +38,7 @@ class RecordingTg:
         self.calls: list[tuple[str, dict]] = []
         self.n = 0
         self.lock = threading.Lock()
+        self.files: dict[str, Path] = {}          # file_id → the local file getFile + download serve
 
     def call(self, method, payload=None, timeout=30):
         with self.lock:
@@ -43,7 +46,13 @@ class RecordingTg:
             if method == "sendMessage":
                 self.n += 1
                 return {"message_id": self.n}
+            if method == "getFile":
+                return {"file_path": (payload or {}).get("file_id")}
             return True
+
+    def download(self, file_path: str, dest: Path, limit: int = 20 << 20) -> Path:
+        dest.write_bytes(self.files[file_path].read_bytes())
+        return dest
 
     def texts(self, since=0):
         return [p["text"] for m, p in self.calls[since:] if m == "sendMessage" and not p.get("disable_notification")]
@@ -91,11 +100,11 @@ def main() -> int:
     mid = [0]
     results = []
 
-    def say(text, mid_=None):
+    def say(text, mid_=None, **extra):
         mid[0] += 1
-        u = {"update_id": mid[0], "message": {"message_id": mid_ or mid[0], "from": {"id": TEST_USER},
-                                              "chat": {"id": chat, "type": "private"}, "text": text}}
-        door.handle(u)
+        msg = {"message_id": mid_ or mid[0], "from": {"id": TEST_USER}, "chat": {"id": chat, "type": "private"},
+               **({"text": text} if text is not None else {}), **extra}
+        door.handle({"update_id": mid[0], "message": msg})
 
     def answer(since, timeout=240, want=1):
         end = time.time() + timeout
@@ -181,8 +190,44 @@ def main() -> int:
         t = [x for x in tg.texts(n) if not x.startswith("🔐")]
         return any("Interrompu" in x for x in t), f"« {' | '.join(t)[:80]} »"
 
+    def c_attachment():
+        from PIL import Image, ImageDraw, ImageFont
+        work = state_dir / "fixtures"
+        work.mkdir(parents=True, exist_ok=True)
+        code = run.upper()
+        img = work / "photo.png"
+        im = Image.new("RGB", (1000, 260), "white")
+        ImageDraw.Draw(im).text((40, 80), f"COLIBRI {code}", fill="black", font=ImageFont.load_default(size=80))
+        im.save(img)
+        doc = work / "note.txt"
+        doc.write_text(f"Code du document : MIMOSA-{run}\n")
+        tg.files.update({"f-photo": img, "f-doc": doc})
+
+        def reply(n, timeout=240):
+            end = time.time() + timeout
+            while time.time() < end:
+                t = [x for x in tg.texts(n) if not x.startswith("🔐")]
+                if t:
+                    return " ".join(t)
+                time.sleep(1)
+            return ""
+        allow = auto_allow(door, tg, len(tg.calls))
+        n = len(tg.calls)
+        say(None, photo=[{"file_id": "f-photo", "file_size": img.stat().st_size}],
+            caption="Test technique : quel mot et quel code sont écrits sur cette image ? Réponds seulement avec eux.")
+        t1 = reply(n)
+        n = len(tg.calls)
+        say(None, document={"file_id": "f-doc", "file_name": "note.txt", "file_size": doc.stat().st_size},
+            caption="Test technique : quel code contient ce document ? Donne-le seul.")
+        t2 = reply(n)
+        allow.set()
+        inbox = state_dir / "inbox" / str(chat)
+        saved = sorted(p.name for p in inbox.iterdir()) if inbox.is_dir() else []
+        ok = "COLIBRI" in t1.upper() and code in t1.upper().replace(" ", "") and f"MIMOSA-{run}".lower() in t2.lower()
+        return ok and len(saved) == 2, f"saved={len(saved)} photo=« {t1[:50]} » document=« {t2[:40]} »"
+
     for name, fn in (("identity", c_identity), ("continuity", c_continuity), ("replay", c_replay),
-                     ("approval", c_approval), ("stop", c_stop)):
+                     ("approval", c_approval), ("stop", c_stop), ("attachment", c_attachment)):
         check(name, fn)
     door.stop.set()
     failed = [n for n, ok in results if not ok]

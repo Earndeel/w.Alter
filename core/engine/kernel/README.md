@@ -4,9 +4,9 @@
 |---|---|
 | **Rôle** | Fige le noyau du moteur (DSH/Cordis `@deepseek-ai/dsh`) : version exacte, verrou npm complet, empreintes de ce qui est réellement installé, installation reproductible hors ligne, vérification. |
 | **Propriétaire** | walter-core (`core/engine`) ; une mise à jour du noyau passe seulement par Lab (étude, banc, puis nouveau gel). |
-| **État** | **Lot E1 en cours depuis le 09/11/2026.** Gel fait et prouvé (ci-dessous) ; l'installation en service reste `/opt/dsh`, inchangée, sous `dsh-web.service`. Compositions rendues depuis une source depuis le 09/11 au soir (`../compositions/`, configuration composée identique) ; rattrapage documentaire fait. Reste : 48 h de service inchangé, puis adoption. |
+| **État** | **Retour arrière seulement depuis le 18/11/2026** : moteur natif en production (`core/engine/walter_engine`, 17/11), DSH désinstallé le 18/11 (`/opt/dsh` et le cache `/services/dsh` archivés : `@instance/backups/changes/2026-11-18-dsh-retrait/`). `walter engine kernel` dit `installed: false, ok: true` tant qu'aucune installation n'est restaurée ; une installation restaurée est revérifiée contre ce manifeste. Historique : gel du lot E1 (09/11), ci-dessous. |
 | **Ne fait pas** | Ne contient aucun artefact compilé ni `node_modules` (gel ≠ déplacement) ; ne modifie jamais une installation existante ; n'installe pas en production (le remplacement de `/opt/dsh` est le lot E9). |
-| **Contrats** | `installed.json` (manifeste) ; commande publique `walter engine kernel` (lecture seule, code de sortie 1 en cas d'écart) ; incident `engine_kernel_drift` de la vigie d'Ops. Cache hors ligne : `/services/dsh/npm-cache` (hors git, voir son README). |
+| **Contrats** | `installed.json` (manifeste) ; commande publique `walter engine kernel` (lecture seule, code de sortie 1 en cas d'écart) ; incident `engine_kernel_drift` de la vigie d'Ops. Cache hors ligne : `/services/dsh/npm-cache` jusqu'au 18/11, désormais dans l'archive `services-dsh.tar.zst` du retrait. |
 
 ## Contenu
 

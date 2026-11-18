@@ -1,6 +1,7 @@
 """Walter V1 — lot E5 checks against a real engine (2026-11-10): delegation is executed by Walter Engine.
 
-Against a TEST engine home by default (composed with `subagents = "on"`, `api = "on"`, policy enforce, intake native):
+Against the engine in service by default, under the test account `e2e` (since 2026-11-18: the DSH trial home on :8892
+is gone with DSH; --base/--token-file name a native trial engine instead):
   parallel   the engine's model delegates to two in-process sub-agents at once and merges their results
   policy     a sub-agent stays under Walter's policy (never-rule: a secret file is refused to the child too)
   interrupt  /stop of a turn whose sub-agent is working → the turn ends cancelled
@@ -9,7 +10,7 @@ Against a TEST engine home by default (composed with `subagents = "on"`, `api = 
   router     `walter-router run` with the engine binding: one engine delegation, the Router's task record kept
 Each check prints one line; exit 0 only when every selected check passes. Costs a handful of model turns.
 
-    walter-python core/scenarios/v1/engine_e5.py [--base http://127.0.0.1:8892 --token-file …] [--only a,b]
+    walter-python core/scenarios/v1/engine_e5.py [--base http://127.0.0.1:8895 --token-file @instance/…] [--only a,b]
 """
 from __future__ import annotations
 
@@ -42,11 +43,14 @@ def a_parent_run() -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument('--base', default='http://127.0.0.1:8892')
-    ap.add_argument('--token-file', default='/opt/dsh/e2-home/walter-api/api.token')
+    ap.add_argument('--base', default='http://127.0.0.1:8895')
+    ap.add_argument('--token-file', default='@instance/bootstrap/engine/api.token')
     ap.add_argument('--only', default=None)
     a = ap.parse_args()
-    api = Api(a.base, open(a.token_file).read().strip())
+    tf = a.token_file
+    if tf.startswith("@instance/"):        # the instance (pointer /etc/walter/instance), never a fixed path
+        tf = str(Path(open("/etc/walter/instance").read().strip()) / tf.removeprefix("@instance/"))
+    api = Api(a.base, open(tf).read().strip())
     run = uuid.uuid4().hex[:8]
     owner = {'kind': 'owner', 'id': 'e2e'}
     results: list = []

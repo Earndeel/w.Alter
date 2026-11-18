@@ -21,8 +21,6 @@
     "/root/.codex/config.toml",
     "/root/.claude.json",
     "/root/.claude/settings.json",
-    "/opt/dsh/home/cordis.patch.yml",
-    "/opt/dsh/home/walter-hooks.json",
     "/usr/local/bin/walter",
     "@instance/instance.toml",
     "@instance/config",
@@ -41,7 +39,7 @@
   ],
   "bindings": {
     "hermes": "native adapters + lifecycle hook (no duplicate MCP attachment)",
-    "dsh": "MCP + lifecycle adapter",
+    "dsh": "ROLLBACK ONLY since 2026-11-18 (DSH uninstalled, archived): MCP + lifecycle adapter",
     "codex": "MCP + lifecycle adapter",
     "claude-code": "MCP + lifecycle adapter"
   },
@@ -203,8 +201,8 @@
     {
       "id": "engine-kernel",
       "path": "engine/kernel",
-      "role": "Gel du noyau DSH/Cordis (lot E1) : version exacte, verrou, empreintes de l'installation, installation hors ligne reproductible, vérification ; l'installation en service reste /opt/dsh",
-      "status": "implemented",
+      "role": "Gel du noyau DSH/Cordis (lot E1) : version exacte, verrou, empreintes de l'installation, installation hors ligne reproductible, vérification ; DSH désinstallé le 2026-11-18 : kit de retour arrière (avec l'archive de l'instance), `walter engine kernel` dit installed=false",
+      "status": "obsolete",
       "readme": "engine/kernel/README.md",
       "interfaces": [
         {
@@ -217,8 +215,8 @@
     {
       "id": "engine-compositions",
       "path": "engine/compositions",
-      "role": "Source de la face du profil web DSH (nom, accueil, durée de connexion), rendue par walter-core dans le bloc géré dsh-face ; valeurs dans la configuration de l'instance (lot E1)",
-      "status": "active",
+      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : source de la face du profil web DSH (nom, accueil, durée de connexion), rendue par walter-core dans le bloc géré dsh-face ; valeurs dans la configuration de l'instance (lot E1)",
+      "status": "obsolete",
       "readme": "engine/compositions/README.md",
       "interfaces": [
         {
@@ -231,8 +229,8 @@
     {
       "id": "engine-plugins",
       "path": "engine/plugins",
-      "role": "Stratégies du moteur : intake et events (lot E2 : accueil d'un tour — run, ContextPlan, pack, skills — et fin du run, turn.ended, session.ended) ; policy et budget (lot E3 : politique unique avant chaque outil de chaque agent, plafonds du tour) ; interrupteurs [dsh.engine] intake hook|shadow|native et policy off|enforce",
-      "status": "implemented",
+      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : greffons Node de DSH (seul engine/plugins/python/runtime sert au moteur natif, composant engine-python). Stratégies du moteur : intake et events (lot E2 : accueil d'un tour — run, ContextPlan, pack, skills — et fin du run, turn.ended, session.ended) ; policy et budget (lot E3 : politique unique avant chaque outil de chaque agent, plafonds du tour) ; interrupteurs [dsh.engine] intake hook|shadow|native et policy off|enforce",
+      "status": "obsolete",
       "readme": "engine/plugins/README.md",
       "contracts": [
         "engine/contracts/engine-event.v1.json",
@@ -281,8 +279,8 @@
     {
       "id": "engine-api",
       "path": "interfaces/api",
-      "role": "Engine API (lot E4) : porte canonique du moteur pour Telegram, le web, les modules et les tests — ouvrir ou retrouver une conversation (<porte>/<compte>/<conversation> → session du noyau), soumettre (idempotent), suivre (SSE), résultat d'un tour, interrompre, répondre aux approbations ; greffon hôte du profil web, interrupteur [dsh.engine] api off|on",
-      "status": "active",
+      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : implémentation Node de l'Engine API hébergée par DSH ; le moteur natif sert le même contrat (engine/walter_engine/api.py). Engine API (lot E4) : porte canonique du moteur pour Telegram, le web, les modules et les tests — ouvrir ou retrouver une conversation (<porte>/<compte>/<conversation> → session du noyau), soumettre (idempotent), suivre (SSE), résultat d'un tour, interrompre, répondre aux approbations ; greffon hôte du profil web, interrupteur [dsh.engine] api off|on",
+      "status": "obsolete",
       "readme": "interfaces/api/README.md",
       "contracts": [
         "engine/contracts/engine-api.v1.json"
@@ -360,8 +358,8 @@
     {
       "id": "dsh-hooks",
       "path": "hooks/dsh",
-      "role": "Greffon DSH owner-turn (texte du propriétaire pour walter_hook.py) ; remplacé par engine/plugins/intake en mode native",
-      "status": "active",
+      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : greffon DSH owner-turn (texte du propriétaire pour walter_hook.py) ; remplacé par engine/plugins/intake en mode native",
+      "status": "obsolete",
       "readme": "README.md",
       "vision_target": "core/engine/plugins"
     },
@@ -414,8 +412,8 @@
     {
       "id": "dsh-web-ui",
       "path": "ports/dsh-web-ui",
-      "role": "Personnalisation de l'interface web DSH (couleurs, porte web du propriétaire)",
-      "status": "active",
+      "role": "Retour arrière seulement depuis le 2026-11-18 (DSH désinstallé, archive dans les sauvegardes de l'instance ; le moteur natif ne le charge pas) : personnalisation de l'interface web DSH (couleurs, porte web du propriétaire)",
+      "status": "obsolete",
       "readme": "README.md",
       "vision_target": "core/interfaces/web"
     },

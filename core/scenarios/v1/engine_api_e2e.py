@@ -1,13 +1,14 @@
 """Walter V1 — end-to-end checks of the Engine API against a real engine (lot E4, 2026-11-10).
 
-Runs against a TEST engine home by default (never the live one unless --base/--token-file say so): open a
+Runs against the engine in service by default, under the test account `e2e` (since 2026-11-18: the DSH trial home on
+:8892 is gone with DSH; --base/--token-file name a native trial engine instead): open a
 conversation, submit with an idempotency key (replay never runs twice), continuity inside the session, the door's
 policy (an `ask` reaches the API's approval answerer, the owner refuses), never-rules (secret file refused),
 cancellation of a running turn, and — with --restart-unit — the same conversation found again after a restart.
 Each check prints one line; exit code 0 only when every selected check passes. Costs a handful of model turns.
 
-    walter-python core/scenarios/v1/engine_api_e2e.py --base http://127.0.0.1:8892 \\
-        --token-file /opt/dsh/e2-home/walter-api/api.token [--restart-unit walter-e4-test]
+    walter-python core/scenarios/v1/engine_api_e2e.py [--base http://127.0.0.1:8895 \\
+        --token-file @instance/bootstrap/engine/api.token] [--restart-unit <unit of a trial engine>]
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from pathlib import Path
 
 
 class Api:
@@ -47,12 +49,15 @@ class Api:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument('--base', default='http://127.0.0.1:8892')
-    ap.add_argument('--token-file', default='/opt/dsh/e2-home/walter-api/api.token')
+    ap.add_argument('--base', default='http://127.0.0.1:8895')
+    ap.add_argument('--token-file', default='@instance/bootstrap/engine/api.token')
     ap.add_argument('--restart-unit', default=None, help='systemd unit of the TEST engine host to restart between turns')
     ap.add_argument('--only', default=None, help='comma-separated checks')
     a = ap.parse_args()
-    api = Api(a.base, open(a.token_file).read().strip())
+    tf = a.token_file
+    if tf.startswith("@instance/"):        # the instance (pointer /etc/walter/instance), never a fixed path
+        tf = str(Path(open("/etc/walter/instance").read().strip()) / tf.removeprefix("@instance/"))
+    api = Api(a.base, open(tf).read().strip())
     run = uuid.uuid4().hex[:8]
     principal = {'kind': 'owner', 'id': 'e2e'}   # approvals are answered by the session's owner
     sid = f'telegram/e2e/v1-{run}'

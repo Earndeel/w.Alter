@@ -1238,21 +1238,19 @@ class Engine:
 
     async def _recover(self) -> None:
         """After a restart: close what the previous process left open, say it, resume where the journal says."""
-        # 1. runs left open by a dead engine process (this one's file, and the DSH engine's at the switch)
-        legacy = config.instance_root() / "state" / "core" / "engine" / "intake" / "open-runs.json"
+        # 1. runs left open by a dead engine process (its own file only: DSH's run file was empty at the switch and
+        #    is no longer read, 2026-11-18; a run nobody closes is ended by Memory's sweep, `runs.sweep`)
         carry: dict[str, dict] = {}      # session key → the cut run (and its plan): the resumed turn is its continuation
-        for f in (self.runs_file, legacy):
-            rows = _read_json(f, {})
-            gone = {k: r for k, r in rows.items() if isinstance(r, dict) and r.get("pid") != os.getpid() and not _alive(r.get("pid"))}
-            if not gone:
-                continue
-            for key, r in gone.items():
-                await self.doors.run_end(r["run_id"], key, "cancelled", {"status": "interrupted",
-                                                                          "error": {"kind": "engine_restart", "message": "the engine restarted during this turn"}})
-                carry[key] = {"run_id": r["run_id"], **(r.get("last") or {}), "open": False}
-                rows.pop(key, None)
+        rows = _read_json(self.runs_file, {})
+        gone = {k: r for k, r in rows.items() if isinstance(r, dict) and r.get("pid") != os.getpid() and not _alive(r.get("pid"))}
+        for key, r in gone.items():
+            await self.doors.run_end(r["run_id"], key, "cancelled", {"status": "interrupted",
+                                                                      "error": {"kind": "engine_restart", "message": "the engine restarted during this turn"}})
+            carry[key] = {"run_id": r["run_id"], **(r.get("last") or {}), "open": False}
+            rows.pop(key, None)
+        if gone:
             try:
-                _write_json(f, rows)
+                _write_json(self.runs_file, rows)
             except OSError:
                 pass
         # 2. turns cut by the restart
