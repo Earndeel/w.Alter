@@ -29,18 +29,18 @@ a{color:var(--blue)}
 #rail{grid-column:1;grid-row:2;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:30px 0 14px;min-height:0;overflow:visible;z-index:2}
 #rail-panels,#rail-links{display:flex;flex-direction:column;gap:6px}
 .rail-spacer{flex:1}
-/* Icône ouverte = onglet : même gris que la surface qu'il touche, bord bleu sur trois côtés, ouvert vers la droite
+/* Icône ouverte = onglet : même gris que la surface qu'il touche, sans bordure, ouvert vers la droite
    (il recouvre le bord de l'espace de travail), avec deux arrondis inversés au raccord. */
-.rail-btn.active{--tab:var(--l1s);width:54px;padding-right:12px;margin-right:-1px;border-color:var(--edge);border-right-color:transparent;
+.rail-btn.active{--tab:var(--l1s);width:54px;padding-right:12px;margin-right:-1px;border-color:transparent;
   border-radius:12px 0 0 12px;background:var(--tab);color:var(--blue)}
 body.side-closed .rail-btn.active{--tab:var(--l1)}
 .rail-btn.active::before,.rail-btn.active::after{content:"";position:absolute;right:-1px;width:10px;height:11px;pointer-events:none}
-.rail-btn.active::before{top:-11px;background:radial-gradient(circle at 0 0,transparent 9.5px,var(--edge) 10px,var(--edge) 10.5px,var(--tab) 11px)}
-.rail-btn.active::after{bottom:-11px;background:radial-gradient(circle at 0 100%,transparent 9.5px,var(--edge) 10px,var(--edge) 10.5px,var(--tab) 11px)}
-#workspace{grid-column:2;grid-row:2;display:flex;min-height:0;min-width:0;margin:0 10px 10px 0;border:1px solid var(--edge);border-radius:var(--r-frame);background:var(--l1);overflow:hidden}
+.rail-btn.active::before{top:-11px;background:radial-gradient(circle at 0 0,transparent 10px,var(--tab) 10.5px)}
+.rail-btn.active::after{bottom:-11px;background:radial-gradient(circle at 0 100%,transparent 10px,var(--tab) 10.5px)}
+#workspace{grid-column:2;grid-row:2;display:flex;min-height:0;min-width:0;margin:0 10px 10px 0;border:1px solid transparent;border-radius:var(--r-frame);background:var(--l1);overflow:hidden}
 body.side-closed #sidebar{display:none}
 
-#sidebar{width:var(--side);flex:none;display:flex;flex-direction:column;min-height:0;background:var(--l1s);border-right:1px solid var(--line-soft);padding:14px 12px 10px}
+#sidebar{width:var(--side);flex:none;display:flex;flex-direction:column;min-height:0;background:var(--l1s);border-right:1px solid var(--l2);padding:14px 12px 10px}
 .side-head{display:none;align-items:center;height:44px;padding:0 12px;flex:none}
 .brand{font-weight:650;font-size:22px;letter-spacing:-.2px;color:var(--fg)}
 .brand::first-letter{color:var(--blue)}
@@ -225,7 +225,7 @@ th{color:var(--fg);font-weight:600;background:var(--l3);border-bottom-color:var(
   .side-head{display:flex}
   #workspace{flex:1;margin:0;border:0;border-radius:0}
   body.side-closed #sidebar{display:flex}
-  #sidebar{position:fixed;z-index:30;left:8px;top:8px;bottom:8px;width:min(84vw,320px);background:var(--l1s);border:1px solid var(--line);border-radius:var(--r-frame);
+  #sidebar{position:fixed;z-index:30;left:8px;top:8px;bottom:8px;width:min(84vw,320px);background:var(--l1s);border:1px solid var(--l2);border-radius:var(--r-frame);
     padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));transform:translateX(calc(-100% - 16px));transition:transform .22s}
   body.drawer #sidebar{transform:none}
   .list .ren{opacity:1}
