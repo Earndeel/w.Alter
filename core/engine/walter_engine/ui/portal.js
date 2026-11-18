@@ -97,6 +97,53 @@ function reflectDocuments() {
   if (inPanel && !inspector.hidden) inspector.hidden = true;
 }
 
+
+/* Barre d'icônes du cadre extérieur : Conversations, puis un bouton par panneau et par lien.
+   Elle ne fait que relayer les éléments déjà rendus par app.js (aucune seconde liste). */
+const ICON = {
+  panel: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/></svg>',
+  link: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h4.5a2.5 2.5 0 0 1 2.5 2.5v12.5a2 2 0 0 0-2-2H5zM19 4.5h-4.5A2.5 2.5 0 0 0 12 7v12.5a2 2 0 0 1 2-2h5z"/></svg>',
+};
+function railButton(label, html, onClick) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'rail-btn'; b.title = label; b.setAttribute('aria-label', label);
+  b.innerHTML = html; b.addEventListener('click', onClick);
+  return b;
+}
+function reflectRail() {
+  const panels = [...$('panels').children];
+  $('rail-panels').replaceChildren(...panels.map((li) => {
+    const b = railButton(li.textContent.trim(), ICON.panel, () => li.click());
+    b.classList.toggle('active', li.classList.contains('active') && !$('panel-view').hidden);
+    return b;
+  }));
+  const links = [...$('links').querySelectorAll('a.link')];
+  $('rail-links').replaceChildren(...links.map((a) => {
+    const label = a.firstChild ? a.firstChild.textContent.trim() : a.textContent.trim();
+    const b = railButton(label + ' ↗', ICON.link, () => window.open(a.href, '_blank', 'noopener'));
+    return b;
+  }));
+  $('rail-chat').classList.toggle('active', $('panel-view').hidden);
+}
+$('rail-chat').addEventListener('click', () => {
+  if ($('panel-view').hidden) { $('input').focus(); return; }
+  let last = null; try { last = localStorage.getItem('walter.last'); } catch (_) { /* ok */ }
+  if (last && document.querySelector('#sessions li .t')) location.hash = '#/c/' + last; else $('new-chat').click();
+});
+
+/* Masquer / afficher la barre latérale (ordinateur) ; sur téléphone, ouvre le tiroir. */
+function side(open) {
+  document.body.classList.toggle('side-closed', !open);
+  const t = $('portal-toggle-side');
+  t.setAttribute('aria-expanded', String(open));
+  t.title = open ? 'Masquer la barre latérale' : 'Afficher la barre latérale';
+  t.setAttribute('aria-label', t.title);
+  try { localStorage.setItem('walter.side', open ? '1' : '0'); } catch (_) { /* ok */ }
+}
+$('portal-toggle-side').addEventListener('click', () => side(document.body.classList.contains('side-closed')));
+let sideOpen = true; try { sideOpen = localStorage.getItem('walter.side') !== '0'; } catch (_) { /* ok */ }
+side(sideOpen);
+
 /* Observateurs (un seul passage par image) */
 let queued = false;
 function refresh() {
@@ -104,7 +151,7 @@ function refresh() {
   queued = true;
   requestAnimationFrame(() => {
     queued = false;
-    reflectActiveTab(); filterSessions(); reflectConfiguration(); tidyTools(thread); reflectDocuments();
+    reflectActiveTab(); filterSessions(); reflectConfiguration(); reflectRail(); tidyTools(thread); reflectDocuments();
   });
 }
 const mo = new MutationObserver(refresh);
@@ -129,4 +176,4 @@ const send = $('send');
 const label = () => { send.setAttribute('aria-label', send.textContent); send.title = send.textContent; send.classList.toggle('steer', send.textContent !== 'Envoyer'); };
 new MutationObserver(label).observe(send, { childList: true, characterData: true, subtree: true });
 label();
-document.body.dataset.walterPortal = 'v5';
+document.body.dataset.walterPortal = 'v6';
