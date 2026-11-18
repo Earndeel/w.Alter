@@ -1,6 +1,6 @@
 ---
 name: gsap-frontend
-category: coder-profile
+category: multi-model-coder-router
 description: GSAP animation skill for frontend coding — timelines, ScrollTrigger, Flip, plugins, React/Vanilla integration. Complements Motion (motion.dev) for complex sequencing, scroll-driven, and SVG animations.
 tags: [gsap, animation, frontend, scrolltrigger, timeline, react, vanilla, svg]
 ---
