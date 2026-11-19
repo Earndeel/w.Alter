@@ -646,7 +646,7 @@ The owner's ChatGPT/Codex account read with W.Alter's OWN Codex session (2026-11
 
 - `_token()` — 
 - `headers(token: str)` — Bearer + the workspace headers the backend derives from the OAuth JWT (account id, data residency).
-- `_get(path: str, timeout: int=30)` — 
+- `_get(path: str, timeout: int=30)` — A 401 drops the token kept by this process and reads the grant again, once: the session's token is refreshed
 - `ranked(entries: list)` — Visible slugs by (priority, slug): `visibility: hide` entries are not offered to the account.
 - `catalog()` — Model slugs the account may run (first client version that answers a non-empty list).
 - `windows(payload: dict)` — Quota windows of a /wham/usage answer, named by their published duration (position only as fallback).

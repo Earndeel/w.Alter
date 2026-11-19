@@ -433,6 +433,14 @@ Ces valeurs sont les défauts logiciels, jamais un export des réglages privés 
 | config/decision-needs.json | `needs.documents.verify.purpose` | str | check a fact drawn from a document against it |
 | config/decision-needs.json | `needs.documents.verify.types[]` | str | choice |
 | config/decision-needs.json | `needs.documents.verify.types[]` | str | noul |
+| config/decision-needs.json | `needs.memory.reconcile.escalate_below` | NoneType | — |
+| config/decision-needs.json | `needs.memory.reconcile.latency_ms` | int | 8000 |
+| config/decision-needs.json | `needs.memory.reconcile.max_timeout_s` | NoneType | — |
+| config/decision-needs.json | `needs.memory.reconcile.memo_ttl_s` | int | 86400 |
+| config/decision-needs.json | `needs.memory.reconcile.owner` | str | cognition/memory |
+| config/decision-needs.json | `needs.memory.reconcile.purpose` | str | consolidation: how each statement extracted from a conversation relates to current knowledge (target item + new / confirms / enriches / corrects / replaces / contradicts / ignore), up to 12 statements per decision |
+| config/decision-needs.json | `needs.memory.reconcile.since` | str | 2026-11-19 |
+| config/decision-needs.json | `needs.memory.reconcile.types[]` | str | choice |
 | config/decision-needs.json | `needs.sourced-observation/1.verify.escalate_below` | NoneType | — |
 | config/decision-needs.json | `needs.sourced-observation/1.verify.latency_ms` | int | 10000 |
 | config/decision-needs.json | `needs.sourced-observation/1.verify.max_timeout_s` | NoneType | — |

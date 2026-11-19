@@ -8275,7 +8275,7 @@
             "signature": "token: str"
           },
           {
-            "description": "",
+            "description": "A 401 drops the token kept by this process and reads the grant again, once: the session's token is refreshed",
             "name": "_get",
             "signature": "path: str, timeout: int=30"
           },
@@ -10417,6 +10417,54 @@
         "default": "noul",
         "file": "config/decision-needs.json",
         "key": "needs.documents.verify.types[]",
+        "type": "str"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.memory.reconcile.escalate_below",
+        "type": "NoneType"
+      },
+      {
+        "default": 8000,
+        "file": "config/decision-needs.json",
+        "key": "needs.memory.reconcile.latency_ms",
+        "type": "int"
+      },
+      {
+        "default": null,
+        "file": "config/decision-needs.json",
+        "key": "needs.memory.reconcile.max_timeout_s",
+        "type": "NoneType"
+      },
+      {
+        "default": 86400,
+        "file": "config/decision-needs.json",
+        "key": "needs.memory.reconcile.memo_ttl_s",
+        "type": "int"
+      },
+      {
+        "default": "cognition/memory",
+        "file": "config/decision-needs.json",
+        "key": "needs.memory.reconcile.owner",
+        "type": "str"
+      },
+      {
+        "default": "consolidation: how each statement extracted from a conversation relates to current knowledge (target item + new / confirms / enriches / corrects / replaces / contradicts / ignore), up to 12 statements per decision",
+        "file": "config/decision-needs.json",
+        "key": "needs.memory.reconcile.purpose",
+        "type": "str"
+      },
+      {
+        "default": "2026-11-19",
+        "file": "config/decision-needs.json",
+        "key": "needs.memory.reconcile.since",
+        "type": "str"
+      },
+      {
+        "default": "choice",
+        "file": "config/decision-needs.json",
+        "key": "needs.memory.reconcile.types[]",
         "type": "str"
       },
       {
@@ -18862,7 +18910,7 @@
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
     "cli.py": "676ccdd84a9e47a74f16bc31dddbbdcaa03a6540517fb886be35e52b7a68904d",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
-    "config/decision-needs.json": "ced8af5a8bc2609504333ab050791990a6fd36bebf1b3ed70222eac65e6d1b55",
+    "config/decision-needs.json": "8c912fe4a937dd9dc2ab2ab8bbe122080a67ddfcd9fd5450c4c79101e824b608",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
     "config/host.json": "517df8ae317ee7dc490a87e1dd3ff2aa131ada5e07bad8a2bb7c318768c9468a",
     "config/kie_media_schemas.json": "278e5d624ffa274e473eaaf6ab044df1c454c43bb39df40613e6cde9c6f8edd1",
@@ -18898,10 +18946,10 @@
     "llm/decision.py": "999ffcf20c7a4598878369e9ad5439b0113b6a0d1b77bf7b0124c44557aba305",
     "llm/gateway.py": "be9df224c7e9ca49c14e15a7678d693a419840681b58609b020b622e0893aed7",
     "llm/resolver.py": "cd04d0c818891381f988d044cc910902ec3fc11e1d1401ad16190e601935d188",
-    "llm/structured.py": "8fd6b1f0f103765584f48361641246946d49b44a2fc9458c2bd2d2c4e856340e",
+    "llm/structured.py": "4a8e241f6033f6e61753d6090dbc920d28a4fdcf45150140d70fdf169ff742da",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
-    "plan/codex_account.py": "89d23c4cc7cded04a8a19eb7f62ed4b2aed7e7d8980660f4fbaf2770347861ec",
+    "plan/codex_account.py": "c6304ef26216528a6c2b5da12e5a410bef6a59bc44d2d0ea440de12b043815a7",
     "plan/consumption.py": "6ff376bf70ecd34d5d16ef9315fc20c1993aec3f178a20ead43f7f61be9d59fe",
     "plan/declared.py": "9687186dc3b15a3aa0d4cf39633dbd2cc1b633608306eadbce87ed894276beac",
     "plan/mail.py": "541e27d036223253091b2349aa5ca4844fd72f478582b465d83abb22cc1da534",
