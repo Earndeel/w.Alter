@@ -580,3 +580,14 @@ def test_an_unverified_declaration_never_overwrites_confirmed_knowledge():
         == ("enriches", "complement_only")
     assert knowledge.guard(agent, "replaces", plain, 0.9, 0.5) == ("replaces", None)      # declaration over declaration
     assert knowledge.guard({**agent, "by_owner": True}, "replaces", proven, 0.9, 0.5) == ("replaces", None)
+
+
+def test_a_dense_segment_is_cut_into_decisions_of_at_most_32_questions():
+    """Production 19/11: 12 statements that may each be work on an open goal ask 36 questions; walter-llm refuses
+    more than 32 per decision, so they are cut, and a plain batch keeps its size."""
+    work = {"act": "action", "open_work": [{"item_id": "x", "content": "objectif"}]}
+    plain = {"act": "fact", "open_work": []}
+    cuts = knowledge.batches([(f"s{i}", work, []) for i in range(12)], 12)
+    assert [len(c) for c in cuts] == [10, 2]
+    assert all(sum(knowledge.question_count(p[1]) for p in c) <= knowledge.MAX_QUESTIONS for c in cuts)
+    assert [len(c) for c in knowledge.batches([(f"s{i}", plain, []) for i in range(13)], 12)] == [12, 1]

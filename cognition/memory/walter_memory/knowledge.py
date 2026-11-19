@@ -158,6 +158,26 @@ WHO = {"stated_owner": "owner", "agent_reported": "assistant", "stated_third_par
        "observed": "observed", "inferred": "assistant (hypothesis)"}
 
 
+MAX_QUESTIONS = 32   # walter-llm /v1/decisions: at most 32 questions per decision
+
+
+def question_count(st: dict) -> int:
+    """Questions judge() asks for one statement: target + verdict, + work when it may be a step of open work."""
+    return 2 + (1 if any(True for _ in st.get("open_work") or []) and st.get("act") in PROGRESS_ACTS else 0)
+
+
+def batches(pending: list, size: int) -> list[list]:
+    """Cut (sid, statement, candidates) into decisions of at most `size` statements and MAX_QUESTIONS questions
+    (production 19/11: a dense segment of 12 statements with open work asked 36 and was refused)."""
+    out, cur, n = [], [], 0
+    for p in pending:
+        q = question_count(p[1])
+        if cur and (len(cur) >= max(1, size) or n + q > MAX_QUESTIONS):
+            out.append(cur); cur, n = [], 0
+        cur.append(p); n += q
+    return out + ([cur] if cur else [])
+
+
 def judge(batch: list[tuple[str, dict, list[dict]]], *, privacy_class: str, budget: str) -> dict:
     """One Walter Decision for a batch of (sid, statement, candidates) → {sid: (verdict, target item_id, confidence)}.
     Memoised on its exact inputs (processing.decide_once): a replay of the same statements never asks again."""

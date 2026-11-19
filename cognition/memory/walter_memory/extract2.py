@@ -599,8 +599,7 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                 verdicts.append(None)
                 pending.append((f"s{j + 1}", st, cands))
     decisions = 0
-    for i in range(0, len(pending), max(1, int(rc["batch"]))):
-        part = pending[i:i + int(rc["batch"])]
+    for part in knowledge.batches(pending, int(rc["batch"])):
         cls = privacy.strictest(seg_class, *(c["privacy_class"] for _, _, cs in part for c in cs))
         got = knowledge.judge(part, privacy_class=cls, budget=budget)
         decisions += 1
