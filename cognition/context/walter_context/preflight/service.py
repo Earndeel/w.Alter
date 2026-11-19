@@ -151,3 +151,10 @@ def _warm() -> None:
                 "runtime": "warmup", "privacy_class": "cloud_allowed"}, shadow=False, want_pack=True, warm=True)
     except Exception:  # noqa: BLE001
         pass
+    try:                                    # the situation digest's projections (a cold big project: ~1 s, warm ~60 ms)
+        from . import DIGEST
+        if DIGEST["enabled"]:
+            from walter_memory import digest
+            digest.warm()
+    except Exception:  # noqa: BLE001
+        pass

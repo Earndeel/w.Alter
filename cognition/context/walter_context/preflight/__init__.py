@@ -27,7 +27,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..config import preflight_settings, state_settings
+from ..config import digest_settings, preflight_settings, state_settings
 from ..plan import (ACTS, CAPABILITIES, DOMAINS, HORIZONS, LEVELS, MODEL_LEVELS, ContextPlan, ModelProfile,
                     ThreadChoice, OBSERVATIONS, PERSONAL, URGENCY, CLARITY, IMAGE_KINDS)
 
@@ -500,6 +500,48 @@ def resolution_brief(res: dict) -> dict | None:
     return out if any(out.values()) else {}
 
 
+DIGEST = digest_settings()
+
+
+def _digest_start(req: Request):
+    """The situation digest (walter_memory.digest), started beside the turn's own preparation; None when off or the
+    message is local_only (nothing of it may reach a cloud decision)."""
+    if not DIGEST["enabled"] or req.privacy_class == "local_only":
+        return None
+    try:
+        from walter_memory import digest as D
+    except Exception as exc:                     # Memory unavailable: the decision goes on as before, said in the plan
+        object.__setattr__(req, "_digest", {"error": type(exc).__name__})
+        return None
+
+    def build(t0=time.perf_counter()):
+        d = D.build(req.message, previous=req.previous.message if req.previous else None,
+                    previous_age_s=req.previous.age_s if req.previous else None, max_tokens=DIGEST["max_tokens"])
+        d["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+        return d
+    return _readers().submit(build), time.perf_counter()
+
+
+def _digest_take(started, req: Request) -> dict | None:
+    """The digest's state entry, or None (nothing to add, late or failed). What the plan journals: kinds, tokens,
+    time — never the lines (the plan is journaled; the lines are in the decision's own call record)."""
+    if started is None:
+        return None
+    fut, t0 = started
+    left = max(DIGEST["timeout_ms"] / 1000 - (time.perf_counter() - t0), 0.0)
+    try:
+        d = fut.result(timeout=left)
+    except Exception as exc:  # noqa: BLE001 — late or failed: the decision goes on without it, said in the plan
+        object.__setattr__(req, "_digest", {"late" if type(exc).__name__ == "TimeoutError" else "error":
+                                            error_text(exc, 80) or type(exc).__name__})
+        return None
+    from walter_memory import digest as D
+    object.__setattr__(req, "_digest", {"kinds": d["kinds"], "tokens": d["tokens"], "ms": d["ms"],
+                                        **({"cut": d["cut"]} if d.get("cut") else {}),
+                                        **({"already_shown": d["known"]} if d.get("known") else {})})
+    return D.block(d)
+
+
 def _decide_turn(req: Request, timeout: float, purpose: str) -> tuple[dict, dict, dict, Readings | None]:
     """→ (answers by set 2 name, the full reply, the trace of the signals, the readings asked apart or None)."""
     from walter_memory import llm
@@ -510,6 +552,7 @@ def _decide_turn(req: Request, timeout: float, purpose: str) -> tuple[dict, dict
         state, q = questions(req)
         res = llm.decide(state, q, samples=DECISION_SAMPLES, **sampling, **common)
         return (res.get("answers") if isinstance(res, dict) else None) or {}, res, {}, None
+    started = _digest_start(req)
     state, facts, opts = turn(req)
     turn_args = dict(occasion="turn", focus="new_message", now=owner_today(), **common)
     from .. import media as M
@@ -518,6 +561,9 @@ def _decide_turn(req: Request, timeout: float, purpose: str) -> tuple[dict, dict
     except Exception as exc:  # noqa: BLE001 — the plan is made on the text alone, said in the trace
         seen_media, media_notes = [], [error_text(exc)]
     object.__setattr__(req, "_media", ([m["type"] for m in seen_media], media_notes))
+    known = _digest_take(started, req)
+    if known:                               # what Memory already knows of the message's references (adaptive)
+        state["known_state"] = known
     readings = None
     if READINGS_APART:
         def read(t0=time.perf_counter()):
@@ -732,6 +778,8 @@ def run(req: Request, *, purpose: str = "walter-context preflight", within: floa
     rb = resolution_brief(res)
     if rb:
         plan.decision["resolution"] = rb
+    if getattr(req, "_digest", None) is not None:
+        plan.decision["digest"] = req._digest
     ds = getattr(req, "_ds", None)
     if ds is not None:                     # the plan carries the DecisionState's summary (no contract change: decision is free)
         from .. import decision_state as DS

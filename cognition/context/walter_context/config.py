@@ -189,6 +189,14 @@ def state_settings(path: str | Path | None = None) -> dict:
     return _optional("state", STATE_DEFAULTS, path)
 
 
+DIGEST_DEFAULTS = {"enabled": False, "max_tokens": 250, "timeout_ms": 300}
+
+
+def digest_settings(path: str | Path | None = None) -> dict:
+    """[digest] (19/11): the situation digest the preflight adds to its single Decision call (walter_memory.digest)."""
+    return _optional("digest", DIGEST_DEFAULTS, path)
+
+
 def media_settings(path: str | Path | None = None) -> dict:
     """[media] (18/11): the images and voice notes of a message read by the preflight's decision model."""
     return _optional("media", MEDIA_DEFAULTS, path)

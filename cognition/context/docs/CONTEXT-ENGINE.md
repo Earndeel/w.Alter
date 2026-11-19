@@ -451,3 +451,14 @@ mesures (banc `bench/preflight_native.py`, 65 cas dont 37 réels) et retour arri
 - **Pack** : le brief M1 d'un module venait deux fois (capacités + cartes d'outils). Le bloc capacités est M0 seul ;
   la carte d'outil vient une fois, aussi quand un domaine lit la mémoire. Rien d'utile retiré (état de session,
   mémoire, position gardés).
+
+## 11. Condensé de situation dans le préflight (19/11/2026)
+
+L'appel unique à Decision reçoit, quand le message désigne un projet, une personne, des tâches, l'agenda, un besoin
+de position ou la situation de Monsieur, l'état compact que Walter Memory en connaît (`state.known_state`,
+`walter_memory.digest`, ≤ 250 tokens, aucun appel de modèle) ; rien sinon. Un message `local_only` n'en reçoit
+jamais ; la position n'y est qu'un signal, jamais le lieu. Lancé en parallèle de la préparation du tour, attendu au
+plus `[digest] timeout_ms` ; en retard ou en erreur, la décision part comme avant (`decision.digest.late|error`).
+Le plan journalise types, tokens et durée, jamais les lignes. Détail, banc et chiffres :
+`/walter/cognition/memory/docs/PROJECTIONS.md` § 11. Réglage et retour arrière : `[digest]` de
+`config/walter-context.toml`.

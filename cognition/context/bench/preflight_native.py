@@ -81,9 +81,13 @@ def _calls(purpose_prefix: str, since: datetime) -> dict:
 
 
 def run(label: str, limit: int | None, only: list[str] | None, need: str | None = None,
-        apart: bool | None = None, without: list[str] | None = None, set_name: str = "gold") -> Path:
+        apart: bool | None = None, without: list[str] | None = None, set_name: str = "gold",
+        digest: bool | None = None) -> Path:
     from walter_context.preflight import __main__ as pm
     from walter_memory import llm
+    if digest is not None:                              # the situation digest ([digest] enabled), 19/11
+        from walter_context import preflight as pf
+        pf.DIGEST = dict(pf.DIGEST, enabled=digest)
     if apart is not None:                               # the candidate's readings setting ([preflight] readings_apart)
         from walter_context import preflight as pf
         pf.READINGS_APART = apart
@@ -141,6 +145,8 @@ def run(label: str, limit: int | None, only: list[str] | None, need: str | None 
                    "fast_path": plan.get("fast_path"), "model": dec.get("model"), "parts": dec.get("parts"),
                    "act": plan.get("act"), "level": plan.get("level"), "caps": plan.get("capabilities") or [],
                    "personal": plan.get("personal"), "observations": plan.get("observations") or {},
+                   "profile": plan.get("model_profile"), "thread_new": (plan.get("thread") or {}).get("new"),
+                   "digest": dec.get("digest"),
                    "assessment": plan.get("assessment"), "media": plan.get("media"),
                    "pack": {"tokens": pk.get("tokens_per_message"), "retrieval_ms": pk.get("retrieval_ms"),
                             "blocks": [b.get("id") for b in pk.get("blocks") or []], "late": pk.get("late"),
@@ -385,15 +391,16 @@ def main() -> None:
     r.add_argument("--need", help="the gateway need to ask under (a candidate policy)")
     r.add_argument("--readings-apart", choices=["true", "false"])
     r.add_argument("--without", help="models taken out of the decision chain, comma-separated (outage drill)")
-    r.add_argument("--set", default="gold", choices=["gold", "indep", "hold"])
+    r.add_argument("--set", default="gold", choices=["gold", "indep", "hold", "digest"])
+    r.add_argument("--digest", choices=["on", "off"], help="the situation digest, whatever [digest] enabled says")
     p = sub.add_parser("report")
     p.add_argument("--labels", required=True)
-    p.add_argument("--set", default="gold", choices=["gold", "indep", "hold"])
+    p.add_argument("--set", default="gold", choices=["gold", "indep", "hold", "digest"])
     a = ap.parse_args()
     if a.cmd == "run":
         run(a.label, a.limit, a.only.split(",") if a.only else None, a.need,
             None if a.readings_apart is None else a.readings_apart == "true",
-            a.without.split(",") if a.without else None, a.set)
+            a.without.split(",") if a.without else None, a.set, None if a.digest is None else a.digest == "on")
     else:
         rep = report(a.labels.split(","), a.set)
         dest = BENCH / f"pfn-report-{'' if a.set == 'gold' else a.set + '-'}{'-'.join(a.labels.split(','))}.json"
