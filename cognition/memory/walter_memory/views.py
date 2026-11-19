@@ -523,7 +523,7 @@ def read(q: dict) -> dict:
     depth = q.get("depth")
     if depth == "state":                      # current-state projection (PROJECTIONS.md, P1): a read, nothing stored
         from . import projection
-        return projection.read(q) if q.get("key") else {"error": "depth state needs a key (project:…, owner, now or me)"}
+        return projection.read(q) if q.get("key") else {"error": "depth state needs a key (project:…, owner, now, me or person:…)"}
     if depth not in DEPTHS or not (q.get("key") or q.get("domain")):
         return {"error": "depth in index|overview|synthesis|details|sources|state and a key or a domain"}
     max_tokens = int(q.get("max_tokens") or 800)

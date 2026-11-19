@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import contextlib
 import re
+from functools import lru_cache
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -36,6 +37,51 @@ AGENDA = timedelta(days=7)
 LEARNED = timedelta(days=3)          # « appris récemment »: the subjects memory got new knowledge about
 EPISODES = timedelta(days=7)
 RULE_ORDER = {"correction": 0, "constraint": 1, "decision": 2, "preference": 3}
+FACT_FRESH = timedelta(days=30)      # a fact said once, longer ago: shown dated « non reconfirmé », after the fresh ones
+VIEW_FRESH = timedelta(hours=36)     # a day / week view built longer ago is shown as old, never as the current period
+
+# P2 corrections (19/11). A rule is normative: it says what must or must not be done, what he wants or refuses. A
+# « constraint » or « correction » that only describes (a technical detail, a biographical fact) is not a rule.
+NORM = re.compile(r"(?i)(\bjamais\b|\btoujours\b|\bne (?:doit|doivent|faut|veut|souhaite|plus|pas)\b|\bdoi(?:t|vent)\b|"
+                  r"\bil faut\b|\bveut (?:que|qu'|des?|les?|la|un|une|du|plus|moins|être)\b|\bexige|\binterdi|\brefuse|"
+                  r"\bpr[ée]f[èe]re|\bpas de\b|\bplus de\b|\bchaque (?:fois|message|réponse|changement)\b|"
+                  r"\bsyst[ée]matiquement\b|\bavant (?:de|tout|toute)\b|\buniquement\b|\bseulement\b|\bsans (?:son |lui )?"
+                  r"(?:demander|accord|validation|go|feu vert)\b|\bà (?:éviter|proscrire)\b|\bn'(?:envoie|utilise|ajoute|accepte)\b|"
+                  r"\bpriorit|\bnever\b|\balways\b|\bmust\b)")
+BIO = re.compile(r"(?i)\b(est n[ée]e?\b|habite|vit (?:à|en|au|chez)|travaille (?:chez|à|comme|pour)|s'appelle|a \d+ ans|"
+                 r"son (?:père|frère|fils|associé|ami)|sa (?:mère|sœur|fille|femme|compagne|famille)|ses (?:parents|enfants)|"
+                 r"poss[èe]de|est (?:propriétaire|marié|né|originaire))")
+# a one-off request is not a durable aim: « Monsieur demande… », « veut que W.Alter vérifie… », « veut un rapport »
+ONE_OFF = re.compile(r"(?i)^\s*(?:Monsieur\s+)?(?:a\s+)?(?:re)?(?:demand|veut (?:que (?:W\.?Alter|Claude|l'agent|tu|on|"
+                     r"ce|cette|le|la|les|l')\b|savoir|voir|comprendre|qu'on|un (?:exemple|rapport|résumé|audit|point|test)|"
+                     r"une (?:liste|explication|vérification|réponse|analyse))|souhaite (?:savoir|voir)|aimerait savoir)")
+ACTION = re.compile(r"(?i)\b(lancer?|lance|corrig|vérifi|ajout|supprim|install|test(?:er|e)\b|regard|envoi|expliqu|montr|"
+                    r"donn|implément|commit|redémarr|relanc|rédig|prépar|analys|audit|compar|cherch|trouv|mesur|"
+                    r"exécut|répar|reprend|termin|livr|publi|déploi)")
+DURABLE = re.compile(r"(?i)(à (?:long )?terme|durablement|devien|puisse|capable|autonom|toujours|systématiquement|\bvise\b|"
+                     r"ambition|apprendre|un jour|vision|de manière générale|en général|à l'avenir|désormais)")
+
+
+@lru_cache(maxsize=50000)
+def _normative(text: str) -> bool:
+    return bool(NORM.search(text or ""))
+
+
+@lru_cache(maxsize=50000)
+def _technical(text: str) -> bool:
+    return len(P.TECH.findall(P.SELON.sub("", text or ""))) >= 2
+
+
+@lru_cache(maxsize=50000)
+def _bio(text: str) -> bool:
+    return bool(BIO.search(text or ""))
+
+
+@lru_cache(maxsize=50000)
+def one_off(text: str) -> bool:
+    """A request for one piece of work, not a durable aim (its head asks for an action, nothing durable is said)."""
+    t = text or ""
+    return bool(ONE_OFF.search(t) or ACTION.search(t[:70])) and not DURABLE.search(t)
 
 # « où en suis-je », « mon état (courant) », « ma situation », « ce que j'ai en cours », « mes engagements »
 ME_HINT = re.compile(r"(?i)(o[uù] en suis[- ]je|o[uù] j'en suis|\bmon [ée]tat\b|\bma situation\b|"
@@ -97,37 +143,50 @@ def personal(*, at: datetime | str | None = None, max_privacy: str = "cloud_allo
     temporary = [r for r in rows if r.get("valid_to") and r["kind"] != "goal"]
     temp_ids = {r["item_id"] for r in temporary}
     # rules in force: what he said himself and still holds, durable (a task's working rule is not his rule)
-    rules, prefs = [], []
+    rules, prefs, described = [], [], []
+    technical = 0
     for r in rows:
         if r["item_id"] in temp_ids or not owner(r) or r.get("scope") == "task" or r.get("dom") == "task":
             continue
         if r["kind"] in ("constraint", "correction") or (r["kind"] == "decision" and r["stage"] in P.IN_FORCE
                                                           | {"requested"}):
-            rules.append(r)
+            if _normative(r["content"]) and not _bio(r["content"]):
+                rules.append(r)
+            elif _technical(r["content"]):
+                technical += 1             # a technical detail filed as a rule: not his rule, counted
+            else:
+                described.append(r)        # a description (biographical, factual): with his facts, not his rules
         elif r["kind"] == "preference":
             prefs.append(r)
-    # reaffirmed first (several sources), then the strongest kind, then the newest
-    key = lambda r: (-(min(r.get("nsrc") or 1, 3)), RULE_ORDER.get(r["kind"], 9), -r["from"].timestamp())  # noqa: E731
+    # reaffirmed first (several sources), plain words before technical ones, the strongest kind, then the newest
+    key = lambda r: (-(min(r.get("nsrc") or 1, 3)), _technical(r["content"]), RULE_ORDER.get(r["kind"], 9),  # noqa: E731
+                     -r["from"].timestamp())
     rules.sort(key=key)
     prefs.sort(key=key)
     goals = P.goal_buckets(by.get("goal", []) + by.get("commitment", []), tasks, (), now)
     # his durable aims (« Monsieur veut que… »), taken up or not: shown with their real status, the newest first
+    durable = [r for r in by.get("goal", []) if r.get("scope") != "task" and r.get("dom") != "task"
+               and not P._is_test(r["content"]) and P.effective(r) == "open" and not P._last_step(r)]
+    requests = [r for r in durable if one_off(r["content"])]       # one piece of work asked: not a durable aim
     aims = [P._line(r, effective=P.effective(r)) for r in sorted(
-        (r for r in by.get("goal", []) if r.get("scope") != "task" and r.get("dom") != "task"
-         and not P._is_test(r["content"]) and P.effective(r) == "open" and not P._last_step(r)),
-        key=lambda r: -r["from"].timestamp())]
+        (r for r in durable if not one_off(r["content"])), key=lambda r: -r["from"].timestamp())]
     facts, reverify = [], []
-    for r in by.get("fact", []):
+    for r in by.get("fact", []) + described:
         if r["item_id"] in temp_ids:
             continue
         transient = r.get("scope") in ("task", "until") or r.get("dom") == "task" or P._stateful(r["content"])
         if transient and now - r["from"] > ttl:
             reverify.append(P._line(r))
         elif r.get("scope") != "task" and r.get("dom") != "task":
-            facts.append(P._line(r, weight=P.weight(r, (), now)))
-    facts.sort(key=lambda l: (l["who"] not in ("vérifié", "Monsieur"), -l["weight"], -l["said"].timestamp()))
+            if _technical(r["content"]) and not _bio(r["content"]):
+                technical += 1             # a technical detail of his work, not a fact about him
+                continue
+            old = now - r["from"] > FACT_FRESH and (r.get("nsrc") or 1) < 2 and r["epistemic"] != "verified"
+            facts.append(P._line(r, weight=P.weight(r, (), now), old=old))
+    facts.sort(key=lambda l: (l["old"], l["who"] not in ("vérifié", "Monsieur"), -l["weight"], -l["said"].timestamp()))
     reverify.sort(key=lambda l: -l["said"].timestamp())
     return {"key": "owner", "name": "Monsieur", "at": at, "count": len(rows), "withheld": withheld,
+            "set_aside": {"technical": technical, "requests": len(requests)},
             "sections": {"rules": [P._line(r) for r in rules], "prefs": [P._line(r) for r in prefs],
                          "temporary": [P._line(r) for r in sorted(temporary, key=lambda r: r["valid_to"])],
                          "goals": goals, "aims": aims, "facts": facts, "reverify": reverify},
@@ -156,19 +215,30 @@ def _place(allowed: list[str], now: datetime) -> dict:
 def _agenda(conn, now: datetime, allowed: list[str]) -> dict:
     # bounds computed here: a literal range prunes the event partitions at planning time (now() would plan them all)
     rows = conn.execute("""select distinct on (coalesce(payload->>'event_id', event_id::text)) occurred_at, content,
-                                  payload->'start' start, payload->>'location' location, privacy_class
+                                  payload->'start' start, payload->>'location' location, privacy_class,
+                                  coalesce(payload->>'calendar_id', '') cal
                            from core.events where source = 'calendar' and event_type = 'calendar.event'
                              and occurred_at >= %s and occurred_at < %s
                              and coalesce(payload->>'status', 'confirmed') <> 'cancelled'
                            order by coalesce(payload->>'event_id', event_id::text), ingested_at desc""",
                         (now - timedelta(hours=12), now + timedelta(days=60))).fetchall()
     rows = sorted(rows, key=lambda r: r["occurred_at"])
+    # a subscribed calendar (holidays, week numbers…) gives landmarks, never an appointment of his (P2 fix, 19/11)
+    marks = [r for r in rows if _subscribed(r["cal"])]
+    rows = [r for r in rows if not _subscribed(r["cal"])]
     shown = [r for r in rows if r["privacy_class"] in allowed]
-    week = [r for r in shown if r["occurred_at"] < now + AGENDA and
-            (r["occurred_at"] >= now or "date" in (r["start"] or {}))]
+    inweek = lambda r: r["occurred_at"] < now + AGENDA and (r["occurred_at"] >= now or "date" in (r["start"] or {}))  # noqa: E731
+    week = [r for r in shown if inweek(r)]
     nxt = None if week else next((r for r in shown if r["occurred_at"] >= now), None)
+    holidays = [r for r in marks if "#holiday" in r["cal"] and inweek(r) and r["privacy_class"] in allowed]
     sync = conn.execute("select max(last_success_at) m from ingestion.connectors where source = 'calendar'").fetchone()
-    return {"week": week, "next": nxt, "withheld": len(rows) - len(shown), "synced": sync["m"] if sync else None}
+    return {"week": week, "next": nxt, "withheld": len(rows) - len(shown), "synced": sync["m"] if sync else None,
+            "holidays": holidays, "landmarks": len(marks)}
+
+
+def _subscribed(cal: str) -> bool:
+    """Google's public calendars (holidays, week numbers, phases of the moon…): not the owner's agenda."""
+    return cal.endswith("@group.v.calendar.google.com") or "#" in cal
 
 
 def _tasks(limit: int = 8) -> list[dict]:
@@ -180,26 +250,16 @@ def _tasks(limit: int = 8) -> list[dict]:
 
 
 def _learned(conn, now: datetime, allowed: list[str]) -> dict:
-    rows = conn.execute(f"""select {P.SUBJ} k, count(*) filter (where created_at > %s) n, max(created_at) last
+    """The freshness of what memory knows about HIM (P2 fix, 19/11: never the volume ingested about everything): his
+    newest knowledge, how much is new in LEARNED, and why it stops when it stops (the live extraction's gate and the
+    conversations waiting). Counts over every class: a count is not a content."""
+    r = conn.execute(f"""select max(created_at) last, count(*) filter (where created_at > %s) n,
+                                count(*) filter (where created_at > %s and not (privacy_class = any(%s))) local_n
         from core.derived_items where derived_by = 'l3.extract' and generation = 'g1' and kind <> 'summary'
-          and status in ('derived', 'verified') and privacy_class = any(%s) group by 1""",
-                        (now - LEARNED, allowed)).fetchall()
-    last = max((r["last"] for r in rows), default=None)
-    rows = sorted((r for r in rows if r["n"]), key=lambda r: -r["n"])
-    cat = P.catalog(conn)
-    named = []
-    for r in rows:
-        k = P.resolve(r["k"]) if (r["k"] or "").startswith(P.PREFIX) else r["k"]
-        e = cat.get(k)
-        name = e["name"] if e else {"owner": "Monsieur lui-même", "other": "hors projet"}.get(r["k"] or "")
-        if name:
-            named.append({"name": name, "n": r["n"], "last": r["last"]})
-    merged: dict[str, dict] = {}
-    for x in named:
-        m = merged.setdefault(x["name"], {"name": x["name"], "n": 0, "last": x["last"]})
-        m["n"] += x["n"]
-        m["last"] = max(m["last"], x["last"])
-    return {"subjects": sorted(merged.values(), key=lambda x: -x["n"])[:5], "last": last}
+          and status in ('derived', 'verified') and ({P.SUBJ} = 'owner' or attributes->>'domain' = 'personal')""",
+                     (now - LEARNED, now - LEARNED, allowed)).fetchone()
+    from . import extract2
+    return {"last": r["last"], "n": r["n"], "local_n": r["local_n"], **extract2.live_status(conn)}
 
 
 def _views(conn, now: datetime, allowed: list[str]) -> dict:
@@ -314,6 +374,9 @@ def blocks_now(s: dict, skip: tuple = ()) -> dict:
     tail = [f"- agenda synchronisé {_ago(ag['synced'], now)}"] if ag.get("synced") else ["- agenda non synchronisé"]
     if ag["withheld"]:
         tail.append(f"- aussi : {ag['withheld']} rendez-vous locaux, non transmis")
+    if ag.get("holidays"):
+        tail.append("- jour férié : " + ", ".join(f"{_when(r['occurred_at'], True)} ({P._short(r['content'] or '', 30)})"
+                                                  for r in ag["holidays"][:3]))
     b["agenda"] = ("Agenda (7 jours)", al or [("- aucun rendez-vous dans les 7 jours", None)], tail)
     if "tasks" not in skip:
         fresh_l, stale_l = [], []
@@ -336,19 +399,15 @@ def blocks_now(s: dict, skip: tuple = ()) -> dict:
     if s.get("working"):
         w = s["working"].split("\n", 1)[1] if s["working"].startswith("## ") else s["working"]
         b["working"] = ("Fil en cours", [(x, None) for x in w.splitlines() if x.strip()][:8], [])
-    le = s["learned"]
-    if le["subjects"]:
-        txt = ", ".join(f"{x['name']} ({x['n']})" for x in le["subjects"])
-        b["learned"] = (f"Appris ces {LEARNED.days} derniers jours", [(f"- {txt}", None)], [])
-    elif le.get("last"):
-        b["learned"] = ("Appris récemment", [(f"- rien de nouveau depuis le {P._d(le['last'])} (l'extraction n'a rien "
-                                              f"écrit depuis)", None)], [])
+    b["learned"] = ("Fraîcheur de la mémoire personnelle", learned_lines(s["learned"], now), [])
     v = s["views"]
     vl = []
     for p in v["periods"]:
         label = "Journée" if ":day:" in p["view_key"] else "Semaine"
         if p["privacy_class"] in _allowed("cloud_allowed") and p.get("content"):
-            vl.append((f"- {label} : {P._short(p['content'], 110)} (vue du {P._d(p['built_at'])})", None))
+            old = p.get("built_at") and now - p["built_at"] > VIEW_FRESH
+            vl.append((f"- {label} : {P._short(p['content'], 110)} (vue du {P._d(p['built_at'])}"
+                       + (", ancienne : non reconstruite depuis" if old else "") + ")", None))
         else:
             vl.append((f"- {label} : vue locale `{p['view_key']}` (non transmise ; memory_view avec un lecteur local)",
                        None))
@@ -358,6 +417,49 @@ def blocks_now(s: dict, skip: tuple = ()) -> dict:
     if vl or tail:
         b["views"] = ("Période et épisodes", vl, tail)
     return b
+
+
+def learned_lines(le: dict, now: datetime) -> list[tuple[str, None]]:
+    """His newest knowledge, then the delay and its cause: the gate (quota, pause), what waits, when it resumes."""
+    out = []
+    last = le.get("last")
+    if le.get("n"):
+        out.append(f"- {le['n']} connaissances personnelles nouvelles en {LEARNED.days} jours"
+                   + (f" (dont {le['local_n']} locales)" if le.get("local_n") else "")
+                   + f", la dernière {_ago(last, now)}")
+    elif last:
+        out.append(f"- dernière connaissance personnelle : {P._d(last)} — rien de nouveau depuis")
+    g, w = le.get("gate") or {}, le.get("waiting") or {}
+    since = _dt(g.get("since"))
+    if g.get("state") == "quota":
+        reset = _dt(g.get("resets_at"))
+        out.append("- extraction suspendue par la garde de quota Codex"
+                   + (f" ({g['used_percent']:.0f} % ≥ {g['limit']:.0f} %)" if g.get("used_percent") is not None
+                      and g.get("limit") is not None else "")
+                   + (f" depuis {_ago(since, now).replace("il y a ", "")}" if since else "")
+                   + (f" ; reprise automatique après la remise à zéro du {_when(reset, False)}" if reset else
+                      " ; reprise automatique dès une lecture fiable du quota"))
+    elif g.get("state") == "paused":
+        out.append("- extraction en pause (décision de Monsieur)" + (f" depuis {_ago(since, now).replace("il y a ", "")}" if since else ""))
+    seen = _dt(g.get("seen"))
+    if seen and now - seen > timedelta(minutes=15):
+        out.append(f"- l'extraction n'a pas tourné depuis {_ago(seen, now).replace("il y a ", "")} (service à vérifier)")
+    if w.get("threads"):
+        out.append(f"- {w['threads']} conversations en attente d'extraction"
+                   + (f", la plus ancienne {_ago(w['oldest'], now)}" if w.get("oldest") else "") + " (rien n'est perdu)")
+    return [(x, None) for x in out] or [("- aucune connaissance personnelle", None)]
+
+
+def _dt(v) -> datetime | None:
+    if not v or v == "None":
+        return None
+    if isinstance(v, datetime):
+        return v
+    try:
+        d = datetime.fromisoformat(str(v))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
 
 
 def blocks_owner(p: dict, exclude: set | None = None) -> dict:
@@ -387,8 +489,13 @@ def blocks_owner(p: dict, exclude: set | None = None) -> dict:
     aims = [l for l in keep(s["aims"]) if l["id"] not in {x for _, x in gl}]
     b["aims"] = ("Ce que Monsieur a dit vouloir (sans trace d'exécution : statut inconnu)",
                  [(fmt(l, 100), l["id"]) for l in aims[:4]], [])
-    b["facts"] = ("Faits personnels", [(fmt(l), l["id"]) for l in keep(s["facts"])[:4]],
+    b["facts"] = ("Faits personnels (les anciens non reconfirmés en dernier)",
+                  [(fmt(l) + (" — non reconfirmé depuis" if l.get("old") else ""), l["id"]) for l in keep(s["facts"])[:4]],
                   [f"- aussi : {len(s['facts']) - 4} autres faits"] if len(s["facts"]) > 4 else [])
+    sa = p.get("set_aside") or {}
+    if sa.get("technical") or sa.get("requests"):
+        b["facts"][2].append(f"- écartés de cet état : {sa.get('technical', 0)} détails techniques, "
+                             f"{sa.get('requests', 0)} demandes ponctuelles (memory_search)")
     rv = s["reverify"]
     b["reverify"] = (f"À revérifier (états passagers de plus de {p['ttl_days']} jours)",
                      [(f"- {P._fmt(l, 100)}", l["id"]) for l in keep(rv)[:3]],

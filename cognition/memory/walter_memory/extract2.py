@@ -469,7 +469,9 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict 
     except (TypeError, ValueError):
         conf = 0.7
     return {"kind": kind, "act": act, "text": text, "state": stage, "stage": stage, "scope": scope, "until": until,
-            "subject": subject or (f"project:{project}" if project else "other"), "domain": domain, "project": project,
+            # the 19/11 format gives no subject: a personal statement is the owner's (it was filed under « other »)
+            "subject": subject or (f"project:{project}" if project else "owner" if domain == "personal" else "other"),
+            "domain": domain, "project": project,
             "quote": (item.get("quote") or "")[:400], "cited": cited, "by_owner": by_owner, "by_agent": by_agent,
             "epistemic": "owner_stated" if by_owner else "agent_reported", "epistemic_v": epistemic_v,
             "same_as": same, "supersedes": supersedes, "contradicts": contradicts, "about": about, "hint": hint,
@@ -822,17 +824,51 @@ def _give_up(source: str, thread_id: str, error: str) -> None:
                          rejected=[{"reason": error[:500]}])
 
 
+def note_gate(state: str, q: dict | None = None) -> None:
+    """The live extraction's last gate verdict, extraction.state 'live_gate' = {state: open | paused | quota, since,
+    at, reason, used_percent, limit, resets_at}: what the situation projection shows as the delay of personal
+    knowledge. `since` = when this state began (kept while it lasts). Written once a tick, never raises."""
+    now = datetime.now(timezone.utc).isoformat()
+    v = {"state": state, "at": now, "since": now,
+         **{k: (q or {}).get(k) for k in ("reason", "used_percent", "limit", "resets_at")}}
+    try:
+        with connection() as conn:
+            conn.execute("""insert into extraction.state (key, value, updated_at) values ('live_gate', %s::jsonb, now())
+                            on conflict (key) do update set updated_at = now(), value = excluded.value
+                              || jsonb_build_object('since', case when extraction.state.value->>'state'
+                                                                       = excluded.value->>'state'
+                                                                  then coalesce(extraction.state.value->>'since',
+                                                                                excluded.value->>'since')
+                                                                  else excluded.value->>'since' end)""",
+                         (json.dumps(v),))
+    except Exception:  # noqa: BLE001 — an indicator, never a reason to stop the tick
+        log.warning("extract2: live_gate not recorded", exc_info=True)
+
+
+def live_status(conn) -> dict:
+    """What the delay display reads (two indexed reads, a few ms): the gate's last verdict and the conversations
+    waiting for extraction (dirty threads, the oldest first)."""
+    g = conn.execute("select value, updated_at from extraction.state where key = 'live_gate'").fetchone()
+    w = conn.execute("""select count(*) n, min(dirty_since) oldest from extraction.threads
+                        where processor = %s and status = 'dirty'""", (PROCESSOR,)).fetchone()
+    return {"gate": dict(g["value"], seen=g["updated_at"]) if g else None,
+            "waiting": {"threads": w["n"], "oldest": w["oldest"]}}
+
+
 def tick(limit: int = 8, workers: int = 4, chat=None, budget: str = "recurring") -> dict:
     import concurrent.futures as cf
     total = {"threads": 0, "segments": 0, "items": 0, "reused": 0, "superseded": 0, "rejected": 0, "filtered": 0,
              "local_only": 0, "cost_usd": 0.0, "errors": 0}
     from . import organic
     if organic.extraction_paused():      # nothing claimed: dirty threads stay pending until the pause ends
+        note_gate("paused")
         return {**total, "paused": True}
     from . import quota
     q = quota.codex()
     if not q["ok"]:                      # A4: over the Codex weekly cap, or no reliable reading: nothing claimed
+        note_gate("quota", q)
         return {**total, "quota": q}
+    note_gate("open", q)
     claimed = claim(limit)
 
     def one(t):

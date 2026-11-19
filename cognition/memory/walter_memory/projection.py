@@ -1056,10 +1056,12 @@ def render(p: dict, max_tokens: int = 900) -> tuple[str, list[str]]:
 def read(q: dict) -> dict:
     """memory_view depth="state" (MemoryViewQuery v1): {key, depth, version, content, built_at, watermark, stale,
     sources, deeper}. `at` = an ISO date for the state as it was. Keys owner / now / me: the personal and
-    situational projections (personal.py, lot P2)."""
-    from . import personal
+    situational projections (personal.py, lot P2); person:<name or id>: the relational state (relation.py, P3)."""
+    from . import personal, relation
     if personal.kind_of(q.get("key") or ""):
         return personal.read(q)
+    if relation.kind_of(q.get("key") or ""):          # person:<name or id> (lot P3)
+        return relation.read(q)
     max_privacy = "cloud_allowed" if (q.get("privacy") or "cloud_allowed") == "cloud_allowed" else q["privacy"]
     p = project(q["key"], at=q.get("at"), max_privacy=max_privacy)
     if p.get("error"):
@@ -1089,7 +1091,15 @@ def check(keys: list[str] | None = None, *, at: str | None = None, limit_ms: flo
     out, ok = [], True
     with connection() as conn:
         cat = catalog(conn, fresh=True)
-        from . import personal
+        from . import personal, relation
+        people = [k for k in keys or [] if relation.kind_of(k)]
+        if people:
+            r = relation.check(people, limit_ms=limit_ms)
+            out += r["people"]
+            ok = ok and r["ok"]
+            keys = [k for k in keys if k not in people]
+            if not keys:
+                return {"ok": ok, "at": at, "projects": out}
         mine = [k for k in keys or [] if personal.kind_of(k)]
         if mine:
             c = personal.check(at=at)

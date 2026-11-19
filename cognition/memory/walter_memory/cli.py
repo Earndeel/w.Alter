@@ -157,7 +157,7 @@ def main(argv=None) -> None:
                         "his situation (now) or both (me) (a read of the versioned "
                         "knowledge, nothing stored, no model); --at for a past date, --list for the hierarchy, --check "
                         "for the invariants (no expired item, sub-projects kept apart, latency)")
-    st.add_argument("key", nargs="*", default=[], help="project:walter, « Walter Memory », owner, now, me… (several with --check)")
+    st.add_argument("key", nargs="*", default=[], help="project:walter, « Walter Memory », owner, now, me, person:<nom ou id>… (several with --check)")
     st.add_argument("--at", default=None); st.add_argument("--max-tokens", type=int, default=900)
     st.add_argument("--list", action="store_true"); st.add_argument("--check", action="store_true")
     st.add_argument("--json", action="store_true")

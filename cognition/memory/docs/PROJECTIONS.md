@@ -2,9 +2,11 @@
 
 > Rôle : décrire comment Memory répond à « où en est X maintenant ? » pour quatre familles d'état — personnel,
 > projet, relationnel, situationnel — à partir de la mémoire existante. Propriétaire : Walter Memory. État : **P1
-> (projection Projet) en service depuis le 19/11/2026** (§ 7), pertinence corrigée le même jour (§ 8) ; **P2 (Personnel + Situationnel) en service depuis le 19/11** (§ 9) ; P3–P4 en projet. Ne fait pas : un second stockage, une
+> (projection Projet) en service depuis le 19/11/2026** (§ 7), pertinence corrigée le même jour (§ 8) ; **P2 (Personnel + Situationnel) en service depuis le 19/11** (§ 9, corrigé § 9.1) ; **P3 (Relationnel) en service
+> depuis le 19/11** (§ 10) ; P4 en projet. Ne fait pas : un second stockage, une
 > seconde boucle de consolidation, une décision de modèle par message. Contrats : `MemoryViewQuery` v1
-> (`memory_view`), Context. Code : `walter_memory/projection.py`, `walter_memory/personal.py`.
+> (`memory_view`), Context. Code : `walter_memory/projection.py`, `walter_memory/personal.py`,
+> `walter_memory/relation.py`.
 
 ## 1. Principe
 
@@ -87,7 +89,7 @@ dont l'intervalle `valid_from` → `valid_to` contient la date. C'est la base de
 |---|---|---|
 | P1 | projection Projet (lecture, règles de fiabilité, `at=`), CLI, `memory_view depth=state`, section Context | sur 5 projets réels : état courant juste, aucun état expiré servi, ancien état retrouvé par `at=`, latence < 50 ms, empreinte de Context inchangée hors section |
 | P2 ✓ 19/11 | Personnel + Situationnel (§ 9) | « où en suis-je » : lieu, tâches ouvertes, sujet actif, règles en vigueur ; aucune donnée `local_only` vers un modèle cloud |
-| P3 | Relationnel (Kardex) | fiche + rythme + écart + en cours, pour 5 personnes, vérifié par agrégats |
+| P3 ✓ 19/11 | Relationnel (Kardex, § 10) | fiche + rythme + écart + en cours, pour 5 personnes, vérifié par agrégats |
 | P4 | cache + invalidation par le bus, seulement si P1–P3 dépassent la latence | relecture identique avec et sans cache |
 
 ## 7. P1 — projection Projet (19/11/2026)
@@ -330,3 +332,127 @@ Context complet « Où en suis-je ? » 260–490 ms, section 717 tokens pour 740
 **Limites** : l'extraction n'a rien écrit pour Monsieur depuis le 14/11 (quota) : l'état personnel s'arrête là et la
 section « Appris » le montre. Le lieu n'est jamais rendu à un lecteur cloud ; une question qui en dépend passe par
 le bloc position. Beaucoup d'objectifs anciens restent « sans trace » : comptés, jamais présentés comme en cours.
+
+### 9.1 Corrections du 19/11 (après relecture de Monsieur)
+
+Corrigé à la source ou dans la projection, sans nouveau stockage :
+- **Agenda** : les calendriers publics abonnés (`…@group.v.calendar.google.com` : jours fériés, numéros de semaine)
+  ne sont plus des rendez-vous. Sur 60 jours, les 13 « rendez-vous » affichés étaient tous de ce type. Les jours
+  fériés de la semaine sont donnés sur une ligne de repère ; les numéros de semaine ne sont jamais montrés.
+- **Règles** : une règle est normative (jamais, toujours, doit, veut que, refuse, préfère, avant de…, `NORM`). Une
+  « contrainte » ou une « correction » qui ne fait que décrire va avec les faits si elle est biographique ; si elle
+  est technique, elle est écartée et comptée. Sur les données réelles : 69 → 30 règles, 16 détails techniques écartés.
+- **Objectifs durables** : une demande ponctuelle (« Monsieur demande de… », « veut que W.Alter vérifie… », un verbe
+  d'action en tête sans rien de durable) n'est plus un objectif durable. 96 → 66, 30 demandes comptées.
+- **« Appris »** devient **« Fraîcheur de la mémoire personnelle »**. Le bloc ne compte plus le volume ingéré sur
+  tous les sujets. Il donne : les connaissances nouvelles sur Monsieur lui-même, la date de la dernière, l'état de
+  la garde d'extraction (`extraction.state 'live_gate'`, écrit à chaque tour par `extract2.tick` avec le début de
+  l'état), et les conversations en attente.
+- **Ancien ≠ courant** : un fait dit une seule fois il y a plus de 30 jours est rangé après les autres et marqué
+  « non reconfirmé depuis ». Une vue de période construite il y a plus de 36 h est marquée « ancienne ».
+- **Source** : le format d'extraction du 19/11 ne donne plus de sujet, et un énoncé `domain = personal` tombait en
+  `other`. Il est désormais à `owner` (`extract2.validate`). Les 14 énoncés du 19/11 concernés ont été réattribués
+  par la porte d'écriture (op `attribute`, tag `owner-subject-2026-11-19`, réversible par `knowledge.revert`).
+
+**Pourquoi la mémoire personnelle « s'arrêtait au 14/11 »** :
+1. Monsieur a mis l'extraction en pause le 14/11 (`organic.toml [extraction] mode = "paused"`). Rien n'a été
+   extrait du 15 au 18/11.
+2. Le 19/11 à 10:25, l'extraction en continu et le rattrapage ont été activés (`[stages]`). 637 énoncés ont été
+   écrits jusqu'à 14:17 environ, mais ceux qui concernaient Monsieur étaient rangés sous `other` (défaut de source
+   ci-dessus). Les lecteurs du sujet `owner` voyaient donc toujours le 14/11.
+3. Depuis 14:25, la garde de quota Codex bloque : relevé à 75 % pour un plafond de 70 % (`[quota]
+   codex_weekly_max`). Seule cette garde suspend l'extraction, et elle est conservée.
+4. La reprise est automatique. Le pipeline relit la garde chaque minute. Après la remise à zéro hebdomadaire
+   (23/11 01:23 UTC), le relevé périmé est rafraîchi, la garde s'ouvre et les fils en attente sont repris. Rien n'est
+   perdu : un fil reste « dirty » tant qu'il n'est pas couvert. La situation affiche ce retard, sa cause, le nombre de
+   conversations en attente et l'heure de reprise. Elle signale aussi si l'extraction n'a pas tourné depuis 15 min.
+
+## 10. P3 — projection Relationnel (19/11/2026)
+
+`relation.state(key, at=, max_privacy=)`, clé `person:<nom>` ou `person:<identifiant ou ses 8 premiers
+caractères>`. C'est une lecture : pas de table, pas de cache, pas de modèle, aucune écriture.
+
+**Ce qu'elle lit (existant)** :
+- Kardex :
+  - `core.entities` et les comptes reliés (`identity_links`) ;
+  - la fiche `kardex.contacts`, champs selon l'audience ;
+  - les `kardex.claims` et leurs preuves ;
+  - `open_loops` et `actions` ouvertes ;
+  - les dates de `kardex.events` (anniversaires, rendez-vous) ;
+  - les mesures `relationship_baselines` et `communication_deviations`.
+- Les connaissances organiques g1 dont `subject_entity_ids` nomme la personne :
+  - conversations déterministes (`flows.conversations`) ;
+  - plans (`episodic.plans`) ;
+  - énoncés.
+- Ses relations `works_on` (projets) et `member_of` (groupes), et les épisodes (`views.view.entity_ids`).
+
+**Ce qu'elle rend** (budget partagé, mêmes trois tours que P1/P2) :
+- **Qui** : réseaux, fiche Kardex, ce que la personne dit d'elle (travail, intérêts…).
+- **Relation connue, par qui le dit** :
+  - *confirmé par Monsieur* : affirmation confirmée dans Kardex ;
+  - *dit par Monsieur* : son énoncé, ou une information qu'il a fournie ;
+  - *vérifié par les données* : volumes, première et dernière date d'échange ;
+  - *source publique* ;
+  - *observé dans les échanges* ;
+  - *dit par la personne* : affirmation tirée de ses messages, non confirmée ; au plus 6 lignes, le reste compté ;
+  - *hypothèse, non vérifiée*.
+- **Changé ces 30 derniers jours** : informations nouvelles comptées par provenance, informations remplacées ou
+  expirées, nouveaux groupes communs.
+- **Échanges** : des mesures (conversations, messages, part de Monsieur, réseau, dernière date), jamais leur contenu.
+- **Engagements et échanges en cours** : plans (convenu ou proposé, avec la date), actions et questions ouvertes de
+  Kardex.
+- **À suivre éventuellement** : une lecture déterministe, jamais une tâche, une notification ou une action
+  (vérifié par test : aucune écriture). Les cas :
+  - échéance passée ou proche ;
+  - plan à venir ;
+  - plan passé sans échange depuis (« tenu ou non inconnu ») ;
+  - anniversaire dans 14 jours.
+- **Contextes** : projets, groupes en commun (comptés par réseau ; noms pour un lecteur local seulement),
+  épisodes. Une personne est une seule entité dans plusieurs contextes, jamais dupliquée.
+- **Rythme mesuré** :
+  - 30 et 90 jours : volumes, part lancée par Monsieur, délais médians ;
+  - les écarts mesurés en chiffres, avec la mention « des mesures, cause inconnue : aucune conclusion sur la
+    personne ou la relation » ;
+  - les `psychological_claims` ne sont jamais lus.
+- **Historique** : les affirmations remplacées (avec celle qui les remplace, `supersedes_claim_id`), retirées ou
+  expirées, et les connaissances remplacées. Rien n'est effacé. Deux affirmations contradictoires restent toutes
+  deux courantes, chacune avec sa provenance : rien n'est tranché en silence.
+- `at=` : l'état à une date.
+  - Une affirmation ou une connaissance remplacée après cette date redevient courante.
+  - Ce qui a été enregistré après n'est pas montré.
+  - Les mesures sont actuelles (c'est dit).
+
+**Homonymes** : un nom porté par plusieurs personnes rend la liste des candidats, sans jamais les fusionner :
+`person:<id8>`, réseaux, volume, dernier échange, présence d'une fiche. 475 noms sont dans ce cas sur 4 039
+personnes. Un identifiant résout une seule personne.
+
+**Confidentialité** : un lecteur cloud reçoit `cloud_allowed` et `redacted_cloud` (téléphones, e-mails et secrets
+masqués), jamais `local_only` (compté). Les affirmations Kardex passent par les règles **strictes** de l'audience
+`cloud_model` (`read_policy.kardex_claim_visible(strict=True)`). Le mode raisonnement « oui tout » ne s'applique pas
+à une projection : être dans une projection n'est pas une raison d'envoyer une information sensible à un modèle
+cloud. En pratique :
+- sensibilité au plus `personal`, ni `restricted` ni `private_osint` ;
+- les types sensibles (santé, sexualité, lieu, famille, argent, identité, apparence…, `SENSITIVE_TYPE`) sont
+  retenus, comme les textes que `privacy.detect` signale ;
+- les actions et questions ouvertes de Kardex, qui n'ont pas de classe, sont filtrées de la même façon.
+
+Un lecteur local reçoit ce que Monsieur voit. Les affirmations sensibles sont marquées « ne pas répéter à un tiers ».
+
+**Intégration** :
+- `memory_view(key="person:…", depth="state")` et `walter-memory state person:… [--check]` ;
+- Context : quand le message nomme une personne connue avec une question de relation ou d'état (« ma relation
+  avec », « où j'en suis avec », « qui est », « quoi de neuf avec »…, `relation.REL_HINT`), la section « État
+  courant » sert sa relation dans le même budget que P1 et P2. La carte de la section `people` n'est alors pas
+  répétée. Un nom ambigu donne la liste des candidats.
+- Index `derived_g1_subject_entities` (GIN sur `subject_entity_ids`, migration 045) : un chemin d'accès, sans
+  nouvelle donnée.
+
+**Mesures du 19/11** (5 contacts réels, à chaud, vérifiés par agrégats seulement) :
+- latence 10–26 ms (56 ms avant l'index et le regroupement des preuves) ;
+- 15 à 143 affirmations par contact, dont 1 à 111 retenues pour un lecteur cloud ;
+- 10 à 50 conversations mesurées ;
+- `relation.check` : aucun élément local, sensible, remplacé ou d'une autre personne cité ;
+- Context « Où en est ma relation avec … ? » : section servie dans son budget, projection 28 ms.
+
+**Reste à faire pour le préflight Decision 2.0** : voir DECISIONS.md, entrée du 19/11 (P3).
+

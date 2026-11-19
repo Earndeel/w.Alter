@@ -60,6 +60,27 @@ PERIOD_HINT = re.compile(r"(?i)\b(hier|avant-hier|aujourd'hui|ce (matin|midi|soi
 STATE_HINT = re.compile(r"(?i)(o[uù] en (est|sont|sommes|suis|es|êtes)|o[uù] [çc]a en est|\b[ée]tat\b|\bstatut|\bstatus\b|"
                         r"avancement|avanc[ée]e?s?\b|reste [àa] faire|prochaines? [ée]tapes?|\bbloqu|\bbilan\b|"
                         r"point sur|r[ée]cap|progress|what'?s left|where (are|is) we)")
+def _rel_hint(message: str) -> bool:
+    from .relation import REL_HINT
+    return bool(REL_HINT.search(message))
+
+
+def _person_state_key(message: str) -> list[str]:
+    """person:<id> for the one person the message names; person:<name> when that name designates several people
+    (the projection then lists them, never picks); nothing when no known person is named."""
+    q = f" {message.lower()} "
+    names = [n for n, _ in _known_people() if re.search(rf"(?<!\w){re.escape(n)}(?!\w)", q)]
+    if not names:
+        return []
+    name = max(names, key=len)
+    from . import relation
+    with connection() as conn:
+        c = [x for x in relation.candidates(conn, name) if x["messages"]]
+    if len(c) == 1:
+        return [f"person:{c[0]['entity_id']}"]
+    return [f"person:{name}"] if c else []
+
+
 def _me_hint(message: str) -> bool:
     from .personal import ME_HINT
     return bool(ME_HINT.search(message))
@@ -359,14 +380,18 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     t0 = time.perf_counter()
     sections, trace = {}, {"query_chars": len(query), "sections": {}}
     state_key, state_budget = None, 0
-    if b["knowledge"] > 0 and b.get("state", 1) > 0 and (STATE_HINT.search(message) or _me_hint(message)):
+    if b["knowledge"] > 0 and b.get("state", 1) > 0 and (STATE_HINT.search(message) or _me_hint(message)
+                                                         or _rel_hint(message)):
         try:
             from . import projection
             from . import personal
-            found = projection.find_projects(message)
+            found = projection.find_projects(message) if not _rel_hint(message) else []
             # the owner's own state (lot P2): « où en suis-je », « mon état courant », « ce que j'ai en cours »
-            if not found and personal.ME_HINT.search(message):
+            if not found and personal.ME_HINT.search(message) and not people_in(message):
                 found = ["me"]
+            # a relation (lot P3): a person the message names, with a state or relation question
+            if not found:
+                found = _person_state_key(message)
             if found:
                 state_key = found[0]
                 if "state" in b:
@@ -408,10 +433,13 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     state_fut = None
     if state_key:
         from . import projection
+        mp = "local_only" if max_privacy == "local_only" else "cloud_allowed"
         if state_key == "me":       # the personal projections read cloud_allowed only for a cloud reader
             from . import personal
-            mp = "local_only" if max_privacy == "local_only" else "cloud_allowed"
             state_fut = pool.submit(lambda: (personal.personal(max_privacy=mp), personal.situation(max_privacy=mp)))
+        elif state_key.startswith("person:"):       # never local rows nor sensitive claims to a cloud reader
+            from . import relation
+            state_fut = pool.submit(lambda: relation.state(state_key, max_privacy=mp))
         else:
             state_fut = pool.submit(lambda: projection.project(state_key, max_privacy=max_privacy))
     pool.shutdown(wait=False)
@@ -483,6 +511,10 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
                 text, ids = personal.render(own, now, state_budget, exclude=shown_ids,
                                             skip=("tasks",) if "tasks" in sections else ())
                 p = {"ms": round(own["ms"] + now["ms"], 1), "sources": own["sources"]}
+            elif state_key.startswith("person:"):
+                from . import relation
+                text, ids = relation.render(p, state_budget)
+                p = {"ms": p.get("ms"), "sources": ids, "entity_id": p.get("entity_id")}
             else:
                 text, ids = projection.render(p, state_budget)
             if text and not p.get("error"):
@@ -499,7 +531,8 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     named = people_in(query) if b["people"] > 0 or b["evidence"] > 0 else []
     if b["people"] > 0:
         t = time.perf_counter()
-        lines = [l for eid in named for l in _card_lines(eid)]
+        in_state = (sections.get("state") and state_key or "").removeprefix("person:")
+        lines = [l for eid in named if eid != in_state for l in _card_lines(eid)]   # the relation already says it
         text, used = _clip(lines, b["people"])
         if text:
             sections["people"] = text

@@ -158,13 +158,15 @@ def audience_for(max_privacy: str) -> str:
     return "owner_local" if max_privacy == "local_only" else "cloud_model"
 
 
-def kardex_claim_visible(claim: dict, audience: str, now=None) -> tuple[bool, str | None]:
+def kardex_claim_visible(claim: dict, audience: str, now=None, *, strict: bool = False) -> tuple[bool, str | None]:
     """→ (visible, reason refused). claim: status, valid_to, sensitivity, mention_policy, disclosure_state,
-    knowledge_origin and evidence_sensitivity (the strictest sensitivity of its evidence, may be None)."""
+    knowledge_origin and evidence_sensitivity (the strictest sensitivity of its evidence, may be None).
+    strict = the audience's own rules even when the owner's reasoning mode is on (the projections, P3: being in a
+    projection is no reason to send a sensitive claim to a cloud model)."""
     from datetime import datetime, timezone
     if audience not in _RULES:
         raise ValueError(f"unknown audience {audience!r}")
-    reasoning = audience == "cloud_model" and _reasoning_full()
+    reasoning = audience == "cloud_model" and _reasoning_full() and not strict
     if reasoning:          # the model reasons with it; mention policies travel with the claim (never repeated)
         audience = "owner_local"
     now = now or datetime.now(timezone.utc)

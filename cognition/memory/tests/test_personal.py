@@ -141,3 +141,74 @@ def test_memory_view_and_the_check_serve_the_personal_keys():
     assert projection.read({"key": "now", "at": "2026-11-12"}).get("error")
     c = projection.check(["owner"], limit_ms=5000)
     assert c["projects"][0]["key"] == "me" and not [p for p in c["projects"][0]["problems"] if "latence" not in p]
+
+
+def test_p2_corrections_no_landmark_as_appointment_no_description_as_rule_no_request_as_aim_old_facts_dated():
+    x = tag()
+    soon = NOW + timedelta(days=1)
+    events.record_events([
+        {"event_type": "calendar.event", "source": "calendar", "source_account": "pytest", "source_id": f"h-{x}",
+         "occurred_at": soon, "content": f"Jour férié {x}", "privacy_class": "cloud_allowed",
+         "payload": {"event_id": f"h-{x}", "calendar_id": "fr.french#holiday@group.v.calendar.google.com",
+                     "start": {"date": soon.date().isoformat()}}},
+        {"event_type": "calendar.event", "source": "calendar", "source_account": "pytest", "source_id": f"w-{x}",
+         "occurred_at": soon, "content": f"Semaine 47 {x}", "privacy_class": "cloud_allowed",
+         "payload": {"event_id": f"w-{x}", "calendar_id": "e_2_fr#weeknum@group.v.calendar.google.com",
+                     "start": {"date": soon.date().isoformat()}}},
+        {"event_type": "calendar.event", "source": "calendar", "source_account": "pytest", "source_id": f"r-{x}",
+         "occurred_at": soon, "content": f"Rendez-vous banque {x}", "privacy_class": "cloud_allowed",
+         "payload": {"event_id": f"r-{x}", "calendar_id": "someone@gmail.com",
+                     "start": {"dateTime": soon.isoformat()}}}])
+    s = personal.situation()
+    titles = [r["content"] for r in s["agenda"]["week"]]
+    assert f"Rendez-vous banque {x}" in titles and f"Jour férié {x}" not in titles and f"Semaine 47 {x}" not in titles
+    text, _ = personal.render(None, s, max_tokens=20000)
+    assert f"jour férié : " in text and f"Semaine 47 {x}" not in text
+
+    norm = item(f"Monsieur ne veut jamais de mot de passe dans un message {x}", kind="constraint")
+    bio = item(f"Monsieur précise qu'il habite à Lyon depuis trois ans {x}", kind="correction")
+    tech = item(f"Le service écoute sur :8890 avec /walter/cognition/memory/.env {x}", kind="constraint")
+    request = item(f"Monsieur demande de vérifier les sauvegardes {x}", kind="goal", stage="requested")
+    aim = item(f"Monsieur veut que W.Alter devienne autonome à terme {x}", kind="goal", stage="requested")
+    old = item(f"Monsieur aime le jazz {x}", kind="fact", at=NOW - timedelta(days=60))
+    p = personal.personal()
+    sec = p["sections"]
+    assert norm in ids(sec["rules"]) and bio not in ids(sec["rules"]) and tech not in ids(sec["rules"])
+    assert bio in ids(sec["facts"]) and p["set_aside"]["technical"] >= 1
+    assert request not in ids(sec["aims"]) and aim in ids(sec["aims"]) and p["set_aside"]["requests"] >= 1
+    line = next(l for l in sec["facts"] if l["id"] == old)
+    assert line["old"] and all(l["old"] for l in sec["facts"][sec["facts"].index(line):])     # the old ones last
+    b = personal.blocks_owner({**p, "sections": {**sec, "facts": [line]}})
+    assert "non reconfirmé depuis" in b["facts"][1][0][0] and "écartés de cet état" in b["facts"][2][-1]
+
+
+def test_the_delay_of_personal_knowledge_says_its_cause_and_its_resumption():
+    from walter_memory import extract2
+    reset = (NOW + timedelta(days=3)).isoformat()
+    extract2.note_gate("quota", {"reason": "codex weekly quota 75 % ≥ 70 %", "used_percent": 75.0, "limit": 70.0,
+                                 "resets_at": reset})
+    with connection() as conn:
+        first = conn.execute("select value->>'since' s from extraction.state where key = 'live_gate'").fetchone()["s"]
+    extract2.note_gate("quota", {"used_percent": 76.0, "limit": 70.0, "resets_at": reset})
+    with connection() as conn:
+        st = conn.execute("select value from extraction.state where key = 'live_gate'").fetchone()["value"]
+    assert st["since"] == first and st["used_percent"] == 76.0          # the state lasts: its start is kept
+    s = personal.situation()
+    lines = [l for l, _ in personal.learned_lines(s["learned"], s["now"])]
+    assert any("garde de quota Codex (76 % ≥ 70 %)" in l and "reprise automatique après la remise à zéro" in l
+               for l in lines), lines
+    extract2.note_gate("open", {"used_percent": 10.0, "limit": 70.0, "resets_at": reset})
+    s = personal.situation()
+    assert not any("suspendue" in l for l, _ in personal.learned_lines(s["learned"], s["now"]))
+
+
+def test_a_personal_statement_without_subject_is_the_owners():
+    """The 19/11 format gives no subject: a personal statement went to « other » (P2 fix: it is the owner's)."""
+    from walter_memory import extract2
+    seg = [{"event_type": "message.sent", "content": "je préfère qu'on me tutoie"}]
+    it, _ = extract2.validate({"type": "preference", "text": "Monsieur préfère être tutoyé", "domain": "personnel",
+                               "msgs": [1], "quote": "je préfère qu'on me tutoie"}, seg, {})
+    assert it["domain"] == "personal" and it["subject"] == "owner"
+    rel, _ = extract2.validate({"type": "fait", "text": "Paul est son voisin", "domain": "relation", "msgs": [1],
+                                "quote": "je préfère qu'on me tutoie"}, seg, {})
+    assert rel["subject"] == "other"
