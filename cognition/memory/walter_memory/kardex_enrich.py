@@ -21,7 +21,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from . import organic, privacy
+from . import events, organic, privacy
 from .db import connection
 
 log = logging.getLogger("walter.kardex")
@@ -62,21 +62,27 @@ def contact_for(conn, entity_id: str) -> int:
 
 def messages_with(conn, entity_id: str, days: int, limit: int) -> list[dict]:
     """The owner's 1:1 messages with this person (both directions), redacted_cloud only, most recent first."""
-    return conn.execute("""
+    rows = conn.execute("""
         with threads as (
             select distinct e.thread_id from core.events e join core.identity_links l on l.identity_id = e.actor_identity_id
                                                                                 and l.status = 'confirmed'
             where l.entity_id = %s and e.source in ('beeper', 'gmail') and e.occurred_at > now() - make_interval(days => %s)
               and coalesce(e.payload->'chat'->>'type', 'single') <> 'group')
-        select e.event_id::text, e.event_type, e.occurred_at, e.content, e.privacy_class,
-               (l.entity_id = %s) as from_contact
+        select e.event_id::text, e.event_type, e.occurred_at, e.content, e.privacy_class, e.source, e.source_id,
+               e.object_refs, (l.entity_id = %s) as from_contact
         from core.events e left join core.identity_links l on l.identity_id = e.actor_identity_id and l.status = 'confirmed'
         where e.thread_id in (select thread_id from threads) and e.occurred_at > now() - make_interval(days => %s)
           and e.event_type in ('message.sent', 'message.received', 'email.sent', 'email.received')
-          and e.privacy_class = any(%s) and coalesce(e.content, '') <> ''
+          and e.privacy_class = any(%s)
+          and (coalesce(e.content, '') <> '' or cardinality(e.object_refs) > 0
+               or jsonb_array_length(coalesce(e.payload->'attachments', '[]'::jsonb)) > 0)
           and not exists (select 1 from core.events r where r.event_type = 'event.retracted'
                           and r.payload @> jsonb_build_object('target_event_id', e.event_id::text))
         order by e.occurred_at desc limit %s""", (entity_id, days, entity_id, days, privacy.model_classes(), limit)).fetchall()
+    # a voice note or a document says its words in its file's derived text (transcript), read as every reader does
+    for r, text in zip(rows, events.spoken_texts(rows, max_privacy="redacted_cloud")):
+        r["content"] = text
+    return [r for r in rows if r["content"]]
 
 
 def enrich(entity_id: str, *, chat=None, days: int | None = None, max_messages: int | None = None) -> dict:

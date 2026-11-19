@@ -318,6 +318,30 @@ def test_attachments_in_compact_detail_render_and_search(made, cfg, tmp_path, mo
     assert [r["id"] for r in objects.search("midi", thread_id=thread)] == [oid]
 
 
+def test_readers_of_a_conversation_hear_its_voice_notes(made, cfg):
+    """Plans and Kardex read a voice note's transcript like its text (E2E vocal, 19/11): a contact's voice note used to
+    be an empty message for them. A file without words adds nothing (a photo never changes their recorded input)."""
+    from walter_memory import episodic
+    thread = f"chat-v-{RUN}"
+    got = events.record_events([{"event_type": "message.received", "source": "beeper", "source_id": f"{thread}|v1",
+                                 "thread_id": thread, "occurred_at": "2026-11-10T10:00:00Z", "content": None,
+                                 "privacy_class": "cloud_allowed", "actor": {"external_id": f"pv-{RUN}"}},
+                                {"event_type": "message.received", "source": "beeper", "source_id": f"{thread}|p1",
+                                 "thread_id": thread, "occurred_at": "2026-11-10T10:01:00Z", "content": "regarde",
+                                 "privacy_class": "cloud_allowed", "actor": {"external_id": f"pv-{RUN}"}}])
+    voice, photo = _obj(made), _obj(made, kind="image", mime="image/jpeg", name="p.jpg")
+    with connection() as conn:
+        for o, sid in ((voice, f"{thread}|v1"), (photo, f"{thread}|p1")):
+            conn.execute("insert into core.object_links (object_id, target_type, target_id) values (%s, 'beeper_message', %s)",
+                         (o, sid))
+    objects.set_derived(voice, "On prend un café le 12 ?", "transcript", model="fake", processor="media/v1")
+    rows = events.get_events(thread_id=thread, order="asc")
+    said = events.spoken_texts(rows)
+    assert 'transcript: "On prend un café le 12 ?"' in said[0] and said[1] == "regarde"
+    msgs = episodic._burst_messages({"source_event_ids": got["event_ids"]})
+    assert "café le 12" in msgs[0]["content"] and msgs[1]["content"] == "regarde"
+
+
 def test_object_refs_on_new_events_are_resolved(made, cfg):
     oid = _obj(made)
     got = events.record_events([{"event_type": "note.recorded", "source": "claude", "source_id": f"n-{RUN}",

@@ -293,13 +293,23 @@ def person_card(entity_id: str, max_privacy: str = "local_only", audience: str |
                                  join core.entities g on g.entity_id = r.object_id
                                  where r.subject_id = %s and r.predicate = 'member_of' limit 15""", (entity_id,)).fetchall()
         recent = [] if audience == "third_party" else conn.execute("""
-                                 select e.occurred_at, e.event_type, e.source_account, left(e.content, 200) content
+                                 select e.event_id::text, e.source, e.source_id, e.object_refs, e.occurred_at, e.event_type,
+                                        e.source_account, left(e.content, 200) content
                                  from core.events e join core.identity_links l on l.identity_id = e.actor_identity_id
                                  where l.entity_id = %s and l.status = 'confirmed' and e.event_type like 'message.%%'
                                    and e.privacy_class = any(%s)
                                    and not exists (select 1 from core.events r where r.event_type = 'event.retracted'
                                                    and r.payload @> jsonb_build_object('target_event_id', e.event_id::text))
                                  order by e.occurred_at desc limit 8""", (entity_id, allowed)).fetchall()
+        if recent:   # a voice note says its words in its transcript (events.attachments), as every reader shows it
+            from . import events
+            atts = events.attachments(recent, max_privacy="local_only" if audience == "owner_local" else "cloud_allowed",
+                                     chars=200, conn=conn)
+            for m in recent:
+                said = [f"[{a.get('kind') or 'fichier'} : {a['text']}]" for a in atts.get(m["event_id"], []) if a.get("text")]
+                m["content"] = " ".join(x for x in [m["content"] or ""] + said if x)[:300] or None
+                for k in ("event_id", "source", "source_id", "object_refs"):
+                    m.pop(k)
         media = conn.execute("""select o.kind, count(*) n from core.objects o join core.object_links ol on ol.object_id = o.id
                                 where ol.target_type = 'beeper_message' and split_part(ol.target_id, '|', 1) in (
                                   select distinct e.thread_id from core.events e join core.identity_links l on l.identity_id = e.actor_identity_id

@@ -34,7 +34,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import ingestion, llm
+from . import events, ingestion, llm
 from .db import connection
 
 RULES = Path(__file__).resolve().parent.parent / "config" / "triage_rules.json"
@@ -83,7 +83,8 @@ def rules() -> dict:
 
 def _thread_context(conn, ev: dict, self_names: list[str]) -> dict:
     """Context Lite of one incoming event's thread (no raw identity, text capped)."""
-    rows = list(conn.execute("""select event_type, occurred_at, content, payload, privacy_class from core.events
+    rows = list(conn.execute("""select event_id, source, source_id, object_refs, event_type, occurred_at, content, payload,
+                                       privacy_class from core.events
                                 where source = %s and thread_id = %s and occurred_at <= %s
                                   and event_type in ('message.received', 'message.sent', 'email.received', 'email.sent')
                                 order by occurred_at desc limit %s""",
@@ -96,13 +97,23 @@ def _thread_context(conn, ev: dict, self_names: list[str]) -> dict:
                          (ev["source"], ev["thread_id"])).fetchone()
     p = ev["payload"] or {}
     chat = p.get("chat") or {}
-    text = (ev["content"] or "")
+    # a voice note or a document carries its words in its file's derived text (transcript, extract), read here as
+    # every reader does (events.attachments); the incoming event itself is always among the rows
+    atts = events.attachments([r for r in rows if r["privacy_class"] != "local_only"], max_privacy="redacted_cloud",
+                              chars=TEXT_CAP, conn=conn)
+
+    def said(r) -> str:
+        parts = [r["content"] or ""] + [f"[{a.get('kind') or 'fichier'} : {a['text']}]"
+                                        for a in atts.get(str(r["event_id"]), []) if a.get("text")]
+        return " ".join(x for x in parts if x).strip()
+    own = next((r for r in rows if r["event_id"] == ev["event_id"]), None)
+    text = said(own) if own else (ev["content"] or "")
     mentioned = any(n.lower() in text.lower() for n in self_names) or bool(p.get("mentions"))
     local = ev["privacy_class"] == "local_only"
     msgs = [] if local else [
         {"from": "Monsieur" if r["event_type"].endswith("sent") else "other",
          "minutes_ago": int((ev["occurred_at"] - r["occurred_at"]).total_seconds() // 60),
-         "text": (r["content"] or "")[:TEXT_CAP], "type": (r["payload"] or {}).get("message_type")}
+         "text": said(r)[:TEXT_CAP], "type": (r["payload"] or {}).get("message_type")}
         for r in reversed(rows) if r["privacy_class"] != "local_only"]
     return {"source": ev["source"], "network": chat.get("network") or ev["source"],
             "thread_kind": chat.get("type") or ("email" if ev["source"] == "gmail" else "event"),
@@ -164,8 +175,8 @@ def _self_names() -> list[str]:
     return []
 
 
-EVENT_COLUMNS = """e.event_id, e.event_type, e.source, e.thread_id, e.occurred_at, e.ingested_at, e.content, e.payload,
-                   e.privacy_class"""
+EVENT_COLUMNS = """e.event_id, e.event_type, e.source, e.source_id, e.object_refs, e.thread_id, e.occurred_at,
+                   e.ingested_at, e.content, e.payload, e.privacy_class"""
 
 
 def run(limit: int = 200, dry: bool = False) -> dict:
@@ -194,6 +205,23 @@ def run(limit: int = 200, dry: bool = False) -> dict:
     return out
 
 
+AWAIT_TEXT = timedelta(minutes=10)      # an incoming file without derived text yet is waited for this long
+
+
+def _awaiting_text(conn, ev: dict, now: datetime) -> bool:
+    """The incoming message's own file (a voice note…) has no derived text yet and was received recently: its
+    transcript lands within seconds (media.derive) and re-marks the triage, so the decision waits for its words."""
+    if now - ev["ingested_at"] > AWAIT_TEXT or not (ev.get("payload") or {}).get("attachments"):
+        return False
+    row = {"event_id": ev["event_id"], "source": ev["source"], "source_id": ev.get("source_id"),
+           "object_refs": ev.get("object_refs")}
+    files = events.attachments([row], max_privacy="local_only", conn=conn).get(str(ev["event_id"]), [])
+    if not files:            # the file itself is not stored yet (download queued)
+        return any((a or {}).get("isVoiceNote") or str((a or {}).get("type")) in ("audio", "AUDIO")
+                   for a in (ev.get("payload") or {}).get("attachments") or [])
+    return any(f.get("text") is None and f.get("kind") in ("audio", "document") for f in files)
+
+
 def _decide(evs: list[dict], *, dry: bool = False, replace_errors: bool = False) -> dict:
     """One decision per event (the latest of each thread decided, the rest of the burst 'remember'). A failed model
     call stores nothing (retried by the next pass) unless the event is past RETRY_WINDOW. replace_errors: rows already
@@ -217,6 +245,9 @@ def _decide(evs: list[dict], *, dry: bool = False, replace_errors: bool = False)
                 rec = {"action": "remember", "rule": "same burst: decided on the latest message", "d": {}}
             else:
                 ctx = _thread_context(conn, ev, self_names)
+                if _awaiting_text(conn, ev, now):
+                    out["retry_later"] += 1      # its file's text is on its way: decided when it lands (or later)
+                    continue
                 settled = _without_model(r, ev, ctx)
                 if settled:  # Monsieur's rules decide alone: no model call
                     out["without_model"] = out.get("without_model", 0) + 1

@@ -26,7 +26,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from . import organic, privacy
+from . import events, organic, privacy
 from .db import connection
 from .flows import _span, tz
 
@@ -77,14 +77,18 @@ def _plans_input(b: dict, msgs: list[dict], z) -> dict:
 
 def _burst_messages(b: dict) -> list[dict]:
     with connection() as conn:
-        return conn.execute("""select e.event_id::text, e.event_type, e.occurred_at, e.content,
-                                      coalesce(en.canonical_name, i.display_name) who
+        rows = conn.execute("""select e.event_id::text, e.event_type, e.occurred_at, e.content, e.source, e.source_id,
+                                      e.object_refs, coalesce(en.canonical_name, i.display_name) who
                                from core.events e left join core.source_identities i on i.identity_id = e.actor_identity_id
                                left join core.identity_links l on l.identity_id = e.actor_identity_id
                                                                 and l.status = 'confirmed'
                                left join core.entities en on en.entity_id = l.entity_id
                                where e.event_id = any(%s::uuid[]) order by e.occurred_at, e.event_id""",
                             (b["source_event_ids"],)).fetchall()
+    # a voice note's words are its file's transcript (events.attachments), as every reader of a conversation reads them
+    for r, text in zip(rows, events.spoken_texts(rows, max_privacy="redacted_cloud")):
+        r["content"] = text
+    return rows
 
 
 def plan_burst(item_id: str, *, chat=None) -> dict:

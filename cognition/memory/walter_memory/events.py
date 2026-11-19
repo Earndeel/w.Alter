@@ -263,6 +263,17 @@ def render_messages(rows: list[dict], *, max_privacy: str = "cloud_allowed", cha
     return [render_message(r, atts.get(str(r.get("event_id")))) for r in rows]
 
 
+def spoken_texts(rows: list[dict], *, max_privacy: str = "cloud_allowed", chars: int = ATTACHMENT_CHARS) -> list[str]:
+    """Each row's text plus only the attachments that HAVE words (a voice note's transcript, a document's text): what a
+    reader of the conversation would read. Files without text add nothing, so a decision keyed on these words is not
+    re-asked for a photo. Never raises (text only on error)."""
+    try:
+        atts = attachments(rows, max_privacy=max_privacy, chars=chars)
+    except Exception:  # noqa: BLE001
+        atts = {}
+    return [render_message(r, [a for a in atts.get(str(r.get("event_id")), []) if a.get("text")]) for r in rows]
+
+
 def compact(rows: list[dict], text: str | None = None, width: int = 500, budget: int = 16000, *,
             max_privacy: str = "cloud_allowed") -> dict:
     """Events as an agent reads them: no payload, the content cut to a window around the searched text, the whole

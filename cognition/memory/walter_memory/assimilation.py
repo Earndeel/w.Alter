@@ -204,6 +204,8 @@ def route(evs: list[dict]) -> int:
                 n += media.route(conn, ev["subject"], p)
             elif ev["type"] == "memory.object":     # a file's derived text (OCR, transcript…) → the search index
                 processing.mark(conn, "search.index", "pending", reason="object", settle=10, max_wait=60)
+                # and the triage: an incoming voice note waits for its transcript (triage._awaiting_text)
+                processing.mark(conn, "triage", "incoming", reason="object", settle=5, max_wait=60)
                 n += 1
             elif ev["type"] in ("task.ended", "task.updated") and p.get("task_id"):
                 # a Run Plane objective changed: the owner's goals it carries follow it (knowledge.runplane)
