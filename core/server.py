@@ -297,7 +297,11 @@ def memory_view(key: str = "", query: str = "", depth: str = "overview", max_tok
     open/blocked/done, decisions in force, recent changes, unresolved contradictions, known next steps, sub-projects'
     important news; every line dated with its provenance; `at`=YYYY-MM-DD for the state as it was then; key owner =
     the owner's rules in force, dated states, goals by their evidence, states to re-check; key now = where, agenda,
-    open work, what memory learned lately, each with its freshness; key me = both, « où en suis-je »). Give
+    open work, the freshness of personal knowledge and why it is late, each with its freshness; key me = both,
+    « où en suis-je »; key person:<name or id> = the relation with one person: who they are, what is known of the
+    relation by who says it (the person / Monsieur / the data / a hypothesis), recent changes, exchanges as measures,
+    commitments, possible follow-ups (nothing is created), contexts, measured rhythm, replaced information; a name
+    shared by several people lists them, never merged). Give
     `query` instead to find the views closest to some words. Cloud-safe: local-only views are never returned."""
     if key:
         d = depth if depth in ("index", "overview", "synthesis", "details", "sources", "state") else "overview"
