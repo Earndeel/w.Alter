@@ -545,6 +545,7 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
     attempts: list[dict] = []
     calls: list[dict] = []
     usable: dict = {}
+    held: list[dict] = []
     for model in models:                 # set-aside routes and the OpenRouter credit floor, once per decision
         provider = provider_of(model)
         aside = _unavailable.get(model)
@@ -560,11 +561,21 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
             bal = await balance()
             if bal is not None and bal < floor:
                 attempts.append({"provider": provider, "model": model, "reason": "balance_below_floor"})
-                calls.append({"provider": provider, "model": model, "ok": False, "skipped": "balance_below_floor",
-                              "seconds": 0})
-                log({"provider": provider, "model": model, "ok": False, "seconds": 0, "skipped": "balance_below_floor"})
+                # booked as a call only if it would have been tried (19/11): a route after the one that answered
+                # is not a failure of this decision (Memory counted 70 "failed" reconcile calls that never happened)
+                held.append({"provider": provider, "model": model, "ok": False, "skipped": "balance_below_floor",
+                             "seconds": 0})
                 continue
         usable[model] = True
+
+    def flush_held(answered: list | None = None) -> None:
+        names = [str(r.get("route") or "").split("/", 1)[-1] for r in answered or []]
+        rank = min([models.index(m) for m in names if m in models] or [len(models)])
+        for h in held:
+            if models.index(h["model"]) < rank:
+                calls.append(h)
+                log({**h})
+        held.clear()
     straggler = _straggler(body)
 
     async def part(names: list[str], first_model: str, media=media) -> tuple[dict | None, list, list]:
@@ -803,15 +814,19 @@ async def decisions(body: dict, *, chain: list[str], key, client, log, balance=N
                 if kept and kept[0] == 200:          # the native call failed too: the split's partial answer stands
                     answered, unavailable = kept[1]["answered"], kept[1]["unavailable"]
                 elif kept:
+                    flush_held()
                     return kept
                 else:
+                    flush_held()
                     return 502, {"error": "no decision model answered", "attempts": attempts, "calls": calls}
     else:
         status, got = await split(usable)
         if status != 200:
+            flush_held()
             return status, got
         answered, unavailable = got["answered"], got["unavailable"]
     main = max(answered, key=lambda r: (len(set(r["questions"]) & required), len(r["questions"])))
+    flush_held(answered)
     answers: dict = {}
     for r in answered:
         answers.update(r["answers"])

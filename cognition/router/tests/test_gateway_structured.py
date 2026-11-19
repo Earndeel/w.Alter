@@ -396,3 +396,22 @@ def test_rerank_endpoint_uses_the_rerank_poste(tmp_path, monkeypatch):
 def test_no_hardcoded_decision_chain_or_default_model_in_the_gateway():
     src = (LLM / "gateway.py").read_text() + (LLM / "structured.py").read_text()
     assert "mercury-decide" not in src and "rerank-4-fast" not in src and "rerank-5-fast" not in src
+
+
+def test_a_floor_held_route_after_the_one_that_answered_is_not_booked_as_a_failed_call():
+    """19/11: the floor check runs for every route up front; a held route is a call of this decision only if it
+    would have been tried (before the model that answered), else Memory books phantom failures."""
+    client = Client({"alpha/decisions": answer()})
+    async def low():
+        return 0.5
+    logged = []
+    code, out = run(structured.decisions({"state": {}, "questions": Q, "paid_floor_usd": 1.0},
+                                                 client=client, key=key, log=logged.append, balance=low,
+                                                 chain=["inception/mercury-decide:free", "liquid/d1-ultra"]))
+    assert code == 200 and out["attempts"][0]["reason"] == "balance_below_floor"
+    assert not [c for c in out["calls"] if c.get("skipped") == "balance_below_floor"]
+    assert not [e for e in logged if e.get("skipped") == "balance_below_floor"]
+    code, out = run(structured.decisions({"state": {}, "questions": Q, "paid_floor_usd": 1.0},
+                                                 client=client, key=key, log=logged.append, balance=low,
+                                                 chain=["liquid/d1-ultra", "inception/mercury-decide:free"]))
+    assert code == 200 and [c["skipped"] for c in out["calls"] if c.get("skipped")] == ["balance_below_floor"]
