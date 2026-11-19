@@ -242,6 +242,18 @@ def main(argv=None) -> None:
             total.update({f"documents_{k}": v for k, v in documents.sync_if_changed().items() if k in ("new", "changed", "removed")})
         except Exception as exc:  # noqa: BLE001 — documents never block the event index
             print(f"documents: {type(exc).__name__}: {exc}", file=sys.stderr)
+            total.update({f"documents_{k}": v for k, v in getattr(exc, "stats", {}).items()
+                          if k in ("new", "changed", "removed") and v})
+            try:      # seen by `walter-memory health` (last run failed) until a pass succeeds; once per error
+                from . import ingestion
+                err = f"{type(exc).__name__}: {exc}"
+                with connection() as c:
+                    known = c.execute("""select 1 from ingestion.failures where connector = 'documents'
+                                         and resolved_at is null and error = %s""", (err[:2000],)).fetchone()
+                if not known:
+                    ingestion.record_failure("documents", err, stream="files")
+            except Exception:  # noqa: BLE001
+                pass
         for _ in range(a.loops):
             out = search.index_pending()
             for k, v in out.items():

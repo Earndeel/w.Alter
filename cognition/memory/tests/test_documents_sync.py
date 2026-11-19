@@ -142,6 +142,8 @@ class MemorySQL:
         if sql.startswith('update ingestion.connectors set last_success_at'):
             self.successes += 1
             return Result()
+        if sql.startswith('update ingestion.failures set resolved_at'):
+            return Result()
         raise AssertionError(f'Unexpected SQL in offline store: {sql}')
 
     def active(self):
@@ -395,3 +397,38 @@ def test_storage_failure_rolls_back_canonical_event_and_current_projection(sourc
     monkeypatch.setattr(conn, 'execute', execute)
     assert documents.sync()['changed'] == 1
     assert len(conn.cloud_rows(monkeypatch)) == 1
+
+
+def test_a_missing_document_holds_only_its_own_source(source, tmp_path):
+    """18/11: two retired projects' READMEs blocked every source (the decisions register included) for 36 h."""
+    conn, config, doc, _ = source
+    other = tmp_path / 'projects'
+    other.mkdir()
+    (other / 'a.md').write_text('Project A.\n')
+    (other / 'b.md').write_text('Project B.\n')
+    config.write_text(config.read_text() + f'[[source]]\nname = "projects"\npath = {json.dumps(str(other / "*.md"))}\n'
+                      'split = "file"\n')
+    assert documents.sync()['new'] == 3
+    (other / 'b.md').unlink()
+    doc.write_text('## Decision\nVersion B.\n')
+    with pytest.raises(documents.DocumentsUnavailable) as caught:
+        documents.sync()
+    assert caught.value.stats['unavailable'] == {'projects': 1} and caught.value.stats['changed'] == 1
+    texts = sorted(r['content'] for r in conn.active())
+    assert texts == ['## Decision\nVersion B.', 'Project A.', 'Project B.']     # the missing one is kept as it was
+
+
+def test_a_path_in_exclude_acknowledges_one_removal(source, tmp_path):
+    conn, config, _, _ = source
+    other = tmp_path / 'projects'
+    for name in ('x', 'y'):
+        (other / name).mkdir(parents=True)
+        (other / name / 'README.md').write_text(f'Project {name}.\n')
+    config.write_text(f'[[source]]\nname = "projects"\npath = {json.dumps(str(other / "*" / "README.md"))}\n'
+                      'split = "file"\n')
+    assert documents.sync()['new'] == 2
+    (other / 'y' / 'README.md').unlink()
+    with config.open('a') as stream:
+        stream.write(f'exclude = [{json.dumps(str(other / "y" / "README.md"))}]\n')
+    assert documents.sync()['removed'] == 1
+    assert [r['content'] for r in conn.active()] == ['Project x.']

@@ -12,7 +12,11 @@ retracted and their chunks hidden, so the knowledge lane holds only the current 
   [[source]]  name = "decisions", path = "/…/DECISIONS.md", split = "h2"     one row per `## ` section
               name = "owner-rules", path = "/…/memory/*.md", split = "file"  one row per file (front matter dropped)
               privacy = "cloud_allowed" (default; a detected category tightens it to local_only)
-              exclude = ["INDEX.md"]  file names a glob must skip
+              exclude = ["INDEX.md"]  file names a glob must skip; an entry with a « / » is a path pattern
+                                      (an acknowledged removal: « /projects/x/y/README.md »)
+A missing document is never read as a removal (an unmounted disk looks the same): its knowledge is kept and the pass
+reports it, but only its own source waits — the other sources sync (18/11: two retired projects' READMEs had blocked
+every source, the register of decisions included, for 36 h with no alert).
 """
 from __future__ import annotations
 
@@ -40,7 +44,27 @@ MAX_CHARS = 12000
 
 
 class DocumentsUnavailable(RuntimeError):
-    """A source could not be inspected; this is never evidence of an intentional removal."""
+    """A source could not be inspected; this is never evidence of an intentional removal. `stats` = what the pass did
+    for the sources that could be read (empty when nothing was)."""
+
+    def __init__(self, message: str, stats: dict | None = None):
+        super().__init__(message)
+        self.stats = stats or {}
+
+
+def _excluded(path: str, src: dict) -> bool:
+    """A file name skips that name anywhere in a glob; an entry with a « / » matches the whole path."""
+    return any(fnmatch.fnmatchcase(path, e) if "/" in e else os.path.basename(path) == e
+               for e in src.get("exclude", []))
+
+
+def _raise_unavailable(stats: dict) -> dict:
+    gone = stats.get("unavailable") or {}
+    if gone:
+        names = ", ".join(f"{k} ({n})" for k, n in sorted(gone.items()))
+        raise DocumentsUnavailable(f"declared documents unavailable in source(s) {names}; their knowledge is retained, "
+                                   "the other sources synced; acknowledge a removal with exclude", stats)
+    return stats
 
 
 def config() -> list[dict]:
@@ -103,11 +127,12 @@ def sections(path: str, split: str) -> list[dict]:
 
 
 def sync(dry_run: bool = False) -> dict:
-    return _sync(config(), dry_run=dry_run)
+    return _raise_unavailable(_sync(config(), dry_run=dry_run))
 
 
 def _sync(sources: list[dict], *, dry_run: bool = False) -> dict:
-    stats = {"sources": 0, "sections": 0, "new": 0, "changed": 0, "unchanged": 0, "removed": 0, "skipped_secret": 0}
+    stats = {"sources": 0, "sections": 0, "new": 0, "changed": 0, "unchanged": 0, "removed": 0, "skipped_secret": 0,
+             "unavailable": {}}
     with connect() as conn:
         # Revisions and their projections commit together. Serialize syncs so parallel index passes cannot
         # allocate the same next revision or create two current rows for one section.
@@ -129,15 +154,16 @@ def _sync(sources: list[dict], *, dry_run: bool = False) -> dict:
         for src in sources:
             stats["sources"] += 1
             files = sorted(glob.glob(src["path"])) if any(c in src["path"] for c in "*?[") else [src["path"]]
-            for old in current.values():
-                if (old["source"] == src["name"] and fnmatch.fnmatchcase(old["path"], src["path"])
-                        and os.path.basename(old["path"]) not in src.get("exclude", []) and old["path"] not in files):
-                    raise DocumentsUnavailable("a previously indexed document is unavailable; use exclude for removal")
+            missing = {old["path"] for old in current.values()
+                       if old["source"] == src["name"] and fnmatch.fnmatchcase(old["path"], src["path"])
+                       and not _excluded(old["path"], src) and old["path"] not in files}
+            missing |= {f for f in files if not _excluded(f, src) and not os.path.isfile(f)}
+            if missing:      # kept as they are, the source's other files still sync
+                stats["unavailable"][src["name"]] = len(missing)
+                live.update(k for k, old in current.items() if old["source"] == src["name"] and old["path"] in missing)
             for f in files:
-                if os.path.basename(f) in src.get("exclude", []):
+                if _excluded(f, src) or f in missing:
                     continue
-                if not os.path.isfile(f):
-                    raise DocumentsUnavailable("a declared document is unavailable; existing knowledge retained")
                 for s in sections(f, src.get("split", "h2")):
                     stats["sections"] += 1
                     key = f"{src['name']}:{f}:{s['key']}"
@@ -261,9 +287,10 @@ def sync_if_changed() -> dict:
                                       sort_keys=True).encode()).hexdigest()
     if ingestion.get_checkpoint(PROCESSOR, "files").get("digest") == digest:
         return {}
-    out = _sync(sources)
+    out = _raise_unavailable(_sync(sources))     # no checkpoint while a document is missing: the next pass retries
     ingestion.set_checkpoint(PROCESSOR, "files", {"digest": digest, "files": len(stamp)})
     ingestion.mark_success(PROCESSOR)
+    ingestion.resolve_failures(PROCESSOR)
     return out
 
 
