@@ -454,5 +454,66 @@ Un lecteur local reçoit ce que Monsieur voit. Les affirmations sensibles sont m
 - `relation.check` : aucun élément local, sensible, remplacé ou d'une autre personne cité ;
 - Context « Où en est ma relation avec … ? » : section servie dans son budget, projection 28 ms.
 
-**Reste à faire pour le préflight Decision 2.0** : voir DECISIONS.md, entrée du 19/11 (P3).
+**Préflight Decision 2.0** : fait le 19/11, voir § 11.
+
+## 11. Condensé de situation pour le préflight Decision 2.0 (19/11/2026)
+
+Le préflight pose **une seule** question à Decision (d1.2-ultra, cloud) par message. Il ne voyait que le message,
+l'échange précédent et les fils : il ne pouvait pas savoir que « le dongle » est un sujet de Sagora, qu’un prénom
+désigne deux personnes, ni que « on reprend » renvoie à des tâches ouvertes. `walter_memory.digest` lui donne, dans
+le même appel, ce que Memory sait déjà des références du message (`state.known_state`).
+
+**Principe** : adaptatif, déterministe, lecture seule.
+- Rien quand le message ne désigne rien (question générale, code, calcul) : 175 des 280 messages réels du journal.
+- Sinon des lignes datées et courtes, ≤ 250 tokens (un plafond, pas un objectif ; p50 réel 102).
+- Aucun appel de modèle pour le préparer, aucune écriture (vérifié par test).
+- Résolution existante uniquement : `projection.find_projects` + ancres `entities.anchors` (projets),
+  `context._known_people` + `relation.candidates` (personnes), `personal._tasks` / `_agenda` / `learned_lines`,
+  `whereabouts.current`. Fraîcheur reprise des projections (« ancienne » au-delà de 30 jours, âge de la position).
+
+**Lignes et déclencheurs** (ordre de priorité, coupe par budget à partir de la fin) :
+
+| Ligne | Quand | Contenu |
+|---|---|---|
+| projet (≤ 2) | nom ou alias d'un projet du catalogue P1 | volume, dernière activité, statut, état / prochaine étape / problème ouvert daté |
+| personne (≤ 3) | nom connu (≥ 20 messages) ou nom propre | une personne : « fiche Kardex » (sans ses champs), messages, dernier échange, plan convenu/proposé, engagements ouverts (nombre), suivis (nombre), projets |
+| homonyme | plusieurs personnes portent le nom | « ambigu, N personnes (jamais fusionnées), préciser laquelle » + volumes, jamais de choix |
+| changement de projet | l'échange précédent (≤ 2 h) nommait un autre projet | « l'échange précédent nommait … » |
+| tâches | reprise implicite (« on reprend », « où on en était », « ça en est où »…) sans autre référence, ou question sur soi | 2 tâches ouvertes masquées + reste |
+| agenda | référence temporelle (demain, ce soir, jours, rdv, « suis dispo »…) | nombre de rdv sur 7 jours, prochain, fraîcheur de la synchro |
+| position | besoin de lieu (« près d'ici », « autour de moi », itinéraire, météo…) | **le signal seulement** : « une position est connue (récente / ancienne, relevée il y a …) ; elle n'est pas dans ce condensé » |
+| situation | question sur soi | lignes apprises de P2 |
+
+Un projet déjà nommé par l'échange précédent récent (≤ 30 min) n'est pas répété : Decision l'a déjà sous les yeux.
+
+**Confidentialité** :
+- audience cloud : `cloud_allowed` et `redacted_cloud` seulement ; textes masqués (`relation._redact`), textes que
+  `privacy.detect` signale retirés ;
+- un message `local_only` ne reçoit jamais de condensé ;
+- **localisation** : le signal « localisation nécessaire » (position connue, âge) est distinct de la donnée ; ni lieu,
+  ni adresse, ni coordonnées n'entrent dans le condensé (test) ; le bloc `position` local existant reste seul à la
+  servir, avec ses règles ;
+- aucune permission de divulgation modifiée ; le journal du préflight garde `decision.digest` = types, tokens, ms,
+  jamais les lignes.
+
+**Intégration** : `walter_context.preflight` lance le condensé en parallèle de la préparation du tour (pool des
+lecteurs) et l'attend au plus `timeout_ms` (300) ; en retard ou en erreur, la décision part comme avant et le plan le
+dit (`late` / `error`). Réglage `[digest]` de `walter-context.toml` ; préchauffage au démarrage du service.
+
+**Banc du 19/11** (`bench/preflight_native.py --set digest`, 33 cas : 12 réels, demandes simples, reprises
+implicites, homonymes, changements de projet, références temporelles, localisation ; dg-off4 / dg-on4) :
+
+| | sans | avec |
+|---|---|---|
+| justes | 100/105 | **105/105** |
+| fausses alertes (besoin ou personnel en trop) | 2/44 (web demandé à tort) | **0/44** |
+| personnel attendu | 14/18 | **18/18** |
+| clarté des homonymes | 0/2 « ambigu » | **2/2** |
+| niveau de modèle | identique | identique |
+| condensé présent | — | 25/33, tokens p50 102, max 248 |
+| latence plan p50 / p95 | 447 / 524 ms | 559 / 783 ms (condensé p50 109 ms, 1 retard sur 33) |
+| coût par appel Decision | ≈ 0,000085 $ | ≈ 0,000085 $ |
+
+Activé en production le 19/11 (`[digest] enabled = true`). Retour arrière : `enabled = false` puis redémarrer
+`walter-context-preflight`.
 
