@@ -54,6 +54,13 @@ PERIOD_HINT = re.compile(r"(?i)\b(hier|avant-hier|aujourd'hui|ce (matin|midi|soi
                          r"pass[ée]e)|ces derniers jours|ce week-?end|ce mois|le mois dernier|o[uù] (é|e)tais-je|o[uù] suis-je "
                          r"all[ée]|positions?|gps|qu'ai-je fait|qu'est-ce que j'ai fait|ma journ[ée]e|ma semaine|yesterday|"
                          r"today|this week|last week|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b")
+# « Où en est X ? » about a project the message names: the current-state projection (PROJECTIONS.md, P1) is served
+# before free memory, out of the knowledge and subject-card budgets it replaces (never added on top). Deterministic:
+# a phrase match on the projects' names, no model call.
+STATE_HINT = re.compile(r"(?i)(o[uù] en (est|sont|sommes|suis|es|êtes)|o[uù] [çc]a en est|\b[ée]tat\b|\bstatut|\bstatus\b|"
+                        r"avancement|avanc[ée]e?s?\b|reste [àa] faire|prochaines? [ée]tapes?|\bbloqu|\bbilan\b|"
+                        r"point sur|r[ée]cap|progress|what'?s left|where (are|is) we)")
+STATE_SHARE = 0.6                 # of the knowledge budget, when the caller sets no explicit "state" budget
 _names_cache: tuple[float, list[tuple[str, str]]] | None = None
 
 
@@ -346,6 +353,23 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     query = FORM_PREAMBLE.sub("", query, count=1) or query
     t0 = time.perf_counter()
     sections, trace = {}, {"query_chars": len(query), "sections": {}}
+    state_key, state_budget = None, 0
+    if b["knowledge"] > 0 and b.get("state", 1) > 0 and STATE_HINT.search(message):
+        try:
+            from . import projection
+            found = projection.find_projects(message)
+            if found:
+                state_key = found[0]
+                if "state" in b:
+                    state_budget = int(b["state"])
+                else:                     # carved out of what it replaces: free knowledge and subject cards
+                    carved = int(b["knowledge"] * STATE_SHARE)
+                    state_budget = carved + int(b.get("views", 0))
+                    b["knowledge"] -= carved
+                    b["views"] = 0
+                trace["state_plan"] = {"key": state_key, "budget": state_budget, "found": found}
+        except Exception as e:  # noqa: BLE001 — an addition: never lose the rest of the context
+            trace["state_plan"] = {"error": type(e).__name__}
     # The candidate searches are local (FTS + vectors) and independent: run them at once; then ONE rerank call over
     # their union orders every section (search.rerank_pools), instead of one call per section (07/11).
     from concurrent.futures import ThreadPoolExecutor
@@ -372,6 +396,10 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
         out = search.rerank_pools(query, pools)
         return {k: (v if k == "evidence" else search.dedupe(v)) for k, v in out.items()}
     rank = pool.submit(ranked)
+    state_fut = None
+    if state_key:
+        from . import projection
+        state_fut = pool.submit(lambda: projection.project(state_key, max_privacy=max_privacy))
     pool.shutdown(wait=False)
     fut = {k: _Section(rank, k) for k in want}
     user_md = _owner_profile() if include_profile and b["profile"] > 0 else None
@@ -429,6 +457,23 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
             trace["sections"][name] = {**tr, "ms": round((time.perf_counter() - t) * 1000)}
         except Exception as e:  # an addition: never lose the rest of the context
             trace["sections"][name] = {"error": type(e).__name__}
+    if state_fut is not None:
+        t = time.perf_counter()
+        try:
+            from . import projection
+            p = state_fut.result()
+            text, ids = projection.render(p, state_budget)
+            if text and not p.get("error"):
+                sections["state"] = text
+                # free knowledge does not repeat the project: the projection is its reading of every current item of
+                # the project (shown or not), so only other subjects remain as free memory
+                shown_ids |= set(ids) | set(p.get("sources") or []) | set(p.get("mention_ids") or [])
+            trace["sections"]["state"] = {"tokens": tokens(text) if text else 0, "budget": state_budget,
+                                          "key": state_key, "projection_ms": p.get("ms"),
+                                          "ms": round((time.perf_counter() - t) * 1000), "refs": ids[:20],
+                                          "children": [c["key"] for c in p.get("children") or []]}
+        except Exception as e:  # noqa: BLE001
+            trace["sections"]["state"] = {"error": type(e).__name__}
     named = people_in(query) if b["people"] > 0 or b["evidence"] > 0 else []
     if b["people"] > 0:
         t = time.perf_counter()
@@ -522,8 +567,8 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
                                             "ms": round((time.perf_counter() - t) * 1000)}
         except Exception as e:
             trace["sections"]["periods"] = {"error": type(e).__name__}
-    order = ["profile", "rules", "working", "tasks", "experience", "people", "records", "knowledge", "periods", "views",
-             "evidence"]
+    order = ["profile", "rules", "working", "tasks", "state", "experience", "people", "records", "knowledge", "periods",
+             "views", "evidence"]
     sections = {k: privacy.mask_secrets(sections[k]) for k in order if k in sections}
     titles = {"profile": "Profil de Monsieur", "people": "Personnes concernées (Kardex)",
               "rules": "Règles durables de Monsieur (en vigueur)",
@@ -532,6 +577,8 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
               "views": "Vues consolidées à approfondir (memory_view clé, profondeur overview|synthesis|details)",
               "records": "Décisions et règles consignées (texte en vigueur, daté)",
               "knowledge": "Mémoire pertinente", "evidence": "Sources d'origine",
+              "state": "État courant (projection de la mémoire versionnée, lecture seule ; une ligne « incertain » ou "
+                       "« non réconcilié » n'est pas tranchée par sa date)",
               "tasks": "Tâches de Monsieur (suivies d'une session et d'une interface à l'autre)",
               "experience": "Expérience : déjà tenté (tiré des traces d'exécution, pas du raisonnement)"}
     block = "\n\n".join(f"## {titles[k]}\n{v}" for k, v in sections.items())

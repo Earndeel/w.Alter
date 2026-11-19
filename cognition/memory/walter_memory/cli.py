@@ -152,6 +152,14 @@ def main(argv=None) -> None:
     vw.add_argument("--max-tokens", type=int, default=800); vw.add_argument("--json", action="store_true")
     vw.add_argument("--query", default="", help="find: the V1 views closest to these words (subjects, episodes, periods)")
     vw.add_argument("--local", action="store_true", help="owner reading on the VM: local_only views too")
+    vw.add_argument("--at", default=None, help="read --depth state: the state as it was at this ISO date")
+    st = sub.add_parser("state", help="P1 projections: the current state of a project (a read of the versioned "
+                        "knowledge, nothing stored, no model); --at for a past date, --list for the hierarchy, --check "
+                        "for the invariants (no expired item, sub-projects kept apart, latency)")
+    st.add_argument("key", nargs="*", default=[], help="project:walter, « Walter Memory »… (several with --check)")
+    st.add_argument("--at", default=None); st.add_argument("--max-tokens", type=int, default=900)
+    st.add_argument("--list", action="store_true"); st.add_argument("--check", action="store_true")
+    st.add_argument("--json", action="store_true")
     dq = sub.add_parser("decision-questions", help="the exact questions a Memory processor asks the decision model "
                         "(Walter Router's decision bench, 2026-11-13); no call, nothing recorded")
     dq.add_argument("processor", choices=["triage"])
@@ -547,6 +555,20 @@ def main(argv=None) -> None:
         res = episodes.experience(thread_id=a.thread, query=a.query, limit=a.limit,
                                   max_privacy="local_only" if a.local else "cloud_allowed")
         print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
+    elif a.cmd == "state":
+        from . import projection
+        if a.list:
+            res = projection.listing()
+        elif a.check:
+            res = projection.check(a.key or None, at=a.at)
+        else:
+            res = projection.read({"key": " ".join(a.key), "at": a.at, "max_tokens": a.max_tokens})
+        if a.json or a.list or a.check or "error" in res:
+            print(json.dumps(res, default=str, ensure_ascii=False, indent=1))
+        else:
+            print(res["content"]); print(f"\n({res['ms']} ms, {len(res['sources'])} connaissances citées)")
+        if a.check and not res.get("ok"):
+            raise SystemExit(1)
     elif a.cmd == "views":
         from . import views
         from datetime import datetime as _dt
@@ -555,7 +577,8 @@ def main(argv=None) -> None:
                             until=_dt.fromisoformat(a.until) if a.until else None, limit=a.limit, dry=a.dry)
         elif a.action == "read":
             res = views.read({"depth": a.depth, "key": a.key or None, "domain": a.domain, "horizon": a.horizon,
-                              "max_tokens": a.max_tokens, "privacy": "local_only" if a.local else "cloud_allowed"})
+                              "max_tokens": a.max_tokens, "privacy": "local_only" if a.local else "cloud_allowed",
+                              "at": a.at})
         elif a.action == "board":
             res = views.read({"depth": "index", "domain": a.domain or "projects", "horizon": a.horizon,
                               "max_tokens": a.max_tokens})
