@@ -141,6 +141,8 @@ def check() -> tuple[list[str], dict]:
         m["extraction_backlog"] = st["backlog"]
         from . import organic
         m["extraction_mode"] = "paused" if organic.extraction_paused() else "active"
+        m["stages"] = {k: v["mode"] + ("" if v["from"] == "stages" else " (extraction)")
+                       for k, v in organic.stages().items()}
         if m["extraction_mode"] == "active" and (st["backlog"]["oldest_s"] or 0) > 6 * 3600:   # a pause is the owner's
             problems.append(f"extraction backlog: {st['backlog']['n']} messages, oldest waiting "
                             f"{st['backlog']['oldest_s'] // 3600} h")

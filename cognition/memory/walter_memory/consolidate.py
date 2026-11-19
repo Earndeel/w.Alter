@@ -276,7 +276,8 @@ def invalidate(*, item_ids: list[str] | None = None, threads: list[tuple[str, st
                 "select distinct view_key from views.evidence where ref_kind = 'derived' and ref_id = any(%s)", (item_ids,))}
         for source, thread in threads or []:
             subjects = {r["view_key"] for r in conn.execute(
-                "select distinct view_key from views.member where session_id like %s", (f"{source}/%/{thread}",))}
+                """select distinct view_key from views.member where session_id like %s
+                   and view_key is not null""", (f"{source}/%/{thread}",))}
             keys |= {key_for(s) for s in subjects} | {key_for(s, "local") for s in subjects}
         frontier = set(keys)
         while frontier:    # parents: a day lists an episode, a week indexes its days, a month its weeks (P1.6)
@@ -380,8 +381,8 @@ def reconsolidate(subject: str, *, chat=None, apply: bool | None = None) -> dict
     """One Router call over the subject's current cloud items. Proposals are validated (ids exist, same kind for a
     merge, the replacing item is newer and stated by the owner) and recorded; applied only in mode 'apply'."""
     from . import llm, organic
-    if organic.extraction_paused():
-        return {"skipped": "extraction paused"}
+    if organic.paused("reconsolidation"):
+        return {"skipped": "reconsolidation paused"}
     chat = chat or llm.chat
     apply = (mode() == "active") if apply is None else apply
     now = _now()

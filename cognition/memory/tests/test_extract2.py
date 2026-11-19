@@ -18,6 +18,8 @@ NOW = datetime.now(timezone.utc)
 def isolated(monkeypatch):
     from walter_memory import search
     monkeypatch.setattr(search, "embed", lambda texts: (_ for _ in ()).throw(RuntimeError("no embedder in tests")))
+    from walter_memory import quota
+    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})        # A4 gate: open unless a test closes it
     extract2.set_v1_start(NOW - timedelta(days=1))
     yield
 
@@ -404,3 +406,86 @@ def test_a_replayed_older_contradiction_never_contests_newer_knowledge():
                             and source_refs->>'thread' = %s""", (t,)).fetchone()
     assert n["status"] == "derived" and "contested" not in n["attributes"]   # the newer knowledge stays current
     assert o["status"] == "superseded" and o["attributes"]["replayed_older"] is True
+
+
+# ─── A4 + pilot (2026-11-19): the Codex quota gate; a staged backfill never touches served knowledge ───
+def test_the_codex_quota_verdict():
+    from walter_memory import quota
+    fresh = {"used_percent": 49.0, "read_at": NOW.isoformat(), "resets_at": (NOW + timedelta(days=3)).isoformat(),
+             "estimated": False}
+    assert quota.judge(fresh, 70, 1800)["ok"] is True
+    assert quota.judge({**fresh, "used_percent": 70.0}, 70, 1800)["ok"] is False
+    assert "too old" in quota.judge({**fresh, "read_at": (NOW - timedelta(hours=2)).isoformat()}, 70, 1800)["reason"]
+    assert "estimated" in quota.judge({**fresh, "estimated": True}, 70, 1800)["reason"]
+    assert "before the weekly reset" in quota.judge({**fresh, "resets_at": (NOW - timedelta(minutes=1)).isoformat()},
+                                                    70, 1800)["reason"]
+    assert "unknown" in quota.judge(None, 70, 1800)["reason"]
+
+
+def test_over_the_quota_a_backfill_stops_and_covers_nothing(monkeypatch):
+    from walter_memory import quota
+    t = thread()
+    seed = say("hermes", t, "owner", "on garde Valkey pour le projet", at=NOW - timedelta(days=40))[0]
+    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": False, "reason": "codex weekly quota 72 % ≥ 70 %"})
+    model = Model(decision)
+    r = extract2.backfill([seed], tag="pytest-quota", chat=model, workers=1, window=0)
+    assert r["segments"] == 0 and not model.calls and "72 %" in r["quota_stopped"]
+    with connection() as conn:
+        assert conn.execute("select count(*) n from extraction.covered where event_id = %s",
+                            (seed,)).fetchone()["n"] == 0
+    assert extract2.tick(chat=model).get("quota", {}).get("ok") is False or extract2.tick(chat=model).get("paused")
+
+
+def _served(conn, ids):
+    return [dict(r) for r in conn.execute("""select item_id::text, status, valid_to, attributes, source_event_ids
+                                             from core.derived_items where item_id = any(%s::uuid[]) order by 1""",
+                                          (ids,)).fetchall()]
+
+
+def test_a_staged_pilot_writes_apart_records_its_effects_and_reverts_to_the_exact_former_state():
+    t = thread()
+    say("hermes", t, "owner", "on garde Valkey pour le projet", at=NOW - timedelta(hours=3))
+    extract2.process_thread("hermes", t, chat=Model(decision), force=True)
+    served = items(t)
+    assert len(served) == 1
+    ids = [served[0]["item_id"]]
+    with connection() as conn:
+        before = _served(conn, ids)
+    again = say("hermes", t, "owner", "on garde Valkey pour le projet, je confirme", at=NOW - timedelta(hours=2))[0]
+    switch_ = say("hermes", t, "owner", "on garde Redis pour le projet finalement", at=NOW - timedelta(hours=1))[0]
+
+    def pilot(lines, known):
+        out = {"items": []}
+        val = next(k for k, v in known.items() if "Valkey" in v)
+        for i, l in enumerate(lines, 1):
+            if "je confirme" in l:
+                out["items"].append({"kind": "decision", "text": "Monsieur a décidé de garder Valkey pour le projet",
+                                     "state": "decided", "msgs": [i], "quote": "on garde Valkey pour le projet",
+                                     "same_as": val})
+            elif "Redis" in l:
+                out["items"].append({"kind": "decision", "text": "Monsieur a décidé de garder Redis pour le projet",
+                                     "state": "decided", "msgs": [i], "quote": "on garde Redis pour le projet",
+                                     "supersedes": [val]})
+        return out
+    tag = f"pytest-pilot-{uuid.uuid4().hex[:6]}"
+    r = extract2.backfill([again, switch_], tag=tag, chat=Model(pilot), workers=1, window=0,
+                          generation=extract2.STAGING)
+    assert r["items"] == 1 and r["reused"] == 1 and r["staged"] == 2
+    with connection() as conn:
+        assert _served(conn, ids) == before                               # served knowledge untouched
+        new = conn.execute("""select generation, attributes from core.derived_items where derived_by = 'l3.extract'
+                              and attributes->>'backfill' = %s""", (tag,)).fetchall()
+        assert [n["generation"] for n in new] == ["g1p"] and new[0]["attributes"]["staged"]["supersedes"] == ids
+        st = conn.execute("select value from extraction.state where key = %s", (f"backfill:{tag}",)).fetchone()["value"]
+        assert {x["op"] for x in st["staged"]} == {"evidence", "effects"} and st["generation"] == "g1p"
+        assert conn.execute("select readable from core.generations where generation = 'g1p'").fetchone()["readable"] is False
+    from walter_memory import generations
+    assert "g1p" not in generations.read_set()                            # Context never reads the pilot
+    replay = extract2.backfill([again, switch_], tag=tag, chat=Model(pilot), workers=1, window=0,
+                               generation=extract2.STAGING)
+    assert replay["segments"] == 0 and replay["items"] == 0                # idempotent
+    extract2.backfill_revert(tag, confirm=True)
+    with connection() as conn:
+        assert _served(conn, ids) == before
+        assert conn.execute("""select count(*) n from core.derived_items where attributes->>'backfill' = %s
+                               and status <> 'retracted'""", (tag,)).fetchone()["n"] == 0

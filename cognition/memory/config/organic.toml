@@ -13,6 +13,24 @@ enforce = true
 # stay uncovered and are taken up on "active". Restart walter-memory-pipeline after a change.
 mode = "paused"
 
+[stages]
+# A2 (2026-11-19, owner: « Sépare les interrupteurs »): one switch per model-driven stage, "active" | "paused". A stage
+# left out follows [extraction] mode above. extraction = L3 extraction of conversations (live worker; an explicit
+# backfill runs under the Codex quota guard whatever this says); subjects = attaching exchanges to subjects and their
+# cards (views); reconsolidation = consolidate.reconsolidate; episode_summaries = run-episode summaries.
+# Restart walter-memory-pipeline after a change. State: `walter-memory health` → stages.
+extraction = "paused"
+subjects = "paused"
+reconsolidation = "paused"
+episode_summaries = "paused"
+
+[quota]
+# A4 (2026-11-19): extraction, backfill and subject cards run on the Router's memory_extraction poste, today the
+# owner's Codex (ChatGPT) plan, booked at $0 (a dollar budget never stops it). Above `codex_weekly_max` % of the
+# weekly window, or when no reading younger than `max_age_s` can be had from Walter Router, they stop.
+codex_weekly_max = 70
+max_age_s = 1800
+
 [working_memory]
 # P1.1: "adaptive" (2026-11-03, owner: integrate, no long shadow) = the adaptive trigger drives extraction (long,
 # marked or directive owner messages at once, the rest grouped) and the working state is injected by Context;

@@ -101,6 +101,11 @@ def preview(query: str) -> dict:
             "text_after_switch": after["text"]}
 
 
+# Staging generations (A1–A4 pilot, 2026-11-19): written by a tagged backfill, never readable until the owner promotes
+# them; a rollback does not make them readable.
+STAGING = ("g1p",)
+
+
 def switch(to: str = "g1", *, confirm: bool = False, note: str = "") -> dict:
     if not confirm:
         return {"refused": "a generation switch is the owner's decision: rerun with --confirm"}
@@ -123,7 +128,8 @@ def rollback(*, confirm: bool = False, to: str = "g0") -> dict:
     if not confirm:
         return {"refused": "rerun with --confirm"}
     with connection() as conn:
-        conn.execute("update core.generations set status = 'candidate', readable = true where generation <> %s", (to,))
+        conn.execute("""update core.generations set status = 'candidate', readable = true where generation <> %s
+                        and generation <> all(%s)""", (to, list(STAGING)))   # a pilot's staging stays unread
         conn.execute("""update core.generations set status = 'active', readable = true, activated_at = now(),
                           note = coalesce(note || ' | ', '') || 'rolled back' where generation = %s""", (to,))
     forget_cache()

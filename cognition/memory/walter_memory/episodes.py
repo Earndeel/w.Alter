@@ -279,7 +279,7 @@ def build(run_id: str, *, reason: str = "run_ended", summarise: bool = True) -> 
     det = deterministic_outcome(m, evaluation)
     summary = model = parsed = None
     from . import organic
-    if summarise and not organic.extraction_paused() and privacy.cloud_readable(m["run"]["privacy_class"]):
+    if summarise and not organic.paused("episode_summaries") and privacy.cloud_readable(m["run"]["privacy_class"]):
         from . import llm
         try:
             r = llm.chat([{"role": "system", "content": PROMPT},

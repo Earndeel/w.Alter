@@ -58,7 +58,8 @@ def _strict_privacy_by_default(request, monkeypatch):
             if request.node.get_closest_marker("owner_privacy")
             else {"cloud_context": "cloud_allowed", "pseudonymise": True, "kardex_cloud": "policy"})
     # the owner's pause of the extraction chain (2026-11-14) is a production state: the mechanisms are tested active
-    monkeypatch.setattr(organic, "settings", lambda: {**cur, "privacy": mode, "extraction": {"mode": "active"}})
+    monkeypatch.setattr(organic, "settings", lambda: {**cur, "privacy": mode, "extraction": {"mode": "active"},
+                                                     "stages": {}})
 
 
 def pytest_configure(config):

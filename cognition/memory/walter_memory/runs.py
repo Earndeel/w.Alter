@@ -217,24 +217,29 @@ REQUESTED_KEYS = ("task", "level", "require", "fast_path", "answer", "message_sh
 
 
 def update(run_id: str, *, thread_id: str | None = None, level: str | None = None, act: str | None = None,
-           requested: dict | None = None) -> dict:
+           requested: dict | None = None, thread_choice: dict | None = None) -> dict:
     """What is learned after the start (preflight). act correct/continue links the run to the run it follows: the
     previous run of the same harness session, else of the same thread (a correction never rewrites its parent).
     `requested` = what the preflight asks of Walter Router for this turn (task, text tier, required capabilities,
     a rule's answer when no model is needed): kept in routing.requested, read by the model gateway (lot 2,
     2026-11-07); the observed route written later keeps it.
     A3 (2026-11-11): the owner's objective is opened or carried on here (see _objective_for); the result then holds
-    `task_id` and `task` = opened | attached | reopened | linked."""
+    `task_id` and `task` = opened | attached | reopened | linked.
+    `thread_choice` (A1, 2026-11-19) = the thread decision's {confidence, new, degraded}: Memory views attach the
+    exchange from it instead of asking Walter Decision the same question again."""
     out = {}
+    choice = {k: thread_choice[k] for k in ("confidence", "new", "degraded")
+              if isinstance(thread_choice, dict) and thread_choice.get(k) is not None} or None
     req = {k: requested[k] for k in REQUESTED_KEYS if isinstance(requested, dict) and requested.get(k) not in (None, "", [])}
     with connect() as conn:
         conn.execute("""update runs.runs set thread_id = coalesce(%s, thread_id), level = coalesce(%s, level),
-                        act = coalesce(%s, act), updated_at = now(),
+                        act = coalesce(%s, act), updated_at = now(), thread_choice = coalesce(%s::jsonb, thread_choice),
                         routing = case when %s::jsonb is null then routing
                                        else coalesce(routing, '{}'::jsonb) || jsonb_build_object('requested',
                                             coalesce(routing->'requested', '{}'::jsonb) || %s::jsonb) end
                         where run_id = %s""",
-                     (thread_id, level, act, json.dumps(req) if req else None, json.dumps(req) if req else None, run_id))
+                     (thread_id, level, act, json.dumps(choice) if choice else None,
+                      json.dumps(req) if req else None, json.dumps(req) if req else None, run_id))
         if act in ("correct", "continue"):
             run = conn.execute("select * from runs.runs where run_id = %s", (run_id,)).fetchone()
             if run and not run["parent_run_id"]:

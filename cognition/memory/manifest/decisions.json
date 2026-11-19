@@ -14,7 +14,8 @@
       "use": "Run Plane: work ≥ 0.5 opens or carries a durable task for the turn (decision.work, effort L4)",
       "consumers": [
         "memory.runs",
-        "core.engine"
+        "core.engine",
+        "memory.views"
       ],
       "since": "2026-11-12"
     },

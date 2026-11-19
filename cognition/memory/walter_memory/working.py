@@ -66,7 +66,8 @@ def _threads(conn, source: str, thread_id: str, subject: bool, message: str = ""
     out = [(source, thread_id)]
     if not subject:
         return out
-    attached = conn.execute("select 1 from views.member where session_id like %s limit 1", (f"%/{thread_id}",)).fetchone()
+    attached = conn.execute("select 1 from views.member where session_id like %s and view_key is not null limit 1",
+                            (f"%/{thread_id}",)).fetchone()
     if not attached and message.strip():
         g = _guess_subject(conn, message, at)
         if g:

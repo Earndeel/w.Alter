@@ -199,28 +199,30 @@ def _context(conn, source: str, thread_id: str, before) -> list[dict]:
     return [r for r in rows if not _noise(r)][:CONTEXT_MSGS][::-1]
 
 
-def _known(conn, source: str, thread_id: str, text: str) -> list[dict]:
+def _known(conn, source: str, thread_id: str, text: str, generations: tuple = ("g1",)) -> list[dict]:
     """Current v2 knowledge the model may restate, supersede or contradict: this thread's latest items and the most
-    similar ones anywhere (local embeddings, no model call)."""
+    similar ones anywhere (local embeddings, no model call). A staged backfill also sees its own staging generation."""
+    gens = list(generations)
     rows = conn.execute("""select item_id::text, kind, content, coalesce(stage, attributes->>'state') as state,
-                                  created_at, lineage_id::text, coalesce(valid_from, created_at) as at
+                                  created_at, lineage_id::text, coalesce(valid_from, created_at) as at, generation
                            from core.derived_items where derived_by = %s and status in ('derived','verified')
                              and (valid_to is null or valid_to > now())
-                             and generation = 'g1' and kind <> 'summary' and source_refs->>'thread' = %s
+                             and generation = any(%s) and kind <> 'summary' and source_refs->>'thread' = %s
                              and source_refs->>'source' = %s
                            order by created_at desc limit %s""",
-                        (PROCESSOR, thread_id, source, KNOWN_THREAD)).fetchall()
+                        (PROCESSOR, gens, thread_id, source, KNOWN_THREAD)).fetchall()
     try:
         from . import search
         v = search.vec(search.embed([text[:4000]])[0])
         rows += conn.execute("""select d.item_id::text, d.kind, d.content, coalesce(d.stage, d.attributes->>'state') as state,
-                                       d.created_at, d.lineage_id::text, coalesce(d.valid_from, d.created_at) as at
+                                       d.created_at, d.lineage_id::text, coalesce(d.valid_from, d.created_at) as at,
+                                       d.generation
                                 from search.chunks c join core.derived_items d on d.item_id = c.ref_id
                                 where c.kind = 'derived' and c.embedding is not null and d.derived_by = %s
-                                  and d.generation = 'g1' and d.status in ('derived','verified') and d.kind <> 'summary'
+                                  and d.generation = any(%s) and d.status in ('derived','verified') and d.kind <> 'summary'
                                   and (d.valid_to is null or d.valid_to > now())
                                 order by c.embedding <=> %s::vector limit %s""",
-                             (PROCESSOR, v, KNOWN_SIMILAR)).fetchall()
+                             (PROCESSOR, gens, v, KNOWN_SIMILAR)).fetchall()
     except Exception as e:  # the embedder is an optimisation: the thread's own items are enough to go on
         log.warning("known items: similarity lookup failed: %s", e)
     seen, out = set(), []
@@ -400,14 +402,19 @@ def _line(i: int, m: dict, prefix: str = "") -> str:
 
 
 def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, budget: str = "recurring",
-                    backfill: str | None = None) -> dict:
+                    backfill: str | None = None, generation: str = "g1") -> dict:
     """One model call for a segment of cloud-readable, non-noise messages; writes items + coverage atomically.
     backfill: the tag of a selective catch-up of pre-V1 messages (backfill()): the segment's summary is not stored
-    (fragments of an old conversation, not a summary of it) and the items carry attributes.backfill = tag."""
+    (fragments of an old conversation, not a summary of it) and the items carry attributes.backfill = tag.
+    generation: a staging generation (STAGING, never readable) writes a pilot apart from served knowledge: its items
+    go there, and what they would do to served items (same_as evidence, supersede, contradict) is recorded on them
+    (attributes.staged) and in out["staged"], never applied; no view invalidation, no entity link."""
     chat = chat or llm.chat
+    staged = generation != "g1"
     with connection() as conn:
         context = _context(conn, source, thread_id, seg[0]["occurred_at"])
-        known_rows = _known(conn, source, thread_id, "\n".join((m["content"] or "")[:500] for m in seg))
+        known_rows = _known(conn, source, thread_id, "\n".join((m["content"] or "")[:500] for m in seg),
+                            ("g1", generation) if staged else ("g1",))
     known = {f"K{i + 1}": r for i, r in enumerate(known_rows)}
     seg_class = privacy.strictest(*(m["privacy_class"] for m in seg))
     prompt = PROMPT.format(
@@ -432,6 +439,9 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
         else:
             kept.append(item)
     out = {"items": 0, "reused": 0, "superseded": 0, "rejected": len(rejected), "cost_usd": float(res.get("cost_usd") or 0)}
+    if staged:
+        out["staged"] = []
+    served = lambda ref: staged and known[ref].get("generation", "g1") != generation    # noqa: E731
     with connection() as conn:
         status = "extracted" if kept or data.get("summary") else "empty"
         sid = _segment_row(conn, source=source, thread_id=thread_id, status=status, msgs=seg, rejected=rejected,
@@ -449,6 +459,11 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                           json.dumps({**base_refs, "ref": f"{sid}:summary"}), seg[-1]["occurred_at"], seg_class))
         for k, it in enumerate(kept):
             ev_ids = [str(m["event_id"]) for m in it["cited"]]
+            if it["same_as"] and served(it["same_as"]):   # staged: the evidence it would add, recorded only
+                out["staged"].append({"op": "evidence", "item": known[it["same_as"]]["item_id"], "events": ev_ids,
+                                      "segment": sid})
+                out["reused"] += 1
+                continue
             if it["same_as"]:            # same knowledge again: new evidence on the known item, no duplicate
                 target = known[it["same_as"]]["item_id"]
                 conn.execute("""update core.derived_items set source_event_ids = (select array_agg(distinct x)
@@ -467,18 +482,31 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                 attrs["holder"] = "owner" if it["by_owner"] else "walter"
             if it["contradicts"]:
                 attrs["contested"] = True
+            if staged:                   # effects on served knowledge: recorded, applied only on promotion
+                at = it["cited"][-1]["occurred_at"]
+                later = lambda r: bool(known[r].get("at") and known[r]["at"] > at)      # noqa: E731
+                # a served item newer than this statement stays: the branches below then only mark the pilot item
+                hold = lambda r: served(r) and not later(r)                             # noqa: E731
+                st = {"supersedes": [known[r]["item_id"] for r in it["supersedes"] if hold(r)],
+                      "contradicts": [known[r]["item_id"] for r in it["contradicts"] if hold(r)]}
+                if st["supersedes"] or st["contradicts"]:
+                    attrs["staged"] = st
+                    out["staged"].append({"op": "effects", "segment": sid, "ref": f"{sid}:{k}", **st})
+                it["supersedes"] = [r for r in it["supersedes"] if not hold(r)]
+                it["contradicts"] = [r for r in it["contradicts"] if not hold(r)]
             lineage = known[it["supersedes"][0]].get("lineage_id") if it["supersedes"] else None
             new_id = conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by,
                                          processor_version, model, prompt_hash, source_event_ids, source_refs, valid_from,
                                          confidence, privacy_class, generation, lineage_id, epistemic, stage, scope,
                                          valid_to)
-                                     values (%s, %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s, %s, 'g1',
+                                     values (%s, %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s, %s, %s,
                                              %s, %s, %s, %s, %s)
                                      on conflict (derived_by, (source_refs->>'ref')) where source_refs ? 'ref' do nothing
                                      returning item_id::text""",
                                   (it["kind"], it["text"], json.dumps(attrs, ensure_ascii=False), PROCESSOR, VERSION,
                                    res.get("model"), PROMPT_HASH, ev_ids, json.dumps({**base_refs, "ref": f"{sid}:{k}"}),
-                                   it["cited"][-1]["occurred_at"], it["confidence"], cls, lineage, it["epistemic_v"],
+                                   it["cited"][-1]["occurred_at"], it["confidence"], cls, generation, lineage,
+                                   it["epistemic_v"],
                                    it["stage"], it["scope"], it["until"])).fetchone()
             if not new_id:
                 continue
@@ -524,6 +552,9 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                              (new_id, old))
         conn.execute("update extraction.segments set items = %s, reused = %s, superseded = %s where segment_id = %s",
                      (out["items"], out["reused"], out["superseded"], sid))
+    out["segment_id"] = sid
+    if staged:
+        return out
     try:   # P1.2: the consolidated views built on this thread are rebuilt from the new state (targeted invalidation);
         # P1.6: a replaced or contested item also marks the episodes and periods that list it (and their parents)
         from . import consolidate
@@ -639,6 +670,10 @@ def tick(limit: int = 8, workers: int = 4, chat=None, budget: str = "recurring")
     from . import organic
     if organic.extraction_paused():      # nothing claimed: dirty threads stay pending until the pause ends
         return {**total, "paused": True}
+    from . import quota
+    q = quota.codex()
+    if not q["ok"]:                      # A4: over the Codex weekly cap, or no reliable reading: nothing claimed
+        return {**total, "quota": q}
     claimed = claim(limit)
 
     def one(t):
@@ -721,15 +756,31 @@ def enqueue(*, since: str | None = None, thread: str | None = None, source: str 
     return len(rows)
 
 
+STAGING = "g1p"      # the pilot's generation (core.generations, never readable until the owner promotes it)
+
+
+def _ensure_staging(generation: str) -> None:
+    with connection() as conn:
+        conn.execute("""insert into core.generations (generation, status, readable, description, note)
+                        values (%s, 'candidate', false, 'staged V1 extraction (tagged backfill pilot): not read by '
+                                || 'Context until promoted', 'pilot') on conflict (generation) do nothing""",
+                     (generation,))
+
+
 def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfill", window: int = 1,
-             max_threads: int | None = None, workers: int = 4, dry: bool = False) -> dict:
+             max_threads: int | None = None, workers: int = 4, dry: bool = False, generation: str = "g1") -> dict:
     """Selective catch-up of pre-V1 history (g0 → g1 migration, 2026-11-10): only the given messages, each with
     `window` neighbours on either side in its thread (the assistant turn an approval answers), go through the same
     extraction as live messages (same prompt, validation, supersession, privacy, entity links, view invalidation).
     Idempotent: covered events are never redone (extraction.covered). Reversible: every segment is listed under
     extraction.state['backfill:<tag>'] and backfill_revert(tag) retracts what it produced. Pre-V1 messages are never
-    swept: only an explicit call reaches them."""
+    swept: only an explicit call reaches them.
+    generation=STAGING: a pilot (2026-11-19) — items written apart (unreadable generation), effects on served knowledge
+    recorded under the ledger's `staged`, never applied; backfill_revert(tag) then leaves served knowledge untouched.
+    The Codex weekly quota gate (quota.codex) is asked before each segment: over it, the run stops (quota_stopped)."""
     from collections import defaultdict
+    if generation != "g1" and not dry:
+        _ensure_staging(generation)
     with connection() as conn:
         seeds = conn.execute("""select source, thread_id, occurred_at, event_id from core.events
                                 where event_id = any(%s::uuid[]) and source = any(%s) and event_type = any(%s)
@@ -747,7 +798,7 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
         source, thread_id = key
         res = {k: 0 for k in ("segments", "items", "reused", "superseded", "rejected", "filtered", "events",
                               "skipped_covered", "errors", "busy")}
-        res["cost_usd"], res["segment_ids"] = 0.0, []
+        res["cost_usd"], res["segment_ids"], res["staged"] = 0.0, [], []
         if dry:
             return _one(key, res)
         # the live worker's lease (extraction.threads): a thread is never read by two extractions at once (live
@@ -804,7 +855,12 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
             cur.append(m); size += _size(m)
         if cur:
             segs.append(cur)
+        from . import quota
         for seg in segs:
+            q = quota.codex()
+            if not q["ok"]:              # A4: the rest of the thread stays uncovered, a later run takes it up
+                res["quota_stopped"] = q["reason"]
+                break
             if not any(m["event_type"] == "message.sent" for m in seg):
                 with connection() as conn:
                     sid = _segment_row(conn, source=source, thread_id=thread_id, status="filtered", msgs=seg,
@@ -816,13 +872,15 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
                 conn.execute("""update extraction.threads set claimed_at = now() where processor = %s and source = %s
                                 and thread_id = %s and status = 'working'""", (PROCESSOR, source, thread_id))
             try:
-                r = extract_segment(source, thread_id, seg, chat=chat, budget=budget, backfill=tag)
+                r = extract_segment(source, thread_id, seg, chat=chat, budget=budget, backfill=tag,
+                                    generation=generation)
             except Exception as e:  # noqa: BLE001 — this thread is retried by a later run (nothing covered)
                 log.warning("backfill %s %s: %s", source, thread_id, e)
                 res["errors"] += 1
                 continue
             res["segments"] += 1
             res["segment_ids"].append(str(r["segment_id"]))
+            res["staged"] += r.get("staged") or []
             for k in ("items", "reused", "superseded", "rejected"):
                 res[k] += r[k]
             res["cost_usd"] += r["cost_usd"]
@@ -833,6 +891,10 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
     with ThreadPoolExecutor(max(1, workers)) as ex:
         for res in ex.map(one, threads):
             seg_ids += res.pop("segment_ids")
+            staged = res.pop("staged", [])
+            out["staged"] = out.get("staged", 0) + len(staged)
+            if res.get("quota_stopped"):
+                out["quota_stopped"] = res.pop("quota_stopped")
             for k, v in res.items():
                 out[k] += v
             if seg_ids and not dry:     # the ledger is written as it goes: an interrupted run stays revertible
@@ -843,7 +905,12 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
                                         jsonb_array_elements_text(coalesce(extraction.state.value->'segments', '[]'::jsonb)
                                                                   || (excluded.value->'segments')) x)),
                                       updated_at = now()""",
-                                 (f"backfill:{tag}", json.dumps({"tag": tag, "segments": seg_ids})))
+                                 (f"backfill:{tag}", json.dumps({"tag": tag, "segments": seg_ids,
+                                                                  "generation": generation})))
+                    if staged:
+                        conn.execute("""update extraction.state set value = jsonb_set(value, '{staged}',
+                                          coalesce(value->'staged', '[]'::jsonb) || %s::jsonb) where key = %s""",
+                                     (json.dumps(staged, default=str), f"backfill:{tag}"))
     out["cost_usd"] = round(out["cost_usd"], 4)
     return out
 

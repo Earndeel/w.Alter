@@ -49,7 +49,8 @@ STOP = set("le la les un une des du de au aux et ou est ce ça que qui je tu il 
 
 CARD_PROMPT = (
     "You maintain the card of one subject of work between the owner and their assistant (the conversation is in "
-    "French). Given the current card (or none) and the newest exchange, return ONLY a JSON object: "
+    "French). Given the current card (or none), the owner's earlier messages since that card (if any) and the newest "
+    "exchange, return ONLY a JSON object: "
     '{"title": "<= 8 words, what the subject is about", '
     '"objective": "<= 30 words, the owner\'s initial intent for this subject; keep it unless the owner changed it", '
     '"state": "en_cours | attend_le_proprietaire | fait | en_pause", '
@@ -190,79 +191,223 @@ def candidates(conn, ex: dict, embed, generations: list[str] | None = None) -> l
 
 def _previous(conn, ex: dict) -> dict | None:
     """The previous attached exchange of the same session (the subject 'waiting' for a reply)."""
-    return conn.execute("""select view_key, occurred_at from views.member
-                           where session_id = %s and occurred_at < %s order by occurred_at desc limit 1""",
+    return conn.execute("""select view_key, occurred_at, thread_id from views.member
+                           where session_id = %s and occurred_at < %s and view_key is not null
+                           order by occurred_at desc limit 1""",
                         (ex["session_id"], ex["at"])).fetchone()
 
 
 # ── attaching and writing ──────────────────────────────────────────────────────────────────────────────────────────
+# A1 (2026-11-19, owner: « Réutilise le fil déjà choisi par le préflight … Évite toute deuxième décision inutile … En
+# cas d'incertitude, conserve l'échange non rattaché plutôt que de fabriquer un nouveau sujet »). The preflight already
+# asks Walter Decision which thread each turn joins and records it on the run (runs.runs.thread_id + thread_choice):
+# that answer is reused. Only an exchange without a preflight decision (Codex, a degraded preflight) asks Walter
+# Decision, with the same declared signal (context.thread, + memory.work). An unsure answer or a failed call leaves the
+# exchange recorded as not attached (13/11: 157 failed decisions had made 117 subjects).
+TRUST = 0.5                         # a thread pick is reused at or above (18/11 journal: median 0.55 subjects, 0.9 tasks)
+NEW_TRUST = 0.6                     # a new subject: a sure « new » on a turn that is work (memory.work)
+WORK_MIN = 0.5
+RUN_WINDOW = timedelta(minutes=3)   # a logged exchange and the run its preflight planned (same session)
+# A3 (owner: « une fiche de sujet est générée à sa création, puis actualisée au maximum une fois par heure, sauf
+# nécessité explicite et justifiée »): the card is rewritten at creation, then at most once per hour of the subject's
+# activity (exchange time, so a catch-up behaves like live), folding the exchanges since the last card; sooner only
+# when the owner says the subject ended, stops or changes course (CARD_NOW). Activity (last_at) moves at once.
+CARD_EVERY = timedelta(hours=1)
+CARD_PENDING = 6
+CARD_NOW = re.compile(r"(?i)(c'?est (fait|fini|termin[ée]|r[ée]gl[ée])\b|\bon (arr[eê]te|abandonne|laisse tomber|passe à "
+                      r"autre chose)\b|\bfinalement\b|\bchange(r|ons)? (de plan|d'objectif|de cap)\b|\bnouvel objectif\b|"
+                      r"\bannule[rz]?\b|\bon met en pause\b)")
+
+
+def _live(conn, key: str | None) -> str | None:
+    """The active subject a key stands for (merges followed), or None."""
+    for _ in range(5):
+        if not key:
+            return None
+        r = conn.execute("select status, merged_into from views.view where view_key = %s", (key,)).fetchone()
+        if not r:
+            return None
+        if r["status"] == "merged" and r["merged_into"]:
+            key = r["merged_into"]
+            continue
+        return key if r["status"] == "active" else None
+    return None
+
+
+def _subject_of_thread(conn, thread: str | None) -> str | None:
+    """subject:… is a subject; task:… (an objective with no subject of its own) is the subject its task names, else the
+    subject its earlier exchanges were attached to."""
+    if not thread:
+        return None
+    if thread.startswith("subject:"):
+        return _live(conn, thread)
+    if thread.startswith("task:"):
+        t = conn.execute("select thread_id from runs.tasks where task_id::text = %s", (thread[5:],)).fetchone()
+        if t and (t["thread_id"] or "").startswith("subject:") and _live(conn, t["thread_id"]):
+            return _live(conn, t["thread_id"])
+        m = conn.execute("""select view_key from views.member where thread_id = %s and view_key is not null
+                            order by occurred_at desc limit 1""", (thread,)).fetchone()
+        return _live(conn, m["view_key"]) if m else None
+    return None
+
+
+def _run_of(conn, ex: dict) -> dict | None:
+    """The run the preflight planned for this exchange (same session, started within RUN_WINDOW)."""
+    return conn.execute("""select run_id::text, thread_id, thread_choice, act,
+                                  routing->'requested'->>'work' as work
+                           from runs.runs where origin->>'session_id' = %s and started_at between %s and %s
+                           order by abs(extract(epoch from started_at - %s)) limit 1""",
+                        (ex["session_id"], ex["at"] - RUN_WINDOW, ex["at"] + RUN_WINDOW, ex["at"])).fetchone()
+
+
+def _from_preflight(conn, run: dict, prev: dict | None) -> tuple[str, str | None, float | None, str | None]:
+    ch, thread = run["thread_choice"] or {}, run["thread_id"]
+    conf = ch.get("confidence")
+    sure = isinstance(conf, (int, float)) and conf >= TRUST
+    work = run.get("work") == "true"
+    if thread:
+        key = _subject_of_thread(conn, thread)
+        if key and sure:
+            return "preflight", key, conf, thread
+        if key and prev and key == prev["view_key"]:          # unsure, but it is where the session already is
+            return "preflight_session", key, conf, thread
+        if key is None and thread.startswith("task:") and sure and work:
+            return "preflight_new", None, conf, thread         # an objective's first exchange: its subject opens
+        return "unattached", None, conf, thread
+    if ch.get("new") and isinstance(conf, (int, float)) and conf >= NEW_TRUST and work:
+        return "preflight_new", None, conf, None
+    return "unattached", None, conf, None
+
+
+def _from_decision(conn, ex: dict, prev: dict | None, embed, llm) -> tuple[str, str | None, float | None, str | None]:
+    """No preflight decision for this exchange: Walter Decision, the declared turn signals context.thread and
+    memory.work, over the closest subjects (+ the session's previous one)."""
+    cands = candidates(conn, ex, embed)
+    if prev and all(c["view_key"] != prev["view_key"] for c in cands):
+        row = conn.execute("select view_key, title, last_at from views.view where view_key = %s",
+                           (prev["view_key"],)).fetchone()
+        if row:
+            cands = [*cands[:SHORTLIST - 1], {**row, "sim": None}]
+    ids = {f"s{k}": c for k, c in enumerate(cands)}
+    last = next((k for k, c in ids.items() if prev and c["view_key"] == prev["view_key"]), None)
+    recent = bool(prev and ex["at"] - prev["occurred_at"] <= REPLY_WINDOW)
+    state = {"new_message": _line(ex["message"], 1500),
+             "previous_exchange": {"thread": last, "minutes_ago": round((ex["at"] - prev["occurred_at"]).total_seconds()
+                                                                        / 60, 1)} if prev else None,
+             "threads": {k: {**_card(conn, c["view_key"]),
+                             "hours_since_last": round((ex["at"] - c["last_at"]).total_seconds() / 3600, 1)}
+                         for k, c in ids.items()}}
+    opts = {"threads": {k: "continues: " + (c["title"] or k) + (" — the thread of the previous exchange"
+                                                                 if k == last and recent else "")
+                        for k, c in ids.items()}}
+    try:
+        res = llm.decide(state, None, occasion="turn", focus="new_message", facts=["threads"] if ids else None,
+                         options=opts if ids else None, ask=["context.thread", "memory.work"], processor="views",
+                         privacy_class="cloud_allowed", purpose="memory views: subject of an exchange (no preflight)",
+                         budget="recurring")
+    except Exception as exc:  # noqa: BLE001 — no decision: not attached, never a made-up subject
+        conn.execute("insert into views.ledger (view_key, action, detail) values (null, 'error', %s)",
+                     (json.dumps({"decide": f"{type(exc).__name__}: {str(exc)[:200]}"}),))
+        return "unattached", None, None, None
+    sig = ((res.get("resolution") or {}).get("signals") if isinstance(res.get("resolution"), dict) else None) \
+        or res.get("signals") or {}
+    t = sig.get("context.thread") or {}
+    work = (sig.get("memory.work") or {}).get("noul")
+    choice, conf = t.get("choice"), t.get("confidence")
+    sure = isinstance(conf, (int, float)) and conf >= TRUST
+    if choice in ids and sure:
+        return "decision", ids[choice]["view_key"], conf, None
+    if choice in ids and prev and ids[choice]["view_key"] == prev["view_key"]:
+        return "decision_session", prev["view_key"], conf, None
+    new_sure = (choice == "new" and isinstance(conf, (int, float)) and conf >= NEW_TRUST) or (not ids and not t)
+    if new_sure and isinstance(work, (int, float)) and work >= WORK_MIN:
+        return "new", None, conf, None
+    return "unattached", None, conf, None
+
+
 def attach(conn, ex: dict, *, embed, llm) -> dict:
-    """Attach one exchange to a subject (rule, decision or new), then rewrite that subject's card."""
+    """Attach one exchange to a subject (rule, the preflight's thread, Walter Decision) or record it as not
+    attached; the subject's card follows A3."""
     prev = _previous(conn, ex)
-    how, conf, key = None, None, None
+    conf, thread = None, None
     if prev and ex["at"] - prev["occurred_at"] <= REPLY_WINDOW and _short(ex["message"]):
-        how, key = "rule", prev["view_key"]
+        how, key, thread = "rule", prev["view_key"], prev.get("thread_id")
     else:
-        cands = candidates(conn, ex, embed)
-        if prev and all(c["view_key"] != prev["view_key"] for c in cands):
-            row = conn.execute("select view_key, title, last_at from views.view where view_key = %s",
-                               (prev["view_key"],)).fetchone()
-            if row:
-                cands = [*cands[:SHORTLIST - 1], {**row, "sim": None}]
-        if cands:
-            ids = {f"s{k}": c for k, c in enumerate(cands)}
-            state = {"new_message": _line(ex["message"], 1500),
-                     "previous_exchange_subject": next((k for k, c in ids.items()
-                                                        if prev and c["view_key"] == prev["view_key"]), None),
-                     "subjects": {k: {**_card(conn, c["view_key"]),
-                                      "hours_since_last": round((ex["at"] - c["last_at"]).total_seconds() / 3600, 1)}
-                                  for k, c in ids.items()}}
-            q = {"subject": {"type": "choice", "criteria": {
-                **{k: "continues: " + (c["title"] or k) for k, c in ids.items()},
-                "new": "opens a subject none of these covers"},
-                "instructions": ("The owner talks to their assistant across sessions and tools and switches "
-                                 "subjects freely. Which subject does the new message belong to? Short replies "
-                                 "belong to the subject of the previous exchange. Choose 'new' only for a subject "
-                                 "none of these covers." + NOTE)}}
-            try:
-                a = llm.decide(state, q, processor="views", privacy_class="cloud_allowed",
-                               purpose="memory views: subject of an exchange", budget="recurring")["answers"]["subject"]
-                conf = a.get("confidence")
-                if a.get("choice") in ids:
-                    how, key = "decision", ids[a["choice"]]["view_key"]
-                else:
-                    how = "new"
-            except Exception as exc:  # noqa: BLE001 — no decision: stay with the session's subject if any
-                conn.execute("insert into views.ledger (view_key, action, detail) values (null, 'error', %s)",
-                             (json.dumps({"decide": f"{type(exc).__name__}: {str(exc)[:200]}"}),))
-                how, key = ("rule", prev["view_key"]) if prev else ("new", None)
+        run = _run_of(conn, ex)
+        if run and run["thread_choice"] and not run["thread_choice"].get("degraded"):
+            how, key, conf, thread = _from_preflight(conn, run, prev)
         else:
-            how = "new"
+            how, key, conf, thread = _from_decision(conn, ex, prev, embed, llm)
+    if how == "unattached":
+        conn.execute("""insert into views.member (session_id, seq, view_key, occurred_at, runtime, attached_by, confidence,
+                                                  thread_id)
+                        values (%s, %s, null, %s, %s, 'unattached', %s, %s) on conflict (session_id, seq) do nothing""",
+                     (ex["session_id"], ex["seq"], ex["at"], ex["runtime"], conf, thread))
+        return {"view_key": None, "by": how, "confidence": conf, "card": None}
     if key is None:
         key = f"subject:{uuid.uuid4().hex[:8]}"
         conn.execute("""insert into views.view (view_key, domain, horizon, first_at, last_at)
                         values (%s, 'projects', 'medium', %s, %s)""", (key, ex["at"], ex["at"]))
         conn.execute("insert into views.ledger (view_key, action, detail) values (%s, 'create', %s)",
-                     (key, json.dumps({"session": ex["session_id"], "seq": ex["seq"]})))
-    conn.execute("""insert into views.member (session_id, seq, view_key, occurred_at, runtime, attached_by, confidence)
-                    values (%s, %s, %s, %s, %s, %s, %s)
+                     (key, json.dumps({"session": ex["session_id"], "seq": ex["seq"], "by": how, "thread": thread})))
+    conn.execute("""insert into views.member (session_id, seq, view_key, occurred_at, runtime, attached_by, confidence,
+                                              thread_id)
+                    values (%s, %s, %s, %s, %s, %s, %s, %s)
                     on conflict (session_id, seq) do update set view_key = excluded.view_key,
-                        attached_by = excluded.attached_by, confidence = excluded.confidence""",
-                 (ex["session_id"], ex["seq"], key, ex["at"], ex["runtime"], how, conf))
+                        attached_by = excluded.attached_by, confidence = excluded.confidence,
+                        thread_id = excluded.thread_id""",
+                 (ex["session_id"], ex["seq"], key, ex["at"], ex["runtime"], how, conf, thread))
     conn.execute("insert into views.ledger (view_key, action, detail) values (%s, 'attach', %s)",
-                 (key, json.dumps({"session": ex["session_id"], "seq": ex["seq"], "by": how, "confidence": conf})))
-    rewrite_card(conn, key, ex, embed=embed, llm=llm)
-    return {"view_key": key, "by": how, "confidence": conf}
+                 (key, json.dumps({"session": ex["session_id"], "seq": ex["seq"], "by": how, "confidence": conf,
+                                   "thread": thread})))
+    why = card_due(conn, key, ex)
+    if why:
+        rewrite_card(conn, key, ex, embed=embed, llm=llm, why=why)
+    else:
+        conn.execute("update views.view set last_at = greatest(last_at, %s), updated_at = now() where view_key = %s",
+                     (ex["at"], key))
+    return {"view_key": key, "by": how, "confidence": conf, "card": why or "deferred"}
 
 
-def rewrite_card(conn, key: str, ex: dict, *, embed, llm) -> None:
-    card = _card(conn, key) or None
-    msg = json.dumps({"current_card": card, "exchange": {"owner": _line(ex["message"], 1500),
-                                                         "assistant": _line(ex["answer"], 1200)}}, ensure_ascii=False)
+def card_due(conn, key: str, ex: dict) -> str | None:
+    """Why the card is rewritten now (creation | owner_changed_course | hourly), or None (deferred)."""
+    cur = _current(conn, key, "overview")
+    if not cur:
+        return "creation"
+    if CARD_NOW.search(ex.get("message") or ""):
+        return "owner_changed_course"
+    if cur["watermark"] is None or ex["at"] - cur["watermark"] >= CARD_EVERY:
+        return "hourly"
+    return None
+
+
+def _pending(conn, key: str, after, upto) -> list[str]:
+    """The owner's messages attached to the subject since its card (oldest first, the newest CARD_PENDING)."""
+    rows = conn.execute("""select e.text from views.member m
+                           join walter_logs.events e on e.session_id = m.session_id and e.seq = m.seq
+                           where m.view_key = %s and m.occurred_at > %s and m.occurred_at < %s
+                           order by m.occurred_at desc limit %s""", (key, after, upto, CARD_PENDING - 1)).fetchall()
+    return [_line(INJECTED.sub(" ", r["text"] or "").strip(), 600) for r in reversed(rows)]
+
+
+def rewrite_card(conn, key: str, ex: dict, *, embed, llm, why: str = "creation") -> None:
+    from . import quota
+    q = quota.codex()
+    if not q["ok"]:            # A4: the card waits for the quota; the activity is recorded
+        conn.execute("update views.view set last_at = greatest(last_at, %s), updated_at = now() where view_key = %s",
+                     (ex["at"], key))
+        return
+    cur = _current(conn, key, "overview")
+    card = _card_from(cur["content"]) if cur else None
+    earlier = _pending(conn, key, cur["watermark"], ex["at"]) if cur and cur["watermark"] else []
+    msg = json.dumps({"current_card": card,
+                      **({"earlier_owner_messages_since_the_card": earlier} if earlier else {}),
+                      "exchange": {"owner": _line(ex["message"], 1500), "assistant": _line(ex["answer"], 1200)}},
+                     ensure_ascii=False)
     try:
         r = llm.chat([{"role": "system", "content": CARD_PROMPT}, {"role": "user", "content": msg}],
                      poste="memory_extraction", processor="views", privacy_class="cloud_allowed",
-                     budget="recurring", purpose="memory views: subject card", timeout=60)
+                     budget="recurring", purpose=f"memory views: subject card ({why})", timeout=60)
         new = _json(r["content"])
         model = r.get("model")
     except Exception as exc:  # noqa: BLE001 — the subject keeps its previous card
@@ -279,7 +424,7 @@ def rewrite_card(conn, key: str, ex: dict, *, embed, llm) -> None:
     if card and card.get("objective") and not new.get("objective"):
         new["objective"] = card["objective"]
     index, overview = _render(new)
-    src = [{"kind": "log", "session": ex["session_id"], "seq": ex["seq"]}]
+    src = [{"kind": "log", "session": ex["session_id"], "seq": ex["seq"], "why": why}]
     for depth, content in (("index", index), ("overview", overview[:CARD_CHARS])):
         conn.execute("""insert into views.version (view_key, depth, version, content, source_refs, watermark, builder, model)
                         values (%s, %s, coalesce((select max(version) from views.version where view_key = %s
@@ -291,12 +436,38 @@ def rewrite_card(conn, key: str, ex: dict, *, embed, llm) -> None:
                     updated_at = now() where view_key = %s""", (new["title"], vec(v), ex["at"], ex["at"], key))
 
 
+def flush_cards(conn, *, embed, llm, now: datetime | None = None) -> int:
+    """A3: subjects whose card is older than CARD_EVERY behind exchanges attached since get one rewrite (the latest
+    exchange + the owner's earlier messages); a burst of exchanges ends in one card, not one per message."""
+    now = now or _now()
+    rows = conn.execute("""
+        select v.view_key, m.session_id, m.seq, m.occurred_at, m.runtime from views.view v
+        join lateral (select session_id, seq, occurred_at, runtime from views.member where view_key = v.view_key
+                      order by occurred_at desc limit 1) m on true
+        join lateral (select watermark from views.version where view_key = v.view_key and depth = 'overview'
+                      order by version desc limit 1) c on true
+        where v.status = 'active' and v.kind = 'subject' and m.occurred_at > c.watermark
+          and %s - c.watermark >= %s""", (now, CARD_EVERY)).fetchall()
+    n = 0
+    for r in rows:
+        ev = conn.execute("""select text from walter_logs.events where session_id = %s and seq = %s""",
+                          (r["session_id"], r["seq"])).fetchone()
+        ans = conn.execute("""select text from walter_logs.events where session_id = %s and seq > %s
+                              and type = 'assistant/message' order by seq limit 1""",
+                           (r["session_id"], r["seq"])).fetchone()
+        ex = {"session_id": r["session_id"], "seq": r["seq"], "at": r["occurred_at"], "runtime": r["runtime"],
+              "message": INJECTED.sub(" ", (ev or {}).get("text") or "").strip(), "answer": (ans or {}).get("text") or ""}
+        rewrite_card(conn, r["view_key"], ex, embed=embed, llm=llm, why="hourly")
+        n += 1
+    return n
+
+
 def run(since: datetime | None = None, until: datetime | None = None, limit: int = 500, cursor: str = "subjects",
         dry: bool = False) -> dict:
     """Attach the exchanges after the cursor (or `since`), oldest first; idempotent (attached exchanges skip)."""
     from . import llm, organic
-    if organic.extraction_paused() and not dry:
-        return {"skipped": "extraction paused"}       # the cursor does not move: exchanges are attached on resume
+    if organic.paused("subjects") and not dry:
+        return {"skipped": "subjects paused"}         # the cursor does not move: exchanges are attached on resume
     from .db import connection
     from .search import embed
     t0 = time.time()
@@ -320,16 +491,20 @@ def _run(since, until, limit, cursor, dry, t0, llm, connection, embed) -> dict:
                                     (ex["session_id"], ex["seq"])).fetchone()][:limit]
     if dry:
         return {"since": start.isoformat(), "pending": len(todo)}
-    out = {"since": start.isoformat(), "attached": 0, "by": {}, "created": 0}
+    out = {"since": start.isoformat(), "attached": 0, "unattached": 0, "by": {}, "created": 0, "cards": {}}
     for ex in todo:
         with connection() as conn:          # one transaction per exchange: a failure loses one, never the batch
             r = attach(conn, ex, embed=embed, llm=llm)
             conn.execute("""insert into views.cursor (name, position) values (%s, %s)
                             on conflict (name) do update set position = greatest(views.cursor.position, excluded.position),
                             updated_at = now()""", (cursor, ex["at"]))
-        out["attached"] += 1
+        out["unattached" if r["by"] == "unattached" else "attached"] += 1
         out["by"][r["by"]] = out["by"].get(r["by"], 0) + 1
-        out["created"] += r["by"] == "new"
+        out["created"] += r["by"] in ("new", "preflight_new")
+        if r.get("card"):
+            out["cards"][r["card"]] = out["cards"].get(r["card"], 0) + 1
+    with connection() as conn:              # A3: the deferred cards of subjects quiet for an hour
+        out["cards"]["flushed"] = flush_cards(conn, embed=embed, llm=llm)
     out["seconds"] = round(time.time() - t0, 1)
     return out
 

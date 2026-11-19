@@ -438,7 +438,8 @@ def main(argv=None) -> None:
         elif a.action == "update":          # what is learned after the start (walter-context preflight): JSON on stdin
             spec = json.load(sys.stdin)
             res = {"ok": True, **runs.update(spec["run_id"], thread_id=spec.get("thread_id"), level=spec.get("level"),
-                                             act=spec.get("act"), requested=spec.get("requested"))}
+                                             act=spec.get("act"), requested=spec.get("requested"),
+                                             thread_choice=spec.get("thread_choice"))}
         elif a.action == "find":            # the latest run of a harness session (a runner that only knows the session)
             from .db import connect
             fields = ("run_id, status, privacy_class, origin->>'channel' as channel, routing->'requested' as requested"
