@@ -48,7 +48,26 @@ def knowledge(query):
     return context.get_context(query, include_profile=False)["text"]
 
 
-def test_decision_under_hermes_is_found_by_codex_after_a_new_session_and_corrections_win():
+def _decide(state, questions, **kw):
+    """Scripted Walter Decision (memory.reconcile): a statement about this run's demo server replaces the earlier one."""
+    ans = {}
+    for sid, st in state["statements"].items():
+        crit = {k: v for k, v in questions[f"{sid}_target"]["criteria"].items() if k != "none"}
+        k = next((k for k, v in crit.items() if RUN in v and "serveur de démo" in v and v != st["text"]), None)
+        ans[f"{sid}_target"] = {"choice": k or "none", "confidence": 0.9}
+        ans[f"{sid}_verdict"] = {"choice": "replaces" if k else "new", "confidence": 0.9}
+    return {"answers": ans, "model": "scripted-decision"}
+
+
+@pytest.mark.real_reconcile
+def test_decision_under_hermes_is_found_by_codex_after_a_new_session_and_corrections_win(monkeypatch):
+    from walter_memory import llm
+    from walter_memory.db import connection
+    monkeypatch.setattr(llm, "decide", _decide)
+    with connection() as conn:      # earlier runs' demo servers (test database only) are not this run's knowledge
+        conn.execute("""update core.derived_items set status = 'retracted' where derived_by = 'l3.extract'
+                        and content like 'Le serveur de démo du projet Zéphyr %%' and content not like %s
+                        and status in ('derived', 'verified')""", (f"%{RUN}%",))
     t1, t2 = f"h-{uuid.uuid4().hex[:8]}", f"c-{uuid.uuid4().hex[:8]}"
     say("hermes", t1, "Pour le projet Zéphyr, le serveur de démo tournera sur Hetzner, c'est décidé.", NOW - timedelta(hours=5))
     extract2.process_thread("hermes", t1, chat=model)

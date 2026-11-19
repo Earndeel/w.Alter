@@ -93,7 +93,8 @@ def main(argv=None) -> None:
     ex.add_argument("--limit", type=int, default=20); ex.add_argument("--since"); ex.add_argument("--budget", default="recurring")
     ex.add_argument("--session")
     x2 = sub.add_parser("extract2", help="V1 knowledge extraction, every runtime, per segment (pipeline service does it live)")
-    x2.add_argument("action", choices=["tick", "thread", "reconcile", "enqueue", "replay", "stats", "start"])
+    x2.add_argument("action", choices=["tick", "thread", "reconcile", "enqueue", "replay", "stats", "start", "history"])
+    x2.add_argument("--item", help="history: a knowledge item (every version of its lineage and every change)")
     x2.add_argument("--source"); x2.add_argument("--thread"); x2.add_argument("--since")
     x2.add_argument("--status", default="failed"); x2.add_argument("--hours", type=int, default=24)
     x2.add_argument("--limit", type=int, default=8); x2.add_argument("--budget", default="recurring")
@@ -295,7 +296,10 @@ def main(argv=None) -> None:
         _print(extract.summarize_session(a.session, a.budget) if a.session else extract.run(a.limit, a.since, a.budget))
     elif a.cmd == "extract2":
         from . import extract2
-        if a.action == "tick":
+        if a.action == "history":
+            from . import knowledge
+            _print(knowledge.history(a.item))
+        elif a.action == "tick":
             _print(extract2.tick(a.limit, budget=a.budget))
         elif a.action == "thread":
             if not (a.source and a.thread):

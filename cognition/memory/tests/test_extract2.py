@@ -475,9 +475,12 @@ def test_a_staged_pilot_writes_apart_records_its_effects_and_reverts_to_the_exac
         assert _served(conn, ids) == before                               # served knowledge untouched
         new = conn.execute("""select generation, attributes from core.derived_items where derived_by = 'l3.extract'
                               and attributes->>'backfill' = %s""", (tag,)).fetchall()
-        assert [n["generation"] for n in new] == ["g1p"] and new[0]["attributes"]["staged"]["supersedes"] == ids
+        assert [n["generation"] for n in new] == ["g1p"] and new[0]["attributes"]["supersedes"] == ids[0]
+        staged = conn.execute("""select op, item_id::text, staged from core.derived_changes where tag = %s
+                                 and item_id = any(%s::uuid[])""", (tag, ids)).fetchall()
+        assert {(x["op"], x["staged"]) for x in staged} == {("evidence", True), ("supersede", True)}   # recorded only
         st = conn.execute("select value from extraction.state where key = %s", (f"backfill:{tag}",)).fetchone()["value"]
-        assert {x["op"] for x in st["staged"]} == {"evidence", "effects"} and st["generation"] == "g1p"
+        assert {x["op"] for x in st["staged"]} == {"evidence", "supersede"} and st["generation"] == "g1p"
         assert conn.execute("select readable from core.generations where generation = 'g1p'").fetchone()["readable"] is False
     from walter_memory import generations
     assert "g1p" not in generations.read_set()                            # Context never reads the pilot

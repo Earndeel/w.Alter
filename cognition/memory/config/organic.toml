@@ -31,6 +31,19 @@ episode_summaries = "paused"
 codex_weekly_max = 70
 max_age_s = 1800
 
+[reconcile]
+# Lot 1 of the consolidation loop (2026-11-19, owner mission « première boucle de consolidation organique »): every
+# statement extracted from a conversation is reconciled with current knowledge before it is written (knowledge.py).
+# mode: "decision" = Walter Decision (need memory.reconcile, one batched decision per segment) when no deterministic
+# rule settles it; "deterministic" = only the rules (no candidate → new, same text → confirms), else new;
+# "model" = rollback: the extraction model's own references (same_as / supersedes / contradicts) as before lot 1.
+mode = "decision"
+candidates = 5          # current items compared with each statement (hybrid search + this thread)
+batch = 12              # statements per decision (2 questions each, ≤ 32 per decision)
+min_confidence = 0.5    # below it, a correction / replacement / contradiction is kept as new (maybe_updates)
+state_ttl_days = 7      # a transient state without an end date expires after this (task-scoped knowledge expires
+                        # when its work stops: consolidate.expire)
+
 [working_memory]
 # P1.1: "adaptive" (2026-11-03, owner: integrate, no long shadow) = the adaptive trigger drives extraction (long,
 # marked or directive owner messages at once, the rest grouped) and the working state is injected by Context;

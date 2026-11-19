@@ -64,6 +64,24 @@ def _strict_privacy_by_default(request, monkeypatch):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "owner_privacy: run under the owner's current privacy choice (organic.toml)")
+    config.addinivalue_line("markers", "real_reconcile: reconciliation asks llm.decide (the test scripts it)")
+
+
+@pytest.fixture(autouse=True)
+def _scripted_reconciliation(request, monkeypatch):
+    """Lot 1 (2026-11-19): reconciliation verdicts come from Walter Decision. Without network, the scripted extraction
+    model's own references (same_as / supersedes / contradicts) stand in for the decision; a test marked
+    `real_reconcile` goes through knowledge.judge and scripts llm.decide itself."""
+    from walter_memory import knowledge
+    if request.node.get_closest_marker("real_reconcile"):
+        return
+    # the test database keeps earlier runs' items: a search across threads would find them (same fixture texts)
+    monkeypatch.setattr(knowledge, "SEARCH", False)
+    from walter_memory import extract2
+    monkeypatch.setattr(extract2, "KNOWN_SIMILAR", 0)
+    monkeypatch.setattr(knowledge, "judge", lambda batch, **kw: {
+        sid: ((st["hint"][0], st["hint_id"], 0.9) if st.get("hint") and st["hint"][0] else ("new", None, None))
+        for sid, st, cands in batch})
 
 
 @pytest.fixture(autouse=True)

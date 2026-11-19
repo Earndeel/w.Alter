@@ -11,7 +11,9 @@ DEFAULTS = {"generations": {"enforce": True}, "extraction": {"mode": "active"}, 
             "episodes": {"mode": "active", "every_s": 600, "plans_every_s": 1800, "plans_per_run": 20, "attest": True},
             "periods": {"tz": "Asia/Bangkok"}, "kardex": {"mode": "daily", "per_run": 5, "days": 60, "max_messages": 160},
             "privacy": {"cloud_context": "cloud_allowed", "pseudonymise": True, "kardex_cloud": "policy"},
-            "stages": {}, "quota": {"codex_weekly_max": 70.0, "max_age_s": 1800}}
+            "stages": {}, "quota": {"codex_weekly_max": 70.0, "max_age_s": 1800},
+            "reconcile": {"mode": "decision", "candidates": 5, "batch": 12, "min_confidence": 0.5,
+                          "state_ttl_days": 7}}
 
 # The model-driven stages of the organic chain, each with its own switch (A2, 2026-11-19). A stage absent from
 # [stages] follows [extraction] mode (the single switch of 2026-11-14), so an older config keeps its meaning.

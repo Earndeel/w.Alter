@@ -38,7 +38,8 @@ KINDS = ("goal", "constraint", "preference", "correction", "decision", "commitme
 TITLES = {"goal": "Objectif", "constraint": "Contraintes en vigueur", "preference": "Préférences",
           "correction": "Corrections", "decision": "Décisions", "commitment": "Engagements ouverts", "fact": "Faits"}
 STAGE_WORD = {"requested": "demandé", "proposed": "proposé", "decided": "validé", "executed": "exécution rapportée",
-              "verified": "résultat vérifié", "abandoned": "abandonné", "open": "ouvert", "done": "tenu", "stated": ""}
+              "verified": "résultat vérifié", "abandoned": "abandonné", "open": "ouvert", "done": "tenu", "stated": "",
+              "accepted": "accepté", "in_progress": "en cours", "cancelled": "annulé"}
 
 
 def _now() -> datetime:
@@ -73,8 +74,10 @@ def items_of(conn, threads: list[tuple[str, str]], allowed: list[str]) -> list[d
                source_refs->>'thread' as thread
         from core.derived_items
         where derived_by = 'l3.extract' and generation = 'g1' and kind = any(%s) and privacy_class = any(%s)
-          and (source_refs->>'source', source_refs->>'thread') in (select * from unnest(%s::text[], %s::text[]))
-        order by created_at""", (list(KINDS), allowed, [s for s, _ in threads], [t for _, t in threads])).fetchall()
+          and ((source_refs->>'source', source_refs->>'thread') in (select * from unnest(%s::text[], %s::text[]))
+               or coalesce(attributes->'threads', '[]'::jsonb) ?| %s::text[])
+        order by created_at""", (list(KINDS), allowed, [s for s, _ in threads], [t for _, t in threads],
+                                 [f"{s}/{t}" for s, t in threads])).fetchall()
 
 
 def current(items: list[dict], now: datetime) -> list[dict]:
@@ -91,7 +94,7 @@ def _as_state(items: list[dict]) -> dict:
     from .working import KINDS as WK
     out = {k: [] for k in WK}
     for i in items:
-        if i["kind"] in out and (i["stage"] or "") not in ("abandoned", "done"):
+        if i["kind"] in out and (i["stage"] or "") not in ("abandoned", "done", "cancelled"):
             out[i["kind"]].append({"id": i["id"], "text": i["content"], "stage": i["stage"], "state": i["stage"],
                                    "scope": i["scope"], "epistemic": i["epistemic"], "at": i["valid_from"] or i["created_at"],
                                    "privacy_class": i["privacy_class"]})

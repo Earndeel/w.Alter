@@ -99,13 +99,15 @@ def _interpreted(conn, threads, allowed, at):
         where derived_by = 'l3.extract' and generation = 'g1' and kind = any(%s)
           and status in ('derived', 'verified') and privacy_class = any(%s)
           and (valid_to is null or valid_to > coalesce(%s::timestamptz, now()))
-          and (source_refs->>'source', source_refs->>'thread') in (select * from unnest(%s::text[], %s::text[]))
+          and ((source_refs->>'source', source_refs->>'thread') in (select * from unnest(%s::text[], %s::text[]))
+               or coalesce(attributes->'threads', '[]'::jsonb) ?| %s::text[])
           and (%s::timestamptz is null or created_at <= %s::timestamptz)
         order by created_at""",
-                        (list(KINDS), allowed, at, [s for s, _ in threads], [t for _, t in threads], at, at)).fetchall()
+                        (list(KINDS), allowed, at, [s for s, _ in threads], [t for _, t in threads],
+                         [f"{s}/{t}" for s, t in threads], at, at)).fetchall()
     out = {k: [] for k in KINDS}
     for r in rows:
-        if r["stage"] in ("abandoned", "done"):
+        if r["stage"] in ("abandoned", "done", "cancelled"):
             continue
         out[r["kind"]].append({"id": r["item_id"], "text": r["content"], "state": r["stage"], "stage": r["stage"],
                                "scope": r["scope"], "epistemic": r["epistemic"], "lineage": r["lineage_id"],
@@ -303,7 +305,8 @@ def _reconcile_objectives(st: dict, thread_id: str, at) -> list[dict]:
 BUDGET = {"goal": 100, "constraint": 400, "preference": 120, "correction": 100, "decision": 200, "commitment": 100,
           "fact": 60, "plan": 100, "question": 60, "pending": 350}
 ITEM_CHARS = 170                  # compact form of an item; the cut is marked with the item's reference
-STAGE_TAG = {"requested": "demandé", "proposed": "proposé, non validé", "decided": "validé",
+STAGE_TAG = {"accepted": "accepté", "in_progress": "en cours", "cancelled": "annulé",
+             "requested": "demandé", "proposed": "proposé, non validé", "decided": "validé",
              "executed": "exécution rapportée", "verified": "résultat vérifié", "open": "", "stated": ""}
 DUP = 0.9                         # cosine between two items of a category above which they say the same thing
 
@@ -463,6 +466,7 @@ def owner_rules(query: str = "", *, audience: str = "cloud_model", budget: int =
             where d.derived_by = 'l3.extract' and d.generation = 'g1' and d.kind = any(%s)
               and d.status in ('derived', 'verified') and d.privacy_class = any(%s)
               and coalesce(d.epistemic, 'stated_owner') = 'stated_owner' and coalesce(d.scope, 'durable') <> 'task'
+              and coalesce(d.attributes->>'domain', 'personal') not in ('project', 'task', 'test')
               and (d.valid_to is null or d.valid_to > now())
             order by d.created_at desc limit 400""", (qv, qv, list(RULE_KINDS), allowed)).fetchall()
     rows = [r for r in rows if r["id"] not in exclude]

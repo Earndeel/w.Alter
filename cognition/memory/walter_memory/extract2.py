@@ -40,7 +40,7 @@ from .db import connection
 
 log = logging.getLogger("walter.extract2")
 
-PROCESSOR, VERSION = "l3.extract", "2"
+PROCESSOR, VERSION = "l3.extract", "3"     # 3 = typed statements + reconciliation (lot 1, 2026-11-19)
 POSTE = "memory_extraction"          # Walter Router poste: the router picks the model (never hardcoded)
 RUNTIMES = ("hermes", "claude_code", "codex", "dsh", "walter")
 MESSAGE_TYPES = ("message.sent", "message.received")    # sent = the owner, received = the assistant
@@ -51,6 +51,24 @@ STAGES = {"decision": {"requested", "proposed", "decided", "executed", "abandone
           "goal": {"requested", "decided", "executed", "abandoned"}, "commitment": {"open", "done"}}
 STATES = STAGES                     # P1.1 name
 SCOPES = {"durable", "task", "until"}
+# Lot 1 (2026-11-19): typed statements. type (what the model writes) → (stored kind, act). The kind keeps the readers'
+# vocabulary (working state, views); the act says what kind of statement it is (attributes.act).
+TYPES = {"fait": ("fact", "fact"), "preference": ("preference", "rule"), "contrainte": ("constraint", "rule"),
+         "correction": ("correction", "correction"), "proposition": ("decision", "proposal"),
+         "hypothese": ("fact", "hypothesis"), "decision": ("decision", "decision"), "objectif": ("goal", "goal"),
+         "action": ("commitment", "action"), "resultat": ("fact", "result"), "etat": ("fact", "state"),
+         "annulation": ("decision", "cancel")}
+LEGACY_ACT = {"fact": "fact", "decision": "decision", "preference": "rule", "goal": "goal", "constraint": "rule",
+              "commitment": "action", "correction": "correction"}
+ACT_STAGES = {"action": {"annoncee": "open", "open": "open", "en_cours": "in_progress", "in_progress": "in_progress",
+                         "terminee": "executed", "done": "executed", "executed": "executed"},
+              "decision": {"decidee": "decided", "decided": "decided", "requested": "requested",
+                           "executed": "executed", "abandoned": "abandoned", "abandonnee": "abandoned"},
+              "goal": {"demande": "requested", "requested": "requested", "decided": "accepted", "accepted": "accepted",
+                       "executed": "executed", "abandoned": "abandoned"}}
+DOMAINS = {"personnel": "personal", "personal": "personal", "projet": "project", "project": "project",
+           "tache": "task", "tâche": "task", "task": "task", "relation": "relation", "test": "test"}
+OWNER_ACTS = {"rule", "correction", "goal", "cancel"}
 SEGMENT_CHARS = 24000
 MSG_CHARS = 3000
 IDLE = timedelta(minutes=20)
@@ -76,43 +94,55 @@ ADAPT_TURNS = 3
 # Text the runtime appends to an owner message (not his words): removed before reading and quoting.
 RUNTIME_NOTES = re.compile(r"\[Your active task list was preserved across context compression\].*$", re.S)
 
-PROMPT = """Tu extrais la mémoire durable d'un extrait de conversation entre Monsieur (le propriétaire) et son assistant W.Alter.
+PROMPT = """Tu extrais la mémoire d'un extrait de conversation entre Monsieur (le propriétaire) et son assistant W.Alter : des énoncés typés, pas un résumé.
 
 Contexte qui précède (ne pas citer) :
 {context}
 
 Connaissances déjà enregistrées (références K) :
 {known}
+(elles servent à écrire chaque énoncé complet et à jour ; Walter rapproche lui-même les énoncés de ces connaissances)
+
+Projets déjà connus (identifiants) : {projects}
 
 Messages à analyser (numérotés, seuls citables) :
 {transcript}
 
 Rends un JSON :
 {{"summary": "2 à 5 phrases : de quoi il a été question, ce qui a été décidé ou fait, où on en est",
-  "topics": ["..."], "projects": ["..."], "people": ["personnes citées hors Monsieur et W.Alter"],
-  "items": [{{"kind": "fact|decision|preference|goal|constraint|commitment|correction",
-              "text": "une seule connaissance, autonome et compréhensible sans la conversation",
-              "subject": "owner | walter | project:<nom> | person:<nom> | other",
-              "stage": "decision/goal : requested|proposed|decided|executed|abandoned ; commitment : open|done ; sinon stated",
-              "scope": "durable | task | until", "until": "AAAA-MM-JJ si scope = until, sinon null",
+  "topics": ["..."], "people": ["personnes citées hors Monsieur et W.Alter"],
+  "items": [{{"type": "fait|preference|contrainte|correction|proposition|hypothese|decision|objectif|action|resultat|etat|annulation",
+              "text": "un seul énoncé, autonome et compréhensible sans la conversation ; s'il met à jour une connaissance K, la version complète à jour",
+              "author": "monsieur | walter | tiers",
+              "domain": "personnel | projet | tache | relation | test",
+              "project": "identifiant court du projet si domain = projet ou tache, sinon null",
+              "stage": "action : annoncee|en_cours|terminee ; sinon null",
+              "scope": "durable | task | until", "until": "AAAA-MM-JJ si scope = until ou si un état a une fin connue, sinon null",
+              "about": "K… si l'énoncé porte sur une connaissance déjà enregistrée, sinon null",
               "msgs": [numéros des messages qui l'établissent],
               "quote": "extrait EXACT (copié mot pour mot, 5 à 25 mots) d'un des messages cités",
-              "same_as": "K… si c'est la même connaissance qu'une connaissance déjà enregistrée, sinon null",
-              "supersedes": ["K… que celle-ci remplace ou corrige"], "contradicts": ["K… qu'elle contredit sans trancher"],
               "confidence": 0.0}}]}}
 
-Ce qui compte comme connaissance durable :
-- étape (stage), sans jamais en sauter une : requested = Monsieur demande ou veut quelque chose ; proposed = W.Alter propose et Monsieur n'a pas tranché ; decided = Monsieur a décidé ou validé ; executed = un message dit que c'est fait (c'est un compte rendu, pas une preuve) ; abandoned = Monsieur y renonce. Une demande de Monsieur est requested, jamais executed ;
-- portée (scope) : durable = vaut au-delà du travail en cours ; task = ne vaut que pour le travail en cours (« ne touche pas aux fichiers que Codex modifie », « attends mon accord avant l'étape suivante ») ; until = jusqu'à une date (until) ;
-- préférence / contrainte : une règle, un goût, une manière de travailler, une limite à respecter ;
-- objectif : ce que Monsieur veut atteindre ; engagement : ce que quelqu'un s'est engagé à faire (open/done) ;
-- correction : Monsieur corrige une information ou une erreur ; fait : une information durable sur Monsieur, ses proches, ses projets, son environnement, ou l'architecture et l'état de W.Alter ;
-- les choix techniques et d'architecture d'un projet SONT des décisions à garder ; ne garde pas les détails passagers des actions de W.Alter (commandes lancées, erreurs corrigées, essais) sauf s'ils fixent une règle durable ;
-- une demande de Monsieur (« tu peux… », « analyse… », « fais… », « envoie ») est un objectif (goal) ou une décision de Monsieur à l'étape requested, même si W.Alter l'exécute aussitôt ;
-- une approbation courte de Monsieur (« oui », « vas-y », « envoi », « ok ») d'une proposition de W.Alter est une décision de Monsieur : écris la décision complète et cite à la fois le message de W.Alter qui la propose et celui de Monsieur qui l'approuve ;
-- une question de Monsieur qui exprime clairement une attente (« pourquoi tu ne le fais pas toi-même ? ») est une contrainte.
-Règles : uniquement ce qui est dit dans les messages numérotés ; une affirmation de W.Alter n'est pas une décision de Monsieur ;
-une affirmation d'un tiers n'est pas un fait vérifié (dis « selon … ») ; listes vides si rien de durable ; chaque item cite ses numéros et une citation exacte."""
+Types (un énoncé = un seul acte) :
+- fait : une information déclarée ; author = qui l'affirme. Ce que W.Alter dit de l'état d'un système est un fait déclaré par W.Alter, pas un fait vérifié ;
+- preference / contrainte : une règle, un goût, une manière de travailler, une limite que Monsieur pose (une question de Monsieur qui exprime clairement une attente est une contrainte) ;
+- correction : Monsieur corrige une information ou une erreur ;
+- proposition : une option proposée, rien n'est tranché ;
+- hypothese : une supposition ou une explication probable, non vérifiée ;
+- decision : Monsieur a décidé ou validé ; une approbation courte (« oui », « vas-y », « ok ») d'une proposition est une décision : écris-la complète et cite la proposition et l'approbation ;
+- objectif : ce que Monsieur demande ou veut atteindre (« tu peux… », « analyse… », « fais… ») ; les étapes d'une même demande ne sont pas des objectifs séparés : un seul objectif par intention ;
+- action : ce que quelqu'un s'engage à faire (annoncee), fait en ce moment (en_cours) ou dit avoir fait (terminee) — c'est un compte rendu, pas une preuve ;
+- resultat : ce qui a été constaté à l'issue d'une action ou d'un contrôle (tests passés, mesure, sortie d'une commande, confirmation de Monsieur) : dis ce qui a été constaté et par quoi ;
+- etat : un état passager (en panne, en pause, en cours de migration, en attente de…) ;
+- annulation : Monsieur renonce à quelque chose, l'arrête ou l'annule.
+Domaine, à décider pour CHAQUE énoncé (jamais d'après les projets cités ailleurs dans l'extrait) :
+- personnel : vaut pour Monsieur lui-même (sa vie, ses goûts, sa manière générale de travailler avec W.Alter) ;
+- projet : vaut pour un projet précis (code, architecture, choix, état d'un dépôt ou d'un module) ; project = son identifiant (pour W.Alter : walter, ou walter-<module> comme walter-memory, walter-router, walter-context, walter-engine) ;
+- tache : ne vaut que pour le travail en cours (« attends mon accord avant l'étape suivante ») ;
+- relation : une personne et son lien avec Monsieur ;
+- test : données de test, essais, bancs, exemples fictifs (ils ne sont pas gardés).
+Portée (scope) : durable = vaut au-delà du travail en cours ; task = ne vaut que pour le travail en cours ; until = jusqu'à une date.
+Règles : uniquement ce qui est dit dans les messages numérotés ; une affirmation de W.Alter n'est ni une décision de Monsieur ni un fait vérifié ; une affirmation d'un tiers se dit « selon … » ; ne garde pas les détails passagers (commandes lancées, erreurs corrigées en route) sauf s'ils établissent une règle, une décision, un résultat ou un état ; listes vides si rien ; chaque énoncé cite ses numéros et une citation exacte."""
 PROMPT_HASH = hashlib.sha256(PROMPT.encode()).hexdigest()[:16]
 
 
@@ -204,19 +234,21 @@ def _known(conn, source: str, thread_id: str, text: str, generations: tuple = ("
     similar ones anywhere (local embeddings, no model call). A staged backfill also sees its own staging generation."""
     gens = list(generations)
     rows = conn.execute("""select item_id::text, kind, content, coalesce(stage, attributes->>'state') as state,
-                                  created_at, lineage_id::text, coalesce(valid_from, created_at) as at, generation
+                                  created_at, lineage_id::text, coalesce(valid_from, created_at) as at, generation,
+                                  stage, epistemic, privacy_class, status, scope, attributes
                            from core.derived_items where derived_by = %s and status in ('derived','verified')
                              and (valid_to is null or valid_to > now())
-                             and generation = any(%s) and kind <> 'summary' and source_refs->>'thread' = %s
-                             and source_refs->>'source' = %s
+                             and generation = any(%s) and kind <> 'summary'
+                             and ((source_refs->>'thread' = %s and source_refs->>'source' = %s)
+                                  or coalesce(attributes->'threads', '[]'::jsonb) ? %s)
                            order by created_at desc limit %s""",
-                        (PROCESSOR, gens, thread_id, source, KNOWN_THREAD)).fetchall()
+                        (PROCESSOR, gens, thread_id, source, f"{source}/{thread_id}", KNOWN_THREAD)).fetchall()
     try:
         from . import search
         v = search.vec(search.embed([text[:4000]])[0])
         rows += conn.execute("""select d.item_id::text, d.kind, d.content, coalesce(d.stage, d.attributes->>'state') as state,
                                        d.created_at, d.lineage_id::text, coalesce(d.valid_from, d.created_at) as at,
-                                       d.generation
+                                       d.generation, d.stage, d.epistemic, d.privacy_class, d.status, d.scope, d.attributes
                                 from search.chunks c join core.derived_items d on d.item_id = c.ref_id
                                 where c.kind = 'derived' and c.embedding is not null and d.derived_by = %s
                                   and d.generation = any(%s) and d.status in ('derived','verified') and d.kind <> 'summary'
@@ -316,12 +348,30 @@ def quote_found(quote: str, texts: list[str]) -> bool:
     return False
 
 
+def project_id(name) -> str | None:
+    """A stable project identifier: lower case, ascii, words joined by '-'; « W.Alter … » → walter-…."""
+    if not isinstance(name, str) or not name.strip() or name.strip().lower() in ("null", "none", "-"):
+        return None
+    n = _norm(name.split(":", 1)[-1]).replace(" ", "-")
+    n = re.sub(r"^w-alter", "walter", n)
+    return n[:60] or None
+
+
 def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict | None, str | None]:
-    """→ (clean item, None) or (None, reason). Pure: no database."""
-    kind = (item.get("kind") or "").strip().lower()
+    """→ (clean statement, None) or (None, reason). Pure: no database. Accepts the typed format (v3: type, author,
+    domain, project, about) and the former one (kind, same_as, supersedes, contradicts: kept as the extraction's
+    own hints, used as candidates, and as verdicts only in reconcile mode "model")."""
+    typ = (item.get("type") or "").strip().lower().replace("é", "e").replace("è", "e")
+    if typ in TYPES:
+        kind, act = TYPES[typ]
+        typed = True
+    else:
+        typed = False
+        kind = (item.get("kind") or "").strip().lower()
+        if kind not in KINDS:
+            return None, "bad_kind"
+        act = LEGACY_ACT[kind]
     text = (item.get("text") or "").strip()
-    if kind not in KINDS:
-        return None, "bad_kind"
     if len(text) < 8:
         return None, "empty_text"
     nums = item.get("msgs") or []
@@ -330,44 +380,80 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict 
     cited = [seg[n - 1] for n in sorted(set(nums))]
     if not quote_found(item.get("quote") or "", [m["content"] or "" for m in cited]):
         return None, "quote_not_found"
+    domain = DOMAINS.get((item.get("domain") or "").strip().lower())
+    if domain == "test":
+        return None, "test"                       # test data never becomes knowledge
     by_owner = any(m["event_type"] == "message.sent" for m in cited)
     by_agent = any(m["event_type"] == "message.received" for m in cited)
-    stage = (item.get("stage") or item.get("state") or "stated").strip().lower()
-    if kind in STAGES:
-        if stage not in STAGES[kind]:
-            stage = "requested" if kind in ("decision", "goal") else "open"
+    raw_stage = (item.get("stage") or item.get("state") or "").strip().lower().replace("é", "e")
+    if act == "decision" and raw_stage == "proposed":
+        act = "proposal"
+    if act == "decision" and raw_stage in ("abandoned", "abandonnee"):
+        act = "cancel"
+    if act == "action" and kind == "commitment" and raw_stage in ("", "stated"):
+        raw_stage = "open"
+    # stage of the stored item
+    if act == "proposal":
+        stage = "proposed"
+    elif act == "cancel":
+        stage = "abandoned"
+    elif act in ACT_STAGES:     # an unknown stage ("verified" from a model) is never taken: the act's first stage
+        stage = ACT_STAGES[act].get(raw_stage) or {"action": "open", "goal": "requested",
+                                                    "decision": "decided" if typed and not raw_stage else "requested"}[act]
+    elif act == "result":
+        stage = "executed"                        # verified only with a proof (extract_segment reads it)
     else:
         stage = "stated"
-    if kind in OWNER_KINDS and not by_owner and not (kind == "decision" and stage == "proposed"):
-        return None, "no_owner_evidence"          # a W.Alter proposal is kept as proposed, never as the owner's choice
+    if (act in OWNER_ACTS or act == "decision") and not by_owner:
+        return None, "no_owner_evidence"          # a goal, rule, decision or cancellation is the owner's word; the
+                                                  # assistant's one is a proposition (typed so by the model)
     if stage in ("decided", "requested", "abandoned") and not by_owner:
         stage = "proposed"
-    if stage == "executed" and not by_agent:      # "it is done" needs a report of it; the owner's request is not one
-        stage = "decided" if by_owner else "proposed"
+    if stage == "executed" and act == "decision" and not by_agent:
+        stage = "decided"                         # "it is done" needs a report of it; the owner's request is not one
     scope = (item.get("scope") or "durable").strip().lower()
     scope = scope if scope in SCOPES else "durable"
     until = None
-    if scope == "until":
+    if item.get("until"):
         try:
             until = datetime.fromisoformat(str(item.get("until"))[:10]).replace(tzinfo=timezone.utc)
         except (TypeError, ValueError):
-            scope = "task"
-    state = stage
-    refs = lambda key: [k for k in (item.get(key) or []) if isinstance(k, str) and k in known]
+            until = None
+    if scope == "until" and not until:
+        scope = "task"
+    author = (item.get("author") or "").strip().lower()
+    if author in ("tiers", "third", "third_party"):
+        epistemic_v = "stated_third_party"
+    elif act == "hypothesis":
+        epistemic_v = "inferred"
+    else:
+        epistemic_v = "stated_owner" if by_owner else "agent_reported"
+    subject = (item.get("subject") or "").strip()[:120]
+    project = project_id(item.get("project")) or (project_id(subject) if subject.lower().startswith("project:") else None)
+    if domain is None:                            # former format: from the subject
+        domain = ("project" if project else "personal" if subject.lower() in ("owner", "monsieur")
+                  else "relation" if subject.lower().startswith("person:") else None)
+    if domain in ("personal", "relation"):
+        project = None
+    refs = lambda key: [k for k in (item.get(key) or []) if isinstance(k, str) and k in known]   # noqa: E731
     same = item.get("same_as") if isinstance(item.get("same_as"), str) and item.get("same_as") in known else None
     supersedes, contradicts = refs("supersedes"), refs("contradicts")
+    about = item.get("about") if isinstance(item.get("about"), str) and item.get("about") in known else None
     if supersedes and not by_owner:          # only the owner's word replaces knowledge; otherwise flag the conflict
         contradicts, supersedes = contradicts + supersedes, []
+    hint = (("confirms", same) if same else ("replaces", supersedes[0]) if supersedes
+            else ("contradicts", contradicts[0]) if contradicts else (None, about) if about else None)
     try:
         conf = max(0.0, min(1.0, float(item.get("confidence") or 0.7)))
     except (TypeError, ValueError):
         conf = 0.7
-    return {"kind": kind, "text": text, "state": state, "stage": stage, "scope": scope, "until": until,
-            "subject": (item.get("subject") or "other")[:120],
-            "quote": (item.get("quote") or "")[:400], "cited": cited, "by_owner": by_owner,
-            "epistemic": "owner_stated" if by_owner else "agent_reported",
-            "epistemic_v": "stated_owner" if by_owner else "agent_reported", "same_as": same,
-            "supersedes": supersedes, "contradicts": contradicts, "confidence": conf}, None
+    return {"kind": kind, "act": act, "text": text, "state": stage, "stage": stage, "scope": scope, "until": until,
+            "subject": subject or (f"project:{project}" if project else "other"), "domain": domain, "project": project,
+            "quote": (item.get("quote") or "")[:400], "cited": cited, "by_owner": by_owner, "by_agent": by_agent,
+            "epistemic": "owner_stated" if by_owner else "agent_reported", "epistemic_v": epistemic_v,
+            "same_as": same, "supersedes": supersedes, "contradicts": contradicts, "about": about, "hint": hint,
+            "hint_id": known[hint[1]].get("item_id") if hint else None,
+            "confidence": conf}, None
 
 
 # ───────────────────────────── one segment ─────────────────────────────
@@ -401,26 +487,47 @@ def _line(i: int, m: dict, prefix: str = "") -> str:
     return f"{prefix}{i}. [{who} · {m['occurred_at']:%Y-%m-%d %H:%M}] {text}"
 
 
+def _projects(conn, gens: list[str]) -> list[str]:
+    """Project identifiers already given to statements (lot 1): the model reuses them instead of inventing variants."""
+    return [r["p"] for r in conn.execute("""select attributes->>'project' as p, count(*) n from core.derived_items
+                                            where derived_by = %s and generation = any(%s) and attributes ? 'project'
+                                              and status in ('derived','verified','superseded')
+                                            group by 1 order by 2 desc limit 30""", (PROCESSOR, gens))]
+
+
+def _pseudo(j: int, st: dict, cls: str, generation: str) -> dict:
+    """An earlier statement of the same segment as a candidate (a goal asked, then reported done, in one segment)."""
+    return {"item_id": f"seg:{j}", "kind": st["kind"], "content": st["text"], "stage": st["stage"], "scope": st["scope"],
+            "epistemic": st["epistemic_v"], "status": "derived", "generation": generation, "lineage_id": None,
+            "privacy_class": cls, "attributes": {}, "at": st["at"]}
+
+
 def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, budget: str = "recurring",
                     backfill: str | None = None, generation: str = "g1") -> dict:
-    """One model call for a segment of cloud-readable, non-noise messages; writes items + coverage atomically.
-    backfill: the tag of a selective catch-up of pre-V1 messages (backfill()): the segment's summary is not stored
-    (fragments of an old conversation, not a summary of it) and the items carry attributes.backfill = tag.
-    generation: a staging generation (STAGING, never readable) writes a pilot apart from served knowledge: its items
-    go there, and what they would do to served items (same_as evidence, supersede, contradict) is recorded on them
-    (attributes.staged) and in out["staged"], never applied; no view invalidation, no entity link."""
+    """One extraction call for a segment of cloud-readable, non-noise messages, then the consolidation loop (lot 1,
+    knowledge.py): each typed statement is reconciled with current knowledge (candidates from the hybrid search and
+    the thread; verdicts deterministic or from Walter Decision, one batched decision per segment) and written through
+    the single write gate, with the segment's coverage, atomically.
+    backfill: the tag of a selective catch-up (backfill()): no segment summary, items carry attributes.backfill = tag,
+    every change is recorded under that tag (knowledge.revert undoes it).
+    generation: a staging generation (STAGING, never readable) writes a pilot apart from served knowledge: new items go
+    there; changes it would make to served items are recorded `staged` in core.derived_changes, never applied."""
+    from . import knowledge
     chat = chat or llm.chat
     staged = generation != "g1"
+    gens = ["g1", generation] if staged else ["g1"]
+    rc = knowledge.settings()
     with connection() as conn:
         context = _context(conn, source, thread_id, seg[0]["occurred_at"])
-        known_rows = _known(conn, source, thread_id, "\n".join((m["content"] or "")[:500] for m in seg),
-                            ("g1", generation) if staged else ("g1",))
+        known_rows = _known(conn, source, thread_id, "\n".join((m["content"] or "")[:500] for m in seg), tuple(gens))
+        projects = _projects(conn, gens)
     known = {f"K{i + 1}": r for i, r in enumerate(known_rows)}
     seg_class = privacy.strictest(*(m["privacy_class"] for m in seg))
     prompt = PROMPT.format(
         context="\n".join(_line(i + 1, m, "C") for i, m in enumerate(context)) or "(début de conversation)",
         known="\n".join(f"{k}. [{r['kind']}{'/' + r['state'] if r['state'] and r['state'] != 'stated' else ''}] {r['content']}"
                         for k, r in known.items()) or "(aucune)",
+        projects=", ".join(projects) or "(aucun encore)",
         transcript="\n".join(_line(i + 1, m) for i, m in enumerate(seg)))
     t0 = time.perf_counter()
     res = chat([{"role": "user", "content": prompt}], poste=POSTE, processor=PROCESSOR, processor_version=VERSION,
@@ -435,136 +542,157 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
             continue
         item, why = validate(raw, seg, known)
         if why:
-            rejected.append({"reason": why, "item": {k: raw.get(k) for k in ("kind", "text", "msgs", "quote")}})
+            rejected.append({"reason": why, "item": {k: raw.get(k) for k in ("type", "kind", "text", "msgs", "quote")}})
         else:
+            item["at"] = item["cited"][-1]["occurred_at"]
+            item["cls"] = privacy.strictest(*(m["privacy_class"] for m in item["cited"]))
             kept.append(item)
-    out = {"items": 0, "reused": 0, "superseded": 0, "rejected": len(rejected), "cost_usd": float(res.get("cost_usd") or 0)}
-    if staged:
-        out["staged"] = []
-    served = lambda ref: staged and known[ref].get("generation", "g1") != generation    # noqa: E731
+
+    # ── reconciliation: candidates and verdicts (reads + one batched decision; no write transaction is held) ──
+    verdicts: list[tuple] = []
+    pending: list[tuple[str, dict, list[dict]]] = []
+    cands_of: dict[int, list[dict]] = {}
+    with connection() as conn:
+        for j, st in enumerate(kept):
+            pool = known_rows + [_pseudo(i, kept[i], kept[i]["cls"], generation) for i in range(j)]
+            cands = knowledge.candidates(conn, st, pool, gens, rc["candidates"])
+            hinted = known.get((st["hint"] or (None, None))[1]) if st["hint"] else None
+            if hinted and hinted["item_id"] not in {x["item_id"] for x in cands}:
+                cands.append(hinted)              # the extraction's own K reference joins the candidates
+            cands_of[j] = cands
+            if st["act"] == "result" or st["stage"] == "executed":    # what backs a report of work, read once
+                st["proof"] = knowledge.proof(conn, source, thread_id, st["at"],
+                                              owner=st["by_owner"] and st["act"] == "result")
+            st["open_work"] = knowledge.open_work(pool) if st["act"] in knowledge.PROGRESS_ACTS else []
+            det = knowledge.deterministic(st, cands)
+            if det and det[0] == "new" and st["open_work"]:
+                det = None                        # no same claim, but it may be the work of an open goal: ask
+            hint = st["hint"] if st["hint"] and st["hint"][0] else None
+            if rc["mode"] == "model" and hint:    # rollback switch: the extraction model's own references
+                verdicts.append((hint[0], st["hint_id"], None, "model:extraction"))
+            elif det:
+                verdicts.append((det[0], det[1], None, f"deterministic:{det[2]}"))
+            elif rc["mode"] in ("deterministic", "model"):
+                verdicts.append(("new", None, None, "deterministic:no_rule"))
+            else:
+                verdicts.append(None)
+                pending.append((f"s{j + 1}", st, cands))
+    decisions = 0
+    for i in range(0, len(pending), max(1, int(rc["batch"]))):
+        part = pending[i:i + int(rc["batch"])]
+        cls = privacy.strictest(seg_class, *(c["privacy_class"] for _, _, cs in part for c in cs))
+        got = knowledge.judge(part, privacy_class=cls, budget=budget)
+        decisions += 1
+        for sid, _, _ in part:
+            v, t, conf = got[sid]
+            verdicts[int(sid[1:]) - 1] = (v, t, conf, f"decision:{knowledge.NEED}")
+
+    # ── writes: one transaction, every change through the gate ──
+    out = {"items": 0, "reused": 0, "superseded": 0, "advanced": 0, "contested": 0, "ignored": 0,
+           "rejected": len(rejected), "decisions": decisions, "verdicts": {},
+           "cost_usd": float(res.get("cost_usd") or 0)}
     with connection() as conn:
         status = "extracted" if kept or data.get("summary") else "empty"
         sid = _segment_row(conn, source=source, thread_id=thread_id, status=status, msgs=seg, rejected=rejected,
                            model=res.get("model"), cost=res.get("cost_usd"), usage=res.get("usage"), latency_ms=latency)
         base_refs = {"segment": sid, "thread": thread_id, "source": source}
+        seg_projects = sorted({it["project"] for it in kept if it["project"]})
         if data.get("summary") and not backfill:
             conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by,
                                 processor_version, model, prompt_hash, source_event_ids, source_refs, valid_from, privacy_class,
                                 generation)
                             values ('summary', %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s, 'g1')""",
-                         (data["summary"], json.dumps({"topics": data.get("topics") or [], "projects": data.get("projects") or [],
+                         (data["summary"], json.dumps({"topics": data.get("topics") or [], "projects": seg_projects,
                                                        "people": data.get("people") or [], "from": str(seg[0]["occurred_at"]),
                                                        "to": str(seg[-1]["occurred_at"]), "pipeline": "v1"}, ensure_ascii=False),
                           PROCESSOR, VERSION, res.get("model"), PROMPT_HASH, [str(m["event_id"]) for m in seg],
                           json.dumps({**base_refs, "ref": f"{sid}:summary"}), seg[-1]["occurred_at"], seg_class))
-        for k, it in enumerate(kept):
+        gate = knowledge.Gate(conn, generation=generation, tag=backfill, segment=sid, where=f"{source}/{thread_id}")
+        resolved: dict[str, str | None] = {}
+        for j, it in enumerate(kept):
+            verdict, target_id, conf, by = verdicts[j]
+            if target_id and target_id.startswith("seg:"):
+                target_id = resolved.get(target_id)
+            target = _target(conn, target_id, gens) if target_id else None
+            verdict, note = knowledge.guard(it, verdict, target, conf, rc["min_confidence"])
             ev_ids = [str(m["event_id"]) for m in it["cited"]]
-            if it["same_as"] and served(it["same_as"]):   # staged: the evidence it would add, recorded only
-                out["staged"].append({"op": "evidence", "item": known[it["same_as"]]["item_id"], "events": ev_ids,
-                                      "segment": sid})
-                out["reused"] += 1
-                continue
-            if it["same_as"]:            # same knowledge again: new evidence on the known item, no duplicate
-                target = known[it["same_as"]]["item_id"]
-                conn.execute("""update core.derived_items set source_event_ids = (select array_agg(distinct x)
-                                    from unnest(source_event_ids || %s::uuid[]) x) where item_id = %s""", (ev_ids, target))
-                for e in ev_ids:
-                    conn.execute("""insert into core.provenance (target_table, target_id, source_type, source_id, role)
-                                    values ('derived_items', %s, 'event', %s, 'supports') on conflict do nothing""", (target, e))
-                out["reused"] += 1
-                continue
-            cls = privacy.strictest(*(m["privacy_class"] for m in it["cited"]))
-            attrs = {"subject": it["subject"], "state": it["state"], "epistemic": it["epistemic"], "quote": it["quote"],
-                     "projects": data.get("projects") or [], "pipeline": "v1"}
+            stage, epistemic, valid_to = it["stage"], it["epistemic_v"], it["until"]
+            attrs = {"subject": it["subject"], "act": it["act"], "domain": it["domain"], "state": stage,
+                     "epistemic": it["epistemic"], "quote": it["quote"], "pipeline": "v1"}
+            if it["project"]:
+                attrs["project"], attrs["projects"] = it["project"], [it["project"]]
+            pr = it.get("proof")
+            if pr:
+                attrs["proof"] = pr
+                if it["act"] == "result" and knowledge.verifies(it, pr):
+                    stage = "verified"
+                    epistemic = "observed" if pr["level"] == "checked" else epistemic
             if backfill:
                 attrs["backfill"] = backfill
             if it["kind"] == "commitment":
                 attrs["holder"] = "owner" if it["by_owner"] else "walter"
-            if it["contradicts"]:
-                attrs["contested"] = True
-            if staged:                   # effects on served knowledge: recorded, applied only on promotion
-                at = it["cited"][-1]["occurred_at"]
-                later = lambda r: bool(known[r].get("at") and known[r]["at"] > at)      # noqa: E731
-                # a served item newer than this statement stays: the branches below then only mark the pilot item
-                hold = lambda r: served(r) and not later(r)                             # noqa: E731
-                st = {"supersedes": [known[r]["item_id"] for r in it["supersedes"] if hold(r)],
-                      "contradicts": [known[r]["item_id"] for r in it["contradicts"] if hold(r)]}
-                if st["supersedes"] or st["contradicts"]:
-                    attrs["staged"] = st
-                    out["staged"].append({"op": "effects", "segment": sid, "ref": f"{sid}:{k}", **st})
-                it["supersedes"] = [r for r in it["supersedes"] if not hold(r)]
-                it["contradicts"] = [r for r in it["contradicts"] if not hold(r)]
-            lineage = known[it["supersedes"][0]].get("lineage_id") if it["supersedes"] else None
-            new_id = conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by,
-                                         processor_version, model, prompt_hash, source_event_ids, source_refs, valid_from,
-                                         confidence, privacy_class, generation, lineage_id, epistemic, stage, scope,
-                                         valid_to)
-                                     values (%s, %s, %s, 'derived', %s, %s, %s, %s, %s::uuid[], %s, %s, %s, %s, %s,
-                                             %s, %s, %s, %s, %s)
-                                     on conflict (derived_by, (source_refs->>'ref')) where source_refs ? 'ref' do nothing
-                                     returning item_id::text""",
-                                  (it["kind"], it["text"], json.dumps(attrs, ensure_ascii=False), PROCESSOR, VERSION,
-                                   res.get("model"), PROMPT_HASH, ev_ids, json.dumps({**base_refs, "ref": f"{sid}:{k}"}),
-                                   it["cited"][-1]["occurred_at"], it["confidence"], cls, generation, lineage,
-                                   it["epistemic_v"],
-                                   it["stage"], it["scope"], it["until"])).fetchone()
-            if not new_id:
-                continue
-            new_id = new_id["item_id"]
-            out["items"] += 1
-            stated_at = it["cited"][-1]["occurred_at"]
-            newer = [ref for ref in it["supersedes"] if known[ref].get("at") and known[ref]["at"] > stated_at]
-            if newer:      # a replayed older message never replaces newer knowledge: it is that knowledge's past
-                ref = newer[0]
-                conn.execute("""update core.derived_items set status = 'superseded', valid_to = %s, lineage_id = %s::uuid,
-                                  attributes = attributes || jsonb_build_object('superseded_by', %s::text,
-                                                                               'replayed_older', true)
-                                where item_id = %s""", (known[ref]["at"], known[ref].get("lineage_id"),
-                                                        known[ref]["item_id"], new_id))
-                it["supersedes"] = [r for r in it["supersedes"] if r not in newer]
-            for ref in it["supersedes"]:
-                old = known[ref]["item_id"]
-                done = conn.execute("""update core.derived_items set status = 'superseded', valid_to = %s,
-                                           attributes = attributes || jsonb_build_object('superseded_by', %s::text)
-                                       where item_id = %s and status in ('derived','verified') returning item_id""",
-                                    (it["cited"][-1]["occurred_at"], new_id, old)).fetchone()
-                if done:
-                    out["superseded"] += 1
-                    out.setdefault("changed", []).append(old)
-                    conn.execute("""insert into core.provenance (target_table, target_id, source_type, source_id, role)
-                                    values ('derived_items', %s, 'derived', %s, 'supersedes') on conflict do nothing""",
-                                 (new_id, old))
-            older_than = [ref for ref in it["contradicts"] if known[ref].get("at") and known[ref]["at"] > stated_at]
-            if older_than:   # an older statement replayed now is the past of newer knowledge, never a doubt on it
-                ref = older_than[0]
-                conn.execute("""update core.derived_items set status = 'superseded', valid_to = %s,
-                                  attributes = attributes || jsonb_build_object('superseded_by', %s::text,
-                                                                               'replayed_older', true)
-                                where item_id = %s""", (known[ref]["at"], known[ref]["item_id"], new_id))
-                it["contradicts"] = [r for r in it["contradicts"] if r not in older_than]
-            for ref in it["contradicts"]:
-                old = known[ref]["item_id"]
-                out.setdefault("changed", []).append(old)
-                conn.execute("""update core.derived_items set attributes = attributes || '{"contested": true}'
-                                where item_id = %s""", (old,))
-                conn.execute("""insert into core.provenance (target_table, target_id, source_type, source_id, role)
-                                values ('derived_items', %s, 'derived', %s, 'contradicts') on conflict do nothing""",
-                             (new_id, old))
+            if it["act"] == "state" and not valid_to:          # a transient state expires (task-scoped knowledge
+                valid_to = it["at"] + timedelta(days=float(rc["state_ttl_days"]))   # expires with its work: consolidate.expire)
+            row = {"kind": it["kind"], "content": it["text"], "attributes": attrs, "status": "derived",
+                   "derived_by": PROCESSOR, "processor_version": VERSION, "model": res.get("model"),
+                   "prompt_hash": PROMPT_HASH, "source_event_ids": ev_ids,
+                   "source_refs": {**base_refs, "ref": f"{sid}:{j}"}, "valid_from": it["at"],
+                   "confidence": it["confidence"], "privacy_class": it["cls"], "generation": generation,
+                   "epistemic": epistemic, "stage": stage, "scope": it["scope"], "valid_to": valid_to}
+            r = knowledge.apply(gate, it, verdict, target, row=row, key=f"{sid}:{j}", decided_by=by,
+                                confidence=conf, note=note,
+                                proof_of=lambda st: st.get("proof") or knowledge.proof(conn, source, thread_id, st["at"],
+                                                                                         owner=st["by_owner"]))
+            resolved[f"seg:{j}"] = r.get("item") or target_id
+            op = r.get("op")
+            out["verdicts"][verdict] = out["verdicts"].get(verdict, 0) + 1
+            out["items"] += op in ("created", "contested", "enriched", "corrected", "replaced", "older", "complemented")
+            out["reused"] += op == "confirmed"
+            out["superseded"] += op in ("enriched", "corrected", "replaced")
+            out["advanced"] += op in ("advanced", "progress")
+            out["contested"] += op == "contested"
+            out["ignored"] += op == "ignored"
+        out["runplane"] = len(knowledge.runplane(gate, source, thread_id))
         conn.execute("update extraction.segments set items = %s, reused = %s, superseded = %s where segment_id = %s",
-                     (out["items"], out["reused"], out["superseded"], sid))
+                     (out["items"], out["reused"] + out["advanced"], out["superseded"], sid))
     out["segment_id"] = sid
+    if staged:
+        out["staged"] = gate.staged
+    try:   # the index follows what changed (a later segment, another thread or the pilot finds it)
+        from . import search
+        search.reindex_derived(sorted(set(gate.changed)))
+    except Exception as e:  # noqa: BLE001
+        log.debug("reindex after extraction failed (index_pending catches up): %s", e)
     if staged:
         return out
     try:   # P1.2: the consolidated views built on this thread are rebuilt from the new state (targeted invalidation);
         # P1.6: a replaced or contested item also marks the episodes and periods that list it (and their parents)
         from . import consolidate
-        consolidate.invalidate(threads=[(source, thread_id)], item_ids=out.pop("changed", None))
+        consolidate.invalidate(threads=[(source, thread_id)], item_ids=sorted(set(gate.changed)) or None)
         from . import entities
         entities.link_items(conn_items_of_segment(sid))
     except Exception as e:
         log.warning("view invalidation / entity links failed (extraction kept): %s", e)
-    out["segment_id"] = sid
     return out
+
+
+def _target(conn, item_id: str, gens: list[str]) -> dict | None:
+    """The current version of a target: an item superseded meanwhile (by an earlier statement of the same segment)
+    is followed to the version that replaced it."""
+    for _ in range(6):
+        r = conn.execute("""select item_id::text, kind, content, stage, scope, epistemic, status, generation,
+                                   lineage_id::text, privacy_class, attributes, coalesce(valid_from, created_at) as at
+                            from core.derived_items where item_id = %s and generation = any(%s)""",
+                         (item_id, gens)).fetchone()
+        if not r:
+            return None
+        if r["status"] in ("derived", "verified"):
+            return r
+        nxt = (r["attributes"] or {}).get("superseded_by")
+        if r["status"] != "superseded" or not nxt:
+            return None
+        item_id = nxt
+    return None
 
 
 def conn_items_of_segment(sid) -> list[str]:
@@ -767,6 +895,23 @@ def _ensure_staging(generation: str) -> None:
                      (generation,))
 
 
+def _ledger(tag: str, generation: str, seg_ids: list[str], staged: list[dict] | None = None) -> None:
+    """The backfill ledger (extraction.state 'backfill:<tag>'), written after every segment: a run interrupted at any
+    point stays exactly revertible (backfill_revert reads it)."""
+    with connection() as conn:
+        conn.execute("""insert into extraction.state (key, value) values (%s, %s)
+                        on conflict (key) do update set value = jsonb_set(extraction.state.value,
+                          '{segments}', (select coalesce(jsonb_agg(distinct x), '[]'::jsonb) from
+                            jsonb_array_elements_text(coalesce(extraction.state.value->'segments', '[]'::jsonb)
+                                                      || (excluded.value->'segments')) x)),
+                          updated_at = now()""",
+                     (f"backfill:{tag}", json.dumps({"tag": tag, "segments": seg_ids, "generation": generation})))
+        if staged:
+            conn.execute("""update extraction.state set value = jsonb_set(value, '{staged}',
+                              coalesce(value->'staged', '[]'::jsonb) || %s::jsonb) where key = %s""",
+                         (json.dumps(staged, default=str), f"backfill:{tag}"))
+
+
 def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfill", window: int = 1,
              max_threads: int | None = None, workers: int = 4, dry: bool = False, generation: str = "g1") -> dict:
     """Selective catch-up of pre-V1 history (g0 → g1 migration, 2026-11-10): only the given messages, each with
@@ -791,14 +936,14 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
         by_thread[(r["source"], r["thread_id"])].add(str(r["event_id"]))
     threads = sorted(by_thread)[:max_threads] if max_threads else sorted(by_thread)
     out = {"tag": tag, "seed_events": len(seeds), "threads": len(threads), "segments": 0, "items": 0, "reused": 0,
-           "superseded": 0, "rejected": 0, "filtered": 0, "skipped_covered": 0, "events": 0, "cost_usd": 0.0,
-           "errors": 0, "busy": 0}
+           "superseded": 0, "advanced": 0, "contested": 0, "ignored": 0, "decisions": 0, "rejected": 0, "filtered": 0,
+           "skipped_covered": 0, "events": 0, "cost_usd": 0.0, "errors": 0, "busy": 0, "verdicts": {}}
 
     def one(key):
         source, thread_id = key
-        res = {k: 0 for k in ("segments", "items", "reused", "superseded", "rejected", "filtered", "events",
-                              "skipped_covered", "errors", "busy")}
-        res["cost_usd"], res["segment_ids"], res["staged"] = 0.0, [], []
+        res = {k: 0 for k in ("segments", "items", "reused", "superseded", "advanced", "contested", "ignored",
+                              "decisions", "rejected", "filtered", "events", "skipped_covered", "errors", "busy")}
+        res["cost_usd"], res["segment_ids"], res["staged"], res["verdicts"] = 0.0, [], [], {}
         if dry:
             return _one(key, res)
         # the live worker's lease (extraction.threads): a thread is never read by two extractions at once (live
@@ -848,6 +993,7 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
                                    rejected=[{"event_id": str(m["event_id"]), "reason": _noise(m)} for m in noise[:50]])
             res["filtered"] += len(noise)
             res["segment_ids"].append(str(sid))
+            _ledger(tag, generation, [str(sid)])
         segs, cur, size = [], [], 0
         for m in usable:
             if cur and size + _size(m) > SEGMENT_CHARS:
@@ -867,6 +1013,7 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
                                        rejected=[{"reason": "no_owner_message"}])
                 res["filtered"] += len(seg)
                 res["segment_ids"].append(str(sid))
+                _ledger(tag, generation, [str(sid)])
                 continue
             with connection() as conn:   # keep the lease while this thread's segments go through
                 conn.execute("""update extraction.threads set claimed_at = now() where processor = %s and source = %s
@@ -881,8 +1028,11 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
             res["segments"] += 1
             res["segment_ids"].append(str(r["segment_id"]))
             res["staged"] += r.get("staged") or []
-            for k in ("items", "reused", "superseded", "rejected"):
-                res[k] += r[k]
+            _ledger(tag, generation, [str(r["segment_id"])], r.get("staged"))
+            for k in ("items", "reused", "superseded", "advanced", "contested", "ignored", "decisions", "rejected"):
+                res[k] += r.get(k, 0)
+            for v, n in (r.get("verdicts") or {}).items():
+                res["verdicts"][v] = res["verdicts"].get(v, 0) + n
             res["cost_usd"] += r["cost_usd"]
         return res
 
@@ -895,29 +1045,21 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
             out["staged"] = out.get("staged", 0) + len(staged)
             if res.get("quota_stopped"):
                 out["quota_stopped"] = res.pop("quota_stopped")
+            for v, n in res.pop("verdicts").items():
+                out["verdicts"][v] = out["verdicts"].get(v, 0) + n
             for k, v in res.items():
                 out[k] += v
-            if seg_ids and not dry:     # the ledger is written as it goes: an interrupted run stays revertible
-                with connection() as conn:
-                    conn.execute("""insert into extraction.state (key, value) values (%s, %s)
-                                    on conflict (key) do update set value = jsonb_set(extraction.state.value,
-                                      '{segments}', (select coalesce(jsonb_agg(distinct x), '[]'::jsonb) from
-                                        jsonb_array_elements_text(coalesce(extraction.state.value->'segments', '[]'::jsonb)
-                                                                  || (excluded.value->'segments')) x)),
-                                      updated_at = now()""",
-                                 (f"backfill:{tag}", json.dumps({"tag": tag, "segments": seg_ids,
-                                                                  "generation": generation})))
-                    if staged:
-                        conn.execute("""update extraction.state set value = jsonb_set(value, '{staged}',
-                                          coalesce(value->'staged', '[]'::jsonb) || %s::jsonb) where key = %s""",
-                                     (json.dumps(staged, default=str), f"backfill:{tag}"))
     out["cost_usd"] = round(out["cost_usd"], 4)
     return out
 
 
 def backfill_revert(tag: str, *, confirm: bool = False) -> dict:
-    """Undo backfill(tag): its items are retracted (and their chunks hidden), what they had superseded is current
-    again, its events are uncovered (a later backfill may redo them). Dry run unless confirm."""
+    """Undo backfill(tag): every change the write gate recorded under the tag is undone (knowledge.revert: items it
+    created retracted, items it changed — evidence, supersession, contest, lifecycle — restored); items written before
+    the gate (pilots up to 2026-11-19b) are retracted and what they had superseded is current again; its events are
+    uncovered (a later backfill may redo them). Dry run unless confirm."""
+    from . import knowledge
+    gate = knowledge.revert(tag, confirm=confirm)
     with connection() as conn:
         st = conn.execute("select value from extraction.state where key = %s", (f"backfill:{tag}",)).fetchone()
         segs = (st["value"].get("segments") if st else None) or []
@@ -934,9 +1076,9 @@ def backfill_revert(tag: str, *, confirm: bool = False) -> dict:
                and not exists (select 1 from core.provenance q where q.target_table = 'derived_items'
                                and q.role = 'contradicts' and q.source_id = p.source_id
                                and not (q.target_id::text = any(%s)))""", (items, items))]
-        out = {"tag": tag, "segments": len(segs), "items": len(items), "revived": len(revived),
-               "uncontested": len(contested), "executed": confirm,
-               "kept": "evidence added to existing items by same_as (true evidence) is kept"}
+        # dry run: the items query still sees the gate's own items; once undone, they are counted by the gate
+        out = {"tag": tag, "segments": len(segs), "items": len(items) + (gate["created"] if confirm else 0),
+               "revived": len(revived), "uncontested": len(contested), "executed": confirm, "gate": gate}
         if not confirm:
             return out
         conn.execute("""update core.derived_items set status = 'retracted', valid_to = coalesce(valid_to, now()),
