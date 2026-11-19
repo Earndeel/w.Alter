@@ -540,17 +540,17 @@ def test_the_history_catch_up_takes_the_oldest_backlog_first_in_slices_under_its
         extract2.set_live_start(datetime.now(timezone.utc))
         model = Model(decision)
         monkeypatch.setattr(organic, "stage", lambda n: {"mode": "paused"})
-        assert extract2.catchup(1, chat=model) == {"stopped": "paused"} and not model.calls
+        assert extract2.catchup(1, chat=model, relate=0) == {"stopped": "paused"} and not model.calls
         monkeypatch.setattr(organic, "stage", lambda n: {"mode": "active"})
         monkeypatch.setattr(quota, "codex", lambda **k: {"ok": False, "reason": "codex weekly quota 71 % ≥ 70 %"})
-        assert extract2.catchup(1, chat=model)["stopped"] == "quota" and not model.calls
+        assert extract2.catchup(1, chat=model, relate=0)["stopped"] == "quota" and not model.calls
         monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})
-        r = extract2.catchup(1, chat=model)
+        r = extract2.catchup(1, chat=model, relate=0)
         assert r["segments"] == 1 and r["remaining"] == 1 and r["tag"].startswith("rattrapage-")
         assert "Valkey" in json.dumps(model.calls[0], ensure_ascii=False, default=str)     # the oldest one first
-        r = extract2.catchup(1, chat=model)
+        r = extract2.catchup(1, chat=model, relate=0)
         assert r["segments"] == 1 and r["remaining"] == 0
-        assert extract2.catchup(1, chat=model) == {"done": True, "remaining": 0}
+        assert extract2.catchup(1, chat=model, relate=0) == {"done": True, "remaining": 0}
         extract2.backfill_revert(r["tag"], confirm=True)
     finally:
         with connection() as conn:

@@ -32,7 +32,8 @@ def test_each_stage_has_its_own_switch_and_an_absent_one_follows_extraction(monk
     assert organic.stage("subjects") == {"mode": "active", "from": "stages"}
     assert organic.stage("reconsolidation") == {"mode": "paused", "from": "extraction"}
     assert organic.paused("extraction") and organic.extraction_paused()
-    assert set(organic.stages()) == {"extraction", "catchup", "subjects", "reconsolidation", "episode_summaries"}
+    assert set(organic.stages()) == {"extraction", "catchup", "reconcile_existing", "subjects", "reconsolidation",
+                                     "episode_summaries"}
     cur = organic.settings()
     monkeypatch.setattr(organic, "settings", lambda: {**cur, "extraction": {"mode": "active"},
                                                       "stages": {"extraction": "paused"}})

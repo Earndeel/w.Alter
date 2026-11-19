@@ -288,6 +288,46 @@ def _experience_section(thread_id: str | None, query: str, budget: int, max_priv
     return text, {"tokens": used, "items": len(items), "refs": [i["run_id"] for i in items]}
 
 
+HISTORY_HINT = re.compile(r"(?i)\b(avant|auparavant|ancien(ne)?s?|pr[ée]c[ée]dent|historique|[ée]volu|a chang[ée]|"
+                          r"changement|depuis quand|[ée]tait|before|previous(ly)?|used to|history|changed)")
+
+
+def _states(refs: list[str], *, past: bool, max_privacy: str) -> dict[str, list[str]]:
+    """What the reader must know about the state of each knowledge line (2026-11-19, owner: « que Context privilégie
+    les états courants fiables tout en permettant de retrouver les anciens états »): a contested item says so and
+    shows the other side; when the question is about the past or a change, the states it replaced follow it. Only
+    current items are served (read_policy): these are additions, read from the history, never a second store."""
+    from . import privacy
+    out: dict[str, list[str]] = {}
+    if not refs:
+        return out
+    allowed = privacy.allowed_classes(max_privacy)
+    with connection() as conn:
+        for r in conn.execute("""
+                select p.target_id::text a, p.source_id::text b, o.item_id::text other, o.content, coalesce(o.valid_from, o.created_at) at
+                from core.provenance p join core.derived_items o
+                  on o.item_id::text = case when p.target_id::text = any(%s::text[]) then p.source_id::text
+                                            else p.target_id::text end
+                where p.target_table = 'derived_items' and p.source_type = 'derived' and p.role = 'contradicts'
+                  and (p.target_id::text = any(%s::text[]) or p.source_id::text = any(%s::text[]))
+                  and o.status in ('derived', 'verified') and o.privacy_class = any(%s)""",
+                (refs, refs, refs, allowed)).fetchall():
+            me = r["a"] if r["a"] in refs and r["a"] != r["other"] else r["b"]
+            out.setdefault(me, []).append(f"  ⚠ contesté — en face : « {r['content'][:160]} » ({str(r['at'])[:10]})")
+        if past:
+            for r in conn.execute("""
+                    select attributes->>'superseded_by' cur, content, coalesce(valid_from, created_at) since, valid_to,
+                           attributes->>'superseded_how' how
+                    from core.derived_items where attributes->>'superseded_by' = any(%s) and status = 'superseded'
+                      and privacy_class = any(%s) order by valid_from desc""", (refs, allowed)).fetchall():
+                lines = out.setdefault(r["cur"], [])
+                if sum(1 for l in lines if l.startswith("  ↳")) < 2:
+                    end = f" → {str(r['valid_to'])[:10]}" if r["valid_to"] else ""
+                    how = {"corrects": ", corrigé", "duplicate": ", doublon"}.get(r["how"] or "", "")
+                    lines.append(f"  ↳ avant : « {r['content'][:160]} » ({str(r['since'])[:10]}{end}{how})")
+    return out
+
+
 def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "cloud_allowed",
                 include_profile: bool = True, history: bool = False,
                 session: tuple[str, str] | None = None, thread_id: str | None = None) -> dict:
@@ -425,11 +465,21 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
             trace["g0_fallback"] = {"candidates": len(g0), "won": len(won), "kept": g0_in}
         if len(res) < 3:
             res = search.dedupe(res + rank.result().get("both", []))
-        lines = [f"- {r['text'].strip()} ({str(r['occurred_at'] or '')[:10]}{mark(r)})" for r in res
-                 if not (b.get("records", 0) > 0 and r.get("label") == "doc_section")     # already in records
-                 and str(r.get("ref_id")) not in shown_ids                                   # already in rules/working
-                 and not (b.get("experience", 0) > 0 and r.get("label") == "experience")]   # the experience layer serves it
-        text, used = _clip(list(dict.fromkeys(lines)), b["knowledge"])
+        keep = [r for r in res
+                if not (b.get("records", 0) > 0 and r.get("label") == "doc_section")     # already in records
+                and str(r.get("ref_id")) not in shown_ids                                   # already in rules/working
+                and not (b.get("experience", 0) > 0 and r.get("label") == "experience")]   # the experience layer serves it
+        try:
+            states = _states([str(r["ref_id"]) for r in keep if r.get("kind") == "derived"],
+                             past=bool(HISTORY_HINT.search(message)) or history, max_privacy=max_privacy)
+        except Exception as e:  # noqa: BLE001 — an addition: never lose the knowledge lines
+            states, trace["states_error"] = {}, type(e).__name__
+        lines = []
+        for r in keep:
+            head = f"- {r['text'].strip()} ({str(r['occurred_at'] or '')[:10]}{mark(r)})"
+            if head not in lines:
+                lines.append("\n".join([head, *dict.fromkeys(states.get(str(r["ref_id"]), []))]))
+        text, used = _clip(lines, b["knowledge"])
         if text:
             sections["knowledge"] = text
         trace["sections"]["knowledge"] = {"tokens": used, "candidates": len(res), "ms": round((time.perf_counter() - t) * 1000),

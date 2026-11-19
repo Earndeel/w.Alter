@@ -26,6 +26,7 @@ before anything is written, and every write goes through this module.
 """
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 import re
@@ -56,7 +57,7 @@ LIFECYCLE_KINDS = {"goal", "decision", "commitment"}
 ENRICH_SUPERSEDES = {"goal", "decision", "commitment", "preference", "constraint"}
 PROGRESS_ACTS = {"action", "result", "cancel"}
 SEARCH = True     # the hybrid search finds candidates in other threads (tests turn it off unless they test it)
-DEFAULTS = {"mode": "decision", "candidates": 5, "batch": 12, "min_confidence": 0.5, "state_ttl_days": 7}
+DEFAULTS = {"mode": "decision", "candidates": 5, "existing_candidates": 8, "batch": 12, "min_confidence": 0.5, "state_ttl_days": 7}
 
 
 def settings() -> dict:
@@ -87,7 +88,9 @@ def _current(conn, ids: list[str], gens: list[str]) -> list[dict]:
                                   lineage_id::text, privacy_class, attributes, coalesce(valid_from, created_at) as at
                            from core.derived_items where item_id = any(%s::uuid[]) and derived_by = %s
                              and status = any(%s) and (valid_to is null or valid_to > now()) and kind <> 'summary'
-                             and generation = any(%s)""", (ids, PROCESSOR, list(LIVE), gens)).fetchall()
+                             and generation = any(%s)
+                           order by array_position(%s::uuid[], item_id)""",      # the ranking given (nearest first):
+                        (ids, PROCESSOR, list(LIVE), gens, ids)).fetchall()      # the same inputs → the same decision
 
 
 def candidates(conn, st: dict, pool: list[dict], gens: list[str], k: int) -> list[dict]:
@@ -103,6 +106,10 @@ def candidates(conn, st: dict, pool: list[dict], gens: list[str], k: int) -> lis
         found = [r["ref_id"] for r in rows if r.get("ref_id")]
     except Exception as e:  # noqa: BLE001 — the embedder is an optimisation; the thread's items still compete
         log.debug("candidate search failed: %s", e)
+    # the same subject's items — its previous states by name, its nearest in meaning — take turns with the open
+    # search's: none fills the k + 2 places alone; a statement already stored is never its own candidate
+    named, near = same_subject(conn, st, gens, k)
+    found = [x for row in itertools.zip_longest(named, found, near) for x in row if x and x != st.get("item_id")]
     by_id = {r["item_id"]: r for r in _current(conn, list(dict.fromkeys(found)), gens)}
     out = [by_id[i] for i in dict.fromkeys(found) if i in by_id]
     for r in sorted(pool, key=lambda r: -overlap(st["text"], r["content"])):
@@ -111,7 +118,90 @@ def candidates(conn, st: dict, pool: list[dict], gens: list[str], k: int) -> lis
         if r["item_id"] not in {o["item_id"] for o in out} and overlap(st["text"], r["content"]) >= 0.12:
             out.append(r)
     out = [r for r in out if privacy.cloud_readable(r["privacy_class"])]
-    return out[:k]
+    return out[:k + 2]
+
+
+GENERIC_SUBJECTS = {"", "other", "owner", "monsieur"}
+
+
+def subject_key(s: str | None) -> str:
+    """« project:W.Alter », « project:walter », « project:Walter Memory » / « project:walter-memory »: one key each."""
+    return re.sub(r"[^a-z0-9:]", "", (s or "").lower())
+
+
+GENERIC_KEYS = {subject_key(x) for x in GENERIC_SUBJECTS}
+
+
+def same_subject(conn, st: dict, gens: list[str], k: int) -> tuple[list[str], list[str]]:
+    """The current items about the same subject (attributes.subject: project:x, person:y, a tool…) or the same
+    project, nearest in meaning to the statement: the same property worded differently, which the open search over
+    every piece of knowledge can rank too low (2026-11-19, owner: « retrouver les connaissances qui portent sur la même
+    propriété d'une même entité ou d'un même projet, même si elles sont formulées différemment »). Local vectors only."""
+    subj = (st.get("subject") or "").strip()
+    proj = st.get("project")
+    if subject_key(subj) in GENERIC_KEYS and not proj:
+        return [], []
+    try:
+        from . import search
+        qv = search.vec(search.embed([st["text"]])[0])
+        rows = conn.execute("""
+            with same as (select item_id from core.derived_items
+                          where derived_by = %s and generation = any(%s) and status = any(%s) and kind <> 'summary'
+                            and (valid_to is null or valid_to > now())
+                            and ((%s::text <> '' and regexp_replace(lower(attributes->>'subject'), '[^a-z0-9:]', '', 'g')
+                                                     = regexp_replace(lower(%s), '[^a-z0-9:]', '', 'g'))
+                                 or (%s::text is not null and attributes->'projects' ? %s)))
+            select c.ref_id::text id, min(c.embedding <=> %s::vector) d from search.chunks c join same on same.item_id = c.ref_id
+            where c.kind = 'derived' and c.embedding is not null and not c.hidden group by 1 order by 2 limit %s""",
+            (PROCESSOR, gens, list(LIVE), subj if subject_key(subj) not in GENERIC_KEYS else "",
+             subj, proj, proj, qv, k)).fetchall()
+        near = [r["id"] for r in rows if r["d"] <= SAME_SUBJECT_MAX_DISTANCE]
+        # the thing whose state is told (a component, a tool, a model): its name, shared with the subject's other
+        # items, and among them the latest said before this statement — its previous state, by fact time. Local
+        # vectors miss « Hermes est entièrement retiré » ↔ « Hermes assure encore en production » (0.68, rank 41 of
+        # the subject's 54 items naming Hermes, first production slice 19/11); each state meeting the one before it,
+        # the chain links up item after item
+        terms = anchors(st["text"], subj)
+        named: list[str] = []
+        if terms:
+            rows = conn.execute("""
+                select i.item_id::text id from core.derived_items i
+                where i.derived_by = %s and i.generation = any(%s) and i.status = any(%s) and i.kind <> 'summary'
+                  and (i.valid_to is null or i.valid_to > now())
+                  and ((%s::text <> '' and regexp_replace(lower(i.attributes->>'subject'), '[^a-z0-9:]', '', 'g')
+                                           = regexp_replace(lower(%s), '[^a-z0-9:]', '', 'g'))
+                       or (%s::text is not null and i.attributes->'projects' ? %s))
+                  and i.content ~* %s and (%s::timestamptz is null or coalesce(i.valid_from, i.created_at) <= %s::timestamptz)
+                order by coalesce(i.valid_from, i.created_at) desc limit %s""",
+                (PROCESSOR, gens, list(LIVE), subj if subject_key(subj) not in GENERIC_KEYS else "", subj, proj, proj,
+                 rf"\m{re.escape(terms[0])}\M", st.get("at"), st.get("at"), k + 1)).fetchall()
+            named = [r["id"] for r in rows]
+        return named, near
+    except Exception as e:  # noqa: BLE001 — an addition to the candidates; never blocks a reconciliation
+        log.debug("same-subject candidates failed: %s", e)
+        return [], []
+
+
+SAME_SUBJECT_MAX_DISTANCE = 0.6     # cosine distance: beyond it, another property of the subject
+NAME = re.compile(r"[A-Za-zÀ-ÿ][\w.\-]*[\w]")
+NOT_NAMES = {"selon", "walter", "w.alter", "monsieur", "the", "le", "la", "les", "un", "une", "il", "elle", "si",
+             "depuis", "après", "avant", "au", "en", "dans"}
+
+
+def anchors(text: str, subject: str = "", n: int = 4) -> list[str]:
+    """The names in a statement — a capitalised word past the first, or a token with a digit, a dot, a hyphen or an
+    underscore (DSH, Hermes, walter-llm, d1.2-ultra) — minus the subject's own words and the usual openers."""
+    own = set(re.split(r"[^a-z0-9]+", (subject or "").lower().split(":", 1)[-1])) - {""}
+    out: list[str] = []
+    for i, m in enumerate(NAME.finditer(text or "")):
+        w = m.group(0).strip(".-")
+        lw = w.lower()
+        if len(w) < 3 or lw in NOT_NAMES or lw in own or any(p in own for p in re.split(r"[^a-z0-9]+", lw) if p):
+            continue
+        if (i > 0 and w[0].isupper()) or re.search(r"[0-9._\-]", w) or (len(w) > 1 and any(ch.isupper() for ch in w[1:])):
+            if lw not in (x.lower() for x in out):
+                out.append(w)
+    return out[:n]
 
 
 # ───────────────────────────── 2. verdicts ─────────────────────────────
@@ -246,6 +336,19 @@ def confirmed(target: dict) -> bool:
             or bool(a.get("confirmed_by_owner")) or (a.get("proof") or {}).get("level") in ("checked", "confirmed"))
 
 
+CHANGE_MARK = re.compile(r"(?i)(\bde nouveau\b|\bà nouveau\b|\bdésormais\b|\bdorénavant\b|\bn['’]est plus\b|"
+                         r"\bne \w+ plus\b|\bn['’]\w+ plus\b|\bplus aucun|réactiv|remplacé|\bretiré|désinstall|"
+                         r"\bno longer\b|\bagain\b|\breplaced\b|\bretired\b|\breactivated\b)")
+
+
+def later_in_fact(st: dict, target: dict) -> bool:
+    a, b = st.get("at"), target.get("at")
+    try:
+        return bool(a and b and a > b)
+    except TypeError:
+        return str(a) > str(b)
+
+
 def guard(st: dict, verdict: str, target: dict | None, conf: float | None, min_conf: float) -> tuple[str, str | None]:
     """Deterministic rules over the model's verdict → (verdict, note)."""
     if verdict in ("new", "ignore"):
@@ -265,8 +368,21 @@ def guard(st: dict, verdict: str, target: dict | None, conf: float | None, min_c
     if verdict in ("corrects", "replaces") and target["kind"] in ("constraint", "preference", "correction") \
             and not st["by_owner"]:
         return "contradicts", "owner_rule"
-    if verdict in ("corrects", "replaces", "contradicts") and conf is not None and conf < min_conf:
+    # 2026-11-19 (owner: « en cas d'incertitude, conserver une contradiction explicite plutôt que de remplacer
+    # arbitrairement une connaissance »): an unsure replacement keeps both, contested; an unsure contradiction is not
+    # one (likely another claim)
+    if verdict in ("corrects", "replaces") and conf is not None and conf < min_conf:
+        # the statement itself says the state changed (« de nouveau active », « n'est plus », « retiré ») and was
+        # said after the target, in fact time: the evidence and the dates settle what the model's confidence does not
+        if verdict == "replaces" and CHANGE_MARK.search(st["text"] or "") and later_in_fact(st, target):
+            return verdict, "explicit_change"
+        return "contradicts", "unsure"
+    if verdict == "contradicts" and conf is not None and conf < min_conf:
         return "new", "unsure"
+    # an unsure "same intention, more precise" would retire its target: kept as a linked complement, both current
+    # (first production slice 19/11: an evolution judged at 0.21 had superseded its target)
+    if verdict == "enriches" and conf is not None and conf < min_conf:
+        return "enriches", "complement_only"
     return verdict, None
 
 
@@ -608,6 +724,182 @@ def settle(gate: Gate, winner: str, at, *, key: str, meta: dict) -> list[str]:
     return out
 
 
+# ───────────────────────────── existing knowledge ─────────────────────────────
+# 2026-11-19 (owner: « traiter … la coexistence de connaissances anciennes et nouvelles qui décrivent des états
+# incompatibles … en réutilisant les mécanismes existants »): knowledge written before the reconciliation existed (the
+# g1 extraction of 10–14/11) or judged "new" against fewer candidates goes once through the same candidates, the same
+# batched decision (memory.reconcile, memoised), the same guards and the same gate, from its own point of view: is it
+# the same claim as an item OLDER IN FACT (valid_from, the moment it was said — never the moment it was ingested), and
+# then a complement, an evolution, a correction or a real contradiction? The older item is never removed: superseded
+# with valid_to, contested, or linked — readable through history(). Driven by the catch-up loop (extract2.catchup),
+# not per message; newest first, so each pair is judged once, from the later statement.
+RELATE_KINDS = ("fact", "decision", "goal", "constraint", "preference", "commitment", "correction")
+
+
+def _pending_existing(conn, limit: int, only: list[str] | None = None) -> list[dict]:
+    r = conn.execute("select value from extraction.state where key = 'reconcile_existing_until'").fetchone()
+    if r is None:       # the knowledge written before this pass: a finite backlog; later items are reconciled live
+        until = datetime.now(timezone.utc)
+        conn.execute("""insert into extraction.state (key, value) values ('reconcile_existing_until', %s)
+                        on conflict (key) do nothing""", (json.dumps({"at": until.isoformat()}),))
+    else:
+        until = datetime.fromisoformat(r["value"]["at"])
+    return conn.execute("""select item_id::text, kind, content, stage, scope, epistemic, status, generation,
+                                  lineage_id::text, privacy_class, attributes, valid_from as at
+                           from core.derived_items
+                           where derived_by = %s and generation = 'g1' and status = any(%s) and kind = any(%s)
+                             and (valid_to is null or valid_to > now()) and created_at < %s
+                             and not attributes ? 'rereconciled'
+                             and coalesce(attributes->'reconcile'->>'verdict', 'new') = 'new'
+                             and (%s::uuid[] is null or item_id = any(%s::uuid[]))
+                           order by valid_from desc, item_id limit %s""",
+                        (PROCESSOR, list(LIVE), list(RELATE_KINDS), until, only, only, limit)).fetchall()
+
+
+def _as_statement(r: dict) -> dict:
+    a = r["attributes"] or {}
+    return {"text": r["content"], "kind": r["kind"], "act": a.get("act") or r["kind"],
+            "stage": r["stage"] or a.get("state") or "stated", "by_owner": r["epistemic"] == "stated_owner",
+            "epistemic_v": r["epistemic"] or "?", "at": r["at"], "subject": a.get("subject"),
+            "project": a.get("project") or ((a.get("projects") or [None])[0]), "open_work": [],
+            "item_id": r["item_id"]}
+
+
+def _linked(conn, a: str, b: str) -> bool:
+    return bool(conn.execute("""select 1 from core.provenance where target_table = 'derived_items' and source_type = 'derived'
+                                and ((target_id = %s and source_id = %s) or (target_id = %s and source_id = %s)) limit 1""",
+                             (a, b, b, a)).fetchone())
+
+
+def relate(gate: "Gate", s: dict, st: dict, verdict: str, t: dict | None, *, key: str, meta: dict,
+           note: str | None) -> dict:
+    """Two existing current items, s (later in fact) and its target t (earlier or same time), through the gate."""
+    mark = {"at": datetime.now(timezone.utc).isoformat(), "verdict": verdict, "by": meta["decided_by"],
+            **({"target": t["item_id"]} if t else {}), **({"note": note} if note else {})}
+    sid = s["item_id"]
+
+    def marked(extra: dict | None = None, row: dict | None = None) -> dict:
+        cur = row or gate._row(sid)
+        return {**(cur["attributes"] or {}), "rereconciled": mark, **(extra or {})}
+    if verdict in ("new", "ignore") or t is None:
+        gate.change(sid, {"attributes": marked()}, op="reconcile", key=f"{key}:mark", reason=note or verdict, **meta)
+        return {"op": "kept"}
+    tid = t["item_id"]
+    tcur = gate._row(tid)
+    if is_progress(st, t, verdict):      # work on that goal / decision: a step of it, both stay (the stage itself
+        a = dict(tcur["attributes"] or {})   # moves only with a proof, in the live path)
+        a["progress"] = (list(a.get("progress") or []) + [{"at": str(st["at"]), "act": st["act"], "stage": st["stage"],
+                                                             "text": st["text"][:300], "said_by": st["epistemic_v"]}])[-12:]
+        gate.change(tid, {"attributes": a}, op="advance", key=f"{key}:advance:{tid}", reason="progress", **meta)
+        gate.change(sid, {"attributes": marked({"enriches": tid})}, op="link", key=f"{key}:link",
+                    links=[(sid, tid, "enriches")], reason="progress", **meta)
+        return {"op": "progress", "item": sid, "target": tid}
+    if verdict == "confirms":            # the same claim twice: the stronger (proven / the owner's) or else the
+        keep, drop = (s, t) if confirmed(s) and not confirmed(t) else (t, s)     # earlier one stays current
+        kcur, dcur = gate._row(keep["item_id"]), gate._row(drop["item_id"])
+        ka = {**(kcur["attributes"] or {}), "confirmations": int((kcur["attributes"] or {}).get("confirmations") or 0) + 1}
+        if drop["epistemic"] == "stated_owner" and keep["epistemic"] != "stated_owner":
+            ka["confirmed_by_owner"] = True
+        if keep["item_id"] == sid:
+            ka["rereconciled"] = mark
+        gate.change(keep["item_id"], {"attributes": ka}, op="evidence", key=f"{key}:evidence",
+                    evidence=[str(e) for e in dcur["source_event_ids"] or []], **meta)
+        da = {**(dcur["attributes"] or {}), "superseded_by": keep["item_id"], "superseded_how": "duplicate"}
+        if drop["item_id"] == sid:
+            da["rereconciled"] = mark
+        gate.change(drop["item_id"], {"status": "superseded", "attributes": da}, op="supersede",
+                    key=f"{key}:duplicate", links=[(keep["item_id"], drop["item_id"], "supersedes")],
+                    reason="duplicate", **meta)
+        return {"op": "merged", "item": keep["item_id"], "target": drop["item_id"]}
+    if verdict == "contradicts":
+        gate.change(tid, {"attributes": {**(tcur["attributes"] or {}), "contested": True}}, op="contest",
+                    key=f"{key}:contest:{tid}", reason=note, **meta)
+        gate.change(sid, {"attributes": marked({"contested": True})}, op="contest", key=f"{key}:contest:{sid}",
+                    links=[(sid, tid, "contradicts")], reason=note, **meta)
+        return {"op": "contested", "item": sid, "target": tid}
+    if verdict == "enriches" and (note == "complement_only"
+                                  or not (st["kind"] == t["kind"] and t["kind"] in ENRICH_SUPERSEDES)):
+        gate.change(sid, {"attributes": marked({"enriches": tid})}, op="link", key=f"{key}:link",
+                    links=[(sid, tid, "enriches")], reason="complement", **meta)
+        return {"op": "complemented", "item": sid, "target": tid}
+    # enriches (same intention) / corrects / replaces: t no longer holds from the moment s was said; s joins t's
+    # lineage as its next version
+    ver = int((tcur["attributes"] or {}).get("version") or 1) + 1
+    fields = {"attributes": marked({"supersedes": tid, "version": ver})}
+    if str(gate._row(sid)["lineage_id"] or sid) == sid:      # no earlier versions of its own: it joins t's lineage
+        fields["lineage_id"] = str(tcur["lineage_id"] or tid)
+    gate.change(sid, fields, op="reconcile", key=f"{key}:version", reason=verdict, **meta)
+    gate.change(tid, {"status": "superseded", "valid_to": st["at"],
+                      "attributes": {**(tcur["attributes"] or {}), "superseded_by": sid, "superseded_how": verdict}},
+                op="supersede", key=f"{key}:supersede:{tid}", links=[(sid, tid, "supersedes")], reason=note, **meta)
+    return {"op": {"enriches": "enriched", "corrects": "corrected", "replaces": "replaced"}[verdict], "item": sid,
+            "target": tid}
+
+
+def reconcile_existing(limit: int = 120, *, tag: str | None = None, budget: str = "backfill",
+                       only: list[str] | None = None) -> dict:
+    """One slice of the existing-knowledge pass (see above) → counts. Idempotent (attributes.rereconciled, decisions
+    memoised, change keys); reversible: knowledge.revert(tag), tag reconciliation-YYYY-MM-DD by default."""
+    from . import search
+    rc = settings()
+    tag = tag or f"reconciliation-{datetime.now(timezone.utc):%Y-%m-%d}"
+    out = {"tag": tag, "items": 0, "decisions": 0, "skipped": 0, "ops": {}}
+    with connection() as conn:
+        rows = _pending_existing(conn, limit, only)
+        work = []
+        for r in rows:
+            st = _as_statement(r)
+            cands = [] if not privacy.cloud_readable(r["privacy_class"]) else [
+                c for c in candidates(conn, st, [], ["g1"], int(rc.get("existing_candidates") or rc["candidates"]))
+                if c["item_id"] != r["item_id"] and c["lineage_id"] != r["lineage_id"] and c["at"] <= r["at"]
+                and not _linked(conn, r["item_id"], c["item_id"])]
+            work.append((r, st, cands))
+    verdicts, pending = {}, []
+    for i, (r, st, cands) in enumerate(work):
+        det = deterministic(st, cands)
+        if det:
+            verdicts[i] = (det[0], det[1], None, f"deterministic:{det[2]}")
+        else:
+            pending.append((f"s{i + 1}", st, cands))
+    for part in batches(pending, int(rc["batch"])):
+        cls = privacy.strictest(*(c["privacy_class"] for _, _, cs in part for c in cs),
+                                *(work[int(sid[1:]) - 1][0]["privacy_class"] for sid, _, _ in part))
+        got = judge(part, privacy_class=cls, budget=budget)
+        out["decisions"] += 1
+        for sid, _, _ in part:
+            v, tgt, conf = got[sid]
+            verdicts[int(sid[1:]) - 1] = (v, tgt, conf, f"decision:{NEED}")
+    changed = []
+    for i, (r, st, cands) in enumerate(work):
+        v, tgt, conf, by = verdicts[i]
+        with connection() as conn:
+            gate = Gate(conn, generation="g1", tag=tag, segment=None)
+            s = gate._row(r["item_id"])
+            target = next((c for c in cands if c["item_id"] == tgt), None) if tgt else None
+            t = gate._row(target["item_id"]) if target else None
+            if s is None or s["status"] not in LIVE or (t is not None and t["status"] not in LIVE):
+                out["skipped"] += 1           # changed meanwhile (live extraction): a later pass sees the new state
+                continue
+            verdict, note = guard(st, v, target, conf, float(rc["min_confidence"]))
+            res = relate(gate, {**r, "epistemic": s["epistemic"], "status": s["status"], "attributes": s["attributes"]},
+                         st, verdict, target and {**target, "epistemic": t["epistemic"], "status": t["status"],
+                                                  "attributes": t["attributes"]},
+                         key=f"rr:{r['item_id']}", meta={"verdict": v, "decided_by": by, "confidence": conf}, note=note)
+            changed += gate.changed
+        out["items"] += 1
+        out["ops"][res["op"]] = out["ops"].get(res["op"], 0) + 1
+    if changed:
+        try:
+            search.reindex_derived(sorted(set(changed)))
+            from . import consolidate
+            consolidate.invalidate(item_ids=sorted(set(changed)))
+        except Exception as e:  # noqa: BLE001 — derived: the index and views catch up
+            log.warning("reindex / views after reconciliation failed: %s", e)
+    with connection() as conn:
+        out["remaining"] = len(_pending_existing(conn, 100000, only))
+    return out
+
+
 # ───────────────────────────── Run Plane ─────────────────────────────
 def runplane(gate: Gate, source: str, thread_id: str) -> list[dict]:
     """Goals of this thread carried by a Run Plane task (the run the owner's request started, ±5 min) follow it:
@@ -710,7 +1002,9 @@ def revert(tag: str, *, confirm: bool = False) -> dict:
                 conn.execute("""delete from core.provenance where target_table = 'derived_items' and target_id = %s
                                 and source_type = %s and source_id = %s and role = %s""",
                              (p["target"], p["source_type"], p["source"], p["role"]))
-            conn.execute("update core.derived_changes set reverted_at = now() where change_id = %s", (ch["change_id"],))
+            # the key is freed (kept, suffixed): a replay after an undo writes again instead of being taken for done
+            conn.execute("""update core.derived_changes set reverted_at = now(), key = key || ':reverted:' || change_id
+                            where change_id = %s""", (ch["change_id"],))
             touched.append(str(ch["item_id"]))
     try:
         from . import search

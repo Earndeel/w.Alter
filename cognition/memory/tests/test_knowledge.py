@@ -591,3 +591,195 @@ def test_a_dense_segment_is_cut_into_decisions_of_at_most_32_questions():
     assert [len(c) for c in cuts] == [10, 2]
     assert all(sum(knowledge.question_count(p[1]) for p in c) <= knowledge.MAX_QUESTIONS for c in cuts)
     assert [len(c) for c in knowledge.batches([(f"s{i}", plain, []) for i in range(13)], 12)] == [12, 1]
+
+
+# ───────────────────────────── existing knowledge (2026-11-19) ─────────────────────────────
+def _old_item(text, *, subject, at, epistemic="agent_reported", kind="fact"):
+    """A g1 item as the extraction of 10–14/11 wrote it: no reconciliation, its own lineage."""
+    ev = say("claude_code", f"old-{tag()}", "owner", text, at)
+    with connection() as conn:
+        r = conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by, processor_version,
+                                source_event_ids, source_refs, valid_from, privacy_class, generation, epistemic, stage)
+                            values (%s, %s, %s, 'derived', 'l3.extract', '1', %s::uuid[], %s, %s, 'cloud_allowed', 'g1',
+                                    %s, 'stated') returning item_id::text""",
+                         (kind, text, json.dumps({"subject": subject, "state": "stated"}), [ev],
+                          json.dumps({"ref": f"old:{uuid.uuid4().hex}"}), at, epistemic)).fetchone()["item_id"]
+        conn.execute("update core.derived_items set lineage_id = item_id where item_id = %s", (r,))
+    return r
+
+
+@pytest.mark.real_reconcile
+def test_existing_knowledge_is_related_by_fact_time_kept_in_history_and_contested_when_unsure(monkeypatch):
+    """The pass over knowledge written before the reconciliation: the same property worded differently is found
+    within its subject; an evolution supersedes the earlier state by FACT time (not ingestion order); a duplicate
+    merges; the owner's word is never replaced by an assistant's claim; an unsure replacement stays a contradiction;
+    every older item stays in the history and a tagged run is undone exactly."""
+    x = tag()
+    subj = f"project:pic{x}"
+    # ingested first but said later: the newer state in fact
+    newer = _old_item(f"Le service Pic{x} écoute désormais sur le port 9090", subject=subj, at=NOW - timedelta(days=1))
+    older = _old_item(f"Pic{x} est servi sur le port 8080", subject=subj, at=NOW - timedelta(days=3))
+    dup_a = _old_item(f"Pic{x} utilise Postgres 17", subject=subj, at=NOW - timedelta(days=4))
+    dup_b = _old_item(f"La base de Pic{x} est Postgres 17", subject=subj, at=NOW - timedelta(days=2))
+    owner = _old_item(f"Monsieur veut les journaux de Pic{x} en français", subject=subj, at=NOW - timedelta(days=5),
+                      epistemic="stated_owner", kind="preference")
+    claim = _old_item(f"Les journaux de Pic{x} doivent être en anglais", subject=subj, at=NOW - timedelta(hours=20),
+                      kind="preference")
+    unsure_old = _old_item(f"Pic{x} se déploie chaque lundi", subject=subj, at=NOW - timedelta(days=6))
+    unsure_new = _old_item(f"Pic{x} se déploie le vendredi", subject=subj, at=NOW - timedelta(hours=10))
+    goal_old = _old_item(f"Monsieur veut nettoyer la boîte Pic{x}", subject=subj, at=NOW - timedelta(days=7), kind="goal")
+    goal_new = _old_item(f"Monsieur veut nettoyer la boîte Pic{x} sauf les factures", subject=subj,
+                         at=NOW - timedelta(hours=5), kind="goal")
+    ids = [newer, older, dup_a, dup_b, owner, claim, unsure_old, unsure_new, goal_old, goal_new]
+    with connection() as conn:
+        conn.execute("""insert into extraction.state (key, value) values ('reconcile_existing_until', %s)
+                        on conflict (key) do update set value = excluded.value""",
+                     (json.dumps({"at": datetime.now(timezone.utc).isoformat()}),))
+
+    def same_subject(conn, st, pool, gens, k):          # the retrieval (its own test below): this subject's items
+        return knowledge._current(conn, [i for i in ids if i], gens)
+    monkeypatch.setattr(knowledge, "candidates", same_subject)
+
+    class Sure(Decide):
+        def __call__(self, state, questions, **kw):
+            out = super().__call__(state, questions, **kw)
+            for sid, st in state["statements"].items():
+                if "vendredi" in st["text"] or "factures" in st["text"]:
+                    out["answers"][f"{sid}_verdict"]["confidence"] = 0.3
+            return out
+
+    def verdict(text, items):
+        pick = lambda word: next((k for k, v in items.items() if word in v), "none")   # noqa: E731
+        if "9090" in text:
+            return "replaces", pick("8080")
+        if "La base" in text:
+            return "confirms", pick("utilise Postgres")
+        if "anglais" in text:
+            return "replaces", pick("français")
+        if "vendredi" in text:
+            return "replaces", pick("lundi")
+        if "factures" in text:
+            return "enriches", pick("boîte Pic")
+        return "new", None
+    d = Sure(verdict)
+    monkeypatch.setattr(llm, "decide", d)
+    t = f"reconciliation-test-{x}"
+    r = knowledge.reconcile_existing(50, tag=t, only=ids)
+    assert r["remaining"] == 0 and r["decisions"] >= 1
+    with connection() as conn:
+        st = {i: dict(conn.execute("""select status, valid_to, lineage_id::text, attributes from core.derived_items
+                                      where item_id = %s""", (i,)).fetchone()) for i in ids}
+    # evolution by fact time: the 8080 state ended when 9090 was said, though 9090 was ingested first
+    assert st[older]["status"] == "superseded" and st[older]["attributes"]["superseded_by"] == newer
+    assert st[older]["valid_to"] is not None and st[newer]["status"] == "derived"
+    assert st[newer]["lineage_id"] == st[older]["lineage_id"]
+    h = knowledge.history(newer)
+    assert [v["item_id"] for v in h["versions"]] == [older, newer]           # the older state stays in the history
+    # a duplicate: the earlier one stays current with the other's evidence
+    assert st[dup_b]["status"] == "superseded" and st[dup_b]["attributes"]["superseded_how"] == "duplicate"
+    assert st[dup_a]["status"] == "derived" and st[dup_a]["attributes"]["confirmations"] == 1
+    # the owner's preference is never replaced by an assistant's claim: both contested, both current
+    assert st[owner]["status"] == "derived" and st[owner]["attributes"]["contested"] is True
+    assert st[claim]["attributes"]["contested"] is True
+    # an unsure replacement keeps both, contested
+    assert st[unsure_old]["status"] == "derived" and st[unsure_old]["attributes"]["contested"] is True
+    assert st[unsure_new]["attributes"]["rereconciled"]["note"] == "unsure"
+    # an unsure precision of the same goal is a linked complement: both stay current
+    assert st[goal_old]["status"] == "derived" and st[goal_new]["attributes"]["enriches"] == goal_old
+    # once: a second run asks nothing
+    calls = len(d.calls)
+    assert knowledge.reconcile_existing(50, tag=t, only=ids)["items"] == 0 and len(d.calls) == calls
+    # undone exactly
+    knowledge.revert(t, confirm=True)
+    with connection() as conn:
+        back = {i: dict(conn.execute("select status, valid_to, attributes from core.derived_items where item_id = %s",
+                                     (i,)).fetchone()) for i in ids}
+    assert all(b["status"] == "derived" and b["valid_to"] is None for b in back.values())
+    assert not any(k in b["attributes"] for b in back.values() for k in ("rereconciled", "contested", "superseded_by"))
+    # a replay after the undo writes again (the keys were freed), from the remembered decisions: no new question
+    again = knowledge.reconcile_existing(50, tag=t, only=ids)
+    assert again["remaining"] == 0 and len(d.calls) == calls
+    with connection() as conn:
+        assert conn.execute("select status from core.derived_items where item_id = %s", (older,)).fetchone()["status"] \
+            == "superseded"
+    knowledge.revert(t, confirm=True)
+
+
+def test_the_same_property_worded_differently_is_found_within_its_subject():
+    """Retrieval: among a subject's items, the nearest in meaning; another subject's items never come in."""
+    from walter_memory import search
+    x = tag()
+    a = _old_item(f"Le cache de Grue{x} est Redis", subject=f"project:grue{x}", at=NOW - timedelta(days=2))
+    b = _old_item(f"Grue{x} a un budget mensuel de 40 euros", subject=f"project:grue{x}", at=NOW - timedelta(days=2))
+    c = _old_item(f"Le cache de Héron{x} est Redis", subject=f"project:heron{x}", at=NOW - timedelta(days=2))
+    with connection() as conn:
+        rows = conn.execute("""select item_id as ref_id, valid_from as occurred_at, derived_by as source, kind as label,
+                                      content as text, privacy_class, generation, false as hidden
+                               from core.derived_items where item_id = any(%s::uuid[])""", ([a, b, c],)).fetchall()
+        search._index_rows(conn, rows, "derived")
+        named, got = knowledge.same_subject(conn, {"text": f"Grue{x} met en cache avec Valkey",
+                                                   "subject": f"project:grue{x}"}, ["g1"], 5)
+    assert got and got[0] == a and c not in got + named
+
+
+def test_the_previous_state_of_a_named_thing_is_found_however_far_its_wording():
+    """The thing whose state is told (a component, a model) is named: among the subject's items naming it, the latest
+    said before the statement comes first, whatever the vectors say; later ones and other subjects never come in."""
+    from walter_memory import search
+    x = tag()
+    subj = f"project:atelier{x}"
+    first = _old_item(f"Kestrel{x} assure encore en production les envois Telegram et les alertes", subject=subj,
+                      at=NOW - timedelta(days=9))
+    prev = _old_item(f"Walter fonctionne sans que Kestrel{x} tourne, sauf deux lectures de clés", subject=subj,
+                     at=NOW - timedelta(days=8))
+    later = _old_item(f"Kestrel{x} a été archivé sur bande", subject=subj, at=NOW - timedelta(hours=1))
+    other = _old_item(f"Kestrel{x} tourne encore", subject=f"project:ailleurs{x}", at=NOW - timedelta(days=7))
+    with connection() as conn:
+        rows = conn.execute("""select item_id as ref_id, valid_from as occurred_at, derived_by as source, kind as label,
+                                      content as text, privacy_class, generation, false as hidden
+                               from core.derived_items where item_id = any(%s::uuid[])""",
+                            ([first, prev, later, other],)).fetchall()
+        search._index_rows(conn, rows, "derived")
+        st = {"text": f"Selon W.Alter, Kestrel{x} est entièrement retiré depuis le 16", "subject": subj,
+              "at": NOW - timedelta(days=2)}
+        assert knowledge.anchors(st["text"], subj) == [f"Kestrel{x}"]
+        named, _ = knowledge.same_subject(conn, st, ["g1"], 5)
+        found = [c["item_id"] for c in knowledge.candidates(conn, st, [], ["g1"], 5)]
+    assert named[:2] == [prev, first] and later not in named and other not in named
+    assert prev in found and first in found
+
+
+def test_context_shows_a_contradiction_both_sides_and_the_former_states_when_asked():
+    """Context serves current knowledge; a contested line shows the other side, and a question about the past or a
+    change brings the states an item replaced (read from the history, not a second store)."""
+    from walter_memory import context
+    x = tag()
+    old = _old_item(f"Le port de Bec{x} est 8080", subject=f"project:bec{x}", at=NOW - timedelta(days=3))
+    new = _old_item(f"Le port de Bec{x} est 9090", subject=f"project:bec{x}", at=NOW - timedelta(days=1))
+    a = _old_item(f"Bec{x} tourne sous Docker", subject=f"project:bec{x}", at=NOW - timedelta(days=2),
+                  epistemic="stated_owner")
+    b = _old_item(f"Bec{x} tourne sous systemd", subject=f"project:bec{x}", at=NOW - timedelta(days=1))
+    with connection() as conn:
+        conn.execute("""update core.derived_items set status = 'superseded', valid_to = now() - interval '1 day',
+                          attributes = attributes || jsonb_build_object('superseded_by', %s::text, 'superseded_how', 'replaces')
+                        where item_id = %s""", (new, old))
+        conn.execute("""insert into core.provenance (target_table, target_id, source_type, source_id, role)
+                        values ('derived_items', %s, 'derived', %s, 'contradicts')""", (b, a))
+    s = context._states([new, a], past=True, max_privacy="cloud_allowed")
+    assert any("8080" in l and "avant" in l for l in s[new])
+    assert any("systemd" in l and "contesté" in l for l in s[a])
+    assert not any("avant" in l for l in context._states([new], past=False, max_privacy="cloud_allowed").get(new, []))
+    assert context.HISTORY_HINT.search("quel était le port avant ?") and not context.HISTORY_HINT.search("quel port ?")
+
+
+def test_an_unsure_replacement_stands_when_the_statement_says_the_state_changed_after_the_target():
+    """Evidence and fact dates over the model's confidence: « de nouveau active » said after « en pause » replaces it;
+    without a change marker, or said before in fact, or against the owner's word, it stays contested."""
+    old = {"kind": "fact", "epistemic": "agent_reported", "at": NOW - timedelta(days=5), "attributes": {}}
+    st = {"text": "L'extraction est de nouveau active depuis ce matin", "by_owner": False, "at": NOW, "kind": "fact",
+          "act": "fact"}
+    assert knowledge.guard(st, "replaces", old, 0.4, 0.5) == ("replaces", "explicit_change")
+    assert knowledge.guard({**st, "text": "L'extraction est active"}, "replaces", old, 0.4, 0.5)[0] == "contradicts"
+    assert knowledge.guard({**st, "at": NOW - timedelta(days=9)}, "replaces", old, 0.4, 0.5)[0] == "contradicts"
+    owner = {**old, "epistemic": "stated_owner"}
+    assert knowledge.guard(st, "replaces", owner, 0.4, 0.5)[0] == "contradicts"

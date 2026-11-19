@@ -27,6 +27,9 @@ extraction = "active"
 # catchup = the history before live_start, oldest first, one slice per run of walter-memory-catchup.timer (hourly;
 # extract2.catchup: stops over the Codex quota and resumes on a later run; "paused" stops it without losing anything).
 catchup = "active"
+# reconcile_existing = existing knowledge never reconciled (written before 19/11 10:40 or judged "new"), newest first,
+# through the same candidates, decision and write gate (knowledge.reconcile_existing), one slice per catch-up run.
+reconcile_existing = "active"
 subjects = "paused"
 reconsolidation = "paused"
 episode_summaries = "paused"
@@ -46,6 +49,7 @@ max_age_s = 1800
 # "model" = rollback: the extraction model's own references (same_as / supersedes / contradicts) as before lot 1.
 mode = "decision"
 candidates = 5          # current items compared with each statement (hybrid search + this thread)
+existing_candidates = 8 # the same for the pass over existing knowledge (its subjects are older and denser)
 batch = 12              # statements per decision (2 questions each, ≤ 32 per decision)
 min_confidence = 0.5    # below it, a correction / replacement / contradiction is kept as new (maybe_updates)
 state_ttl_days = 7      # a transient state without an end date expires after this (task-scoped knowledge expires

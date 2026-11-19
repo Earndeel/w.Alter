@@ -1079,7 +1079,22 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
     return out
 
 
-def catchup(events: int = 120, *, workers: int = 2, dry: bool = False, chat=None) -> dict:
+def catchup(events: int = 120, *, workers: int = 2, dry: bool = False, chat=None, relate: int = 120) -> dict:
+    """One run of the catch-up loop: a slice of the message history (catchup_messages), then a slice of the
+    reconciliation of existing knowledge (knowledge.reconcile_existing, stage reconcile_existing: no Codex, so it goes
+    on when the quota stops the messages)."""
+    from . import knowledge, organic
+    out = catchup_messages(events, workers=workers, dry=dry, chat=chat)
+    if relate and not dry and organic.stage("reconcile_existing")["mode"] == "active":
+        try:
+            out["reconciled"] = knowledge.reconcile_existing(relate)
+        except Exception as e:  # noqa: BLE001 — the next run takes it up
+            log.warning("reconcile_existing failed: %s", e)
+            out["reconciled"] = {"error": f"{type(e).__name__}: {e}"[:300]}
+    return out
+
+
+def catchup_messages(events: int = 120, *, workers: int = 2, dry: bool = False, chat=None) -> dict:
     """Production catch-up of the history (2026-11-19, owner: « lance le rattrapage de l'historique par tranches,
     sans dépasser le quota et sans laisser des événements anciens écraser des états plus récents »): the uncovered
     messages ingested between v1_start and live_start, OLDEST FIRST, one slice of `events` messages per call, through
