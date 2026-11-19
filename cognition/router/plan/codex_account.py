@@ -50,8 +50,19 @@ def headers(token: str) -> dict:
 
 
 def _get(path: str, timeout: int = 30) -> dict:
-    with urlopen(Request(BASE + path, headers=headers(_token())), timeout=timeout) as r:  # noqa: S310 (fixed host)
-        return json.loads(r.read() or b"{}")
+    """A 401 drops the token kept by this process and reads the grant again, once: the session's token is refreshed
+    under a long-running reader (walter-router-quota read 401 from 19/11 04:53 on: the weekly meter went stale while
+    the token in the vault was valid)."""
+    from urllib.error import HTTPError
+    for attempt in (0, 1):
+        try:
+            with urlopen(Request(BASE + path, headers=headers(_token())), timeout=timeout) as r:  # noqa: S310
+                return json.loads(r.read() or b"{}")
+        except HTTPError as e:
+            if e.code != 401 or attempt:
+                raise
+            _TOKEN.clear()
+    raise AssertionError("unreachable")
 
 
 def ranked(entries: list) -> list[str]:
