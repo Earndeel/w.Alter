@@ -269,7 +269,7 @@ COLS = """item_id::text, kind, content, stage, scope, epistemic, status, lineage
           regexp_replace(lower(attributes->>'subject'), '[^a-z0-9:]', '', 'g') nkey,
           attributes->>'proof' proof, (attributes->>'contested')::boolean contested, attributes->>'task_id' task_id,
           attributes->'progress'->-1 last_step, attributes->>'domain' dom, attributes->>'act' act,
-          attributes->>'task_status' task_status"""
+          attributes->>'task_status' task_status, cardinality(source_event_ids) nsrc"""
 SUBJ = "regexp_replace(lower(attributes->>'subject'), '[^a-z0-9:]', '', 'g')"
 
 
@@ -652,6 +652,50 @@ def _keymap(cat: dict, keys: list[str]) -> dict[str, str]:
     return out
 
 
+def goal_buckets(rows: list[dict], tasks: dict[str, str], names: tuple, now: datetime) -> dict:
+    """Goals and commitments by what their evidence shows (effective): achieved and verified, announced done (not
+    verified), really under way (an open Run Plane objective or a step in the last ACTIVE days), blocked, without
+    news (a step long ago, no open objective: status unknown), taken up but not started (open), requested without
+    any trace (counted). Test requests are counted only. Shared by the project and the personal projections."""
+    goals = {"in_progress": [], "blocked": [], "open": [], "done": [], "claimed": [], "dropped": [], "stale": [],
+             "not_followed": 0, "tests": 0, "requested": 0}
+    for r in sorted(rows, key=lambda r: r["from"], reverse=True):
+        if _is_test(r["content"]):
+            goals["tests"] += 1
+            continue
+        step = _last_step(r)
+        last = datetime.fromisoformat(step["at"]) if step and step.get("at") else r["from"]
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        task = tasks.get((r.get("attributes") or {}).get("task_id") or "")
+        ln = _line(r, step=(step or {}).get("text"), step_at=last if step else None, task=task,
+                   weight=weight(r, names, now), effective=effective(r))
+        eff = ln["effective"]
+        if eff == "proven":
+            if now - last <= RECENT:
+                goals["done"].append(ln)
+        elif eff == "claimed":
+            if now - last <= RECENT:
+                goals["claimed"].append(ln)
+        elif eff == "dropped":
+            if now - last <= RECENT:
+                goals["dropped"].append(ln)
+        elif step and step.get("act") != "runplane" and BLOCKED.search(step.get("text") or "") \
+                and now - last <= RECENT:
+            goals["blocked"].append(ln)
+        elif task in ("running", "open", "in_progress") or (step and now - last <= ACTIVE):
+            goals["in_progress"].append(ln)
+        elif r["stage"] == "in_progress" or step:
+            goals["stale"].append(ln)
+        elif r["kind"] == "commitment" or r["stage"] in ("accepted", "decided", "open"):
+            goals["open"].append(ln)         # taken up, not started: a known next step
+        elif now - r["from"] <= FOLLOWED:
+            goals["requested"] += 1
+        else:
+            goals["not_followed"] += 1
+    return goals
+
+
 def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "cloud_allowed",
             children: bool = True, conn=None, cat: dict | None = None) -> dict:
     """The state of a project now (or at `at`): structured sections of line dicts, its parent and sub-projects."""
@@ -702,42 +746,7 @@ def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "c
         # objectives and tasks, by what their evidence shows (effective): achieved and verified, announced done
         # (not verified), really under way (an open Run Plane objective or a step in the last ACTIVE days), blocked,
         # without news (a step long ago, no open objective: status unknown), requested without any trace (counted)
-        goals = {"in_progress": [], "blocked": [], "open": [], "done": [], "claimed": [], "dropped": [], "stale": [],
-                 "not_followed": 0, "tests": 0, "requested": 0}
-        for r in newest(by_kind.get("goal", []) + by_kind.get("commitment", [])):
-            if _is_test(r["content"]):
-                goals["tests"] += 1
-                continue
-            step = _last_step(r)
-            last = datetime.fromisoformat(step["at"]) if step and step.get("at") else r["from"]
-            if last.tzinfo is None:
-                last = last.replace(tzinfo=timezone.utc)
-            task = tasks.get((r.get("attributes") or {}).get("task_id") or "")
-            ln = _line(r, step=(step or {}).get("text"), step_at=last if step else None, task=task,
-                       weight=weight(r, names, now), effective=effective(r))
-            eff = ln["effective"]
-            if eff == "proven":
-                if now - last <= RECENT:
-                    goals["done"].append(ln)
-            elif eff == "claimed":
-                if now - last <= RECENT:
-                    goals["claimed"].append(ln)
-            elif eff == "dropped":
-                if now - last <= RECENT:
-                    goals["dropped"].append(ln)
-            elif step and step.get("act") != "runplane" and BLOCKED.search(step.get("text") or "") \
-                    and now - last <= RECENT:
-                goals["blocked"].append(ln)
-            elif task in ("running", "open", "in_progress") or (step and now - last <= ACTIVE):
-                goals["in_progress"].append(ln)
-            elif r["stage"] == "in_progress" or step:
-                goals["stale"].append(ln)
-            elif r["kind"] == "commitment" or r["stage"] in ("accepted", "decided", "open"):
-                goals["open"].append(ln)         # taken up, not started: a known next step
-            elif now - r["from"] <= FOLLOWED:
-                goals["requested"] += 1
-            else:
-                goals["not_followed"] += 1
+        goals = goal_buckets(by_kind.get("goal", []) + by_kind.get("commitment", []), tasks, names, now)
         # decisions and rules in force; a proposal nobody took is counted, not shown as in force
         decisions, proposals = [], 0
         for r in by_kind.get("decision", []):
@@ -1046,7 +1055,11 @@ def render(p: dict, max_tokens: int = 900) -> tuple[str, list[str]]:
 
 def read(q: dict) -> dict:
     """memory_view depth="state" (MemoryViewQuery v1): {key, depth, version, content, built_at, watermark, stale,
-    sources, deeper}. `at` = an ISO date for the state as it was."""
+    sources, deeper}. `at` = an ISO date for the state as it was. Keys owner / now / me: the personal and
+    situational projections (personal.py, lot P2)."""
+    from . import personal
+    if personal.kind_of(q.get("key") or ""):
+        return personal.read(q)
     max_privacy = "cloud_allowed" if (q.get("privacy") or "cloud_allowed") == "cloud_allowed" else q["privacy"]
     p = project(q["key"], at=q.get("at"), max_privacy=max_privacy)
     if p.get("error"):
@@ -1076,6 +1089,15 @@ def check(keys: list[str] | None = None, *, at: str | None = None, limit_ms: flo
     out, ok = [], True
     with connection() as conn:
         cat = catalog(conn, fresh=True)
+        from . import personal
+        mine = [k for k in keys or [] if personal.kind_of(k)]
+        if mine:
+            c = personal.check(at=at)
+            out.append(c)
+            ok = ok and c["ok"]
+            keys = [k for k in keys if k not in mine]
+            if not keys:
+                return {"ok": ok, "at": at, "projects": out}
         keys = [resolve(k) for k in keys] if keys else \
             [k for k, _ in sorted(((k, e["count"]) for k, e in cat.items() if not e["parent"]), key=lambda x: -x[1])[:5]]
         for k in keys:

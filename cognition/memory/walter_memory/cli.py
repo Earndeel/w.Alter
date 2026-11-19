@@ -153,10 +153,11 @@ def main(argv=None) -> None:
     vw.add_argument("--query", default="", help="find: the V1 views closest to these words (subjects, episodes, periods)")
     vw.add_argument("--local", action="store_true", help="owner reading on the VM: local_only views too")
     vw.add_argument("--at", default=None, help="read --depth state: the state as it was at this ISO date")
-    st = sub.add_parser("state", help="P1 projections: the current state of a project (a read of the versioned "
+    st = sub.add_parser("state", help="P1/P2 projections: the current state of a project, of the owner (owner), of "
+                        "his situation (now) or both (me) (a read of the versioned "
                         "knowledge, nothing stored, no model); --at for a past date, --list for the hierarchy, --check "
                         "for the invariants (no expired item, sub-projects kept apart, latency)")
-    st.add_argument("key", nargs="*", default=[], help="project:walter, « Walter Memory »… (several with --check)")
+    st.add_argument("key", nargs="*", default=[], help="project:walter, « Walter Memory », owner, now, me… (several with --check)")
     st.add_argument("--at", default=None); st.add_argument("--max-tokens", type=int, default=900)
     st.add_argument("--list", action="store_true"); st.add_argument("--check", action="store_true")
     st.add_argument("--json", action="store_true")

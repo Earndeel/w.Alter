@@ -60,6 +60,11 @@ PERIOD_HINT = re.compile(r"(?i)\b(hier|avant-hier|aujourd'hui|ce (matin|midi|soi
 STATE_HINT = re.compile(r"(?i)(o[uù] en (est|sont|sommes|suis|es|êtes)|o[uù] [çc]a en est|\b[ée]tat\b|\bstatut|\bstatus\b|"
                         r"avancement|avanc[ée]e?s?\b|reste [àa] faire|prochaines? [ée]tapes?|\bbloqu|\bbilan\b|"
                         r"point sur|r[ée]cap|progress|what'?s left|where (are|is) we)")
+def _me_hint(message: str) -> bool:
+    from .personal import ME_HINT
+    return bool(ME_HINT.search(message))
+
+
 STATE_SHARE = 0.6                 # of the knowledge budget, when the caller sets no explicit "state" budget
 _names_cache: tuple[float, list[tuple[str, str]]] | None = None
 
@@ -354,10 +359,14 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     t0 = time.perf_counter()
     sections, trace = {}, {"query_chars": len(query), "sections": {}}
     state_key, state_budget = None, 0
-    if b["knowledge"] > 0 and b.get("state", 1) > 0 and STATE_HINT.search(message):
+    if b["knowledge"] > 0 and b.get("state", 1) > 0 and (STATE_HINT.search(message) or _me_hint(message)):
         try:
             from . import projection
+            from . import personal
             found = projection.find_projects(message)
+            # the owner's own state (lot P2): « où en suis-je », « mon état courant », « ce que j'ai en cours »
+            if not found and personal.ME_HINT.search(message):
+                found = ["me"]
             if found:
                 state_key = found[0]
                 if "state" in b:
@@ -399,7 +408,12 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     state_fut = None
     if state_key:
         from . import projection
-        state_fut = pool.submit(lambda: projection.project(state_key, max_privacy=max_privacy))
+        if state_key == "me":       # the personal projections read cloud_allowed only for a cloud reader
+            from . import personal
+            mp = "local_only" if max_privacy == "local_only" else "cloud_allowed"
+            state_fut = pool.submit(lambda: (personal.personal(max_privacy=mp), personal.situation(max_privacy=mp)))
+        else:
+            state_fut = pool.submit(lambda: projection.project(state_key, max_privacy=max_privacy))
     pool.shutdown(wait=False)
     fut = {k: _Section(rank, k) for k in want}
     user_md = _owner_profile() if include_profile and b["profile"] > 0 else None
@@ -462,7 +476,15 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
         try:
             from . import projection
             p = state_fut.result()
-            text, ids = projection.render(p, state_budget)
+            if state_key == "me":
+                from . import personal
+                own, now = p
+                # what the rules and tasks sections already say is not repeated
+                text, ids = personal.render(own, now, state_budget, exclude=shown_ids,
+                                            skip=("tasks",) if "tasks" in sections else ())
+                p = {"ms": round(own["ms"] + now["ms"], 1), "sources": own["sources"]}
+            else:
+                text, ids = projection.render(p, state_budget)
             if text and not p.get("error"):
                 sections["state"] = text
                 # free knowledge does not repeat the project: the projection is its reading of every current item of

@@ -2,9 +2,9 @@
 
 > Rôle : décrire comment Memory répond à « où en est X maintenant ? » pour quatre familles d'état — personnel,
 > projet, relationnel, situationnel — à partir de la mémoire existante. Propriétaire : Walter Memory. État : **P1
-> (projection Projet) en service depuis le 19/11/2026** (§ 7), pertinence corrigée le même jour (§ 8) ; P2–P4 en projet. Ne fait pas : un second stockage, une
+> (projection Projet) en service depuis le 19/11/2026** (§ 7), pertinence corrigée le même jour (§ 8) ; **P2 (Personnel + Situationnel) en service depuis le 19/11** (§ 9) ; P3–P4 en projet. Ne fait pas : un second stockage, une
 > seconde boucle de consolidation, une décision de modèle par message. Contrats : `MemoryViewQuery` v1
-> (`memory_view`), Context. Code : `walter_memory/projection.py`.
+> (`memory_view`), Context. Code : `walter_memory/projection.py`, `walter_memory/personal.py`.
 
 ## 1. Principe
 
@@ -86,7 +86,7 @@ dont l'intervalle `valid_from` → `valid_to` contient la date. C'est la base de
 | Lot | Contenu | Critère d'acceptation |
 |---|---|---|
 | P1 | projection Projet (lecture, règles de fiabilité, `at=`), CLI, `memory_view depth=state`, section Context | sur 5 projets réels : état courant juste, aucun état expiré servi, ancien état retrouvé par `at=`, latence < 50 ms, empreinte de Context inchangée hors section |
-| P2 | Personnel + Situationnel | « où en suis-je » : lieu, tâches ouvertes, sujet actif, règles en vigueur ; aucune donnée `local_only` vers un modèle cloud |
+| P2 ✓ 19/11 | Personnel + Situationnel (§ 9) | « où en suis-je » : lieu, tâches ouvertes, sujet actif, règles en vigueur ; aucune donnée `local_only` vers un modèle cloud |
 | P3 | Relationnel (Kardex) | fiche + rythme + écart + en cours, pour 5 personnes, vérifié par agrégats |
 | P4 | cache + invalidation par le bus, seulement si P1–P3 dépassent la latence | relecture identique avec et sans cache |
 
@@ -273,3 +273,60 @@ validation de Monsieur n'était pas encore extraite : c'est le comportement atte
 - Retour arrière : annuler le commit ; `knowledge.revert('attribution-2026-11-19', confirm=True)` et
   `knowledge.revert('runplane-2026-11-19', confirm=True)` ; la migration `044` (opération `attribute` autorisée) est
   sans effet seule. Sauvegardes : `/user/Lucas/backups/changes/2026-11-19-memoire-pertinence/`.
+
+## 9. P2 — projections Personnel et Situationnel (19/11/2026)
+
+Même principe que P1 : une lecture de la mémoire existante, sans table, sans cache, sans appel de modèle ; mêmes
+règles de fiabilité et mêmes états effectifs des objectifs (la fonction `projection.goal_buckets` est partagée).
+Code : `walter_memory/personal.py`.
+
+**Clés** : `owner` (alias moi, monsieur, personnel) = Personnel ; `now` (maintenant, situation) = Situationnel ;
+`me` = les deux, situation d'abord (« où en suis-je ? »). `memory_view(depth="state", key=…)`,
+`walter-memory state owner|now|me [--at] [--check]`.
+
+**Personnel** (`personal(at=)`) : les connaissances g1 courantes du sujet `owner`, et celles qu'une attribution a
+rangées comme une chose de Monsieur (sujet `other`, domaine `personal`, § 8.1).
+- **Règles en vigueur** : contraintes, corrections et décisions dites par Monsieur, durables (une règle de travail
+  d'une tâche n'est pas sa règle ; ce qu'un agent croit savoir de lui non plus). Les plus réaffirmées d'abord
+  (plusieurs sources), puis correction > contrainte > décision, puis la plus récente. Les préférences à part.
+- **Valable jusqu'à une date** : ce qui a un `valid_to` futur (portée `until`/`task`), avec sa fin.
+- **Objectifs et engagements** : bloqués, en cours, réalisés vérifiés, annoncés terminés non vérifiés, engagements
+  pris pas encore commencés, sans nouvelle (statut inconnu) ; les demandes sans trace sont comptées.
+- **Ce que Monsieur a dit vouloir** : ses objectifs durables sans aucune trace d'exécution, au statut inconnu.
+- **Faits personnels** : dits par Monsieur ou vérifiés d'abord.
+- **À revérifier** : les états passagers (portée tâche/until, ou formulés comme un état : « encore », « en
+  production »…) sans date de fin et plus vieux que `state_ttl_days` (7 j, `organic.toml`).
+- `at=` : l'état personnel à une date (même filtre d'intervalle que P1).
+
+**Situationnel** (`situation()`, maintenant seulement) — chaque ligne dit sa fraîcheur :
+- **Lieu** : `whereabouts.current` (domicile, lieu connu, ou distance au domicile ; « ancien » au-delà de 2 h).
+- **Agenda (7 jours)** : événements `calendar.event` confirmés (le dernier état de chaque événement), sinon le
+  prochain ; l'heure de la dernière synchronisation (`ingestion.connectors`).
+- **Travaux ouverts** : objectifs du Run Plane du canal propriétaire (`runs.tasks_list`), les actifs (3 jours)
+  listés, les autres « sans nouvelle, statut inconnu » comptés au-delà de deux.
+- **Fil en cours** : l'état de travail du fil (`working.state`) quand un appel donne la session (CLI) ; dans
+  Context il est déjà servi par sa propre section.
+- **Appris ces 3 derniers jours** : les sujets qui ont reçu des connaissances, ou la date de la dernière écriture
+  de l'extraction (un retard d'extraction se voit).
+- **Période et épisodes** : la vue du jour et de la semaine (`period:day:…`, `period:week:…`) et les épisodes des
+  7 derniers jours.
+
+**Confidentialité** (critère P2) : pour un lecteur cloud, ces deux projections ne lisent que la classe
+`cloud_allowed`, quel que soit le plafond cloud de Context (`organic.toml [privacy] cloud_context`). Une ligne locale
+(position, lieux, épisodes et vues de période locaux, rendez-vous ou règles `local_only`) est **comptée, jamais
+rendue** (« N locales non transmises »). Le bloc position de Context, qui suit le plafond, est inchangé. Un lecteur
+local (`max_privacy="local_only"`) reçoit tout. `walter-memory state --check owner` vérifie qu'aucune ligne citée
+n'est locale, expirée ou remplacée, ni hors de Monsieur.
+
+**Context** : la section « État courant » sert `me` quand le message demande l'état de Monsieur lui-même (« où en
+suis-je », « mon état », « ma situation », « ce que j'ai en cours », « mes engagements »…, sans nom de projet ;
+`personal.ME_HINT`, sans modèle). Même budget que P1 (pris sur les connaissances libres et les cartes). Elle ne
+répète ni les règles déjà servies par la section `rules`, ni les tâches de la section `tasks`.
+
+**Mesures du 19/11** (données réelles, chaud) : Personnel 17–25 ms (504 connaissances, 12 locales comptées) ;
+Situationnel 27–29 ms (agenda : bornes calculées pour élaguer les partitions à la planification, 140 ms → 1 ms) ;
+Context complet « Où en suis-je ? » 260–490 ms, section 717 tokens pour 740 de budget ; `--check` sans défaut.
+
+**Limites** : l'extraction n'a rien écrit pour Monsieur depuis le 14/11 (quota) : l'état personnel s'arrête là et la
+section « Appris » le montre. Le lieu n'est jamais rendu à un lecteur cloud ; une question qui en dépend passe par
+le bloc position. Beaucoup d'objectifs anciens restent « sans trace » : comptés, jamais présentés comme en cours.
