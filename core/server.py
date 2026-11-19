@@ -287,16 +287,20 @@ def memory_context(query: str, include_profile: bool = False, history: bool = Fa
 
 
 @mcp.tool()
-def memory_view(key: str = "", query: str = "", depth: str = "overview", max_tokens: int = 1500) -> str:
+def memory_view(key: str = "", query: str = "", depth: str = "overview", max_tokens: int = 1500, at: str = "") -> str:
     """Walter Memory's consolidated views (Memory V1), rebuilt from current knowledge and evidence: a subject of work
     (g1:subject:…), an episode (episode:…: hypotheses keep their status — candidate / probable / confirmed), a period
     (period:day:YYYY-MM-DD, period:week:YYYY-Www, period:month:YYYY-MM). Give `key` to read one at a depth: index
     (one line) · overview (budgeted current state) · synthesis (how it evolved) · details (every item with stage and id)
-    · sources (what it is built from: knowledge, observations, sub-views, with event ids for memory_events). Give
+    · sources (what it is built from: knowledge, observations, sub-views, with event ids for memory_events)
+    · state (a project's current state, key project:<name> e.g. project:walter or « Walter Memory »: state, goals
+    open/blocked/done, decisions in force, recent changes, unresolved contradictions, known next steps, sub-projects'
+    important news; every line dated with its provenance; `at`=YYYY-MM-DD for the state as it was then). Give
     `query` instead to find the views closest to some words. Cloud-safe: local-only views are never returned."""
     if key:
-        d = depth if depth in ("index", "overview", "synthesis", "details", "sources") else "overview"
+        d = depth if depth in ("index", "overview", "synthesis", "details", "sources", "state") else "overview"
         return _walter_memory("views", "read", key, "--depth", d, "--max-tokens", str(max(100, min(int(max_tokens), 8000))),
+                              *(["--at", at] if at and d == "state" else []),
                               *(["--json"] if d == "sources" else []), timeout=60)
     return _walter_memory("views", "find", "--query", query or "", timeout=60)
 
