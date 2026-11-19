@@ -319,7 +319,7 @@ def test_a_goal_moves_from_request_to_done_with_proof_never_on_the_agents_word_a
         kn.judge = orig
 
 
-def test_a_failing_check_leaves_the_report_unverified_and_a_cancelled_task_cancels_the_goal():
+def test_a_failing_check_leaves_the_report_unverified_and_an_interrupted_task_never_cancels_the_goal():
     x = tag()
     t = f"kf-{x}"
     t0 = NOW - timedelta(hours=6)
@@ -344,12 +344,17 @@ def test_a_failing_check_leaves_the_report_unverified_and_a_cancelled_task_cance
     g = current(t, kind="goal")[0]
     assert g["stage"] == "executed" and g["attributes"]["proof"]["level"] == "refuted"    # the agent said so; the test failed
     assert g["attributes"]["proof"]["tools_error"] == 1
+    # the Run Plane cancels an objective when its run is interrupted (an error, a restart, a newer message): the
+    # goal keeps its stage, the interruption is a step of it — only the owner abandons his goal
     _task(t, t0 + timedelta(seconds=10), "cancelled")
-    say("claude_code", t, "owner", "laisse tomber", t0 + timedelta(minutes=30))
+    say("claude_code", t, "owner", "on verra", t0 + timedelta(minutes=30))
     extract2.process_thread("claude_code", t, chat=model(lambda lines: []), force=True)
     with connection() as conn:
-        assert conn.execute("select stage from core.derived_items where item_id = %s",
-                            (g["item_id"],)).fetchone()["stage"] == "cancelled"
+        row = conn.execute("select stage, attributes from core.derived_items where item_id = %s",
+                           (g["item_id"],)).fetchone()
+    assert row["stage"] == "executed" and row["attributes"]["task_status"] == "cancelled"
+    assert row["attributes"]["progress"][-1]["act"] == "runplane"
+    assert row["attributes"]["progress"][-1]["text"].startswith("tâche Run Plane interrompue")
 
 
 # ───────────────────────────── revert, pilot, replay ─────────────────────────────

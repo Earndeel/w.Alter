@@ -12,3 +12,7 @@
 
 [subjects]
 # « sujet sans préfixe » = « projet »  — un sujet écrit sans « project: » qui appartient à un projet
+
+[attribution]
+# assistant = "<projet>"  — le projet de l'assistant lui-même : un énoncé n'y est pas rangé parce qu'il a été dit dans
+# une conversation avec l'assistant ; il faut que le texte le nomme (lui ou un de ses sous-projets)

@@ -39,7 +39,7 @@ from .db import connection
 
 log = logging.getLogger("walter.assimilation")
 CONSUMER = "memory.organic"
-TYPES = ["memory.event", "memory.derived", "memory.view", "memory.object"]
+TYPES = ["memory.event", "memory.derived", "memory.view", "memory.object", "task.ended", "task.updated"]
 TRIAGE_IN = {("beeper", "message.received"), ("gmail", "email.received"), ("calendar", "calendar.event")}
 SEP = "\x1f"
 CHAT = ("beeper", "gmail")
@@ -52,7 +52,7 @@ SIGNALS = ("appointment", "plan", "visit")
 SETTLE = {"flows.visits": 300, "flows.conversations": 60, "flows.appointments": 30, "flows.work_sessions": 120,
           "episodic.episodes": 30}
 BURST_SETTLE = timedelta(minutes=15)      # plans are read once a burst has been calm this long (a deadline)
-ORDER = ["search.index", "search.reindex", "triage", "flows.visits", "flows.conversations", "flows.appointments", "flows.work_sessions", "episodic.plans",
+ORDER = ["search.index", "search.reindex", "goals.runplane", "triage", "flows.visits", "flows.conversations", "flows.appointments", "flows.work_sessions", "episodic.plans",
          "episodic.episodes", "periods.day", "periods.week", "periods.month",
          "media.derive"]   # last: model calls of a media burst never delay the index, triage or flows
 RECONCILE_S = 6 * 3600
@@ -205,6 +205,11 @@ def route(evs: list[dict]) -> int:
             elif ev["type"] == "memory.object":     # a file's derived text (OCR, transcript…) → the search index
                 processing.mark(conn, "search.index", "pending", reason="object", settle=10, max_wait=60)
                 n += 1
+            elif ev["type"] in ("task.ended", "task.updated") and p.get("task_id"):
+                # a Run Plane objective changed: the owner's goals it carries follow it (knowledge.runplane)
+                processing.mark(conn, "goals.runplane", str(p["task_id"]), reason=p.get("status") or ev["type"],
+                                settle=5, max_wait=60)
+                n += 1
     return n
 
 
@@ -244,6 +249,10 @@ def _run_one(processor: str, row: dict) -> dict:
         src, thread = key.split(SEP, 1)
         now = datetime.now(timezone.utc)
         return flows.work_sessions(since=lo or now, until=hi or lo or now, thread=(src, thread))
+    if processor == "goals.runplane":
+        from . import knowledge
+        r = knowledge.runplane_task(key)
+        return {"changed": r["goals"]}
     if processor == "episodic.plans":
         return episodic.plan_burst(key)
     if processor == "episodic.episodes":

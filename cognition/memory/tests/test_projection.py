@@ -26,7 +26,7 @@ def projects(monkeypatch):
     parent, child = f"Zeph{x}", f"Zeph{x} Core"
     norm = lambda s: knowledge.subject_key(projection.PREFIX + s)   # noqa: E731
     monkeypatch.setattr(projection, "_config", lambda: {"aliases": {}, "parents": {norm(child): norm(parent)},
-                                                         "subjects": {}})
+                                                         "subjects": {}, "assistant": ""})
     projection._catalog_memo.clear()
 
     def no_model(*a, **k):
@@ -195,3 +195,110 @@ def test_context_serves_the_state_section_carved_from_knowledge_without_repeatin
     # a question that names no project, or asks no state, gets no section and keeps its whole budget
     other = context.get_context("Quel temps fera-t-il demain ?", budget=budget, include_profile=False)
     assert "state" not in other["sections"] and "state_plan" not in other["trace"]
+
+
+# ───────────────────────────── goals and the Run Plane, relevance (owner, 19/11) ─────────────────────────────
+def goal(text, subject, thread, at, *, stage="requested", epistemic="stated_owner", attrs=None, kind="goal"):
+    ev = events.record_events([{"event_type": "message.sent", "source": "claude_code", "source_account": "pytest",
+                                "source_id": uuid.uuid4().hex, "thread_id": thread, "occurred_at": at,
+                                "content": text, "privacy_class": "cloud_allowed"}])["event_ids"][0]
+    with connection() as conn:
+        r = conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by,
+                                processor_version, source_event_ids, source_refs, valid_from, privacy_class,
+                                generation, epistemic, stage)
+                            values (%s, %s, %s, 'derived', 'l3.extract', '1', %s::uuid[], %s, %s, 'cloud_allowed',
+                                    'g1', %s, %s) returning item_id::text""",
+                         (kind, text, json.dumps({"subject": "project:" + subject, **(attrs or {})}), [ev],
+                          json.dumps({"ref": f"goal:{uuid.uuid4().hex}", "thread": thread, "source": "claude_code"}),
+                          at, epistemic, stage)).fetchone()["item_id"]
+        conn.execute("update core.derived_items set lineage_id = item_id where item_id = %s", (r,))
+    return r
+
+
+def objective(thread, runs_at, status):
+    """One Run Plane objective whose first run opened it and whose later runs are attempts of it."""
+    task, ids = str(uuid.uuid4()), [str(uuid.uuid4()) for _ in runs_at]
+    with connection() as conn:
+        for rid, at in zip(ids, runs_at):
+            conn.execute("""insert into runs.runs (run_id, origin, status, started_at) values (%s, %s, 'ended', %s)""",
+                         (rid, json.dumps({"session_id": f"claude_code/vm/{thread}", "runtime": "claude_code"}), at))
+        conn.execute("""insert into runs.tasks (task_id, run_id, kind, status, started_at)
+                        values (%s, %s, 'objective', %s, %s)""", (task, ids[0], status, runs_at[0]))
+        for k, rid in enumerate(ids):
+            conn.execute("insert into runs.task_runs (task_id, run_id, role) values (%s, %s, %s)",
+                         (task, rid, "origin" if k == 0 else "attempt"))
+    return task
+
+
+def test_goals_follow_the_run_plane_through_its_attempts_never_as_proof(projects, monkeypatch):
+    from walter_memory import assimilation
+    p, th = projects["parent"], f"rp-{projects['x']}"
+    t0 = NOW - timedelta(days=1)
+    opened = goal(f"Monsieur demande de migrer {p} vers le schéma 2", p, th, t0)
+    later = goal(f"Monsieur demande aussi de renommer la table de {p}", p, th, t0 + timedelta(hours=1))
+    task = objective(th, [t0 + timedelta(seconds=20), t0 + timedelta(hours=1, seconds=30)], "done")
+    # the bus: an objective that ends marks its goals for a follow-up, nothing computed in the handler
+    monkeypatch.setattr(assimilation, "engine", lambda: "events")
+    assert assimilation.route([{"type": "task.ended", "subject": "r", "payload": {"task_id": task, "status": "done"}}]) == 1
+    with connection() as conn:
+        assert conn.execute("select 1 from processing.queue where processor = 'goals.runplane' and key = %s",
+                            (task,)).fetchone()
+    r = knowledge.runplane_task(task)
+    assert r["goals"] == 2
+    with connection() as conn:
+        g = {x["item_id"]: x for x in conn.execute("""select item_id::text, stage, status, attributes
+                                                      from core.derived_items where item_id = any(%s::uuid[])""",
+                                                   ([opened, later],))}
+    # the request that opened the objective is « executed » (the Run Plane's word, not a proof); the one asked
+    # while it went on is linked, its own completion unknown
+    assert g[opened]["stage"] == "executed" and g[opened]["status"] == "derived"
+    assert g[opened]["attributes"]["task_role"] == "origin"
+    assert g[later]["stage"] == "requested" and g[later]["attributes"]["task_role"] == "attempt"
+    assert g[later]["attributes"]["task_status"] == "done"
+    assert knowledge.runplane_task(task)["goals"] == 0            # idempotent
+    filler(p, 5)
+    out = projection.project(p)
+    claimed = {l["id"] for l in out["sections"]["goals"]["claimed"]}
+    assert opened in claimed and not out["sections"]["goals"]["done"]
+    text, _ = projection.render(out)
+    assert "annoncé terminé, non vérifié" in text and "réalisé, vérifié" not in text
+
+
+
+def test_the_state_puts_the_project_first_and_counts_the_technical_details(projects):
+    p = projects["parent"]
+    details = [item(f"Le fichier /opt/{p.lower()}/conf_{i}.toml écoute sur :84{i}0 avec --flag-{i}", p,
+                    NOW - timedelta(hours=i + 1)) for i in range(6)]
+    big = item(f"{p} est en production depuis le moteur natif et ne dépend plus de l'ancien runtime", p,
+               NOW - timedelta(days=2))
+    task_rule = item(f"Pour cette tâche, garder le port 9999 de {p} libre", p, NOW - timedelta(hours=1),
+                     kind="constraint", attrs={"domain": "task"})
+    owner = item(f"Monsieur décide que {p} reste l'unique runtime de production", p, NOW - timedelta(days=3),
+                 kind="decision", stage="decided", epistemic="stated_owner")
+    stale = goal(f"Monsieur demande de documenter {p}", p, f"st-{projects['x']}", NOW - timedelta(days=9),
+                 stage="in_progress", attrs={"progress": [{"at": str(NOW - timedelta(days=8)), "act": "action",
+                                                            "stage": "in_progress", "text": "W.Alter rédige la doc"}]})
+    claimed = goal(f"Monsieur demande de nettoyer les journaux de {p}", p, f"cl-{projects['x']}",
+                   NOW - timedelta(days=2), attrs={"progress": [{"at": str(NOW - timedelta(days=2)), "act": "result",
+                                                                  "stage": "executed",
+                                                                  "text": "W.Alter indique avoir nettoyé les journaux"}]})
+    test = goal(f"Pour le test socle a1b2c3 de {p}, Monsieur demande trois noms d'arbres", p, f"ts-{projects['x']}",
+                NOW - timedelta(days=1))
+    nxt = item(f"La prochaine étape de {p} attend son go pour la phase 2", p, NOW - timedelta(days=1))
+    out = projection.project(p)
+    s = out["sections"]
+
+    assert s["state"][0]["id"] == big                                   # the project as a whole first
+    text, shown = projection.render(out, 700)
+    assert big in shown and not set(details) & set(shown)
+    assert "autres faits (détails techniques ou secondaires)" in text
+    assert s["decisions"][0]["id"] == owner and s["decisions"][-1]["id"] == task_rule
+    g = s["goals"]
+    assert [l["id"] for l in g["stale"]] == [stale] and not g["in_progress"]
+    assert [l["id"] for l in g["claimed"]] == [claimed] and g["tests"] == 1
+    assert test not in shown and nxt in {l["id"] for l in s["next"]}
+    assert "statut inconnu" in text and "annoncé terminé, non vérifié" in text
+    order = [text.index(h) for h in ("### État global", "### Avancées récentes", "### Décisions importantes",
+                                     "### Travaux en cours", "### Prochaines étapes")]
+    assert order == sorted(order)
+    assert projection.check([p], limit_ms=5000)["ok"]

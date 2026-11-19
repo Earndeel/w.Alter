@@ -901,43 +901,134 @@ def reconcile_existing(limit: int = 120, *, tag: str | None = None, budget: str 
 
 
 # ───────────────────────────── Run Plane ─────────────────────────────
-def runplane(gate: Gate, source: str, thread_id: str) -> list[dict]:
-    """Goals of this thread carried by a Run Plane task (the run the owner's request started, ±5 min) follow it:
-    a cancelled task cancels the goal; a done task marks the work executed, and closes a goal already verified."""
+def runplane(gate: Gate, source: str | None, thread_id: str) -> list[dict]:
+    """Goals of this thread carried by a Run Plane objective follow it (proof level « runplane », never « verified »):
+    the objective is the one already linked (attributes.task_id), else the one whose runs (origin or any attempt,
+    runs.task_runs) started within ±5 min of the owner's request in the same session. A done objective marks the work
+    executed (« terminé selon le Run Plane », an agent's claim, not a proof) and closes a goal already verified; a
+    failed or cancelled one (the Run Plane cancels on interruption, never for the owner) records a step, the goal
+    keeps its stage. Called by the extraction of the thread and, when an objective changes
+    later, by the bus (task.ended / task.updated → assimilation « goals.runplane »)."""
     conn, out = gate.conn, []
-    goals = conn.execute("""select item_id::text, kind, stage, attributes, generation,
+    goals = conn.execute(f"""select item_id::text, kind, stage, attributes, generation,
                                    (select min(e.occurred_at) from core.events e where e.event_id = any(d.source_event_ids)
                                       and e.event_type = 'message.sent') as asked_at
                             from core.derived_items d where derived_by = %s and status = any(%s) and kind = 'goal'
                               and (valid_to is null or valid_to > now()) and generation = %s
-                              and source_refs->>'thread' = %s and source_refs->>'source' = %s
+                              and source_refs->>'thread' = %s {"and source_refs->>'source' = %s" if source else ""}
                               and coalesce(stage, '') <> all(%s)""",
-                         (PROCESSOR, list(LIVE), gate.generation, thread_id, source, list(CLOSED))).fetchall()
+                         (PROCESSOR, list(LIVE), gate.generation, thread_id, *([source] if source else []),
+                          list(CLOSED))).fetchall()
     for g in goals:
-        if not g["asked_at"]:
-            continue
-        t = conn.execute("""select t.task_id::text, t.status, t.ended_at from runs.tasks t join runs.runs r on r.run_id = t.run_id
-                            where (r.origin->>'session_id' like %s or r.origin->>'session_id' = %s)
-                              and r.started_at between %s - interval '5 minutes' and %s + interval '5 minutes'
-                            order by abs(extract(epoch from r.started_at - %s)) limit 1""",
-                         (f"%/{thread_id}", thread_id, g["asked_at"], g["asked_at"], g["asked_at"])).fetchone()
+        a0 = g["attributes"] or {}
+        t = None
+        if a0.get("task_id"):       # linked before: by its origin run unless recorded otherwise
+            t = conn.execute("""select task_id::text, status, ended_at, last_outcome, %s as role from runs.tasks
+                                where task_id::text = %s""", (a0.get("task_role") or "origin", a0["task_id"])).fetchone()
+        if t is None and g["asked_at"]:
+            t = conn.execute("""select t.task_id::text, t.status, t.ended_at, t.last_outcome,
+                                       case when tr.run_id = t.run_id or tr.role = 'origin' then 'origin'
+                                            else 'attempt' end as role
+                                from runs.tasks t join runs.task_runs tr on tr.task_id = t.task_id
+                                join runs.runs r on r.run_id = tr.run_id
+                                where t.kind = 'objective'
+                                  and (r.origin->>'session_id' like %s or r.origin->>'session_id' = %s)
+                                  and r.started_at between %s - interval '5 minutes' and %s + interval '5 minutes'
+                                order by (tr.role = 'origin') desc, abs(extract(epoch from r.started_at - %s)) limit 1""",
+                             (f"%/{thread_id}", thread_id, g["asked_at"], g["asked_at"], g["asked_at"])).fetchone()
+        if t is None and g["asked_at"]:      # older objectives not recorded in task_runs: their origin run
+            t = conn.execute("""select t.task_id::text, t.status, t.ended_at, t.last_outcome, 'origin' as role
+                                from runs.tasks t join runs.runs r on r.run_id = t.run_id
+                                where (r.origin->>'session_id' like %s or r.origin->>'session_id' = %s)
+                                  and r.started_at between %s - interval '5 minutes' and %s + interval '5 minutes'
+                                order by abs(extract(epoch from r.started_at - %s)) limit 1""",
+                             (f"%/{thread_id}", thread_id, g["asked_at"], g["asked_at"], g["asked_at"])).fetchone()
         if not t:
             continue
-        a = dict(g["attributes"] or {})
+        a = dict(a0)
         a["task_id"] = t["task_id"]
+        a["task_status"] = t["status"]
+        a["task_role"] = t["role"]
         new = None
-        if t["status"] == "cancelled":
-            new = "cancelled"
-        elif t["status"] == "done":
+        # only the request that opened the objective follows its end: a request made while the objective went on
+        # (a later run of it) is part of it, but its own completion is not shown by the objective's
+        if t["status"] == "done" and t["role"] == "origin":
             new = "done" if g["stage"] == "verified" else ("executed" if ORDER.get(g["stage"] or "", 0) < 3 else None)
+        elif t["status"] in ("failed", "cancelled") and t["role"] == "origin":
+            # the Run Plane cancels an objective when its run is interrupted (tool error, engine restart, a newer
+            # message): never the owner abandoning it — the goal keeps its stage, the interruption is a step
+            steps = list(a.get("progress") or [])
+            if not steps or steps[-1].get("act") != "runplane":
+                why = ((t.get("last_outcome") or {}).get("reason") or "")[:80]
+                steps.append({"at": str(t["ended_at"] or datetime.now(timezone.utc)), "act": "runplane",
+                              "stage": g["stage"], "text": ("tâche Run Plane en échec" if t["status"] == "failed"
+                                                            else "tâche Run Plane interrompue") + (f" : {why}" if why else "")})
+                a["progress"] = steps[-12:]
         fields = {"attributes": a} | ({"stage": new} if new else {})
-        if a.get("task_id") == (g["attributes"] or {}).get("task_id") and not new:
+        if a == a0 and not new:
             continue
         res = gate.change(g["item_id"], fields, op="advance" if new else "link",
-                          key=f"runplane:{g['item_id']}:{t['task_id']}:{t['status']}", decided_by="runplane",
+                          key=f"runplane:{g['item_id']}:{t['task_id']}:{t['status']}:{t['role']}", decided_by="runplane",
                           proof={"level": "runplane", "task": t["task_id"], "status": t["status"]},
                           reason=f"task {t['status']}")
         out.append({"item": g["item_id"], "task": t["task_id"], "stage": new, "result": res})
+    return out
+
+
+def runplane_task(task_id: str) -> dict:
+    """An objective changed (bus): the goals of every thread its runs belong to follow it."""
+    from . import search
+    with connection() as conn:
+        sessions = [r["s"] for r in conn.execute("""select distinct r.origin->>'session_id' s from runs.runs r
+            where r.run_id in (select run_id from runs.task_runs where task_id::text = %s
+                               union select run_id from runs.tasks where task_id::text = %s)""",
+                                                (task_id, task_id)) if r["s"]]
+        gate = Gate(conn, generation="g1", tag=None, segment=None, where="runplane")
+        done = []
+        for sid in sessions:
+            done += runplane(gate, None, sid.rsplit("/", 1)[-1])
+    if gate.changed:
+        try:
+            search.reindex_derived(sorted(set(gate.changed)))
+        except Exception as e:  # noqa: BLE001
+            log.warning("reindex after runplane failed: %s", e)
+    return {"task": task_id, "sessions": len(sessions), "goals": len(done)}
+
+
+class _DryRun(Exception):
+    """Leaves a connection() block without committing (a dry run): carries what would have been done."""
+
+
+def runplane_backfill(*, apply: bool = False) -> dict:
+    try:
+        return _runplane_backfill(apply)
+    except _DryRun as d:
+        return d.args[0]
+
+
+def _runplane_backfill(apply: bool) -> dict:
+    """The goals already recorded: every thread with an open goal and Run Plane runs in its session, once."""
+    from . import search
+    with connection() as conn:
+        threads = [r["th"] for r in conn.execute("""select distinct d.source_refs->>'thread' th from core.derived_items d
+            where d.derived_by = %s and d.generation = 'g1' and d.kind = 'goal' and d.status = any(%s)
+              and (d.valid_to is null or d.valid_to > now()) and coalesce(d.stage, '') <> all(%s)
+              and exists (select 1 from runs.runs r where r.origin->>'session_id' like '%%/' || (d.source_refs->>'thread'))""",
+                                                   (PROCESSOR, list(LIVE), list(CLOSED)))]
+        out = {"threads": len(threads), "goals": 0, "stages": {}, "executed": apply}
+        gate = Gate(conn, generation="g1", tag=f"runplane-{datetime.now(timezone.utc):%Y-%m-%d}", segment=None,
+                    where="runplane")
+        for th in threads:
+            for r in runplane(gate, None, th):
+                out["goals"] += 1
+                out["stages"][r["stage"] or "link"] = out["stages"].get(r["stage"] or "link", 0) + 1
+        if not apply:
+            raise _DryRun(out)
+    if gate.changed:
+        try:
+            search.reindex_derived(sorted(set(gate.changed)))
+        except Exception as e:  # noqa: BLE001
+            log.warning("reindex after runplane backfill failed: %s", e)
     return out
 
 

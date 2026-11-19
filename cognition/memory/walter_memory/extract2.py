@@ -137,7 +137,7 @@ Types (un énoncé = un seul acte) :
 - annulation : Monsieur renonce à quelque chose, l'arrête ou l'annule.
 Domaine, à décider pour CHAQUE énoncé (jamais d'après les projets cités ailleurs dans l'extrait) :
 - personnel : vaut pour Monsieur lui-même (sa vie, ses goûts, sa manière générale de travailler avec W.Alter) ;
-- projet : vaut pour un projet précis (code, architecture, choix, état d'un dépôt ou d'un module) ; project = son identifiant (pour W.Alter : walter, ou walter-<module> comme walter-memory, walter-router, walter-context, walter-engine) ;
+- projet : vaut pour un projet précis (code, architecture, choix, état d'un dépôt ou d'un module) ; project = l'identifiant de la chose dont parle l'énoncé (pour W.Alter : walter, ou walter-<module> comme walter-memory, walter-router, walter-context, walter-engine). Toute la conversation a lieu avec W.Alter : ce n'est jamais une raison de choisir walter. walter seulement si l'énoncé porte sur W.Alter lui-même ou un de ses modules ; un appareil, un compte, une démarche de Monsieur (sa télévision, sa boîte mail) ou un autre projet a son propre identifiant, ou le domaine personnel ;
 - tache : ne vaut que pour le travail en cours (« attends mon accord avant l'étape suivante ») ;
 - relation : une personne et son lien avec Monsieur ;
 - test : données de test, essais, bancs, exemples fictifs (ils ne sont pas gardés).
@@ -616,6 +616,9 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
         sid = _segment_row(conn, source=source, thread_id=thread_id, status=status, msgs=seg, rejected=rejected,
                            model=res.get("model"), cost=res.get("cost_usd"), usage=res.get("usage"), latency_ms=latency)
         base_refs = {"segment": sid, "thread": thread_id, "source": source}
+        # the real subject, not the assistant's project by default (attribution.py, 19/11): deterministic, no model
+        from . import attribution
+        out["reattributed"] = attribution.for_segment(kept, conn)
         seg_projects = sorted({it["project"] for it in kept if it["project"]})
         if data.get("summary") and not backfill:
             conn.execute("""insert into core.derived_items (kind, content, attributes, status, derived_by,
@@ -641,6 +644,8 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                      "epistemic": it["epistemic"], "quote": it["quote"], "pipeline": "v1"}
             if it["project"]:
                 attrs["project"], attrs["projects"] = it["project"], [it["project"]]
+            if it.get("attribution"):
+                attrs["attribution"] = it["attribution"]
             pr = it.get("proof")
             if pr:
                 attrs["proof"] = pr

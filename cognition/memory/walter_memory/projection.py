@@ -46,6 +46,9 @@ CHAIN_SPAN = timedelta(hours=20)     # a chain is an evolution: statements on di
 MIN_ITEMS = 5                        # a subject with fewer current items is not a project of the catalog
 PARENT_MIN_ITEMS = 20                # a name-inferred parent must be a real project
 DONE = {"executed", "verified", "done"}
+PROVEN = {"verified", "done"}         # a goal shown as achieved: proof checked or confirmed by the owner
+CLAIMED = {"executed"}                # an agent or the Run Plane says it is done: shown as such, never as verified
+ACTIVE = timedelta(days=3)           # work « en cours »: an open Run Plane objective, or a step this recent
 DROPPED = {"cancelled", "abandoned"}
 IN_FORCE = {"decided", "executed", "verified"}       # a decision; « requested » counts when the owner asked it
 RULE_KINDS = {"constraint", "preference", "correction"}
@@ -61,6 +64,24 @@ MONTHS = {m: i for i, m in enumerate(("janvier", "février", "mars", "avril", "m
                                       "septembre", "octobre", "novembre", "décembre"), 1)}
 DATE_FR = re.compile(r"(?i)\b(depuis le|dès le|le|du|au)\s+(\d{1,2})(?:er)?\s+(" + "|".join(MONTHS) + r")(?:\s+(\d{4}))?")
 DATE_GATE = re.compile(r"(?i)\b(?:le|du|au)\s+\d")
+# Relevance (owner, 19/11: « l'état global, les avancées, les décisions en vigueur, les travaux en cours, les blocages,
+# les prochaines étapes ; les détails techniques restent consultables mais ne dominent pas »): a deterministic weight
+# from what the extraction recorded (kind, act, scope, epistemic, proof) and from the text's technical density.
+TECH = re.compile(r"(`[^`]+`|(?<![\w.])/[a-z_.-]+/[\w./-]*|:\d{2,5}\b|\b\w+_\w+\b|--\w|\b[0-9a-f]{8,}\b|\bhttps?://|"
+                  r"\.(?:py|toml|json|md|sh|yaml|service|timer)\b|\b\d+(?:[.,]\d+)?\s?(?:ms|s|Mo|Go|Ko|tokens?|%)(?!\w)|"
+                  r"\b[a-z]+\d[\w.-]*\b|\b\w+\.\w+\(|\bmigration \d+|\b(?!w\.alter\b)[a-z]+\.[a-z_]{3,}\b|"
+                  r"\b[a-z]+-[a-z]+-[a-z-]+\b)", re.I)
+GLOBAL = re.compile(r"(?i)(en production|\bnati(f|ve)\b|désinstall|\bretiré|\barrêté|n'est plus|ne sont plus|"
+                    r"n.en dépend|validé|terminé|livré|en service|migr[ée]|\blots?\b|\bphases?\b|architecture|"
+                    r"runtime|\bunique\b|repose sur|ne dispose|trajectoire|priorit|basculé|non lancé)")
+NEXT = re.compile(r"(?i)(prochaine étape|prochaines étapes|reste à|il reste|à venir|en attente de (son|votre|sa) "
+                  r"(go|feu vert|validation|accord)|attend (son|votre|sa) (go|feu vert|validation|accord)|"
+                  r"\bnext step)")
+# a request that is itself a test of W.Alter (« pour le test socle bd1f68 », « un test de sécurité ») is not
+# project work: counted, never shown as a goal
+TEST = re.compile(r"(?i)(\btests?\s+(de|d['’]|socle)|pour (le|la|l['’])\s*(test|opération de test|tâche-socle)|"
+                  r"tâche-socle|\bPIVOINE-|\bun test\b|\btest [0-9a-f]{6}\b)")
+STATE_MIN = 2                        # weight a fact needs to be part of the global state
 DATE_NUM = re.compile(r"(?i)\b(depuis le|dès le|le|du|au)\s+(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b")
 
 
@@ -82,7 +103,9 @@ def _config() -> dict:
     return {"aliases": {norm(k): norm(v) for k, v in (data.get("aliases") or {}).items()},
             "parents": {norm(k): norm(v) for k, v in (data.get("parents") or {}).items()},
             # subjects written without the prefix that belong to a project (raw subject key → project key)
-            "subjects": {knowledge.subject_key(k): norm(v) for k, v in (data.get("subjects") or {}).items() if v}}
+            "subjects": {knowledge.subject_key(k): norm(v) for k, v in (data.get("subjects") or {}).items() if v},
+            # the assistant's own project (attribution.py): never the default home of what is said to the assistant
+            "assistant": norm((data.get("attribution") or {}).get("assistant") or "")}
 
 
 def resolve(key_or_name: str) -> str:
@@ -245,7 +268,8 @@ COLS = """item_id::text, kind, content, stage, scope, epistemic, status, lineage
           coalesce(valid_from, created_at) said, valid_to, created_at, attributes->>'subject' subject,
           regexp_replace(lower(attributes->>'subject'), '[^a-z0-9:]', '', 'g') nkey,
           attributes->>'proof' proof, (attributes->>'contested')::boolean contested, attributes->>'task_id' task_id,
-          attributes->'progress'->-1 last_step"""
+          attributes->'progress'->-1 last_step, attributes->>'domain' dom, attributes->>'act' act,
+          attributes->>'task_status' task_status"""
 SUBJ = "regexp_replace(lower(attributes->>'subject'), '[^a-z0-9:]', '', 'g')"
 
 
@@ -276,7 +300,8 @@ def _items(conn, keymap: dict[str, str], at: datetime | None, allowed: list[str]
         r = dict(r)
         r["project"] = keymap[r.pop("nkey")]
         r["attributes"] = {"proof": r.pop("proof"), "contested": bool(r.pop("contested")),
-                           "task_id": r.pop("task_id"), "progress": [x for x in [r.pop("last_step")] if x]}
+                           "task_id": r.pop("task_id"), "progress": [x for x in [r.pop("last_step")] if x],
+                           "task_status": r.pop("task_status")}
         r["fact"] = fact_date(r["content"], r["said"])
         r["from"] = r["fact"] or r["said"]
         if at is not None and r["from"] > at:
@@ -301,12 +326,17 @@ def _status_rx(names: tuple) -> dict:
     # the project as a subject: at the start, after punctuation or after a function word (« avec Hermes arrêté »),
     # never inside an identifier (ask_hermes) nor after a noun (« l'extraction Memory fonctionne »)
     # (never after « de » / « du » / « d' »: « l'extraction de Walter Memory est active » is about the extraction)
-    lead = (r"(?:^|[.;:!?«\"(]\s*|\b(?:le|la|les|avec|que|et|ou|sans|projet|module|service|runtime|agent|"
-            r"application|outil)\s+|\bl')")
-    return {"arrêté": re.compile(rf"{lead}{n}{_AUX}\s+{_STOP}\b|{lead}{n}\s+n'?est plus\b|"
+    # « X et Y sont arrêtés » is about both, « la clé utilisée par la mémoire et le Router est active » about the
+    # key: after « et » / « ou » only a plural verb makes the project a subject
+    lead = (r"(?:^|[.;:!?«\"(]\s*|\b(?:(?:avec|que|sans|projet|module|service|runtime|agent|application|outil)\s+)?"
+            r"(?<!et )(?<!ou )(?:le|la|les)\s+|\b(?:avec|que|sans|projet|module|service|runtime|agent|application|"
+            r"outil)\s+|\bl')")
+    coord = r"\b(?:et|ou)\s+(?:le\s+|la\s+|les\s+|l')?"
+    plural = r"(?:\s+(?:sont|ont ete|etaient|restent|seront|are|were|have been))(?:\s+(?:desormais|maintenant|toujours|bien|completement|definitivement|de nouveau|a nouveau|now|still))?"
+    return {"arrêté": re.compile(rf"{lead}{n}{_AUX}\s+{_STOP}\b|{lead}{n}\s+n'?est plus\b|{coord}{n}{plural}\s+{_STOP}|"
                                  rf"\b(?:arret|retrait|desactivation|desinstallation){_OF}{n}(?![a-z0-9_])"),
             # « X tourne » is a state, « X tourne sur Y » says what it runs on
-            "actif": re.compile(rf"{lead}{n}{_AUX}\s+{_RUN}\b|"
+            "actif": re.compile(rf"{lead}{n}{_AUX}\s+{_RUN}\b|{coord}{n}{plural}\s+{_RUN}|"
                                 rf"{lead}{n}\s+(?:tourne|fonctionne)\b(?!\s+(?:sur|sous|avec|dans|grace|via|par|comme)\b)|"
                                 rf"\b(?:relance|reactivation|remise en service|redemarrage){_OF}{n}(?![a-z0-9_])")}
 
@@ -348,7 +378,8 @@ def _mentions(conn, e: dict, keymap: dict[str, str], at: datetime | None, allowe
         r.pop("nkey")
         r["project"] = None
         r["attributes"] = {"proof": r.pop("proof"), "contested": bool(r.pop("contested")),
-                           "task_id": r.pop("task_id"), "progress": [x for x in [r.pop("last_step")] if x]}
+                           "task_id": r.pop("task_id"), "progress": [x for x in [r.pop("last_step")] if x],
+                           "task_status": r.pop("task_status")}
         r["fact"] = fact_date(r["content"], r["said"])
         r["from"] = r["fact"] or r["said"]
         if r["from"] <= t:
@@ -424,6 +455,67 @@ def _line(r: dict, **extra) -> dict:
 def _last_step(r: dict) -> dict | None:
     steps = (r.get("attributes") or {}).get("progress") or []
     return steps[-1] if steps and isinstance(steps[-1], dict) else None
+
+
+@lru_cache(maxsize=50000)
+def _text_weight(text: str, names: tuple = ()) -> int:
+    t = SELON.sub("", text or "")
+    if names:                        # the project's own name is never a technical identifier
+        t = re.sub(r"(?i)(?<![\w])(?:" + "|".join(re.escape(n) for n in names) + r")(?![\w])", "X", t) \
+            if any(n in _fold(t) for n in names) else t
+    w = -min(len(TECH.findall(t)), 4) + (2 if GLOBAL.search(t[:130]) else 0)     # a global word in the head
+    return w - (1 if len(t) > 220 else 0)
+
+
+@lru_cache(maxsize=50000)
+def _is_test(text: str) -> bool:
+    return bool(TEST.search(text or ""))
+
+
+@lru_cache(maxsize=50000)
+def _announces_next(text: str) -> bool:
+    return bool(NEXT.search(text or ""))
+
+
+@lru_cache(maxsize=50000)
+def _named(text: str, names: tuple) -> bool:
+    head = _fold(SELON.sub("", text or ""))[:90]
+    return any(re.search(rf"(?<![a-z0-9]){re.escape(n)}(?![a-z0-9])", head) for n in names)
+
+
+def weight(r: dict, names: tuple = (), now: datetime | None = None) -> int:
+    """How much a line says about the project as a whole: a state, proven, said by the owner, durable, naming the
+    project or one of its sub-projects at its head, in plain words (no paths, ports, identifiers, commands) weighs
+    more; a task's working detail weighs less. names = the folded labels of the project and its sub-projects."""
+    a = r.get("attributes") or {}
+    w = {"state": 2, "result": 1, "fact": 1}.get(r.get("act") or "", 0)
+    if names and _named(r.get("content") or "", names):
+        w += 1
+    if r.get("status") == "verified" or a.get("proof") in ("checked", "verified"):
+        w += 2
+    if r.get("epistemic") == "stated_owner":
+        w += 1
+    if r.get("scope") == "task" or r.get("dom") == "task":
+        w -= 3
+    if now is not None and r.get("from"):         # the current era first: a still valid old detail weighs less
+        age = (now - r["from"]).days
+        w -= 2 if age > 120 else 1 if age > 30 else 0
+    return w + _text_weight(r.get("content") or "", names)
+
+
+def effective(r: dict) -> str:
+    """The state of a goal as its evidence shows it: « proven » (verified, done), « claimed » (executed: an agent or
+    the Run Plane says so, or its last recorded step says it was executed — never taken for a proof), « dropped »,
+    else « open ». Read only: the stored stage moves only through the write gate, with its proof rule."""
+    st = r.get("stage") or ""
+    if r.get("status") == "verified" or st in PROVEN:
+        return "proven"
+    if st in DROPPED:
+        return "dropped"
+    step = _last_step(r)
+    if st in CLAIMED or (step and step.get("stage") in ("executed", "verified") and step.get("act") != "runplane"):
+        return "claimed"
+    return "open"
 
 
 @lru_cache(maxsize=50000)
@@ -581,6 +673,8 @@ def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "c
         if e is None:
             return {"key": k, "error": f"aucun projet {k} (au moins {MIN_ITEMS} connaissances courantes)"}
         kids = e["children"] if children else []
+        names = tuple(sorted({n for c in [k, *e["children"]] for lb in cat[c]["labels"]
+                              if len(n := _fold(lb)) >= 3}))
         keymap = _keymap(cat, [k, *kids])
         kidmap = _keymap(cat, kids)
 
@@ -605,27 +699,43 @@ def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "c
         for r in items:
             by_kind.setdefault(r["kind"], []).append(r)
         newest = lambda rs: sorted(rs, key=lambda r: r["from"], reverse=True)   # noqa: E731
-        # objectives and tasks: open, in progress, blocked, done, dropped; an old untouched request is « not followed »
-        goals = {"in_progress": [], "blocked": [], "open": [], "done": [], "dropped": [], "not_followed": 0}
+        # objectives and tasks, by what their evidence shows (effective): achieved and verified, announced done
+        # (not verified), really under way (an open Run Plane objective or a step in the last ACTIVE days), blocked,
+        # without news (a step long ago, no open objective: status unknown), requested without any trace (counted)
+        goals = {"in_progress": [], "blocked": [], "open": [], "done": [], "claimed": [], "dropped": [], "stale": [],
+                 "not_followed": 0, "tests": 0, "requested": 0}
         for r in newest(by_kind.get("goal", []) + by_kind.get("commitment", [])):
+            if _is_test(r["content"]):
+                goals["tests"] += 1
+                continue
             step = _last_step(r)
             last = datetime.fromisoformat(step["at"]) if step and step.get("at") else r["from"]
             if last.tzinfo is None:
                 last = last.replace(tzinfo=timezone.utc)
             task = tasks.get((r.get("attributes") or {}).get("task_id") or "")
-            ln = _line(r, step=(step or {}).get("text"), step_at=last if step else None, task=task)
-            if r["stage"] in DONE:
+            ln = _line(r, step=(step or {}).get("text"), step_at=last if step else None, task=task,
+                       weight=weight(r, names, now), effective=effective(r))
+            eff = ln["effective"]
+            if eff == "proven":
                 if now - last <= RECENT:
                     goals["done"].append(ln)
-            elif r["stage"] in DROPPED:
+            elif eff == "claimed":
+                if now - last <= RECENT:
+                    goals["claimed"].append(ln)
+            elif eff == "dropped":
                 if now - last <= RECENT:
                     goals["dropped"].append(ln)
-            elif step and BLOCKED.search(step.get("text") or ""):
+            elif step and step.get("act") != "runplane" and BLOCKED.search(step.get("text") or "") \
+                    and now - last <= RECENT:
                 goals["blocked"].append(ln)
-            elif r["stage"] == "in_progress" or step or task in ("running", "open", "in_progress"):
+            elif task in ("running", "open", "in_progress") or (step and now - last <= ACTIVE):
                 goals["in_progress"].append(ln)
+            elif r["stage"] == "in_progress" or step:
+                goals["stale"].append(ln)
+            elif r["kind"] == "commitment" or r["stage"] in ("accepted", "decided", "open"):
+                goals["open"].append(ln)         # taken up, not started: a known next step
             elif now - r["from"] <= FOLLOWED:
-                goals["open"].append(ln)
+                goals["requested"] += 1
             else:
                 goals["not_followed"] += 1
         # decisions and rules in force; a proposal nobody took is counted, not shown as in force
@@ -636,7 +746,10 @@ def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "c
             elif r["stage"] not in DROPPED:
                 proposals += 1
         decisions += [r for kd in RULE_KINDS for r in by_kind.get(kd, [])]
-        decisions = sorted(decisions, key=lambda r: (_rank(r) > 1, -r["from"].timestamp()))
+        # in force and important first: the owner's, decided, durable, in plain words; a task's working rule last
+        decisions = sorted(decisions, key=lambda r: (_rank(r) > 1, -(weight(r, names, now) + (r["stage"] in IN_FORCE)
+                                                                     + (r["kind"] == "decision")),
+                                                     -r["from"].timestamp()))
         # the state: facts, newest in fact first, the reliable before the reported at equal weight; chains flagged
         facts = newest(by_kind.get("fact", []))
         chains = _chains(facts, e["name"], linked)
@@ -648,8 +761,12 @@ def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "c
                 flags.append("incertain")
             if (r.get("attributes") or {}).get("contested"):
                 flags.append("contesté")
-            state.append(_line(r, flags=flags, other=other.get(r["item_id"], [])))
-        state.sort(key=lambda l: (bool(l["flags"]) and "contesté" in l["flags"], -l["said"].timestamp()))
+            # a statement that announces a next step is shown there, not as the state
+            state.append(_line(r, flags=flags, other=other.get(r["item_id"], []),
+                               weight=weight(r, names, now) - 2 * _announces_next(r["content"])))
+        # the global state first (weight), the newest at equal weight; contested lines after; every line is kept
+        # (the render shows the global ones and counts the details)
+        state.sort(key=lambda l: (bool(l["flags"]) and "contesté" in l["flags"], -l["weight"], -l["said"].timestamp()))
         # problems: contradictions (both sides), blocked goals, unreconciled chains, recent failures
         issues = []
         for r in items:
@@ -673,13 +790,23 @@ def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "c
         if status and not status["reconciled"]:
             issues.insert(0, {"type": "status", "id": status["line"]["id"], **status})
         changes = [c for c in allchanges if c["project"] == k]
-        # next steps: only what memory holds — open requests and commitments not yet started, newest first
+        # next steps: only what memory holds — commitments and goals taken up but not started, and the statements
+        # that announce one (« prochaine étape », « reste à », « attend son go »), recent, never deduced
         nxt = goals["open"][:]
+        seen_next = {l["id"] for l in nxt}
+        for r in newest(facts + by_kind.get("decision", [])):
+            if r["item_id"] not in seen_next and now - r["from"] <= FOLLOWED and _announces_next(r["content"]) \
+                    and r["stage"] not in DONE | DROPPED and r["epistemic"] != "inferred" \
+                    and r.get("act") != "hypothesis":
+                nxt.append(_line(r, weight=weight(r, names)))
+        # significant recent advances: goals achieved (verified) or announced done, and replaced states that weigh
+        advances = [*goals["done"], *goals["claimed"]]
         out = {"key": k, "name": e["name"], "labels": e["labels"], "at": at, "count": len(items),
                "parent": ({"key": e["parent"], "name": cat[e["parent"]]["name"]} if e["parent"] else None),
                "status": status, "mentions": len(mentions), "mention_ids": [r["item_id"] for r in mentions],
                "sections": {"state": state, "goals": goals, "decisions": [_line(r) for r in decisions],
-                            "proposals": proposals, "changes": changes, "issues": issues, "next": nxt},
+                            "proposals": proposals, "changes": changes, "issues": issues, "next": nxt,
+                            "advances": advances},
                "children": [], "sources": ids}
         for c in kids:
             out["children"].append(_child(cat[c], kid_counts.get(c, {}), [r for r in recent_kids if r["project"] == c],
@@ -689,7 +816,8 @@ def project(key: str, *, at: datetime | str | None = None, max_privacy: str = "c
         return out
 
 
-CHILD_PRIORITY = {"bloqué": 0, "contesté": 1, "décision de Monsieur": 2, "réalisé": 3}
+CHILD_PRIORITY = {"bloqué": 0, "décision de Monsieur": 1, "réalisé, vérifié": 2, "annoncé terminé, non vérifié": 3,
+                  "contesté": 4}
 
 
 def _child(e: dict, counts: dict, items: list[dict], changes: list[dict], now) -> dict:
@@ -701,16 +829,21 @@ def _child(e: dict, counts: dict, items: list[dict], changes: list[dict], now) -
             continue
         a = r.get("attributes") or {}
         step = _last_step(r)
-        if r["kind"] in ("goal", "commitment") and r["stage"] not in DONE | DROPPED and step \
-                and BLOCKED.search(step.get("text") or ""):
+        goal = r["kind"] in ("goal", "commitment")
+        if goal and _is_test(r["content"]):
+            continue
+        eff = effective(r) if goal else None
+        if goal and eff == "open" and step and step.get("act") != "runplane" and BLOCKED.search(step.get("text") or ""):
             important.append(("bloqué", r))
-        elif a.get("contested"):
-            important.append(("contesté", r))
         elif r["kind"] == "decision" and r["epistemic"] == "stated_owner" and r["stage"] not in DROPPED:
             important.append(("décision de Monsieur", r))
-        elif r["kind"] in ("goal", "commitment") and r["stage"] in DONE:
-            important.append(("réalisé", r))
-    important.sort(key=lambda x: (CHILD_PRIORITY[x[0]], -x[1]["from"].timestamp()))
+        elif eff == "proven":
+            important.append(("réalisé, vérifié", r))
+        elif eff == "claimed":
+            important.append(("annoncé terminé, non vérifié", r))
+        elif a.get("contested"):
+            important.append(("contesté", r))
+    important.sort(key=lambda x: (CHILD_PRIORITY[x[0]], -weight(x[1]), -x[1]["from"].timestamp()))
     changes = [c for c in changes if c["op"] == "supersede" and now - c["at"] <= CHILD_RECENT]
     return {"key": e["key"], "name": e["name"], "count": counts.get("count", 0),
             "open_goals": counts.get("open_goals", 0), "contested": counts.get("contested", 0),
@@ -744,32 +877,42 @@ def _fmt(l: dict, n: int = 140) -> str:
 
 
 # the order of the sections, and the lines each one is sure to get before any other takes more
-ORDER = ("state", "goals", "decisions", "issues", "changes", "next", "children")
-FLOOR = {"state": 3, "goals": 2, "decisions": 2, "issues": 2, "changes": 2, "next": 2, "children": 3}
+# (owner, 19/11): the global state, the significant recent advances, the decisions in force, the work really under
+# way, the blocks, the known next steps; then the sub-projects' important lines. The technical details are counted.
+ORDER = ("state", "advances", "decisions", "goals", "issues", "next", "children")
+FLOOR = {"state": 3, "advances": 2, "decisions": 2, "goals": 2, "issues": 1, "next": 1, "children": 1}
+STATE_LINES = 5
+
+
+def names_of(p: dict) -> set:
+    return {_fold(x) for x in [p.get("name") or "", *(p.get("labels") or []), *[c["name"] for c in p.get("children") or []]]}
 
 
 def render(p: dict, max_tokens: int = 900) -> tuple[str, list[str]]:
-    """The projection as text within the budget → (text, ids of the items shown). Every section first gets a few
-    lines (FLOOR), then the remaining budget goes to more lines in the order of ORDER; sections keep their order."""
+    """The projection as text within the budget → (text, ids of the items shown). Every section first gets one line,
+    then a few (FLOOR), then the remaining budget goes to more lines in the order of ORDER; sections keep their order."""
     if p.get("error"):
         return p["error"], []
     s = p["sections"]
     g = s["goals"]
     when = f"au {_d(p['at'])}" if p.get("at") else "maintenant"
-    head = [f"Projet {p['name']} (`{p['key']}`) — état {when}, lu dans la mémoire versionnée "
-            f"({p['count']} connaissances valables à cette date ; rien d'expiré n'est présenté comme courant)."]
+    head = [f"Projet {p['name']} (`{p['key']}`) — état {when} ({p['count']} connaissances valables ; rien d'expiré "
+            f"n'est présenté comme courant)."]
     if p.get("parent"):
         head.append(f"Sous-projet de {p['parent']['name']} (`{p['parent']['key']}`).")
     blocks: dict[str, tuple[str, list[tuple[str, str | None]], list[str]]] = {}   # title, [(line, id)], always-lines
 
     def fmt_state(l):
-        x = f"- {_fmt(l)}"
+        x = f"- {_fmt(l, 110)}"
         if "incertain" in l.get("flags", []):
-            x += " — incertain : non relié à d'autres énoncés sur la même chose (voir Problèmes)"
+            x += " — incertain (voir Blocages)"
         for o in (l.get("other") or [])[:1]:
             x += f"\n  ⚠ contesté par : « {_short(o['text'], 110)} » ({_d(o['said'])} · {o['who']} · {o['id'][:8]})"
         return x
-    st_lines = [(fmt_state(l), l["id"]) for l in s["state"][:12]]
+    glob = [l for l in s["state"] if l.get("weight", 0) >= STATE_MIN][:STATE_LINES]
+    if len(glob) < FLOOR["state"]:          # a small project: its best lines in plain words, never a technical detail
+        glob += [l for l in s["state"] if 0 <= l.get("weight", 0) < STATE_MIN][:FLOOR["state"] - len(glob)]
+    st_lines = [(fmt_state(l), l["id"]) for l in glob]
     sts = p.get("status")
     if sts:
         l = sts["line"]
@@ -779,85 +922,105 @@ def render(p: dict, max_tokens: int = 900) -> tuple[str, list[str]]:
                  " — non vérifié" + ("" if sts["reconciled"] else ", contredit par des énoncés non reliés (voir Problèmes)"))
         st_lines.insert(0, (f"- Statut : {sts['status']} selon le dernier énoncé « {_short(l['text'], 120)} » "
                             f"({_dates(l)} · {l['who']}{where} · {l['id'][:8]}){trust}", l["id"]))
-    blocks["state"] = ("État actuel", st_lines, [])
-    gl = []
-    for label, key, n in (("bloqué", "blocked", 4), ("en cours", "in_progress", 6), ("réalisé récemment", "done", 4),
-                          ("abandonné récemment", "dropped", 2)):
-        for l in g[key][:n]:
-            step = f" — dernière étape {_d(l['step_at'])} : « {_short(l['step'], 90)} »" if l.get("step") else ""
-            task = f" — tâche Run Plane : {l['task']}" if l.get("task") else ""
-            gl.append((f"- [{label}] {_fmt(l, 120)}{step}{task}", l["id"]))
-    gl.sort(key=lambda x: 0 if "[bloqué]" in x[0] else 1 if "[en cours]" in x[0] else 2)
-    tail = [f"- en tout : {len(g['in_progress'])} en cours, {len(g['blocked'])} bloqués, {len(g['open'])} demandés sans "
-            f"étape (Prochaines étapes), {len(g['done'])} réalisés depuis {RECENT.days} jours ; {g['not_followed']} demandés "
-            f"il y a plus de {FOLLOWED.days} jours sans suite connue (statut inconnu, non présentés)"]
-    blocks["goals"] = ("Objectifs et tâches", gl, tail)
-    dt = [f"- {s['proposals']} proposition(s) non décidée(s), non présentées comme en vigueur"] if s["proposals"] else []
-    blocks["decisions"] = ("Décisions et règles en vigueur", [(f"- {_fmt(l, 130)}", l["id"]) for l in s["decisions"][:10]], dt)
+    rest = len(s["state"]) - len(glob)
+    blocks["state"] = ("État global", st_lines,
+                       [f"- {rest} autres faits (détails techniques ou secondaires), consultables dans la mémoire"]
+                       if rest > 0 else [])
+
+    def fmt_goal(label, l, n=95, step_text=True, task=True):
+        step = ""
+        if l.get("step"):
+            step = (f" — dernière étape {_d(l['step_at'])} : « {_short(l['step'], 65)} »" if step_text
+                    else f" — dernière étape {_d(l['step_at'])}")
+        run = f" — tâche Run Plane : {l['task']}" if task and l.get("task") else ""
+        return f"- [{label}] {_fmt(l, n)}{step}{run}"
+    adv = [(fmt_goal("réalisé, vérifié", l, 95, False, False), l["id"])
+           for l in sorted(g["done"], key=lambda l: (-l["weight"], -l["said"].timestamp()))[:4]]
+    adv += [(fmt_goal("annoncé terminé, non vérifié", l, 95, False), l["id"])
+            for l in sorted(g["claimed"], key=lambda l: (-l["weight"], -l["said"].timestamp()))[:6]]
 
     def fmt_change(c):
-        if c["op"] == "supersede":
-            by = f" → « {_short(c['by_text'], 110)} »" if c.get("by_text") else ""
-            return f"- {_d(c['at'])} · remplacé : « {_short(c['text'], 110)} »{by} [{c['id'][:8]}]"
-        if c["op"] == "advance":
-            st = f" (étape {c['stage']})" if c.get("stage") else ""
-            return f"- {_d(c['at'])} · objectif avancé{st} : « {_short(c['text'], 140)} » [{c['id'][:8]}]"
-        return f"- {_d(c['at'])} · contesté : « {_short(c['text'], 140)} » [{c['id'][:8]}]"
-    ch = sorted(s["changes"], key=lambda c: (c["op"] != "supersede", -c["at"].timestamp()))
-    # a change line cites the version in force (the replacing one), never the replaced one as current
-    blocks["changes"] = (f"Changements récents ({RECENT.days} jours)",
-                         [(fmt_change(c), c.get("by") if c["op"] == "supersede" else c["id"]) for c in ch[:8]], [])
+        by = f" → « {_short(c['by_text'], 110)} »" if c.get("by_text") else ""
+        return f"- {_d(c['at'])} · état remplacé : « {_short(c['text'], 100)} »{by} [{c['id'][:8]}]"
+    # a replaced state that weighs (its new version in plain words): an advance; a change line cites the version in
+    # force (the replacing one), never the replaced one as current
+    sup = [c for c in s["changes"] if c["op"] == "supersede" and c.get("by_text")
+           and _text_weight(c["by_text"]) >= 0]
+    adv += [(fmt_change(c), c.get("by")) for c in sorted(sup, key=lambda c: -c["at"].timestamp())[:4]]
+    blocks["advances"] = (f"Avancées récentes ({RECENT.days} jours)", adv,
+                          [f"- en tout : {len(g['done'])} réalisés et vérifiés, {len(g['claimed'])} annoncés terminés "
+                           f"sans vérification"] if len(g["done"]) + len(g["claimed"]) > 10 else [])
+    gl = [(fmt_goal("bloqué", l), l["id"]) for l in g["blocked"][:4]]
+    gl += [(fmt_goal("en cours", l), l["id"]) for l in g["in_progress"][:6]]
+    gl += [(fmt_goal(f"sans nouvelle depuis le {_d(l['step_at'] or l['said'])}, statut inconnu", l), l["id"])
+           for l in g["stale"][:2]]
+    tail = [f"- aussi : {len(g['stale'])} sans nouvelle, {g['requested'] + g['not_followed']} demandes sans trace "
+            f"d'exécution (statut inconnu, non listées)" + (f", {g['tests']} tests ignorés" if g["tests"] else "")]
+    blocks["goals"] = ("Travaux en cours", gl, tail)
+    more = len(s["decisions"]) - 8
+    dt = [f"- aussi : {max(more, 0)} autres en vigueur, {s['proposals']} propositions non décidées (consultables)"] \
+        if more > 0 or s["proposals"] else []
+    blocks["decisions"] = ("Décisions importantes en vigueur", [(f"- {_fmt(l, 105)}", l["id"]) for l in s["decisions"][:8]],
+                           dt)
 
     def fmt_issue(i):
         if i["type"] == "contradiction":
             o = i["other"][0]
-            return (f"- contradiction non tranchée : « {_short(i['text'], 120)} » ({_d(i['said'])} · {i['who']}) ↔ "
-                    f"« {_short(o['text'], 120)} » ({_d(o['said'])} · {o['who']}) [{i['id'][:8]} ↔ {o['id'][:8]}]")
+            return (f"- contradiction non tranchée : « {_short(i['text'], 95)} » ({_d(i['said'])} · {i['who']}) ↔ "
+                    f"« {_short(o['text'], 95)} » ({_d(o['said'])} · {o['who']}) [{i['id'][:8]} ↔ {o['id'][:8]}]")
         if i["type"] == "chain":
-            return (f"- état non entièrement réconcilié pour « {i['name']} » : {i['count']} énoncés valables non reliés "
-                    f"du {_d(i['first'])} au {_d(i['last'])} ; le plus récent ({i['who']}) n'est pas tenu pour vérifié : "
-                    f"« {_short(i['text'], 130)} » [{i['id'][:8]}]")
+            return (f"- « {i['name']} » : {i['count']} énoncés non reliés ({_d(i['first'])} → {_d(i['last'])}), "
+                    f"le dernier non tenu pour vérifié : « {_short(i['text'], 85)} » [{i['id'][:8]}]")
         if i["type"] == "status":
             o = i["others"][0]
             return (f"- statut non entièrement réconcilié : le dernier énoncé dit « {i['status']} » mais "
                     f"{i['others_count']} énoncé(s) non relié(s) disent autre chose, dont « {_short(o['text'], 100)} » "
                     f"({_d(o['said'])} · {o['who']} · {o['id'][:8]})")
-        return f"- objectif bloqué : {_fmt(i, 130)} — « {_short(i.get('step'), 110)} »"
-    iss = sorted(s["issues"], key=lambda i: {"status": -1, "blocked": 0, "chain": 1, "contradiction": 2}[i["type"]])
-    blocks["issues"] = ("Problèmes et contradictions non résolus", [(fmt_issue(i), i["id"]) for i in iss[:8]],
-                        [f"- {len(iss)} en tout"] if len(iss) > 8 else [])
-    blocks["next"] = ("Prochaines étapes connues (demandées, pas encore commencées ; aucune n'est déduite)",
-                      [(f"- {_fmt(l, 120)}", l["id"]) for l in s["next"][:6]], [])
+        return f"- objectif bloqué : {_fmt(i, 105)} — « {_short(i.get('step'), 90)} »"
+    # blocks first, then what weighs most (a contradiction on the project's state before one on a detail)
+    iss = sorted(s["issues"], key=lambda i: ({"status": -1, "blocked": 0, "chain": 1, "contradiction": 2}[i["type"]],
+                                             -_text_weight(i.get("text") or "")))
+    # an unreconciled chain on a detail (not the project, not a sub-project, nothing that weighs) is counted only
+    # and so is an old contradiction between two details
+    recent = (p.get("at") or datetime.now(timezone.utc)) - RECENT
+    shown_iss = [i for i in iss if (i["type"] != "chain" or (_fold(i["name"]) in names_of(p)
+                                                             and _text_weight(i.get("text") or "") >= 0))
+                 and (i["type"] != "contradiction" or i["said"] >= recent
+                      or any(o["said"] >= recent for o in i["other"]))]
+    iss_tail = len(iss) - min(len(shown_iss), 8)
+    blocks["issues"] = ("Blocages et points non résolus", [(fmt_issue(i), i["id"]) for i in shown_iss[:8]],
+                        [f"- aussi : {iss_tail} points non résolus sur des détails (contradictions, états non "
+                         f"réconciliés), consultables"] if iss_tail > 0 else [])
+    blocks["next"] = ("Prochaines étapes connues (engagements et étapes annoncées, pas encore commencées ; aucune "
+                      "n'est déduite)", [(f"- {_fmt(l, 120)}", l["id"]) for l in s["next"][:6]], [])
     cl = []
     for c in p.get("children") or []:
         bits = [f"{c['count']} connaissances", f"{c['open_goals']} objectifs ouverts"]
         if c["contested"]:
             bits.append(f"{c['contested']} contestées")
-        line = f"- {c['name']} (`{c['key']}`) : {', '.join(bits)}"
-        imp = c["important"][:2]
+        line = f"- {c['name']} : {', '.join(bits)}"
+        imp = c["important"][:1]
         for i in imp:
-            line += f"\n  · {i['why']} : « {_short(i['text'], 110)} » ({_d(i['said'])} · {i['who']} · {i['id'][:8]})"
-        for x in c["changes"][:1]:
-            line += f"\n  · remplacé le {_d(x['at'])} : « {_short(x['text'], 90)} » → « {_short(x.get('by_text') or '', 90)} »"
+            line += f" · {i['why']} : « {_short(i['text'], 90)} » ({_d(i['said'])} · {i['who']} · {i['id'][:8]})"
+        for x in ([] if imp else c["changes"][:1]):
+            line += f" · état remplacé le {_d(x['at'])} → « {_short(x.get('by_text') or '', 90)} »"
         cl.append((line, imp[0]["id"] if imp else None, [i["id"] for i in imp]))
     cl.sort(key=lambda x: not x[2])               # those with something to bring up first
     blocks["children"] = ("Sous-projets (avancées importantes seulement ; leur détail : leur propre état)",
-                          [(x[0], x[1]) for x in cl[:8]], [f"- {len(cl) - 8} autres sous-projets"] if len(cl) > 8 else [])
+                          [(x[0], x[1]) for x in cl[:8]], [f"- {len(cl)} sous-projets en tout"] if len(cl) > 2 else [])
     child_ids = {x[0]: x[2] for x in cl}
-    foot = (f"Historique : memory_view(key=\"{p['key']}\", depth=\"state\", at=\"AAAA-MM-JJ\") pour l'état à une date ; "
-            f"versions d'une connaissance : walter-memory extract2 history --item <id>.")
+    foot = f"État à une date : memory_view(key=\"{p['key']}\", depth=\"state\", at=\"AAAA-MM-JJ\")."
     budget = max_tokens - _tokens("\n".join(head)) - _tokens(foot)
     take = {k: 0 for k in blocks}
     # a block's title and summary lines are paid with its first line: a block that does not fit costs nothing
     cost = {k: _tokens(f"### {blocks[k][0]}") + sum(_tokens(t) for t in blocks[k][2]) for k in blocks if blocks[k][1]}
-    # a parent is read for its sub-projects too: they get their floor right after the state
-    first = ("state", "children", *[k for k in ORDER if k not in ("state", "children")]) if p.get("children") else ORDER
-    for rnd in ("floor", "more"):
-        for k in first if rnd == "floor" else ORDER:
+    # every section first gets one line (none is crowded out by a long one before it), then its floor, then more
+    for rnd in ("one", "floor", "more"):
+        for k in ORDER:
             if k not in cost:
                 continue
             lines = blocks[k][1]
-            stop = FLOOR[k] if rnd == "floor" else len(lines)
+            stop = {"one": 1, "floor": FLOOR[k]}.get(rnd, len(lines))
             while take[k] < min(stop, len(lines)):
                 t = _tokens(lines[take[k]][0]) + (cost[k] if take[k] == 0 else 0)
                 if t > budget:

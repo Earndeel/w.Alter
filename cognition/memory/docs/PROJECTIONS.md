@@ -2,7 +2,7 @@
 
 > Rôle : décrire comment Memory répond à « où en est X maintenant ? » pour quatre familles d'état — personnel,
 > projet, relationnel, situationnel — à partir de la mémoire existante. Propriétaire : Walter Memory. État : **P1
-> (projection Projet) en service depuis le 19/11/2026** (§ 7) ; P2–P4 en projet. Ne fait pas : un second stockage, une
+> (projection Projet) en service depuis le 19/11/2026** (§ 7), pertinence corrigée le même jour (§ 8) ; P2–P4 en projet. Ne fait pas : un second stockage, une
 > seconde boucle de consolidation, une décision de modèle par message. Contrats : `MemoryViewQuery` v1
 > (`memory_view`), Context. Code : `walter_memory/projection.py`.
 
@@ -187,9 +187,89 @@ partagé ; pour un parent, les sous-projets passent juste après l'état)
   elle ne s'y ajoute pas.
 
 **Limites connues**
-- L'état d'un projet racine montre ses faits les plus récents, tels que l'extraction les a rangés : au 19/11, des
-  faits VIDAA sous `project:walter`. C'est un défaut d'attribution de l'extraction, pas de la projection.
+- ~~L'état d'un projet racine montre ses faits les plus récents, tels que l'extraction les a rangés (faits VIDAA sous
+  `project:walter`)~~ : corrigé le 19/11 à la source (attribution) et à la lecture (pertinence), § 8.
 - La ligne « Statut » ne connaît que le vocabulaire du cycle de vie. Les chaînes reposent sur le nom de la chose
   (faux positifs possibles, par exemple « gps »).
 - Les plans sans budget de connaissances (L1/L2, `records` seul) n'ont pas de section « État courant ».
 - Le bloc `subject:synthesis` du préflight peut recouper la section ; il n'a pas été modifié.
+
+## 8. Pertinence de l'état courant (19/11/2026)
+
+**Demande de Monsieur** (après validation technique de P1) : les exemples réels manquaient de pertinence — des faits
+VIDAA dans l'état de w.Alter, des derniers faits techniques au lieu de l'état global, P1 « en cours » et beaucoup
+d'objectifs « demandés ». Trois corrections à la source, sans nouveau pipeline ni modèle supplémentaire.
+
+### 8.1 Attribution (`walter_memory/attribution.py`)
+
+Tout est dit à l'assistant : le modèle d'extraction rangeait sous le projet de l'assistant (`[attribution] assistant`
+dans le `projects.toml` de l'instance) ce dont parlait une session technique, même la télévision de Monsieur.
+Règles déterministes, appliquées seulement quand c'est manifeste :
+- l'assistant comme **locuteur ou destinataire** (« Selon W.Alter… », « Monsieur demande à W.Alter de… ») n'est
+  pas un sujet : ces tournures sont retirées avant de chercher un nom ;
+- un énoncé reste sous le projet de l'assistant s'il nomme ce projet ou un de ses sous-projets, ou un outil que ses
+  propres connaissances citent souvent (Hermes, Claude Code… : `integrated`, calculé sur les données) ;
+- sinon, s'il nomme **en tête** (110 premiers caractères) un autre projet connu → ce projet (`names_other_project`) ;
+  une mention plus loin est incidente et ne déplace rien ;
+- s'il parle d'**une chose de Monsieur** (« sa télévision », « sa boîte mail ») → aucun projet, sujet `other`,
+  domaine `personal` (`owner_thing`) ;
+- dans le **même fil**, un énoncé qui nomme la même chose qu'un énoncé déplacé le suit (`same_thing_in_thread`) ;
+- un énoncé qui ne nomme rien garde le choix du modèle (inconnu n'est pas faux).
+
+Branchement : l'extraction l'applique avant d'écrire (`extract2`, `attributes.attribution` garde l'ancienne valeur et
+la règle) ; la consigne du modèle dit aussi que le projet est le sujet réel, pas la session. L'existant :
+`attribution.fix(apply=)` passe par la garde avec une opération `attribute` (migration `044`), une change par
+connaissance, sources, lignée et historique intacts, annulable par étiquette. Appliqué le 19/11 : **23 déplacements**
+(11 choses de Monsieur, 4 autres projets, 8 voisins de fil), étiquette `attribution-2026-11-19` ; plus aucune
+connaissance VIDAA sous `project:walter`.
+
+### 8.2 Sélection déterministe de l'état (`projection.py`)
+
+Une projection ne montre plus « les derniers faits » mais, dans cet ordre : **état global, avancées récentes,
+décisions importantes en vigueur, travaux en cours, blocages, prochaines étapes connues**, puis les sous-projets.
+Chaque ligne reçoit un poids calculé sans modèle, à la lecture :
+- type d'acte (état +2, résultat +1, fait +1), preuve ou vérification +2, dit par Monsieur +1, projet nommé en tête +1 ;
+- portée « tâche » ou domaine de tâche −3 ; ancienneté (> 30 j −1, > 120 j −2) ;
+- texte : densité technique (chemins, ports, identifiants, options, unités…, au plus −4) contre vocabulaire d'état
+  global en tête (en production, retiré, validé, lot, architecture, runtime… +2) ; une ligne longue −1.
+
+L'état global garde les lignes de poids ≥ 2 (au plus 5) et **compte** le reste (« N autres faits, détails techniques
+ou secondaires, consultables dans la mémoire »). Les décisions sont triées par rang (Monsieur d'abord), poids et
+vigueur ; les propositions sont comptées. Les chaînes non reliées et les contradictions anciennes sur des détails
+sont comptées ; une contradiction récente est toujours montrée. Les prochaines étapes = engagements ouverts et
+étapes annoncées explicitement (« reste à », « en attente de son go »…), jamais une hypothèse ni une déduction.
+Le budget se partage en trois tours (une ligne par section, puis le plancher, puis le reste), pour que chaque
+section ait sa place à 740 tokens. Rien n'est supprimé de la mémoire : `memory_search` et `depth="state"` avec
+`at=` retrouvent tout.
+
+### 8.3 Statuts des objectifs et Run Plane (`knowledge.runplane*`, `assimilation`)
+
+Constats : (1) le lien objectif ↔ tâche du Run Plane ne voyait que la tâche d'origine d'une session et prenait une
+tâche « parapluie » comme preuve pour tous les objectifs de la session ; (2) une tâche `cancelled` (interruption :
+erreur d'outil, redémarrage, message remplacé) annulait l'objectif ; (3) le rattrapage ajoute des étapes
+« exécuté » sans changer le stade (voulu : pas de preuve), et beaucoup de demandes anciennes n'ont aucune trace.
+
+Corrections :
+- un objectif est relié à la tâche `objective` de **sa** demande (même session, ± 5 min), avec son rôle : `origin`
+  (la demande elle-même) ou `attempt` (une reprise) ;
+- seule une tâche d'origine **terminée** fait passer l'objectif à « exécuté » (jamais « vérifié » : c'est une
+  déclaration d'agent) ; un échec ou une interruption ajoute une étape et garde le stade ; une reprise n'est qu'un lien ;
+- le bus déclenche la mise à jour (`task.ended`, `task.updated` → file `goals.runplane`) ; l'existant :
+  `knowledge.runplane_backfill(apply=)`, étiquette `runplane-2026-11-19` (12 « exécuté », 128 liens ; relance à vide = 0) ;
+- à la lecture, l'état effectif est calculé : **vérifié** (Monsieur ou preuve), **annoncé terminé, non vérifié**
+  (stade ou dernière étape « exécuté » d'un agent), **abandonné**, ou ouvert ; un ouvert sans nouvelle depuis 3 jours
+  est « sans nouvelle depuis le …, statut inconnu » ; une demande sans aucune trace est **comptée comme statut
+  inconnu**, jamais listée comme en cours ni comme prochaine étape ; les objectifs de test sont ignorés et comptés.
+
+P1 apparaissait « en cours » parce que sa tâche du Run Plane était encore ouverte (la session continuait) et que la
+validation de Monsieur n'était pas encore extraite : c'est le comportement attendu, pas un défaut.
+
+### 8.4 Garanties et mesures
+
+- Aucun appel de modèle à la lecture ; aucune table nouvelle ; vues `at=` inchangées (même filtre d'intervalle).
+- `walter-memory state --check` sans défaut sur les 5 projets, maintenant et à `at=2026-11-12`.
+- Latence (projection chaude) : W.Alter 47 ms, Walter Memory 22 ms, Walter Router 28 ms, walter-context 17 ms,
+  Hermes 13 ms.
+- Retour arrière : annuler le commit ; `knowledge.revert('attribution-2026-11-19', confirm=True)` et
+  `knowledge.revert('runplane-2026-11-19', confirm=True)` ; la migration `044` (opération `attribute` autorisée) est
+  sans effet seule. Sauvegardes : `/user/Lucas/backups/changes/2026-11-19-memoire-pertinence/`.
