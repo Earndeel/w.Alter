@@ -284,7 +284,7 @@ reassess_cache = 256
 reassess_timeout_s = 6.0
 
 [digest]
-# Situation digest (19/11, Monsieur « active directement si meilleur ») — `walter_memory.digest`: the compact,
+# Situation digest (19/11, owner: « active directement si meilleur ») — `walter_memory.digest`: the compact,
 # dated state of the projects, people, tasks, agenda and situation a message refers to, added to the preflight's single
 # Decision call as `known_state`; nothing when nothing is referred to; no model call; cloud audience (local_only
 # messages never get one); the position only as a signal « une position est connue », never the place.

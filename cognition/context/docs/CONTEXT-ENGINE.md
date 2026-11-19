@@ -455,7 +455,7 @@ mesures (banc `bench/preflight_native.py`, 65 cas dont 37 réels) et retour arri
 ## 11. Condensé de situation dans le préflight (19/11/2026)
 
 L'appel unique à Decision reçoit, quand le message désigne un projet, une personne, des tâches, l'agenda, un besoin
-de position ou la situation de Monsieur, l'état compact que Walter Memory en connaît (`state.known_state`,
+de position ou la situation du propriétaire, l'état compact que Walter Memory en connaît (`state.known_state`,
 `walter_memory.digest`, ≤ 250 tokens, aucun appel de modèle) ; rien sinon. Un message `local_only` n'en reçoit
 jamais ; la position n'y est qu'un signal, jamais le lieu. Lancé en parallèle de la préparation du tour, attendu au
 plus `[digest] timeout_ms` ; en retard ou en erreur, la décision part comme avant (`decision.digest.late|error`).
