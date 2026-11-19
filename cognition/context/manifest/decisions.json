@@ -45,7 +45,8 @@
       "use": "ContextPlan.thread (+ alternates): which subject's history and task the turn joins",
       "consumers": [
         "context.preflight",
-        "memory.runs"
+        "memory.runs",
+        "memory.views"
       ],
       "since": "2026-10-25"
     },

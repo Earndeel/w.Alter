@@ -105,11 +105,15 @@ def requested(plan: dict, message: str, channel: str | None = None) -> dict:
 def _attach_run(run_id: str, plan: dict, message: str = "", channel: str | None = None) -> None:
     """Walter Memory's Run Plane through its command (declared interface); never blocks the preflight."""
     import subprocess
-    thread = (plan.get("thread") or {}).get("id")
+    t = plan.get("thread") or {}
+    thread = t.get("id")
     try:
         subprocess.run(["walter-memory", "runs", "update"], input=json.dumps(
             {"run_id": run_id, "level": plan.get("level"), "act": plan.get("act"),
              "thread_id": thread if thread and thread != "new" else None,
+             # A1 (2026-11-19): how sure the thread decision was, so Memory never asks it again
+             "thread_choice": {"confidence": t.get("confidence"), "new": bool(t.get("new")),
+                               "degraded": bool((plan.get("decision") or {}).get("degraded"))},
              "requested": requested(plan, message, channel)}),
             capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.TimeoutExpired):
