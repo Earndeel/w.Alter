@@ -295,7 +295,9 @@ def memory_view(key: str = "", query: str = "", depth: str = "overview", max_tok
     · sources (what it is built from: knowledge, observations, sub-views, with event ids for memory_events)
     · state (a project's current state, key project:<name> e.g. project:walter or « Walter Memory »: state, goals
     open/blocked/done, decisions in force, recent changes, unresolved contradictions, known next steps, sub-projects'
-    important news; every line dated with its provenance; `at`=YYYY-MM-DD for the state as it was then). Give
+    important news; every line dated with its provenance; `at`=YYYY-MM-DD for the state as it was then; key owner =
+    the owner's rules in force, dated states, goals by their evidence, states to re-check; key now = where, agenda,
+    open work, what memory learned lately, each with its freshness; key me = both, « où en suis-je »). Give
     `query` instead to find the views closest to some words. Cloud-safe: local-only views are never returned."""
     if key:
         d = depth if depth in ("index", "overview", "synthesis", "details", "sources", "state") else "overview"
