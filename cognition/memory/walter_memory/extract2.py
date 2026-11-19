@@ -161,11 +161,32 @@ def set_v1_start(at: datetime | None = None) -> str:
     return at.isoformat()
 
 
+def live_start(conn) -> datetime | None:
+    r = conn.execute("select value from extraction.state where key = 'live_start'").fetchone()
+    return datetime.fromisoformat(r["value"]["at"]) if r else None
+
+
+def set_live_start(at: datetime | None = None) -> str:
+    """Production start of the continuous extraction (2026-11-19, owner: « réactive l'extraction continue sur les
+    nouveaux événements », then the history by slices): the live worker takes messages ingested from this instant;
+    what waited before it goes through backfill() in slices, under the per-segment Codex quota gate."""
+    at = at or datetime.now(timezone.utc)
+    with connection() as conn:
+        conn.execute("""insert into extraction.state (key, value) values ('live_start', %s)
+                        on conflict (key) do update set value = excluded.value, updated_at = now()""",
+                     (json.dumps({"at": at.isoformat()}),))
+    return at.isoformat()
+
+
 def _thread_start(conn, source: str, thread_id: str) -> datetime | None:
-    """Eligibility start of a thread: its explicit catch-up start if one was requested, else the V1 start."""
+    """Eligibility start of a thread for the live worker: its explicit catch-up start if one was requested, else the
+    later of the V1 start and the live start (the backlog before it is backfill's)."""
     r = conn.execute("select from_at from extraction.threads where processor = %s and source = %s and thread_id = %s",
                      (PROCESSOR, source, thread_id)).fetchone()
-    return r["from_at"] if r and r["from_at"] else v1_start(conn)
+    if r and r["from_at"]:
+        return r["from_at"]
+    starts = [x for x in (v1_start(conn), live_start(conn)) if x]
+    return max(starts) if starts else None
 
 
 def mark_dirty(conn, source: str, thread_id: str, last_event_at=None) -> None:
@@ -737,7 +758,13 @@ def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "rec
     if force and tail:
         segs, tail = segs + [tail], []
     out["waiting"] = len(tail)
-    for seg in segs:
+    from . import quota
+    for i, seg in enumerate(segs):
+        q = quota.codex()
+        if not q["ok"]:                  # A4 per segment (a long thread can be many segments): the rest waits
+            out["quota_stopped"] = q["reason"]
+            out["waiting"] += sum(len(x) for x in segs[i:])
+            break
         if not any(m["event_type"] == "message.sent" for m in seg) and sum(_size(m) for m in seg) < 1500:
             with connection() as conn:   # assistant-only chatter: nothing the owner said, nothing substantial
                 _segment_row(conn, source=source, thread_id=thread_id, status="filtered", msgs=seg,
@@ -1050,6 +1077,42 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
             for k, v in res.items():
                 out[k] += v
     out["cost_usd"] = round(out["cost_usd"], 4)
+    return out
+
+
+def catchup(events: int = 120, *, workers: int = 2, dry: bool = False, chat=None) -> dict:
+    """Production catch-up of the history (2026-11-19, owner: « lance le rattrapage de l'historique par tranches,
+    sans dépasser le quota et sans laisser des événements anciens écraser des états plus récents »): the uncovered
+    messages ingested between v1_start and live_start, OLDEST FIRST, one slice of `events` messages per call, through
+    backfill() (same extraction, reconciliation and write gate as live; window=0 = only these messages).
+    Order: slices follow occurred_at, and the write gate records a statement older than the knowledge it meets as
+    past (op "older"), never as a replacement. Quota: asked before the slice and before every segment (70 %); over
+    it, nothing more is read and the next call resumes where this one stopped. Switch: organic.toml [stages] catchup.
+    Ledger per day: tag rattrapage-YYYY-MM-DD (backfill_revert(tag) undoes one day of catch-up)."""
+    from . import organic, quota
+    if organic.stage("catchup")["mode"] != "active":
+        return {"stopped": "paused"}
+    q = quota.codex()
+    if not q["ok"]:
+        return {"stopped": "quota", "reason": q.get("reason"), "used_percent": q.get("used_percent")}
+    sql = """from core.events e where e.source = any(%s) and e.event_type = any(%s) and e.thread_id is not null
+               and e.ingested_at >= %s and e.ingested_at < %s
+               and not exists (select 1 from extraction.covered cv where cv.processor = %s and cv.event_id = e.event_id)
+               and not exists (select 1 from core.events r where r.event_type = 'event.retracted'
+                               and r.payload @> jsonb_build_object('target_event_id', e.event_id::text))"""
+    with connection() as conn:
+        v1, ls = v1_start(conn), live_start(conn)
+        if v1 is None or ls is None:
+            return {"stopped": "no_window"}
+        args = (list(RUNTIMES), list(MESSAGE_TYPES), v1, ls, PROCESSOR)
+        ids = [str(r["event_id"]) for r in conn.execute(
+            f"select e.event_id {sql} order by e.occurred_at, e.event_id limit %s", (*args, events)).fetchall()]
+        if not ids:
+            return {"done": True, "remaining": 0}
+    tag = f"rattrapage-{datetime.now(timezone.utc):%Y-%m-%d}"
+    out = backfill(ids, tag=tag, chat=chat, window=0, workers=workers, dry=dry, generation="g1")
+    with connection() as conn:
+        out["remaining"] = conn.execute(f"select count(*) n {sql}", args).fetchone()["n"]
     return out
 
 

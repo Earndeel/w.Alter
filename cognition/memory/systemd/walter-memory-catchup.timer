@@ -1,0 +1,9 @@
+[Unit]
+Description=Walter Memory history catch-up: next slice 10 min after the previous one ends (no-op when done, paused or over the quota)
+
+[Timer]
+OnBootSec=10min
+OnUnitInactiveSec=10min
+
+[Install]
+WantedBy=timers.target

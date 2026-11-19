@@ -492,3 +492,70 @@ def test_a_staged_pilot_writes_apart_records_its_effects_and_reverts_to_the_exac
         assert _served(conn, ids) == before
         assert conn.execute("""select count(*) n from core.derived_items where attributes->>'backfill' = %s
                                and status <> 'retracted'""", (tag,)).fetchone()["n"] == 0
+
+
+def test_the_live_worker_starts_at_the_live_start_and_stops_per_segment_over_the_quota(monkeypatch):
+    """Production 19/11: the continuous extraction takes the messages ingested from its live start (the backlog is
+    backfill's, in slices) and asks the Codex quota gate before each segment, not once per tick."""
+    from walter_memory import quota
+    t = thread()
+    say("hermes", t, "owner", "on garde Valkey pour le projet", at=NOW - timedelta(hours=2))
+    with connection() as conn:
+        before = conn.execute("select value from extraction.state where key = 'live_start'").fetchone()
+    try:
+        extract2.set_live_start(datetime.now(timezone.utc) + timedelta(seconds=1))
+        model = Model(decision)
+        r = extract2.process_thread("hermes", t, chat=model, now=NOW + timedelta(days=1))
+        assert r["segments"] == 0 and not model.calls                  # ingested before the live start: backlog
+        import time as _t
+        _t.sleep(1.2)
+        say("hermes", t, "owner", "on garde Redis pour le cache", at=NOW - timedelta(hours=1))
+        monkeypatch.setattr(quota, "codex", lambda **k: {"ok": False, "reason": "codex weekly quota 71 % ≥ 70 %"})
+        r = extract2.process_thread("hermes", t, chat=model, now=NOW + timedelta(days=1), force=True)
+        assert r["segments"] == 0 and not model.calls and "71 %" in r["quota_stopped"] and r["waiting"] >= 1
+        monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})
+        r = extract2.process_thread("hermes", t, chat=model, now=NOW + timedelta(days=1), force=True)
+        assert r["segments"] == 1 and len(model.calls) == 1
+    finally:
+        with connection() as conn:
+            if before:
+                conn.execute("update extraction.state set value = %s where key = 'live_start'",
+                             (json.dumps(before["value"]),))
+            else:
+                conn.execute("delete from extraction.state where key = 'live_start'")
+
+
+def test_the_history_catch_up_takes_the_oldest_backlog_first_in_slices_under_its_switch_and_the_quota(monkeypatch):
+    """Production 19/11: the backlog between v1_start and live_start goes through backfill oldest first, one slice
+    per run; paused or over the quota it reads nothing, and the next run resumes where the last one stopped."""
+    from walter_memory import organic, quota
+    with connection() as conn:
+        saved = {k: conn.execute("select value from extraction.state where key = %s", (k,)).fetchone()
+                 for k in ("v1_start", "live_start")}
+    try:
+        extract2.set_v1_start(datetime.now(timezone.utc))
+        old, new = thread(), thread()
+        say("hermes", new, "owner", "on garde Redis pour le cache", at=NOW - timedelta(hours=1))
+        say("hermes", old, "owner", "on garde Valkey pour le projet", at=NOW - timedelta(days=3))
+        extract2.set_live_start(datetime.now(timezone.utc))
+        model = Model(decision)
+        monkeypatch.setattr(organic, "stage", lambda n: {"mode": "paused"})
+        assert extract2.catchup(1, chat=model) == {"stopped": "paused"} and not model.calls
+        monkeypatch.setattr(organic, "stage", lambda n: {"mode": "active"})
+        monkeypatch.setattr(quota, "codex", lambda **k: {"ok": False, "reason": "codex weekly quota 71 % ≥ 70 %"})
+        assert extract2.catchup(1, chat=model)["stopped"] == "quota" and not model.calls
+        monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})
+        r = extract2.catchup(1, chat=model)
+        assert r["segments"] == 1 and r["remaining"] == 1 and r["tag"].startswith("rattrapage-")
+        assert "Valkey" in json.dumps(model.calls[0], ensure_ascii=False, default=str)     # the oldest one first
+        r = extract2.catchup(1, chat=model)
+        assert r["segments"] == 1 and r["remaining"] == 0
+        assert extract2.catchup(1, chat=model) == {"done": True, "remaining": 0}
+        extract2.backfill_revert(r["tag"], confirm=True)
+    finally:
+        with connection() as conn:
+            for k, v in saved.items():
+                if v:
+                    conn.execute("update extraction.state set value = %s where key = %s", (json.dumps(v["value"]), k))
+                else:
+                    conn.execute("delete from extraction.state where key = %s", (k,))

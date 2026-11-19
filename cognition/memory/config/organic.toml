@@ -19,7 +19,14 @@ mode = "paused"
 # backfill runs under the Codex quota guard whatever this says); subjects = attaching exchanges to subjects and their
 # cards (views); reconsolidation = consolidate.reconsolidate; episode_summaries = run-episode summaries.
 # Restart walter-memory-pipeline after a change. State: `walter-memory health` → stages.
-extraction = "paused"
+# 2026-11-19 production (owner: « mets la consolidation organique en production … réactive l'extraction continue sur
+# les nouveaux événements … conserve l'ancienne reconsolidation et les résumés redondants désactivés »): extraction
+# active from extraction.state['live_start'] (the backlog before it goes through backfill in slices); subject cards,
+# reconsolidation and episode summaries stay paused.
+extraction = "active"
+# catchup = the history before live_start, oldest first, one slice per run of walter-memory-catchup.timer (hourly;
+# extract2.catchup: stops over the Codex quota and resumes on a later run; "paused" stops it without losing anything).
+catchup = "active"
 subjects = "paused"
 reconsolidation = "paused"
 episode_summaries = "paused"

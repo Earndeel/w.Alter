@@ -219,6 +219,13 @@ def judge(batch: list[tuple[str, dict, list[dict]]], *, privacy_class: str, budg
     return res
 
 
+def confirmed(target: dict) -> bool:
+    """Knowledge that is more than a declaration: the owner's word, confirmed by him, or a result proven by a check."""
+    a = target.get("attributes") or {}
+    return (target.get("epistemic") == "stated_owner" or target.get("status") == "verified"
+            or bool(a.get("confirmed_by_owner")) or (a.get("proof") or {}).get("level") in ("checked", "confirmed"))
+
+
 def guard(st: dict, verdict: str, target: dict | None, conf: float | None, min_conf: float) -> tuple[str, str | None]:
     """Deterministic rules over the model's verdict → (verdict, note)."""
     if verdict in ("new", "ignore"):
@@ -228,6 +235,13 @@ def guard(st: dict, verdict: str, target: dict | None, conf: float | None, min_c
     if verdict in ("corrects", "replaces") and not st["by_owner"] and target.get("epistemic") == "stated_owner" \
             and not is_progress(st, target, verdict):
         return "contradicts", "agent_vs_owner"      # an assistant's claim never overrides the owner's word
+    # production 19/11 (owner: « une déclaration non vérifiée ne doit pas écraser un fait confirmé »): a declaration
+    # that is not the owner's never replaces confirmed or proven knowledge; it is contested (or a linked complement)
+    if not st["by_owner"] and confirmed(target) and not is_progress(st, target, verdict):
+        if verdict in ("corrects", "replaces"):
+            return "contradicts", "unverified_vs_confirmed"
+        if verdict == "enriches":
+            return "enriches", "complement_only"
     if verdict in ("corrects", "replaces") and target["kind"] in ("constraint", "preference", "correction") \
             and not st["by_owner"]:
         return "contradicts", "owner_rule"
@@ -515,7 +529,8 @@ def apply(gate: Gate, st: dict, verdict: str, target: dict | None, *, row: dict,
         res = gate.change(tid, {"attributes": {**(cur["attributes"] or {}), "contested": True}}, op="contest",
                           key=f"{key}:contest:{tid}", links=[(new, tid, "contradicts")], **meta, reason=note)
         return {"op": "contested", "item": new, "target": tid, "result": res}
-    if verdict == "enriches" and not (st["kind"] == target["kind"] and target["kind"] in ENRICH_SUPERSEDES):
+    if verdict == "enriches" and (note == "complement_only"
+                                  or not (st["kind"] == target["kind"] and target["kind"] in ENRICH_SUPERSEDES)):
         attrs["enriches"] = tid                    # a complement: a new item linked to the target, both current
         new = gate.create({**row, "attributes": attrs}, key=f"{key}:create", **meta, reason=note)
         if not new:

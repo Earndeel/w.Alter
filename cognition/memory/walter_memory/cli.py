@@ -93,12 +93,13 @@ def main(argv=None) -> None:
     ex.add_argument("--limit", type=int, default=20); ex.add_argument("--since"); ex.add_argument("--budget", default="recurring")
     ex.add_argument("--session")
     x2 = sub.add_parser("extract2", help="V1 knowledge extraction, every runtime, per segment (pipeline service does it live)")
-    x2.add_argument("action", choices=["tick", "thread", "reconcile", "enqueue", "replay", "stats", "start", "history"])
+    x2.add_argument("action", choices=["tick", "thread", "reconcile", "enqueue", "replay", "stats", "start", "history", "catchup"])
     x2.add_argument("--item", help="history: a knowledge item (every version of its lineage and every change)")
     x2.add_argument("--source"); x2.add_argument("--thread"); x2.add_argument("--since")
     x2.add_argument("--status", default="failed"); x2.add_argument("--hours", type=int, default=24)
     x2.add_argument("--limit", type=int, default=8); x2.add_argument("--budget", default="recurring")
     x2.add_argument("--force", action="store_true", help="thread: also process the tail still waiting")
+    x2.add_argument("--events", type=int, default=120, help="catchup: messages per slice (oldest first)")
     pl = sub.add_parser("pipeline", help="V1 event pipeline: run the consumers (service) or show their health")
     pl.add_argument("action", nargs="?", default="run", choices=["run", "health"])
     asm = sub.add_parser("assimilation", help="event-driven P1.4-P1.6 (memory.organic): status, step (drain + work now), "
@@ -307,6 +308,8 @@ def main(argv=None) -> None:
             _print(extract2.process_thread(a.source, a.thread, budget=a.budget, force=a.force))
         elif a.action == "reconcile":
             _print(extract2.reconcile())
+        elif a.action == "catchup":     # history before live_start, oldest first, one slice (quota-guarded)
+            _print(extract2.catchup(a.events))
         elif a.action == "enqueue":
             if not (a.since or a.thread):
                 p.error("extract2 enqueue needs --since or --thread (no automatic pre-V1 backfill)")

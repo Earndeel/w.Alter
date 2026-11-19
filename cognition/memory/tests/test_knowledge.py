@@ -561,3 +561,22 @@ def test_an_action_and_a_result_carry_out_the_owners_goal_across_conversations(m
     assert g["stage"] == "verified" and g["status"] == "verified"
     assert [p["act"] for p in g["attributes"]["progress"]] == ["action", "result"]
     assert f"claude_code/{b}" in g["attributes"]["threads"]                # the goal is visible from both conversations
+
+
+def test_an_unverified_declaration_never_overwrites_confirmed_knowledge():
+    """Production 19/11: a declaration that is not the owner's never replaces knowledge confirmed by him or proven
+    by a check — it is contested; an enrichment of it stays a linked complement."""
+    agent = {"by_owner": False, "act": "fact", "kind": "fact"}
+    proven = {"kind": "fact", "epistemic": "agent_reported", "status": "verified", "attributes": {}}
+    endorsed = {"kind": "decision", "epistemic": "agent_reported", "status": "derived",
+                "attributes": {"confirmed_by_owner": True}}
+    checked = {"kind": "fact", "epistemic": "observed", "status": "derived",
+               "attributes": {"proof": {"level": "checked"}}}
+    plain = {"kind": "fact", "epistemic": "agent_reported", "status": "derived", "attributes": {}}
+    for t in (proven, endorsed, checked):
+        assert knowledge.guard(agent, "replaces", t, 0.9, 0.5) == ("contradicts", "unverified_vs_confirmed")
+        assert knowledge.guard(agent, "corrects", t, 0.9, 0.5) == ("contradicts", "unverified_vs_confirmed")
+    assert knowledge.guard({**agent, "kind": "decision", "act": "decision"}, "enriches", endorsed, 0.9, 0.5) \
+        == ("enriches", "complement_only")
+    assert knowledge.guard(agent, "replaces", plain, 0.9, 0.5) == ("replaces", None)      # declaration over declaration
+    assert knowledge.guard({**agent, "by_owner": True}, "replaces", proven, 0.9, 0.5) == ("replaces", None)
