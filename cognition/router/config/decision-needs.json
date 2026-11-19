@@ -112,6 +112,18 @@
         "choice",
         "noul"
       ]
+    },
+    "memory.reconcile": {
+      "owner": "cognition/memory",
+      "purpose": "consolidation: how each statement extracted from a conversation relates to current knowledge (target item + new / confirms / enriches / corrects / replaces / contradicts / ignore), up to 12 statements per decision",
+      "latency_ms": 8000,
+      "memo_ttl_s": 86400,
+      "escalate_below": null,
+      "max_timeout_s": null,
+      "types": [
+        "choice"
+      ],
+      "since": "2026-11-19"
     }
   }
 }
