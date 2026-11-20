@@ -157,3 +157,41 @@ def test_what_is_built_only_from_purged_knowledge_goes_with_it_and_its_dependent
         conn.execute("delete from core.entities where entity_id = %s", (ent,))
     assert left == {str(real)}
     assert pub and pub["payload"]["kind"] == "plan" and pub["payload"]["status"] == "purged" and name not in json.dumps(pub["payload"])
+
+
+def test_a_period_that_summarised_the_purged_episode_is_masked_too():
+    """20/11: the test café's episode was masked, but the December day, week and month views built on it (views.evidence
+    ref_kind 'view') kept naming the test contact. A view built on it that never quotes the purged text stays."""
+    run = uuid.uuid4().hex[:10]
+    name = f"Pytestin Episodique {run}"
+    ev = events.record_events([_ev(f"p{run}", f"{name} propose un café le 12")])["event_ids"][0]
+    ep, day, month = f"pytest-episode:{run}", f"pytest-day:{run}", f"pytest-month:{run}"
+    with connect() as conn:
+        ent = conn.execute("insert into core.entities (entity_type, canonical_name) values ('person', %s) returning entity_id",
+                           (name,)).fetchone()["entity_id"]
+        plan = conn.execute("""insert into core.derived_items (kind, content, status, derived_by, source_event_ids,
+                                   subject_entity_ids, generation) values ('plan', %s, 'derived', 'pytest', %s::uuid[],
+                                   %s::uuid[], 'g1') returning item_id""",
+                            (f"Projet : café avec {name}", [ev], [ent])).fetchone()["item_id"]
+        for v in (ep, day, month):
+            conn.execute("insert into views.view (view_key, domain, horizon, title, status) values (%s, 'projects', 'long', 't', 'active')", (v,))
+        conn.execute("""insert into views.evidence (view_key, ref_kind, ref_id, role, privacy_class, added_by)
+                        values (%s, 'derived', %s, 'support', 'cloud_allowed', 'pytest')""", (ep, str(plan)))
+        for v, ref in ((day, ep), (month, day)):
+            conn.execute("""insert into views.evidence (view_key, ref_kind, ref_id, role, privacy_class, added_by)
+                            values (%s, 'view', %s, 'contains', 'cloud_allowed', 'pytest')""", (v, ref))
+        conn.execute("insert into views.version (view_key, depth, version, content, builder) values (%s, 'overview', 1, %s, 'pytest')",
+                     (ep, f"Café avec {name}"))
+        conn.execute("insert into views.version (view_key, depth, version, content, builder) values (%s, 'overview', 1, %s, 'pytest')",
+                     (day, f"Le 12 : café proposé par {name}."))
+        conn.execute("insert into views.version (view_key, depth, version, content, builder) values (%s, 'overview', 1, %s, 'pytest')",
+                     (month, "Décembre : quelques projets, rien de précis."))
+    dry = purge.purge(reason="pytest", requested_by="pytest", event_ids=[str(ev)])
+    assert dry["counts"]["views_masked"] == 2 and dry["counts"]["view_versions_masked"] == 2
+    purge.purge(reason="pytest", requested_by="pytest", event_ids=[str(ev)], execute=True)
+    with connect() as conn:
+        got = {r["view_key"]: (r["content"], r["stale_since"] is not None) for r in conn.execute(
+            "select view_key, content, stale_since from views.version where view_key = any(%s)", ([ep, day, month],))}
+        conn.execute("delete from core.entities where entity_id = %s", (ent,))
+    assert got[ep] == (purge.MARK, True) and got[day] == (purge.MARK, True)
+    assert got[month] == ("Décembre : quelques projets, rien de précis.", False)

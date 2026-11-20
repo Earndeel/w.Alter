@@ -239,8 +239,41 @@ def _exposed_versions(conn, derived: list, quotes: list[str] | None = None) -> l
                  join core.derived_items d on d.item_id::text = e.ref_id::text
                  where e.ref_kind = 'derived' and e.ref_id = any(%s::text[]) group by e.view_key) s on s.view_key = x.view_key
            where x.built_at >= s.since and x.content is distinct from %s""", ([str(d) for d in derived], MARK)).fetchall()
-    return [(r["view_key"], r["depth"], r["version"]) for r in rows
-            if quotes is None or any(q in _norm(r["t"]) for q in quotes)]
+    out = [(r["view_key"], r["depth"], r["version"]) for r in rows
+           if quotes is None or any(q in _norm(r["t"]) for q in quotes)]
+    if quotes:
+        since = {}
+        for r in conn.execute("""select view_key, min(built_at) b from views.version
+                                 where (view_key, depth, version) in (select * from unnest(%s::text[], %s::text[], %s::int[]))
+                                 group by view_key""", ([e[0] for e in out], [e[1] for e in out], [e[2] for e in out])):
+            since[r["view_key"]] = r["b"]
+        out += _dependent_versions(conn, since, quotes, {e[0] for e in out})
+    return out
+
+
+def _dependent_versions(conn, since: dict, quotes: list[str], seen: set | None = None) -> list[tuple[str, str, int]]:
+    """Views built on an exposed view (views.evidence ref_kind 'view': a day on its episodes, a week on its days…),
+    level by level: their versions built once the cited view quoted the purged knowledge and that quote it too.
+    20/11: the test café's episode was masked, but the December day, week and month that summarised it kept naming
+    the test contact. Without known quotes nothing is masked here: a period summarising many views is not guessed."""
+    seen, out = set(seen or ()) | set(since), []
+    while since:
+        rows = conn.execute(
+            """select x.view_key, x.depth, x.version, x.built_at, x.content::text t from views.version x
+               join (select e.view_key, min(s.b) b from views.evidence e
+                     join unnest(%s::text[], %s::timestamptz[]) s(k, b) on s.k = e.ref_id::text
+                     where e.ref_kind = 'view' group by e.view_key) d on d.view_key = x.view_key
+               where x.built_at >= d.b and x.content is distinct from %s""",
+            (list(since), list(since.values()), MARK)).fetchall()
+        nxt = {}
+        for r in rows:
+            if r["view_key"] in seen or not any(q in _norm(r["t"]) for q in quotes):
+                continue
+            out.append((r["view_key"], r["depth"], r["version"]))
+            nxt[r["view_key"]] = min(nxt.get(r["view_key"], r["built_at"]), r["built_at"])
+        seen |= set(nxt)
+        since = nxt
+    return out
 
 
 def _remove(conn, t: dict) -> dict:
