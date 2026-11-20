@@ -200,3 +200,17 @@ def test_the_owner_hears_the_repair_agents_words_and_only_after_its_runs(tmp_pat
     assert v["outcome"] == "needs_owner" and "2 fois" in v["message_fr"]
     path.write_text(json.dumps({"runs": [], "running": {"since": A.time.time(), "pid": A.os.getpid()}}))
     assert A.escalate("a", inc, v0)["repair"] == "running"
+
+
+def test_the_engine_is_restarted_after_the_agent_never_by_it(monkeypatch):
+    calls = []
+    def fake_sh(*cmd, timeout=60):
+        calls.append(cmd)
+        out = "0\n" if cmd[0] == "walter-python" else ""
+        return A.subprocess.CompletedProcess(cmd, 0, out, "")
+    monkeypatch.setattr(A, "sh", fake_sh)
+    assert A.restart_after(["walter-engine", "nginx"]) == {"walter-engine": "restarted"}   # only the engine's own units
+    assert ("systemctl", "restart", "walter-engine") in calls
+    monkeypatch.setattr(A, "sh", lambda *c, timeout=60: A.subprocess.CompletedProcess(c, 0, "1\n", ""))
+    assert A.restart_after(["walter-engine"]) == {"walter-engine": "deferred:busy"}           # a turn in flight
+    assert "systemctl restart <unité>" in A.REPAIR_BRIEF and '"restart"' in A.REPAIR_BRIEF

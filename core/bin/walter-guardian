@@ -400,7 +400,9 @@ Déjà tenté :
    `walter instance path`). Corrige la cause, pas le symptôme, dans le style du code voisin ; ajoute ou adapte le test qui
    reproduit le cas ; ne supprime jamais une assertion, ne saute jamais un test.
 3. Vérifie : tests du module, puis le contrôle réel (le service, la source relue, la commande qui échouait). Redémarre
-   un service dont tu as changé le code (`walter deploy restart <unité>`).
+   un service dont tu as changé le code avec `systemctl restart <unité>`, puis vérifie qu'il répond. Jamais
+   `walter-engine` ni `walter-telegram` : tu tournes dans le moteur ; s'il faut les redémarrer, mets-les dans
+   `"restart"` du verdict et le guardian le fera après toi, quand aucun tour n'est en cours.
 4. Git : commite seulement TES fichiers (`git -c user.name=W.Alter -c user.email=lucas.jouvencon@gmail.com commit
    <fichiers>`) avec un message qui dit cause et correction. Un fichier où quelqu'un a du travail non commité : n'y touche
    pas, verdict `needs_owner` en le disant.
@@ -416,6 +418,7 @@ Déjà tenté :
  "changes": ["fichier ou geste : ce qui a changé"],
  "evidence": "ce qui prouve la cause et la correction",
  "commit": "hash ou null",
+ "restart": ["walter-engine ou walter-telegram, seulement si ton changement l'exige"],
  "summary_fr": "deux phrases simples pour Monsieur, sans jargon ni commande : ce qui n'allait pas, ce qui est fait",
  "question_fr": "seulement pour needs_owner : ce qu'il doit faire ou décider"}}"""
 
@@ -467,6 +470,23 @@ def delegate(module: str, goal: str, key: str, budget: int = REPAIR_BUDGET) -> d
             "walter_session": res.get("walter_session")}
 
 
+AFTER_UNITS = ("walter-engine", "walter-telegram")   # the agent runs inside them: restarted after its run
+
+
+def restart_after(units) -> dict:
+    """Units the agent could not restart itself, restarted once its run is over and no engine turn is in flight
+    (`walter_platform.deploy.turns_in_flight`; unknown = busy, then left to the core guardian's stale-code check)."""
+    out = {}
+    for unit in [u for u in (units or []) if u in AFTER_UNITS]:
+        busy = sh("walter-python", "-c", "from walter_platform import deploy; print(deploy.turns_in_flight())", timeout=60)
+        if busy.returncode or busy.stdout.strip() != "0":
+            out[unit] = "deferred:busy"
+            continue
+        r = sh("systemctl", "restart", unit, timeout=120)
+        out[unit] = "restarted" if r.returncode == 0 else f"failed:{r.returncode}"
+    return out
+
+
 def repair(module: str, incident: dict, tried: str = "", root: Path | None = None) -> dict:
     """Run the repair agent on one incident (blocking) and record its verdict."""
     root = root or module_root(module)
@@ -488,6 +508,7 @@ def repair(module: str, incident: dict, tried: str = "", root: Path | None = Non
     ran = delegate(module, goal, f"guardian-{module}-{incident.get('key')}-{int(started)}"[:200])
     v = verdict_of(ran.get("output") or "") if ran.get("ok") or ran.get("output") else \
         {"outcome": "failed", "cause": ran.get("error") or ran.get("reason") or "no answer", "summary_fr": ""}
+    v["restarted"] = restart_after(v.get("restart"))
     run_rec = {"t": started, "at": now_iso(), "seconds": round(time.time() - started), "verdict": v,
                "engine": {k: ran.get(k) for k in ("ok", "status", "reason", "error", "tools", "walter_session")},
                "poste": f"{REPAIR_TASK}/{REPAIR_LEVEL}"}

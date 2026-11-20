@@ -106,6 +106,8 @@ régler les problèmes directement sans passer par moi. »
 - **Brief.** `REPAIR_BRIEF` in `walter-guardian` + the module's `guardian/playbook.json` `notes`: cause first, backup in
   `@instance/backups/changes/`, fix the cause with a test, verify the real thing, restart what changed, commit only its
   own files (another session's uncommitted file = `needs_owner`), never a secret, a message, an owner choice, a purge.
+  It restarts what it changed with `systemctl`, except `walter-engine` / `walter-telegram` (it runs inside them): those
+  go in its verdict's `restart` and the guardian restarts them after the run when no engine turn is in flight.
 - **Verdict.** `fixed` is believed only when the module's check (router: the incident's own check) no longer sees it;
   `external` waits; `needs_owner` reaches Monsieur with the agent's words and question. At most 2 runs per incident per
   24 h, 1 h apart (router: 2, 5 h apart), then the owner is told what was tried. History
