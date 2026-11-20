@@ -50,7 +50,7 @@ personnes ont été remplacés par des pseudonymes : garde-les tels quels. Les d
 
 Relève seulement les PROJETS DATÉS de rencontre, de sortie ou de rendez-vous auxquels Monsieur participe (pas les
 livraisons, pas les rappels génériques). Réponds en JSON :
-{{"plans": [{{"what": "ce qui est prévu, en français, ≤ 15 mots", "start": "AAAA-MM-JJTHH:MM (heure locale) ou null",
+{{"plans": [{{"what": "ce qui est prévu, en français, ≤ 15 mots", "start": "AAAA-MM-JJTHH:MM (heure locale), AAAA-MM-JJ si seul le jour est connu, ou null",
 "end": "… ou null", "where": "lieu tel qu'écrit ou null", "with": ["pseudonymes"],
 "agreed": "yes | no | unclear (Monsieur a-t-il accepté ?)", "msgs": [numéros], "quote": "extrait exact 3-20 mots"}}]}}
 Liste vide s'il n'y a aucun projet daté."""
@@ -68,7 +68,7 @@ def _ts(v):
 
 
 # ───────────────────────────── plans from conversations (pseudonymised) ─────────────────────────────
-PLANS_VERSION = "1"     # bump when the prompt or the reading of the answer changes: every burst is read again once
+PLANS_VERSION = "2"     # bump when the prompt or the reading of the answer changes: every burst is read again once
 
 
 def _plans_input(b: dict, msgs: list[dict], z) -> dict:
@@ -247,6 +247,7 @@ def resolve_when(text: str, said_at: datetime) -> datetime | None:
 
 def _store_plan(burst: dict, msgs: list[dict], p: dict, k: int, z) -> str | None:
     from .flows import _upsert
+    day_only = bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(p.get("start") or "").strip()))   # « café le 12 »: a day, no hour
     try:
         start = datetime.fromisoformat(str(p.get("start"))[:16]).replace(tzinfo=z) if p.get("start") else None
     except ValueError:
@@ -259,10 +260,13 @@ def _store_plan(burst: dict, msgs: list[dict], p: dict, k: int, z) -> str | None
                 break
     if not start or not p.get("what"):
         return None
+    default_end = start + (timedelta(days=1) - timedelta(minutes=1) if day_only else timedelta(hours=2))
     try:
-        end = datetime.fromisoformat(str(p.get("end"))[:16]).replace(tzinfo=z) if p.get("end") else start + timedelta(hours=2)
+        end = datetime.fromisoformat(str(p.get("end"))[:16]).replace(tzinfo=z) if p.get("end") else default_end
     except ValueError:
-        end = start + timedelta(hours=2)
+        end = default_end
+    if end < start:
+        end = default_end
     cited = [msgs[i - 1] for i in p.get("msgs") or [] if isinstance(i, int) and 1 <= i <= len(msgs)] or msgs[-1:]
     by_owner = any(m["event_type"] in ("message.sent", "email.sent") for m in cited)
     agreed = str(p.get("agreed") or "unclear")
@@ -270,11 +274,12 @@ def _store_plan(burst: dict, msgs: list[dict], p: dict, k: int, z) -> str | None
         agreed = "unclear"     # the owner wrote nothing: a contact's proposal is never accepted (nor refused) for him
     with connection() as conn:
         participants = [e for e in (burst["attributes"].get("participants") or [])]
-        content = (f"Projet : {p['what']} — prévu {_span(start, end, z)}" + (f" à {p['where']}" if p.get("where") else "")
+        when = f"le {start:%d/%m/%Y} (heure non fixée)" if day_only else _span(start, end, z)
+        content = (f"Projet : {p['what']} — prévu {when}" + (f" à {p['where']}" if p.get("where") else "")
                    + (f" avec {', '.join(p.get('with') or [])}" if p.get("with") else "")
                    + {"yes": " (accepté par Monsieur)", "no": " (refusé par Monsieur)"}.get(agreed, " (accord non établi)"))
         iid = _upsert(conn, kind="plan", builder="episodic.plans", ref=f"plan:{burst['item_id']}:{k}", content=content,
-                      attributes={"start": start, "end": end, "where": p.get("where"), "with": p.get("with") or [],
+                      attributes={"start": start, "end": end, "day_only": day_only, "where": p.get("where"), "with": p.get("with") or [],
                                   "agreed": agreed, "quote": str(p.get("quote") or "")[:300], "burst": burst["item_id"],
                                   "participants": participants},
                       event_ids=[m["event_id"] for m in cited], privacy_class=burst["privacy_class"], at=start,
@@ -298,6 +303,12 @@ def _signals(conn, since: datetime, until: datetime) -> list[dict]:
     return [s for s in out if s["start"]]
 
 
+def _day_only(s: dict) -> bool:
+    """A plan known only by its day (« café le 12 »): its hours are unknown, so no visit or other seed of that day
+    is taken as part of it by mere overlap."""
+    return bool((s.get("attributes") or {}).get("day_only"))
+
+
 def _overlap(a: dict, b: dict, tol: timedelta = TOLERANCE) -> bool:
     return a["start"] - tol <= b["end"] and b["start"] - tol <= a["end"]
 
@@ -318,7 +329,8 @@ def group(signals: list[dict], home: str | None) -> list[list[dict]]:
             first = g[0]
             same_title = (s["attributes"].get("title") or "").lower() == (first["attributes"].get("title") or "-").lower()
             shared = set(s["entities"]) & {e for x in g for e in x["entities"]}
-            if _overlap(first, s) and (shared or same_title or s["kind"] != first["kind"]):
+            loose = s["kind"] != first["kind"] and not _day_only(s) and not _day_only(first)
+            if _overlap(first, s) and (shared or same_title or loose):
                 g.append(s)
                 break
         else:
@@ -326,7 +338,7 @@ def group(signals: list[dict], home: str | None) -> list[list[dict]]:
     used = set()
     for g in groups:
         for v in visits:
-            if any(_overlap(x, v, timedelta(minutes=30)) for x in g if x["kind"] != "visit"):
+            if any(_overlap(x, v, timedelta(minutes=30)) for x in g if x["kind"] != "visit" and not _day_only(x)):
                 g.append(v); used.add(v["id"])
     for v in visits:
         if v["id"] not in used and v["end"] - v["start"] >= MIN_OUTING:

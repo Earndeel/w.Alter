@@ -256,3 +256,35 @@ def test_a_date_without_an_hour_is_enough_for_the_plans_to_be_read():
         assert TIME_HINT.search(t), t
     for t in ("merci beaucoup", "j'ai 3 chats", "trop bien ton appart"):
         assert not TIME_HINT.search(t), t
+
+
+def test_a_plan_known_only_by_its_day_is_kept_without_inventing_an_hour():
+    """E2E 20/11: the reader understood « café le 12 » but had to answer start=null (hour required), so the proposal
+    never became a plan. A day alone is a plan « heure non fixée »; it never pulls a visit of that day into an episode."""
+    from walter_memory import episodic, flows
+    c, chat = contact(), f"!pytest-pd-{uuid.uuid4().hex[:8]}:beeper.local"
+    at = NOW - timedelta(hours=3)
+    say(c, chat, "contact", "Je passe à Bangkok du 10 au 14 décembre, ça te dit qu'on prenne un café le 12 ?", at=at)
+    flows.conversations(at - timedelta(minutes=5), thread=("beeper", chat))
+    with connection() as conn:
+        burst = conn.execute("""select item_id::text from core.derived_items where derived_by = 'flows.conversations'
+                                and status = 'derived' and source_refs->>'ref' like %s""", (f"conv:beeper:{chat}:%",)).fetchone()
+
+    def model(messages, **kw):
+        assert "AAAA-MM-JJ si seul le jour est connu" in messages[0]["content"]
+        return {"content": json.dumps({"plans": [{"what": "Café à Bangkok", "start": "2026-12-12", "where": "Bangkok",
+                                                  "agreed": "unclear", "msgs": [1], "quote": "un café le 12"}]}),
+                "model": "scripted"}
+    assert episodic.plan_burst(burst["item_id"], chat=model)["plans"] == 1
+    with connection() as conn:
+        p = conn.execute("""select item_id::text id, kind, content, attributes, subject_entity_ids from core.derived_items
+                            where derived_by = 'episodic.plans' and attributes->>'burst' = %s and status = 'derived'""",
+                         (burst["item_id"],)).fetchone()
+    a = p["attributes"]
+    assert a["day_only"] is True and "12/12/2026 (heure non fixée)" in p["content"] and "accord non établi" in p["content"]
+    assert episodic._ts(a["start"]).hour == 0 and episodic._ts(a["end"]).date() == episodic._ts(a["start"]).date()
+    seed = {**p, "start": episodic._ts(a["start"]), "end": episodic._ts(a["end"]), "entities": []}
+    visit = {"id": "v", "kind": "visit", "attributes": {"place_id": "elsewhere"}, "entities": [],
+             "start": seed["start"] + timedelta(hours=15), "end": seed["start"] + timedelta(hours=16)}
+    groups = episodic.group([seed, visit], home="home")
+    assert [len(g) for g in groups] == [1, 1]      # the visit is its own outing, not the café
