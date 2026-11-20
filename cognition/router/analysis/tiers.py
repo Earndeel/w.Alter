@@ -19,6 +19,10 @@ Input: every callable model x reasoning level with its AA Intelligence score and
    L3 on that pool, L2 = the best model of ANOTHER subscription costing less per task than L3 (the two tiers then
    spread over two quotas), else the best cheaper one of L3's own. Only ever raises a tier; each carries its pick
    once its subscription is spent, which execution switches to instead of paying the API price.
+7. Owner's hold rule (2026-11-20, hold_price, applied in select._tier_rows): once a tier is declared, L1 and L2 keep
+   about its price — a proposal costs at most HOLD_BAND more per task than the declared tier and scores at least
+   HOLD_MIN_GAIN more, both read in the same index snapshot; nothing better at that price = the declared tier stays.
+   No tier is ever proposed below the declared tier's current score (L3 keeps the method, with that floor).
 
 On 2026-10-02 this gives L1 GPT-6 Luna max (38.1, 0.020 $), L2 GPT-6.1 Sol medium (47.8, 0.064 $), L3 Claude
 Opus 5.5 high (53.6, 0.73 $) — the tiers the owner had reached by hand. The method proposes; the declared tiers
@@ -33,6 +37,10 @@ KNEE_DROP = 2.0
 # ceiling nor competes for a tier. Fable 5.2 max (64.6 at 26.5 $/task) had set the band at 59.6, so Opus 5.5 max
 # (59.1 at 0.17 $) missed it by 0.5 point and L3 went to Gemini 4 Carbon (60.0 at 3.10 $).
 CEILING_MIN_GAIN = 1.0
+# 2026-11-20 (owner): « le L1 doit rester plus ou moins le même prix, mais évidemment jamais descendre en score.
+# pareil pour L2 ». The knee / best-gain rules had proposed Terra medium (38.2) under the declared 6.2 Sol low (40.6).
+HOLD_BAND = 0.25
+HOLD_MIN_GAIN = 0.5
 
 
 def frontier(points: list[dict]) -> list[dict]:
@@ -88,6 +96,18 @@ def compute(points: list[dict], floor: float = QUALITY_FLOOR, band: float = CEIL
     return {"frontier": f + luxury, "L1": l1, "L2": l2, "L3": l3,
             "params": {"floor": floor, "ceiling_band": band, "knee_drop": knee_drop, "ceiling": ceiling,
                        "ceiling_min_gain": min_gain, "luxury": [f'{p["model_id"]}/{p["variant"]}' for p in luxury]}}
+
+
+def hold_price(points: list[dict], anchor: dict, band: float = HOLD_BAND, min_gain: float = HOLD_MIN_GAIN,
+               allow=lambda p: True) -> dict | None:
+    """The declared tier's successor at about its price: the best-scoring point costing at most (1 + band) x the
+    anchor's cost per task and scoring at least `min_gain` above it (tie: the cheaper). None = keep the anchor."""
+    if not anchor.get("cost") or anchor.get("score") is None:
+        return None
+    cap = anchor["cost"] * (1 + band)
+    better = [p for p in points if p.get("cost") and p["cost"] <= cap and p.get("score") is not None
+              and p["score"] >= anchor["score"] + min_gain and allow(p)]
+    return max(better, key=lambda p: (p["score"], -p["cost"]), default=None)
 
 
 def _best(ps) -> dict | None:

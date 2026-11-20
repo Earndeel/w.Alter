@@ -80,9 +80,50 @@ def load_subscription_costs(conn) -> dict[tuple[str, str], dict]:
                                                          "source": c.get("source")}
     except Exception:  # noqa: BLE001 — no cost price known = the paid routes alone, as before
         return {}
+    try:
+        out.update(estimate_from_predecessor(out, load_offers(conn, latest_snapshots(conn))))
+    except Exception:  # noqa: BLE001 — an estimate is a bonus: the measured ratios stand alone
+        pass
     SUBSCRIPTION_COSTS.clear()
     SUBSCRIPTION_COSTS.update(out)
     return out
+
+
+def _family(model_id: str) -> tuple[tuple[str, ...], tuple[int, ...]]:
+    """(line, version) of a model id: gpt-6-2-sol -> (('gpt', 'sol'), (6, 2)); claude-opus-5-5 -> (('claude', 'opus'), (5, 5))."""
+    tokens = model_id.split("-")
+    return tuple(t for t in tokens if not t.isdigit()), tuple(int(t) for t in tokens if t.isdigit())
+
+
+def _list_price(offers: list[dict]) -> tuple[float, float] | None:
+    o = next((o for o in offers if o["provider"] == "openrouter" and o["interface"] == "chat"
+              and o.get("price_in_1m") is not None and o.get("price_out_1m") is not None), None)
+    return (float(o["price_in_1m"]), float(o["price_out_1m"])) if o else None
+
+
+def estimate_from_predecessor(measured: dict, offers: dict) -> dict:
+    """Owner, 2026-11-20: a new model of a subscription that ModelDial has not measured yet takes the measured ratio of
+    its predecessor — the closest older version of the same line on the same subscription — when both have the SAME
+    official API price (input and output per token, OpenRouter's list price). Marked `source: estimated`; a measured
+    ratio always wins. GPT-6.2 Sol (2/10 $) takes GPT-6.1 Sol's; GPT-6.2 Astra (8/40 $ vs GPT-6 Astra's 10/50 $) not."""
+    est = {}
+    for mid, mo in offers.items():
+        for prov in {o["provider"] for o in mo if o["access"] == "subscription" and o["interface"] == "chat"}:
+            if (prov, mid) in measured:
+                continue
+            line, version = _family(mid)
+            price = _list_price(mo)
+            if not version or price is None:
+                continue
+            older = [(v, m) for (p, m) in measured if p == prov
+                     for (ln, v) in [_family(m)] if ln == line and v and v < version]
+            if not older:
+                continue
+            _, pred = max(older)
+            if _list_price(offers.get(pred, [])) != price:
+                continue
+            est[(prov, mid)] = {**measured[(prov, pred)], "source": "estimated", "estimated_from": pred}
+    return est
 
 
 def route_cost(route: dict) -> float | None:
@@ -124,7 +165,8 @@ def chat_route(offers: list[dict], list_cost: float | None, modes: list[str] | N
         known = SUBSCRIPTION_COSTS.get((subscription, mid))
         if known:
             sub_cost = {"provider": subscription, "ratio": known["ratio"], "basis": "subscription_cost_price",
-                        "sub_id": known["sub_id"], "source": known.get("source"), "cost": list_cost * known["ratio"]}
+                        "sub_id": known["sub_id"], "source": known.get("source"), "cost": list_cost * known["ratio"],
+                        **({"estimated_from": known["estimated_from"]} if known.get("estimated_from") else {})}
     return {"paid": best, "subscription": subscription, "subscription_cost": sub_cost,
             "callable": bool(best or subscription)}
 
@@ -286,38 +328,83 @@ def _without_subscription(pts: list[dict], provider: str) -> list[dict]:
     return out
 
 
-def _tier_rows(cands: list[dict]) -> list[dict]:
-    """The owner's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs."""
+HOLD_WHY = {"move": "même prix que le niveau déclaré (±{band} %), meilleur score",
+            "keep": "niveau déclaré gardé : rien de mieux noté au même prix (±{band} %)",
+            "keep_l3": "niveau déclaré gardé : la méthode ne trouve pas mieux noté"}
+
+
+def _spent_fallback(pts: list[dict], p: dict, level: str, picked: dict) -> dict | None:
+    """The tier's pick once `p`'s subscription is spent (the 16/11 rule on the remaining pool, else the method)."""
+    spent = _without_subscription(pts, p["route"]["subscription_cost"]["provider"])
+    if not spent:
+        return None
+    from walter_router.analysis import tiers
+    fb = (tiers.above(spent, _on_subscription, picked["L2"]) if level == "L3" and picked.get("L2")
+          else tiers.quota_levels(spent, _on_subscription, _sub_of).get(level))
+    return fb or tiers.compute(spent)[level]
+
+
+def _quota_info(pts, p, level, picked, method_pick) -> dict | None:
+    if not _on_subscription(p):
+        return None
+    sub = p["route"]["subscription_cost"]
+    fb = _spent_fallback(pts, p, level, picked)
+    return {"subscription": sub["sub_id"], "route_provider": sub["provider"], "method_pick": method_pick,
+            "estimated_from": sub.get("estimated_from"),
+            "when_quota_spent": fb and {"pin": f'{fb["model_id"]}/{fb["variant"]}', "name": fb["display_name"],
+                                        "score": fb["score"], "real_cost": fb["cost"]}}
+
+
+def _tier_rows(cands: list[dict], pins: dict | None = None) -> list[dict]:
+    """The owner's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs.
+    `pins` = the declared tiers {level: (model_id, variant)}: L1/L2 then follow the hold rule (2026-11-20, same price,
+    better score), and no tier is proposed below its declared model's score in this same snapshot."""
     from walter_router.analysis import tiers  # late import keeps the module graph flat
     pts = [{**c, "cost": c["real_cost"]} for c in cands if c.get("real_cost")]
     t = tiers.compute(pts)
     q = tiers.quota_levels(pts, _on_subscription, _sub_of)
+    pins = pins or {}
+    anchors = {lv: next((p for p in pts if (p["model_id"], p["variant"] or "") == tuple(pin)), None)
+               for lv, pin in pins.items()}
+    band = round(tiers.HOLD_BAND * 100)
     rows, picked = [], {}
     for level, why in (("L1", "économique : premier coude au-dessus du plancher de qualité"),
                        ("L2", "intermédiaire : meilleur gain en points par $ depuis L1"),
                        ("L3", "haut de gamme : meilleur gain depuis L2 dans la bande du plafond")):
         p, m = q.get(level), t[level]
+        a = anchors.get(level)
+        missing = {"declared_missing": "/".join(pins[level])} if level in pins and not a else {}
+        method_pick = m and f'{m["model_id"]}/{m["variant"]}'
+        if a and level in ("L1", "L2"):
+            l3_sub = _sub_of(anchors["L3"]) if anchors.get("L3") else None
+            # L2 keeps the 16/11 spread: never on L3's subscription
+            allow = (lambda c: not (l3_sub and _sub_of(c) == l3_sub)) if level == "L2" else (lambda c: True)
+            nxt = tiers.hold_price(pts, a, allow=allow)
+            pick = nxt or a
+            picked[level] = pick
+            rows.append(_row("general", level, 1, pick, role=HOLD_WHY["move" if nxt else "keep"].format(band=band),
+                             hold={"declared": f'{a["model_id"]}/{a["variant"]}', "declared_score": a["score"],
+                                   "declared_cost": a["cost"], "band": tiers.HOLD_BAND,
+                                   "gain": round(pick["score"] - a["score"], 2),
+                                   "cost_ratio": round(pick["cost"] / a["cost"], 3) if a["cost"] else None},
+                             quota_rule=nxt and _quota_info(pts, pick, level, picked, method_pick),
+                             method_pick=method_pick, method=t.get("params")))
+            continue
         # the rule only ever raises a tier: never below the method's pick, nor at or below L1
         bar = max(m["score"] if m else 0, (t["L1"]["score"] + 1e-9) if t["L1"] else 0)
         if p and p["score"] >= bar:
             # the owner's subscription rule (2026-11-16); once every account of that subscription is spent, the same
             # rule on the remaining subscriptions (L3: the best gain above L2's pick), else the method without it
-            sub = p["route"]["subscription_cost"]
-            spent = _without_subscription(pts, sub["provider"])
-            fb = None
-            if spent:
-                fb = (tiers.above(spent, _on_subscription, picked["L2"]) if level == "L3" and picked.get("L2")
-                      else tiers.quota_levels(spent, _on_subscription, _sub_of)[level])
-                fb = fb or tiers.compute(spent)[level]
-            picked[level] = p
-            rows.append(_row("general", level, 1, p, role=QUOTA_WHY[level], quota_rule={
-                "subscription": sub["sub_id"], "route_provider": sub["provider"],
-                "method_pick": m and f'{m["model_id"]}/{m["variant"]}',
-                "when_quota_spent": fb and {"pin": f'{fb["model_id"]}/{fb["variant"]}', "name": fb["display_name"],
-                                            "score": fb["score"], "real_cost": fb["cost"]}}, method=t.get("params")))
+            pick, role, extra = p, QUOTA_WHY[level], {"quota_rule": _quota_info(pts, p, level, picked, method_pick)}
         elif m:
-            picked[level] = m
-            rows.append(_row("general", level, 1, m, role=why, marginal=m.get("marginal"), method=t.get("params")))
+            pick, role, extra = m, why, {"marginal": m.get("marginal")}
+        else:
+            continue
+        if a and pick["score"] < a["score"] + tiers.HOLD_MIN_GAIN:
+            # never a lower score than the declared tier (owner 2026-11-20): it stays
+            pick, role, extra = a, HOLD_WHY["keep_l3"], {"method_pick": f'{pick["model_id"]}/{pick["variant"]}'}
+        picked[level] = pick
+        rows.append(_row("general", level, 1, pick, role=role, method=t.get("params"), **extra, **missing))
     rows += [_row("general", "frontier", i + 1, p, marginal=p.get("marginal"))
              for i, p in enumerate(q for q in t["frontier"] if q["score"] >= tiers.QUALITY_FLOOR - 5)]
     return rows
@@ -450,6 +537,13 @@ def general_points(conn) -> list[dict]:
     return out
 
 
+def _declared_tiers(conn) -> dict:
+    """The owner's declared text tiers as pinned (knowledge.json "levels", re-applied to preferences each cycle)."""
+    return {r["role"]: (r["pinned_model_id"], r["pinned_variant"] or "") for r in conn.execute(
+        """select role, pinned_model_id, pinned_variant from models.preferences
+           where task = 'general' and role in ('L1', 'L2', 'L3') and pinned_model_id is not null""")}
+
+
 def compute(conn) -> list[dict]:
     load_subscription_costs(conn)
     snaps = latest_snapshots(conn)
@@ -502,7 +596,7 @@ def compute(conn) -> list[dict]:
         if not cands:
             continue
         if t["task"] == "general":
-            out += _tier_rows(cands)
+            out += _tier_rows(cands, _declared_tiers(conn))
     return out
 
 

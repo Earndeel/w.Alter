@@ -23,6 +23,9 @@ NERF = {"aa_intelligence": 2.0, "aa_eval": 3.0, "aa_decision": 2.0, "bridgebench
         "aa_stt:wer": 1.0, "aa_stt:speed": 50.0, "agentset:rerank_speed": 0.5, "agentset:embeddings_speed": 0.5,
         "mteb": 2.0}
 NERF_ELO = 15.0
+# a board-wide recalculation without a new version label (2026-11-20): share of shared models moved past the nerf limit
+RECALC_SHARE = 0.5
+RECALC_MIN = 10
 BENCH_KINDS = ("aa", "aa_eval", "aa_decision", "mm", "da", "arena", "bridgebench", "aa_stt", "agentset", "mteb")
 OFFER_KINDS = ("openrouter", "kie", "hermes_providers")
 INTELLIGENCE = "aa_intelligence:intelligence"
@@ -43,6 +46,35 @@ def rebased_boards(conn, cur: int, prev: int) -> dict[str, dict]:
     snapshot (methodology page down, AA's 'updated' mark expired) is not a change."""
     after, before = _versions(conn, cur), _versions(conn, prev)
     return {b: {"before": before.get(b), "after": v} for b, v in after.items() if v and v != before.get(b)}
+
+
+def _limit(board: str) -> float:
+    return NERF.get(board, NERF.get(board.split(":", 1)[0], NERF_ELO))
+
+
+def recalculated_boards(old: dict, rows: list, labelled: dict) -> dict[str, dict]:
+    """Boards AA recomputed without changing their version label (owner 2026-11-20: « faut faire attention au
+    changement que Artificial Analysis fait sur son index … ça recalcule les valeurs souvent à la baisse »): at least
+    RECALC_SHARE of the models present in both snapshots (RECALC_MIN at least) moved the same way by more than the
+    board's nerf threshold. Such a board is a rebase, not a nerf of every model nor news: its scores are compared
+    within one snapshot only."""
+    deltas: dict[str, list[float]] = {}
+    for r in rows:
+        key = (r["benchmark"], r["task"], r["external_key"])
+        board = f'{r["benchmark"]}:{r["task"]}'
+        if board not in labelled and key in old and r["score"] is not None and old[key] is not None:
+            deltas.setdefault(board, []).append(r["score"] - old[key])
+    out = {}
+    for board, ds in deltas.items():
+        if len(ds) < RECALC_MIN:
+            continue
+        limit = _limit(board)
+        down, up = sum(d < -limit for d in ds), sum(d > limit for d in ds)
+        if max(down, up) >= RECALC_SHARE * len(ds):
+            med = sorted(ds)[len(ds) // 2]
+            out[board] = {"before": None, "after": None, "silent": True, "median_shift": round(med, 1),
+                          "share": round(max(down, up) / len(ds), 2), "models": len(ds)}
+    return out
 
 
 def _previous(conn, kind: str) -> tuple[int | None, int | None]:
@@ -70,8 +102,12 @@ def events(conn) -> dict:
             "select benchmark, task, external_key, max(score) as score from models.benchmarks where snapshot_id = %s "
             "group by 1, 2, 3", (prev,))}
         boards_before = {(b, t) for b, t, _ in old}
-        for r in conn.execute("""select benchmark, task, external_key, model_id, max(score) as score
-                                 from models.benchmarks where snapshot_id = %s group by 1, 2, 3, 4""", (cur,)):
+        rows = list(conn.execute("""select benchmark, task, external_key, model_id, max(score) as score
+                                    from models.benchmarks where snapshot_id = %s group by 1, 2, 3, 4""", (cur,)))
+        silent = recalculated_boards(old, rows, moved)
+        moved.update(silent)
+        out["rebased"].update(silent)
+        for r in rows:
             key = (r["benchmark"], r["task"], r["external_key"])
             board = f'{r["benchmark"]}:{r["task"]}'
             if board in moved:
@@ -80,7 +116,7 @@ def events(conn) -> dict:
                 if (r["benchmark"], r["task"]) in boards_before:  # a brand-new board is not a new model
                     out["new"].setdefault(r["model_id"], []).append(f"nouveau sur {board}")
                 continue
-            limit = NERF.get(board, NERF.get(r["benchmark"], NERF_ELO))
+            limit = _limit(board)
             if old[key] - r["score"] > limit:
                 out["nerf"].setdefault(r["model_id"], []).append(
                     {"board": board, "before": round(old[key], 1), "after": round(r["score"], 1)})
@@ -122,6 +158,10 @@ def rebased_intelligence(ev: dict) -> list:
     moved = (ev.get("rebased") or {}).get(INTELLIGENCE)
     if not moved:
         return []
+    if moved.get("silent"):
+        shift = f'{moved["median_shift"]:+.1f}'.replace(".", ",")
+        return [f'AA a recalculé son Intelligence Index sans changer de version ({shift} pts en médiane sur '
+                f'{moved["models"]} modèles) : niveaux recomparés dans le nouvel index']
     before = f'v{moved["before"]}' if moved["before"] else "version précédente"
     return [f'nouvel AA Intelligence Index ({before} → v{moved["after"]}) : niveaux recalculés']
 

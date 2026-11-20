@@ -290,6 +290,18 @@ def boards_down(conn) -> list[str]:
     return created
 
 
+def _hold_why(hold: dict | None, quota: dict | None) -> list[str]:
+    """The owner's hold rule (2026-11-20) in words: same price as the declared tier, a better score."""
+    if not hold or not hold.get("gain"):
+        return []
+    pct = round(((hold.get("cost_ratio") or 1) - 1) * 100)
+    out = [f'même prix que {hold["declared"]} ({"+" if pct >= 0 else ""}{pct} % par tâche, bande ±{round(hold["band"] * 100)} %) '
+           f'et +{hold["gain"]:.1f} pts AA (même index)'.replace(".", ",")]
+    if quota and quota.get("estimated_from"):
+        out.append(f'coût d’abonnement estimé d’après {quota["estimated_from"]} (même prix API officiel)')
+    return out
+
+
 def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]:
     """When the owner's method (nightly L1/L2/L3 in models.selection) designates another model x reasoning level than
     the declared tier, one alert per tier; they test and adopt or ignore (never switched automatically)."""
@@ -313,12 +325,19 @@ def tiers(conn, run_id: int | None = None, chg: dict | None = None) -> list[str]
         ev = {"level": r["level"], "proposed": f'{r["model_id"]}/{r["variant"]}', "name": r["display_name"],
               "score": r["quality"], "real_cost": r["real_cost"],
               "current": f'{r["pinned_model_id"]}/{r["pinned_variant"]}', "current_score": pinned and pinned["score"]}
-        quota = (r["reasons"] or {}).get("quota_rule")
+        reasons = r["reasons"] or {}
+        hold = reasons.get("hold")
+        if hold:   # same snapshot on both sides: an AA rebase moves both scores together (owner 2026-11-20)
+            ev["current_score"] = hold.get("declared_score")
+            ev["current_cost"] = hold.get("declared_cost")
+        quota = reasons.get("quota_rule")
         if quota:   # the owner's quota rule (2026-11-16): adopting the tier also declares its model once the quota is spent
             ev["subscription"] = quota.get("subscription")
             ev["when_quota_spent"] = (quota.get("when_quota_spent") or {}).get("pin")
         chg = chg or changes.events(conn)
-        ev["why"] = changes.changed(chg, r["model_id"]) + [
+        ev["why"] = _hold_why(hold, quota) + ([f'niveau déclaré {reasons["declared_missing"]} absent de l’index courant']
+                                              if reasons.get("declared_missing") else []) + \
+            changes.changed(chg, r["model_id"]) + [
             f'{r["pinned_model_id"]} dégradé' for _ in chg["nerf"].get(r["pinned_model_id"], [])[:1]] + \
             changes.rebased_intelligence(chg) + ([
                 f'règle des abonnements (propriétaire, 16/11) : {quota.get("subscription")}, '
@@ -363,7 +382,9 @@ def pareto(conn, run_id: int, chg: dict | None = None) -> list[str]:
         if sub.get("cost") is not None and r["real_cost"] is not None and abs(sub["cost"] - r["real_cost"]) < 1e-9:
             # its real cost is a subscription's cost price (ModelDial, 2026-11-16): that is the reason, not a board
             why = [f'prix de revient via l’abonnement {sub.get("sub_id") or sub.get("provider")} : '
-                   f'{sub["ratio"] * 100:.1f} % du prix API (quota mesuré par ModelDial)'.replace(".", ",", 1)]
+                   f'{sub["ratio"] * 100:.1f} % du prix API '.replace(".", ",", 1)
+                   + (f'(estimé d’après {sub["estimated_from"]}, même prix API officiel ; ModelDial ne l’a pas encore mesuré)'
+                      if sub.get("estimated_from") else '(quota mesuré par ModelDial)')]
         else:
             why = changes.changed(chg, r["model_id"])
         if not why:

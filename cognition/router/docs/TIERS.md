@@ -35,6 +35,23 @@ La méthode est implémentée dans `analysis/tiers.py`. Les constantes et leurs 
    l’instance). À l’exécution, quand tous les comptes de l’abonnement
    dépassent le seuil hebdomadaire (90 %) ou ont plein leur fenêtre de session, le niveau passe sur ce repli au lieu de
    payer le modèle au prix API (`quota_switch` dans la réponse). Il y revient dès qu’un compte a de nouveau du quota.
+8. Estimation d’après le prédécesseur (propriétaire, 20/11/2026) : un nouveau modèle d’abonnement que ModelDial n’a
+   pas encore mesuré prend le ratio mesuré de la version précédente de la même gamme sur le même abonnement, seulement
+   si leur prix API officiel (entrée et sortie, prix catalogue OpenRouter) est identique. Le ratio est marqué
+   `estimated` / `estimated_from` et une mesure ModelDial le remplace dès qu’elle existe. GPT-6.2 Sol (2/10 $) prend
+   celui de GPT-6.1 Sol ; GPT-6.2 Astra (8/40 $ contre 10/50 $ pour GPT-6 Astra) n’est pas estimé.
+9. Règle de maintien (propriétaire, 20/11/2026 : « le L1 doit rester plus ou moins le même prix, mais évidemment jamais
+   descendre en score, pareil pour L2 ») : une fois un niveau déclaré, L1 et L2 ne proposent qu’un modèle qui coûte au
+   plus `HOLD_BAND` (25 %) de plus par tâche que le niveau déclaré et gagne au moins `HOLD_MIN_GAIN` (0,5 point AA) ;
+   le meilleur score l’emporte, à égalité le moins cher. L2 reste sur un autre abonnement que L3. Rien de mieux à ce
+   prix : le niveau déclaré reste. L3 garde la méthode des étapes 6-7, mais aucun niveau n’est jamais proposé sous le
+   score actuel du modèle déclaré. Les deux scores sont toujours lus dans le même instantané de l’index : quand
+   Artificial Analysis change de version ou recalcule son index (souvent à la baisse), les deux côtés bougent ensemble.
+   Un niveau déclaré absent de l’index retombe sur la méthode, et la proposition le dit.
+10. Recalcul silencieux de l’index (20/11/2026) : quand, sur un classement, au moins la moitié des modèles présents dans
+   les deux instantanés (10 au minimum) bougent dans le même sens au-delà du seuil de baisse, sans nouvelle étiquette
+   de version, le classement est traité comme une nouvelle version (`changes.recalculated_boards`) : ni « dégradé »
+   pour chaque modèle, ni « nouveau », et les niveaux sont recomparés dans le nouvel index.
 
 Si les points exploitables ne suffisent pas, le calcul ne fabrique pas trois niveaux artificiels. Les détails
 et cas limites sont dans la fonction `compute`, sa docstring et ses tests.

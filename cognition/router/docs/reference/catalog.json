@@ -5924,6 +5924,11 @@
             "signature": "conn"
           },
           {
+            "description": "The owner's hold rule (2026-11-20) in words: same price as the declared tier, a better score.",
+            "name": "_hold_why",
+            "signature": "hold: dict | None, quota: dict | None"
+          },
+          {
             "description": "When the owner's method (nightly L1/L2/L3 in models.selection) designates another model x reasoning level than",
             "name": "tiers",
             "signature": "conn, run_id: int | None=None, chg: dict | None=None"
@@ -6050,6 +6055,16 @@
             "description": "{board: {'before', 'after'}} for the boards whose version label changed. A label missing from the latest",
             "name": "rebased_boards",
             "signature": "conn, cur: int, prev: int"
+          },
+          {
+            "description": "",
+            "name": "_limit",
+            "signature": "board: str"
+          },
+          {
+            "description": "Boards AA recomputed without changing their version label (owner 2026-11-20: « faut faire attention au",
+            "name": "recalculated_boards",
+            "signature": "old: dict, rows: list, labelled: dict"
           },
           {
             "description": "",
@@ -6575,6 +6590,21 @@
             "signature": "conn"
           },
           {
+            "description": "(line, version) of a model id: gpt-6-2-sol -> (('gpt', 'sol'), (6, 2)); claude-opus-5-5 -> (('claude', 'opus'), (5, 5)).",
+            "name": "_family",
+            "signature": "model_id: str"
+          },
+          {
+            "description": "",
+            "name": "_list_price",
+            "signature": "offers: list[dict]"
+          },
+          {
+            "description": "Owner, 2026-11-20: a new model of a subscription that ModelDial has not measured yet takes the measured ratio of",
+            "name": "estimate_from_predecessor",
+            "signature": "measured: dict, offers: dict"
+          },
+          {
             "description": "Real cost of a chat route: the cheaper of its best paid offer and its subscription's cost price.",
             "name": "route_cost",
             "signature": "route: dict"
@@ -6640,9 +6670,19 @@
             "signature": "pts: list[dict], provider: str"
           },
           {
+            "description": "The tier's pick once `p`'s subscription is spent (the 16/11 rule on the remaining pool, else the method).",
+            "name": "_spent_fallback",
+            "signature": "pts: list[dict], p: dict, level: str, picked: dict"
+          },
+          {
+            "description": "",
+            "name": "_quota_info",
+            "signature": "pts, p, level, picked, method_pick"
+          },
+          {
             "description": "The owner's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs.",
             "name": "_tier_rows",
-            "signature": "cands: list[dict]"
+            "signature": "cands: list[dict], pins: dict | None=None"
           },
           {
             "description": "'best' level: callable models ordered by the weighted multi-board score (scoring.composite).",
@@ -6667,6 +6707,11 @@
           {
             "description": "Every callable model x reasoning level on the AA Intelligence Index with its real cost per AA task (the cloud",
             "name": "general_points",
+            "signature": "conn"
+          },
+          {
+            "description": "The owner's declared text tiers as pinned (knowledge.json \"levels\", re-applied to preferences each cycle).",
+            "name": "_declared_tiers",
             "signature": "conn"
           },
           {
@@ -6845,6 +6890,11 @@
             "description": "",
             "name": "compute",
             "signature": "points: list[dict], floor: float=QUALITY_FLOOR, band: float=CEILING_BAND, knee_drop: float=KNEE_DROP, min_gain: float=CEILING_MIN_GAIN"
+          },
+          {
+            "description": "The declared tier's successor at about its price: the best-scoring point costing at most (1 + band) x the",
+            "name": "hold_price",
+            "signature": "points: list[dict], anchor: dict, band: float=HOLD_BAND, min_gain: float=HOLD_MIN_GAIN, allow=lambda p: True"
           },
           {
             "description": "",
@@ -15274,6 +15324,18 @@
       {
         "comment": "",
         "file": "analysis/changes.py",
+        "name": "RECALC_SHARE",
+        "value": 0.5
+      },
+      {
+        "comment": "",
+        "file": "analysis/changes.py",
+        "name": "RECALC_MIN",
+        "value": 10
+      },
+      {
+        "comment": "",
+        "file": "analysis/changes.py",
         "name": "BENCH_KINDS",
         "value": [
           "aa",
@@ -15582,6 +15644,16 @@
       {
         "comment": "",
         "file": "analysis/select.py",
+        "name": "HOLD_WHY",
+        "value": {
+          "keep": "niveau déclaré gardé : rien de mieux noté au même prix (±{band} %)",
+          "keep_l3": "niveau déclaré gardé : la méthode ne trouve pas mieux noté",
+          "move": "même prix que le niveau déclaré (±{band} %), meilleur score"
+        }
+      },
+      {
+        "comment": "",
+        "file": "analysis/select.py",
         "name": "MEDIA_EXEC_INTERFACES",
         "value": [
           "image",
@@ -15746,6 +15818,18 @@
         "file": "analysis/tiers.py",
         "name": "CEILING_MIN_GAIN",
         "value": 1.0
+      },
+      {
+        "comment": "",
+        "file": "analysis/tiers.py",
+        "name": "HOLD_BAND",
+        "value": 0.25
+      },
+      {
+        "comment": "",
+        "file": "analysis/tiers.py",
+        "name": "HOLD_MIN_GAIN",
+        "value": 0.5
       },
       {
         "comment": "the cycle runs every 48 h",
@@ -18899,11 +18983,11 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "71bc53ae96f1cc767d3259fa2aa2d263d40bb87e2e8d58f4e129c5bd678fc49d",
+    "analysis/alerts.py": "e88a3b505ba085af5dde75b470b440a8bd60324851e9950bf154ab3367341400",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
-    "analysis/changes.py": "b271c982b30c5b1b5160fe80e8079690b78b7a14c37087464d8fa3678a7ae528",
+    "analysis/changes.py": "c6b4f850da513c8e1cab96a351670b0e41292ffee0079b716c905da587d90358",
     "analysis/decision_pareto.py": "7b6baccc8f2b924fef703c7f49ab97f81620f3de58f84a58d7048f4721fa5e9d",
     "analysis/dossier.py": "31cb4cdb76c9ada3510f040f9dd8fc30861d25b44a97db3add8a563cae4e2872",
     "analysis/identity.py": "06626cefaeea94adda2153e9b7400ab948b5bece0a821b36211546f00e8aca9f",
@@ -18916,9 +19000,9 @@
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
     "analysis/refresh.py": "dcc93f5a5ac7a7f89177ec1a8900c669b499585c5dc31df1aba7c2608d0e3a1f",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
-    "analysis/select.py": "cf2df58a9b52983ac90aee39bc5d3f1164ea7503761c3b220e294248224dbfb2",
+    "analysis/select.py": "39ad5f96af616cd95209b22ee6f4f77c62be760cf7efa614e775bf6065390624",
     "analysis/telegram.py": "d540335c619255933a50b0dde50400329a6adf9a5e78559f49f40eb59b105cdf",
-    "analysis/tiers.py": "a21de3334f3580930208ccc43aea948bf33997c154209f1779db92cfe0d52f2a",
+    "analysis/tiers.py": "5b70be11b3a4268e5f329ea330600814309194bab681ecffb42f8f726390291a",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
     "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
     "bin/walter-router-cycle": "0dcd43cafbfbed0de2ebfffa9d6beab43aa9a494b7ad5d4a6d694e4d43904e79",
@@ -18956,6 +19040,7 @@
     "interface/site/functions/api/status.js": "37fbd922a3eae2e33236fe4cda7d4546dafd6b69f7d76b50aea92d2deafd92cb",
     "interface/translate.py": "1d95781d0817a7590212867af01c36f0d9719d839c3dfdd67c468fe3df885daf",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
+    "llm/chatgpt/auth.json": "5efff32b7414e5ee402989a9ec441ae040538f6862a4c3cdf62a633f79ed741e",
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",

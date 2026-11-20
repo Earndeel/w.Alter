@@ -21,6 +21,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/changes.py | `PRICE_DROP` | 0.15 |  |
 | analysis/changes.py | `NERF` | {"aa_decision": 2.0, "aa_eval": 3.0, "aa_intelligence": 2.0, "aa_stt:speed": 50.0, "aa_stt:wer": 1.0, "agentset:embeddings_speed": 0.5, "agentset:rerank_speed": 0.5, "bridgebench": 30.0, "mteb": 2.0} | Elo-type boards: NERF_ELO |
 | analysis/changes.py | `NERF_ELO` | 15.0 |  |
+| analysis/changes.py | `RECALC_SHARE` | 0.5 |  |
+| analysis/changes.py | `RECALC_MIN` | 10 |  |
 | analysis/changes.py | `BENCH_KINDS` | ["aa", "aa_eval", "aa_decision", "mm", "da", "arena", "bridgebench", "aa_stt", "agentset", "mteb"] |  |
 | analysis/changes.py | `OFFER_KINDS` | ["openrouter", "kie", "hermes_providers"] |  |
 | analysis/changes.py | `INTELLIGENCE` | aa_intelligence:intelligence |  |
@@ -48,6 +50,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/select.py | `BOARD_GRACE_DAYS` | 21 |  |
 | analysis/select.py | `AA_MEDIA_COST_UNITS` | {"usd_per_image": "image", "usd_per_second": "video"} |  |
 | analysis/select.py | `QUOTA_WHY` | {"L2": "abonnements : meilleur modèle d'un autre abonnement que L3, moins cher par tâche que L3, tant que son quota dure", "L3": "abonnements : choix de la méthode parmi les modèles d'abonnement, tant que son quota dure"} |  |
+| analysis/select.py | `HOLD_WHY` | {"keep": "niveau déclaré gardé : rien de mieux noté au même prix (±{band} %)", "keep_l3": "niveau déclaré gardé : la méthode ne trouve pas mieux noté", "move": "même prix que le niveau déclaré (±{band} %), meilleur score"} |  |
 | analysis/select.py | `MEDIA_EXEC_INTERFACES` | ["image", "video", "audio", "music"] |  |
 | analysis/select.py | `LEVEL_WORDS` | ["high", "latest", "low", "max", "medium", "minimal", "preview", "xhigh"] |  |
 | analysis/telegram.py | `ROLE_LABELS` | {"action": "action", "budget": "budget", "default": "défaut", "premium": "premium", "ugc": "UGC", "value": "ratio"} |  |
@@ -58,6 +61,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/tiers.py | `CEILING_BAND` | 5.0 |  |
 | analysis/tiers.py | `KNEE_DROP` | 2.0 |  |
 | analysis/tiers.py | `CEILING_MIN_GAIN` | 1.0 |  |
+| analysis/tiers.py | `HOLD_BAND` | 0.25 |  |
+| analysis/tiers.py | `HOLD_MIN_GAIN` | 0.5 |  |
 | guardian/checks.py | `RUN_MAX_AGE_H` | 54 | the cycle runs every 48 h |
 | guardian/checks.py | `TEST_TIMEOUT` | 600 |  |
 | guardian/run.py | `MAX_ATTEMPTS` | 2 | repair-agent runs per incident before it is handed to the owner (coding/L3 since 20/11) |

@@ -23,6 +23,7 @@ Alerts: a pinned favourite overtaken, unranked new releases, stale sources — a
 - `unranked(conn)` — Models released recently on a provider with no measurement on any leaderboard yet (one alert per model).
 - `stale_sources(conn)` — 
 - `boards_down(conn)` — 2026-10-14: tell them when a leaderboard used by a task can no longer be read — the whole source
+- `_hold_why(hold: dict | None, quota: dict | None)` — The owner's hold rule (2026-11-20) in words: same price as the declared tier, a better score.
 - `tiers(conn, run_id: int | None=None, chg: dict | None=None)` — When the owner's method (nightly L1/L2/L3 in models.selection) designates another model x reasoning level than
 - `adopt_orchestrator(conn, model_id: str)` — The owner adopted a new orchestrator: it is a Router poste, walter-llm follows the adoption (Hermes, which
 - `nerfs(conn, run_id: int, chg: dict | None=None)` — An ACTIVE model (favourite, text tier, auto #1) lost score on a board of the task it is active for.
@@ -60,6 +61,8 @@ What CHANGED since the previous cycle — the only thing worth a Telegram messag
 
 - `_versions(conn, snapshot_id: int)` — Board -> version label of a snapshot. The first AA v5.0 snapshot (2026-10-28) only had `index_version`.
 - `rebased_boards(conn, cur: int, prev: int)` — {board: {'before', 'after'}} for the boards whose version label changed. A label missing from the latest
+- `_limit(board: str)` — 
+- `recalculated_boards(old: dict, rows: list, labelled: dict)` — Boards AA recomputed without changing their version label (owner 2026-11-20: « faut faire attention au
 - `_previous(conn, kind: str)` — 
 - `events(conn)` — {'new': {model_id: [why]}, 'nerf': {model_id: [why]}, 'price_drop': {model_id: [why]},
 - `changed(ev: dict, model_id: str)` — Reasons a model counts as news (new or cheaper).
@@ -214,6 +217,9 @@ Compute ranked candidates per task from the latest snapshots, on the cheapest *r
 - `load_offers(conn, snaps: dict[str, int])` — 
 - `blended(offer: dict)` — AA's blended token price: 3 parts input, 1 part output.
 - `load_subscription_costs(conn)` — Cost price of each model through the owner's subscriptions (owner, 2026-11-16: ModelDial's measured quota, see
+- `_family(model_id: str)` — (line, version) of a model id: gpt-6-2-sol -> (('gpt', 'sol'), (6, 2)); claude-opus-5-5 -> (('claude', 'opus'), (5, 5)).
+- `_list_price(offers: list[dict])` — 
+- `estimate_from_predecessor(measured: dict, offers: dict)` — Owner, 2026-11-20: a new model of a subscription that ModelDial has not measured yet takes the measured ratio of
 - `route_cost(route: dict)` — Real cost of a chat route: the cheaper of its best paid offer and its subscription's cost price.
 - `chat_route(offers: list[dict], list_cost: float | None, modes: list[str] | None=None)` — Cheapest paid route for a chat model, scaling AA's list-price task cost by the provider/list price ratio.
 - `_fields(o: dict)` — Stored classification of an offer (models.offers columns), or computed from its key when absent.
@@ -227,12 +233,15 @@ Compute ranked candidates per task from the latest snapshots, on the cheapest *r
 - `_on_subscription(p: dict)` — The point's real cost is a subscription's cost price (not a paid route).
 - `_sub_of(p: dict)` — Which subscription serves the point at its cost price (two Claude accounts = one route provider).
 - `_without_subscription(pts: list[dict], provider: str)` — The same points once `provider`'s subscription is spent: its models at their best paid price, or gone.
-- `_tier_rows(cands: list[dict])` — The owner's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs.
+- `_spent_fallback(pts: list[dict], p: dict, level: str, picked: dict)` — The tier's pick once `p`'s subscription is spent (the 16/11 rule on the remaining pool, else the method).
+- `_quota_info(pts, p, level, picked, method_pick)` — 
+- `_tier_rows(cands: list[dict], pins: dict | None=None)` — The owner's three text tiers (tiers.py) on the AA frontier of callable model x reasoning level, real costs.
 - `_best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dict], n: int=6)` — 'best' level: callable models ordered by the weighted multi-board score (scoring.composite).
 - `family(model_id: str)` — 'gpt-image-2-5-sunburst' -> ('gpt-image', (2, 5), 'sunburst'); 'gpt-image-2' -> ('gpt-image', (2,), '').
 - `same_line(model_id: str, newer_id: str)` — newer_id is a later version of the SAME product line: same prefix, higher version, and it keeps every product
 - `_executable_first(conn, t: dict, ranked: list[dict], offers: dict)` — The owner (2026-10-14, logo): the best measured model must be one Walter can run; and when a newer version of
 - `general_points(conn)` — Every callable model x reasoning level on the AA Intelligence Index with its real cost per AA task (the cloud
+- `_declared_tiers(conn)` — The owner's declared text tiers as pinned (knowledge.json "levels", re-applied to preferences each cycle).
 - `compute(conn)` — 
 - `save(conn, run_id: int, rows: list[dict])` — 
 
@@ -276,6 +285,7 @@ The owner's method for the three functional text tiers (declared 2026-10-02).
 - `_gain(a: dict, b: dict)` — Points per extra dollar going from a to b.
 - `affordable(f: list[dict], floor: float=QUALITY_FLOOR, min_gain: float=CEILING_MIN_GAIN)` — The frontier up to its first point above the floor that buys less than `min_gain` points per extra dollar.
 - `compute(points: list[dict], floor: float=QUALITY_FLOOR, band: float=CEILING_BAND, knee_drop: float=KNEE_DROP, min_gain: float=CEILING_MIN_GAIN)` — 
+- `hold_price(points: list[dict], anchor: dict, band: float=HOLD_BAND, min_gain: float=HOLD_MIN_GAIN, allow=lambda p: True)` — The declared tier's successor at about its price: the best-scoring point costing at most (1 + band) x the
 - `_best(ps)` — 
 - `quota_levels(points: list[dict], in_pool, sub_of=lambda p: None)` — The owner's subscription rule (2026-11-16): the subscriptions are already paid, so L2 and L3 are sought among
 - `above(points: list[dict], in_pool, base: dict)` — The subscription model above `base` (the tier just below) with the best gain from it — L3's pick once its own
