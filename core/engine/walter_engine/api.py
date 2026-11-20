@@ -549,11 +549,17 @@ class EngineApi:
         level = d.get("level")
         if level is not None and level not in ("L1", "L2", "L3"):
             raise ApiError(400, "invalid_level", "level L1, L2 or L3")
+        machine = {"kind": "machine", "id": caller}
+        # choosing the level is the owner's (session.open); a delegation may pin it only for a machine caller the
+        # policy declares (`machine_interfaces`: the module guardians, 2026-11-20)
+        if level and not self.e.policy.machine_interface(self.e.policy._load(), "mcp", machine):
+            raise ApiError(403, "owner_only", "level is pinned only for a declared machine caller")
         conversation = "task-" + hashlib.sha256(key.encode()).hexdigest()[:24]
-        opened = await self.open({"interface": "mcp", "conversation": conversation,
-                                  "principal": {"kind": "machine", "id": caller}, "mode": "interactive",
-                                  **({"level": level} if level else {})})
+        opened = await self.open({"interface": "mcp", "conversation": conversation, "principal": machine,
+                                  "mode": "interactive"})
         row = self.bindings.get(opened["session_id"])
+        if level and row.get("level") != level:
+            row = self._set({**row, "level": level})
         if not row.get("unattended"):
             row = self._set({**row, "unattended": True,
                              "parent": {"run_id": parent.get("run_id"), "session_id": parent.get("session_id"),
