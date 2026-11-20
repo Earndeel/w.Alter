@@ -7331,6 +7331,16 @@
             "signature": "rs: list[dict], ctx: dict"
           },
           {
+            "description": "The page says something new (its generation time aside).",
+            "name": "differs",
+            "signature": "new_html: str, published_html: str | None"
+          },
+          {
+            "description": "Guardian pass (2026-11-20): the page tracks quotas, routes and choices that move between two 48 h cycles;",
+            "name": "follow",
+            "signature": "conn"
+          },
+          {
             "description": "Rebuild the library page in the instance's build folder (host.json site_build) and deploy it to Cloudflare",
             "name": "publish",
             "signature": "conn, deploy: bool=True"
@@ -18925,12 +18935,12 @@
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
-    "guardian/repair.py": "9b81285d70fe2a6052b1eab9d72166d28ee225e46752afc477432f6ad3d90bf7",
-    "guardian/run.py": "3093f8e6b65fca4b8906a57617c02d07fd5db1e67d44339d7575ebee3e343932",
+    "guardian/repair.py": "b0b01aa17a19ccbd0d93a08f1f1256f461dae78fd12bb4ac9458ea317445f2a2",
+    "guardian/run.py": "f4c8b0338e4026c57219ac963ee1e396bba4e26e2e0dbcf676b9a15b0879359a",
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "instance.py": "81fc40b3bf9914f5246d0bb16f0a750141432127b6e03716546aebfc6f991724",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
-    "interface/library.py": "af65c945e4b1738f7d6b1bc40e8bb898e877fd0004cee921cd2714eaf719d7cd",
+    "interface/library.py": "de071359c937ba6a9c5167b98e34beebbb0f0b4b510e1cfb885d2a558a59addc",
     "interface/page.py": "e8d655bd694a122b7c23ed2ae9d1cdabb9f74070335a7ee72cf258ce4a7b7bd8",
     "interface/site/functions/_middleware.js": "7698f9a6d90639f63790b347aaa8d4b7473f128e5ac2f130158481768217a12f",
     "interface/site/functions/api/consumption.js": "84af305ac0a0d70a56bf142c08d5332d793d3acdfe280776f3f2f58919ddb9ad",
@@ -18944,7 +18954,7 @@
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
     "llm/decision.py": "999ffcf20c7a4598878369e9ad5439b0113b6a0d1b77bf7b0124c44557aba305",
-    "llm/gateway.py": "5b734b712e8d4be189b1b03818182d387425e9503647f0961e4fd38ad691bb54",
+    "llm/gateway.py": "be5439ac783c745c7158fd421d520601648d5c9ffb66cb93fd8df19ead9ac6a9",
     "llm/resolver.py": "cd04d0c818891381f988d044cc910902ec3fc11e1d1401ad16190e601935d188",
     "llm/structured.py": "4a8e241f6033f6e61753d6090dbc920d28a4fdcf45150140d70fdf169ff742da",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",

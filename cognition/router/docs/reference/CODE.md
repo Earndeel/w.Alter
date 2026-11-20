@@ -415,6 +415,8 @@ The model library as the owner reads it (2026-10-14): per task and category, the
 - `render(rs: list[dict])` — 
 - `_context(conn)` — 
 - `render_html(rs: list[dict], ctx: dict)` — 
+- `differs(new_html: str, published_html: str | None)` — The page says something new (its generation time aside).
+- `follow(conn)` — Guardian pass (2026-11-20): the page tracks quotas, routes and choices that move between two 48 h cycles;
 - `publish(conn, deploy: bool=True)` — Rebuild the library page in the instance's build folder (host.json site_build) and deploy it to Cloudflare
 
 ## interface/page.py

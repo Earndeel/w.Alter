@@ -135,8 +135,11 @@ def test_dominance_watch_ignores_better_but_dearer_models(conn):
     alerts.challengers(conn, "open", only_task="image_to_video", only_role="budget")
     for a in conn.execute("""select evidence from models.alerts where task = 'image_to_video' and role = 'budget'
                              and kind = 'challenger' and subject not like '%%:unmeasured'"""):
-        e = a["evidence"]
-        assert e["unit_cost"] <= e["pinned_unit_cost"] and e["score"] > e["pinned_score"]
+        e = a["evidence"]                 # scores per board since the composite rule (2026-10-14)
+        assert e["unit_cost"] <= e["pinned_unit_cost"]
+        assert e["boards"] and all(b["score"] > b["pinned_score"] for b in e["boards"].values())
+        c = e.get("composite") or {}
+        assert c.get("pinned") is None or c["challenger"] > c["pinned"]
 
 
 def test_notification_buttons_one_row_per_news():

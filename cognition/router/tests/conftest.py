@@ -1,7 +1,17 @@
 """Tests never write the active instance's files: every instance-owned file goes to the test's temporary folder."""
+import sys
+from pathlib import Path
+
 import pytest
 
 from walter_router import instance
+
+# The suite also covers the gateway (llm/gateway.py: FastAPI, litellm), whose packages live in its own environment
+# (llm/venv): appended after this venv's own, so the router's versions always win (2026-11-20: without them six
+# gateway test files failed to collect and the guardian chased them as failures for a week).
+for _sp in sorted((Path(__file__).resolve().parents[1] / "llm" / "venv").glob("lib/python3*/site-packages")):
+    if str(_sp) not in sys.path:
+        sys.path.append(str(_sp))
 
 
 @pytest.fixture(autouse=True)

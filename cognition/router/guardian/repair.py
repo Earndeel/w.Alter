@@ -40,6 +40,8 @@ def workspace(incident_id: int) -> Path:
     module = base / "module"
     shutil.copytree(paths.ROOT, module, symlinks=True, ignore=_COPY_IGNORE)
     (module / "venv").symlink_to(paths.ROOT / "venv")
+    if (paths.ROOT / "llm" / "venv").exists():          # the gateway's packages, read by the tests (conftest.py)
+        (module / "llm" / "venv").symlink_to(paths.ROOT / "llm" / "venv")
     _git(module, "init", "-q")
     _git(module, "add", "-A")
     _git(module, "-c", "user.email=guardian@localhost", "commit", "-qm", "baseline (live module at copy time)")

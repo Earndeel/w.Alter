@@ -149,3 +149,32 @@ def test_parametrised_test_ids_with_spaces_are_kept_whole(monkeypatch, tmp_path)
     assert checks.run_tests(tmp_path)["failures"] == {
         "tests/test_k.py::test_v[20 variantes en brouillon-budget-grok]": "AssertionError: x",
         "tests/test_c.py": "ERROR"}
+
+
+def test_an_incident_out_of_agent_runs_goes_to_the_owner(monkeypatch):
+    """2026-11-20: incidents stayed `open` forever after their 3rd run (the count was read before its increment),
+    so the owner never heard of them (AA source 15–17/11, five failing tests since 13/11)."""
+    sets = []
+    monkeypatch.setattr(run, "_set", lambda conn, inc, status, verdict=None, attempt=False: sets.append(status))
+    monkeypatch.setattr(run.repair, "workspace", lambda i: "/nowhere")
+    monkeypatch.setattr(run.checks, "run_tests", lambda m: {})
+    monkeypatch.setattr(run.repair, "agent", lambda inc, m: {"ok": False, "verdict": {"outcome": "unknown"}})
+    now = datetime.now(timezone.utc)
+    inc = {"incident_id": 7, "kind": "source_stale", "subject": "aa", "status": "open", "attempts": 2,
+           "last_attempt_at": now - timedelta(hours=13), "opened_at": now - timedelta(hours=40), "detail": {}}
+    run._repair(None, inc, dry_run=False)
+    assert sets[-1] == "needs_owner"                      # the 3rd run failed: the owner is told
+    sets.clear()
+    stuck = {**inc, "attempts": 3}                         # left `open` by the old code
+    monkeypatch.setattr(run, "reread_source", lambda kind: {"ok": False})
+    run.handle(None, stuck, [3])
+    assert sets == ["needs_owner"]
+
+
+def test_library_page_is_republished_only_when_it_says_something_new():
+    from walter_router.interface import library
+    page = "<p>Claude Pro, quota {q} %</p><footer>Page générée le {t}.</footer>"
+    old = page.format(q=48, t="18/11/2026, 19:32 UTC")
+    assert not library.differs(page.format(q=48, t="20/11/2026, 09:50 UTC"), old)
+    assert library.differs(page.format(q=82, t="20/11/2026, 09:50 UTC"), old)
+    assert library.differs(old, None)

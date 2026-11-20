@@ -435,6 +435,28 @@ SITE = paths.SITE
 CF = instance.host().get("cloudflare_cli", "")   # the instance's Cloudflare helper (publishing the page)
 
 
+_STAMP = re.compile(r"Page générée le [^.<]*")
+
+
+def differs(new_html: str, published_html: str | None) -> bool:
+    """The page says something new (its generation time aside)."""
+    return published_html is None or _STAMP.sub("", new_html) != _STAMP.sub("", published_html)
+
+
+def follow(conn) -> dict:
+    """Guardian pass (2026-11-20): the page tracks quotas, routes and choices that move between two 48 h cycles;
+    republished as soon as what it says changed, untouched otherwise."""
+    from walter_router.interface import page
+    build = instance.host_path("site_build") or SITE
+    try:
+        published = (build / "fr" / "index.html").read_text()
+    except OSError:
+        published = None
+    if not differs(page.render(conn, rows(conn), _context(conn)), published):
+        return {"changed": False}
+    return {"changed": True, **publish(conn)}
+
+
 def publish(conn, deploy: bool = True) -> dict:
     """Rebuild the library page in the instance's build folder (host.json site_build) and deploy it to Cloudflare
     Pages (project walter-library, served only on the instance's library_domain behind Cloudflare Access; the

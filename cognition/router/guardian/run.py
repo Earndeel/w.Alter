@@ -93,6 +93,7 @@ def _repair(conn, inc: dict, dry_run: bool) -> dict:
         return {"workspace": str(module), "dry_run": True}
     baseline = checks.run_tests(module)
     _set(conn, inc, "repairing", attempt=True)
+    inc["attempts"] += 1                    # this run counts: its own failure may be the last one allowed
     ran = repair.agent(inc, module)
     v = {**ran["verdict"], "model": ran.get("model"), "provider": ran.get("provider"), "agent_ok": ran["ok"],
          "agent_error": ran.get("error"), "workspace": str(module), "at": _now().isoformat()}
@@ -177,6 +178,8 @@ def handle(conn, inc: dict, budget: list[int], dry_run: bool = False) -> None:
         if again["ok"]:
             return _set(conn, inc, "resolved", {"outcome": "resolved", "reread": again})
         inc["detail"] = {**(inc["detail"] or {}), "reread_error": again.get("error")}
+    if inc["status"] == "open" and inc["attempts"] >= MAX_ATTEMPTS:   # out of agent runs: the owner decides
+        return _set(conn, inc, "needs_owner", {**(inc.get("verdict") or {}), "outcome": "needs_owner"})
     if inc["status"] in ("external", "needs_owner") or not _needs_agent(inc) or budget[0] <= 0:
         return None
     budget[0] -= 1
@@ -239,11 +242,18 @@ def run(agent: bool = True, tests: bool = True, send: bool = True, dry_run: bool
             inc["notified_status"] = (inc.get("verdict") or {}).get("notified_status")
             handle(conn, inc, budget, dry_run)
         messages = notify(conn, [i for i in incidents if i["status"] != "repairing"], send and not dry_run)
+        library = {}
+        if not dry_run:                         # the library page follows what moved since the last cycle
+            try:
+                from walter_router.interface import library as library_page
+                library = library_page.follow(conn)
+            except Exception as exc:  # noqa: BLE001 — the page never blocks a pass; the next one tries again
+                library = {"error": f"{type(exc).__name__}: {exc}"[:300]}
         keep = {(i.get("verdict") or {}).get("workspace") for i in incidents if i["status"] == "deferred"}
         repair.prune(keep={k for k in keep if k})
         return {"problems": problems,
                 "incidents": [{k: i[k] for k in ("incident_id", "key", "status", "attempts")} for i in incidents],
-                "messages": messages}
+                "messages": messages, "library": library}
 
 
 def status() -> dict:
