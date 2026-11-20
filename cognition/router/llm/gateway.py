@@ -291,7 +291,8 @@ def _refresh(task: str) -> dict:
         if isinstance(d, dict) and not d.get("execution") and d.get("openrouter_id"):
             # a service poste (stt): the Router names the model and its OpenRouter id, no chat route list — the one
             # route is that id on OpenRouter (2026-11-10: the Telegram door's voice notes, no longer Hermes' plugin)
-            d = {**d, "execution": [{"provider": "openrouter", "model": d["openrouter_id"]}]}
+            d = {**d, "execution": [{"provider": "openrouter", "model": d["openrouter_id"],
+                                     **({"endpoint": d["endpoint"]} if d.get("endpoint") else {})}]}
         _routes[task] = (time.time(), d)
         return d
     finally:
@@ -516,6 +517,10 @@ def litellm_target(route: dict) -> dict | None:
 
 async def provider_completion(route: dict, **kwargs):
     """One provider transport; Claude's native client contributes no agent context or tools."""
+    if route.get("endpoint") == "transcriptions":            # a transcription-only model (stt poste, 2026-11-20)
+        import transcription
+        return await transcription.completion(route["model"], kwargs["api_key"], kwargs.get("messages") or [],
+                                              stream=bool(kwargs.get("stream")), timeout=float(kwargs.get("timeout") or 180))
     if route["provider"] == "antigravity":
         from antigravity_subscription import completion as antigravity
         config = dict(_CONF["antigravity_subscription"])

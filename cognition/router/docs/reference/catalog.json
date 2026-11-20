@@ -8221,6 +8221,27 @@
         ]
       },
       {
+        "description": "Transcription-only models behind the chat door (owner 2026-11-20: STT poste = MAI-Transcribe-2).",
+        "file": "llm/transcription.py",
+        "functions": [
+          {
+            "description": "The last `input_audio` part of the request ({data, format}), or None.",
+            "name": "audio_part",
+            "signature": "messages: list[dict]"
+          },
+          {
+            "description": "",
+            "name": "chat_shape",
+            "signature": "model: str, text: str, cost: float | None, seconds: float | None"
+          },
+          {
+            "description": "",
+            "name": "completion",
+            "signature": "model: str, api_key: str, messages: list[dict], *, stream: bool=False, timeout: float=180, language: str | None=None, client=None"
+          }
+        ]
+      },
+      {
         "description": "Folders of the Walter Router module (software side; instance data comes from walter_router.instance).",
         "file": "paths.py",
         "functions": []
@@ -9693,6 +9714,11 @@
           {
             "description": "",
             "name": "openrouter_id",
+            "signature": "conn, model_id: str"
+          },
+          {
+            "description": "The model has a chat offer on OpenRouter (a chat model that hears audio, e.g. Gemini Flash-Lite), as opposed",
+            "name": "chat_capable",
             "signature": "conn, model_id: str"
           },
           {
@@ -17188,6 +17214,22 @@
       },
       {
         "comment": "",
+        "file": "llm/transcription.py",
+        "name": "OPENROUTER_TRANSCRIPTIONS",
+        "value": "https://openrouter.ai/api/v1/audio/transcriptions"
+      },
+      {
+        "comment": "",
+        "file": "llm/transcription.py",
+        "name": "RETRY_WAITS",
+        "value": [
+          1.5,
+          3.0,
+          4.0
+        ]
+      },
+      {
+        "comment": "",
         "file": "plan/codex_account.py",
         "name": "BASE",
         "value": "https://chatgpt.com/backend-api"
@@ -18918,9 +18960,10 @@
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
     "llm/decision.py": "999ffcf20c7a4598878369e9ad5439b0113b6a0d1b77bf7b0124c44557aba305",
-    "llm/gateway.py": "be5439ac783c745c7158fd421d520601648d5c9ffb66cb93fd8df19ead9ac6a9",
+    "llm/gateway.py": "79c803972062badb5d04b371f24966f702b721e7f5e9397dc7ae8100990eccda",
     "llm/resolver.py": "cd04d0c818891381f988d044cc910902ec3fc11e1d1401ad16190e601935d188",
     "llm/structured.py": "4a8e241f6033f6e61753d6090dbc920d28a4fdcf45150140d70fdf169ff742da",
+    "llm/transcription.py": "6ab3be5f2b81801248665469f8451ea630a07e53397c44e3f0357448b627b8dc",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "c6304ef26216528a6c2b5da12e5a410bef6a59bc44d2d0ea440de12b043815a7",
@@ -18978,10 +19021,10 @@
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "bda52e62df56396fedfd29c23cfaa8711b8967aff3f23ef25505e247cc875225",
     "serve/intent.py": "b5cc05dfe5a571e4f74e3a2dd379e041f961e49d8e9b2d15181c647c7b98c9ab",
-    "serve/media_exec.py": "91bd46fb1566d24eaabaf2cd3d3d933db3a66d1578e37434f1a62e4f9c6bcd8c",
+    "serve/media_exec.py": "11d4b2ffa3912518e40b348429af9a0976b6b94e4f39c0ff46e52ae87909ef2f",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",
-    "serve/routes.py": "98c17c13bd577139a975853df23f8e9c3424f7edf84eb6079ceafbbaf7456365",
+    "serve/routes.py": "7c1c4772ef597f305a8078e6ee5edd4069a594b9bbcffae0a63eba51139c91a4",
     "serve/run.py": "ed428ba8c3dda62ccca7450aa54560841acc2c998349ee5ecb7df21f4551403f",
     "serve/web.py": "a7c4019f149f362fb5a9f6edf99bf798af9cf12447d9da13b3f39435ec3303dd",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",

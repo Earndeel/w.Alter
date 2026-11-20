@@ -624,6 +624,14 @@ Structured model calls of walter-llm (SOCLE A6, 2026-11-11): typed decisions and
 - `rerank_once(client, key, model: str, query: str, documents: list[str], top_n: int, timeout: float)` — 
 - `rerank(body: dict, *, routes: list[dict], key, client, log, balance=None)` — Execute a rerank request on the Router's `rerank` poste routes, in order.
 
+## llm/transcription.py
+
+Transcription-only models behind the chat door (owner 2026-11-20: STT poste = MAI-Transcribe-2).
+
+- `audio_part(messages: list[dict])` — The last `input_audio` part of the request ({data, format}), or None.
+- `chat_shape(model: str, text: str, cost: float | None, seconds: float | None)` — 
+- `completion(model: str, api_key: str, messages: list[dict], *, stream: bool=False, timeout: float=180, language: str | None=None, client=None)` — 
+
 ## paths.py
 
 Folders of the Walter Router module (software side; instance data comes from walter_router.instance).
@@ -1142,6 +1150,7 @@ Direct media generation (image, video, music, voice) on the model the router pic
 - `coerce(path: str, params: dict)` — Keep only the fields the Kie model accepts, mapped to its allowed values (duration, resolution, ratio).
 - `craft_prompt(conn, request: str, style: str | None)` — Rewrite the owner's request in the model's prompt style with the economic text tier (L1, walter-llm direct
 - `openrouter_id(conn, model_id: str)` — 
+- `chat_capable(conn, model_id: str)` — The model has a chat offer on OpenRouter (a chat model that hears audio, e.g. Gemini Flash-Lite), as opposed
 - `choose_provider(conn, model_id: str, interface: str, resolution: str | None, has_kie_path: bool, or_id: str | None)` — The owner's order for paid media: Kie if it has the model and is not > 25 % dearer than OpenRouter at this
 - `fallback_models(conn, task: str, role: str | None, model_id: str, mode: str | None=None, n: int=2, declared_only: bool=True)` — Other models to try when every provider of `model_id` failed. Since 2026-10-22 (owner: « le secours, c'est pas
 - `_kie_key()` — 

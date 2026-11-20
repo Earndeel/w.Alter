@@ -154,6 +154,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/structured.py | `OCCASIONS` | ["turn", "incoming", "outgoing", "document", "result"] |  |
 | llm/structured.py | `SAMPLING` | ["mean", "first"] |  |
 | llm/structured.py | `ASIDE_ERROR_S` | 60.0 | a native route whose every call failed (5xx, timeout): asked again after this |
+| llm/transcription.py | `OPENROUTER_TRANSCRIPTIONS` | https://openrouter.ai/api/v1/audio/transcriptions |  |
+| llm/transcription.py | `RETRY_WAITS` | [1.5, 3.0, 4.0] |  |
 | plan/codex_account.py | `BASE` | https://chatgpt.com/backend-api |  |
 | plan/codex_account.py | `GRANT` | codex-subscription |  |
 | plan/codex_account.py | `CLIENT_VERSIONS` | ["99.0.0", "0.0.0"] |  |

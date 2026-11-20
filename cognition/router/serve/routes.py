@@ -41,6 +41,8 @@ def with_execution(conn, out: dict) -> dict:
     elif out.get("model_id") and task and task["interface"] in ("rerank", "transcription", "embedding"):
         from walter_router.serve import media_exec  # service postes: modules call OpenRouter with this id (stt, rerank)
         out["openrouter_id"] = media_exec.openrouter_id(conn, out["model_id"])
+        if task["interface"] == "transcription" and out["openrouter_id"] and not media_exec.chat_capable(conn, out["model_id"]):
+            out["endpoint"] = "transcriptions"   # a dedicated STT model refuses chat/completions (walter-llm translates)
     elif out.get("model_id") and task and task["interface"] in ("video", "image", "audio", "music"):
         from walter_router.serve import media_exec  # media: provider order of the model (the fallback = its next provider; another model only when declared)
         cfg = media_exec._models(conn).get(out["model_id"]) or {}

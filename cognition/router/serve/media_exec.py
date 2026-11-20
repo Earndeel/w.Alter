@@ -149,6 +149,15 @@ def openrouter_id(conn, model_id: str) -> str | None:
     return row["offer_key"].split(" | ")[0] if row else None
 
 
+def chat_capable(conn, model_id: str) -> bool:
+    """The model has a chat offer on OpenRouter (a chat model that hears audio, e.g. Gemini Flash-Lite), as opposed
+    to a transcription-only model (MAI-Transcribe, Whisper…) that answers only /audio/transcriptions."""
+    snaps = sel.latest_snapshots(conn)
+    return conn.execute("""select 1 from models.offers where snapshot_id = %s and provider = 'openrouter'
+                           and model_id = %s and interface = 'chat' limit 1""",
+                        (snaps.get("openrouter"), model_id)).fetchone() is not None
+
+
 def choose_provider(conn, model_id: str, interface: str, resolution: str | None, has_kie_path: bool,
                     or_id: str | None) -> list[str]:
     """The owner's order for paid media: Kie if it has the model and is not > 25 % dearer than OpenRouter at this
