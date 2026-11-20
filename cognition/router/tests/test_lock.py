@@ -26,10 +26,13 @@ def _weak_3d(conn):
     assert out["baseline_challengers"] > 0
 
 
-def test_every_model_is_locked_by_default_and_nothing_switches(conn):
-    assert conn.execute("select bool_and(locked) as all_locked from models.preferences").fetchone()["all_locked"]
+def test_a_model_is_locked_by_default_and_a_locked_one_never_switches(conn):
+    # the owner opens padlocks himself on the page (16/11: two open): the default is what is checked, not the live set
+    assert conn.execute("""select column_default from information_schema.columns where table_schema = 'models'
+                           and table_name = 'preferences' and column_name = 'locked'""").fetchone()["column_default"] == "true"
+    conn.execute("update models.preferences set locked = true where task = '3d'")
     _weak_3d(conn)
-    assert alerts.auto_adopt(conn) == []
+    assert all(c["task"] != "3d" for c in alerts.auto_adopt(conn))
     assert choose.pick(conn, "3d")["model_id"] == "claude-opus-5"
 
 

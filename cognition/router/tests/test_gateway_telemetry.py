@@ -500,6 +500,16 @@ def test_auto_follows_the_plan_and_an_explicit_task_only_takes_its_tier(tmp_path
     assert post(ns['build_app'](),{'model':'auto','messages':[],'prompt_cache_key':SESSION}).status_code==200 and asked==['coding/L1']
 
 
+def test_a_tier_pinned_on_the_conversation_wins_over_the_preflights(tmp_path,monkeypatch):
+    """2026-11-16: the board's resume pins L3 on its conversation; the preflight's own level (L1) never lowers it."""
+    ns,logs,asked=plan_gateway(tmp_path,monkeypatch,{'task':'general','level':'L1','pinned_level':'L3'})
+    assert post(ns['build_app'](),{'model':'auto','messages':[{'role':'user','content':'x'}],'prompt_cache_key':SESSION}).status_code==200
+    assert asked==['general/L3']
+    assert ns['planned_task']('auto',{'pinned_level':'L3'})==('coding/L3','task+level')     # no preflight plan: default task
+    assert ns['planned_task']('auto',{'task':'general','level':'L2','pinned_level':'L9'})==('general/L2','task+level')
+    assert ns['planned_task']('auto',{'model':'claude-opus-5-5','pinned_level':'L3'})==('exact:claude-opus-5-5','model')
+
+
 def test_rule_answer_needs_the_exact_owner_message_and_calls_no_model(tmp_path,monkeypatch):
     sha=hashlib.sha256(b'12*7').hexdigest()
     ns,logs,asked=plan_gateway(tmp_path,monkeypatch,{'task':'general','level':'L1','fast_path':'trivial','answer':'12*7 = 84','message_sha':sha})
