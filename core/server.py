@@ -236,7 +236,8 @@ def task_create(goal: str, entity_id: str = "", person: str = "", due_at: str = 
     with the person's name, never « le » / « il »; the linked person — `entity_id` (from person_lookup) or its exact
     full name in `person` (several or no match → an error with the candidates: ask the owner, never guess); `due_at`
     (YYYY-MM-DD or ISO with offset); `remind_at` = when the owner is reminded (ISO with its offset, e.g.
-    2026-12-10T09:00:00+07:00), fired once by Walter's scheduler; `draft` = a prepared message stored with the task,
+    2026-12-10T09:00:00+07:00), fired once by Walter's scheduler — without it a dated task reminds the owner on
+    `due_at` (09:00 his time for a day); `draft` = a prepared message stored with the task,
     NOT sent (sending is a separate tool that needs its own permission); `source` = where the request came from.
     Answers the task read back from the Run Plane (`verified` true when it carries what was asked) and its reminder.
     Replaying the same call never creates a second task."""
