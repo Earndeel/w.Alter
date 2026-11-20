@@ -26,10 +26,22 @@ def test_purge_reingest_restore_reapply():
         item = conn.execute("""insert into core.derived_items (kind, content, status, derived_by, source_event_ids)
                                values ('fact', 'synthetic fact', 'derived', 'pytest', %s::uuid[]) returning item_id""",
                             ([secret_id],)).fetchone()["item_id"]
+        older = conn.execute("""insert into core.derived_items (kind, content, status, derived_by, source_event_ids,
+                                    valid_to, attributes) values ('fact', 'the fact it replaced', 'superseded', 'pytest',
+                                    %s::uuid[], now(), %s) returning item_id""",
+                             ([other_id], json.dumps({"superseded_by": str(item), "superseded_how": "replaces"}))
+                             ).fetchone()["item_id"]
+        seg = conn.execute("""insert into extraction.segments (processor, version, source, thread_id, status, event_ids,
+                                  rejected) values ('l3.extract', 'pytest', 'test', %s, 'extracted', %s::uuid[], %s)
+                              returning segment_id""", (f"purge-{RUN}", [secret_id, other_id],
+                                                        json.dumps([{"quote": SECRET}]))).fetchone()["segment_id"]
         view = f"pytest:{RUN}"
         conn.execute("insert into views.view (view_key, domain, horizon, title, status) values (%s, 'projects', 'long', 't', 'active')", (view,))
+        conn.execute("""insert into views.version (view_key, depth, version, content, builder, built_at)
+                        values (%s, 'overview', 1, 'version d''avant cette connaissance', 'pytest', now() - interval '1 day')""",
+                     (view,))
         conn.execute("""insert into views.version (view_key, depth, version, content, builder)
-                        values (%s, 'overview', 1, %s, 'pytest')""", (view, f"résumé citant {SECRET}"))
+                        values (%s, 'overview', 2, %s, 'pytest')""", (view, f"résumé citant {SECRET}"))
         conn.execute("""insert into views.evidence (view_key, ref_kind, ref_id, role, privacy_class, added_by)
                         values (%s, 'derived', %s, 'support', 'cloud_allowed', 'pytest')""", (view, str(item)))
         conn.execute("""insert into search.chunks (kind, ref_id, chunk_no, occurred_at, source, label, text, tsv, privacy_class, indexer_version)
@@ -43,7 +55,8 @@ def test_purge_reingest_restore_reapply():
 
     dry = purge.purge(reason="pytest", requested_by="pytest", pattern=SECRET)
     assert dry["counts"] == {"events": 1, "derived": 1, "objects": 0, "walter_logs": 1,
-                             "views_masked": 1, "view_versions_masked": 1}   # announced before executing
+                             "views_masked": 1, "view_versions_masked": 1,
+                             "knowledge_restored": 1}                     # announced before executing
     done = purge.purge(reason="pytest", requested_by="pytest", pattern=SECRET, execute=True)
     assert done["status"] == "executed" and all(not b["automatic_change"] for b in done["backups"])
     with connect() as conn:
@@ -51,8 +64,16 @@ def test_purge_reingest_restore_reapply():
         assert conn.execute("select count(*) n from core.events where event_id = %s", (other_id,)).fetchone()["n"] == 1
         assert conn.execute("select count(*) n from core.derived_items where item_id = %s", (item,)).fetchone()["n"] == 0
         assert conn.execute("select count(*) n from search.chunks where ref_id = %s", (secret_id,)).fetchone()["n"] == 0
-        v = conn.execute("select content, stale_since from views.version where view_key = %s", (view,)).fetchone()
+        v = conn.execute("select content, stale_since from views.version where view_key = %s and version = 2",
+                         (view,)).fetchone()
         assert SECRET not in v["content"] and v["stale_since"] is not None
+        old = conn.execute("select content from views.version where view_key = %s and version = 1", (view,)).fetchone()
+        assert old["content"] == "version d'avant cette connaissance"     # built before it existed: never masked
+        sg = conn.execute("select event_ids, rejected from extraction.segments where segment_id = %s", (seg,)).fetchone()
+        assert [str(x) for x in sg["event_ids"]] == [str(other_id)] and sg["rejected"] == []    # an extracted message can be purged too
+        back = conn.execute("select status, valid_to, attributes from core.derived_items where item_id = %s",
+                            (older,)).fetchone()                              # what it had replaced is current again
+        assert back["status"] == "derived" and back["valid_to"] is None and "superseded_by" not in back["attributes"]
         wl = conn.execute("select text, event_key from walter_logs.events where session_id = %s",
                           (f"claude_code/pytest/{RUN}",)).fetchone()
         assert wl["text"] == purge.MARK and wl["event_key"]

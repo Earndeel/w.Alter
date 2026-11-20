@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from walter_memory import bus, events, extract2, read_policy
+from walter_memory.quota import gate as _real_gate  # noqa: E402 — captured before the autouse patch
 from walter_memory.db import connection
 
 NOW = datetime.now(timezone.utc)
@@ -19,7 +20,7 @@ def isolated(monkeypatch):
     from walter_memory import search
     monkeypatch.setattr(search, "embed", lambda texts: (_ for _ in ()).throw(RuntimeError("no embedder in tests")))
     from walter_memory import quota
-    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})        # A4 gate: open unless a test closes it
+    monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": True})        # A4 gate: open unless a test closes it
     extract2.set_v1_start(NOW - timedelta(days=1))
     yield
 
@@ -408,28 +409,65 @@ def test_a_replayed_older_contradiction_never_contests_newer_knowledge():
     assert o["status"] == "superseded" and o["attributes"]["replayed_older"] is True
 
 
-# ─── A4 + pilot (2026-11-19): the Codex quota gate; a staged backfill never touches served knowledge ───
-def test_the_codex_quota_verdict():
+# ─── No percentage gate (owner 2026-11-20): only a real provider refusal holds Memory's poste ───
+def test_only_a_real_provider_refusal_counts_as_a_limit():
     from walter_memory import quota
-    fresh = {"used_percent": 49.0, "read_at": NOW.isoformat(), "resets_at": (NOW + timedelta(days=3)).isoformat(),
-             "estimated": False}
-    assert quota.judge(fresh, 70, 1800)["ok"] is True
-    assert quota.judge({**fresh, "used_percent": 70.0}, 70, 1800)["ok"] is False
-    assert "too old" in quota.judge({**fresh, "read_at": (NOW - timedelta(hours=2)).isoformat()}, 70, 1800)["reason"]
-    assert "estimated" in quota.judge({**fresh, "estimated": True}, 70, 1800)["reason"]
-    assert "before the weekly reset" in quota.judge({**fresh, "resets_at": (NOW - timedelta(minutes=1)).isoformat()},
-                                                    70, 1800)["reason"]
-    assert "unknown" in quota.judge(None, 70, 1800)["reason"]
+    assert quota.real_limit(RuntimeError("HTTP 429: Too Many Requests"))
+    assert quota.real_limit(RuntimeError("HTTP 502: {'message': 'every route failed', 'attempts': "
+                                         "['codex/gpt-6-1-terra: RateLimitError', 'kie/gpt-6-1-terra: RateLimitError']}"))
+    assert not quota.real_limit(RuntimeError("HTTP 502: {'message': 'every route failed', 'attempts': "
+                                             "['codex/gpt-6-1-terra: RateLimitError', 'kie/gpt-6-1-terra: Timeout']}"))
+    assert not quota.real_limit(RuntimeError("HTTP 500: internal error")) and not quota.real_limit(ValueError("json"))
+
+
+def test_a_real_limit_holds_the_poste_once_and_no_call_is_made_until_it_lifts(monkeypatch):
+    """The single model door: the first real refusal records one hold; while it lasts no caller reaches the gateway
+    (no retry loop); a hold that has passed lets the next call go; any other failure records nothing."""
+    import httpx
+    from walter_memory import llm, quota
+    monkeypatch.setattr(quota, "gate", _real_gate)                    # the real hold, not the tests' open gate
+    poste = f"pytest-poste-{uuid.uuid4().hex[:6]}"
+    posts = []
+
+    class R:
+        def __init__(self, code, body):
+            self.status_code, self._b, self.headers = code, body, {}
+
+        def json(self):
+            return self._b
+    answers = [R(502, {"detail": {"message": "every route failed", "attempts": ["codex/m: RateLimitError"]}}),
+               R(500, {"detail": "boom"}),
+               R(200, {"choices": [{"message": {"content": "ok"}}], "usage": {}})]
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: posts.append(1) or answers.pop(0))
+    monkeypatch.setattr(llm, "_gateway_token", lambda: "t")
+    monkeypatch.setattr(quota, "_reset_of", lambda text, now: None)
+    kw = dict(poste=poste, processor="pytest", privacy_class="cloud_allowed")
+    try:
+        with pytest.raises(quota.Waiting) as w:
+            llm.chat([{"role": "user", "content": "x"}], **kw)
+        assert w.value.until > datetime.now(timezone.utc) and len(posts) == 1
+        with pytest.raises(quota.Waiting):                            # held: nothing sent to the gateway
+            llm.chat([{"role": "user", "content": "x"}], **kw)
+        assert len(posts) == 1
+        with connection() as conn:                                    # the hold has passed
+            conn.execute("""update extraction.state set value = jsonb_set(value, %s, to_jsonb(%s::text))
+                            where key = 'provider_hold'""", ([poste, "until"], (NOW - timedelta(days=9)).isoformat()))
+        with pytest.raises(RuntimeError) as e:                        # another failure: an error, no new hold
+            llm.chat([{"role": "user", "content": "x"}], **kw)
+        assert not isinstance(e.value, quota.Waiting) and quota.gate(poste)["ok"]
+        assert llm.chat([{"role": "user", "content": "x"}], **kw)["content"] == "ok" and len(posts) == 3
+    finally:
+        quota.release(poste)
 
 
 def test_over_the_quota_a_backfill_stops_and_covers_nothing(monkeypatch):
     from walter_memory import quota
     t = thread()
     seed = say("hermes", t, "owner", "on garde Valkey pour le projet", at=NOW - timedelta(days=40))[0]
-    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": False, "reason": "codex weekly quota 72 % ≥ 70 %"})
+    monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": False, "reason": "limite réelle du fournisseur : HTTP 429 (72)"})
     model = Model(decision)
     r = extract2.backfill([seed], tag="pytest-quota", chat=model, workers=1, window=0)
-    assert r["segments"] == 0 and not model.calls and "72 %" in r["quota_stopped"]
+    assert r["segments"] == 0 and not model.calls and "(72)" in r["quota_stopped"]
     with connection() as conn:
         assert conn.execute("select count(*) n from extraction.covered where event_id = %s",
                             (seed,)).fetchone()["n"] == 0
@@ -510,10 +548,10 @@ def test_the_live_worker_starts_at_the_live_start_and_stops_per_segment_over_the
         import time as _t
         _t.sleep(1.2)
         say("hermes", t, "owner", "on garde Redis pour le cache", at=NOW - timedelta(hours=1))
-        monkeypatch.setattr(quota, "codex", lambda **k: {"ok": False, "reason": "codex weekly quota 71 % ≥ 70 %"})
+        monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": False, "reason": "limite réelle du fournisseur : HTTP 429 (71)"})
         r = extract2.process_thread("hermes", t, chat=model, now=NOW + timedelta(days=1), force=True)
-        assert r["segments"] == 0 and not model.calls and "71 %" in r["quota_stopped"] and r["waiting"] >= 1
-        monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})
+        assert r["segments"] == 0 and not model.calls and "(71)" in r["quota_stopped"] and r["waiting"] >= 1
+        monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": True})
         r = extract2.process_thread("hermes", t, chat=model, now=NOW + timedelta(days=1), force=True)
         assert r["segments"] == 1 and len(model.calls) == 1
     finally:
@@ -542,9 +580,9 @@ def test_the_history_catch_up_takes_the_oldest_backlog_first_in_slices_under_its
         monkeypatch.setattr(organic, "stage", lambda n: {"mode": "paused"})
         assert extract2.catchup(1, chat=model, relate=0) == {"stopped": "paused"} and not model.calls
         monkeypatch.setattr(organic, "stage", lambda n: {"mode": "active"})
-        monkeypatch.setattr(quota, "codex", lambda **k: {"ok": False, "reason": "codex weekly quota 71 % ≥ 70 %"})
+        monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": False, "reason": "limite réelle du fournisseur : HTTP 429 (71)"})
         assert extract2.catchup(1, chat=model, relate=0)["stopped"] == "quota" and not model.calls
-        monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})
+        monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": True})
         r = extract2.catchup(1, chat=model, relate=0)
         assert r["segments"] == 1 and r["remaining"] == 1 and r["tag"].startswith("rattrapage-")
         assert "Valkey" in json.dumps(model.calls[0], ensure_ascii=False, default=str)     # the oldest one first

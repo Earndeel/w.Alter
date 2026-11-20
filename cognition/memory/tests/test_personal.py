@@ -184,22 +184,20 @@ def test_p2_corrections_no_landmark_as_appointment_no_description_as_rule_no_req
 
 def test_the_delay_of_personal_knowledge_says_its_cause_and_its_resumption():
     from walter_memory import extract2
-    reset = (NOW + timedelta(days=3)).isoformat()
-    extract2.note_gate("quota", {"reason": "codex weekly quota 75 % ≥ 70 %", "used_percent": 75.0, "limit": 70.0,
-                                 "resets_at": reset})
+    until = (NOW + timedelta(days=3)).isoformat()
+    extract2.note_gate("provider_limit", {"reason": "limite réelle du fournisseur : HTTP 429", "until": until})
     with connection() as conn:
         first = conn.execute("select value->>'since' s from extraction.state where key = 'live_gate'").fetchone()["s"]
-    extract2.note_gate("quota", {"used_percent": 76.0, "limit": 70.0, "resets_at": reset})
+    extract2.note_gate("provider_limit", {"reason": "limite réelle du fournisseur : HTTP 429", "until": until})
     with connection() as conn:
         st = conn.execute("select value from extraction.state where key = 'live_gate'").fetchone()["value"]
-    assert st["since"] == first and st["used_percent"] == 76.0          # the state lasts: its start is kept
+    assert st["since"] == first and st["until"] == until               # the state lasts: its start is kept
     s = personal.situation()
     lines = [l for l, _ in personal.learned_lines(s["learned"], s["now"])]
-    assert any("garde de quota Codex (76 % ≥ 70 %)" in l and "reprise automatique après la remise à zéro" in l
-               for l in lines), lines
-    extract2.note_gate("open", {"used_percent": 10.0, "limit": 70.0, "resets_at": reset})
+    assert any("limite réelle du fournisseur" in l and "reprise automatique le" in l for l in lines), lines
+    extract2.note_gate("open", {"ok": True})
     s = personal.situation()
-    assert not any("suspendue" in l for l, _ in personal.learned_lines(s["learned"], s["now"]))
+    assert not any("limite réelle" in l for l, _ in personal.learned_lines(s["learned"], s["now"]))
 
 
 def test_a_personal_statement_without_subject_is_the_owners():

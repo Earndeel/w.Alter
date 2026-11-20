@@ -39,12 +39,9 @@ subjects = "paused"
 reconsolidation = "paused"
 episode_summaries = "paused"
 
-[quota]
-# A4 (2026-11-19): extraction, backfill and subject cards run on the Router's memory_extraction poste, today the
-# owner's Codex (ChatGPT) plan, booked at $0 (a dollar budget never stops it). Above `codex_weekly_max` % of the
-# weekly window, or when no reading younger than `max_age_s` can be had from Walter Router, they stop.
-codex_weekly_max = 70
-max_age_s = 1800
+# [quota] removed 2026-11-20 (owner: « aucune limitation artificielle de quota »): no percentage gate. Memory's work
+# waits only on a real provider refusal of every route (walter_memory/quota.py: one hold per poste, until the reset
+# the Router reports or 15 min); dollar limits stay in system.budgets (monthly, hard stop) and the paid floor.
 
 [reconcile]
 # Lot 1 of the consolidation loop (2026-11-19, owner mission « première boucle de consolidation organique »): every

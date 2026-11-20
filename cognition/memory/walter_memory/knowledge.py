@@ -470,6 +470,9 @@ def progress_stage(st: dict, target: dict, pr: dict | None) -> str | None:
     cur = target.get("stage") or "stated"
     if cur in CLOSED:
         return None
+    if cur == "proposed" and target.get("epistemic") != "stated_owner" and not st["by_owner"]:
+        return None     # a proposal made to the owner is agreed only by his own word (E2E 20/11: the contact's
+                        # « je te confirmerai » had turned his own café proposal into an accepted appointment)
     act, s = st["act"], st["stage"]
     new = None
     if act == "cancel" or s in ("abandoned", "cancelled"):

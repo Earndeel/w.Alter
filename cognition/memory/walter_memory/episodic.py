@@ -36,7 +36,12 @@ TOLERANCE = timedelta(minutes=60)
 MIN_OUTING = timedelta(minutes=20)
 TIME_HINT = re.compile(r"(?i)(\b\d{1,2}\s?[h:]\s?\d{0,2}\b|\b\d{1,2}\s?(am|pm)\b|demain|ce soir|ce midi|ce matin|"
                        r"samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|tomorrow|tonight|weekend|week-end|"
-                       r"rdv|rendez-vous|on se voit|see you|meet|พรุ่งนี้|คืนนี้|โมง|นัด)")
+                       r"rdv|rendez-vous|on se voit|see you|meet|พรุ่งนี้|คืนนี้|โมง|นัด|"
+                       # a date too, not only an hour or a weekday (E2E 20/11: « un café, le 12 ? » was never read;
+                       # 7 days of bursts: 21 read → 25)
+                       r"\b\d{1,2}(er)?\s+(janv|f[ée]vr|mars|avr|mai|juin|juil|ao[uû]t|sept|oct|nov|d[ée]c|jan|feb|apr|"
+                       r"jun|jul|aug|sep|dec)\w*|\b(le|du|au)\s+\d{1,2}(er)?\b|\b\d{1,2}/\d{1,2}\b|la semaine prochaine|"
+                       r"le mois prochain|next week)")
 PLAN_PROMPT = """Conversation de Monsieur (messages numérotés, horodatés avec l'année, fuseau {tz}). Les noms de
 personnes ont été remplacés par des pseudonymes : garde-les tels quels. Les dates relatives (« samedi », « demain »,
 « ce soir ») se calculent à partir de la date du message qui les contient.
@@ -133,7 +138,7 @@ def plan_burst(item_id: str, *, chat=None) -> dict:
     inp = _plans_input(b, msgs, z)
 
     def call():
-        quota.require()          # Codex weekly gate (A4): over it, Waiting — the burst stays queued (assimilation)
+        quota.require()          # a real provider limit holds the poste: Waiting — the burst stays queued (assimilation)
         res = chat([{"role": "user", "content": inp["prompt"]}], poste="memory_extraction", processor="episodic.plans",
                    processor_version=PLANS_VERSION, privacy_class=b["privacy_class"], names=inp["names"],
                    budget="recurring", purpose="dated plans in a conversation", response_format={"type": "json_object"},
@@ -198,7 +203,7 @@ def plans(since: datetime | None = None, *, chat=None, limit: int | None = None)
             break
         try:
             r = plan_burst(iid, chat=chat)
-        except quota.Waiting as w:   # the Codex gate holds for every burst: the next pass takes them up
+        except quota.Waiting as w:   # a real provider limit holds every burst: the next pass takes them up
             out["waiting"] = str(w)
             break
         except Exception as e:  # noqa: BLE001 — retried by the next event or pass

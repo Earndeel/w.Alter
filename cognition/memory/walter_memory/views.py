@@ -392,8 +392,8 @@ def _pending(conn, key: str, after, upto) -> list[str]:
 
 def rewrite_card(conn, key: str, ex: dict, *, embed, llm, why: str = "creation") -> None:
     from . import quota
-    q = quota.codex()
-    if not q["ok"]:            # A4: the card waits for the quota; the activity is recorded
+    q = quota.gate()
+    if not q["ok"]:            # a real provider limit holds the poste: the card waits; the activity is recorded
         conn.execute("update views.view set last_at = greatest(last_at, %s), updated_at = now() where view_key = %s",
                      (ex["at"], key))
         return

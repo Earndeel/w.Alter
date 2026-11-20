@@ -104,7 +104,7 @@ def enrich(entity_id: str, *, chat=None, days: int | None = None, max_messages: 
     prompt = PROMPT.format(who=who, messages=lines[:24000])
 
     def call():
-        quota.require()          # Codex weekly gate (A4): over it, Waiting — nothing recorded, asked again later
+        quota.require()          # a real provider limit holds the poste: Waiting — nothing recorded, asked again later
         res = chat([{"role": "user", "content": prompt}], poste="memory_extraction",
                    processor="kardex.enrich", processor_version="1", privacy_class=cls, names=[name],
                    budget="recurring", purpose="kardex: what a contact says about themselves",
@@ -201,7 +201,7 @@ def run(limit: int | None = None) -> dict:
     for eid in top_contacts(limit):
         try:
             out.append(enrich(eid))
-        except quota.Waiting as w:   # the gate holds for every contact: stop, the next run reads them (30-day window)
+        except quota.Waiting as w:   # a real limit holds every contact: stop, the next run reads them (30-day window)
             out.append({"entity": eid, "waiting": str(w), "until": w.until.isoformat()})
             break
         except Exception as e:  # noqa: BLE001

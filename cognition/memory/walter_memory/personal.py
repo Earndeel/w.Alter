@@ -431,14 +431,11 @@ def learned_lines(le: dict, now: datetime) -> list[tuple[str, None]]:
         out.append(f"- dernière connaissance personnelle : {P._d(last)} — rien de nouveau depuis")
     g, w = le.get("gate") or {}, le.get("waiting") or {}
     since = _dt(g.get("since"))
-    if g.get("state") == "quota":
-        reset = _dt(g.get("resets_at"))
-        out.append("- extraction suspendue par la garde de quota Codex"
-                   + (f" ({g['used_percent']:.0f} % ≥ {g['limit']:.0f} %)" if g.get("used_percent") is not None
-                      and g.get("limit") is not None else "")
+    if g.get("state") == "provider_limit":    # a real refusal of every route (no percentage gate, 2026-11-20)
+        until = _dt(g.get("until"))
+        out.append("- extraction en attente : limite réelle du fournisseur de modèles"
                    + (f" depuis {_ago(since, now).replace("il y a ", "")}" if since else "")
-                   + (f" ; reprise automatique après la remise à zéro du {_when(reset, False)}" if reset else
-                      " ; reprise automatique dès une lecture fiable du quota"))
+                   + (f" ; reprise automatique le {_when(until, False)}" if until else " ; reprise automatique"))
     elif g.get("state") == "paused":
         out.append("- extraction en pause (décision de Monsieur)" + (f" depuis {_ago(since, now).replace("il y a ", "")}" if since else ""))
     seen = _dt(g.get("seen"))

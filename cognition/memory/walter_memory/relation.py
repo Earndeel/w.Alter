@@ -246,7 +246,8 @@ def _items(conn, eid: str, at: datetime | None, allowed: list[str], cloud: bool)
             out["history"].append({**line, "until": r["changed_at"] or r["valid_to"],
                                    "how": "expiré" if expired and not gone else
                                           "remplacé" if r["status"] == "superseded" else "retiré"})
-        elif r["derived_by"] == "episodic.plans" or r["kind"] in ("plan", "commitment", "goal"):
+        elif (r["derived_by"] == "episodic.plans" or r["kind"] in ("plan", "commitment", "goal")) \
+                and r["stage"] not in ("executed", "done"):     # a carried-out action is a past fact, not a plan
             out["plans"].append(line)
         else:
             out["statements"].append(line)

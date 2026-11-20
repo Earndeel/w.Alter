@@ -390,26 +390,25 @@ def test_the_index_follows_a_changed_burst_and_drops_a_retracted_one():
     assert text() == [] and search.reindex_derived([b["item_id"]])["unchanged"] == 1
 
 
-def test_a_closed_codex_gate_parks_the_plans_without_failure_and_they_resume_after_the_reset(monkeypatch):
-    """E2E 20/11: « les traitements dépendants de Codex se mettent en attente puis reprennent sans perdre d'événements ;
-    les traitements déterministes ne s'arrêtent pas ». Over the cap: the burst is built (deterministic), its plans wait
-    until the reset without a failure count and without a model call; after it, they are read once."""
+def test_a_real_provider_limit_parks_the_plans_without_failure_and_they_resume_after_it(monkeypatch):
+    """E2E 20/11, no percentage gate since: « les files d'attente doivent pouvoir reprendre automatiquement après une
+    indisponibilité réelle ». While a real limit holds the poste the burst is built (deterministic), its plans wait
+    until the hold lifts without a failure count and without a model call; after it, they are read once."""
     from walter_memory import quota
     t = f"Q{uuid.uuid4().hex[:8]}"
     m = Models(monkeypatch, plans={t: [plan(t)]})
     reset = datetime.now(timezone.utc) + timedelta(days=3)
-    closed = {"ok": False, "used_percent": 75.0, "limit": 70.0, "resets_at": reset.isoformat(),
-              "reason": "codex weekly quota 75 % ≥ 70 %"}
-    monkeypatch.setattr(quota, "codex", lambda **k: closed)
+    closed = {"ok": False, "until": reset.isoformat(), "reason": "limite réelle du fournisseur : HTTP 429"}
+    monkeypatch.setattr(quota, "gate", lambda *a, **k: closed)
     msg(t, at(12), f"{t} on se voit demain à 20h ?")
     step()
     assert len(bursts(t)) == 1 and m.calls(t) == 0                     # deterministic work went on, no model call
     with connection() as conn:
         q = conn.execute("""select attempts, last_error, due_at from processing.queue
                             where processor = 'episodic.plans' and key = %s""", (bursts(t)[0]["item_id"],)).fetchone()
-    assert q and q["attempts"] == 0 and q["last_error"].startswith("waiting: codex weekly quota")
+    assert q and q["attempts"] == 0 and q["last_error"].startswith("waiting: limite réelle")
     assert q["due_at"] >= reset                                          # parked until the reset, not retried in a loop
-    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})
+    monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": True})
     assimilation.step(now=reset + timedelta(minutes=10))
     assert m.calls(t) == 1
     with connection() as conn:
@@ -420,9 +419,10 @@ def test_a_closed_codex_gate_parks_the_plans_without_failure_and_they_resume_aft
     assert n == 1
 
 
-def test_the_retry_time_of_a_closed_gate():
+def test_the_retry_time_of_a_real_limit():
     from walter_memory import quota
     now = datetime(2026, 11, 20, tzinfo=timezone.utc)
     r = datetime(2026, 11, 23, 1, 23, tzinfo=timezone.utc)
-    assert quota.retry_at({"used_percent": 75, "limit": 70, "resets_at": r.isoformat()}, now) == r + timedelta(minutes=5)
-    assert quota.retry_at({"reason": "unknown"}, now) == now + timedelta(minutes=30)
+    e = RuntimeError("HTTP 429: usage limit")
+    assert quota.until_for(e, now, reset=r) == r + timedelta(minutes=5)          # exhausted: after the reported reset
+    assert quota.until_for(e, now, reset=False) == now + timedelta(minutes=15)    # a burst limit: a short retry

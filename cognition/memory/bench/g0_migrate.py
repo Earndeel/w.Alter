@@ -124,7 +124,7 @@ def run(a) -> None:
     if ("5433" in db or db == "production") and not a.production:
         sys.exit("refused: this is the production database (pass --production for the validated rollout)")
     # personal knowledge first: threads ordered by how many candidates they carry back, then by batches, each one
-    # checked against the Codex weekly meter (Walter Router's reading; above QUOTA_SWITCH the router would move the
+    # checked against the Codex weekly meter (Walter Router's reading; at its real limit the router moves the
     # extraction poste to paid routes) and against the segment cap of this run
     weight = Counter(sel["thread_of"][e] for i in sel["candidates"] for e in sel["item_events"].get(i, [])
                      if e in sel["thread_of"])
@@ -218,7 +218,7 @@ def main() -> None:
     p.add_argument("--dry", action="store_true")
     p.add_argument("--production", action="store_true")
     p.add_argument("--batch", type=int, default=50, help="threads per batch (meter checked between batches)")
-    p.add_argument("--ceiling", type=float, default=60.0, help="stop when the Codex weekly meter reaches this %%")
+    p.add_argument("--ceiling", type=float, default=100.0, help="stop when the Codex weekly meter reaches this %% (default: the provider's real limit, 2026-11-20)")
     p.add_argument("--max-segments", type=int, default=0)
     p = sub.add_parser("eval")
     p.add_argument("--tag", required=True)

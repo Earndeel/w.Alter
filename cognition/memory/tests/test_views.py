@@ -53,7 +53,7 @@ def embed(texts):
 @pytest.fixture(autouse=True)
 def quota_ok(monkeypatch):
     from walter_memory import quota
-    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})
+    monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": True})
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -291,7 +291,7 @@ def test_the_quota_gate_defers_the_card_but_records_the_activity(monkeypatch):
     from walter_memory import quota
     llm = FakeLLM()
     sid = f"{SID}-quota"
-    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": False, "reason": "codex weekly quota 71 % ≥ 70 %"})
+    monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": False, "reason": "limite réelle du fournisseur : HTTP 429 (71)"})
     _run(sid, 3000, None, 0.9, new=True)
     with connection() as c:
         a = views.attach(c, {**ex(70, 3000, "Lance l'audit des sauvegardes hors site de la semaine"), "session_id": sid},

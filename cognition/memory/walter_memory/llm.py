@@ -121,6 +121,9 @@ def chat(messages: list[dict], *, model: str | None = None, poste: str | None = 
     if b and b["hard_stop"] and b["spent_usd"] >= b["limit_usd"]:
         _log(**base, status="refused_budget")
         raise BudgetExceeded(f"{budget} budget exhausted ({b['spent_usd']:.2f}/{b['limit_usd']} USD this month)")
+    from . import quota
+    hold_key = poste or f"exact:{model}"
+    quota.require(hold_key)      # a real provider limit holds this poste: no call until it lifts (Waiting)
     mapping: dict[str, str] = {}
     if privacy_class == "redacted_cloud" and privacy.pseudonymise():
         red = []
@@ -143,6 +146,8 @@ def chat(messages: list[dict], *, model: str | None = None, poste: str | None = 
             raise RuntimeError(f"HTTP {r.status_code}: {str(data.get('error') or data.get('detail') or data)[:300]}")
     except Exception as e:
         _log(**base, status="error", error=str(e)[:500], latency_ms=int((time.perf_counter() - t0) * 1000))
+        if quota.real_limit(e):  # every route refused for a real limit: one hold for the poste, callers park on it
+            raise quota.Waiting(quota.hold(hold_key, e)) from e
         raise
     usage = data.get("usage") or {}
     cost = usage.get("cost")

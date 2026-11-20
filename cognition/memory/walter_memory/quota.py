@@ -1,116 +1,132 @@
-"""The Codex weekly quota as the gate of Memory's costly model work (A4, 2026-11-19).
+"""Real provider limits for Memory's model work (owner, 2026-11-20: « aucune limitation artificielle de quota »).
 
-L3 extraction, its backfills and subject cards run on Walter Router's `memory_extraction` poste, today the owner's
-ChatGPT (Codex) plan. Those calls are booked at $0, so no dollar budget ever stops them: this gate does. It reads the
-plan's weekly meter from Walter Router (`walter-router subscriptions show|refresh`: the live /wham/usage reading,
-never an estimate) and answers ok only when a reading younger than `[quota] max_age_s` is under
-`[quota] codex_weekly_max` %. No reading, a stale one, an estimated one or a failed refresh = not ok: the costly work
-waits (nothing is lost, pending messages stay uncovered).
+There is no percentage gate any more (the A4 gate at 70 % of the Codex week, 2026-11-19, is gone). Memory's calls go
+through Walter Router like every other module's: the Router uses each subscription up to its provider's real limit
+and, when one refuses, fails over to another allowed route — paid routes within their explicit dollar limits only
+(`walter_memory.llm` monthly budgets with hard stop, the paid-balance floor, the gateway's test budget).
+
+Memory waits only when the Router itself could not answer because of a real limit: every route refused the call for
+rate or usage limits (HTTP 429, « every route failed » with only rate-limit refusals, a provider's usage-limit text).
+The first such refusal records one hold for that poste (extraction.state 'provider_hold'), until the reset the
+Router reports for an exhausted subscription or a short retry for a burst limit. While it lasts every caller of the
+poste waits without calling (`Waiting`: queue keys are parked at `until` with their attempts unchanged, extraction
+threads stay dirty), so nothing is lost, nothing loops, and the work resumes by itself afterwards.
 """
 from __future__ import annotations
 
 import json
+import re
 import subprocess
-import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-SUB = "openai-plus"
-CACHE_S = 120                    # one Router read per two minutes per process (a backfill asks before each segment)
-_last: dict = {}
+POSTE = "memory_extraction"      # the poste of Memory's costly work (extraction, cards, Kardex, plans)
+HOLD_KEY = "provider_hold"
+RETRY_S = 900                    # a burst limit (or a limit without a known reset): ask again in 15 min
+RESET_MARGIN_S = 300             # an exhausted subscription: resume 5 min after the reset its provider reports
+SUBSCRIPTIONS = {"codex": "openai-plus"}   # route provider -> Walter Router subscription, for the reset time
 
-
-def _meter(action: str) -> dict | None:
-    try:
-        r = subprocess.run(["walter-router", "subscriptions", action, SUB], capture_output=True, text=True, timeout=90)
-        subs = json.loads(r.stdout or "[]")
-    except (OSError, subprocess.TimeoutExpired, ValueError):
-        return None
-    for s in subs if isinstance(subs, list) else []:
-        if s.get("id") == SUB:
-            return s.get("meter") or None
-    return None
-
-
-def _age(m: dict) -> float | None:
-    try:
-        return (datetime.now(timezone.utc) - datetime.fromisoformat(str(m["read_at"]))).total_seconds()
-    except (KeyError, TypeError, ValueError):
-        return None
-
-
-def _reset_passed(m: dict) -> bool:
-    try:
-        return datetime.fromisoformat(str(m["resets_at"])) <= datetime.now(timezone.utc)
-    except (KeyError, TypeError, ValueError):
-        return False
-
-
-def judge(m: dict | None, limit: float, max_age: float) -> dict:
-    """Pure verdict on one meter reading (tests)."""
-    if not m or m.get("used_percent") is None:
-        return {"ok": False, "reason": "codex quota unknown (no reading from Walter Router)"}
-    age = _age(m)
-    out = {"used_percent": float(m["used_percent"]), "limit": limit, "read_at": str(m.get("read_at")),
-           "age_s": round(age) if age is not None else None, "resets_at": str(m.get("resets_at"))}
-    if m.get("estimated"):
-        return {**out, "ok": False, "reason": "codex quota only estimated"}
-    if age is None or age > max_age:
-        return {**out, "ok": False, "reason": f"codex quota reading too old ({out['age_s']} s)"}
-    if _reset_passed(m):
-        return {**out, "ok": False, "reason": "codex quota reading from before the weekly reset"}
-    if out["used_percent"] >= limit:
-        return {**out, "ok": False, "reason": f"codex weekly quota {out['used_percent']:.0f} % ≥ {limit:.0f} %"}
-    return {**out, "ok": True}
-
-
-def codex(*, fresh: bool = False) -> dict:
-    """{"ok", "used_percent", "limit", "read_at", "age_s", "resets_at"[, "reason"]}."""
-    from . import organic
-    cfg = organic.settings().get("quota") or {}
-    limit, max_age = float(cfg.get("codex_weekly_max", 70)), float(cfg.get("max_age_s", 1800))
-    if not fresh and _last and time.monotonic() - _last["t"] < CACHE_S:
-        return _last["v"]
-    m = _meter("show")
-    if not m or (_age(m) or 1e9) > max_age / 2 or _reset_passed(m):
-        m = _meter("refresh") or m          # a live read through the Router (it records the reading)
-    v = judge(m, limit, max_age)
-    _last.update(t=time.monotonic(), v=v)
-    return v
-
-
-# ───────────────────────────── waiting for the quota (E2E 20/11) ─────────────────────────────
-RETRY_UNKNOWN_S = 1800           # no reliable reading: ask again in 30 min
-RESET_MARGIN_S = 300             # over the cap: resume 5 min after the weekly reset (a fresh reading is then taken)
+_LIMIT = re.compile(r"(?i)(\bHTTP 429\b|rate.?limit|usage.?limit|insufficient_quota|quota (exceeded|exhausted)|"
+                    r"too many requests)")
 
 
 class Waiting(RuntimeError):
-    """Raised before a Codex-dependent model call while the gate is closed. Not a failure: the queue keeps the key,
-    due again at `until`, attempts unchanged (processing.wait), so nothing is lost and nothing is retried in a loop."""
+    """A real provider limit holds this poste. Not a failure: the caller parks its work until `until`."""
 
     def __init__(self, verdict: dict):
         self.verdict = verdict
-        self.until = retry_at(verdict)
-        super().__init__(verdict.get("reason") or "codex quota gate closed")
+        self.until = _dt(verdict.get("until")) or datetime.now(timezone.utc) + timedelta(seconds=RETRY_S)
+        super().__init__(verdict.get("reason") or "provider limit")
 
 
-def retry_at(v: dict, now: datetime | None = None) -> datetime:
-    from datetime import timedelta
+def _dt(v) -> datetime | None:
+    try:
+        d = datetime.fromisoformat(str(v))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def real_limit(exc: BaseException) -> bool:
+    """True when the Router could not answer because of a provider's real limit, not for any other failure.
+    « every route failed » counts only when every attempt was a rate-limit refusal."""
+    text = str(exc)
+    if "every route failed" in text:
+        attempts = re.findall(r"[\w.-]+/[\w.:@-]+: (\w+)", text)
+        return bool(attempts) and all(a == "RateLimitError" for a in attempts)
+    return bool(_LIMIT.search(text))
+
+
+def _reset_of(text: str, now: datetime) -> datetime | None:
+    """The reset of an exhausted subscription named in the refusal, from Walter Router's live meter."""
+    for provider, sub in SUBSCRIPTIONS.items():
+        if f"{provider}/" not in text:
+            continue
+        try:
+            r = subprocess.run(["walter-router", "subscriptions", "show", sub], capture_output=True, text=True,
+                               timeout=60)
+            rows = json.loads(r.stdout or "[]")
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            return None
+        for s in rows if isinstance(rows, list) else []:
+            m = s.get("meter") or {}
+            reset = _dt(m.get("resets_at"))
+            if s.get("id") == sub and float(m.get("used_percent") or 0) >= 100 and reset and reset > now:
+                return reset
+    return None
+
+
+def until_for(exc: BaseException, now: datetime | None = None, reset: datetime | None = None) -> datetime:
+    now = now or datetime.now(timezone.utc)
+    reset = reset if reset is not None else _reset_of(str(exc), now)
+    return reset + timedelta(seconds=RESET_MARGIN_S) if reset else now + timedelta(seconds=RETRY_S)
+
+
+def _read(conn) -> dict:
+    r = conn.execute("select value from extraction.state where key = %s", (HOLD_KEY,)).fetchone()
+    return dict(r["value"]) if r and isinstance(r["value"], dict) else {}
+
+
+def gate(poste: str = POSTE, now: datetime | None = None) -> dict:
+    """{"ok": True} unless a real limit holds the poste: {"ok": False, "reason", "until", "since"}."""
+    from .db import connection
     now = now or datetime.now(timezone.utc)
     try:
-        if v.get("used_percent") is not None and float(v["used_percent"]) >= float(v.get("limit") or 0):
-            r = datetime.fromisoformat(str(v["resets_at"]))
-            if r > now:
-                return r + timedelta(seconds=RESET_MARGIN_S)
-    except (KeyError, TypeError, ValueError):
-        pass
-    return now + timedelta(seconds=RETRY_UNKNOWN_S)
+        with connection() as conn:
+            h = _read(conn).get(poste)
+    except Exception:  # noqa: BLE001 — no hold readable: the call itself will meet any real limit
+        return {"ok": True}
+    if h and (_dt(h.get("until")) or now) > now:
+        return {"ok": False, **h}
+    return {"ok": True}
 
 
-def require() -> dict:
-    """The gate for one Codex-dependent call (Kardex enrichment, dated plans…): the verdict when open, else Waiting.
-    Called inside the model call itself, so answers already recorded (processing.decide_once) are still reused and the
-    deterministic work around it never stops."""
-    v = codex()
+def hold(poste: str, exc: BaseException, now: datetime | None = None) -> dict:
+    """Record (or extend) the poste's hold after a real refusal; the verdict callers park on."""
+    from .db import connection
+    now = now or datetime.now(timezone.utc)
+    until = until_for(exc, now)
+    v = {"reason": f"limite réelle du fournisseur : {str(exc)[:200]}", "until": until.isoformat(),
+         "since": now.isoformat()}
+    with connection() as conn:
+        cur = _read(conn).get(poste) or {}
+        if cur and (_dt(cur.get("until")) or now) > now:
+            v["since"] = cur.get("since") or v["since"]
+        conn.execute("""insert into extraction.state (key, value, updated_at) values (%s, jsonb_build_object(%s::text, %s::jsonb), now())
+                        on conflict (key) do update set value = extraction.state.value || excluded.value, updated_at = now()""",
+                     (HOLD_KEY, poste, json.dumps(v)))
+    return {"ok": False, **v}
+
+
+def release(poste: str = POSTE) -> None:
+    from .db import connection
+    with connection() as conn:
+        conn.execute("update extraction.state set value = value - %s::text, updated_at = now() where key = %s",
+                     (poste, HOLD_KEY))
+
+
+def require(poste: str = POSTE) -> dict:
+    """Before a call of the poste: its verdict when free, else Waiting (no call is made while a real limit holds)."""
+    v = gate(poste)
     if not v["ok"]:
         raise Waiting(v)
     return v

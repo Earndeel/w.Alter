@@ -227,3 +227,32 @@ def test_a_contacts_proposal_without_any_reply_is_a_plan_whose_agreement_is_not_
         g = conn.execute("""select item_id::text from core.derived_items where derived_by = 'flows.conversations'
                             and status = 'derived' and source_refs->>'ref' like %s""", (f"conv:beeper:{group}:%",)).fetchone()
     assert episodic.plan_burst(g["item_id"], chat=model)["outcome"] == "no_owner_message" and len(asked) == 1
+
+
+def test_a_contact_exchange_is_read_whole_once_the_conversation_is_calm():
+    """20/11 Beeper lot: a question and its answer, minutes apart, reach the model in one call — never one call per
+    burst of five minutes. A lone « oui » is never skipped (it may accept a proposal)."""
+    c, chat = contact(), f"!pytest-{uuid.uuid4().hex[:8]}:beeper.local"
+    model = Model(lambda lines, known: {"summary": "", "items": []})
+    t = NOW - timedelta(minutes=40)
+    say(c, chat, "contact", "On se fait un ciné samedi ?", at=t)
+    say(c, chat, "owner", "Je regarde mon planning", at=t + timedelta(minutes=12))
+    last = say(c, chat, "contact", "Dis-moi vite", at=NOW - timedelta(minutes=10))
+    r = extract2.process_thread("beeper", chat, chat=model)
+    assert r["segments"] == 0 and r["waiting"] == 3 and not model.calls        # still going: it waits
+    r = extract2.process_thread("beeper", chat, chat=model, now=NOW + timedelta(minutes=15))
+    assert r["segments"] == 1 and len(model.calls) == 1                         # calm: the whole exchange, once
+    assert "On se fait un ciné" in model.calls[0] and "Dis-moi vite" in model.calls[0]
+    say(c, chat, "owner", "oui", at=NOW)
+    r = extract2.process_thread("beeper", chat, chat=model, now=NOW + timedelta(minutes=25))
+    assert r["segments"] == 1 and len(model.calls) == 2 and last                # the lone « oui » is read
+
+
+def test_a_date_without_an_hour_is_enough_for_the_plans_to_be_read():
+    """E2E 20/11: « Ça te dit qu'on prenne un café, le 12 ? » was never given to the plans reader (hours and weekdays
+    only); a date is a time too. A message without any date still costs no call."""
+    from walter_memory.episodic import TIME_HINT
+    for t in ("Ça te dit qu'on prenne un café, le 12 ?", "je passe du 10 au 14 décembre", "dispo le 3/01 ?"):
+        assert TIME_HINT.search(t), t
+    for t in ("merci beaucoup", "j'ai 3 chats", "trop bien ton appart"):
+        assert not TIME_HINT.search(t), t

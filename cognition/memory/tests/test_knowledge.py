@@ -20,7 +20,7 @@ NOW = datetime.now(timezone.utc)
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch):
     from walter_memory import quota, search
-    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})
+    monkeypatch.setattr(quota, "gate", lambda *a, **k: {"ok": True})
     monkeypatch.setattr(search, "reindex_derived", lambda ids: {})       # the index is not under test here
     extract2.set_v1_start(NOW - timedelta(days=1))
     yield
@@ -788,3 +788,15 @@ def test_an_unsure_replacement_stands_when_the_statement_says_the_state_changed_
     assert knowledge.guard({**st, "at": NOW - timedelta(days=9)}, "replaces", old, 0.4, 0.5)[0] == "contradicts"
     owner = {**old, "epistemic": "stated_owner"}
     assert knowledge.guard(st, "replaces", owner, 0.4, 0.5)[0] == "contradicts"
+
+
+def test_a_proposal_made_to_the_owner_is_agreed_only_by_his_own_word():
+    """E2E 20/11: the contact's « je te confirmerai » had advanced his own café proposal to an accepted appointment."""
+    from walter_memory.knowledge import progress_stage
+    offer = {"kind": "decision", "stage": "proposed", "epistemic": "stated_third_party"}
+    theirs = {"act": "action", "stage": "open", "by_owner": False}
+    mine = {"act": "action", "stage": "open", "by_owner": True}
+    assert progress_stage(theirs, offer, None) is None              # the proposer's own follow-up agrees to nothing
+    assert progress_stage(mine, offer, None) == "accepted"          # the owner's « ok » does
+    own_offer = {**offer, "epistemic": "stated_owner"}              # the owner's proposal: the contact's yes counts
+    assert progress_stage(theirs, own_offer, None) == "accepted"

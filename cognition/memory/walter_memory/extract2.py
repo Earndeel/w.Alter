@@ -934,7 +934,12 @@ def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "rec
                          rejected=[{"event_id": str(m["event_id"]), "reason": _noise(m)} for m in noise[:50]])
         out["filtered"] += len(noise)
     usable = [m for m in cloud if not _noise(m)]
-    if (mode or policy()) == "adaptive":
+    if contact:     # a human exchange is read whole: grouped until IDLE of calm (at most MAX_WAIT), so a question and
+        segs, tail = due_segments(usable, now)          # its answer reach the model together (20/11 Beeper lot: 7 days
+                                                        # of 1:1 traffic = 311 calls instead of 441 at 5 min of calm).
+                                                        # No message is skipped as trivial: a lone « oui » or 👍 may
+                                                        # accept a proposal made earlier.
+    elif (mode or policy()) == "adaptive":
         segs, tail, out["reason"] = adaptive_due(usable, now)
     else:
         segs, tail = due_segments(usable, now)
@@ -943,8 +948,8 @@ def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "rec
     out["waiting"] = len(tail)
     from . import quota
     for i, seg in enumerate(segs):
-        q = quota.codex()
-        if not q["ok"]:                  # A4 per segment (a long thread can be many segments): the rest waits
+        q = quota.gate()
+        if not q["ok"]:                  # a real provider limit holds the poste: the rest of the thread waits
             out["quota_stopped"] = q["reason"]
             out["waiting"] += sum(len(x) for x in segs[i:])
             break
@@ -954,7 +959,12 @@ def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "rec
                              rejected=[{"reason": "no_owner_message"}])
             out["filtered"] += len(seg)
             continue
-        r = extract_segment(source, thread_id, seg, chat=chat, budget=budget)
+        try:
+            r = extract_segment(source, thread_id, seg, chat=chat, budget=budget)
+        except quota.Waiting as w:       # met a real limit now: this and the next segments wait, nothing covered
+            out["quota_stopped"] = str(w)
+            out["waiting"] += sum(len(x) for x in segs[i:])
+            break
         out["segments"] += 1
         for k in ("items", "reused", "superseded", "rejected"):
             out[k] += r[k]
@@ -1002,12 +1012,12 @@ def _give_up(source: str, thread_id: str, error: str) -> None:
 
 
 def note_gate(state: str, q: dict | None = None) -> None:
-    """The live extraction's last gate verdict, extraction.state 'live_gate' = {state: open | paused | quota, since,
-    at, reason, used_percent, limit, resets_at}: what the situation projection shows as the delay of personal
+    """The live extraction's last gate verdict, extraction.state 'live_gate' = {state: open | paused | provider_limit,
+    since, at, reason, until}: what the situation projection shows as the delay of personal
     knowledge. `since` = when this state began (kept while it lasts). Written once a tick, never raises."""
     now = datetime.now(timezone.utc).isoformat()
     v = {"state": state, "at": now, "since": now,
-         **{k: (q or {}).get(k) for k in ("reason", "used_percent", "limit", "resets_at")}}
+         **{k: (q or {}).get(k) for k in ("reason", "until")}}
     try:
         with connection() as conn:
             conn.execute("""insert into extraction.state (key, value, updated_at) values ('live_gate', %s::jsonb, now())
@@ -1041,9 +1051,9 @@ def tick(limit: int = 8, workers: int = 4, chat=None, budget: str = "recurring")
         note_gate("paused")
         return {**total, "paused": True}
     from . import quota
-    q = quota.codex()
-    if not q["ok"]:                      # A4: over the Codex weekly cap, or no reliable reading: nothing claimed
-        note_gate("quota", q)
+    q = quota.gate()
+    if not q["ok"]:                      # a real provider limit holds the poste: nothing claimed until it lifts
+        note_gate("provider_limit", q)
         return {**total, "quota": q}
     note_gate("open", q)
     claimed = claim(limit)
@@ -1053,6 +1063,9 @@ def tick(limit: int = 8, workers: int = 4, chat=None, budget: str = "recurring")
             r = process_thread(t["source"], t["thread_id"], chat=chat, budget=budget)
             _release(t["source"], t["thread_id"], waiting=r["waiting"] > 0)
             return r
+        except quota.Waiting as e:       # a real provider limit: the thread stays dirty, attempts unchanged
+            _release(t["source"], t["thread_id"], waiting=True)
+            return {"budget": str(e)}
         except llm.BudgetExceeded as e:
             _release(t["source"], t["thread_id"], waiting=True)
             return {"budget": str(e)}
@@ -1174,7 +1187,8 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
     swept: only an explicit call reaches them.
     generation=STAGING: a pilot (2026-11-19) — items written apart (unreadable generation), effects on served knowledge
     recorded under the ledger's `staged`, never applied; backfill_revert(tag) then leaves served knowledge untouched.
-    The Codex weekly quota gate (quota.codex) is asked before each segment: over it, the run stops (quota_stopped)."""
+    A real provider limit (quota.gate, held after every route refused) stops the run before or at a segment
+    (quota_stopped); the next run resumes where it stopped."""
     from collections import defaultdict
     if generation != "g1" and not dry:
         _ensure_staging(generation)
@@ -1255,9 +1269,9 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
             segs.append(cur)
         from . import quota
         for seg in segs:
-            q = quota.codex()
-            if not q["ok"]:              # A4: the rest of the thread stays uncovered, a later run takes it up
-                res["quota_stopped"] = q["reason"]
+            q = quota.gate()
+            if not q["ok"]:              # a real provider limit: the rest of the thread stays uncovered, a later run
+                res["quota_stopped"] = q["reason"]      # takes it up
                 break
             if not any(m["event_type"] == "message.sent" for m in seg):
                 with connection() as conn:
@@ -1273,6 +1287,9 @@ def backfill(event_ids: list[str], *, tag: str, chat=None, budget: str = "backfi
             try:
                 r = extract_segment(source, thread_id, seg, chat=chat, budget=budget, backfill=tag,
                                     generation=generation)
+            except quota.Waiting as w:   # a real provider limit met now: stop here, nothing covered
+                res["quota_stopped"] = str(w)
+                break
             except Exception as e:  # noqa: BLE001 — this thread is retried by a later run (nothing covered)
                 log.warning("backfill %s %s: %s", source, thread_id, e)
                 res["errors"] += 1
@@ -1326,15 +1343,16 @@ def catchup_messages(events: int = 120, *, workers: int = 2, dry: bool = False, 
     messages ingested between v1_start and live_start, OLDEST FIRST, one slice of `events` messages per call, through
     backfill() (same extraction, reconciliation and write gate as live; window=0 = only these messages).
     Order: slices follow occurred_at, and the write gate records a statement older than the knowledge it meets as
-    past (op "older"), never as a replacement. Quota: asked before the slice and before every segment (70 %); over
-    it, nothing more is read and the next call resumes where this one stopped. Switch: organic.toml [stages] catchup.
+    past (op "older"), never as a replacement. Provider limit: asked before the slice and before every
+    segment (a real refusal only, no percentage); held, nothing more is read and the next call resumes where this one
+    stopped. Switch: organic.toml [stages] catchup.
     Ledger per day: tag rattrapage-YYYY-MM-DD (backfill_revert(tag) undoes one day of catch-up)."""
     from . import organic, quota
     if organic.stage("catchup")["mode"] != "active":
         return {"stopped": "paused"}
-    q = quota.codex()
+    q = quota.gate()
     if not q["ok"]:
-        return {"stopped": "quota", "reason": q.get("reason"), "used_percent": q.get("used_percent")}
+        return {"stopped": "quota", "reason": q.get("reason"), "until": q.get("until")}
     sql = """from core.events e where e.source = any(%s) and e.event_type = any(%s) and e.thread_id is not null
                and e.ingested_at >= %s and e.ingested_at < %s
                and not exists (select 1 from extraction.covered cv where cv.processor = %s and cv.event_id = e.event_id)

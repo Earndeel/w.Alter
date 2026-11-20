@@ -297,7 +297,7 @@ def work(now: datetime | None = None, max_seconds: float = 50.0) -> dict:
                 o = out.setdefault(proc, {"keys": 0, "changed": 0, "errors": 0})
                 try:
                     r = _run_one(proc, row)
-                except quota.Waiting as w:   # the Codex gate is closed: the key waits for it, not a failure
+                except quota.Waiting as w:   # a real provider limit holds the poste: the key waits for it, not a failure
                     processing.wait(row, w.until, str(w))
                     processing.count(proc, keys=1, waiting=1)
                     o["waiting"] = o.get("waiting", 0) + 1

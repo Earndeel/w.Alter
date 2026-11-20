@@ -172,6 +172,11 @@ def test_one_person_in_several_projects_commitments_and_follow_ups_without_any_w
         after = conn.execute("select (select count(*) from core.derived_items) d, (select count(*) from kardex.actions) a, "
                              "(select count(*) from bus.events) b").fetchone()
     assert before == after                                       # a read: no task, no notification, no action
+    done = known(eid, f"Marc est allé voir le chantier {x}", kind="commitment")
+    with connection() as conn:
+        conn.execute("update core.derived_items set stage = 'executed' where item_id = %s", (done,))
+    s = relation.state(eid)                                     # a carried-out action is a past fact, not a plan
+    assert done not in {p["id"] for p in s["items"]["plans"]} and done in {p["id"] for p in s["items"]["statements"]}
 
 
 def test_memory_view_check_and_context_serve_the_relation(monkeypatch):
