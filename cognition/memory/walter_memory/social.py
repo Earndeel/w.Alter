@@ -258,6 +258,34 @@ def find_entities(query: str, limit: int = 5) -> list[dict]:
             order by coalesce(b.messages, 0) desc limit %(n)s""", {"q": f"%{query}%", "raw": query, "n": limit}).fetchall()
 
 
+def conversations(conn, entity_id: str, allowed: list[str], limit: int = 8) -> list[dict]:
+    """Where the owner and this person talk: every chat thread (Beeper networks, e-mail…) in which one of the
+    person's confirmed identities wrote, direct chats first, then by last exchange. Each entry gives what a reader
+    needs to open the exchanges directly — memory_events(thread_id=…, since=…) — without searching by text:
+    source, thread_id, network, single/group, message count, first/last exchange, last message from each side.
+    Counts skip retracted events (duplicates, corrections)."""
+    rows = conn.execute("""
+        with mine as (select distinct e.source, e.thread_id from core.events e
+                      join core.identity_links l on l.identity_id = e.actor_identity_id
+                      where l.entity_id = %(e)s and l.status = 'confirmed' and e.thread_id is not null
+                        and e.event_type in ('message.received', 'message.sent', 'email.received', 'email.sent'))
+        select m.source, m.thread_id, max(e.payload->'chat'->>'network') network, max(e.payload->'chat'->>'type') chat_type,
+               max(e.payload->'chat'->>'title') title, count(*) messages,
+               min(e.occurred_at) first_exchange, max(e.occurred_at) last_exchange,
+               max(e.occurred_at) filter (where e.event_type like '%%.sent') last_from_owner,
+               max(e.occurred_at) filter (where e.event_type like '%%.received') last_from_them
+        from mine m join core.events e on e.source = m.source and e.thread_id = m.thread_id
+        where e.event_type in ('message.received', 'message.sent', 'email.received', 'email.sent')
+          and e.privacy_class = any(%(a)s)
+          and not exists (select 1 from core.events r where r.event_type = 'event.retracted'
+                          and r.payload->>'target_event_id' = e.event_id::text)
+        group by 1, 2
+        order by max(e.payload->'chat'->>'type') = 'single' desc nulls last, max(e.occurred_at) desc limit %(n)s""",
+                        {"e": entity_id, "a": allowed, "n": limit}).fetchall()
+    return [{**r, "read_with": {"tool": "memory_events", "thread_id": r["thread_id"], "source": r["source"]}}
+            for r in rows]
+
+
 def person_card(entity_id: str, max_privacy: str = "local_only", audience: str | None = None) -> dict:
     """Fast social card (§24): identity, accounts, relationship metrics, deviations, Kardex knowledge, shared groups,
     recent interactions, media counts. Deep dive happens through events/objects.
@@ -319,6 +347,7 @@ def person_card(entity_id: str, max_privacy: str = "local_only", audience: str |
                 m["content"] = " ".join(x for x in [m["content"] or ""] + said if x)[:300] or None
                 for k in ("event_id", "source", "source_id", "object_refs"):
                     m.pop(k)
+        threads = [] if audience == "third_party" else conversations(conn, entity_id, allowed)
         media = conn.execute("""select o.kind, count(*) n from core.objects o join core.object_links ol on ol.object_id = o.id
                                 where ol.target_type = 'beeper_message' and split_part(ol.target_id, '|', 1) in (
                                   select distinct e.thread_id from core.events e join core.identity_links l on l.identity_id = e.actor_identity_id
@@ -327,5 +356,6 @@ def person_card(entity_id: str, max_privacy: str = "local_only", audience: str |
     return {"entity": {k: en[k] for k in ("entity_id", "entity_type", "canonical_name", "aliases", "kardex_contact_id")},
             "accounts": accounts, "relationship": metrics, "deviations": deviations, "knowledge": knowledge,
             "kardex": kardex,
-            "shared_groups": groups, "recent_interactions": recent, "media": {m["kind"]: m["n"] for m in media},
+            "shared_groups": groups, "conversations": threads, "recent_interactions": recent,
+            "media": {m["kind"]: m["n"] for m in media},
             "audience": audience}

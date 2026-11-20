@@ -274,6 +274,25 @@ def spoken_texts(rows: list[dict], *, max_privacy: str = "cloud_allowed", chars:
     return [render_message(r, [a for a in atts.get(str(r.get("event_id")), []) if a.get("text")]) for r in rows]
 
 
+def owner_label() -> str:
+    """How the owner is named in a conversation read by an agent: the instance's form of address (instance.toml
+    [owner] address), never the technical account ID of a network."""
+    global _owner_label
+    if _owner_label is None:
+        try:
+            import tomllib
+            from pathlib import Path
+            root = Path(Path("/etc/walter/instance").read_text().strip())
+            _owner_label = str((tomllib.loads((root / "instance.toml").read_text()).get("owner") or {}).get("address")
+                               or "owner")
+        except (OSError, ValueError):
+            _owner_label = "owner"
+    return _owner_label
+
+
+_owner_label: str | None = None
+
+
 def compact(rows: list[dict], text: str | None = None, width: int = 500, budget: int = 16000, *,
             max_privacy: str = "cloud_allowed") -> dict:
     """Events as an agent reads them: no payload, the content cut to a window around the searched text, the whole
@@ -285,14 +304,32 @@ def compact(rows: list[dict], text: str | None = None, width: int = 500, budget:
         atts = attachments(rows, max_privacy=max_privacy)
     except Exception:  # noqa: BLE001 — attachments enrich the answer, never break it
         atts = {}
+    # a conversation read (one thread, no searched words) is a transcript: the thread is said once, each line keeps
+    # only what a reader cites (event_id, instant, author, text), and the hint names the exact next window, so the
+    # following call continues where this one stopped instead of re-reading the same days
+    thread = bool(rows) and not text and len({(r.get("source"), r.get("thread_id")) for r in rows}) == 1
     for r in rows:
         content = r.get("content") or ""
+        if thread:
+            item = {"event_id": r["event_id"], "at": str(r["occurred_at"])[:19],
+                    "who": owner_label() if r.get("actor_is_self") else (r.get("actor_name") or "?"),
+                    "text": content[:width] + ("…" if len(content) > width else "")}
+            if r["event_type"] not in ("message.sent", "message.received"):
+                item["type"] = r["event_type"]
+            if atts.get(str(r["event_id"])):
+                item["attachments"] = atts[str(r["event_id"])]
+            size = len(json.dumps(item, ensure_ascii=False, default=str))
+            if out and used + size > budget:
+                break
+            out.append(item); used += size
+            continue
         i = content.lower().find(low) if low else -1
         start = max(0, i - width // 3) if i > 0 else 0
         snippet = ("…" if start else "") + content[start:start + width] + ("…" if start + width < len(content) else "")
         item = {"event_id": r["event_id"], "occurred_at": str(r["occurred_at"]), "source": r["source"],
                 "event_type": r["event_type"], "thread_id": r.get("thread_id"), "source_id": r.get("source_id"),
-                "actor": r.get("actor_name"), "chars": len(content), "content": snippet}
+                "actor": owner_label() if r.get("actor_is_self") else r.get("actor_name"),
+                "chars": len(content), "content": snippet}
         if atts.get(str(r["event_id"])):
             item["attachments"] = atts[str(r["event_id"])]
         size = len(json.dumps(item, ensure_ascii=False, default=str))
@@ -300,6 +337,15 @@ def compact(rows: list[dict], text: str | None = None, width: int = 500, budget:
             break
         out.append(item); used += size
     more = len(rows) - len(out)
+    if thread:
+        newest_first = len(rows) > 1 and rows[0]["occurred_at"] > rows[-1]["occurred_at"]
+        # until is exclusive (the last shown), since inclusive (the first not shown): no event read twice
+        edge = (str(rows[len(out) - 1]["occurred_at"]) if newest_first else str(rows[len(out)]["occurred_at"])) \
+            if more and out else None
+        nxt = ({"until": edge} if newest_first else {"since": edge}) if edge else None
+        return {"source": rows[0]["source"], "thread_id": rows[0]["thread_id"], "events": out, "truncated": more,
+                **({"next": nxt, "hint": f"{more} more not shown: call again with {nxt} to continue without overlap"}
+                   if nxt else {})}
     return {"events": out, "truncated": more,
             **({"hint": f"{more} more not shown: narrow with since/until, or read one event in full by event_id"}
                if more else {})}

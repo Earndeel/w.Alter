@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from . import bus, processing, quota
@@ -84,6 +85,14 @@ def _local_day(t: datetime) -> date:
     return t.astimezone(tz()).date()
 
 
+def _uuid(value) -> bool:
+    try:
+        uuid.UUID(str(value))
+        return True
+    except ValueError:
+        return False
+
+
 # ───────────────────────────── routing: event → dirty keys ─────────────────────────────
 def _route_event(conn, p: dict, subject: str | None) -> int:
     """A canonical event (memory.event payload) → the search index, the triage of incoming events, the flow keys."""
@@ -94,9 +103,13 @@ def _route_event(conn, p: dict, subject: str | None) -> int:
     if (src, et) in TRIAGE_IN:        # one decision per thread after 2 min of calm, at least every 10 min while busy
         processing.mark(conn, "triage", "incoming", reason=src, settle=120, max_wait=600)
     if et == "event.retracted" and subject:
+        if not _uuid(subject):
+            return 0
+        # typed comparisons: a text cast skips the index of each of the ~220 partitions (≈0.5 s a retraction; 8 000
+        # retractions of the Beeper reconciliation held one transaction for over an hour, 20/11/2026)
         t = conn.execute("""select e.event_type, e.source, e.thread_id, e.occurred_at, e.payload->>'event_id' cal
-                            from core.events r join core.events e on e.event_id::text = r.payload->>'target_event_id'
-                            where r.event_id::text = %s""", (subject,)).fetchone()
+                            from core.events r join core.events e on e.event_id = (r.payload->>'target_event_id')::uuid
+                            where r.event_id = %s::uuid""", (subject,)).fetchone()
         if not t:
             return 0
         if t["source"] == "calendar" and t["cal"]:
@@ -115,7 +128,8 @@ def _route_event(conn, p: dict, subject: str | None) -> int:
                         settle=SETTLE["flows.conversations"])
         return 1
     if src == "calendar" and et == "calendar.event" and subject:
-        r = conn.execute("select payload->>'event_id' cal from core.events where event_id::text = %s", (subject,)).fetchone()
+        r = conn.execute("select payload->>'event_id' cal from core.events where event_id = %s::uuid",
+                         (subject,)).fetchone() if _uuid(subject) else None
         processing.mark(conn, "flows.appointments", (r and r["cal"]) or subject, reason="calendar",
                         settle=SETTLE["flows.appointments"])
         return 1

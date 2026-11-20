@@ -11,6 +11,7 @@ import json
 import mimetypes
 import os
 import re
+import subprocess
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -76,6 +77,20 @@ def kind_of(mime: str | None, name: str) -> str:
     return "document" if m.startswith(("text/", "application/")) else "other"
 
 
+def audio_only(path: Path, mime: str) -> str:
+    """A video container with no picture is a sound file: voice notes of some networks arrive as `.mp4`
+    (video/mp4 by the name) while they hold one audio track. The bytes decide (ffprobe); on any doubt the guess stays."""
+    if not mime.startswith("video/"):
+        return mime
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", str(path)],
+                           capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return mime
+    streams = {line.strip() for line in r.stdout.splitlines() if line.strip()}
+    return "audio/" + mime.split("/", 1)[1] if r.returncode == 0 and streams == {"audio"} else mime
+
+
 def _image_meta(path: Path) -> tuple[dict, datetime | None]:
     try:
         from PIL import Image
@@ -107,7 +122,7 @@ def put_object(path: str | Path, source: str, *, source_ref: dict | None = None,
     name = original_name or path.name
     row = conn.execute("select * from core.objects where sha256 = %s", (sha,)).fetchone()
     if row is None:
-        mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        mime = audio_only(path, mimetypes.guess_type(name)[0] or "application/octet-stream")
         kind = kind_of(mime, name)
         meta, exif_when = _image_meta(path) if mime.startswith("image/") else ({}, None)
         when = captured_at or exif_when

@@ -210,3 +210,18 @@ def test_a_personal_statement_without_subject_is_the_owners():
     rel, _ = extract2.validate({"type": "fait", "text": "Paul est son voisin", "domain": "relation", "msgs": [1],
                                 "quote": "je préfère qu'on me tutoie"}, seg, {})
     assert rel["subject"] == "other"
+
+
+def test_a_statement_about_someone_is_filed_under_that_person_and_linked_only_when_unambiguous():
+    """20/11: an analysis of exchanges with a contact produced statements filed under « other », attached to no one."""
+    from walter_memory import entities, extract2
+    seg = [{"event_type": "message.received", "content": "Vos échanges avec Zéphyrin Testard sont surtout logistiques"}]
+    it, _ = extract2.validate({"type": "hypothese", "text": "Les échanges avec Zéphyrin Testard semblent surtout logistiques",
+                               "author": "walter", "domain": "relation", "person": "Zéphyrin  Testard", "msgs": [1],
+                               "quote": "Vos échanges avec Zéphyrin Testard sont surtout logistiques"}, seg, {})
+    assert it["subject"] == "person:Zéphyrin Testard" and it["epistemic_v"] == "inferred"
+    assert entities.mentions_of({"attributes": {"subject": it["subject"]}}) == [("person", "Zéphyrin Testard")]
+    no, _ = extract2.validate({"type": "fait", "text": "Les échanges sont surtout logistiques", "domain": "relation",
+                               "person": None, "msgs": [1], "quote": "Vos échanges avec Zéphyrin Testard sont surtout logistiques"},
+                              seg, {})
+    assert no["subject"] == "other"

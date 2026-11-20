@@ -304,7 +304,7 @@ def test_attachments_in_compact_detail_render_and_search(made, cfg, tmp_path, mo
     rows = events.get_events(thread_id=thread, order="asc")
     out = events.compact(rows)
     first = out["events"][0]
-    assert first["source_id"] == sid and oid in [a["object_id"] for a in first["attachments"]] and "attachments" not in out["events"][1]
+    assert out["thread_id"] == thread and first["event_id"] == eid and oid in [a["object_id"] for a in first["attachments"]] and "attachments" not in out["events"][1]
     lines = events.render_messages(rows)
     assert f'[audio · object {oid} · transcript: "Je serai là à midi"]' in lines[0] and lines[1] == "ok"
     assert events.attachment_line({"object_id": "x", "kind": "audio", "text": None}) == "[audio · object x · no text yet]"
@@ -379,3 +379,20 @@ def test_cli_media_status_and_search(made, cfg, capsys):
     with pytest.raises(SystemExit):
         cli.main(["media", "search", "--kind", "audio", "--thread", f"none-{RUN}", "--cloud-safe", "--", "x"])
     assert json.loads(capsys.readouterr().out) == []
+
+
+def test_a_voice_note_in_a_video_container_is_stored_as_audio(tmp_path):
+    """Some networks send voice notes as `.mp4` (video/mp4 by the name) holding one audio track: the bytes decide,
+    so it is an audio object the STT derivation reads, while a real video stays a video."""
+    import subprocess
+    voice, clip = tmp_path / "audioclip-1.mp4", tmp_path / "clip.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:a", "aac",
+                    str(voice)], check=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=32x32:d=1", "-f", "lavfi", "-i",
+                    "sine=duration=1", "-shortest", "-c:v", "libx264", "-c:a", "aac", str(clip)], check=True)
+    assert objects.audio_only(voice, "video/mp4") == "audio/mp4"
+    assert objects.kind_of(objects.audio_only(voice, "video/mp4"), voice.name) == "audio"
+    assert objects.audio_only(clip, "video/mp4") == "video/mp4"
+    assert objects.audio_only(tmp_path / "missing.mp4", "video/mp4") == "video/mp4"     # doubt → the guess stays
+    assert objects.audio_only(voice, "image/png") == "image/png"
+    assert media._audio_format({"original_name": voice.name, "mime": "audio/mp4"}) == "mp4"

@@ -123,6 +123,7 @@ Rends un JSON :
               "author": "monsieur | walter | tiers",
               "domain": "personnel | projet | tache | relation | test",
               "project": "identifiant court du projet si domain = projet ou tache, sinon null",
+              "person": "si domain = relation : la personne (hors Monsieur et W.Alter) sur qui porte l'énoncé, nom tel qu'écrit dans les messages ; sinon null",
               "stage": "action : annoncee|en_cours|terminee ; sinon null",
               "scope": "durable | task | until", "until": "AAAA-MM-JJ si scope = until ou si un état a une fin connue, sinon null",
               "about": "K… si l'énoncé porte sur une connaissance déjà enregistrée, sinon null",
@@ -603,6 +604,10 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict], *, chan: str =
         elif w_:
             subject = f"person:{w_[:80]}"
             domain = domain if domain == "test" else "relation"
+    elif domain == "relation" and not subject and isinstance(item.get("person"), str) and item["person"].strip():
+        # what the assistant or the owner says about someone (an analysis of exchanges, 20/11): filed under that
+        # person, resolved to its entity only on an unambiguous name (entities.link_items), never under « other »
+        subject = f"person:{' '.join(item['person'].split())[:80]}"
     project = project_id(item.get("project")) or (project_id(subject) if subject.lower().startswith("project:") else None)
     if domain is None:                            # former format: from the subject
         domain = ("project" if project else "personal" if subject.lower() in ("owner", "monsieur")

@@ -64,7 +64,7 @@ def _material(conn, run_id: str) -> dict | None:
                              where l.run_id = %s and l.kind = 'observation_reused'""", (run_id,)).fetchall()
     children = conn.execute("""select run_id, act, goal, status, correction from runs.runs where parent_run_id = %s
                                order by started_at""", (run_id,)).fetchall()
-    answer = None
+    answer = tail = None
     sid = (run["origin"] or {}).get("session_id")
     if sid and privacy.cloud_readable(run["privacy_class"]):
         row = conn.execute("""select text from walter_logs.events where session_id = %s and type = 'assistant/message'
@@ -72,10 +72,11 @@ def _material(conn, run_id: str) -> dict | None:
                               and privacy_class = any(%s) order by seq desc limit 1""",
                            (sid, run["started_at"], run["ended_at"], privacy.allowed_classes("cloud_allowed"))).fetchone()
         answer = (row["text"] or "")[:2500] if row else None
+        tail = (row["text"] or "")[-400:] if row else None
     model_failures = conn.execute("""select task, model_id, provider, skipped from models.exec_log
                                      where run_id = %s and not ok order by at limit 5""", (run_id,)).fetchall()
     return {"run": run, "tasks": tasks, "calls": calls, "observations": obs, "reused": reused, "children": children,
-            "answer": answer, "tools": _tools(conn, run), "model_failures": model_failures}
+            "answer": answer, "answer_tail": tail, "tools": _tools(conn, run), "model_failures": model_failures}
 
 
 def _like(prefix: str) -> str:
@@ -209,6 +210,27 @@ def deterministic_outcome(m: dict, evaluation: dict) -> dict:
             "pending": []}
 
 
+def answered(m: dict, outcome: dict) -> str | None:
+    """A request answered in one turn, from the traces alone (no model; the episode summaries may be paused): the run
+    ended normally (outcome ok), no error anywhere, nothing pending, no sub-run or delegated task still working, and a
+    final answer that does not end on a question to the owner (a confirmation, a choice, a missing detail = an action
+    still waits). The objective must also be a one-shot request (a single attempt): update_objective checks it. Returns
+    the closing reason, else None. Never says the answer was good: only that nothing is left to do in this turn."""
+    run, ro = m["run"], m["run"].get("outcome") or {}
+    if run["status"] != "ended" or ro.get("status") != "ok" or ro.get("error"):
+        return None
+    if outcome["status"] not in ("unknown", "achieved") or outcome["errors"] or outcome["pending"]:
+        return None
+    if any(c["status"] == "open" for c in m["children"]):
+        return None
+    if any(t["status"] not in ("ended", "done") for t in m["tasks"] if t["kind"] != "objective"):
+        return None                             # a delegated task still working (the objective itself is a task)
+    tail = (m.get("answer_tail") or m.get("answer") or "").strip()
+    if len(tail) < 20 or tail.rstrip("*_)»\"' \n").endswith("?"):
+        return None
+    return "réponse livrée en un tour, sans erreur, sans question ni travail en attente"
+
+
 def _dedupe(errors: list[dict]) -> list[dict]:
     seen, out = set(), []
     for e in errors:
@@ -326,7 +348,8 @@ def build(run_id: str, *, reason: str = "run_ended", summarise: bool = True) -> 
     except Exception as e:  # noqa: BLE001 — the episode stands; the catch-up republishes
         out["experience"] = {"error": type(e).__name__}
     try:
-        out["task"] = update_objective(m["run"], outcome, summary)
+        out["task"] = update_objective(m["run"], outcome, summary,
+                                       answered=answered(m, outcome) if parsed is None else None)
     except Exception as e:  # noqa: BLE001
         out["task"] = {"error": type(e).__name__}
     parent = facts["parent_run_id"]
@@ -335,7 +358,7 @@ def build(run_id: str, *, reason: str = "run_ended", summarise: bool = True) -> 
     return out
 
 
-STATUS_FR = {"achieved": "réussie", "partial": "partielle", "failed": "échouée", "blocked": "bloquée",
+STATUS_FR = {"answered": "répondue", "achieved": "réussie", "partial": "partielle", "failed": "échouée", "blocked": "bloquée",
              "unknown": "issue non établie"}
 
 
@@ -422,11 +445,14 @@ def publish_experience(run: dict, version: int, summary: str | None, outcome: di
     return {"published": True, "item_id": row["item_id"], "superseded": len(prev)}
 
 
-def update_objective(run: dict, outcome: dict, summary: str | None) -> dict | None:
+def update_objective(run: dict, outcome: dict, summary: str | None, answered: str | None = None) -> dict | None:
     """The run's objective (A3) after its evaluation: done when achieved with nothing pending; suspended (resumable)
     when the run was interrupted (outcome.status interrupted, error.kind engine_restart); a failure — a budget stop
     (error.kind budget) included — keeps it open, a retry being plausible (only the owner or the engine's task_state
-    sets failed / cancelled); otherwise it stays open with what is pending. last_outcome is recorded."""
+    sets failed / cancelled); otherwise it stays open with what is pending. last_outcome is recorded.
+    `answered` (episodes.answered: no model judged the run) closes a one-shot request — an objective whose only attempt
+    is this run — as done with that reason and the run as its trace; an objective worked over several attempts, a
+    commitment or a durable goal, is never closed by it."""
     from . import runs as _runs
     run_id = str(run["run_id"])
     task_id = _runs.objective_of_run(run_id)
@@ -449,8 +475,16 @@ def update_objective(run: dict, outcome: dict, summary: str | None) -> dict | No
     ro = run.get("outcome") or {}
     interrupted = ro.get("status") == "interrupted" or (ro.get("error") or {}).get("kind") == "engine_restart"
     status = None
+    one_shot = False
+    if answered and not interrupted:
+        with connect() as conn:
+            one_shot = conn.execute("select count(*) n from runs.task_runs where task_id = %s",
+                                    (task_id,)).fetchone()["n"] == 1
     if st == "achieved" and not outcome["pending"] and not interrupted:
         status = "done"
+    elif one_shot:
+        status = "done"
+        last.update(status="answered", reason=answered)
     elif interrupted:
         status = "suspended"          # interrupted (engine restart…): resumable, the next continuation re-opens it
     elif cur["status"] == "suspended":
@@ -463,6 +497,8 @@ def update_objective(run: dict, outcome: dict, summary: str | None) -> dict | No
     result = None
     if status == "done":
         result = {"summary": summary, "refs": {"runs": [run_id]}}
+        if one_shot and st != "achieved":
+            result["closed_by"] = "answered"
     res = _runs.task_update(task_id, status=status, progress=progress or None, result=result, last_outcome=last,
                             by="episode")
     return {"task_id": task_id, "status": res.get("status")}

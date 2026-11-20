@@ -238,3 +238,52 @@ def test_an_interrupted_run_suspends_its_objective_and_a_budget_stop_keeps_it_op
     runs.end(b, "failed", outcome={"status": "failed", "error": {"kind": "budget", "message": "turn cap"}})
     ep = episodes.build(b, summarise=False)
     assert ep["task"]["status"] == "open" and "budget" in runs.task_get(tid)["last_outcome"]
+
+
+def _answered_run(th, answer, *, act="new", requested=None, session=None):
+    s = session or sid()
+    a = runs.start(origin={"channel": "owner", "runtime": RT, "session_id": s}, goal="analyse mes échanges avec X",
+                   started_at=datetime.now(timezone.utc) - timedelta(seconds=30))
+    runs.update(a, thread_id=th, act=act, requested=requested or {"task": "general", "level": "L2", "work": True})
+    now = datetime.now(timezone.utc)
+    evs = [e for i in range(6) for e in ({"type": "tool/call", "at": now, "text": "{}", "tool": "Read", "call_id": f"ok{i}"},
+                                         {"type": "tool/result", "at": now, "text": "fine", "tool": "Read",
+                                          "call_id": f"ok{i}", "status": "ok"})]
+    runs.trace(s, evs + [{"type": "assistant/message", "at": now, "text": answer}], runtime=RT,
+               native_id=s.rsplit("/", 1)[-1])     # one trace call: its event keys are numbered per call
+    runs.end(a, "ended", outcome={"status": "ok"})
+    return a
+
+
+def test_a_one_shot_request_answered_without_a_model_closes_with_its_trace(monkeypatch):
+    from walter_memory import organic
+    monkeypatch.setattr(organic, "paused", lambda stage: stage == "episode_summaries")   # Monsieur's 19/11 setting
+    th = thread()
+    a = _answered_run(th, "Voici l'analyse : trois échanges en novembre, ton cordial, rien en attente de votre part.")
+    tid = runs.objective_of_run(a)
+    ep = episodes.build(a)
+    assert ep["summary"] is None and ep["outcome"]["status"] == "unknown"      # no model: never claimed « achieved »
+    assert ep["task"]["status"] == "done"
+    t = runs.task_get(tid)
+    assert t["result"]["refs"]["runs"] == [a] and t["result"]["closed_by"] == "answered"
+    assert t["last_outcome"].startswith("answered: réponse livrée")
+
+
+def test_an_answer_that_waits_for_the_owner_or_a_worked_objective_stays_open(monkeypatch):
+    from walter_memory import organic
+    monkeypatch.setattr(organic, "paused", lambda stage: stage == "episode_summaries")
+    th = thread()
+    a = _answered_run(th, "Brouillon prêt pour votre contact. Je l'envoie tel quel ?")
+    ep = episodes.build(a)
+    assert ep["task"]["status"] == "open"                                     # an action still waits for Monsieur
+    th2 = thread()
+    s = sid()
+    first = runs.start(origin={"channel": "owner", "runtime": RT, "session_id": s}, goal="refonds la page d'accueil",
+                       started_at=datetime.now(timezone.utc) - timedelta(minutes=5))
+    tid = runs.update(first, thread_id=th2, act="new", requested={"task": "coding", "level": "L2", "work": True})["task_id"]
+    runs.end(first, "failed", outcome={"status": "failed", "error": {"kind": "tool_error", "message": "x"}})
+    b = _answered_run(th2, "La couleur du bandeau est définie dans le fichier de thème, ligne 12.", act="continue",
+                      session=s)
+    assert runs.objective_of_run(b) == tid
+    ep = episodes.build(b)
+    assert ep["task"]["status"] == "open" and runs.task_get(tid)["status"] == "open"   # several attempts: not one-shot

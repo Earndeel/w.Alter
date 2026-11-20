@@ -27,7 +27,7 @@ import re
 import time
 from pathlib import Path
 
-from . import privacy, search, social
+from . import events, privacy, search, social
 from .db import connection
 
 @functools.lru_cache(maxsize=1)
@@ -196,7 +196,17 @@ def _card_lines(entity_id: str) -> list[str]:
         return f" ({' ; '.join(t)})" if t else ""
     lines += [f"  • {cl['claim']}{tag(cl)}" for cl in (c["kardex"].get("claims") or [])[:8]]   # read_policy decides
     lines += list(dict.fromkeys(f"  ⚠ {d['observation']}" for d in c["deviations"]))[:2]
-    return lines
+    return lines[:1] + _thread_lines(c.get("conversations") or []) + lines[1:]   # where to read, before the details
+
+
+def _thread_lines(threads: list[dict], n: int = 4) -> list[str]:
+    """Where the exchanges with this person are: each thread id, read directly with memory_events (no search)."""
+    def d(x):
+        return str(x)[:16] if x else "?"
+    return [f"  ↳ {t.get('network') or t['source']} ({'direct' if t.get('chat_type') == 'single' else t.get('chat_type') or 'fil'}) "
+            f"thread_id={t['thread_id']} : {t['messages']} messages, du {d(t['first_exchange'])[:10]} au {d(t['last_exchange'])}"
+            f" (dernier de {events.owner_label()} {d(t['last_from_owner'])}, de la personne {d(t['last_from_them'])})"
+            for t in threads[:n]]
 
 
 def _periods(message: str, max_privacy: str, budget: int) -> tuple[str, list[str]]:
@@ -545,7 +555,8 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     if b["people"] > 0:
         t = time.perf_counter()
         in_state = (sections.get("state") and state_key or "").removeprefix("person:")
-        lines = [l for eid in named if eid != in_state for l in _card_lines(eid)]   # the relation already says it
+        lines = [l for eid in named for l in (_card_lines(eid) if eid != in_state   # the relation already says it
+                                               else _thread_lines(social.person_card(eid, "cloud_allowed")["conversations"]))]
         text, used = _clip(lines, b["people"])
         if text:
             sections["people"] = text
