@@ -238,6 +238,16 @@ def test_budget_ceilings_follow_the_stated_effort(engine):
     assert at_least("L1", "L2") == "L2" and at_least("L3", "L2") == "L3" and at_least("L1", None) == "L1"
 
 
+def test_a_delegation_is_told_to_conclude_before_its_budget_cuts_it(engine):
+    """2026-11-20: the Router's advisor was cancelled at budget_seconds (25 min) after 37 tool calls, never told to
+    conclude — the general machine ceiling is 45 min. A delegation's own budget is now the conclude deadline."""
+    c = engine._ceilings({"effort": "L3", "channel": "machine"}, conclude_ms=880_000)
+    assert c["max_ms"] == 880_000
+    assert engine._verdict(c, 5, 879_000) == "go" and engine._verdict(c, 5, 880_000) == "conclude"
+    assert engine._verdict(c, 5, 3_000_000) == "conclude"          # never a hard stop: the API cancel is the end
+    assert engine._ceilings({"effort": "L2"})["max_ms"] == 20 * 60_000   # owner turns unchanged
+
+
 def test_commands_never_see_the_engine_credentials_and_carry_the_run(engine, monkeypatch):
     monkeypatch.setenv("WALTER_LLM_TOKEN", "tok")
     monkeypatch.setenv("WALTER_MEMORY_GATEWAY_TOKEN", "tok2")

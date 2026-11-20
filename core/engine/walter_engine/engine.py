@@ -132,6 +132,7 @@ class Agent:
         self.run_key: str | None = None
         self.plan: dict | None = None
         self.last: dict | None = None            # {run_id, channel, plan} of the last request turn (wake turns inherit)
+        self.conclude_ms: float | None = None    # a delegation's own budget: told to conclude before the API cancels it
         self.images: list[dict] = []
         self.live: set = set()                   # callables(event) for events that are not journaled (deltas, notices)
         self._sys: tuple[str, str] | None = None  # (day, system prompt)
@@ -502,24 +503,27 @@ class Engine:
                 break
         return ""
 
-    def _ceilings(self, plan: dict | None) -> dict:
+    def _ceilings(self, plan: dict | None, conclude_ms: float | None = None) -> dict:
         b = self.s.budget or {}
         gen = {"level": None, "checkpoint": 0, "max_steps": int(b.get("max_steps", 80)),
                "max_ms": float(b.get("max_turn_min", 45)) * 60_000}
         name = (plan.get("effort") or plan.get("level")) if plan and not plan.get("degraded") and plan.get("channel") != "machine" else None
         lv = (b.get("levels") or {}).get(name) if name else None
-        if not lv:
-            return gen
-        return {"level": name, "checkpoint": min(int(lv.get("checkpoint", 0)), gen["max_steps"]),
-                "max_steps": min(int(lv.get("max_steps", gen["max_steps"])), gen["max_steps"]),
-                "max_ms": min(float(lv.get("max_turn_min", gen["max_ms"] / 60_000)) * 60_000, gen["max_ms"])}
+        c = gen if not lv else {
+            "level": name, "checkpoint": min(int(lv.get("checkpoint", 0)), gen["max_steps"]),
+            "max_steps": min(int(lv.get("max_steps", gen["max_steps"])), gen["max_steps"]),
+            "max_ms": min(float(lv.get("max_turn_min", gen["max_ms"] / 60_000)) * 60_000, gen["max_ms"])}
+        if conclude_ms:   # 2026-11-20: a delegation cut at budget_seconds never got the conclude notice (45 min ceiling)
+            c = {**c, "max_ms": min(c["max_ms"], conclude_ms), "grace_ms": 0}
+        return c
 
     def _verdict(self, c: dict, step: int, ms: float) -> str:
         b = self.s.budget or {}
         over_steps, over_time = step >= c["max_steps"], ms >= c["max_ms"]
         if not over_steps and not over_time:
             return "checkpoint" if c["checkpoint"] and step >= c["checkpoint"] else "go"
-        grace = step >= c["max_steps"] + int(b.get("grace_steps", 3)) or ms >= c["max_ms"] + float(b.get("grace_min", 5)) * 60_000
+        grace_ms = c["grace_ms"] if "grace_ms" in c else float(b.get("grace_min", 5)) * 60_000
+        grace = step >= c["max_steps"] + int(b.get("grace_steps", 3)) or (ms >= c["max_ms"] + grace_ms and grace_ms > 0)
         return "stop" if grace else "conclude"
 
     def _budget_record(self, row: dict) -> None:
@@ -535,7 +539,7 @@ class Engine:
 
     async def _steps(self, a: Agent, turn: int, plan: dict | None, stats: dict, t0: float) -> tuple[str, dict]:
         s = a.session
-        c = self._ceilings(plan)
+        c = self._ceilings(plan, a.conclude_ms)
         checked = told = False
         overflow_retry = False
         while True:

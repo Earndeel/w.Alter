@@ -569,6 +569,8 @@ class EngineApi:
         if not opened["resumed"] and not model and d.get("task") and d["task"] != "auto" and d["task"] in self.s.models:
             self.e.set_model(a, d["task"])
         budget_ms = max(60, min(int(d.get("budget_seconds") or 900), 3600)) * 1000
+        # told to conclude (tools removed) early enough to write the answer before the cancel below (2026-11-20)
+        a.conclude_ms = max(budget_ms * 0.5, budget_ms - max(90_000, budget_ms * 0.2))
         r = await self.submit({"session_id": opened["session_id"], "message": {"text": mission(d)}, "channel": "machine",
                                "idempotency_key": key, "wait_ms": budget_ms}, "queue", keyed=True)
         res = r["result"]
