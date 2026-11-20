@@ -105,7 +105,8 @@ def test_best_available_objective_without_pin_takes_top_callable(conn):
 
 
 def test_image_favourite_is_sunburst(conn):
-    assert choose.pick(conn, "text_to_image")["model_id"] == "gpt-image-2-5-sunburst"
+    # unlocked since 2026-11-20 (owner): it follows the best of the Sunburst line (2.5 → 2.6 the same day)
+    assert choose.pick(conn, "text_to_image")["model_id"].startswith("gpt-image-2")
 
 
 def test_tool_tasks_never_get_a_model(conn):
