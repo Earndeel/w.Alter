@@ -150,6 +150,9 @@ FIELD_MEANINGS = {
 ENV_MEANINGS = {
     "WALTER_ROUTER_DATABASE_URL": "DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée.",
     "WALTER_ROUTER_CLI": "Commande publique appelée par l'adaptateur de tools.",
+    "WALTER_ENGINE_API_URL": "Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895).",
+    "WALTER_ROUTER_ADVISOR": "« off » : le cycle et les clics ne lancent pas le conseiller du Router.",
+    "PYTEST_CURRENT_TEST": "Posée par pytest : le conseiller ne se lance jamais depuis un test.",
     "WALTER_DELEGATION_DEPTH": "Profondeur de délégation de l'appelant (0 = le propriétaire) transmise au moteur par une délégation Engine API ; posée par le moteur pour ses sous-tâches.",
     "WALTER_RUN_ID": "Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log.",
     "WALTER_RUN_CHANNEL": "test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation du propriétaire.",

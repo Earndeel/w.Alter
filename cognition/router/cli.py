@@ -88,6 +88,13 @@ def build_parser() -> argparse.ArgumentParser:
     lk.add_argument("--role", help="role of the task (L1/L2/L3 for general; default otherwise)")
     a = sub.add_parser("alerts")
     a.add_argument("--all", action="store_true")
+    ad = sub.add_parser("advisor", help="the Router's advisor agent: reads the whole picture after a cycle or an owner's "
+                                        "choice and proposes its consequences on Telegram (never applies by itself)")
+    ad.add_argument("action", choices=("run", "launch", "state"))
+    ad.add_argument("--trigger", default="manual", help="cycle | owner | manual")
+    ad.add_argument("--detail", help="JSON: what triggered the run (the owner's answer…)")
+    ad.add_argument("--dry-run", action="store_true", help="build the brief, run nothing")
+    ad.add_argument("--no-notify", action="store_true")
     v = sub.add_parser("verdict")
     v.add_argument("alert_id", type=int)
     v.add_argument("decision", choices=("adopted", "dismissed"))
@@ -330,6 +337,21 @@ def main(argv: list[str] | None = None) -> int:
                 subprocess.run(["walter-soul", "sync"], capture_output=True, timeout=120)
         print(json.dumps({"written": str(instance.state_file("brief.md")), "changed": changed}))
         return 0
+    if args.cmd == "advisor":
+        from walter_router.analysis import advisor
+        detail = json.loads(args.detail) if args.detail else None
+        if args.action == "state":
+            with db.connect() as conn:
+                out = advisor.state(conn, args.trigger, detail)
+        elif args.action == "launch":
+            out = {"launched": advisor.launch(args.trigger, detail)}
+        else:
+            out = advisor.run(args.trigger, detail, dry_run=args.dry_run, notify=not args.no_notify)
+            if args.dry_run:
+                out = {k: v for k, v in out.items() if k != "state"}
+        json.dump(out, sys.stdout, indent=1, ensure_ascii=False, default=str)
+        print()
+        return 0
     if args.cmd == "migrate":
         out = {"applied": db.migrate()}
     elif args.cmd == "decision-chain":
@@ -440,6 +462,9 @@ def main(argv: list[str] | None = None) -> int:
                 wr = paths.ROOT / "bin" / "walter-router"   # the library page follows (background, after this commit)
                 subprocess.Popen(["sh", "-c", f'sleep 3; "{wr}" publish-library'],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                from walter_router.analysis import advisor
+                advisor.launch("owner", {"padlock": {"task": args.task, "role": args.role, "locked": args.state == "on"},
+                                         "changed": out["changed"]}, delay=advisor.OWNER_DELAY)
             elif args.cmd == "alerts":
                 rows = conn.execute("select * from models.alerts order by alert_id").fetchall() if args.all else alerts.pending(conn)
                 out = rows
@@ -458,6 +483,10 @@ def main(argv: list[str] | None = None) -> int:
                 wr = paths.ROOT / "bin" / "walter-router"   # after this command's commit
                 subprocess.Popen(["sh", "-c", f'sleep 5; "{wr}" publish-library'],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                if args.decision == "adopted":   # the advisor works out what the owner's choice implies (2026-11-20)
+                    from walter_router.analysis import advisor
+                    advisor.launch("owner", {"answer": "adopté", "alert_id": args.alert_id, "result": out},
+                                   delay=advisor.OWNER_DELAY)
             conn.commit()
     json.dump(out, sys.stdout, indent=1, ensure_ascii=False, default=str)
     print()

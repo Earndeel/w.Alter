@@ -65,6 +65,14 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 3. **The owner decides** — his pins and roles (`config/knowledge.json`, `prefer`) always win. A model that beats an
    active one on the task's global score, a new #1, a nerf, a board down, a plan change or a plan news becomes one
    Telegram message with buttons; nothing switches without his button (`verdict`).
+   **Advisor agent** (2026-11-20, `analysis/advisor.py`): after each cycle and each choice of the owner (button,
+   padlock), one Walter Engine delegation (`guardian-router-advisor`, poste general/L3) reads the whole picture —
+   declared tiers and their quota substitutes, padlocks, frontier with measured / estimated subscription costs,
+   changes, the owner's recent answers, `docs/TIERS.md` — investigates read-only and proposes at most 3 consequences.
+   Each becomes an `advice` alert (Telegram « Appliquer / Non »); accepting applies exactly one whitelisted action
+   (`set_quota_fallback`, `set_level`, `set_preference`, `set_lock`; `note` = information). It never applies anything
+   by itself; runs are logged in `@instance/state/router/advisor/runs.jsonl`. CLI `walter-router advisor run|launch|state`;
+   `WALTER_ROUTER_ADVISOR=off` disables the automatic runs.
 4. **Serve** — routes in the owner's order: a subscription first at its cost price while its weekly quota is under
    90 %, Kie when reliable and not much dearer, OpenRouter last on the cheapest usable host it is told to use (never
    below the model's native precision, ≥ 95 % uptime over 24 h; flex tier only for background postes). Text execution stays on the selected model: only its ordered providers are tried, with an explicit

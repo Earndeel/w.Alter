@@ -89,6 +89,13 @@ Lire les abonnements, ou enregistrer une modification demandée par leur propri�
 ## CLI complète
 
 ```text
+walter-router advisor
+  -h, --help : show this help message and exit ; défaut===SUPPRESS==
+  action :  ; défaut=— ; valeurs=["run", "launch", "state"]
+  --trigger : cycle | owner | manual ; défaut=manual
+  --detail : JSON: what triggered the run (the owner's answer…) ; défaut=—
+  --dry-run : build the brief, run nothing ; défaut=false
+  --no-notify :  ; défaut=false
 walter-router alerts
   -h, --help : show this help message and exit ; défaut===SUPPRESS==
   --all :  ; défaut=false

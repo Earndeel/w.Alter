@@ -52,7 +52,7 @@ challenger, new_best, tier, nerf, pareto, board_down, top3, unranked, billing; e
 constraints :
 
 ```sql
-CHECK ((kind = ANY (ARRAY['challenger'::text, 'unranked'::text, 'source_stale'::text, 'top3'::text, 'billing'::text, 'tier'::text, 'new_best'::text, 'nerf'::text, 'pareto'::text, 'board_down'::text, 'plan_change'::text])))
+CHECK ((kind = ANY (ARRAY['challenger'::text, 'unranked'::text, 'source_stale'::text, 'top3'::text, 'billing'::text, 'tier'::text, 'new_best'::text, 'nerf'::text, 'pareto'::text, 'board_down'::text, 'plan_change'::text, 'advice'::text])))
 UNIQUE (kind, task, role, subject)
 PRIMARY KEY (alert_id)
 CHECK ((status = ANY (ARRAY['baseline'::text, 'open'::text, 'notified'::text, 'dismissed'::text, 'adopted'::text])))

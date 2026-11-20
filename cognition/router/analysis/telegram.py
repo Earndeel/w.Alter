@@ -70,10 +70,19 @@ def _plan_block(a: dict) -> list[str]:
             f'« {e.get("quote", "")[:160]} »']
 
 
+def _advice_block(a: dict) -> list[str]:
+    """The advisor agent's proposal (2026-11-20): what it saw, what accepting changes."""
+    e = a["evidence"]
+    return ["🧠 Conseil du Router", e.get("title_fr") or a["subject"], "",
+            e.get("why_fr") or None, (f'➡️ {e["consequences_fr"]}' if e.get("consequences_fr") else None)]
+
+
 def _block(conn, a: dict) -> list[str]:
     e = a["evidence"]
     if a["kind"] == "plan_change":
         return _plan_block(a)
+    if a["kind"] == "advice":
+        return _advice_block(a)
     task = conn.execute("select label, interface, modes from models.tasks where task = %s", (a["task"],)).fetchone() \
         if a["task"] else None
     if a["kind"] == "challenger" and "boards" in e:
@@ -305,7 +314,13 @@ BUTTONS = {"challenger": (("✅ Changer", "a"), ("✖️ Garder l'actuel", "d"))
            "pareto": (("👍 Noté", "a"), ("✖️ Ignorer", "d")),
            "nerf": (("👁️ Masquer", "d"),),
            "board_down": (("👁️ Vu", "d"),),
-           "plan_change": (("✅ Mettre à jour", "a"), ("✖️ Ignorer", "d"))}
+           "plan_change": (("✅ Mettre à jour", "a"), ("✖️ Ignorer", "d")),
+           "advice": (("✅ Appliquer", "a"), ("✖️ Non", "d"))}
+
+
+def _actionable(a: dict) -> bool:
+    action = (a.get("evidence") or {}).get("action")
+    return action != "none" and not (isinstance(action, dict) and action.get("op") == "note")
 
 
 def keyboard(conn, alerts: list[dict]) -> list[list[dict]]:
@@ -318,7 +333,7 @@ def keyboard(conn, alerts: list[dict]) -> list[list[dict]]:
         n = a0.get("ref") or a0["alert_id"]
         rows.append([{"text": _button_text(conn, a0, label, code), "callback_data": f"wr:{code}:{n}"}
                      for label, code in (BUTTONS.get(a0["kind"], (("✖️ Ignorer", "d"),))
-                                         if (a0.get("evidence") or {}).get("action") != "none" else (("👁️ Vu", "d"),))])
+                                         if _actionable(a0) else (("👁️ Vu", "d"),))])
         roles = sorted({a.get("role") or "" for a in group} - {""})
         if a0["kind"] == "challenger" and len(roles) > 1:   # one model beating several roles: adopt one role only
             rows.append([{"text": f"✅ Seulement {ROLE_LABELS.get(r, r)}"[:40], "callback_data": f"wr:a:{n}:{r}"[:64]}
@@ -344,7 +359,7 @@ def _button_text(conn, a: dict, label: str, code: str) -> str:
         return f"✖️ Garder {_name(conn, cur)}"[:48] if cur else label
     if a["kind"] == "new_best" and code == "d" and e.get("previous_name"):
         return f"↩️ Garder {e['previous_name']}"[:48]
-    if a["kind"] in ("board_down", "plan_change"):
+    if a["kind"] in ("board_down", "plan_change", "advice"):
         return label
     return f"{label} · {_name(conn, (a.get('subject') or '').partition('/')[0])}".rstrip(" ·")[:48]
 

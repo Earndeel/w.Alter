@@ -8,6 +8,27 @@
 Analysis: understands the collected data and organises it in the database (parsing, identities, media
 
 
+## analysis/advisor.py
+
+The Router's advisor agent (owner, 2026-11-20: « le router doit avoir un vrai agent intelligent qui s'occupe de
+
+- `_pin(model_id, variant)` — 
+- `_aa(conn, model_id: str, variant: str)` — 
+- `_routes(conn, pin: str | None)` — 
+- `state(conn, trigger: str='manual', extra: dict | None=None)` — Everything the advisor needs, compact and in one snapshot of the index.
+- `brief(st: dict)` — 
+- `verdict_of(output: str)` — The agent's closing JSON: the last object carrying `proposals`.
+- `_callable(conn, task: str, pin: str)` — 
+- `validate(conn, action: dict)` — None when the action can be applied as is, else why not.
+- `subject(action: dict)` — One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal).
+- `apply(conn, action: dict, note: str)` — The owner adopted the advice: one action through the Router's usual writers.
+- `record(conn, verdict: dict, run: dict)` — The agent's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log.
+- `_engine_token()` — 
+- `delegate(goal: str, key: str, budget: int=BUDGET)` — One Walter Engine delegation (Engine API, the declared door to the runtime).
+- `_log(entry: dict)` — 
+- `run(trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True)` — 
+- `launch(trigger: str, extra: dict | None=None, delay: int=0)` — Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.
+
 ## analysis/alerts.py
 
 Alerts: a pinned favourite overtaken, unranked new releases, stale sources — and their Telegram notification.
@@ -256,6 +277,7 @@ Telegram side of the alerts: one message per piece of news with its buttons (202
 - `_money_line(c: dict)` — 
 - `_why(e: dict)` — 
 - `_plan_block(a: dict)` — 2026-10-22: a billing e-mail differs from the declared plans.
+- `_advice_block(a: dict)` — The advisor agent's proposal (2026-11-20): what it saw, what accepting changes.
 - `_block(conn, a: dict)` — 
 - `_decision_block(conn, a: dict, task: dict)` — Decision model proposal, short (2026-10-16: « trop gros, des informations inutiles »): who replaces
 - `_group_key(conn, a: dict)` — 
@@ -267,6 +289,7 @@ Telegram side of the alerts: one message per piece of news with its buttons (202
 - `_route_line(conn, a: dict, c: dict)` — '🔁 Fournisseurs : Kie → OpenRouter · Secours : Wan 3' for a media model (what would run if adopted).
 - `render(alerts: list[dict], conn=None, typed: bool=False)` — 
 - `render_each(alerts: list[dict], conn=None, typed: bool=False)` — One message per piece of news (2026-10-16: « 2 messages différents, pas un gros message »).
+- `_actionable(a: dict)` — 
 - `keyboard(conn, alerts: list[dict])` — 
 - `_name(conn, model_id: str | None)` — 
 - `_button_text(conn, a: dict, label: str, code: str)` — '✅ Passer à Grok Imagine Video 1.5' / '✖️ Garder MiniMax H3' (names, not numbers: several news per message).

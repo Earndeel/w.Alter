@@ -1074,6 +1074,79 @@
     },
     {
       "subcommands": {
+        "advisor": [
+          {
+            "choices": null,
+            "default": "==SUPPRESS==",
+            "dest": "help",
+            "flags": [
+              "-h",
+              "--help"
+            ],
+            "help": "show this help message and exit",
+            "nargs": 0,
+            "required": false
+          },
+          {
+            "choices": [
+              "run",
+              "launch",
+              "state"
+            ],
+            "default": null,
+            "dest": "action",
+            "flags": [
+              "action"
+            ],
+            "help": "",
+            "nargs": null,
+            "required": true
+          },
+          {
+            "choices": null,
+            "default": "manual",
+            "dest": "trigger",
+            "flags": [
+              "--trigger"
+            ],
+            "help": "cycle | owner | manual",
+            "nargs": null,
+            "required": false
+          },
+          {
+            "choices": null,
+            "default": null,
+            "dest": "detail",
+            "flags": [
+              "--detail"
+            ],
+            "help": "JSON: what triggered the run (the owner's answer…)",
+            "nargs": null,
+            "required": false
+          },
+          {
+            "choices": null,
+            "default": false,
+            "dest": "dry_run",
+            "flags": [
+              "--dry-run"
+            ],
+            "help": "build the brief, run nothing",
+            "nargs": 0,
+            "required": false
+          },
+          {
+            "choices": null,
+            "default": false,
+            "dest": "no_notify",
+            "flags": [
+              "--no-notify"
+            ],
+            "help": "",
+            "nargs": 0,
+            "required": false
+          }
+        ],
         "alerts": [
           {
             "choices": null,
@@ -3092,7 +3165,7 @@
           }
         ],
         "constraints": [
-          "CHECK ((kind = ANY (ARRAY['challenger'::text, 'unranked'::text, 'source_stale'::text, 'top3'::text, 'billing'::text, 'tier'::text, 'new_best'::text, 'nerf'::text, 'pareto'::text, 'board_down'::text, 'plan_change'::text])))",
+          "CHECK ((kind = ANY (ARRAY['challenger'::text, 'unranked'::text, 'source_stale'::text, 'top3'::text, 'billing'::text, 'tier'::text, 'new_best'::text, 'nerf'::text, 'pareto'::text, 'board_down'::text, 'plan_change'::text, 'advice'::text])))",
           "UNIQUE (kind, task, role, subject)",
           "PRIMARY KEY (alert_id)",
           "CHECK ((status = ANY (ARRAY['baseline'::text, 'open'::text, 'notified'::text, 'dismissed'::text, 'adopted'::text])))"
@@ -5865,6 +5938,92 @@
         "functions": []
       },
       {
+        "description": "The Router's advisor agent (owner, 2026-11-20: « le router doit avoir un vrai agent intelligent qui s'occupe de",
+        "file": "analysis/advisor.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_pin",
+            "signature": "model_id, variant"
+          },
+          {
+            "description": "",
+            "name": "_aa",
+            "signature": "conn, model_id: str, variant: str"
+          },
+          {
+            "description": "",
+            "name": "_routes",
+            "signature": "conn, pin: str | None"
+          },
+          {
+            "description": "Everything the advisor needs, compact and in one snapshot of the index.",
+            "name": "state",
+            "signature": "conn, trigger: str='manual', extra: dict | None=None"
+          },
+          {
+            "description": "",
+            "name": "brief",
+            "signature": "st: dict"
+          },
+          {
+            "description": "The agent's closing JSON: the last object carrying `proposals`.",
+            "name": "verdict_of",
+            "signature": "output: str"
+          },
+          {
+            "description": "",
+            "name": "_callable",
+            "signature": "conn, task: str, pin: str"
+          },
+          {
+            "description": "None when the action can be applied as is, else why not.",
+            "name": "validate",
+            "signature": "conn, action: dict"
+          },
+          {
+            "description": "One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal).",
+            "name": "subject",
+            "signature": "action: dict"
+          },
+          {
+            "description": "The owner adopted the advice: one action through the Router's usual writers.",
+            "name": "apply",
+            "signature": "conn, action: dict, note: str"
+          },
+          {
+            "description": "The agent's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log.",
+            "name": "record",
+            "signature": "conn, verdict: dict, run: dict"
+          },
+          {
+            "description": "",
+            "name": "_engine_token",
+            "signature": ""
+          },
+          {
+            "description": "One Walter Engine delegation (Engine API, the declared door to the runtime).",
+            "name": "delegate",
+            "signature": "goal: str, key: str, budget: int=BUDGET"
+          },
+          {
+            "description": "",
+            "name": "_log",
+            "signature": "entry: dict"
+          },
+          {
+            "description": "",
+            "name": "run",
+            "signature": "trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True"
+          },
+          {
+            "description": "Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.",
+            "name": "launch",
+            "signature": "trigger: str, extra: dict | None=None, delay: int=0"
+          }
+        ]
+      },
+      {
         "description": "Alerts: a pinned favourite overtaken, unranked new releases, stale sources — and their Telegram notification.",
         "file": "analysis/alerts.py",
         "functions": [
@@ -6766,6 +6925,11 @@
             "signature": "a: dict"
           },
           {
+            "description": "The advisor agent's proposal (2026-11-20): what it saw, what accepting changes.",
+            "name": "_advice_block",
+            "signature": "a: dict"
+          },
+          {
             "description": "",
             "name": "_block",
             "signature": "conn, a: dict"
@@ -6819,6 +6983,11 @@
             "description": "One message per piece of news (2026-10-16: « 2 messages différents, pas un gros message »).",
             "name": "render_each",
             "signature": "alerts: list[dict], conn=None, typed: bool=False"
+          },
+          {
+            "description": "",
+            "name": "_actionable",
+            "signature": "a: dict"
           },
           {
             "description": "",
@@ -15182,6 +15351,70 @@
     ],
     "constants": [
       {
+        "comment": "policy machine_interfaces « guardian- »: a declared machine caller",
+        "file": "analysis/advisor.py",
+        "name": "CALLER",
+        "value": "guardian-router-advisor"
+      },
+      {
+        "comment": "the owner's top text tier: understanding consequences is its job",
+        "file": "analysis/advisor.py",
+        "name": "TASK",
+        "value": "general"
+      },
+      {
+        "comment": "the owner's top text tier: understanding consequences is its job",
+        "file": "analysis/advisor.py",
+        "name": "LEVEL",
+        "value": "L3"
+      },
+      {
+        "comment": "seconds of work per run",
+        "file": "analysis/advisor.py",
+        "name": "BUDGET",
+        "value": 1500
+      },
+      {
+        "comment": "",
+        "file": "analysis/advisor.py",
+        "name": "MAX_PROPOSALS",
+        "value": 3
+      },
+      {
+        "comment": "after an owner's click: let a burst of clicks land before reading the state",
+        "file": "analysis/advisor.py",
+        "name": "OWNER_DELAY",
+        "value": 90
+      },
+      {
+        "comment": "",
+        "file": "analysis/advisor.py",
+        "name": "OPS",
+        "value": [
+          "set_quota_fallback",
+          "set_level",
+          "set_preference",
+          "set_lock",
+          "note"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "analysis/advisor.py",
+        "name": "LEVELS",
+        "value": [
+          "L1",
+          "L2",
+          "L3"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "analysis/advisor.py",
+        "name": "BRIEF",
+        "value": "Tu es le conseiller du Walter Router de {owner}, sur sa VM. Le Router choisit le modèle de chaque tâche\n(niveaux texte L1/L2/L3, spécialistes, image, vidéo, voix…) à partir des classements (Artificial Analysis…), des prix et\ndes abonnements de {owner}. Ses règles automatiques regardent une chose à la fois ; toi, tu comprends les tenants et les\naboutissants : ce qu'un changement implique ailleurs, ce qui est devenu incohérent, ce que {owner} n'a pas vu.\n\nDéclencheur : {trigger}. L'état complet est ci-dessous (un seul instantané de l'index ; les règles des niveaux, écrites\npar {owner}, sont dans `tier_rules`).\n\nCe que tu cherches (exemples, pas une liste fermée) :\n- un repli « quota épuisé » (`when_quota_spent`) ou un `fallback` resté sur un ancien modèle alors qu'un meilleur existe\n  sur le même abonnement, ou qui n'a plus de route, ou qui ferait descendre le niveau sous le niveau inférieur ;\n- un niveau qui ne respecte plus ses règles (L1 < L2 < L3 en score ; L2 sur un autre abonnement que L3 ; même prix ±25 %\n  et jamais un score plus bas pour L1/L2) ;\n- un coût d'abonnement estimé (`estimated_from`) qui change une décision, ou qu'une mesure contredit ;\n- un recalcul de l'index (rebased) qui fausse une comparaison ; une proposition déjà refusée par {owner} qu'il ne faut\n  pas reproposer (regarde `recent_alerts_and_owner_answers`) ;\n- les conséquences du choix que {owner} vient de faire (détail du déclencheur).\n\nComment travailler : vérifie avant de proposer, en lecture seule — `walter-router pick general --level L3`,\n`walter-router route <tâche>`, `walter-router dossier <tâche>`, `walter-router plans`, `walter-router library`,\n`cd {root} && venv/bin/python -c \"…\"` pour lire la base via `walter_router.store.db`. Tu ne modifies RIEN (ni fichier,\nni base, ni service), tu n'envoies aucun message, tu ne fais aucun appel payant : {owner} décide, sur Telegram, avec\nles boutons que le Router fabrique à partir de ton verdict.\n\nPropose peu : au plus {max} propositions, seulement celles qui changent vraiment quelque chose pour {owner}, chacune\navec UNE action parmi :\n- {{\"op\": \"set_quota_fallback\", \"level\": \"L1|L2|L3\", \"pin\": \"model_id/variant\"}} — le modèle qui prend le relais du\n  niveau quand son abonnement est épuisé (et en cas de panne de tous ses fournisseurs) ;\n- {{\"op\": \"set_level\", \"level\": \"L1|L2|L3\", \"pin\": \"model_id/variant\", \"provider\": \"route_provider ou null\",\n  \"when_quota_spent\": \"model_id/variant ou null\"}} — changer un niveau texte ;\n- {{\"op\": \"set_preference\", \"task\": \"<tâche>\", \"role\": \"<rôle>\", \"pin\": \"model_id[/variant]\", \"provider\": null}} ;\n- {{\"op\": \"set_lock\", \"task\": \"<tâche>\", \"role\": \"<rôle>\", \"locked\": true|false}} ;\n- {{\"op\": \"note\"}} — une information importante sans action.\nLes identifiants viennent de l'état ou de tes vérifications (jamais inventés) ; le Router refuse une action dont le\nmodèle n'a pas de route.\n\nTermine par un seul objet JSON :\n{{\"summary_fr\": \"deux phrases simples pour {owner} : ce que tu as regardé et ce que tu en conclus\",\n \"proposals\": [{{\"title_fr\": \"titre court\", \"why_fr\": \"pourquoi, chiffres à l'appui (score AA, $/tâche)\",\n                \"consequences_fr\": \"ce qui change concrètement si {owner} accepte\", \"action\": {{...}}}}]}}\nRien à proposer : \"proposals\": [].\n\n## État\n```json\n{state}\n```"
+      },
+      {
         "comment": "",
         "file": "analysis/alerts.py",
         "name": "UNRANKED_DAYS",
@@ -15731,6 +15964,16 @@
         "file": "analysis/telegram.py",
         "name": "BUTTONS",
         "value": {
+          "advice": [
+            [
+              "✅ Appliquer",
+              "a"
+            ],
+            [
+              "✖️ Non",
+              "d"
+            ]
+          ],
           "board_down": [
             [
               "👁️ Vu",
@@ -18718,6 +18961,27 @@
     ],
     "environment": [
       {
+        "default_expression": "'http://127.0.0.1:8895'",
+        "description": "Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895).",
+        "file": "analysis/advisor.py",
+        "name": "WALTER_ENGINE_API_URL",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "Posée par pytest : le conseiller ne se lance jamais depuis un test.",
+        "file": "analysis/advisor.py",
+        "name": "PYTEST_CURRENT_TEST",
+        "operation": "get"
+      },
+      {
+        "default_expression": "aucun",
+        "description": "« off » : le cycle et les clics ne lancent pas le conseiller du Router.",
+        "file": "analysis/advisor.py",
+        "name": "WALTER_ROUTER_ADVISOR",
+        "operation": "get"
+      },
+      {
         "default_expression": "str(CHATGPT_DIR)",
         "description": "Réglage du transport de l'abonnement ; l'authentification reste fournie par son grant.",
         "file": "llm/gateway.py",
@@ -18925,12 +19189,15 @@
       "CODEX_SESSIONS",
       "KIE_API_KEY",
       "OPENROUTER_API_KEY",
+      "PYTEST_CURRENT_TEST",
       "VENICE_API_KEY",
       "WALTER_DELEGATION_DEPTH",
+      "WALTER_ENGINE_API_URL",
       "WALTER_FLARESOLVERR",
       "WALTER_LLM_PORT",
       "WALTER_LLM_TOKEN",
       "WALTER_LLM_URL",
+      "WALTER_ROUTER_ADVISOR",
       "WALTER_ROUTER_DATABASE_URL",
       "WALTER_RUN_CHANNEL",
       "WALTER_RUN_ID",
@@ -18983,7 +19250,8 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "e88a3b505ba085af5dde75b470b440a8bd60324851e9950bf154ab3367341400",
+    "analysis/advisor.py": "6dee82b29121396deed3d9a49010e3a1230d31eddc999cce3d576b03a09eb8de",
+    "analysis/alerts.py": "146708a0b7f31655da4674246a522a3e4091a197fea710f39db0e0b7fa3565cc",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -18998,16 +19266,16 @@
     "analysis/parse.py": "cf82c94b379e607f9793738b1e770374b3e96c6da328062ecb16292d43b59317",
     "analysis/postes.py": "8871b0214df0a72334179b1fc575af74452a4608c786200ca5170a2bce996fd1",
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
-    "analysis/refresh.py": "dcc93f5a5ac7a7f89177ec1a8900c669b499585c5dc31df1aba7c2608d0e3a1f",
+    "analysis/refresh.py": "7dfe581ec0e5de9a1f74ebe8be2c792f9fe9179e1db3fbd793cf0c7fa19ff237",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
     "analysis/select.py": "39ad5f96af616cd95209b22ee6f4f77c62be760cf7efa614e775bf6065390624",
-    "analysis/telegram.py": "d540335c619255933a50b0dde50400329a6adf9a5e78559f49f40eb59b105cdf",
+    "analysis/telegram.py": "702b3ddd6d93e7c666975b3bd9a9fddeb18582854ec6a79e12fe2b9d1bfeb9bf",
     "analysis/tiers.py": "5b70be11b3a4268e5f329ea330600814309194bab681ecffb42f8f726390291a",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
     "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
     "bin/walter-router-cycle": "0dcd43cafbfbed0de2ebfffa9d6beab43aa9a494b7ad5d4a6d694e4d43904e79",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "676ccdd84a9e47a74f16bc31dddbbdcaa03a6540517fb886be35e52b7a68904d",
+    "cli.py": "614d78994d63acb3119ba608f5ed4afca3e216c5826c3208e1d6a7fa6d1e24dd",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/decision-needs.json": "8c912fe4a937dd9dc2ab2ab8bbe122080a67ddfcd9fd5450c4c79101e824b608",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
@@ -19020,7 +19288,7 @@
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "2ae414f686eb127423d4081339551c3ce26eb4ab64bc958d39be7580da53b218",
     "contracts/router.json": "2c22033548faf73d7cba8f3e98e7309cccce1ffb267e0f68efa10d7cb8d3b185",
-    "documentation.py": "bc32530f551ad3e0189b0927d42873f3ba7f0b8d8f3d9f56dd98587a37477870",
+    "documentation.py": "8982ebe7a685a8ea7c746845b008bd5c1ea542a383ae9c7d75848c99d9d36188",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
@@ -19040,7 +19308,6 @@
     "interface/site/functions/api/status.js": "37fbd922a3eae2e33236fe4cda7d4546dafd6b69f7d76b50aea92d2deafd92cb",
     "interface/translate.py": "1d95781d0817a7590212867af01c36f0d9719d839c3dfdd67c468fe3df885daf",
     "llm/antigravity_subscription.py": "8c2527a4e38d2cc120348a63172fd35db0cd61e88198f8fcc60fae4f1eeefc40",
-    "llm/chatgpt/auth.json": "5efff32b7414e5ee402989a9ec441ae040538f6862a4c3cdf62a633f79ed741e",
     "llm/claude_subscription.py": "2ff05c32c4c182dda472eee4a4154785a1a0447ca0fce7f922eb9347d249443b",
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
@@ -19155,7 +19422,8 @@
     "store/migrations/039_exec_log_account.sql": "f1711eeb24fa9d054e25ae9993a83465a5bf220315dab33261e44481a5833a75",
     "store/migrations/040_devboard_reading.sql": "60d718a4071dd9eb75e356acb444868f54095ca58553b853966487fef9d601c5",
     "store/migrations/041_plan_evidence_modeldial.sql": "8e5ad3892b3dcae5c15cd54ff103ff3d487174640e0d37d045a612d6829b6de8",
-    "store/migrations/042_preferences_locked.sql": "fd9839a6d6353037ab2385c5c1325eaf4ad3b2ebd30fbe9653a78c7d0f8b5995"
+    "store/migrations/042_preferences_locked.sql": "fd9839a6d6353037ab2385c5c1325eaf4ad3b2ebd30fbe9653a78c7d0f8b5995",
+    "store/migrations/043_alerts_advice.sql": "fa667b9ed075e8c3bb75fd0ef5bc7de5ee04c27300a2a8a4ec6c1c41ea415bb5"
   },
   "tasks": [
     {
