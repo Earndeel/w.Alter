@@ -150,3 +150,27 @@ def test_a_dated_task_is_not_suspended_as_idle_and_a_lost_reminder_is_queued_aga
     earlier = remind - timedelta(days=10)
     runs.task_update(tid, remind_at=earlier.isoformat(), by=BY)
     assert abs((queued(tid)["due_at"] - earlier).total_seconds()) < 1
+
+
+def test_a_dated_task_asked_without_a_reminder_reminds_the_owner_on_its_day():
+    """E2E 20/11: the engine created « relance-le le 10 décembre » with a due date and no reminder, so nothing would
+    ever have reminded the owner. A dated task reminds him that day at 9:00 his time; moving the date moves it; an
+    explicit reminder always wins; a due day already past adds none."""
+    from walter_memory.flows import tz
+    eid, name = person()
+    day = (datetime.now(tz()) + timedelta(days=30)).date()
+    r = runs.task_create(f"Relancer {name}", entity_id=eid, due_at=day.isoformat(), run_id=a_test_run(), by=BY)
+    t, tid = r["task"], r["task"]["task_id"]
+    at = datetime.fromisoformat(t["remind_at"])
+    assert r["verified"] and r["reminder"]["delivery"] == "dry"
+    assert at.astimezone(tz()).date() == day and at.astimezone(tz()).hour == runs.REMIND_DEFAULT_HOUR
+    assert abs((queued(tid)["due_at"] - at).total_seconds()) < 1
+    later = day + timedelta(days=2)
+    runs.task_update(tid, due_at=later.isoformat(), by=BY)
+    assert datetime.fromisoformat(runs.task_get(tid)["remind_at"]).astimezone(tz()).date() == later
+    explicit = datetime.now(timezone.utc) + timedelta(days=3)
+    r2 = runs.task_create(f"Appeler {name}", entity_id=eid, due_at=day.isoformat(), remind_at=explicit.isoformat(),
+                          run_id=a_test_run(), by=BY)
+    assert r2["task"]["remind_at"] == explicit.isoformat()
+    r3 = runs.task_create(f"Écrire à {name}", entity_id=eid, due_at="2020-01-01", run_id=a_test_run(), by=BY)
+    assert r3["task"].get("remind_at") is None and r3["reminder"] is None

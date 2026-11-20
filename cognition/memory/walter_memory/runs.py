@@ -685,6 +685,8 @@ def task_update(task_id: str, status: str | None = None, progress: dict | None =
             return {"error": "unknown task"}
         if due or rem or draft:          # a created task's dates / draft (a new reminder date is scheduled again)
             spec = dict(cur["spec"] or {})
+            if due and not rem and spec.get("remind_default"):
+                rem = _default_reminder(due)   # its reminder followed its due date: it follows the new one
             spec.update({**({"due_at": due} if due else {}), **({"remind_at": rem} if rem else {}),
                          **({"draft": {"text": mask(str(draft))[:DRAFT_MAX],
                                        "to": (spec.get("person") or {}).get("entity_id"), "sent": False}}
@@ -729,6 +731,19 @@ REMINDER = "runs.reminder"                 # processing.queue processor: the dat
 DELIVER_CHANNELS = ("owner",)              # a reminder is delivered on these channels; a test / Lab run's stays dry
 DRAFT_MAX = 2000
 REMIND_GRACE_S = 60                        # a reminder asked for « now » (a few seconds ago) is still accepted
+REMIND_DEFAULT_HOUR = 9                    # a dated task without its own reminder reminds the owner that day at 9:00
+
+
+def _default_reminder(due: str | None) -> str | None:
+    """The reminder of a dated task asked without one (E2E 20/11: « une tâche pour que je le relance le 10 décembre »
+    was stored with no reminder at all): its due instant, or its due day at REMIND_DEFAULT_HOUR in the owner's zone.
+    None when that moment is already past."""
+    if not due:
+        return None
+    from .flows import tz
+    at = (datetime.fromisoformat(due) if "T" in due else
+          datetime.combine(datetime.fromisoformat(due).date(), datetime.min.time(), tz()).replace(hour=REMIND_DEFAULT_HOUR))
+    return at.isoformat() if at >= now() - timedelta(seconds=REMIND_GRACE_S) else None
 
 
 def _when(value, *, date_ok: bool) -> tuple[str | None, str | None]:
@@ -794,6 +809,7 @@ def task_create(goal: str, *, entity_id: str | None = None, entity_name: str | N
         return {"error": err or err2}
     if rem and datetime.fromisoformat(rem) < now() - timedelta(seconds=REMIND_GRACE_S):
         return {"error": f"remind_at {rem} is in the past"}
+    rem_default = not rem and bool(rem := _default_reminder(due))
     if not has_tasks_schema():
         return {"error": "tasks schema not migrated (037)"}
     from .logs import mask
@@ -814,6 +830,7 @@ def task_create(goal: str, *, entity_id: str | None = None, entity_name: str | N
     spec = {"created": True, "by": by,
             **({"person": {"entity_id": person["id"], "name": person["name"]}} if person else {}),
             **({"due_at": due} if due else {}), **({"remind_at": rem} if rem else {}),
+            **({"remind_default": True} if rem_default else {}),
             **({"source": source if isinstance(source, dict) else {"text": mask(str(source))[:300]}} if source else {}),
             **({"draft": {"text": mask(str(draft))[:DRAFT_MAX], "to": (person or {}).get("id"), "sent": False}}
                if draft else {})}
