@@ -1,0 +1,10 @@
+{
+ "created_at": "2026-11-20T04:14:18.745273+00:00",
+ "description": "Use when modifying or validating Sagora's application-installation UI across web browsers, Android, iOS and Android TV.",
+ "domain": "sagorawebapplicationandandroidtvinstallationui",
+ "kind": "new",
+ "reason": "The session introduced a recurring Sagora-specific release and cross-platform installation-validation workflow not covered by the listed skills. Concrete evidence includes the incorrect desktop-app host discriminator corrected to desktop, native Android WebView inspection, APK ABI checks, Android TV navigation validation, mobile menu timing failures, PWA mock state changes invalidating subsequent selectors, and preserving active TV playback. A separate skill is preferable to patching generic GUI or debugging guidance. [session codex/Codex Desktop/01a1f3d8-24ab-7e20-bb37-328de2c66026]",
+ "runtime": "learner",
+ "session_id": "codex/Codex Desktop/01a1f3d8-24ab-7e20-bb37-328de2c66026",
+ "target": "sagora-web-install-validation"
+}
