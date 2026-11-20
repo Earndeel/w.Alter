@@ -292,6 +292,6 @@ il y a moins de 10 minutes.
 ## Abonnements (2026-10-14, révisé le 2026-10-22)
 Les abonnements forment la partie `plan/` du module. Depuis le 2026-10-22 ils comptent dans le choix du fournisseur :
 un chemin par abonnement passe en premier, au prix de revient d'un token (prix du forfait ÷ valeur API transportée
-par mois), tant que son quota hebdomadaire reste sous 90 %. La recherche « abonnements » lit les compteurs, les mails
+par mois), tant que son quota hebdomadaire n'a pas atteint la limite réelle du fournisseur (100 %, 2026-11-20). La recherche « abonnements » lit les compteurs, les mails
 d'abonnement, le web (SemiAnalysis / Tokenomics, pages des éditeurs, autres mesures) et notifie toute nouveauté sur un
 plan du propriétaire. Détails : README, section « How a choice is made » et dossier `plan/`.

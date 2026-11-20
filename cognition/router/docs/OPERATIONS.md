@@ -29,7 +29,7 @@ dans le README. `--skip-collect` recalcule les relevés existants ; il ne les re
 | Niveaux texte | `analysis/tiers.py`, déclarations de niveaux | Plancher, coude et bande de plafond ; la proposition n'adopte pas un favori |
 | Favoris et rôles | Déclarations de l'instance, projetées dans `models.preferences` | Modèle/variante/fournisseur, objectif et politique de surveillance |
 | Fournisseurs | `serve/execution.py` | Ordre des voies d'accès, prix et état mesuré |
-| Quotas | `QUOTA_SWITCH`, relevés d'abonnements | À 90 % de quota hebdomadaire consommé, l'abonnement passe après les voies payantes |
+| Quotas | `QUOTA_SWITCH`, relevés d'abonnements | À sa limite réelle (compteur à 100 %), l'abonnement passe après les voies payantes ; un refus 429 bascule la voie |
 | Surcoût Kie | `KIE_MAX_PREMIUM` | Au-delà de 1,25 fois le prix OpenRouter comparable, Kie est déplacé après cette voie |
 | Fiabilité réelle | `UNRELIABLE_MIN_RUNS`, `UNRELIABLE_FAIL_RATE`, `RELIABILITY_DAYS` | Au moins 3 exécutions, taux d'échec ≥ 50 %, fenêtre de 14 jours ; calcul sur les 10 dernières |
 | Contrôle fournisseur | `MIN_CREDIT_USD`, `SLOW_MS` | Crédit OpenRouter inférieur à 1 USD et probe au-delà de 30 s marquent une dégradation |
