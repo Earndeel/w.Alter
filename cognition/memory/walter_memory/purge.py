@@ -98,8 +98,15 @@ def ledger(conn) -> dict[str, set[str]]:
 
 
 # ── selection ─────────────────────────────────────────────────────────────────────────────────────────────────────
-def select_targets(conn, *, event_ids=None, object_refs=None, pattern=None) -> dict:
+def select_targets(conn, *, event_ids=None, object_refs=None, pattern=None, sessions=None, derived_ids=None) -> dict:
     t = {k: [] for k in KINDS}
+    if derived_ids:   # one piece of knowledge (e.g. a run experience of a test conversation)
+        t["derived"] += [r["item_id"] for r in conn.execute(
+            "select item_id from core.derived_items where item_id = any(%s::uuid[])", (list(derived_ids),)).fetchall()]
+    if sessions:      # whole walter_logs sessions (a test conversation): every keyed row is masked
+        t["walter_logs"] += [f"{r['session_id']}#{r['event_key']}" for r in conn.execute(
+            "select session_id, event_key from walter_logs.events where session_id = any(%s) and event_key is not null",
+            (list(sessions),)).fetchall()]
     if event_ids:
         t["event"] += [r["event_id"] for r in conn.execute(
             "select event_id from core.events where event_id = any(%s::uuid[])", (event_ids,)).fetchall()]
@@ -228,14 +235,23 @@ def _record_ledger(conn, pid: int, targets: dict, reason: str) -> None:
                            "reason_sha256": hashlib.sha256(reason.encode()).hexdigest()})
 
 
-def purge(*, reason: str, requested_by: str, event_ids=None, object_refs=None, pattern=None,
-          execute=False, rotate_local_dumps=False) -> dict:
+def purge(*, reason: str, requested_by: str, event_ids=None, object_refs=None, pattern=None, sessions=None,
+          derived_ids=None, execute=False, rotate_local_dumps=False) -> dict:
     with connect() as conn:
-        targets = select_targets(conn, event_ids=event_ids, object_refs=object_refs, pattern=pattern)
+        targets = select_targets(conn, event_ids=event_ids, object_refs=object_refs, pattern=pattern, sessions=sessions,
+                                 derived_ids=derived_ids)
         selector = {"event_ids": len(event_ids or []), "object_refs": len(object_refs or []),
+                    "sessions": len(sessions or []), "derived_ids": len(derived_ids or []),
                     "pattern_sha256": hashlib.sha256(pattern.encode()).hexdigest() if pattern else None}
         if not execute:
             counts = {COUNT_KEYS[k]: len(v) for k, v in targets.items()}
+            if targets["derived"]:    # every version of a view citing that knowledge is masked: say how many (E2E 20/11)
+                views = conn.execute("""select count(distinct e.view_key) v, (select count(*) from views.version x where
+                                            x.view_key in (select view_key from views.evidence where ref_kind = 'derived'
+                                                           and ref_id = any(%s)) and x.content is distinct from %s) n
+                                          from views.evidence e where e.ref_kind = 'derived' and e.ref_id = any(%s)""",
+                                     (targets["derived"], MARK, targets["derived"])).fetchone()
+                counts["views_masked"], counts["view_versions_masked"] = views["v"], views["n"]
             conn.execute("""insert into system.purges (requested_by, reason, selector, fingerprints, counts, status)
                             values (%s,%s,%s,%s,%s,'dry_run')""",
                          (requested_by, reason, json.dumps(selector),

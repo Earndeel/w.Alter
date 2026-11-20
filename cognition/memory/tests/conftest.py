@@ -94,3 +94,11 @@ def _no_decision_carried_over():
             c.execute("delete from processing.decisions")
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True)
+def _codex_gate_open(monkeypatch):
+    """The Codex weekly gate (quota.codex) reads the live plan meter through Walter Router: never in a test. Open unless
+    a test closes it (E2E 20/11)."""
+    from walter_memory import quota
+    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})

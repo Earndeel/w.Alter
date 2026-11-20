@@ -13,7 +13,7 @@ import os
 import secrets
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .db import connect
@@ -38,6 +38,7 @@ CANDIDATE_SIM = 0.30                       # message ↔ goal similarity (local 
 CANDIDATE_MAX = 3                          # objectives proposed to the preflight as threads, at most
 ATTACH_WINDOW = "14 days"                  # an objective older than this (last activity) is not carried on silently
 SUSPEND_AFTER = "3 days"                   # open without activity this long → suspended (never abandoned or deleted)
+DATED_SQL = ("spec->>'due_at'", "spec->>'remind_at'")
 OUTCOME_STATUSES = ("ok", "failed", "cancelled", "interrupted")
 OUTCOME_MESSAGE_MAX = 500
 
@@ -378,6 +379,8 @@ def suspend_idle() -> list[str]:
         rows = conn.execute(f"""update runs.tasks set status = 'suspended', updated_at = now()
                                 where kind = '{OBJECTIVE}' and status = 'open'
                                   and coalesce(updated_at, started_at) < now() - interval '{SUSPEND_AFTER}'
+                                  and not coalesce(greatest(({DATED_SQL[0]})::timestamptz, ({DATED_SQL[1]})::timestamptz)
+                                                   > now(), false)   -- a dated task waits for its date, not idle
                                 returning task_id, run_id, thread_id""").fetchall()
         for r in rows:
             _emit(conn, "task.updated", str(r["run_id"]),
@@ -512,14 +515,22 @@ def _last_outcome_text(lo: dict | None) -> str | None:
     return (f"{lo.get('status')}: {reason}" if reason else str(lo.get("status")))[:200]
 
 
+CREATED_KEYS = ("person", "due_at", "remind_at", "draft", "source")   # what an explicitly created task carries (spec)
+
+
 def _task_shape(r: dict) -> dict:
-    return {"task_id": str(r["task_id"]), "goal": r["goal"], "status": r["status"], "thread_id": r["thread_id"],
-            "updated_at": (r["updated_at"] or r["started_at"]).isoformat(), "progress": r["progress"] or {},
-            "attempts": int(r["attempts"] or 0), "last_outcome": _last_outcome_text(r["last_outcome"])}
+    out = {"task_id": str(r["task_id"]), "goal": r["goal"], "status": r["status"], "thread_id": r["thread_id"],
+           "updated_at": (r["updated_at"] or r["started_at"]).isoformat(), "progress": r["progress"] or {},
+           "attempts": int(r["attempts"] or 0), "last_outcome": _last_outcome_text(r["last_outcome"])}
+    spec = r.get("spec") or {}
+    out.update({k: spec[k] for k in CREATED_KEYS if spec.get(k)})   # only a created task has them: the shape is unchanged
+    if (out["progress"] or {}).get("reminder"):
+        out["reminder"] = out["progress"]["reminder"]
+    return out
 
 
 TASK_SELECT = f"""select t.task_id, t.goal, t.status, {THREAD_SQL} thread_id, t.updated_at, t.started_at, t.progress, t.last_outcome,
-                        t.result, t.run_id, (select count(*) from runs.task_runs tr where tr.task_id = t.task_id) attempts
+                        t.result, t.run_id, t.spec, (select count(*) from runs.task_runs tr where tr.task_id = t.task_id) attempts
                  from runs.tasks t"""
 
 
@@ -652,7 +663,8 @@ NOTES_MAX = 20
 
 
 def task_update(task_id: str, status: str | None = None, progress: dict | None = None, result: dict | None = None,
-                note: str | None = None, *, last_outcome: dict | None = None, by: str = "api") -> dict:
+                note: str | None = None, *, last_outcome: dict | None = None, by: str = "api", due_at=None,
+                remind_at=None, draft: str | None = None) -> dict:
     """Update an objective (the engine's task_state tool, the run episode, the owner). progress / result are merged
     key by key into what is there; a note is appended to progress.notes (masked, bounded). Status: open | suspended |
     done | failed | cancelled (done / failed / cancelled set ended_at; open clears it). Emits task.updated."""
@@ -662,11 +674,25 @@ def task_update(task_id: str, status: str | None = None, progress: dict | None =
         return {"error": "tasks schema not migrated (037)"}
     from .logs import mask
     prog = dict(progress) if isinstance(progress, dict) else {}
+    due, err = _when(due_at, date_ok=True)
+    rem, err2 = _when(remind_at, date_ok=False)
+    if err or err2:
+        return {"error": err or err2}
     with connect() as conn:
-        cur = conn.execute(f"select status, progress, run_id, thread_id from runs.tasks where task_id::text = %s and kind = '{OBJECTIVE}'",
+        cur = conn.execute(f"select status, progress, run_id, thread_id, spec from runs.tasks where task_id::text = %s and kind = '{OBJECTIVE}'",
                            (str(task_id),)).fetchone()
         if not cur:
             return {"error": "unknown task"}
+        if due or rem or draft:          # a created task's dates / draft (a new reminder date is scheduled again)
+            spec = dict(cur["spec"] or {})
+            spec.update({**({"due_at": due} if due else {}), **({"remind_at": rem} if rem else {}),
+                         **({"draft": {"text": mask(str(draft))[:DRAFT_MAX],
+                                       "to": (spec.get("person") or {}).get("entity_id"), "sent": False}}
+                            if draft else {})})
+            conn.execute("update runs.tasks set spec = %s where task_id::text = %s",
+                         (json.dumps(spec, ensure_ascii=False, default=str), str(task_id)))
+            if rem:
+                _schedule(conn, str(task_id), rem)
         if note:
             notes = list(((cur["progress"] or {}).get("notes")) or [])
             notes.append({"at": now().isoformat(), "note": mask(str(note))[:300], "by": by})
@@ -687,9 +713,194 @@ def task_update(task_id: str, status: str | None = None, progress: dict | None =
                       json.dumps(last_outcome, ensure_ascii=False, default=str) if last_outcome else None, str(task_id)))
         payload = {"task_id": str(task_id), "thread_id": cur["thread_id"], "status": status or cur["status"],
                    "old_status": cur["status"], "by": by,
-                   "changed": [k for k, v in (("progress", prog), ("result", result), ("last_outcome", last_outcome)) if v]}
+                   "changed": [k for k, v in (("progress", prog), ("result", result), ("last_outcome", last_outcome),
+                                               ("due_at", due), ("remind_at", rem), ("draft", draft)) if v]}
         _emit(conn, "task.updated", str(cur["run_id"]), payload, f"task.updated/{task_id}/{new_id()}")
     return task_get(str(task_id)) or {"error": "unknown task"}
+
+
+# ── Created tasks (E2E 20/11): an explicit task with a person, a due date, a source, a draft and a dated reminder ──
+# The owner (or the engine on his behalf) asks « mets une tâche pour que je le relance le 10 décembre, prépare une
+# réponse, ne lui envoie rien »: one objective of the Run Plane (no second task manager), its dated trigger a deadline of
+# the existing scheduler (processing.queue, run every minute by the memory.organic consumer). Creating it is a local
+# write; the draft is stored, never sent (sending is another tool, an outgoing action under its own permission).
+
+REMINDER = "runs.reminder"                 # processing.queue processor: the dated trigger of a created task
+DELIVER_CHANNELS = ("owner",)              # a reminder is delivered on these channels; a test / Lab run's stays dry
+DRAFT_MAX = 2000
+REMIND_GRACE_S = 60                        # a reminder asked for « now » (a few seconds ago) is still accepted
+
+
+def _when(value, *, date_ok: bool) -> tuple[str | None, str | None]:
+    """(iso, error). A due date may be a day (YYYY-MM-DD); a reminder is an instant with its offset (no guessed zone)."""
+    if value in (None, ""):
+        return None, None
+    v = str(value).strip()
+    if date_ok and len(v) == 10:
+        try:
+            return datetime.strptime(v, "%Y-%m-%d").date().isoformat(), None
+        except ValueError:
+            return None, f"bad date {v!r} (YYYY-MM-DD)"
+    try:
+        d = datetime.fromisoformat(v.replace("Z", "+00:00"))
+    except ValueError:
+        return None, f"bad date {v!r} (ISO 8601)"
+    if d.tzinfo is None:
+        return None, f"{v!r} has no time zone offset: give it (e.g. +07:00)"
+    return d.isoformat(), None
+
+
+def _person(conn, entity_id: str | None, name: str | None) -> tuple[dict | None, dict | None]:
+    """(person, error). By id, or by an exact name / alias of exactly one live entity; never a guess between several."""
+    if entity_id:
+        r = conn.execute("""select entity_id::text id, canonical_name name, entity_type type from core.entities
+                            where entity_id::text = %s and merged_into is null""", (str(entity_id),)).fetchone()
+        return (dict(r), None) if r else (None, {"error": "unknown entity", "entity_id": entity_id})
+    if not name:
+        return None, None
+    rows = conn.execute("""select entity_id::text id, canonical_name name, entity_type type from core.entities
+                           where merged_into is null and coalesce(status, 'active') <> 'retired'
+                             and (lower(canonical_name) = lower(%s) or lower(%s) = any(aliases))
+                           order by updated_at desc nulls last limit 6""", (name.strip(), name.strip())).fetchall()
+    if len(rows) == 1:
+        return dict(rows[0]), None
+    return None, {"error": "ambiguous person" if rows else "unknown person", "name": name,
+                  "candidates": [dict(r) for r in rows],
+                  "hint": "ask the owner which one, then pass entity_id (person_lookup finds ids)"}
+
+
+def _schedule(conn, task_id: str, at: str | None) -> None:
+    from . import processing
+    conn.execute("delete from processing.queue where processor = %s and key = %s", (REMINDER, task_id))
+    if at:
+        processing.mark(conn, REMINDER, task_id, due=datetime.fromisoformat(at), reason="task.reminder")
+
+
+def task_create(goal: str, *, entity_id: str | None = None, entity_name: str | None = None, due_at=None, remind_at=None,
+                source: dict | str | None = None, draft: str | None = None, channel: str = "owner",
+                run_id: str | None = None, session_id: str | None = None, thread_id: str | None = None,
+                idempotency_key: str | None = None, by: str = "api") -> dict:
+    """Create the owner's task: an objective (kind objective, status open) with spec {person, due_at, remind_at, source,
+    draft}. Idempotent: the same key (default: run + goal + person + dates) returns the task already created, never a
+    second one. The run is the caller's (its channel then says whose task it is: a test run's never reaches the owner's
+    list), else a run of `channel` is opened for it. Returns {task, created, verified, reminder}: `verified` = the task
+    read back from the Run Plane carries what was asked."""
+    goal_txt = _goal(goal, "cloud_allowed")
+    if not goal_txt:
+        return {"error": "goal required"}
+    due, err = _when(due_at, date_ok=True)
+    rem, err2 = _when(remind_at, date_ok=False)
+    if err or err2:
+        return {"error": err or err2}
+    if rem and datetime.fromisoformat(rem) < now() - timedelta(seconds=REMIND_GRACE_S):
+        return {"error": f"remind_at {rem} is in the past"}
+    if not has_tasks_schema():
+        return {"error": "tasks schema not migrated (037)"}
+    from .logs import mask
+    with connect() as conn:
+        person, perr = _person(conn, entity_id, entity_name)
+        if perr:
+            return perr
+        if run_id:
+            run = conn.execute("select run_id, origin from runs.runs where run_id::text = %s", (str(run_id),)).fetchone()
+            if not run:
+                return {"error": "unknown run", "run_id": run_id}
+            channel = (run["origin"] or {}).get("channel") or "owner"
+    key = idempotency_key or "|".join(str(x or "") for x in (run_id, goal_txt, (person or {}).get("id"), due, rem))
+    tid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"walter:task/{channel}/{key}"))
+    if not run_id:
+        run_id = start(origin={"channel": channel, "via": "task_create", "by": by, "session_id": session_id},
+                       goal=goal_txt, dedupe_key=f"task.create/{tid}")
+    spec = {"created": True, "by": by,
+            **({"person": {"entity_id": person["id"], "name": person["name"]}} if person else {}),
+            **({"due_at": due} if due else {}), **({"remind_at": rem} if rem else {}),
+            **({"source": source if isinstance(source, dict) else {"text": mask(str(source))[:300]}} if source else {}),
+            **({"draft": {"text": mask(str(draft))[:DRAFT_MAX], "to": (person or {}).get("id"), "sent": False}}
+               if draft else {})}
+    with connect() as conn:
+        row = conn.execute(f"""insert into runs.tasks (task_id, run_id, kind, goal, spec, session_id, thread_id, progress,
+                                                       started_at, updated_at)
+                               values (%s, %s, '{OBJECTIVE}', %s, %s, %s, %s, '{{}}'::jsonb, now(), now())
+                               on conflict (task_id) do nothing returning task_id""",
+                           (tid, run_id, goal_txt, json.dumps(spec, ensure_ascii=False, default=str), session_id,
+                            thread_id)).fetchone()
+        created = bool(row)
+        fired = conn.execute("select progress->'reminder'->>'fired_at' f from runs.tasks where task_id = %s",
+                             (tid,)).fetchone()["f"]
+        if created or (rem and not fired):
+            _schedule(conn, tid, rem)
+        if created:
+            _emit(conn, "task.opened", run_id, {"task_id": tid, "run_id": run_id, "thread_id": thread_id or TASK_THREAD + tid,
+                                                "act": "create", "channel": channel, "due_at": due, "remind_at": rem,
+                                                "entity_id": (person or {}).get("id"), "draft": bool(draft)},
+                  f"task.opened/{tid}")
+    got = task_get(tid)
+    verified = bool(got) and got["goal"] == goal_txt and got.get("due_at") == due and got.get("remind_at") == rem \
+        and (got.get("person") or {}).get("entity_id") == (person or {}).get("id")
+    return {"task": got, "created": created, "verified": verified, "channel": channel,
+            "reminder": ({"at": rem, "fired": bool(fired), "delivery": "owner" if channel in DELIVER_CHANNELS else "dry"}
+                         if rem else None),
+            "sent": False}
+
+
+def _telegram(text: str) -> bool:
+    import subprocess
+    r = subprocess.run(["walter-telegram", "send", "--plain", text], capture_output=True, text=True, timeout=120)
+    return r.returncode == 0
+
+
+def remind(task_id: str, *, send=None) -> dict:
+    """The dated trigger of a created task (processor runs.reminder, due at its remind_at). Fires once: an already fired,
+    closed or rescheduled task is skipped. Delivered to the owner (Telegram) only for an owner-channel task; any other
+    channel's (test, Lab) is recorded as `dry`, nothing sent. A failed delivery raises: retried with backoff."""
+    with connect() as conn:
+        t = conn.execute(f"""select t.task_id, t.goal, t.status, t.spec, t.progress, t.run_id,
+                                    coalesce(o.origin->>'channel', 'owner') channel
+                             from runs.tasks t join runs.runs o on o.run_id = t.run_id
+                             where t.task_id::text = %s and t.kind = '{OBJECTIVE}' for update of t""",
+                          (str(task_id),)).fetchone()
+        if not t:
+            return {"changed": 0, "skipped": "unknown task"}
+        spec, rem = t["spec"] or {}, (t["progress"] or {}).get("reminder") or {}
+        at = spec.get("remind_at")
+        if rem.get("fired_at") and rem.get("for") == at:
+            return {"changed": 0, "skipped": "already fired"}
+        if t["status"] not in ACTIVE or not at:
+            return {"changed": 0, "skipped": f"task {t['status']}" if at else "no reminder"}
+        when = datetime.fromisoformat(at)
+        if when > now() + timedelta(seconds=5):   # marked early (a re-mark): due again at its date
+            _schedule(conn, str(t["task_id"]), at)
+            return {"changed": 0, "skipped": "not yet"}
+        person = (spec.get("person") or {}).get("name")
+        text = "⏰ Rappel : " + t["goal"] + (f"\nPersonne : {person}" if person else "") + \
+            (f"\nÉchéance : {spec['due_at']}" if spec.get("due_at") else "") + \
+            ("\nUn brouillon de réponse est prêt (non envoyé)." if spec.get("draft") else "")
+        delivery = "owner" if t["channel"] in DELIVER_CHANNELS else "dry"
+        if delivery == "owner" and not (send or _telegram)(text):
+            raise RuntimeError("reminder delivery failed (walter-telegram)")
+        fired = {"fired_at": now().isoformat(), "for": at, "delivery": delivery, "delivered": delivery == "owner"}
+        conn.execute("""update runs.tasks set progress = coalesce(progress, '{}'::jsonb) || jsonb_build_object('reminder', %s::jsonb),
+                               updated_at = now() where task_id = %s""", (json.dumps(fired), t["task_id"]))
+        _emit(conn, "task.reminder", str(t["run_id"]), {"task_id": str(t["task_id"]), **fired},
+              f"task.reminder/{t['task_id']}/{at}")
+    return {"changed": 1, **fired}
+
+
+def reminders_missed() -> int:
+    """Safety net (reconcile_runs): an active task whose reminder is due or ahead, not fired for that date and not in
+    the queue, is queued again (a lost queue row never loses a reminder)."""
+    if not has_tasks_schema():
+        return 0
+    with connect() as conn:
+        rows = conn.execute(f"""select t.task_id::text id, t.spec->>'remind_at' remind from runs.tasks t
+                                where t.kind = '{OBJECTIVE}' and t.status = any(%s) and t.spec ? 'remind_at'
+                                  and coalesce(t.progress->'reminder'->>'for', '') <> t.spec->>'remind_at'
+                                  and not exists (select 1 from processing.queue q
+                                                  where q.processor = %s and q.key = t.task_id::text)""",
+                            (list(ACTIVE), REMINDER)).fetchall()
+        for r in rows:
+            _schedule(conn, r["id"], r["remind"])
+    return len(rows)
 
 
 def show(run_id: str) -> dict[str, Any] | None:

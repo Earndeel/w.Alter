@@ -121,6 +121,11 @@ def run(tick_every: float = 60.0, reconcile_every: float = 3600.0, prune_every: 
                         from . import kardex_enrich
                         r_k = kardex_enrich.run()
                         log.info("kardex enrich %s", {k: v for k, v in r_k.items() if k != "results"})
+                        w = next((r for r in r_k.get("results") or [] if r.get("until")), None)
+                        if w:   # Codex gate closed: run again once it reopens, not a day later
+                            from datetime import datetime
+                            until = datetime.fromisoformat(w["until"]).timestamp() - time.time()
+                            last["kardex"] = now - 86400 + max(until, 60.0)
                     last["kardex_started"] = True
             except Exception:
                 log.exception("kardex enrichment failed (extraction unaffected)")

@@ -441,7 +441,8 @@ def test_the_hourly_reconciliation_closes_runs_that_never_ended(monkeypatch):
             "select run_id, status from runs.runs where run_id::text = any(%s)", ([old, fresh],))}
     assert status == {old: "abandoned", fresh: "open"}
     monkeypatch.setattr(runs, "sweep", lambda: 1 / 0)             # one step failing never stops the others
-    assert assimilation.reconcile_runs() == {"abandoned": "error: ZeroDivisionError", "episodes": 0}
+    assert assimilation.reconcile_runs() == {"abandoned": "error: ZeroDivisionError", "episodes": 0,
+                                              "reminders": 0}
 
 
 def test_the_owners_list_never_shows_a_lab_channels_objectives(monkeypatch, capsys):

@@ -380,8 +380,19 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
     t0 = time.perf_counter()
     sections, trace = {}, {"query_chars": len(query), "sections": {}}
     state_key, state_budget = None, 0
+    ref = None
+    if b["knowledge"] > 0:   # « cette personne », « il », « le relancer »: one recent entity, or ambiguous (E2E 20/11)
+        try:
+            from . import digest
+            ref = digest.implicit_reference(message)
+        except Exception as e:  # noqa: BLE001 — an addition: never lose the rest of the context
+            trace["reference"] = {"error": type(e).__name__}
+        if ref:
+            sections["reference"] = "- " + ref["line"]
+            trace["reference"] = {"kind": ref["kind"], "people": len(ref["people"])}
+    linked = ref["people"][0]["entity_id"] if ref and ref["kind"] in ("certain", "probable") else None
     if b["knowledge"] > 0 and b.get("state", 1) > 0 and (STATE_HINT.search(message) or _me_hint(message)
-                                                         or _rel_hint(message)):
+                                                         or _rel_hint(message) or linked):
         try:
             from . import projection
             from . import personal
@@ -392,6 +403,8 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
             # a relation (lot P3): a person the message names, with a state or relation question
             if not found:
                 found = _person_state_key(message)
+            if not found and linked:      # the person it points at (its basis is said in the reference line)
+                found = [f"person:{linked}"]
             if found:
                 state_key = found[0]
                 if "state" in b:
@@ -622,10 +635,12 @@ def get_context(query: str, *, budget: dict | None = None, max_privacy: str = "c
                                             "ms": round((time.perf_counter() - t) * 1000)}
         except Exception as e:
             trace["sections"]["periods"] = {"error": type(e).__name__}
-    order = ["profile", "rules", "working", "tasks", "state", "experience", "people", "records", "knowledge", "periods",
+    order = ["profile", "rules", "reference", "working", "tasks", "state", "experience", "people", "records", "knowledge", "periods",
              "views", "evidence"]
     sections = {k: privacy.mask_secrets(sections[k]) for k in order if k in sections}
     titles = {"profile": "Profil de Monsieur", "people": "Personnes concernées (Kardex)",
+              "reference": "Personne désignée sans être nommée (« certain » = nommée juste avant ; « probable » = "
+                           "hypothèse à dire ; « ambiguë » = demander laquelle, ne rien supposer)",
               "rules": "Règles durables de Monsieur (en vigueur)",
               "periods": "Synthèse de la période (reconstruite depuis les épisodes, connaissances et mesures)",
               "working": "État de travail de ce fil (reconstruit par la mémoire, identique après compression)",

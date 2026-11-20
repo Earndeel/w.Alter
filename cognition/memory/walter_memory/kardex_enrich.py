@@ -21,7 +21,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from . import events, organic, privacy
+from . import events, organic, privacy, quota
 from .db import connection
 
 log = logging.getLogger("walter.kardex")
@@ -99,11 +99,12 @@ def enrich(entity_id: str, *, chat=None, days: int | None = None, max_messages: 
     who = name if not privacy.pseudonymise() else "Contact"     # real names when pseudonymisation is off
     lines = "\n".join(f"{k}. [{m['occurred_at']:%d/%m/%Y}] {who if m['from_contact'] else 'Monsieur'} : "
                       f"{privacy.mask_secrets(m['content'] or '')[:500]}" for k, m in enumerate(msgs, 1))
-    from . import processing
+    from . import processing, quota
     cls = privacy.strictest(*(m["privacy_class"] for m in msgs))
     prompt = PROMPT.format(who=who, messages=lines[:24000])
 
     def call():
+        quota.require()          # Codex weekly gate (A4): over it, Waiting — nothing recorded, asked again later
         res = chat([{"role": "user", "content": prompt}], poste="memory_extraction",
                    processor="kardex.enrich", processor_version="1", privacy_class=cls, names=[name],
                    budget="recurring", purpose="kardex: what a contact says about themselves",
@@ -200,8 +201,12 @@ def run(limit: int | None = None) -> dict:
     for eid in top_contacts(limit):
         try:
             out.append(enrich(eid))
+        except quota.Waiting as w:   # the gate holds for every contact: stop, the next run reads them (30-day window)
+            out.append({"entity": eid, "waiting": str(w), "until": w.until.isoformat()})
+            break
         except Exception as e:  # noqa: BLE001
             out.append({"entity": eid, "error": f"{type(e).__name__}: {str(e)[:160]}"})
     return {"contacts": len(out), "claims": sum(r.get("claims", 0) for r in out),
+            "waiting": next((r["waiting"] for r in out if r.get("waiting")), None),
             "reused": sum(r.get("reused", 0) for r in out), "results": [{k: v for k, v in r.items() if k != "entity"}
                                                                         for r in out]}

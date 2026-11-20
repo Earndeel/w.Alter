@@ -42,7 +42,8 @@ def test_purge_reingest_restore_reapply():
         backup = conn.execute("select * from core.events where event_id = %s", (secret_id,)).fetchone()
 
     dry = purge.purge(reason="pytest", requested_by="pytest", pattern=SECRET)
-    assert dry["counts"] == {"events": 1, "derived": 1, "objects": 0, "walter_logs": 1}
+    assert dry["counts"] == {"events": 1, "derived": 1, "objects": 0, "walter_logs": 1,
+                             "views_masked": 1, "view_versions_masked": 1}   # announced before executing
     done = purge.purge(reason="pytest", requested_by="pytest", pattern=SECRET, execute=True)
     assert done["status"] == "executed" and all(not b["automatic_change"] for b in done["backups"])
     with connect() as conn:

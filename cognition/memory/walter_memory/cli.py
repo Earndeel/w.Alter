@@ -124,6 +124,8 @@ def main(argv=None) -> None:
     g.add_argument("action", nargs="?", default="run", choices=["run", "reapply", "verify", "exposure"])
     g.add_argument("--reason"); g.add_argument("--by")
     g.add_argument("--event", action="append"); g.add_argument("--object", action="append"); g.add_argument("--pattern")
+    g.add_argument("--session", action="append", help="a whole walter_logs session (e.g. a test conversation)")
+    g.add_argument("--derived", action="append", help="one derived item (knowledge) by id")
     g.add_argument("--execute", action="store_true")
     g.add_argument("--rotate-local-dumps", action="store_true",
                    help="after the purge: fresh dump, then shred the older rolling local dumps (never restic/keep)")
@@ -190,7 +192,9 @@ def main(argv=None) -> None:
     rn.add_argument("--limit", type=int, default=20)
     tk = sub.add_parser("tasks", help="socle A3: the owner's objectives (list, show, update JSON stdin, sweep) and the "
                                       "triage re-decision of failed decisions (triage-redecide, dry unless --execute)")
-    tk.add_argument("action", choices=["list", "show", "update", "sweep", "triage-redecide"])
+    tk.add_argument("action", choices=["list", "show", "create", "update", "sweep", "triage-redecide"],
+                    help="create: JSON stdin {goal, entity_id | entity_name, due_at, remind_at, source, draft, channel, "
+                         "run_id, session_id, idempotency_key} → the task read back (verified), its reminder; nothing sent")
     tk.add_argument("task_id", nargs="?", default="")
     tk.add_argument("--thread"); tk.add_argument("--session"); tk.add_argument("--status")
     tk.add_argument("--limit", type=int, default=10); tk.add_argument("--since")
@@ -540,11 +544,20 @@ def main(argv=None) -> None:
             res = runs.tasks_list(thread_id=a.thread, session_id=a.session, status=a.status, limit=a.limit, channels=ch)
         elif a.action == "show":
             res = runs.task_get(a.task_id) or {"error": "unknown task"}
-        elif a.action == "update":          # {"task_id"?, "status", "progress", "result", "note"} on stdin
+        elif a.action == "create":
+            spec = json.load(sys.stdin)
+            res = runs.task_create(spec.get("goal") or "", entity_id=spec.get("entity_id"),
+                                   entity_name=spec.get("entity_name"), due_at=spec.get("due_at"),
+                                   remind_at=spec.get("remind_at"), source=spec.get("source"), draft=spec.get("draft"),
+                                   channel=spec.get("channel") or "owner", run_id=spec.get("run_id"),
+                                   session_id=spec.get("session_id"), thread_id=spec.get("thread_id"),
+                                   idempotency_key=spec.get("idempotency_key"), by=spec.get("by") or "cli")
+        elif a.action == "update":          # {"task_id"?, "status", "progress", "result", "note", dates, draft} on stdin
             spec = json.load(sys.stdin)
             res = runs.task_update(spec.get("task_id") or a.task_id, status=spec.get("status"),
                                    progress=spec.get("progress"), result=spec.get("result"), note=spec.get("note"),
-                                   by="cli")
+                                   by="cli", due_at=spec.get("due_at"), remind_at=spec.get("remind_at"),
+                                   draft=spec.get("draft"))
         elif a.action == "sweep":
             res = {"abandoned_runs": runs.sweep(), "suspended": runs.suspend_idle()}
         else:
@@ -649,7 +662,9 @@ def main(argv=None) -> None:
             _print(purge.reapply(requested_by=a.by, execute=a.execute))
         else:
             _print(purge.purge(reason=a.reason, requested_by=a.by, event_ids=a.event, object_refs=a.object,
-                               pattern=a.pattern, execute=a.execute, rotate_local_dumps=a.rotate_local_dumps))
+                               pattern=a.pattern, sessions=a.session, derived_ids=a.derived,
+                               execute=a.execute,
+                               rotate_local_dumps=a.rotate_local_dumps))
     elif a.cmd == "observability":
         from . import observability
         if a.action == "retire" and (not a.by or not a.reason):

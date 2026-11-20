@@ -76,3 +76,41 @@ def codex(*, fresh: bool = False) -> dict:
     v = judge(m, limit, max_age)
     _last.update(t=time.monotonic(), v=v)
     return v
+
+
+# ───────────────────────────── waiting for the quota (E2E 20/11) ─────────────────────────────
+RETRY_UNKNOWN_S = 1800           # no reliable reading: ask again in 30 min
+RESET_MARGIN_S = 300             # over the cap: resume 5 min after the weekly reset (a fresh reading is then taken)
+
+
+class Waiting(RuntimeError):
+    """Raised before a Codex-dependent model call while the gate is closed. Not a failure: the queue keeps the key,
+    due again at `until`, attempts unchanged (processing.wait), so nothing is lost and nothing is retried in a loop."""
+
+    def __init__(self, verdict: dict):
+        self.verdict = verdict
+        self.until = retry_at(verdict)
+        super().__init__(verdict.get("reason") or "codex quota gate closed")
+
+
+def retry_at(v: dict, now: datetime | None = None) -> datetime:
+    from datetime import timedelta
+    now = now or datetime.now(timezone.utc)
+    try:
+        if v.get("used_percent") is not None and float(v["used_percent"]) >= float(v.get("limit") or 0):
+            r = datetime.fromisoformat(str(v["resets_at"]))
+            if r > now:
+                return r + timedelta(seconds=RESET_MARGIN_S)
+    except (KeyError, TypeError, ValueError):
+        pass
+    return now + timedelta(seconds=RETRY_UNKNOWN_S)
+
+
+def require() -> dict:
+    """The gate for one Codex-dependent call (Kardex enrichment, dated plans…): the verdict when open, else Waiting.
+    Called inside the model call itself, so answers already recorded (processing.decide_once) are still reused and the
+    deterministic work around it never stops."""
+    v = codex()
+    if not v["ok"]:
+        raise Waiting(v)
+    return v

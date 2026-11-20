@@ -43,7 +43,14 @@ log = logging.getLogger("walter.extract2")
 PROCESSOR, VERSION = "l3.extract", "3"     # 3 = typed statements + reconciliation (lot 1, 2026-11-19)
 POSTE = "memory_extraction"          # Walter Router poste: the router picks the model (never hardcoded)
 RUNTIMES = ("hermes", "claude_code", "codex", "dsh", "walter")
-MESSAGE_TYPES = ("message.sent", "message.received")    # sent = the owner, received = the assistant
+MESSAGE_TYPES = ("message.sent", "message.received")    # sent = the owner, received = the assistant (or the contact)
+# E2E 20/11 (owner: « l'extraction doit aussi traiter les messages entrants et sortants de mes contacts, y compris les
+# transcriptions audio »): the owner's 1:1 conversations with his contacts go through the same extraction, the same
+# reconciliation and the same write gate; received = the contact (a third party), never the assistant. Live only from
+# extraction.state['contacts_start'] ([extraction] contacts = "single" | "off"): no automatic sweep of the history.
+CONTACT_SOURCES = ("beeper",)
+SOURCES = RUNTIMES + CONTACT_SOURCES
+AWAIT_TEXT = timedelta(minutes=10)    # a voice note without its transcript yet is waited for this long
 KINDS = ("fact", "decision", "preference", "goal", "constraint", "commitment", "correction")
 OWNER_KINDS = {"decision", "preference", "goal", "constraint", "correction"}
 # Stage of an intention (P1.2): a request is not a decision, a decision is not an execution, a report is not a proof.
@@ -145,6 +152,46 @@ Portée (scope) : durable = vaut au-delà du travail en cours ; task = ne vaut q
 Règles : uniquement ce qui est dit dans les messages numérotés ; une affirmation de W.Alter n'est ni une décision de Monsieur ni un fait vérifié ; une affirmation d'un tiers se dit « selon … » ; ne garde pas les détails passagers (commandes lancées, erreurs corrigées en route) sauf s'ils établissent une règle, une décision, un résultat ou un état ; listes vides si rien ; chaque énoncé cite ses numéros et une citation exacte."""
 PROMPT_HASH = hashlib.sha256(PROMPT.encode()).hexdigest()[:16]
 
+# E2E 20/11: the same typed statements for a conversation between the owner and one of his contacts. Same JSON, same
+# types, same reconciliation; what changes is who speaks and what a contact's words can establish.
+PROMPT_CONTACT = """Tu extrais la mémoire d'un extrait de conversation privée entre Monsieur (le propriétaire) et son contact {contact} : des énoncés typés, pas un résumé.
+
+Contexte qui précède (ne pas citer) :
+{context}
+
+Connaissances déjà enregistrées (références K) :
+{known}
+(elles servent à écrire chaque énoncé complet et à jour ; Walter rapproche lui-même les énoncés de ces connaissances)
+
+Messages à analyser (numérotés, seuls citables ; une note vocale ou un document est donné par sa transcription) :
+{transcript}
+
+Rends un JSON :
+{{"summary": "1 à 3 phrases : de quoi il a été question, ce qui a été dit, proposé ou convenu",
+  "topics": ["..."], "people": ["personnes citées hors Monsieur et {contact}"],
+  "items": [{{"type": "fait|preference|contrainte|correction|proposition|hypothese|decision|objectif|action|resultat|etat|annulation",
+              "text": "un seul énoncé, autonome et compréhensible sans la conversation, qui nomme la personne ({contact}, Monsieur…) ; s'il met à jour une connaissance K, la version complète à jour",
+              "author": "monsieur | contact",
+              "about": "K… si l'énoncé porte sur une connaissance déjà enregistrée, sinon null",
+              "who": "de qui parle l'énoncé : contact | monsieur | le nom d'une autre personne",
+              "domain": "personnel | relation | projet | test",
+              "stage": "action : annoncee|en_cours|terminee ; sinon null",
+              "scope": "durable | until", "until": "AAAA-MM-JJ si l'énoncé ne vaut que jusqu'à une date connue, sinon null",
+              "msgs": [numéros des messages qui l'établissent],
+              "quote": "extrait EXACT (copié mot pour mot, 5 à 25 mots) d'un des messages cités",
+              "confidence": 0.0}}]}}
+
+Types (un énoncé = un seul acte) :
+- fait : une information déclarée par celui qui parle (où il vit, son travail, un voyage prévu…) ; ce que dit {contact} est déclaré par {contact}, jamais vérifié ;
+- etat : une situation passagère (malade, en déplacement, occupé jusqu'à…) ;
+- proposition : une option proposée par l'un des deux (un rendez-vous, un café, une aide) : rien n'est tranché tant que l'autre ne l'a pas acceptée dans les messages ;
+- action : ce que quelqu'un s'engage à faire (annoncee : « je te confirmerai », « je t'envoie ça demain »), fait en ce moment (en_cours) ou dit avoir fait (terminee) ;
+- decision : seulement ce que Monsieur décide ou accepte lui-même ;
+- objectif / preference / contrainte / correction / annulation : ceux de Monsieur seulement ; un souhait du contact est un fait déclaré par lui ;
+- hypothese : une supposition, non vérifiée ; resultat : ce qui a été constaté.
+Règles : uniquement ce qui est dit dans les messages numérotés ; une proposition sans réponse de Monsieur reste une proposition (jamais un rendez-vous accepté) ; une promesse de confirmer plus tard est une action annoncée de celui qui la fait ; un changement (« j'ai quitté Lyon, je vis à Paris ») s'écrit comme la nouvelle version complète, avec about = la connaissance K qu'il remplace ; les salutations, remerciements et banalités ne sont pas des énoncés ; listes vides si rien ; chaque énoncé cite ses numéros et une citation exacte."""
+PROMPT_CONTACT_HASH = hashlib.sha256(PROMPT_CONTACT.encode()).hexdigest()[:16]
+
 
 # ───────────────────────────── state ─────────────────────────────
 def v1_start(conn) -> datetime | None:
@@ -178,6 +225,29 @@ def set_live_start(at: datetime | None = None) -> str:
     return at.isoformat()
 
 
+def channel(source: str) -> str:
+    return "contact" if source in CONTACT_SOURCES else "agent"
+
+
+def contacts_start(conn) -> datetime | None:
+    r = conn.execute("select value from extraction.state where key = 'contacts_start'").fetchone()
+    return datetime.fromisoformat(r["value"]["at"]) if r else None
+
+
+def set_contacts_start(at: datetime | None = None) -> str:
+    at = at or datetime.now(timezone.utc)
+    with connection() as conn:
+        conn.execute("""insert into extraction.state (key, value) values ('contacts_start', %s)
+                        on conflict (key) do update set value = excluded.value, updated_at = now()""",
+                     (json.dumps({"at": at.isoformat()}),))
+    return at.isoformat()
+
+
+def contacts_on() -> bool:
+    from . import organic
+    return str((organic.settings().get("extraction") or {}).get("contacts", "single")) == "single"
+
+
 def _thread_start(conn, source: str, thread_id: str) -> datetime | None:
     """Eligibility start of a thread for the live worker: its explicit catch-up start if one was requested, else the
     later of the V1 start and the live start (the backlog before it is backfill's)."""
@@ -186,6 +256,9 @@ def _thread_start(conn, source: str, thread_id: str) -> datetime | None:
     if r and r["from_at"]:
         return r["from_at"]
     starts = [x for x in (v1_start(conn), live_start(conn)) if x]
+    if channel(source) == "contact":        # never before the contacts' own start: no sweep of their history
+        cs = contacts_start(conn)
+        return max(starts + [cs]) if cs and contacts_on() else datetime.max.replace(tzinfo=timezone.utc)
     return max(starts) if starts else None
 
 
@@ -200,12 +273,22 @@ def mark_dirty(conn, source: str, thread_id: str, last_event_at=None) -> None:
 
 
 def on_bus_events(evs: list[dict]) -> int:
-    """Bus consumer handler (memory.event): a new message of a runtime makes its thread dirty. Idempotent."""
+    """Bus consumer handler (memory.event): a new message of a runtime, or of a 1:1 conversation with a contact, makes
+    its thread dirty. Idempotent."""
     n = 0
     with connection() as conn:
+        contact = [ev.get("subject") for ev in evs if (ev.get("payload") or {}).get("source") in CONTACT_SOURCES
+                   and (ev.get("payload") or {}).get("event_type") in MESSAGE_TYPES]
+        single = set()
+        if contact and contacts_on() and contacts_start(conn):
+            single = {r["id"] for r in conn.execute(
+                """select event_id::text id from core.events where event_id = any(%s::uuid[])
+                   and payload->'chat'->>'type' = 'single'""", ([c for c in contact if c],)).fetchall()}
         for ev in evs:
             p = ev.get("payload") or {}
-            if p.get("source") in RUNTIMES and p.get("event_type") in MESSAGE_TYPES and p.get("thread_id"):
+            if p.get("event_type") not in MESSAGE_TYPES or not p.get("thread_id"):
+                continue
+            if p.get("source") in RUNTIMES or (p.get("source") in CONTACT_SOURCES and ev.get("subject") in single):
                 mark_dirty(conn, p["source"], p["thread_id"], p.get("occurred_at"))
                 n += 1
     return n
@@ -229,7 +312,9 @@ def _noise(m: dict) -> str | None:
 def pending_events(conn, source: str, thread_id: str, start: datetime | None) -> list[dict]:
     return conn.execute("""
         select e.event_id, e.event_type, e.occurred_at, e.ingested_at, e.content, e.privacy_class, e.thread_id,
-               e.payload->>'model' as model, e.payload->>'cwd' as cwd
+               e.payload->>'model' as model, e.payload->>'cwd' as cwd, e.source, e.source_id, e.object_refs,
+               e.actor_identity_id::text as actor, e.payload->'chat'->>'type' as chat_type,
+               e.payload->'attachments' as files
         from core.events e
         where e.source = %s and e.thread_id = %s and e.event_type = any(%s)
           and (%s::timestamptz is null or e.ingested_at >= %s::timestamptz)
@@ -240,13 +325,57 @@ def pending_events(conn, source: str, thread_id: str, start: datetime | None) ->
                         (source, thread_id, list(MESSAGE_TYPES), start, start, PROCESSOR)).fetchall()
 
 
+def contact_messages(conn, rows: list[dict], now: datetime | None = None) -> list[dict]:
+    """A contact conversation as the extraction reads it (E2E 20/11): 1:1 chats only; each message says who spoke
+    (speaker, speaker_id = the contact's entity through a CONFIRMED identity link, never a name match) and carries the
+    words of its files (a voice note's transcript, a document's text), so quotes are checked against them. A file whose
+    text is not derived yet and arrived less than AWAIT_TEXT ago sets `awaiting` (the reader holds from there)."""
+    from . import events as ev_mod
+    rows = [dict(r) for r in rows if r.get("chat_type") == "single"]
+    if not rows:
+        return []
+    now = now or datetime.now(timezone.utc)
+    actors = sorted({r["actor"] for r in rows if r.get("actor") and r["event_type"] == "message.received"})
+    who = {r["identity_id"]: r for r in conn.execute(
+        """select l.identity_id::text identity_id, l.entity_id::text entity_id, coalesce(en.canonical_name,
+                  si.display_name) as name
+           from core.identity_links l join core.entities en on en.entity_id = l.entity_id
+           join core.source_identities si on si.identity_id = l.identity_id
+           where l.identity_id = any(%s::uuid[]) and l.status = 'confirmed'""", (actors,)).fetchall()} if actors else {}
+    readable = ev_mod.attachments(rows, max_privacy="redacted_cloud", chars=MSG_CHARS, conn=conn)
+    open_ = ev_mod.attachments(rows, max_privacy="cloud_allowed", chars=MSG_CHARS, conn=conn)
+    for r in rows:
+        if r["event_type"] == "message.sent":
+            r["speaker"], r["speaker_id"] = "Monsieur", None
+        else:
+            w = who.get(r.get("actor") or "") or {}
+            r["speaker"], r["speaker_id"] = w.get("name") or "Contact", w.get("entity_id")
+        files = readable.get(str(r["event_id"]), [])
+        said = [ev_mod.attachment_line(a) for a in files if a.get("text")]
+        if said:
+            r["content"] = "\n".join(x for x in [r["content"] or ""] + said if x)
+            if any(a.get("text") and not any(b["object_id"] == a["object_id"] and b.get("text") for b in
+                                              open_.get(str(r["event_id"]), [])) for a in files):
+                r["privacy_class"] = privacy.strictest(r["privacy_class"], "redacted_cloud")
+        stored_waiting = any(a.get("text") is None and a.get("kind") in ("audio", "document") for a in files)
+        queued = not files and any((f or {}).get("isVoiceNote") or str((f or {}).get("type")).lower() == "audio"
+                                   for f in (r.get("files") or []))
+        r["awaiting"] = (stored_waiting or queued) and now - r["ingested_at"] < AWAIT_TEXT
+    return rows
+
+
 def _context(conn, source: str, thread_id: str, before) -> list[dict]:
-    rows = conn.execute("""select e.event_type, e.occurred_at, e.content, e.payload->>'model' as model, e.thread_id,
-                                  e.payload->>'cwd' as cwd from core.events e
+    rows = conn.execute("""select e.event_id, e.event_type, e.occurred_at, e.ingested_at, e.content,
+                                  e.payload->>'model' as model, e.thread_id, e.privacy_class,
+                                  e.payload->>'cwd' as cwd, e.source, e.source_id, e.object_refs,
+                                  e.actor_identity_id::text as actor, e.payload->'chat'->>'type' as chat_type,
+                                  e.payload->'attachments' as files from core.events e
                            where e.source = %s and e.thread_id = %s and e.event_type = any(%s)
                              and e.occurred_at < %s and e.privacy_class = 'cloud_allowed'
                            order by e.occurred_at desc limit 20""",
                         (source, thread_id, list(MESSAGE_TYPES), before)).fetchall()
+    if channel(source) == "contact":
+        rows = contact_messages(conn, rows)
     return [r for r in rows if not _noise(r)][:CONTEXT_MSGS][::-1]
 
 
@@ -378,7 +507,7 @@ def project_id(name) -> str | None:
     return n[:60] or None
 
 
-def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict | None, str | None]:
+def validate(item: dict, seg: list[dict], known: dict[str, dict], *, chan: str = "agent") -> tuple[dict | None, str | None]:
     """→ (clean statement, None) or (None, reason). Pure: no database. Accepts the typed format (v3: type, author,
     domain, project, about) and the former one (kind, same_as, supersedes, contradicts: kept as the extraction's
     own hints, used as candidates, and as verdicts only in reconcile mode "model")."""
@@ -405,7 +534,19 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict 
     if domain == "test":
         return None, "test"                       # test data never becomes knowledge
     by_owner = any(m["event_type"] == "message.sent" for m in cited)
-    by_agent = any(m["event_type"] == "message.received" for m in cited)
+    by_agent = chan == "agent" and any(m["event_type"] == "message.received" for m in cited)
+    # a contact conversation: received = the contact. Who states it is who wrote the cited messages, whatever the
+    # model says; a statement of the contact is a third party's word (E2E 20/11)
+    by_contact = chan == "contact" and any(m["event_type"] == "message.received" for m in cited)
+    speaker_ids = sorted({m["speaker_id"] for m in cited if m.get("speaker_id")})
+    if chan == "contact":
+        a_ = (item.get("author") or "").strip().lower()
+        if a_ in ("contact", "tiers") and by_contact:
+            by_owner = False                      # the owner's message is only cited as context of his contact's word
+        elif a_ == "monsieur" and by_owner:
+            by_contact = False
+        if by_contact and not by_owner and typ in ("decision",):
+            typ, kind, act = "proposition", "decision", "proposal"   # a contact's « decision » about the owner: proposed
     raw_stage = (item.get("stage") or item.get("state") or "").strip().lower().replace("é", "e")
     if act == "decision" and raw_stage == "proposed":
         act = "proposal"
@@ -443,13 +584,25 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict 
     if scope == "until" and not until:
         scope = "task"
     author = (item.get("author") or "").strip().lower()
-    if author in ("tiers", "third", "third_party"):
+    if author in ("tiers", "third", "third_party") or (by_contact and not by_owner):
         epistemic_v = "stated_third_party"
     elif act == "hypothesis":
         epistemic_v = "inferred"
     else:
         epistemic_v = "stated_owner" if by_owner else "agent_reported"
     subject = (item.get("subject") or "").strip()[:120]
+    about_entities: list[str] = []
+    if chan == "contact":                         # whom the statement is about: the contact by its entity, not a name
+        w_ = (item.get("who") or "").strip()
+        contact = next((m for m in seg if m["event_type"] == "message.received" and m.get("speaker_id")), None)
+        if w_.lower() in ("contact", "") and contact:
+            subject, about_entities = f"person:{contact['speaker']}", [contact["speaker_id"]]
+            domain = domain if domain in ("relation", "test") else "relation"
+        elif w_.lower() in ("monsieur", "owner"):
+            subject, domain = "owner", domain if domain in ("personal", "test") else "personal"
+        elif w_:
+            subject = f"person:{w_[:80]}"
+            domain = domain if domain == "test" else "relation"
     project = project_id(item.get("project")) or (project_id(subject) if subject.lower().startswith("project:") else None)
     if domain is None:                            # former format: from the subject
         domain = ("project" if project else "personal" if subject.lower() in ("owner", "monsieur")
@@ -460,7 +613,10 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict 
     same = item.get("same_as") if isinstance(item.get("same_as"), str) and item.get("same_as") in known else None
     supersedes, contradicts = refs("supersedes"), refs("contradicts")
     about = item.get("about") if isinstance(item.get("about"), str) and item.get("about") in known else None
-    if supersedes and not by_owner:          # only the owner's word replaces knowledge; otherwise flag the conflict
+    # only the owner's word replaces knowledge; otherwise flag the conflict — except a contact updating what HE said
+    # before (« j'ai quitté Lyon ») : the same speaker's newer word replaces his older one (E2E 20/11)
+    own_word = lambda k: by_contact and speaker_ids and (known[k].get("attributes") or {}).get("speaker_id") in speaker_ids  # noqa: E731
+    if supersedes and not by_owner and not all(own_word(k) for k in supersedes):
         contradicts, supersedes = contradicts + supersedes, []
     hint = (("confirms", same) if same else ("replaces", supersedes[0]) if supersedes
             else ("contradicts", contradicts[0]) if contradicts else (None, about) if about else None)
@@ -473,7 +629,9 @@ def validate(item: dict, seg: list[dict], known: dict[str, dict]) -> tuple[dict 
             "subject": subject or (f"project:{project}" if project else "owner" if domain == "personal" else "other"),
             "domain": domain, "project": project,
             "quote": (item.get("quote") or "")[:400], "cited": cited, "by_owner": by_owner, "by_agent": by_agent,
-            "epistemic": "owner_stated" if by_owner else "agent_reported", "epistemic_v": epistemic_v,
+            "epistemic": "owner_stated" if by_owner else "third_party" if by_contact else "agent_reported",
+            "epistemic_v": epistemic_v, "by_contact": by_contact, "speaker_ids": speaker_ids,
+            "about_entities": about_entities,
             "same_as": same, "supersedes": supersedes, "contradicts": contradicts, "about": about, "hint": hint,
             "hint_id": known[hint[1]].get("item_id") if hint else None,
             "confidence": conf}, None
@@ -504,7 +662,7 @@ def _segment_row(conn, *, source, thread_id, status, msgs, items=0, reused=0, su
 
 
 def _line(i: int, m: dict, prefix: str = "") -> str:
-    who = "Monsieur" if m["event_type"] == "message.sent" else "W.Alter"
+    who = "Monsieur" if m["event_type"] == "message.sent" else m.get("speaker") or "W.Alter"
     from .views import INJECTED
     text = RUNTIME_NOTES.sub("", INJECTED.sub("", m["content"] or "")).strip()[:MSG_CHARS]
     return f"{prefix}{i}. [{who} · {m['occurred_at']:%Y-%m-%d %H:%M}] {text}"
@@ -537,6 +695,7 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
     there; changes it would make to served items are recorded `staged` in core.derived_changes, never applied."""
     from . import knowledge
     chat = chat or llm.chat
+    chan = channel(source)
     staged = generation != "g1"
     gens = ["g1", generation] if staged else ["g1"]
     rc = knowledge.settings()
@@ -546,12 +705,17 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
         projects = _projects(conn, gens)
     known = {f"K{i + 1}": r for i, r in enumerate(known_rows)}
     seg_class = privacy.strictest(*(m["privacy_class"] for m in seg))
-    prompt = PROMPT.format(
+    fields = dict(
         context="\n".join(_line(i + 1, m, "C") for i, m in enumerate(context)) or "(début de conversation)",
         known="\n".join(f"{k}. [{r['kind']}{'/' + r['state'] if r['state'] and r['state'] != 'stated' else ''}] {r['content']}"
                         for k, r in known.items()) or "(aucune)",
-        projects=", ".join(projects) or "(aucun encore)",
         transcript="\n".join(_line(i + 1, m) for i, m in enumerate(seg)))
+    if chan == "contact":
+        name = next((m["speaker"] for m in seg + context if m["event_type"] == "message.received"
+                     and m.get("speaker")), "le contact")
+        prompt, prompt_hash = PROMPT_CONTACT.format(contact=name, **fields), PROMPT_CONTACT_HASH
+    else:
+        prompt, prompt_hash = PROMPT.format(projects=", ".join(projects) or "(aucun encore)", **fields), PROMPT_HASH
     t0 = time.perf_counter()
     res = chat([{"role": "user", "content": prompt}], poste=POSTE, processor=PROCESSOR, processor_version=VERSION,
                privacy_class=seg_class, budget=budget, purpose=f"{source} {thread_id} {len(seg)} msgs",
@@ -563,7 +727,7 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
     for raw in data.get("items") or []:
         if not isinstance(raw, dict):
             continue
-        item, why = validate(raw, seg, known)
+        item, why = validate(raw, seg, known, chan=chan)
         if why:
             rejected.append({"reason": why, "item": {k: raw.get(k) for k in ("type", "kind", "text", "msgs", "quote")}})
         else:
@@ -630,7 +794,7 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
                          (data["summary"], json.dumps({"topics": data.get("topics") or [], "projects": seg_projects,
                                                        "people": data.get("people") or [], "from": str(seg[0]["occurred_at"]),
                                                        "to": str(seg[-1]["occurred_at"]), "pipeline": "v1"}, ensure_ascii=False),
-                          PROCESSOR, VERSION, res.get("model"), PROMPT_HASH, [str(m["event_id"]) for m in seg],
+                          PROCESSOR, VERSION, res.get("model"), prompt_hash, [str(m["event_id"]) for m in seg],
                           json.dumps({**base_refs, "ref": f"{sid}:summary"}), seg[-1]["occurred_at"], seg_class))
         gate = knowledge.Gate(conn, generation=generation, tag=backfill, segment=sid, where=f"{source}/{thread_id}")
         resolved: dict[str, str | None] = {}
@@ -657,12 +821,18 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
             if backfill:
                 attrs["backfill"] = backfill
             if it["kind"] == "commitment":
-                attrs["holder"] = "owner" if it["by_owner"] else "walter"
+                attrs["holder"] = "owner" if it["by_owner"] else "contact" if it.get("by_contact") else "walter"
+            if chan == "contact":          # who said it and whom it is about (entities, not names: E2E 20/11)
+                attrs["channel"] = "contact"
+                if it.get("speaker_ids"):
+                    attrs["speaker_id"] = it["speaker_ids"][0]
+                if it.get("about_entities"):
+                    attrs["entities"] = it["about_entities"]
             if it["act"] == "state" and not valid_to:          # a transient state expires (task-scoped knowledge
                 valid_to = it["at"] + timedelta(days=float(rc["state_ttl_days"]))   # expires with its work: consolidate.expire)
             row = {"kind": it["kind"], "content": it["text"], "attributes": attrs, "status": "derived",
                    "derived_by": PROCESSOR, "processor_version": VERSION, "model": res.get("model"),
-                   "prompt_hash": PROMPT_HASH, "source_event_ids": ev_ids,
+                   "prompt_hash": prompt_hash, "source_event_ids": ev_ids,
                    "source_refs": {**base_refs, "ref": f"{sid}:{j}"}, "valid_from": it["at"],
                    "confidence": it["confidence"], "privacy_class": it["cls"], "generation": generation,
                    "epistemic": epistemic, "stage": stage, "scope": it["scope"], "valid_to": valid_to}
@@ -679,7 +849,7 @@ def extract_segment(source: str, thread_id: str, seg: list[dict], *, chat=None, 
             out["advanced"] += op in ("advanced", "progress")
             out["contested"] += op == "contested"
             out["ignored"] += op == "ignored"
-        out["runplane"] = len(knowledge.runplane(gate, source, thread_id))
+        out["runplane"] = len(knowledge.runplane(gate, source, thread_id)) if chan == "agent" else 0
         conn.execute("update extraction.segments set items = %s, reused = %s, superseded = %s where segment_id = %s",
                      (out["items"], out["reused"] + out["advanced"], out["superseded"], sid))
     out["segment_id"] = sid
@@ -739,6 +909,13 @@ def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "rec
     with connection() as conn:
         start = _thread_start(conn, source, thread_id)
         msgs = pending_events(conn, source, thread_id, None if force else start)
+        contact = channel(source) == "contact"
+        if contact:      # 1:1 only, who spoke, the words of voice notes; a transcript still coming is waited for
+            msgs = contact_messages(conn, msgs, now)
+            held = next((i for i, m in enumerate(msgs) if m["awaiting"]), None)
+            if held is not None:
+                out["waiting"] += len(msgs) - held
+                msgs = msgs[:held]
     if not msgs:
         return out
     # 1. never to a cloud model, never retried by this version
@@ -771,7 +948,7 @@ def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "rec
             out["quota_stopped"] = q["reason"]
             out["waiting"] += sum(len(x) for x in segs[i:])
             break
-        if not any(m["event_type"] == "message.sent" for m in seg) and sum(_size(m) for m in seg) < 1500:
+        if not contact and not any(m["event_type"] == "message.sent" for m in seg) and sum(_size(m) for m in seg) < 1500:
             with connection() as conn:   # assistant-only chatter: nothing the owner said, nothing substantial
                 _segment_row(conn, source=source, thread_id=thread_id, status="filtered", msgs=seg,
                              rejected=[{"reason": "no_owner_message"}])
@@ -917,6 +1094,14 @@ def reconcile(window: timedelta = timedelta(days=3)) -> dict:
             where e.source = any(%s) and e.event_type = any(%s) and e.ingested_at >= %s and e.thread_id is not null
               and not exists (select 1 from extraction.covered c where c.processor = %s and c.event_id = e.event_id)
             group by 1, 2""", (list(RUNTIMES), list(MESSAGE_TYPES), since, PROCESSOR)).fetchall()
+        cs = contacts_start(conn) if contacts_on() else None
+        if cs:   # the owner's 1:1 conversations with his contacts, from their own start (E2E 20/11)
+            rows += conn.execute("""
+                select e.source, e.thread_id, max(e.occurred_at) as last_at, count(*) as n from core.events e
+                where e.source = any(%s) and e.event_type = any(%s) and e.ingested_at >= greatest(%s, %s)
+                  and e.thread_id is not null and e.payload->'chat'->>'type' = 'single'
+                  and not exists (select 1 from extraction.covered c where c.processor = %s and c.event_id = e.event_id)
+                group by 1, 2""", (list(CONTACT_SOURCES), list(MESSAGE_TYPES), since, cs, PROCESSOR)).fetchall()
         known = {(r["source"], r["thread_id"]) for r in conn.execute(
             "select source, thread_id from extraction.threads where processor = %s and status in ('dirty','working')",
             (PROCESSOR,)).fetchall()}

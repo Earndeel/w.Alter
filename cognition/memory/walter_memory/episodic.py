@@ -26,7 +26,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from . import events, organic, privacy
+from . import events, organic, privacy, quota
 from .db import connection
 from .flows import _span, tz
 
@@ -112,7 +112,11 @@ def plan_burst(item_id: str, *, chat=None) -> dict:
 
     if not b or b["status"] != "derived":
         return {"burst": item_id, "outcome": "burst_gone", "retracted": retract_all("its conversation burst changed")}
-    if int((b["attributes"] or {}).get("owner_messages") or 0) == 0:
+    # a burst where only the contact wrote is read too when it is a 1:1 conversation (E2E 20/11: « une proposition
+    # d'un contact doit être reconnue même sans réponse du propriétaire ») — stored « accord non établi », never accepted;
+    # a group where the owner said nothing is not his plan
+    a_ = b["attributes"] or {}
+    if int(a_.get("owner_messages") or 0) == 0 and a_.get("chat_type") != "single":
         return {"burst": item_id, "outcome": "no_owner_message", "retracted": retract_all("no message of Monsieur")}
     if not privacy.model_may_receive(b["privacy_class"]):
         return {"burst": item_id, "outcome": "local_only"}
@@ -129,6 +133,7 @@ def plan_burst(item_id: str, *, chat=None) -> dict:
     inp = _plans_input(b, msgs, z)
 
     def call():
+        quota.require()          # Codex weekly gate (A4): over it, Waiting — the burst stays queued (assimilation)
         res = chat([{"role": "user", "content": inp["prompt"]}], poste="memory_extraction", processor="episodic.plans",
                    processor_version=PLANS_VERSION, privacy_class=b["privacy_class"], names=inp["names"],
                    budget="recurring", purpose="dated plans in a conversation", response_format={"type": "json_object"},
@@ -185,7 +190,7 @@ def plans(since: datetime | None = None, *, chat=None, limit: int | None = None)
     with connection() as conn:
         ids = [r["item_id"] for r in conn.execute(
             """select item_id::text from core.derived_items where derived_by = 'flows.conversations' and status = 'derived'
-               and valid_from >= %s and (attributes->>'owner_messages')::int > 0 order by valid_from desc limit 400""",
+               and valid_from >= %s and ((attributes->>'owner_messages')::int > 0 or attributes->>'chat_type' = 'single') order by valid_from desc limit 400""",
             (since,))]
     calls = 0
     for iid in ids:
@@ -193,6 +198,9 @@ def plans(since: datetime | None = None, *, chat=None, limit: int | None = None)
             break
         try:
             r = plan_burst(iid, chat=chat)
+        except quota.Waiting as w:   # the Codex gate holds for every burst: the next pass takes them up
+            out["waiting"] = str(w)
+            break
         except Exception as e:  # noqa: BLE001 — retried by the next event or pass
             log.warning("plans: %s", e)
             out["errors"] += 1
@@ -253,6 +261,8 @@ def _store_plan(burst: dict, msgs: list[dict], p: dict, k: int, z) -> str | None
     cited = [msgs[i - 1] for i in p.get("msgs") or [] if isinstance(i, int) and 1 <= i <= len(msgs)] or msgs[-1:]
     by_owner = any(m["event_type"] in ("message.sent", "email.sent") for m in cited)
     agreed = str(p.get("agreed") or "unclear")
+    if agreed in ("yes", "no") and not any(m["event_type"] in ("message.sent", "email.sent") for m in msgs):
+        agreed = "unclear"     # the owner wrote nothing: a contact's proposal is never accepted (nor refused) for him
     with connection() as conn:
         participants = [e for e in (burst["attributes"].get("participants") or [])]
         content = (f"Projet : {p['what']} — prévu {_span(start, end, z)}" + (f" à {p['where']}" if p.get("where") else "")

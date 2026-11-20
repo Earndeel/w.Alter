@@ -355,6 +355,10 @@ def guard(st: dict, verdict: str, target: dict | None, conf: float | None, min_c
         return verdict, None
     if target is None:
         return "new", "no_target"
+    # a contact's word replaces only what the same person said before, never another person's (E2E 20/11)
+    if verdict in ("corrects", "replaces") and st.get("by_contact") and not st["by_owner"] \
+            and (target.get("attributes") or {}).get("speaker_id") not in (st.get("speaker_ids") or []):
+        return "contradicts", "other_speaker"
     if verdict in ("corrects", "replaces") and not st["by_owner"] and target.get("epistemic") == "stated_owner" \
             and not is_progress(st, target, verdict):
         return "contradicts", "agent_vs_owner"      # an assistant's claim never overrides the owner's word

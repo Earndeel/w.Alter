@@ -176,9 +176,9 @@ def resolve_person(conn, name: str) -> str | None:
 def mentions_of(item: dict) -> list[tuple[str, str]]:
     """(type, name) mentioned by a V1 knowledge item: its subject and the projects of its segment."""
     attrs = item.get("attributes") or {}
-    out = []
+    out = [("entity", e) for e in attrs.get("entities") or [] if isinstance(e, str)]   # resolved by the extraction
     subj = attrs.get("subject") or ""
-    if ":" in subj:
+    if ":" in subj and not out:      # a contact's statement names its entity: never resolved again by name
         kind, _, name = subj.partition(":")
         out.append((kind.strip(), name.strip()))
     out += [("project", p) for p in attrs.get("projects") or [] if isinstance(p, str)]
@@ -209,6 +209,8 @@ def link_items(item_ids: list[str] | None = None, *, limit: int = 5000) -> dict:
                         _aliases.cache_clear()
                 elif kind == "person":
                     eid = resolve_person(conn, name)
+                elif kind == "entity":
+                    eid = name
                 if eid and eid not in ents:
                     ents.append(eid)
             if not ents:

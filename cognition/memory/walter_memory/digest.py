@@ -239,6 +239,102 @@ def _situation_line(conn, now: datetime) -> str | None:
     return ("mémoire personnelle : " + " ; ".join(x.lstrip("- ") for x in lines)) if lines else None
 
 
+# ───────────────────────────── implicit references (E2E 20/11) ─────────────────────────────
+# « Que sais-tu de cette personne ? », « il habite où ? », « mets une tâche pour que je le relance » — the owner
+# points at someone without naming him. Linked to ONE recent entity only when the context identifies it: the previous
+# exchange named exactly one person (certain), else the only contact who wrote to him one-to-one within INBOUND_WINDOW
+# (probable: said as an assumption, confirmed before any action). Several candidates → ambiguous: ask. Read-only: no
+# relation, link or knowledge is ever written from a mention (owner: « ne crée pas de relation artificielle »).
+PERSON_REF = re.compile(
+    r"(?i)\b(cette personne|ce contact|ce (mec|gars|type)|cette (fille|femme|nana)|cet (ami|homme)|cette amie|"
+    r"(je|on|tu|pour|de|à|a|peux-tu|tu peux|vas-y|faut) (le|la|l')\s?(relanc|rappel|appel|contact|recontact|pr[ée]ven|"
+    r"remerci|invit|r[ée]pond|[ée]cri|voi[rs]|retrouv|aid)\w*|"
+    r"\blui (r[ée]pondre|[ée]crire|dire|envoyer|proposer|demander|parler|confirmer|souhaiter)|"
+    r"\b(il|elle) (habite|vit|vient|m'a|t'a|a (dit|[ée]crit|propos|demand|envoy)|veut|propose|pense|revient|passe|"
+    r"arrive|demande|travaille|bosse|est o[uù]|part|se trouve|compte))")
+INBOUND_WINDOW = timedelta(hours=2)
+PREVIOUS_MAX_S = 7200
+
+
+def _single(conn, name: str) -> dict | None:
+    from . import relation
+    every = relation.candidates(conn, name, limit=4)
+    c = [x for x in every if x["messages"]] or every          # someone exchanged with first; never one of several
+    return {"entity_id": str(c[0]["entity_id"]), "name": c[0].get("canonical_name") or name} if len(c) == 1 else None
+
+
+def _recent_inbound(conn, now: datetime) -> list[dict]:
+    """The contacts who wrote to the owner one-to-one within INBOUND_WINDOW (confirmed identities), latest first."""
+    rows = conn.execute("""select distinct on (l.entity_id) l.entity_id::text entity_id, e.canonical_name name,
+                                  ev.occurred_at, ev.object_refs is not null and cardinality(ev.object_refs) > 0 has_file
+                           from core.events ev
+                           join core.identity_links l on l.identity_id = ev.actor_identity_id and l.status = 'confirmed'
+                           join core.entities e on e.entity_id = l.entity_id and e.merged_into is null
+                           where ev.event_type = 'message.received' and ev.occurred_at > %s and ev.occurred_at <= %s
+                             and ev.payload->'chat'->>'type' = 'single' and ev.privacy_class <> 'local_only'
+                           order by l.entity_id, ev.occurred_at desc""", (now - INBOUND_WINDOW, now)).fetchall()
+    return sorted((dict(r) for r in rows), key=lambda r: r["occurred_at"], reverse=True)
+
+
+def implicit_reference(message: str, *, previous: str | None = None, previous_age_s: float | None = None,
+                       conn=None, now: datetime | None = None) -> dict | None:
+    """→ {"kind": certain | probable | ambiguous, "people": [{entity_id, name, basis}], "line"} or None (the message
+    names someone, points at no one, or nothing recent identifies anyone)."""
+    import contextlib
+    from .db import connection
+    msg = (message or "").strip()
+    if not PERSON_REF.search(msg):
+        return None
+    now = now or datetime.now(timezone.utc)
+    stack = contextlib.ExitStack()
+    if conn is None:
+        conn = stack.enter_context(connection())
+    with stack:
+        if any(_single(conn, n) or relation_known(conn, n) for n in _people_names(msg, [])):
+            return None                                   # the message names its person: nothing implicit
+        if previous and (previous_age_s is None or previous_age_s <= PREVIOUS_MAX_S):
+            named = {p["entity_id"]: p for p in (_single(conn, n) for n in _people_names(previous, [])) if p}
+            if len(named) == 1:
+                p = next(iter(named.values()))
+                return {"kind": "certain", "people": [{**p, "basis": "previous"}],
+                        "line": f"référence implicite : « {_ref_word(msg)} » désigne « {p['name']} », nommé dans "
+                                f"l'échange précédent"}
+            if len(named) > 1:
+                names = [p["name"] for p in named.values()][:3]
+                return {"kind": "ambiguous", "people": [{**p, "basis": "previous"} for p in named.values()][:3],
+                        "line": f"référence implicite ambiguë : « {_ref_word(msg)} » peut désigner "
+                                f"{' ou '.join(f'« {n} »' for n in names)} (tous nommés dans l'échange précédent) : "
+                                f"demander lequel"}
+        rec = _recent_inbound(conn, now)
+    if not rec:
+        return None
+    from .personal import _ago
+    if len(rec) == 1:
+        r = rec[0]
+        what = "une note vocale ou un fichier" if r["has_file"] else "un message"
+        return {"kind": "probable", "people": [{"entity_id": r["entity_id"], "name": r["name"], "basis": "inbound"}],
+                "line": f"référence implicite probable : « {_ref_word(msg)} » désigne sans doute « {r['name']} », seul "
+                        f"contact à avoir écrit en tête-à-tête depuis {int(INBOUND_WINDOW.total_seconds() // 3600)} h "
+                        f"({what}, {_ago(r['occurred_at'], now)}) — si la conversation ne nomme personne d'autre ; le "
+                        f"dire comme une hypothèse et confirmer avant toute action"}
+    names = [r["name"] for r in rec[:3]]
+    return {"kind": "ambiguous", "people": [{"entity_id": r["entity_id"], "name": r["name"], "basis": "inbound"}
+                                            for r in rec[:3]],
+            "line": f"référence implicite ambiguë : « {_ref_word(msg)} » peut désigner plusieurs contacts récents "
+                    f"({', '.join(f'« {n} »' for n in names)}{' …' if len(rec) > 3 else ''}) : demander lequel"}
+
+
+def relation_known(conn, name: str) -> bool:
+    """A name several known people bear is still a name: the message names someone (the person line says ambiguous)."""
+    from . import relation
+    return bool(relation.candidates(conn, name, limit=2))
+
+
+def _ref_word(msg: str) -> str:
+    m = PERSON_REF.search(msg)
+    return re.sub(r"\s+", " ", m.group(0)).strip() if m else "il"
+
+
 # ───────────────────────────── the digest ─────────────────────────────
 RECENT_S = 1800        # a previous exchange this recent already put its project in front of the decision model
 
@@ -281,6 +377,10 @@ def build(message: str, *, previous: str | None = None, previous_age_s: float | 
                     return kept[:2]
                 out.append(("switch", f"l'échange précédent nommait {', '.join(uniq(before))} ; ce message nomme "
                                       f"{', '.join(uniq(anchors))}"))
+        if not any(k == "person" for k, _ in out):
+            ref = implicit_reference(msg, previous=previous, previous_age_s=previous_age_s, conn=conn, now=now)
+            if ref:
+                out.insert(0, ("reference", ref["line"]))
         named = any(k in ("project", "person") for k, _ in out)
         if RESUME.search(msg) and not named:
             line = _tasks_line(now)

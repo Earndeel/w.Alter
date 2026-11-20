@@ -34,7 +34,7 @@ import threading
 import time
 from datetime import date, datetime, timedelta, timezone
 
-from . import bus, processing
+from . import bus, processing, quota
 from .db import connection
 
 log = logging.getLogger("walter.assimilation")
@@ -52,7 +52,7 @@ SIGNALS = ("appointment", "plan", "visit")
 SETTLE = {"flows.visits": 300, "flows.conversations": 60, "flows.appointments": 30, "flows.work_sessions": 120,
           "episodic.episodes": 30}
 BURST_SETTLE = timedelta(minutes=15)      # plans are read once a burst has been calm this long (a deadline)
-ORDER = ["search.index", "search.reindex", "goals.runplane", "triage", "flows.visits", "flows.conversations", "flows.appointments", "flows.work_sessions", "episodic.plans",
+ORDER = ["search.index", "search.reindex", "goals.runplane", "runs.reminder", "triage", "flows.visits", "flows.conversations", "flows.appointments", "flows.work_sessions", "episodic.plans",
          "episodic.episodes", "periods.day", "periods.week", "periods.month",
          "media.derive"]   # last: model calls of a media burst never delay the index, triage or flows
 RECONCILE_S = 6 * 3600
@@ -134,8 +134,12 @@ def _route_derived(conn, item_id: str, p: dict) -> int:
     processing.mark(conn, "search.index", "pending", reason="knowledge", settle=10, max_wait=60)
     if p.get("op") == "update":            # its chunks must follow its new text or status (index_pending adds only)
         processing.mark(conn, "search.reindex", item_id, reason=p.get("status") or "update", settle=10, max_wait=120)
+    # a burst of a 1:1 conversation counts even when only the contact wrote (E2E 20/11: « une proposition d'un contact
+    # doit être reconnue même sans réponse du propriétaire »); a group where the owner said nothing does not
     if kind == "conversation" and by == "flows.conversations" and \
-            (int(p.get("owner_messages") or 0) > 0 or p.get("status") != "derived"):
+            (int(p.get("owner_messages") or 0) > 0 or p.get("status") != "derived" or (conn.execute(
+                "select attributes->>'chat_type' = 'single' s from core.derived_items where item_id = %s",
+                (item_id,)).fetchone() or {}).get("s")):
         if p.get("status") != "derived":     # the burst is gone: its plans go now
             processing.mark(conn, "episodic.plans", item_id, reason="burst gone")
         else:                                # read once the burst has been calm BURST_SETTLE (a deadline)
@@ -251,6 +255,9 @@ def _run_one(processor: str, row: dict) -> dict:
         src, thread = key.split(SEP, 1)
         now = datetime.now(timezone.utc)
         return flows.work_sessions(since=lo or now, until=hi or lo or now, thread=(src, thread))
+    if processor == "runs.reminder":     # the dated trigger of a created task (Run Plane, E2E 20/11)
+        from . import runs
+        return runs.remind(key)
     if processor == "goals.runplane":
         from . import knowledge
         r = knowledge.runplane_task(key)
@@ -290,6 +297,11 @@ def work(now: datetime | None = None, max_seconds: float = 50.0) -> dict:
                 o = out.setdefault(proc, {"keys": 0, "changed": 0, "errors": 0})
                 try:
                     r = _run_one(proc, row)
+                except quota.Waiting as w:   # the Codex gate is closed: the key waits for it, not a failure
+                    processing.wait(row, w.until, str(w))
+                    processing.count(proc, keys=1, waiting=1)
+                    o["waiting"] = o.get("waiting", 0) + 1
+                    continue
                 except Exception as e:  # noqa: BLE001 — retried with backoff, never lost
                     log.exception("assimilation: %s %s failed", proc, row["key"][:60])
                     processing.failed(row, e)
@@ -337,7 +349,8 @@ def reconcile_runs() -> dict:
     step stands alone: a failure is logged and counted, the others still run."""
     from . import episodes, runs
     out: dict = {}
-    for name, fn in (("abandoned", runs.sweep), ("episodes", lambda: len(episodes.pending()))):
+    for name, fn in (("abandoned", runs.sweep), ("episodes", lambda: len(episodes.pending())),
+                     ("reminders", runs.reminders_missed)):
         try:
             out[name] = fn()
         except Exception as exc:

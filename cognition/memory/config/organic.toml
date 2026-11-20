@@ -12,6 +12,11 @@ enforce = true
 # run-episode summaries. Ingestion, search index, GPS flows, triage, Kardex and media keep running; pending messages
 # stay uncovered and are taken up on "active". Restart walter-memory-pipeline after a change.
 mode = "paused"
+# E2E 20/11 (owner: « l'extraction doit aussi traiter les messages entrants et sortants de mes contacts, y compris les
+# transcriptions audio … sans créer un nouveau système d'extraction relationnelle concurrent »): "single" = the owner's
+# 1:1 conversations with his contacts (Beeper) go through this same extraction, live from extraction.state
+# ['contacts_start'] (never their history); "off" = runtimes only.
+contacts = "single"
 
 [stages]
 # A2 (2026-11-19, owner: « Sépare les interrupteurs »): one switch per model-driven stage, "active" | "paused". A stage
@@ -94,7 +99,10 @@ tz = "Asia/Bangkok"
 # Kardex enrichment (2026-11-03): once a day, the `per_run` people the owner exchanged with most in 1:1 recently; their
 # last `days` of messages (redacted_cloud only, pseudonymised) → claims about the CONTACT only, status proposed,
 # sensitivity tightened by type, mention policy derived. "off" = only on demand (walter-memory organic kardex).
-mode = "daily"
+# E2E 20/11: "canonical" = no daily claims any more: what contacts say is extracted by the organic extraction
+# ([extraction] contacts) into the canonical knowledge the person card and the relation state read (one truth; a
+# contact's newer word replaces his older one). Rollback = "daily". Claims already recorded stay readable.
+mode = "canonical"
 per_run = 5
 days = 60
 max_messages = 160

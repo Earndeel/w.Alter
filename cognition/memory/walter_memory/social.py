@@ -283,6 +283,15 @@ def person_card(entity_id: str, max_privacy: str = "local_only", audience: str |
         deviations = conn.execute("""select metric, observation, detected_on from kardex.communication_deviations
                                      where entity_id = %s and acknowledged_at is null order by detected_on desc limit 5""",
                                   (entity_id,)).fetchall()
+        # what Walter Memory knows about the person (E2E 20/11: one truth): the canonical knowledge whose subject is
+        # this entity — current statements and plans, then what they replaced — read exactly as the relation state
+        # (P3, relation._items) reads it, never a second copy
+        from . import relation
+        k = relation._items(conn, entity_id, None, allowed, shown_as != "owner_local")
+        trim = lambda xs, n: [{f: x.get(f) for f in ("id", "text", "who", "stage", "said", "until", "how")  # noqa: E731
+                               if x.get(f) is not None} for x in sorted(xs, key=lambda x: str(x.get("said")), reverse=True)[:n]]
+        knowledge = {"current": trim(k["statements"], 12), "plans": trim(k["plans"], 8),
+                     "history": trim(k["history"], 8), "withheld": k["withheld"]}
         kardex = {}
         if en["kardex_contact_id"] is not None:
             fields = read_policy.CONTACT_FIELDS[shown_as]
@@ -316,6 +325,7 @@ def person_card(entity_id: str, max_privacy: str = "local_only", audience: str |
                                   where l.entity_id = %s and e.payload->'chat'->>'type' = 'single')
                                 group by 1""", (entity_id,)).fetchall()
     return {"entity": {k: en[k] for k in ("entity_id", "entity_type", "canonical_name", "aliases", "kardex_contact_id")},
-            "accounts": accounts, "relationship": metrics, "deviations": deviations, "kardex": kardex,
+            "accounts": accounts, "relationship": metrics, "deviations": deviations, "knowledge": knowledge,
+            "kardex": kardex,
             "shared_groups": groups, "recent_interactions": recent, "media": {m["kind"]: m["n"] for m in media},
             "audience": audience}

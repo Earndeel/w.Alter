@@ -388,3 +388,41 @@ def test_the_index_follows_a_changed_burst_and_drops_a_retracted_one():
     assert b["item_id"] in search.stale_derived()
     assert search.reindex_derived([b["item_id"]]) == {"unchanged": 0, "reindexed": 0, "removed": 1, "skipped": 0}
     assert text() == [] and search.reindex_derived([b["item_id"]])["unchanged"] == 1
+
+
+def test_a_closed_codex_gate_parks_the_plans_without_failure_and_they_resume_after_the_reset(monkeypatch):
+    """E2E 20/11: « les traitements dépendants de Codex se mettent en attente puis reprennent sans perdre d'événements ;
+    les traitements déterministes ne s'arrêtent pas ». Over the cap: the burst is built (deterministic), its plans wait
+    until the reset without a failure count and without a model call; after it, they are read once."""
+    from walter_memory import quota
+    t = f"Q{uuid.uuid4().hex[:8]}"
+    m = Models(monkeypatch, plans={t: [plan(t)]})
+    reset = datetime.now(timezone.utc) + timedelta(days=3)
+    closed = {"ok": False, "used_percent": 75.0, "limit": 70.0, "resets_at": reset.isoformat(),
+              "reason": "codex weekly quota 75 % ≥ 70 %"}
+    monkeypatch.setattr(quota, "codex", lambda **k: closed)
+    msg(t, at(12), f"{t} on se voit demain à 20h ?")
+    step()
+    assert len(bursts(t)) == 1 and m.calls(t) == 0                     # deterministic work went on, no model call
+    with connection() as conn:
+        q = conn.execute("""select attempts, last_error, due_at from processing.queue
+                            where processor = 'episodic.plans' and key = %s""", (bursts(t)[0]["item_id"],)).fetchone()
+    assert q and q["attempts"] == 0 and q["last_error"].startswith("waiting: codex weekly quota")
+    assert q["due_at"] >= reset                                          # parked until the reset, not retried in a loop
+    monkeypatch.setattr(quota, "codex", lambda **k: {"ok": True})
+    assimilation.step(now=reset + timedelta(minutes=10))
+    assert m.calls(t) == 1
+    with connection() as conn:
+        assert conn.execute("select 1 from processing.queue where processor = 'episodic.plans' and key = %s",
+                            (bursts(t)[0]["item_id"],)).fetchone() is None
+        n = conn.execute("""select count(*) n from core.derived_items where derived_by = 'episodic.plans'
+                            and status = 'derived' and content like %s""", (f"%{t}%",)).fetchone()["n"]
+    assert n == 1
+
+
+def test_the_retry_time_of_a_closed_gate():
+    from walter_memory import quota
+    now = datetime(2026, 11, 20, tzinfo=timezone.utc)
+    r = datetime(2026, 11, 23, 1, 23, tzinfo=timezone.utc)
+    assert quota.retry_at({"used_percent": 75, "limit": 70, "resets_at": r.isoformat()}, now) == r + timedelta(minutes=5)
+    assert quota.retry_at({"reason": "unknown"}, now) == now + timedelta(minutes=30)

@@ -84,6 +84,15 @@ def failed(row: dict, err: Exception) -> None:
                       row["processor"], row["key"]))
 
 
+def wait(row: dict, until: datetime, reason: str) -> None:
+    """Not a failure (a closed quota gate…): the key stays queued, due again at `until`, attempts unchanged. A new mark
+    may make it due earlier: it is then asked again (the gate answers from its cache, no model call)."""
+    with connection() as conn:
+        conn.execute("""update processing.queue set due_at = greatest(due_at, %s), last_error = %s, updated_at = now()
+                        where processor = %s and key = %s""",
+                     (until, f"waiting: {reason}"[:500], row["processor"], row["key"]))
+
+
 def inputs_hash(inputs: Any) -> str:
     return hashlib.sha256(json.dumps(inputs, ensure_ascii=False, sort_keys=True, default=str).encode()).hexdigest()
 
