@@ -84,7 +84,8 @@ def _sub(account, weekly, session=0):
 
 def test_exhausted_means_every_account_spent():
     assert not execution.subscription_exhausted([_sub("a", 100), _sub("b", 75), {"access": "paid"}])
-    assert execution.subscription_exhausted([_sub("a", 100), _sub("b", 92), {"access": "paid"}])
+    assert not execution.subscription_exhausted([_sub("a", 100), _sub("b", 92), {"access": "paid"}])  # no reserve
+    assert execution.subscription_exhausted([_sub("a", 100), _sub("b", 100), {"access": "paid"}])
     assert execution.subscription_exhausted([_sub("a", 100), _sub("b", 10, session=100)])
     assert not execution.subscription_exhausted([{"access": "paid"}])          # no subscription: nothing to switch
 
@@ -112,7 +113,7 @@ def _with(monkeypatch, opus_routes):
 
 
 def test_spent_subscription_switches_to_the_declared_substitute(monkeypatch):
-    out, calls = _with(monkeypatch, [_sub("a", 100), _sub("b", 95), {"provider": "kie", "access": "paid"}])
+    out, calls = _with(monkeypatch, [_sub("a", 100), _sub("b", 100), {"provider": "kie", "access": "paid"}])
     assert (out["model_id"], out["variant"]) == ("gpt-6-1-sol", "xhigh") and calls == ["claude-opus-5-5", "gpt-6-1-sol"]
     assert out["quota_switch"]["from"]["model_id"] == "claude-opus-5-5" and out["provider"] == "codex"
 

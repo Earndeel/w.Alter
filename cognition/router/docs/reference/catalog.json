@@ -9564,7 +9564,7 @@
             "signature": "conn, provider: str, model: str"
           },
           {
-            "description": "A subscription route whose weekly quota is nearly spent, or whose session window is full.",
+            "description": "A subscription route whose weekly quota is spent (provider meter at 100 %), or whose session window is full.",
             "name": "quota_spent",
             "signature": "r: dict"
           },
@@ -17066,10 +17066,10 @@
         ]
       },
       {
-        "comment": "same threshold as the Router's execution.routes (weekly %), mirrored for the trace only",
+        "comment": "same threshold as the Router's execution.routes (the provider's real limit), for the trace only",
         "file": "llm/gateway.py",
         "name": "QUOTA_SWITCH",
-        "value": 90.0
+        "value": 100.0
       },
       {
         "comment": "below it an answer is « uncertain » (Walter Decision's calibration: choice confidence / noul distance)",
@@ -18327,10 +18327,10 @@
         "value": 14
       },
       {
-        "comment": "weekly meter %: above it a subscription route goes after the paid ones (quota nearly spent)",
+        "comment": "weekly meter %: a subscription route goes after the paid ones only at its provider's real limit",
         "file": "serve/execution.py",
         "name": "QUOTA_SWITCH",
-        "value": 90.0
+        "value": 100.0
       },
       {
         "comment": "",
@@ -18944,7 +18944,7 @@
     "llm/config/gateway.json": "8113f9d583ce8a116958f00aee3e53b3bd55f63dd650d9fd8fda70567938a3ab",
     "llm/contracts/llm.json": "d0d9d632257220b819e3402f998ee7ad40e55f9fe6861fca958a16e32758e36c",
     "llm/decision.py": "999ffcf20c7a4598878369e9ad5439b0113b6a0d1b77bf7b0124c44557aba305",
-    "llm/gateway.py": "be9df224c7e9ca49c14e15a7678d693a419840681b58609b020b622e0893aed7",
+    "llm/gateway.py": "5b734b712e8d4be189b1b03818182d387425e9503647f0961e4fd38ad691bb54",
     "llm/resolver.py": "cd04d0c818891381f988d044cc910902ec3fc11e1d1401ad16190e601935d188",
     "llm/structured.py": "4a8e241f6033f6e61753d6090dbc920d28a4fdcf45150140d70fdf169ff742da",
     "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
@@ -19002,7 +19002,7 @@
     "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
-    "serve/execution.py": "bd32cc241c3c1dbf2c7b95617fce3bcdf77a6203658ac9b9420a1b1095483487",
+    "serve/execution.py": "bda52e62df56396fedfd29c23cfaa8711b8967aff3f23ef25505e247cc875225",
     "serve/intent.py": "31e6ba9747d690ee684384c7ae58e9dd54639f2af430d39de0a9b7cf031bf93f",
     "serve/media_exec.py": "2d1cc2912695ec9011219a2f73a6a1832faeea5df23551c34f69ff9b9a111593",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",

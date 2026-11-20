@@ -66,11 +66,14 @@ def reliability(conn, provider: str, model: str) -> dict:
     return {"runs": r["n"], "failed": r["failed"], "unreliable": unreliable}
 
 
-QUOTA_SWITCH = 90.0   # weekly meter %: above it a subscription route goes after the paid ones (quota nearly spent)
+# A subscription is used up to its provider's real limit (owner, 2026-11-20: « aucune réserve artificielle »): its
+# route goes after the paid ones only once the provider's own weekly meter reads 100 % or its session window is
+# full. A real refusal before that (429, usage limit) fails over to the next route in the gateway, call by call.
+QUOTA_SWITCH = 100.0  # weekly meter %: a subscription route goes after the paid ones only at its provider's real limit
 
 
 def quota_spent(r: dict) -> bool:
-    """A subscription route whose weekly quota is nearly spent, or whose session window is full."""
+    """A subscription route whose weekly quota is spent (provider meter at 100 %), or whose session window is full."""
     q = (r.get("subscription") or {}).get("quota_used_percent")
     session = (r.get("subscription") or {}).get("session_used_percent")
     return (q is not None and q >= QUOTA_SWITCH) or (session is not None and session >= 100)
@@ -125,7 +128,7 @@ def host_order(conn, model_id: str, usage: str = "interactive") -> list[dict]:
 def routes(conn, model_id: str, variant: str = "", preferred: str | None = None, usage: str = "interactive",
            modes: list[str] | None = None) -> list[dict]:
     """Every way Hermes can run this chat model, in the owner's order: subscription (while its weekly quota is not
-    nearly spent, always first then), Kie (if not much dearer), OpenRouter last — on its cheapest usable host
+    spent, always first then), Kie (if not much dearer), OpenRouter last — on its cheapest usable host
     (2026-10-22). Paid providers whose last probe failed, or that failed most recent real runs, go to their end. Each route carries its price: the
     subscription's cost price per token, Kie's price, the chosen OpenRouter host's price."""
     snaps = sel.latest_snapshots(conn)

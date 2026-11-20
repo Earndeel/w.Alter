@@ -1071,7 +1071,7 @@ def cost_headers(telemetry: dict) -> dict:
 # One line per request (event "selection") in walter-llm.jsonl: the router's whole plan in order, why each route sits
 # where it does (subscription with quota / spent / paid, probe, reliability), the route that answered and every route
 # passed over before it with its reason. Attempt lines keep their own shape (models.exec_log).
-QUOTA_SWITCH = 90.0   # same threshold as the Router's execution.routes (weekly %), mirrored for the trace only
+QUOTA_SWITCH = 100.0  # same threshold as the Router's execution.routes (the provider's real limit), for the trace only
 
 
 def route_state(route: dict) -> str:

@@ -135,7 +135,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | llm/gateway.py | `_DECISION_CHAIN` | __decision_chain__ |  |
 | llm/gateway.py | `SIGNALS_TTL` | 60.0 |  |
 | llm/gateway.py | `ANTHROPIC_CACHE_POINTS` | [{"location": "message", "role": "system"}, {"index": -1, "location": "message"}] |  |
-| llm/gateway.py | `QUOTA_SWITCH` | 90.0 | same threshold as the Router's execution.routes (weekly %), mirrored for the trace only |
+| llm/gateway.py | `QUOTA_SWITCH` | 100.0 | same threshold as the Router's execution.routes (the provider's real limit), for the trace only |
 | llm/resolver.py | `FLOOR` | 0.6 | below it an answer is « uncertain » (Walter Decision's calibration: choice confidence / noul distance) |
 | llm/resolver.py | `HAS_MIN` | 0.5 | a several-options answer « has » an option at this probability (the consumers' NEED_MIN) |
 | llm/structured.py | `OPENROUTER_DECISIONS` | https://openrouter.ai/api/alpha/decisions |  |
@@ -276,7 +276,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/execution.py | `UNRELIABLE_MIN_RUNS` | 3 |  |
 | serve/execution.py | `UNRELIABLE_FAIL_RATE` | 0.5 |  |
 | serve/execution.py | `RELIABILITY_DAYS` | 14 |  |
-| serve/execution.py | `QUOTA_SWITCH` | 90.0 | weekly meter %: above it a subscription route goes after the paid ones (quota nearly spent) |
+| serve/execution.py | `QUOTA_SWITCH` | 100.0 | weekly meter %: a subscription route goes after the paid ones only at its provider's real limit |
 | serve/execution.py | `_TIMEOUT` | 90 |  |
 | serve/intent.py | `URL` | https://openrouter.ai/api/alpha/decisions |  |
 | serve/intent.py | `MODEL` | ~typesafe/jev-latest |  |

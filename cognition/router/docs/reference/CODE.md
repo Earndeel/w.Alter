@@ -1108,7 +1108,7 @@ Ordered provider routes and execution metadata for Walter consumers.
 
 - `_runnable(offer: dict)` — (Hermes provider, model id at that provider, status key) or None when Hermes cannot run this offer.
 - `reliability(conn, provider: str, model: str)` — Recent real executions of this provider x model (models.exec_log, skipped attempts excluded: walter-llm logs a
-- `quota_spent(r: dict)` — A subscription route whose weekly quota is nearly spent, or whose session window is full.
+- `quota_spent(r: dict)` — A subscription route whose weekly quota is spent (provider meter at 100 %), or whose session window is full.
 - `subscription_exhausted(execution: list[dict])` — The model has subscription routes and every one of them is spent (all accounts).
 - `subscription_accounts(conn)` — route provider -> its subscriptions in declaration order, each with its own quota and cost price. Several
 - `subscription_costs(conn)` — route provider (codex) -> its first subscription: cost price, plan name, quotas (see subscription_accounts).

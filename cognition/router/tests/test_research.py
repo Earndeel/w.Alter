@@ -138,7 +138,7 @@ def test_partial_read_merges_into_the_last_snapshot():
 
 def test_routes_carry_cost_price_quota_and_host_order(monkeypatch):
     """2026-10-22: a subscription route is priced at its cost price and goes after the paid routes once its weekly
-    quota is nearly spent; an OpenRouter route carries the host order the gateway imposes."""
+    quota is spent (provider meter at 100 %, owner 2026-11-20); an OpenRouter route carries the host order the gateway imposes."""
     from walter_router.serve import execution
     from walter_router.store import db
     with db.connect() as conn:
@@ -152,6 +152,10 @@ def test_routes_carry_cost_price_quota_and_host_order(monkeypatch):
             assert orr["or_provider"]["allow_fallbacks"] and orr["or_provider"]["order"][0] == orr["host"]["tag"]
         monkeypatch.setattr(execution, "subscription_accounts", lambda c: {"codex": [{"plan": "P", "ratio_pace": 0.02,
                                                                                       "used_percent": 95.0, "sub_id": "s"}]})
+        rs = execution.routes(conn, "gpt-6-1-sol", "medium")
+        assert rs[0]["access"] == "subscription"        # 2026-11-20: no reserve, used up to the provider's limit
+        monkeypatch.setattr(execution, "subscription_accounts", lambda c: {"codex": [{"plan": "P", "ratio_pace": 0.02,
+                                                                                      "used_percent": 100.0, "sub_id": "s"}]})
         rs = execution.routes(conn, "gpt-6-1-sol", "medium")
         assert rs[0]["access"] != "subscription"
 
