@@ -1,6 +1,8 @@
 """One model reading, guarded. Before any call: the Router must route the poste `devboard_reading` to the required
-provider, and at least one subscription account (`subscription_prefix*`) must have a fresh meter under the pause
-threshold. Otherwise nothing is sent and the caller waits (`Paused`) — never a silent paid fallback.
+provider, and the subscription accounts (`subscription_prefix*`) must not all be at their provider's real limit
+(owner, 2026-11-20: no artificial reserve — a meter at 100 % or a full 5-hour window; an unknown meter lets the call
+go, the provider's own refusal then pauses it). Otherwise nothing is sent and the caller waits (`Paused`) — never a
+silent paid fallback.
 
 The gateway is called with `exact:<picked model>@<required provider>`: the model still comes from the Router, but
 the gateway cannot fall through to another provider. The schema travels in the prompt and is checked here (the
@@ -52,11 +54,14 @@ def _accounts(cfg: Config) -> list[dict]:
     return [s for s in _router("subscriptions", "show") or [] if str(s.get("id", "")).startswith(cfg.subscription_prefix)]
 
 
+REAL_LIMIT = 100.0        # the provider's own meter at its limit: the only "spent" (no reserve, 2026-11-20)
+
+
 def _room(meter: dict | None, cfg: Config) -> bool | None:
-    """True/False = fresh meter under/over the threshold, None = unknown or stale."""
+    """True/False = fresh meter under/at the provider's real limit, None = unknown or stale."""
     if not meter or meter.get("used_percent") is None or float(meter.get("age_s") or 1e9) > FRESH_S:
         return None
-    return float(meter["used_percent"]) < cfg.quota_pause_percent
+    return float(meter["used_percent"]) < REAL_LIMIT
 
 
 def _sessions_window(pick: dict, cfg: Config) -> dict[str, float]:
@@ -71,8 +76,9 @@ def _sessions_window(pick: dict, cfg: Config) -> dict[str, float]:
 
 
 def gate(cfg: Config) -> dict:
-    """Raise Paused unless a call may go; returns the Router pick. An account has room when its weekly meter is
-    fresh and under the threshold, and its 5-hour window too."""
+    """Raise Paused unless a call may go; returns the Router pick. A call goes unless every account is at its real
+    limit (weekly meter at 100 % or 5-hour window full); an account whose meter is unknown may be tried (a real
+    refusal of the call then pauses, see read)."""
     pick = _router("pick", POSTE)
     if pick.get("provider") != cfg.required_provider or not pick.get("model_id"):
         raise Paused("route", f"{POSTE} → {pick.get('provider')}")
@@ -90,16 +96,16 @@ def gate(cfg: Config) -> dict:
     rooms = []
     for a in accounts:
         r = _room(a.get("meter"), cfg)
-        if r and window.get(a["id"], 0.0) >= cfg.quota_pause_percent:
+        if r is not False and window.get(a["id"], 0.0) >= REAL_LIMIT:
             r = False
         rooms.append(r)
-    if any(rooms):
+    if not accounts:
+        raise Paused("unknown_quota", "no account")
+    if any(r is not False for r in rooms):
         return pick
-    if any(r is False for r in rooms):
-        raise Paused("quota", ", ".join(
-            f"{a['id']} {a['meter']['used_percent']}% (5 h : {window.get(a['id'], '?')}%)"
-            for a, r in zip(accounts, rooms) if r is False))
-    raise Paused("unknown_quota", ", ".join(a.get("id", "?") for a in accounts) or "no account")
+    raise Paused("quota", ", ".join(
+        f"{a['id']} {(a.get('meter') or {}).get('used_percent', '?')}% (5 h : {window.get(a['id'], '?')}%)"
+        for a in accounts))
 
 
 def _token(cfg: Config) -> str:

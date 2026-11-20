@@ -1,5 +1,5 @@
 """Model calls and their guards: the Router must route the poste to the required provider, one subscription
-account must have room under the pause threshold, a reading is never asked twice, the route header is checked and
+account must be below its provider's real limit (no reserve, 2026-11-20), a reading is never asked twice, the route header is checked and
 an invalid answer is retried once. walter-router and the gateway are simulated."""
 import json  # noqa: F401
 
@@ -18,8 +18,10 @@ def ask(conn, key="k1", validate=lambda r: None):
                     prompt=[{"role": "user", "content": "lis"}], schema={"type": "object"}, validate=validate)
 
 
-def test_gate_pauses_at_70(router):
-    router["subs"] = subs(70.0, 100.0)
+def test_gate_has_no_artificial_reserve_and_pauses_only_at_the_real_limit(router):
+    router["subs"] = subs(95.0, 100.0)
+    llm.gate(CFG)                                    # 95 %: still usable (no reserve)
+    router["subs"] = subs(100.0, 100.0)
     with pytest.raises(llm.Paused) as e:
         llm.gate(CFG)
     assert e.value.reason == "quota"
@@ -38,18 +40,15 @@ def test_gate_pauses_on_wrong_provider(router, gateway, conn):
     assert gateway["posts"] == []
 
 
-def test_gate_unknown_quota(router):
+def test_gate_unknown_quota_lets_the_call_go(router):
+    """No reading is not a limit: the call goes and the provider's own refusal (429) pauses it (read)."""
     router["subs"] = [{"id": "anthropic-pro", "meter": None}]
-    with pytest.raises(llm.Paused) as e:
-        llm.gate(CFG)
-    assert e.value.reason == "unknown_quota"
+    llm.gate(CFG)
 
 
 def test_gate_refreshes_stale_meter(router):
     router["subs"] = subs(49.0, age=5000.0)
-    with pytest.raises(llm.Paused) as e:   # still stale after refresh → unknown
-        llm.gate(CFG)
-    assert e.value.reason == "unknown_quota"
+    llm.gate(CFG)                          # still stale after refresh → unknown, which is not a limit
     assert ("subscriptions", "refresh", "anthropic-pro") in router["calls"]
 
 
@@ -138,17 +137,17 @@ def test_gateway_failure_is_a_pause_not_an_attempt(router, gateway, conn, answer
 
 
 def test_gate_pauses_on_the_five_hour_window(router):
-    """The weekly meter has room but the session window (shared with the owner's own Claude use) is at 80 %."""
+    """The weekly meter has room but the session window (shared with the owner's own Claude use) is full."""
     router["subs"] = subs(100.0, 57.0)
     router["pick"] = {**router["pick"], "execution": [
         {"provider": "claude-pro", "account": "anthropic-pro-2",
-         "subscription": {"account": "anthropic-pro-2", "quota_used_percent": 57.0, "session_used_percent": 80.0}},
+         "subscription": {"account": "anthropic-pro-2", "quota_used_percent": 57.0, "session_used_percent": 100.0}},
         {"provider": "claude-pro", "account": "anthropic-pro",
          "subscription": {"account": "anthropic-pro", "quota_used_percent": 100.0, "session_used_percent": 0.0}}]}
     with pytest.raises(llm.Paused) as e:
         llm.gate(CFG)
     assert e.value.reason == "quota"
-    router["pick"]["execution"][0]["subscription"]["session_used_percent"] = 40.0
+    router["pick"]["execution"][0]["subscription"]["session_used_percent"] = 95.0
     assert llm.gate(CFG)["model_id"] == "claude-haiku-5-5"
 
 

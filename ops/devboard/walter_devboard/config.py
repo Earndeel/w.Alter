@@ -19,7 +19,6 @@ class Config:
     dsn: str = field(default_factory=lambda: os.environ.get("WALTER_DEVBOARD_DATABASE_URL", DEFAULT_DSN))
     required_provider: str = "claude-pro"
     subscription_prefix: str = "anthropic-pro"
-    quota_pause_percent: float = 70.0
     idle_minutes: int = 30
     stale_days: int = 7
     since: str = "2026-10-01"

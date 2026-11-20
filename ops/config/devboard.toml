@@ -1,8 +1,7 @@
 # ops/devboard defaults (neutral). The instance overrides them in `walter instance config ops devboard.toml`.
 [devboard]
 required_provider = "claude-pro"      # subscription provider the board's model calls must run on (no paid fallback)
-subscription_prefix = "anthropic-pro" # Router subscriptions whose meter gates the calls (any one with room is enough)
-quota_pause_percent = 70
+subscription_prefix = "anthropic-pro" # Router subscriptions the calls run on (paused only when all are at their real limit)
 idle_minutes = 30                     # a session is read after this much calm
 stale_days = 7                        # an in-progress chantier without activity for this long is flagged
 since = "2026-10-01"

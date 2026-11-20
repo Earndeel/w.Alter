@@ -13,7 +13,7 @@
   des dépôts de modules, sessions de walter-logs (`walter-memory logs digest`), état des modules (`walter status`).
 - **Avec un modèle** : le poste du Router `devboard_reading` (épinglé par le propriétaire, sur abonnement) lit le condensé des sessions de technicien (Claude Code ouvert dans le dossier de technicien (`technician_cwd`), Codex) et en tire les
   chantiers ; il lit chaque nouvelle décision pour savoir laquelle elle remplace. Appel
-  `exact:<modèle du pick>@claude-pro` : jamais de repli payant. Pause quand tous les comptes Pro sont à ≥ 70 %.
+  `exact:<modèle du pick>@claude-pro` : jamais de repli payant. Pause seulement quand tous les comptes Pro sont à leur limite réelle (compteur à 100 % ou fenêtre de 5 h pleine) ; un refus réel (429) met aussi en pause.
 - **Preuves** : chaque carte cite sa source (session#seq, décision, commit, tâche). Une correction de le propriétaire
   (`devboard_correct`) l'emporte toujours.
 
