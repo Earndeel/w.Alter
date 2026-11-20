@@ -75,3 +75,24 @@ ssh mac 'cd ~/walter-tv && python3 stremio.py "TITLE" … --state'
   `(nowELAPSED − updated) × speed` from `dumpsys alarm` (raw 12:12 vs computed 38:43 on 2026-10-26).
 - Tests: 22 local checks (selection, VOSTFR, French-only preference, probe verdicts, kept track, `--match`,
   URL masking). `--list`, `--probe`, `--state` were run read-only on the real dongle on 2026-10-26.
+
+## Diagnose the D6 before installing controller-dependent apps
+
+- Route D6 ADB operations through the Mac SSH alias `mac`, using `/usr/local/bin/adb`. The D6 used in this session was `192.168.1.38:5555`; revalidate the address before acting. Do not confuse it with the other TV device previously addressed at `192.168.1.37:5555`.
+- Inspect Bluetooth support before installing game-streaming software. Run from the VM:
+
+```sh
+ssh -o BatchMode=yes -o ConnectTimeout=4 mac 'sh -s' <<'SH'
+adb=/usr/local/bin/adb
+device=192.168.1.38:5555
+"$adb" connect "$device"
+"$adb" -s "$device" shell -n 'echo FEATURES; pm list features | grep -i bluetooth; echo SERVICES; service list | grep -i bluetooth; echo SETTINGS; cmd package resolve-activity --brief -a android.settings.BLUETOOTH_SETTINGS; echo STATE; settings get global bluetooth_on; echo PACKAGES; pm list packages -u | grep -i bluetooth; echo DISABLED; pm list packages -d | grep -i bluetooth; echo HAL; lshal 2>/dev/null | grep -i bluetooth'
+SH
+```
+
+- Use `shell -n` and redirect `exec-out` stdin from `/dev/null` when ADB runs inside an SSH heredoc, so it cannot consume the remaining script.
+- Expect intermittent ADB `error: closed` on this route. Retry at most three times. Between attempts, reconnect with `adb connect "$device"`. If necessary, restart the Mac ADB server with `/usr/local/bin/adb kill-server` followed by `/usr/local/bin/adb start-server`, then reconnect. A server restart affects all Mac ADB clients: do not do it concurrently with another deployment or capture.
+- Do not infer missing physical Bluetooth hardware from `bluetooth_on=0` alone. Compare feature declarations, services, packages, HAL output and Settings activity resolution. If no usable adapter is exposed, describe that firmware-level observation rather than claiming hardware absence.
+- Treat application launch, licence activation and controller pairing as separate checks. PXPlay's package is `psplay.grill.com`; its observed TV activity is `psplay.grill.com/com.grill.psplay.TvMainActivity`. Launch with `adb -s "$device" shell -n 'am start -W -n psplay.grill.com/com.grill.psplay.TvMainActivity'`, then inspect the screen. This session reached an activation screen requiring an APK licence; opening the app did not activate it.
+- Capture a screenshot through the Mac with `ssh -o BatchMode=yes mac '/usr/local/bin/adb -s 192.168.1.38:5555 exec-out screencap -p </dev/null' > /tmp/d6-screen.png`. Check the SSH exit status and inspect the image before reporting success; retry transport failures rather than accepting an empty capture.
+- If Monsieur requests removal, uninstall with `adb -s "$device" uninstall psplay.grill.com` and verify its absence with `adb -s "$device" shell -n 'pm path psplay.grill.com'`. Removing an APK does not remove its custom Paysages launcher tile. Inspect `/apps/sagora/tv/launcher/src/local/codex/depthhome/MainActivity.java` and `/apps/sagora/tv/launcher/build_depth_home.py`; remove the obsolete tile separately, use the established signed launcher deployment procedure, and verify the resulting home screen. Do not reconstruct signing credentials or rely on session-specific `/tmp` build directories.
