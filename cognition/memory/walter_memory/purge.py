@@ -130,7 +130,35 @@ def select_targets(conn, *, event_ids=None, object_refs=None, pattern=None, sess
     if t["event"]:
         t["derived"] += [r["item_id"] for r in conn.execute(
             "select item_id from core.derived_items where source_event_ids && %s::uuid[]", (t["event"],)).fetchall()]
+    if t["derived"]:
+        t["derived"] += _built_from(conn, [str(x) for x in t["derived"]], t["event"], pattern)
     return {k: sorted({str(x) for x in v}) for k, v in t.items()}
+
+
+def _built_from(conn, derived: list[str], events: list, pattern: str | None) -> list[str]:
+    """Knowledge built only from other knowledge (no source event of its own: an episode's facets…) that sits in a
+    view citing the purged knowledge and quotes it (`_quotes`) goes with it — 20/11: the facets of a purged plan's
+    episode kept naming the test contact. Knowledge with its own sources is never taken this way: it is purged only
+    through its events, an id or the pattern."""
+    quotes = _quotes(conn, derived, events, pattern)
+    if not quotes:
+        return []
+    found: set[str] = set()
+    frontier = set(derived)
+    for _ in range(3):    # facet of an episode of a plan…: a few levels at most
+        rows = conn.execute(
+            """select distinct d.item_id::text id, d.content from views.evidence e
+               join views.evidence e2 on e2.view_key = e.view_key and e2.ref_kind = 'derived'
+               join core.derived_items d on d.item_id::text = e2.ref_id
+               where e.ref_kind = 'derived' and e.ref_id = any(%s::text[]) and not (e2.ref_id = any(%s::text[]))
+                 and cardinality(d.source_event_ids) = 0""",
+            (sorted(frontier), sorted(set(derived) | found))).fetchall()
+        new = {r["id"] for r in rows if any(q in _norm(r["content"]) for q in quotes)}
+        if not new:
+            break
+        found |= new
+        frontier = new
+    return sorted(found)
 
 
 def present(conn, led: dict[str, set[str]]) -> dict:
@@ -250,6 +278,17 @@ def _remove(conn, t: dict) -> dict:
                    from unnest(%s::text[], %s::text[], %s::int[]) e(view_key, depth, version)
                    where x.view_key = e.view_key and x.depth = e.depth and x.version = e.version""",
                 (MARK, [e[0] for e in exposed], [e[1] for e in exposed], [e[2] for e in exposed])).rowcount
+        # what was built from them (episodes, periods…) is recomputed: the publish trigger fires on insert and update
+        # only, so a purge publishes each deletion itself, in the payload shape of core.publish_derived (ids, kinds
+        # and dates, no text) — 20/11: a purged plan otherwise left its episode and December's periods quoting it
+        n["dependents_published"] = conn.execute(
+            """insert into bus.events (type, source, subject, payload)
+               select 'memory.derived', 'memory', d.item_id::text,
+                      jsonb_build_object('op', 'delete', 'kind', d.kind, 'derived_by', d.derived_by, 'status', 'purged',
+                                         'old_status', d.status, 'epistemic', d.epistemic, 'privacy_class', d.privacy_class,
+                                         'at', coalesce(d.valid_from, d.created_at), 'end', d.attributes->>'end',
+                                         'owner_messages', d.attributes->>'owner_messages')
+               from core.derived_items d where d.item_id = any(%s::uuid[]) and d.generation = 'g1'""", (dv,)).rowcount
         n["derived"] = conn.execute("delete from core.derived_items where item_id = any(%s::uuid[])", (dv,)).rowcount
     refs = [*ev, *dv, *ob]
     if refs:

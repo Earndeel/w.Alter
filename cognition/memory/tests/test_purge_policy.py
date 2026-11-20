@@ -117,3 +117,43 @@ def test_purge_reingest_restore_reapply():
 def test_exposure_never_changes_backups():
     rep = purge.exposure()
     assert rep and all(b["automatic_change"] is False for b in rep)
+
+
+def test_what_is_built_only_from_purged_knowledge_goes_with_it_and_its_dependents_are_recomputed():
+    """20/11: purging a test contact left the facets of his plan's episode (built from the plan alone, no event of
+    their own) naming him, and nothing told the episodes and periods that the plan was gone (the publish trigger fires
+    on insert and update only). A real item in the same view, with its own sources, is never taken along."""
+    run = uuid.uuid4().hex[:10]
+    name = f"Pytestine Purgeable {run}"
+    ev, real_ev = events.record_events([_ev(f"x{run}", f"{name} propose un café le 12"),
+                                        _ev(f"y{run}", f"un vrai souvenir qui cite {name} aussi")])["event_ids"]
+    with connect() as conn:
+        ent = conn.execute("insert into core.entities (entity_type, canonical_name) values ('person', %s) returning entity_id",
+                           (name,)).fetchone()["entity_id"]
+        plan = conn.execute("""insert into core.derived_items (kind, content, status, derived_by, source_event_ids,
+                                   subject_entity_ids, generation) values ('plan', %s, 'derived', 'pytest', %s::uuid[],
+                                   %s::uuid[], 'g1') returning item_id""",
+                            (f"Projet : café avec {name}", [ev], [ent])).fetchone()["item_id"]
+        facet = conn.execute("""insert into core.derived_items (kind, content, status, derived_by, generation)
+                                values ('facet', %s, 'derived', 'pytest', 'g1') returning item_id""",
+                             (f"avec {name}",)).fetchone()["item_id"]
+        real = conn.execute("""insert into core.derived_items (kind, content, status, derived_by, source_event_ids)
+                               values ('fact', %s, 'derived', 'pytest', %s::uuid[]) returning item_id""",
+                            (f"un vrai souvenir qui cite {name}", [real_ev])).fetchone()["item_id"]
+        view = f"pytest-episode:{run}"
+        conn.execute("insert into views.view (view_key, domain, horizon, title, status) values (%s, 'projects', 'long', 't', 'active')", (view,))
+        for ref, role in ((plan, "support"), (facet, "facet"), (real, "support")):
+            conn.execute("""insert into views.evidence (view_key, ref_kind, ref_id, role, privacy_class, added_by)
+                            values (%s, 'derived', %s, %s, 'cloud_allowed', 'pytest')""", (view, str(ref), role))
+    dry = purge.purge(reason="pytest", requested_by="pytest", event_ids=[str(ev)])
+    assert dry["counts"]["derived"] == 2                       # the plan and its facet, not the real item
+    purge.purge(reason="pytest", requested_by="pytest", event_ids=[str(ev)], execute=True)
+    with connect() as conn:
+        left = {str(r["item_id"]) for r in conn.execute("select item_id from core.derived_items where item_id = any(%s::uuid[])",
+                                                         ([plan, facet, real],))}
+        pub = conn.execute("""select payload from bus.events where type = 'memory.derived' and subject = %s
+                              and payload->>'op' = 'delete'""", (str(plan),)).fetchone()
+        conn.execute("delete from core.derived_items where item_id = %s", (real,))
+        conn.execute("delete from core.entities where entity_id = %s", (ent,))
+    assert left == {str(real)}
+    assert pub and pub["payload"]["kind"] == "plan" and pub["payload"]["status"] == "purged" and name not in json.dumps(pub["payload"])
