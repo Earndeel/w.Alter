@@ -43,7 +43,7 @@ def with_execution(conn, out: dict) -> dict:
         out["openrouter_id"] = media_exec.openrouter_id(conn, out["model_id"])
     elif out.get("model_id") and task and task["interface"] in ("video", "image", "audio", "music"):
         from walter_router.serve import media_exec  # media: provider order of the model (the fallback = its next provider; another model only when declared)
-        cfg = media_exec._models().get(out["model_id"]) or {}
+        cfg = media_exec._models(conn).get(out["model_id"]) or {}
         mode = {"text_to_video": "t2v", "image_to_video": "i2v", "text_to_image": "t2i", "image_edit": "i2i"}.get(out["task"])
         out["providers"] = media_exec.choose_provider(conn, out["model_id"], task["interface"], None,
                                                       bool((cfg.get("kie") or {}).get(mode)),

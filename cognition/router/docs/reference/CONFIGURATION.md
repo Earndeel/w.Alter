@@ -46,6 +46,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/select.py | `DEFAULT_EFFORTS` | ["medium", "high"] | assumed effort when a leaderboard lists a model without one (flagged) |
 | analysis/select.py | `BENCH_KIND` | {"aa_decision": "aa_decision", "aa_eval": "aa_eval", "aa_intelligence": "aa", "aa_mm": "mm", "aa_stt": "aa_stt", "agentset": "agentset", "arena": "arena", "bridgebench": "bridgebench", "da_agents": "da", "da_models": "da", "mteb": "mteb"} |  |
 | analysis/select.py | `BOARD_GRACE_DAYS` | 21 |  |
+| analysis/select.py | `AA_MEDIA_COST_UNITS` | {"usd_per_image": "image", "usd_per_second": "video"} |  |
 | analysis/select.py | `QUOTA_WHY` | {"L2": "abonnements : meilleur modèle d'un autre abonnement que L3, moins cher par tâche que L3, tant que son quota dure", "L3": "abonnements : choix de la méthode parmi les modèles d'abonnement, tant que son quota dure"} |  |
 | analysis/select.py | `MEDIA_EXEC_INTERFACES` | ["image", "video", "audio", "music"] |  |
 | analysis/select.py | `LEVEL_WORDS` | ["high", "latest", "low", "max", "medium", "minimal", "preview", "xhigh"] |  |
@@ -291,6 +292,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | serve/media_exec.py | `OPENROUTER` | https://openrouter.ai/api/v1 |  |
 | serve/media_exec.py | `KIE_USD_PER_CREDIT` | 0.005 | 6 credits = 0.03 $ (Sunburst 1K, 2026-10-02) |
 | serve/media_exec.py | `TIMEOUTS` | {"audio": 300, "image": 360, "music": 600, "video": 1200} |  |
+| serve/media_exec.py | `OPENROUTER_MODES` | {"image": ["t2i"], "video": ["t2v", "i2v", "r2v"]} | what run_openrouter sends (no input image) |
 | serve/media_exec.py | `FALLBACK_COST_X` | 2.0 |  |
 | serve/named.py | `PROVIDERS` | {"arnict": "arnict", "chatgpt": "codex", "codex": "codex", "flow": "google-flow", "google-flow": "google-flow", "kie": "kie", "kie-codex": "kie", "kie.ai": "kie", "openai-codex": "codex", "openrouter": "openrouter", "venice": "venice"} |  |
 | serve/named.py | `DEFAULT_TASK` | {"audio": "tts", "chat": "general", "image": "text_to_image", "music": "music", "video": "text_to_video"} |  |

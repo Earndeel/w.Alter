@@ -173,7 +173,7 @@ def test_successor_family_and_runnable_selection(conn):
     assert not sel.same_line("gpt-image-2-5", "gpt-image-2")
     best = conn.execute("""select model_id from models.selection where run_id = (select run_id from models.latest_run)
                            and task = 'logo' and level = 'best' and rank = 1""").fetchone()
-    assert best and best["model_id"] in media_exec._models()
+    assert best and best["model_id"] in media_exec._models(conn)
 
 
 def test_level_poste_follows_the_owners_text_tier(conn):

@@ -266,7 +266,7 @@ def _route_line(conn, a: dict, c: dict) -> list[str]:
         return []
     from walter_router.serve import media_exec
     try:
-        cfg = media_exec._models().get(a["subject"]) or {}
+        cfg = media_exec._models(conn).get(a["subject"]) or {}
         mode = {"text_to_video": "t2v", "image_to_video": "i2v", "text_to_image": "t2i", "image_edit": "i2i"}.get(a["task"])
         order = media_exec.choose_provider(conn, a["subject"], c["interface"], None,
                                            bool((cfg.get("kie") or {}).get(mode)), media_exec.openrouter_id(conn, a["subject"]))

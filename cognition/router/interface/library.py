@@ -180,7 +180,7 @@ def boards_of(conn, task: str) -> tuple[str, str]:
 def rows(conn) -> list[dict]:
     from walter_router.serve.routes import with_execution   # late import (cli -> library)
     offers = sel.load_offers(conn, sel.latest_snapshots(conn))
-    runnable = set(media_exec._models())
+    runnable = set(media_exec._models(conn))
     hosts = best_hosts(conn)
     out = []
     for e in conn.execute(f"""select t.task, t.label, t.interface, t.modes, p.role, p.pinned_model_id, p.label as role_label,
@@ -246,7 +246,7 @@ def rows(conn) -> list[dict]:
             row["subscription"] = subscription_label(main) or (subscription_label(fb) + " (secours)"
                                                                  if subscription_label(fb) else "—")
         elif iface in sel.MEDIA_EXEC_INTERFACES:
-            cfg = media_exec._models().get(mid) or {}
+            cfg = media_exec._models(conn).get(mid) or {}
             mode = MODES.get(task)
             order = media_exec.choose_provider(conn, mid, iface, None, bool((cfg.get("kie") or {}).get(mode)),
                                                media_exec.openrouter_id(conn, mid)) if cfg else []

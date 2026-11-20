@@ -6595,9 +6595,19 @@
             "signature": "offers: list[dict], modes: list[str] | None=None"
           },
           {
+            "description": "AA's list price of a media model in the interface's comparable unit (image: $/image, video: $/second), from its",
+            "name": "media_list_costs",
+            "signature": "conn, snaps: dict[str, int]"
+          },
+          {
+            "description": "",
+            "name": "_token_billed",
+            "signature": "o: dict"
+          },
+          {
             "description": "Cheapest generation offer in the interface's comparable unit (video per second, image per image), restricted",
             "name": "media_route",
-            "signature": "offers: list[dict], interface: str, modes: list[str] | None=None"
+            "signature": "offers: list[dict], interface: str, modes: list[str] | None=None, list_cost: float | None=None"
           },
           {
             "description": "",
@@ -7310,6 +7320,11 @@
             "description": "First provider in clear, the rest folded under « Ensuite : … », fallback on its own line.",
             "name": "_route_block",
             "signature": "providers: str | None, fallback: str | None=None"
+          },
+          {
+            "description": "The Pareto frontier of the same points priced at AA's official cost — the owner's method (tiers.frontier, same",
+            "name": "aa_frontier",
+            "signature": "points: list[dict]"
           },
           {
             "description": "",
@@ -9636,9 +9651,14 @@
         "file": "serve/media_exec.py",
         "functions": [
           {
-            "description": "",
+            "description": "The media executors: config/media_models.json (Kie paths, prompt styles, workflows), plus — given a DB",
             "name": "_models",
-            "signature": ""
+            "signature": "conn=None"
+          },
+          {
+            "description": "A configured executor keeps its own paths; a derived (OpenRouter-only) one runs only the modes it declares.",
+            "name": "supports",
+            "signature": "cfg: dict, modes: list[str] | None"
           },
           {
             "description": "",
@@ -15513,6 +15533,15 @@
       {
         "comment": "",
         "file": "analysis/select.py",
+        "name": "AA_MEDIA_COST_UNITS",
+        "value": {
+          "usd_per_image": "image",
+          "usd_per_second": "video"
+        }
+      },
+      {
+        "comment": "",
+        "file": "analysis/select.py",
         "name": "QUOTA_WHY",
         "value": {
           "L2": "abonnements : meilleur modèle d'un autre abonnement que L3, moins cher par tâche que L3, tant que son quota dure",
@@ -18394,6 +18423,21 @@
         }
       },
       {
+        "comment": "what run_openrouter sends (no input image)",
+        "file": "serve/media_exec.py",
+        "name": "OPENROUTER_MODES",
+        "value": {
+          "image": [
+            "t2i"
+          ],
+          "video": [
+            "t2v",
+            "i2v",
+            "r2v"
+          ]
+        }
+      },
+      {
         "comment": "",
         "file": "serve/media_exec.py",
         "name": "FALLBACK_COST_X",
@@ -18825,8 +18869,8 @@
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
     "analysis/refresh.py": "dcc93f5a5ac7a7f89177ec1a8900c669b499585c5dc31df1aba7c2608d0e3a1f",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
-    "analysis/select.py": "d144ffd109701a68864467208a4ece10a02a4d34cc6421d232b8792fd1e85bd2",
-    "analysis/telegram.py": "7d6224219b10f0568d76bf652375c7f58e1278a191c9d5933960f5d4d7c69fb5",
+    "analysis/select.py": "cf2df58a9b52983ac90aee39bc5d3f1164ea7503761c3b220e294248224dbfb2",
+    "analysis/telegram.py": "d540335c619255933a50b0dde50400329a6adf9a5e78559f49f40eb59b105cdf",
     "analysis/tiers.py": "a21de3334f3580930208ccc43aea948bf33997c154209f1779db92cfe0d52f2a",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
     "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
@@ -18855,8 +18899,8 @@
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "instance.py": "81fc40b3bf9914f5246d0bb16f0a750141432127b6e03716546aebfc6f991724",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
-    "interface/library.py": "de071359c937ba6a9c5167b98e34beebbb0f0b4b510e1cfb885d2a558a59addc",
-    "interface/page.py": "e8d655bd694a122b7c23ed2ae9d1cdabb9f74070335a7ee72cf258ce4a7b7bd8",
+    "interface/library.py": "813c6a027d1cd98e071dedc1f9f3200c779d1dbf90b82e8078f514b51f1971e0",
+    "interface/page.py": "bb971afacc0390f30efb511d52441d41bf82eca1377a9930304cbb00452b275c",
     "interface/site/functions/_middleware.js": "7698f9a6d90639f63790b347aaa8d4b7473f128e5ac2f130158481768217a12f",
     "interface/site/functions/api/consumption.js": "84af305ac0a0d70a56bf142c08d5332d793d3acdfe280776f3f2f58919ddb9ad",
     "interface/site/functions/api/lock.js": "7a5f1ca04741451016686e4f10a7416692d842e3bc0823cc27321f64111529a3",
@@ -18929,10 +18973,10 @@
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "bda52e62df56396fedfd29c23cfaa8711b8967aff3f23ef25505e247cc875225",
     "serve/intent.py": "31e6ba9747d690ee684384c7ae58e9dd54639f2af430d39de0a9b7cf031bf93f",
-    "serve/media_exec.py": "2d1cc2912695ec9011219a2f73a6a1832faeea5df23551c34f69ff9b9a111593",
+    "serve/media_exec.py": "91bd46fb1566d24eaabaf2cd3d3d933db3a66d1578e37434f1a62e4f9c6bcd8c",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",
-    "serve/routes.py": "d0c7dc71e713c6a7f1dfea8f4c1bba8f0225dbd6fb03c310c1fe4f3607f54ed6",
+    "serve/routes.py": "98c17c13bd577139a975853df23f8e9c3424f7edf84eb6079ceafbbaf7456365",
     "serve/run.py": "ed428ba8c3dda62ccca7450aa54560841acc2c998349ee5ecb7df21f4551403f",
     "serve/web.py": "a7c4019f149f362fb5a9f6edf99bf798af9cf12447d9da13b3f39435ec3303dd",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",

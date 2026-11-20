@@ -151,15 +151,48 @@ def decision_route(offers: list[dict], modes: list[str] | None = None) -> dict[s
     return {"callable": bool(best), "paid": route, "subscription": None}
 
 
-def media_route(offers: list[dict], interface: str, modes: list[str] | None = None) -> dict[str, Any]:
+AA_MEDIA_COST_UNITS = {"usd_per_image": "image", "usd_per_second": "video"}
+
+
+def media_list_costs(conn, snaps: dict[str, int]) -> dict[tuple[str, str], float]:
+    """AA's list price of a media model in the interface's comparable unit (image: $/image, video: $/second), from its
+    best-scored row on AA's media boards: (interface, model_id) -> cost. The reference a token-billed offer is
+    priced at (media_route)."""
+    out: dict[tuple[str, str], float] = {}
+    best: dict[tuple[str, str], float] = {}
+    if "mm" not in snaps:
+        return out
+    for r in conn.execute("""select model_id, score, cost, cost_unit from models.benchmarks
+                             where snapshot_id = %s and benchmark = 'aa_mm' and cost is not null""", (snaps["mm"],)):
+        iface = AA_MEDIA_COST_UNITS.get(r["cost_unit"])
+        k = (iface, r["model_id"])
+        if iface and (k not in best or (r["score"] or 0) > best[k]):
+            best[k], out[k] = r["score"] or 0, r["cost"]
+    return out
+
+
+def _token_billed(o: dict) -> bool:
+    pricing = o.get("pricing") if isinstance(o.get("pricing"), dict) else {}
+    return any(float(pricing.get(k) or 0) > 0 for k in ("image_output", "completion"))
+
+
+def media_route(offers: list[dict], interface: str, modes: list[str] | None = None,
+                list_cost: float | None = None) -> dict[str, Any]:
     """Cheapest generation offer in the interface's comparable unit (video per second, image per image), restricted
-    to the task's generation modes; input fees, upscales, extensions and free auxiliary SKUs never count."""
+    to the task's generation modes; input fees, upscales, extensions and free auxiliary SKUs never count.
+
+    An OpenRouter offer billed per token (GPT Image 2.6, MAI-Image 2.7…: no price per image) is priced at AA's list
+    price per image (`list_cost`, media_list_costs): OpenRouter mirrors first-party pricing, as for chat_route. Without
+    it such a model had no comparable cost and newer image models never reached the library (2026-11-20)."""
     want = MEDIA_UNITS.get(interface)
     paid = []
     for o in offers:
         if o["interface"] != interface:
             continue
         f = _fields(o)
+        if f["offer_kind"] == "generation" and f["norm_price"] is None and list_cost is not None \
+                and o["provider"] == "openrouter" and _token_billed(o):
+            f = {**f, "norm_price": list_cost, "norm_unit": want, "basis": "aa_list_price_token_billed"}
         if f["offer_kind"] != "generation" or f["norm_price"] is None or not media.compatible(f["modes"], modes):
             continue
         if want and f["norm_unit"] != want:
@@ -306,7 +339,8 @@ def _best_by_composite(conn, t: dict, snaps: dict, offers: dict, cands: list[dic
         else:
             mo = offers.get(mid, [])
             route = chat_route(mo, None, t["modes"]) if t["interface"] == "chat" else decision_route(mo, t["modes"]) \
-                if t["interface"] == "decisions" else media_route(mo, t["interface"], t["modes"])
+                if t["interface"] == "decisions" else media_route(mo, t["interface"], t["modes"],
+                                                                 media_list_costs(conn, snaps).get((t["interface"], mid)))
             if not route["callable"]:
                 continue
             cost, variant = route_cost(route) if t["interface"] == "chat" else (route["paid"] or {}).get("cost"), ""
@@ -357,8 +391,9 @@ def _executable_first(conn, t: dict, ranked: list[dict], offers: dict) -> list[d
     """The owner (2026-10-14, logo): the best measured model must be one Walter can run; and when a newer version of
     it exists, runs and is not benchmarked on this task yet, it goes first with a warning (GPT Image 2 measured on
     the logo board, GPT Image 2.5 Sunburst not yet: Sunburst, « version supérieure pas encore classée »)."""
-    from walter_router.serve.media_exec import _models   # late import (media_exec -> select)
-    runnable = {m for m, c in _models().items() if c.get("kind") in ("image", "video", "audio", "music")}
+    from walter_router.serve.media_exec import _models, supports   # late import (media_exec -> select)
+    runnable = {m for m, c in _models(conn).items() if c.get("kind") in ("image", "video", "audio", "music")
+                and supports(c, t["modes"])}
     pinned = {r["pinned_model_id"] for r in conn.execute("select pinned_model_id from models.preferences "
                                                          "where pinned_model_id is not null")}
     # 'measured' = on the task's own board (DA logo for logo), not only on a generic board it borrows weight from
@@ -372,11 +407,15 @@ def _executable_first(conn, t: dict, ranked: list[dict], offers: dict) -> list[d
         top, fam = top_measured[0], family(top_measured[0]["model_id"])
         newer = [m for m in runnable if m not in measured and fam and same_line(top["model_id"], m)
                  and any(o["interface"] == t["interface"] for o in offers.get(m, []))]
-        newer.sort(key=lambda m: (m in pinned, family(m)[1]), reverse=True)
+        # same version (GPT Image 2.6 Flare / Sunburst): the better on the boards this task borrows weight from
+        from walter_router.analysis.scoring import composite  # late import (scoring -> select)
+        borrowed = {c["model_id"]: c["composite"] for c in composite(conn, t["task"])} if len(newer) > 1 else {}
+        newer.sort(key=lambda m: (m in pinned, family(m)[1], borrowed.get(m, -1.0), m), reverse=True)
         if newer:
             name = conn.execute("select coalesce(display_name, model_id) as n from models.canonical where model_id = %s",
                                 (newer[0],)).fetchone()
-            route = media_route(offers.get(newer[0], []), t["interface"], t["modes"])
+            route = media_route(offers.get(newer[0], []), t["interface"], t["modes"],
+                                media_list_costs(conn, latest_snapshots(conn)).get((t["interface"], newer[0])))
             paid = route.get("paid") or {}
             out.append({**top, "model_id": newer[0], "variant": "", "display_name": name["n"] if name else newer[0],
                         "quality": None, "real_cost": paid.get("cost"), "cost_unit": paid.get("unit"),
@@ -416,6 +455,7 @@ def compute(conn) -> list[dict]:
     snaps = latest_snapshots(conn)
     offers = load_offers(conn, snaps)
     intel = _intelligence_index(conn, snaps, offers)
+    list_costs = media_list_costs(conn, snaps)
     # 'level' postes follow a text tier of 'general' (choose.pick): nothing of their own to rank here
     tasks = list(conn.execute("""select * from models.tasks where quality_benchmark is not null
                                  and default_objective <> 'level'"""))
@@ -447,7 +487,7 @@ def compute(conn) -> list[dict]:
                 route = decision_route(mo, t["modes"])
                 cost_unit = "usd_per_1m_input_tokens"
             else:
-                route = media_route(mo, t["interface"], t["modes"])
+                route = media_route(mo, t["interface"], t["modes"], list_costs.get((t["interface"], b["model_id"])))
                 cost_unit = (route["paid"] or {}).get("unit")
             if not route["callable"]:
                 continue

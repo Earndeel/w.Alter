@@ -82,6 +82,15 @@ def _route_block(providers: str | None, fallback: str | None = None) -> str:
     return html_
 
 
+def aa_frontier(points: list[dict]) -> list[dict]:
+    """The Pareto frontier of the same points priced at AA's official cost — the owner's method (tiers.frontier, same
+    floor margin as the stored real-cost frontier). The real-cost frontier drawn at official prices zigzags: a cheap
+    subscription point is not cheap at list price (2026-11-20, « le pareto … c'est n'importe quoi »)."""
+    from walter_router.analysis import tiers
+    f = tiers.frontier([{**p, "cost": p["cost_aa"]} for p in points if p.get("cost_aa")])
+    return [{**p, "cost_aa": p["cost"]} for p in f if p["score"] >= tiers.QUALITY_FLOOR - 5]
+
+
 def _chart(points: list[dict], frontier: list[dict], levels: dict[str, dict], key: str = "cost") -> str:
     points = [{**p, "cost": p[key]} for p in points if p.get(key)]
     frontier = [{**p, "cost": p[key]} for p in frontier if p.get(key)]
@@ -623,7 +632,7 @@ footer{{border-top:1px solid var(--rule2);color:var(--mute);font-size:12px;paddi
 <div class="lvcards">{"".join(lrows)}</div>
 {conso_html}
 <div class="split block"><div><h2>📈 Indice d'intelligence et coût par tâche</h2><p class="dek">{len(pts)} combinaisons modèle × niveau de réflexion exécutables</p><div class="seg small-seg" id="costseg"><button data-cost="cost" class="on">Coût réel</button><button data-cost="cost_aa">Coût AA officiel</button></div>
-{_chart(pts, frontier, levels)}{_chart(pts, frontier, levels, "cost_aa")}</div>
+{_chart(pts, frontier, levels)}{_chart(pts, aa_frontier(pts), levels, "cost_aa")}</div>
 <div><h2>🎨 Spécialisations Design Arena</h2><p class="dek">Rang du modèle retenu sur le classement Design Arena de chaque tâche</p>
 <div class="tw"><table class="da"><thead><tr><th>Tâche</th><th>Modèle retenu</th><th class="num">Rang</th><th class="num">Score</th>
 <th>N°1 Design Arena, si différent</th></tr></thead><tbody>{"".join(da_rows)}</tbody></table></div></div></div>

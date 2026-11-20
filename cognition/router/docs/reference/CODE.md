@@ -218,7 +218,9 @@ Compute ranked candidates per task from the latest snapshots, on the cheapest *r
 - `chat_route(offers: list[dict], list_cost: float | None, modes: list[str] | None=None)` — Cheapest paid route for a chat model, scaling AA's list-price task cost by the provider/list price ratio.
 - `_fields(o: dict)` — Stored classification of an offer (models.offers columns), or computed from its key when absent.
 - `decision_route(offers: list[dict], modes: list[str] | None=None)` — Cheapest Decisions-API offer (decision models are billed on input tokens only) that reads every input the
-- `media_route(offers: list[dict], interface: str, modes: list[str] | None=None)` — Cheapest generation offer in the interface's comparable unit (video per second, image per image), restricted
+- `media_list_costs(conn, snaps: dict[str, int])` — AA's list price of a media model in the interface's comparable unit (image: $/image, video: $/second), from its
+- `_token_billed(o: dict)` — 
+- `media_route(offers: list[dict], interface: str, modes: list[str] | None=None, list_cost: float | None=None)` — Cheapest generation offer in the interface's comparable unit (video per second, image per image), restricted
 - `_intelligence_index(conn, snaps: dict[str, int], offers: dict[str, list[dict]])` — 
 - `_row(task: str, level: str, rank: int, cand: dict, **extra)` — 
 - `_ladder(cands: list[dict], minimum_score: float, cost_cap: float)` — 
@@ -415,6 +417,7 @@ Library web page (v3, 2026-10-14: « le design fait trop IA, pas pro » ; v4 202
 - `_lock(task: str, role: str | None, locked: bool)` — Padlock of one active model (owner 2026-11-16), sent to /api/lock (Access + HMAC), applied by walter-router lock.
 - `_steps(text: str | None)` — 'Claude Pro ≈ 0,068/0,34 $/M (prix de revient, …) → Kie 1,6/8 $/M' -> [(name, price, detail), …]
 - `_route_block(providers: str | None, fallback: str | None=None)` — First provider in clear, the rest folded under « Ensuite : … », fallback on its own line.
+- `aa_frontier(points: list[dict])` — The Pareto frontier of the same points priced at AA's official cost — the owner's method (tiers.frontier, same
 - `_chart(points: list[dict], frontier: list[dict], levels: dict[str, dict], key: str='cost')` — 
 - `_da(conn, rs: list[dict])` — 
 - `_tasks(rs: list[dict])` — One task per row in three zones — task, model, providers — instead of a 7-column table (readable page v4,
@@ -1130,7 +1133,8 @@ Intent classification by the decision model (OpenRouter's Decisions API, or Clou
 
 Direct media generation (image, video, music, voice) on the model the router picked.
 
-- `_models()` — 
+- `_models(conn=None)` — The media executors: config/media_models.json (Kie paths, prompt styles, workflows), plus — given a DB
+- `supports(cfg: dict, modes: list[str] | None)` — A configured executor keeps its own paths; a derived (OpenRouter-only) one runs only the modes it declares.
 - `_schemas()` — 
 - `_http(method: str, url: str, headers: dict, body: dict | None=None, timeout: int=60)` — 
 - `_nearest(value: Any, allowed: list)` — Closest allowed value (case-insensitive for strings, numeric distance for numbers/durations).

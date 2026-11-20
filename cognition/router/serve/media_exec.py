@@ -35,8 +35,34 @@ KIE_USD_PER_CREDIT = 0.005          # 6 credits = 0.03 $ (Sunburst 1K, 2026-10-0
 TIMEOUTS = {"image": 360, "video": 1200, "music": 600, "audio": 300}
 
 
-def _models() -> dict:
-    return json.loads((CONFIG / "media_models.json").read_text())["models"]
+OPENROUTER_MODES = {"image": ["t2i"], "video": ["t2v", "i2v", "r2v"]}   # what run_openrouter sends (no input image)
+
+
+def _models(conn=None) -> dict:
+    """The media executors: config/media_models.json (Kie paths, prompt styles, workflows), plus — given a DB
+    connection — every image/video model OpenRouter sells for generation, run by the generic OpenRouter path
+    (run_openrouter) with the modes it supports. Without them a new model (GPT Image 2.6, MAI-Image 2.7) was never
+    runnable, so never chosen, and the library stayed on the hand-listed ones (2026-11-20)."""
+    models = json.loads((CONFIG / "media_models.json").read_text())["models"]
+    if conn is None:
+        return models
+    snaps = sel.latest_snapshots(conn)
+    if "openrouter" not in snaps:
+        return models
+    derived = {}
+    for r in conn.execute("""select model_id, interface, offer_key from models.offers where snapshot_id = %s
+                             and provider = 'openrouter' and interface in ('image', 'video')
+                             and offer_kind = 'generation' and model_id is not null order by length(offer_key)""",
+                          (snaps["openrouter"],)):
+        if r["model_id"] not in models and r["model_id"] not in derived:
+            derived[r["model_id"]] = {"kind": r["interface"], "openrouter": r["offer_key"].split(" | ")[0],
+                                      "derived": True, "modes": OPENROUTER_MODES[r["interface"]]}
+    return {**models, **derived}
+
+
+def supports(cfg: dict, modes: list[str] | None) -> bool:
+    """A configured executor keeps its own paths; a derived (OpenRouter-only) one runs only the modes it declares."""
+    return not cfg.get("derived") or all(m in cfg["modes"] for m in (modes or []))
 
 
 def _schemas() -> dict:
@@ -180,7 +206,7 @@ def fallback_models(conn, task: str, role: str | None, model_id: str, mode: str 
     cands = []
     for c in composite(conn, task):
         m = c["model_id"]
-        cfg = _models().get(m)
+        cfg = _models(conn).get(m)
         if m == model_id or m in out or not cfg or unit(m) is None:
             continue
         if mode and not ((cfg.get("kie") or {}).get(mode) or (cfg.get("openrouter") and mode != "r2v")):
@@ -283,7 +309,7 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
         return {"error": f"not a media task: {task}", "decision": {k: d.get(k) for k in ("task", "model_id")}}
     if model:   # a fallback model (or a forced one) for the same task and role
         d = {**d, "model_id": model, "mode": None}
-    model_id, cfg = d["model_id"], _models().get(d["model_id"])
+    model_id, cfg = d["model_id"], _models(conn).get(d["model_id"])
     if not cfg:
         return {"error": f"no media executor configured for {model_id}", "decision": d.get("model_id")}
     kind = cfg["kind"]
@@ -294,6 +320,9 @@ def generate(conn, request: str, task: str | None = None, role: str | None = Non
                 "relancer avec paid_fallback pour générer en payant via Kie."}
     mode = {"image": "i2i" if image_urls else "t2i", "video": "i2v" if image_urls else "t2v",
             "music": "music", "audio": "tts"}[kind]
+    if not supports(cfg, [mode]):
+        return {"error": f"{model_id} : le mode {mode} n'est pas pris en charge par son exécuteur OpenRouter",
+                "model_id": model_id}
     prof = knowledge.profile(conn, model_id) or {}
     prompt = craft_prompt(conn, request, cfg.get("prompt_style")) if craft else request
     steps = [{"step": "prompt", "prompt": prompt}]

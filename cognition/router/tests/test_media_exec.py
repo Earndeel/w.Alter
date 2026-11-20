@@ -49,7 +49,7 @@ def test_fallback_and_kie_health():
             return
         assert media_exec.fallback_models(conn, "text_to_video", "action", "minimax-h3", "t2v") == []   # none declared
         fb = media_exec.fallback_models(conn, "text_to_video", "action", "minimax-h3", "t2v", declared_only=False)
-        assert fb and "minimax-h3" not in fb and all(m in media_exec._models() for m in fb)
+        assert fb and "minimax-h3" not in fb and all(m in media_exec._models(conn) for m in fb)
         or_id = media_exec.openrouter_id(conn, "minimax-h3")
         conn.execute("""insert into models.provider_status (provider, ok, detail) values ('kie-media', true, 't')
                         on conflict (provider) do update set ok = true""")
