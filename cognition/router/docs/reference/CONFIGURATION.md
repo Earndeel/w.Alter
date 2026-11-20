@@ -59,12 +59,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/tiers.py | `CEILING_MIN_GAIN` | 1.0 |  |
 | guardian/checks.py | `RUN_MAX_AGE_H` | 54 | the cycle runs every 48 h |
 | guardian/checks.py | `TEST_TIMEOUT` | 600 |  |
-| guardian/repair.py | `LEVEL` | L2 |  |
-| guardian/repair.py | `MAX_TURNS` | 80 |  |
-| guardian/repair.py | `BUDGET_S` | 2400 |  |
-| guardian/repair.py | `ALLOWED` | ["research/", "analysis/parse.py", "analysis/identity.py", "analysis/aliases.json", "interface/", "tests/"] |  |
-| guardian/run.py | `MAX_ATTEMPTS` | 3 | agent runs per incident before it is handed to the owner |
-| guardian/run.py | `RETRY_AFTER_H` | 12 | between two agent runs on the same incident |
+| guardian/run.py | `MAX_ATTEMPTS` | 2 | repair-agent runs per incident before it is handed to the owner (coding/L3 since 20/11) |
+| guardian/run.py | `RETRY_AFTER_H` | 5 | between two runs on the same incident: the next pass (every 6 h) tries again |
 | guardian/run.py | `TEST_GRACE_H` | 6 | a failing test is often someone's work in progress: act only if it lasts |
 | guardian/run.py | `MAX_REPAIRS_PER_PASS` | 3 |  |
 | guardian/run.py | `EXTERNAL_NOTICE_H` | 48 | an outside outage is worth a message only when it lasts this long |

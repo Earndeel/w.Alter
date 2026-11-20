@@ -1,6 +1,7 @@
 """Guardian (2026-10-26): detection rules, the agent's verdict, the gates and the landing rules of a patch."""
 from __future__ import annotations
 
+import json
 import subprocess
 from datetime import datetime, timedelta, timezone
 
@@ -32,69 +33,6 @@ def _repo(root, files: dict[str, str]):
 ])
 def test_provider_failure_side(detail, side):
     assert checks.provider_side(detail) == side
-
-
-def test_verdict_is_the_last_json_with_an_outcome():
-    out = 'Investigated {"a": 1}.\n```json\n{"outcome": "fixed", "cause": "page redesign", "changes": ["x"]}\n```'
-    assert repair.verdict_of(out)["cause"] == "page redesign"
-    assert repair.verdict_of("no verdict here")["outcome"] == "unknown"
-
-
-def _workspace(tmp_path, files, edits):
-    module = _repo(tmp_path / "ws", files)
-    for name, text in edits.items():
-        if text is None:
-            (module / name).unlink()
-        else:
-            (module / name).parent.mkdir(parents=True, exist_ok=True)
-            (module / name).write_text(text)
-    return module
-
-
-def test_gates_refuse_scope_weakened_tests_and_new_failures(tmp_path, monkeypatch):
-    files = {"research/a.py": "x = 1\n", "tests/test_a.py": "def test_a():\n    assert 1\n    assert 2\n",
-             "config/knowledge.json": "{}"}
-    module = _workspace(tmp_path, files, {"research/a.py": "x = 2\n", "config/knowledge.json": '{"pin": 1}',
-                                          "tests/test_a.py": "import pytest\n@pytest.mark.skip\ndef test_a():\n    assert 1\n"})
-    monkeypatch.setattr(checks, "run_tests", lambda root: {"failures": {"tests/test_b.py::test_b": "x"}})
-    g = repair.gates(module, {"kind": "test_failure", "subject": "tests/test_a.py::test_a"}, {"failures": {}})
-    text = " | ".join(g["reasons"])
-    assert not g["ok"]
-    assert "config/knowledge.json" in text and "fewer assertions" in text and "skip/xfail" in text
-    assert "tests/test_b.py::test_b" in text
-
-
-def test_gates_pass_a_clean_fix_of_the_failing_test(tmp_path, monkeypatch):
-    files = {"interface/page.py": "WORD = 'fidélité'\n", "tests/test_p.py": "def test_p():\n    assert 1\n"}
-    module = _workspace(tmp_path, files, {"interface/page.py": "WORD = 'loyalty'\n"})
-    monkeypatch.setattr(checks, "run_tests", lambda root: {"failures": {"tests/test_old.py::t": "x"}})
-    g = repair.gates(module, {"kind": "test_failure", "subject": "tests/test_p.py::test_p"},
-                     {"failures": {"tests/test_p.py::test_p": "x", "tests/test_old.py::t": "x"}})
-    assert g["ok"], g["reasons"]
-    assert g["files"] == ["interface/page.py"]
-
-
-def test_apply_lands_only_on_untouched_files_and_commits_just_them(tmp_path, monkeypatch):
-    files = {"research/a.py": "x = 1\n", "research/b.py": "y = 1\n", "serve/other.py": "z = 1\n"}
-    live = _repo(tmp_path / "live", files)
-    monkeypatch.setattr(paths, "ROOT", live)
-    (live / "serve/other.py").write_text("z = 2  # someone else's work in progress\n")
-
-    module = _workspace(tmp_path, files, {"research/a.py": "x = 2\n"})
-    repair.changed_files(module)
-    landed = repair.apply(module, ["research/a.py"], [], "Guardian: test")
-    assert landed["applied"] and (live / "research/a.py").read_text() == "x = 2\n"
-    committed = subprocess.run(["git", "show", "--name-only", "--format=", "HEAD"], cwd=live, capture_output=True,
-                               text=True).stdout.split()
-    assert committed == ["research/a.py"]
-    assert (live / "serve/other.py").read_text().startswith("z = 2")      # left alone, still uncommitted
-
-    (live / "research/b.py").write_text("y = 5\n")                          # edited by someone meanwhile
-    module2 = _workspace(tmp_path / "2", {**files, "research/a.py": "x = 2\n"}, {"research/b.py": "y = 2\n"})
-    repair.changed_files(module2)
-    later = repair.apply(module2, ["research/b.py"], [], "Guardian: test")
-    assert later == {"applied": False, "deferred": True, "blocked": ["research/b.py"]}
-    assert (live / "research/b.py").read_text() == "y = 5\n"
 
 
 def _inc(status, opened_h=1.0, **verdict):
@@ -152,23 +90,59 @@ def test_parametrised_test_ids_with_spaces_are_kept_whole(monkeypatch, tmp_path)
 
 
 def test_an_incident_out_of_agent_runs_goes_to_the_owner(monkeypatch):
-    """2026-11-20: incidents stayed `open` forever after their 3rd run (the count was read before its increment),
+    """2026-11-20: incidents stayed `open` forever after their last run (the count was read before its increment),
     so the owner never heard of them (AA source 15–17/11, five failing tests since 13/11)."""
     sets = []
     monkeypatch.setattr(run, "_set", lambda conn, inc, status, verdict=None, attempt=False: sets.append(status))
-    monkeypatch.setattr(run.repair, "workspace", lambda i: "/nowhere")
-    monkeypatch.setattr(run.checks, "run_tests", lambda m: {})
-    monkeypatch.setattr(run.repair, "agent", lambda inc, m: {"ok": False, "verdict": {"outcome": "unknown"}})
+    monkeypatch.setattr(run.repair, "agent", lambda inc, tried: {"ok": False, "verdict": {"outcome": "unknown"}})
     now = datetime.now(timezone.utc)
-    inc = {"incident_id": 7, "kind": "source_stale", "subject": "aa", "status": "open", "attempts": 2,
+    inc = {"incident_id": 7, "kind": "source_stale", "subject": "aa", "status": "open", "attempts": run.MAX_ATTEMPTS - 1,
            "last_attempt_at": now - timedelta(hours=13), "opened_at": now - timedelta(hours=40), "detail": {}}
     run._repair(None, inc, dry_run=False)
-    assert sets[-1] == "needs_owner"                      # the 3rd run failed: the owner is told
+    assert sets[-1] == "needs_owner"                      # the last run failed: the owner is told
     sets.clear()
-    stuck = {**inc, "attempts": 3}                         # left `open` by the old code
+    stuck = {**inc, "attempts": run.MAX_ATTEMPTS}          # left `open` by the old code
     monkeypatch.setattr(run, "reread_source", lambda kind: {"ok": False})
     run.handle(None, stuck, [3])
     assert sets == ["needs_owner"]
+
+
+def test_the_repair_agents_fixed_is_checked_before_anyone_believes_it(monkeypatch):
+    """2026-11-20: the Router hands incidents to the guardians' common repair agent (coding/L3, dev rights)."""
+    sets, told = [], []
+    monkeypatch.setattr(run, "_set", lambda conn, inc, status, verdict=None, attempt=False:
+                        sets.append(status) or inc.update(status=status, verdict=verdict or inc.get("verdict")))
+    monkeypatch.setattr(run.repair, "agent", lambda inc, tried: told.append(tried) or {
+        "ok": True, "poste": "coding/L3", "verdict": {"outcome": "fixed", "cause": "nouvelle page AA",
+                                                       "summary_fr": "La page AA avait changé ; le lecteur suit."}})
+    now = datetime.now(timezone.utc)
+    inc = {"incident_id": 8, "kind": "source_stale", "subject": "aa", "status": "open", "attempts": 0,
+           "opened_at": now - timedelta(hours=40), "detail": {}, "verdict": None}
+    monkeypatch.setattr(run, "still_broken", lambda conn, i: True)
+    v = run._repair(None, inc, dry_run=False)
+    assert v["outcome"] == "failed" and "toujours en panne" in v["cause"] and sets[-1] == "open"
+    monkeypatch.setattr(run, "still_broken", lambda conn, i: False)
+    inc.update(attempts=0, status="open")
+    v = run._repair(None, inc, dry_run=False)
+    assert v["verified"] and sets[-1] == "fixed"
+    assert "réparé tout seul" in run._message(inc) and "La page AA" in run._message(inc)
+    assert "tentative précédente : failed" in told[1]      # the second run knows what the first one found
+
+
+def test_the_router_hands_the_incident_to_the_common_agent(monkeypatch, tmp_path):
+    monkeypatch.setattr(repair.instance, "state_file", lambda name: tmp_path / name)
+    seen = []
+    def fake_run(cmd, **k):
+        seen.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"verdict": {"outcome": "external"}, "poste": "coding/L3",
+                                                                "engine": {"ok": True, "walter_session": "w-1"}}), "")
+    monkeypatch.setattr(repair.subprocess, "run", fake_run)
+    out = repair.agent({"incident_id": 3, "key": "provider:kie", "kind": "provider_down", "subject": "kie",
+                        "detail": {"probe": "HTTP 503"}, "opened_at": None})
+    assert seen[0][:4] == ["walter-guardian", "repair", "--module", "router"] and "--wait" in seen[0]
+    assert out["verdict"]["outcome"] == "external" and out["poste"] == "coding/L3" and out["ok"]
+    sent = json.loads((tmp_path / "guardian" / "repair" / "3.json").read_text())
+    assert sent["incident"]["key"] == "provider:kie" and sent["incident"]["module"] == "router"
 
 
 def test_library_page_is_republished_only_when_it_says_something_new():

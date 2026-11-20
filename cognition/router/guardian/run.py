@@ -13,12 +13,12 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from walter_router import instance
+from walter_router import instance, paths
 from walter_router.guardian import checks, repair
 from walter_router.store import db
 
-MAX_ATTEMPTS = 3          # agent runs per incident before it is handed to the owner
-RETRY_AFTER_H = 12        # between two agent runs on the same incident
+MAX_ATTEMPTS = 2          # repair-agent runs per incident before it is handed to the owner (coding/L3 since 20/11)
+RETRY_AFTER_H = 5         # between two runs on the same incident: the next pass (every 6 h) tries again
 TEST_GRACE_H = 6          # a failing test is often someone's work in progress: act only if it lasts
 MAX_REPAIRS_PER_PASS = 3
 EXTERNAL_NOTICE_H = 48    # an outside outage is worth a message only when it lasts this long
@@ -80,63 +80,49 @@ def _needs_agent(inc: dict) -> bool:
     return True
 
 
-def commit_message(inc: dict, v: dict) -> str:
-    """Subject: which incident; body: the agent's cause and evidence, then who did the work."""
-    body = "\n\n".join(x for x in (v.get("cause"), v.get("evidence")) if x)
-    return (f'Guardian: incident {inc["incident_id"]} repaired ({inc["kind"]})\n\n{inc["subject"]}\n\n{body}\n\n'
-            f'Repaired by the L2 agent ({v.get("model")} via {v.get("provider")}), landed through the guardian gates.')
+def _tried(inc: dict) -> str:
+    v = inc.get("verdict") or {}
+    return f'- tentative précédente : {v.get("outcome")} — {str(v.get("cause") or "")[:300]}' if v.get("outcome") else ""
+
+
+def still_broken(conn, inc: dict) -> bool:
+    """The incident's own check, run again after the agent: its word is never enough."""
+    kind, subject = inc["kind"], inc["subject"]
+    if kind in ("source_stale", "source_error"):
+        return not reread_source(subject)["ok"]
+    if kind == "test_failure":
+        proc = subprocess.run([str(paths.ROOT / "venv" / "bin" / "python"), "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                               subject], cwd=paths.ROOT, capture_output=True, text=True, timeout=900)
+        return proc.returncode != 0
+    if kind == "provider_down":
+        from walter_router.serve import execution
+        execution.probe(conn, only=subject)
+        return any(p["key"] == inc["key"] for p in checks.providers(conn))
+    return any(p["key"] == inc["key"] for p in checks.detect(conn, with_tests=False))
 
 
 def _repair(conn, inc: dict, dry_run: bool) -> dict:
-    module = repair.workspace(inc["incident_id"])
+    """The guardians' common repair agent (walter-guardian repair) on this incident, then its own check again."""
     if dry_run:
-        return {"workspace": str(module), "dry_run": True}
-    baseline = checks.run_tests(module)
+        return {"dry_run": True}
+    tried = _tried(inc)
     _set(conn, inc, "repairing", attempt=True)
     inc["attempts"] += 1                    # this run counts: its own failure may be the last one allowed
-    ran = repair.agent(inc, module)
-    v = {**ran["verdict"], "model": ran.get("model"), "provider": ran.get("provider"), "agent_ok": ran["ok"],
-         "agent_error": ran.get("error"), "workspace": str(module), "at": _now().isoformat()}
+    ran = repair.agent(inc, tried)
+    v = {**ran["verdict"], "by": "repair-agent", "poste": ran.get("poste"), "agent_ok": ran["ok"],
+         "agent_error": ran.get("error"), "walter_session": ran.get("walter_session"), "at": _now().isoformat()}
     outcome = v.get("outcome")
     if outcome == "fixed":
-        g = repair.gates(module, inc, baseline)
-        v["gates"] = g
-        if not g["ok"]:
-            _set(conn, inc, "needs_owner" if inc["attempts"] >= MAX_ATTEMPTS else "open", v)
-            return v
-        landed = repair.apply(module, g["files"], g.get("deleted") or [], commit_message(inc, v))
-        v["apply"] = landed
-        if not landed["applied"]:
-            _set(conn, inc, "deferred", v)
-            return v
-        if inc["kind"] in ("source_stale", "source_error"):
-            v["reread"] = reread_source(inc["subject"])
-        _set(conn, inc, "fixed", v)
-    elif outcome == "external":
-        _set(conn, inc, "external", v)
-    elif outcome == "needs_owner":
-        _set(conn, inc, "needs_owner", v)
+        v["verified"] = not still_broken(conn, inc)
+        if v["verified"]:
+            return _set(conn, inc, "fixed", v) or v
+        v["outcome"] = "failed"
+        v["cause"] = f'{v.get("cause") or ""} (vérification : toujours en panne)'.strip()
+    if outcome in ("external", "needs_owner"):
+        _set(conn, inc, outcome, v)
     else:
         _set(conn, inc, "needs_owner" if inc["attempts"] >= MAX_ATTEMPTS else "open", v)
     return v
-
-
-def _retry_deferred(conn, inc: dict) -> None:
-    """A verified patch waiting for files someone else was editing: land it once they are free."""
-    v = inc["verdict"] or {}
-    g = v.get("gates") or {}
-    module = Path(v.get("workspace") or "")
-    if not (module / ".git").exists() or not g.get("files"):
-        _set(conn, inc, "open")
-        return
-    landed = repair.apply(module, g["files"], g.get("deleted") or [], commit_message(inc, v))
-    v["apply"] = landed
-    if landed["applied"]:
-        if inc["kind"] in ("source_stale", "source_error"):
-            v["reread"] = reread_source(inc["subject"])
-        _set(conn, inc, "fixed", v)
-    else:
-        _set(conn, inc, "deferred", v)
 
 
 DOCS_OWNER_AFTER_H = 24   # a reference that cannot be regenerated for a day goes to the owner
@@ -163,8 +149,8 @@ def handle(conn, inc: dict, budget: list[int], dry_run: bool = False) -> None:
     kind = inc["kind"]
     if kind == "docs_stale":
         return None if inc["status"] == "needs_owner" else _docs(conn, inc, dry_run)
-    if inc["status"] == "deferred":
-        return _retry_deferred(conn, inc)
+    if inc["status"] == "deferred":            # a patch of the former copy-and-gates agent: repaired afresh
+        _set(conn, inc, "open")
     if kind == "provider_down":
         side = (inc["detail"] or {}).get("side")
         if side == "external":
@@ -190,7 +176,7 @@ def _message(inc: dict) -> str | None:
     """What the owner reads, once per outcome; None = nothing worth a message."""
     v = inc.get("verdict") or {}
     head = "🛠 Walter Router"
-    if inc["status"] == "fixed" and (v.get("apply") or {}).get("applied") and not v.get("quiet"):
+    if inc["status"] == "fixed" and (v.get("verified") or (v.get("apply") or {}).get("applied")) and not v.get("quiet"):
         return f'{head} — réparé tout seul\n\n{v.get("summary_fr") or v.get("cause")}\n\nVérifié avant mise en place.'
     if inc["status"] == "needs_owner":
         q = v.get("question_fr")
@@ -249,8 +235,7 @@ def run(agent: bool = True, tests: bool = True, send: bool = True, dry_run: bool
                 library = library_page.follow(conn)
             except Exception as exc:  # noqa: BLE001 — the page never blocks a pass; the next one tries again
                 library = {"error": f"{type(exc).__name__}: {exc}"[:300]}
-        keep = {(i.get("verdict") or {}).get("workspace") for i in incidents if i["status"] == "deferred"}
-        repair.prune(keep={k for k in keep if k})
+        repair.prune()
         return {"problems": problems,
                 "incidents": [{k: i[k] for k in ("incident_id", "key", "status", "attempts")} for i in incidents],
                 "messages": messages, "library": library}

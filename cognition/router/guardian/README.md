@@ -13,16 +13,16 @@ the owner: it finds what broke, repairs what is ours, waits out what is not, and
 | Cheap actions | `run.py` | A provider seen down is probed again first (its status heals when it is back). A stale source is read again once (`walter-router research --source`). |
 | Reference | `repair.regenerate_docs`, no model | Generated reference out of date (`walter-router docs --check`): regenerated with `docs --write`, checked again, the regenerated files committed alone. Quiet; waits while someone has uncommitted work on those files. |
 | Classify | `checks.provider_side` | Provider 5xx / 429 / a stream ending on a provider error / timeout = `external` (wait, no agent); 401/402/403 or credit exhausted = `needs_owner`; 400/404/422… = ours (agent). |
-| Repair | `repair.py`, **L2 text tier** through `walter-router run` | Only what is still broken and repairable here. The agent works on a copy of the module (`@instance/state/router/guardian/<incident>-<time>/module`, own git baseline, the live venv); the live module, the instance configuration and `/etc/systemd` are mounted read-only for it. It ends with a JSON verdict (`prompt.md`). |
-| Gates | `repair.gates`, no model | The patch only touches `research/`, `analysis/parse.py`, `analysis/identity.py`, `analysis/aliases.json`, `interface/`, `tests/`; no test deleted, no assertion removed, no skip/xfail added; the full suite on the copy has no new failure; the incident's own case passes (the test is green, or the source is read with rows). |
-| Land | `repair.apply` | Each file is copied only if the live file is still exactly what the agent started from and nobody has uncommitted work on it; then a commit of just those files. Otherwise the verified patch waits (`deferred`) and lands on a later pass. A repaired source is read again at once. |
+| Repair | `repair.agent` → `walter-guardian repair --module router --wait` (walter-core) | Since 2026-11-20 (Monsieur: « les guardians doivent pouvoir agir comme moi je le ferais » from a Claude Code session): the guardians' **common repair agent** — one Walter Engine delegation as `guardian-router`, poste **coding/L3** (Opus 5.5 high on 20/11), with the rights of a development session (policy interface `maintenance`: shell and files; outgoing messages never). It works on the live module like a Claude Code session: cause first, backup, fix, tests, restart what it changed, commit only its own files. The module's knowledge it gets: `guardian/playbook.json` `notes`. Ends with a JSON verdict. |
+| Verify | `run.still_broken`, no model | The agent's « fixed » is believed only when the incident's own check passes again: the source re-read with rows, the failing test green, the provider probe healthy, the cycle check clear. Otherwise the run counts as failed. |
 | Library | `interface/library.follow`, no model | The library page (library.walter-ai.cloud) is rendered again; when what it says changed since its last publication (quotas, routes, choices move between two 48 h cycles), it is republished. |
 | Tell | `run.notify` → Telegram | Once per outcome: a repair that landed (« réparé tout seul »), a decision only the owner can take (« besoin de vous »), an outside outage lasting ≥ 48 h. Nothing else. |
 
-Limits: 3 agent runs per incident (then `needs_owner`, and the owner is told; before 2026-11-20 the third failure
-left it `open` and silent), 12 h between two runs on the same incident, 3 repairs per
-pass, a failing test waits 6 h (often someone's work in progress). Never: changing an owner choice (favourites,
-roles, preferences, plans, `config/`), execution policy (`serve/`, `llm/`), the schema, units or the cycle.
+Limits: 2 repair-agent runs per incident, 5 h apart (then `needs_owner`, and the owner is told with the agent's words;
+before 2026-11-20 the last failure left it `open` and silent), 3 repairs per pass, a failing test waits 6 h (often
+someone's work in progress). Never: changing an owner choice (favourites, roles, locks, preferences, plans, `config/`),
+sending a message, reading a secret, deleting data (common brief + `playbook.json` notes; the policy blocks outgoing
+messages and secret files whatever the agent decides).
 
 ## When it runs
 

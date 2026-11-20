@@ -7008,7 +7008,7 @@
         ]
       },
       {
-        "description": "Repair of one incident by the L2 agent, on a copy of the module; deterministic gates decide whether it lands.",
+        "description": "Repair of one incident by the guardians' common repair agent (2026-11-20).",
         "file": "guardian/repair.py",
         "functions": [
           {
@@ -7017,59 +7017,9 @@
             "signature": "cwd: Path, *args: str, check: bool=True"
           },
           {
-            "description": "A fresh copy of the live module with a git baseline: what the agent works on.",
-            "name": "workspace",
-            "signature": "incident_id: int"
-          },
-          {
-            "description": "",
-            "name": "_render",
-            "signature": "incident: dict, module: Path"
-          },
-          {
-            "description": "The live module, the instance configuration and the system units are read-only for the agent.",
-            "name": "_readonly_script",
-            "signature": ""
-          },
-          {
-            "description": "The agent's closing JSON (outcome, cause, changes, summary): the last object carrying an `outcome`.",
-            "name": "verdict_of",
-            "signature": "output: str"
-          },
-          {
-            "description": "",
+            "description": "The common repair agent on this incident (blocking): {ok, verdict, model, engine…}.",
             "name": "agent",
-            "signature": "incident: dict, module: Path"
-          },
-          {
-            "description": "(status, path) of the agent's changes against the baseline; status D = deleted.",
-            "name": "changed_files",
-            "signature": "module: Path"
-          },
-          {
-            "description": "",
-            "name": "_asserts",
-            "signature": "text: str"
-          },
-          {
-            "description": "Read the source with the repaired code (no database write): rows parsed, or the error.",
-            "name": "verify_source",
-            "signature": "module: Path, kind: str"
-          },
-          {
-            "description": "Deterministic checks on the agent's patch. ok=False lists why it must not land.",
-            "name": "gates",
-            "signature": "module: Path, incident: dict, baseline: dict"
-          },
-          {
-            "description": "",
-            "name": "_digest",
-            "signature": "path: Path"
-          },
-          {
-            "description": "Copy the verified files into the live module, only where the live file is exactly what the agent started",
-            "name": "apply",
-            "signature": "module: Path, files: list[str], deleted: list[str], message: str"
+            "signature": "incident: dict, tried: str=''"
           },
           {
             "description": "Generated reference out of date: regenerate it (no model), and commit the regenerated files alone, unless one",
@@ -7077,12 +7027,7 @@
             "signature": "message: str"
           },
           {
-            "description": "",
-            "name": "_new",
-            "signature": "module: Path"
-          },
-          {
-            "description": "Old workspaces go; those holding a deferred patch stay.",
+            "description": "Old work folders of the guardian go (the former copies of the module included).",
             "name": "prune",
             "signature": "days: int=7, keep: set[str]=frozenset()"
           }
@@ -7123,19 +7068,19 @@
             "signature": "inc: dict"
           },
           {
-            "description": "Subject: which incident; body: the agent's cause and evidence, then who did the work.",
-            "name": "commit_message",
-            "signature": "inc: dict, v: dict"
+            "description": "",
+            "name": "_tried",
+            "signature": "inc: dict"
           },
           {
-            "description": "",
+            "description": "The incident's own check, run again after the agent: its word is never enough.",
+            "name": "still_broken",
+            "signature": "conn, inc: dict"
+          },
+          {
+            "description": "The guardians' common repair agent (walter-guardian repair) on this incident, then its own check again.",
             "name": "_repair",
             "signature": "conn, inc: dict, dry_run: bool"
-          },
-          {
-            "description": "A verified patch waiting for files someone else was editing: land it once they are free.",
-            "name": "_retry_deferred",
-            "signature": "conn, inc: dict"
           },
           {
             "description": "Generated reference: regenerated mechanically, never by the agent; quiet when it works.",
@@ -15755,47 +15700,16 @@
         "value": 600
       },
       {
-        "comment": "",
-        "file": "guardian/repair.py",
-        "name": "LEVEL",
-        "value": "L2"
-      },
-      {
-        "comment": "",
-        "file": "guardian/repair.py",
-        "name": "MAX_TURNS",
-        "value": 80
-      },
-      {
-        "comment": "",
-        "file": "guardian/repair.py",
-        "name": "BUDGET_S",
-        "value": 2400
-      },
-      {
-        "comment": "",
-        "file": "guardian/repair.py",
-        "name": "ALLOWED",
-        "value": [
-          "research/",
-          "analysis/parse.py",
-          "analysis/identity.py",
-          "analysis/aliases.json",
-          "interface/",
-          "tests/"
-        ]
-      },
-      {
-        "comment": "agent runs per incident before it is handed to the owner",
+        "comment": "repair-agent runs per incident before it is handed to the owner (coding/L3 since 20/11)",
         "file": "guardian/run.py",
         "name": "MAX_ATTEMPTS",
-        "value": 3
+        "value": 2
       },
       {
-        "comment": "between two agent runs on the same incident",
+        "comment": "between two runs on the same incident: the next pass (every 6 h) tries again",
         "file": "guardian/run.py",
         "name": "RETRY_AFTER_H",
-        "value": 12
+        "value": 5
       },
       {
         "comment": "a failing test is often someone's work in progress: act only if it lasts",
@@ -18929,14 +18843,15 @@
     "config/providers.json": "82b0a50103f1b932ab876bf06f27b50e183dc1631159bfa258c8752de168f938",
     "config/subscriptions.json": "b024fe62090d03e99ea7c06e6a76fd98228ab0d9811692ae07a65ccf4f958dac",
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
-    "contracts/maintenance.json": "39778c3ef58539ea14a375ca36c762d0d628de2c02440d7372095191affda842",
+    "contracts/maintenance.json": "2ae414f686eb127423d4081339551c3ce26eb4ab64bc958d39be7580da53b218",
     "contracts/router.json": "2c22033548faf73d7cba8f3e98e7309cccce1ffb267e0f68efa10d7cb8d3b185",
     "documentation.py": "bc32530f551ad3e0189b0927d42873f3ba7f0b8d8f3d9f56dd98587a37477870",
     "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
     "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
-    "guardian/repair.py": "b0b01aa17a19ccbd0d93a08f1f1256f461dae78fd12bb4ac9458ea317445f2a2",
-    "guardian/run.py": "f4c8b0338e4026c57219ac963ee1e396bba4e26e2e0dbcf676b9a15b0879359a",
+    "guardian/playbook.json": "f7fd51cde9ef095ac777f062262e233d83865b81e650fe7c0536c96439312a94",
+    "guardian/repair.py": "f9515f5def8a36b767a1ac859337c266c4af4d37f1979ef15c52e0132af2653f",
+    "guardian/run.py": "b25aaa7eaab951726661a74a1ce244cd86aab07891b3437adf8d43fd07950a0c",
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "instance.py": "81fc40b3bf9914f5246d0bb16f0a750141432127b6e03716546aebfc6f991724",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",

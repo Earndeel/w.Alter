@@ -330,23 +330,12 @@ Deterministic detection: what is wrong with the module right now. No model is ca
 
 ## guardian/repair.py
 
-Repair of one incident by the L2 agent, on a copy of the module; deterministic gates decide whether it lands.
+Repair of one incident by the guardians' common repair agent (2026-11-20).
 
 - `_git(cwd: Path, *args: str, check: bool=True)` — 
-- `workspace(incident_id: int)` — A fresh copy of the live module with a git baseline: what the agent works on.
-- `_render(incident: dict, module: Path)` — 
-- `_readonly_script()` — The live module, the instance configuration and the system units are read-only for the agent.
-- `verdict_of(output: str)` — The agent's closing JSON (outcome, cause, changes, summary): the last object carrying an `outcome`.
-- `agent(incident: dict, module: Path)` — 
-- `changed_files(module: Path)` — (status, path) of the agent's changes against the baseline; status D = deleted.
-- `_asserts(text: str)` — 
-- `verify_source(module: Path, kind: str)` — Read the source with the repaired code (no database write): rows parsed, or the error.
-- `gates(module: Path, incident: dict, baseline: dict)` — Deterministic checks on the agent's patch. ok=False lists why it must not land.
-- `_digest(path: Path)` — 
-- `apply(module: Path, files: list[str], deleted: list[str], message: str)` — Copy the verified files into the live module, only where the live file is exactly what the agent started
+- `agent(incident: dict, tried: str='')` — The common repair agent on this incident (blocking): {ok, verdict, model, engine…}.
 - `regenerate_docs(message: str)` — Generated reference out of date: regenerate it (no model), and commit the regenerated files alone, unless one
-- `_new(module: Path)` — 
-- `prune(days: int=7, keep: set[str]=frozenset())` — Old workspaces go; those holding a deferred patch stay.
+- `prune(days: int=7, keep: set[str]=frozenset())` — Old work folders of the guardian go (the former copies of the module included).
 
 ## guardian/run.py
 
@@ -358,9 +347,9 @@ One guardian pass: detect, follow incidents, act, tell the owner only what is wo
 - `_set(conn, inc: dict, status: str, verdict: dict | None=None, attempt: bool=False)` — 
 - `reread_source(kind: str)` — The router's own read of one source (writes its snapshot when it works).
 - `_needs_agent(inc: dict)` — 
-- `commit_message(inc: dict, v: dict)` — Subject: which incident; body: the agent's cause and evidence, then who did the work.
-- `_repair(conn, inc: dict, dry_run: bool)` — 
-- `_retry_deferred(conn, inc: dict)` — A verified patch waiting for files someone else was editing: land it once they are free.
+- `_tried(inc: dict)` — 
+- `still_broken(conn, inc: dict)` — The incident's own check, run again after the agent: its word is never enough.
+- `_repair(conn, inc: dict, dry_run: bool)` — The guardians' common repair agent (walter-guardian repair) on this incident, then its own check again.
 - `_docs(conn, inc: dict, dry_run: bool)` — Generated reference: regenerated mechanically, never by the agent; quiet when it works.
 - `handle(conn, inc: dict, budget: list[int], dry_run: bool=False)` — 
 - `_message(inc: dict)` — What the owner reads, once per outcome; None = nothing worth a message.
