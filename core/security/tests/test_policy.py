@@ -36,3 +36,17 @@ def test_strictest_and_every_preset_complete():
         assert classes <= set(preset), name
         assert set(preset.values()) <= set(policy.ORDER), name
     assert set(p["interfaces"].values()) <= set(p["presets"])
+
+
+@pytest.mark.parametrize("iface,expected", [("api", "allow"), ("test", "allow"), ("telegram", "allow"),
+                                            ("web", "allow"), ("command", "deny")])
+def test_creating_a_task_is_a_local_record_not_a_sensitive_action(iface, expected):
+    """E2E 20/11 (owner: « ne classe pas automatiquement toute écriture locale comme une action externe sensible »):
+    creating a task (its reminder goes to the owner only, a test run's stays in its channel) is allowed on every door
+    but the narrow command one, while changing an existing task from an unattended door still asks, and sending a
+    message stays outgoing."""
+    p = policy.load(policy.POLICY, instance_root=ROOT)
+    out = policy.decide(p, tool="mcp__walter__task_create", args={"goal": "relancer"}, interface=iface)
+    assert out["class"] == "record" and out["decision"] == expected, out
+    assert policy.decide(p, tool="mcp__walter__task_update", args={"task_id": "t"}, interface="api")["decision"] == "ask"
+    assert policy.classify(p, "mcp__walter__beeper_send_message") == "outgoing"

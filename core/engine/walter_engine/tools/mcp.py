@@ -121,7 +121,11 @@ class McpClient:
     async def call(self, name: str, args: dict, ex: Exec) -> Result:
         if not self.proc or self.proc.returncode is not None:
             await self.start()
-        req = self._request("tools/call", {"name": name, "arguments": args}, CALL_TIMEOUT_S)
+        a = ex.agent       # the run of the turn: a task the tool creates belongs to it (its channel), as for shell_env
+        rid = getattr(a, "run_id", None) or (a.root().run_id if hasattr(a, "root") else None)
+        meta = {k: v for k, v in (("walter_run_id", rid), ("walter_session_id", getattr(a, "key", None))) if v}
+        req = self._request("tools/call", {"name": name, "arguments": args, **({"_meta": meta} if meta else {})},
+                            CALL_TIMEOUT_S)
         task = asyncio.ensure_future(req)
         stop = asyncio.ensure_future(ex.cancel.wait())
         try:

@@ -70,6 +70,9 @@
       "mcp__walter__audio_transcribe",
       "mcp__walter__tasks_list"
     ],
+    "record": [
+      "mcp__walter__task_create"
+    ],
     "write_local": [
       "write",
       "edit",
@@ -113,6 +116,7 @@
   "presets": {
     "web-owner": {
       "read": "allow",
+      "record": "allow",
       "write_local": "allow",
       "shell": "allow",
       "outgoing": "check",
@@ -122,6 +126,7 @@
     },
     "telegram-owner": {
       "read": "allow",
+      "record": "allow",
       "write_local": "allow",
       "shell": "allow",
       "outgoing": "check",
@@ -131,6 +136,7 @@
     },
     "api": {
       "read": "allow",
+      "record": "allow",
       "write_local": "ask",
       "shell": "ask",
       "outgoing": "ask",
@@ -140,6 +146,7 @@
     },
     "command": {
       "read": "allow",
+      "record": "deny",
       "write_local": "deny",
       "shell": "deny",
       "outgoing": "deny",
@@ -149,6 +156,7 @@
     },
     "child": {
       "read": "allow",
+      "record": "allow",
       "write_local": "allow",
       "shell": "allow",
       "outgoing": "deny",
@@ -158,6 +166,7 @@
     },
     "dev": {
       "read": "allow",
+      "record": "allow",
       "write_local": "allow",
       "shell": "allow",
       "outgoing": "check",

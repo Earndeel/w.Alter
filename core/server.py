@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 
 CLIENT_TAG = os.environ.get("WALTER_CLIENT_TAG", "claude")
 # Machine services Walter relies on without owning them; module services come from the registry.
@@ -216,6 +216,40 @@ def tasks_list(status: str = "", thread_id: str = "", limit: int = 10) -> str:
     if thread_id:
         args += ["--thread", thread_id[:200]]
     return _walter_memory(*args, timeout=60)
+
+
+def _run_meta(ctx) -> dict:
+    """The run the caller works under, when its client says it (the engine passes `_meta.walter_*` on tools/call):
+    a task it creates belongs to that run, so to its channel (a test run's never reaches the owner's list)."""
+    try:
+        meta = ctx.request_context.meta if ctx is not None else None
+        extra = dict(getattr(meta, "model_extra", None) or {}) if meta is not None else {}
+    except Exception:   # noqa: BLE001 — no request context (direct call, older client): the owner's
+        extra = {}
+    return {k: str(extra[f"walter_{k}"])[:80] for k in ("run_id", "session_id") if extra.get(f"walter_{k}")}
+
+
+@mcp.tool()
+def task_create(goal: str, entity_id: str = "", person: str = "", due_at: str = "", remind_at: str = "",
+                draft: str = "", source: str = "", ctx: Context | None = None) -> str:
+    """Create a durable task for the owner (a local record, nothing is sent to anyone): an explicit `goal` written
+    with the person's name, never « le » / « il »; the linked person — `entity_id` (from person_lookup) or its exact
+    full name in `person` (several or no match → an error with the candidates: ask the owner, never guess); `due_at`
+    (YYYY-MM-DD or ISO with offset); `remind_at` = when the owner is reminded (ISO with its offset, e.g.
+    2026-12-10T09:00:00+07:00), fired once by Walter's scheduler; `draft` = a prepared message stored with the task,
+    NOT sent (sending is a separate tool that needs its own permission); `source` = where the request came from.
+    Answers the task read back from the Run Plane (`verified` true when it carries what was asked) and its reminder.
+    Replaying the same call never creates a second task."""
+    if not (goal or "").strip():
+        return json.dumps({"ok": False, "error": "goal required"})
+    spec = {"goal": goal[:500], "entity_id": entity_id[:80] or None, "entity_name": person[:200] or None,
+            "due_at": due_at[:40] or None, "remind_at": remind_at[:40] or None, "draft": (draft or "")[:2000] or None,
+            "source": {"text": source[:300]} if source else None, "by": CLIENT_TAG or "mcp", **_run_meta(ctx)}
+    r = subprocess.run([*WALTER_MEMORY, "tasks", "create"], input=json.dumps(spec, ensure_ascii=False, default=str),
+                       capture_output=True, text=True, timeout=60)
+    if r.returncode != 0:
+        return f"Walter Memory error: {(r.stderr or r.stdout).strip()[-800:]}"
+    return r.stdout.strip()
 
 
 @mcp.tool()
