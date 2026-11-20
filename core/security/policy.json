@@ -181,7 +181,12 @@
     "api": "api",
     "command": "command",
     "test": "api",
-    "dev": "dev"
+    "dev": "dev",
+    "maintenance": "dev"
+  },
+  "machine_interfaces": {
+    "_doc": "Engine API delegations by a machine caller whose id starts with a key are judged under that interface (2026-11-20, Monsieur: module guardians fix problems the way he would from a Claude Code session, without going through him). Outgoing messages stay a disclosure check, which an unattended run cannot pass.",
+    "guardian-": "maintenance"
   },
   "mcp_clients": {
     "dsh": "engine",

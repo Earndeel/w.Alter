@@ -64,9 +64,21 @@ class Policy:
         except OSError:
             pass
 
-    async def judge(self, *, tool: str, args: dict, door: str, depth: int) -> dict:
+    @staticmethod
+    def machine_interface(p: dict | None, door: str, principal: dict | None) -> str | None:
+        """A delegation by a declared machine caller (policy `machine_interfaces`, by id prefix: `guardian-` = the
+        module guardians, 2026-11-20) is judged under that caller's interface instead of the generic `api`."""
+        if not p or door != "mcp" or (principal or {}).get("kind") != "machine":
+            return None
+        pid = str((principal or {}).get("id") or "")
+        for prefix, iface in (p.get("machine_interfaces") or {}).items():
+            if not prefix.startswith("_") and pid.startswith(prefix) and iface in (p.get("interfaces") or {}):
+                return iface
+        return None
+
+    async def judge(self, *, tool: str, args: dict, door: str, depth: int, principal: dict | None = None) -> dict:
         p = self._load()
-        iface = IFACE.get(door, "api")
+        iface = self.machine_interface(p, door, principal) or IFACE.get(door, "api")
         if p is None:
             out = {**FALLBACK, "tool": tool}
         else:

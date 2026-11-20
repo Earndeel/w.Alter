@@ -14,6 +14,16 @@ spec = importlib.util.spec_from_loader("walter_guardian", loader)
 A = importlib.util.module_from_spec(spec); loader.exec_module(A)
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_real_repair_agent(monkeypatch):
+    """No test starts a transient unit or reaches the engine: the repair agent is faked where a test needs it."""
+    monkeypatch.setattr(A, "launch_repair", lambda module, incident, tried: False)
+    monkeypatch.setattr(A, "delegate", lambda *a, **k: {"ok": False, "error": "no engine in tests"})
+
+
 def _incident(key="service:x", kind="service_down", severity="high", **ev):
     return {"version": 1, "module": "a", "key": key, "kind": kind, "severity": severity, "summary": "x en panne",
             "evidence": ev}
@@ -141,3 +151,52 @@ def test_engine_masks_secrets_and_rejects_bad_playbooks(tmp_path):
         raise AssertionError("an action parameter without an allow-list must be refused")
     except ValueError:
         pass
+
+
+# ---- repair agent (2026-11-20) -----------------------------------------------------------------------------------
+
+def test_what_would_reach_the_owner_goes_to_the_repair_agent_first(tmp_path, monkeypatch):
+    """Monsieur, 2026-11-20: the guardian fixes it the way he would from Claude Code; he hears only its verdict."""
+    monkeypatch.setenv("WALTER_INSTANCE", str(tmp_path / "inst"))
+    inc = _incident(unit="x")
+    root, flag = _module(tmp_path, [inc])
+    monkeypatch.setattr(A, "ask_model", lambda prompt: ({"incidents": [{"key": "a:service:x", "outcome": "needs_owner",
+                                                                         "message_fr": "Je ne sais pas."}]}, {}))
+    started = []
+    monkeypatch.setattr(A, "launch_repair", lambda m, i, tried: started.append(i["key"]) or True)
+    v = A.run("a", [inc], root=root)["verdicts"]["a:service:x"]
+    assert v["outcome"] == "pending" and v["repair"] == "started" and started == ["service:x"]
+
+    asked = []
+    def fake_delegate(module, goal, key, budget=A.REPAIR_BUDGET):
+        asked.append((module, goal))
+        flag.write_text("")                                            # the agent fixed it
+        return {"ok": True, "output": 'Cause trouvée. {"outcome": "fixed", "cause": "unité mal nommée", '
+                                      '"summary_fr": "Le service était mal configuré ; corrigé.", "commit": "abc"}'}
+    monkeypatch.setattr(A, "delegate", fake_delegate)
+    out = A.repair("a", inc, "", root=root)
+    assert out["verdict"]["outcome"] == "fixed" and out["poste"] == "coding/L3"
+    assert "service:x" in asked[0][1] and "Claude Code" in asked[0][1] and "commite seulement TES fichiers" in asked[0][1]
+    assert A.module_check(A.load("a", root)[0]) == set()                 # the module's own check confirms it
+
+
+def test_the_owner_hears_the_repair_agents_words_and_only_after_its_runs(tmp_path, monkeypatch):
+    monkeypatch.setenv("WALTER_INSTANCE", str(tmp_path / "inst"))
+    inc = _incident(unit="x")
+    v0 = {"outcome": "failed", "diagnosis_fr": "", "message_fr": ""}
+    path = A._repair_file("a", "a:service:x")
+    def runs(*verdicts, ago=7200):
+        now = A.time.time()
+        path.write_text(json.dumps({"runs": [{"t": now - ago - 10 * n, "verdict": v} for n, v in enumerate(verdicts)]}))
+    runs({"outcome": "needs_owner", "summary_fr": "Le crédit Venice est épuisé.", "question_fr": "Le recharger ?"})
+    v = A.escalate("a", inc, v0)
+    assert v["outcome"] == "needs_owner" and "Venice" in v["message_fr"] and "recharger" in v["message_fr"]
+    runs({"outcome": "external", "cause": "HTTP 503"})
+    assert A.escalate("a", inc, v0)["outcome"] == "external"
+    runs({"outcome": "failed", "cause": "x"}, ago=600)                    # a run 10 min ago: wait before the next
+    assert A.escalate("a", inc, v0)["repair"] == "waiting"
+    runs({"outcome": "fixed", "summary_fr": "Corrigé."}, {"outcome": "failed", "cause": "x"})
+    v = A.escalate("a", inc, v0)                                         # two runs and still there: the owner
+    assert v["outcome"] == "needs_owner" and "2 fois" in v["message_fr"]
+    path.write_text(json.dumps({"runs": [], "running": {"since": A.time.time(), "pid": A.os.getpid()}}))
+    assert A.escalate("a", inc, v0)["repair"] == "running"

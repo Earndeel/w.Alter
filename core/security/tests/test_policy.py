@@ -50,3 +50,17 @@ def test_creating_a_task_is_a_local_record_not_a_sensitive_action(iface, expecte
     assert out["class"] == "record" and out["decision"] == expected, out
     assert policy.decide(p, tool="mcp__walter__task_update", args={"task_id": "t"}, interface="api")["decision"] == "ask"
     assert policy.classify(p, "mcp__walter__beeper_send_message") == "outgoing"
+
+
+def test_module_guardians_work_like_the_owner_in_a_dev_session_but_send_nothing():
+    """2026-11-20 (Monsieur): a module guardian fixes what broke the way he would from Claude Code, without him."""
+    p = policy.load(policy.POLICY, instance_root=ROOT)
+    assert p["machine_interfaces"]["guardian-"] == "maintenance"
+    shell = policy.decide(p, tool="bash", args={"command": "pytest -q"}, interface="maintenance")
+    write = policy.decide(p, tool="write", args={"file_path": "/walter/x.py"}, interface="maintenance")
+    assert shell["decision"] == write["decision"] == "allow"
+    out = policy.decide(p, tool="mcp__walter__beeper_send_message", args={}, interface="maintenance")
+    assert out["decision"] == "check"           # an unattended run has nobody to approve it: never sent
+    secret = policy.decide(p, tool="bash", args={"command": f"cat {ROOT}/bootstrap/engine/api.token"},
+                           interface="maintenance")
+    assert secret["decision"] == "deny"

@@ -703,7 +703,8 @@ class Engine:
             res = Result(f"{name}: missing required argument(s) {', '.join(missing)} (arguments: {props})", True,
                          meta={"invalid_arguments": missing})
         else:
-            decision = await self.policy.judge(tool=name, args=args, door=a.policy_door, depth=a.depth)
+            decision = await self.policy.judge(tool=name, args=args, door=a.policy_door, depth=a.depth,
+                                                principal=a.principal)
             if decision["decision"] == "deny":
                 res = Result(decision.get("reason") or "refusé par la politique Walter", True,
                              meta={"policy": decision.get("rule")})

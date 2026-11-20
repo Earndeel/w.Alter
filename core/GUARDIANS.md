@@ -86,6 +86,31 @@ les régler d'eux-mêmes ; pour le Mac qui se déconnecte, pas besoin de me noti
   `params` allow-lists, `async`, `timeout_seconds`), `fallback` by kind, `settle_seconds`. Written for browse,
   memory, secrets, skills, context, ops. Adding knowledge to a guardian = editing its playbook, not the engine.
 
+## Repair agent: the guardian works like Monsieur in a Claude Code session (2026-11-20)
+
+Owner, 2026-11-20: « les guardians des modules doivent pouvoir agir comme moi je le ferais ici : je reçois une alerte
+par Telegram et j'envoie juste un message à Opus 5.5 high pour régler le problème. L'objectif des guardians est de
+régler les problèmes directement sans passer par moi. »
+
+- **Where.** `walter-guardian` step 5: every verdict that would reach the owner (`needs_owner`, `failed`, `unknown`)
+  goes first to the repair agent. The router (`"self"`) hands its incidents to the same agent
+  (`walter-guardian repair --module router --wait`, `router/guardian/repair.py`).
+- **Who.** One Walter Engine delegation (Engine API `delegate`, caller `guardian-<module>`), poste `coding/L3` through the
+  Router (Opus 5.5 high on 20/11; env `WALTER_GUARDIAN_REPAIR_TASK/LEVEL`), budget 45 min, run in its own transient unit
+  (`walter-guardian-repair-<module>-<hash>`); the supervisor sees `pending` meanwhile (rechecked after 30 min).
+- **Rights.** `security/policy.json` `machine_interfaces`: a machine caller whose id starts with `guardian-` is judged
+  under the interface `maintenance` = preset `dev`, the one of a Claude Code session: shell, files, Walter tools;
+  outgoing messages stay a disclosure check, which an unattended run cannot pass (never sent); `never` (secret files,
+  secret-revealing commands, delegation depth) unchanged. Before this, delegations were judged `api`: every command
+  asked for an approval nobody could give, so every agent attempt ended « cause indéterminée ».
+- **Brief.** `REPAIR_BRIEF` in `walter-guardian` + the module's `guardian/playbook.json` `notes`: cause first, backup in
+  `@instance/backups/changes/`, fix the cause with a test, verify the real thing, restart what changed, commit only its
+  own files (another session's uncommitted file = `needs_owner`), never a secret, a message, an owner choice, a purge.
+- **Verdict.** `fixed` is believed only when the module's check (router: the incident's own check) no longer sees it;
+  `external` waits; `needs_owner` reaches Monsieur with the agent's words and question. At most 2 runs per incident per
+  24 h, 1 h apart (router: 2, 5 h apart), then the owner is told what was tried. History
+  `@instance/state/guardians/repair/<module>/`, `actions.jsonl`; the agent's whole session is in walter_logs.
+
 ## Failures must be visible (SOCLE A8, 2026-11-11)
 
 Incident of 2026-11-11: `walter_memory/llm.py` fixed on disk at 06:17 UTC and a credentials file removed, but

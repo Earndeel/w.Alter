@@ -546,9 +546,13 @@ class EngineApi:
             raise ApiError(403, "max_depth", f"delegation depth {depth} reaches the limit {self.s.max_depth}")
         if not PART.match(str(caller)):
             raise ApiError(400, "invalid_principal")
+        level = d.get("level")
+        if level is not None and level not in ("L1", "L2", "L3"):
+            raise ApiError(400, "invalid_level", "level L1, L2 or L3")
         conversation = "task-" + hashlib.sha256(key.encode()).hexdigest()[:24]
         opened = await self.open({"interface": "mcp", "conversation": conversation,
-                                  "principal": {"kind": "machine", "id": caller}, "mode": "interactive"})
+                                  "principal": {"kind": "machine", "id": caller}, "mode": "interactive",
+                                  **({"level": level} if level else {})})
         row = self.bindings.get(opened["session_id"])
         if not row.get("unattended"):
             row = self._set({**row, "unattended": True,
