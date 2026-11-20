@@ -693,6 +693,11 @@ async def exact_call(spec: dict) -> dict:
             kwargs["tools"] = spec["tools"]
         if route.get("reasoning") and route["reasoning"] not in {"none", "non-reasoning"}:
             kwargs["reasoning_effort"] = route["reasoning"]
+        # litellm's Codex (ChatGPT) transport lists no `reasoning_effort` for any model and drop_params removed it silently:
+        # every Codex call ran at the backend's default effort whatever the route said (20/11/2026, request captured
+        # on a local stub). Allowed explicitly, it goes out as reasoning.effort.
+        if provider == "codex" and kwargs.get("reasoning_effort"):
+            kwargs["allowed_openai_params"] = ["reasoning_effort"]
         response = await provider_completion(route, **kwargs)
         if test:
             _charge(route, {"channel": "test", "agent": "walter-router"}, _telemetry(response), spec)
@@ -1312,6 +1317,8 @@ def build_app():
                 kwargs.setdefault("litellm_session_id", codex_cache_session(agent, task, body, correlation))
             if route.get("reasoning") and route["reasoning"] not in ("none", "non-reasoning"):
                 kwargs.setdefault("reasoning_effort", route["reasoning"])
+            if route["provider"] == "codex" and kwargs.get("reasoning_effort"):     # see the same rule above
+                kwargs["allowed_openai_params"] = ["reasoning_effort"]
             want_json = route["provider"] == "codex" and (body.get("response_format") or {}).get("type") in (
                 "json_object", "json_schema")
             if want_json:   # the Codex backend ignores response_format: ask in words, check the answer below
