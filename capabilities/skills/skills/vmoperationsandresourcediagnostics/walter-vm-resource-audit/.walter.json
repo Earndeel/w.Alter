@@ -1,10 +1,7 @@
 {
- "created_at": "2026-11-20T04:15:01.841050+00:00",
- "description": "Use when auditing W.Alter VM resource consumption, attributing CPU and memory to services, investigating duplicate model loads or orphan processes, and prioritizing optimizations without changing production.",
- "domain": "vmoperationsandresourcediagnostics",
- "kind": "new",
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
  "reason": "The session demonstrated a reusable, distinct VM audit workflow: ten-minute cgroup CPU sampling, systemd/registry reconciliation, PSS and model-mapping analysis, user-scope daemon attribution, timer and PostgreSQL aggregate checks, and a read-only report. It uncovered repeated embedding-model allocations across five services and showed why lifetime CPU, summed RSS, old journal failures, and apparently orphaned daemons require careful attribution. None of the listed skills covers this operational audit procedure. [session claude_code/vm/2e6eef9d-c55a-4db3-a2c8-bffe0deecf05]",
- "runtime": "learner",
- "session_id": "claude_code/vm/2e6eef9d-c55a-4db3-a2c8-bffe0deecf05",
- "target": "walter-vm-resource-audit"
+ "store_sha": "52b99fbf955bf433a1369c943aecc2e3d5f55db813b545492e7704df2953224e"
 }
