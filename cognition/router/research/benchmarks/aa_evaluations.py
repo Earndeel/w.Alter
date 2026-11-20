@@ -5,18 +5,16 @@ knowledge reliability (AA-Omniscience), coding (LiveCodeBench), cybersecurity (A
 indexes of artificialanalysis.ai/indexes (engineering, economics, finance & accounting, healthcare, legal, strategy &
 ops) with their cost and time per task.
 
-The model pages carry AA's whole language-model catalogue with every evaluation field; an evaluation page carries the
+The model page's public manifest carries AA's whole language-model catalogue with every evaluation field; an evaluation page carries the
 same objects for the models it features (HealthBench is only there). Both are read from their Next.js data, merged by
 slug — no browser. Stored as fractions by AA, kept here as published; analysis.parse puts them on 0-100."""
 from __future__ import annotations
 
-import json
-import re
 from datetime import datetime
 from typing import Any
 
-from walter_router.research.benchmarks.aa import (AA_MODEL_URL, ANCHORS, RSC_PUSH_PATTERN, decode_rsc_string, index_version,
-                                                  strip_rsc_prefix, updates)
+from walter_router.research.benchmarks.aa import index_version, updates
+from walter_router.research.benchmarks.aa_data import flight_values, model_catalogue
 from walter_router.research.web import fetch_text, now
 
 EVAL_URL = "https://artificialanalysis.ai/evaluations/{}"
@@ -50,7 +48,6 @@ INDEXES = {"idx_engineering": "engineering", "idx_economics": "economics", "idx_
            "idx_medical": "healthcare-and-medical", "idx_legal": "legal", "idx_strategy_ops": "strategy-and-ops"}
 # evaluations whose scores are not (or not all) in the model-page catalogue: read from their own page as well
 PAGE_ONLY = ("healthbench", "healthbench_pro", "cyber")
-MIN_MODELS = 300
 
 
 def _objects(page: str) -> list[dict[str, Any]]:
@@ -67,14 +64,8 @@ def _objects(page: str) -> list[dict[str, Any]]:
         elif isinstance(x, list):
             for v in x:
                 walk(v)
-    for m in RSC_PUSH_PATTERN.finditer(page):
-        decoded = strip_rsc_prefix(decode_rsc_string(m.group(1)))
-        for line in decoded.split("\n"):
-            line = re.sub(r"^[0-9a-z]+:", "", line, count=1)
-            try:
-                walk(json.loads(line))
-            except ValueError:
-                continue
+    for value in flight_values(page):
+        walk(value)
     return out
 
 
@@ -91,13 +82,8 @@ def _index_models(page: str) -> list[dict[str, Any]]:
         elif isinstance(x, list):
             for v in x:
                 walk(v)
-    for m in RSC_PUSH_PATTERN.finditer(page):
-        decoded = strip_rsc_prefix(decode_rsc_string(m.group(1)))
-        for line in decoded.split("\n"):
-            try:
-                walk(json.loads(re.sub(r"^[0-9a-z]+:", "", line, count=1)))
-            except ValueError:
-                continue
+    for value in flight_values(page):
+        walk(value)
     return out
 
 
@@ -117,19 +103,8 @@ def merge(objects: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 
 def source_aa_eval() -> tuple[dict, datetime, str]:
-    objects, used, errors = [], None, []
-    for anchor in ANCHORS:
-        try:
-            found = _objects(fetch_text(AA_MODEL_URL.format(anchor)))
-        except Exception as exc:  # noqa: BLE001 — next anchor
-            errors.append(f"{anchor}: {exc}"[:160])
-            continue
-        if len({o["slug"] for o in found}) >= MIN_MODELS:
-            objects, used = found, AA_MODEL_URL.format(anchor)
-            break
-        errors.append(f"{anchor}: {len(found)} objects")
-    if not used:
-        raise ValueError("AA evaluations: " + "; ".join(errors))
+    objects, used = model_catalogue()
+    errors = []
     pages = {}
     for key in PAGE_ONLY:
         url = EVAL_URL.format(EVALS[key][1])

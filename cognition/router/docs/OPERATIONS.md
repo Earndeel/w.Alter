@@ -21,6 +21,31 @@ Le cycle de maintenance recherche les sources, les analyse, relève les abonneme
 publie la bibliothèque. Sa fréquence est portée par les unités déployées, actuellement le cycle de 48 h décrit
 dans le README. `--skip-collect` recalcule les relevés existants ; il ne les rend pas plus récents.
 
+## Collecte Artificial Analysis
+
+Les pages modèles n'embarquent qu'un aperçu d'environ 30 modèles. `research/benchmarks/aa_data.py` lit le
+manifeste public associé à `initialModels` pour récupérer le catalogue complet. Le format utilisé par le client
+AA est AES-GCM authentifié puis gzip ; la clé publique est fournie dans la page, sans compte supplémentaire.
+Installer la dépendance dans l'environnement du Router avec
+`uv pip install --python venv/bin/python -r requirements-research.txt`.
+
+Une erreur de décodage, un catalogue inférieur à 300 modèles distincts ou une identité sans slug fait échouer la
+collecte et conserve le dernier relevé réussi. Le lecteur d'intelligence garde également le minimum de 40 modèles
+avec coût par tâche et le contrôle de cohérence avec l'API. L'API gratuite actuelle est
+`/api/v2/language/models/free` ([contrat officiel](https://artificialanalysis.ai/data-api/docs)) : toutes les pages
+sont lues (200 lignes par page), avec rejet d'une réponse partielle. Elle fournit désormais aussi le coût par tâche :
+il complète un coût absent de la page, sans remplacer sa précision ni estimer un coût (`cost_source` = `page`/`api`).
+Les lignes du leaderboard qui ne contiennent que
+la famille du modèle sont remplacées par les identités exactes du catalogue ; aucun effort de raisonnement n'est
+déduit du nom affiché. `catalogue_url` conserve la provenance de cette lecture dans le relevé d'intelligence.
+
+Les lecteurs d'évaluations et d'index réunissent les fragments du flux Next.js avant de lire les objets JSON.
+Les badges « underReview » sont lus même quand le badge de mise à jour de l'Intelligence Index a expiré.
+Pour les médias, `Pricing` et `API Pricing` désignent la même colonne de tarifs de référence ; ces tarifs gardent
+leur unité publiée et ne deviennent pas des coûts par tâche benchmark. Reprise ciblée :
+`walter-router research --source aa --source aa_eval --source mm` ; contrôler les erreurs et la couverture,
+puis recalculer/publier avec les commandes habituelles si demandé.
+
 ## Paramètres qui gouvernent les choix
 
 | Sujet | Réglage / provenance | Sens |

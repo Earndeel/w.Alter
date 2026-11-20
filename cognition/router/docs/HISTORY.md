@@ -488,3 +488,19 @@ Source de catalogue `antigravity` (cycle prix), offres d'abonnement, plan `googl
 choisit encore ces modèles : la route sert en tête quand l'un d'eux est choisi ou nommé. Guide :
 ANTIGRAVITY-SUBSCRIPTION.md.
 
+
+## 2026-11-18 — Réparation de la recherche Artificial Analysis
+
+La collecte d'intelligence et d'évaluations échouait depuis le 12/11 : le leaderboard n'expose plus les slugs des
+variantes, et le catalogue complet est chargé par un manifeste public distinct de l'aperçu des graphiques.
+`research/benchmarks/aa_data.py` lit ce manifeste (AES-GCM authentifié, gzip), conserve les identités exactes et
+refuse les aperçus incomplets. Dépendance du lecteur : `requirements-research.txt`. Le flux Next.js complet est
+réuni avant lecture des évaluations/index. Les en-têtes média `Pricing` et `API Pricing` sont tous deux acceptés,
+avec les unités et le rôle de référence des prix préservés.
+
+L'ancienne URL Data API répond HTTP 410. Migration vers `/api/v2/language/models/free`, selon le contrat public
+AA : lecture de toutes les pages, rejet d'une pagination incomplète ; le coût par tâche désormais publié complète
+un coût absent de la page, dont la précision reste prioritaire. La provenance est enregistrée (`cost_source`,
+`catalogue_url`, `api.url`). Le contrôle page/API et les seuils de couverture restent actifs. Les badges de révision
+ne dépendent plus de la présence d'un badge de l'Intelligence Index : SciCode est correctement marqué en révision.
+Les favoris, cadenas et règles de choix ne changent pas dans cette réparation.

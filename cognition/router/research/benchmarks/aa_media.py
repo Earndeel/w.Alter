@@ -125,7 +125,7 @@ def table_matches(rows: list[list[str]], spec: dict[str, Any]) -> bool:
         return (
             find_column(headers, ("model",)) is not None
             and find_column(headers, ("elo",)) is not None
-            and (not spec.get("priced", True) or find_column(headers, ("api pricing",)) is not None)
+            and (not spec.get("priced", True) or find_column(headers, ("api pricing", "pricing")) is not None)
         )
     return (
         find_column(headers, ("provider",)) is not None
@@ -200,7 +200,7 @@ def _elo_rows(spec: dict[str, Any], table_rows: list[list[str]]) -> list[dict[st
         "samples": find_column(headers, ("samples",)),
         "arena_voices": find_column(headers, ("arena voices",)),
         "released": find_column(headers, ("released",)),
-        "api_price": find_column(headers, ("api pricing",)),
+        "api_price": find_column(headers, ("api pricing", "pricing")),
     }
     if columns["rank"] is None and headers and not clean_cell(headers[0]):
         columns["rank"] = 0
