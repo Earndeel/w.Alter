@@ -38,6 +38,7 @@ import hashlib
 import json
 import os
 import subprocess
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -166,16 +167,52 @@ _RESTORE = ("update core.derived_items set status = 'derived', valid_to = null, 
             "attributes = attributes - 'superseded_by' - 'superseded_how' where " + _SUPERSEDED_BY)
 
 
-def _exposed_versions(conn, derived: list) -> list[tuple[str, str, int]]:
-    """The view versions that may quote the purged knowledge: those of a view citing it built once it existed.
-    A version built before the knowledge was recorded cannot contain it and is left untouched (incident of 20/11:
-    masking every version of such a view lost 695 intermediate period versions that never quoted a test item)."""
-    return [(r["view_key"], r["depth"], r["version"]) for r in conn.execute(
-        """select x.view_key, x.depth, x.version from views.version x
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r'[\\"]', "", s or "")).strip().lower()
+
+
+def _quotes(conn, derived: list, events: list | None = None, pattern: str | None = None) -> list[str] | None:
+    """What a view would carry if it quoted the purged data: the pattern, the opening of each sentence of the purged
+    knowledge and events, and the names of the people that knowledge is about (never the owner's). None when a purged
+    item has no text to look for: every exposed version is then masked (the safe side)."""
+    from .entities import owner_id
+    out = [pattern] if pattern else []
+    rows = conn.execute("select content, subject_entity_ids from core.derived_items where item_id::text = any(%s)",
+                        ([str(d) for d in derived],)).fetchall()
+    texts = [r["content"] for r in rows]
+    if events:
+        texts += [r["content"] for r in conn.execute("select content from core.events where event_id = any(%s::uuid[])",
+                                                    (list(events),))]
+    if any(not (x or "").strip() for x in texts[:len(rows)]):
+        return None
+    for x in texts:
+        for s in re.split(r"(?<=[.!?…])\s+|\n+", x or "")[:50]:
+            if len(s.strip()) >= 16:
+                out.append(s.strip()[:40])
+    me = owner_id(conn)
+    ents = {str(e) for r in rows for e in (r["subject_entity_ids"] or [])} - {me}
+    if ents:
+        out += [r["canonical_name"] for r in conn.execute(
+            "select canonical_name from core.entities where entity_id::text = any(%s) and length(canonical_name) >= 4",
+            (sorted(ents),))]
+    return sorted({_norm(q) for q in out if q and len(_norm(q)) >= 4})
+
+
+def _exposed_versions(conn, derived: list, quotes: list[str] | None = None) -> list[tuple[str, str, int]]:
+    """The view versions that quote the purged knowledge: those of a view citing it, built once it existed, whose
+    text carries one of its quotes (`_quotes`). A version built before the knowledge was recorded cannot contain it,
+    and one built after that never quotes it (a month view rebuilt for other days) is left untouched — incident of
+    20/11: masking every version of such a view lost 695 intermediate period versions that never quoted a test item,
+    and on the next test purge 130 of 192 later versions of real period views did not quote it either.
+    `quotes` None (no text known) masks every version built after it."""
+    rows = conn.execute(
+        """select x.view_key, x.depth, x.version, x.content::text t from views.version x
            join (select e.view_key, min(d.created_at) since from views.evidence e
                  join core.derived_items d on d.item_id::text = e.ref_id::text
                  where e.ref_kind = 'derived' and e.ref_id = any(%s::text[]) group by e.view_key) s on s.view_key = x.view_key
-           where x.built_at >= s.since and x.content is distinct from %s""", ([str(d) for d in derived], MARK))]
+           where x.built_at >= s.since and x.content is distinct from %s""", ([str(d) for d in derived], MARK)).fetchall()
+    return [(r["view_key"], r["depth"], r["version"]) for r in rows
+            if quotes is None or any(q in _norm(r["t"]) for q in quotes)]
 
 
 def _remove(conn, t: dict) -> dict:
@@ -184,6 +221,9 @@ def _remove(conn, t: dict) -> dict:
     ev, dv, ob, wl = (list(t.get(k) or []) for k in KINDS)
     n = collections.Counter()
     src_refs = []
+    quotes = _quotes(conn, list(dv) + ([str(r["item_id"]) for r in conn.execute(
+        "select item_id from core.derived_items where source_event_ids && %s::uuid[]", (ev,))] if ev else []),
+        ev, t.get("pattern")) if (dv or ev) else None   # before the events and knowledge they come from go
     if ev:
         src_refs = [r["ref"] for r in conn.execute(
             "select source || ':' || source_id ref from core.events where event_id = any(%s::uuid[])", (ev,))]
@@ -201,7 +241,7 @@ def _remove(conn, t: dict) -> dict:
     if dv:
         # what the purged knowledge had replaced becomes current again: the purged statement is as if never said
         n["knowledge_restored"] = conn.execute(_RESTORE, ([str(x) for x in dv], [str(x) for x in dv])).rowcount
-        exposed = _exposed_versions(conn, dv)     # before the evidence rows that tell them go
+        exposed = _exposed_versions(conn, dv, quotes)     # before the evidence rows that tell them go
         n["views_evidence"] = conn.execute(
             "delete from views.evidence where ref_kind = 'derived' and ref_id = any(%s)", (dv,)).rowcount
         if exposed:
@@ -270,7 +310,8 @@ def purge(*, reason: str, requested_by: str, event_ids=None, object_refs=None, p
         if not execute:
             counts = {COUNT_KEYS[k]: len(v) for k, v in targets.items()}
             if targets["derived"]:    # the view versions that may quote that knowledge are masked: say how many
-                exposed = _exposed_versions(conn, targets["derived"])
+                exposed = _exposed_versions(conn, targets["derived"], _quotes(conn, targets["derived"], targets["event"],
+                                                                               pattern))
                 counts["views_masked"] = len({e[0] for e in exposed})
                 counts["view_versions_masked"] = len(exposed)
                 counts["knowledge_restored"] = conn.execute(   # replaced by the purged knowledge: current again
@@ -281,7 +322,7 @@ def purge(*, reason: str, requested_by: str, event_ids=None, object_refs=None, p
                          (requested_by, reason, json.dumps(selector),
                           _fp([x for k in KINDS for x in targets[k]]), json.dumps(counts)))
             return {"status": "dry_run", "counts": counts}
-        removed = _remove(conn, targets)
+        removed = _remove(conn, {**targets, "pattern": pattern})
         counts = {COUNT_KEYS[k]: len(v) for k, v in targets.items()}
         pid = conn.execute("""insert into system.purges (requested_by, reason, selector, fingerprints, counts, status,
                                   backups_rewritten) values (%s,%s,%s,%s,%s,'executed',false) returning purge_id""",

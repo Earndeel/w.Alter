@@ -42,6 +42,8 @@ def test_purge_reingest_restore_reapply():
                      (view,))
         conn.execute("""insert into views.version (view_key, depth, version, content, builder)
                         values (%s, 'overview', 2, %s, 'pytest')""", (view, f"résumé citant {SECRET}"))
+        conn.execute("""insert into views.version (view_key, depth, version, content, builder)
+                        values (%s, 'overview', 3, 'résumé des autres jours, sans rien de purgé', 'pytest')""", (view,))
         conn.execute("""insert into views.evidence (view_key, ref_kind, ref_id, role, privacy_class, added_by)
                         values (%s, 'derived', %s, 'support', 'cloud_allowed', 'pytest')""", (view, str(item)))
         conn.execute("""insert into search.chunks (kind, ref_id, chunk_no, occurred_at, source, label, text, tsv, privacy_class, indexer_version)
@@ -69,6 +71,8 @@ def test_purge_reingest_restore_reapply():
         assert SECRET not in v["content"] and v["stale_since"] is not None
         old = conn.execute("select content from views.version where view_key = %s and version = 1", (view,)).fetchone()
         assert old["content"] == "version d'avant cette connaissance"     # built before it existed: never masked
+        later = conn.execute("select content from views.version where view_key = %s and version = 3", (view,)).fetchone()
+        assert later["content"] == "résumé des autres jours, sans rien de purgé"   # built after, quotes none of it: kept
         sg = conn.execute("select event_ids, rejected from extraction.segments where segment_id = %s", (seg,)).fetchone()
         assert [str(x) for x in sg["event_ids"]] == [str(other_id)] and sg["rejected"] == []    # an extracted message can be purged too
         back = conn.execute("select status, valid_to, attributes from core.derived_items where item_id = %s",
