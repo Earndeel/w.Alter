@@ -5,7 +5,7 @@
 [toolsets]
 # Entry points named first by each module's one-line presentation (M0), plus the module guides.
 core = [
-  "memory_context", "memory_search", "person_lookup",
+  "memory_context", "memory_search", "memory_events", "person_lookup",
   "tasks_list", "task_create", "task_update",
   "logs_search",
   "vault_search",
@@ -25,6 +25,7 @@ toolset = "core"
 module_layer = "m0"
 
 [clients.engine]
+# 2026-11-20: memory_events listed directly (reading a conversation needed walter_call describe, then calls: 07:47 test).
 # 2026-11-17: Walter Engine natif (production depuis la bascule) — même jeu que DSH ; le reste via walter_call.
 toolset = "core"
 module_layer = "m0"
