@@ -72,7 +72,4 @@ def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = Fal
             conn.commit()
             raise
         conn.commit()
-    if notify and not dry_run:   # the advisor reads the whole cycle and works out its consequences (2026-11-20)
-        from walter_router.analysis import advisor
-        report["advisor"] = {"launched": advisor.launch("cycle", {"run_id": run_id})}
     return {"run_id": run_id, **report}

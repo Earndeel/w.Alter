@@ -9,6 +9,13 @@ the owner's rules…). It is one Walter Engine delegation (caller `guardian-rout
 investigates read-only and ends with a JSON verdict. Its proposals become 'advice' alerts sent on Telegram with
 buttons; adopting one applies exactly one whitelisted action (OPS) through the Router's usual writers. It never
 changes anything by itself: the owner decides (CLAUDE.md: Telegram proposals, never an automatic switch).
+
+One agent, not two (owner, 2026-11-20): at the 48 h cycle (step 2, `walter-router analyze`) it also does what the
+former cycle analyst did — sources and providers, name links checked on the web (applied by the Router through the
+validated `aliases_admin.add`, the only thing applied without the owner: a name, never a model choice) and the cycle
+report `analysis-<day>.md`. Its time is bounded: the facts are precomputed in the state, the brief caps the checks and
+gives the deadline, and the engine tells a delegation to conclude before its budget cuts it (the first run, 2026-11-20,
+spent 25 min reading the Router's code and was cancelled without a verdict).
 """
 from __future__ import annotations
 
@@ -26,7 +33,8 @@ from walter_router import instance, paths
 ENGINE_URL = os.environ.get("WALTER_ENGINE_API_URL", "http://127.0.0.1:8895")
 CALLER = "guardian-router-advisor"      # policy machine_interfaces « guardian- »: a declared machine caller
 TASK, LEVEL = "general", "L3"           # the owner's top text tier: understanding consequences is its job
-BUDGET = 1500                           # seconds of work per run
+BUDGET = 1100                           # seconds per run; fits the cycle's `timeout 1300 walter-router analyze`
+MAX_CHECKS = 12                         # commands or web searches before concluding
 MAX_PROPOSALS = 3
 OWNER_DELAY = 90                        # after an owner's click: let a burst of clicks land before reading the state
 OPS = ("set_quota_fallback", "set_level", "set_preference", "set_lock", "note")
@@ -104,7 +112,8 @@ def state(conn, trigger: str = "manual", extra: dict | None = None) -> dict:
         rules = (paths.ROOT / "docs" / "TIERS.md").read_text()
     except OSError:
         rules = ""
-    return {"now": datetime.now(timezone.utc).isoformat(timespec="minutes"), "trigger": trigger, "detail": extra or {},
+    cycle = _cycle_facts(conn) if trigger == "cycle" else None
+    return {**({"cycle": cycle} if cycle else {}),"now": datetime.now(timezone.utc).isoformat(timespec="minutes"), "trigger": trigger, "detail": extra or {},
             "declared_text_tiers": declared, "method_tiers_last_cycle": tiers, "text_frontier": frontier[:30],
             "subscription_cost_ratios": [{"route_provider": p, "model_id": m, "ratio": v.get("ratio"),
                                           "source": v.get("source"), "estimated_from": v.get("estimated_from")}
@@ -113,6 +122,36 @@ def state(conn, trigger: str = "manual", extra: dict | None = None) -> dict:
             "changes_since_previous_cycle": {"new": sorted(chg["new"])[:40], "nerf": chg["nerf"],
                                              "price_drop": chg["price_drop"], "rebased": chg["rebased"]},
             "recent_alerts_and_owner_answers": recent, "tier_rules": rules}
+
+
+def _cycle_facts(conn) -> dict:
+    """What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links."""
+    from walter_router.analysis import aliases_admin
+    from walter_router.health import health
+    from walter_router.research.agent import review
+    d = review.digest(conn)
+    d.pop("tiers", None)                                   # the tiers are already in the state, with more detail
+    try:
+        h = health()
+    except Exception as exc:  # noqa: BLE001 — the health check is a fact among others
+        h = {"error": f"{type(exc).__name__}: {exc}"[:200]}
+    return {"review": d, "health": h,
+            "name_links_already_made": {k: v.get("model_id") for k, v in (aliases_admin.listing() or {}).items()}}
+
+
+CYCLE_DUTIES = """
+C'est le cycle de 48 h : tu fais aussi l'analyse du cycle (les faits sont dans `cycle`).
+- Sources et fournisseurs (`cycle.review.sources`, `providers`, `sources_ages_h`, `cycle.health`) : une source en
+  erreur ou trop vieille, un fournisseur en panne ou sans crédit — cause probable et impact concret pour {owner}.
+- Noms (`cycle.review.unmatched_candidates`) : un modèle sans score à côté d'un modèle classé au nom proche — décide
+  MÊME modèle / AUTRE / incertain, preuve à l'appui (page officielle ou fournisseur ; l'URL si les noms diffèrent).
+  Ne rends dans `aliases` que les « même modèle » CERTAINS, jamais sur une ressemblance (7b ≠ 72b, 3.1 ≠ 3.5,
+  flash ≠ flash-lite) ; ceux de `name_links_already_made` sont déjà faits. Le Router applique ces liens lui-même.
+- Prix (`price_changes_shortlist`) : seulement ceux qui changent un choix ou un coût de plus de 20 %.
+Ajoute à ton JSON final : "aliases": [{{"key": "<id sans score>", "model_id": "<id classé>", "reason": "<preuve>"}}]
+et "report_fr": "<rapport Markdown court (≤ 40 lignes) : sources et fournisseurs, noms décidés / rejetés / incertains,
+niveaux, prix>" (ce rapport reste dans le journal du Router ; ce qui doit atteindre {owner} va dans `proposals`).
+"""
 
 
 BRIEF = """Tu es le conseiller du Walter Router de {owner}, sur sa VM. Le Router choisit le modèle de chaque tâche
@@ -133,12 +172,14 @@ Ce que tu cherches (exemples, pas une liste fermée) :
   pas reproposer (regarde `recent_alerts_and_owner_answers`) ;
 - les conséquences du choix que {owner} vient de faire (détail du déclencheur).
 
-Comment travailler : vérifie avant de proposer, en lecture seule — `walter-router pick general --level L3`,
-`walter-router route <tâche>`, `walter-router dossier <tâche>`, `walter-router plans`, `walter-router library`,
-`cd {root} && venv/bin/python -c "…"` pour lire la base via `walter_router.store.db`. Tu ne modifies RIEN (ni fichier,
-ni base, ni service), tu n'envoies aucun message, tu ne fais aucun appel payant : {owner} décide, sur Telegram, avec
-les boutons que le Router fabrique à partir de ton verdict.
-
+Temps : {minutes} minutes en tout, puis ta réponse est perdue — conclus avant {deadline} UTC. L'état ci-dessous
+contient déjà les faits utiles : ne lis PAS le code du Router ni ses fichiers, ne refais pas ses calculs. Au plus
+{checks} vérifications ciblées, chacune pour confirmer UN fait précis avant de le proposer (une route, un prix, un nom) :
+`walter-router route <tâche>`, `walter-router dossier <tâche>`, `walter-router plans`, une recherche web. Rien de
+douteux à vérifier : conclus tout de suite. Tu ne modifies RIEN (ni fichier, ni base, ni service), tu n'envoies aucun
+message, tu ne fais aucun appel payant : {owner} décide, sur Telegram, avec les boutons que le Router fabrique à partir
+de ton verdict.
+{cycle_duties}
 Propose peu : au plus {max} propositions, seulement celles qui changent vraiment quelque chose pour {owner}, chacune
 avec UNE action parmi :
 - {{"op": "set_quota_fallback", "level": "L1|L2|L3", "pin": "model_id/variant"}} — le modèle qui prend le relais du
@@ -163,9 +204,13 @@ Rien à proposer : "proposals": [].
 ```"""
 
 
-def brief(st: dict) -> str:
-    return BRIEF.format(owner=instance.owner(), trigger=st.get("trigger"), root=paths.ROOT, max=MAX_PROPOSALS,
-                        state=json.dumps(st, ensure_ascii=False, indent=1, default=str))
+def brief(st: dict, budget: int = BUDGET, start: float | None = None) -> str:
+    owner = instance.owner()
+    deadline = datetime.fromtimestamp((time.time() if start is None else start) + budget * 0.75, timezone.utc).strftime("%H:%M")
+    return BRIEF.format(owner=owner, trigger=st.get("trigger"), root=paths.ROOT, max=MAX_PROPOSALS,
+                        minutes=round(budget * 0.75 / 60), deadline=deadline, checks=MAX_CHECKS,
+                        cycle_duties=CYCLE_DUTIES.format(owner=owner) if st.get("cycle") else "",
+                        state=json.dumps(st, ensure_ascii=False, separators=(",", ":"), default=str))
 
 
 def verdict_of(output: str) -> dict | None:
@@ -231,10 +276,14 @@ def validate(conn, action: dict) -> str | None:
     return None if _callable(conn, task, pin) else f"{pin} n'a pas de route"
 
 
-def subject(action: dict) -> str:
-    """One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal)."""
+def subject(action: dict, title: str = "") -> str:
+    """One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal). A note
+    has no action to tell it apart: its title does (2026-11-20, two notes of one run collapsed into one alert)."""
     keys = [k for k in ("op", "level", "task", "role", "pin", "provider", "when_quota_spent", "locked") if k in action]
-    return ":".join(str(action.get(k)) for k in keys)[:300]
+    head = ":".join(str(action.get(k)) for k in keys)
+    if action.get("op") == "note":
+        head += ":" + re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:120]
+    return head[:300]
 
 
 def apply(conn, action: dict, note: str) -> dict:
@@ -282,7 +331,7 @@ def record(conn, verdict: dict, run: dict) -> list[dict]:
         ev = {"title_fr": str(p.get("title_fr") or "")[:200], "why_fr": str(p.get("why_fr") or "")[:900],
               "consequences_fr": str(p.get("consequences_fr") or "")[:600], "action": action,
               "trigger": run.get("trigger"), "run_at": run.get("at")}
-        new = alerts.record(conn, "advice", action.get("task") or "general", subject(action), ev, "open",
+        new = alerts.record(conn, "advice", action.get("task") or "general", subject(action, ev["title_fr"]), ev, "open",
                             action.get("level") or action.get("role") or "")
         kept.append({"title_fr": ev["title_fr"], "action": action, "new": new})
     return kept
@@ -324,28 +373,56 @@ def _log(entry: dict) -> None:
         pass
 
 
-def run(trigger: str = "manual", extra: dict | None = None, dry_run: bool = False, notify: bool = True) -> dict:
+def cycle_report(conn, v: dict | None, ran: dict, *, add=None, log_dir: Path | None = None,
+                 now: datetime | None = None) -> dict:
+    """The cycle's part of the verdict: name links applied through the validated add, report written."""
+    from walter_router.analysis import aliases_admin
+    from walter_router.research.agent import run as names
+    day = (now or datetime.now(timezone.utc)).strftime("%Y%m%d")
+    aliases = [a for a in ((v or {}).get("aliases") or []) if isinstance(a, dict)
+               and all(isinstance(a.get(k), str) and a.get(k) for k in ("key", "model_id", "reason"))]
+    added, refused = names.apply(conn, aliases, add or aliases_admin.add) if v else ([], [])
+    answer = None
+    if v:
+        props = [f"- {k.get('title_fr')}" + (f" (refusée : {k['refused']})" if k.get("refused") else "")
+                 for k in v.get("_kept") or []]
+        answer = {"report": (str(v.get("report_fr") or v.get("summary_fr") or "").strip()
+                             + ("\n\n## Conseils envoyés à " + instance.owner() + "\n" + "\n".join(props) if props else ""))}
+    raw = None if not ran.get("output") and not ran.get("ok") else ran.get("output")
+    path = Path(log_dir or instance.host_path("log_dir")) / f"analysis-{day}.md"
+    path.write_text(names.report_text(day, answer, added, refused, raw))
+    return {"report": str(path), "added": [a["added"] for a in added], "refused": len(refused)}
+
+
+def run(trigger: str = "manual", extra: dict | None = None, dry_run: bool = False, notify: bool = True,
+        budget: int = BUDGET) -> dict:
+    """One advisor run. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's
+    refresh sends the Telegram message); 'owner' = after an owner's choice (consequences only)."""
     from walter_router.analysis import telegram
     from walter_router.store import db
     started = time.time()
     at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with db.connect() as conn:
         st = state(conn, trigger, extra)
-    goal = brief(st)
+    goal = brief(st, budget, started)
     if dry_run:
         return {"trigger": trigger, "brief_chars": len(goal), "state": st}
-    ran = delegate(goal, f"router-advisor-{trigger}-{int(started)}"[:200])
+    ran = delegate(goal, f"router-advisor-{trigger}-{int(started)}"[:200], budget)
     v = verdict_of(ran.get("output") or "")
     entry = {"at": at, "trigger": trigger, "detail": extra, "seconds": round(time.time() - started),
              "engine": {k: ran.get(k) for k in ("ok", "status", "reason", "error", "tools")}}
-    if not v:
-        _log({**entry, "verdict": None, "tail": (ran.get("output") or "")[-600:]})
-        return {**entry, "verdict": None}
     with db.connect() as conn:
-        kept = record(conn, v, {"trigger": trigger, "at": at})
+        kept = record(conn, v, {"trigger": trigger, "at": at}) if v else []
+        if v:
+            v["_kept"] = kept
+        if trigger == "cycle":
+            entry["cycle"] = cycle_report(conn, v, ran)
         sent = telegram.notify(conn) if notify and any(k.get("new") for k in kept) else {"sent": 0}
         conn.commit()
-    entry.update(summary_fr=v.get("summary_fr"), proposals=kept, notify=sent)
+    if not v:
+        _log({**entry, "verdict": None, "tail": (ran.get("output") or "")[-600:]})
+        return {**entry, "ok": False, "verdict": None}
+    entry.update(ok=True, summary_fr=v.get("summary_fr"), proposals=kept, notify=sent)
     _log(entry)
     return entry
 

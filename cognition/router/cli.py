@@ -40,20 +40,15 @@ def feedback(conn, model: str, rating: int, task: str | None, note: str | None) 
 
 
 def _instance_env() -> int:
-    """LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
-    rendered for the instance: its owner, its log folder), as shell assignments."""
+    """LOG, CONTROL_ENV and LIBRARY_URL, as shell assignments (the analysis prompt rendering left with the cycle
+    analyst, merged into the advisor on 2026-11-20)."""
     import shlex
     log = instance.host_path("log_dir")
     log.mkdir(parents=True, exist_ok=True)
-    prompt = paths.AGENT_PROMPT.read_text()
-    prompt = prompt.replace("{{log_dir}}", str(log))
-    rendered = subprocess.run(["walter", "instance", "render"], input=prompt, capture_output=True, text=True,
-                              timeout=30, check=True).stdout
-    (log / "analysis-prompt.md").write_text(rendered)
     domain = instance.host().get("library_domain") or ""
     values = {"LOG": log,
               "CONTROL_ENV": instance.host_path("control_env") or "",
-              "LIBRARY_URL": f"https://{domain}" if domain else "", "ANALYSIS_PROMPT": log / "analysis-prompt.md"}
+              "LIBRARY_URL": f"https://{domain}" if domain else ""}
     for k, v in values.items():
         print(f"{k}={shlex.quote(str(v))}")
     return 0
@@ -424,8 +419,8 @@ def main(argv: list[str] | None = None) -> int:
             elif args.cmd == "review":
                 out = review.digest(conn)
             elif args.cmd == "analyze":
-                from walter_router.research.agent import run as agent_run
-                out = agent_run.run(conn)
+                from walter_router.analysis import advisor   # one Router agent (2026-11-20); step 3 notifies
+                out = advisor.run("cycle", notify=False)
             elif args.cmd == "subscriptions":
                 if args.action == "refresh":
                     subscriptions.refresh(conn, args.sub_id)

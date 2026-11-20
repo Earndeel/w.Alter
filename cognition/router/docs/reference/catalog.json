@@ -5962,9 +5962,14 @@
             "signature": "conn, trigger: str='manual', extra: dict | None=None"
           },
           {
+            "description": "What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links.",
+            "name": "_cycle_facts",
+            "signature": "conn"
+          },
+          {
             "description": "",
             "name": "brief",
-            "signature": "st: dict"
+            "signature": "st: dict, budget: int=BUDGET, start: float | None=None"
           },
           {
             "description": "The agent's closing JSON: the last object carrying `proposals`.",
@@ -5982,9 +5987,9 @@
             "signature": "conn, action: dict"
           },
           {
-            "description": "One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal).",
+            "description": "One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal). A note",
             "name": "subject",
-            "signature": "action: dict"
+            "signature": "action: dict, title: str=''"
           },
           {
             "description": "The owner adopted the advice: one action through the Router's usual writers.",
@@ -6012,9 +6017,14 @@
             "signature": "entry: dict"
           },
           {
-            "description": "",
+            "description": "The cycle's part of the verdict: name links applied through the validated add, report written.",
+            "name": "cycle_report",
+            "signature": "conn, v: dict | None, ran: dict, *, add=None, log_dir: Path | None=None, now: datetime | None=None"
+          },
+          {
+            "description": "One advisor run. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's",
             "name": "run",
-            "signature": "trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True"
+            "signature": "trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True, budget: int=BUDGET"
           },
           {
             "description": "Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.",
@@ -7092,7 +7102,7 @@
             "signature": "conn, model: str, rating: int, task: str | None, note: str | None"
           },
           {
-            "description": "LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt",
+            "description": "LOG, CONTROL_ENV and LIBRARY_URL, as shell assignments (the analysis prompt rendering left with the cycle",
             "name": "_instance_env",
             "signature": ""
           },
@@ -8891,19 +8901,9 @@
         ]
       },
       {
-        "description": "Step 2 of the 48 h cycle: the research agent, run by Walter Engine (2026-11-13; before, a Hermes loop with shell,",
+        "description": "Name links and the cycle report, for the Router's single agent (analysis/advisor.py).",
         "file": "research/agent/run.py",
         "functions": [
-          {
-            "description": "",
-            "name": "prompt",
-            "signature": "data: dict"
-          },
-          {
-            "description": "The agent's JSON object {aliases, report} (tolerates a code fence or text around it); None if absent.",
-            "name": "parse",
-            "signature": "text: str | None"
-          },
           {
             "description": "",
             "name": "apply",
@@ -8913,11 +8913,6 @@
             "description": "",
             "name": "report_text",
             "signature": "day: str, answer: dict | None, added: list[dict], refused: list[dict], raw: str | None"
-          },
-          {
-            "description": "",
-            "name": "run",
-            "signature": "conn, *, delegate=None, gather=None, add=None, log_dir: Path | None=None, now: datetime | None=None"
           }
         ]
       },
@@ -15369,10 +15364,16 @@
         "value": "L3"
       },
       {
-        "comment": "seconds of work per run",
+        "comment": "seconds per run; fits the cycle's `timeout 1300 walter-router analyze`",
         "file": "analysis/advisor.py",
         "name": "BUDGET",
-        "value": 1500
+        "value": 1100
+      },
+      {
+        "comment": "commands or web searches before concluding",
+        "file": "analysis/advisor.py",
+        "name": "MAX_CHECKS",
+        "value": 12
       },
       {
         "comment": "",
@@ -15411,8 +15412,14 @@
       {
         "comment": "",
         "file": "analysis/advisor.py",
+        "name": "CYCLE_DUTIES",
+        "value": "\nC'est le cycle de 48 h : tu fais aussi l'analyse du cycle (les faits sont dans `cycle`).\n- Sources et fournisseurs (`cycle.review.sources`, `providers`, `sources_ages_h`, `cycle.health`) : une source en\n  erreur ou trop vieille, un fournisseur en panne ou sans crédit — cause probable et impact concret pour {owner}.\n- Noms (`cycle.review.unmatched_candidates`) : un modèle sans score à côté d'un modèle classé au nom proche — décide\n  MÊME modèle / AUTRE / incertain, preuve à l'appui (page officielle ou fournisseur ; l'URL si les noms diffèrent).\n  Ne rends dans `aliases` que les « même modèle » CERTAINS, jamais sur une ressemblance (7b ≠ 72b, 3.1 ≠ 3.5,\n  flash ≠ flash-lite) ; ceux de `name_links_already_made` sont déjà faits. Le Router applique ces liens lui-même.\n- Prix (`price_changes_shortlist`) : seulement ceux qui changent un choix ou un coût de plus de 20 %.\nAjoute à ton JSON final : \"aliases\": [{{\"key\": \"<id sans score>\", \"model_id\": \"<id classé>\", \"reason\": \"<preuve>\"}}]\net \"report_fr\": \"<rapport Markdown court (≤ 40 lignes) : sources et fournisseurs, noms décidés / rejetés / incertains,\nniveaux, prix>\" (ce rapport reste dans le journal du Router ; ce qui doit atteindre {owner} va dans `proposals`).\n"
+      },
+      {
+        "comment": "",
+        "file": "analysis/advisor.py",
         "name": "BRIEF",
-        "value": "Tu es le conseiller du Walter Router de {owner}, sur sa VM. Le Router choisit le modèle de chaque tâche\n(niveaux texte L1/L2/L3, spécialistes, image, vidéo, voix…) à partir des classements (Artificial Analysis…), des prix et\ndes abonnements de {owner}. Ses règles automatiques regardent une chose à la fois ; toi, tu comprends les tenants et les\naboutissants : ce qu'un changement implique ailleurs, ce qui est devenu incohérent, ce que {owner} n'a pas vu.\n\nDéclencheur : {trigger}. L'état complet est ci-dessous (un seul instantané de l'index ; les règles des niveaux, écrites\npar {owner}, sont dans `tier_rules`).\n\nCe que tu cherches (exemples, pas une liste fermée) :\n- un repli « quota épuisé » (`when_quota_spent`) ou un `fallback` resté sur un ancien modèle alors qu'un meilleur existe\n  sur le même abonnement, ou qui n'a plus de route, ou qui ferait descendre le niveau sous le niveau inférieur ;\n- un niveau qui ne respecte plus ses règles (L1 < L2 < L3 en score ; L2 sur un autre abonnement que L3 ; même prix ±25 %\n  et jamais un score plus bas pour L1/L2) ;\n- un coût d'abonnement estimé (`estimated_from`) qui change une décision, ou qu'une mesure contredit ;\n- un recalcul de l'index (rebased) qui fausse une comparaison ; une proposition déjà refusée par {owner} qu'il ne faut\n  pas reproposer (regarde `recent_alerts_and_owner_answers`) ;\n- les conséquences du choix que {owner} vient de faire (détail du déclencheur).\n\nComment travailler : vérifie avant de proposer, en lecture seule — `walter-router pick general --level L3`,\n`walter-router route <tâche>`, `walter-router dossier <tâche>`, `walter-router plans`, `walter-router library`,\n`cd {root} && venv/bin/python -c \"…\"` pour lire la base via `walter_router.store.db`. Tu ne modifies RIEN (ni fichier,\nni base, ni service), tu n'envoies aucun message, tu ne fais aucun appel payant : {owner} décide, sur Telegram, avec\nles boutons que le Router fabrique à partir de ton verdict.\n\nPropose peu : au plus {max} propositions, seulement celles qui changent vraiment quelque chose pour {owner}, chacune\navec UNE action parmi :\n- {{\"op\": \"set_quota_fallback\", \"level\": \"L1|L2|L3\", \"pin\": \"model_id/variant\"}} — le modèle qui prend le relais du\n  niveau quand son abonnement est épuisé (et en cas de panne de tous ses fournisseurs) ;\n- {{\"op\": \"set_level\", \"level\": \"L1|L2|L3\", \"pin\": \"model_id/variant\", \"provider\": \"route_provider ou null\",\n  \"when_quota_spent\": \"model_id/variant ou null\"}} — changer un niveau texte ;\n- {{\"op\": \"set_preference\", \"task\": \"<tâche>\", \"role\": \"<rôle>\", \"pin\": \"model_id[/variant]\", \"provider\": null}} ;\n- {{\"op\": \"set_lock\", \"task\": \"<tâche>\", \"role\": \"<rôle>\", \"locked\": true|false}} ;\n- {{\"op\": \"note\"}} — une information importante sans action.\nLes identifiants viennent de l'état ou de tes vérifications (jamais inventés) ; le Router refuse une action dont le\nmodèle n'a pas de route.\n\nTermine par un seul objet JSON :\n{{\"summary_fr\": \"deux phrases simples pour {owner} : ce que tu as regardé et ce que tu en conclus\",\n \"proposals\": [{{\"title_fr\": \"titre court\", \"why_fr\": \"pourquoi, chiffres à l'appui (score AA, $/tâche)\",\n                \"consequences_fr\": \"ce qui change concrètement si {owner} accepte\", \"action\": {{...}}}}]}}\nRien à proposer : \"proposals\": [].\n\n## État\n```json\n{state}\n```"
+        "value": "Tu es le conseiller du Walter Router de {owner}, sur sa VM. Le Router choisit le modèle de chaque tâche\n(niveaux texte L1/L2/L3, spécialistes, image, vidéo, voix…) à partir des classements (Artificial Analysis…), des prix et\ndes abonnements de {owner}. Ses règles automatiques regardent une chose à la fois ; toi, tu comprends les tenants et les\naboutissants : ce qu'un changement implique ailleurs, ce qui est devenu incohérent, ce que {owner} n'a pas vu.\n\nDéclencheur : {trigger}. L'état complet est ci-dessous (un seul instantané de l'index ; les règles des niveaux, écrites\npar {owner}, sont dans `tier_rules`).\n\nCe que tu cherches (exemples, pas une liste fermée) :\n- un repli « quota épuisé » (`when_quota_spent`) ou un `fallback` resté sur un ancien modèle alors qu'un meilleur existe\n  sur le même abonnement, ou qui n'a plus de route, ou qui ferait descendre le niveau sous le niveau inférieur ;\n- un niveau qui ne respecte plus ses règles (L1 < L2 < L3 en score ; L2 sur un autre abonnement que L3 ; même prix ±25 %\n  et jamais un score plus bas pour L1/L2) ;\n- un coût d'abonnement estimé (`estimated_from`) qui change une décision, ou qu'une mesure contredit ;\n- un recalcul de l'index (rebased) qui fausse une comparaison ; une proposition déjà refusée par {owner} qu'il ne faut\n  pas reproposer (regarde `recent_alerts_and_owner_answers`) ;\n- les conséquences du choix que {owner} vient de faire (détail du déclencheur).\n\nTemps : {minutes} minutes en tout, puis ta réponse est perdue — conclus avant {deadline} UTC. L'état ci-dessous\ncontient déjà les faits utiles : ne lis PAS le code du Router ni ses fichiers, ne refais pas ses calculs. Au plus\n{checks} vérifications ciblées, chacune pour confirmer UN fait précis avant de le proposer (une route, un prix, un nom) :\n`walter-router route <tâche>`, `walter-router dossier <tâche>`, `walter-router plans`, une recherche web. Rien de\ndouteux à vérifier : conclus tout de suite. Tu ne modifies RIEN (ni fichier, ni base, ni service), tu n'envoies aucun\nmessage, tu ne fais aucun appel payant : {owner} décide, sur Telegram, avec les boutons que le Router fabrique à partir\nde ton verdict.\n{cycle_duties}\nPropose peu : au plus {max} propositions, seulement celles qui changent vraiment quelque chose pour {owner}, chacune\navec UNE action parmi :\n- {{\"op\": \"set_quota_fallback\", \"level\": \"L1|L2|L3\", \"pin\": \"model_id/variant\"}} — le modèle qui prend le relais du\n  niveau quand son abonnement est épuisé (et en cas de panne de tous ses fournisseurs) ;\n- {{\"op\": \"set_level\", \"level\": \"L1|L2|L3\", \"pin\": \"model_id/variant\", \"provider\": \"route_provider ou null\",\n  \"when_quota_spent\": \"model_id/variant ou null\"}} — changer un niveau texte ;\n- {{\"op\": \"set_preference\", \"task\": \"<tâche>\", \"role\": \"<rôle>\", \"pin\": \"model_id[/variant]\", \"provider\": null}} ;\n- {{\"op\": \"set_lock\", \"task\": \"<tâche>\", \"role\": \"<rôle>\", \"locked\": true|false}} ;\n- {{\"op\": \"note\"}} — une information importante sans action.\nLes identifiants viennent de l'état ou de tes vérifications (jamais inventés) ; le Router refuse une action dont le\nmodèle n'a pas de route.\n\nTermine par un seul objet JSON :\n{{\"summary_fr\": \"deux phrases simples pour {owner} : ce que tu as regardé et ce que tu en conclus\",\n \"proposals\": [{{\"title_fr\": \"titre court\", \"why_fr\": \"pourquoi, chiffres à l'appui (score AA, $/tâche)\",\n                \"consequences_fr\": \"ce qui change concrètement si {owner} accepte\", \"action\": {{...}}}}]}}\nRien à proposer : \"proposals\": [].\n\n## État\n```json\n{state}\n```"
       },
       {
         "comment": "",
@@ -17787,18 +17794,6 @@
       },
       {
         "comment": "",
-        "file": "research/agent/run.py",
-        "name": "SOURCE",
-        "value": "walter-router-analysis"
-      },
-      {
-        "comment": "",
-        "file": "research/agent/run.py",
-        "name": "TIMEOUT_S",
-        "value": 1100
-      },
-      {
-        "comment": "",
         "file": "research/benchmarks/aa.py",
         "name": "AA_MODEL_URL",
         "value": "https://artificialanalysis.ai/models/{}"
@@ -19250,7 +19245,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/advisor.py": "6dee82b29121396deed3d9a49010e3a1230d31eddc999cce3d576b03a09eb8de",
+    "analysis/advisor.py": "a5e1aac86c63de11abf13f060a9d2a68367fc82cd8a2998979998dc31b739297",
     "analysis/alerts.py": "146708a0b7f31655da4674246a522a3e4091a197fea710f39db0e0b7fa3565cc",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
@@ -19266,16 +19261,16 @@
     "analysis/parse.py": "cf82c94b379e607f9793738b1e770374b3e96c6da328062ecb16292d43b59317",
     "analysis/postes.py": "8871b0214df0a72334179b1fc575af74452a4608c786200ca5170a2bce996fd1",
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
-    "analysis/refresh.py": "7dfe581ec0e5de9a1f74ebe8be2c792f9fe9179e1db3fbd793cf0c7fa19ff237",
+    "analysis/refresh.py": "dcc93f5a5ac7a7f89177ec1a8900c669b499585c5dc31df1aba7c2608d0e3a1f",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
     "analysis/select.py": "39ad5f96af616cd95209b22ee6f4f77c62be760cf7efa614e775bf6065390624",
     "analysis/telegram.py": "702b3ddd6d93e7c666975b3bd9a9fddeb18582854ec6a79e12fe2b9d1bfeb9bf",
     "analysis/tiers.py": "5b70be11b3a4268e5f329ea330600814309194bab681ecffb42f8f726390291a",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
     "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
-    "bin/walter-router-cycle": "0dcd43cafbfbed0de2ebfffa9d6beab43aa9a494b7ad5d4a6d694e4d43904e79",
+    "bin/walter-router-cycle": "10d27d55ff691eb1138895fa94a2c3c55eeaea46fcefae19eadfa3e79a0c90f9",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "614d78994d63acb3119ba608f5ed4afca3e216c5826c3208e1d6a7fa6d1e24dd",
+    "cli.py": "dbef9053133471bc2f38da96a10cd77d2210c349fde660a76cc218d3146ba0e3",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/decision-needs.json": "8c912fe4a937dd9dc2ab2ab8bbe122080a67ddfcd9fd5450c4c79101e824b608",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
@@ -19316,7 +19311,7 @@
     "llm/resolver.py": "cd04d0c818891381f988d044cc910902ec3fc11e1d1401ad16190e601935d188",
     "llm/structured.py": "4a8e241f6033f6e61753d6090dbc920d28a4fdcf45150140d70fdf169ff742da",
     "llm/transcription.py": "6ab3be5f2b81801248665469f8451ea630a07e53397c44e3f0357448b627b8dc",
-    "paths.py": "4da4fe941816093bb718a9b3cddf81eb6d7903043c9fad002f616763f28545cf",
+    "paths.py": "2feb1f504430171cc532b1bd7ce3a16a00f489eb286f820b48dc9aa4b6fcdab5",
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "c6304ef26216528a6c2b5da12e5a410bef6a59bc44d2d0ea440de12b043815a7",
     "plan/consumption.py": "6ff376bf70ecd34d5d16ef9315fc20c1993aec3f178a20ead43f7f61be9d59fe",
@@ -19330,7 +19325,7 @@
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",
     "research/agent/review.py": "93905a0e3b4849e11d07232e7b50799fef1bb90736e104705533569e08ea8a13",
-    "research/agent/run.py": "a492c23c21a001cc958d37a31a37aa8c2c77178ae874ae8ab0da0f755fbf758a",
+    "research/agent/run.py": "83fc17b7bd293913dbe3b429f8063ab7981c83dafb51fe5219d217ea77daeb60",
     "research/benchmarks/__init__.py": "5066d339167d8898f0cda8d667da3b6e935a3edda56c178ce3f4e350b58e3679",
     "research/benchmarks/aa.py": "04c8aa990ad9d31c0aba588b0cd186a8863b15864923525285616fec9df61207",
     "research/benchmarks/aa_data.py": "5e602b5a70e0454ee0ac3df6d6948ff215f4fa6851e4d6823b2269cfe348298d",

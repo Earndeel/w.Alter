@@ -72,3 +72,24 @@ def test_state_holds_the_declared_tiers_and_the_owner_rules(conn):
     assert "pin_now" in st["declared_text_tiers"]["L3"] and st["tier_rules"]
     assert len(advisor.brief(st)) < 120_000
     json.dumps(st, default=str)
+
+
+def test_the_cycle_state_holds_the_former_analysts_facts(conn):
+    st = advisor.state(conn, "cycle")
+    assert {"review", "health", "name_links_already_made"} <= set(st["cycle"])
+    assert "tiers" not in st["cycle"]["review"]                  # already in the state, with more detail
+    assert len(advisor.brief(st)) < 120_000
+    assert "cycle" not in advisor.state(conn, "owner")
+
+
+def test_the_run_fits_the_cycle_step():
+    assert advisor.BUDGET + 120 < 1300                           # bin/walter-router-cycle: timeout 1300 analyze
+
+
+def test_two_notes_of_one_run_are_two_alerts(conn):
+    conn.execute("delete from models.alerts where kind = 'advice'")
+    v = {"summary_fr": "s", "proposals": [{"title_fr": "Recharger OpenRouter", "action": {"op": "note"}},
+                                          {"title_fr": "ChatGPT Plus à 85 %", "action": {"op": "note"}}]}
+    kept = advisor.record(conn, v, {"trigger": "test", "at": "now"})
+    assert [k["new"] for k in kept] == [True, True]
+    assert conn.execute("select count(*) as n from models.alerts where kind = 'advice'").fetchone()["n"] == 2

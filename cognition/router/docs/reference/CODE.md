@@ -16,17 +16,19 @@ The Router's advisor agent (owner, 2026-11-20: « le router doit avoir un vrai a
 - `_aa(conn, model_id: str, variant: str)` — 
 - `_routes(conn, pin: str | None)` — 
 - `state(conn, trigger: str='manual', extra: dict | None=None)` — Everything the advisor needs, compact and in one snapshot of the index.
-- `brief(st: dict)` — 
+- `_cycle_facts(conn)` — What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links.
+- `brief(st: dict, budget: int=BUDGET, start: float | None=None)` — 
 - `verdict_of(output: str)` — The agent's closing JSON: the last object carrying `proposals`.
 - `_callable(conn, task: str, pin: str)` — 
 - `validate(conn, action: dict)` — None when the action can be applied as is, else why not.
-- `subject(action: dict)` — One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal).
+- `subject(action: dict, title: str='')` — One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal). A note
 - `apply(conn, action: dict, note: str)` — The owner adopted the advice: one action through the Router's usual writers.
 - `record(conn, verdict: dict, run: dict)` — The agent's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log.
 - `_engine_token()` — 
 - `delegate(goal: str, key: str, budget: int=BUDGET)` — One Walter Engine delegation (Engine API, the declared door to the runtime).
 - `_log(entry: dict)` — 
-- `run(trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True)` — 
+- `cycle_report(conn, v: dict | None, ran: dict, *, add=None, log_dir: Path | None=None, now: datetime | None=None)` — The cycle's part of the verdict: name links applied through the validated add, report written.
+- `run(trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True, budget: int=BUDGET)` — One advisor run. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's
 - `launch(trigger: str, extra: dict | None=None, delay: int=0)` — Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.
 
 ## analysis/alerts.py
@@ -318,7 +320,7 @@ The owner's method for the three functional text tiers (declared 2026-10-02).
 walter-router CLI: migrate | refresh | pick | prefer | alerts | verdict | status | route | run | web …
 
 - `feedback(conn, model: str, rating: int, task: str | None, note: str | None)` — 
-- `_instance_env()` — LOG, CONTROL_ENV, LIBRARY_URL and ANALYSIS_PROMPT (the shipped analysis prompt
+- `_instance_env()` — LOG, CONTROL_ENV and LIBRARY_URL, as shell assignments (the analysis prompt rendering left with the cycle
 - `build_parser()` — 
 - `main(argv: list[str] | None=None)` — 
 
@@ -807,13 +809,10 @@ Deterministic digest of a refresh cycle, the input of the 48 h analysis agent (e
 
 ## research/agent/run.py
 
-Step 2 of the 48 h cycle: the research agent, run by Walter Engine (2026-11-13; before, a Hermes loop with shell,
+Name links and the cycle report, for the Router's single agent (analysis/advisor.py).
 
-- `prompt(data: dict)` — 
-- `parse(text: str | None)` — The agent's JSON object {aliases, report} (tolerates a code fence or text around it); None if absent.
 - `apply(conn, aliases: list[dict], add)` — 
 - `report_text(day: str, answer: dict | None, added: list[dict], refused: list[dict], raw: str | None)` — 
-- `run(conn, *, delegate=None, gather=None, add=None, log_dir: Path | None=None, now: datetime | None=None)` — 
 
 ## research/benchmarks/__init__.py
 
