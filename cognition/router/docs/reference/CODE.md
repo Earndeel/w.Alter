@@ -1120,6 +1120,7 @@ Ordered provider routes and execution metadata for Walter consumers.
 Intent classification by the decision model (OpenRouter's Decisions API, or Cloudflare Workers AI for Clef).
 
 - `chain(conn)` — Decision models to try, in order. The best one comes from the 48 h cycle (task 'decision', AA Decision Index,
+- `_native_pin(conn)` — The owner's pinned decision model when its provider is Liquid's own API (`pinned_provider = 'liquidai'`, not a
 - `_typed(conn, best: str, decision: dict)` — Walter Decision 2.0 (17/11): the model whose routes carry d1.2's typed kinds (values read, estimates,
 - `_cloudflare(model: str, payload: dict, timeout: float)` — Cloudflare Workers AI (Clef family, free daily allocation). Scoped token preferred; the global key only when
 - `_nace(model: str, payload: dict, timeout: float)` — Nace systemone (Drex Max): the OpenRouter Decisions contract on Nace's own API (2026-11-13); Liquid's own

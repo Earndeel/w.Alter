@@ -420,7 +420,9 @@ def auto_adopt(conn, only_task: str | None = None, only_role: str | None = None)
     button); its other proposals are closed. Locked preferences (the default) are untouched: their proposals go to
     Telegram and wait for the owner. Returns what changed, for the information message."""
     done = []
-    for p in conn.execute("""select p.task, p.role, p.pinned_model_id, p.pinned_variant, t.label from models.preferences p
+    from walter_router.serve.choose import routes_for
+    for p in conn.execute("""select p.task, p.role, p.pinned_model_id, p.pinned_variant, t.label, t.interface, t.modes
+                             from models.preferences p
                              join models.tasks t using (task) where not p.locked and p.pinned_model_id is not null
                              and (%s::text is null or p.task = %s) and (%s::text is null or p.role = %s)
                              order by p.task, p.role""", (only_task, only_task, only_role, only_role)).fetchall():
@@ -438,6 +440,8 @@ def auto_adopt(conn, only_task: str | None = None, only_role: str | None = None)
                                      and subject not like '%%:unmeasured' and evidence ? 'boards'
                                      and last_seen > now() - interval '{FRESH}'""",
                                  (p["task"], p["role"], p["pinned_model_id"])).fetchall()
+            # only a model Walter can call today (2026-11-20: Arrow 2 Telos, no offer, was adopted for svg)
+            cands = [a for a in cands if routes_for(conn, a["subject"], p["interface"], p["modes"] or None)["callable"]]
             pick = max(cands, key=lambda a: ((a["evidence"].get("composite") or {}).get("challenger") or 0), default=None)
             others = "kind in ('challenger', 'new_best') and task = %s and role = %s"
             args = (p["task"], p["role"])

@@ -9605,6 +9605,11 @@
             "signature": "conn"
           },
           {
+            "description": "The owner's pinned decision model when its provider is Liquid's own API (`pinned_provider = 'liquidai'`, not a",
+            "name": "_native_pin",
+            "signature": "conn"
+          },
+          {
             "description": "Walter Decision 2.0 (17/11): the model whose routes carry d1.2's typed kinds (values read, estimates,",
             "name": "_typed",
             "signature": "conn, best: str, decision: dict"
@@ -18852,7 +18857,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "15a020ba8f81ce419bd63ef4f911928a34d52f84dc4e304ecdcdd8db9ab7b11e",
+    "analysis/alerts.py": "71bc53ae96f1cc767d3259fa2aa2d263d40bb87e2e8d58f4e129c5bd678fc49d",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -18972,7 +18977,7 @@
     "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "bda52e62df56396fedfd29c23cfaa8711b8967aff3f23ef25505e247cc875225",
-    "serve/intent.py": "31e6ba9747d690ee684384c7ae58e9dd54639f2af430d39de0a9b7cf031bf93f",
+    "serve/intent.py": "b5cc05dfe5a571e4f74e3a2dd379e041f961e49d8e9b2d15181c647c7b98c9ab",
     "serve/media_exec.py": "91bd46fb1566d24eaabaf2cd3d3d933db3a66d1578e37434f1a62e4f9c6bcd8c",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",
     "serve/oneshot.py": "0d48ad5fe40335a1192a13ea736d3e2e70704045ea076b9f4fa171437673b302",

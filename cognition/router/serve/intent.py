@@ -45,9 +45,16 @@ def chain(conn) -> tuple[str, ...]:
     """Decision models to try, in order. The best one comes from the 48 h cycle (task 'decision', AA Decision Index,
     callable Decisions-API offer); knowledge.json `decision.order` says where it goes:
       best_first  best, then the free fallback (Clef on Workers AI)
-      free_first  the free models first, the best last (the owner's choice of 2026-10-04: Clef, free allocation)"""
+      free_first  the free models first, the best last (the owner's choice of 2026-10-04: Clef, free allocation)
+    A pin on Liquid's own API (pinned_provider 'liquidai', owner 2026-11-20) heads the chain with its OpenRouter resale,
+    then knowledge.json `decision.failover` (other paid decision models), then the free fallback."""
     decision = json.loads(KNOWLEDGE.read_text()).get("decision") or {}
     order = decision.get("order", "free_first")
+    failover = tuple(m for m in decision.get("failover") or () if isinstance(m, str) and m)
+    native = _native_pin(conn)
+    if native:   # owner 2026-11-20: the pinned model on its maker's own API, its OpenRouter resale as first failover
+        seq = (*native, *failover, *FREE_FALLBACKS) if order == "best_first" else (*FREE_FALLBACKS[::-1], *native, *failover)
+        return tuple(dict.fromkeys(seq))
     # the owner's pinned decision model first (a new #1 is only proposed, 2026-10-16), else the cycle's #1
     row = conn.execute("""select o.offer_key from models.preferences p join models.offers o on o.model_id = p.pinned_model_id
                           join models.latest_snapshots s using (snapshot_id)
@@ -60,6 +67,23 @@ def chain(conn) -> tuple[str, ...]:
     typed = _typed(conn, best, decision)
     seq = (best, *typed, *FREE_FALLBACKS) if order == "best_first" else (*FREE_FALLBACKS[::-1], best, *typed)
     return tuple(dict.fromkeys(seq))
+
+
+def _native_pin(conn) -> tuple[str, ...]:
+    """The owner's pinned decision model when its provider is Liquid's own API (`pinned_provider = 'liquidai'`, not a
+    catalogued offer): `liquidai/<name>`, then the OpenRouter resale `liquid/<name>` of the same model when it is a
+    current decision offer. Empty when the pin is on a catalogued provider (the offer query below handles it)."""
+    pin = conn.execute("""select pinned_model_id from models.preferences where task = 'decision' and role = 'default'
+                          and pinned_provider = 'liquidai' and pinned_model_id is not null""").fetchone()
+    if not pin:
+        return ()
+    resale = conn.execute("""select o.offer_key from models.offers o join models.latest_snapshots s using (snapshot_id)
+                             where o.interface = 'decisions' and o.offer_key like 'liquid/%%'
+                               and (o.model_id = %s or o.offer_key = 'liquid/' || %s) limit 1""",
+                          (pin["pinned_model_id"], pin["pinned_model_id"])).fetchone()
+    if resale:
+        return (f"liquidai/{resale['offer_key'].split('/', 1)[1]}", resale["offer_key"])
+    return (f"liquidai/{pin['pinned_model_id']}",)
 
 
 def _typed(conn, best: str, decision: dict) -> tuple[str, ...]:
