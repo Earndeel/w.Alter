@@ -242,7 +242,8 @@ def test_noise_is_covered_without_a_model_call():
     assert r["filtered"] == 2 and not model.calls
 
 
-def test_failures_retry_with_backoff_then_dead_letter_then_replay():
+def test_failures_retry_with_backoff_then_dead_letter_then_replay(monkeypatch):
+    monkeypatch.setattr(extract2, "HUMAN_SOURCES", [])   # the oldest thread is leased first: this one (1970)
     t = thread()
     say("claude_code", t, "owner", "on garde Loki pour le projet", at=NOW - timedelta(hours=2))
     extract2.enqueue(thread=t)

@@ -973,8 +973,14 @@ def process_thread(source: str, thread_id: str, *, chat=None, budget: str = "rec
 
 
 # ───────────────────────────── the worker ─────────────────────────────
+HUMAN_SOURCES = ["beeper", "gmail"]   # conversations with people: read before the agents' sessions
+
+
 def claim(limit: int = 8) -> list[dict]:
-    """Lease due dirty threads (short transaction: no lock is held during model calls)."""
+    """Lease due dirty threads (short transaction: no lock is held during model calls). The owner's conversations with
+    people come first, then the oldest: an agent session is long to read (~40 s a segment) and must not keep a
+    contact's proposal waiting behind it (20/11). Human traffic is small (~500 exchanges a week), so agents never
+    starve."""
     with connection() as conn:
         return conn.execute("""
             update extraction.threads t set status = 'working', claimed_at = now(), updated_at = now()
@@ -982,8 +988,8 @@ def claim(limit: int = 8) -> list[dict]:
                 select processor, source, thread_id from extraction.threads
                 where processor = %s and (status = 'dirty' or (status = 'working' and claimed_at < now() - %s))
                   and (retry_after is null or retry_after <= now())
-                order by last_event_at nulls first limit %s for update skip locked)
-            returning t.source, t.thread_id, t.attempts""", (PROCESSOR, LEASE, limit)).fetchall()
+                order by source <> all(%s), last_event_at nulls first limit %s for update skip locked)
+            returning t.source, t.thread_id, t.attempts""", (PROCESSOR, LEASE, HUMAN_SOURCES, limit)).fetchall()
 
 
 def _release(source: str, thread_id: str, *, error: str | None = None, attempts: int = 0, waiting: bool = False) -> None:

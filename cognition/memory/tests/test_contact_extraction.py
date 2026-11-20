@@ -288,3 +288,25 @@ def test_a_plan_known_only_by_its_day_is_kept_without_inventing_an_hour():
              "start": seed["start"] + timedelta(hours=15), "end": seed["start"] + timedelta(hours=16)}
     groups = episodic.group([seed, visit], home="home")
     assert [len(g) for g in groups] == [1, 1]      # the visit is its own outing, not the café
+
+
+def test_a_contact_conversation_is_read_before_older_agent_sessions(monkeypatch):
+    """20/11: an agent session (~40 s a segment) must not keep a contact's exchange waiting; among the same kind, the
+    oldest first."""
+    import uuid
+    from walter_memory import extract2
+    from walter_memory.db import connection
+    proc = f"pytest.claim.{uuid.uuid4().hex[:8]}"
+    monkeypatch.setattr(extract2, "PROCESSOR", proc)
+    rows = [("claude_code", "agent-old", "2026-11-01"), ("codex", "agent-older", "2026-10-01"),
+            ("beeper", "contact-new", "2026-11-20"), ("beeper", "contact-old", "2026-11-19")]
+    with connection() as conn:
+        for src, tid, at in rows:
+            conn.execute("""insert into extraction.threads (processor, source, thread_id, status, last_event_at)
+                            values (%s, %s, %s, 'dirty', %s)""", (proc, src, tid, at))
+    try:
+        order = [r["thread_id"] for _ in rows for r in extract2.claim(limit=1)]   # one lease at a time: its order
+    finally:
+        with connection() as conn:
+            conn.execute("delete from extraction.threads where processor = %s", (proc,))
+    assert order == ["contact-old", "contact-new", "agent-older", "agent-old"]
