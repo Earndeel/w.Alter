@@ -64,3 +64,51 @@ def test_closed_gate_refuses_and_open_gate_forwards_with_a_budget(servers):
         for s in (up, org, gate):
             s.close()
     asyncio.run(scenario())
+
+
+def probe_with(monkeypatch, tmp_path, chromium_ip):
+    """probe() with the network replaced: the France exit is 203.0.113.7, the local exit is closed."""
+    import json
+    from urllib.parse import urlparse
+    monkeypatch.setattr(X, "load_config", lambda: {"listen": urlparse("socks5://127.0.0.1:1084")})
+    monkeypatch.setattr(X, "france_ips", lambda: {"203.0.113.7"})
+    monkeypatch.setattr(X, "exit_ip", lambda proxy, **kw: (chromium_ip, "FR" if chromium_ip else None)
+                        if ":1083" in proxy else (None, None))
+    monkeypatch.setattr(X, "sh", lambda *a, **k: X.subprocess.CompletedProcess(a, 0, "", ""))
+    st = tmp_path / "state.json"; st.write_text(json.dumps({"route": "closed", "why": "mac unreachable"}))
+    monkeypatch.setattr(X, "STATE", st)
+    return X.probe()
+
+
+def test_probe_flags_chromium_leaving_by_another_ip(monkeypatch, tmp_path, capsys):
+    import json
+    assert probe_with(monkeypatch, tmp_path, "198.51.100.9") == 1
+    out = json.loads(capsys.readouterr().out)
+    assert "Chromium's exit (:1083) is not the instance's France exit" in out["violations"]
+    assert out["chromium_exit_unanswered"] is False
+
+
+def test_probe_no_answer_from_chromium_exit_is_failed_closed_not_a_violation(monkeypatch, tmp_path, capsys):
+    # 2026-11-20: the selector refused while the owner's machine flapped; the probe read "no IP" as a violation.
+    import json
+    probe_with(monkeypatch, tmp_path, None)
+    out = json.loads(capsys.readouterr().out)
+    assert not any("Chromium" in v for v in out["violations"])
+    assert out["chromium_exit_unanswered"] is True
+
+
+def test_exit_ip_falls_back_to_a_second_lookup_service(monkeypatch):
+    calls = []
+    def fake_sh(*cmd, **kw):
+        calls.append(cmd[-1])
+        body = "" if "ipinfo" in cmd[-1] else '{"ip": "203.0.113.7", "country_iso": "FR"}'
+        return X.subprocess.CompletedProcess(cmd, 0, body, "")
+    monkeypatch.setattr(X, "sh", fake_sh)
+    assert X.exit_ip("socks5h://127.0.0.1:1083") == ("203.0.113.7", "FR")
+    assert len(calls) == 2
+
+
+def test_exit_ip_none_when_nothing_answers_through_the_exit(monkeypatch):
+    monkeypatch.setattr(X, "sh", lambda *cmd, **kw: X.subprocess.CompletedProcess(cmd, 97, "", ""))
+    monkeypatch.setattr(X.time, "sleep", lambda s: None)
+    assert X.exit_ip("socks5h://127.0.0.1:1083") == (None, None)

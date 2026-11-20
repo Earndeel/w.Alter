@@ -17,8 +17,9 @@ the owner's IP; over budget the connection is refused and logged.
 
   walter-exit-local serve       run it (systemd unit walter-exit-local)
   walter-exit-local status      state: open/closed, why, exit IP and country, hosts over budget today
-  walter-exit-local probe       egress check of every Browse exit (JSON; exit 1 on a violation): Chromium's exit
-                                must be the instance's France exit, this exit must refuse or be a non-France owner IP,
+  walter-exit-local probe       egress check of every Browse exit (JSON; exit 1 on a violation): Chromium's exit,
+                                when it answers, must be the instance's France exit (no answer = failed closed,
+                                chromium_exit_unanswered, not a violation), this exit must refuse or be a non-France owner IP,
                                 and each engine must be configured on its exit (guardian building block)
 """
 from __future__ import annotations
@@ -89,20 +90,32 @@ def mac_on_vpn() -> bool | None:
     return r.stdout.splitlines()[:1] == ["Connected"]
 
 
-def exit_ip(proxy: str) -> tuple[str | None, str | None]:
-    r = sh("curl", "-s", "--max-time", "12", "-x", proxy, "https://ipinfo.io/json", timeout=20)
-    try:
-        d = json.loads(r.stdout)
-        return d.get("ip"), d.get("country")
-    except ValueError:
-        return None, None
+# Where an exit's public IP is read, in order (country field). One lookup service failing (rate limit, outage) or a
+# connection lost while an exit switches must not read as "no IP" (2026-11-20).
+IP_SERVICES = (("https://ipinfo.io/json", "country"), ("https://ifconfig.co/json", "country_iso"))
+
+
+def exit_ip(proxy: str, attempts: int = 2, pause: float = 5) -> tuple[str | None, str | None]:
+    """(ip, country) seen through `proxy`, or (None, None) when nothing answered through it (exit closed or down)."""
+    for n in range(attempts):
+        for url, field in IP_SERVICES:
+            r = sh("curl", "-s", "--max-time", "12", "-x", proxy, url, timeout=20)
+            try:
+                d = json.loads(r.stdout)
+            except ValueError:
+                continue
+            if isinstance(d, dict) and d.get("ip"):
+                return d["ip"], d.get(field)
+        if n + 1 < attempts:
+            time.sleep(pause)
+    return None, None
 
 
 def france_ips() -> set[str]:
     ips = set(cfg.get("france_known") or ())
     for port in cfg["france_ports"]:
         if port_open("127.0.0.1", port):
-            ip, _ = exit_ip(f"http://127.0.0.1:{port}")
+            ip, _ = exit_ip(f"http://127.0.0.1:{port}", attempts=1)
             if ip:
                 ips.add(ip)
     return ips
@@ -284,9 +297,13 @@ def probe() -> int:
     fr = france_ips()
     ip, country = exit_ip("socks5h://127.0.0.1:1083")
     out["chromium_exit"] = {"ip": ip, "country": country}
-    if not ip or ip not in fr:
+    # A violation is traffic seen leaving by another IP. No answer at all is the selector failing closed (machine
+    # flapping, fallback switching, lookup service down): nothing left, so it is reported apart, never as a violation
+    # (2026-11-20: 12 false critical egress incidents with chromium_exit_country null).
+    if ip and ip not in fr:
         bad.append("Chromium's exit (:1083) is not the instance's France exit")
-    ip, country = exit_ip(f"socks5h://{cfg['listen'].netloc}")
+    out["chromium_exit_unanswered"] = not ip
+    ip, country = exit_ip(f"socks5h://{cfg['listen'].netloc}", attempts=1)   # closed refuses at once
     st = json.loads(STATE.read_text()) if STATE.exists() else {}
     out["local_exit"] = {"ip": ip, "country": country, "route": st.get("route"), "why": st.get("why")}
     if ip and (ip in fr or country == "FR"):

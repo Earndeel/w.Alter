@@ -93,6 +93,13 @@ try:
     for v in p.get("violations") or []:
         out.append(inc("browse", "egress:" + v[:60], "egress_violation", "critical",
                        f"Règle de sortie réseau enfreinte : {v}.", {"chromium_exit_country": (p.get("chromium_exit") or {}).get("country")}, "G3"))
+    # Chromium's exit gave no answer at all: the selector failed closed (machine flapping, fallback switching, lookup
+    # service down). Nothing left by a wrong IP, so not an egress violation (12 false criticals, 30/10-20/11/2026).
+    if p.get("chromium_exit_unanswered"):
+        st = sh("walter-exit-default", "status", timeout=10).stdout.strip()
+        out.append(inc("browse", "exit-default:unanswered", "exit_unanswered", "warning",
+                       "La sortie France de Chromium n'a pas répondu au contrôle (fermée, rien n'est sorti ailleurs).",
+                       {"selector": st[:200]}, "G0"))
     loc = p.get("local_exit") or {}
     if loc.get("route") == "closed":
         out.append(inc("browse", "exit-local:closed", "exit_closed", "info",
