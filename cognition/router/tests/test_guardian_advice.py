@@ -48,7 +48,7 @@ def test_proposals_become_advice_alerts_sent_with_apply_buttons(conn):
     a = conn.execute("select * from models.alerts where kind = 'advice'").fetchone()
     assert a["status"] == "open" and a in alerts.pending(conn)
     text = telegram.render_each([a], conn)[0]
-    assert "Guardian du Router" in text and "parce que" in text
+    assert "Walter Router — conseil" in text and "parce que" in text
     assert [b["text"] for b in telegram.keyboard(conn, [a])[0]] == ["👁️ Vu"]          # a note: nothing to apply
     again = advisor.record(conn, v, {"trigger": "test", "at": "later"})
     assert not again[0]["new"]                                                     # same action = same alert

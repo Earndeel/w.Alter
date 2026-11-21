@@ -1,9 +1,10 @@
 """The Router guardian's « advice » mission (owner, 2026-11-20: « le router doit avoir un vrai agent intelligent qui
 s'occupe de comprendre les tenants et les aboutissants » ; 2026-11-21: « cet agent est supposé être le guardian »).
 
-The guardian has one identity (`guardian-router`) and two missions: repair what breaks (run.py / repair.py, on an
-incident) and advise (this file). Its standing instructions are a readable file, `guardian/advice-brief.md`; the
-owner's own rules for it live in the instance (`config/router/guardian-rules.md`) and come last in the brief.
+The Router's agent (agent.py: identity `guardian/agent.md`, caller `guardian-router`) has its missions: repair what
+breaks (run.py / repair.py, on an incident), the plans watch (plan/watch.py) and advise (this file). This mission's
+instructions are a readable file, `guardian/advice-brief.md`; the identity and the owner's own rules for the agent
+(instance `config/router/guardian-rules.md`) come first, from agent.py.
 
 The cycle's rules (tiers.py, alerts.py) see one thing at a time; the guardian reads the whole picture after each cycle
 and after each choice of the owner — declared tiers, their quota substitutes, padlocks, the frontier with measured and
@@ -30,12 +31,10 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.request import Request, urlopen
 
 from walter_router import instance, paths
+from walter_router.guardian import agent
 
-ENGINE_URL = os.environ.get("WALTER_ENGINE_API_URL", "http://127.0.0.1:8895")
-CALLER = "guardian-router"             # the guardian's one identity (policy « guardian- » = maintenance)
 TASK, LEVEL = "general", "L3"           # the owner's top text tier: understanding consequences is its job
 BUDGET = 1100                           # seconds per run; fits the cycle's `timeout 1300 walter-router analyze`
 MAX_CHECKS = 12                         # commands or web searches before concluding
@@ -148,25 +147,14 @@ BRIEF_FILE = Path(__file__).with_name("advice-brief.md")
 CYCLE_SECTION = "\n## Au cycle de 48 h\n"
 
 
-def owner_rules() -> list[str]:
-    """The owner's own rules for the guardian (instance file config/router/guardian-rules.md, lines « - … »)."""
-    try:
-        text = instance.config_path("guardian-rules.md").read_text()
-    except OSError:
-        return []
-    return [ln.strip() for ln in text.splitlines() if ln.strip().startswith("- ") and len(ln.strip()) > 2]
-
-
 def brief(st: dict, budget: int = BUDGET, start: float | None = None) -> str:
-    """The guardian's standing instructions (advice-brief.md, readable and editable), the owner's rules, the state."""
+    """The mission's instructions (advice-brief.md, readable and editable) and the state; agent.goal puts the identity
+    and the owner's rules first."""
     text = BRIEF_FILE.read_text().split("\n---\n", 1)[-1]          # the file's own header is for humans
     main, _, cycle = text.partition(CYCLE_SECTION)
     owner = instance.owner()
     deadline = datetime.fromtimestamp((time.time() if start is None else start) + budget * 0.75, timezone.utc)
     out = main.strip() + ("\n\n" + cycle.strip() if st.get("cycle") else "")
-    rules = owner_rules()
-    if rules:
-        out += f"\n\n## Règles de {owner} pour toi (elles priment sur ce qui précède)\n" + "\n".join(rules)
     for key, value in {"owner": owner, "trigger": st.get("trigger"), "minutes": round(budget * 0.75 / 60),
                        "deadline": deadline.strftime("%H:%M"), "checks": MAX_CHECKS, "max": MAX_PROPOSALS}.items():
         out = out.replace("{{" + key + "}}", str(value))
@@ -299,30 +287,6 @@ def record(conn, verdict: dict, run: dict) -> list[dict]:
 
 # ---- running ---------------------------------------------------------------------------------------------------------
 
-def _engine_token() -> str:
-    root = instance._walter("path")
-    if not root:
-        raise RuntimeError("no active Walter instance")
-    return (Path(root) / "bootstrap" / "engine" / "api.token").read_text().strip()
-
-
-def delegate(goal: str, key: str, budget: int = BUDGET) -> dict:
-    """One Walter Engine delegation (Engine API, the declared door to the runtime)."""
-    body = {"version": 1, "op": "delegate", "caller": CALLER,
-            "delegation": {"version": 1, "goal": goal, "task": TASK, "level": LEVEL, "budget_seconds": budget,
-                           "idempotency_key": key, "parent": {"depth": 0}}}
-    req = Request(ENGINE_URL.rstrip("/") + "/v1", data=json.dumps(body).encode(),
-                  headers={"Authorization": "Bearer " + _engine_token(), "Content-Type": "application/json"})
-    try:
-        with urlopen(req, timeout=budget + 120) as r:
-            out = json.load(r)
-    except Exception as exc:  # noqa: BLE001 — engine down: a failed run, said as such
-        return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
-    res = out.get("result") or out
-    return {"ok": bool(res.get("ok")), "output": res.get("output") or "", "status": res.get("status"),
-            "reason": res.get("reason"), "error": res.get("error"), "tools": len(res.get("tools") or [])}
-
-
 def _log(entry: dict) -> None:
     try:
         f = instance.state_file("guardian/advice-runs.jsonl")
@@ -364,10 +328,11 @@ def run(trigger: str = "manual", extra: dict | None = None, dry_run: bool = Fals
     at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with db.connect() as conn:
         st = state(conn, trigger, extra)
-    goal = brief(st, budget, started)
+    mission = brief(st, budget, started)
     if dry_run:
-        return {"trigger": trigger, "brief_chars": len(goal), "state": st}
-    ran = delegate(goal, f"router-guardian-advice-{trigger}-{int(started)}"[:200], budget)
+        return {"trigger": trigger, "brief_chars": len(agent.goal(mission)), "state": st}
+    ran = agent.delegate(mission, f"router-guardian-advice-{trigger}-{int(started)}", task=TASK, level=LEVEL,
+                         budget=budget)
     v = verdict_of(ran.get("output") or "")
     entry = {"at": at, "trigger": trigger, "detail": extra, "seconds": round(time.time() - started),
              "engine": {k: ran.get(k) for k in ("ok", "status", "reason", "error", "tools")}}

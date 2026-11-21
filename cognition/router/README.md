@@ -44,7 +44,7 @@ et les limites actuelles des outils natifs sont explicités dans [docs/EXECUTION
 | `plan/` | **Plan** — the owner's subscriptions | `declared` (his plans: one writer) · `subscriptions` (meters, real usage, cost price of a token) · `quota_watch` (service) · `mail` (subscription mails) · `modeldial` (ModelDial's measured quota per plan x model → cost price of a token per model) · `watch` (web research per plan) · `news` (new benefits or changes → notices) |
 | `interface/` | **Interface** — the library page | `library` (rows, publishing) · `page` (HTML) · `translate` (English) · `site/` (Cloudflare Pages functions) |
 | `serve/` | What Walter calls at run time | `api` (schémas) · `brief` (note) · `run` / `engine` (texte exécuté par Walter Engine, lot E5 ; l'ancienne boucle `text_agent` a été retirée le 11/11/2026) · `choose` (pick) · `routes` (execution routes, free-text entry) · `intent` (decision model) · `execution` (provider order, hosts, probes, reliability) · `media_exec` (image / video / music / voice) · `oneshot` (economic-tier answers) · `hermes_sync` |
-| `guardian/` | **Guardian** — the module's own maintenance (2026-10-26) | `checks` (detection, no model) · `run` (incidents, decisions, Telegram) · `repair` (hands an incident to the guardians' common repair agent, coding/L3, 20/11) · `playbook.json` (the module notes it reads) · README |
+| `guardian/` | **Guardian** — the module's own maintenance (2026-10-26) and, since 2026-11-21, **the Router's agent** (« le Router », Walter's sub-agent for this module) | `agent.md` / `agent.py` (its identity and its door to Walter Engine, used by every mission) · `checks` (detection, no model) · `run` (incidents, decisions, Telegram) · `repair` (hands an incident to the guardians' common repair agent, coding/L3, 20/11) · `playbook.json` (the module notes it reads) · README |
 | `store/` | The database | `db`, `migrations/` (each table and view commented) |
 | `llm/` | walter-llm, the model gateway (own venv, 127.0.0.1:8894) | |
 | `cli.py`, `health.py`, `bin/` | The command, the module's health, the cycle and the page trigger | |
@@ -65,7 +65,7 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 3. **The owner decides** — his pins and roles (`config/knowledge.json`, `prefer`) always win. A model that beats an
    active one on the task's global score, a new #1, a nerf, a board down, a plan change or a plan news becomes one
    Telegram message with buttons; nothing switches without his button (`verdict`).
-   **The guardian advises** (2026-11-20/21, `guardian/advice.py`; the Router has one agent, its guardian — see
+   **The Router's agent advises** (2026-11-20/21, `guardian/advice.py`; the Router has one agent, « le Router », its guardian — see
    `guardian/README.md` « Advise »): at step 2 of each cycle and after each choice of the owner (button, padlock), one
    Walter Engine delegation (`guardian-router`, poste general/L3) reads the whole picture — declared tiers and their
    quota substitutes, padlocks, frontier with measured / estimated subscription costs, changes, the owner's recent

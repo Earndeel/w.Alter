@@ -1,16 +1,19 @@
-"""Plan research on the web (part of `research plans` and of the 48 h cycle): the economic text tier (L1, Hermes
-one-shot with web tools) looks for what is published about each of the owner's plans — the API value a plan carries
+"""Plan research on the web (part of `research plans` and of the 48 h cycle): one mission of the Router's agent
+(guardian/agent.py, Walter Engine, poste general, web tools) looks for what is published about each of the owner's plans — the API value a plan carries
 (SemiAnalysis Tokenomics, other measurements), tokens or messages per 5 h / week window, price and limit changes —
 and answers in JSON. Each fact is stored in models.plan_evidence with its source and date; nothing is applied."""
 from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 
 from walter_router.plan import declared
 
 METRICS = ("usd_value_month", "tokens_month", "messages_5h", "messages_week", "price_usd_month", "limit_note")
-PROMPT = """Tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :
+PROMPT = """## Mission : veille des abonnements
+
+Ici, tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :
 {plans}
 
 Faits déjà connus (ne les redonne pas sauf s'ils ont changé) :
@@ -76,12 +79,13 @@ def store(conn, items: list[dict], origin: str = "web") -> tuple[int, list[int]]
 
 def run(conn) -> dict:
     from walter_router import instance
-    from walter_router.serve.oneshot import ask_l1
+    from walter_router.guardian import agent
     plans = [{k: s.get(k) for k in ("id", "vendor", "plan", "price_usd_month", "models", "execution")}
              for s in declared.read().get("subscriptions", [])]
     prompt = PROMPT.format(owner=instance.owner(), plans=json.dumps(plans, ensure_ascii=False),
                            known=json.dumps(known(conn), ensure_ascii=False, default=str))
-    text = ask_l1(conn, prompt, "walter-router-plans", timeout=900, tools="web", max_turns=25)
+    ran = agent.delegate(prompt, f"router-plans-watch-{datetime.now(timezone.utc):%Y%m%dT%H%M}", budget=900)
+    text = ran.get("output") if ran.get("ok") else None
     items = parse(text or "")
     added, ids = store(conn, items)
     from walter_router.plan import news

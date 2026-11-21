@@ -73,7 +73,7 @@ def _plan_block(a: dict) -> list[str]:
 def _advice_block(a: dict) -> list[str]:
     """The Router guardian's advice (2026-11-20): what it saw, what accepting changes."""
     e = a["evidence"]
-    return ["🛡️ Guardian du Router — conseil", e.get("title_fr") or a["subject"], "",
+    return ["🛠 Walter Router — conseil", e.get("title_fr") or a["subject"], "",
             e.get("why_fr") or None, (f'➡️ {e["consequences_fr"]}' if e.get("consequences_fr") else None)]
 
 

@@ -63,7 +63,6 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/tiers.py | `CEILING_MIN_GAIN` | 1.0 |  |
 | analysis/tiers.py | `HOLD_BAND` | 0.25 |  |
 | analysis/tiers.py | `HOLD_MIN_GAIN` | 0.5 |  |
-| guardian/advice.py | `CALLER` | guardian-router | the guardian's one identity (policy « guardian- » = maintenance) |
 | guardian/advice.py | `TASK` | general | the owner's top text tier: understanding consequences is its job |
 | guardian/advice.py | `LEVEL` | L3 | the owner's top text tier: understanding consequences is its job |
 | guardian/advice.py | `BUDGET` | 1100 | seconds per run; fits the cycle's `timeout 1300 walter-router analyze` |
@@ -74,6 +73,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | guardian/advice.py | `OPS` | ["set_quota_fallback", "set_level", "set_preference", "set_lock", "note"] |  |
 | guardian/advice.py | `LEVELS` | ["L1", "L2", "L3"] |  |
 | guardian/advice.py | `CYCLE_SECTION` | <br>## Au cycle de 48 h<br> | # Au cycle de 48 h\n" |
+| guardian/agent.py | `CALLER` | guardian-router | the agent's one identity (policy « guardian- » = maintenance) |
+| guardian/agent.py | `RULES_FILE` | guardian-rules.md | instance config/router/<this>: the owner's rules for the agent |
+| guardian/agent.py | `NAME` | Walter Router | how it signs what it sends the owner |
 | guardian/checks.py | `RUN_MAX_AGE_H` | 54 | the cycle runs every 48 h |
 | guardian/checks.py | `TEST_TIMEOUT` | 600 |  |
 | guardian/run.py | `MAX_ATTEMPTS` | 2 | repair-agent runs per incident before it is handed to the owner (coding/L3 since 20/11) |
@@ -194,7 +196,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | plan/subscriptions.py | `KINDS` | ["input", "cache_read", "cache_write", "cache_write_1h", "output"] |  |
 | plan/subscriptions.py | `MIN_POINTS` | 3 | meter points between two readings before we trust a capacity (Codex reports whole percents) |
 | plan/watch.py | `METRICS` | ["usd_value_month", "tokens_month", "messages_5h", "messages_week", "price_usd_month", "limit_note"] |  |
-| plan/watch.py | `PROMPT` | Tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :<br>{plans}<br><br>Faits déjà connus (ne les redonne pas sauf s'ils ont changé) :<br>{known}<br><br>Cherche sur le web (au plus 10 recherches, pages officielles d'abord : aide, tarifs, notes de version de l'éditeur ;<br>puis analyses sérieuses et datées : SemiAnalysis / Tokenomics, autres mesures publiées de la valeur d'un plan au prix<br>de l'API ou du nombre de tokens / messages par fenêtre). Pour CHAQUE plan : prix actuel, limites publiées (fenêtre de<br>5 h, hebdomadaire, modèles inclus), valeur mensuelle au prix API par modèle si quelqu'un l'a mesurée.<br><br>Réponds UNIQUEMENT par un tableau JSON, sans texte autour. Chaque élément :<br>{{"sub_id": "<id du plan ou null>", "vendor": "...", "plan": "...", "model_id": "<id router du modèle ou null>",<br>  "metric": "usd_value_month \| tokens_month \| messages_5h \| messages_week \| price_usd_month \| limit_note",<br>  "value": <nombre ou null>, "unit": "...", "source_name": "...", "source_url": "https://...",<br>  "published": "AAAA-MM-JJ ou null", "quote": "<phrase exacte de la source, 300 caractères max>"}}<br>N'invente rien : un fait sans URL vérifiée n'est pas rendu. Tableau vide si rien de nouveau. |  |
+| plan/watch.py | `PROMPT` | ## Mission : veille des abonnements<br><br>Ici, tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :<br>{plans}<br><br>Faits déjà connus (ne les redonne pas sauf s'ils ont changé) :<br>{known}<br><br>Cherche sur le web (au plus 10 recherches, pages officielles d'abord : aide, tarifs, notes de version de l'éditeur ;<br>puis analyses sérieuses et datées : SemiAnalysis / Tokenomics, autres mesures publiées de la valeur d'un plan au prix<br>de l'API ou du nombre de tokens / messages par fenêtre). Pour CHAQUE plan : prix actuel, limites publiées (fenêtre de<br>5 h, hebdomadaire, modèles inclus), valeur mensuelle au prix API par modèle si quelqu'un l'a mesurée.<br><br>Réponds UNIQUEMENT par un tableau JSON, sans texte autour. Chaque élément :<br>{{"sub_id": "<id du plan ou null>", "vendor": "...", "plan": "...", "model_id": "<id router du modèle ou null>",<br>  "metric": "usd_value_month \| tokens_month \| messages_5h \| messages_week \| price_usd_month \| limit_note",<br>  "value": <nombre ou null>, "unit": "...", "source_name": "...", "source_url": "https://...",<br>  "published": "AAAA-MM-JJ ou null", "quote": "<phrase exacte de la source, 300 caractères max>"}}<br>N'invente rien : un fait sans URL vérifiée n'est pas rendu. Tableau vide si rien de nouveau. | # Mission : veille des abonnements |
 | research/agent/review.py | `MY_PROVIDERS` | ["openrouter", "kie", "codex", "arnict", "google-flow"] |  |
 | research/benchmarks/aa.py | `AA_MODEL_URL` | https://artificialanalysis.ai/models/{} |  |
 | research/benchmarks/aa.py | `ANCHORS` | ["gpt-6-luna", "gpt-5-6-luna", "claude-opus-5-5", "deepseek-v4-pro"] |  |
@@ -328,9 +330,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 
 | Variable | Source | Accès | Défaut (expression de code) | Effet |
 |---|---|---|---|---|
-| `WALTER_ENGINE_API_URL` | guardian/advice.py | get | 'http://127.0.0.1:8895' | Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895). |
 | `PYTEST_CURRENT_TEST` | guardian/advice.py | get | aucun | Posée par pytest : le conseiller ne se lance jamais depuis un test. |
 | `WALTER_ROUTER_ADVISOR` | guardian/advice.py | get | aucun | « off » : le cycle et les clics ne lancent pas le conseiller du Router. |
+| `WALTER_ENGINE_API_URL` | guardian/agent.py | get | 'http://127.0.0.1:8895' | Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895). |
 | `CHATGPT_TOKEN_DIR` | llm/gateway.py | setdefault | str(CHATGPT_DIR) | Réglage du transport de l'abonnement ; l'authentification reste fournie par son grant. |
 | `CHATGPT_DEFAULT_INSTRUCTIONS` | llm/gateway.py | setdefault | "You are a precise assistant for W.Alter's background jobs. Follow the system and user instructions exactly; answer in the language of the request." | Instructions de base du transport d'abonnement, indépendantes du goal de la sous-tâche. |
 | `WALTER_RUN_CHANNEL` | llm/gateway.py | get | aucun | test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation du propriétaire. |

@@ -49,11 +49,16 @@ def test_the_cycle_brief_carries_the_names_duty_the_deadline_and_no_code_reading
     assert "report_fr" not in owner and "ne lis PAS le code" in owner
 
 
-def test_the_owners_own_rules_for_the_guardian_come_last_and_win(tmp_path, monkeypatch):
+def test_every_mission_opens_with_the_router_s_identity_then_the_owner_s_rules(tmp_path, monkeypatch):
+    """2026-11-21 (owner): the agent is « le Router », Walter's sub-agent that maintains the module. Its identity
+    (agent.md) and the owner's own rules for it (instance file, « - » lines, they win) open every mission."""
+    from walter_router.guardian import agent
     f = tmp_path / "guardian-rules.md"
     f.write_text("# Règles\n\nExplication.\n- Ne me propose jamais Fable en L1.\n-\n")
-    monkeypatch.setattr(advisor.instance, "config_path", lambda name: f)
-    text = advisor.brief({"trigger": "owner"}, budget=1100, start=NOW.timestamp())
+    monkeypatch.setattr(agent.instance, "config_path", lambda name: f)
+    monkeypatch.setattr(agent.instance, "owner", lambda: "Madame")
+    text = agent.goal(advisor.brief({"trigger": "owner"}, budget=1100, start=NOW.timestamp()))
+    assert text.startswith("Tu es **le Router**") and "sous-agent de Walter" in text
     assert "- Ne me propose jamais Fable en L1." in text and "Explication." not in text
-    assert text.index("Ne me propose jamais") < text.index("## État")
-    assert "{{" not in text and "Consignes du guardian" not in text     # placeholders filled, file header for humans
+    assert text.index("Ne me propose jamais") < text.index("## Mission : conseiller") < text.index("## État")
+    assert "{{" not in text and "Madame" in text and "Déclaré dans" not in text and "Fichier lu" not in text  # human headers dropped

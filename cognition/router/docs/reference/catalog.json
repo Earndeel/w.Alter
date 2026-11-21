@@ -7124,12 +7124,7 @@
             "signature": "conn"
           },
           {
-            "description": "The owner's own rules for the guardian (instance file config/router/guardian-rules.md, lines « - … »).",
-            "name": "owner_rules",
-            "signature": ""
-          },
-          {
-            "description": "The guardian's standing instructions (advice-brief.md, readable and editable), the owner's rules, the state.",
+            "description": "The mission's instructions (advice-brief.md, readable and editable) and the state; agent.goal puts the identity",
             "name": "brief",
             "signature": "st: dict, budget: int=BUDGET, start: float | None=None"
           },
@@ -7165,16 +7160,6 @@
           },
           {
             "description": "",
-            "name": "_engine_token",
-            "signature": ""
-          },
-          {
-            "description": "One Walter Engine delegation (Engine API, the declared door to the runtime).",
-            "name": "delegate",
-            "signature": "goal: str, key: str, budget: int=BUDGET"
-          },
-          {
-            "description": "",
             "name": "_log",
             "signature": "entry: dict"
           },
@@ -7192,6 +7177,37 @@
             "description": "Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.",
             "name": "launch",
             "signature": "trigger: str, extra: dict | None=None, delay: int=0"
+          }
+        ]
+      },
+      {
+        "description": "The Router's agent (owner, 2026-11-21): « il doit s'identifier comme le Router, il fait partie intégrante de ce",
+        "file": "guardian/agent.py",
+        "functions": [
+          {
+            "description": "The owner's own rules for the agent (lines « - … » of the instance file); they win over the rest.",
+            "name": "owner_rules",
+            "signature": ""
+          },
+          {
+            "description": "Who the agent is, what Walter and the Router are, the owner's rules (agent.md + instance rules).",
+            "name": "identity",
+            "signature": ""
+          },
+          {
+            "description": "The identity first, then the mission's own brief.",
+            "name": "goal",
+            "signature": "mission: str"
+          },
+          {
+            "description": "",
+            "name": "_engine_token",
+            "signature": ""
+          },
+          {
+            "description": "One mission of the Router's agent on Walter Engine (Engine API, the declared door to the runtime).",
+            "name": "delegate",
+            "signature": "mission: str, key: str, *, task: str='general', level: str | None=None, budget: int=900"
           }
         ]
       },
@@ -8844,7 +8860,7 @@
         ]
       },
       {
-        "description": "Plan research on the web (part of `research plans` and of the 48 h cycle): the economic text tier (L1, Hermes",
+        "description": "Plan research on the web (part of `research plans` and of the 48 h cycle): one mission of the Router's agent",
         "file": "plan/watch.py",
         "functions": [
           {
@@ -16011,12 +16027,6 @@
         "value": 0.5
       },
       {
-        "comment": "the guardian's one identity (policy « guardian- » = maintenance)",
-        "file": "guardian/advice.py",
-        "name": "CALLER",
-        "value": "guardian-router"
-      },
-      {
         "comment": "the owner's top text tier: understanding consequences is its job",
         "file": "guardian/advice.py",
         "name": "TASK",
@@ -16085,6 +16095,24 @@
         "file": "guardian/advice.py",
         "name": "CYCLE_SECTION",
         "value": "\n## Au cycle de 48 h\n"
+      },
+      {
+        "comment": "the agent's one identity (policy « guardian- » = maintenance)",
+        "file": "guardian/agent.py",
+        "name": "CALLER",
+        "value": "guardian-router"
+      },
+      {
+        "comment": "instance config/router/<this>: the owner's rules for the agent",
+        "file": "guardian/agent.py",
+        "name": "RULES_FILE",
+        "value": "guardian-rules.md"
+      },
+      {
+        "comment": "how it signs what it sends the owner",
+        "file": "guardian/agent.py",
+        "name": "NAME",
+        "value": "Walter Router"
       },
       {
         "comment": "the cycle runs every 48 h",
@@ -17780,10 +17808,10 @@
         ]
       },
       {
-        "comment": "",
+        "comment": "# Mission : veille des abonnements",
         "file": "plan/watch.py",
         "name": "PROMPT",
-        "value": "Tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :\n{plans}\n\nFaits déjà connus (ne les redonne pas sauf s'ils ont changé) :\n{known}\n\nCherche sur le web (au plus 10 recherches, pages officielles d'abord : aide, tarifs, notes de version de l'éditeur ;\npuis analyses sérieuses et datées : SemiAnalysis / Tokenomics, autres mesures publiées de la valeur d'un plan au prix\nde l'API ou du nombre de tokens / messages par fenêtre). Pour CHAQUE plan : prix actuel, limites publiées (fenêtre de\n5 h, hebdomadaire, modèles inclus), valeur mensuelle au prix API par modèle si quelqu'un l'a mesurée.\n\nRéponds UNIQUEMENT par un tableau JSON, sans texte autour. Chaque élément :\n{{\"sub_id\": \"<id du plan ou null>\", \"vendor\": \"...\", \"plan\": \"...\", \"model_id\": \"<id router du modèle ou null>\",\n  \"metric\": \"usd_value_month | tokens_month | messages_5h | messages_week | price_usd_month | limit_note\",\n  \"value\": <nombre ou null>, \"unit\": \"...\", \"source_name\": \"...\", \"source_url\": \"https://...\",\n  \"published\": \"AAAA-MM-JJ ou null\", \"quote\": \"<phrase exacte de la source, 300 caractères max>\"}}\nN'invente rien : un fait sans URL vérifiée n'est pas rendu. Tableau vide si rien de nouveau."
+        "value": "## Mission : veille des abonnements\n\nIci, tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :\n{plans}\n\nFaits déjà connus (ne les redonne pas sauf s'ils ont changé) :\n{known}\n\nCherche sur le web (au plus 10 recherches, pages officielles d'abord : aide, tarifs, notes de version de l'éditeur ;\npuis analyses sérieuses et datées : SemiAnalysis / Tokenomics, autres mesures publiées de la valeur d'un plan au prix\nde l'API ou du nombre de tokens / messages par fenêtre). Pour CHAQUE plan : prix actuel, limites publiées (fenêtre de\n5 h, hebdomadaire, modèles inclus), valeur mensuelle au prix API par modèle si quelqu'un l'a mesurée.\n\nRéponds UNIQUEMENT par un tableau JSON, sans texte autour. Chaque élément :\n{{\"sub_id\": \"<id du plan ou null>\", \"vendor\": \"...\", \"plan\": \"...\", \"model_id\": \"<id router du modèle ou null>\",\n  \"metric\": \"usd_value_month | tokens_month | messages_5h | messages_week | price_usd_month | limit_note\",\n  \"value\": <nombre ou null>, \"unit\": \"...\", \"source_name\": \"...\", \"source_url\": \"https://...\",\n  \"published\": \"AAAA-MM-JJ ou null\", \"quote\": \"<phrase exacte de la source, 300 caractères max>\"}}\nN'invente rien : un fait sans URL vérifiée n'est pas rendu. Tableau vide si rien de nouveau."
       },
       {
         "comment": "",
@@ -18961,13 +18989,6 @@
     ],
     "environment": [
       {
-        "default_expression": "'http://127.0.0.1:8895'",
-        "description": "Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895).",
-        "file": "guardian/advice.py",
-        "name": "WALTER_ENGINE_API_URL",
-        "operation": "get"
-      },
-      {
         "default_expression": "aucun",
         "description": "Posée par pytest : le conseiller ne se lance jamais depuis un test.",
         "file": "guardian/advice.py",
@@ -18979,6 +19000,13 @@
         "description": "« off » : le cycle et les clics ne lancent pas le conseiller du Router.",
         "file": "guardian/advice.py",
         "name": "WALTER_ROUTER_ADVISOR",
+        "operation": "get"
+      },
+      {
+        "default_expression": "'http://127.0.0.1:8895'",
+        "description": "Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895).",
+        "file": "guardian/agent.py",
+        "name": "WALTER_ENGINE_API_URL",
         "operation": "get"
       },
       {
@@ -19268,7 +19296,7 @@
     "analysis/refresh.py": "dcc93f5a5ac7a7f89177ec1a8900c669b499585c5dc31df1aba7c2608d0e3a1f",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
     "analysis/select.py": "39ad5f96af616cd95209b22ee6f4f77c62be760cf7efa614e775bf6065390624",
-    "analysis/telegram.py": "caa598e5cb2753c822f4c27e0788c2fdd07baca2b271b640ab211608f863504a",
+    "analysis/telegram.py": "59722e62c19bdb426eedc46d343788ccedeae2ffa269219f60259d2929f956d5",
     "analysis/tiers.py": "5b70be11b3a4268e5f329ea330600814309194bab681ecffb42f8f726390291a",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
     "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
@@ -19285,12 +19313,13 @@
     "config/providers.json": "82b0a50103f1b932ab876bf06f27b50e183dc1631159bfa258c8752de168f938",
     "config/subscriptions.json": "b024fe62090d03e99ea7c06e6a76fd98228ab0d9811692ae07a65ccf4f958dac",
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
-    "contracts/maintenance.json": "2ae414f686eb127423d4081339551c3ce26eb4ab64bc958d39be7580da53b218",
+    "contracts/maintenance.json": "e5a30b7b5a5cc295eb05115fc25b3ca5efdc2ea64a3414b5f57c94cd9916bc33",
     "contracts/router.json": "2c22033548faf73d7cba8f3e98e7309cccce1ffb267e0f68efa10d7cb8d3b185",
     "documentation.py": "8982ebe7a685a8ea7c746845b008bd5c1ea542a383ae9c7d75848c99d9d36188",
-    "guardian/__init__.py": "f470d81f9688a4d9f6a235cdd93ee1ce17d1e523d546da6b1db0e8725ccf4f7a",
+    "guardian/__init__.py": "a28ff92bf9c1254bad5416a6139b10f03a3cfedd0955894a65d042960b4ee587",
     "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
-    "guardian/advice.py": "aa08666b41b62ad36538ca07b7ac0dc4b34ab83a2078ae00390ea684d2afc02d",
+    "guardian/advice.py": "21e49812f6606cddbec7f40e557504d9e0ab0765bce838ea3a3ad19dcdb6edd8",
+    "guardian/agent.py": "45b543d716f8f97eb5584e0f90fda2b3da8175cbfbb189fbeba8505def0b438d",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
     "guardian/playbook.json": "dd413285fa40d68b4539bd2469a74d825dd576cf03910add0a47ff5cb5fda5e6",
     "guardian/repair.py": "50604a48872e4684ba7a8cbe031eafde5ec7cbfe1c04697927dd9447d3dd29cd",
@@ -19326,7 +19355,7 @@
     "plan/news.py": "cb79f91afd5eb20ceb83399d9281c9efa2eaa81997cc5df35c07541311972a22",
     "plan/quota_watch.py": "f204815a2507c01c4e5b4f5df8b5c49354a9748e1535636f1d40aa1465921497",
     "plan/subscriptions.py": "3c614b30df9844bf2ef0b82af69ccfe53cbe94531122a035b32cfcd2cf96553d",
-    "plan/watch.py": "9721d7f8f85084b42536b9e4c206b4845576fc5bf3325d035ab0a148b8c2dd04",
+    "plan/watch.py": "f59a369ebcf2f53af62cb3bff03e6f8b86a6aad8baf3950ef317ff0fc4326eec",
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",
     "research/agent/review.py": "93905a0e3b4849e11d07232e7b50799fef1bb90736e104705533569e08ea8a13",

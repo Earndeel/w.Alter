@@ -336,20 +336,27 @@ The Router guardian's « advice » mission (owner, 2026-11-20: « le router doit
 - `_routes(conn, pin: str | None)` — 
 - `state(conn, trigger: str='manual', extra: dict | None=None)` — Everything the guardian needs to advise, compact and in one snapshot of the index.
 - `_cycle_facts(conn)` — What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links.
-- `owner_rules()` — The owner's own rules for the guardian (instance file config/router/guardian-rules.md, lines « - … »).
-- `brief(st: dict, budget: int=BUDGET, start: float | None=None)` — The guardian's standing instructions (advice-brief.md, readable and editable), the owner's rules, the state.
+- `brief(st: dict, budget: int=BUDGET, start: float | None=None)` — The mission's instructions (advice-brief.md, readable and editable) and the state; agent.goal puts the identity
 - `verdict_of(output: str)` — The agent's closing JSON: the last object carrying `proposals`.
 - `_callable(conn, task: str, pin: str)` — 
 - `validate(conn, action: dict)` — None when the action can be applied as is, else why not.
 - `subject(action: dict, title: str='')` — One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal). A note
 - `apply(conn, action: dict, note: str)` — The owner adopted the guardian's advice: one action through the Router's usual writers.
 - `record(conn, verdict: dict, run: dict)` — The guardian's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log.
-- `_engine_token()` — 
-- `delegate(goal: str, key: str, budget: int=BUDGET)` — One Walter Engine delegation (Engine API, the declared door to the runtime).
 - `_log(entry: dict)` — 
 - `cycle_report(conn, v: dict | None, ran: dict, *, add=None, log_dir: Path | None=None, now: datetime | None=None)` — The cycle's part of the verdict: name links applied through the validated add, report written.
 - `run(trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True, budget: int=BUDGET)` — One advice pass of the guardian. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's
 - `launch(trigger: str, extra: dict | None=None, delay: int=0)` — Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.
+
+## guardian/agent.py
+
+The Router's agent (owner, 2026-11-21): « il doit s'identifier comme le Router, il fait partie intégrante de ce
+
+- `owner_rules()` — The owner's own rules for the agent (lines « - … » of the instance file); they win over the rest.
+- `identity()` — Who the agent is, what Walter and the Router are, the owner's rules (agent.md + instance rules).
+- `goal(mission: str)` — The identity first, then the mission's own brief.
+- `_engine_token()` — 
+- `delegate(mission: str, key: str, *, task: str='general', level: str | None=None, budget: int=900)` — One mission of the Router's agent on Walter Engine (Engine API, the declared door to the runtime).
 
 ## guardian/checks.py
 
@@ -782,7 +789,7 @@ The owner's subscriptions: meters, usage and the cost price of a token through e
 
 ## plan/watch.py
 
-Plan research on the web (part of `research plans` and of the 48 h cycle): the economic text tier (L1, Hermes
+Plan research on the web (part of `research plans` and of the 48 h cycle): one mission of the Router's agent
 
 - `known(conn)` — 
 - `parse(text: str)` — The JSON array of the agent's answer (tolerates text or a code fence around it).

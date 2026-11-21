@@ -4,10 +4,26 @@ Owner, 2026-10-26: « cela doit être fait automatiquement à partir de maintena
 s'occupe de la maintenance de celui-ci, peut-être propulsé par L2 ». The guardian keeps the module working without
 the owner: it finds what broke, repairs what is ours, waits out what is not, and only speaks when it matters.
 
-**It is the Router's one agent** (owner, 2026-11-21: « cet agent est supposé être le guardian »), one identity
-`guardian-router`, two missions: **repair** what breaks (« A pass », below) and **advise** on the owner's choices
-(« Advise »). Before, the advice was a separate « advisor » (20/11) and, before that, a cycle analyst whose reports
+**It is the Router's one agent — « le Router » itself** (owner, 2026-11-21: « cet agent est supposé être le
+guardian » ; « il doit s'identifier comme le Router, il fait partie intégrante de ce module… il comprend
+l'architecture de Walter et de son module. Il est un sous-agent de Walter spécialisé dans le maintien du module »).
+Everything in the module that needs a model with tools is one of its missions: **repair** what breaks (« A pass »),
+**advise** on the owner's choices (« Advise »), the **plans watch** (`plan/watch.py`), and whatever Walter asks it as
+a sub-agent. Before, the advice was a separate « advisor » (20/11) and, before that, a cycle analyst whose reports
 nobody read.
+
+## The agent
+
+| What | Where |
+|---|---|
+| Who it is: « le Router », Walter's sub-agent for this module; what Walter and the Router are; the owner's standing rules | `guardian/agent.md` — plain text, opens every mission (`{{owner.address}}` rendered by the instance) |
+| Its declaration (read by the common repair agent and by Walter Engine's `subagent` tool) | `contracts/maintenance.json` → `agent` (identity, rules, poste general/L3, description) |
+| The owner's own rules for it (win over everything) | instance `config/router/guardian-rules.md`, one « - » line each |
+| Its one door to the runtime | `guardian/agent.py` `delegate(mission, …)`: Walter Engine delegation as caller `guardian-router` (policy « guardian- » = interface maintenance) |
+
+When it writes for the owner it speaks as the Router (« je » = le Router) and its messages are signed « 🛠 Walter
+Router ». Walter (any door) can hand it a task: tool `subagent` with `agent: "router"` gives the sub-agent this
+identity and the poste `general` (active once walter-engine is restarted with the 2026-11-21 code).
 
 ## A pass
 
@@ -18,7 +34,7 @@ nobody read.
 | Cheap actions | `run.py` | A provider seen down is probed again first (its status heals when it is back). A stale source is read again once (`walter-router research --source`). |
 | Reference | `repair.regenerate_docs`, no model | Generated reference out of date (`walter-router docs --check`): regenerated with `docs --write`, checked again, the regenerated files committed alone. Quiet; waits while someone has uncommitted work on those files. |
 | Classify | `checks.provider_side` | Provider 5xx / 429 / a stream ending on a provider error / timeout = `external` (wait, no agent); 401/402/403 or credit exhausted = `needs_owner`; 400/404/422… = ours (agent). |
-| Repair | `repair.agent` → `walter-guardian repair --module router --wait` (walter-core) | Since 2026-11-20 (owner: « les guardians doivent pouvoir agir comme moi je le ferais » from a Claude Code session): the guardians' **common repair agent** — one Walter Engine delegation as `guardian-router`, poste **coding/L3** (Opus 5.5 high on 20/11), with the rights of a development session (policy interface `maintenance`: shell and files; outgoing messages never). It works on the live module like a Claude Code session: cause first, backup, fix, tests, restart what it changed, commit only its own files. The module's knowledge it gets: `guardian/playbook.json` `notes`. Ends with a JSON verdict. |
+| Repair | `repair.agent` → `walter-guardian repair --module router --wait` (walter-core) | Since 2026-11-20 (owner: « les guardians doivent pouvoir agir comme moi je le ferais » from a Claude Code session): the guardians' **common repair agent** — one Walter Engine delegation as `guardian-router`, poste **coding/L3** (Opus 5.5 high on 20/11), with the rights of a development session (policy interface `maintenance`: shell and files; outgoing messages never). It works on the live module like a Claude Code session: cause first, backup, fix, tests, restart what it changed, commit only its own files. The module's knowledge it gets: its identity `guardian/agent.md` (read by `walter-guardian` from the declaration) and `guardian/playbook.json` `notes`. Ends with a JSON verdict. |
 | Verify | `run.still_broken`, no model | The agent's « fixed » is believed only when the incident's own check passes again: the source re-read with rows, the failing test green, the provider probe healthy, the cycle check clear. Otherwise the run counts as failed. |
 | Library | `interface/library.follow`, no model | The library page (the instance's library domain, host.json) is rendered again; when what it says changed since its last publication (quotas, routes, choices move between two 48 h cycles), it is republished. |
 | Tell | `run.notify` → Telegram | Once per outcome: a repair that landed (« réparé tout seul »), a decision only the owner can take (« besoin de vous »), an outside outage lasting ≥ 48 h. Nothing else. |
@@ -39,10 +55,10 @@ the validated `alias-add`; report `analysis-<day>.md` in the Router's log).
 
 | What | Where |
 |---|---|
-| Its instructions (role, what to look for, time, actions allowed) | `guardian/advice-brief.md` — plain text, read at every pass |
+| This mission's instructions (what to look for, time, actions allowed) | `guardian/advice-brief.md` — plain text, read at every pass, after `agent.md` |
 | The owner's own rules for it (win over the instructions) | instance `config/router/guardian-rules.md`, one « - » line each |
 | The facts it gets (computed, no model) | `advice.state` (`walter-router-guardian advise state --trigger cycle`) |
-| Its proposals and the owner's answers | `models.alerts` kind `advice` (Telegram « 🛡️ Guardian du Router — conseil ») |
+| Its proposals and the owner's answers | `models.alerts` kind `advice` (Telegram « 🛠 Walter Router — conseil ») |
 | Its passes | `@instance/state/router/guardian/advice-runs.jsonl` |
 
 When: step 2 of the 48 h cycle (`walter-router analyze`; its proposals leave with step 3's message) and ~90 s after an
