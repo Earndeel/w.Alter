@@ -140,10 +140,10 @@ session_search(query="whatsapp lcomte63", limit=5)
 ### PG Connection Failed
 ```bash
 # 1. Check if container is running
-docker ps | grep hindsight-pg
+docker ps | grep walter-pg
 
 # 2. Get current IP
-docker inspect hindsight-pg | grep IPAddress
+docker inspect walter-pg | grep IPAddress
 
 # 3. Update scripts if IP changed
 sed -i 's/DB_HOST = ".*"/DB_HOST = "172.17.0.X"/' /root/.hermes/services/kardex/scripts/*.py

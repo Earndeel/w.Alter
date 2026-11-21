@@ -252,7 +252,7 @@ The `[verified]` prefix indicates an independent reviewer approved this change.
 - Enforce read-only database access explicitly, before the first query. Use the locally configured connection without copying credentials into reports:
   ```python
   import psycopg
-  c = psycopg.connect("postgresql://hindsight@127.0.0.1:5433/hindsight")
+  c = psycopg.connect("postgresql://walter@127.0.0.1:5433/walter")
   c.read_only = True
   ```
   Inspect live state as well as tests: `devboard.sessions` grouped by runtime, eligibility and state; `devboard.cards` grouped by status and activity age; and `bus.dead` filtered to `consumer='devboard'`. A working HTTP endpoint does not prove ingestion, retries or backfill are healthy.

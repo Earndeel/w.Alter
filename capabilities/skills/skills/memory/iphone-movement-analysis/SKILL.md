@@ -11,12 +11,12 @@ Check the earliest and latest samples before promising coverage. Report missing 
 
 ## Inspect the local source when MCP results are insufficient
 
-Use read-only queries. The observed container is `hindsight-pg`, database `hindsight`, role `hindsight`. `-U postgres` failed because that role did not exist. Verify live configuration rather than assuming the role remains unchanged:
+Use read-only queries. The observed container is `walter-pg`, database `walter`, role `walter`. `-U postgres` failed because that role did not exist. Verify live configuration rather than assuming the role remains unchanged:
 
 ```bash
-docker exec hindsight-pg sh -c 'env | grep -E "^POSTGRES_(USER|DB)="'
-docker exec hindsight-pg psql -U hindsight -d hindsight -At -c '\d core.events'
-docker exec hindsight-pg psql -U hindsight -d hindsight -At -c "SELECT privacy_class, count(*), min(occurred_at), max(occurred_at) FROM core.events WHERE event_type = 'location.sample' GROUP BY privacy_class"
+docker exec walter-pg sh -c 'env | grep -E "^POSTGRES_(USER|DB)="'
+docker exec walter-pg psql -U walter -d walter -At -c '\d core.events'
+docker exec walter-pg psql -U walter -d walter -At -c "SELECT privacy_class, count(*), min(occurred_at), max(occurred_at) FROM core.events WHERE event_type = 'location.sample' GROUP BY privacy_class"
 ```
 
 Never print passwords or inspect the complete container environment. Respect event privacy classes: process restricted coordinates locally and do not expose local_only payloads to a cloud model.
@@ -28,7 +28,7 @@ The observed payload fields are `lat`, `lng`, `accuracy_m`, and nested `raw.prop
 Use explicit start and end timestamps with offsets and a half-open interval. For example, to inspect coverage for three Bangkok calendar days:
 
 ```bash
-docker exec hindsight-pg psql -U hindsight -d hindsight -At -c "SELECT count(*), min(occurred_at), max(occurred_at) FROM core.events WHERE event_type = 'location.sample' AND occurred_at >= TIMESTAMPTZ '2026-10-30 00:00:00+07' AND occurred_at < TIMESTAMPTZ '2026-11-02 00:00:00+07'"
+docker exec walter-pg psql -U walter -d walter -At -c "SELECT count(*), min(occurred_at), max(occurred_at) FROM core.events WHERE event_type = 'location.sample' AND occurred_at >= TIMESTAMPTZ '2026-10-30 00:00:00+07' AND occurred_at < TIMESTAMPTZ '2026-11-02 00:00:00+07'"
 ```
 
 Replace the example bounds with the requested period. Keep timestamps timezone-aware. Bangkok reports used `Asia/Bangkok`; do not assume this timezone for every request.

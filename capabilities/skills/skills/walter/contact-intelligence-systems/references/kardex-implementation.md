@@ -2,9 +2,9 @@
 
 ## Current Infrastructure
 
-- **PG**: `hindsight-pg`, schema `kardex`
+- **PG**: `walter-pg`, schema `kardex`
 - **Qdrant**: collection `kardex_ctx` (768d, Gemini Embedding) — NOT YET CREATED
-- **Connection**: Verify IP with `docker inspect hindsight-pg | grep IPAddress` (commonly `172.17.0.3` or `172.17.0.4` — changes on container recreate)
+- **Connection**: Verify IP with `docker inspect walter-pg | grep IPAddress` (commonly `172.17.0.3` or `172.17.0.4` — changes on container recreate)
 
 ## Schema (7 tables + 3 views)
 
@@ -81,14 +81,14 @@ python3 /root/.hermes/services/kardex/scripts/build_context.py --contact-id 1
 
 ## Key Design Decisions
 
-- Same PG container (hindsight-pg), separate schema `kardex` — isolation without new infrastructure
+- Same PG container (walter-pg), separate schema `kardex` — isolation without new infrastructure
 - NOT merged into Jarvis memory (public schema) — Kardex is contact-centric, Jarvis is fact-centric
 - Qdrant collection `kardex_ctx` (future) for semantic search across conversations
 - Events and Actions are extracted automatically from conversations via NLP
 
 ## Pitfalls (Implementation-Specific)
 
-- **PG connection IP changes on container recreate**: Both `beeper_sync.py` and `build_context.py` hardcode `DB_HOST`. After `docker-compose down/up` or container recreation, the IP changes. Always verify with `docker inspect hindsight-pg | grep IPAddress` and update both scripts.
+- **PG connection IP changes on container recreate**: Both `beeper_sync.py` and `build_context.py` hardcode `DB_HOST`. After `docker-compose down/up` or container recreation, the IP changes. Always verify with `docker inspect walter-pg | grep IPAddress` and update both scripts.
 - **Beeper chat pagination**: API returns 25 chats/page. Contacts beyond page 15 are missed with default `--chat-pages=15`. Use `--chat-pages 30` or higher for full coverage (719 chats = 29 pages as of June 2026).
 - **Beeper handle case/accent matching**: `--contact` search is case-insensitive Python `in`, but the Beeper chat title may include accents (e.g., `Kérian_wmb`). Searching `kerian` works; the accent is handled by Python's casefold.
 - **PG schema isolation**: Always prefix queries with `kardex.`

@@ -61,9 +61,9 @@ Forward masking does not clean already persisted data. Inspect journal text and 
 The host lacked `psql` in this session. Use the database container for schema inspection:
 
 ```sh
-docker exec -i hindsight-pg psql -U hindsight -d hindsight -P pager=off -c '\d walter_logs.events'
-docker exec -i hindsight-pg psql -U hindsight -d hindsight -P pager=off -c '\d core.events'
-docker exec -i hindsight-pg psql -U hindsight -d hindsight -P pager=off -c '\d system.purges'
+docker exec -i walter-pg psql -U walter -d walter -P pager=off -c '\d walter_logs.events'
+docker exec -i walter-pg psql -U walter -d walter -P pager=off -c '\d core.events'
+docker exec -i walter-pg psql -U walter -d walter -P pager=off -c '\d system.purges'
 ```
 
 Check both `walter_logs.events.text` and `.data`, and both `core.events.content` and `.payload`. Verify the current schema and inspect `/walter/cognition/memory/walter_memory/purge.py` before planning historical remediation.

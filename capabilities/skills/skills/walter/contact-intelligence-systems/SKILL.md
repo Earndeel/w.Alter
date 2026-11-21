@@ -242,10 +242,10 @@ When Monsieur asks "who is X?" or "what's the profile for Y?", follow this seque
 ### 1. Verify DB connectivity first
 ```bash
 # Check PG container is running
-docker ps | grep hindsight-pg
+docker ps | grep walter-pg
 
 # Get current IP (changes on container recreate!)
-docker inspect hindsight-pg | grep IPAddress
+docker inspect walter-pg | grep IPAddress
 
 # Test connection
 psql -h <IP> -U postgres -d hermes -c "SELECT 1 FROM kardex.contacts LIMIT 1;"
@@ -334,7 +334,7 @@ Added 2026-06-07. Fields: content, title, mood, energy_level, emotional_tags[], 
 
 ## Current Kardex Deployment (Implementation-Specific)
 
-The Kardex system is deployed on `hindsight-pg` (Docker, schema `kardex`). For current schema, scripts, connection details, and implementation status, see `references/kardex-implementation.md`.
+The Kardex system is deployed on `walter-pg` (Docker, schema `kardex`). For current schema, scripts, connection details, and implementation status, see `references/kardex-implementation.md`.
 
 Key scripts:
 - **Beeper sync**: `/root/.hermes/services/kardex/scripts/beeper_sync.py`

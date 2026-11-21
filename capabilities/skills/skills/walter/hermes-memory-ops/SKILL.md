@@ -14,7 +14,7 @@ material is kept verbatim in `references/historical-2026-08-architecture.md` for
 ## What is live (and what is not)
 
 - **Durable truth** = `core.events` (append-only, idempotent, privacy-classed) + `core.objects` (Raw Vault registry)
-  in Postgres `hindsight-pg` (127.0.0.1:5433, db `hindsight`; the container keeps its historical name; password
+  in Postgres `walter-pg` (127.0.0.1:5433, db `walter`; the container keeps its historical name; password
   only in `/root/.pgpass`, never printed). Kardex = schema `kardex` of the same database, fed only by walter-memory
   processors. Search = `search.chunks` (FTS + local embeddings, pgvector).
 - **Code**: `/walter/cognition/memory` (link `/walter/cognition/memory`), lib `walter_memory`, CLI `walter-memory`
@@ -44,7 +44,7 @@ material is kept verbatim in `references/historical-2026-08-architecture.md` for
 1. `walter-memory health` (`/usr/local/bin/walter-memory`) — connector freshness, failures, queues, budgets, index
    lag. A `problems` list names what to look at (example 2026-11-01: `queue beeper_media: 3 dead jobs`).
 2. `systemctl status walter-memory-gateway walter-logs-watch` and `systemctl list-timers 'walter-memory-*'`.
-3. PG: `docker exec -i hindsight-pg psql -U hindsight -d hindsight …` (no password on the command line, never
+3. PG: `docker exec -i walter-pg psql -U walter -d walter …` (no password on the command line, never
    print secrets).
 4. Hermes gateway is a **user** unit: `systemctl --user status hermes-gateway`, not the system service.
 5. Raw journal coverage, checkpoints or duplicates: `walter-memory logs stats|sessions|search`; duplicate events after

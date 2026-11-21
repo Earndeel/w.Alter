@@ -7,7 +7,7 @@ description: Use when validating changes to Walter Memory extraction, working st
 
 - Read the memory architecture and dated decisions before changing behavior. Resolve module locations with `walter path memory` and `walter path context`; `/walter/cognition/memory` and `/walter/cognition/context` were the locations verified in this session.
 - Back up affected code and database schemas under the instance's `backups/changes/` directory. Preserve a rollback script alongside the backup before applying a migration.
-- Use a disposable PostgreSQL database for quality experiments. The session used container `walter-memory-testpg`, exposed on port 5440; production used `hindsight-pg` on port 5433. Verify these live before running anything. Never reset benchmark state against production.
+- Use a disposable PostgreSQL database for quality experiments. The session used container `walter-memory-testpg`, exposed on port 5440; production used `walter-pg` on port 5433. Verify these live before running anything. Never reset benchmark state against production.
 - Supply `WALTER_MEMORY_DATABASE_URL` through the approved secret mechanism; never print it or embed credentials in commands, reports, or skills.
 - Preserve the same reference corpus when comparing policies. The session used 12 threads and 68 reference items; retain the corpus and output artifacts so later results are comparable.
 
@@ -33,7 +33,7 @@ walter-python bench/memory_v1.py /path/to/reference.jsonl /path/to/results-direc
 - During slow runs, inspect the output log, process tree, and disposable database activity. For example:
 
 ```bash
-docker exec walter-memory-testpg psql -U hindsight -d hindsight -Atc 'select processor, count(*) from system.model_calls group by 1'
+docker exec walter-memory-testpg psql -U walter -d walter -Atc 'select processor, count(*) from system.model_calls group by 1'
 ```
 
 ## Evaluate reconsolidation separately

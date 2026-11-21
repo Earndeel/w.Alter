@@ -105,7 +105,7 @@ docker images --format '{{.Repository}}:{{.Tag}}|{{.Size}}|{{.ID}}'
 5. For the observed PostgreSQL deployment, run aggregate, read-only queries through:
 
 ```sh
-docker exec -i hindsight-pg psql -U hindsight -d hindsight \
+docker exec -i walter-pg psql -U walter -d walter \
   -X -A -P footer=off \
   -c 'select count(*) filter (where not granted) as waiting, count(*) as total from pg_locks;'
 ```

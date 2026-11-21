@@ -20,7 +20,7 @@ walter-memory events --source beeper --since YYYY-MM-DD --limit 100000 > beeper_
 
 ```bash
 export PGPASSFILE=/root/.pgpass
-psql -h 127.0.0.1 -p 5433 -U hindsight -d hindsight -Atc "select id::text, kind, mime, original_name, captured_at, size_bytes, storage_zone, storage_key, source_ref::text, meta::text from core.objects where source='beeper' and kind='audio' order by captured_at desc"
+psql -h 127.0.0.1 -p 5433 -U walter -d walter -Atc "select id::text, kind, mime, original_name, captured_at, size_bytes, storage_zone, storage_key, source_ref::text, meta::text from core.objects where source='beeper' and kind='audio' order by captured_at desc"
 ```
 
 Utiliser `/walter/cognition/memory` et le module `walter_memory.objects.get_object` pour récupérer les fichiers par identifiant, au lieu d'exposer ou de copier des identifiants d'accès au stockage. Vérifier que `source_ref` relie bien l'objet au `chat_id` et au `message_id` de l'événement.

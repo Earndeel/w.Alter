@@ -14,7 +14,7 @@ write-worker/write-bridge, pg-qdrant-sync, dream-cycle and Jarvis are retired si
 Do not restart them or install Qdrant clients to satisfy an old smoke test.
 
 1. Read /root/.hermes/docs/walter-memory/{ARCHITECTURE,DECISIONS,RUNBOOK}.md.
-   Durable truth is core.events + core.objects in hindsight-pg (127.0.0.1:5433).
+   Durable truth is core.events + core.objects in walter-pg (127.0.0.1:5433).
    Hindsight is replaceable cognition; Kardex is the social schema; vectors use PostgreSQL/pgvector.
    Use Walter Memory lib/gateway for writes. Never patch the upstream Hermes checkout.
 2. Run /usr/local/bin/walter-memory health, systemctl status walter-logs-watch and
@@ -72,11 +72,11 @@ provider/model, cron or deletion command below must be checked against the curre
 ```
 Layer 0: MEMORY.md (cap 2200) + USER.md (cap 1375) — injected every turn
 Layer 1: Hindsight Recall via Hybrid Search (:8889) — Qdrant + ZeRank-2 reranker
-Layer 2: PostgreSQL (hindsight-pg container) — source of truth
+Layer 2: PostgreSQL (walter-pg container) — source of truth
 Layer 3: Write Path — Hindsight API (:8888) + Write Worker (:8890)
 Layer 4: Maintenance crons — on Kie/gemini-3.5-flash (NOT OpenRouter)
 Layer 5: Sessions DB (state.db, SQLite FTS5)
-Kardex: Social memory (schema kardex in hindsight-pg, 41 tables)
+Kardex: Social memory (schema kardex in walter-pg, 41 tables)
 ```
 
 **⚠️ Schema change (verified 2026-08-21):** facts live in `memory_units`
@@ -101,7 +101,7 @@ Recall bench: `~/.hermes/scripts/recall_bench.py` (14 probes, 5 categories,
 results in `~/.hermes/membench/`).
 
 Services: hindsight-api, hybrid-search, write-worker (all systemd)
-Docker: qdrant (6333), hindsight-pg (5432 internal), flaresolverr, webtop
+Docker: qdrant (6333), walter-pg (5432 internal), flaresolverr, webtop
 
 ## Critical Pitfall: Cron Provider Resolution
 
@@ -127,7 +127,7 @@ curl -s http://127.0.0.1:8888/health   # Hindsight API
 curl -s http://127.0.0.1:8889/health   # Hybrid Search (shows memories_count)
 curl -s http://127.0.0.1:8890/health   # Write Worker
 curl -s http://127.0.0.1:6333/collections  # Qdrant
-docker exec hindsight-pg psql -U hindsight -d hindsight -c "SELECT COUNT(*) FROM memory_units WHERE created_at > NOW() - INTERVAL '7 days';"
+docker exec walter-pg psql -U walter -d walter -c "SELECT COUNT(*) FROM memory_units WHERE created_at > NOW() - INTERVAL '7 days';"
 ```
 Full post-repair battery: `bash /root/.hermes/skills/devops/hermes-memory-ops/scripts/post_repair_smoke_test.sh [--write-test]`
 — checks the 4 health endpoints, Qdrant point count, PG write-path activity,
@@ -338,7 +338,7 @@ When asked to audit the memory stack without making changes, run these checks in
 - Service memory from systemd: `Memory` and `CPU` lines
 
 **Deep diagnostics batch:**
-- Container memory limits: `docker inspect --format '{{.HostConfig.Memory}}' hindsight-pg qdrant`
+- Container memory limits: `docker inspect --format '{{.HostConfig.Memory}}' walter-pg qdrant`
 - Qdrant storage: `docker exec qdrant du -sh /qdrant/storage/collections/*`
 - PG replication slots: `SELECT * FROM pg_replication_slots;`
 
@@ -362,9 +362,9 @@ Produce a report with these 9 sections, in French when the user requested French
 **Correction :** `pip install psycopg2-binary` dans `/root/.hermes/hermes-agent/venv`.
 **Impact :** pas de consolidation nocturne des mémoires, pas de mise à jour du profil utilisateur.
 
-### hindsight-pg saturation mémoire
+### walter-pg saturation mémoire
 **Symptôme :** `docker stats` montre >85% de la limite mémoire (1 GiB par défaut). OOM imminent.
-**Correction :** `docker update --memory 2g hindsight-pg` ou modification du compose file.
+**Correction :** `docker update --memory 2g walter-pg` ou modification du compose file.
 
 ### WAL PostgreSQL anormalement élevé
 **Symptôme :** `pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0')` > 10 GB.

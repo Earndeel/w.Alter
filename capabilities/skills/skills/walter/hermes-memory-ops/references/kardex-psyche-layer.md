@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Kardex schema (`kardex.*` in hindsight-pg) serves dual purpose:
+The Kardex schema (`kardex.*` in walter-pg) serves dual purpose:
 1. Social memory — contacts, relationships, communication history
 2. Psyche layer — Monsieur's psychological profile, preferences, journal (added 2026-06-07)
 

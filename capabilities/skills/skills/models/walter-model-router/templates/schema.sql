@@ -1,5 +1,5 @@
 -- WALTER MODEL ROUTER — PostgreSQL Schema
--- Run: docker exec -i hindsight-pg psql -U hindsight -d hindsight < schema.sql
+-- Run: docker exec -i walter-pg psql -U walter -d walter < schema.sql
 
 CREATE SCHEMA IF NOT EXISTS walter_router;
 

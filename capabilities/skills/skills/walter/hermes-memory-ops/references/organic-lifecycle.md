@@ -127,9 +127,9 @@ PG query MUST use `\x01` (SOH character) as field separator, NOT `|`. Fact conte
 
 ```python
 # WRONG
-["docker", "exec", "hindsight-pg", "psql", ..., "-tAF", "|", "-c", sql]
+["docker", "exec", "walter-pg", "psql", ..., "-tAF", "|", "-c", sql]
 # RIGHT
-["docker", "exec", "hindsight-pg", "psql", ..., "-tAF", "\x01", "-c", sql]
+["docker", "exec", "walter-pg", "psql", ..., "-tAF", "\x01", "-c", sql]
 ```
 
 ### Performance

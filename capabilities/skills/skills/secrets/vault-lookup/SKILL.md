@@ -188,7 +188,7 @@ for i in json.loads(sys.stdin.read()):
 
 ## 3. Kardex perso (profil de Monsieur — ID 0)
 
-Le Kardex est le système de contact intelligence (PostgreSQL `hindsight-pg`, schema `kardex`, table `contacts`). Monsieur est **l'ID 0, `relationship_type = self`**. Raccourci CLI `kardex`.
+Le Kardex est le système de contact intelligence (PostgreSQL `walter-pg`, schema `kardex`, table `contacts`). Monsieur est **l'ID 0, `relationship_type = self`**. Raccourci CLI `kardex`.
 
 ```bash
 kardex                  # Profil complet de Monsieur (ID 0)
@@ -202,11 +202,11 @@ Le contenu du profil vit dans le Kardex (outil MCP `person_lookup`, CLI `kardex`
 
 Accès direct SQL si besoin :
 ```bash
-docker exec hindsight-pg psql -U hindsight -d hindsight -x -c \
+docker exec walter-pg psql -U walter -d walter -x -c \
   "SELECT * FROM kardex.contacts WHERE id = 0;"
 ```
 
-Base : Postgres `hindsight-pg` sur 127.0.0.1:5433, base `hindsight` ; identifiants uniquement dans `/root/.pgpass` (jamais dans une fiche). Schema doc : `~/.hermes/services/kardex/`.
+Base : Postgres `walter-pg` sur 127.0.0.1:5433, base `walter` ; identifiants uniquement dans `/root/.pgpass` (jamais dans une fiche). Schema doc : `~/.hermes/services/kardex/`.
 
 NE PAS confondre avec un service vault — le Kardex vit dans PostgreSQL, pas dans vault.json.age. Pour les infos perso de Monsieur (téléphone, adresse, etc.), c'est le Kardex ID 0 la source de vérité, complétée par l'item Bitwarden "Lucas" (type 4, identité).
 

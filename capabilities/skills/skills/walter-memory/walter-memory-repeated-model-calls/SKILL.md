@@ -10,14 +10,14 @@ Load memory context and the relevant memory procedures through the Walter harnes
 Use the actual incident date and explicit UTC boundaries. Inspect schemas before assuming column names:
 
 ```sh
-docker exec -i hindsight-pg psql -U hindsight -d hindsight -c '\d system.model_calls'
-docker exec -i hindsight-pg psql -U hindsight -d hindsight -c '\d walter_logs.events'
+docker exec -i walter-pg psql -U walter -d walter -c '\d system.model_calls'
+docker exec -i walter-pg psql -U walter -d walter -c '\d walter_logs.events'
 ```
 
 Define a read-only query helper:
 
 ```sh
-Q() { docker exec -i hindsight-pg psql -U hindsight -d hindsight -c "$1"; }
+Q() { docker exec -i walter-pg psql -U walter -d walter -c "$1"; }
 ```
 
 Count by processor, purpose, model, budget and status; include cost and a historical comparison. Example incident query:

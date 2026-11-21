@@ -17,7 +17,7 @@ Day-to-day maintenance for the Hindsight memory stack. Covers deduplication back
 
 - Dreaming cycle or other cron jobs failing with 402 / provider errors
 - Duplicate memories accumulating faster than cleanup
-- hindsight-pg container IP changed after reboot
+- walter-pg container IP changed after reboot
 - Verifying Hindsight health and model configuration
 - Tuning exact dedup parameters
 
@@ -57,7 +57,7 @@ python3 /root/.hermes/scripts/hindsight_pg_exact_dedup.py --apply --limit-groups
 
 **Count current duplicates:**
 ```bash
-docker exec hindsight-pg psql -U hindsight -d hindsight -c "
+docker exec walter-pg psql -U walter -d walter -c "
 SELECT COUNT(*) as groups, SUM(cnt - 1) as excess
 FROM (SELECT text, COUNT(*) as cnt FROM memory_units GROUP BY text HAVING COUNT(*) > 1) sub;"
 ```
@@ -88,11 +88,11 @@ for j in data['jobs']:
 
 ### 3. Docker bridge IP changes on reboot
 
-`hindsight-pg` on default bridge gets a new IP after host reboot. Hardcoded in `hindsight-api.env`.
+`walter-pg` on default bridge gets a new IP after host reboot. Hardcoded in `hindsight-api.env`.
 
 **Quick fix:**
 ```bash
-NEW_IP=$(docker inspect hindsight-pg --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+NEW_IP=$(docker inspect walter-pg --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 sed -i "s/172.17.0.[0-9]*/$NEW_IP/" /root/.hermes/hindsight/hindsight-api.env
 systemctl restart hindsight-api
 sleep 20 && curl -s http://127.0.0.1:8888/health
@@ -130,10 +130,10 @@ docker ps -a | grep hindsight
 curl -s http://127.0.0.1:8888/health
 
 # 4. Memory count
-docker exec hindsight-pg psql -U hindsight -d hindsight -c "SELECT COUNT(*) FROM memory_units;"
+docker exec walter-pg psql -U walter -d walter -c "SELECT COUNT(*) FROM memory_units;"
 
 # 5. Duplicate count
-docker exec hindsight-pg psql -U hindsight -d hindsight -c "
+docker exec walter-pg psql -U walter -d walter -c "
 SELECT COUNT(*) as groups, SUM(cnt - 1) as excess
 FROM (SELECT text, COUNT(*) as cnt FROM memory_units GROUP BY text HAVING COUNT(*) > 1) sub;"
 

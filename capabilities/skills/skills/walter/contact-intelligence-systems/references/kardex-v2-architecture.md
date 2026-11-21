@@ -17,7 +17,7 @@ Kardex is a multi-source contact intelligence system intended to ingest years of
 ## Key Decisions
 
 ### PG + Qdrant
-- PostgreSQL (`hindsight-pg`, schema `kardex`) is source of truth.
+- PostgreSQL (`walter-pg`, schema `kardex`) is source of truth.
 - Qdrant is a derived semantic index only.
 - Qdrant payloads must always reference PG IDs (`contact_id`, `raw_item_id`, `episode_id`, `claim_id`, timestamps).
 

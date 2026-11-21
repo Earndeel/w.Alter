@@ -15,8 +15,8 @@ description: Use when walter-logs contains duplicate events after transcript rew
 ## Back up and backfill keys
 
 1. Create a protected, dated backup directory under `/root/.hermes/backups/`. Back up modified code and decision records as well as the database schema.
-2. Export the schema with `docker exec hindsight-pg pg_dump -U hindsight -d hindsight -n walter_logs -Fc > "$backup_dir/walter_logs-before-keys.dump"`. Set `umask 077` before creating the file and verify successful completion.
-3. Validate the archive with `docker exec -i hindsight-pg pg_restore -l < "$backup_dir/walter_logs-before-keys.dump"`. Check disk space before large backfills.
+2. Export the schema with `docker exec walter-pg pg_dump -U walter -d walter -n walter_logs -Fc > "$backup_dir/walter_logs-before-keys.dump"`. Set `umask 077` before creating the file and verify successful completion.
+3. Validate the archive with `docker exec -i walter-pg pg_restore -l < "$backup_dir/walter_logs-before-keys.dump"`. Check disk space before large backfills.
 4. Confirm migrations 015 and 016 are applied through the project's migration procedure; do not blindly rerun migration SQL.
 5. Stop the writer with `systemctl stop walter-logs-watch` before historical key backfill. Arrange to restart it if the repair fails.
 6. Run a representative session first: `PGPASSFILE=/root/.pgpass walter-python connectors/walter_logs.py keys --session "$session_id"`.

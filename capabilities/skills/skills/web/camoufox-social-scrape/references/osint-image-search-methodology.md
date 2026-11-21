@@ -241,7 +241,7 @@ Google `"@handle" site:starngage.com` to find the page, or construct the URL dir
 
 ### Persisting Results to Kardex
 
-After identifying a person, persist all findings to the Kardex PostgreSQL schema (`hindsight-pg`, schema `kardex`). This makes the data queryable across sessions and integrates with the broader contact intelligence system.
+After identifying a person, persist all findings to the Kardex PostgreSQL schema (`walter-pg`, schema `kardex`). This makes the data queryable across sessions and integrates with the broader contact intelligence system.
 
 ### Tables to populate (in order)
 

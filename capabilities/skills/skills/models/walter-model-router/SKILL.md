@@ -12,7 +12,7 @@ metadata:
 # Walter Router
 
 Module `/walter/cognition/router` (also reachable as `/walter/cognition/router`), command `walter-router` on the PATH. Data: schema
-`models` in PostgreSQL 127.0.0.1:5433 db `hindsight` (password only in ~/.pgpass; every table and view is commented).
+`models` in PostgreSQL 127.0.0.1:5433 db `walter` (password only in ~/.pgpass; every table and view is commented).
 Read first: `/walter/cognition/router/README.md` (current state: layout, how a choice is made, consumers, access, rules), then
 `docs/README.md` (documentation index), `docs/reference/DATABASE.md` (all SQL fields), `docs/DATA.md` (provenance), `docs/TIERS.md` (text tiers), `docs/HISTORY.md` (dated decisions).
 The old store (schema `walter_router`, fixed weight vectors, router_matrix.json) is retired: never use it.
@@ -111,7 +111,7 @@ import psycopg
 from datetime import datetime, timezone, timedelta
 end = datetime.now(timezone.utc)
 start = end - timedelta(hours=48)
-with psycopg.connect('host=127.0.0.1 port=5433 dbname=hindsight user=hindsight') as c:
+with psycopg.connect('host=127.0.0.1 port=5433 dbname=walter user=walter') as c:
     c.execute('SET TRANSACTION READ ONLY')
     print('Fenêtre UTC :', start.isoformat(), end.isoformat())
     rows = c.execute('''
@@ -195,7 +195,7 @@ Use the installed Hindsight PostgreSQL container. A guessed `postgres` role fail
 
 ```bash
 U=$(cut -d: -f4 /root/.pgpass | head -1)
-Q(){ docker exec -i hindsight-pg psql -U "$U" -d hindsight "$@"; }
+Q(){ docker exec -i walter-pg psql -U "$U" -d walter "$@"; }
 Q -At -c "select column_name || ' ' || data_type from information_schema.columns where table_schema='runs' and table_name='runs'"
 Q -c "select origin->>'runtime' runtime, routing->>'applied' applied, routing->'requested'->>'task' task, routing->'requested'->>'level' level, count(*) from runs.runs where started_at > now()-interval '3 days' and parent_run_id is null group by 1,2,3,4 order by 1,5 desc"
 Q -At -c "select started_at, origin->>'runtime', routing::text from runs.runs where parent_run_id is null and routing->>'applied'='true' order by started_at desc limit 4"

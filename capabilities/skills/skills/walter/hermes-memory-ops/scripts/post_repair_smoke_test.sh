@@ -20,11 +20,11 @@ fi
 n=$(timeout 60 walter-memory search "sauvegarde" --limit 5 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)
 [ "${n:-0}" -gt 0 ] && ok "unified search (FTS + vectors) returns $n" || bad "unified search returns nothing"
 
-ext=$(docker exec hindsight-pg psql -U hindsight -d hindsight -Atc \
+ext=$(docker exec walter-pg psql -U walter -d walter -Atc \
   "select count(*) from pg_extension where extname in ('vector','pg_trgm','pgcrypto','unaccent')" 2>/dev/null || echo 0)
 [ "$ext" = 4 ] && ok "extensions vector, pg_trgm, pgcrypto, unaccent present" || bad "extensions missing ($ext/4)"
 
-recent=$(docker exec hindsight-pg psql -U hindsight -d hindsight -Atc \
+recent=$(docker exec walter-pg psql -U walter -d walter -Atc \
   "select count(*) from core.events where ingested_at > now() - interval '1 day'" 2>/dev/null || echo 0)
 [ "${recent:-0}" -gt 0 ] && ok "core.events ingested in the last 24 h = $recent" || bad "no core.events in the last 24 h"
 
