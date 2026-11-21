@@ -53,6 +53,11 @@ def sync(conn, problems: list[dict], tests_checked: bool) -> list[dict]:
 
 
 def _set(conn, inc: dict, status: str, verdict: dict | None = None, attempt: bool = False) -> None:
+    # the same outcome keeps its « already told » mark: rewriting the verdict every pass erased it, so a needs_owner
+    # message (Venice without credit, since 14/11) went again every other pass (2026-11-21)
+    told = (inc.get("verdict") or {}).get("notified_status") or inc.get("notified_status")
+    if verdict is not None and told and status == inc.get("status") == told:
+        verdict = {**verdict, "notified_status": told}
     conn.execute(f"""update models.guardian_incidents set status = %s, verdict = coalesce(%s, verdict)
                      {", attempts = attempts + 1, last_attempt_at = now()" if attempt else ""}
                      where incident_id = %s""",

@@ -37,3 +37,33 @@ def test_an_open_padlock_off_its_first_is_detected_and_repaired(monkeypatch):
             assert inc["status"] == "fixed" and now == first and sent and sent[0][0]["to"] == first
         finally:
             conn.rollback()
+
+
+def test_a_needs_owner_message_is_not_sent_again_on_the_next_passes(monkeypatch):
+    """2026-11-21: Venice (no credit) was announced every other pass since 14/11."""
+    from walter_router.guardian import run
+    from walter_router.analysis import telegram
+    sent = []
+    monkeypatch.setattr(telegram, "send_with_buttons", lambda text, buttons: sent.append(text))
+
+    class C:
+        def __init__(self):
+            self.verdict = None
+
+        def execute(self, sql, args=None):
+            if "set status" in sql and args[1] is not None:
+                import json
+                self.verdict = json.loads(args[1])
+            if "set notified_at" in sql:
+                import json
+                self.verdict = json.loads(args[0])
+            return self
+    conn = C()
+    inc = {"incident_id": 1, "kind": "credit_low", "subject": "openrouter", "status": "open", "attempts": 0,
+           "detail": {"left_usd": 0.9, "step_usd": 1.0}, "verdict": None}
+    for _ in range(4):                       # four guardian passes on the same incident
+        inc = {**inc, "verdict": conn.verdict}
+        inc["notified_status"] = (inc.get("verdict") or {}).get("notified_status")
+        run.handle(conn, inc, [0])
+        run.notify(conn, [inc])
+    assert len(sent) == 1

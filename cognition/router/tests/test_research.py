@@ -76,7 +76,10 @@ def test_specialised_tasks_have_their_boards():
     from walter_router.store import db
     with db.connect() as conn:
         boards = {(r["task"], r["benchmark"], r["bench_task"]) for r in conn.execute("select * from models.task_benchmarks")}
-    for need in [("medical", "aa_eval", "healthbench_pro"), ("legal", "aa_eval", "harvey_lab"), ("science", "aa_eval", "critpt"),
+    # 2026-11-21: medical / finance / legal ranked on their AA domain index alone (owner)
+    for task, only in (("medical", "idx_medical"), ("finance", "idx_finance"), ("legal", "idx_legal")):
+        assert {b for t, _, b in boards if t == task} == {only}
+    for need in [("science", "aa_eval", "critpt"),
                  ("long_context", "aa_eval", "lcr"), ("writing", "arena", "text_creative"), ("music", "aa_mm", "music_vocals"),
                  ("3d", "aa_eval", "aa_3d"), ("vision", "aa_eval", "mmmu_pro"), ("engineering", "aa_eval", "idx_engineering"),
                  ("finance", "aa_eval", "idx_finance"), ("strategy", "aa_eval", "idx_strategy_ops"),
