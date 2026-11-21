@@ -149,6 +149,7 @@ FIELD_MEANINGS = {
 
 ENV_MEANINGS = {
     "WALTER_ROUTER_DATABASE_URL": "DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée.",
+    "WALTER_DATABASE_URL_FILE": "Fichier de l'hôte qui déclare l'adresse PostgreSQL de Walter (défaut /etc/walter/database.url, sans mot de passe) ; lu quand WALTER_ROUTER_DATABASE_URL est absent.",
     "WALTER_ROUTER_CLI": "Commande publique appelée par l'adaptateur de tools.",
     "WALTER_ENGINE_API_URL": "Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895).",
     "WALTER_ROUTER_ADVISOR": "« off » : le cycle et les clics ne lancent pas le conseiller du Router.",

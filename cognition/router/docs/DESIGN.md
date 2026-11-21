@@ -225,7 +225,7 @@ Mise à jour 2026-10-16 :
 
 ---
 
-## 13. Données (PostgreSQL `hindsight-pg`)
+## 13. Données (PostgreSQL `walter-pg`)
 
 - `models` ✅ — bibliothèque : identités, benchmarks, offres, catalogue, choix, dossiers, préférences, fiches,
   affinités, alertes, état des providers, journal d'exécution, retours.

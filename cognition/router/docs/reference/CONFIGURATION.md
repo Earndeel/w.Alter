@@ -360,7 +360,8 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | `WALTER_LLM_URL` | serve/oneshot.py | get | 'http://127.0.0.1:8894' | URL loopback de la passerelle walter-llm pour les commandes Telegram des services web conversationnels (défaut http://127.0.0.1:8894). |
 | `WALTER_LLM_TOKEN` | serve/oneshot.py | get | aucun | Jeton local d'agent pour la passerelle walter-llm, propre à chaque runtime (@instance/bootstrap/llm/<agent>.env 0600 ; jamais affiché). |
 | `WALTER_RUN_ID` | serve/oneshot.py | get | aucun | Run Walter (runs.runs) servi par l'exécution ; posé par l'adaptateur du harness, inscrit dans models.exec_log. |
-| `WALTER_ROUTER_DATABASE_URL` | store/db.py | get | 'postgresql://hindsight@127.0.0.1:5433/hindsight' | DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée. |
+| `WALTER_ROUTER_DATABASE_URL` | store/db.py | get | aucun | DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée. |
+| `WALTER_DATABASE_URL_FILE` | store/db.py | get | '/etc/walter/database.url' | Fichier de l'hôte qui déclare l'adresse PostgreSQL de Walter (défaut /etc/walter/database.url, sans mot de passe) ; lu quand WALTER_ROUTER_DATABASE_URL est absent. |
 
 ## Clés des fichiers de configuration livrés
 

@@ -1255,6 +1255,7 @@ Store: the router's database (schema models in PostgreSQL): connection, migratio
 
 Connection handling. Credentials come from ~/.pgpass (never from code or DSNs).
 
+- `_host_dsn()` — 
 - `connect()` — 
 - `migrate()` — Apply every migrations/NNN_*.sql not yet recorded in models.schema_migrations (each file is one transaction).
 

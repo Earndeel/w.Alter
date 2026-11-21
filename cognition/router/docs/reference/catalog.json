@@ -10144,6 +10144,11 @@
         "functions": [
           {
             "description": "",
+            "name": "_host_dsn",
+            "signature": ""
+          },
+          {
+            "description": "",
             "name": "connect",
             "signature": ""
           },
@@ -19199,10 +19204,17 @@
         "operation": "get"
       },
       {
-        "default_expression": "'postgresql://hindsight@127.0.0.1:5433/hindsight'",
+        "default_expression": "aucun",
         "description": "DSN PostgreSQL ; secret via .pgpass, jamais dans une URL publiée.",
         "file": "store/db.py",
         "name": "WALTER_ROUTER_DATABASE_URL",
+        "operation": "get"
+      },
+      {
+        "default_expression": "'/etc/walter/database.url'",
+        "description": "Fichier de l'hôte qui déclare l'adresse PostgreSQL de Walter (défaut /etc/walter/database.url, sans mot de passe) ; lu quand WALTER_ROUTER_DATABASE_URL est absent.",
+        "file": "store/db.py",
+        "name": "WALTER_DATABASE_URL_FILE",
         "operation": "get"
       }
     ],
@@ -19219,6 +19231,7 @@
       "OPENROUTER_API_KEY",
       "PYTEST_CURRENT_TEST",
       "VENICE_API_KEY",
+      "WALTER_DATABASE_URL_FILE",
       "WALTER_DELEGATION_DEPTH",
       "WALTER_ENGINE_API_URL",
       "WALTER_FLARESOLVERR",
@@ -19315,7 +19328,7 @@
     "contracts/data-classes.json": "664f2d3052e4d742687cf93932a419efea88597b868840225fb8c9470288815b",
     "contracts/maintenance.json": "e5a30b7b5a5cc295eb05115fc25b3ca5efdc2ea64a3414b5f57c94cd9916bc33",
     "contracts/router.json": "2c22033548faf73d7cba8f3e98e7309cccce1ffb267e0f68efa10d7cb8d3b185",
-    "documentation.py": "8982ebe7a685a8ea7c746845b008bd5c1ea542a383ae9c7d75848c99d9d36188",
+    "documentation.py": "2c37ce0d6189e2551eb7b85ed70060fdd196ed6ef36f420bcb6b1e8e1e9e448c",
     "guardian/__init__.py": "a28ff92bf9c1254bad5416a6139b10f03a3cfedd0955894a65d042960b4ee587",
     "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
     "guardian/advice.py": "21e49812f6606cddbec7f40e557504d9e0ab0765bce838ea3a3ad19dcdb6edd8",
@@ -19409,7 +19422,7 @@
     "serve/run.py": "ed428ba8c3dda62ccca7450aa54560841acc2c998349ee5ecb7df21f4551403f",
     "serve/web.py": "a7c4019f149f362fb5a9f6edf99bf798af9cf12447d9da13b3f39435ec3303dd",
     "store/__init__.py": "274246c514c992bbb1fbf78a36cc19241608850ce45ff2d91176806bad2795fe",
-    "store/db.py": "d3bfc458ba2d488ebc56dc91ea0fedafe68b79d7cc088fef0e5bb5567ded2802",
+    "store/db.py": "87b88d8672a975678f42b8ee388d0ac6f6b11020306f60246b54b73e9d3ac53b",
     "store/migrations/001_models.sql": "dfdcb4be9930086cbdc935eb7cffe07f6705cb1562169c162f74f7b2205dcc37",
     "store/migrations/002_tasks.sql": "90cb0c200c4ecdd8165caf7eccbdd6abd0fe85b77e8949c44154195d0bee45d2",
     "store/migrations/003_roles_and_declared_offers.sql": "46766227cc3ec1f8517816f5dec24ce0a449da5cce41934db371b03c8afa7272",
