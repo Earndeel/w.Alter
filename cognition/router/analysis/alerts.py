@@ -16,10 +16,23 @@ STALE_HOURS = {"aa": 60, "aa_eval": 60, "aa_decision": 60, "mm": 60, "da": 60, "
 
 
 def record(conn, kind: str, task: str, subject: str, evidence: dict, status: str, role: str = "") -> bool:
-    """Insert or refresh an alert; returns True when it is new. Verdicts and statuses are never overwritten."""
+    """Insert or refresh an alert; returns True when it is new. The owner's verdicts are never overwritten; a
+    challenger the Router itself closed (adopted then replaced, or set aside when another one was auto-adopted) is
+    live again when it beats the model in use once more (2026-11-21: Fable 5.2, #1 in medical and finance, was stuck
+    as « adopted » / « auto: … » and could never come back)."""
     row = conn.execute("""insert into models.alerts (kind, task, role, subject, evidence, status)
                           values (%s, %s, %s, %s, %s::jsonb, %s)
-                          on conflict (kind, task, role, subject) do update set last_seen = now(), evidence = excluded.evidence
+                          on conflict (kind, task, role, subject) do update set last_seen = now(), evidence = excluded.evidence,
+                            status = case when models.alerts.kind = 'challenger'
+                                           and models.alerts.status in ('adopted', 'dismissed')
+                                           and (models.alerts.verdict_note like 'auto:%%'
+                                                or models.alerts.verdict_note like '%%— remplacé par%%')
+                                          then excluded.status else models.alerts.status end,
+                            ref = case when models.alerts.kind = 'challenger'
+                                        and models.alerts.status in ('adopted', 'dismissed')
+                                        and (models.alerts.verdict_note like 'auto:%%'
+                                             or models.alerts.verdict_note like '%%— remplacé par%%')
+                                       then null else models.alerts.ref end
                           returning (xmax = 0) as inserted""",
                        (kind, task, role, subject, json.dumps(evidence, default=str), status)).fetchone()
     return bool(row["inserted"])
@@ -463,7 +476,10 @@ def auto_adopt(conn, only_task: str | None = None, only_role: str | None = None)
                                      and last_seen > now() - interval '{FRESH}'""",
                                  (p["task"], p["role"], p["pinned_model_id"])).fetchall()
             # only a model Walter can call today (2026-11-20: Arrow 2 Telos, no offer, was adopted for svg)
-            cands = [a for a in cands if routes_for(conn, a["subject"], p["interface"], p["modes"] or None)["callable"]]
+            # and only a comparison made against the model in use (2026-11-21: a 20/11 proposal « Astra beats
+            # Sonnet 5.5 » switched medical from Fable 5.2, #1, to Astra, #3, after Fable had replaced Sonnet)
+            cands = [a for a in cands if (a["evidence"] or {}).get("pinned") == p["pinned_model_id"]
+                     and routes_for(conn, a["subject"], p["interface"], p["modes"] or None)["callable"]]
             pick = max(cands, key=lambda a: ((a["evidence"].get("composite") or {}).get("challenger") or 0), default=None)
             others = "kind in ('challenger', 'new_best') and task = %s and role = %s"
             args = (p["task"], p["role"])

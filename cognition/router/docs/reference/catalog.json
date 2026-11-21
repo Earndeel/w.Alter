@@ -5942,7 +5942,7 @@
         "file": "analysis/alerts.py",
         "functions": [
           {
-            "description": "Insert or refresh an alert; returns True when it is new. Verdicts and statuses are never overwritten.",
+            "description": "Insert or refresh an alert; returns True when it is new. The owner's verdicts are never overwritten; a",
             "name": "record",
             "signature": "conn, kind: str, task: str, subject: str, evidence: dict, status: str, role: str=''"
           },
@@ -19376,7 +19376,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "13f290e1044255c0c6ceb9b06458c213c35401518289fffaa51d124638e7453d",
+    "analysis/alerts.py": "d4f3d488b5510abebe1fa18d0718a0bcfa331231342af95f1c2825901e06d840",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -19496,7 +19496,7 @@
     "serve/agent_view.py": "07946ccdf7f8e57d0a721b5727fb51c7d8b6a2c7c37cb24ce05481cd233f0eb1",
     "serve/api.py": "ca15f8aecd1b00dd6cc546263694a0de92b1e2b1d54f34373d60bae61621cb9e",
     "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
-    "serve/choose.py": "a6da76f13724c528d423c4105abe7101c6ed0c49a072e7076e6ae10f5a281ea1",
+    "serve/choose.py": "b1c260b7e8536a68e2b323b4dbe4e4039995eed702b1f5eebe9c50fe05d665f2",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
     "serve/execution.py": "78863d1337508d0123a9d288904c8284758dbc1a44f5160d1ec8104eb2df8c23",
     "serve/intent.py": "b5cc05dfe5a571e4f74e3a2dd379e041f961e49d8e9b2d15181c647c7b98c9ab",

@@ -44,8 +44,10 @@ def test_auto_adopt_skips_a_challenger_walter_cannot_call(monkeypatch):
     from walter_router.serve import choose
     pref = {"task": "svg", "role": "default", "pinned_model_id": "old", "pinned_variant": "", "label": "SVG",
             "interface": "chat", "modes": None}
-    cands = [{"alert_id": 1, "subject": "ghost", "evidence": {"composite": {"challenger": 90}}},
-             {"alert_id": 2, "subject": "real", "evidence": {"composite": {"challenger": 80}}}]
+    cands = [{"alert_id": 1, "subject": "ghost", "evidence": {"pinned": "old", "composite": {"challenger": 90}}},
+             {"alert_id": 2, "subject": "real", "evidence": {"pinned": "old", "composite": {"challenger": 80}}},
+             # 2026-11-21: compared with a model no longer in use (medical: Astra vs Sonnet, Fable in use) — ignored
+             {"alert_id": 3, "subject": "stale", "evidence": {"pinned": "older", "composite": {"challenger": 99}}}]
 
     class C:
         def execute(self, sql, args=None):
@@ -56,7 +58,7 @@ def test_auto_adopt_skips_a_challenger_walter_cannot_call(monkeypatch):
             return [pref] if "from models.preferences" in self.sql else cands
 
     adopted = []
-    monkeypatch.setattr(choose, "routes_for", lambda conn, m, i, modes=None: {"callable": m == "real"})
+    monkeypatch.setattr(choose, "routes_for", lambda conn, m, i, modes=None: {"callable": m in ("real", "stale")})
     monkeypatch.setattr(alerts, "verdict", lambda conn, aid, *a, **k: adopted.append(aid))
     done = alerts.auto_adopt(C())
     assert adopted == [2] and done[0]["to"] == "real"

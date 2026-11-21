@@ -12,7 +12,7 @@ Analysis: understands the collected data and organises it in the database (parsi
 
 Alerts: a pinned favourite overtaken, unranked new releases, stale sources — and their Telegram notification.
 
-- `record(conn, kind: str, task: str, subject: str, evidence: dict, status: str, role: str='')` — Insert or refresh an alert; returns True when it is new. Verdicts and statuses are never overwritten.
+- `record(conn, kind: str, task: str, subject: str, evidence: dict, status: str, role: str='')` — Insert or refresh an alert; returns True when it is new. The owner's verdicts are never overwritten; a
 - `_unit_cost(offers: list[dict], interface: str, modes: list[str] | None=None)` — 
 - `_board_rows(conn, snaps: dict, benchmark: str, bench_task: str)` — 
 - `_order(rows: list[dict])` — Distinct models of a board, best first (variants of one model count once).

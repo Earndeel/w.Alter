@@ -200,11 +200,14 @@ def set_preference(conn, task: str, objective: str | None = None, pin: str | Non
                  (task, role, objective, model_id, variant, provider, note, watch, watch))
     if model_id:   # an adoption the owner has since replaced is history, not the current choice (2026-11-21:
         # tts alert 166 still said « adopted eleven-v4 » after Monsieur relocked gemini, and misled the advisor)
+        # « — remplacé par » = the Router replaced it (it may come back as a challenger: alerts.record); the owner's
+        # own choice reads « — <owner> a choisi », his answer, which nothing reopens
+        by_router = "automatique" in (note or "")
         conn.execute("""update models.alerts set status = 'dismissed',
-                          verdict_note = coalesce(verdict_note, '') || ' — remplacé par ' || %s || ' le ' || to_char(now(), 'DD/MM')
+                          verdict_note = coalesce(verdict_note, '') || %s || %s || ' le ' || to_char(now(), 'DD/MM')
                         where status = 'adopted' and task = %s and coalesce(role, 'default') = %s
                           and kind in ('challenger', 'new_best', 'tier') and subject not in (%s, %s)""",
-                     (pin, task, role, pin, model_id))
+                     (" — remplacé par " if by_router else f" — {instance.owner()} a choisi ", pin, task, role, pin, model_id))
     from walter_router.analysis import alerts
     baseline = alerts.challengers(conn, status_for_new="baseline", only_task=task, only_role=role) if model_id else []
     return {"task": task, "role": role, "objective": objective, "pinned": pin, "watch": watch,
