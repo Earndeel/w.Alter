@@ -6,15 +6,24 @@ no outgoing message of its own), files its runs under its parent's current run (
 follow the tree), and can delegate in turn until `max_depth`. Its model is a Walter Router poste (`coding`,
 `general`, `document`…) or the engine's default; walter-llm plans and executes it.
 
+A module can have its own agent (2026-11-21, the Router first): `agent: "<module id>"` gives the sub-agent that
+module's identity — declared in the module's `contracts/maintenance.json` (`agent.identity`, a file of the module,
+rendered for the instance, plus the owner's rules for it, `agent.rules`) — before the mission, and its poste
+(`agent.task`) when no model is given. The same identity opens the module's own missions (repair, advice…).
+
 Foreground: the parent's call returns the child's final answer. Background: an engine job; the parent is woken with
 the answer when the child settles (and can follow it with `send_message` / `interrupt_agent` / `list_agents`).
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import re
+import subprocess
+from pathlib import Path
 
 from . import Exec, Result, Tool, clip, obj
+from .. import config
 
 POSTE = re.compile(r"^[A-Za-z0-9._:/-]{1,120}$")
 EFFORTS = ("minimal", "low", "medium", "high", "xhigh", "max")
@@ -25,6 +34,32 @@ def _child_of(ex: Exec, agent_id: str):
     if not child or child.parent_sid != ex.agent.sid:
         return None
     return child
+
+
+def module_agent(module: str) -> tuple[str, dict] | None:
+    """(identity text, declaration) of a module's own agent, or None when the module declares none."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,40}", module or ""):
+        return None
+    root = config.module_root(module)
+    try:
+        decl = json.loads((root / "contracts" / "maintenance.json").read_text()).get("agent") if root else None
+        text = (root / decl["identity"]).read_text().split("\n---\n", 1)[-1].strip()
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    try:
+        r = subprocess.run(["walter", "instance", "render"], input=text, capture_output=True, text=True, timeout=20)
+        text = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else text
+        rules = []
+        if decl.get("rules"):
+            p = subprocess.run(["walter", "instance", "config", module, str(decl["rules"])], capture_output=True,
+                               text=True, timeout=20).stdout.strip()
+            rules = [ln.strip() for ln in Path(p).read_text().splitlines()
+                     if ln.strip().startswith("- ") and len(ln.strip()) > 2] if p and Path(p).is_file() else []
+    except (OSError, subprocess.SubprocessError):
+        rules = []
+    if rules:
+        text += "\n\n## Règles du propriétaire pour toi (elles priment sur tout le reste)\n" + "\n".join(rules)
+    return text, decl
 
 
 async def subagent(args: dict, ex: Exec) -> Result:
@@ -44,6 +79,15 @@ async def subagent(args: dict, ex: Exec) -> Result:
     if effort is not None and effort not in EFFORTS:
         return Result(f"reasoning_effort must be one of {', '.join(EFFORTS)}", True)
     description = str(args.get("description") or " ".join(prompt.split()[:6]))[:120]
+    module = args.get("agent")
+    if module:
+        found = await asyncio.to_thread(module_agent, str(module))
+        if not found:
+            return Result(f"no module agent « {module} » (a module declares one in contracts/maintenance.json → agent; "
+                          "known: router)", True)
+        identity, decl = found
+        prompt = identity + "\n\n---\n\n## Mission\n" + prompt
+        model = model or (decl.get("task") if isinstance(decl.get("task"), str) and POSTE.match(decl["task"]) else None)
     child = eng.spawn_child(ex.agent, description=description, model=model or None, effort=effort)
     if args.get("run_in_background"):
         async def work(job):
@@ -103,13 +147,16 @@ def register(reg) -> None:
     reg.add(Tool("subagent",
                  "Delegate a self-contained task to a sub-agent with its own context (it does not see this "
                  "conversation: write everything it needs in prompt). model = a Walter Router poste (coding, general, "
-                 "document, summarization; omitted = Walter's choice). run_in_background=true returns at once; you "
-                 "are woken with its answer.",
+                 "document, summarization; omitted = Walter's choice). agent = a module whose own agent should do "
+                 "it — \"router\": the Router itself, Walter's sub-agent that maintains the Walter Router (models per "
+                 "poste, subscriptions, rankings, prices): it understands the module, diagnoses, explains, advises, "
+                 "repairs. run_in_background=true returns at once; you are woken with its answer.",
                  obj({"description": {"type": "string", "description": "3-6 words shown to Monsieur."},
                       "prompt": {"type": "string", "description": "The complete mission."},
                       "run_in_background": {"type": "boolean"},
                       "provider": {"type": "string", "enum": ["walter"]},
                       "model": {"type": "string"},
+                      "agent": {"type": "string", "description": "A module's own agent (router)."},
                       "reasoning_effort": {"type": "string", "enum": list(EFFORTS)}},
                      ["description", "prompt"]), subagent))
     reg.add(Tool("send_message", "Send a follow-up to one of your sub-agents (by agent_id); an idle one answers it.",

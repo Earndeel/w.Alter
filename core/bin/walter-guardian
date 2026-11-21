@@ -377,8 +377,11 @@ def run(module: str, incidents: list[dict], dry_run: bool = False, root: Path | 
 
 # ---- 5. repair agent ----------------------------------------------------------------------------------------------
 
-REPAIR_BRIEF = """Tu es le guardian du module W.Alter « {module} », sur la VM de Monsieur. Un contrôle automatique a
-trouvé le problème ci-dessous et les gestes simples n'ont pas suffi. Monsieur veut que tu le règles toi-même, comme il
+IDENTITY_FALLBACK = """Tu es l'agent de maintenance du module W.Alter « {module} », sur la VM de Monsieur : un sous-agent
+de Walter spécialisé dans ce module."""
+
+REPAIR_BRIEF = """## Mission : réparer
+Un contrôle automatique du module « {module} » a trouvé le problème ci-dessous et les gestes simples n'ont pas suffi. Monsieur veut que tu le règles toi-même, comme il
 le ferait en t'écrivant depuis une session Claude Code : trouver la vraie cause, la corriger, prouver que ça marche.
 Tu ne lui parles pas ; tu termines par un verdict JSON que le guardian lit.
 
@@ -421,6 +424,31 @@ Déjà tenté :
  "restart": ["walter-engine ou walter-telegram, seulement si ton changement l'exige"],
  "summary_fr": "deux phrases simples pour Monsieur, sans jargon ni commande : ce qui n'allait pas, ce qui est fait",
  "question_fr": "seulement pour needs_owner : ce qu'il doit faire ou décider"}}"""
+
+
+def module_agent(module: str, root: Path) -> str:
+    """Who the repair agent is: the module's own agent when it declares one (maintenance.json `agent`: `identity` =
+    a file of the module, text after its first « --- » line, rendered for the instance; `rules` = the owner's rules
+    for it, an instance config file of the module, lines « - … »), else a neutral line. The same identity opens every
+    mission of that agent, here and in the module."""
+    try:
+        decl = json.loads((root / "contracts" / "maintenance.json").read_text()).get("agent") or {}
+        text = (root / decl["identity"]).read_text().split("\n---\n", 1)[-1].strip()
+    except (OSError, ValueError, KeyError, TypeError):
+        return IDENTITY_FALLBACK.format(module=module)
+    r = subprocess.run(["walter", "instance", "render"], input=text, capture_output=True, text=True, timeout=30)
+    text = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else text
+    rules = []
+    if decl.get("rules"):
+        p = sh("walter", "instance", "config", module, str(decl["rules"]), timeout=30).stdout.strip()
+        try:
+            rules = [ln.strip() for ln in Path(p).read_text().splitlines() if ln.strip().startswith("- ")
+                     and len(ln.strip()) > 2] if p else []
+        except OSError:
+            rules = []
+    if rules:
+        text += "\n\n## Règles du propriétaire pour toi (elles priment sur tout le reste)\n" + "\n".join(rules)
+    return text
 
 
 def _repair_dir(module: str) -> Path:
@@ -500,7 +528,7 @@ def repair(module: str, incident: dict, tried: str = "", root: Path | None = Non
     started = time.time()
     rec.update(running={"since": started, "pid": os.getpid(), "unit": os.environ.get("INVOCATION_ID")})
     path.write_text(json.dumps(rec, ensure_ascii=False, indent=1, default=str))
-    goal = REPAIR_BRIEF.format(module=module, root=root,
+    goal = module_agent(module, root) + "\n\n---\n\n" + REPAIR_BRIEF.format(module=module, root=root,
                                notes="\n".join(f"  - {n}" for n in pb.get("notes", [])) or "  - (aucune)",
                                incident=mask(json.dumps({k: v for k, v in incident.items() if not k.startswith("_")},
                                                         ensure_ascii=False, indent=1, default=str))[:6000],

@@ -248,6 +248,33 @@ def test_a_delegation_is_told_to_conclude_before_its_budget_cuts_it(engine):
     assert engine._ceilings({"effort": "L2"})["max_ms"] == 20 * 60_000   # owner turns unchanged
 
 
+def test_a_module_agent_is_a_sub_agent_with_the_module_s_identity(engine, tmp_path, monkeypatch):
+    """2026-11-21 (owner): the Router's agent is « le Router », a sub-agent of Walter that maintains its module. The
+    module declares it (maintenance.json `agent`); Walter's subagent tool gives it that identity and its poste."""
+    from walter_engine.tools import Exec, agents
+    root = tmp_path / "router"
+    (root / "contracts").mkdir(parents=True)
+    (root / "guardian").mkdir()
+    (root / "contracts" / "maintenance.json").write_text(json.dumps(
+        {"agent": {"identity": "guardian/agent.md", "task": "general"}}))
+    (root / "guardian" / "agent.md").write_text("# pour les humains\n\n---\n\nTu es **le Router**.")
+    monkeypatch.setattr(agents.config, "module_root", lambda name: root if name == "router" else None)
+    seen = {}
+
+    async def run_child(child, prompt, cancel=None):
+        seen.update(prompt=prompt, model=child.model)
+        return {"status": "ok", "text": "vu", "tools": 0}
+    monkeypatch.setattr(engine, "run_child", run_child)
+    a = engine.create(cwd="/w", door="telegram", principal={"kind": "owner", "id": "monsieur"})
+    ex = Exec(engine=engine, agent=a, call_id="c1", name="subagent", cancel=asyncio.Event())
+    res = asyncio.run(agents.subagent({"description": "quotas", "prompt": "Regarde les quotas.", "agent": "router"}, ex))
+    assert not res.is_error and seen["prompt"].startswith("Tu es **le Router**.")
+    assert seen["prompt"].endswith("Regarde les quotas.") and "pour les humains" not in seen["prompt"]
+    assert seen["model"] == "general"
+    res = asyncio.run(agents.subagent({"description": "x", "prompt": "y", "agent": "memory"}, ex))
+    assert res.is_error and "no module agent" in res.content
+
+
 def test_commands_never_see_the_engine_credentials_and_carry_the_run(engine, monkeypatch):
     monkeypatch.setenv("WALTER_LLM_TOKEN", "tok")
     monkeypatch.setenv("WALTER_MEMORY_GATEWAY_TOKEN", "tok2")
