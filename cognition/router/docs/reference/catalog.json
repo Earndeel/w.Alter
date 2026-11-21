@@ -563,20 +563,12 @@
       "weight": 1.0
     },
     {
-      "bench_task": "idx_economics",
-      "benchmark": "aa_eval",
-      "is_primary": false,
-      "note": "AA Economics Index",
-      "task": "finance",
-      "weight": 0.3
-    },
-    {
       "bench_task": "idx_finance",
       "benchmark": "aa_eval",
       "is_primary": true,
       "note": "AA Finance & Accounting Index",
       "task": "finance",
-      "weight": 0.7
+      "weight": 1.0
     },
     {
       "bench_task": "webdev",
@@ -731,20 +723,12 @@
       "weight": 0.5
     },
     {
-      "bench_task": "harvey_lab",
-      "benchmark": "aa_eval",
-      "is_primary": false,
-      "note": "Harvey LAB : tâches réelles d'avocats (critères tous validés)",
-      "task": "legal",
-      "weight": 0.4
-    },
-    {
       "bench_task": "idx_legal",
       "benchmark": "aa_eval",
       "is_primary": true,
       "note": "AA Legal Index",
       "task": "legal",
-      "weight": 0.6
+      "weight": 1.0
     },
     {
       "bench_task": "text_to_image",
@@ -771,28 +755,12 @@
       "weight": 1.0
     },
     {
-      "bench_task": "healthbench",
-      "benchmark": "aa_eval",
-      "is_primary": false,
-      "note": "HealthBench : questions de santé du grand public",
-      "task": "medical",
-      "weight": 0.2
-    },
-    {
-      "bench_task": "healthbench_pro",
-      "benchmark": "aa_eval",
-      "is_primary": false,
-      "note": "HealthBench Professional : cas cliniques de professionnels",
-      "task": "medical",
-      "weight": 0.3
-    },
-    {
       "bench_task": "idx_medical",
       "benchmark": "aa_eval",
       "is_primary": true,
       "note": "AA Healthcare & Medical Index",
       "task": "medical",
-      "weight": 0.5
+      "weight": 1.0
     },
     {
       "bench_task": "webdev",
@@ -19566,7 +19534,8 @@
     "store/migrations/040_devboard_reading.sql": "60d718a4071dd9eb75e356acb444868f54095ca58553b853966487fef9d601c5",
     "store/migrations/041_plan_evidence_modeldial.sql": "8e5ad3892b3dcae5c15cd54ff103ff3d487174640e0d37d045a612d6829b6de8",
     "store/migrations/042_preferences_locked.sql": "fd9839a6d6353037ab2385c5c1325eaf4ad3b2ebd30fbe9653a78c7d0f8b5995",
-    "store/migrations/043_alerts_advice.sql": "fa667b9ed075e8c3bb75fd0ef5bc7de5ee04c27300a2a8a4ec6c1c41ea415bb5"
+    "store/migrations/043_alerts_advice.sql": "fa667b9ed075e8c3bb75fd0ef5bc7de5ee04c27300a2a8a4ec6c1c41ea415bb5",
+    "store/migrations/044_specialists_one_reference.sql": "6ebefea3889e466d16ef369e5b8a06231329ed2377cd37f0efaebe4850c76dae"
   },
   "tasks": [
     {
@@ -19735,7 +19704,7 @@
     {
       "consumers": null,
       "default_objective": "best_available",
-      "description": "Comptabilité, analyse financière, fiscalité, prévisions et analyse économique quantitative. AA Finance & Accounting et Economics Index.",
+      "description": "Comptabilité, analyse financière, fiscalité, prévisions et analyse économique quantitative. Référence : AA Finance & Accounting Index.",
       "intent_hint": "Finance, comptabilité ou économie : bilan, compte de résultat, fiscalité, valorisation, budget, prévision économique",
       "interface": "chat",
       "internal": false,
@@ -19853,7 +19822,7 @@
     {
       "consumers": null,
       "default_objective": "best_available",
-      "description": "Questions juridiques et travail d'avocat : contrats, litiges, réglementation. AA Legal Index + Harvey LAB.",
+      "description": "Questions juridiques et travail d'avocat : contrats, litiges, réglementation. Référence : AA Legal Index.",
       "intent_hint": "Question juridique : droit, contrat, clause, litige, réglementation, conformité, démarche légale",
       "interface": "chat",
       "internal": false,
@@ -19897,7 +19866,7 @@
     {
       "consumers": null,
       "default_objective": "best_available",
-      "description": "Questions de santé : symptômes, maladies, médicaments, lecture de résultats. AA Healthcare & Medical Index + HealthBench.",
+      "description": "Questions de santé : symptômes, maladies, médicaments, lecture de résultats. Référence : AA Healthcare & Medical Index.",
       "intent_hint": "Question de santé ou médicale : symptômes, maladie, médicament, posologie, résultats d'analyse, conseil médical",
       "interface": "chat",
       "internal": false,

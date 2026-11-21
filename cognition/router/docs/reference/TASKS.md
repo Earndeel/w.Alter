@@ -18,7 +18,7 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | `document` | chat | False | best_available | Arena Document ; {} |
 | `embeddings` | embedding | True | best_available | Vecteurs de la mémoire : qualité de recherche (ELO Agentset) et recherche en français (MTEB MIRACL fr) ; seuls les modèles mesurés sur le classement principal sont rangés (revectoriser ne se décide pas sur un seul test). Changer de modèle oblige à revectoriser toute la banque : jamais sans l'accord du propriétaire. ; {"on_change": "Changer de modèle d'embeddings = revectoriser tout l'index de la mémoire : opération lourde, à planifier avec le propriétaire de l'instance ; l'ancien modèle reste en place tant que ce n'est pas fait.", "require_primary": true, "revectorize_on_change": true} |
 | `engineering` | chat | False | best_available | Travail d'ingénieur : analyse de conception, calculs techniques, normes, documentation technique. AA Engineering Index. ; {} |
-| `finance` | chat | False | best_available | Comptabilité, analyse financière, fiscalité, prévisions et analyse économique quantitative. AA Finance & Accounting et Economics Index. ; {} |
+| `finance` | chat | False | best_available | Comptabilité, analyse financière, fiscalité, prévisions et analyse économique quantitative. Référence : AA Finance & Accounting Index. ; {} |
 | `frontend` | chat | False | best_available | Design Arena Website ; {} |
 | `fullstack` | chat | False | best_available | Design Arena agents Full-Stack ; {} |
 | `gamedev` | chat | False | best_available | Design Arena Game Dev ; {} |
@@ -26,10 +26,10 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | `graphic_design` | image | False | best_available | Design Arena Graphic Design ; {} |
 | `image_edit` | image | False | best_available | Arena Image Edit ; {} |
 | `image_to_video` | video | False | best_available | AA Image-to-Video Arena ; {} |
-| `legal` | chat | False | best_available | Questions juridiques et travail d'avocat : contrats, litiges, réglementation. AA Legal Index + Harvey LAB. ; {} |
+| `legal` | chat | False | best_available | Questions juridiques et travail d'avocat : contrats, litiges, réglementation. Référence : AA Legal Index. ; {} |
 | `logo` | image | False | best_available | Design Arena Logo ; {} |
 | `long_context` | chat | False | best_available | Raisonner sur un très long contexte : livre, base documentaire, plusieurs gros documents, long historique. ; {} |
-| `medical` | chat | False | best_available | Questions de santé : symptômes, maladies, médicaments, lecture de résultats. AA Healthcare & Medical Index + HealthBench. ; {} |
+| `medical` | chat | False | best_available | Questions de santé : symptômes, maladies, médicaments, lecture de résultats. Référence : AA Healthcare & Medical Index. ; {} |
 | `memory_extraction` | chat | True | level | Extraire faits, entités, préférences et liens d'un texte en JSON fidèle (rétention, consolidation, profil). ; {"level": "L1", "min_context": 128000, "structured_output": true} |
 | `mobile_app` | chat | False | best_available | Design Arena agents Mobile Apps ; {} |
 | `music` | music | False | best_available | Aucun classement collecté : choix sur offres uniquement Classé sur AA Music (chant et instrumental). ; {} |
@@ -73,8 +73,7 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | embeddings | agentset | embeddings | true | 0.5 | qualité de recherche RAG (ELO par paires) |
 | embeddings | mteb | retrieval_fr | false | 0.5 | recherche en français (MIRACL fr, nDCG@10) |
 | engineering | aa_eval | idx_engineering | true | 1.0 | AA Engineering Index |
-| finance | aa_eval | idx_economics | false | 0.3 | AA Economics Index |
-| finance | aa_eval | idx_finance | true | 0.7 | AA Finance & Accounting Index |
+| finance | aa_eval | idx_finance | true | 1.0 | AA Finance & Accounting Index |
 | frontend | arena | webdev | false | 0.3 | — |
 | frontend | bridgebench | frontend | false | 0.25 | — |
 | frontend | da_models | website | true | 0.45 | — |
@@ -94,14 +93,11 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | image_edit | arena | image_edit | true | 1.0 | — |
 | image_to_video | aa_mm | image_to_video | true | 0.5 | — |
 | image_to_video | arena | image_to_video | false | 0.5 | — |
-| legal | aa_eval | harvey_lab | false | 0.4 | Harvey LAB : tâches réelles d'avocats (critères tous validés) |
-| legal | aa_eval | idx_legal | true | 0.6 | AA Legal Index |
+| legal | aa_eval | idx_legal | true | 1.0 | AA Legal Index |
 | logo | arena | text_to_image | false | 0.3 | — |
 | logo | da_models | logo | true | 0.7 | — |
 | long_context | aa_eval | lcr | true | 1.0 | AA-LCR : raisonnement sur ~100k tokens de documents |
-| medical | aa_eval | healthbench | false | 0.2 | HealthBench : questions de santé du grand public |
-| medical | aa_eval | healthbench_pro | false | 0.3 | HealthBench Professional : cas cliniques de professionnels |
-| medical | aa_eval | idx_medical | true | 0.5 | AA Healthcare & Medical Index |
+| medical | aa_eval | idx_medical | true | 1.0 | AA Healthcare & Medical Index |
 | mobile_app | arena | webdev | false | 0.2 | — |
 | mobile_app | bridgebench | overall | false | 0.2 | — |
 | mobile_app | da_agents | mobileapps | true | 0.6 | — |
