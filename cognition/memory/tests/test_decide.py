@@ -46,7 +46,7 @@ def test_decide_posts_to_the_gateway_with_memory_token_and_books_each_call(monke
     out = llm.decide({"text": "x"}, {"a": {}}, processor="t", privacy_class="cloud_allowed", samples=3)
     (req,) = gw.seen
     assert req["url"].endswith("/v1/decisions") and req["headers"] == {"Authorization": "Bearer memory-token"}
-    assert req["json"]["samples"] == 3 and "models" not in req["json"] and req["json"]["paid_floor_usd"] == 1.0
+    assert req["json"]["samples"] == 3 and "models" not in req["json"] and req["json"]["paid_floor_usd"] == 0.0
     assert out["answers"] == {"a": {"choice": "x"}} and out["samples"] == 3 and out["route"] == "openrouter/vendor/decider"
     assert [(r["status"], r["provider"], r["cost_usd"], r["latency_ms"]) for r in door] == [
         ("ok", "openrouter", 0.00007, 400)] * 3

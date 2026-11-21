@@ -39,7 +39,9 @@ class BudgetExceeded(RuntimeError):
 # Backfill stops first, so live uses keep a reserve. Since SOCLE A6 the floor is enforced by the gateway, which knows
 # the route: Memory sends its budget's floor (`paid_floor_usd` / X-Walter-Paid-Floor-USD) and a paid OpenRouter route is
 # skipped below it; free models and subscriptions are never refused by it.
-ACCOUNT_FLOOR_USD = {"backfill": 5.0, "recurring": 1.0}
+# Owner, 2026-11-21: « OpenRouter doit être utilisé jusqu'au bout » — live uses run to the last cent (floor 0 $; the
+# Router's guardian warns at each credit step); bulk backfill keeps stopping at 5 $ so live uses keep that reserve.
+ACCOUNT_FLOOR_USD = {"backfill": 5.0, "recurring": 0.0}
 _balance: tuple[float, float | None] | None = None
 
 
@@ -138,7 +140,7 @@ def chat(messages: list[dict], *, model: str | None = None, poste: str | None = 
         if poste:   # the router decides the reasoning level of the route
             params.pop("reasoning", None)
         else:       # a named model: exactly that one (Router-validated), the paid floor of this budget applies
-            headers["X-Walter-Paid-Floor-USD"] = repr(ACCOUNT_FLOOR_USD.get(budget, 1.0))
+            headers["X-Walter-Paid-Floor-USD"] = repr(ACCOUNT_FLOOR_USD.get(budget, 0.0))
         r = httpx.post(GATEWAY_URL, headers=headers, timeout=timeout,
                        json={"model": poste or f"exact:{model}", "messages": messages, **params})
         data = r.json()
@@ -266,7 +268,7 @@ def decide(state: dict, questions: dict | None, *, processor: str, privacy_class
     if privacy_class == "redacted_cloud" and privacy.pseudonymise():
         state = _redact_tree(state, names, {})
     body = {"state": state, "samples": samples, "timeout": timeout, "need": processor,
-            "paid_floor_usd": ACCOUNT_FLOOR_USD.get(budget, 1.0), **({"models": asked} if asked else {}),
+            "paid_floor_usd": ACCOUNT_FLOOR_USD.get(budget, 0.0), **({"models": asked} if asked else {}),
             **({"questions": questions} if questions else {}),
             **{k: v for k, v in (("occasion", occasion), ("facts", facts), ("options", options), ("now", now),
                                  ("media", media), ("sampling", sampling), ("focus", focus), ("ask", ask),
@@ -311,7 +313,7 @@ def rerank(query: str, documents: list[str], *, top_n: int | None = None, proces
         _log(**base, provider="walter-llm", status="refused_budget")
         raise BudgetExceeded(f"{budget} budget exhausted")
     body = {"query": query, "documents": documents, "timeout": timeout,
-            "paid_floor_usd": ACCOUNT_FLOOR_USD.get(budget, 1.0),
+            "paid_floor_usd": ACCOUNT_FLOOR_USD.get(budget, 0.0),
             **({"top_n": top_n} if top_n else {}), **({"model": model} if model else {})}
     t0 = time.perf_counter()
     try:

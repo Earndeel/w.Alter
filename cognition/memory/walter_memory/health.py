@@ -184,7 +184,8 @@ def check() -> tuple[list[str], dict]:
     bal = account_balance()
     if bal is not None:
         m["openrouter_balance_usd"] = round(bal, 2)
-        if bal < ACCOUNT_FLOOR_USD["recurring"] * 2:
-            problems.append(f"OpenRouter balance low: {bal:.2f} USD (synthesis stops below {ACCOUNT_FLOOR_USD['recurring']} USD)")
+        # live uses run to the last cent (2026-11-21); the Router's guardian tells the owner at each credit step
+        if bal <= ACCOUNT_FLOOR_USD["recurring"]:
+            problems.append(f"OpenRouter credit empty: {bal:.2f} USD (paid rerank and synthesis stopped)")
     m["errors"] = [p for p in problems if severity(p) == "error"]
     return problems, m
