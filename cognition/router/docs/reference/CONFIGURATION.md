@@ -7,17 +7,6 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 
 | Source | Constante | Valeur | Commentaire source |
 |---|---|---|---|
-| analysis/advisor.py | `CALLER` | guardian-router-advisor | policy machine_interfaces « guardian- »: a declared machine caller |
-| analysis/advisor.py | `TASK` | general | the owner's top text tier: understanding consequences is its job |
-| analysis/advisor.py | `LEVEL` | L3 | the owner's top text tier: understanding consequences is its job |
-| analysis/advisor.py | `BUDGET` | 1100 | seconds per run; fits the cycle's `timeout 1300 walter-router analyze` |
-| analysis/advisor.py | `MAX_CHECKS` | 12 | commands or web searches before concluding |
-| analysis/advisor.py | `MAX_PROPOSALS` | 3 |  |
-| analysis/advisor.py | `OWNER_DELAY` | 90 | after an owner's click: let a burst of clicks land before reading the state |
-| analysis/advisor.py | `OPS` | ["set_quota_fallback", "set_level", "set_preference", "set_lock", "note"] |  |
-| analysis/advisor.py | `LEVELS` | ["L1", "L2", "L3"] |  |
-| analysis/advisor.py | `CYCLE_DUTIES` | <br>C'est le cycle de 48 h : tu fais aussi l'analyse du cycle (les faits sont dans `cycle`).<br>- Sources et fournisseurs (`cycle.review.sources`, `providers`, `sources_ages_h`, `cycle.health`) : une source en<br>  erreur ou trop vieille, un fournisseur en panne ou sans crédit — cause probable et impact concret pour {owner}.<br>- Noms (`cycle.review.unmatched_candidates`) : un modèle sans score à côté d'un modèle classé au nom proche — décide<br>  MÊME modèle / AUTRE / incertain, preuve à l'appui (page officielle ou fournisseur ; l'URL si les noms diffèrent).<br>  Ne rends dans `aliases` que les « même modèle » CERTAINS, jamais sur une ressemblance (7b ≠ 72b, 3.1 ≠ 3.5,<br>  flash ≠ flash-lite) ; ceux de `name_links_already_made` sont déjà faits. Le Router applique ces liens lui-même.<br>- Prix (`price_changes_shortlist`) : seulement ceux qui changent un choix ou un coût de plus de 20 %.<br>Ajoute à ton JSON final : "aliases": [{{"key": "<id sans score>", "model_id": "<id classé>", "reason": "<preuve>"}}]<br>et "report_fr": "<rapport Markdown court (≤ 40 lignes) : sources et fournisseurs, noms décidés / rejetés / incertains,<br>niveaux, prix>" (ce rapport reste dans le journal du Router ; ce qui doit atteindre {owner} va dans `proposals`).<br> |  |
-| analysis/advisor.py | `BRIEF` | Tu es le conseiller du Walter Router de {owner}, sur sa VM. Le Router choisit le modèle de chaque tâche<br>(niveaux texte L1/L2/L3, spécialistes, image, vidéo, voix…) à partir des classements (Artificial Analysis…), des prix et<br>des abonnements de {owner}. Ses règles automatiques regardent une chose à la fois ; toi, tu comprends les tenants et les<br>aboutissants : ce qu'un changement implique ailleurs, ce qui est devenu incohérent, ce que {owner} n'a pas vu.<br><br>Déclencheur : {trigger}. L'état complet est ci-dessous (un seul instantané de l'index ; les règles des niveaux, écrites<br>par {owner}, sont dans `tier_rules`).<br><br>Ce que tu cherches (exemples, pas une liste fermée) :<br>- un repli « quota épuisé » (`when_quota_spent`) ou un `fallback` resté sur un ancien modèle alors qu'un meilleur existe<br>  sur le même abonnement, ou qui n'a plus de route, ou qui ferait descendre le niveau sous le niveau inférieur ;<br>- un niveau qui ne respecte plus ses règles (L1 < L2 < L3 en score ; L2 sur un autre abonnement que L3 ; même prix ±25 %<br>  et jamais un score plus bas pour L1/L2) ;<br>- un coût d'abonnement estimé (`estimated_from`) qui change une décision, ou qu'une mesure contredit ;<br>- un recalcul de l'index (rebased) qui fausse une comparaison ; une proposition déjà refusée par {owner} qu'il ne faut<br>  pas reproposer (regarde `recent_alerts_and_owner_answers`) ;<br>- les conséquences du choix que {owner} vient de faire (détail du déclencheur).<br><br>Temps : {minutes} minutes en tout, puis ta réponse est perdue — conclus avant {deadline} UTC. L'état ci-dessous<br>contient déjà les faits utiles : ne lis PAS le code du Router ni ses fichiers, ne refais pas ses calculs. Au plus<br>{checks} vérifications ciblées, chacune pour confirmer UN fait précis avant de le proposer (une route, un prix, un nom) :<br>`walter-router route <tâche>`, `walter-router dossier <tâche>`, `walter-router plans`, une recherche web. Rien de<br>douteux à vérifier : conclus tout de suite. Tu ne modifies RIEN (ni fichier, ni base, ni service), tu n'envoies aucun<br>message, tu ne fais aucun appel payant : {owner} décide, sur Telegram, avec les boutons que le Router fabrique à partir<br>de ton verdict.<br>{cycle_duties}<br>Propose peu : au plus {max} propositions, seulement celles qui changent vraiment quelque chose pour {owner}, chacune<br>avec UNE action parmi :<br>- {{"op": "set_quota_fallback", "level": "L1\|L2\|L3", "pin": "model_id/variant"}} — le modèle qui prend le relais du<br>  niveau quand son abonnement est épuisé (et en cas de panne de tous ses fournisseurs) ;<br>- {{"op": "set_level", "level": "L1\|L2\|L3", "pin": "model_id/variant", "provider": "route_provider ou null",<br>  "when_quota_spent": "model_id/variant ou null"}} — changer un niveau texte ;<br>- {{"op": "set_preference", "task": "<tâche>", "role": "<rôle>", "pin": "model_id[/variant]", "provider": null}} ;<br>- {{"op": "set_lock", "task": "<tâche>", "role": "<rôle>", "locked": true\|false}} ;<br>- {{"op": "note"}} — une information importante sans action.<br>Les identifiants viennent de l'état ou de tes vérifications (jamais inventés) ; le Router refuse une action dont le<br>modèle n'a pas de route.<br><br>Termine par un seul objet JSON :<br>{{"summary_fr": "deux phrases simples pour {owner} : ce que tu as regardé et ce que tu en conclus",<br> "proposals": [{{"title_fr": "titre court", "why_fr": "pourquoi, chiffres à l'appui (score AA, $/tâche)",<br>                "consequences_fr": "ce qui change concrètement si {owner} accepte", "action": {{...}}}}]}}<br>Rien à proposer : "proposals": [].<br><br>## État<br>```json<br>{state}<br>``` |  |
 | analysis/alerts.py | `UNRANKED_DAYS` | 30 |  |
 | analysis/alerts.py | `TOP_N` | 3 |  |
 | analysis/alerts.py | `RAW_MEASURES` | [["latency", "latency_ms", "ms"], ["WER", "wer_pct", "% WER"]] |  |
@@ -74,6 +63,17 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | analysis/tiers.py | `CEILING_MIN_GAIN` | 1.0 |  |
 | analysis/tiers.py | `HOLD_BAND` | 0.25 |  |
 | analysis/tiers.py | `HOLD_MIN_GAIN` | 0.5 |  |
+| guardian/advice.py | `CALLER` | guardian-router | the guardian's one identity (policy « guardian- » = maintenance) |
+| guardian/advice.py | `TASK` | general | the owner's top text tier: understanding consequences is its job |
+| guardian/advice.py | `LEVEL` | L3 | the owner's top text tier: understanding consequences is its job |
+| guardian/advice.py | `BUDGET` | 1100 | seconds per run; fits the cycle's `timeout 1300 walter-router analyze` |
+| guardian/advice.py | `MAX_CHECKS` | 12 | commands or web searches before concluding |
+| guardian/advice.py | `MAX_PROPOSALS` | 3 |  |
+| guardian/advice.py | `OWNER_DELAY` | 90 | after an owner's click: let a burst of clicks land before reading the state |
+| guardian/advice.py | `UNIT` | walter-router-guardian-advice |  |
+| guardian/advice.py | `OPS` | ["set_quota_fallback", "set_level", "set_preference", "set_lock", "note"] |  |
+| guardian/advice.py | `LEVELS` | ["L1", "L2", "L3"] |  |
+| guardian/advice.py | `CYCLE_SECTION` | <br>## Au cycle de 48 h<br> | # Au cycle de 48 h\n" |
 | guardian/checks.py | `RUN_MAX_AGE_H` | 54 | the cycle runs every 48 h |
 | guardian/checks.py | `TEST_TIMEOUT` | 600 |  |
 | guardian/run.py | `MAX_ATTEMPTS` | 2 | repair-agent runs per incident before it is handed to the owner (coding/L3 since 20/11) |
@@ -328,9 +328,9 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 
 | Variable | Source | Accès | Défaut (expression de code) | Effet |
 |---|---|---|---|---|
-| `WALTER_ENGINE_API_URL` | analysis/advisor.py | get | 'http://127.0.0.1:8895' | Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895). |
-| `PYTEST_CURRENT_TEST` | analysis/advisor.py | get | aucun | Posée par pytest : le conseiller ne se lance jamais depuis un test. |
-| `WALTER_ROUTER_ADVISOR` | analysis/advisor.py | get | aucun | « off » : le cycle et les clics ne lancent pas le conseiller du Router. |
+| `WALTER_ENGINE_API_URL` | guardian/advice.py | get | 'http://127.0.0.1:8895' | Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895). |
+| `PYTEST_CURRENT_TEST` | guardian/advice.py | get | aucun | Posée par pytest : le conseiller ne se lance jamais depuis un test. |
+| `WALTER_ROUTER_ADVISOR` | guardian/advice.py | get | aucun | « off » : le cycle et les clics ne lancent pas le conseiller du Router. |
 | `CHATGPT_TOKEN_DIR` | llm/gateway.py | setdefault | str(CHATGPT_DIR) | Réglage du transport de l'abonnement ; l'authentification reste fournie par son grant. |
 | `CHATGPT_DEFAULT_INSTRUCTIONS` | llm/gateway.py | setdefault | "You are a precise assistant for W.Alter's background jobs. Follow the system and user instructions exactly; answer in the language of the request." | Instructions de base du transport d'abonnement, indépendantes du goal de la sous-tâche. |
 | `WALTER_RUN_CHANNEL` | llm/gateway.py | get | aucun | test = run d'essai (posé par walter-scenario / walter-lab) : dépense payante plafonnée par walter-llm (test_budget), au-delà validation du propriétaire. |

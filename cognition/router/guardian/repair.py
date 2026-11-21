@@ -1,6 +1,6 @@
 """Repair of one incident by the guardians' common repair agent (2026-11-20).
 
-Monsieur, 2026-11-20: « les guardians des modules doivent pouvoir agir comme moi je le ferais » — an alert, one
+Owner, 2026-11-20: « les guardians des modules doivent pouvoir agir comme moi je le ferais » — an alert, one
 message to Opus in a Claude Code session, problem solved. The Router no longer runs its own agent on a read-only copy
 behind file gates (that agent could not run a single command once `walter_run` went through the engine, and the
 copy's read-only mounts no longer protected anything). It hands the incident to `walter-guardian repair` (walter-core,

@@ -526,7 +526,7 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
     if not a:
         raise KeyError(alert_id)
     if a["kind"] == "advice" and decision == "adopted":   # the advisor's proposal: its one action (2026-11-20)
-        from walter_router.analysis import advisor
+        from walter_router.guardian import advice as advisor
         return {"alert_id": alert_id, "status": decision,
                 **advisor.apply(conn, a["evidence"]["action"],
                                 f"conseil du Router accepté par {instance.owner()} (alerte {alert_id})")}

@@ -5938,102 +5938,6 @@
         "functions": []
       },
       {
-        "description": "The Router's advisor agent (owner, 2026-11-20: « le router doit avoir un vrai agent intelligent qui s'occupe de",
-        "file": "analysis/advisor.py",
-        "functions": [
-          {
-            "description": "",
-            "name": "_pin",
-            "signature": "model_id, variant"
-          },
-          {
-            "description": "",
-            "name": "_aa",
-            "signature": "conn, model_id: str, variant: str"
-          },
-          {
-            "description": "",
-            "name": "_routes",
-            "signature": "conn, pin: str | None"
-          },
-          {
-            "description": "Everything the advisor needs, compact and in one snapshot of the index.",
-            "name": "state",
-            "signature": "conn, trigger: str='manual', extra: dict | None=None"
-          },
-          {
-            "description": "What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links.",
-            "name": "_cycle_facts",
-            "signature": "conn"
-          },
-          {
-            "description": "",
-            "name": "brief",
-            "signature": "st: dict, budget: int=BUDGET, start: float | None=None"
-          },
-          {
-            "description": "The agent's closing JSON: the last object carrying `proposals`.",
-            "name": "verdict_of",
-            "signature": "output: str"
-          },
-          {
-            "description": "",
-            "name": "_callable",
-            "signature": "conn, task: str, pin: str"
-          },
-          {
-            "description": "None when the action can be applied as is, else why not.",
-            "name": "validate",
-            "signature": "conn, action: dict"
-          },
-          {
-            "description": "One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal). A note",
-            "name": "subject",
-            "signature": "action: dict, title: str=''"
-          },
-          {
-            "description": "The owner adopted the advice: one action through the Router's usual writers.",
-            "name": "apply",
-            "signature": "conn, action: dict, note: str"
-          },
-          {
-            "description": "The agent's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log.",
-            "name": "record",
-            "signature": "conn, verdict: dict, run: dict"
-          },
-          {
-            "description": "",
-            "name": "_engine_token",
-            "signature": ""
-          },
-          {
-            "description": "One Walter Engine delegation (Engine API, the declared door to the runtime).",
-            "name": "delegate",
-            "signature": "goal: str, key: str, budget: int=BUDGET"
-          },
-          {
-            "description": "",
-            "name": "_log",
-            "signature": "entry: dict"
-          },
-          {
-            "description": "The cycle's part of the verdict: name links applied through the validated add, report written.",
-            "name": "cycle_report",
-            "signature": "conn, v: dict | None, ran: dict, *, add=None, log_dir: Path | None=None, now: datetime | None=None"
-          },
-          {
-            "description": "One advisor run. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's",
-            "name": "run",
-            "signature": "trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True, budget: int=BUDGET"
-          },
-          {
-            "description": "Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.",
-            "name": "launch",
-            "signature": "trigger: str, extra: dict | None=None, delay: int=0"
-          }
-        ]
-      },
-      {
         "description": "Alerts: a pinned favourite overtaken, unranked new releases, stale sources — and their Telegram notification.",
         "file": "analysis/alerts.py",
         "functions": [
@@ -6935,7 +6839,7 @@
             "signature": "a: dict"
           },
           {
-            "description": "The advisor agent's proposal (2026-11-20): what it saw, what accepting changes.",
+            "description": "The Router guardian's advice (2026-11-20): what it saw, what accepting changes.",
             "name": "_advice_block",
             "signature": "a: dict"
           },
@@ -7175,7 +7079,7 @@
         ]
       },
       {
-        "description": "Guardian of the Walter Router: keeps the module working without the owner (2026-10-26).",
+        "description": "Guardian of the Walter Router: keeps the module working without the owner (2026-10-26), and since 2026-11-21 the",
         "file": "guardian/__init__.py",
         "functions": []
       },
@@ -7187,6 +7091,107 @@
             "description": "",
             "name": "main",
             "signature": "argv: list[str] | None=None"
+          }
+        ]
+      },
+      {
+        "description": "The Router guardian's « advice » mission (owner, 2026-11-20: « le router doit avoir un vrai agent intelligent qui",
+        "file": "guardian/advice.py",
+        "functions": [
+          {
+            "description": "",
+            "name": "_pin",
+            "signature": "model_id, variant"
+          },
+          {
+            "description": "",
+            "name": "_aa",
+            "signature": "conn, model_id: str, variant: str"
+          },
+          {
+            "description": "",
+            "name": "_routes",
+            "signature": "conn, pin: str | None"
+          },
+          {
+            "description": "Everything the guardian needs to advise, compact and in one snapshot of the index.",
+            "name": "state",
+            "signature": "conn, trigger: str='manual', extra: dict | None=None"
+          },
+          {
+            "description": "What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links.",
+            "name": "_cycle_facts",
+            "signature": "conn"
+          },
+          {
+            "description": "The owner's own rules for the guardian (instance file config/router/guardian-rules.md, lines « - … »).",
+            "name": "owner_rules",
+            "signature": ""
+          },
+          {
+            "description": "The guardian's standing instructions (advice-brief.md, readable and editable), the owner's rules, the state.",
+            "name": "brief",
+            "signature": "st: dict, budget: int=BUDGET, start: float | None=None"
+          },
+          {
+            "description": "The agent's closing JSON: the last object carrying `proposals`.",
+            "name": "verdict_of",
+            "signature": "output: str"
+          },
+          {
+            "description": "",
+            "name": "_callable",
+            "signature": "conn, task: str, pin: str"
+          },
+          {
+            "description": "None when the action can be applied as is, else why not.",
+            "name": "validate",
+            "signature": "conn, action: dict"
+          },
+          {
+            "description": "One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal). A note",
+            "name": "subject",
+            "signature": "action: dict, title: str=''"
+          },
+          {
+            "description": "The owner adopted the guardian's advice: one action through the Router's usual writers.",
+            "name": "apply",
+            "signature": "conn, action: dict, note: str"
+          },
+          {
+            "description": "The guardian's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log.",
+            "name": "record",
+            "signature": "conn, verdict: dict, run: dict"
+          },
+          {
+            "description": "",
+            "name": "_engine_token",
+            "signature": ""
+          },
+          {
+            "description": "One Walter Engine delegation (Engine API, the declared door to the runtime).",
+            "name": "delegate",
+            "signature": "goal: str, key: str, budget: int=BUDGET"
+          },
+          {
+            "description": "",
+            "name": "_log",
+            "signature": "entry: dict"
+          },
+          {
+            "description": "The cycle's part of the verdict: name links applied through the validated add, report written.",
+            "name": "cycle_report",
+            "signature": "conn, v: dict | None, ran: dict, *, add=None, log_dir: Path | None=None, now: datetime | None=None"
+          },
+          {
+            "description": "One advice pass of the guardian. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's",
+            "name": "run",
+            "signature": "trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True, budget: int=BUDGET"
+          },
+          {
+            "description": "Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.",
+            "name": "launch",
+            "signature": "trigger: str, extra: dict | None=None, delay: int=0"
           }
         ]
       },
@@ -8901,7 +8906,7 @@
         ]
       },
       {
-        "description": "Name links and the cycle report, for the Router's single agent (analysis/advisor.py).",
+        "description": "Name links and the cycle report, for the Router guardian's advice mission (guardian/advice.py).",
         "file": "research/agent/run.py",
         "functions": [
           {
@@ -15346,82 +15351,6 @@
     ],
     "constants": [
       {
-        "comment": "policy machine_interfaces « guardian- »: a declared machine caller",
-        "file": "analysis/advisor.py",
-        "name": "CALLER",
-        "value": "guardian-router-advisor"
-      },
-      {
-        "comment": "the owner's top text tier: understanding consequences is its job",
-        "file": "analysis/advisor.py",
-        "name": "TASK",
-        "value": "general"
-      },
-      {
-        "comment": "the owner's top text tier: understanding consequences is its job",
-        "file": "analysis/advisor.py",
-        "name": "LEVEL",
-        "value": "L3"
-      },
-      {
-        "comment": "seconds per run; fits the cycle's `timeout 1300 walter-router analyze`",
-        "file": "analysis/advisor.py",
-        "name": "BUDGET",
-        "value": 1100
-      },
-      {
-        "comment": "commands or web searches before concluding",
-        "file": "analysis/advisor.py",
-        "name": "MAX_CHECKS",
-        "value": 12
-      },
-      {
-        "comment": "",
-        "file": "analysis/advisor.py",
-        "name": "MAX_PROPOSALS",
-        "value": 3
-      },
-      {
-        "comment": "after an owner's click: let a burst of clicks land before reading the state",
-        "file": "analysis/advisor.py",
-        "name": "OWNER_DELAY",
-        "value": 90
-      },
-      {
-        "comment": "",
-        "file": "analysis/advisor.py",
-        "name": "OPS",
-        "value": [
-          "set_quota_fallback",
-          "set_level",
-          "set_preference",
-          "set_lock",
-          "note"
-        ]
-      },
-      {
-        "comment": "",
-        "file": "analysis/advisor.py",
-        "name": "LEVELS",
-        "value": [
-          "L1",
-          "L2",
-          "L3"
-        ]
-      },
-      {
-        "comment": "",
-        "file": "analysis/advisor.py",
-        "name": "CYCLE_DUTIES",
-        "value": "\nC'est le cycle de 48 h : tu fais aussi l'analyse du cycle (les faits sont dans `cycle`).\n- Sources et fournisseurs (`cycle.review.sources`, `providers`, `sources_ages_h`, `cycle.health`) : une source en\n  erreur ou trop vieille, un fournisseur en panne ou sans crédit — cause probable et impact concret pour {owner}.\n- Noms (`cycle.review.unmatched_candidates`) : un modèle sans score à côté d'un modèle classé au nom proche — décide\n  MÊME modèle / AUTRE / incertain, preuve à l'appui (page officielle ou fournisseur ; l'URL si les noms diffèrent).\n  Ne rends dans `aliases` que les « même modèle » CERTAINS, jamais sur une ressemblance (7b ≠ 72b, 3.1 ≠ 3.5,\n  flash ≠ flash-lite) ; ceux de `name_links_already_made` sont déjà faits. Le Router applique ces liens lui-même.\n- Prix (`price_changes_shortlist`) : seulement ceux qui changent un choix ou un coût de plus de 20 %.\nAjoute à ton JSON final : \"aliases\": [{{\"key\": \"<id sans score>\", \"model_id\": \"<id classé>\", \"reason\": \"<preuve>\"}}]\net \"report_fr\": \"<rapport Markdown court (≤ 40 lignes) : sources et fournisseurs, noms décidés / rejetés / incertains,\nniveaux, prix>\" (ce rapport reste dans le journal du Router ; ce qui doit atteindre {owner} va dans `proposals`).\n"
-      },
-      {
-        "comment": "",
-        "file": "analysis/advisor.py",
-        "name": "BRIEF",
-        "value": "Tu es le conseiller du Walter Router de {owner}, sur sa VM. Le Router choisit le modèle de chaque tâche\n(niveaux texte L1/L2/L3, spécialistes, image, vidéo, voix…) à partir des classements (Artificial Analysis…), des prix et\ndes abonnements de {owner}. Ses règles automatiques regardent une chose à la fois ; toi, tu comprends les tenants et les\naboutissants : ce qu'un changement implique ailleurs, ce qui est devenu incohérent, ce que {owner} n'a pas vu.\n\nDéclencheur : {trigger}. L'état complet est ci-dessous (un seul instantané de l'index ; les règles des niveaux, écrites\npar {owner}, sont dans `tier_rules`).\n\nCe que tu cherches (exemples, pas une liste fermée) :\n- un repli « quota épuisé » (`when_quota_spent`) ou un `fallback` resté sur un ancien modèle alors qu'un meilleur existe\n  sur le même abonnement, ou qui n'a plus de route, ou qui ferait descendre le niveau sous le niveau inférieur ;\n- un niveau qui ne respecte plus ses règles (L1 < L2 < L3 en score ; L2 sur un autre abonnement que L3 ; même prix ±25 %\n  et jamais un score plus bas pour L1/L2) ;\n- un coût d'abonnement estimé (`estimated_from`) qui change une décision, ou qu'une mesure contredit ;\n- un recalcul de l'index (rebased) qui fausse une comparaison ; une proposition déjà refusée par {owner} qu'il ne faut\n  pas reproposer (regarde `recent_alerts_and_owner_answers`) ;\n- les conséquences du choix que {owner} vient de faire (détail du déclencheur).\n\nTemps : {minutes} minutes en tout, puis ta réponse est perdue — conclus avant {deadline} UTC. L'état ci-dessous\ncontient déjà les faits utiles : ne lis PAS le code du Router ni ses fichiers, ne refais pas ses calculs. Au plus\n{checks} vérifications ciblées, chacune pour confirmer UN fait précis avant de le proposer (une route, un prix, un nom) :\n`walter-router route <tâche>`, `walter-router dossier <tâche>`, `walter-router plans`, une recherche web. Rien de\ndouteux à vérifier : conclus tout de suite. Tu ne modifies RIEN (ni fichier, ni base, ni service), tu n'envoies aucun\nmessage, tu ne fais aucun appel payant : {owner} décide, sur Telegram, avec les boutons que le Router fabrique à partir\nde ton verdict.\n{cycle_duties}\nPropose peu : au plus {max} propositions, seulement celles qui changent vraiment quelque chose pour {owner}, chacune\navec UNE action parmi :\n- {{\"op\": \"set_quota_fallback\", \"level\": \"L1|L2|L3\", \"pin\": \"model_id/variant\"}} — le modèle qui prend le relais du\n  niveau quand son abonnement est épuisé (et en cas de panne de tous ses fournisseurs) ;\n- {{\"op\": \"set_level\", \"level\": \"L1|L2|L3\", \"pin\": \"model_id/variant\", \"provider\": \"route_provider ou null\",\n  \"when_quota_spent\": \"model_id/variant ou null\"}} — changer un niveau texte ;\n- {{\"op\": \"set_preference\", \"task\": \"<tâche>\", \"role\": \"<rôle>\", \"pin\": \"model_id[/variant]\", \"provider\": null}} ;\n- {{\"op\": \"set_lock\", \"task\": \"<tâche>\", \"role\": \"<rôle>\", \"locked\": true|false}} ;\n- {{\"op\": \"note\"}} — une information importante sans action.\nLes identifiants viennent de l'état ou de tes vérifications (jamais inventés) ; le Router refuse une action dont le\nmodèle n'a pas de route.\n\nTermine par un seul objet JSON :\n{{\"summary_fr\": \"deux phrases simples pour {owner} : ce que tu as regardé et ce que tu en conclus\",\n \"proposals\": [{{\"title_fr\": \"titre court\", \"why_fr\": \"pourquoi, chiffres à l'appui (score AA, $/tâche)\",\n                \"consequences_fr\": \"ce qui change concrètement si {owner} accepte\", \"action\": {{...}}}}]}}\nRien à proposer : \"proposals\": [].\n\n## État\n```json\n{state}\n```"
-      },
-      {
         "comment": "",
         "file": "analysis/alerts.py",
         "name": "UNRANKED_DAYS",
@@ -16080,6 +16009,82 @@
         "file": "analysis/tiers.py",
         "name": "HOLD_MIN_GAIN",
         "value": 0.5
+      },
+      {
+        "comment": "the guardian's one identity (policy « guardian- » = maintenance)",
+        "file": "guardian/advice.py",
+        "name": "CALLER",
+        "value": "guardian-router"
+      },
+      {
+        "comment": "the owner's top text tier: understanding consequences is its job",
+        "file": "guardian/advice.py",
+        "name": "TASK",
+        "value": "general"
+      },
+      {
+        "comment": "the owner's top text tier: understanding consequences is its job",
+        "file": "guardian/advice.py",
+        "name": "LEVEL",
+        "value": "L3"
+      },
+      {
+        "comment": "seconds per run; fits the cycle's `timeout 1300 walter-router analyze`",
+        "file": "guardian/advice.py",
+        "name": "BUDGET",
+        "value": 1100
+      },
+      {
+        "comment": "commands or web searches before concluding",
+        "file": "guardian/advice.py",
+        "name": "MAX_CHECKS",
+        "value": 12
+      },
+      {
+        "comment": "",
+        "file": "guardian/advice.py",
+        "name": "MAX_PROPOSALS",
+        "value": 3
+      },
+      {
+        "comment": "after an owner's click: let a burst of clicks land before reading the state",
+        "file": "guardian/advice.py",
+        "name": "OWNER_DELAY",
+        "value": 90
+      },
+      {
+        "comment": "",
+        "file": "guardian/advice.py",
+        "name": "UNIT",
+        "value": "walter-router-guardian-advice"
+      },
+      {
+        "comment": "",
+        "file": "guardian/advice.py",
+        "name": "OPS",
+        "value": [
+          "set_quota_fallback",
+          "set_level",
+          "set_preference",
+          "set_lock",
+          "note"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "guardian/advice.py",
+        "name": "LEVELS",
+        "value": [
+          "L1",
+          "L2",
+          "L3"
+        ]
+      },
+      {
+        "comment": "# Au cycle de 48 h\\n\"",
+        "file": "guardian/advice.py",
+        "name": "CYCLE_SECTION",
+        "value": "\n## Au cycle de 48 h\n"
       },
       {
         "comment": "the cycle runs every 48 h",
@@ -18958,21 +18963,21 @@
       {
         "default_expression": "'http://127.0.0.1:8895'",
         "description": "Engine API où le conseiller du Router délègue son analyse (défaut 127.0.0.1:8895).",
-        "file": "analysis/advisor.py",
+        "file": "guardian/advice.py",
         "name": "WALTER_ENGINE_API_URL",
         "operation": "get"
       },
       {
         "default_expression": "aucun",
         "description": "Posée par pytest : le conseiller ne se lance jamais depuis un test.",
-        "file": "analysis/advisor.py",
+        "file": "guardian/advice.py",
         "name": "PYTEST_CURRENT_TEST",
         "operation": "get"
       },
       {
         "default_expression": "aucun",
         "description": "« off » : le cycle et les clics ne lancent pas le conseiller du Router.",
-        "file": "analysis/advisor.py",
+        "file": "guardian/advice.py",
         "name": "WALTER_ROUTER_ADVISOR",
         "operation": "get"
       },
@@ -19245,8 +19250,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/advisor.py": "a5e1aac86c63de11abf13f060a9d2a68367fc82cd8a2998979998dc31b739297",
-    "analysis/alerts.py": "146708a0b7f31655da4674246a522a3e4091a197fea710f39db0e0b7fa3565cc",
+    "analysis/alerts.py": "6d13da4a9d0f9adf024d9ebdb4379237f7a53a74f7bfd79eb929727e8d3663da",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -19264,13 +19268,13 @@
     "analysis/refresh.py": "dcc93f5a5ac7a7f89177ec1a8900c669b499585c5dc31df1aba7c2608d0e3a1f",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
     "analysis/select.py": "39ad5f96af616cd95209b22ee6f4f77c62be760cf7efa614e775bf6065390624",
-    "analysis/telegram.py": "702b3ddd6d93e7c666975b3bd9a9fddeb18582854ec6a79e12fe2b9d1bfeb9bf",
+    "analysis/telegram.py": "caa598e5cb2753c822f4c27e0788c2fdd07baca2b271b640ab211608f863504a",
     "analysis/tiers.py": "5b70be11b3a4268e5f329ea330600814309194bab681ecffb42f8f726390291a",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
     "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
-    "bin/walter-router-cycle": "10d27d55ff691eb1138895fa94a2c3c55eeaea46fcefae19eadfa3e79a0c90f9",
+    "bin/walter-router-cycle": "3b7860282a75d8dfe68ddc5f2334da5890fcdda5ca28cecd3ae90e9c451c9704",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
-    "cli.py": "dbef9053133471bc2f38da96a10cd77d2210c349fde660a76cc218d3146ba0e3",
+    "cli.py": "e077bc54f57698e3c0383ea0e74dc9c815dbde8fa1f56fd61ca0acd49f69a4f9",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
     "config/decision-needs.json": "8c912fe4a937dd9dc2ab2ab8bbe122080a67ddfcd9fd5450c4c79101e824b608",
     "config/declared_offers.json": "1da3b15f5b60c1e2440d760d690f2310fd5f4fd60ace44bece83be4e8174c95d",
@@ -19284,11 +19288,12 @@
     "contracts/maintenance.json": "2ae414f686eb127423d4081339551c3ce26eb4ab64bc958d39be7580da53b218",
     "contracts/router.json": "2c22033548faf73d7cba8f3e98e7309cccce1ffb267e0f68efa10d7cb8d3b185",
     "documentation.py": "8982ebe7a685a8ea7c746845b008bd5c1ea542a383ae9c7d75848c99d9d36188",
-    "guardian/__init__.py": "b0f1ff280c06f00d852743be848eb9d3cb320133938ef13537e0b87e54e2ba13",
-    "guardian/__main__.py": "659b9eb276a1a370b7c0444f9e3afde57283f61fd3991c36b83a1ca4c7c840cf",
+    "guardian/__init__.py": "f470d81f9688a4d9f6a235cdd93ee1ce17d1e523d546da6b1db0e8725ccf4f7a",
+    "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
+    "guardian/advice.py": "aa08666b41b62ad36538ca07b7ac0dc4b34ab83a2078ae00390ea684d2afc02d",
     "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
-    "guardian/playbook.json": "f7fd51cde9ef095ac777f062262e233d83865b81e650fe7c0536c96439312a94",
-    "guardian/repair.py": "f9515f5def8a36b767a1ac859337c266c4af4d37f1979ef15c52e0132af2653f",
+    "guardian/playbook.json": "dd413285fa40d68b4539bd2469a74d825dd576cf03910add0a47ff5cb5fda5e6",
+    "guardian/repair.py": "50604a48872e4684ba7a8cbe031eafde5ec7cbfe1c04697927dd9447d3dd29cd",
     "guardian/run.py": "b25aaa7eaab951726661a74a1ce244cd86aab07891b3437adf8d43fd07950a0c",
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "instance.py": "81fc40b3bf9914f5246d0bb16f0a750141432127b6e03716546aebfc6f991724",
@@ -19325,7 +19330,7 @@
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",
     "research/agent/review.py": "93905a0e3b4849e11d07232e7b50799fef1bb90736e104705533569e08ea8a13",
-    "research/agent/run.py": "83fc17b7bd293913dbe3b429f8063ab7981c83dafb51fe5219d217ea77daeb60",
+    "research/agent/run.py": "8c44e8466f7cb87421085de7d0cc3ee81aef47018f6f5b2205cc82f6b7bd634e",
     "research/benchmarks/__init__.py": "5066d339167d8898f0cda8d667da3b6e935a3edda56c178ce3f4e350b58e3679",
     "research/benchmarks/aa.py": "04c8aa990ad9d31c0aba588b0cd186a8863b15864923525285616fec9df61207",
     "research/benchmarks/aa_data.py": "5e602b5a70e0454ee0ac3df6d6948ff215f4fa6851e4d6823b2269cfe348298d",

@@ -1,11 +1,15 @@
-"""The Router's advisor agent (owner, 2026-11-20: « le router doit avoir un vrai agent intelligent qui s'occupe de
-comprendre les tenants et les aboutissants »).
+"""The Router guardian's « advice » mission (owner, 2026-11-20: « le router doit avoir un vrai agent intelligent qui
+s'occupe de comprendre les tenants et les aboutissants » ; 2026-11-21: « cet agent est supposé être le guardian »).
 
-The cycle's rules (tiers.py, alerts.py) see one thing at a time; the advisor reads the whole picture after each cycle
+The guardian has one identity (`guardian-router`) and two missions: repair what breaks (run.py / repair.py, on an
+incident) and advise (this file). Its standing instructions are a readable file, `guardian/advice-brief.md`; the
+owner's own rules for it live in the instance (`config/router/guardian-rules.md`) and come last in the brief.
+
+The cycle's rules (tiers.py, alerts.py) see one thing at a time; the guardian reads the whole picture after each cycle
 and after each choice of the owner — declared tiers, their quota substitutes, padlocks, the frontier with measured and
 estimated subscription costs, what changed, what the owner already accepted or refused — and works out the
 consequences (a substitute left behind by a new tier, an estimate a measure contradicts, a tier that no longer fits
-the owner's rules…). It is one Walter Engine delegation (caller `guardian-router-advisor`, poste general/L3) that
+the owner's rules…). It is one Walter Engine delegation (caller `guardian-router`, poste general/L3) that
 investigates read-only and ends with a JSON verdict. Its proposals become 'advice' alerts sent on Telegram with
 buttons; adopting one applies exactly one whitelisted action (OPS) through the Router's usual writers. It never
 changes anything by itself: the owner decides (CLAUDE.md: Telegram proposals, never an automatic switch).
@@ -31,12 +35,13 @@ from urllib.request import Request, urlopen
 from walter_router import instance, paths
 
 ENGINE_URL = os.environ.get("WALTER_ENGINE_API_URL", "http://127.0.0.1:8895")
-CALLER = "guardian-router-advisor"      # policy machine_interfaces « guardian- »: a declared machine caller
+CALLER = "guardian-router"             # the guardian's one identity (policy « guardian- » = maintenance)
 TASK, LEVEL = "general", "L3"           # the owner's top text tier: understanding consequences is its job
 BUDGET = 1100                           # seconds per run; fits the cycle's `timeout 1300 walter-router analyze`
 MAX_CHECKS = 12                         # commands or web searches before concluding
 MAX_PROPOSALS = 3
 OWNER_DELAY = 90                        # after an owner's click: let a burst of clicks land before reading the state
+UNIT = "walter-router-guardian-advice"
 OPS = ("set_quota_fallback", "set_level", "set_preference", "set_lock", "note")
 LEVELS = ("L1", "L2", "L3")
 
@@ -66,7 +71,7 @@ def _routes(conn, pin: str | None) -> list[str]:
 
 
 def state(conn, trigger: str = "manual", extra: dict | None = None) -> dict:
-    """Everything the advisor needs, compact and in one snapshot of the index."""
+    """Everything the guardian needs to advise, compact and in one snapshot of the index."""
     from walter_router.analysis import changes, knowledge
     from walter_router.analysis import select as sel
     levels = (knowledge.load().get("levels") or {}).get("general") or {}
@@ -139,78 +144,33 @@ def _cycle_facts(conn) -> dict:
             "name_links_already_made": {k: v.get("model_id") for k, v in (aliases_admin.listing() or {}).items()}}
 
 
-CYCLE_DUTIES = """
-C'est le cycle de 48 h : tu fais aussi l'analyse du cycle (les faits sont dans `cycle`).
-- Sources et fournisseurs (`cycle.review.sources`, `providers`, `sources_ages_h`, `cycle.health`) : une source en
-  erreur ou trop vieille, un fournisseur en panne ou sans crédit — cause probable et impact concret pour {owner}.
-- Noms (`cycle.review.unmatched_candidates`) : un modèle sans score à côté d'un modèle classé au nom proche — décide
-  MÊME modèle / AUTRE / incertain, preuve à l'appui (page officielle ou fournisseur ; l'URL si les noms diffèrent).
-  Ne rends dans `aliases` que les « même modèle » CERTAINS, jamais sur une ressemblance (7b ≠ 72b, 3.1 ≠ 3.5,
-  flash ≠ flash-lite) ; ceux de `name_links_already_made` sont déjà faits. Le Router applique ces liens lui-même.
-- Prix (`price_changes_shortlist`) : seulement ceux qui changent un choix ou un coût de plus de 20 %.
-Ajoute à ton JSON final : "aliases": [{{"key": "<id sans score>", "model_id": "<id classé>", "reason": "<preuve>"}}]
-et "report_fr": "<rapport Markdown court (≤ 40 lignes) : sources et fournisseurs, noms décidés / rejetés / incertains,
-niveaux, prix>" (ce rapport reste dans le journal du Router ; ce qui doit atteindre {owner} va dans `proposals`).
-"""
+BRIEF_FILE = Path(__file__).with_name("advice-brief.md")
+CYCLE_SECTION = "\n## Au cycle de 48 h\n"
 
 
-BRIEF = """Tu es le conseiller du Walter Router de {owner}, sur sa VM. Le Router choisit le modèle de chaque tâche
-(niveaux texte L1/L2/L3, spécialistes, image, vidéo, voix…) à partir des classements (Artificial Analysis…), des prix et
-des abonnements de {owner}. Ses règles automatiques regardent une chose à la fois ; toi, tu comprends les tenants et les
-aboutissants : ce qu'un changement implique ailleurs, ce qui est devenu incohérent, ce que {owner} n'a pas vu.
-
-Déclencheur : {trigger}. L'état complet est ci-dessous (un seul instantané de l'index ; les règles des niveaux, écrites
-par {owner}, sont dans `tier_rules`).
-
-Ce que tu cherches (exemples, pas une liste fermée) :
-- un repli « quota épuisé » (`when_quota_spent`) ou un `fallback` resté sur un ancien modèle alors qu'un meilleur existe
-  sur le même abonnement, ou qui n'a plus de route, ou qui ferait descendre le niveau sous le niveau inférieur ;
-- un niveau qui ne respecte plus ses règles (L1 < L2 < L3 en score ; L2 sur un autre abonnement que L3 ; même prix ±25 %
-  et jamais un score plus bas pour L1/L2) ;
-- un coût d'abonnement estimé (`estimated_from`) qui change une décision, ou qu'une mesure contredit ;
-- un recalcul de l'index (rebased) qui fausse une comparaison ; une proposition déjà refusée par {owner} qu'il ne faut
-  pas reproposer (regarde `recent_alerts_and_owner_answers`) ;
-- les conséquences du choix que {owner} vient de faire (détail du déclencheur).
-
-Temps : {minutes} minutes en tout, puis ta réponse est perdue — conclus avant {deadline} UTC. L'état ci-dessous
-contient déjà les faits utiles : ne lis PAS le code du Router ni ses fichiers, ne refais pas ses calculs. Au plus
-{checks} vérifications ciblées, chacune pour confirmer UN fait précis avant de le proposer (une route, un prix, un nom) :
-`walter-router route <tâche>`, `walter-router dossier <tâche>`, `walter-router plans`, une recherche web. Rien de
-douteux à vérifier : conclus tout de suite. Tu ne modifies RIEN (ni fichier, ni base, ni service), tu n'envoies aucun
-message, tu ne fais aucun appel payant : {owner} décide, sur Telegram, avec les boutons que le Router fabrique à partir
-de ton verdict.
-{cycle_duties}
-Propose peu : au plus {max} propositions, seulement celles qui changent vraiment quelque chose pour {owner}, chacune
-avec UNE action parmi :
-- {{"op": "set_quota_fallback", "level": "L1|L2|L3", "pin": "model_id/variant"}} — le modèle qui prend le relais du
-  niveau quand son abonnement est épuisé (et en cas de panne de tous ses fournisseurs) ;
-- {{"op": "set_level", "level": "L1|L2|L3", "pin": "model_id/variant", "provider": "route_provider ou null",
-  "when_quota_spent": "model_id/variant ou null"}} — changer un niveau texte ;
-- {{"op": "set_preference", "task": "<tâche>", "role": "<rôle>", "pin": "model_id[/variant]", "provider": null}} ;
-- {{"op": "set_lock", "task": "<tâche>", "role": "<rôle>", "locked": true|false}} ;
-- {{"op": "note"}} — une information importante sans action.
-Les identifiants viennent de l'état ou de tes vérifications (jamais inventés) ; le Router refuse une action dont le
-modèle n'a pas de route.
-
-Termine par un seul objet JSON :
-{{"summary_fr": "deux phrases simples pour {owner} : ce que tu as regardé et ce que tu en conclus",
- "proposals": [{{"title_fr": "titre court", "why_fr": "pourquoi, chiffres à l'appui (score AA, $/tâche)",
-                "consequences_fr": "ce qui change concrètement si {owner} accepte", "action": {{...}}}}]}}
-Rien à proposer : "proposals": [].
-
-## État
-```json
-{state}
-```"""
+def owner_rules() -> list[str]:
+    """The owner's own rules for the guardian (instance file config/router/guardian-rules.md, lines « - … »)."""
+    try:
+        text = instance.config_path("guardian-rules.md").read_text()
+    except OSError:
+        return []
+    return [ln.strip() for ln in text.splitlines() if ln.strip().startswith("- ") and len(ln.strip()) > 2]
 
 
 def brief(st: dict, budget: int = BUDGET, start: float | None = None) -> str:
+    """The guardian's standing instructions (advice-brief.md, readable and editable), the owner's rules, the state."""
+    text = BRIEF_FILE.read_text().split("\n---\n", 1)[-1]          # the file's own header is for humans
+    main, _, cycle = text.partition(CYCLE_SECTION)
     owner = instance.owner()
-    deadline = datetime.fromtimestamp((time.time() if start is None else start) + budget * 0.75, timezone.utc).strftime("%H:%M")
-    return BRIEF.format(owner=owner, trigger=st.get("trigger"), root=paths.ROOT, max=MAX_PROPOSALS,
-                        minutes=round(budget * 0.75 / 60), deadline=deadline, checks=MAX_CHECKS,
-                        cycle_duties=CYCLE_DUTIES.format(owner=owner) if st.get("cycle") else "",
-                        state=json.dumps(st, ensure_ascii=False, separators=(",", ":"), default=str))
+    deadline = datetime.fromtimestamp((time.time() if start is None else start) + budget * 0.75, timezone.utc)
+    out = main.strip() + ("\n\n" + cycle.strip() if st.get("cycle") else "")
+    rules = owner_rules()
+    if rules:
+        out += f"\n\n## Règles de {owner} pour toi (elles priment sur ce qui précède)\n" + "\n".join(rules)
+    for key, value in {"owner": owner, "trigger": st.get("trigger"), "minutes": round(budget * 0.75 / 60),
+                       "deadline": deadline.strftime("%H:%M"), "checks": MAX_CHECKS, "max": MAX_PROPOSALS}.items():
+        out = out.replace("{{" + key + "}}", str(value))
+    return out + "\n\n## État\n```json\n" + json.dumps(st, ensure_ascii=False, separators=(",", ":"), default=str) + "\n```"
 
 
 def verdict_of(output: str) -> dict | None:
@@ -287,7 +247,7 @@ def subject(action: dict, title: str = "") -> str:
 
 
 def apply(conn, action: dict, note: str) -> dict:
-    """The owner adopted the advice: one action through the Router's usual writers."""
+    """The owner adopted the guardian's advice: one action through the Router's usual writers."""
     err = validate(conn, action)
     if err and err != "déjà en place":
         raise ValueError(err)
@@ -317,7 +277,7 @@ def apply(conn, action: dict, note: str) -> dict:
 
 
 def record(conn, verdict: dict, run: dict) -> list[dict]:
-    """The agent's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log."""
+    """The guardian's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log."""
     from walter_router.analysis import alerts
     kept = []
     for p in (verdict.get("proposals") or [])[:MAX_PROPOSALS]:
@@ -365,7 +325,7 @@ def delegate(goal: str, key: str, budget: int = BUDGET) -> dict:
 
 def _log(entry: dict) -> None:
     try:
-        f = instance.state_file("advisor/runs.jsonl")
+        f = instance.state_file("guardian/advice-runs.jsonl")
         f.parent.mkdir(parents=True, exist_ok=True)
         with open(f, "a") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
@@ -396,7 +356,7 @@ def cycle_report(conn, v: dict | None, ran: dict, *, add=None, log_dir: Path | N
 
 def run(trigger: str = "manual", extra: dict | None = None, dry_run: bool = False, notify: bool = True,
         budget: int = BUDGET) -> dict:
-    """One advisor run. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's
+    """One advice pass of the guardian. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's
     refresh sends the Telegram message); 'owner' = after an owner's choice (consequences only)."""
     from walter_router.analysis import telegram
     from walter_router.store import db
@@ -407,7 +367,7 @@ def run(trigger: str = "manual", extra: dict | None = None, dry_run: bool = Fals
     goal = brief(st, budget, started)
     if dry_run:
         return {"trigger": trigger, "brief_chars": len(goal), "state": st}
-    ran = delegate(goal, f"router-advisor-{trigger}-{int(started)}"[:200], budget)
+    ran = delegate(goal, f"router-guardian-advice-{trigger}-{int(started)}"[:200], budget)
     v = verdict_of(ran.get("output") or "")
     entry = {"at": at, "trigger": trigger, "detail": extra, "seconds": round(time.time() - started),
              "engine": {k: ran.get(k) for k in ("ok", "status", "reason", "error", "tools")}}
@@ -431,13 +391,13 @@ def launch(trigger: str, extra: dict | None = None, delay: int = 0) -> bool:
     """Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time."""
     if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("WALTER_ROUTER_ADVISOR") == "off":
         return False
-    if subprocess.run(["systemctl", "is-active", "--quiet", "walter-router-advisor"]).returncode == 0:
+    if subprocess.run(["systemctl", "is-active", "--quiet", UNIT]).returncode == 0:
         return False
-    cmd = [str(paths.ROOT / "bin" / "walter-router"), "advisor", "run", "--trigger", trigger]
+    cmd = [str(paths.ROOT / "bin" / "walter-router-guardian"), "advise", "run", "--trigger", trigger]
     if extra:
         cmd += ["--detail", json.dumps(extra, ensure_ascii=False, default=str)[:2000]]
     if delay:
         cmd = ["sh", "-c", f"sleep {int(delay)}; exec \"$@\"", "sh", *cmd]
-    r = subprocess.run(["systemd-run", "--unit", "walter-router-advisor", "--collect", "--quiet",
+    r = subprocess.run(["systemd-run", "--unit", UNIT, "--collect", "--quiet",
                         f"--property=RuntimeMaxSec={BUDGET + 600}", *cmd], capture_output=True, text=True, timeout=30)
     return r.returncode == 0

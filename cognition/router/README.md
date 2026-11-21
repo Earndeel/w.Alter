@@ -65,18 +65,12 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 3. **The owner decides** — his pins and roles (`config/knowledge.json`, `prefer`) always win. A model that beats an
    active one on the task's global score, a new #1, a nerf, a board down, a plan change or a plan news becomes one
    Telegram message with buttons; nothing switches without his button (`verdict`).
-   **The Router's agent** (2026-11-20, `analysis/advisor.py`; one agent — the former cycle analyst merged into it the
-   same day): at step 2 of each cycle and after each choice of the owner (button, padlock), one Walter Engine delegation (`guardian-router-advisor`, poste general/L3) reads the whole picture —
-   declared tiers and their quota substitutes, padlocks, frontier with measured / estimated subscription costs,
-   changes, the owner's recent answers, `docs/TIERS.md` — investigates read-only and proposes at most 3 consequences.
-   Each becomes an `advice` alert (Telegram « Appliquer / Non »); accepting applies exactly one whitelisted action
-   (`set_quota_fallback`, `set_level`, `set_preference`, `set_lock`; `note` = information). It never applies anything
-   by itself; runs are logged in `@instance/state/router/advisor/runs.jsonl`. At the cycle it also checks sources,
-   providers and name candidates (its certain "same model" links are applied by the Router through the validated
-   `alias-add` — a name, never a model choice) and writes `analysis-<day>.md`. Bounded: the facts are precomputed in
-   its state, the brief gives the deadline and at most 12 checks and forbids reading the Router's code (the first run
-   spent 25 min doing so and was cancelled), the engine tells a delegation to conclude before its budget (1100 s).
-   CLI `walter-router advisor run|launch|state`; `WALTER_ROUTER_ADVISOR=off` disables the automatic runs.
+   **The guardian advises** (2026-11-20/21, `guardian/advice.py`; the Router has one agent, its guardian — see
+   `guardian/README.md` « Advise »): at step 2 of each cycle and after each choice of the owner (button, padlock), one
+   Walter Engine delegation (`guardian-router`, poste general/L3) reads the whole picture — declared tiers and their
+   quota substitutes, padlocks, frontier with measured / estimated subscription costs, changes, the owner's recent
+   answers, `docs/TIERS.md` — and proposes at most 3 consequences, each an `advice` alert (Telegram « Appliquer / Non »)
+   that applies exactly one whitelisted action when accepted. It never applies a model choice by itself.
 4. **Serve** — routes in the owner's order: a subscription first at its cost price while its weekly quota is under
    90 %, Kie when reliable and not much dearer, OpenRouter last on the cheapest usable host it is told to use (never
    below the model's native precision, ≥ 95 % uptime over 24 h; flex tier only for background postes). Text execution stays on the selected model: only its ordered providers are tried, with an explicit
@@ -96,7 +90,7 @@ The import name is `walter_router` (`walter_router/__init__.py` points it at thi
 ## Operating it
 
 The 48 h cycle (`walter-router-refresh.timer`, `bin/walter-router-cycle`): research + analysis → plan research
-(meters, mails, web, news, cost price) → the Router's agent (`walter-router analyze` = `advisor run --trigger cycle`
+(meters, mails, web, news, cost price) → the guardian's advice pass (`walter-router analyze` = `walter-router-guardian advise run --trigger cycle`
 without its own message: sources, names, consequences; see « The owner decides ») → final analysis and Telegram → Hermes follows (no-op while it is retired), the
 page is republished → the guardian follows up what is still broken. Services:
 `walter-router-quota` (meters after each agent turn), `walter-router-control` (page trigger), `walter-llm`,

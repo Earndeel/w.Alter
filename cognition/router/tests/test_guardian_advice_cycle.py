@@ -3,7 +3,7 @@ also checks sources and names; the Router applies its name links through the val
 History: 2026-11-13 the analyst became a Walter Engine delegation (before, a Hermes loop)."""
 from datetime import datetime, timezone
 
-from walter_router.analysis import advisor
+from walter_router.guardian import advice as advisor
 
 NOW = datetime(2026, 11, 13, tzinfo=timezone.utc)
 
@@ -47,3 +47,13 @@ def test_the_cycle_brief_carries_the_names_duty_the_deadline_and_no_code_reading
     assert "ne lis PAS le code" in text and "conclus avant 00:13 UTC" in text and f"{advisor.MAX_CHECKS} vérifications" in text
     owner = advisor.brief({"trigger": "owner"}, budget=1100, start=NOW.timestamp())
     assert "report_fr" not in owner and "ne lis PAS le code" in owner
+
+
+def test_the_owners_own_rules_for_the_guardian_come_last_and_win(tmp_path, monkeypatch):
+    f = tmp_path / "guardian-rules.md"
+    f.write_text("# Règles\n\nExplication.\n- Ne me propose jamais Fable en L1.\n-\n")
+    monkeypatch.setattr(advisor.instance, "config_path", lambda name: f)
+    text = advisor.brief({"trigger": "owner"}, budget=1100, start=NOW.timestamp())
+    assert "- Ne me propose jamais Fable en L1." in text and "Explication." not in text
+    assert text.index("Ne me propose jamais") < text.index("## État")
+    assert "{{" not in text and "Consignes du guardian" not in text     # placeholders filled, file header for humans

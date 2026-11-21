@@ -8,29 +8,6 @@
 Analysis: understands the collected data and organises it in the database (parsing, identities, media
 
 
-## analysis/advisor.py
-
-The Router's advisor agent (owner, 2026-11-20: « le router doit avoir un vrai agent intelligent qui s'occupe de
-
-- `_pin(model_id, variant)` — 
-- `_aa(conn, model_id: str, variant: str)` — 
-- `_routes(conn, pin: str | None)` — 
-- `state(conn, trigger: str='manual', extra: dict | None=None)` — Everything the advisor needs, compact and in one snapshot of the index.
-- `_cycle_facts(conn)` — What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links.
-- `brief(st: dict, budget: int=BUDGET, start: float | None=None)` — 
-- `verdict_of(output: str)` — The agent's closing JSON: the last object carrying `proposals`.
-- `_callable(conn, task: str, pin: str)` — 
-- `validate(conn, action: dict)` — None when the action can be applied as is, else why not.
-- `subject(action: dict, title: str='')` — One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal). A note
-- `apply(conn, action: dict, note: str)` — The owner adopted the advice: one action through the Router's usual writers.
-- `record(conn, verdict: dict, run: dict)` — The agent's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log.
-- `_engine_token()` — 
-- `delegate(goal: str, key: str, budget: int=BUDGET)` — One Walter Engine delegation (Engine API, the declared door to the runtime).
-- `_log(entry: dict)` — 
-- `cycle_report(conn, v: dict | None, ran: dict, *, add=None, log_dir: Path | None=None, now: datetime | None=None)` — The cycle's part of the verdict: name links applied through the validated add, report written.
-- `run(trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True, budget: int=BUDGET)` — One advisor run. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's
-- `launch(trigger: str, extra: dict | None=None, delay: int=0)` — Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.
-
 ## analysis/alerts.py
 
 Alerts: a pinned favourite overtaken, unranked new releases, stale sources — and their Telegram notification.
@@ -279,7 +256,7 @@ Telegram side of the alerts: one message per piece of news with its buttons (202
 - `_money_line(c: dict)` — 
 - `_why(e: dict)` — 
 - `_plan_block(a: dict)` — 2026-10-22: a billing e-mail differs from the declared plans.
-- `_advice_block(a: dict)` — The advisor agent's proposal (2026-11-20): what it saw, what accepting changes.
+- `_advice_block(a: dict)` — The Router guardian's advice (2026-11-20): what it saw, what accepting changes.
 - `_block(conn, a: dict)` — 
 - `_decision_block(conn, a: dict, task: dict)` — Decision model proposal, short (2026-10-16: « trop gros, des informations inutiles »): who replaces
 - `_group_key(conn, a: dict)` — 
@@ -341,7 +318,7 @@ Reproducible reference documentation. Metadata only; never read provider/account
 
 ## guardian/__init__.py
 
-Guardian of the Walter Router: keeps the module working without the owner (2026-10-26).
+Guardian of the Walter Router: keeps the module working without the owner (2026-10-26), and since 2026-11-21 the
 
 
 ## guardian/__main__.py
@@ -349,6 +326,30 @@ Guardian of the Walter Router: keeps the module working without the owner (2026-
 walter-router-guardian check | run [--no-agent] [--no-tests] [--no-notify] [--dry-run] | status
 
 - `main(argv: list[str] | None=None)` — 
+
+## guardian/advice.py
+
+The Router guardian's « advice » mission (owner, 2026-11-20: « le router doit avoir un vrai agent intelligent qui
+
+- `_pin(model_id, variant)` — 
+- `_aa(conn, model_id: str, variant: str)` — 
+- `_routes(conn, pin: str | None)` — 
+- `state(conn, trigger: str='manual', extra: dict | None=None)` — Everything the guardian needs to advise, compact and in one snapshot of the index.
+- `_cycle_facts(conn)` — What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links.
+- `owner_rules()` — The owner's own rules for the guardian (instance file config/router/guardian-rules.md, lines « - … »).
+- `brief(st: dict, budget: int=BUDGET, start: float | None=None)` — The guardian's standing instructions (advice-brief.md, readable and editable), the owner's rules, the state.
+- `verdict_of(output: str)` — The agent's closing JSON: the last object carrying `proposals`.
+- `_callable(conn, task: str, pin: str)` — 
+- `validate(conn, action: dict)` — None when the action can be applied as is, else why not.
+- `subject(action: dict, title: str='')` — One proposal = one action: the same action proposed twice is the same alert (a refusal stays a refusal). A note
+- `apply(conn, action: dict, note: str)` — The owner adopted the guardian's advice: one action through the Router's usual writers.
+- `record(conn, verdict: dict, run: dict)` — The guardian's proposals as 'advice' alerts (open → sent on Telegram); refused actions are kept in the run log.
+- `_engine_token()` — 
+- `delegate(goal: str, key: str, budget: int=BUDGET)` — One Walter Engine delegation (Engine API, the declared door to the runtime).
+- `_log(entry: dict)` — 
+- `cycle_report(conn, v: dict | None, ran: dict, *, add=None, log_dir: Path | None=None, now: datetime | None=None)` — The cycle's part of the verdict: name links applied through the validated add, report written.
+- `run(trigger: str='manual', extra: dict | None=None, dry_run: bool=False, notify: bool=True, budget: int=BUDGET)` — One advice pass of the guardian. trigger 'cycle' = step 2 of the 48 h cycle (names, sources, report; `notify=False`: step 3's
+- `launch(trigger: str, extra: dict | None=None, delay: int=0)` — Start a run in its own transient unit (the cycle or the Telegram click never waits for it). One at a time.
 
 ## guardian/checks.py
 
@@ -809,7 +810,7 @@ Deterministic digest of a refresh cycle, the input of the 48 h analysis agent (e
 
 ## research/agent/run.py
 
-Name links and the cycle report, for the Router's single agent (analysis/advisor.py).
+Name links and the cycle report, for the Router guardian's advice mission (guardian/advice.py).
 
 - `apply(conn, aliases: list[dict], add)` — 
 - `report_text(day: str, answer: dict | None, added: list[dict], refused: list[dict], raw: str | None)` — 

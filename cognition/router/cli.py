@@ -83,8 +83,8 @@ def build_parser() -> argparse.ArgumentParser:
     lk.add_argument("--role", help="role of the task (L1/L2/L3 for general; default otherwise)")
     a = sub.add_parser("alerts")
     a.add_argument("--all", action="store_true")
-    ad = sub.add_parser("advisor", help="the Router's advisor agent: reads the whole picture after a cycle or an owner's "
-                                        "choice and proposes its consequences on Telegram (never applies by itself)")
+    ad = sub.add_parser("advisor", help="alias of `walter-router-guardian advise`: the guardian reads the whole picture "
+                                        "after a cycle or an owner's choice and proposes on Telegram (never applies by itself)")
     ad.add_argument("action", choices=("run", "launch", "state"))
     ad.add_argument("--trigger", default="manual", help="cycle | owner | manual")
     ad.add_argument("--detail", help="JSON: what triggered the run (the owner's answer…)")
@@ -333,7 +333,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"written": str(instance.state_file("brief.md")), "changed": changed}))
         return 0
     if args.cmd == "advisor":
-        from walter_router.analysis import advisor
+        from walter_router.guardian import advice as advisor
         detail = json.loads(args.detail) if args.detail else None
         if args.action == "state":
             with db.connect() as conn:
@@ -419,7 +419,7 @@ def main(argv: list[str] | None = None) -> int:
             elif args.cmd == "review":
                 out = review.digest(conn)
             elif args.cmd == "analyze":
-                from walter_router.analysis import advisor   # one Router agent (2026-11-20); step 3 notifies
+                from walter_router.guardian import advice as advisor   # the guardian advises at the cycle; step 3 notifies
                 out = advisor.run("cycle", notify=False)
             elif args.cmd == "subscriptions":
                 if args.action == "refresh":
@@ -457,7 +457,7 @@ def main(argv: list[str] | None = None) -> int:
                 wr = paths.ROOT / "bin" / "walter-router"   # the library page follows (background, after this commit)
                 subprocess.Popen(["sh", "-c", f'sleep 3; "{wr}" publish-library'],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                from walter_router.analysis import advisor
+                from walter_router.guardian import advice as advisor
                 advisor.launch("owner", {"padlock": {"task": args.task, "role": args.role, "locked": args.state == "on"},
                                          "changed": out["changed"]}, delay=advisor.OWNER_DELAY)
             elif args.cmd == "alerts":
@@ -479,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
                 subprocess.Popen(["sh", "-c", f'sleep 5; "{wr}" publish-library'],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
                 if args.decision == "adopted":   # the advisor works out what the owner's choice implies (2026-11-20)
-                    from walter_router.analysis import advisor
+                    from walter_router.guardian import advice as advisor
                     advisor.launch("owner", {"answer": "adopté", "alert_id": args.alert_id, "result": out},
                                    delay=advisor.OWNER_DELAY)
             conn.commit()

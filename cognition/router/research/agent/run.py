@@ -1,4 +1,4 @@
-"""Name links and the cycle report, for the Router's single agent (analysis/advisor.py).
+"""Name links and the cycle report, for the Router guardian's advice mission (guardian/advice.py).
 
 History: 2026-11-13 the cycle's research agent became one Walter Engine delegation (before, a Hermes loop); 2026-11-20
 (owner) it was merged into the advisor, so the Router has one agent that both checks the cycle (sources, providers,
