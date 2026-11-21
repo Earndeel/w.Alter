@@ -78,7 +78,7 @@ def test_specialised_tasks_have_their_boards():
         boards = {(r["task"], r["benchmark"], r["bench_task"]) for r in conn.execute("select * from models.task_benchmarks")}
     # 2026-11-21: medical / finance / legal ranked on their AA domain index alone (owner)
     # and the design / web ones on their Design Arena board alone (045)
-    for task, only in (("medical", "idx_medical"), ("finance", "idx_finance"), ("legal", "idx_legal"), ("3d", "3d"),
+    for task, only in (("medical", "idx_medical"), ("finance", "idx_finance"), ("legal", "idx_legal"), ("3d", "aa_3d"),
                        ("svg", "svg"), ("frontend", "website"), ("fullstack", "fullstack"), ("mobile_app", "mobileapps")):
         assert {b for t, _, b in boards if t == task} == {only}
     for need in [("science", "aa_eval", "critpt"),

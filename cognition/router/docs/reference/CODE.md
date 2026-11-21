@@ -14,7 +14,7 @@ Alerts: a pinned favourite overtaken, unranked new releases, stale sources — a
 
 - `record(conn, kind: str, task: str, subject: str, evidence: dict, status: str, role: str='')` — Insert or refresh an alert; returns True when it is new. The owner's verdicts are never overwritten; a
 - `_unit_cost(offers: list[dict], interface: str, modes: list[str] | None=None)` — 
-- `_callable_via(offers: list[dict])` — Providers that can really run the model: a chat offer Walter has no endpoint for (2026-11-21: Kie lists
+- `_callable_via(offers: list[dict])` — Providers that can really run the model: a chat offer Walter has no endpoint for (2026-11-21: Kie sells
 - `_board_rows(conn, snaps: dict, benchmark: str, bench_task: str)` — 
 - `_order(rows: list[dict])` — Distinct models of a board, best first (variants of one model count once).
 - `new_best(conn, run_id: int, chg: dict | None=None)` — A new #1 for a specialised task is only PROPOSED (2026-10-16: « je dois toujours appuyer sur le

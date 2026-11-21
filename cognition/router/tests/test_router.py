@@ -78,23 +78,23 @@ def test_pinned_favourite_wins_over_computed_choice(conn):
 def test_challenger_flow_baseline_then_new_then_adopt(conn):
     # Pin a weaker model: everything already better (on the task composite) becomes 'baseline' (no message).
     conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d'")   # clean slate (rolled back)
-    out = choose.set_preference(conn, "3d", pin="gemini-4-hydrogen")
+    out = choose.set_preference(conn, "3d", pin="glm-5-3")
     assert out["baseline_challengers"] > 0
     assert not [a for a in alerts.pending(conn) if a["kind"] == "challenger" and a["task"] == "3d"]
     # A model overtaking later is 'open' and gets rendered for Telegram.
-    conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d' and subject = 'gpt-6-astra'")
+    conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d' and subject = 'gpt-6-2-astra'")
     # an UNCHANGED better model is not news; a new (or cheaper) one is
     still = {"new": {}, "nerf": {}, "price_drop": {}}
     assert alerts.challengers(conn, "open", only_task="3d", chg=still) == []
-    conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d' and subject = 'gpt-6-astra'")
-    news = {"new": {"gpt-6-astra": ["nouveau sur da_models:3d"]}, "nerf": {}, "price_drop": {}}
-    assert "3d:default:gpt-6-astra" in alerts.challengers(conn, "open", only_task="3d", chg=news)
+    conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d' and subject = 'gpt-6-2-astra'")
+    news = {"new": {"gpt-6-2-astra": ["nouveau sur aa_eval:aa_3d"]}, "nerf": {}, "price_drop": {}}
+    assert "3d:default:gpt-6-2-astra" in alerts.challengers(conn, "open", only_task="3d", chg=news)
     pend = [a for a in alerts.pending(conn) if a["task"] == "3d"]
     assert pend and "Catégorie du router" in telegram.render(pend, conn)
     assert pend[0]["evidence"]["composite"]["challenger"] > pend[0]["evidence"]["composite"]["pinned"]
     # The owner adopts it: it becomes the pinned favourite.
     alerts.verdict(conn, pend[0]["alert_id"], "adopted")
-    assert choose.pick(conn, "3d")["model_id"] == "gpt-6-astra"
+    assert choose.pick(conn, "3d")["model_id"] == "gpt-6-2-astra"
 
 
 def test_best_available_objective_without_pin_takes_top_callable(conn):

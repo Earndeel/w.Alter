@@ -98,7 +98,7 @@ def test_a_model_the_reference_has_not_measured_is_kept():
 
 
 def test_a_listed_model_its_provider_cannot_run_is_no_route():
-    """2026-11-21: Kie lists Kimi K3.1 Pro, but its chat APIs only serve Claude and some GPT models."""
+    """2026-11-21: Kie sells Kimi K3.1 Pro on an endpoint Walter does not call yet: no route until it does."""
     from walter_router.analysis import alerts
     kimi = {"provider": "kie", "interface": "chat", "model_id": "kimi-k3-1-pro", "offer_key": "Kimi K3.1 Pro"}
     claude = {"provider": "kie", "interface": "chat", "model_id": "claude-opus-5-5", "offer_key": "claude-opus-5-5"}

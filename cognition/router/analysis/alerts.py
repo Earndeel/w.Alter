@@ -47,8 +47,8 @@ def _unit_cost(offers: list[dict], interface: str, modes: list[str] | None = Non
 
 
 def _callable_via(offers: list[dict]) -> list[str]:
-    """Providers that can really run the model: a chat offer Walter has no endpoint for (2026-11-21: Kie lists
-    Kimi K3.1 Pro but its chat APIs only serve Claude and some GPT models) is no route."""
+    """Providers that can really run the model: a chat offer Walter has no endpoint for (2026-11-21: Kie sells
+    Kimi K3.1 Pro on its /openai/v1/responses API, which Walter does not call yet) is no route."""
     from walter_router.serve import execution
     return sorted({o["provider"] for o in offers
                    if o.get("interface") != "chat" or execution._runnable(o) is not None})

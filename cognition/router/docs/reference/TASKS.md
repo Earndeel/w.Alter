@@ -7,7 +7,7 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 
 | Clé | Interface | Interne | Objectif | Description / exigences |
 |---|---|---|---|---|
-| `3d` | chat | False | best_available | Design Arena 3D ; {} |
+| `3d` | chat | False | best_available | Artificial Analysis 3D Arena ; {} |
 | `calculation` | tool | False | tool | Calcul déterministe ; {} |
 | `coding` | chat | False | best_available | Arena coding + BridgeBench (vibe coding) + Arena webdev ; {} |
 | `cybersecurity` | chat | False | best_available | Sécurité informatique : audit de code, vulnérabilités, analyse d'incident, durcissement. AA Cyber Index. ; {} |
@@ -55,7 +55,7 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 
 | Tâche | Famille | Sous-classement | Principal | Poids | Note |
 |---|---|---|---|---|---|
-| 3d | da_models | 3d | true | 1.0 | — |
+| 3d | aa_eval | aa_3d | true | 1.0 | — |
 | coding | arena | text_coding | true | 0.3 | — |
 | coding | arena | webdev | false | 0.2 | — |
 | coding | bridgebench | backend | false | 0.15 | — |

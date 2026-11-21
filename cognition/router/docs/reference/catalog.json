@@ -419,8 +419,8 @@
   },
   "benchmark_weights": [
     {
-      "bench_task": "3d",
-      "benchmark": "da_models",
+      "bench_task": "aa_3d",
+      "benchmark": "aa_eval",
       "is_primary": true,
       "note": null,
       "task": "3d",
@@ -5784,7 +5784,7 @@
             "signature": "offers: list[dict], interface: str, modes: list[str] | None=None"
           },
           {
-            "description": "Providers that can really run the model: a chat offer Walter has no endpoint for (2026-11-21: Kie lists",
+            "description": "Providers that can really run the model: a chat offer Walter has no endpoint for (2026-11-21: Kie sells",
             "name": "_callable_via",
             "signature": "offers: list[dict]"
           },
@@ -19234,7 +19234,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "7242a42a208b2fc59385314f72f5d5e924ffba15faa2e24262a4d79594dbd7e4",
+    "analysis/alerts.py": "a2bf1ddc0a12c66249550489bbd3409695185093728b9de1c3bf7242b6b2d232",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -19410,13 +19410,14 @@
     "store/migrations/042_preferences_locked.sql": "fd9839a6d6353037ab2385c5c1325eaf4ad3b2ebd30fbe9653a78c7d0f8b5995",
     "store/migrations/043_alerts_advice.sql": "fa667b9ed075e8c3bb75fd0ef5bc7de5ee04c27300a2a8a4ec6c1c41ea415bb5",
     "store/migrations/044_specialists_one_reference.sql": "6ebefea3889e466d16ef369e5b8a06231329ed2377cd37f0efaebe4850c76dae",
-    "store/migrations/045_design_tasks_on_design_arena.sql": "bcddd3848035ac35e76f154aa09a19869c96f4bbdee25a58d1179e3a7aeec448"
+    "store/migrations/045_design_tasks_on_design_arena.sql": "bcddd3848035ac35e76f154aa09a19869c96f4bbdee25a58d1179e3a7aeec448",
+    "store/migrations/046_3d_on_aa_3d.sql": "8f81da49203457af598005b428b5df0df5fc6b80519106497e73ca342d9bf74f"
   },
   "tasks": [
     {
       "consumers": null,
       "default_objective": "best_available",
-      "description": "Design Arena 3D",
+      "description": "Artificial Analysis 3D Arena",
       "intent_hint": "Créer une scène 3D interactive ou du WebGL/Three.js en code",
       "interface": "chat",
       "internal": false,
