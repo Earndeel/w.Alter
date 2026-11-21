@@ -67,6 +67,9 @@ def composite(conn, task: str, snaps: dict | None = None) -> list[dict]:
                                    from models.benchmarks
                                    where snapshot_id = %s and benchmark = %s and task = %s""",
                                  (sid, b["benchmark"], b["bench_task"])))
+        # 2026-11-21: a model nobody can buy (AA « trusted-access, not publicly available », e.g. GPT-6 Sol Daybreak
+        # Blue on the Cyber Index) is no #1 to route to, and would set the scale of the board
+        rows = [r for r in rows if not (r["extra"] or {}).get("trusted_access")]
         if b["benchmark"] == "aa_decision":   # LLM reference rows would set the scale: rank decision models only
             rows = [r for r in rows if (r["extra"] or {}).get("kind") == "decisionModel"]
         name = f'{BOARDS.get(b["benchmark"], b["benchmark"])} {b["bench_task"]}'

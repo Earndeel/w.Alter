@@ -70,6 +70,31 @@ def unmatched(conn, limit: int = 25) -> list[dict]:
     return (first + sorted(out, key=lambda x: -x["similarity"]))[:limit]
 
 
+def board_gaps(conn, top: int = 12) -> list[dict]:
+    """Leading models (AA Intelligence top, and the text tiers in use) a Design Arena reference has not measured yet:
+    the board may lag behind recent releases (owner 2026-11-21), so their absence says nothing about their quality."""
+    snaps = sel.latest_snapshots(conn)
+    lead = [r["model_id"] for r in conn.execute(
+        """select model_id, max(score) as s from models.benchmarks where snapshot_id = %s and benchmark = 'aa'
+           group by model_id order by s desc limit %s""", (snaps.get("aa"), top))] if snaps.get("aa") else []
+    lead += [r["pinned_model_id"] for r in conn.execute(
+        "select pinned_model_id from models.preferences where task = 'general' and pinned_model_id is not null")]
+    out = []
+    for b in conn.execute("""select tb.task, tb.benchmark, tb.bench_task, p.pinned_model_id from models.task_benchmarks tb
+                             left join models.preferences p on p.task = tb.task and p.role = 'default'
+                             where tb.benchmark like 'da_%%' and tb.is_primary"""):
+        sid = sel.board_snapshot(conn, snaps, b["benchmark"], b["bench_task"])
+        if sid is None:
+            continue
+        have = {r["model_id"] for r in conn.execute("""select distinct model_id from models.benchmarks
+                                                      where snapshot_id = %s and benchmark = %s and task = %s""",
+                                                   (sid, b["benchmark"], b["bench_task"]))}
+        missing = [m for m in dict.fromkeys(lead + [b["pinned_model_id"]]) if m and m not in have]
+        if missing:
+            out.append({"task": b["task"], "board": f'Design Arena {b["bench_task"]}', "not_measured": missing})
+    return out
+
+
 def price_changes(conn) -> list[dict]:
     """Price moves since the previous snapshot of each provider, restricted to the router's short list."""
     snaps = sel.latest_snapshots(conn)
@@ -116,6 +141,7 @@ def digest(conn) -> dict:
                           for r in conn.execute("""select * from models.selection where run_id = %s and level = 'best'
                                                    and rank = 1""", (run["run_id"],))} if run else {},
         "unmatched_candidates": unmatched(conn),
+        "design_arena_not_measured": board_gaps(conn),
         "price_changes_shortlist": price_changes(conn),
         "open_unranked_count": conn.execute("""select count(*) as n from models.alerts where kind = 'unranked'
                                                and status = 'open'""").fetchone()["n"],

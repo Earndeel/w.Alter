@@ -96,6 +96,8 @@ def merge(objects: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     models: dict[str, dict[str, Any]] = {}
     for o in objects:
         row = models.setdefault(o["slug"], {"slug": o["slug"], "name": o.get("shortName") or o.get("name") or o["slug"]})
+        if o.get("mitigationStatus") == "unmitigated":   # AA « Trusted-access model (not publicly available) »
+            row["trusted_access"] = True
         for key, (field, _, _) in EVALS.items():
             if row.get(key) is None and _num(o.get(field)) is not None:
                 row[key] = _num(o.get(field))
@@ -124,7 +126,8 @@ def source_aa_eval() -> tuple[dict, datetime, str]:
             continue
         indexes[key] = [{"slug": m["slug"], "name": m.get("shortName") or m.get("name"), "index": _num(m.get("weightedIndex")),
                          "cost_per_task": _num((m.get("costPerTask") or {}).get("total")),
-                         "time_per_task_s": _num(m.get("timePerTaskSeconds")), "sub_scores": m.get("subScores")}
+                         "time_per_task_s": _num(m.get("timePerTaskSeconds")), "sub_scores": m.get("subScores"),
+                         **({"trusted_access": True} if m.get("mitigationStatus") == "unmitigated" else {})}
                         for m in rows if _num(m.get("weightedIndex")) is not None]
         pages[key] = url
     badges = updates()

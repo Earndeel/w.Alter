@@ -67,3 +67,43 @@ def test_a_needs_owner_message_is_not_sent_again_on_the_next_passes(monkeypatch)
         run.handle(conn, inc, [0])
         run.notify(conn, [inc])
     assert len(sent) == 1
+
+
+def test_a_model_the_reference_has_not_measured_is_kept():
+    """2026-11-21: svg left Fable 5.2 for GPT-6 Astra only because Design Arena had not measured Fable yet (Monsieur:
+    « ils peuvent ne pas toujours être à jour avec les derniers modèles sortis »). Unmeasured ≠ worse."""
+    from walter_router.guardian import checks
+    from walter_router.store import db
+    with db.connect() as conn:
+        try:
+            case = None
+            for p in conn.execute("""select p.task, p.role, d.doc from models.preferences p
+                                     join models.latest_dossiers d using (task)
+                                     where not p.locked and p.pinned_model_id is not null and p.task <> 'general'"""):
+                ranked = {x["model_id"] for x in (p["doc"].get("ranking") or []) if x.get("composite") is not None}
+                if any(x.get("callable") and x.get("composite") is not None for x in p["doc"].get("ranking") or []):
+                    case = (p["task"], p["role"], ranked)
+                    break
+            if not case:
+                pytest.skip("no open padlock with a ranked callable model")
+            task, role, ranked = case
+            unmeasured = "test-unmeasured-model"
+            assert unmeasured not in ranked
+            conn.execute("insert into models.canonical (model_id) values (%s) on conflict do nothing", (unmeasured,))
+            conn.execute("update models.preferences set pinned_model_id = %s, pinned_variant = '' where task = %s and role = %s",
+                         (unmeasured, task, role))
+            assert not [x for x in checks.padlocks(conn) if x["subject"] == task]
+        finally:
+            conn.rollback()
+
+
+def test_a_listed_model_its_provider_cannot_run_is_no_route():
+    """2026-11-21: Kie lists Kimi K3.1 Pro, but its chat APIs only serve Claude and some GPT models."""
+    from walter_router.analysis import alerts
+    kimi = {"provider": "kie", "interface": "chat", "model_id": "kimi-k3-1-pro", "offer_key": "Kimi K3.1 Pro"}
+    claude = {"provider": "kie", "interface": "chat", "model_id": "claude-opus-5-5", "offer_key": "claude-opus-5-5"}
+    orr = {"provider": "openrouter", "interface": "chat", "model_id": "kimi-k3-1-pro", "offer_key": "moonshotai/kimi-k3.1-pro"}
+    image = {"provider": "kie", "interface": "image", "model_id": "x-image", "offer_key": "x"}
+    assert alerts._callable_via([kimi, orr]) == ["openrouter"]
+    assert alerts._callable_via([claude]) == ["kie"]
+    assert alerts._callable_via([image]) == ["kie"]

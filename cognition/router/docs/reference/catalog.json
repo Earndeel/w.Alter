@@ -5784,6 +5784,11 @@
             "signature": "offers: list[dict], interface: str, modes: list[str] | None=None"
           },
           {
+            "description": "Providers that can really run the model: a chat offer Walter has no endpoint for (2026-11-21: Kie lists",
+            "name": "_callable_via",
+            "signature": "offers: list[dict]"
+          },
+          {
             "description": "",
             "name": "_board_rows",
             "signature": "conn, snaps: dict, benchmark: str, bench_task: str"
@@ -8810,6 +8815,11 @@
             "description": "Callable models without any score, next to a scored model with a very similar id: probable naming gaps",
             "name": "unmatched",
             "signature": "conn, limit: int=25"
+          },
+          {
+            "description": "Leading models (AA Intelligence top, and the text tiers in use) a Design Arena reference has not measured yet:",
+            "name": "board_gaps",
+            "signature": "conn, top: int=12"
           },
           {
             "description": "Price moves since the previous snapshot of each provider, restricted to the router's short list.",
@@ -19224,7 +19234,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "d4f3d488b5510abebe1fa18d0718a0bcfa331231342af95f1c2825901e06d840",
+    "analysis/alerts.py": "7242a42a208b2fc59385314f72f5d5e924ffba15faa2e24262a4d79594dbd7e4",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -19236,11 +19246,11 @@
     "analysis/knowledge.py": "3a8059a56f954abfa97b46a4d965cf11a6723d4d8e8bd424028f4dd0dfd75891",
     "analysis/media.py": "c61030754e36087f9b9b4caf86641ec786e97eccf3b33345d04b5f2d7eb1b267",
     "analysis/pareto.py": "00621f7e0584567022991ee1bd154dfe15b64b9443dd0c89a6faf26f11d23f0f",
-    "analysis/parse.py": "cf82c94b379e607f9793738b1e770374b3e96c6da328062ecb16292d43b59317",
+    "analysis/parse.py": "6d1401b7a53c05e26f58e17084a5738e175c20c28a90f0d9ba223d7f1797349b",
     "analysis/postes.py": "8871b0214df0a72334179b1fc575af74452a4608c786200ca5170a2bce996fd1",
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
     "analysis/refresh.py": "047e8a1cd50ea4c52ce3947ea9f702f00c18d3288a7c87ff3234d6eaed5b9906",
-    "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
+    "analysis/scoring.py": "f7abdc1a829b85eee3dff891f081fac36bbdde710fdbc614e10bf271e4e9b557",
     "analysis/select.py": "39ad5f96af616cd95209b22ee6f4f77c62be760cf7efa614e775bf6065390624",
     "analysis/telegram.py": "5e444d17241f9a3d7446dda2c30da6ddd65cd7f0f8cbac8aac13a7e1e537a10f",
     "analysis/tiers.py": "5b70be11b3a4268e5f329ea330600814309194bab681ecffb42f8f726390291a",
@@ -19266,7 +19276,7 @@
     "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
     "guardian/advice.py": "1d64179e24257d9a431f15e957d5981881598b04d60be58c3f57a28bdd556c49",
     "guardian/agent.py": "45b543d716f8f97eb5584e0f90fda2b3da8175cbfbb189fbeba8505def0b438d",
-    "guardian/checks.py": "e57eae8ac0b0b0f8213b092739080a8ab89a2dbb7e2cbcef24858251c9bd7362",
+    "guardian/checks.py": "510e008432bbcf0c31287163bed9afdf42242380486fc6039b86dd7eba51f341",
     "guardian/playbook.json": "dd413285fa40d68b4539bd2469a74d825dd576cf03910add0a47ff5cb5fda5e6",
     "guardian/repair.py": "50604a48872e4684ba7a8cbe031eafde5ec7cbfe1c04697927dd9447d3dd29cd",
     "guardian/run.py": "58e51e4199d184c4213eae760cd9407c4b7cf081f86d1fa04c55127a05064fc3",
@@ -19304,13 +19314,13 @@
     "plan/watch.py": "e470e06d4c9b0fe3b77f6f1f62919893ef19e81b88b4a22c2e42710e011f6fb5",
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",
-    "research/agent/review.py": "22fe6f742f67c6f3fa761d4447fefc5eeac9cccc18041902e8972586f335c6ba",
+    "research/agent/review.py": "a8dc825e4237c5e810ab8d9ca352212511a7bae0694b0becee377cb356655236",
     "research/agent/run.py": "8c44e8466f7cb87421085de7d0cc3ee81aef47018f6f5b2205cc82f6b7bd634e",
     "research/benchmarks/__init__.py": "5066d339167d8898f0cda8d667da3b6e935a3edda56c178ce3f4e350b58e3679",
     "research/benchmarks/aa.py": "04c8aa990ad9d31c0aba588b0cd186a8863b15864923525285616fec9df61207",
     "research/benchmarks/aa_data.py": "5e602b5a70e0454ee0ac3df6d6948ff215f4fa6851e4d6823b2269cfe348298d",
     "research/benchmarks/aa_decision.py": "7ff83ca212ef02ad25876dfeeac95913722a177f28b501dfbdcdb57ca76ae02e",
-    "research/benchmarks/aa_evaluations.py": "67407e016a78c5c472100cf96c2a429d3263f6ad5f39a16763397f67374394c5",
+    "research/benchmarks/aa_evaluations.py": "c4c961ff8d4d1e198f8f313162935be4bbddf39900b4f6f67e8400a1ebec79c8",
     "research/benchmarks/aa_media.py": "071aa2f3e569abf11756c72a5181d530fb878f68afedeeed611c16687805537e",
     "research/benchmarks/aa_stt.py": "1df780e8e54d6a6a4e5eaea618f952de41bc3ff5878c8320d6a1efd49b320afe",
     "research/benchmarks/agentset.py": "1c73bb7619c1b0807e70b8177f4f2822e14cde7ad074af12767dcaa10dd81291",

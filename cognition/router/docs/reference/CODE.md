@@ -14,6 +14,7 @@ Alerts: a pinned favourite overtaken, unranked new releases, stale sources — a
 
 - `record(conn, kind: str, task: str, subject: str, evidence: dict, status: str, role: str='')` — Insert or refresh an alert; returns True when it is new. The owner's verdicts are never overwritten; a
 - `_unit_cost(offers: list[dict], interface: str, modes: list[str] | None=None)` — 
+- `_callable_via(offers: list[dict])` — Providers that can really run the model: a chat offer Walter has no endpoint for (2026-11-21: Kie lists
 - `_board_rows(conn, snaps: dict, benchmark: str, bench_task: str)` — 
 - `_order(rows: list[dict])` — Distinct models of a board, best first (variants of one model count once).
 - `new_best(conn, run_id: int, chg: dict | None=None)` — A new #1 for a specialised task is only PROPOSED (2026-10-16: « je dois toujours appuyer sur le
@@ -826,6 +827,7 @@ Deterministic digest of a refresh cycle, the input of the 48 h analysis agent (e
 - `_family(model_id: str)` — 
 - `blocked_challengers(conn)` — A model that beats one of the owner's choices on a board but has no offer: often the same model sold under
 - `unmatched(conn, limit: int=25)` — Callable models without any score, next to a scored model with a very similar id: probable naming gaps
+- `board_gaps(conn, top: int=12)` — Leading models (AA Intelligence top, and the text tiers in use) a Design Arena reference has not measured yet:
 - `price_changes(conn)` — Price moves since the previous snapshot of each provider, restricted to the router's short list.
 - `digest(conn)` — 
 

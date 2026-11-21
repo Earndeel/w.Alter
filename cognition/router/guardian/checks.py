@@ -165,7 +165,9 @@ def padlocks(conn) -> list[dict]:
         mine = next((r for r in ranking if r["model_id"] == p["pinned_model_id"]), None)
         if not best or best["model_id"] == p["pinned_model_id"]:
             continue
-        if mine is None or best["composite"] > mine["composite"] + PADLOCK_MARGIN:
+        # not measured on the reference ≠ worse (owner 2026-11-21: Design Arena can lag behind the latest releases;
+        # svg left Fable 5.2, absent from its board, for GPT-6 Astra): the model in use stays until it is measured
+        if mine is not None and best["composite"] > mine["composite"] + PADLOCK_MARGIN:
             out.append({"key": f'padlock:{p["task"]}:{p["role"]}', "kind": "padlock_drift", "subject": p["task"],
                         "detail": {"role": p["role"], "in_use": p["pinned_model_id"],
                                    "in_use_score": mine and mine["composite"], "in_use_rank": mine and mine["rank"],

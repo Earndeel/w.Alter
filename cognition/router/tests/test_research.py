@@ -239,3 +239,16 @@ def test_new_web_fact_on_an_owned_plan_is_notified_once():
         conn.rollback()
     # the first figure is only learnt (2026-11-21), a change is news, the same fact from a second source is not again
     assert made == ids[1:2]
+
+
+def test_a_trusted_access_model_is_flagged_and_never_ranked():
+    """2026-11-21: GPT-6 Sol Daybreak Blue (AA « Trusted-access model, not publicly available ») topped the Cyber
+    Index; nobody can buy it, so it is neither a #1 nor a proposal."""
+    page = _flight({"models": [{"slug": "m-open", "shortName": "Open", "cyberIndex": 60.0, "mitigationStatus": "standard"},
+                               {"slug": "m-closed", "shortName": "Closed", "cyberIndex": 70.0,
+                                "mitigationStatus": "unmitigated"}]})
+    models = aa_evaluations.merge(aa_evaluations._objects(page))
+    assert models["m-closed"].get("trusted_access") and not models["m-open"].get("trusted_access")
+    doc = {"evals": {k: {"unit": u} for k, (_, _, u) in aa_evaluations.EVALS.items()}, "data": list(models.values())}
+    rows = {r["external_key"]: r for r in parse_benchmarks("aa_eval", doc) if r["task"] == "cyber"}
+    assert rows["m-closed"]["extra"].get("trusted_access") and not rows["m-open"]["extra"].get("trusted_access")

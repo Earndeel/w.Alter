@@ -61,6 +61,9 @@ C'est le cycle de 48 h : tu fais aussi l'analyse du cycle (les faits sont dans `
   MÊME modèle / AUTRE / incertain, preuve à l'appui (page officielle ou fournisseur ; l'URL si les noms diffèrent).
   Ne rends dans `aliases` que les « même modèle » CERTAINS, jamais sur une ressemblance (7b ≠ 72b, 3.1 ≠ 3.5,
   flash ≠ flash-lite) ; ceux de `name_links_already_made` sont déjà faits. Le Router applique ces liens lui-même.
+- Design Arena (`cycle.review.design_arena_not_measured`) : un modèle récent absent d'un tableau n'est pas moins bon,
+  le tableau peut être en retard. Si c'est un candidat sérieux pour la tâche (un niveau texte, un n°1 AA), dis-le
+  dans `report_fr`, ou en `note` s'il change un choix de {{owner}}.
 - Prix (`price_changes_shortlist`) : seulement ceux qui changent un choix ou un coût de plus de 20 %.
 - Propositions qui vont partir (`cycle.challengers_to_send`) : pour chacune, une phrase pour {{owner}} qui compare au
   choix actuel, chiffres à l'appui — ce qu'on gagne (points, classements), ce que ça coûte (`price_ratio` = combien de

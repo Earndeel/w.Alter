@@ -46,12 +46,21 @@ def _unit_cost(offers: list[dict], interface: str, modes: list[str] | None = Non
     return paid["cost"] if paid else None
 
 
+def _callable_via(offers: list[dict]) -> list[str]:
+    """Providers that can really run the model: a chat offer Walter has no endpoint for (2026-11-21: Kie lists
+    Kimi K3.1 Pro but its chat APIs only serve Claude and some GPT models) is no route."""
+    from walter_router.serve import execution
+    return sorted({o["provider"] for o in offers
+                   if o.get("interface") != "chat" or execution._runnable(o) is not None})
+
+
 def _board_rows(conn, snaps: dict, benchmark: str, bench_task: str) -> list[dict]:
     sid = sel.board_snapshot(conn, snaps, benchmark, bench_task)
     if sid is None:
         return []
-    return list(conn.execute("""select model_id, variant, display_name, score, score_unit, extra from models.benchmarks
-                               where snapshot_id = %s and benchmark = %s and task = %s""", (sid, benchmark, bench_task)))
+    return [r for r in conn.execute("""select model_id, variant, display_name, score, score_unit, extra from models.benchmarks
+                                      where snapshot_id = %s and benchmark = %s and task = %s""", (sid, benchmark, bench_task))
+            if not (r["extra"] or {}).get("trusted_access")]   # not publicly available: never a proposal (2026-11-21)
 
 
 TOP_N = 3
@@ -197,7 +206,7 @@ def challengers(conn, status_for_new: str = "open", only_task: str | None = None
                 ev = found.setdefault(r["model_id"], {
                     "task_label": p["label"], "role": p["role"], "watch": p["watch"], "pinned": p["pinned_model_id"],
                     "pinned_unit_cost": ref_cost, "unit_cost": cost, "boards": {},
-                    "callable_via": sorted({o["provider"] for o in offers.get(r["model_id"], [])})})
+                    "callable_via": _callable_via(offers.get(r["model_id"], []))})
                 prev = ev["boards"].get(board)
                 if prev is None or r["score"] - ref > prev["delta"]:
                     ev["boards"][board] = {"score": r["score"], "pinned_score": ref, "delta": r["score"] - ref,
