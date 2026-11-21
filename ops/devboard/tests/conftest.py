@@ -14,7 +14,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-ADMIN = os.environ.get("WALTER_DEVBOARD_TEST_ADMIN_URL", "postgresql://hindsight:walter-test-only@127.0.0.1:5440/postgres")
+ADMIN = os.environ.get("WALTER_DEVBOARD_TEST_ADMIN_URL", "postgresql://walter:walter-test-only@127.0.0.1:5440/postgres")
 if re.search(r"[:@/]5433\b", ADMIN):
     raise pytest.UsageError("devboard tests refuse the production database (port 5433)")
 NAME = f"devboard_test_{os.getpid()}"

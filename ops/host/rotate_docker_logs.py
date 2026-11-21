@@ -61,7 +61,7 @@ def rotate(path: Path, max_bytes: int, keep: int, dry_run: bool = False) -> dict
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--containers", nargs="*", default=["hindsight-pg"])
+    ap.add_argument("--containers", nargs="*", default=["walter-pg"])
     ap.add_argument("--max-mb", type=int, default=50)
     ap.add_argument("--keep", type=int, default=5)
     ap.add_argument("--dry-run", action="store_true")

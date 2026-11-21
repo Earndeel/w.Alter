@@ -214,7 +214,7 @@
     {
       "id": "postgres",
       "path": "/services/postgres",
-      "role": "PostgreSQL de Walter en service depuis le 2026-11-10 (E9.2b) : données dans /services/postgres/data, configuration dans config/, compose verrouillé par empreinte ; conteneur hindsight-pg, 127.0.0.1:5433 inchangés. Déplacement et retour arrière : walter-pg-relocate (ops/backup/scripts)",
+      "role": "PostgreSQL de Walter en service depuis le 2026-11-10 (E9.2b) : données dans /services/postgres/data, configuration dans config/, compose verrouillé par empreinte ; conteneur walter-pg (hindsight-pg jusqu’au 2026-11-21), 127.0.0.1:5433. Déplacement et retour arrière : walter-pg-relocate (ops/backup/scripts)",
       "status": "active",
       "readme": "/services/postgres/README.md"
     },

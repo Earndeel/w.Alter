@@ -5,4 +5,4 @@ Wants=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /walter/ops/host/rotate_docker_logs.py --containers hindsight-pg --max-mb 50 --keep 5
+ExecStart=/usr/bin/python3 /walter/ops/host/rotate_docker_logs.py --containers walter-pg --max-mb 50 --keep 5

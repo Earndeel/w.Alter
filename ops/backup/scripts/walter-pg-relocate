@@ -9,17 +9,17 @@
 #   walter-pg-relocate rollback           compose down, data back into the volume, old container, old settings
 #
 # Parameters (environment; defaults = Walter's production server, see /services/postgres/README.md):
-#   PG_CONTAINER (hindsight-pg)  PG_VOLUME (hindsight-pg)  PG_TARGET (/services/postgres)  PG_DB / PG_USER (hindsight)
+#   PG_CONTAINER (walter-pg)  PG_VOLUME (hindsight-pg, historical)  PG_TARGET (/services/postgres)  PG_DB / PG_USER (walter)
 #   PG_UNITS ("" = the consumer list below; "none" = touch no unit, for a rehearsal)  PG_STATE (state + reports folder)
 #
 # No password is read, written or printed: psql runs inside the container over its local socket (trust there).
 set -Eeuo pipefail
 
-CONTAINER=${PG_CONTAINER:-hindsight-pg}
+CONTAINER=${PG_CONTAINER:-walter-pg}
 VOLUME=${PG_VOLUME:-hindsight-pg}
 TARGET=${PG_TARGET:-/services/postgres}
-DB=${PG_DB:-hindsight}
-DBUSER=${PG_USER:-hindsight}
+DB=${PG_DB:-walter}
+DBUSER=${PG_USER:-walter}
 STATE=${PG_STATE:-$TARGET/relocation}
 OLD=${CONTAINER}-volume
 DEFAULT_UNITS="walter-memory-gateway walter-memory-pipeline walter-memory-overland walter-logs-watch walter-skills

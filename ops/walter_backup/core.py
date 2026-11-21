@@ -339,8 +339,8 @@ def checkpoint(level: str, scope: str, *, schemas: list[str] | None = None, note
         dest.mkdir(parents=True, exist_ok=True, mode=0o700)
         out = dest / f"pg-{'+'.join(schemas)}-{stamp}.dump"
         user = _pg_user()
-        args = ["docker", "exec", pg.get("container", "hindsight-pg"), "pg_dump", "-U", user, "-d",
-                pg.get("database", "hindsight"), "-Fc"] + [x for s in schemas for x in ("-n", s)]
+        args = ["docker", "exec", pg.get("container", "walter-pg"), "pg_dump", "-U", user, "-d",
+                pg.get("database", "walter"), "-Fc"] + [x for s in schemas for x in ("-n", s)]
         with open(out, "wb") as f:
             p = subprocess.run(args, stdout=f, stderr=subprocess.PIPE, timeout=3600)
         if p.returncode:
@@ -378,7 +378,7 @@ def _pg_user() -> str:
     try:
         return Path(os.environ.get("PGPASSFILE") or Path.home() / ".pgpass").read_text().splitlines()[0].split(":")[3]
     except (OSError, IndexError):
-        return "hindsight"
+        return "walter"
 
 
 def checkpoints(limit: int = 20) -> list[dict]:
@@ -397,7 +397,7 @@ def verify(sample: int | None = None) -> dict:
     if "pg" in k and (n := newest(k["pg"]["dir"], k["pg"].get("pattern", "*"))):
         path = Path(k["pg"]["dir"]) / n["file"]
         with open(path, "rb") as f:
-            p = subprocess.run(["docker", "exec", "-i", (cfg.get("pg") or {}).get("container", "hindsight-pg"),
+            p = subprocess.run(["docker", "exec", "-i", (cfg.get("pg") or {}).get("container", "walter-pg"),
                                 "pg_restore", "--list"], stdin=f, capture_output=True, timeout=600)
         out["pg_dump_readable"] = {"file": n["file"], "ok": p.returncode == 0,
                                    "entries": len([l for l in p.stdout.decode(errors="replace").splitlines()
