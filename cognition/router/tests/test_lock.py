@@ -22,7 +22,9 @@ def conn():
 
 def _weak_3d(conn):
     """3d pinned to a weaker model: better ones become 'baseline' challengers (seen by this cycle)."""
-    out = choose.set_preference(conn, "3d", pin="claude-opus-5")
+    # a clean slate (rolled back): since 045 the only 3d board is Design Arena 3D, whose podium already has rows
+    conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d'")
+    out = choose.set_preference(conn, "3d", pin="gemini-4-hydrogen")
     assert out["baseline_challengers"] > 0
 
 
@@ -33,7 +35,7 @@ def test_a_model_is_locked_by_default_and_a_locked_one_never_switches(conn):
     conn.execute("update models.preferences set locked = true where task = '3d'")
     _weak_3d(conn)
     assert all(c["task"] != "3d" for c in alerts.auto_adopt(conn))
-    assert choose.pick(conn, "3d")["model_id"] == "claude-opus-5"
+    assert choose.pick(conn, "3d")["model_id"] == "gemini-4-hydrogen"
 
 
 def test_opening_the_padlock_follows_the_best_challenger_and_closes_its_proposals(conn):
@@ -43,7 +45,7 @@ def test_opening_the_padlock_follows_the_best_challenger_and_closes_its_proposal
                key=lambda a: a["evidence"]["composite"]["challenger"])["subject"]
     out = alerts.set_lock(conn, "3d", None, False)
     assert out["locked"] is False and [c["to"] for c in out["changed"]] == [best]
-    assert out["changed"][0]["from"] == "claude-opus-5"
+    assert out["changed"][0]["from"] == "gemini-4-hydrogen"
     assert choose.pick(conn, "3d")["model_id"] == best
     assert not conn.execute("""select 1 from models.alerts where kind = 'challenger' and task = '3d'
                                and status in ('open', 'notified')""").fetchone()
@@ -56,7 +58,7 @@ def test_a_stale_challenger_is_not_followed(conn):
     _weak_3d(conn)
     conn.execute("update models.alerts set last_seen = now() - interval '5 days' where kind = 'challenger' and task = '3d'")
     assert alerts.set_lock(conn, "3d", None, False)["changed"] == []
-    assert choose.pick(conn, "3d")["model_id"] == "claude-opus-5"
+    assert choose.pick(conn, "3d")["model_id"] == "gemini-4-hydrogen"
 
 
 def test_opening_an_undeclared_task_pins_the_model_in_use(conn):
@@ -100,7 +102,7 @@ def test_unknown_task_is_refused(conn):
 def test_information_message_has_no_buttons_and_names_both_models(conn, monkeypatch):
     sent = []
     monkeypatch.setattr(telegram, "send_with_buttons", lambda text, rows: sent.append((text, rows)))
-    out = telegram.notify_auto(conn, [{"task": "3d", "role": "default", "label": "3D", "from": "claude-opus-5",
+    out = telegram.notify_auto(conn, [{"task": "3d", "role": "default", "label": "3D", "from": "gemini-4-hydrogen",
                                        "to": "claude-opus-5-5"}])
     assert out == {"sent": 1} and sent[0][1] == []
     assert "3D" in sent[0][0] and "→" in sent[0][0] and "cadenas" in sent[0][0]

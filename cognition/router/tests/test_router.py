@@ -77,7 +77,8 @@ def test_pinned_favourite_wins_over_computed_choice(conn):
 
 def test_challenger_flow_baseline_then_new_then_adopt(conn):
     # Pin a weaker model: everything already better (on the task composite) becomes 'baseline' (no message).
-    out = choose.set_preference(conn, "3d", pin="claude-opus-5")
+    conn.execute("delete from models.alerts where kind = 'challenger' and task = '3d'")   # clean slate (rolled back)
+    out = choose.set_preference(conn, "3d", pin="gemini-4-hydrogen")
     assert out["baseline_challengers"] > 0
     assert not [a for a in alerts.pending(conn) if a["kind"] == "challenger" and a["task"] == "3d"]
     # A model overtaking later is 'open' and gets rendered for Telegram.

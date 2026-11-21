@@ -55,18 +55,13 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 
 | Tâche | Famille | Sous-classement | Principal | Poids | Note |
 |---|---|---|---|---|---|
-| 3d | aa_eval | aa_3d | false | 0.2 | AA-3D : scènes 3D construites par des agents |
-| 3d | arena | webdev | false | 0.2 | — |
-| 3d | bridgebench | frontend | false | 0.1 | — |
-| 3d | da_models | 3d | true | 0.5 | — |
+| 3d | da_models | 3d | true | 1.0 | — |
 | coding | arena | text_coding | true | 0.3 | — |
 | coding | arena | webdev | false | 0.2 | — |
 | coding | bridgebench | backend | false | 0.15 | — |
 | coding | bridgebench | overall | false | 0.35 | — |
 | cybersecurity | aa_eval | cyber | true | 1.0 | AA Cyber Index |
-| dataviz | arena | webdev | false | 0.25 | — |
-| dataviz | bridgebench | frontend | false | 0.15 | — |
-| dataviz | da_models | dataviz | true | 0.6 | — |
+| dataviz | da_models | dataviz | true | 1.0 | — |
 | decision | aa_decision | decision | true | 1.0 | AA Decision Index v1.0 |
 | decision_vision | aa_decision | decision | true | 1.0 | AA Decision Index v1.0 (no vision eval yet) |
 | document | arena | document | true | 1.0 | — |
@@ -74,16 +69,9 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | embeddings | mteb | retrieval_fr | false | 0.5 | recherche en français (MIRACL fr, nDCG@10) |
 | engineering | aa_eval | idx_engineering | true | 1.0 | AA Engineering Index |
 | finance | aa_eval | idx_finance | true | 1.0 | AA Finance & Accounting Index |
-| frontend | arena | webdev | false | 0.3 | — |
-| frontend | bridgebench | frontend | false | 0.25 | — |
-| frontend | da_models | website | true | 0.45 | — |
-| fullstack | arena | webdev | false | 0.2 | — |
-| fullstack | bridgebench | backend | false | 0.2 | — |
-| fullstack | bridgebench | overall | false | 0.2 | — |
-| fullstack | da_agents | fullstack | true | 0.4 | — |
-| gamedev | arena | webdev | false | 0.25 | — |
-| gamedev | bridgebench | frontend | false | 0.15 | — |
-| gamedev | da_models | gamedev | true | 0.6 | — |
+| frontend | da_models | website | true | 1.0 | — |
+| fullstack | da_agents | fullstack | true | 1.0 | — |
+| gamedev | da_models | gamedev | true | 1.0 | — |
 | general | aa_intelligence | intelligence | true | 0.5 | — |
 | general | arena | text | false | 0.2 | — |
 | general | arena | text_french | false | 0.2 | — |
@@ -98,9 +86,7 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | logo | da_models | logo | true | 0.7 | — |
 | long_context | aa_eval | lcr | true | 1.0 | AA-LCR : raisonnement sur ~100k tokens de documents |
 | medical | aa_eval | idx_medical | true | 1.0 | AA Healthcare & Medical Index |
-| mobile_app | arena | webdev | false | 0.2 | — |
-| mobile_app | bridgebench | overall | false | 0.2 | — |
-| mobile_app | da_agents | mobileapps | true | 0.6 | — |
+| mobile_app | da_agents | mobileapps | true | 1.0 | — |
 | music | aa_mm | music_instrumental | false | 0.5 | AA Music instrumental |
 | music | aa_mm | music_vocals | true | 0.5 | AA Music chant |
 | rerank | agentset | rerank | true | 0.7 | qualité de classement RAG (ELO par paires) |
@@ -113,16 +99,13 @@ Les postes `internal=true` servent aux modules. Une capacité annoncée ou une o
 | strategy | aa_eval | idx_strategy_ops | true | 1.0 | AA Strategy & Ops Index |
 | stt | aa_stt | speed | false | 0.25 | vitesse (facteur temps réel) : messages vocaux transcrits sans attendre |
 | stt | aa_stt | wer | true | 0.75 | fidélité de transcription (AA-WER, anglais) |
-| svg | arena | webdev | false | 0.4 | — |
-| svg | da_models | svg | true | 0.6 | — |
+| svg | da_models | svg | true | 1.0 | — |
 | text_to_image | aa_mm | text_to_image | true | 0.5 | — |
 | text_to_image | arena | text_to_image | false | 0.5 | — |
 | text_to_video | aa_mm | text_to_video | true | 0.5 | — |
 | text_to_video | arena | text_to_video | false | 0.5 | — |
 | tts | aa_mm | tts | true | 1.0 | — |
-| ui_component | arena | webdev | false | 0.3 | — |
-| ui_component | bridgebench | frontend | false | 0.25 | — |
-| ui_component | da_models | uicomponent | true | 0.45 | — |
+| ui_component | da_models | uicomponent | true | 1.0 | — |
 | video_edit | arena | video_edit | true | 1.0 | — |
 | vision | aa_eval | mmmu_pro | false | 0.4 | MMMU-Pro : raisonnement sur images |
 | vision | arena | vision | true | 0.6 | — |
