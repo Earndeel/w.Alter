@@ -1,0 +1,134 @@
+{
+  "id": "colab",
+  "anchors": [
+    "RUNBOOK.md",
+    "contracts/colab.json",
+    "on_demand.py"
+  ],
+  "requires": [],
+  "external": [
+    "official Colab MCP",
+    "browser authentication",
+    "Google Drive"
+  ],
+  "data": [
+    "immutable prepared artifacts and result evidence"
+  ],
+  "core_paths": [],
+  "backup_paths": [
+    "."
+  ],
+  "interfaces": [
+    "on_demand.py CLI"
+  ],
+  "bindings": {
+    "hermes": "local CLI via host execution permissions",
+    "dsh": "local CLI via host execution permissions",
+    "codex": "local CLI via host execution permissions",
+    "claude-code": "local CLI via host execution permissions"
+  },
+  "limitations": [
+    "GPU remains blocked until prepared artifact validation; modularity work does not remove this guard.",
+    "No remote compute is allocated by modularity checks."
+  ],
+  "services": [],
+  "optional": [
+    "raw-vault"
+  ],
+  "contract": {
+    "schema_version": 1,
+    "version": "1.0.0",
+    "owner": "colab",
+    "kind": "capability",
+    "purpose": "Préparer et exécuter des travaux de calcul distant qualifiés.",
+    "target_root": "capabilities/colab",
+    "config_paths": [],
+    "permissions": [
+      "validation de l’artefact avant allocation GPU",
+      "authentification Google existante"
+    ],
+    "invariants": [
+      "Les adaptateurs réutilisent le noyau commun et conservent les permissions du harness.",
+      "Une indisponibilité est explicite ; aucun repli concurrent non déclaré.",
+      "Les données privées et secrets ne sont pas exposés par les diagnostics."
+    ],
+    "errors": [
+      "invalid_request",
+      "permission_denied",
+      "dependency_unavailable",
+      "deadline_exceeded",
+      "internal_error"
+    ],
+    "cancellation": [
+      "Propager l’annulation lorsque le port la supporte ; qualifier le comportement par interface.",
+      "Une interruption ne doit pas être présentée comme une annulation transactionnelle garantie."
+    ],
+    "operations": [
+      {
+        "id": "primary",
+        "transport": "cli",
+        "interface": "on_demand.py",
+        "access": "execute",
+        "timeout_seconds": 1800,
+        "timeout_status": "target"
+      }
+    ],
+    "resources": [
+      {
+        "id": "compute-artifacts",
+        "role": "owner",
+        "owner": "colab",
+        "durability": "canonical"
+      }
+    ],
+    "migrations": [
+      "Versionner le contrat et vérifier les adaptateurs consommateurs avant activation.",
+      "Sauvegarder les données avant migration ; documenter la compatibilité du retour arrière."
+    ],
+    "recovery": {
+      "backup": [
+        "Utiliser backup_paths et anchors de ce manifeste ; inclure les configurations des ports.",
+        "Les schémas PostgreSQL sont sauvegardés par dump cohérent, les SQLite par snapshot."
+      ],
+      "restore": [
+        "Restaurer ensemble le module, ses configurations, ses données et les versions des ports.",
+        "Rétablir les accès externes depuis le matériel de récupération protégé."
+      ],
+      "verification": [
+        "Vérifier empreintes, modes, liens et dépendances.",
+        "Rejouer les scénarios du module et les intégrations ; l’archive seule ne prouve pas la restauration."
+      ]
+    },
+    "acceptance": [
+      {
+        "id": "compute-guard",
+        "assertion": "Une charge non qualifiée est refusée avant toute allocation de calcul.",
+        "scope": "integration"
+      },
+      {
+        "id": "restore",
+        "assertion": "Le module et ses données sont reconstruits dans un environnement isolé avec ses intégrations.",
+        "scope": "recovery"
+      }
+    ],
+    "conventions_status": "required; enforced per port only after qualification evidence"
+  },
+  "components": [
+    {
+      "id": "bridge",
+      "path": "bridge.py",
+      "role": "Pont Colab (GPU à la demande)",
+      "status": "active",
+      "readme": "RUNBOOK.md",
+      "vision_target": "capabilities/colab"
+    },
+    {
+      "id": "mcp",
+      "path": "mcp",
+      "role": "Serveur MCP Colab",
+      "status": "active",
+      "readme": "mcp/README.md",
+      "vision_target": "capabilities/colab"
+    }
+  ]
+}

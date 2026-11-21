@@ -1,0 +1,161 @@
+{
+  "cycles": [
+    {
+      "cycle": 1,
+      "requested_device": "cpu",
+      "preflight": {
+        "selected": "cpu",
+        "disabled": false,
+        "resources_before": {
+          "compute_units": 82.84,
+          "active_sessions": 0,
+          "balance_text": "Available: 82.84 compute units",
+          "sessions_text": "You have 0 active sessions.",
+          "rate_text": "Usage rate: approximately 0 per hour"
+        }
+      },
+      "initialize": {
+        "store": "/content/walter-cache-store",
+        "drive_mounted": false,
+        "google_credentials_present": false,
+        "pid": 1745
+      },
+      "fresh_runtime_verified": true,
+      "uploads": [
+        {
+          "name": "walter-cpu-proof-input.json",
+          "sha256": "a1e9a2cc0291b57405a4b37e48f52edd9dabf869fa3299cf07d3c2c55deb76a8",
+          "seconds": 0.533
+        },
+        {
+          "name": "cache_runtime.py",
+          "sha256": "f94e07fbb6f915a96082cc3320d6b96389cd3ada5dcb7def6ee3f8b7e06af03f",
+          "seconds": 0.915
+        }
+      ],
+      "execution": {
+        "message": "Bonjour Monsieur",
+        "cycle": 1,
+        "python": "3.13.16",
+        "architecture": "x86_64",
+        "gpu_detected": false,
+        "drive_mounted": false,
+        "cache_module_imported": true
+      },
+      "download": {
+        "name": "walter-cpu-proof-result.json",
+        "size_bytes": 168,
+        "sha256": "ec668a45c5cae3b06ee4dedd92cc20a5e777a47bd42f423b13b804a392fd72e9",
+        "seconds": 1.086,
+        "independent_readback_verified": true
+      },
+      "saved_notebook": true,
+      "release": {
+        "disconnected": true,
+        "buttons": [
+          "search\n        \n        Show command palette Ctrl+Shift+P",
+          "add\n        \n        Insert code cell below Ctrl+M B",
+          "add\n        \n        Add text cell",
+          "play_arrow\n        \n        Run all cells in notebook",
+          "Click to connect",
+          "Manage sessions",
+          "Change runtime type",
+          "check11:55\u202fPM",
+          "data_object\n        Variables",
+          "terminal\n        Terminal"
+        ],
+        "connection": [
+          "Additional connection options",
+          "Additional connection options",
+          "Runtime status bar"
+        ],
+        "resources_after": {
+          "compute_units": 82.84,
+          "active_sessions": 0,
+          "balance_text": "Available: 82.84 compute units",
+          "sessions_text": "You have 0 active sessions.",
+          "rate_text": "Usage rate: approximately 0 per hour"
+        }
+      },
+      "total_seconds": 42.068
+    },
+    {
+      "cycle": 2,
+      "requested_device": "cpu",
+      "preflight": {
+        "selected": "cpu",
+        "disabled": false,
+        "resources_before": {
+          "compute_units": 82.84,
+          "active_sessions": 0,
+          "balance_text": "Available: 82.84 compute units",
+          "sessions_text": "You have 0 active sessions.",
+          "rate_text": "Usage rate: approximately 0 per hour"
+        }
+      },
+      "initialize": {
+        "store": "/content/walter-cache-store",
+        "drive_mounted": false,
+        "google_credentials_present": false,
+        "pid": 1103
+      },
+      "fresh_runtime_verified": true,
+      "uploads": [
+        {
+          "name": "walter-cpu-proof-input.json",
+          "sha256": "369cc84b535f359f8b0170efc10b8fb0ccab9b508b308efd4fbdf9bff1c62d03",
+          "seconds": 1.11
+        },
+        {
+          "name": "cache_runtime.py",
+          "sha256": "f94e07fbb6f915a96082cc3320d6b96389cd3ada5dcb7def6ee3f8b7e06af03f",
+          "seconds": 1.109
+        }
+      ],
+      "execution": {
+        "message": "Bonjour Monsieur",
+        "cycle": 2,
+        "python": "3.13.16",
+        "architecture": "x86_64",
+        "gpu_detected": false,
+        "drive_mounted": false,
+        "cache_module_imported": true
+      },
+      "download": {
+        "name": "walter-cpu-proof-result.json",
+        "size_bytes": 168,
+        "sha256": "69b2f0c112e22c32d6f8d3a7f38734085ea3717add2f7af69c8bacf359bef04d",
+        "seconds": 1.099,
+        "independent_readback_verified": true
+      },
+      "saved_notebook": true,
+      "release": {
+        "disconnected": true,
+        "buttons": [
+          "search\n        \n        Show command palette Ctrl+Shift+P",
+          "add\n        \n        Insert code cell below Ctrl+M B",
+          "add\n        \n        Add text cell",
+          "play_arrow\n        \n        Run all cells in notebook",
+          "Click to connect",
+          "Change runtime type",
+          "check11:56\u202fPM",
+          "data_object\n        Variables",
+          "terminal\n        Terminal"
+        ],
+        "connection": [
+          "Additional connection options",
+          "Additional connection options",
+          "Runtime status bar"
+        ],
+        "resources_after": {
+          "compute_units": 82.84,
+          "active_sessions": 0,
+          "balance_text": "Available: 82.84 compute units",
+          "sessions_text": "You have 0 active sessions.",
+          "rate_text": "Usage rate: approximately 0 per hour"
+        }
+      },
+      "total_seconds": 47.316
+    }
+  ]
+}

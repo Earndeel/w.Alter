@@ -1,0 +1,65 @@
+{
+  "kind": "actual_cli_negative_tests_no_browser_or_allocation",
+  "results": [
+    {
+      "device": "T4",
+      "exit_code": 1,
+      "report": {
+        "status": "blocked",
+        "reason": "gpu_preparation_incomplete",
+        "error_type": "GPUPreparationError",
+        "detail": "GPU preparation incomplete: validated dependencies, model assets and workflow restoration are required before allocation",
+        "allocation_requested": false,
+        "cleanup": {
+          "attempted": false,
+          "disconnected": null
+        },
+        "timings": {
+          "total_seconds": 0.0004764019977301359,
+          "cell_seconds": null
+        },
+        "compute_units_consumed": null
+      }
+    },
+    {
+      "device": "L4",
+      "exit_code": 1,
+      "report": {
+        "status": "blocked",
+        "reason": "gpu_preparation_incomplete",
+        "error_type": "GPUPreparationError",
+        "detail": "GPU preparation incomplete: validated dependencies, model assets and workflow restoration are required before allocation",
+        "allocation_requested": false,
+        "cleanup": {
+          "attempted": false,
+          "disconnected": null
+        },
+        "timings": {
+          "total_seconds": 0.00045584188774228096,
+          "cell_seconds": null
+        },
+        "compute_units_consumed": null
+      }
+    },
+    {
+      "device": "A100",
+      "exit_code": 1,
+      "report": {
+        "status": "blocked",
+        "reason": "gpu_preparation_incomplete",
+        "error_type": "GPUPreparationError",
+        "detail": "GPU preparation incomplete: validated dependencies, model assets and workflow restoration are required before allocation",
+        "allocation_requested": false,
+        "cleanup": {
+          "attempted": false,
+          "disconnected": null
+        },
+        "timings": {
+          "total_seconds": 0.0004914829041808844,
+          "cell_seconds": null
+        },
+        "compute_units_consumed": null
+      }
+    }
+  ]
+}

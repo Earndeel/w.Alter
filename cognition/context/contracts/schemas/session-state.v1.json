@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/context/session-state.v1.json",
+  "title": "SessionState v1",
+  "type": "object",
+  "required": [
+    "version",
+    "thread_id"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "thread_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective": {
+      "type": "string"
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "open_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "plan": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  }
+}

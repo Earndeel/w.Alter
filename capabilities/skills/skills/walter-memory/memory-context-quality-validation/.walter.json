@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
+ "reason": "The session developed and exercised a reusable Memory–Context quality gate absent from the listed skills: isolated database benchmarking, four distinct recall stages, blind annotation and arbitration, reconsolidation proposal audits, and shadow activation checks. Concrete evidence includes bench/memory_v1.py, bench/p12_recon.py, results.json/disagreements.json, partial-message interpretation failures, completed-item versus expired-rule corrections, and final runs reporting 266 Memory tests plus 74 Context tests. [session claude_code/vm/b7b4d3cc-2253-4b9a-a570-b9c375891725]",
+ "store_sha": "340bc850197212a30518dbf7f5c73ff0702fee51062cd927aebeb1e0fb638362"
+}

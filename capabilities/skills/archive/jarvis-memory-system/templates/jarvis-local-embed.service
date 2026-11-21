@@ -1,0 +1,19 @@
+[Unit]
+Description=W.Alter Jarvis Local Embedding Service (all-MiniLM-L6-v2)
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.hermes/services/jarvis
+Environment=LOCAL_EMBED_PORT=8896
+Environment=LOCAL_EMBED_MODEL=all-MiniLM-L6-v2
+Environment=EMBED_DIM=384
+ExecStart=/root/.hermes/hermes-agent/venv/bin/python3 /root/.hermes/services/jarvis/local_embedding_service.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

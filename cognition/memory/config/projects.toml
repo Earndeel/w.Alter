@@ -1,0 +1,18 @@
+# Walter Memory — projets pour les projections d'état courant (docs/PROJECTIONS.md, lot P1).
+# Défaut neutre du module : l'instance le surcharge dans @instance/config/memory/projects.toml
+# (`walter instance config memory projects.toml`). Clés sans le préfixe « project: », normalisées
+# comme knowledge.subject_key (casse et ponctuation ignorées).
+
+[aliases]
+# « autre graphie » = « projet »  — deux noms d'un même projet
+
+[parents]
+# « sous-projet » = « projet parent »  — sans entrée, un nom en deux mots dont le premier est un projet
+# d'au moins 20 connaissances est rangé sous lui ; une valeur vide le garde à la racine
+
+[subjects]
+# « sujet sans préfixe » = « projet »  — un sujet écrit sans « project: » qui appartient à un projet
+
+[attribution]
+# assistant = "<projet>"  — le projet de l'assistant lui-même : un énoncé n'y est pas rangé parce qu'il a été dit dans
+# une conversation avec l'assistant ; il faut que le texte le nomme (lui ou un de ses sous-projets)

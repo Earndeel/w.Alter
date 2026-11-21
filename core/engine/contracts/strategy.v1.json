@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/core/engine/strategy.v1.json",
+  "title": "Strategy declaration v1",
+  "description": "Header every engine strategy (a Cordis plugin owned by Walter) declares, and that core's contract lists under components. A composition names exactly one strategy per seam; walter check refuses zero or two. Status: DRAFT (E0).",
+  "type": "object",
+  "required": [
+    "version",
+    "id",
+    "seam",
+    "plugin",
+    "replaces",
+    "reads",
+    "writes",
+    "switch",
+    "owner",
+    "status",
+    "tests"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "seam": {
+      "enum": [
+        "intake",
+        "context",
+        "model",
+        "tools",
+        "orchestration",
+        "policy",
+        "budget",
+        "events",
+        "persistence",
+        "recovery",
+        "identity",
+        "host"
+      ]
+    },
+    "plugin": {
+      "type": "string",
+      "description": "Cordis plugin entry, relative to core/engine/plugins"
+    },
+    "replaces": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Kernel plugin id it replaces (Cordis replace), or null when it only adds"
+    },
+    "reads": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Contracts read (schema $id or interface name)"
+    },
+    "writes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "switch": {
+      "type": "string",
+      "description": "Composition key that selects it"
+    },
+    "owner": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$",
+      "description": "Walter module responsible"
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "experimental",
+        "active",
+        "obsolete"
+      ]
+    },
+    "origin": {
+      "type": "string",
+      "description": "Where the idea comes from (DSH, Hermes, Pi, Walter…), for Lab traceability"
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  }
+}

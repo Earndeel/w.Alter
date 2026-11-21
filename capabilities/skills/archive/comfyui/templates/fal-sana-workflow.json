@@ -1,0 +1,31 @@
+{
+  "1": {
+    "class_type": "Sana_fal",
+    "inputs": {
+      "prompt": "a majestic lion in a savanna at golden hour, highly detailed, 8k quality",
+      "negative_prompt": "blurry, low quality, distorted",
+      "image_size": "square_hd",
+      "width": 1024,
+      "height": 1024,
+      "num_inference_steps": 20,
+      "guidance_scale": 5.0,
+      "num_images": 1,
+      "seed": 42,
+      "enable_safety_checker": true,
+      "output_format": "png"
+    },
+    "_meta": {
+      "title": "Fal.ai Sana Image Generator"
+    }
+  },
+  "2": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["1", 0],
+      "filename_prefix": "fal_sana"
+    },
+    "_meta": {
+      "title": "Save Fal Output"
+    }
+  }
+}

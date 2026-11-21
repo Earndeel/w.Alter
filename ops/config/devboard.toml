@@ -1,0 +1,24 @@
+# ops/devboard defaults (neutral). The instance overrides them in `walter instance config ops devboard.toml`.
+[devboard]
+required_provider = "claude-pro"      # subscription provider the board's model calls must run on (no paid fallback)
+subscription_prefix = "anthropic-pro" # Router subscriptions the calls run on (paused only when all are at their real limit)
+idle_minutes = 30                     # a session is read after this much calm
+stale_days = 7                        # an in-progress chantier without activity for this long is flagged
+since = "2026-10-01"
+listen_host = "127.0.0.1"
+port = 3093
+sessions_per_pass = 20
+dev_cwds = []                         # the instance names the folders where development sessions are opened
+excluded_cwds = []                    # folders never read, whatever the runtime (the instance names its personal-mode profiles)
+owner_name = "le propriétaire"           # the instance names its owner
+# The owner's buttons « Abandonner » / « Reprendre » (2026-11-15): POST /api/actions/* answered only on this loopback
+# listener, which the web interface's sign-in panel relays to. 0 = no buttons.
+actions_host = "127.0.0.1"
+actions_port = 0
+engine_url = "http://127.0.0.1:8895"            # Engine API (core/interfaces/api)
+engine_token_file = "@instance/bootstrap/engine/api.token"
+engine_interface = "web"                        # door of a resume = the owner's own
+engine_account = "owner"
+notify_command = []                             # the instance names how the end of a resume is told to its owner
+follow_seconds = 20
+resume_lost_hours = 8

@@ -1,0 +1,15 @@
+{
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "web-research-operations",
+ "content_since": "2026-09-09T10:58:08Z",
+ "domain": "research",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/conversation-corpus-extraction",
+  "sha": "5b1da32fd46a9b1ffae3a1b75289a77689536ecad39e0fd6b611abbb0e3fce42",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:23+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "5b1da32fd46a9b1ffae3a1b75289a77689536ecad39e0fd6b611abbb0e3fce42"
+}

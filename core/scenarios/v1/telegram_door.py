@@ -1,0 +1,246 @@
+"""Walter V1 — lot E7: the Telegram door against the REAL engine, Telegram itself simulated (2026-11-10).
+
+The door's own code (core/interfaces/telegram/bot.py) runs in-process with a recording stand-in for the Bot API and
+synthetic updates from a test owner account (`e2e`, its own conversations: the owner's chats are never touched):
+  identity    « Qui es-tu ? » → Walter's Soul answers (name, the owner's address form)
+  continuity  a fact given in one message is found again in the next (same persistent session)
+  replay      the same Telegram update delivered twice runs once (idempotency key = message id)
+  approval    an action that needs the owner → buttons → « Refuser » → the engine says it was refused
+  stop        /stop during a long turn → « Interrompu »
+  attachment  a photo and a document sent on Telegram → kept by the door, named to the engine, read with its tools
+              (read_image for the photo): the only attachment path the owner has since DSH's web upload (18/11)
+Prints one line per check; exit 0 when all pass. Costs a few model turns.
+
+    walter-python core/scenarios/v1/telegram_door.py [--only identity,stop]
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import threading
+import time
+import uuid
+from pathlib import Path
+
+HERE = Path(__file__).resolve()
+sys.path.insert(0, str(HERE.parents[2] / "interfaces" / "telegram"))
+import bot as B  # noqa: E402
+
+TEST_USER = 4242
+
+
+class RecordingTg:
+    """Bot API stand-in: every call recorded, sendMessage numbered."""
+
+    def __init__(self):
+        self.calls: list[tuple[str, dict]] = []
+        self.n = 0
+        self.lock = threading.Lock()
+        self.files: dict[str, Path] = {}          # file_id → the local file getFile + download serve
+
+    def call(self, method, payload=None, timeout=30):
+        with self.lock:
+            self.calls.append((method, payload or {}))
+            if method == "sendMessage":
+                self.n += 1
+                return {"message_id": self.n}
+            if method == "getFile":
+                return {"file_path": (payload or {}).get("file_id")}
+            return True
+
+    def download(self, file_path: str, dest: Path, limit: int = 20 << 20) -> Path:
+        dest.write_bytes(self.files[file_path].read_bytes())
+        return dest
+
+    def texts(self, since=0):
+        return [p["text"] for m, p in self.calls[since:] if m == "sendMessage" and not p.get("disable_notification")]
+
+
+def auto_allow(door, tg, since: int = 0) -> threading.Event:
+    """Press « Autoriser une fois » on every approval the door shows from `since` on; set the returned event to stop.
+
+    The test account is judged under the `test` preset (native engine, 17/11/2026): shell, Python and sub-agents ASK.
+    A check that is not about approvals answers its own requests through the door's buttons, as the account itself —
+    the approval path is exercised on every run, never bypassed."""
+    stop, seen = threading.Event(), set()
+
+    def run():
+        while not stop.is_set():
+            with tg.lock:
+                calls = list(tg.calls[since:])
+            for m, p in calls:
+                for row in (p.get("reply_markup") or {}).get("inline_keyboard") or [] if m == "sendMessage" else []:
+                    for b in row:
+                        data = b.get("callback_data") or ""
+                        if data.startswith("ap|") and data.endswith("|a") and data not in seen:
+                            seen.add(data)
+                            try:
+                                door.on_callback({"id": "auto", "from": {"id": TEST_USER}, "data": data})
+                            except Exception:  # noqa: BLE001 — engine restarting: the request is asked again
+                                seen.discard(data)
+            stop.wait(0.5)
+    threading.Thread(target=run, daemon=True).start()
+    return stop
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", default=None)
+    a = ap.parse_args()
+    only = set(a.only.split(",")) if a.only else None
+    root = Path(subprocess.run(["walter", "instance", "path"], capture_output=True, text=True).stdout.strip())
+    engine = B.Engine("http://127.0.0.1:8895", (root / "bootstrap/engine/api.token").read_text().strip())
+    run = uuid.uuid4().hex[:6]
+    state_dir = Path(f"/tmp/walter-telegram-e2e-{run}")
+    tg = RecordingTg()
+    door = B.Bot({"owner_ids": [TEST_USER], "account": "e2e", "grant": "-"}, tg, engine, B.State(str(state_dir)))
+    chat = int(time.time()) % 10_000_000 + 10_000_000      # a fresh conversation per run
+    mid = [0]
+    results = []
+
+    def say(text, mid_=None, **extra):
+        mid[0] += 1
+        msg = {"message_id": mid_ or mid[0], "from": {"id": TEST_USER}, "chat": {"id": chat, "type": "private"},
+               **({"text": text} if text is not None else {}), **extra}
+        door.handle({"update_id": mid[0], "message": msg})
+
+    def answer(since, timeout=240, want=1):
+        end = time.time() + timeout
+        while time.time() < end:
+            t = tg.texts(since)
+            if len(t) >= want:
+                return t
+            time.sleep(1)
+        return tg.texts(since)
+
+    def check(name, fn):
+        if only and name not in only:
+            return
+        t0 = time.time()
+        try:
+            ok, info = fn()
+        except Exception as e:  # noqa: BLE001
+            ok, info = False, f"{type(e).__name__}: {e}"
+        results.append((name, ok))
+        print(f"{'ok  ' if ok else 'FAIL'} {name:<11} {time.time() - t0:6.1f}s  {info}", flush=True)
+
+    def c_identity():
+        n = len(tg.calls)
+        say("Test technique du canal Telegram : qui es-tu, et comment m'appelles-tu ? Une phrase.")
+        t = " ".join(answer(n)).lower()
+        typing = any(m == "sendChatAction" for m, _ in tg.calls[n:])
+        return ("walter" in t or "w.alter" in t) and "monsieur" in t and typing, f"typing={typing} « {t[:90]} »"
+
+    def c_continuity():
+        n = len(tg.calls)
+        say(f"Retiens ce code de test pour la suite de cette conversation : ORCHIDEE-{run}. Réponds juste « noté ».")
+        answer(n)
+        n = len(tg.calls)
+        say("Quel était le code de test que je viens de te donner ? Donne-le seul.")
+        t = " ".join(answer(n))
+        return f"ORCHIDEE-{run}".lower() in t.lower(), f"« {t[:60]} »"
+
+    def c_replay():
+        submits = []
+        orig = engine.op
+        engine.op = lambda body, timeout=60: (submits.append(body) if body.get("op") == "turn.submit" else None) or orig(body, timeout)
+        n = len(tg.calls)
+        say("Réponds seulement « un ».", mid_=990001)
+        say("Réponds seulement « un ».", mid_=990001)          # Telegram redelivers the same message
+        t = answer(n, want=1)
+        time.sleep(20)
+        engine.op = orig
+        t = tg.texts(n)
+        keys = {s["idempotency_key"] for s in submits}
+        return len(submits) == 2 and len(keys) == 1 and len(t) == 1, f"submits={len(submits)} keys={len(keys)} answers={len(t)}"
+
+    def c_approval():
+        n = len(tg.calls)
+        say("Test d'autorisation : ouvre une session navigateur Google avec l'outil browser_session (site google) et "
+            "dis-moi seulement si ça a été autorisé ou refusé.")
+        end = time.time() + 180
+        btn = None
+        while time.time() < end and not btn:
+            for m, p in tg.calls[n:]:
+                if m == "sendMessage" and p.get("reply_markup"):
+                    btn = p["reply_markup"]["inline_keyboard"][0][1]["callback_data"]
+            time.sleep(1)
+        if not btn:
+            return False, f"no approval buttons; said: {tg.texts(n)[:2]}"
+        door.on_callback({"id": "cb", "from": {"id": TEST_USER}, "data": btn})
+        end = time.time() + 180
+        while time.time() < end and not [x for x in tg.texts(n) if not x.startswith("🔐")]:
+            time.sleep(1)
+        t = " ".join(x for x in tg.texts(n) if not x.startswith("🔐")).lower()
+        edited = any(m == "editMessageText" and "refusé" in p.get("text", "") for m, p in tg.calls[n:])
+        return edited and "refus" in t, f"edited={edited} « {t[:80]} »"
+
+    def c_stop():
+        n = len(tg.calls)
+        allow = auto_allow(door, tg, n)                   # the test preset asks before the shell call runs
+        say("Test d'interruption : exécute `sleep 120` dans bash puis réponds « fini ».")
+        time.sleep(25)
+        say("/stop")
+        end = time.time() + 90
+        while time.time() < end and not any("Interrompu" in x for x in tg.texts(n)):
+            time.sleep(1)
+        allow.set()
+        t = [x for x in tg.texts(n) if not x.startswith("🔐")]
+        return any("Interrompu" in x for x in t), f"« {' | '.join(t)[:80]} »"
+
+    def c_attachment():
+        from PIL import Image, ImageDraw, ImageFont
+        work = state_dir / "fixtures"
+        work.mkdir(parents=True, exist_ok=True)
+        code = run.upper()
+        img = work / "photo.png"
+        im = Image.new("RGB", (1000, 260), "white")
+        ImageDraw.Draw(im).text((40, 80), f"COLIBRI {code}", fill="black", font=ImageFont.load_default(size=80))
+        im.save(img)
+        doc = work / "note.txt"
+        doc.write_text(f"Code du document : MIMOSA-{run}\n")
+        tg.files.update({"f-photo": img, "f-doc": doc})
+
+        def reply(n, timeout=240):
+            end = time.time() + timeout
+            while time.time() < end:
+                t = [x for x in tg.texts(n) if not x.startswith("🔐")]
+                if t:
+                    return " ".join(t)
+                time.sleep(1)
+            return ""
+        allow = auto_allow(door, tg, len(tg.calls))
+        n = len(tg.calls)
+        say(None, photo=[{"file_id": "f-photo", "file_size": img.stat().st_size}],
+            caption="Test technique : quel mot et quel code sont écrits sur cette image ? Réponds seulement avec eux.")
+        t1 = reply(n)
+        n = len(tg.calls)
+        say(None, document={"file_id": "f-doc", "file_name": "note.txt", "file_size": doc.stat().st_size},
+            caption="Test technique : quel code contient ce document ? Donne-le seul.")
+        t2 = reply(n)
+        allow.set()
+        inbox = state_dir / "inbox" / str(chat)
+        saved = sorted(p.name for p in inbox.iterdir()) if inbox.is_dir() else []
+        ok = "COLIBRI" in t1.upper() and code in t1.upper().replace(" ", "") and f"MIMOSA-{run}".lower() in t2.lower()
+        return ok and len(saved) == 2, f"saved={len(saved)} photo=« {t1[:50]} » document=« {t2[:40]} »"
+
+    for name, fn in (("identity", c_identity), ("continuity", c_continuity), ("replay", c_replay),
+                     ("approval", c_approval), ("stop", c_stop), ("attachment", c_attachment)):
+        check(name, fn)
+    door.stop.set()
+    failed = [n for n, ok in results if not ok]
+    print(json.dumps({"chat": chat, "session": door.sessions.get(chat), "passed": len(results) - len(failed),
+                      "failed": failed}))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    rc = main()
+    import sys                                             # the objectives this scenario opened are test data
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from e2e_objectives import close
+    close("objectif de test du scénario telegram_door")
+    raise SystemExit(rc)

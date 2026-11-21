@@ -1,0 +1,17 @@
+{
+ "archived_at": "2026-11-16T17:03:19+00:00",
+ "archived_reason": "Hermes removed from the VM (2026-11-16, Monsieur)",
+ "content_since": "2026-07-12T15:52:42Z",
+ "domain": "hermes",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-desktop-debug",
+  "sha": "57ff23a77e4d844bf1521214ac9555c7d29ea2acc77360d3edcd4b9b48d1e01b",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "retired": "hermes",
+ "store_sha": "57ff23a77e4d844bf1521214ac9555c7d29ea2acc77360d3edcd4b9b48d1e01b"
+}

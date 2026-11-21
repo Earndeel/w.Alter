@@ -1,0 +1,15 @@
+# Real context injection trial on DSH (owner, 2026-10-27/28: start real injection on a compatible runtime as soon as
+# the bench shows no regression). Rule written before the runs.
+name: dsh-context-injection
+hypothesis: >-
+  Sur DSH, le paquet walter-context (plan du preflight → récupération → assemblage) injecté à la place du bloc
+  mémoire du hook donne au moins autant de bonnes réponses aux questions de mémoire, sans plus de tokens d'entrée.
+scenario: dsh-contexte
+repeats: 2
+variants:
+  legacy: {env: {WALTER_HOOK_INJECT_DSH: legacy}, note: "injection actuelle : bloc mémoire du hook + skills"}
+  pack: {env: {WALTER_HOOK_INJECT_DSH: pack}, note: "paquet walter-context (sans la couche capacités, déjà dans le profil DSH) + skills"}
+metrics: [ok, answers_correct, harness_input_tokens, harness_seconds]
+decision:
+  prefer: pack
+  if: ["median answers_correct >= baseline", "median harness_input_tokens <= baseline"]

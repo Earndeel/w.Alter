@@ -1,0 +1,8 @@
+[Unit]
+Description=walter-devboard sync-docs: re-read documents and decisions after a change (no model)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/walter-devboard sync-docs
+Nice=10

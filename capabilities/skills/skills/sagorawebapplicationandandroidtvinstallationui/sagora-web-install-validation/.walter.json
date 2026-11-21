@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
+ "reason": "The session introduced a recurring Sagora-specific release and cross-platform installation-validation workflow not covered by the listed skills. Concrete evidence includes the incorrect desktop-app host discriminator corrected to desktop, native Android WebView inspection, APK ABI checks, Android TV navigation validation, mobile menu timing failures, PWA mock state changes invalidating subsequent selectors, and preserving active TV playback. A separate skill is preferable to patching generic GUI or debugging guidance. [session codex/Codex Desktop/01a1f3d8-24ab-7e20-bb37-328de2c66026]",
+ "store_sha": "9d088fd3465d61ccbbc69df81be1b02220fdbb0115912d5e993c6c019d48356b"
+}

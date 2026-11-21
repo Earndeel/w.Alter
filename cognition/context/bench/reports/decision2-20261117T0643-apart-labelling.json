@@ -1,0 +1,369 @@
+[
+ {
+  "case": "u01",
+  "split": "cal",
+  "message": "Rappelle-moi jeudi à 14h d'appeler Sophie Marchetti pour le devis",
+  "threads": [
+   "Devis cuisine avec l'artisan",
+   "Cycle du Walter Router",
+   "Voyage à Lisbonne en décembre"
+  ],
+  "ask": {
+   "needs": {
+    "memory": {
+     "A": 0.26998803824150674,
+     "C": 0.38885472383662234,
+     "F": 0.37816558415191126,
+     "G": 0.3888547238366223
+    }
+   }
+  }
+ },
+ {
+  "case": "u05",
+  "split": "cal",
+  "message": "Combien coûte un billet Paris-Lisbonne le 3 décembre ?",
+  "threads": [
+   "Devis cuisine avec l'artisan",
+   "Cycle du Walter Router",
+   "Voyage à Lisbonne en décembre"
+  ],
+  "ask": {
+   "act": {
+    "A": "continue",
+    "C": "new",
+    "F": "new",
+    "G": "new"
+   }
+  }
+ },
+ {
+  "case": "u10",
+  "split": "test",
+  "message": "Dis à Paul Verdier que je serai en retard demain matin",
+  "threads": [],
+  "ask": {
+   "needs": {
+    "secrets": {
+     "C": 0.0387868845417607,
+     "F": 0.0387868845417607,
+     "G": 0.0387868845417607,
+     "A": 0.43259352445602417
+    }
+   }
+  }
+ },
+ {
+  "case": "u12",
+  "split": "test",
+  "message": "Tu peux relancer l'artisan pour le devis ?",
+  "threads": [
+   "Devis cuisine avec l'artisan",
+   "Cycle du Walter Router",
+   "Voyage à Lisbonne en décembre"
+  ],
+  "ask": {
+   "needs": {
+    "browser": {
+     "G": 0.32664342681428354,
+     "A": 0.6003481983930946,
+     "C": 0.32664342681428354,
+     "F": 0.32664342681428354
+    },
+    "secrets": {
+     "G": 0.04815165415688705,
+     "A": 0.35714725724301505,
+     "C": 0.04815165415688705,
+     "F": 0.04815165415688705
+    }
+   }
+  }
+ },
+ {
+  "case": "u15",
+  "split": "cal",
+  "message": "On part le vendredi 11 décembre, réserve l'hôtel pour trois nuits",
+  "threads": [
+   "Devis cuisine avec l'artisan",
+   "Cycle du Walter Router",
+   "Voyage à Lisbonne en décembre"
+  ],
+  "ask": {
+   "needs": {
+    "memory": {
+     "F": 0.6111452761633777,
+     "G": 0.6111452761633777,
+     "A": 0.6996369007545679,
+     "C": 0.6041494115641931
+    },
+    "secrets": {
+     "F": 0.27899134159088135,
+     "G": 0.27899134159088135,
+     "A": 0.56160934882092,
+     "C": 0.3204690235233549
+    },
+    "web": {
+     "F": 0.3070746660232544,
+     "G": 0.3070746660232544,
+     "A": 0.46093797676758763,
+     "C": 0.626384417782937
+    }
+   }
+  }
+ },
+ {
+  "case": "u16",
+  "split": "test",
+  "message": "Lundi dernier j'ai couru 10 km, note-le dans mon suivi sportif",
+  "threads": [],
+  "ask": {
+   "needs": {
+    "browser": {
+     "G": 0.21159627226350972,
+     "A": 0.5505814883978699,
+     "C": 0.2115962722635097,
+     "F": 0.2115962722635097
+    }
+   }
+  }
+ },
+ {
+  "case": "u18",
+  "split": "test",
+  "message": "Quelle heure est-il à Tokyo en ce moment ?",
+  "threads": [],
+  "ask": {
+   "needs": {
+    "web": {
+     "C": 0.5468383445972871,
+     "F": 0.5468383445972871,
+     "G": 0.17044858888460082,
+     "A": 0.261169970035553
+    }
+   }
+  }
+ },
+ {
+  "case": "u19",
+  "split": "cal",
+  "message": "Compare les trois devis reçus et dis-moi lequel prendre",
+  "threads": [
+   "Devis cuisine avec l'artisan",
+   "Cycle du Walter Router",
+   "Voyage à Lisbonne en décembre"
+  ],
+  "ask": {
+   "act": {
+    "F": "new",
+    "G": "new",
+    "A": "continue",
+    "C": "new"
+   }
+  }
+ },
+ {
+  "case": "u24",
+  "split": "test",
+  "message": "Envoie un mail à Julie Barrault pour décaler la réunion à mercredi",
+  "threads": [],
+  "ask": {
+   "needs": {
+    "browser": {
+     "G": 0.5784686631420654,
+     "A": 0.8690960956203444,
+     "C": 0.511301263830028,
+     "F": 0.5784686631420654
+    },
+    "memory": {
+     "G": 0.711823582649231,
+     "A": 0.5845051209131876,
+     "C": 0.77219505268626,
+     "F": 0.711823582649231
+    }
+   }
+  }
+ },
+ {
+  "case": "u32",
+  "split": "test",
+  "message": "Lance trois sous-agents pour évaluer ces modèles en parallèle",
+  "threads": [],
+  "ask": {
+   "needs": {
+    "memory": {
+     "G": 0.29058480990699737,
+     "A": 0.3519020414082948,
+     "C": 0.31032650153251357,
+     "F": 0.31032650153251357
+    },
+    "skills": {
+     "G": 0.4531616554027129,
+     "A": 0.5,
+     "C": 0.47652922333437353,
+     "F": 0.47652922333437353
+    }
+   }
+  }
+ },
+ {
+  "case": "u33",
+  "split": "cal",
+  "message": "Souhaite un bon anniversaire à Léa Fontaine de ma part ce soir",
+  "threads": [],
+  "ask": {
+   "needs": {
+    "browser": {
+     "A": 0.6406616031486276,
+     "C": 0.07679522037506104,
+     "F": 0.07679522037506104,
+     "G": 0.25342090804029865
+    },
+    "secrets": {
+     "A": 0.47275687522294224,
+     "C": 0.04815167543235542,
+     "F": 0.04815167543235542,
+     "G": 0.3519020414082948
+    }
+   }
+  }
+ },
+ {
+  "case": "u34",
+  "split": "test",
+  "message": "J'ai rendez-vous chez le dentiste le 4 décembre à 10h30",
+  "threads": [
+   "Refonte du site de la boutique",
+   "Rendez-vous médicaux"
+  ],
+  "ask": {
+   "needs": {
+    "memory": {
+     "C": 0.4185247102847435,
+     "F": 0.46482613745002505,
+     "G": 0.32664334774017334,
+     "A": 0.1663127980726904
+    }
+   }
+  }
+ },
+ {
+  "case": "u38",
+  "split": "test",
+  "message": "Trouve-moi un plombier disponible demain à Bangkok",
+  "threads": [],
+  "ask": {
+   "needs": {
+    "browser": {
+     "C": 0.29753889746848056,
+     "F": 0.3571472572430151,
+     "G": 0.35714725724301505,
+     "A": 0.45491008326143273
+    }
+   }
+  }
+ },
+ {
+  "case": "u39",
+  "split": "cal",
+  "message": "Ajoute Pierre Lefranc et Nadia Benhamou à la réunion de vendredi",
+  "threads": [],
+  "ask": {
+   "needs": {
+    "browser": {
+     "F": 0.08345660133125637,
+     "G": 0.0839675806281333,
+     "A": 0.5,
+     "C": 0.06771398285244418
+    },
+    "secrets": {
+     "F": 0.05026676693062361,
+     "G": 0.0469382115047911,
+     "A": 0.48497002775381093,
+     "C": 0.037135929975984396
+    }
+   }
+  }
+ },
+ {
+  "case": "u41",
+  "split": "cal",
+  "message": "Vérifie que le certificat TLS du portail n'expire pas avant fin décembre",
+  "threads": [],
+  "ask": {
+   "needs": {
+    "skills": {
+     "A": 0.6038160724707108,
+     "C": 0.47740878232095296,
+     "F": 0.47740878232095296,
+     "G": 0.47740878232095296
+    }
+   }
+  }
+ },
+ {
+  "case": "u43",
+  "split": "cal",
+  "message": "Est-ce que le cycle du Router a tourné cette nuit ?",
+  "threads": [
+   "Devis cuisine avec l'artisan",
+   "Cycle du Walter Router",
+   "Voyage à Lisbonne en décembre"
+  ],
+  "ask": {
+   "needs": {
+    "memory": {
+     "F": 0.43259362675528606,
+     "G": 0.43259362675528606,
+     "A": 0.7024611025315194,
+     "C": 0.43259362675528606
+    },
+    "skills": {
+     "F": 0.6003481983930946,
+     "G": 0.6003481983930946,
+     "A": 0.6003481983930946,
+     "C": 0.6003481983930946
+    }
+   }
+  }
+ },
+ {
+  "case": "u44",
+  "split": "test",
+  "message": "Ah et pour Lisbonne, prends plutôt un vol le matin",
+  "threads": [
+   "Devis cuisine avec l'artisan",
+   "Cycle du Walter Router",
+   "Voyage à Lisbonne en décembre"
+  ],
+  "ask": {
+   "needs": {
+    "browser": {
+     "G": 0.4661422371864319,
+     "A": 0.13022833286354943,
+     "C": null,
+     "F": 0.4661422371864319
+    },
+    "memory": {
+     "G": 0.7210086584091187,
+     "A": 0.3781655841519112,
+     "C": null,
+     "F": 0.7210086584091187
+    }
+   }
+  }
+ },
+ {
+  "case": "u48",
+  "split": "test",
+  "message": "Réserve une table pour quatre au restaurant italien jeudi prochain à 20h",
+  "threads": [],
+  "ask": {
+   "act": {
+    "G": "new",
+    "A": "new",
+    "C": "continue",
+    "F": "new"
+   }
+  }
+ }
+]

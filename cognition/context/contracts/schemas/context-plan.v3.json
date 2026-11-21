@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://walter.local/contracts/context/context-plan.v3.json",
+  "title": "ContextPlan v3",
+  "description": "What the preflight decides for one owner message (walter-context output, traced). v3 (2026-11-17): observations read in the message, apart from the judgements; a v1/v2 plan reads as v3 without them.",
+  "type": "object",
+  "required": [
+    "version",
+    "turn_id",
+    "thread",
+    "act",
+    "level"
+  ],
+  "properties": {
+    "version": {
+      "const": 3
+    },
+    "turn_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "thread": {
+      "type": "object",
+      "required": [
+        "id",
+        "new"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "new": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "alternates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "act": {
+      "enum": [
+        "new",
+        "continue",
+        "approve",
+        "correct",
+        "inform"
+      ]
+    },
+    "level": {
+      "enum": [
+        "L0",
+        "L1",
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "description": "L0: nothing beyond the message: the assistant's tools suffice; L1: the last exchange of its thread; L2: its thread at overview depth (card, recent exchanges); L3: its thread at synthesis depth plus targeted memory (people, decisions, other sources); L4: extensive: several sources, history, multi-step retrieval"
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "projects",
+          "profile",
+          "activities",
+          "relations",
+          "agenda",
+          "decisions",
+          "goals"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "horizons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "instant",
+          "day",
+          "medium",
+          "long",
+          "stable"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "tools",
+          "skills",
+          "memory",
+          "web",
+          "browser",
+          "delegation",
+          "secrets"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "model_profile": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "L1",
+            "L2",
+            "L3"
+          ]
+        },
+        "require": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Asked of Walter Router; the Router alone picks the concrete model."
+    },
+    "fast_path": {
+      "enum": [
+        "short_reply",
+        "trivial",
+        null
+      ]
+    },
+    "escalated": {
+      "type": "boolean"
+    },
+    "answer": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "trivial fast path only: the exact answer"
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "read in the message and checkable against it (Walter Decision 2.0 signals context.dates and context.people): each date passage as written, the calendar day Walter reads it as (`past` = the same words read as already gone, `ambiguous` = the words leave a choice), the people named",
+      "properties": {
+        "dates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "past": {
+                "type": "string"
+              },
+              "time": {
+                "type": "string"
+              },
+              "ambiguous": {
+                "type": "boolean"
+              },
+              "found": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "people": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "found": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "description": "trace only; degraded = true with error (exception class + short scrubbed reason) when the decision failed and the plan is the prudent default (SOCLE A2, 2026-11-11)",
+      "properties": {
+        "degraded": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "work": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "the decision model's judgement that the message asks for work to carry out and follow (>= 0.5: the Run Plane keeps it as a durable task, SOCLE A3, 2026-11-12)"
+        },
+        "resume": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "asked only when a thread shows an open or suspended task: the judgement that the message carries on, resumes or finishes it (>= 0.5: the Run Plane attaches the run to the thread's task instead of opening another, 2026-11-13)"
+        },
+        "effort": {
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "description": "the level whose ceilings the engine gives the turn (SOCLE A7): the context level raised to the difficulty asked (text tier) and to L4 for work to carry out; absent (fast path, degraded plan) = the plan's level, or the general ceilings when degraded"
+        }
+      }
+    }
+  }
+}

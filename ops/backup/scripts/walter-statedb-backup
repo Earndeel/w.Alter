@@ -1,0 +1,51 @@
+#!/bin/bash
+# Daily online backup of the agent runtime's SQLite state (Hermes state.db: raw archive of its conversations).
+# Ported into walter/ops on 2026-10-29 from the host script v2 of 2026-10-01: same steps and retention; locations come
+# from the instance's backup configuration (`walter-ops backup env statedb`).
+# Copies every table/index/view/trigger EXCEPT the FTS5 search indexes (messages_fts*, ~70% of the file): they are
+# derived from `messages`, and Hermes recreates + rebuilds them on open when they are missing. One read transaction =
+# one consistent WAL snapshot while Hermes writes. Staged in memory (staging) so the slow volume only sees the
+# compressed result.
+# Restore: stop the gateway and other writers, zstd -d <file> -o <source>, start; FTS rebuilds itself.
+set -euo pipefail
+umask 077
+eval "$(walter-ops backup env statedb)"
+DIR="$WALTER_BACKUP_DIR"
+SRC="$WALTER_STATEDB_SOURCE"
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+TMP="$WALTER_BACKUP_STAGING/walter-statedb-$TS.db"
+trap 'rm -f "$TMP" "$TMP-journal"' EXIT
+python3 - "$SRC" "$TMP" <<'PY'
+import sqlite3, sys
+src_path, dst_path = sys.argv[1:]
+dst = sqlite3.connect(dst_path, isolation_level=None)
+dst.execute("pragma journal_mode=off"); dst.execute("pragma synchronous=off")
+dst.execute("attach database ? as src", (f"file:{src_path}?mode=ro",))
+skip = lambda n: n.startswith("messages_fts") or n.startswith("sqlite_")
+dst.execute("begin")  # single snapshot of src for every read below
+objs = dst.execute("select type, name, tbl_name, sql from src.sqlite_master where sql is not null").fetchall()
+tables = [(n, s) for t, n, tn, s in objs if t == "table" and not skip(n)]
+for name, sql in tables:
+    dst.execute(sql)
+    dst.execute(f'insert into main."{name}" select * from src."{name}"')
+if dst.execute("select 1 from src.sqlite_master where name='sqlite_sequence'").fetchone():
+    dst.execute("insert into main.sqlite_sequence select * from src.sqlite_sequence")
+for t, n, tn, s in objs:  # indexes, views, non-FTS triggers once data is in
+    if t in ("index", "view", "trigger") and not skip(n) and not skip(tn) and "messages_fts" not in s:
+        dst.execute(s)
+counts = {n: (dst.execute(f'select count(*) from main."{n}"').fetchone()[0],
+              dst.execute(f'select count(*) from src."{n}"').fetchone()[0]) for n in ("messages", "sessions")}
+dst.execute("commit"); dst.execute("detach database src")
+ok = dst.execute("pragma quick_check").fetchone()[0]
+dst.close()
+bad = {n: c for n, c in counts.items() if c[0] != c[1]}
+if ok != "ok" or bad:
+    sys.exit(f"verification failed: quick_check={ok} mismatched={bad}")
+print(f"snapshot ok: {len(tables)} tables, messages={counts['messages'][0]} sessions={counts['sessions'][0]}")
+PY
+OUT="$DIR/${WALTER_BACKUP_PREFIX}${TS}${WALTER_BACKUP_SUFFIX}"
+zstd -q -T2 -10 "$TMP" -o "$OUT"
+zstd -q -t "$OUT"
+find "$DIR" -maxdepth 1 -name "${WALTER_BACKUP_PREFIX}*${WALTER_BACKUP_SUFFIX}" -printf '%T@ %p\n' | sort -rn \
+  | tail -n +"$((WALTER_BACKUP_KEEP + 1))" | cut -d' ' -f2- | xargs -r rm -f
+echo "state.db backup ok: $OUT ($(du -h "$OUT" | cut -f1))"

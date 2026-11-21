@@ -1,0 +1,4 @@
+{
+  "_doc": "Offers declared by the instance's owner that no provider API lists (web interfaces, subscriptions). Only explicit declarations go here; an instance keeps its own in config/router/declared_offers.json.",
+  "offers": []
+}

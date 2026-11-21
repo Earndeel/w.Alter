@@ -1,0 +1,15 @@
+{
+ "absorbed_by": "hermes-curator",
+ "absorbed_into": "hermes-theme-operations",
+ "content_since": "2026-07-04T21:13:40Z",
+ "domain": "devops",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/hermes-theming",
+  "sha": "c4e100c1914bd340e148c623354afa0e753673b872bb9d18d8782dfd27ed0d25",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:24+00:00",
+ "origin": "hermes-archive",
+ "owner": "walter",
+ "store_sha": "c4e100c1914bd340e148c623354afa0e753673b872bb9d18d8782dfd27ed0d25"
+}

@@ -1,0 +1,2 @@
+# Standby groups (walter standby): none shipped. An instance declares its own in config/core/standby.toml.
+# [groups.<name>]  title, units = [...], containers = [...], ports = [...], idle_minutes = 60

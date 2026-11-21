@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
+ "reason": "The session repeatedly audited the real extraction pipeline and its downstream continuity using extract2.py, Decision manifests, Context shadow plans, and PostgreSQL aggregates. It exposed concrete schema traps through failed queries: rejected is JSONB while items/reused/superseded are counters, and relationships uses predicate rather than relation_type. This is a reusable, setup-specific read-only audit procedure not covered by the existing generic debugging or credential skills. [session claude_code/vm/186ab38f-697f-4dae-ae3d-8ac6828b16c2]",
+ "store_sha": "43c8f90d6128e7b0aa5095d780421fd19b21c7cf2519b7c6d99d258501ee8714"
+}

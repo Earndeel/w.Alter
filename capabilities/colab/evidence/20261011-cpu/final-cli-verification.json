@@ -1,0 +1,77 @@
+{
+  "tests_run": 82,
+  "tests_status": "OK",
+  "source_sha256": {
+    "on_demand.py": "507c869cdbfba564bd97f9066888efb345e215a533a88a67bfb374cb65276e62",
+    "bridge.py": "3546b082552da558581c684d09e812d3c78ec8dcb7f5c3d4af55f28f576fff22",
+    "transfer.py": "2fb4fac09731eaa858e2cfef3806af6cb4db50a313fe84dc310d1d58376a0db0",
+    "RUNBOOK.md": "0f4630225c05d4cdc462a12c6f701835ec1906e8d452bf458d96772d4caa2009"
+  },
+  "live_cpu_runs": [
+    {
+      "source": "evidence/20261011-cpu/cli-live/success-stdout.json",
+      "status": "success",
+      "total_seconds": 50.0347330418881,
+      "rounded_total_seconds": 50.035,
+      "cell_seconds": 0.06819451999996318,
+      "balance_before": 82.84,
+      "balance_after": 82.84,
+      "active_sessions_after": 0,
+      "gpu_allocated": false,
+      "consumption_exact": null,
+      "outputs": [
+        {
+          "name": "result.json",
+          "exists": true,
+          "size": 152,
+          "sha256": "98fa27bcac54123ed14cd0137b4460b13f0bed552963fe62535edc541007e2d9",
+          "path": "/opt/walter-colab/evidence/20261011-cpu/cli-live/results/result.json",
+          "already_present": false
+        }
+      ]
+    },
+    {
+      "source": "evidence/20261011-cpu/cli-live/timeout-stdout.json",
+      "status": "timeout",
+      "total_seconds": 51.5953331310302,
+      "rounded_total_seconds": 51.595,
+      "cell_seconds": 1.0061994670000018,
+      "balance_before": 82.84,
+      "balance_after": 82.84,
+      "active_sessions_after": 0,
+      "gpu_allocated": false,
+      "consumption_exact": null,
+      "outputs": []
+    },
+    {
+      "source": "evidence/20261011-cpu/cli-guarded-live/success-stdout.json",
+      "status": "success",
+      "total_seconds": 77.80175939202309,
+      "rounded_total_seconds": 77.802,
+      "cell_seconds": 0.06741045799998346,
+      "balance_before": 82.84,
+      "balance_after": 82.84,
+      "active_sessions_after": 0,
+      "gpu_allocated": false,
+      "consumption_exact": null,
+      "outputs": [
+        {
+          "name": "result.json",
+          "exists": true,
+          "size": 152,
+          "sha256": "98fa27bcac54123ed14cd0137b4460b13f0bed552963fe62535edc541007e2d9",
+          "path": "/opt/walter-colab/evidence/20261011-cpu/cli-guarded-live/results/result.json",
+          "already_present": false
+        }
+      ]
+    }
+  ],
+  "gpu_final_cli_live_validation": false,
+  "limits": [
+    "GPU consumes included units; no purchase authorized",
+    "No exact zero-consumption claim from rounded balance",
+    "80 MiB per CLI file",
+    "No cleanup guarantee when controller process or VM dies",
+    "Total cycle time is not subprocess timeout"
+  ]
+}

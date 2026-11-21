@@ -1,0 +1,7 @@
+# Reconstruisibles ou tiers : interpréteur embarqué, checkout du MCP Colab officiel et son venv
+/python/
+/mcp/
+__pycache__/
+*.pyc
+# État d'exécution
+/locks/

@@ -1,0 +1,13 @@
+[Unit]
+Description=walter-llm — W.Alter model gateway (Walter Router choice + Bitwarden keys) for agent runtimes, 127.0.0.1:8894
+After=network-online.target walter-memory-gateway.service
+
+[Service]
+ExecStart=/walter/cognition/router/llm/venv/bin/python3 /walter/cognition/router/llm/gateway.py serve
+WorkingDirectory=/walter/cognition/router/llm
+Restart=on-failure
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

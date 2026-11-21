@@ -1,0 +1,7 @@
+{
+ "origin": "agent-proposal",
+ "owner": "walter",
+ "proposed_by": "learner",
+ "reason": "Adds a concrete Walter Memory usage-investigation and remediation procedure beyond generic debugging or model selection. Evidence includes attribution of 164 rerank calls to two benchmark runs, discovery of overwritten processing markers and uncached decisions, and an equal-duration production comparison showing attestation calls fall from 45 to 2 and plans calls from 8 to 0. [session claude_code/vm/1ede2cf6-39ae-4b1e-825d-4faff1ab4dbc]",
+ "store_sha": "43ddbaa2d0cae3d296a89309923ca047d85a6057a4c25c124c9f1e09bda36b7d"
+}

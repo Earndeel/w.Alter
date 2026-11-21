@@ -1,0 +1,11 @@
+{
+  "name": "@walter/dsh-context",
+  "version": "0.2.0",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": "./index.mjs",
+  "peerDependencies": {
+    "@deepseek-ai/dsh-compaction-basic": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-compaction": "0.2.0-rc.2"
+  }
+}

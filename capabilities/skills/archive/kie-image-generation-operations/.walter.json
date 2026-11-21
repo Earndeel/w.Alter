@@ -1,0 +1,17 @@
+{
+ "archived_at": "2026-11-19T04:14:55+00:00",
+ "archived_reason": "not read for 30 days",
+ "content_since": "2026-07-22T12:55:55Z",
+ "domain": "images",
+ "hermes": {
+  "path": "/root/.hermes/skills/.archive/kie-image-generation-operations",
+  "sha": "52c5cbd96fea974b103a8c587bc44ef12d7e87fb2a02e816b62f9a5c7b54969c",
+  "state": "archived"
+ },
+ "imported_at": "2026-10-09T17:16:22+00:00",
+ "origin": "hermes-archive-restored",
+ "owner": "walter",
+ "reserve": true,
+ "restore_reason": "used >= 10 times by Monsieur's sessions (walter_logs) before Hermes' curator absorbed it",
+ "store_sha": "52c5cbd96fea974b103a8c587bc44ef12d7e87fb2a02e816b62f9a5c7b54969c"
+}

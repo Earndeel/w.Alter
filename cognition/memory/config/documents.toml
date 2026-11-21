@@ -1,0 +1,7 @@
+# Documents read as knowledge by walter_memory.documents (one row per section, kind doc_section).
+# Neutral default: none. An instance declares its own in <instance>/config/memory/documents.toml:
+# [[source]]
+# name = "decisions"            # label of the source
+# path = "/path/to/DECISIONS.md" # a file or a glob
+# split = "h2"                   # h2: one row per `## ` section; file: one row per file (front matter dropped)
+# privacy = "cloud_allowed"      # default; a detected sensitive category tightens a section to local_only

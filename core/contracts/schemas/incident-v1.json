@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Incident v1",
+  "description": "One problem seen by a module's guardian watchdog (owner decision 2026-10-27: a guardian per module, G0-G3). A check command prints a JSON list of these; an empty list means healthy. Same key across passes = same incident.",
+  "type": "object",
+  "required": ["version", "module", "key", "kind", "severity", "summary"],
+  "properties": {
+    "version": {"const": 1},
+    "module": {"type": "string", "description": "Walter module id (walter modules)"},
+    "key": {"type": "string", "description": "Stable identity of the problem inside the module"},
+    "kind": {"type": "string", "description": "Module vocabulary: service_down, backup_stale, egress_violation, source_stale…"},
+    "severity": {"enum": ["info", "warning", "high", "critical"]},
+    "summary": {"type": "string", "description": "One sentence for the owner, no secret"},
+    "evidence": {"type": "object", "description": "Measured facts behind the incident, no secret"},
+    "suggested_level": {"enum": ["G0", "G1", "G2", "G3"], "description": "G0 observe, G1 routine reversible action, G2 controlled repair on a copy with checkpoint, G3 owner only"}
+  }
+}

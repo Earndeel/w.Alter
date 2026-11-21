@@ -1,0 +1,15 @@
+#!/bin/sh
+# walter-runtime sync: expose the declared module libraries (config/libraries) to the shared Python runtime.
+# Roots come from the Walter path resolver, never from a hardcoded directory.
+set -eu
+here="$(dirname "$(readlink -f "$0")")/.."
+case "${1:-}" in
+  sync)
+    site="$("$here/venv/bin/python3" -c 'import sysconfig;print(sysconfig.get_paths()["purelib"])')"
+    tmp="$site/.walter-modules.pth.tmp"
+    : > "$tmp"
+    grep -vE '^\s*(#|$)' "$here/config/libraries" | while read -r module; do walter path "$module" >> "$tmp"; done
+    mv "$tmp" "$site/walter-modules.pth"
+    cat "$site/walter-modules.pth";;
+  *) echo "usage: walter-runtime sync" >&2; exit 2;;
+esac

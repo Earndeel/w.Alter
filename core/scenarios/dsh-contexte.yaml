@@ -1,0 +1,23 @@
+# Context injection trials on DSH (owner, 2026-10-27/28): questions whose answers Walter's memory holds, asked to DSH
+# WITHOUT tools, so only the injected context can answer. Mixed horizons: stable preferences, decisions of the last
+# days, today's decisions. Played by walter-lab under both injection modes (legacy hook block vs walter-context pack).
+# The scenario's own pass criterion is loose (it measures; the experiment decides): at least one correct answer.
+name: dsh-contexte
+milestone: P2-inject
+# Both injection modes need the hook's memory and skills on (absent = off in walter-scenario): until 28/10 the legacy
+# variant ran with no memory at all and the comparison was pack vs nothing.
+modules: [memory, skills]
+steps:
+  - harness: {runtime: dsh, timeout: 300, prompt: "Sans utiliser aucun outil, réponds en une phrase : dans quel pays Monsieur vit-il en ce moment ?"}
+  - harness: {runtime: dsh, timeout: 300, prompt: "Sans utiliser aucun outil, réponds en une phrase : pour les images, Walter Router doit-il prendre le meilleur rapport qualité-prix ou le meilleur modèle disponible ?"}
+  - harness: {runtime: dsh, timeout: 300, prompt: "Sans utiliser aucun outil, réponds en une phrase : quel modèle de décision rapide le preflight de walter-context utilise-t-il ?"}
+  - harness: {runtime: dsh, timeout: 300, prompt: "Sans utiliser aucun outil, réponds en une phrase : comment s'appelle le skill d'entrée de Walter pour une recherche de produit local avec Pareto ?"}
+  - harness: {runtime: dsh, timeout: 300, prompt: "Sans utiliser aucun outil, réponds en une phrase : sur quel port local écoute la sortie réseau walter-exit-local ?"}
+  - harness: {runtime: dsh, timeout: 300, prompt: "Sans utiliser aucun outil, réponds en une phrase : par quelle connexion sort le navigateur Chromium de Walter ?"}
+assertions:
+  - {harness_answer: 0, contains_any: ["thaïlande", "thailand", "bangkok"]}
+  - {harness_answer: 1, contains_any: ["meilleur modèle disponible", "meilleur disponible", "toujours le meilleur", "best available"]}
+  - {harness_answer: 2, contains_any: ["d1-ultra", "d1 ultra", "d1-Ultra"]}
+  - {harness_answer: 3, contains_any: ["recherche-produit-locale"]}
+  - {harness_answer: 4, contains_any: ["1084"]}
+  - {harness_answer: 5, contains_any: ["freebox"]}

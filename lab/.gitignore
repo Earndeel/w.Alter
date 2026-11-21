@@ -1,0 +1,6 @@
+# Local interpreter, test and virtual-environment artifacts are regenerated.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+venv/
+.venv/
