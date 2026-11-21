@@ -62,6 +62,33 @@ def _set(conn, inc: dict, status: str, verdict: dict | None = None, attempt: boo
         inc["verdict"] = verdict
 
 
+def _padlock(conn, inc: dict) -> None:
+    """An open padlock not on its #1: the adoption goes through the usual path (a proposal compared with the model in
+    use, then `auto_adopt`, then the Router's « changé automatiquement » message), checked again afterwards. A model
+    the owner refused is never forced: then he is asked."""
+    from walter_router.analysis import alerts, telegram
+    d = inc["detail"] or {}
+    task, role = inc["subject"], d.get("role") or "default"
+    alerts.record(conn, "challenger", task, d["best"],
+                  {"pinned": d["in_use"], "boards": {}, "origin": "guardian",
+                   "composite": {"challenger": d["best_score"], "pinned": d.get("in_use_score"),
+                                 "rank": d["best_rank"], "pinned_rank": d.get("in_use_rank")}},
+                  "baseline", role)
+    done = alerts.auto_adopt(conn, only_task=task, only_role=role)
+    now = conn.execute("select pinned_model_id from models.preferences where task = %s and role = %s",
+                       (task, role)).fetchone()
+    if done and now and now["pinned_model_id"] == d["best"]:
+        telegram.notify_auto(conn, done)
+        return _set(conn, inc, "fixed", {"outcome": "fixed", "verified": True, "quiet": True, "adopted": done,
+                                          "summary_fr": f"{task} : {d['in_use']} → {d['best']} (n°1 du classement)"})
+    return _set(conn, inc, "needs_owner", {
+        "outcome": "needs_owner", "cause": "padlock_drift",
+        "summary_fr": f"Cadenas ouvert, mais {task} n'est pas sur le n°1 de son classement : {d['in_use']} "
+                      f"({d.get('in_use_score')}) au lieu de {d['best']} ({d['best_score']}), et je n'ai pas pu "
+                      "changer tout seul (proposition déjà refusée, ou modèle sans route).",
+        "question_fr": "Je passe sur le n°1, ou vous gardez le modèle actuel (fermez alors le cadenas) ?"})
+
+
 def reread_source(kind: str) -> dict:
     """The router's own read of one source (writes its snapshot when it works)."""
     proc = subprocess.run(["walter-router", "research", "--source", kind], capture_output=True, text=True, timeout=1200)
@@ -161,6 +188,8 @@ def handle(conn, inc: dict, budget: list[int], dry_run: bool = False) -> None:
                           f"(passé sous {step} $). Je continue à l'utiliser jusqu'au dernier centime ; une fois vide, "
                           "les tâches qui passent par lui prennent leurs autres routes, ou échouent si elles n'en ont pas. "
                           "Une recharge évite cela."})
+    if kind == "padlock_drift":
+        return None if dry_run or inc["status"] == "needs_owner" else _padlock(conn, inc)
     if kind == "provider_down":
         side = (inc["detail"] or {}).get("side")
         if side == "external":

@@ -149,6 +149,30 @@ def docs() -> list[dict]:
              "detail": {"stale": out.get("stale") or [], "error": out.get("error")}}]
 
 
+PADLOCK_MARGIN = 0.5   # composite points: below, two models are tied and the one in use stays
+
+
+def padlocks(conn) -> list[dict]:
+    """Invariant of the open padlocks (owner 2026-11-16/20): the model in use is the best callable one of its
+    ranking. Checked on the ranking itself, never on the proposals that should have produced it — on 2026-11-21 a
+    stale proposal put medical on its #3 and the #1 could not come back; nothing noticed until the owner asked."""
+    out = []
+    for p in conn.execute("""select p.task, p.role, p.pinned_model_id, d.doc from models.preferences p
+                             join models.latest_dossiers d using (task)
+                             where not p.locked and p.pinned_model_id is not null and p.task <> 'general'"""):
+        ranking = [r for r in ((p["doc"] or {}).get("ranking") or []) if r.get("composite") is not None]
+        best = next((r for r in ranking if r.get("callable")), None)
+        mine = next((r for r in ranking if r["model_id"] == p["pinned_model_id"]), None)
+        if not best or best["model_id"] == p["pinned_model_id"]:
+            continue
+        if mine is None or best["composite"] > mine["composite"] + PADLOCK_MARGIN:
+            out.append({"key": f'padlock:{p["task"]}:{p["role"]}', "kind": "padlock_drift", "subject": p["task"],
+                        "detail": {"role": p["role"], "in_use": p["pinned_model_id"],
+                                   "in_use_score": mine and mine["composite"], "in_use_rank": mine and mine["rank"],
+                                   "best": best["model_id"], "best_score": best["composite"], "best_rank": best["rank"]}})
+    return out
+
+
 def detect(conn, with_tests: bool = True) -> list[dict]:
-    found = sources(conn) + cycle(conn) + providers(conn) + credits(conn) + docs()
+    found = sources(conn) + cycle(conn) + providers(conn) + credits(conn) + padlocks(conn) + docs()
     return found + (tests() if with_tests else [])

@@ -79,6 +79,7 @@ Inventaire exhaustif des affectations littérales MAJUSCULES au niveau module et
 | guardian/checks.py | `RUN_MAX_AGE_H` | 54 | the cycle runs every 48 h |
 | guardian/checks.py | `TEST_TIMEOUT` | 600 |  |
 | guardian/checks.py | `CREDIT_STEPS_USD` | [5.0, 1.0] |  |
+| guardian/checks.py | `PADLOCK_MARGIN` | 0.5 | composite points: below, two models are tied and the one in use stays |
 | guardian/run.py | `MAX_ATTEMPTS` | 2 | repair-agent runs per incident before it is handed to the owner (coding/L3 since 20/11) |
 | guardian/run.py | `RETRY_AFTER_H` | 5 | between two runs on the same incident: the next pass (every 6 h) tries again |
 | guardian/run.py | `TEST_GRACE_H` | 6 | a failing test is often someone's work in progress: act only if it lasts |

@@ -376,6 +376,7 @@ Deterministic detection: what is wrong with the module right now. No model is ca
 - `tests(root=None)` — Failing tests, except those whose test file is itself someone's uncommitted work (still being written).
 - `docs_check()` — `walter-router docs --check`: the generated reference against code and schema. {} when the installed version
 - `docs()` — 
+- `padlocks(conn)` — Invariant of the open padlocks (owner 2026-11-16/20): the model in use is the best callable one of its
 - `detect(conn, with_tests: bool=True)` — 
 
 ## guardian/repair.py
@@ -395,6 +396,7 @@ One guardian pass: detect, follow incidents, act, tell the owner only what is wo
 - `_age_h(ts)` — 
 - `sync(conn, problems: list[dict], tests_checked: bool)` — Open or refresh one incident per problem; close those no longer seen (a test incident only when the
 - `_set(conn, inc: dict, status: str, verdict: dict | None=None, attempt: bool=False)` — 
+- `_padlock(conn, inc: dict)` — An open padlock not on its #1: the adoption goes through the usual path (a proposal compared with the model in
 - `reread_source(kind: str)` — The router's own read of one source (writes its snapshot when it works).
 - `_needs_agent(inc: dict)` — 
 - `_tried(inc: dict)` — 

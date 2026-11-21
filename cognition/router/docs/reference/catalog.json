@@ -7286,6 +7286,11 @@
             "signature": ""
           },
           {
+            "description": "Invariant of the open padlocks (owner 2026-11-16/20): the model in use is the best callable one of its",
+            "name": "padlocks",
+            "signature": "conn"
+          },
+          {
             "description": "",
             "name": "detect",
             "signature": "conn, with_tests: bool=True"
@@ -7341,6 +7346,11 @@
             "description": "",
             "name": "_set",
             "signature": "conn, inc: dict, status: str, verdict: dict | None=None, attempt: bool=False"
+          },
+          {
+            "description": "An open padlock not on its #1: the adoption goes through the usual path (a proposal compared with the model in",
+            "name": "_padlock",
+            "signature": "conn, inc: dict"
           },
           {
             "description": "The router's own read of one source (writes its snapshot when it works).",
@@ -16201,6 +16211,12 @@
         ]
       },
       {
+        "comment": "composite points: below, two models are tied and the one in use stays",
+        "file": "guardian/checks.py",
+        "name": "PADLOCK_MARGIN",
+        "value": 0.5
+      },
+      {
         "comment": "repair-agent runs per incident before it is handed to the owner (coding/L3 since 20/11)",
         "file": "guardian/run.py",
         "name": "MAX_ATTEMPTS",
@@ -19418,10 +19434,10 @@
     "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
     "guardian/advice.py": "1d64179e24257d9a431f15e957d5981881598b04d60be58c3f57a28bdd556c49",
     "guardian/agent.py": "45b543d716f8f97eb5584e0f90fda2b3da8175cbfbb189fbeba8505def0b438d",
-    "guardian/checks.py": "0b1ed4743157d5a3c3d0b8603b78e611afc1c3fc66bb073d9887409395f0c2b0",
+    "guardian/checks.py": "e57eae8ac0b0b0f8213b092739080a8ab89a2dbb7e2cbcef24858251c9bd7362",
     "guardian/playbook.json": "dd413285fa40d68b4539bd2469a74d825dd576cf03910add0a47ff5cb5fda5e6",
     "guardian/repair.py": "50604a48872e4684ba7a8cbe031eafde5ec7cbfe1c04697927dd9447d3dd29cd",
-    "guardian/run.py": "b042fdddd2d1f039768ecab8c5d73ea6c6a77effb0572b316be8d4e2596f13c2",
+    "guardian/run.py": "ac33b3b8ab84be48539b1e13d356ec05ec3cec211b207ace53920827fb45fec4",
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "instance.py": "81fc40b3bf9914f5246d0bb16f0a750141432127b6e03716546aebfc6f991724",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
