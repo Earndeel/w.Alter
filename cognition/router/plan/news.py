@@ -122,20 +122,45 @@ def from_mail(conn, days: int = NEWS_DAYS) -> list[int]:
     return created
 
 
+def _worth_sending(conn, row, prices: dict) -> bool:
+    """A price that differs from the declared one, or a limit that changed from its last known value. A first
+    figure (nothing known before: the watch is only learning it) is recorded, not sent."""
+    if row["value"] is None:
+        return False
+    if row["metric"] == "price_usd_month":
+        declared_price = prices.get(row["sub_id"])
+        return declared_price is not None and abs(float(row["value"]) - float(declared_price)) > 0.5
+    keep, keep_args = declared.evidence_filter()
+    before = conn.execute(f"""select value from models.plan_evidence where sub_id = %s and metric = %s
+                              and evidence_id < %s and value is not null and {keep}
+                              order by evidence_id desc limit 1""",
+                          (row["sub_id"], row["metric"], row["evidence_id"], *keep_args)).fetchone()
+    return before is not None and float(before["value"]) != float(row["value"])
+
+
 def from_web(conn, evidence_ids: list[int]) -> list[int]:
-    """Facts the web research just added for one of the owner's plans, unless the same fact was already known."""
+    """Facts the web research just added for one of the owner's plans, unless the same fact was already known.
+    Returns the facts sent to the owner (those asking for a decision)."""
     created = []
+    prices = {s["id"]: s.get("price_usd_month") for s in declared.read().get("subscriptions", [])}
     from walter_router.analysis import alerts
-    for r in conn.execute("""select e.* from models.plan_evidence e where e.evidence_id = any(%s) and e.sub_id is not null
+    keep, keep_args = declared.evidence_filter("e")
+    for r in conn.execute(f"""select e.* from models.plan_evidence e where e.evidence_id = any(%s) and e.sub_id is not null
+                             and {keep}
                              and not exists (select 1 from models.plan_evidence o where o.evidence_id < e.evidence_id
                                              and o.sub_id = e.sub_id and o.metric = e.metric
                                              and coalesce(o.value, -1) = coalesce(e.value, -1)
                                              and coalesce(o.model_id, '') = coalesce(e.model_id, ''))""",
-                          (evidence_ids,)).fetchall():
+                          (evidence_ids, *keep_args)).fetchall():
         title = f'{r["unit"] or r["metric"]}'.strip()
         ev = {"action": "none", "news": True, "sub_id": r["sub_id"], "vendor": r["vendor"], "plan": r["plan"],
               "mail_date": str(r["published"] or ""), "title": title[:160], "quote": (r["quote"] or "")[:240],
               "source": r["source_name"], "url": r["source_url"]}
-        if alerts.record(conn, "plan_change", "", f'{r["sub_id"]}:news:web:{r["evidence_id"]}', ev, "open"):
+        # owner, 2026-11-21 (« trop de messages qui n'avaient pas trop d'intérêt »): a web fact is a Telegram message
+        # only when something changed — a price unlike the declared one, a limit unlike its last value. First
+        # figures are recorded for the page and the agent, never sent.
+        status = "open" if _worth_sending(conn, r, prices) else "baseline"
+        if alerts.record(conn, "plan_change", "", f'{r["sub_id"]}:news:web:{r["evidence_id"]}', ev, status) \
+                and status == "open":
             created.append(r["evidence_id"])
     return created

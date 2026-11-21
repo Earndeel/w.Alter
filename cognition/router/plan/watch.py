@@ -19,6 +19,8 @@ Ici, tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :
 Faits déjà connus (ne les redonne pas sauf s'ils ont changé) :
 {known}
 
+Sources que {owner} a écartées (ne les cite jamais, ne t'en sers pas) : {excluded}
+
 Cherche sur le web (au plus 10 recherches, pages officielles d'abord : aide, tarifs, notes de version de l'éditeur ;
 puis analyses sérieuses et datées : SemiAnalysis / Tokenomics, autres mesures publiées de la valeur d'un plan au prix
 de l'API ou du nombre de tokens / messages par fenêtre). Pour CHAQUE plan : prix actuel, limites publiées (fenêtre de
@@ -33,9 +35,10 @@ N'invente rien : un fait sans URL vérifiée n'est pas rendu. Tableau vide si ri
 
 
 def known(conn) -> list[dict]:
+    keep, args = declared.evidence_filter()
     return [dict(r) for r in conn.execute(
-        """select sub_id, model_id, metric, value, unit, source_name, published from models.plan_evidence
-           where origin = 'web' order by found_at desc limit 60""")]
+        f"""select sub_id, model_id, metric, value, unit, source_name, published from models.plan_evidence
+            where origin = 'web' and {keep} order by found_at desc limit 60""", args)]
 
 
 def parse(text: str) -> list[dict]:
@@ -48,8 +51,11 @@ def parse(text: str) -> list[dict]:
     except ValueError:
         return []
     out = []
+    excluded = declared.excluded_sources()
     for it in items if isinstance(items, list) else []:
         if not isinstance(it, dict) or it.get("metric") not in METRICS or not it.get("source_url", "").startswith("http"):
+            continue
+        if declared.is_excluded(it["source_url"], excluded):   # a source the owner excluded: never stored
             continue
         out.append(it)
     return out
@@ -83,7 +89,8 @@ def run(conn) -> dict:
     plans = [{k: s.get(k) for k in ("id", "vendor", "plan", "price_usd_month", "models", "execution")}
              for s in declared.read().get("subscriptions", [])]
     prompt = PROMPT.format(owner=instance.owner(), plans=json.dumps(plans, ensure_ascii=False),
-                           known=json.dumps(known(conn), ensure_ascii=False, default=str))
+                           known=json.dumps(known(conn), ensure_ascii=False, default=str),
+                           excluded=", ".join(declared.excluded_sources()) or "aucune")
     ran = agent.delegate(prompt, f"router-plans-watch-{datetime.now(timezone.utc):%Y%m%dT%H%M}", budget=900)
     text = ran.get("output") if ran.get("ok") else None
     items = parse(text or "")

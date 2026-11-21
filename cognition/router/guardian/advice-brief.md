@@ -29,7 +29,7 @@ Ce que tu cherches (exemples, pas une liste fermée) :
 Temps : {{minutes}} minutes en tout, puis ta réponse est perdue — conclus avant {{deadline}} UTC. L'état ci-dessous
 contient déjà les faits utiles : ne lis PAS le code du Router ni ses fichiers, ne refais pas ses calculs. Au plus
 {{checks}} vérifications ciblées, chacune pour confirmer UN fait précis avant de le proposer (une route, un prix, un
-nom) : `walter-router route <tâche>`, `walter-router dossier <tâche>`, `walter-router plans`, une recherche web. Rien
+nom) : `walter-router pick <tâche>` (le modèle choisi et ses routes), `walter-router dossier <tâche>`, `walter-router plans`, une recherche web. Rien
 de douteux à vérifier : conclus tout de suite. Tu ne modifies RIEN (ni fichier, ni base, ni service), tu n'envoies
 aucun message, tu ne fais aucun appel payant : {{owner}} décide, sur Telegram, avec les boutons que le Router fabrique
 à partir de ton verdict.
@@ -62,6 +62,11 @@ C'est le cycle de 48 h : tu fais aussi l'analyse du cycle (les faits sont dans `
   Ne rends dans `aliases` que les « même modèle » CERTAINS, jamais sur une ressemblance (7b ≠ 72b, 3.1 ≠ 3.5,
   flash ≠ flash-lite) ; ceux de `name_links_already_made` sont déjà faits. Le Router applique ces liens lui-même.
 - Prix (`price_changes_shortlist`) : seulement ceux qui changent un choix ou un coût de plus de 20 %.
-Ajoute à ton JSON final : "aliases": [{"key": "<id sans score>", "model_id": "<id classé>", "reason": "<preuve>"}]
+- Propositions qui vont partir (`cycle.challengers_to_send`) : pour chacune, une phrase pour {{owner}} qui compare au
+  choix actuel, chiffres à l'appui — ce qu'on gagne (points, classements), ce que ça coûte (`price_ratio` = combien de
+  fois le prix actuel), et ton avis (vaut le coup / pas à ce prix / à tester). Un modèle sans offre
+  (`callable_via` vide) : cherche s'il est vendu sous un autre nom (lien de nom ci-dessus).
+Ajoute à ton JSON final : "aliases": [{"key": "<id sans score>", "model_id": "<id classé>", "reason": "<preuve>"}],
+"challenger_notes": [{"alert_id": <n>, "note_fr": "<une ou deux phrases, ≤ 300 caractères>"}]
 et "report_fr": "<rapport Markdown court (≤ 40 lignes) : sources et fournisseurs, noms décidés / rejetés / incertains,
 niveaux, prix>" (ce rapport reste dans le journal du Router ; ce qui doit atteindre {{owner}} va dans `proposals`).

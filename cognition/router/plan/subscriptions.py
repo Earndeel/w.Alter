@@ -25,6 +25,7 @@ from pathlib import Path
 from walter_router.analysis import identity
 from walter_router.analysis import select as sel
 from walter_router import instance
+from walter_router.plan import declared
 
 CONFIG = instance.config_path("subscriptions.json")
 CLAUDE_PROJECTS = Path(os.environ.get("CLAUDE_PROJECTS") or Path.home() / ".claude" / "projects")
@@ -381,9 +382,10 @@ def record_costs(conn) -> dict:
     for st in state(conn):
         price = float(st["price_usd_month"])
         pace = (st["usage_7d"]["api_value_usd"] or 0) * MONTH_WEEKS or None
+        keep, keep_args = declared.evidence_filter()   # sources the owner excluded (Wokey, 2026-11-21) never count
         published = [v["usd_month"] for v in st["semianalysis"]] + [float(r["value"]) for r in conn.execute(
-            """select value from models.plan_evidence where sub_id = %s and metric = 'usd_value_month' and value > 0""",
-            (st["id"],))]   # web research (SemiAnalysis / Tokenomics, other measurements), owner's config
+            f"""select value from models.plan_evidence where sub_id = %s and metric = 'usd_value_month' and value > 0
+                and {keep}""", (st["id"], *keep_args))]   # web research (SemiAnalysis / Tokenomics, other measurements)
         full = (st["measured_capacity"] or {}).get("month_usd") or max(published, default=None)
         row = {"price_usd_month": price, "api_value_month_pace": pace, "api_value_month_full": full,
                "ratio_pace": price / pace if pace else None, "ratio_full": price / full if full else None,

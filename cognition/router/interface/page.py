@@ -379,9 +379,13 @@ def _plan_costs(conn, names: dict[str, str] | None = None) -> str:
 def _plan_facts(conn) -> str:
     """Everything known about each plan, with its source (web research, billing mails, measures, the owner)."""
     rows = []
-    for r in conn.execute("""select * from models.plan_evidence
-                             where plan <> 'crédit'   -- pay-as-you-go top-ups (OpenRouter, API credits) are not plans
-                             order by plan, origin = 'email', published desc nulls last, found_at desc limit 60"""):
+    from walter_router.plan import declared
+    keep, keep_args = declared.evidence_filter()     # sources the owner excluded are not shown
+    for r in conn.execute(f"""select * from models.plan_evidence
+                              where plan <> 'crédit'   -- pay-as-you-go top-ups (OpenRouter, API credits) are not plans
+                              and {keep}
+                              order by plan, origin = 'email', published desc nulls last, found_at desc limit 60""",
+                          keep_args):
         val = "" if r["value"] is None else (f'{r["value"]:g} '.replace(".", ","))
         src = (f'<a href="{esc(r["source_url"])}" rel="noopener" target="_blank"><span class="raw">{esc(r["source_name"])}</span></a>'
                if (r["source_url"] or "").startswith("http") else f'<span class="raw">{esc(r["source_name"])}</span>')

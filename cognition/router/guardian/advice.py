@@ -106,17 +106,21 @@ def state(conn, trigger: str = "manual", extra: dict | None = None) -> dict:
              for r in conn.execute("""select task, role, pinned_model_id, pinned_variant, pinned_provider, locked
                                       from models.preferences where pinned_model_id is not null order by task, role""")]
     chg = changes.events(conn)
-    recent = [dict(r) for r in conn.execute(
-        """select kind, task, role, subject, status, verdict_note, evidence->'why' as why,
+    # 2026-11-21: 24k characters of 60 rows with their `why` were a third of the state; the advisor needs what
+    # the owner answered (not to repropose) and what still waits. Status words say who decided: adopted = in use,
+    # dismissed = refused or replaced since (verdict_note says which).
+    recent = [{k: v for k, v in dict(r).items() if v not in (None, "")} for r in conn.execute(
+        """select kind, task, role, subject, status, left(verdict_note, 160) as note,
                   evidence->>'title_fr' as title, to_char(last_seen, 'YYYY-MM-DD') as seen
            from models.alerts where kind in ('tier', 'pareto', 'advice', 'challenger', 'new_best', 'nerf')
-             and last_seen > now() - interval '30 days' and status <> 'baseline'
-           order by last_seen desc limit 60""")]
+             and last_seen > now() - interval '30 days'
+             and (status in ('open', 'notified') or (status in ('adopted', 'dismissed') and verdict_note is not null))
+           order by status in ('adopted', 'dismissed') desc, last_seen desc limit 35""")]
     try:
         rules = (paths.ROOT / "docs" / "TIERS.md").read_text()
     except OSError:
         rules = ""
-    cycle = _cycle_facts(conn) if trigger == "cycle" else None
+    cycle = {**_cycle_facts(conn), "challengers_to_send": challengers_to_send(conn)} if trigger == "cycle" else None
     return {**({"cycle": cycle} if cycle else {}),"now": datetime.now(timezone.utc).isoformat(timespec="minutes"), "trigger": trigger, "detail": extra or {},
             "declared_text_tiers": declared, "method_tiers_last_cycle": tiers, "text_frontier": frontier[:30],
             "subscription_cost_ratios": [{"route_provider": p, "model_id": m, "ratio": v.get("ratio"),
@@ -126,6 +130,45 @@ def state(conn, trigger: str = "manual", extra: dict | None = None) -> dict:
             "changes_since_previous_cycle": {"new": sorted(chg["new"])[:40], "nerf": chg["nerf"],
                                              "price_drop": chg["price_drop"], "rebased": chg["rebased"]},
             "recent_alerts_and_owner_answers": recent, "tier_rules": rules}
+
+
+def challengers_to_send(conn) -> list[dict]:
+    """The proposals step 3 of the cycle is about to send (status open): each with the current choice, the scores and
+    both prices, so the agent writes the one-line comparison the owner reads in the message (2026-11-21, owner: « 1
+    point de mieux mais quasiment 3 fois plus cher que d1.2 Ultra : ça aurait été intéressant de le donner »)."""
+    from walter_router.analysis import catalog, telegram
+    out = []
+    for a in conn.execute("""select a.alert_id, a.task, a.role, a.subject, a.evidence, t.interface, t.modes
+                             from models.alerts a join models.tasks t using (task)
+                             where a.kind = 'challenger' and a.status = 'open' order by a.alert_id desc limit 12"""):
+        e = a["evidence"] or {}
+        c, cur = (catalog.card(conn, m, a["interface"], a["modes"]) for m in (a["subject"], e.get("pinned")))
+        out.append({"alert_id": a["alert_id"], "task": a["task"], "role": a["role"], "challenger": a["subject"],
+                    "current": e.get("pinned"), "composite": e.get("composite"),
+                    "boards": {k: [v.get("challenger"), v.get("pinned")] for k, v in (e.get("all_boards") or {}).items()},
+                    "callable_via": e.get("callable_via"),
+                    "price": catalog.price_text(c), "current_price": catalog.price_text(cur),
+                    "price_ratio": (round(telegram._per_m(c) / telegram._per_m(cur), 2)
+                                    if telegram._per_m(c) and telegram._per_m(cur) else None)})
+    return out
+
+
+def notes_to_alerts(conn, v: dict | None) -> list[int]:
+    """`challenger_notes` of the verdict → evidence.agent_note of each open challenger, shown as « 🧠 Le Router »."""
+    done = []
+    for n in ((v or {}).get("challenger_notes") or [])[:12]:
+        if not isinstance(n, dict) or not str(n.get("note_fr") or "").strip():
+            continue
+        try:
+            aid = int(n.get("alert_id"))
+        except (TypeError, ValueError):
+            continue
+        row = conn.execute("""update models.alerts set evidence = evidence || jsonb_build_object('agent_note', %s::text)
+                              where alert_id = %s and kind = 'challenger' and status = 'open' returning alert_id""",
+                           (str(n["note_fr"]).strip()[:300], aid)).fetchone()
+        if row:
+            done.append(aid)
+    return done
 
 
 def _cycle_facts(conn) -> dict:
@@ -342,6 +385,7 @@ def run(trigger: str = "manual", extra: dict | None = None, dry_run: bool = Fals
             v["_kept"] = kept
         if trigger == "cycle":
             entry["cycle"] = cycle_report(conn, v, ran)
+            entry["cycle"]["challenger_notes"] = notes_to_alerts(conn, v)
         sent = telegram.notify(conn) if notify and any(k.get("new") for k in kept) else {"sent": 0}
         conn.commit()
     if not v:

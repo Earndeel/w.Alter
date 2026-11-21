@@ -6049,7 +6049,7 @@
           {
             "description": "Record the owner's answer. 'adopted' on a challenger also pins the challenger as the new favourite.",
             "name": "verdict",
-            "signature": "conn, alert_id: int, decision: str, note: str | None=None, role: str | None=None, _resolved: bool=False"
+            "signature": "conn, alert_id: int, decision: str, note: str | None=None, role: str | None=None, _resolved: bool=False, by: str='owner'"
           }
         ]
       },
@@ -6879,6 +6879,16 @@
             "signature": "c: dict, current: dict | None=None"
           },
           {
+            "description": "One price per million tokens to compare two models: input only for decision and rerank models (their output",
+            "name": "_per_m",
+            "signature": "c: dict"
+          },
+          {
+            "description": "2026-11-21 (owner): « 1 point de mieux mais quasiment 3 fois plus cher » must be in the message itself.",
+            "name": "_token_compare",
+            "signature": "c: dict, current: dict | None"
+          },
+          {
             "description": "One block for one new model that beats one or several of the owner's choices (2026-10-14:",
             "name": "_challenger_group",
             "signature": "conn, group: list[dict]"
@@ -7119,6 +7129,16 @@
             "signature": "conn, trigger: str='manual', extra: dict | None=None"
           },
           {
+            "description": "The proposals step 3 of the cycle is about to send (status open): each with the current choice, the scores and",
+            "name": "challengers_to_send",
+            "signature": "conn"
+          },
+          {
+            "description": "`challenger_notes` of the verdict → evidence.agent_note of each open challenger, shown as « 🧠 Le Router ».",
+            "name": "notes_to_alerts",
+            "signature": "conn, v: dict | None"
+          },
+          {
             "description": "What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links.",
             "name": "_cycle_facts",
             "signature": "conn"
@@ -7229,6 +7249,11 @@
             "description": "'ours' (the request looks wrong: repairable here), 'account' (key, credit: the owner's), 'external'.",
             "name": "provider_side",
             "signature": "detail: str"
+          },
+          {
+            "description": "",
+            "name": "credits",
+            "signature": "conn"
           },
           {
             "description": "",
@@ -8603,6 +8628,26 @@
             "signature": "sub_id: str, why: str"
           },
           {
+            "description": "Web sites the owner no longer wants among the plan facts (owner, 2026-11-21: Wokey « pas très intéressant ») :",
+            "name": "excluded_sources",
+            "signature": ""
+          },
+          {
+            "description": "",
+            "name": "is_excluded",
+            "signature": "url: str | None, domains: list[str] | None=None"
+          },
+          {
+            "description": "SQL condition (and its parameter) keeping only plan facts from sources that are not excluded.",
+            "name": "evidence_filter",
+            "signature": "alias: str=''"
+          },
+          {
+            "description": "",
+            "name": "exclude_source",
+            "signature": "domain: str, why: str, source: str='owner'"
+          },
+          {
             "description": "A dated offer (`until`, e.g. Google AI Pro 15 months) ending within `days` becomes one Telegram notice.",
             "name": "expiring",
             "signature": "conn, days: int=30"
@@ -8714,6 +8759,11 @@
             "description": "New product / plan mails from the vendors of the owner's plans -> evidence + notice. Returns alert ids.",
             "name": "from_mail",
             "signature": "conn, days: int=NEWS_DAYS"
+          },
+          {
+            "description": "A price that differs from the declared one, or a limit that changed from its last known value. A first",
+            "name": "_worth_sending",
+            "signature": "conn, row, prices: dict"
           },
           {
             "description": "Facts the web research just added for one of the owner's plans, unless the same fact was already known.",
@@ -8905,7 +8955,17 @@
             "signature": "conn, kind: str, latest: int"
           },
           {
-            "description": "Callable models (chat/image/video/audio/music) without any score, next to a scored model with a very similar",
+            "description": "",
+            "name": "_family",
+            "signature": "model_id: str"
+          },
+          {
+            "description": "A model that beats one of the owner's choices on a board but has no offer: often the same model sold under",
+            "name": "blocked_challengers",
+            "signature": "conn"
+          },
+          {
+            "description": "Callable models without any score, next to a scored model with a very similar id: probable naming gaps",
             "name": "unmatched",
             "signature": "conn, limit: int=25"
           },
@@ -16132,6 +16192,15 @@
         "value": 600
       },
       {
+        "comment": "",
+        "file": "guardian/checks.py",
+        "name": "CREDIT_STEPS_USD",
+        "value": [
+          5.0,
+          1.0
+        ]
+      },
+      {
         "comment": "repair-agent runs per incident before it is handed to the owner (coding/L3 since 20/11)",
         "file": "guardian/run.py",
         "name": "MAX_ATTEMPTS",
@@ -17816,7 +17885,7 @@
         "comment": "# Mission : veille des abonnements",
         "file": "plan/watch.py",
         "name": "PROMPT",
-        "value": "## Mission : veille des abonnements\n\nIci, tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :\n{plans}\n\nFaits déjà connus (ne les redonne pas sauf s'ils ont changé) :\n{known}\n\nCherche sur le web (au plus 10 recherches, pages officielles d'abord : aide, tarifs, notes de version de l'éditeur ;\npuis analyses sérieuses et datées : SemiAnalysis / Tokenomics, autres mesures publiées de la valeur d'un plan au prix\nde l'API ou du nombre de tokens / messages par fenêtre). Pour CHAQUE plan : prix actuel, limites publiées (fenêtre de\n5 h, hebdomadaire, modèles inclus), valeur mensuelle au prix API par modèle si quelqu'un l'a mesurée.\n\nRéponds UNIQUEMENT par un tableau JSON, sans texte autour. Chaque élément :\n{{\"sub_id\": \"<id du plan ou null>\", \"vendor\": \"...\", \"plan\": \"...\", \"model_id\": \"<id router du modèle ou null>\",\n  \"metric\": \"usd_value_month | tokens_month | messages_5h | messages_week | price_usd_month | limit_note\",\n  \"value\": <nombre ou null>, \"unit\": \"...\", \"source_name\": \"...\", \"source_url\": \"https://...\",\n  \"published\": \"AAAA-MM-JJ ou null\", \"quote\": \"<phrase exacte de la source, 300 caractères max>\"}}\nN'invente rien : un fait sans URL vérifiée n'est pas rendu. Tableau vide si rien de nouveau."
+        "value": "## Mission : veille des abonnements\n\nIci, tu fais la veille des abonnements IA de {owner}. Ses plans actuels (JSON) :\n{plans}\n\nFaits déjà connus (ne les redonne pas sauf s'ils ont changé) :\n{known}\n\nSources que {owner} a écartées (ne les cite jamais, ne t'en sers pas) : {excluded}\n\nCherche sur le web (au plus 10 recherches, pages officielles d'abord : aide, tarifs, notes de version de l'éditeur ;\npuis analyses sérieuses et datées : SemiAnalysis / Tokenomics, autres mesures publiées de la valeur d'un plan au prix\nde l'API ou du nombre de tokens / messages par fenêtre). Pour CHAQUE plan : prix actuel, limites publiées (fenêtre de\n5 h, hebdomadaire, modèles inclus), valeur mensuelle au prix API par modèle si quelqu'un l'a mesurée.\n\nRéponds UNIQUEMENT par un tableau JSON, sans texte autour. Chaque élément :\n{{\"sub_id\": \"<id du plan ou null>\", \"vendor\": \"...\", \"plan\": \"...\", \"model_id\": \"<id router du modèle ou null>\",\n  \"metric\": \"usd_value_month | tokens_month | messages_5h | messages_week | price_usd_month | limit_note\",\n  \"value\": <nombre ou null>, \"unit\": \"...\", \"source_name\": \"...\", \"source_url\": \"https://...\",\n  \"published\": \"AAAA-MM-JJ ou null\", \"quote\": \"<phrase exacte de la source, 300 caractères max>\"}}\nN'invente rien : un fait sans URL vérifiée n'est pas rendu. Tableau vide si rien de nouveau."
       },
       {
         "comment": "",
@@ -17828,6 +17897,22 @@
           "codex",
           "arnict",
           "google-flow"
+        ]
+      },
+      {
+        "comment": "",
+        "file": "research/agent/review.py",
+        "name": "INTERFACES",
+        "value": [
+          "chat",
+          "image",
+          "video",
+          "audio",
+          "music",
+          "decisions",
+          "rerank",
+          "transcription",
+          "embedding"
         ]
       },
       {
@@ -18620,10 +18705,10 @@
         ]
       },
       {
-        "comment": "below this, OpenRouter routes go last (a 402 after minutes of agent work is worse)",
+        "comment": "owner, 2026-11-21: OpenRouter is used to its last cent; the guardian warns at CREDIT_STEPS_USD",
         "file": "serve/execution.py",
         "name": "MIN_CREDIT_USD",
-        "value": 1.0
+        "value": 0.0
       },
       {
         "comment": "a 5-token probe slower than this = degraded (Kie Claude took 64 s on 2026-10-02)",
@@ -19291,7 +19376,7 @@
   "schema_version": 1,
   "sources": {
     "analysis/__init__.py": "622a5a271bf2dac1bc23a44d2bba15492a391799e661815619cbe35674800b47",
-    "analysis/alerts.py": "6d13da4a9d0f9adf024d9ebdb4379237f7a53a74f7bfd79eb929727e8d3663da",
+    "analysis/alerts.py": "13f290e1044255c0c6ceb9b06458c213c35401518289fffaa51d124638e7453d",
     "analysis/aliases.json": "fcae06801ed109d96052540bb6d340db38b69d44dff248a17f151187e7f5e192",
     "analysis/aliases_admin.py": "4a2644b46d3837a22f1e92a5b96a0cdab8e70b428115345ddb9a54097283932a",
     "analysis/catalog.py": "cb98f053933981ee20acea0410a31484acf988a8144fd34a680b6e61a8b4828f",
@@ -19306,14 +19391,14 @@
     "analysis/parse.py": "cf82c94b379e607f9793738b1e770374b3e96c6da328062ecb16292d43b59317",
     "analysis/postes.py": "8871b0214df0a72334179b1fc575af74452a4608c786200ca5170a2bce996fd1",
     "analysis/recommend.py": "5ebce883dd37252539473671120c439012e46cd6a2497954c0e08fbb62e64ece",
-    "analysis/refresh.py": "dcc93f5a5ac7a7f89177ec1a8900c669b499585c5dc31df1aba7c2608d0e3a1f",
+    "analysis/refresh.py": "047e8a1cd50ea4c52ce3947ea9f702f00c18d3288a7c87ff3234d6eaed5b9906",
     "analysis/scoring.py": "0aa98f383b032cb14d757a32157aebaa6c92bdc08c671df95eee3bcf7bafcbff",
     "analysis/select.py": "39ad5f96af616cd95209b22ee6f4f77c62be760cf7efa614e775bf6065390624",
-    "analysis/telegram.py": "59722e62c19bdb426eedc46d343788ccedeae2ffa269219f60259d2929f956d5",
+    "analysis/telegram.py": "5e444d17241f9a3d7446dda2c30da6ddd65cd7f0f8cbac8aac13a7e1e537a10f",
     "analysis/tiers.py": "5b70be11b3a4268e5f329ea330600814309194bab681ecffb42f8f726390291a",
     "bin/walter-router": "90b48d3a45336af335c9f99a5e60212ab88d9e792ff92d8624ec072048f7c072",
     "bin/walter-router-control": "a21ab8d4348ede689c947427f9e4b1cabb6b4ed206d31a7e66b98432e454aa47",
-    "bin/walter-router-cycle": "3b7860282a75d8dfe68ddc5f2334da5890fcdda5ca28cecd3ae90e9c451c9704",
+    "bin/walter-router-cycle": "c974f7bbdb2df16f3be5bde0cc8efdee0bedfec0e4f846f0dec7ab3067a7ef79",
     "bin/walter-router-guardian": "52294a77b8b4d1198998a3694245243faf98477b1e97930413abd60143d48da5",
     "cli.py": "e077bc54f57698e3c0383ea0e74dc9c815dbde8fa1f56fd61ca0acd49f69a4f9",
     "config/aliases_auto.json": "8eb13c8b0a5fa54f3fdf3755fb1bec713c00135f5955410a39efb98e6120e3c2",
@@ -19331,17 +19416,17 @@
     "documentation.py": "2c37ce0d6189e2551eb7b85ed70060fdd196ed6ef36f420bcb6b1e8e1e9e448c",
     "guardian/__init__.py": "a28ff92bf9c1254bad5416a6139b10f03a3cfedd0955894a65d042960b4ee587",
     "guardian/__main__.py": "507846e4c26dd1f427861a627daa6a4aea91e91710ed1640405f1e074d11b064",
-    "guardian/advice.py": "21e49812f6606cddbec7f40e557504d9e0ab0765bce838ea3a3ad19dcdb6edd8",
+    "guardian/advice.py": "1d64179e24257d9a431f15e957d5981881598b04d60be58c3f57a28bdd556c49",
     "guardian/agent.py": "45b543d716f8f97eb5584e0f90fda2b3da8175cbfbb189fbeba8505def0b438d",
-    "guardian/checks.py": "94d498cbfcb58d7ff963b7d6487e1ec4721641315b3264b6a4f9f86b659fc34a",
+    "guardian/checks.py": "0b1ed4743157d5a3c3d0b8603b78e611afc1c3fc66bb073d9887409395f0c2b0",
     "guardian/playbook.json": "dd413285fa40d68b4539bd2469a74d825dd576cf03910add0a47ff5cb5fda5e6",
     "guardian/repair.py": "50604a48872e4684ba7a8cbe031eafde5ec7cbfe1c04697927dd9447d3dd29cd",
-    "guardian/run.py": "b25aaa7eaab951726661a74a1ce244cd86aab07891b3437adf8d43fd07950a0c",
+    "guardian/run.py": "b042fdddd2d1f039768ecab8c5d73ea6c6a77effb0572b316be8d4e2596f13c2",
     "health.py": "aeb89568df1f3c699a749117efac4c6d7074edc441b57de32672f50dbf38eac8",
     "instance.py": "81fc40b3bf9914f5246d0bb16f0a750141432127b6e03716546aebfc6f991724",
     "interface/__init__.py": "0d4c9af1f42c1f7ede8f6ce6ea9f14170b8792f03dad00957608c9feb00ed3bb",
     "interface/library.py": "813c6a027d1cd98e071dedc1f9f3200c779d1dbf90b82e8078f514b51f1971e0",
-    "interface/page.py": "bb971afacc0390f30efb511d52441d41bf82eca1377a9930304cbb00452b275c",
+    "interface/page.py": "87621c2bb25bd00dee5a9e2c90a8ec40b97fdaa7505d8746072d9f63dc44b320",
     "interface/site/functions/_middleware.js": "7698f9a6d90639f63790b347aaa8d4b7473f128e5ac2f130158481768217a12f",
     "interface/site/functions/api/consumption.js": "84af305ac0a0d70a56bf142c08d5332d793d3acdfe280776f3f2f58919ddb9ad",
     "interface/site/functions/api/lock.js": "7a5f1ca04741451016686e4f10a7416692d842e3bc0823cc27321f64111529a3",
@@ -19362,16 +19447,16 @@
     "plan/__init__.py": "5ba5fab620c9715c48f475098814d11ff6f272469a2adc08d5f01c7b3bd69e79",
     "plan/codex_account.py": "c6304ef26216528a6c2b5da12e5a410bef6a59bc44d2d0ea440de12b043815a7",
     "plan/consumption.py": "6ff376bf70ecd34d5d16ef9315fc20c1993aec3f178a20ead43f7f61be9d59fe",
-    "plan/declared.py": "9687186dc3b15a3aa0d4cf39633dbd2cc1b633608306eadbce87ed894276beac",
+    "plan/declared.py": "1961f1f790b1c8b0502d3c68d451da67e5a71e5d9d68acc644fbbaf866f67bf0",
     "plan/mail.py": "541e27d036223253091b2349aa5ca4844fd72f478582b465d83abb22cc1da534",
     "plan/modeldial.py": "2e3e08248e754052e26ea6aa543b3a7d328a9f5a6a7a08fbb8e87adf5808ff55",
-    "plan/news.py": "cb79f91afd5eb20ceb83399d9281c9efa2eaa81997cc5df35c07541311972a22",
+    "plan/news.py": "bfe0ec1a596ef2f174eb07b7ed6752a78039e3e10044142a1fc487cf3c979a2f",
     "plan/quota_watch.py": "f204815a2507c01c4e5b4f5df8b5c49354a9748e1535636f1d40aa1465921497",
-    "plan/subscriptions.py": "3c614b30df9844bf2ef0b82af69ccfe53cbe94531122a035b32cfcd2cf96553d",
-    "plan/watch.py": "f59a369ebcf2f53af62cb3bff03e6f8b86a6aad8baf3950ef317ff0fc4326eec",
+    "plan/subscriptions.py": "dcea82db2526a0f239b38b42dd5519b951d0d93848f9686c38f6f8400bb5ff90",
+    "plan/watch.py": "e470e06d4c9b0fe3b77f6f1f62919893ef19e81b88b4a22c2e42710e011f6fb5",
     "research/__init__.py": "3772fd8c8f851cfce7d8f5f164a91d57de0e63d8ec6a7f58a03e4400a8d8423e",
     "research/agent/__init__.py": "812029e1b1fc9526a1f1cf35bed63023b47d1f23d3aa3b0a9c8886d98c5615a1",
-    "research/agent/review.py": "93905a0e3b4849e11d07232e7b50799fef1bb90736e104705533569e08ea8a13",
+    "research/agent/review.py": "22fe6f742f67c6f3fa761d4447fefc5eeac9cccc18041902e8972586f335c6ba",
     "research/agent/run.py": "8c44e8466f7cb87421085de7d0cc3ee81aef47018f6f5b2205cc82f6b7bd634e",
     "research/benchmarks/__init__.py": "5066d339167d8898f0cda8d667da3b6e935a3edda56c178ce3f4e350b58e3679",
     "research/benchmarks/aa.py": "04c8aa990ad9d31c0aba588b0cd186a8863b15864923525285616fec9df61207",
@@ -19411,9 +19496,9 @@
     "serve/agent_view.py": "07946ccdf7f8e57d0a721b5727fb51c7d8b6a2c7c37cb24ce05481cd233f0eb1",
     "serve/api.py": "ca15f8aecd1b00dd6cc546263694a0de92b1e2b1d54f34373d60bae61621cb9e",
     "serve/brief.py": "db7bf5b366f73e12fa9f45698a3877c9a62a4939a8d1ad971f586cb421f45f7b",
-    "serve/choose.py": "230476e2303672c48acf7e1b40215d3db95081e2e53288fcb0f61072067a5549",
+    "serve/choose.py": "a6da76f13724c528d423c4105abe7101c6ed0c49a072e7076e6ae10f5a281ea1",
     "serve/engine.py": "8e0827468ae82d68073de93b969e69ae8c085cff4c13571c38475458f72c6669",
-    "serve/execution.py": "bda52e62df56396fedfd29c23cfaa8711b8967aff3f23ef25505e247cc875225",
+    "serve/execution.py": "78863d1337508d0123a9d288904c8284758dbc1a44f5160d1ec8104eb2df8c23",
     "serve/intent.py": "b5cc05dfe5a571e4f74e3a2dd379e041f961e49d8e9b2d15181c647c7b98c9ab",
     "serve/media_exec.py": "11d4b2ffa3912518e40b348429af9a0976b6b94e4f39c0ff46e52ae87909ef2f",
     "serve/named.py": "fb83192b767fce2c33e921e32669c62769b58354a0c15529d2a37f65c71da0aa",

@@ -151,6 +151,16 @@ def handle(conn, inc: dict, budget: list[int], dry_run: bool = False) -> None:
         return None if inc["status"] == "needs_owner" else _docs(conn, inc, dry_run)
     if inc["status"] == "deferred":            # a patch of the former copy-and-gates agent: repaired afresh
         _set(conn, inc, "open")
+    if kind == "credit_low":                   # the owner's to top up; said once per step crossed
+        d = inc["detail"] or {}
+        left = f'{d.get("left_usd", 0):.2f}'.replace(".", ",")
+        step = f'{d.get("step_usd", 0):g}'.replace(".", ",")
+        return _set(conn, inc, "needs_owner", {
+            "outcome": "needs_owner", "cause": f'{inc["subject"]} : {d.get("left_usd")} $',
+            "summary_fr": f"Il reste {left} $ sur {inc['subject'].capitalize() if inc['subject'] != 'openrouter' else 'OpenRouter'} "
+                          f"(passé sous {step} $). Je continue à l'utiliser jusqu'au dernier centime ; une fois vide, "
+                          "les tâches qui passent par lui prennent leurs autres routes, ou échouent si elles n'en ont pas. "
+                          "Une recharge évite cela."})
     if kind == "provider_down":
         side = (inc["detail"] or {}).get("side")
         if side == "external":
@@ -178,6 +188,8 @@ def _message(inc: dict) -> str | None:
     head = "🛠 Walter Router"
     if inc["status"] == "fixed" and (v.get("verified") or (v.get("apply") or {}).get("applied")) and not v.get("quiet"):
         return f'{head} — réparé tout seul\n\n{v.get("summary_fr") or v.get("cause")}\n\nVérifié avant mise en place.'
+    if inc["status"] == "needs_owner" and inc["kind"] == "credit_low":
+        return f'{head} — crédit bas\n\n{v.get("summary_fr")}'
     if inc["status"] == "needs_owner":
         q = v.get("question_fr")
         return f'{head} — besoin de vous\n\n{v.get("summary_fr") or inc["subject"]}' + (f"\n\n{q}" if q else "")

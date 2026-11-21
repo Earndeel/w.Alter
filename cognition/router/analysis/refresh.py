@@ -57,7 +57,9 @@ def refresh(notify: bool = True, dry_run: bool = False, skip_collect: bool = Fal
                                     "stale": alerts.stale_sources(conn), "boards_down": alerts.boards_down(conn)}
                 # open padlocks (owner 2026-11-16): those models follow the best by themselves; locked ones wait for
                 # the Telegram answer (never in a dry run, which must not switch anything)
-                report["auto_adopted"] = [] if dry_run else alerts.auto_adopt(conn)
+                # only in the run that tells the owner (2026-11-21: step 1 of the cycle, --no-notify, switched medical
+                # Fable 5.2 → GPT-6 Astra and the information message was never sent)
+                report["auto_adopted"] = [] if dry_run or not notify else alerts.auto_adopt(conn)
                 report["pruned_snapshots"] = sources.prune(conn)
                 conn.execute("update models.runs set status = 'ok', finished_at = now(), summary = %s::jsonb where run_id = %s",
                              (json.dumps(report, default=str), run_id))

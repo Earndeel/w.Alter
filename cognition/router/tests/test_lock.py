@@ -82,7 +82,7 @@ def test_closing_an_undeclared_task_changes_nothing(conn):
 
 def test_an_open_tier_follows_the_methods_proposal(conn, monkeypatch):
     seen = []
-    monkeypatch.setattr(alerts, "verdict", lambda c, alert_id, decision, note=None, role=None, _resolved=False:
+    monkeypatch.setattr(alerts, "verdict", lambda c, alert_id, decision, note=None, role=None, _resolved=False, by="owner":
                         seen.append((alert_id, decision)) or {})
     conn.execute("delete from models.alerts where kind = 'tier' and role = 'L2'")
     a = conn.execute("""insert into models.alerts (kind, task, role, subject, evidence, status)

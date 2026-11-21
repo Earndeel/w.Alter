@@ -470,7 +470,7 @@ def auto_adopt(conn, only_task: str | None = None, only_role: str | None = None)
         if not pick:
             continue
         note = f"automatique : modèle déverrouillé (cadenas ouvert), remplace {current}"
-        verdict(conn, pick["alert_id"], "adopted", note, _resolved=True)
+        verdict(conn, pick["alert_id"], "adopted", note, _resolved=True, by="auto")
         conn.execute(f"""update models.alerts set status = 'dismissed', verdict_note = %s
                          where {others} and status in ('open', 'notified') and alert_id <> %s""",
                      (f"auto: {pick['subject']} adopté (cadenas ouvert)", *args, pick["alert_id"]))
@@ -507,8 +507,10 @@ def set_lock(conn, task: str, role: str | None, locked: bool) -> dict:
 
 
 def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: str | None = None,
-            _resolved: bool = False) -> dict:
-    """Record the owner's answer. 'adopted' on a challenger also pins the challenger as the new favourite."""
+            _resolved: bool = False, by: str = "owner") -> dict:
+    """Record the owner's answer. 'adopted' on a challenger also pins the challenger as the new favourite.
+    by = "auto": an open padlock adopted it, never written as the owner's choice (2026-11-21)."""
+    who = "automatiquement (cadenas ouvert)" if by == "auto" else f"par {instance.owner()}"
     if decision not in ("adopted", "dismissed"):
         raise ValueError("decision must be adopted or dismissed")
     group = [] if _resolved else conn.execute("""select alert_id, role from models.alerts where ref = %s
@@ -542,7 +544,7 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
     if a["kind"] == "new_best" and decision == "adopted":
         from walter_router.serve.choose import set_preference
         set_preference(conn, a["task"], pin=a["subject"], watch="quality",
-                       note=f"Adopté par {instance.owner()} (alerte {alert_id}).")
+                       note=f"Adopté {who} (alerte {alert_id}).")
         return {"alert_id": alert_id, "status": decision, "pinned": a["subject"]}
     if a["kind"] == "new_best" and decision == "dismissed":
         from walter_router.serve.choose import set_preference
@@ -555,7 +557,7 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
         from walter_router.analysis import knowledge
         from walter_router.serve.choose import set_preference
         ev = a["evidence"] or {}
-        note = f"Niveau {a['role']} adopté par {instance.owner()} (alerte {alert_id}), méthode des 3 niveaux."
+        note = f"Niveau {a['role']} adopté {who} (alerte {alert_id}), méthode des 3 niveaux."
         spent = ev.get("when_quota_spent")
         knowledge.set_level("general", a["role"], a["subject"], why=f"alerte {alert_id} adoptée",
                             description=f"{ev.get('name') or a['subject']} ({ev.get('score')} AA) — {note}",
@@ -568,5 +570,5 @@ def verdict(conn, alert_id: int, decision: str, note: str | None = None, role: s
     if decision == "adopted" and a["kind"] == "challenger" and ("boards" in a["evidence"] or "challenger" in a["evidence"]):
         from walter_router.serve.choose import set_preference
         set_preference(conn, a["task"], pin=a["subject"], role=a["role"] or "default",
-                       note=f"Adopté par {instance.owner()} (alerte {alert_id}). {note or ''}".strip())
+                       note=f"Adopté {who} (alerte {alert_id}). {note or ''}".strip())
     return {"alert_id": alert_id, "status": decision}

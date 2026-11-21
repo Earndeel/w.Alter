@@ -70,6 +70,27 @@ def provider_side(detail: str) -> str:
     return "ours" if _OUR_SIDE.search(detail or "") else "external"
 
 
+# Owner, 2026-11-21: « OpenRouter doit être utilisé jusqu'au bout, mais m'envoyer des limites quand on arrive à un point
+# critique ». Its routes stay in use until 0 $; crossing each step below is one message (a new incident per step).
+CREDIT_STEPS_USD = (5.0, 1.0)
+_CREDIT = re.compile(r"crédit (-?\d+(?:\.\d+)?) \$")
+
+
+def credits(conn) -> list[dict]:
+    out = []
+    for r in conn.execute("select provider, detail, checked_at from models.provider_status where ok and provider = 'openrouter'"):
+        m = _CREDIT.search(r["detail"] or "")
+        if not m:
+            continue
+        left = float(m.group(1))
+        crossed = [s for s in CREDIT_STEPS_USD if left < s]
+        if crossed:
+            step = min(crossed)
+            out.append({"key": f'credit:{r["provider"]}:{step:g}', "kind": "credit_low", "subject": r["provider"],
+                        "detail": {"left_usd": round(left, 2), "step_usd": step, "checked_at": str(r["checked_at"])}})
+    return out
+
+
 def providers(conn) -> list[dict]:
     return [{"key": f'provider:{r["provider"]}', "kind": "provider_down", "subject": r["provider"],
              "detail": {"probe": r["detail"], "checked_at": str(r["checked_at"]), "side": provider_side(r["detail"])}}
@@ -129,5 +150,5 @@ def docs() -> list[dict]:
 
 
 def detect(conn, with_tests: bool = True) -> list[dict]:
-    found = sources(conn) + cycle(conn) + providers(conn) + docs()
+    found = sources(conn) + cycle(conn) + providers(conn) + credits(conn) + docs()
     return found + (tests() if with_tests else [])

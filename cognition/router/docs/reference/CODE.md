@@ -33,7 +33,7 @@ Alerts: a pinned favourite overtaken, unranked new releases, stale sources — a
 - `pending(conn)` — What goes to Telegram. Unranked releases are recorded but never sent (too many, unproven): a new model is
 - `auto_adopt(conn, only_task: str | None=None, only_role: str | None=None)` — Unlocked favourites follow the best (owner, 2026-11-16: padlock of the library page). For each preference with
 - `set_lock(conn, task: str, role: str | None, locked: bool)` — Close or open the padlock of one active model. Opening a task the owner never declared first records the model
-- `verdict(conn, alert_id: int, decision: str, note: str | None=None, role: str | None=None, _resolved: bool=False)` — Record the owner's answer. 'adopted' on a challenger also pins the challenger as the new favourite.
+- `verdict(conn, alert_id: int, decision: str, note: str | None=None, role: str | None=None, _resolved: bool=False, by: str='owner')` — Record the owner's answer. 'adopted' on a challenger also pins the challenger as the new favourite.
 
 ## analysis/aliases_admin.py
 
@@ -264,6 +264,8 @@ Telegram side of the alerts: one message per piece of news with its buttons (202
 - `_modes_fr(modes: list[str])` — 
 - `_origin(e: dict)` — 'nouveau chez kie' -> 'Nouveau chez Kie'.
 - `_price_lines(c: dict, current: dict | None=None)` — One line per resolution with its cheapest provider, then the current model's entry price.
+- `_per_m(c: dict)` — One price per million tokens to compare two models: input only for decision and rerank models (their output
+- `_token_compare(c: dict, current: dict | None)` — 2026-11-21 (owner): « 1 point de mieux mais quasiment 3 fois plus cher » must be in the message itself.
 - `_challenger_group(conn, group: list[dict])` — One block for one new model that beats one or several of the owner's choices (2026-10-14:
 - `_route_line(conn, a: dict, c: dict)` — '🔁 Fournisseurs : Kie → OpenRouter · Secours : Wan 3' for a media model (what would run if adopted).
 - `render(alerts: list[dict], conn=None, typed: bool=False)` — 
@@ -335,6 +337,8 @@ The Router guardian's « advice » mission (owner, 2026-11-20: « le router doit
 - `_aa(conn, model_id: str, variant: str)` — 
 - `_routes(conn, pin: str | None)` — 
 - `state(conn, trigger: str='manual', extra: dict | None=None)` — Everything the guardian needs to advise, compact and in one snapshot of the index.
+- `challengers_to_send(conn)` — The proposals step 3 of the cycle is about to send (status open): each with the current choice, the scores and
+- `notes_to_alerts(conn, v: dict | None)` — `challenger_notes` of the verdict → evidence.agent_note of each open challenger, shown as « 🧠 Le Router ».
 - `_cycle_facts(conn)` — What the former cycle analyst read: sources, providers, name candidates, price moves, health, existing links.
 - `brief(st: dict, budget: int=BUDGET, start: float | None=None)` — The mission's instructions (advice-brief.md, readable and editable) and the state; agent.goal puts the identity
 - `verdict_of(output: str)` — The agent's closing JSON: the last object carrying `proposals`.
@@ -365,6 +369,7 @@ Deterministic detection: what is wrong with the module right now. No model is ca
 - `sources(conn)` — 
 - `cycle(conn)` — 
 - `provider_side(detail: str)` — 'ours' (the request looks wrong: repairable here), 'account' (key, credit: the owner's), 'external'.
+- `credits(conn)` — 
 - `providers(conn)` — 
 - `dirty_paths(root=None)` — Files with uncommitted changes in the live module (someone's work in progress), relative to its root.
 - `run_tests(root, timeout: int=TEST_TIMEOUT)` — The module's test suite in `root`: {ok, failures: {node id: one-line reason}, tail}.
@@ -716,6 +721,10 @@ The owner's plans (subscriptions), editable from anywhere (owner, 2026-10-22: «
 - `upsert(sub_id: str, fields: dict, why: str, source: str='owner')` — Create or change one plan. Unknown fields are refused; a new plan needs vendor, plan and price.
 - `retire(sub_id: str, why: str, source: str='owner')` — A cancelled plan leaves the active list but stays in `retired` with its date.
 - `bind_claude_meter(sub_id: str, why: str)` — One-writer activation of the real Claude quota and bridge usage, preserving plan/price/history.
+- `excluded_sources()` — Web sites the owner no longer wants among the plan facts (owner, 2026-11-21: Wokey « pas très intéressant ») :
+- `is_excluded(url: str | None, domains: list[str] | None=None)` — 
+- `evidence_filter(alias: str='')` — SQL condition (and its parameter) keeping only plan facts from sources that are not excluded.
+- `exclude_source(domain: str, why: str, source: str='owner')` — 
 - `expiring(conn, days: int=30)` — A dated offer (`until`, e.g. Google AI Pro 15 months) ending within `days` becomes one Telegram notice.
 
 ## plan/mail.py
@@ -750,6 +759,7 @@ A new benefit or change on a plan the owner has -> one Telegram notice each (own
 - `_vendors_owned()` — 
 - `_sender_vendor(sender: str, owned: dict[str, str])` — 
 - `from_mail(conn, days: int=NEWS_DAYS)` — New product / plan mails from the vendors of the owner's plans -> evidence + notice. Returns alert ids.
+- `_worth_sending(conn, row, prices: dict)` — A price that differs from the declared one, or a limit that changed from its last known value. A first
 - `from_web(conn, evidence_ids: list[int])` — Facts the web research just added for one of the owner's plans, unless the same fact was already known.
 
 ## plan/quota_watch.py
@@ -811,7 +821,9 @@ The research agent of the 48 h cycle (economic text tier): reads the cycle diges
 Deterministic digest of a refresh cycle, the input of the 48 h analysis agent (economic tier model).
 
 - `_previous_snapshot(conn, kind: str, latest: int)` — 
-- `unmatched(conn, limit: int=25)` — Callable models (chat/image/video/audio/music) without any score, next to a scored model with a very similar
+- `_family(model_id: str)` — 
+- `blocked_challengers(conn)` — A model that beats one of the owner's choices on a board but has no offer: often the same model sold under
+- `unmatched(conn, limit: int=25)` — Callable models without any score, next to a scored model with a very similar id: probable naming gaps
 - `price_changes(conn)` — Price moves since the previous snapshot of each provider, restricted to the router's short list.
 - `digest(conn)` — 
 

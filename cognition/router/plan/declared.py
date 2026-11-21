@@ -96,6 +96,37 @@ def bind_claude_meter(sub_id: str, why: str) -> dict:
     return {"id": sub_id, "meter_source": "claude_usage_api", "usage_sources": sources}
 
 
+def excluded_sources() -> list[str]:
+    """Web sites the owner no longer wants among the plan facts (owner, 2026-11-21: Wokey « pas très intéressant ») :
+    their rows stay in models.plan_evidence (never deleted) but no cost price, page, notice or agent reads them."""
+    return [d.strip().lower() for d in read().get("excluded_sources", []) if str(d).strip()]
+
+
+def is_excluded(url: str | None, domains: list[str] | None = None) -> bool:
+    host = (url or "").split("://", 1)[-1].split("/", 1)[0].lower()
+    return any(host == d or host.endswith("." + d) for d in (excluded_sources() if domains is None else domains))
+
+
+def evidence_filter(alias: str = "") -> tuple[str, list]:
+    """SQL condition (and its parameter) keeping only plan facts from sources that are not excluded."""
+    col = f"{alias}.source_url" if alias else "source_url"
+    domains = excluded_sources()
+    if not domains:
+        return "true", []
+    pattern = r"^https?://([^/]*\.)?(" + "|".join(d.replace(".", r"\.") for d in domains) + r")(/|$)"
+    return f"coalesce({col}, '') !~* %s", [pattern]
+
+
+def exclude_source(domain: str, why: str, source: str = "owner") -> dict:
+    doc = read()
+    domain = domain.strip().lower()
+    listed = doc.setdefault("excluded_sources", [])
+    if domain not in listed:
+        listed.append(domain)
+        _write(doc, f"{source}: source {domain} excluded ({why})")
+    return {"excluded_sources": listed}
+
+
 def expiring(conn, days: int = 30) -> list[str]:
     """A dated offer (`until`, e.g. Google AI Pro 15 months) ending within `days` becomes one Telegram notice."""
     from datetime import date

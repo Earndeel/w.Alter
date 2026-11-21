@@ -200,8 +200,8 @@ def _origin(e: dict) -> str | None:
 def _price_lines(c: dict, current: dict | None = None) -> list[str]:
     """One line per resolution with its cheapest provider, then the current model's entry price."""
     items = [(r, v) for r, v in c["prices"].items() if r] or list(c["prices"].items())
-    if not items:
-        return [f"💰 {catalog.price_text(c)}"]
+    if not items or c.get("interface") in ("decisions", "chat", "rerank"):
+        return [f"💰 {catalog.price_text(c)}"] + _token_compare(c, current)
     unit = catalog.UNIT_SHORT.get(items[0][1]["unit"] or "", "$")
     per = {"$/s": "Prix par seconde", "$/img": "Prix par image"}.get(unit, f"Prix ({unit})")
     lines = [f"💰 {per}"]
@@ -212,6 +212,30 @@ def _price_lines(c: dict, current: dict | None = None) -> list[str]:
     if current and current["prices"]:
         lo = min(v["price"] for v in current["prices"].values())
         lines.append(f"• Actuel, {current['name']} : dès {catalog.money(lo)} $")
+    return lines
+
+
+def _per_m(c: dict) -> float | None:
+    """One price per million tokens to compare two models: input only for decision and rerank models (their output
+    is a few tokens), the usual 3 input : 1 output blend for chat."""
+    i, o = c.get("price_in_1m"), c.get("price_out_1m")
+    if i is None:
+        return None
+    return i if c.get("interface") != "chat" or o is None else (3 * i + o) / 4
+
+
+def _token_compare(c: dict, current: dict | None) -> list[str]:
+    """2026-11-21 (owner): « 1 point de mieux mais quasiment 3 fois plus cher » must be in the message itself."""
+    if not current:
+        return []
+    mine, theirs = _per_m(c), _per_m(current)
+    if theirs is None:
+        return []
+    lines = [f"• Actuel, {current['name']} : {catalog.price_text(current)}"]
+    if mine and theirs:
+        r = mine / theirs
+        lines.append("  ≈ même prix" if 0.9 <= r <= 1.1 else
+                     f"  ≈ {_fr(r, 1)}× plus cher" if r > 1 else f"  ≈ {_fr(1 / r, 1)}× moins cher")
     return lines
 
 
@@ -266,7 +290,11 @@ def _challenger_group(conn, group: list[dict]) -> list[str]:
                              f"{mark}{version}")
                 continue
             lines.append(f"• {_board_fr(name)} : {b['challenger']:.0f} contre {b['pinned']:.0f} {mark}{version}")
-    return lines + [""] + _price_lines(c, current) + _route_line(conn, a0, c)
+    lines += [""] + _price_lines(c, current) + _route_line(conn, a0, c)
+    note = next((a["evidence"].get("agent_note") for a in group if a["evidence"].get("agent_note")), None)
+    if note:   # the Router agent's reading of this proposal against the current choice (advice mission)
+        lines += ["", f"🧠 Le Router : {note}"]
+    return lines
 
 
 def _route_line(conn, a: dict, c: dict) -> list[str]:

@@ -24,7 +24,9 @@ echo "[cycle] 1/4 research + analysis (no message yet)"
 "$WR" refresh --no-notify || exit 1   # a failed refresh fails the unit (Telegram only after 2 failed cycles)
 
 echo "[cycle] 2/4 plans: meters, billing mails, web research on the plans, cost price of a token"
-timeout 1500 "$WR" research plans > "$LOG/plans-$day.json" 2>&1 || echo "[cycle] plans research failed (non-blocking)"
+# --no-notify: nothing leaves before step 3, so each message carries the agent's reading and the new name links
+# (2026-11-21: a challenger sent at step 2 said « prix non publié » although its price was on OpenRouter)
+timeout 1500 "$WR" research plans --no-notify > "$LOG/plans-$day.json" 2>&1 || echo "[cycle] plans research failed (non-blocking)"
 
 echo "[cycle] 2/4 the guardian advises on Walter Engine (sources, names, consequences; proposals sent at step 3)"
 timeout 1300 "$WR" analyze > "$LOG/analysis-run-$day.json" 2>&1 \

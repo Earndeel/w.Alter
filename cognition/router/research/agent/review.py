@@ -19,20 +19,55 @@ def _previous_snapshot(conn, kind: str, latest: int) -> int | None:
     return row["snapshot_id"] if row else None
 
 
+INTERFACES = ("chat", "image", "video", "audio", "music", "decisions", "rerank", "transcription", "embedding")
+
+
+def _family(model_id: str) -> str:
+    return model_id.split("-", 1)[0]
+
+
+def blocked_challengers(conn) -> list[dict]:
+    """A model that beats one of the owner's choices on a board but has no offer: often the same model sold under
+    another name (2026-11-21: AA « Bison 31B » = OpenRouter « Bison 1 », a 31B model). Its unscored offers of the
+    same family are the candidates that matter most: the link gives the proposal its price and its route."""
+    scored = {r["model_id"] for r in conn.execute("select model_id from models.model_scores")}
+    out = []
+    for a in conn.execute("""select distinct on (subject) subject, task from models.alerts
+                             where kind = 'challenger' and status in ('open', 'notified')
+                             and last_seen > now() - interval '7 days' and coalesce(evidence->'callable_via', '[]') = '[]'"""):
+        offered = conn.execute("select 1 from models.catalog where model_id = %s and providers && %s",
+                               (a["subject"], list(MY_PROVIDERS))).fetchone()
+        if offered:
+            continue
+        iface = conn.execute("select interface from models.tasks where task = %s", (a["task"],)).fetchone()
+        for r in conn.execute("""select distinct model_id, interface from models.catalog where not ranked
+                                 and interface = %s and providers && %s""",
+                              (iface["interface"] if iface else "chat", list(MY_PROVIDERS))):
+            if r["model_id"] in scored or _family(r["model_id"]) != _family(a["subject"]):
+                continue
+            out.append({"model_id": r["model_id"], "interface": r["interface"], "closest_scored": a["subject"],
+                        "similarity": round(SequenceMatcher(None, r["model_id"], a["subject"]).ratio(), 2),
+                        "why": f"« {a['subject']} » bat un choix de Monsieur ({a['task']}) mais n'a aucune offre"})
+    return out
+
+
 def unmatched(conn, limit: int = 25) -> list[dict]:
-    """Callable models (chat/image/video/audio/music) without any score, next to a scored model with a very similar
-    id: probable naming gaps between sources (candidate aliases for aliases.json)."""
+    """Callable models without any score, next to a scored model with a very similar id: probable naming gaps
+    between sources (candidate aliases for aliases.json). The challengers blocked for want of an offer come first."""
     scored = [r["model_id"] for r in conn.execute("select model_id from models.model_scores")]
+    first = blocked_challengers(conn)
     out = []
     for r in conn.execute("""select distinct model_id, interface from models.catalog
-                             where not ranked and interface in ('chat', 'image', 'video', 'audio', 'music')
-                             and providers && %s""", (list(MY_PROVIDERS),)):
+                             where not ranked and interface = any(%s)
+                             and providers && %s""", (list(INTERFACES), list(MY_PROVIDERS))):
+        if any(f["model_id"] == r["model_id"] for f in first):
+            continue
         best = max(scored, key=lambda s: SequenceMatcher(None, r["model_id"], s).ratio(), default=None)
         ratio = SequenceMatcher(None, r["model_id"], best).ratio() if best else 0
         if ratio >= 0.82:
             out.append({"model_id": r["model_id"], "interface": r["interface"], "closest_scored": best,
                         "similarity": round(ratio, 2)})
-    return sorted(out, key=lambda x: -x["similarity"])[:limit]
+    return (first + sorted(out, key=lambda x: -x["similarity"]))[:limit]
 
 
 def price_changes(conn) -> list[dict]:

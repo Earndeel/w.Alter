@@ -22,7 +22,7 @@ HERMES_PROVIDERS = {"codex": "openai-codex", "openrouter": "openrouter", "kie": 
 NATIVE_ONLY = {"venice", "antigravity"}   # providers walter-llm runs itself (2026-10-30), with no Hermes provider
 KIE_CODEX_MODELS = {"gpt-6-1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5-6-sol", "gpt-5-6-terra",
                     "gpt-5-6-luna", "gpt-5-5"}  # GET https://api.kie.ai/codex/v1/models, 2026-10-02
-MIN_CREDIT_USD = 1.0  # below this, OpenRouter routes go last (a 402 after minutes of agent work is worse)
+MIN_CREDIT_USD = 0.0  # owner, 2026-11-21: OpenRouter is used to its last cent; the guardian warns at CREDIT_STEPS_USD
 SLOW_MS = 30000  # a 5-token probe slower than this = degraded (Kie Claude took 64 s on 2026-10-02)
 REASONING = {"non-reasoning": "none", "minimal": "minimal", "low": "low", "medium": "medium", "high": "high",
              "xhigh": "xhigh", "max": "max"}
@@ -319,7 +319,7 @@ def probe(conn, only: str | None = None, timeout: int = 90) -> dict:
             with urlopen(req, timeout=20) as resp:  # noqa: S310
                 c = json.loads(resp.read())["data"]
             left = c["total_credits"] - c["total_usage"]
-            if left < MIN_CREDIT_USD:
+            if left <= MIN_CREDIT_USD:
                 return False, f"crédit épuisé : {left:.2f} $ restant"
             return ok, f"{detail}, crédit {left:.2f} $"
         except Exception:  # noqa: BLE001 — balance unknown: keep the call verdict

@@ -156,8 +156,14 @@ def test_routes_carry_cost_price_quota_and_host_order(monkeypatch):
         assert rs[0]["access"] == "subscription"        # 2026-11-20: no reserve, used up to the provider's limit
         monkeypatch.setattr(execution, "subscription_accounts", lambda c: {"codex": [{"plan": "P", "ratio_pace": 0.02,
                                                                                       "used_percent": 100.0, "sub_id": "s"}]})
-        rs = execution.routes(conn, "gpt-6-1-sol", "medium")
-        assert rs[0]["access"] != "subscription"
+        # the paid routes must be alive for the spent quota to give way to them: the live probes are not this test's
+        # subject (2026-11-21: OpenRouter at 0.94 $ / kie-codex 503 made it fail), so they are set ok, then rolled back
+        conn.execute("update models.provider_status set ok = true")
+        try:
+            rs = execution.routes(conn, "gpt-6-1-sol", "medium")
+            assert rs[0]["access"] != "subscription"
+        finally:
+            conn.rollback()
 
 
 def test_plan_mails_are_read_on_the_latest_event():
@@ -221,9 +227,10 @@ def test_new_web_fact_on_an_owned_plan_is_notified_once():
     from walter_router.store import db
     with db.connect() as conn:
         ids = [conn.execute("""insert into models.plan_evidence (sub_id, vendor, plan, metric, value, unit, source_name,
-                               source_url, origin) values ('openai-plus', 'OpenAI', 'ChatGPT Plus', 'messages_5h', %s,
+                               source_url, origin) values ('test-plan-x', 'OpenAI', 'ChatGPT Plus', 'messages_5h', %s,
                                'messages/5 h', 't', %s, 'web') returning evidence_id""", (v, u)).fetchone()["evidence_id"]
-               for v, u in ((1234.0, "https://a"), (1234.0, "https://b"))]
+               for v, u in ((1000.0, "https://a"), (1234.0, "https://a"), (1234.0, "https://b"))]
         made = news.from_web(conn, ids)
         conn.rollback()
-    assert made == ids[:1]      # the same fact from a second source is not news again
+    # the first figure is only learnt (2026-11-21), a change is news, the same fact from a second source is not again
+    assert made == ids[1:2]
