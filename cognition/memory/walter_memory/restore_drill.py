@@ -142,7 +142,7 @@ def drill(report_path: Path, *, remote='gdrive:W.Alter Backups', image=None, scr
     os.umask(0o077)
     try:
       free=shutil.disk_usage(scratch_parent).free
-      pg_bytes=int(command(['docker','exec','hindsight-pg','psql','-U','hindsight','-d','hindsight',
+      pg_bytes=int(command(['docker','exec','walter-pg','psql','-U','walter','-d','walter',
           '-X','-A','-t','-c','select pg_database_size(current_database())']).decode())
       minimum=max(12*1024**3,pg_bytes*2+4*1024**3)
       report['resource_preflight']={'free_bytes':free,'production_database_bytes':pg_bytes,'minimum_free_bytes':minimum,
@@ -180,7 +180,7 @@ def drill(report_path: Path, *, remote='gdrive:W.Alter Backups', image=None, scr
       validation=validate_sources(restored)
       report['restored_python_sources_parsed']=validation['parsed']
       report['non_runtime_artifacts']=validation['non_runtime_artifacts']
-      image=image or command(['docker','inspect','hindsight-pg','--format','{{.Image}}']).decode().strip()
+      image=image or command(['docker','inspect','walter-pg','--format','{{.Image}}']).decode().strip()
       report['postgres_image']=image
       data=work/'pgdata';data.mkdir(mode=0o700)
       container=True

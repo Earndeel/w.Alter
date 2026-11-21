@@ -11,7 +11,7 @@
   ],
   "requires": [],
   "external": [
-    "PostgreSQL hindsight-pg:5433",
+    "PostgreSQL walter-pg:5433",
     "pgvector",
     "walter-llm for derived extraction"
   ],

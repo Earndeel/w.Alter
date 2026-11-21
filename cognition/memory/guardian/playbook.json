@@ -2,7 +2,7 @@
  "version": 1,
  "module": "memory",
  "notes": [
-  "Walter Memory: Postgres hindsight-pg (127.0.0.1:5433) holds the truth; walter-memory-gateway (:8890) is the write door; walter-logs-watch follows agent logs; connectors are oneshot units walter-memory-<name> run by timers.",
+  "Walter Memory: Postgres walter-pg (127.0.0.1:5433) holds the truth; walter-memory-gateway (:8890) is the write door; walter-logs-watch follows agent logs; connectors are oneshot units walter-memory-<name> run by timers.",
   "The beeper connector reads the Beeper API on the owner's Mac: when the Mac sleeps it fails or goes stale. That is external and recovers alone when the Mac wakes.",
   "gmail and calendar connectors wait for an OAuth consent from the owner: their failure needs_owner only if it lasts.",
   "An OpenRouter balance low or a monthly budget reached is the owner's decision (top up / raise the budget): needs_owner, no action.",

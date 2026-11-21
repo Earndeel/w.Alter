@@ -8,7 +8,16 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-DSN = os.environ.get("WALTER_MEMORY_DATABASE_URL", "postgresql://hindsight@127.0.0.1:5433/hindsight")
+# Walter's PostgreSQL address: the variable above, else the host's one declaration (/etc/walter/database.url, no
+# password: credentials come from ~/.pgpass), else the default. Renamed hindsight → walter on 2026-11-21.
+def _host_dsn() -> str | None:
+    try:
+        return open(os.environ.get("WALTER_DATABASE_URL_FILE", "/etc/walter/database.url")).read().strip() or None
+    except OSError:
+        return None
+
+
+DSN = os.environ.get("WALTER_MEMORY_DATABASE_URL") or _host_dsn() or "postgresql://walter@127.0.0.1:5433/walter"
 _pool: ConnectionPool | None = None
 
 

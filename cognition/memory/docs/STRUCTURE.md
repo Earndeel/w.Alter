@@ -1,7 +1,7 @@
 # Walter Memory — structure réelle (vérifiée le 19/10/2026)
 
 Cartographie de ce qui existe **aujourd'hui** (pas la cible : voir `ARCHITECTURE.md`). Chiffres relevés le 19/10
-vers 11 h 50 UTC dans la base `hindsight` du conteneur `hindsight-pg`. Pour les mettre à jour : fin de document.
+vers 11 h 50 UTC dans la base `walter` du conteneur `walter-pg`. Pour les mettre à jour : fin de document.
 
 ## En une phrase
 
@@ -13,7 +13,7 @@ vérifie à chaque lecture que l'information a le droit de sortir.
 ## Schéma
 
 ```
- SOURCES                         ENTRÉE                       STOCKAGE (Postgres hindsight-pg)        LECTURE
+ SOURCES                         ENTRÉE                       STOCKAGE (Postgres walter-pg)        LECTURE
  ───────                         ──────                       ────────────────────────────────        ───────
  Hermes (state.db, 5 profils) ─┐ minuteurs walter-memory-*                                    ┌─ Hermes (fournisseur walter-memory → recall)
  Beeper (Mac, toutes messageries)┤ + walter-logs-watch     ┌──► core.events  (journal, 503 k) ──┐ │
@@ -121,6 +121,6 @@ confidentialité actuelle, provenance lisible, pas de rétractation, contenu tou
 ## Mettre à jour ces chiffres (pour les agents)
 
 `walter-memory health` (fraîcheur, files, budgets) ; `walter-memory stats` ; volumes : requêtes SQL sur les schémas
-ci-dessus (lecture seule, `docker exec hindsight-pg psql -U hindsight -d hindsight`). Qualité du rappel :
+ci-dessus (lecture seule, `docker exec walter-pg psql -U walter -d walter`). Qualité du rappel :
 `walter-python /walter/cognition/memory/bench/recall_bench.py --bench-dir <dossier du banc> --path recall|context`
 puis `bench/recall_judge.py` (le banc utilise le réordonnancement payant : ~0,06 USD par passage).

@@ -37,7 +37,7 @@ def _log_dir() -> Path:
 LOG_DIR = _log_dir()
 DEFAULT_OUTPUT = LOG_DIR / "latest.json"
 ALERT_REPORT = LOG_DIR / "alert-latest.json"
-PG_CONTAINER = "hindsight-pg"          # historical name: it hosts every Walter schema
+PG_CONTAINER = "walter-pg"             # every Walter schema (named hindsight-pg until 2026-11-21)
 MEMORY_MODULES = ("memory", "logs", "bus", "raw-vault")
 MODEL_CALL_PREFIX = "model_calls:"                         # walter_memory.health: severity error
 FALLBACK_PREFIXES = ("triage:", "assimilation ")            # decisions by fallback, processing errors

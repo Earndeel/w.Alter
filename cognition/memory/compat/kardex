@@ -2,7 +2,7 @@
 # kardex — Raccourci vers le profil perso du propriétaire (ID 0, self) dans le Kardex PostgreSQL.
 # Compatibilité (E9.8, 2026-11-10) : ancien raccourci de ~/.hermes/bin, rangé dans Memory. Écrit le schéma kardex hors du
 # processeur walter-memory (écart A10 connu, voir DECISIONS 2026-10-11) : lecture seule recommandée.
-# Le Kardex est le système de contact intelligence (hindsight-pg, schema kardex).
+# Le Kardex est le système de contact intelligence (walter-pg, schema kardex).
 # Usage:
 #   kardex                  → profil complet du propriétaire (ID 0)
 #   kardex <field>          → un champ précis (ex: kardex phone_numbers, kardex emails)
@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-PG="docker exec hindsight-pg psql -U hindsight -d hindsight"
+PG="docker exec walter-pg psql -U walter -d walter"
 
 case "${1:-}" in
     set)

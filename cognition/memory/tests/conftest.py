@@ -10,8 +10,8 @@ import re
 import pytest
 
 TEST_DSN = os.environ.get("WALTER_MEMORY_TEST_DATABASE_URL",
-                          "postgresql://hindsight:walter-test-only@127.0.0.1:5440/hindsight")
-if re.search(r"[:@/]5433\b", TEST_DSN) or "hindsight-pg" in TEST_DSN:
+                          "postgresql://walter:walter-test-only@127.0.0.1:5440/walter")
+if re.search(r"[:@/]5433\b", TEST_DSN) or "walter-pg" in TEST_DSN or "hindsight-pg" in TEST_DSN:
     raise pytest.UsageError("tests refuse the production database (port 5433): use tests/testdb.sh")
 os.environ["WALTER_MEMORY_DATABASE_URL"] = TEST_DSN   # read by walter_memory.db at import, before any test module
 # purges run by tests write their ledger here, never into the instance's purge ledger
