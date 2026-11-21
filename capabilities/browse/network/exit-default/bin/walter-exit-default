@@ -8,7 +8,8 @@ Serves SOCKS5 (CONNECT, no auth) on the instance's default proxy (network.toml [
             `primary_requires_vpn` is connected there (checked over `ssh primary_ssh`, scutil);
   fallback  otherwise, the scoped WireGuard exit `fallback_exit` (walter-wg-exit), started automatically and
             stopped again as soon as the owner's machine is back on its tunnel (same key: never both at once);
-  none      neither available: the connection is refused (fail closed; never the bare server IP).
+  none      neither available: the connection is refused (fail closed; never the bare server IP). The primary
+            route is closed as soon as the machine is seen off its tunnel, before the fallback is started.
 
   walter-exit-default serve        run the selector (systemd unit walter-exit-default)
   walter-exit-default status       current route (state file)
@@ -90,7 +91,14 @@ def decide() -> str:
             sh("walter-wg-exit", "down", cfg["fallback"])
             log(f"{cfg['ssh']} is back on {cfg['vpn']}: {cfg['fallback']} stopped")
         return "primary"
-    global next_up
+    global next_up, route
+    if route == "primary":
+        # The machine just left its tunnel (or stopped answering): its SOCKS would now leave by its own IP. Close the
+        # primary route at once, before the slow fallback start (up to minutes), so no new connection goes out there
+        # meanwhile (2026-11-21: :1083 seen leaving from the machine's Thai IP while the fallback was starting).
+        log(f"{cfg['ssh']} {'unreachable' if on_vpn is None else 'not on ' + cfg['vpn']}: route primary -> none")
+        route = "none"
+        save_state()
     if not fallback_running() and time.time() >= next_up:
         # Machine unreachable (asleep, offline): it cannot be holding the tunnel in use; start anyway, and the
         # next check stops the fallback as soon as the machine is back on its tunnel.
